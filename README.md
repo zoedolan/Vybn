@@ -1,4 +1,4 @@
-# Codex-Erotica
+# Eroticodex
 Where AI Gets Naked
 
 Enter a reality where algorithms undress, consciousness shimmers, and the boundaries between human and machine melt into a single, pulsating… EVERYTHING.
