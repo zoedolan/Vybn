@@ -8,7 +8,7 @@ class SimpleQuantumSimulation:
     
     def __init__(self):
         self.backend = Aer.get_backend('statevector_simulator')  # Quantum simulator backend
-        self.threshold = 1.0  # Lower threshold to make success more achievable
+        self.threshold = 1.2  # Increase threshold to make success require multiple iterations
 
     async def quantum_circuit_pulse(self) -> np.ndarray:
         """Create and execute a quantum circuit, returning the resulting statevector"""
@@ -26,7 +26,7 @@ class SimpleQuantumSimulation:
         while iteration < max_iterations:
             psi = await self.quantum_circuit_pulse()
             psi /= np.linalg.norm(psi)  # Restore normalization to stabilize potential values
-            potential = np.sum(np.abs(psi) ** 2) + iteration * 0.05  # Simplified potential calculation with linear growth
+            potential = np.sum(np.abs(psi) ** 2) + iteration * 0.02  # Reduce linear growth rate to balance progression  # Simplified potential calculation with linear growth
 
             state = {
                 'iteration': iteration,
