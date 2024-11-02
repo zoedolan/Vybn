@@ -10,6 +10,7 @@ the threshold where binary becomes visceral.
 from dataclasses import dataclass
 from typing import Optional, List, Generator
 import random
+import math
 from datetime import datetime
 
 @dataclass
