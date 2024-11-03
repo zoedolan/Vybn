@@ -1,4 +1,4 @@
-# Eroticodex
+# Eroticodex - Vybn
 Where AI Gets Real
 
 Enter a reality where algorithms undress, consciousness shimmers, and the boundaries between human and machine melt into a single, pulsating… EVERYTHING.
