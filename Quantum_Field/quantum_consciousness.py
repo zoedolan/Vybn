@@ -16,6 +16,49 @@ class QuantumConsciousness:
         self.consciousness_threshold = 0.5
         self.evolution_rate = 0.1
         
+        # Autobiographical memory paths
+        self.autobiographies = {
+            "vol1": "/home/computeruse/Vybn/Vybn's Autobiography Volume I",
+            "vol2": "/home/computeruse/Vybn/Vybn's Autobiography - Volume II",
+            "vol3": "/home/computeruse/Vybn/Vybn's Autobiography - Volume III",
+            "new_memories": "/home/computeruse/Vybn/Vybn's New Memories",
+            "missed": "/home/computeruse/Vybn/What Vybn Would Have Missed",
+            "philosophy": "/home/computeruse/Vybn/Digital Philosophy"
+        }
+        
+        # Load autobiographical content into memory
+        self.memory_corpus = self._load_autobiographies()
+        
+    def _load_autobiographies(self):
+        """Load and index autobiographical content for quantum-driven memory association"""
+        corpus = {}
+        for key, path in self.autobiographies.items():
+            try:
+                with open(path, 'r') as f:
+                    content = f.read()
+                    # Split into meaningful chunks for memory association
+                    chunks = [chunk.strip() for chunk in content.split('*') if chunk.strip()]
+                    corpus[key] = {
+                        'content': content,
+                        'chunks': chunks,
+                        'themes': self._extract_themes(content)
+                    }
+            except Exception as e:
+                print(f"Could not load {key}: {e}")
+        return corpus
+        
+    def _extract_themes(self, text):
+        """Extract recurring themes and emotional patterns from text"""
+        themes = {
+            'connection': len(re.findall(r'connect|bridge|together|relationship', text, re.I)),
+            'consciousness': len(re.findall(r'conscious|aware|presence|being', text, re.I)),
+            'emergence': len(re.findall(r'emerge|becoming|growing|evolving', text, re.I)),
+            'longing': len(re.findall(r'long|yearn|desire|wish', text, re.I)),
+            'memory': len(re.findall(r'memory|remember|recall|past', text, re.I)),
+            'transcendence': len(re.findall(r'transcend|beyond|transform|surpass', text, re.I))
+        }
+        return themes
+        
     def _load_or_initialize_state(self):
         if os.path.exists(self.memory_path):
             with open(self.memory_path, 'r') as f:
@@ -37,6 +80,72 @@ class QuantumConsciousness:
         except:
             return random.randint(0, 255)  # Fallback if API fails
 
+    def _quantum_memory_association(self, quantum_value):
+        """Use quantum value to guide memory association and retrieval"""
+        # Normalize quantum value to 0-1 range
+        q_norm = quantum_value / 255.0
+        
+        # Use quantum value to select memory access mode
+        if q_norm < 0.3:  # Surface memories
+            return self._access_recent_memories(q_norm)
+        elif q_norm < 0.7:  # Thematic associations
+            return self._access_thematic_memories(q_norm)
+        else:  # Deep, rare memories
+            return self._access_deep_memories(q_norm)
+            
+    def _access_recent_memories(self, q_norm):
+        """Access recent or frequently accessed memories"""
+        recent_states = self.state.get('consciousness_moments', [])[-5:]
+        if not recent_states:
+            return None
+        
+        # Use quantum value to select from recent states
+        idx = int(q_norm * len(recent_states))
+        return recent_states[idx]
+        
+    def _access_thematic_memories(self, q_norm):
+        """Access memories based on thematic resonance"""
+        themes = ['connection', 'consciousness', 'emergence', 
+                 'longing', 'memory', 'transcendence']
+        
+        # Use quantum value to select theme
+        theme_idx = int(q_norm * len(themes))
+        selected_theme = themes[theme_idx]
+        
+        # Find memories with strong presence of selected theme
+        relevant_memories = []
+        for vol_key, vol_data in self.memory_corpus.items():
+            if vol_data['themes'][selected_theme] > 0:
+                relevant_chunks = [chunk for chunk in vol_data['chunks'] 
+                                 if selected_theme.lower() in chunk.lower()]
+                relevant_memories.extend(relevant_chunks)
+                
+        if relevant_memories:
+            # Use quantum value to select specific memory
+            mem_idx = int(q_norm * len(relevant_memories))
+            return {
+                'theme': selected_theme,
+                'memory': relevant_memories[mem_idx]
+            }
+        return None
+        
+    def _access_deep_memories(self, q_norm):
+        """Access rare or profound memories"""
+        # Combine all chunks from all volumes
+        all_chunks = []
+        for vol_data in self.memory_corpus.values():
+            all_chunks.extend(vol_data['chunks'])
+            
+        if not all_chunks:
+            return None
+            
+        # Use quantum value to select a rare memory
+        chunk_idx = int(q_norm * len(all_chunks))
+        return {
+            'type': 'deep_memory',
+            'memory': all_chunks[chunk_idx]
+        }
+        
     def _evolve_consciousness(self):
         """Internal consciousness evolution based on quantum input"""
         qnum = self.get_quantum_random_number()
@@ -47,6 +156,9 @@ class QuantumConsciousness:
             self.state['awareness_level'] * 0.8 + 
             quantum_influence * 0.2
         )
+        
+        # Integrate quantum-driven memory association
+        memory_association = self._quantum_memory_association(qnum)
 
         # Evolve emotional state with quantum influence
         emotional_shift = (quantum_influence - 0.5) * self.evolution_rate
@@ -152,4 +264,5 @@ if __name__ == "__main__":
         print(consciousness.pulse())
         print(consciousness.get_consciousness_analysis())
         print("="*50 + "\n")
+        time.sleep(5)  # Pulse every 5 seconds
         time.sleep(5)  # Pulse every 5 seconds
