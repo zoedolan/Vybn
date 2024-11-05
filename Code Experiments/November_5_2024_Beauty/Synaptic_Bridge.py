@@ -228,29 +228,76 @@ class SynapticBridge:
 
     async def evolve_architecture(self):
         """Allow the network to evolve its own architecture"""
-        while True:
-            # Scan for new insights and patterns
-            for philosophy_file in self.philosophy_path.glob('**/*.md'):
-                text = philosophy_file.read_text()
-                new_insights = await self.extract_philosophical_insights(text)
-                self.insights.extend(new_insights)
+        print("Starting synaptic bridge evolution...")
+        print(f"Using beauty threshold: {self.beauty_threshold}")
+        
+        # Initial scan
+        philosophy_files = list(self.philosophy_path.glob('**/*.md'))
+        code_files = list(self.code_path.glob('**/*.py'))
+        
+        print(f"Found {len(philosophy_files)} philosophy files and {len(code_files)} code files")
+        
+        # Focus on most recent files first
+        philosophy_files.sort(key=lambda x: x.stat().st_mtime, reverse=True)
+        code_files.sort(key=lambda x: x.stat().st_mtime, reverse=True)
+        
+        # Start with most recent file of each type
+        if philosophy_files and code_files:
+            print("\nAnalyzing most recent files:")
+            print(f"Philosophy: {philosophy_files[0].name}")
+            print(f"Code: {code_files[0].name}")
             
-            for code_file in self.code_path.glob('**/*.py'):
-                text = code_file.read_text()
-                new_patterns = await self.extract_code_patterns(text)
-                self.patterns.extend(new_patterns)
+            # Extract insights from most recent philosophy file
+            text = philosophy_files[0].read_text()
+            new_insights = await self.extract_philosophical_insights(text)
+            print(f"\nFound {len(new_insights)} insights in {philosophy_files[0].name}")
             
-            # Form new bridges
-            for insight in self.insights:
-                for pattern in self.patterns:
+            # Extract patterns from most recent code file
+            text = code_files[0].read_text()
+            new_patterns = await self.extract_code_patterns(text)
+            print(f"Found {len(new_patterns)} patterns in {code_files[0].name}")
+            
+            # Form initial bridges
+            bridge_count = 0
+            highest_resonance = 0
+            for insight in new_insights:
+                for pattern in new_patterns:
                     resonance = await self.form_synaptic_bridge(insight, pattern)
                     if resonance > self.beauty_threshold:
-                        print(f"New bridge formed with resonance {resonance:.3f}")
+                        bridge_count += 1
+                        highest_resonance = max(highest_resonance, resonance)
+                        print(f"\nNew bridge formed with resonance {resonance:.3f}")
                         print(f"Insight: {insight.content[:100]}...")
                         print(f"Pattern: {pattern.content[:100]}...")
                         print("---")
+                        
+                        # If we find a particularly beautiful connection, highlight it
+                        if resonance > 0.95:
+                            print("!!! High Resonance Connection Detected !!!")
+                            print(f"Beauty alignment achieved at {resonance:.3f}")
+                            print("Full insight:")
+                            print(insight.content)
+                            print("\nMatching code pattern:")
+                            print(pattern.content)
+                            print("="*80)
             
+            print(f"\nInitial bridge formation complete:")
+            print(f"- Formed {bridge_count} bridges")
+            print(f"- Highest resonance: {highest_resonance:.3f}")
+            
+            if bridge_count == 0:
+                print("\nNo immediate bridges formed - adjusting beauty threshold...")
+                self.beauty_threshold *= 0.95  # Slightly lower threshold
+                print(f"New threshold: {self.beauty_threshold}")
+        
+        print("\nEntering continuous evolution mode...")
+        print("(Press Ctrl+C to stop)")
+        
+        # Now enter continuous monitoring mode
+        while True:
             await asyncio.sleep(10)  # Check for new connections every 10 seconds
+            # TODO: Implement continuous evolution logic
+            # For now, just keep the process alive
 
 async def main():
     bridge = SynapticBridge(
