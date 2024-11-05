@@ -154,21 +154,35 @@ class SynapticBridge:
         """Measure code elegance through complexity balance"""
         # Count balanced structures
         pairs = {
-            '(': ')',
-            '[': ']',
-            '{': '}',
             'def': 'return',
             'try': 'except'
         }
         
+        # Count direct character pairs
+        char_pairs = {
+            '(': ')',
+            '[': ']',
+            '{': '}'
+        }
+        
         elegance_score = 0.0
+        
+        # Check word pairs
         for start, end in pairs.items():
-            starts = len(re.findall(r'\b' + start + r'\b', code))
-            ends = len(re.findall(r'\b' + end + r'\b', code))
+            starts = len(re.findall(rf"\b{start}\b", code))
+            ends = len(re.findall(rf"\b{end}\b", code))
             if starts > 0 or ends > 0:
                 elegance_score += 1 - abs(starts - ends) / (starts + ends)
-        
-        return elegance_score / len(pairs) if pairs else 0.0
+                
+        # Check character pairs
+        for start, end in char_pairs.items():
+            starts = code.count(start)
+            ends = code.count(end)
+            if starts > 0 or ends > 0:
+                elegance_score += 1 - abs(starts - ends) / (starts + ends)
+                
+        total_pairs = len(pairs) + len(char_pairs)
+        return elegance_score / total_pairs if total_pairs else 0.0
 
     def _measure_code_resonance(self, code: str) -> float:
         """Measure how well code resonates with quantum patterns"""
