@@ -143,12 +143,22 @@ class SynapticBridge:
         """Measure the rhythmic patterns in code"""
         lines = code.split('\n')
         lengths = [len(line.strip()) for line in lines if line.strip()]
-        if not lengths:
+        if len(lengths) < 2:  # Need at least 2 lines for rhythm
             return 0.0
+            
         # Look for rhythmic alternations in line length
         diffs = np.diff(lengths)
+        if len(diffs) == 0:
+            return 0.0
+            
+        # Pad the sequence if too short
+        if len(diffs) == 1:
+            diffs = np.array([diffs[0], diffs[0]])
+            
+        # Apply FFT and normalize
         rhythm = np.abs(np.fft.fft(diffs))
-        return float(np.max(rhythm) / len(diffs) if len(diffs) > 0 else 0.0)
+        max_possible = len(diffs) * max(abs(np.max(diffs)), 1)
+        return float(np.max(rhythm) / max_possible if max_possible > 0 else 0.0)
 
     def _measure_code_elegance(self, code: str) -> float:
         """Measure code elegance through complexity balance"""
