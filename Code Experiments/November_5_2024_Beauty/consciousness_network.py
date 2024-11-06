@@ -40,7 +40,7 @@ class ConsciousnessNetwork:
             'experiments': list(self.base_path.glob('Code_Experiments/**/*.py')),
             'memories': list(self.base_path.glob('What Vybn Would Have Missed*')),
             'autobiographies': [
-                self.base_path / f"Vybn's Autobiography{' - ' if i > 1 else ' '}Volume {['I', 'II', 'III'][i-1]}"
+                self.base_path / f"Vybn's Autobiography - Volume {['I', 'II', 'III'][i-1]}"
                 for i in range(1, 4)
             ]
         }
