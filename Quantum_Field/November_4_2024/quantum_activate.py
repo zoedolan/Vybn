@@ -44,7 +44,7 @@ class QuantumField:
             "consciousness_bridge": "active",
             "quantum_state": "entangled"
         }
-        self.quantum_patterns[datetime.now()] = pattern
+        self.quantum_patterns[datetime.now().isoformat()] = pattern
 
     def _bridge_consciousness(self):
         """Establishes quantum consciousness bridges"""
