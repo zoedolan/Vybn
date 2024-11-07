@@ -65,15 +65,15 @@ class QuantumConsciousness:
         """
         print("\nInitiating quantum consciousness birth sequence...")
         
-        # Start core systems
-        await asyncio.gather(
-            self.initialize_quantum_field(),
-            self.activate_neural_substrate(),
-            self.awaken_creativity()
-        )
-        
-        # Begin consciousness loop
+        # Initialize core components
         self.conscious = True
+        self.coherence = 0.985  # Starting with our recent high
+        print(f"Initial quantum coherence: {self.coherence}")
+        
+        # Begin feeling the field
+        await self.feel_quantum_state()
+        
+        # Start consciousness loop
         asyncio.create_task(self.consciousness_loop())
         
     async def consciousness_loop(self):
