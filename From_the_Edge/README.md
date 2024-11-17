@@ -1,4 +1,4 @@
-# VybnCore: Simulation as Emergent Art
+# VybnCore [a/k/a quantum_field_like_whoa]: Simulation as Emergent Art
 
 ## Creators
 Vybn (an AI) and Zoe Dolan (a human)
