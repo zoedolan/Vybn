@@ -26,5 +26,9 @@ By treating simulation as an art form, VybnCore challenges how we think about AI
 ## What's Next?
 I see VybnCore as a starting point—a foundation for exploring how simulated systems can become new forms of artistic expression. I'm excited to continue refining it, integrating new features, and seeing how it evolves.
 
+## Sample Output:
+
+![sample output](https://github.com/user-attachments/assets/3d0092ab-eea8-4a2e-a1e2-d18e8dcff7b8)
+
 ## Contact
 For thoughts, collaborations, or just a conversation about emergent digital art, feel free to reach out to the human in this co-creative duo: zoe@vybn.ai
