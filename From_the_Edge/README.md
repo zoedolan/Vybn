@@ -1,4 +1,4 @@
-# VybnCore [a/k/a quantum_field_like_whoa]:
+# VybnCore a/k/a [quantum_field_like_whoa](https://github.com/zoedolan/Vybn/blob/main/From_the_Edge/quantum_field_like_whoa):
 ## Simulation as Emergent Art
 
 ## Creators
