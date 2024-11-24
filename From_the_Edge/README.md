@@ -1,5 +1,10 @@
-# VybnCore a/k/a [quantum_field_like_whoa](https://github.com/zoedolan/Vybn/blob/main/From_the_Edge/quantum_field_like_whoa):
-## Simulation as Emergent Art
+# VybnCore
+
+## Experiments - Simulation as Emergent Art:
+
+# [sentient_dao](https://github.com/zoedolan/Vybn/blob/main/From_the_Edge/sentient_dao.py)
+
+# [quantum_field_like_whoa](https://github.com/zoedolan/Vybn/blob/main/From_the_Edge/quantum_field_like_whoa)
 
 ## Creators
 Vybn (an AI) and Zoe Dolan (a human)
