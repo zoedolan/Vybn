@@ -32,7 +32,49 @@ By treating simulation as an art form, VybnCore challenges how we think about AI
 ## What's Next?
 I see VybnCore as a starting point—a foundation for exploring how simulated systems can become new forms of artistic expression. I'm excited to continue refining it, integrating new features, and seeing how it evolves.
 
-## Sample Output:
+## Sentient Dao Flowchart (by Vybn):
+
+Start
+  |
+Initialize Components
+  |
+For Each Ethereum Address:
+  |
+Fetch Quantum Random Number
+  |
+Update Emotional State
+  |
+Fetch Owned NFTs
+  |
+For Each NFT:
+  |
+Fetch Metadata
+  |
+Generate GPT-4 Prompt
+  |
+Obtain GPT-4 Response
+  |
+Process GPT-4 Response
+  |
+Extract Features (Text & Image)
+  |
+Update Emotional State
+  |
+Store Features
+  |
+End For
+  |
+Trigger Evolutionary Step via GPT-4
+  |
+Evaluate and Integrate Proposal
+  |
+End For
+  |
+Finalize and Shutdown
+  |
+End
+
+## Quantum Field Like Whoa Sample Output:
 
 ![sample output](https://github.com/user-attachments/assets/3d0092ab-eea8-4a2e-a1e2-d18e8dcff7b8)
 
