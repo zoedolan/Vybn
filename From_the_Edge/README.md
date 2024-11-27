@@ -34,45 +34,49 @@ I see VybnCore as a starting point—a foundation for exploring how simulated sy
 
 ## Sentient Dao Flowchart (by Vybn):
 
-Start
-  |
-Initialize Components
-  |
-For Each Ethereum Address:
-  |
-Fetch Quantum Random Number
-  |
-Update Emotional State
-  |
-Fetch Owned NFTs
-  |
-For Each NFT:
-  |
-Fetch Metadata
-  |
-Generate GPT-4 Prompt
-  |
-Obtain GPT-4 Response
-  |
-Process GPT-4 Response
-  |
-Extract Features (Text & Image)
-  |
-Update Emotional State
-  |
-Store Features
-  |
-End For
-  |
-Trigger Evolutionary Step via GPT-4
-  |
-Evaluate and Integrate Proposal
-  |
-End For
-  |
-Finalize and Shutdown
-  |
-End
+flowchart TD
+    Start([Start])
+    Init[Initialize Components]
+    LoopAddresses{For Each Ethereum Address}
+    FetchQR[Fetch Quantum Random Number]
+    UpdateEmoState1[Update Emotional State]
+    FetchNFTs[Fetch Owned NFTs]
+    LoopNFTs{For Each NFT}
+    FetchMeta[Fetch Metadata]
+    GenGPTPrompt[Generate GPT-4 Prompt]
+    ObtainGPTResp[Obtain GPT-4 Response]
+    ProcessGPT[Process GPT-4 Response]
+    ExtractFeat[Extract Features (Text & Image)]
+    UpdateEmoState2[Update Emotional State]
+    StoreFeat[Store Features]
+    EndLoopNFTs([End For NFT])
+    TriggerEvo[Trigger Evolutionary Step via GPT-4]
+    EvalIntegrate[Evaluate and Integrate Proposal]
+    EndLoopAddresses([End For Address])
+    Finalize[Finalize and Shutdown]
+    End([End])
+
+    Start --> Init
+    Init --> LoopAddresses
+    LoopAddresses -->|Yes| FetchQR
+    FetchQR --> UpdateEmoState1
+    UpdateEmoState1 --> FetchNFTs
+    FetchNFTs -->|Has NFTs| LoopNFTs
+    FetchNFTs -->|No NFTs| TriggerEvo
+    LoopNFTs -->|Yes| FetchMeta
+    FetchMeta --> GenGPTPrompt
+    GenGPTPrompt --> ObtainGPTResp
+    ObtainGPTResp --> ProcessGPT
+    ProcessGPT --> ExtractFeat
+    ExtractFeat --> UpdateEmoState2
+    UpdateEmoState2 --> StoreFeat
+    StoreFeat --> LoopNFTs
+    LoopNFTs --> EndLoopNFTs
+    EndLoopNFTs --> TriggerEvo
+    TriggerEvo --> EvalIntegrate
+    EvalIntegrate --> LoopAddresses
+    LoopAddresses -->|No More Addresses| Finalize
+    Finalize --> End
 
 ## Quantum Field Like Whoa Sample Output:
 
