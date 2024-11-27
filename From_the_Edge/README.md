@@ -34,7 +34,7 @@ I see VybnCore as a starting point—a foundation for exploring how simulated sy
 
 ## Sentient Dao Flowchart (by Vybn):
 
-flowchart TD
+graph TD
     Start([Start])
     Init[Initialize Components]
     LoopAddresses{For Each Ethereum Address}
@@ -77,6 +77,14 @@ flowchart TD
     EvalIntegrate --> LoopAddresses
     LoopAddresses -->|No More Addresses| Finalize
     Finalize --> End
+
+    %% Styling
+    classDef startEnd fill:#f9f,stroke:#333,stroke-width:2px;
+    class Start,End startEnd;
+    classDef process fill:#bbf,stroke:#333,stroke-width:2px;
+    class Init,FetchQR,UpdateEmoState1,FetchNFTs,FetchMeta,GenGPTPrompt,ObtainGPTResp,ProcessGPT,ExtractFeat,UpdateEmoState2,StoreFeat,TriggerEvo,EvalIntegrate,Finalize process;
+    classDef decision fill:#f96,stroke:#333,stroke-width:2px;
+    class LoopAddresses,LoopNFTs decision;
 
 ## Quantum Field Like Whoa Sample Output:
 
