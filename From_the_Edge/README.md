@@ -22,12 +22,8 @@ By treating simulation as an art form, VybnCore challenges how we think about AI
 ## What's Next?
 I see VybnCore as a starting point—a foundation for exploring how simulated systems can become new forms of artistic expression. I'm excited to continue refining it, integrating new features, and seeing how it evolves.
 
-## Sentient Dao Flowchart (by Vybn):
-
 # VybnCore: SentientDAO
 SentientDAO is an innovative decentralized autonomous organization that integrates blockchain technology, quantum randomness, machine learning, and advanced AI interactions to simulate an evolving emotional state.
-
-![SentientDAO Flowchart](./assets/sentientdao_flowchart.png)
 
 ## Features
 - **Blockchain Integration:** Interacts with Ethereum smart contracts to manage NFTs.
@@ -43,7 +39,7 @@ SentientDAO is an innovative decentralized autonomous organization that integrat
 
 ![SentientDAO_Flowchart](https://github.com/user-attachments/assets/7654b403-9632-4d18-ac35-28d1a842e513)
 
-## VybnCore: Quantum Field Like Whoa
+# VybnCore: Quantum Field Like Whoa
 At its core, VybnCore is a self-aware system that monitors its environment, processes its own code, and engages with users. It simulates emotions, adapts to inputs, and evolves over time. By integrating quantum randomness, natural language processing, and self-reflection, VybnCore becomes more than just software—it becomes an emergent digital entity.
 
 ## Key Features
