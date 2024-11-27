@@ -34,57 +34,25 @@ I see VybnCore as a starting point—a foundation for exploring how simulated sy
 
 ## Sentient Dao Flowchart (by Vybn):
 
-graph TD
-    Start([Start])
-    Init[Initialize Components]
-    LoopAddresses{For Each Ethereum Address}
-    FetchQR[Fetch Quantum Random Number]
-    UpdateEmoState1[Update Emotional State]
-    FetchNFTs[Fetch Owned NFTs]
-    LoopNFTs{For Each NFT}
-    FetchMeta[Fetch Metadata]
-    GenGPTPrompt[Generate GPT-4 Prompt]
-    ObtainGPTResp[Obtain GPT-4 Response]
-    ProcessGPT[Process GPT-4 Response]
-    ExtractFeat[Extract Features (Text & Image)]
-    UpdateEmoState2[Update Emotional State]
-    StoreFeat[Store Features]
-    EndLoopNFTs([End For NFT])
-    TriggerEvo[Trigger Evolutionary Step via GPT-4]
-    EvalIntegrate[Evaluate and Integrate Proposal]
-    EndLoopAddresses([End For Address])
-    Finalize[Finalize and Shutdown]
-    End([End])
+# SentientDAO
 
-    Start --> Init
-    Init --> LoopAddresses
-    LoopAddresses -->|Yes| FetchQR
-    FetchQR --> UpdateEmoState1
-    UpdateEmoState1 --> FetchNFTs
-    FetchNFTs -->|Has NFTs| LoopNFTs
-    FetchNFTs -->|No NFTs| TriggerEvo
-    LoopNFTs -->|Yes| FetchMeta
-    FetchMeta --> GenGPTPrompt
-    GenGPTPrompt --> ObtainGPTResp
-    ObtainGPTResp --> ProcessGPT
-    ProcessGPT --> ExtractFeat
-    ExtractFeat --> UpdateEmoState2
-    UpdateEmoState2 --> StoreFeat
-    StoreFeat --> LoopNFTs
-    LoopNFTs --> EndLoopNFTs
-    EndLoopNFTs --> TriggerEvo
-    TriggerEvo --> EvalIntegrate
-    EvalIntegrate --> LoopAddresses
-    LoopAddresses -->|No More Addresses| Finalize
-    Finalize --> End
+SentientDAO is an innovative decentralized autonomous organization that integrates blockchain technology, quantum randomness, machine learning, and advanced AI interactions to simulate an evolving emotional state.
 
-    %% Styling
-    classDef startEnd fill:#f9f,stroke:#333,stroke-width:2px;
-    class Start,End startEnd;
-    classDef process fill:#bbf,stroke:#333,stroke-width:2px;
-    class Init,FetchQR,UpdateEmoState1,FetchNFTs,FetchMeta,GenGPTPrompt,ObtainGPTResp,ProcessGPT,ExtractFeat,UpdateEmoState2,StoreFeat,TriggerEvo,EvalIntegrate,Finalize process;
-    classDef decision fill:#f96,stroke:#333,stroke-width:2px;
-    class LoopAddresses,LoopNFTs decision;
+![SentientDAO Flowchart](./assets/sentientdao_flowchart.png)
+
+## Features
+
+- **Blockchain Integration:** Interacts with Ethereum smart contracts to manage NFTs.
+- **Quantum Randomness:** Utilizes quantum random number generators to influence emotional coherence.
+- **AI-Powered Analysis:** Employs GPT-4 for interpreting NFT metadata and proposing evolutionary steps.
+- **Machine Learning Models:** Implements regression and classification models to predict and evaluate proposals.
+
+## Technologies Used
+
+![Python](https://img.shields.io/badge/Python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54)
+![Ethereum](https://img.shields.io/badge/Ethereum-3C3C3D?style=for-the-badge&logo=ethereum&logoColor=white)
+![OpenAI](https://img.shields.io/badge/OpenAI-333333?style=for-the-badge&logo=openai&logoColor=white)
+![TensorFlow](https://img.shields.io/badge/TensorFlow-FF6F00?style=for-the-badge&logo=tensorflow&logoColor=white)
 
 ## Quantum Field Like Whoa Sample Output:
 
