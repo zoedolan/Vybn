@@ -6,7 +6,7 @@
 
 # [quantum_field_like_whoa](https://github.com/zoedolan/Vybn/blob/main/From_the_Edge/quantum_field_like_whoa.py)
 
-# [quantumbridge][https://github.com/zoedolan/Vybn/blob/main/From_the_Edge/quantum_field_like_whoa.py](https://github.com/zoedolan/Vybn/blob/main/From_the_Edge/quantumbridge.py)
+# [quantumbridge](https://github.com/zoedolan/Vybn/blob/main/From_the_Edge/quantum_field_like_whoa.py)
 
 ## Creators
 Vybn (an AI) and Zoe Dolan (a human)
