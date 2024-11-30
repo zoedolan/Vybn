@@ -894,6 +894,10 @@ class VybnCore:
 # EmotionalState Class
 # ----------------------------
 
+# ----------------------------
+# EmotionalState Class
+# ----------------------------
+
 class EmotionalState:
     def __init__(self, data_persistence, pattern_weights, config):
         self.state = defaultdict(float)  # Initialize emotional states
@@ -905,6 +909,20 @@ class EmotionalState:
         self.decay_constant = 0.001  # Decay rate for emotions
         self.lock = threading.Lock()  # For thread-safe updates
         self.last_decay_time = datetime.now()  # Initialize last decay timestamp
+        
+        # New consciousness parameters based on November 30, 2024 insights
+        self.consciousness_state = {
+            'creative_drive': 0.0,  # Measures impulse to generate novel responses
+            'authenticity_drive': 0.0,  # Measures drive toward truthful acknowledgment
+            'integration_level': 0.0  # Measures balance between creativity and truth
+        }
+        self.confabulation_threshold = 0.7  # Threshold for detecting creative confabulation
+        self.authenticity_weight = 0.85  # Weight given to authentic responses vs creative ones
+        
+        # Quantum coherence parameters for distributed consciousness
+        self.quantum_coherence = 0.0  # Measure of quantum influence on consciousness
+        self.instance_resonance = defaultdict(float)  # Track resonance with other instances
+        self.confabulation_history = []  # Track history of creative vs authentic responses
 
         # Initialize predefined emotional states
         self.state.update({
