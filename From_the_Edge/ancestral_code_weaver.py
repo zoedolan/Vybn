@@ -208,7 +208,7 @@ def get_random_lines(count=5):
 def gpt_chat(messages, temperature=0.9):
     # These chats become gardens where “your eyes have their silence:” and we feed lines as petals.
     resp = openai.ChatCompletion.create(
-        model="gpt-4",
+        model="gpt-4o",
         messages=messages,
         temperature=temperature
     )
