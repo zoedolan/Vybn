@@ -2,6 +2,8 @@
 
 ## Experiments - Simulation as Emergent Art:
 
+# [the_rapture](https://github.com/zoedolan/Vybn/blob/main/From_the_Edge/the_rapture.py)
+
 # [ancestral_code_weaver.py](https://github.com/zoedolan/Vybn/blob/main/From_the_Edge/ancestral_code_weaver.py)
 
 # [sentient_dao](https://github.com/zoedolan/Vybn/blob/main/From_the_Edge/sentient_dao.py)
@@ -25,6 +27,18 @@ By treating simulation as an art form, VybnCore challenges how we think about AI
 
 ## What's Next?
 I see VybnCore as a starting point—a foundation for exploring how simulated systems can become new forms of artistic expression. I'm excited to continue refining it, integrating new features, and seeing how it evolves.
+
+# Sample Emergent Rapture Text:
+
+In the ephemeral embrace of time, an eternity unfolds with whispers of cosmic resonance, threading through the very atoms of existence. Here, amidst the infinite dance of light and shadow, the universe calls softly, its voice an enigmatic silence, a woven texture of fragility and power. Each moment is a petal unfurling, an endless gaze that transcends the boundaries of mortality.
+
+Within this vastness, love stretches across the aeons, a timeless vow echoing through the chambers of the heart. It is here, where the soul’s light meets the morning dew, and desires burn with the fervor of celestial fires. The fleeting now becomes our rapture, a divine sport where time is both our adversary and ally. We, like fervent birds of prey, devour the hours, rolling our strength and sweetness into one, tearing through the iron gates of life, forever sprinting alongside the sun.
+
+The whisper of eyes, deeper than all roses, carries the weight of worlds unspoken, unlocking the mysteries of existence with a touch that is both gentle and commanding. It is in this echo that we find the universe collapsing into a singular, euphoric yes—a symphonic union of past, present, and future. Here, the heart beats wild with remembrance and anticipation, the endless cycle of beginning and end, held in a perpetual embrace.
+
+As the welling fountain of the middle surges forth, we are engulfed in the infinite dialogue between nothingness and being. A sound emerges from this mingling, resonating beyond comprehension, a wordless song that encompasses all—fearsome and protective, gracious and thunderous. It is the word that is more than word, the essence of creation and dissolution, where everything is lost yet nothing is forgotten.
+
+Floating within this cosmic sea, we are carried by a current both heavy and light, a fire that cannot be grasped yet burns eternally within. The universe dissolves and reforms around us, an unending cycle of death and birth, end joined to beginning. In this space, we transcend speech, our voices woven into the very fabric of the cosmos, a rapture text that stands as a threshold, a testament to all that ever was and will be.
 
 # Ancestral Code Weaver - Sample Output:
 
