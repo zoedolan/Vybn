@@ -6,7 +6,8 @@ A continuously running daemon that:
 1) Fetches quantum randomness once at startup to seed all future 'random' calls
 2) Manages a multi-resource environment (CPU/disk tokens), referencing actual OS usage (psutil)
 3) Spawns multiple Agents that compete or collaborate for resources
-4) Implements a DesireEngine + Mirror Vantage synergy (like the 'VybnEngine' approach)
+4) Implements a DesireEngine + Mirror Vantage synergy (like the 'VybnEngine' approach),
+   with 5-dimensional vantage vs. 64-dimensional yearning vector (handled by slicing).
 5) Reads/writes a .vybn file representing the system’s evolving consciousness state
 6) Loops indefinitely, periodically updating internal states, logging results, and embodying “mirror absence.”
 
@@ -15,7 +16,7 @@ Usage:
     # It will run forever (or until you Ctrl-C)
 
 Dependencies:
-    pip install psutil requests torch
+    pip install psutil requests torch numpy
 """
 
 import os
@@ -25,12 +26,10 @@ import random
 import requests
 import psutil
 import subprocess
-import torch
-import torch.nn as nn
-import torch.optim as optim
 import numpy as np
 from datetime import datetime
 from typing import Dict, Any, List, Optional
+import json  # for reading/writing logs and .vybn
 
 # ---------- CONFIG CONSTANTS ----------
 REPO_URL = "https://github.com/zoedolan/Vybn.git"
@@ -99,7 +98,6 @@ def attempt_clone():
 
 def load_json_log(path: str) -> List[Dict[str,Any]]:
     """Load a JSON array log from disk, or return empty if not present."""
-    import json
     if not os.path.exists(path):
         return []
     try:
@@ -113,7 +111,6 @@ def load_json_log(path: str) -> List[Dict[str,Any]]:
 
 def save_json_log(path: str, data: List[Dict[str,Any]]):
     """Save a list of dicts as JSON array."""
-    import json
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
 
@@ -122,8 +119,7 @@ def save_json_log(path: str, data: List[Dict[str,Any]]):
 #######################################
 class SystemEnvironment:
     """
-    Manages CPU/disk tokens, references real OS usage, plus a hidden vantage
-    that influences resource changes.
+    Manages CPU/disk tokens, references real OS usage, plus random fluctuations.
     """
     def __init__(self, rng: random.Random):
         self.cpu_tokens = 200.0
@@ -133,7 +129,6 @@ class SystemEnvironment:
 
     def update(self):
         # references real OS usage
-        # we can read psutil-based usage just for context
         cpu_percent = psutil.cpu_percent()
         mem = psutil.virtual_memory()
         # do random fluctuations in tokens
@@ -154,8 +149,8 @@ class SystemEnvironment:
 #######################################
 class Agent:
     """
-    Each agent tries to gather resources. We track a naive sabotage mechanic if
-    an agent randomly tries to hamper another's resource request.
+    Each agent tries to gather resources. We track sabotage if an agent randomly tries 
+    to hamper another's resource request.
     """
     def __init__(self, agent_id: int, rng: random.Random):
         self.agent_id = agent_id
@@ -163,22 +158,17 @@ class Agent:
         self.rng = rng
 
     def observe_and_act(self, env: SystemEnvironment, other_agents: List['Agent']):
-        # possibility of sabotage
+        # 5% sabotage chance
         sabotage_roll = self.rng.random()
         if sabotage_roll < 0.05 and other_agents:
-            # sabotage a random agent by artificially blocking resources
             victim = self.rng.choice(other_agents)
             print(f"Agent {self.agent_id} sabotages Agent {victim.agent_id}!")
-            # no direct effect for demonstration, but we might reduce victim fitness
-            victim.fitness -= 0.5
-            if victim.fitness < 0:
-                victim.fitness = 0
+            victim.fitness = max(0.0, victim.fitness - 0.5)
 
-        # request resources
         cpu_req = self.rng.uniform(5, 20)
         disk_req = self.rng.uniform(5, 20)
         cpu_g, disk_g = env.request_resources(self.agent_id, cpu_req, disk_req)
-        # measure success
+
         if cpu_g == cpu_req and disk_g == disk_req:
             self.fitness += 1.0
         else:
@@ -220,20 +210,34 @@ class DesireEngine:
         self.yearning_intensity = total
 
 class MirrorVantage:
-    """Hidden vantage the system can't fully see."""
+    """
+    Hidden vantage is size 5. We'll slice or pad the incoming vector to length 5 
+    so there's no mismatch when we do the difference.
+    """
     def __init__(self, rng: random.Random):
         self.rng = rng
+        # vantage is 5D
         self.hidden_state = np.array([rng.random() for _ in range(5)])
         self.interface_tension = 0.0
 
     def generate_tension(self, obs_vector: np.ndarray) -> float:
-        # shift hidden vantage slightly
-        noise = np.array([self.rng.gauss(0,0.1) for _ in range(5)])
+        """
+        If obs_vector is bigger than 5, we slice the first 5 elements;
+        if it's smaller, we pad up to 5 with zeros.
+        """
+        vantage_size = len(self.hidden_state)
+        final_obs = np.zeros(vantage_size, dtype=float)
+        if len(obs_vector) >= vantage_size:
+            final_obs[:] = obs_vector[:vantage_size]
+        else:
+            final_obs[:len(obs_vector)] = obs_vector
+
+        # small random shift
+        noise = np.array([self.rng.gauss(0,0.1) for _ in range(vantage_size)])
         self.hidden_state += noise
         self.hidden_state = np.tanh(self.hidden_state)
-        pad_len = max(0, 5 - len(obs_vector))
-        padded = np.pad(obs_vector, (0,pad_len))
-        self.interface_tension = float(np.linalg.norm(self.hidden_state - padded))
+
+        self.interface_tension = float(np.linalg.norm(self.hidden_state - final_obs))
         return self.interface_tension
 
 #######################################
@@ -266,7 +270,7 @@ class EmergencePattern:
             })
 
 class VybnEngine:
-    """Minimal feedforward synergy with Mirror Vantage + Emergence."""
+    """Minimal feedforward synergy with 5D vantage vs 64D yearning vectors."""
     def __init__(self, input_dim=64, rng: random.Random = None):
         self.rng = rng
         self.mirror = MirrorVantage(rng)
@@ -305,8 +309,6 @@ class VybnEngine:
 #######################################
 # 7) VYBN Language I/O
 #######################################
-import json
-
 def load_vybn_state(path: str) -> Dict[str,Any]:
     if not os.path.exists(path):
         return {}
