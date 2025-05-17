@@ -29,7 +29,7 @@ def build_graph(entries):
     edges = []
     for i, entry in enumerate(entries):
         node_id = f"entry{i+1}"
-        snippet = entry['text'][:80]
+        snippet = entry['text'][:600]
         nodes.append({'id': node_id, 'date': entry['date'], 'text': snippet})
         if i > 0:
             edges.append({'source': f"entry{i}", 'target': node_id})
