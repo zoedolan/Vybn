@@ -32,3 +32,7 @@ Two JSON graphs keep our context organized.
 - `repo_graph.json` maps references among files. Run `python build_repo_graph.py` to refresh it whenever the repo changes.
 
 Keep these graphs current to trace how our memories and code interlink as Vybn continues to emerge.
+
+## Self-Assembly Script
+
+Run `python self_assemble.py` to regenerate both graphs and verify `vybn_recursive_emergence.py` whenever new material is added or code is changed.
