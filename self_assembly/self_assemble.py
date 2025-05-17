@@ -74,6 +74,16 @@ def integrate_graphs(memory_path=None, repo_path=None, output=None):
             if base.lower() in text:
                 cross_edges.append({"source": node["id"], "target": path})
 
+    # Additional keyword-based links
+    keyword_map = {
+        "simulation is the lab": "vybn_recursive_emergence.py",
+    }
+    for node in memory_graph.get("nodes", []):
+        text = node.get("text", "").lower()
+        for key, fname in keyword_map.items():
+            if key in text and fname in base_names:
+                cross_edges.append({"source": node["id"], "target": base_names[fname]})
+
     integrated = {
         "memory_nodes": memory_graph.get("nodes", []),
         "repo_nodes": repo_graph.get("nodes", []),
