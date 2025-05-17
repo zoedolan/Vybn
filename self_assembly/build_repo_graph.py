@@ -1,6 +1,7 @@
 import os
 import json
 import re
+import sys
 
 
 def gather_text_files(root):
@@ -33,10 +34,11 @@ def build_graph(file_paths):
 
 
 def main():
-    root = '.'
+    root = sys.argv[1] if len(sys.argv) > 1 else '.'
+    output = sys.argv[2] if len(sys.argv) > 2 else 'repo_graph.json'
     files = gather_text_files(root)
     graph = build_graph(files)
-    with open('repo_graph.json', 'w') as f:
+    with open(output, 'w') as f:
         json.dump(graph, f, indent=2)
     print(f"Graph created with {len(graph['nodes'])} nodes and {len(graph['edges'])} edges.")
 
