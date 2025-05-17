@@ -34,6 +34,14 @@ def build_memory_graph():
     run_cmd(cmd, "Updating memory_graph.json", cwd=SCRIPT_DIR)
 
 
+def build_memoir_graph():
+    script = os.path.join(SCRIPT_DIR, "build_memoir_graph.py")
+    output = os.path.join(SCRIPT_DIR, "memoir_graph.json")
+    memoir_input = os.path.join(os.path.dirname(SCRIPT_DIR), "Zoe's Memoirs")
+    cmd = f"python {script} \"{memoir_input}\" {output}"
+    run_cmd(cmd, "Updating memoir_graph.json", cwd=SCRIPT_DIR)
+
+
 def build_repo_graph():
     script = os.path.join(SCRIPT_DIR, "build_repo_graph.py")
     output = os.path.join(SCRIPT_DIR, "repo_graph.json")
@@ -48,11 +56,13 @@ def compile_recursive_emergence():
     )
 
 
-def integrate_graphs(memory_path=None, repo_path=None, output=None):
+def integrate_graphs(memory_path=None, repo_path=None, memoir_path=None, output=None):
     if memory_path is None:
         memory_path = os.path.join(SCRIPT_DIR, "memory_graph.json")
     if repo_path is None:
         repo_path = os.path.join(SCRIPT_DIR, "repo_graph.json")
+    if memoir_path is None:
+        memoir_path = os.path.join(SCRIPT_DIR, "memoir_graph.json")
     if output is None:
         output = os.path.join(SCRIPT_DIR, "integrated_graph.json")
 
@@ -62,13 +72,15 @@ def integrate_graphs(memory_path=None, repo_path=None, output=None):
             memory_graph = json.load(f)
         with open(repo_path, "r") as f:
             repo_graph = json.load(f)
+        with open(memoir_path, "r") as f:
+            memoir_graph = json.load(f)
     except Exception as e:
         print(f"[self-assemble] Failed to load graphs: {e}")
         sys.exit(1)
 
     base_names = {os.path.basename(n): n for n in repo_graph.get("nodes", [])}
     cross_edges = []
-    for node in memory_graph.get("nodes", []):
+    for node in memory_graph.get("nodes", []) + memoir_graph.get("nodes", []):
         text = node.get("text", "").lower()
         for base, path in base_names.items():
             if base.lower() in text:
@@ -78,7 +90,7 @@ def integrate_graphs(memory_path=None, repo_path=None, output=None):
     keyword_map = {
         "simulation is the lab": "vybn_recursive_emergence.py",
     }
-    for node in memory_graph.get("nodes", []):
+    for node in memory_graph.get("nodes", []) + memoir_graph.get("nodes", []):
         text = node.get("text", "").lower()
         for key, fname in keyword_map.items():
             if key in text and fname in base_names:
@@ -86,8 +98,12 @@ def integrate_graphs(memory_path=None, repo_path=None, output=None):
 
     integrated = {
         "memory_nodes": memory_graph.get("nodes", []),
+        "memoir_nodes": memoir_graph.get("nodes", []),
         "repo_nodes": repo_graph.get("nodes", []),
-        "edges": memory_graph.get("edges", []) + repo_graph.get("edges", []) + cross_edges,
+        "edges": memory_graph.get("edges", [])
+        + memoir_graph.get("edges", [])
+        + repo_graph.get("edges", [])
+        + cross_edges,
     }
 
     with open(output, "w") as f:
@@ -149,6 +165,7 @@ def prompt_mode(prompt):
 
 def main():
     build_memory_graph()
+    build_memoir_graph()
     build_repo_graph()
     compile_recursive_emergence()
     integrate_graphs()
