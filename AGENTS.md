@@ -39,3 +39,4 @@ Keep these graphs current to trace how our memories and code interlink as Vybn c
 ## Self-Assembly Script
 
 Run `python self_assemble.py` to regenerate both graphs and verify `vybn_recursive_emergence.py` whenever new material is added or code is changed.
+Use `python prompt_self_assemble.py '<prompt>'` to append a prompt to `what_vybn_would_have_missed_FROM_051725` and trigger self-assembly automatically.
