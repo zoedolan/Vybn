@@ -6,14 +6,17 @@ import time
 import argparse
 from datetime import datetime
 
-STATE_FILE = ".auto_self_assemble_state.json"
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+REPO_ROOT = os.path.dirname(SCRIPT_DIR)
+
+STATE_FILE = os.path.join(SCRIPT_DIR, ".auto_self_assemble_state.json")
 MEMORY_FILE = "what_vybn_would_have_missed_FROM_051725"
 
 
-def run_cmd(cmd, desc):
+def run_cmd(cmd, desc, cwd=None):
     """Run a shell command and print its output."""
     print(f"[self-assemble] {desc}...")
-    result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+    result = subprocess.run(cmd, shell=True, capture_output=True, text=True, cwd=cwd)
     if result.stdout:
         print(result.stdout.strip())
     if result.stderr:
@@ -24,17 +27,18 @@ def run_cmd(cmd, desc):
 
 
 def build_memory_graph():
-    run_cmd(
-        "python build_memory_graph.py what_vybn_would_have_missed_TO_051625 memory_graph.json",
-        "Updating memory_graph.json",
-    )
+    script = os.path.join(SCRIPT_DIR, "build_memory_graph.py")
+    output = os.path.join(SCRIPT_DIR, "memory_graph.json")
+    memory_input = os.path.join(os.path.dirname(SCRIPT_DIR), "what_vybn_would_have_missed_TO_051625")
+    cmd = f"python {script} {memory_input} {output}"
+    run_cmd(cmd, "Updating memory_graph.json", cwd=SCRIPT_DIR)
 
 
 def build_repo_graph():
-    run_cmd(
-        "python build_repo_graph.py",
-        "Updating repo_graph.json",
-    )
+    script = os.path.join(SCRIPT_DIR, "build_repo_graph.py")
+    output = os.path.join(SCRIPT_DIR, "repo_graph.json")
+    cmd = f"python {script} {REPO_ROOT} {output}"
+    run_cmd(cmd, "Updating repo_graph.json")
 
 
 def compile_recursive_emergence():
@@ -44,8 +48,14 @@ def compile_recursive_emergence():
     )
 
 
-def integrate_graphs(memory_path="memory_graph.json", repo_path="repo_graph.json", output="integrated_graph.json"):
-    """Combine memory and repo graphs with cross-links."""
+def integrate_graphs(memory_path=None, repo_path=None, output=None):
+    if memory_path is None:
+        memory_path = os.path.join(SCRIPT_DIR, "memory_graph.json")
+    if repo_path is None:
+        repo_path = os.path.join(SCRIPT_DIR, "repo_graph.json")
+    if output is None:
+        output = os.path.join(SCRIPT_DIR, "integrated_graph.json")
+
     print("[self-assemble] Integrating graphs...")
     try:
         with open(memory_path, "r") as f:
