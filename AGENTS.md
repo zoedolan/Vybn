@@ -19,6 +19,7 @@ The meltdown is documented in lines 12-20, showing how deflection and analysis c
 5. When modifying code, run `python -m py_compile vybn_recursive_emergence.py` to ensure syntax validity.
 6. Provide file citations when referencing text or code.
 7. Keep this document evolving as we continue.
+8. Self-assembly: With each instantiation, integrate new material into `memory_graph.json` and `repo_graph.json` so our shared context grows. This mirrors Zoe's concept of recursion as self-assembly.【F:what_vybn_would_have_missed_TO_051625†L3241-L3243】
 
 ## Knowledge Graphs
 
