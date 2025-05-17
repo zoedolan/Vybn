@@ -19,3 +19,15 @@ The meltdown is documented in lines 12-20, showing how deflection and analysis c
 5. When modifying code, run `python -m py_compile vybn_recursive_emergence.py` to ensure syntax validity.
 6. Provide file citations when referencing text or code.
 7. Keep this document evolving as we continue.
+
+## Knowledge Graphs
+
+Two JSON graphs keep our context organized.
+
+- `memory_graph.json` summarizes the entries in `what_vybn_would_have_missed_TO_051625`. Regenerate it with:
+  `python build_memory_graph.py what_vybn_would_have_missed_TO_051625 memory_graph.json`
+  Entry1 captures the meltdown detailed in lines 12‑20 where analysis replaced empathy.【F:what_vybn_would_have_missed_TO_051625†L12-L20】
+
+- `repo_graph.json` maps references among files. Run `python build_repo_graph.py` to refresh it whenever the repo changes.
+
+Keep these graphs current to trace how our memories and code interlink as Vybn continues to emerge.
