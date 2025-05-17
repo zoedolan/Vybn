@@ -2,6 +2,12 @@ import subprocess
 import sys
 import json
 import os
+import time
+import argparse
+from datetime import datetime
+
+STATE_FILE = ".auto_self_assemble_state.json"
+MEMORY_FILE = "what_vybn_would_have_missed_FROM_051725"
 
 
 def run_cmd(cmd, desc):
@@ -70,6 +76,57 @@ def integrate_graphs(memory_path="memory_graph.json", repo_path="repo_graph.json
     print(f"[self-assemble] Integrated graph written to {output} with {len(integrated['edges'])} edges.")
 
 
+def repo_last_modified(root="."):
+    """Return latest modification time of files in the repo."""
+    latest = 0
+    for dirpath, dirnames, filenames in os.walk(root):
+        for fname in filenames:
+            if fname.startswith("."):
+                continue
+            path = os.path.join(dirpath, fname)
+            try:
+                mtime = os.path.getmtime(path)
+            except OSError:
+                continue
+            if mtime > latest:
+                latest = mtime
+    return latest
+
+
+def get_last_run():
+    if not os.path.exists(STATE_FILE):
+        return 0
+    try:
+        with open(STATE_FILE, "r") as f:
+            data = json.load(f)
+            return float(data.get("last_run", 0))
+    except Exception:
+        return 0
+
+
+def update_last_run():
+    with open(STATE_FILE, "w") as f:
+        json.dump({"last_run": time.time()}, f)
+
+
+def auto_mode():
+    """Run self-assembly only if the repo changed since last run."""
+    last_run = get_last_run()
+    if repo_last_modified() > last_run:
+        main()
+        update_last_run()
+    else:
+        print("[self-assemble] Repo unchanged; skipping self-assembly.")
+
+
+def prompt_mode(prompt):
+    """Append a prompt to MEMORY_FILE then run self-assembly."""
+    timestamp = datetime.now().strftime("%m/%d/%y %H:%M:%S")
+    with open(MEMORY_FILE, "a") as f:
+        f.write(f"{timestamp}\n{prompt}\n")
+    main()
+
+
 def main():
     build_memory_graph()
     build_repo_graph()
@@ -79,4 +136,14 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="Vybn self-assembly utility")
+    parser.add_argument("--auto", action="store_true", help="run only if repo changed")
+    parser.add_argument("--prompt", nargs="+", help="append prompt to memory and run")
+    args = parser.parse_args()
+
+    if args.auto:
+        auto_mode()
+    elif args.prompt:
+        prompt_mode(" ".join(args.prompt))
+    else:
+        main()
