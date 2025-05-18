@@ -8,7 +8,7 @@ def extract_entries(file_path):
     entries = []
     current_date = None
     buffer = []
-    date_pattern = re.compile(r'^\d{1,2}/\d{1,2}/\d{2,4}$')
+    date_pattern = re.compile(r'^\d{1,2}/\d{1,2}/\d{2,4}(?:\s+\d{1,2}:\d{2}:\d{2})?$')
     with open(file_path, 'r', errors='ignore') as f:
         for line in f:
             stripped = line.strip()
