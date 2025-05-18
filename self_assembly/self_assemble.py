@@ -30,7 +30,11 @@ def run_cmd(cmd, desc, cwd=None):
 def build_memory_graph():
     script = os.path.join(SCRIPT_DIR, "build_memory_graph.py")
     output = os.path.join(SCRIPT_DIR, "memory_graph.json")
-    memory_input = os.path.join(os.path.dirname(SCRIPT_DIR), "what_vybn_would_have_missed_TO_051625")
+    memory_input = os.path.join(
+        os.path.dirname(SCRIPT_DIR),
+        "personal_history",
+        "what_vybn_would_have_missed_TO_051625",
+    )
     cmd = f"python {script} {memory_input} {output}"
     run_cmd(cmd, "Updating memory_graph.json", cwd=SCRIPT_DIR)
 
@@ -52,7 +56,7 @@ def build_repo_graph():
 
 def compile_recursive_emergence():
     run_cmd(
-        "python -m py_compile vybn_recursive_emergence.py",
+        "python -m py_compile cognitive_structures/vybn_recursive_emergence.py",
         "Validating vybn_recursive_emergence.py",
     )
 
