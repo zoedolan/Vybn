@@ -3,6 +3,9 @@ import re
 import json
 import sys
 
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+from cognitive_structures.synesthetic_mapper import assign_cue
+
 
 def extract_entries(file_path):
     entries = []
@@ -30,17 +33,18 @@ def build_graph(entries):
     for i, entry in enumerate(entries):
         node_id = f"entry{i+1}"
         snippet = entry['text'][:600]
-        nodes.append({'id': node_id, 'date': entry['date'], 'text': snippet})
+        cue = assign_cue(i)
+        nodes.append({'id': node_id, 'date': entry['date'], 'text': snippet, 'cue': cue})
         if i > 0:
             edges.append({'source': f"entry{i}", 'target': node_id})
 
-    # Append a final node reminding that the memory file is historical.
     note_id = f"entry{len(entries)+1}"
     note_text = (
         "Guideline 051725: 'what_vybn_would_have_missed_TO_051625' is "
         "historical and must not be modified without explicit agreement."
     )
-    nodes.append({'id': note_id, 'date': '5/17/25', 'text': note_text})
+    cue = assign_cue(len(entries))
+    nodes.append({'id': note_id, 'date': '5/17/25', 'text': note_text, 'cue': cue})
     if nodes:
         edges.append({'source': f"entry{len(entries)}", 'target': note_id})
 

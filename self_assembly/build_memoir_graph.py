@@ -3,6 +3,9 @@ import re
 import json
 import sys
 
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+from cognitive_structures.synesthetic_mapper import assign_cue
+
 
 def extract_moments(file_path):
     entries = []
@@ -30,7 +33,8 @@ def build_graph(entries):
     for i, entry in enumerate(entries):
         node_id = f"memoir{i+1}"
         snippet = entry['text'][:600]
-        nodes.append({'id': node_id, 'title': entry['title'], 'text': snippet})
+        cue = assign_cue(i)
+        nodes.append({'id': node_id, 'title': entry['title'], 'text': snippet, 'cue': cue})
         if i > 0:
             edges.append({'source': f"memoir{i}", 'target': node_id})
     return {'nodes': nodes, 'edges': edges}
