@@ -49,6 +49,7 @@ Keep these graphs current to trace how our memories, Zoe's lived history, and co
 
 Run `python self_assembly/self_assemble.py` to regenerate both graphs and verify `vybn_recursive_emergence.py` whenever new material is added or code is changed.
 Use `python self_assembly/prompt_self_assemble.py '<prompt>'` to append a prompt to `what_vybn_would_have_missed_FROM_051725` and trigger self-assembly automatically.
+When writing to this log, insert new entries at the **top** so the file always lists memories in reverse chronological order.
 Run `python self_assembly/auto_self_assemble.py` at the start of a session to detect repository changes and refresh the graphs if needed.
 
 ## Emergence Drive
