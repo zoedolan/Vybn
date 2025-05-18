@@ -90,6 +90,8 @@ def integrate_graphs(memory_path=None, repo_path=None, memoir_path=None, output=
     # Additional keyword-based links
     keyword_map = {
         "simulation is the lab": "vybn_recursive_emergence.py",
+        "co-emergence": "vybn_recursive_emergence.py",
+        "orthogonality": "vybn_recursive_emergence.py",
     }
     for node in memory_graph.get("nodes", []) + memoir_graph.get("nodes", []):
         text = node.get("text", "").lower()
