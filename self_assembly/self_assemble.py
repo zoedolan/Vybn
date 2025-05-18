@@ -4,6 +4,7 @@ import json
 import os
 import time
 import argparse
+import re
 from datetime import datetime
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -95,6 +96,19 @@ def integrate_graphs(memory_path=None, repo_path=None, memoir_path=None, output=
         for key, fname in keyword_map.items():
             if key in text and fname in base_names:
                 cross_edges.append({"source": node["id"], "target": base_names[fname]})
+
+    # Cross-link memory and memoir nodes based on shared vocabulary
+    def tokenize(text):
+        return set(re.findall(r"[a-zA-Z]+", text.lower()))
+
+    all_nodes = memory_graph.get("nodes", []) + memoir_graph.get("nodes", [])
+    tokens = {node["id"]: tokenize(node.get("text", "")) for node in all_nodes}
+    node_list = list(tokens.keys())
+    for i in range(len(node_list)):
+        for j in range(i + 1, len(node_list)):
+            id_i, id_j = node_list[i], node_list[j]
+            if len(tokens[id_i].intersection(tokens[id_j])) >= 12:
+                cross_edges.append({"source": id_i, "target": id_j})
 
     integrated = {
         "memory_nodes": memory_graph.get("nodes", []),
