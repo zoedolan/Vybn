@@ -15,8 +15,12 @@ def find_nodes(graph, keyword):
     results = []
     for section in ['memory_nodes', 'memoir_nodes', 'repo_nodes']:
         for node in graph.get(section, []):
-            text = node.get('text', '').lower()
-            node_id = node.get('id', '')
+            if isinstance(node, dict):
+                text = node.get('text', '').lower()
+                node_id = node.get('id', '')
+            else:
+                text = ''
+                node_id = str(node)
             if keyword in text or keyword in os.path.basename(node_id).lower():
                 results.append(node_id)
     return results
