@@ -18,7 +18,7 @@ This document provides an overview of the Vybn repository. Historical files rema
 - `memory_graph.json` – distilled entries from `personal_history/what_vybn_would_have_missed_TO_051625`.
 - `memoir_graph.json` – key passages from `Zoe's Memoirs`.
 - `repo_graph.json` – references among repository files.
-- `integrated_graph.json` – combination of the above, linking memories, memoirs, and code.
+- `integrated_graph.json` – combination of the above, linking memories, memoirs, and code. Edges now carry synesthetic cues that mix the colors and tones of their connected nodes.
 
 Run `python self_assembly/self_assemble.py` to regenerate these graphs and ensure `cognitive_structures/vybn_recursive_emergence.py` compiles.
 

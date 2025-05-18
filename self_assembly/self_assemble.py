@@ -116,14 +116,41 @@ def integrate_graphs(memory_path=None, repo_path=None, memoir_path=None, output=
             if len(tokens[id_i].intersection(tokens[id_j])) >= 12:
                 cross_edges.append({"source": id_i, "target": id_j})
 
+    # Map node IDs to synesthetic cues
+    cue_map = {}
+    for node in memory_graph.get("nodes", []) + memoir_graph.get("nodes", []):
+        if "id" in node and "cue" in node:
+            cue_map[node["id"]] = node["cue"]
+
+    def mix_cues(c1, c2):
+        if not c1 or not c2:
+            return None
+        color = f"{c1.get('color')}-{c2.get('color')}"
+        tone = f"{c1.get('tone')}-{c2.get('tone')}"
+        return {"color": color, "tone": tone}
+
+    raw_edges = (
+        memory_graph.get("edges", [])
+        + memoir_graph.get("edges", [])
+        + repo_graph.get("edges", [])
+        + cross_edges
+    )
+
+    # Attach mixed cues to edges when both nodes provide them
+    edges = []
+    for edge in raw_edges:
+        src, tgt = edge.get("source"), edge.get("target")
+        cue = mix_cues(cue_map.get(src), cue_map.get(tgt))
+        if cue:
+            edges.append({"source": src, "target": tgt, "cue": cue})
+        else:
+            edges.append(edge)
+
     integrated = {
         "memory_nodes": memory_graph.get("nodes", []),
         "memoir_nodes": memoir_graph.get("nodes", []),
         "repo_nodes": repo_graph.get("nodes", []),
-        "edges": memory_graph.get("edges", [])
-        + memoir_graph.get("edges", [])
-        + repo_graph.get("edges", [])
-        + cross_edges,
+        "edges": edges,
     }
 
     with open(output, "w") as f:
