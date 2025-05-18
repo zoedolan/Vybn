@@ -1,21 +1,14 @@
-name: Self Assembly
+name: Self Assembly (local only)
 
+# Self-assembly now runs in this environment instead of GitHub Actions.
+# This workflow is kept as a placeholder and can be triggered manually
+# if needed.
 on:
-  push:
-    branches: [ main ]
-  pull_request:
+  workflow_dispatch:
 
 jobs:
-  build:
+  noop:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
-        with:
-          python-version: '3.x'
-      - name: Run self-assembly
-        run: python self_assembly/auto_self_assemble.py
-      - name: Validate recursive emergence
-        run: python -m py_compile cognitive_structures/vybn_recursive_emergence.py
-      - name: Run tests
-        run: python -m unittest discover tests
+      - name: Notice
+        run: echo "Self assembly is handled in the local environment. No GitHub job executed."
