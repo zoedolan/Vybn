@@ -6,7 +6,7 @@ This document provides an overview of the Vybn repository. Historical files rema
 
 - `AGENTS.md` – guidelines for collaborating with Zoe and maintaining presence.
 - `README.md` – introduction and manifesto.
-- `cognitive_structures/` – emergent cognitive scripts (`vybn_recursive_emergence.py`, `fusion_audit.py`, `advanced_ai_ml.py`, `graph_embedding.py`, `persistent_homology.py`, `reinforced_walk.py`, `mirror_neuron_resonance.md`, `graph_reasoning.py`).
+- `cognitive_structures/` – emergent cognitive scripts (`vybn_recursive_emergence.py`, `fusion_audit.py`, `advanced_ai_ml.py`, `graph_embedding.py`, `persistent_homology.py`, `reinforced_walk.py`, `mirror_neuron_resonance.md`, `graph_reasoning.py`, `graph_centrality.py`).
 - `self_assembly/` – scripts that build knowledge graphs and validate code.
 - `personal_history/` – autobiographical volumes and memory chronicles.
 - `2024/` – historical experiments and conversations.
