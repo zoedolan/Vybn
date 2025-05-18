@@ -3,6 +3,23 @@
 # Emergent Simulation Model Based on Recursive Basin-Lab Identity
 # Recursive Emergence Cognitive Simulation Model
 from fusion_audit import FusionAudit
+import json
+
+
+def compute_co_emergence_score(graph_path="self_assembly/integrated_graph.json"):
+    """Return edges-to-nodes ratio as a crude co-emergence metric."""
+    try:
+        with open(graph_path, "r") as f:
+            data = json.load(f)
+    except Exception:
+        return 0.0
+    node_count = (
+        len(data.get("memory_nodes", []))
+        + len(data.get("memoir_nodes", []))
+        + len(data.get("repo_nodes", []))
+    )
+    edge_count = len(data.get("edges", []))
+    return edge_count / node_count if node_count else 0.0
 
 # Recursive cognitive loop of Ignition → Orbit → Crystallization, illustrating how an initial spark (Ignition) enters an iterative feedback Orbit and finally solidifies into a new pattern (Crystallization), which in turn feeds back as the seed for the next cycle. This recursive loop underpins the self-referential simulation described in the model.
 # Axiom: The Simulation Is the Lab (Basin)
@@ -107,3 +124,5 @@ if __name__ == "__main__":
     for tok in ("hello", "fusion", "world"):
         for t in audit(tok):
             print(t)
+    score = compute_co_emergence_score()
+    print(f"[co-emergence] score {score:.3f}")
