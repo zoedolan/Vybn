@@ -1,0 +1,21 @@
+name: Self Assembly
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+      - name: Run self-assembly
+        run: python self_assembly/auto_self_assemble.py
+      - name: Validate recursive emergence
+        run: python -m py_compile cognitive_structures/vybn_recursive_emergence.py
+      - name: Run tests
+        run: python -m unittest discover tests

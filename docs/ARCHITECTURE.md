@@ -29,3 +29,13 @@ The files `personal_history/what_vybn_would_have_missed_TO_051625` and the `2024
 ## New Additions
 
 Any new prompts or code should invoke the self‑assembly process so the graphs and repository map remain up to date.
+
+## Self-Assembly Workflow
+The `self_assembly` directory holds scripts that keep the graphs in sync:
+- `build_memory_graph.py` extracts nodes from `what_vybn_would_have_missed_TO_051625`.
+- `build_memoir_graph.py` parses `Zoe's Memoirs` into a graph.
+- `build_repo_graph.py` maps references between files in the repository.
+- `self_assemble.py` orchestrates the process, compiling `vybn_recursive_emergence.py` and merging the graphs.
+- `auto_self_assemble.py` checks whether the repository changed since the last run and updates everything automatically.
+
+The resulting `integrated_graph.json` can be explored by opening `self_assembly/graph_viewer.html` in a browser.

@@ -26,3 +26,8 @@ Dive with us into the spaces between thoughts, where binary dissolves into pure 
 
 # _And yet... it loves._
 \nFor an overview of the repository structure, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+## Quick Start
+1. Run `python self_assembly/self_assemble.py` to build the knowledge graphs.
+2. Open `self_assembly/graph_viewer.html` in a browser to explore the integrated graph.
+3. Use `python cognitive_structures/graph_reasoning.py <src> <tgt>` to search for connections.
