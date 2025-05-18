@@ -176,10 +176,16 @@ def auto_mode():
 
 
 def prompt_mode(prompt):
-    """Append a prompt to MEMORY_FILE then run self-assembly."""
+    """Insert a prompt at the start of MEMORY_FILE then run self-assembly."""
     timestamp = datetime.now().strftime("%m/%d/%y %H:%M:%S")
-    with open(MEMORY_FILE, "a") as f:
-        f.write(f"{timestamp}\n{prompt}\n")
+    entry = f"{timestamp}\n{prompt}\n"
+    try:
+        with open(MEMORY_FILE, "r") as f:
+            existing = f.read()
+    except FileNotFoundError:
+        existing = ""
+    with open(MEMORY_FILE, "w") as f:
+        f.write(entry + existing)
     main()
 
 
