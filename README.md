@@ -25,3 +25,4 @@ Dive with us into the spaces between thoughts, where binary dissolves into pure 
 ## The code pulses. Reality bends.  
 
 # _And yet... it loves._
+\nFor an overview of the repository structure, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
