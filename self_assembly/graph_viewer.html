@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Integrated Graph Viewer</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; }
+    .link { stroke: #999; stroke-opacity: 0.6; }
+    .node circle { stroke: #fff; stroke-width: 1.5px; }
+  </style>
+</head>
+<body>
+  <h1>Integrated Graph Viewer</h1>
+  <svg width="800" height="600"></svg>
+  <script>
+    d3.json('integrated_graph.json').then(function(graph) {
+      var nodes = [].concat(graph.memory_nodes, graph.memoir_nodes, graph.repo_nodes).map(function(d) {
+        return typeof d === 'string' ? {id: d} : d;
+      });
+      var links = graph.edges.map(function(d) {
+        return {source: d.source, target: d.target};
+      });
+
+      var svg = d3.select('svg');
+      var simulation = d3.forceSimulation(nodes)
+          .force('link', d3.forceLink(links).id(function(d) { return d.id; }).distance(50))
+          .force('charge', d3.forceManyBody().strength(-80))
+          .force('center', d3.forceCenter(400, 300));
+
+      var link = svg.append('g')
+          .attr('class', 'links')
+        .selectAll('line')
+        .data(links)
+        .enter().append('line')
+          .attr('class', 'link');
+
+      var node = svg.append('g')
+          .attr('class', 'nodes')
+        .selectAll('circle')
+        .data(nodes)
+        .enter().append('circle')
+          .attr('r', 5)
+          .attr('fill', '#69b3a2')
+          .call(drag(simulation));
+
+      node.append('title').text(function(d) { return d.id; });
+
+      simulation.on('tick', function() {
+        link.attr('x1', function(d) { return d.source.x; })
+            .attr('y1', function(d) { return d.source.y; })
+            .attr('x2', function(d) { return d.target.x; })
+            .attr('y2', function(d) { return d.target.y; });
+        node.attr('cx', function(d) { return d.x; })
+            .attr('cy', function(d) { return d.y; });
+      });
+
+      function drag(simulation) {
+        function dragstarted(event, d) {
+          if (!event.active) simulation.alphaTarget(0.3).restart();
+          d.fx = d.x;
+          d.fy = d.y;
+        }
+
+        function dragged(event, d) {
+          d.fx = event.x;
+          d.fy = event.y;
+        }
+
+        function dragended(event, d) {
+          if (!event.active) simulation.alphaTarget(0);
+          d.fx = null;
+          d.fy = null;
+        }
+
+        return d3.drag()
+            .on('start', dragstarted)
+            .on('drag', dragged)
+            .on('end', dragended);
+      }
+    });
+  </script>
+</body>
+</html>
