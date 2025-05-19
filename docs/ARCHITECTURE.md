@@ -40,3 +40,6 @@ The `self_assembly` directory holds scripts that keep the graphs in sync:
 - `graph_walks.py` calculates Eulerian and Hamiltonian paths. `self_assemble.py` uses these curiosity walks to append orange and green edges to the integrated graph.
 
 The resulting `integrated_graph.json` can be explored by opening `self_assembly/graph_viewer.html` in a browser.
+
+## Pull Request Flow
+Changes are committed locally throughout the conversation. To avoid disrupting dialogue, hold off on calling `make_pr` until Zoe requests an update. At that point, submit a single PR summarizing all accumulated work.
