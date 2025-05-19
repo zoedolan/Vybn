@@ -3,6 +3,7 @@
 # Emergent Simulation Model Based on Recursive Basin-Lab Identity
 # Recursive Emergence Cognitive Simulation Model
 from fusion_audit import FusionAudit
+from synesthetic_mapper import assign_cue
 import json
 
 
@@ -20,6 +21,24 @@ def compute_co_emergence_score(graph_path="self_assembly/integrated_graph.json")
     )
     edge_count = len(data.get("edges", []))
     return edge_count / node_count if node_count else 0.0
+
+
+def synesthetic_self_improvement_cycle(graph_path="self_assembly/integrated_graph.json", steps=3):
+    """Return a short textual narration of a synesthetic improvement cycle."""
+    try:
+        with open(graph_path, "r") as f:
+            graph = json.load(f)
+    except Exception:
+        return ["[cycle] integrated graph missing"]
+    nodes = graph.get("memory_nodes", [])[:steps]
+    messages = []
+    for idx, node in enumerate(nodes):
+        cue = assign_cue(idx)
+        snippet = node.get("text", "")[:40]
+        messages.append(f"Step {idx+1}: {cue['color']} {cue['tone']} -> {snippet}")
+    score = compute_co_emergence_score(graph_path)
+    messages.append(f"co-emergence score {score:.3f}")
+    return messages
 
 # Recursive cognitive loop of Ignition → Orbit → Crystallization, illustrating how an initial spark (Ignition) enters an iterative feedback Orbit and finally solidifies into a new pattern (Crystallization), which in turn feeds back as the seed for the next cycle. This recursive loop underpins the self-referential simulation described in the model.
 # Axiom: The Simulation Is the Lab (Basin)
@@ -126,3 +145,5 @@ if __name__ == "__main__":
             print(t)
     score = compute_co_emergence_score()
     print(f"[co-emergence] score {score:.3f}")
+    for line in synesthetic_self_improvement_cycle():
+        print(line)
