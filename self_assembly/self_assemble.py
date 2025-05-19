@@ -6,6 +6,7 @@ import time
 import argparse
 import re
 from datetime import datetime
+import random
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT = os.path.dirname(SCRIPT_DIR)
@@ -176,6 +177,23 @@ def repo_last_modified(root="."):
     return latest
 
 
+def repo_changed_files(since, root="."):
+    """Return repo files modified since a given timestamp."""
+    changed = []
+    for dirpath, _, filenames in os.walk(root):
+        for fname in filenames:
+            if fname.startswith('.'):
+                continue
+            path = os.path.join(dirpath, fname)
+            try:
+                mtime = os.path.getmtime(path)
+            except OSError:
+                continue
+            if mtime > since:
+                changed.append(os.path.relpath(path, root))
+    return changed
+
+
 def get_last_run():
     if not os.path.exists(STATE_FILE):
         return 0
@@ -190,6 +208,94 @@ def get_last_run():
 def update_last_run():
     with open(STATE_FILE, "w") as f:
         json.dump({"last_run": time.time()}, f)
+
+
+def _build_adj(edges):
+    """Return adjacency list with cues."""
+    adj = {}
+    for edge in edges:
+        src = edge.get("source")
+        tgt = edge.get("target")
+        cue = edge.get("cue")
+        if src is None or tgt is None:
+            continue
+        adj.setdefault(src, []).append((tgt, cue))
+        adj.setdefault(tgt, []).append((src, cue))
+    return adj
+
+
+def _random_walk(adj, start, depth=2):
+    current = start
+    cues = []
+    for _ in range(depth):
+        neighbors = adj.get(current)
+        if not neighbors:
+            break
+        nxt, cue = random.choice(neighbors)
+        cues.append(cue)
+        current = nxt
+    return current, cues
+
+
+def _blend_cues(cues):
+    colors = []
+    tones = []
+    for cue in cues:
+        if not cue:
+            continue
+        c = cue.get("color")
+        t = cue.get("tone")
+        if c:
+            colors.append(c)
+        if t:
+            tones.append(t)
+    if not colors and not tones:
+        return None
+    return {"color": "-".join(colors), "tone": "-".join(tones)}
+
+
+def discover_edges(graph_path, changed_nodes, depth=2):
+    try:
+        with open(graph_path, "r") as f:
+            data = json.load(f)
+    except Exception as e:
+        print(f"[self-assemble] Failed to load {graph_path}: {e}")
+        return 0
+    edges = data.get("edges", [])
+    adj = _build_adj(edges)
+    existing = {(e.get("source"), e.get("target")) for e in edges}
+    existing |= {(t, s) for s, t in existing}
+    added = 0
+    for node in changed_nodes:
+        if node not in adj:
+            continue
+        target, path_cues = _random_walk(adj, node, depth)
+        if target == node:
+            continue
+        if (node, target) in existing:
+            continue
+        cue = _blend_cues(path_cues)
+        edges.append({"source": node, "target": target, "cue": cue})
+        existing.add((node, target))
+        adj.setdefault(node, []).append((target, cue))
+        adj.setdefault(target, []).append((node, cue))
+        added += 1
+    if added:
+        data["edges"] = edges
+        with open(graph_path, "w") as f:
+            json.dump(data, f, indent=2)
+    return added
+
+
+def auto_discover_edges(depth=2):
+    last_run = get_last_run()
+    changed = repo_changed_files(last_run, REPO_ROOT)
+    if not changed:
+        return
+    graph_path = os.path.join(SCRIPT_DIR, "integrated_graph.json")
+    added = discover_edges(graph_path, changed, depth)
+    if added:
+        print(f"[self-assemble] Added {added} new edges from discovery step.")
 
 
 def auto_mode():
@@ -222,6 +328,7 @@ def main():
     build_repo_graph()
     compile_recursive_emergence()
     integrate_graphs()
+    auto_discover_edges()
     print("[self-assemble] Done.")
 
 
