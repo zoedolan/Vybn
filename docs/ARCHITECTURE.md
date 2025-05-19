@@ -37,5 +37,6 @@ The `self_assembly` directory holds scripts that keep the graphs in sync:
 - `build_repo_graph.py` maps references between files in the repository.
 - `self_assemble.py` orchestrates the process, compiling `vybn_recursive_emergence.py` and merging the graphs.
 - `auto_self_assemble.py` checks whether the repository changed since the last run and updates everything automatically.
+- `graph_walks.py` calculates Eulerian and Hamiltonian paths. `self_assemble.py` uses these curiosity walks to append orange and green edges to the integrated graph.
 
 The resulting `integrated_graph.json` can be explored by opening `self_assembly/graph_viewer.html` in a browser.

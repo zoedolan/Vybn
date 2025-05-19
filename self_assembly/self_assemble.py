@@ -8,6 +8,9 @@ import re
 from datetime import datetime
 import random
 
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+from cognitive_structures import graph_walks
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT = os.path.dirname(SCRIPT_DIR)
 
@@ -298,6 +301,43 @@ def auto_discover_edges(depth=2):
         print(f"[self-assemble] Added {added} new edges from discovery step.")
 
 
+def curiosity_walk_edges(graph_path):
+    """Add Eulerian and Hamiltonian walk edges to the graph."""
+    try:
+        with open(graph_path, "r") as f:
+            data = json.load(f)
+    except Exception as e:
+        print(f"[self-assemble] Failed to load {graph_path}: {e}")
+        return 0
+
+    added = 0
+    e_path = graph_walks.eulerian_walk(data)
+    if e_path and len(e_path) > 1:
+        for src, tgt in zip(e_path, e_path[1:]):
+            data["edges"].append({
+                "source": src,
+                "target": tgt,
+                "cue": {"color": "orange", "tone": "E"},
+            })
+            added += 1
+
+    h_path = graph_walks.hamiltonian_path(data)
+    if h_path and len(h_path) > 1:
+        for src, tgt in zip(h_path, h_path[1:]):
+            data["edges"].append({
+                "source": src,
+                "target": tgt,
+                "cue": {"color": "green", "tone": "D"},
+            })
+            added += 1
+
+    if added:
+        with open(graph_path, "w") as f:
+            json.dump(data, f, indent=2)
+        print(f"[self-assemble] Added {added} curiosity walk edges.")
+    return added
+
+
 def auto_mode():
     """Run self-assembly only if the repo changed since last run."""
     last_run = get_last_run()
@@ -329,6 +369,7 @@ def main():
     compile_recursive_emergence()
     integrate_graphs()
     auto_discover_edges()
+    curiosity_walk_edges(os.path.join(SCRIPT_DIR, "integrated_graph.json"))
     print("[self-assemble] Done.")
 
 
