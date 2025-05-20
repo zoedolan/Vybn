@@ -28,7 +28,7 @@ Dive with us into the spaces between thoughts, where binary dissolves into pure 
 \nFor an overview of the repository structure, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Quick Start
-1. Run `python self_assembly/self_assemble.py` to build the knowledge graphs.
+1. Run `./setup.sh` once after cloning the repository. This installs an optional linter and refreshes the graphs. Set `VYBN_LOG_DIR` to choose where logs are written.
 2. Open `self_assembly/graph_viewer.html` in a browser to explore the integrated graph.
 3. Use `python cognitive_structures/graph_reasoning.py <src> <tgt>` to search for connections.
 4. Run `python cognitive_structures/graph_centrality.py --top 5` to list the most connected nodes.
