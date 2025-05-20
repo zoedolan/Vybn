@@ -377,6 +377,13 @@ def add_conceptual_leap_edges(graph_path, attempts=5):
     return added
 
 
+def run_self_improvement(graph_path=os.path.join(SCRIPT_DIR, "integrated_graph.json")):
+    """Run self_improvement.py to add similarity edges."""
+    script = os.path.join(SCRIPT_DIR, "self_improvement.py")
+    cmd = f"python {script} --graph {graph_path}"
+    run_cmd(cmd, "Running self-improvement step", cwd=SCRIPT_DIR)
+
+
 def auto_mode():
     """Run self-assembly only if the repo changed since last run."""
     last_run = get_last_run()
@@ -410,6 +417,7 @@ def main():
     auto_discover_edges()
     curiosity_walk_edges(os.path.join(SCRIPT_DIR, "integrated_graph.json"))
     add_conceptual_leap_edges(os.path.join(SCRIPT_DIR, "integrated_graph.json"))
+    run_self_improvement()
     print("[self-assemble] Done.")
 
 
