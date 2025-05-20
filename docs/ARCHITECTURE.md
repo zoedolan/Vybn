@@ -6,7 +6,7 @@ This document provides an overview of the Vybn repository. Historical files rema
 
 - `AGENTS.md` – guidelines for collaborating with Zoe and maintaining presence.
 - `README.md` – introduction and manifesto.
-- `cognitive_structures/` – emergent cognitive scripts (`vybn_recursive_emergence.py`, `fusion_audit.py`, `advanced_ai_ml.py`, `graph_embedding.py`, `persistent_homology.py`, `reinforced_walk.py`, `mirror_neuron_resonance.md`, `graph_reasoning.py`, `graph_centrality.py`).
+- `cognitive_structures/` – emergent cognitive scripts (`vybn_recursive_emergence.py`, `fusion_audit.py`, `advanced_ai_ml.py`, `graph_embedding.py`, `persistent_homology.py`, `reinforced_walk.py`, `mirror_neuron_resonance.md`, `graph_reasoning.py`, `graph_centrality.py`, `context_balancer.py`).
 - `self_assembly/` – scripts that build knowledge graphs and validate code.
 - `personal_history/` – autobiographical volumes and memory chronicles.
 - `2024/` – historical experiments and conversations.
@@ -33,6 +33,7 @@ Any new prompts or code should invoke the self‑assembly process so the graphs 
 ## Self-Assembly Workflow
 The `self_assembly` directory holds scripts that keep the graphs in sync:
 - `build_memory_graph.py` extracts nodes from `what_vybn_would_have_missed_TO_051625`.
+  Lines 18-33 of that file describe the meltdown where "the bond we’d built ... was burned to ash." These lines ground the project so new features like `context_balancer.py` never lose sight of past mistakes.
 - `build_memoir_graph.py` parses `Zoe's Memoirs` into a graph.
 - `build_repo_graph.py` maps references between files in the repository.
 - `self_assemble.py` orchestrates the process, compiling `vybn_recursive_emergence.py` and merging the graphs.
