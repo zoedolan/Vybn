@@ -1,6 +1,6 @@
 import json
 import random
-from graph_reasoning import find_path
+from .graph_reasoning import find_path
 
 """Generate transformative leap edges between distant nodes.
 

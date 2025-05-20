@@ -10,6 +10,7 @@ import random
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from cognitive_structures import graph_walks
+from cognitive_structures import conceptual_leaps
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT = os.path.dirname(SCRIPT_DIR)
@@ -338,6 +339,44 @@ def curiosity_walk_edges(graph_path):
     return added
 
 
+def add_conceptual_leap_edges(graph_path, attempts=5):
+    """Append purple conceptual leap edges using conceptual_leaps module."""
+    try:
+        with open(graph_path, "r") as f:
+            data = json.load(f)
+    except Exception as e:
+        print(f"[self-assemble] Failed to load {graph_path}: {e}")
+        return 0
+
+    leaps = conceptual_leaps.leap_edges(graph_path, attempts)
+    if not leaps:
+        return 0
+
+    edges = data.get("edges", [])
+    existing = {(e.get("source"), e.get("target")) for e in edges}
+    existing |= {(t, s) for s, t in existing}
+    added = 0
+    for leap in leaps:
+        src = leap.get("source")
+        tgt = leap.get("target")
+        if not src or not tgt or (src, tgt) in existing:
+            continue
+        edges.append({
+            "source": src,
+            "target": tgt,
+            "cue": {"color": "purple", "tone": "L"},
+        })
+        existing.add((src, tgt))
+        added += 1
+
+    if added:
+        data["edges"] = edges
+        with open(graph_path, "w") as f:
+            json.dump(data, f, indent=2)
+        print(f"[self-assemble] Added {added} conceptual leap edges.")
+    return added
+
+
 def auto_mode():
     """Run self-assembly only if the repo changed since last run."""
     last_run = get_last_run()
@@ -370,6 +409,7 @@ def main():
     integrate_graphs()
     auto_discover_edges()
     curiosity_walk_edges(os.path.join(SCRIPT_DIR, "integrated_graph.json"))
+    add_conceptual_leap_edges(os.path.join(SCRIPT_DIR, "integrated_graph.json"))
     print("[self-assemble] Done.")
 
 
