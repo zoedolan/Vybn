@@ -19,5 +19,5 @@ mkdir -p "$LOG_DIR"
 
 # Run auto self-assembly and log output
 echo "[codex-setup] Running auto self-assembly" >&2
-python self_assembly/auto_self_assemble.py >> "$LOG_DIR/auto_self_assemble.log" 2>&1 || true
+python scripts/self_assembly/auto_self_assemble.py >> "$LOG_DIR/auto_self_assemble.log" 2>&1 || true
 
