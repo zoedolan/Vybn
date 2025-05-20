@@ -1,6 +1,9 @@
 import json
 import unittest
 import os
+import sys
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from cognitive_structures.graph_reasoning import find_path
 
 class TestGraphReasoning(unittest.TestCase):
