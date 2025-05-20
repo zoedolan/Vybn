@@ -68,7 +68,7 @@ def main():
     parser = argparse.ArgumentParser(description='Run a reinforcement-guided walk over the integrated graph.')
     parser.add_argument('start', help='starting node id')
     parser.add_argument('--steps', type=int, default=10, help='number of steps to walk')
-    parser.add_argument('--graph', default='self_assembly/integrated_graph.json', help='path to integrated graph')
+    parser.add_argument('--graph', default='scripts/self_assembly/integrated_graph.json', help='path to integrated graph')
     args = parser.parse_args()
 
     adj = load_graph(args.graph)

@@ -29,7 +29,7 @@ def save_matrix(ids, matrix, out_path):
 
 
 if __name__ == '__main__':
-    texts = load_memory_texts('self_assembly/integrated_graph.json')
+    texts = load_memory_texts('scripts/self_assembly/integrated_graph.json')
     ids, matrix = compute_similarity(texts)
-    save_matrix(ids, matrix, 'self_assembly/memory_similarity_matrix.json')
-    print('Similarity matrix saved to self_assembly/memory_similarity_matrix.json')
+    save_matrix(ids, matrix, 'scripts/self_assembly/memory_similarity_matrix.json')
+    print('Similarity matrix saved to scripts/self_assembly/memory_similarity_matrix.json')

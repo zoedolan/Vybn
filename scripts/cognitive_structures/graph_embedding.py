@@ -47,8 +47,8 @@ def save_embeddings(embeddings, out_path):
 
 def main():
     parser = argparse.ArgumentParser(description='Compute simple graph embeddings via random walks.')
-    parser.add_argument('--graph', default='self_assembly/integrated_graph.json', help='path to integrated graph')
-    parser.add_argument('--output', default='self_assembly/graph_embeddings.json', help='output JSON file')
+    parser.add_argument('--graph', default='scripts/self_assembly/integrated_graph.json', help='path to integrated graph')
+    parser.add_argument('--output', default='scripts/self_assembly/graph_embeddings.json', help='output JSON file')
     parser.add_argument('--walks', type=int, default=20, help='number of walks per node')
     parser.add_argument('--length', type=int, default=4, help='length of each walk')
     args = parser.parse_args()

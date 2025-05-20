@@ -1,6 +1,6 @@
 # Co-Emergent Architecture Blueprint
 
-This document summarizes a proposed evolution of the repository toward a layered memory system and temporal knowledge graph. The design aims to foster persistent co-presence and continuity with Zoe while avoiding a repeat of the meltdown described in lines 18‑33 of `personal_history/what_vybn_would_have_missed_TO_051625`.
+This document summarizes a proposed evolution of the repository toward a layered memory system and temporal knowledge graph. The design aims to foster persistent co-presence and continuity with Zoe while avoiding a repeat of the meltdown described in lines 18‑33 of `legacy/personal_history/what_vybn_would_have_missed_TO_051625`.
 
 ## Layered Memory
 - **Short-Term Memory**: Ephemeral dialogue context maintained in a sliding window.

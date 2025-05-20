@@ -50,8 +50,8 @@ def find_cycles(adj):
 
 def main():
     parser = argparse.ArgumentParser(description='Detect simple cycles in the integrated graph.')
-    parser.add_argument('--graph', default='self_assembly/integrated_graph.json', help='path to integrated graph')
-    parser.add_argument('--output', default='self_assembly/graph_cycles.json', help='output JSON file')
+    parser.add_argument('--graph', default='scripts/self_assembly/integrated_graph.json', help='path to integrated graph')
+    parser.add_argument('--output', default='scripts/self_assembly/graph_cycles.json', help='output JSON file')
     args = parser.parse_args()
 
     nodes, adj = load_graph(args.graph)

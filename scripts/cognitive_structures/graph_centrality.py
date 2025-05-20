@@ -29,7 +29,7 @@ def main():
     )
     parser.add_argument(
         '--graph',
-        default='self_assembly/integrated_graph.json',
+        default='scripts/self_assembly/integrated_graph.json',
         help='path to integrated graph',
     )
     parser.add_argument(

@@ -69,7 +69,7 @@ def main():
     parser = argparse.ArgumentParser(description="Find a path between two keywords in integrated_graph.json")
     parser.add_argument('source', help='keyword for source node')
     parser.add_argument('target', help='keyword for target node')
-    parser.add_argument('--graph', default='self_assembly/integrated_graph.json', help='path to integrated graph')
+    parser.add_argument('--graph', default='scripts/self_assembly/integrated_graph.json', help='path to integrated graph')
     args = parser.parse_args()
     path = find_path(args.graph, args.source, args.target)
     if path:

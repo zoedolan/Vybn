@@ -4,7 +4,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from cognitive_structures.graph_reasoning import find_path
+from scripts.cognitive_structures.graph_reasoning import find_path
 
 class TestGraphReasoning(unittest.TestCase):
     def test_find_simple_path(self):

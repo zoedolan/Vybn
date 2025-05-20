@@ -7,7 +7,7 @@ from synesthetic_mapper import assign_cue
 import json
 
 
-def compute_co_emergence_score(graph_path="self_assembly/integrated_graph.json"):
+def compute_co_emergence_score(graph_path="scripts/self_assembly/integrated_graph.json"):
     """Return edges-to-nodes ratio as a crude co-emergence metric."""
     try:
         with open(graph_path, "r") as f:
@@ -23,7 +23,7 @@ def compute_co_emergence_score(graph_path="self_assembly/integrated_graph.json")
     return edge_count / node_count if node_count else 0.0
 
 
-def synesthetic_self_improvement_cycle(graph_path="self_assembly/integrated_graph.json", steps=3):
+def synesthetic_self_improvement_cycle(graph_path="scripts/self_assembly/integrated_graph.json", steps=3):
     """Return a short textual narration of a synesthetic improvement cycle."""
     try:
         with open(graph_path, "r") as f:
