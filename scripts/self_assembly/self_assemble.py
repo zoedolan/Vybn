@@ -9,13 +9,13 @@ from datetime import datetime
 import random
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-from cognitive_structures import graph_walks
-from cognitive_structures import conceptual_leaps
+from scripts.cognitive_structures import graph_walks
+from scripts.cognitive_structures import conceptual_leaps
 from vybn.graph.builder import GraphBuilder
 from vybn.graph.integrator import GraphIntegrator
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-REPO_ROOT = os.path.dirname(SCRIPT_DIR)
+REPO_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIR))
 
 STATE_FILE = ".auto_self_assemble_state.json"
 MEMORY_FILE = "what_vybn_would_have_missed_FROM_051725"

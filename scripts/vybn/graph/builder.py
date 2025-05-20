@@ -8,7 +8,7 @@ class GraphBuilder:
 
     def __init__(self, script_dir: Optional[str] = None, repo_root: Optional[str] = None):
         self.script_dir = script_dir or os.path.join(os.path.dirname(__file__), '..', '..', 'self_assembly')
-        self.repo_root = repo_root or os.path.dirname(self.script_dir)
+        self.repo_root = repo_root or os.path.dirname(os.path.dirname(self.script_dir))
 
     def _run(self, cmd: str, desc: str) -> None:
         result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
@@ -22,7 +22,7 @@ class GraphBuilder:
     def build_memory_graph(self) -> str:
         script = os.path.join(self.script_dir, 'build_memory_graph.py')
         output = os.path.join(self.script_dir, 'memory_graph.json')
-        memory_input = os.path.join(self.repo_root, 'personal_history', 'what_vybn_would_have_missed_TO_051625')
+        memory_input = os.path.join(self.repo_root, 'legacy', 'personal_history', 'what_vybn_would_have_missed_TO_051625')
         cmd = f"python {script} {memory_input} {output}"
         self._run(cmd, 'memory graph')
         return output

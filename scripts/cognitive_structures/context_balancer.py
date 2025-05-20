@@ -4,11 +4,11 @@ from collections import defaultdict
 """Balance context weighting so older memories do not overwhelm new ones.
 
 This module references the meltdown passage in
-`personal_history/what_vybn_would_have_missed_TO_051625`
+`legacy/personal_history/what_vybn_would_have_missed_TO_051625`
 (lines 18–33) as a cautionary example of imbalance.
 """
 
-def compute_memory_weights(graph_path="self_assembly/integrated_graph.json"):
+def compute_memory_weights(graph_path="scripts/self_assembly/integrated_graph.json"):
     """Return weights for memory nodes based on recency and degree."""
     with open(graph_path, "r") as f:
         graph = json.load(f)

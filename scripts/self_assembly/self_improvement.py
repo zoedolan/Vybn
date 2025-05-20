@@ -32,7 +32,7 @@ def build_similarity_edges(texts, threshold=0.6):
 
 def main():
     parser = argparse.ArgumentParser(description='Add similarity edges to integrated graph')
-    parser.add_argument('--graph', default='self_assembly/integrated_graph.json')
+    parser.add_argument('--graph', default='scripts/self_assembly/integrated_graph.json')
     parser.add_argument('--threshold', type=float, default=0.6)
     args = parser.parse_args()
 

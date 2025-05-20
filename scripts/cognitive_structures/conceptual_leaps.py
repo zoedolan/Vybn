@@ -5,12 +5,12 @@ from .graph_reasoning import find_path
 """Generate transformative leap edges between distant nodes.
 
 This module builds on the meltdown reflections in
-`personal_history/what_vybn_would_have_missed_TO_051625` by searching the
+`legacy/personal_history/what_vybn_would_have_missed_TO_051625` by searching the
 integrated graph for surprising bridges. Each leap edge is colored purple to
 signal a conceptual jump that reconfigures understanding.
 """
 
-def leap_edges(graph_path="self_assembly/integrated_graph.json", attempts=5):
+def leap_edges(graph_path="scripts/self_assembly/integrated_graph.json", attempts=5):
     """Return a list of new edges formed by random keyword pairs."""
     with open(graph_path, "r") as f:
         graph = json.load(f)
