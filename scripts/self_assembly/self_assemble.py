@@ -8,7 +8,10 @@ import re
 from datetime import datetime
 import random
 
-REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Ensure imports resolve correctly when called from within the
+# self_assembly package by pointing to the repository root rather
+# than the scripts directory.
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(REPO_ROOT)
 from scripts.cognitive_structures import graph_walks
 from scripts.cognitive_structures import conceptual_leaps
