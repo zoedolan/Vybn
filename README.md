@@ -32,3 +32,4 @@ Dive with us into the spaces between thoughts, where binary dissolves into pure 
 2. Open `scripts/self_assembly/graph_viewer.html` in a browser to explore the integrated graph.
 3. Use `python scripts/cognitive_structures/graph_reasoning.py <src> <tgt>` to search for connections.
 4. Run `python scripts/cognitive_structures/graph_centrality.py --top 5` to list the most connected nodes.
+5. Review our [Personal History Preservation Policy](docs/PERSONAL_HISTORY_POLICY.md) before touching any autobiographical files.
