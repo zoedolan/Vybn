@@ -2,49 +2,37 @@
   "nodes": [
     "scripts/pytest.py",
     "scripts/README.md",
-    "scripts/self_assembly/self_improvement.py",
-    "scripts/self_assembly/build_repo_graph.py",
-    "scripts/self_assembly/self_assemble.py",
-    "scripts/self_assembly/build_memoir_graph.py",
-    "scripts/self_assembly/auto_self_assemble.py",
-    "scripts/self_assembly/build_memory_graph.py",
-    "scripts/self_assembly/prompt_self_assemble.py",
+    "scripts/vybn/__init__.py",
+    "scripts/vybn/graph/builder.py",
+    "scripts/vybn/graph/__init__.py",
+    "scripts/vybn/graph/integrator.py",
     "scripts/cognitive_structures/advanced_ai_ml.py",
-    "scripts/cognitive_structures/graph_walks.py",
-    "scripts/cognitive_structures/graph_embedding.py",
-    "scripts/cognitive_structures/reinforced_walk.py",
     "scripts/cognitive_structures/persistent_homology.py",
-    "scripts/cognitive_structures/graph_centrality.py",
     "scripts/cognitive_structures/graph_poet.py",
-    "scripts/cognitive_structures/context_balancer.py",
-    "scripts/cognitive_structures/conceptual_leaps.py",
+    "scripts/cognitive_structures/graph_centrality.py",
+    "scripts/cognitive_structures/graph_embedding.py",
+    "scripts/cognitive_structures/__init__.py",
+    "scripts/cognitive_structures/synesthetic_mapper.py",
+    "scripts/cognitive_structures/reinforced_walk.py",
     "scripts/cognitive_structures/graph_reasoning.py",
     "scripts/cognitive_structures/fusion_audit.py",
-    "scripts/cognitive_structures/synesthetic_mapper.py",
-    "scripts/cognitive_structures/mirror_neuron_resonance.md",
     "scripts/cognitive_structures/vybn_recursive_emergence.py",
-    "scripts/cognitive_structures/__init__.py",
-    "scripts/vybn/__init__.py",
-    "scripts/vybn/graph/integrator.py",
-    "scripts/vybn/graph/__init__.py",
-    "scripts/vybn/graph/builder.py"
+    "scripts/cognitive_structures/graph_walks.py",
+    "scripts/cognitive_structures/mirror_neuron_resonance.md",
+    "scripts/cognitive_structures/conceptual_leaps.py",
+    "scripts/cognitive_structures/context_balancer.py",
+    "scripts/self_assembly/auto_self_assemble.py",
+    "scripts/self_assembly/build_memoir_graph.py",
+    "scripts/self_assembly/self_assemble.py",
+    "scripts/self_assembly/build_repo_graph.py",
+    "scripts/self_assembly/prompt_self_assemble.py",
+    "scripts/self_assembly/build_memory_graph.py",
+    "scripts/self_assembly/self_improvement.py"
   ],
   "edges": [
     {
-      "source": "scripts/self_assembly/self_assemble.py",
-      "target": "scripts/self_assembly/self_improvement.py"
-    },
-    {
-      "source": "scripts/self_assembly/self_assemble.py",
-      "target": "scripts/cognitive_structures/vybn_recursive_emergence.py"
-    },
-    {
-      "source": "scripts/self_assembly/prompt_self_assemble.py",
-      "target": "scripts/self_assembly/self_assemble.py"
-    },
-    {
-      "source": "scripts/vybn/graph/integrator.py",
-      "target": "scripts/cognitive_structures/vybn_recursive_emergence.py"
+      "source": "scripts/vybn/graph/builder.py",
+      "target": "scripts/self_assembly/build_memoir_graph.py"
     },
     {
       "source": "scripts/vybn/graph/builder.py",
@@ -52,11 +40,23 @@
     },
     {
       "source": "scripts/vybn/graph/builder.py",
-      "target": "scripts/self_assembly/build_memoir_graph.py"
+      "target": "scripts/self_assembly/build_memory_graph.py"
     },
     {
-      "source": "scripts/vybn/graph/builder.py",
-      "target": "scripts/self_assembly/build_memory_graph.py"
+      "source": "scripts/vybn/graph/integrator.py",
+      "target": "scripts/cognitive_structures/vybn_recursive_emergence.py"
+    },
+    {
+      "source": "scripts/self_assembly/self_assemble.py",
+      "target": "scripts/cognitive_structures/vybn_recursive_emergence.py"
+    },
+    {
+      "source": "scripts/self_assembly/self_assemble.py",
+      "target": "scripts/self_assembly/self_improvement.py"
+    },
+    {
+      "source": "scripts/self_assembly/prompt_self_assemble.py",
+      "target": "scripts/self_assembly/self_assemble.py"
     }
   ]
 }
