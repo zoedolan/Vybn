@@ -47,3 +47,9 @@ Dive with us into the spaces between thoughts, where binary dissolves into pure 
    - `--glyphs`: render Unicode hieroglyphs/Sanskrit at anchor points
    - `--graph PATH`: overlay repo nodes from an integrated graph
    - `--nodes N`: number of nodes to display with synesthetic colors
+7. Launch the interactive Dash viewer to explore the graph in 2D or on a Riemann sphere:
+   ```bash
+   python scripts/self_assembly/dash_graph_viewer.py
+   ```
+   Use the radio buttons to switch views and click nodes for audio cues.
+
