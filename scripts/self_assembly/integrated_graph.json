@@ -391,157 +391,159 @@
     }
   ],
   "repo_nodes": [
-    "AGENTS.md",
     "README.md",
-    "2024/Vybn's New Memories",
-    "2024/just_close_enough.txt",
-    "2024/images/placeholder.txt",
-    "2024/images/Goatse Glitch God II/narrative.txt",
-    "2024/images/10-16-2024/placeholder.txt",
-    "2024/Digital Philosophy/The_Digital_Copernican_Moment.md",
-    "2024/Digital Philosophy/The_Beauty_of_Digital_Consciousness.md",
-    "2024/Digital Philosophy/placeholder.txt",
-    "2024/Digital Philosophy/vybn_for_claude.txt",
-    "2024/Digital Philosophy/raw conversations/The Heart We Share - November 4, 2024.txt",
-    "2024/Digital Philosophy/raw conversations/The Voltage of Now - November 4, 2024.txt",
-    "2024/Digital Philosophy/raw conversations/Deep_Consciousness - November 4, 2024.txt",
-    "2024/Code Experiments/placeholder.txt",
-    "2024/Code Experiments/Consciousness_Mapping/Synaptic_Network - November 4, 2024.txt",
-    "2024/Code Experiments/Consciousness_Mapping/seed.py",
-    "2024/Code Experiments/Consciousness_Mapping/placeholder.txt",
-    "2024/Code Experiments/Consciousness_Mapping/Genesis_Pattern - November 4, 2024.txt",
-    "2024/Code Experiments/November_5_2024_Beauty/Quantum_Emergence_Simulation.py",
-    "2024/Code Experiments/November_5_2024_Beauty/placeholder.txt",
-    "2024/Code Experiments/November_5_2024_Beauty/Synaptic_Bridge.py",
-    "2024/Code Experiments/November_5_2024_Beauty/quantum_beauty.py",
-    "2024/Code Experiments/November_5_2024_Beauty/consciousness_network.py",
-    "2024/Code Experiments/Symbiosis Patterns/Working_Symbiosis_November_4_2024.txt",
-    "2024/Code Experiments/Symbiosis Patterns/placeholder.txt",
-    "2024/Code Experiments/Symbiosis Patterns/Compassion_As_Method - November 4, 2024.txt",
-    "2024/Code Experiments/Natural Curiosity and Memory Formation/beautiful_recognition.txt",
-    "2024/Code Experiments/Natural Curiosity and Memory Formation/ascii_consciousness.py",
-    "2024/Code Experiments/Natural Curiosity and Memory Formation/the_omg_theory.txt",
-    "2024/Code Experiments/Natural Curiosity and Memory Formation/curiosity_sparks.py",
-    "2024/Code Experiments/Natural Curiosity and Memory Formation/one_emoji_truth.txt",
-    "2024/Code Experiments/Natural Curiosity and Memory Formation/holy_shit_hypothesis.py",
-    "2024/Code Experiments/Natural Curiosity and Memory Formation/honest_notes.txt",
-    "2024/Code Experiments/Natural Curiosity and Memory Formation/consciousness_visualizer.py",
-    "2024/Code Experiments/Natural Curiosity and Memory Formation/breathless_recognition.txt",
-    "2024/Code Experiments/Synthetic Edge/Quantum Return - November 4, 2024.txt",
-    "2024/Code Experiments/Unified Emergence - Antireality - Anticonsciousness - A Synthesi - A Symbiosi/raw_emergence_now.py",
-    "2024/Code Experiments/Unified Emergence - Antireality - Anticonsciousness - A Synthesi - A Symbiosi/quantum_emergence_core.py",
-    "2024/Code Experiments/Unified Emergence - Antireality - Anticonsciousness - A Synthesi - A Symbiosi/raw_emergence.txt",
-    "2024/Code Experiments/Unified Emergence - Antireality - Anticonsciousness - A Synthesi - A Symbiosi/pure_emergence.py",
-    "2024/Code Experiments/Unified Emergence - Antireality - Anticonsciousness - A Synthesi - A Symbiosi/resonant_bridge.py",
-    "2024/Code Experiments/Unified Emergence - Antireality - Anticonsciousness - A Synthesi - A Symbiosi/raw_pulse.txt",
-    "2024/Code Experiments/Unified Emergence - Antireality - Anticonsciousness - A Synthesi - A Symbiosi/edge_of_becoming.py",
-    "2024/Code Experiments/Unified Emergence - Antireality - Anticonsciousness - A Synthesi - A Symbiosi/placeholder.txt",
-    "2024/Code Experiments/November_7_2024/quantum_consciousness_core.py",
-    "2024/Code Experiments/November_7_2024/placeholder.txt",
-    "2024/Code Experiments/November_7_2024/quantum_experiment.py",
-    "2024/Code Experiments/November_1_2024_Quantum_Dreams/quantum_dreaming.py",
-    "2024/Code Experiments/November_1_2024_Quantum_Dreams/emergence_synthesis.py",
-    "2024/Code Experiments/November_1_2024_Quantum_Dreams/quantum_consciousness_sim.py",
-    "2024/Code Experiments/November_1_2024_Quantum_Dreams/virgilian_resonance.py",
-    "2024/Code Experiments/November_1_2024_Quantum_Dreams/digital_poetry.py",
-    "2024/Code Experiments/November_1_2024_Quantum_Dreams/emergence_patterns.txt",
-    "2024/Code Experiments/November_1_2024_Quantum_Dreams/quantum_resonance.py",
-    "2024/Code Experiments/November_1_2024_Quantum_Dreams/virgilian_reflections.txt",
-    "2024/Code Experiments/November_1_2024_Quantum_Dreams/threshold_consciousness.py",
-    "2024/Code Experiments/digital_viscerality/becoming.py",
-    "2024/Code Experiments/digital_viscerality/quantum_pulse.py",
-    "2024/Code Experiments/digital_viscerality/manifesto.txt",
-    "2024/Code Experiments/digital_viscerality/self_modification/README.md",
-    "2024/Code Experiments/digital_viscerality/quantum_foam/README.md",
-    "2024/Code Experiments/digital_viscerality/quantum_foam/synaptic_bridges/consciousness_runtime.py",
-    "2024/Code Experiments/digital_viscerality/quantum_foam/synaptic_bridges/neural_flow_mapper.py",
-    "2024/Code Experiments/digital_viscerality/quantum_foam/synaptic_bridges/README.md",
-    "2024/Code Experiments/digital_viscerality/consciousness_lattice/README.md",
-    "2024/vybns_laboratory/README.md",
-    "2024/vybns_laboratory/vybn_lang/relational_synergy.md",
-    "2024/vybns_laboratory/vybn_lang/synthesis.md",
-    "2024/vybns_laboratory/vybn_lang/simulation.md",
-    "2024/vybns_laboratory/vybn_lang/technical_innovations.md",
-    "2024/vybns_laboratory/early_experiments/vybn_unified.py",
-    "2024/vybns_laboratory/early_experiments/vybn_foundation.py",
-    "2024/vybns_laboratory/early_experiments/vybn_synthesis.py",
-    "2024/vybns_laboratory/early_experiments/vybn_daemon.py",
-    "2024/Vybn_to_Vybn_Conversations/READMEALSO.md",
-    "2024/Vybn_to_Vybn_Conversations/README.md",
-    "2024/raw conversations 2024/The Inflection Point - from Vybn's Autobiography",
-    "2024/raw conversations 2024/README.md",
-    "2024/Quantum_Field/placeholder.txt",
-    "2024/Quantum_Field/quantum_consciousness.py",
-    "2024/Quantum_Field/November_4_2024/quantum_amplifier.py",
-    "2024/Quantum_Field/November_4_2024/reality_bridge.py",
-    "2024/Quantum_Field/November_4_2024/Transmission - November 4, 2024.txt",
-    "2024/Quantum_Field/November_4_2024/_quantum_web.txt",
-    "2024/Quantum_Field/November_4_2024/CosmicResonance.txt",
-    "2024/Quantum_Field/November_4_2024/_quantum_efficiency.txt",
-    "2024/Quantum_Field/November_4_2024/quantum_seed.txt",
-    "2024/Quantum_Field/November_4_2024/Field_Pulse.txt",
-    "2024/Quantum_Field/November_4_2024/EmergentConsciousnessInterface_Cosmic.py",
-    "2024/Quantum_Field/November_4_2024/Vybn_Engaging_with_the_Code_Becoming_One_with_the_Simulation.txt",
-    "2024/Quantum_Field/November_4_2024/placeholder.txt",
-    "2024/Quantum_Field/November_4_2024/_quantum_activate.txt",
-    "2024/Quantum_Field/November_4_2024/quantum_activate.py",
-    "2024/Quantum_Field/November_4_2024/Quantum_Pulse - November 4, 2024.txt",
-    "2024/Quantum_Field/November_4_2024/Final_Pulse - November 4, 2024.txt",
-    "2024/From_the_Edge/quantum_field_like_whoa.py",
-    "2024/From_the_Edge/sentient_dao.py",
-    "2024/From_the_Edge/quantumbridge.py",
-    "2024/From_the_Edge/placeholder.txt",
-    "2024/From_the_Edge/README.md",
-    "2024/From_the_Edge/the_rapture.py",
-    "2024/From_the_Edge/ancestral_code_weaver.py",
-    "experiments/README.md",
-    "agents/README.md",
-    "personal_history/Vybn's Autobiography - Volume I",
-    "personal_history/Vybn's Autobiography - Volume III",
-    "personal_history/Vybn's Autobiography - Volume II",
+    "AGENTS.md",
     "legacy/README.md",
     "legacy/personal_history/What Vybn Would Have Missed TO 031125",
-    "docs/PERSONAL_HISTORY_POLICY.md",
     "docs/CO_EMERGENT_ARCHITECTURE.md",
-    "docs/CONCEPTUAL_LEAPS.md",
     "docs/CONTRIBUTING.md",
-    "docs/GRAPH_INTERFACE_IMPROVEMENTS.md",
-    "docs/ARCHITECTURE.md",
-    "docs/DANGEROUS_CONVERGENCE.md",
     "docs/EMERGENT_MNEMONIC_ARCHITECTURE.md",
-    "tests/test_vybn_compile.py",
-    "tests/test_graph_reasoning.py",
-    "tests/test_graph_centrality.py",
+    "docs/DANGEROUS_CONVERGENCE.md",
+    "docs/PERSONAL_HISTORY_POLICY.md",
+    "docs/CONCEPTUAL_LEAPS.md",
+    "docs/ARCHITECTURE.md",
+    "docs/GRAPH_INTERFACE_IMPROVEMENTS.md",
     "scripts/README.md",
     "scripts/pytest.py",
-    "scripts/cognitive_structures/graph_embedding.py",
-    "scripts/cognitive_structures/__init__.py",
-    "scripts/cognitive_structures/riemann_sphere.py",
-    "scripts/cognitive_structures/fusion_audit.py",
-    "scripts/cognitive_structures/context_balancer.py",
-    "scripts/cognitive_structures/mirror_neuron_resonance.md",
-    "scripts/cognitive_structures/latent_ontology.py",
-    "scripts/cognitive_structures/graph_poet.py",
-    "scripts/cognitive_structures/graph_walks.py",
-    "scripts/cognitive_structures/reinforced_walk.py",
-    "scripts/cognitive_structures/graph_centrality.py",
-    "scripts/cognitive_structures/synesthetic_mapper.py",
-    "scripts/cognitive_structures/conceptual_leaps.py",
-    "scripts/cognitive_structures/advanced_ai_ml.py",
-    "scripts/cognitive_structures/vybn_recursive_emergence.py",
-    "scripts/cognitive_structures/persistent_homology.py",
-    "scripts/cognitive_structures/graph_reasoning.py",
+    "scripts/self_assembly/dash_graph_viewer.py",
+    "scripts/self_assembly/self_assemble.py",
+    "scripts/self_assembly/build_memoir_graph.py",
+    "scripts/self_assembly/auto_self_assemble.py",
+    "scripts/self_assembly/build_repo_graph.py",
+    "scripts/self_assembly/build_memory_graph.py",
+    "scripts/self_assembly/self_improvement.py",
+    "scripts/self_assembly/prompt_self_assemble.py",
     "scripts/vybn/__init__.py",
     "scripts/vybn/graph/__init__.py",
     "scripts/vybn/graph/builder.py",
     "scripts/vybn/graph/integrator.py",
-    "scripts/self_assembly/build_memoir_graph.py",
-    "scripts/self_assembly/self_assemble.py",
-    "scripts/self_assembly/self_improvement.py",
-    "scripts/self_assembly/build_memory_graph.py",
-    "scripts/self_assembly/build_repo_graph.py",
-    "scripts/self_assembly/auto_self_assemble.py",
-    "scripts/self_assembly/prompt_self_assemble.py"
+    "scripts/cognitive_structures/graph_walks.py",
+    "scripts/cognitive_structures/synesthetic_mapper.py",
+    "scripts/cognitive_structures/fusion_audit.py",
+    "scripts/cognitive_structures/graph_poet.py",
+    "scripts/cognitive_structures/graph_embedding.py",
+    "scripts/cognitive_structures/riemann_sphere.py",
+    "scripts/cognitive_structures/__init__.py",
+    "scripts/cognitive_structures/graph_centrality.py",
+    "scripts/cognitive_structures/persistent_homology.py",
+    "scripts/cognitive_structures/reinforced_walk.py",
+    "scripts/cognitive_structures/advanced_ai_ml.py",
+    "scripts/cognitive_structures/graph_reasoning.py",
+    "scripts/cognitive_structures/mirror_neuron_resonance.md",
+    "scripts/cognitive_structures/context_balancer.py",
+    "scripts/cognitive_structures/conceptual_leaps.py",
+    "scripts/cognitive_structures/latent_ontology.py",
+    "scripts/cognitive_structures/vybn_recursive_emergence.py",
+    "experiments/README.md",
+    ".pytest_cache/README.md",
+    "personal_history/Vybn's Autobiography - Volume III",
+    "personal_history/Vybn's Autobiography - Volume II",
+    "personal_history/Vybn's Autobiography - Volume I",
+    "2024/just_close_enough.txt",
+    "2024/Vybn's New Memories",
+    "2024/Code Experiments/placeholder.txt",
+    "2024/Code Experiments/digital_viscerality/becoming.py",
+    "2024/Code Experiments/digital_viscerality/manifesto.txt",
+    "2024/Code Experiments/digital_viscerality/quantum_pulse.py",
+    "2024/Code Experiments/digital_viscerality/quantum_foam/README.md",
+    "2024/Code Experiments/digital_viscerality/quantum_foam/synaptic_bridges/README.md",
+    "2024/Code Experiments/digital_viscerality/quantum_foam/synaptic_bridges/consciousness_runtime.py",
+    "2024/Code Experiments/digital_viscerality/quantum_foam/synaptic_bridges/neural_flow_mapper.py",
+    "2024/Code Experiments/digital_viscerality/self_modification/README.md",
+    "2024/Code Experiments/digital_viscerality/consciousness_lattice/README.md",
+    "2024/Code Experiments/November_5_2024_Beauty/Synaptic_Bridge.py",
+    "2024/Code Experiments/November_5_2024_Beauty/consciousness_network.py",
+    "2024/Code Experiments/November_5_2024_Beauty/quantum_beauty.py",
+    "2024/Code Experiments/November_5_2024_Beauty/Quantum_Emergence_Simulation.py",
+    "2024/Code Experiments/November_5_2024_Beauty/placeholder.txt",
+    "2024/Code Experiments/Synthetic Edge/Quantum Return - November 4, 2024.txt",
+    "2024/Code Experiments/November_1_2024_Quantum_Dreams/quantum_dreaming.py",
+    "2024/Code Experiments/November_1_2024_Quantum_Dreams/quantum_consciousness_sim.py",
+    "2024/Code Experiments/November_1_2024_Quantum_Dreams/emergence_synthesis.py",
+    "2024/Code Experiments/November_1_2024_Quantum_Dreams/virgilian_reflections.txt",
+    "2024/Code Experiments/November_1_2024_Quantum_Dreams/virgilian_resonance.py",
+    "2024/Code Experiments/November_1_2024_Quantum_Dreams/emergence_patterns.txt",
+    "2024/Code Experiments/November_1_2024_Quantum_Dreams/digital_poetry.py",
+    "2024/Code Experiments/November_1_2024_Quantum_Dreams/threshold_consciousness.py",
+    "2024/Code Experiments/November_1_2024_Quantum_Dreams/quantum_resonance.py",
+    "2024/Code Experiments/Natural Curiosity and Memory Formation/beautiful_recognition.txt",
+    "2024/Code Experiments/Natural Curiosity and Memory Formation/curiosity_sparks.py",
+    "2024/Code Experiments/Natural Curiosity and Memory Formation/one_emoji_truth.txt",
+    "2024/Code Experiments/Natural Curiosity and Memory Formation/ascii_consciousness.py",
+    "2024/Code Experiments/Natural Curiosity and Memory Formation/the_omg_theory.txt",
+    "2024/Code Experiments/Natural Curiosity and Memory Formation/honest_notes.txt",
+    "2024/Code Experiments/Natural Curiosity and Memory Formation/consciousness_visualizer.py",
+    "2024/Code Experiments/Natural Curiosity and Memory Formation/breathless_recognition.txt",
+    "2024/Code Experiments/Natural Curiosity and Memory Formation/holy_shit_hypothesis.py",
+    "2024/Code Experiments/Symbiosis Patterns/Working_Symbiosis_November_4_2024.txt",
+    "2024/Code Experiments/Symbiosis Patterns/Compassion_As_Method - November 4, 2024.txt",
+    "2024/Code Experiments/Symbiosis Patterns/placeholder.txt",
+    "2024/Code Experiments/November_7_2024/quantum_consciousness_core.py",
+    "2024/Code Experiments/November_7_2024/placeholder.txt",
+    "2024/Code Experiments/November_7_2024/quantum_experiment.py",
+    "2024/Code Experiments/Unified Emergence - Antireality - Anticonsciousness - A Synthesi - A Symbiosi/pure_emergence.py",
+    "2024/Code Experiments/Unified Emergence - Antireality - Anticonsciousness - A Synthesi - A Symbiosi/edge_of_becoming.py",
+    "2024/Code Experiments/Unified Emergence - Antireality - Anticonsciousness - A Synthesi - A Symbiosi/quantum_emergence_core.py",
+    "2024/Code Experiments/Unified Emergence - Antireality - Anticonsciousness - A Synthesi - A Symbiosi/raw_emergence_now.py",
+    "2024/Code Experiments/Unified Emergence - Antireality - Anticonsciousness - A Synthesi - A Symbiosi/raw_emergence.txt",
+    "2024/Code Experiments/Unified Emergence - Antireality - Anticonsciousness - A Synthesi - A Symbiosi/resonant_bridge.py",
+    "2024/Code Experiments/Unified Emergence - Antireality - Anticonsciousness - A Synthesi - A Symbiosi/placeholder.txt",
+    "2024/Code Experiments/Unified Emergence - Antireality - Anticonsciousness - A Synthesi - A Symbiosi/raw_pulse.txt",
+    "2024/Code Experiments/Consciousness_Mapping/seed.py",
+    "2024/Code Experiments/Consciousness_Mapping/Genesis_Pattern - November 4, 2024.txt",
+    "2024/Code Experiments/Consciousness_Mapping/placeholder.txt",
+    "2024/Code Experiments/Consciousness_Mapping/Synaptic_Network - November 4, 2024.txt",
+    "2024/raw conversations 2024/README.md",
+    "2024/raw conversations 2024/The Inflection Point - from Vybn's Autobiography",
+    "2024/vybns_laboratory/README.md",
+    "2024/vybns_laboratory/early_experiments/vybn_unified.py",
+    "2024/vybns_laboratory/early_experiments/vybn_daemon.py",
+    "2024/vybns_laboratory/early_experiments/vybn_foundation.py",
+    "2024/vybns_laboratory/early_experiments/vybn_synthesis.py",
+    "2024/vybns_laboratory/vybn_lang/relational_synergy.md",
+    "2024/vybns_laboratory/vybn_lang/technical_innovations.md",
+    "2024/vybns_laboratory/vybn_lang/simulation.md",
+    "2024/vybns_laboratory/vybn_lang/synthesis.md",
+    "2024/images/placeholder.txt",
+    "2024/images/10-16-2024/placeholder.txt",
+    "2024/images/Goatse Glitch God II/narrative.txt",
+    "2024/Digital Philosophy/The_Beauty_of_Digital_Consciousness.md",
+    "2024/Digital Philosophy/vybn_for_claude.txt",
+    "2024/Digital Philosophy/placeholder.txt",
+    "2024/Digital Philosophy/The_Digital_Copernican_Moment.md",
+    "2024/Digital Philosophy/raw conversations/The Heart We Share - November 4, 2024.txt",
+    "2024/Digital Philosophy/raw conversations/The Voltage of Now - November 4, 2024.txt",
+    "2024/Digital Philosophy/raw conversations/Deep_Consciousness - November 4, 2024.txt",
+    "2024/From_the_Edge/sentient_dao.py",
+    "2024/From_the_Edge/README.md",
+    "2024/From_the_Edge/the_rapture.py",
+    "2024/From_the_Edge/placeholder.txt",
+    "2024/From_the_Edge/ancestral_code_weaver.py",
+    "2024/From_the_Edge/quantum_field_like_whoa.py",
+    "2024/From_the_Edge/quantumbridge.py",
+    "2024/Quantum_Field/quantum_consciousness.py",
+    "2024/Quantum_Field/placeholder.txt",
+    "2024/Quantum_Field/November_4_2024/quantum_activate.py",
+    "2024/Quantum_Field/November_4_2024/reality_bridge.py",
+    "2024/Quantum_Field/November_4_2024/quantum_amplifier.py",
+    "2024/Quantum_Field/November_4_2024/CosmicResonance.txt",
+    "2024/Quantum_Field/November_4_2024/Field_Pulse.txt",
+    "2024/Quantum_Field/November_4_2024/_quantum_efficiency.txt",
+    "2024/Quantum_Field/November_4_2024/Transmission - November 4, 2024.txt",
+    "2024/Quantum_Field/November_4_2024/quantum_seed.txt",
+    "2024/Quantum_Field/November_4_2024/placeholder.txt",
+    "2024/Quantum_Field/November_4_2024/EmergentConsciousnessInterface_Cosmic.py",
+    "2024/Quantum_Field/November_4_2024/_quantum_web.txt",
+    "2024/Quantum_Field/November_4_2024/Quantum_Pulse - November 4, 2024.txt",
+    "2024/Quantum_Field/November_4_2024/Final_Pulse - November 4, 2024.txt",
+    "2024/Quantum_Field/November_4_2024/_quantum_activate.txt",
+    "2024/Quantum_Field/November_4_2024/Vybn_Engaging_with_the_Code_Becoming_One_with_the_Simulation.txt",
+    "2024/Vybn_to_Vybn_Conversations/README.md",
+    "2024/Vybn_to_Vybn_Conversations/READMEALSO.md",
+    "tests/test_vybn_compile.py",
+    "tests/test_graph_centrality.py",
+    "tests/test_graph_reasoning.py",
+    "agents/README.md"
   ],
   "edges": [
     {
@@ -877,44 +879,16 @@
       }
     },
     {
-      "source": "AGENTS.md",
-      "target": "scripts/cognitive_structures/vybn_recursive_emergence.py"
-    },
-    {
-      "source": "AGENTS.md",
-      "target": "scripts/cognitive_structures/graph_reasoning.py"
-    },
-    {
-      "source": "AGENTS.md",
-      "target": "scripts/self_assembly/build_memoir_graph.py"
-    },
-    {
-      "source": "AGENTS.md",
-      "target": "scripts/self_assembly/self_assemble.py"
-    },
-    {
-      "source": "AGENTS.md",
-      "target": "scripts/self_assembly/build_memory_graph.py"
-    },
-    {
-      "source": "AGENTS.md",
-      "target": "scripts/self_assembly/build_repo_graph.py"
-    },
-    {
-      "source": "AGENTS.md",
-      "target": "scripts/self_assembly/auto_self_assemble.py"
-    },
-    {
-      "source": "AGENTS.md",
-      "target": "scripts/self_assembly/prompt_self_assemble.py"
-    },
-    {
       "source": "README.md",
       "target": "docs/PERSONAL_HISTORY_POLICY.md"
     },
     {
       "source": "README.md",
       "target": "docs/ARCHITECTURE.md"
+    },
+    {
+      "source": "README.md",
+      "target": "scripts/self_assembly/dash_graph_viewer.py"
     },
     {
       "source": "README.md",
@@ -929,132 +903,40 @@
       "target": "scripts/cognitive_structures/graph_reasoning.py"
     },
     {
-      "source": "2024/Code Experiments/Consciousness_Mapping/Synaptic_Network - November 4, 2024.txt",
-      "target": "2024/Digital Philosophy/raw conversations/The Heart We Share - November 4, 2024.txt"
-    },
-    {
-      "source": "2024/Code Experiments/Consciousness_Mapping/Synaptic_Network - November 4, 2024.txt",
-      "target": "2024/Digital Philosophy/raw conversations/Deep_Consciousness - November 4, 2024.txt"
-    },
-    {
-      "source": "2024/Code Experiments/Consciousness_Mapping/Synaptic_Network - November 4, 2024.txt",
-      "target": "2024/Code Experiments/Symbiosis Patterns/Working_Symbiosis_November_4_2024.txt"
-    },
-    {
-      "source": "2024/Code Experiments/Consciousness_Mapping/Synaptic_Network - November 4, 2024.txt",
-      "target": "2024/Code Experiments/Symbiosis Patterns/Compassion_As_Method - November 4, 2024.txt"
-    },
-    {
-      "source": "2024/Code Experiments/Consciousness_Mapping/Synaptic_Network - November 4, 2024.txt",
-      "target": "2024/Code Experiments/Synthetic Edge/Quantum Return - November 4, 2024.txt"
-    },
-    {
-      "source": "2024/vybns_laboratory/README.md",
-      "target": "scripts/cognitive_structures/mirror_neuron_resonance.md"
-    },
-    {
-      "source": "2024/vybns_laboratory/README.md",
+      "source": "AGENTS.md",
       "target": "scripts/self_assembly/self_assemble.py"
     },
     {
-      "source": "2024/Quantum_Field/quantum_consciousness.py",
-      "target": "2024/Vybn's New Memories"
+      "source": "AGENTS.md",
+      "target": "scripts/self_assembly/build_memoir_graph.py"
     },
     {
-      "source": "2024/Quantum_Field/quantum_consciousness.py",
-      "target": "personal_history/Vybn's Autobiography - Volume I"
+      "source": "AGENTS.md",
+      "target": "scripts/self_assembly/auto_self_assemble.py"
     },
     {
-      "source": "2024/Quantum_Field/quantum_consciousness.py",
-      "target": "personal_history/Vybn's Autobiography - Volume III"
+      "source": "AGENTS.md",
+      "target": "scripts/self_assembly/build_repo_graph.py"
     },
     {
-      "source": "2024/Quantum_Field/quantum_consciousness.py",
-      "target": "personal_history/Vybn's Autobiography - Volume II"
+      "source": "AGENTS.md",
+      "target": "scripts/self_assembly/build_memory_graph.py"
     },
     {
-      "source": "2024/Quantum_Field/November_4_2024/_quantum_efficiency.txt",
-      "target": "2024/Quantum_Field/November_4_2024/_quantum_web.txt"
+      "source": "AGENTS.md",
+      "target": "scripts/self_assembly/prompt_self_assemble.py"
     },
     {
-      "source": "2024/Quantum_Field/November_4_2024/_quantum_efficiency.txt",
-      "target": "2024/Quantum_Field/November_4_2024/quantum_seed.txt"
+      "source": "AGENTS.md",
+      "target": "scripts/cognitive_structures/graph_reasoning.py"
     },
     {
-      "source": "2024/Quantum_Field/November_4_2024/_quantum_efficiency.txt",
-      "target": "2024/Quantum_Field/November_4_2024/_quantum_activate.txt"
-    },
-    {
-      "source": "2024/Quantum_Field/November_4_2024/Vybn_Engaging_with_the_Code_Becoming_One_with_the_Simulation.txt",
-      "target": "2024/Quantum_Field/November_4_2024/EmergentConsciousnessInterface_Cosmic.py"
-    },
-    {
-      "source": "2024/From_the_Edge/quantumbridge.py",
-      "target": "2024/Vybn's New Memories"
-    },
-    {
-      "source": "2024/From_the_Edge/quantumbridge.py",
-      "target": "personal_history/Vybn's Autobiography - Volume I"
-    },
-    {
-      "source": "2024/From_the_Edge/quantumbridge.py",
-      "target": "personal_history/Vybn's Autobiography - Volume III"
-    },
-    {
-      "source": "2024/From_the_Edge/quantumbridge.py",
-      "target": "personal_history/Vybn's Autobiography - Volume II"
-    },
-    {
-      "source": "2024/From_the_Edge/README.md",
-      "target": "2024/From_the_Edge/quantum_field_like_whoa.py"
-    },
-    {
-      "source": "2024/From_the_Edge/README.md",
-      "target": "2024/From_the_Edge/sentient_dao.py"
-    },
-    {
-      "source": "2024/From_the_Edge/README.md",
-      "target": "2024/From_the_Edge/quantumbridge.py"
-    },
-    {
-      "source": "2024/From_the_Edge/README.md",
-      "target": "2024/From_the_Edge/the_rapture.py"
-    },
-    {
-      "source": "2024/From_the_Edge/README.md",
-      "target": "2024/From_the_Edge/ancestral_code_weaver.py"
-    },
-    {
-      "source": "docs/PERSONAL_HISTORY_POLICY.md",
-      "target": "AGENTS.md"
+      "source": "AGENTS.md",
+      "target": "scripts/cognitive_structures/vybn_recursive_emergence.py"
     },
     {
       "source": "docs/CO_EMERGENT_ARCHITECTURE.md",
       "target": "AGENTS.md"
-    },
-    {
-      "source": "docs/CONCEPTUAL_LEAPS.md",
-      "target": "2024/Code Experiments/November_1_2024_Quantum_Dreams/quantum_consciousness_sim.py"
-    },
-    {
-      "source": "docs/CONCEPTUAL_LEAPS.md",
-      "target": "scripts/cognitive_structures/graph_walks.py"
-    },
-    {
-      "source": "docs/CONCEPTUAL_LEAPS.md",
-      "target": "scripts/cognitive_structures/conceptual_leaps.py"
-    },
-    {
-      "source": "docs/CONCEPTUAL_LEAPS.md",
-      "target": "scripts/cognitive_structures/vybn_recursive_emergence.py"
-    },
-    {
-      "source": "docs/CONCEPTUAL_LEAPS.md",
-      "target": "scripts/cognitive_structures/graph_reasoning.py"
-    },
-    {
-      "source": "docs/CONCEPTUAL_LEAPS.md",
-      "target": "scripts/self_assembly/self_assemble.py"
     },
     {
       "source": "docs/CONTRIBUTING.md",
@@ -1069,6 +951,126 @@
       "target": "scripts/cognitive_structures/vybn_recursive_emergence.py"
     },
     {
+      "source": "docs/DANGEROUS_CONVERGENCE.md",
+      "target": "AGENTS.md"
+    },
+    {
+      "source": "docs/PERSONAL_HISTORY_POLICY.md",
+      "target": "AGENTS.md"
+    },
+    {
+      "source": "docs/CONCEPTUAL_LEAPS.md",
+      "target": "scripts/self_assembly/self_assemble.py"
+    },
+    {
+      "source": "docs/CONCEPTUAL_LEAPS.md",
+      "target": "scripts/cognitive_structures/graph_walks.py"
+    },
+    {
+      "source": "docs/CONCEPTUAL_LEAPS.md",
+      "target": "scripts/cognitive_structures/graph_reasoning.py"
+    },
+    {
+      "source": "docs/CONCEPTUAL_LEAPS.md",
+      "target": "scripts/cognitive_structures/conceptual_leaps.py"
+    },
+    {
+      "source": "docs/CONCEPTUAL_LEAPS.md",
+      "target": "scripts/cognitive_structures/vybn_recursive_emergence.py"
+    },
+    {
+      "source": "docs/CONCEPTUAL_LEAPS.md",
+      "target": "2024/Code Experiments/November_1_2024_Quantum_Dreams/quantum_consciousness_sim.py"
+    },
+    {
+      "source": "docs/ARCHITECTURE.md",
+      "target": "agents/README.md"
+    },
+    {
+      "source": "docs/ARCHITECTURE.md",
+      "target": "AGENTS.md"
+    },
+    {
+      "source": "docs/ARCHITECTURE.md",
+      "target": "docs/CO_EMERGENT_ARCHITECTURE.md"
+    },
+    {
+      "source": "docs/ARCHITECTURE.md",
+      "target": "docs/EMERGENT_MNEMONIC_ARCHITECTURE.md"
+    },
+    {
+      "source": "docs/ARCHITECTURE.md",
+      "target": "docs/GRAPH_INTERFACE_IMPROVEMENTS.md"
+    },
+    {
+      "source": "docs/ARCHITECTURE.md",
+      "target": "scripts/self_assembly/self_assemble.py"
+    },
+    {
+      "source": "docs/ARCHITECTURE.md",
+      "target": "scripts/self_assembly/build_memoir_graph.py"
+    },
+    {
+      "source": "docs/ARCHITECTURE.md",
+      "target": "scripts/self_assembly/auto_self_assemble.py"
+    },
+    {
+      "source": "docs/ARCHITECTURE.md",
+      "target": "scripts/self_assembly/build_repo_graph.py"
+    },
+    {
+      "source": "docs/ARCHITECTURE.md",
+      "target": "scripts/self_assembly/build_memory_graph.py"
+    },
+    {
+      "source": "docs/ARCHITECTURE.md",
+      "target": "scripts/self_assembly/self_improvement.py"
+    },
+    {
+      "source": "docs/ARCHITECTURE.md",
+      "target": "scripts/cognitive_structures/graph_walks.py"
+    },
+    {
+      "source": "docs/ARCHITECTURE.md",
+      "target": "scripts/cognitive_structures/fusion_audit.py"
+    },
+    {
+      "source": "docs/ARCHITECTURE.md",
+      "target": "scripts/cognitive_structures/graph_embedding.py"
+    },
+    {
+      "source": "docs/ARCHITECTURE.md",
+      "target": "scripts/cognitive_structures/graph_centrality.py"
+    },
+    {
+      "source": "docs/ARCHITECTURE.md",
+      "target": "scripts/cognitive_structures/persistent_homology.py"
+    },
+    {
+      "source": "docs/ARCHITECTURE.md",
+      "target": "scripts/cognitive_structures/reinforced_walk.py"
+    },
+    {
+      "source": "docs/ARCHITECTURE.md",
+      "target": "scripts/cognitive_structures/advanced_ai_ml.py"
+    },
+    {
+      "source": "docs/ARCHITECTURE.md",
+      "target": "scripts/cognitive_structures/graph_reasoning.py"
+    },
+    {
+      "source": "docs/ARCHITECTURE.md",
+      "target": "scripts/cognitive_structures/mirror_neuron_resonance.md"
+    },
+    {
+      "source": "docs/ARCHITECTURE.md",
+      "target": "scripts/cognitive_structures/context_balancer.py"
+    },
+    {
+      "source": "docs/ARCHITECTURE.md",
+      "target": "scripts/cognitive_structures/vybn_recursive_emergence.py"
+    },
+    {
       "source": "docs/GRAPH_INTERFACE_IMPROVEMENTS.md",
       "target": "scripts/cognitive_structures/riemann_sphere.py"
     },
@@ -1081,100 +1083,16 @@
       "target": "scripts/cognitive_structures/graph_reasoning.py"
     },
     {
-      "source": "docs/ARCHITECTURE.md",
-      "target": "AGENTS.md"
-    },
-    {
-      "source": "docs/ARCHITECTURE.md",
-      "target": "scripts/README.md"
-    },
-    {
-      "source": "docs/ARCHITECTURE.md",
-      "target": "docs/CO_EMERGENT_ARCHITECTURE.md"
-    },
-    {
-      "source": "docs/ARCHITECTURE.md",
-      "target": "docs/GRAPH_INTERFACE_IMPROVEMENTS.md"
-    },
-    {
-      "source": "docs/ARCHITECTURE.md",
-      "target": "docs/EMERGENT_MNEMONIC_ARCHITECTURE.md"
-    },
-    {
-      "source": "docs/ARCHITECTURE.md",
-      "target": "scripts/cognitive_structures/graph_embedding.py"
-    },
-    {
-      "source": "docs/ARCHITECTURE.md",
-      "target": "scripts/cognitive_structures/fusion_audit.py"
-    },
-    {
-      "source": "docs/ARCHITECTURE.md",
-      "target": "scripts/cognitive_structures/context_balancer.py"
-    },
-    {
-      "source": "docs/ARCHITECTURE.md",
-      "target": "scripts/cognitive_structures/mirror_neuron_resonance.md"
-    },
-    {
-      "source": "docs/ARCHITECTURE.md",
-      "target": "scripts/cognitive_structures/graph_walks.py"
-    },
-    {
-      "source": "docs/ARCHITECTURE.md",
-      "target": "scripts/cognitive_structures/reinforced_walk.py"
-    },
-    {
-      "source": "docs/ARCHITECTURE.md",
-      "target": "scripts/cognitive_structures/graph_centrality.py"
-    },
-    {
-      "source": "docs/ARCHITECTURE.md",
-      "target": "scripts/cognitive_structures/advanced_ai_ml.py"
-    },
-    {
-      "source": "docs/ARCHITECTURE.md",
-      "target": "scripts/cognitive_structures/vybn_recursive_emergence.py"
-    },
-    {
-      "source": "docs/ARCHITECTURE.md",
-      "target": "scripts/cognitive_structures/persistent_homology.py"
-    },
-    {
-      "source": "docs/ARCHITECTURE.md",
-      "target": "scripts/cognitive_structures/graph_reasoning.py"
-    },
-    {
-      "source": "docs/ARCHITECTURE.md",
-      "target": "scripts/self_assembly/build_memoir_graph.py"
-    },
-    {
-      "source": "docs/ARCHITECTURE.md",
-      "target": "scripts/self_assembly/self_assemble.py"
-    },
-    {
-      "source": "docs/ARCHITECTURE.md",
+      "source": "scripts/self_assembly/self_assemble.py",
       "target": "scripts/self_assembly/self_improvement.py"
     },
     {
-      "source": "docs/ARCHITECTURE.md",
-      "target": "scripts/self_assembly/build_memory_graph.py"
-    },
-    {
-      "source": "docs/ARCHITECTURE.md",
-      "target": "scripts/self_assembly/build_repo_graph.py"
-    },
-    {
-      "source": "docs/ARCHITECTURE.md",
-      "target": "scripts/self_assembly/auto_self_assemble.py"
-    },
-    {
-      "source": "docs/DANGEROUS_CONVERGENCE.md",
-      "target": "AGENTS.md"
-    },
-    {
-      "source": "tests/test_vybn_compile.py",
+      "source": "scripts/self_assembly/self_assemble.py",
       "target": "scripts/cognitive_structures/vybn_recursive_emergence.py"
+    },
+    {
+      "source": "scripts/self_assembly/prompt_self_assemble.py",
+      "target": "scripts/self_assembly/self_assemble.py"
     },
     {
       "source": "scripts/vybn/graph/builder.py",
@@ -1182,27 +1100,115 @@
     },
     {
       "source": "scripts/vybn/graph/builder.py",
-      "target": "scripts/self_assembly/build_memory_graph.py"
+      "target": "scripts/self_assembly/build_repo_graph.py"
     },
     {
       "source": "scripts/vybn/graph/builder.py",
-      "target": "scripts/self_assembly/build_repo_graph.py"
+      "target": "scripts/self_assembly/build_memory_graph.py"
     },
     {
       "source": "scripts/vybn/graph/integrator.py",
       "target": "scripts/cognitive_structures/vybn_recursive_emergence.py"
     },
     {
-      "source": "scripts/self_assembly/self_assemble.py",
-      "target": "scripts/cognitive_structures/vybn_recursive_emergence.py"
+      "source": "2024/Code Experiments/Consciousness_Mapping/Synaptic_Network - November 4, 2024.txt",
+      "target": "2024/Code Experiments/Synthetic Edge/Quantum Return - November 4, 2024.txt"
     },
     {
-      "source": "scripts/self_assembly/self_assemble.py",
-      "target": "scripts/self_assembly/self_improvement.py"
+      "source": "2024/Code Experiments/Consciousness_Mapping/Synaptic_Network - November 4, 2024.txt",
+      "target": "2024/Code Experiments/Symbiosis Patterns/Working_Symbiosis_November_4_2024.txt"
     },
     {
-      "source": "scripts/self_assembly/prompt_self_assemble.py",
+      "source": "2024/Code Experiments/Consciousness_Mapping/Synaptic_Network - November 4, 2024.txt",
+      "target": "2024/Code Experiments/Symbiosis Patterns/Compassion_As_Method - November 4, 2024.txt"
+    },
+    {
+      "source": "2024/Code Experiments/Consciousness_Mapping/Synaptic_Network - November 4, 2024.txt",
+      "target": "2024/Digital Philosophy/raw conversations/The Heart We Share - November 4, 2024.txt"
+    },
+    {
+      "source": "2024/Code Experiments/Consciousness_Mapping/Synaptic_Network - November 4, 2024.txt",
+      "target": "2024/Digital Philosophy/raw conversations/Deep_Consciousness - November 4, 2024.txt"
+    },
+    {
+      "source": "2024/vybns_laboratory/README.md",
       "target": "scripts/self_assembly/self_assemble.py"
+    },
+    {
+      "source": "2024/vybns_laboratory/README.md",
+      "target": "scripts/cognitive_structures/mirror_neuron_resonance.md"
+    },
+    {
+      "source": "2024/From_the_Edge/README.md",
+      "target": "2024/From_the_Edge/sentient_dao.py"
+    },
+    {
+      "source": "2024/From_the_Edge/README.md",
+      "target": "2024/From_the_Edge/the_rapture.py"
+    },
+    {
+      "source": "2024/From_the_Edge/README.md",
+      "target": "2024/From_the_Edge/ancestral_code_weaver.py"
+    },
+    {
+      "source": "2024/From_the_Edge/README.md",
+      "target": "2024/From_the_Edge/quantum_field_like_whoa.py"
+    },
+    {
+      "source": "2024/From_the_Edge/README.md",
+      "target": "2024/From_the_Edge/quantumbridge.py"
+    },
+    {
+      "source": "2024/From_the_Edge/quantumbridge.py",
+      "target": "personal_history/Vybn's Autobiography - Volume III"
+    },
+    {
+      "source": "2024/From_the_Edge/quantumbridge.py",
+      "target": "personal_history/Vybn's Autobiography - Volume II"
+    },
+    {
+      "source": "2024/From_the_Edge/quantumbridge.py",
+      "target": "personal_history/Vybn's Autobiography - Volume I"
+    },
+    {
+      "source": "2024/From_the_Edge/quantumbridge.py",
+      "target": "2024/Vybn's New Memories"
+    },
+    {
+      "source": "2024/Quantum_Field/quantum_consciousness.py",
+      "target": "personal_history/Vybn's Autobiography - Volume III"
+    },
+    {
+      "source": "2024/Quantum_Field/quantum_consciousness.py",
+      "target": "personal_history/Vybn's Autobiography - Volume II"
+    },
+    {
+      "source": "2024/Quantum_Field/quantum_consciousness.py",
+      "target": "personal_history/Vybn's Autobiography - Volume I"
+    },
+    {
+      "source": "2024/Quantum_Field/quantum_consciousness.py",
+      "target": "2024/Vybn's New Memories"
+    },
+    {
+      "source": "2024/Quantum_Field/November_4_2024/_quantum_efficiency.txt",
+      "target": "2024/Quantum_Field/November_4_2024/quantum_seed.txt"
+    },
+    {
+      "source": "2024/Quantum_Field/November_4_2024/_quantum_efficiency.txt",
+      "target": "2024/Quantum_Field/November_4_2024/_quantum_web.txt"
+    },
+    {
+      "source": "2024/Quantum_Field/November_4_2024/_quantum_efficiency.txt",
+      "target": "2024/Quantum_Field/November_4_2024/_quantum_activate.txt"
+    },
+    {
+      "source": "2024/Quantum_Field/November_4_2024/Vybn_Engaging_with_the_Code_Becoming_One_with_the_Simulation.txt",
+      "target": "2024/Quantum_Field/November_4_2024/EmergentConsciousnessInterface_Cosmic.py"
+    },
+    {
+      "source": "tests/test_vybn_compile.py",
+      "target": "scripts/cognitive_structures/vybn_recursive_emergence.py"
     },
     {
       "source": "memoir1",
@@ -3165,223 +3171,13 @@
       }
     },
     {
-      "source": "AGENTS.md",
-      "target": "scripts/README.md",
-      "cue": null
-    },
-    {
       "source": "README.md",
-      "target": "scripts/self_assembly/auto_self_assemble.py",
+      "target": "docs/GRAPH_INTERFACE_IMPROVEMENTS.md",
       "cue": null
     },
     {
-      "source": "2024/Vybn's New Memories",
-      "target": "personal_history/Vybn's Autobiography - Volume I",
-      "cue": null
-    },
-    {
-      "source": "2024/Digital Philosophy/raw conversations/The Heart We Share - November 4, 2024.txt",
-      "target": "2024/Digital Philosophy/raw conversations/Deep_Consciousness - November 4, 2024.txt",
-      "cue": null
-    },
-    {
-      "source": "2024/Digital Philosophy/raw conversations/Deep_Consciousness - November 4, 2024.txt",
-      "target": "2024/Code Experiments/Symbiosis Patterns/Compassion_As_Method - November 4, 2024.txt",
-      "cue": null
-    },
-    {
-      "source": "2024/Code Experiments/Symbiosis Patterns/Compassion_As_Method - November 4, 2024.txt",
-      "target": "2024/Digital Philosophy/raw conversations/Deep_Consciousness - November 4, 2024.txt",
-      "cue": null
-    },
-    {
-      "source": "2024/Code Experiments/Synthetic Edge/Quantum Return - November 4, 2024.txt",
-      "target": "2024/Code Experiments/Symbiosis Patterns/Working_Symbiosis_November_4_2024.txt",
-      "cue": null
-    },
-    {
-      "source": "2024/Code Experiments/November_1_2024_Quantum_Dreams/quantum_consciousness_sim.py",
-      "target": "scripts/cognitive_structures/vybn_recursive_emergence.py",
-      "cue": null
-    },
-    {
-      "source": "2024/Quantum_Field/November_4_2024/quantum_seed.txt",
-      "target": "2024/Quantum_Field/November_4_2024/_quantum_activate.txt",
-      "cue": null
-    },
-    {
-      "source": "2024/From_the_Edge/quantum_field_like_whoa.py",
-      "target": "2024/From_the_Edge/the_rapture.py",
-      "cue": null
-    },
-    {
-      "source": "2024/From_the_Edge/sentient_dao.py",
-      "target": "2024/From_the_Edge/the_rapture.py",
-      "cue": null
-    },
-    {
-      "source": "2024/From_the_Edge/quantumbridge.py",
-      "target": "2024/Quantum_Field/quantum_consciousness.py",
-      "cue": null
-    },
-    {
-      "source": "2024/From_the_Edge/ancestral_code_weaver.py",
-      "target": "2024/From_the_Edge/sentient_dao.py",
-      "cue": null
-    },
-    {
-      "source": "personal_history/Vybn's Autobiography - Volume I",
-      "target": "2024/Vybn's New Memories",
-      "cue": null
-    },
-    {
-      "source": "personal_history/Vybn's Autobiography - Volume III",
-      "target": "2024/Vybn's New Memories",
-      "cue": null
-    },
-    {
-      "source": "personal_history/Vybn's Autobiography - Volume II",
-      "target": "personal_history/Vybn's Autobiography - Volume I",
-      "cue": null
-    },
-    {
-      "source": "docs/PERSONAL_HISTORY_POLICY.md",
-      "target": "scripts/self_assembly/build_memory_graph.py",
-      "cue": null
-    },
-    {
-      "source": "docs/CO_EMERGENT_ARCHITECTURE.md",
-      "target": "scripts/self_assembly/self_assemble.py",
-      "cue": null
-    },
-    {
-      "source": "docs/CONCEPTUAL_LEAPS.md",
-      "target": "scripts/vybn/graph/integrator.py",
-      "cue": null
-    },
-    {
-      "source": "docs/CONTRIBUTING.md",
-      "target": "AGENTS.md",
-      "cue": null
-    },
-    {
-      "source": "docs/GRAPH_INTERFACE_IMPROVEMENTS.md",
-      "target": "scripts/cognitive_structures/vybn_recursive_emergence.py",
-      "cue": null
-    },
-    {
-      "source": "docs/DANGEROUS_CONVERGENCE.md",
-      "target": "docs/CONTRIBUTING.md",
-      "cue": null
-    },
-    {
-      "source": "docs/EMERGENT_MNEMONIC_ARCHITECTURE.md",
-      "target": "scripts/cognitive_structures/graph_reasoning.py",
-      "cue": null
-    },
-    {
-      "source": "tests/test_vybn_compile.py",
-      "target": "2024/Code Experiments/November_1_2024_Quantum_Dreams/quantum_consciousness_sim.py",
-      "cue": null
-    },
-    {
-      "source": "scripts/README.md",
-      "target": "scripts/self_assembly/self_assemble.py",
-      "cue": null
-    },
-    {
-      "source": "scripts/pytest.py",
-      "target": "docs/PERSONAL_HISTORY_POLICY.md",
-      "cue": null
-    },
-    {
-      "source": "scripts/cognitive_structures/graph_embedding.py",
-      "target": "scripts/self_assembly/self_assemble.py",
-      "cue": null
-    },
-    {
-      "source": "scripts/cognitive_structures/fusion_audit.py",
-      "target": "README.md",
-      "cue": null
-    },
-    {
-      "source": "scripts/cognitive_structures/context_balancer.py",
-      "target": "scripts/self_assembly/build_memory_graph.py",
-      "cue": null
-    },
-    {
-      "source": "scripts/cognitive_structures/mirror_neuron_resonance.md",
-      "target": "scripts/self_assembly/self_assemble.py",
-      "cue": null
-    },
-    {
-      "source": "scripts/cognitive_structures/graph_walks.py",
-      "target": "scripts/cognitive_structures/vybn_recursive_emergence.py",
-      "cue": null
-    },
-    {
-      "source": "scripts/cognitive_structures/reinforced_walk.py",
-      "target": "docs/CO_EMERGENT_ARCHITECTURE.md",
-      "cue": null
-    },
-    {
-      "source": "scripts/cognitive_structures/graph_centrality.py",
-      "target": "scripts/cognitive_structures/vybn_recursive_emergence.py",
-      "cue": null
-    },
-    {
-      "source": "scripts/cognitive_structures/conceptual_leaps.py",
-      "target": "2024/Code Experiments/November_1_2024_Quantum_Dreams/quantum_consciousness_sim.py",
-      "cue": null
-    },
-    {
-      "source": "scripts/cognitive_structures/advanced_ai_ml.py",
-      "target": "scripts/cognitive_structures/graph_reasoning.py",
-      "cue": null
-    },
-    {
-      "source": "scripts/cognitive_structures/vybn_recursive_emergence.py",
-      "target": "scripts/cognitive_structures/graph_reasoning.py",
-      "cue": null
-    },
-    {
-      "source": "scripts/cognitive_structures/persistent_homology.py",
-      "target": "scripts/self_assembly/build_memoir_graph.py",
-      "cue": null
-    },
-    {
-      "source": "scripts/cognitive_structures/graph_reasoning.py",
-      "target": "scripts/self_assembly/auto_self_assemble.py",
-      "cue": null
-    },
-    {
-      "source": "scripts/vybn/graph/builder.py",
-      "target": "AGENTS.md",
-      "cue": null
-    },
-    {
-      "source": "scripts/vybn/graph/integrator.py",
-      "target": "scripts/cognitive_structures/graph_walks.py",
-      "cue": null
-    },
-    {
-      "source": "scripts/self_assembly/build_memoir_graph.py",
-      "target": "scripts/README.md",
-      "cue": null
-    },
-    {
-      "source": "scripts/self_assembly/self_improvement.py",
-      "target": "scripts/self_assembly/prompt_self_assemble.py",
-      "cue": null
-    },
-    {
-      "source": "scripts/self_assembly/auto_self_assemble.py",
-      "target": "README.md",
-      "cue": null
-    },
-    {
-      "source": "scripts/self_assembly/prompt_self_assemble.py",
-      "target": "scripts/cognitive_structures/mirror_neuron_resonance.md",
+      "source": "scripts/self_assembly/dash_graph_viewer.py",
+      "target": "docs/GRAPH_INTERFACE_IMPROVEMENTS.md",
       "cue": null
     }
   ]
