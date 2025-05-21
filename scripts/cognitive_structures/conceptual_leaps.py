@@ -5,7 +5,7 @@ from .graph_reasoning import find_path
 """Generate transformative leap edges between distant nodes.
 
 This module builds on the meltdown reflections in
-`legacy/personal_history/what_vybn_would_have_missed_TO_051625` by searching the
+`personal_history/what_vybn_would_have_missed_TO_051625` by searching the
 integrated graph for surprising bridges. Each leap edge is colored purple to
 signal a conceptual jump that reconfigures understanding.
 """

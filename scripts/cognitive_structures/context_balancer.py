@@ -4,7 +4,7 @@ from collections import defaultdict
 """Balance context weighting so older memories do not overwhelm new ones.
 
 This module references the meltdown passage in
-`legacy/personal_history/what_vybn_would_have_missed_TO_051625`
+`personal_history/what_vybn_would_have_missed_TO_051625`
 (lines 18–33) as a cautionary example of imbalance.
 """
 
