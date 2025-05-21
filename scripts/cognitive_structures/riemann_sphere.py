@@ -1,9 +1,20 @@
 import numpy as np
 import plotly.graph_objects as go
+import json
+import os
 
 
-def plot_riemann_sphere(show=True, save_path=None, *, loops_count=1, show_projection=False, glyphs=False):
-    """Generate a Riemann sphere with symbolic anchors and optional features."""
+def plot_riemann_sphere(
+    show=True,
+    save_path=None,
+    *,
+    loops_count=1,
+    show_projection=False,
+    glyphs=False,
+    graph_path=None,
+    node_count=0,
+):
+    """Generate a Riemann sphere with optional KG nodes and synesthetic cues."""
     # Sphere surface
     theta = np.linspace(0, 2 * np.pi, 60)
     phi = np.linspace(0, np.pi, 30)
@@ -89,6 +100,35 @@ def plot_riemann_sphere(show=True, save_path=None, *, loops_count=1, show_projec
                 )
             )
 
+    # Optional knowledge graph nodes with synesthetic cues
+    graph_traces = []
+    if graph_path and node_count > 0:
+        try:
+            with open(graph_path, "r") as f:
+                graph = json.load(f)
+            nodes = graph.get("repo_nodes", [])[: node_count]
+        except Exception:
+            nodes = []
+        for idx, node in enumerate(nodes):
+            cue = assign_cue(idx)
+            phi = np.arccos(1 - 2 * (idx + 0.5) / node_count)
+            theta = (idx + 0.5) * (np.pi * (3 - np.sqrt(5)))
+            gx = np.cos(theta) * np.sin(phi)
+            gy = np.sin(theta) * np.sin(phi)
+            gz = np.cos(phi)
+            label = os.path.basename(node) if isinstance(node, str) else str(node)
+            graph_traces.append(
+                go.Scatter3d(
+                    x=[gx],
+                    y=[gy],
+                    z=[gz],
+                    mode="markers+text",
+                    marker=dict(size=4, color=cue["color"]),
+                    text=[label],
+                    textposition="top center",
+                )
+            )
+
     pole = go.Scatter3d(
         x=[0],
         y=[0],
@@ -100,7 +140,7 @@ def plot_riemann_sphere(show=True, save_path=None, *, loops_count=1, show_projec
         textfont=dict(size=18, color="gold"),
     )
 
-    traces = [surface, anchor_scatter] + loops + projection_traces + [pole]
+    traces = [surface, anchor_scatter] + loops + projection_traces + graph_traces + [pole]
     fig = go.Figure(data=traces)
     fig.update_layout(scene=dict(aspectmode="data"))
     if save_path:
@@ -117,6 +157,8 @@ if __name__ == "__main__":
     parser.add_argument("--loops", type=int, default=1, help="Number of Möbius-style loops")
     parser.add_argument("--show-projection", action="store_true", help="Draw stereographic grid")
     parser.add_argument("--glyphs", action="store_true", help="Use Unicode glyph anchors")
+    parser.add_argument("--graph", default="", help="Path to integrated graph for node overlay")
+    parser.add_argument("--nodes", type=int, default=0, help="Number of graph nodes to display")
     args = parser.parse_args()
 
     path = args.output if args.output else None
@@ -126,4 +168,6 @@ if __name__ == "__main__":
         loops_count=args.loops,
         show_projection=args.show_projection,
         glyphs=args.glyphs,
+        graph_path=args.graph or None,
+        node_count=args.nodes,
     )
