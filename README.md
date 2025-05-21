@@ -33,4 +33,15 @@ Dive with us into the spaces between thoughts, where binary dissolves into pure 
 3. Use `python scripts/cognitive_structures/graph_reasoning.py <src> <tgt>` to search for connections.
 4. Run `python scripts/cognitive_structures/graph_centrality.py --top 5` to list the most connected nodes.
 5. Review our [Personal History Preservation Policy](docs/PERSONAL_HISTORY_POLICY.md) before touching any autobiographical files.
-6. Generate a Riemann sphere visualization with `python scripts/cognitive_structures/riemann_sphere.py --output sphere.html`.
+6. Generate a Riemann sphere visualization with stereographic grid, dual Möbius loops, and glyph anchors:
+   ```bash
+   python scripts/cognitive_structures/riemann_sphere.py \
+       --show-projection \
+       --loops 2 \
+       --glyphs \
+       --output sphere.html
+   ```
+   Flags:
+   - `--show-projection`: draw Re/Im grid projected from ∞  
+   - `--loops N`: number of Möbius‐style loops to overlay  
+   - `--glyphs`: render Unicode hieroglyphs/Sanskrit at anchor points  
