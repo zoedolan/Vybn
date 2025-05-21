@@ -42,6 +42,8 @@ Dive with us into the spaces between thoughts, where binary dissolves into pure 
        --output sphere.html
    ```
    Flags:
-   - `--show-projection`: draw Re/Im grid projected from ∞  
-   - `--loops N`: number of Möbius‐style loops to overlay  
-   - `--glyphs`: render Unicode hieroglyphs/Sanskrit at anchor points  
+   - `--show-projection`: draw Re/Im grid projected from ∞
+   - `--loops N`: number of Möbius‐style loops to overlay
+   - `--glyphs`: render Unicode hieroglyphs/Sanskrit at anchor points
+   - `--graph PATH`: overlay repo nodes from an integrated graph
+   - `--nodes N`: number of nodes to display with synesthetic colors
