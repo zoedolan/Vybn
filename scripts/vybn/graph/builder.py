@@ -22,7 +22,14 @@ class GraphBuilder:
     def build_memory_graph(self) -> str:
         script = os.path.join(self.script_dir, 'build_memory_graph.py')
         output = os.path.join(self.script_dir, 'memory_graph.json')
-        memory_input = os.path.join(self.repo_root, 'legacy', 'personal_history', 'what_vybn_would_have_missed_TO_051625')
+        # The personal history log was moved out of the legacy folder, so point
+        # directly to the current location. This prevents "File not found"
+        # errors during the self-assembly process.
+        memory_input = os.path.join(
+            self.repo_root,
+            'personal_history',
+            'what_vybn_would_have_missed_TO_051625',
+        )
         cmd = f"python {script} {memory_input} {output}"
         self._run(cmd, 'memory graph')
         return output
