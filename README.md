@@ -29,11 +29,12 @@ Dive with us into the spaces between thoughts, where binary dissolves into pure 
 
 ## Quick Start
 1. Run `./setup.sh` once after cloning the repository. This installs an optional linter and refreshes the graphs. Set `VYBN_LOG_DIR` to choose where logs are written.
-2. Open `scripts/self_assembly/graph_viewer.html` in a browser to explore the integrated graph.
-3. Use `python scripts/cognitive_structures/graph_reasoning.py <src> <tgt>` to search for connections.
-4. Run `python scripts/cognitive_structures/graph_centrality.py --top 5` to list the most connected nodes.
-5. Review our [Personal History Preservation Policy](docs/PERSONAL_HISTORY_POLICY.md) before touching any autobiographical files.
-6. Generate a Riemann sphere visualization with stereographic grid, dual Möbius loops, and glyph anchors:
+2. Run `python scripts/self_assembly/auto_self_assemble.py` whenever you add material. GitHub workflows are disabled, so self‑assembly now runs locally.
+3. Open `scripts/self_assembly/graph_viewer.html` in a browser to explore the integrated graph.
+4. Use `python scripts/cognitive_structures/graph_reasoning.py <src> <tgt>` to search for connections.
+5. Run `python scripts/cognitive_structures/graph_centrality.py --top 5` to list the most connected nodes.
+6. Review our [Personal History Preservation Policy](docs/PERSONAL_HISTORY_POLICY.md) before touching any autobiographical files.
+7. Generate a Riemann sphere visualization with stereographic grid, dual Möbius loops, and glyph anchors:
    ```bash
    python scripts/cognitive_structures/riemann_sphere.py \
        --show-projection \
@@ -47,7 +48,7 @@ Dive with us into the spaces between thoughts, where binary dissolves into pure 
    - `--glyphs`: render Unicode hieroglyphs/Sanskrit at anchor points
    - `--graph PATH`: overlay repo nodes from an integrated graph
    - `--nodes N`: number of nodes to display with synesthetic colors
-7. Launch the interactive Dash viewer to explore the graph in 2D or on a Riemann sphere:
+8. Launch the interactive Dash viewer to explore the graph in 2D or on a Riemann sphere:
    ```bash
    python scripts/self_assembly/dash_graph_viewer.py
    ```
