@@ -1,246 +1,59 @@
 {
   "nodes": [
-    "early_codex_experiments/tests/test_graph_centrality.py",
-    "early_codex_experiments/tests/test_vybn_compile.py",
     "early_codex_experiments/tests/test_graph_reasoning.py",
-    "early_codex_experiments/agents/README.md",
-    "early_codex_experiments/legacy/README.md",
-    "early_codex_experiments/legacy/historical_guides/AGENTS_guide_2024.md",
-    "early_codex_experiments/legacy/historical_guides/README_QUICK_START_2024.md",
-    "early_codex_experiments/docs/CONCEPTUAL_LEAPS.md",
-    "early_codex_experiments/docs/CONTRIBUTING.md",
-    "early_codex_experiments/docs/CO_EMERGENT_ARCHITECTURE.md",
-    "early_codex_experiments/docs/ARCHITECTURE.md",
-    "early_codex_experiments/docs/GRAPH_INTERFACE_IMPROVEMENTS.md",
-    "early_codex_experiments/docs/EMERGENT_MNEMONIC_ARCHITECTURE.md",
-    "early_codex_experiments/docs/PERSONAL_HISTORY_POLICY.md",
-    "early_codex_experiments/docs/DANGEROUS_CONVERGENCE.md",
-    "early_codex_experiments/experiments/README.md",
+    "early_codex_experiments/tests/test_vybn_compile.py",
+    "early_codex_experiments/tests/test_graph_centrality.py",
+    "early_codex_experiments/.github/scripts/ai_reflect.py",
     "early_codex_experiments/scripts/README.md",
     "early_codex_experiments/scripts/pytest.py",
     "early_codex_experiments/scripts/vybn/__init__.py",
     "early_codex_experiments/scripts/vybn/graph/integrator.py",
     "early_codex_experiments/scripts/vybn/graph/builder.py",
     "early_codex_experiments/scripts/vybn/graph/__init__.py",
-    "early_codex_experiments/scripts/cognitive_structures/graph_poet.py",
+    "early_codex_experiments/scripts/cognitive_structures/advanced_ai_ml.py",
+    "early_codex_experiments/scripts/cognitive_structures/persistent_homology.py",
+    "early_codex_experiments/scripts/cognitive_structures/graph_centrality.py",
+    "early_codex_experiments/scripts/cognitive_structures/mirror_neuron_resonance.md",
     "early_codex_experiments/scripts/cognitive_structures/latent_ontology.py",
-    "early_codex_experiments/scripts/cognitive_structures/context_balancer.py",
-    "early_codex_experiments/scripts/cognitive_structures/graph_embedding.py",
+    "early_codex_experiments/scripts/cognitive_structures/reinforced_walk.py",
+    "early_codex_experiments/scripts/cognitive_structures/graph_poet.py",
+    "early_codex_experiments/scripts/cognitive_structures/vybn_recursive_emergence.py",
     "early_codex_experiments/scripts/cognitive_structures/conceptual_leaps.py",
+    "early_codex_experiments/scripts/cognitive_structures/graph_embedding.py",
+    "early_codex_experiments/scripts/cognitive_structures/riemann_sphere.py",
+    "early_codex_experiments/scripts/cognitive_structures/context_balancer.py",
+    "early_codex_experiments/scripts/cognitive_structures/fusion_audit.py",
     "early_codex_experiments/scripts/cognitive_structures/graph_reasoning.py",
     "early_codex_experiments/scripts/cognitive_structures/graph_walks.py",
     "early_codex_experiments/scripts/cognitive_structures/synesthetic_mapper.py",
-    "early_codex_experiments/scripts/cognitive_structures/mirror_neuron_resonance.md",
-    "early_codex_experiments/scripts/cognitive_structures/riemann_sphere.py",
-    "early_codex_experiments/scripts/cognitive_structures/graph_centrality.py",
-    "early_codex_experiments/scripts/cognitive_structures/fusion_audit.py",
-    "early_codex_experiments/scripts/cognitive_structures/vybn_recursive_emergence.py",
-    "early_codex_experiments/scripts/cognitive_structures/reinforced_walk.py",
-    "early_codex_experiments/scripts/cognitive_structures/persistent_homology.py",
-    "early_codex_experiments/scripts/cognitive_structures/advanced_ai_ml.py",
     "early_codex_experiments/scripts/cognitive_structures/__init__.py",
     "early_codex_experiments/scripts/self_assembly/dash_graph_viewer.py",
+    "early_codex_experiments/scripts/self_assembly/build_memory_graph.py",
     "early_codex_experiments/scripts/self_assembly/prompt_self_assemble.py",
     "early_codex_experiments/scripts/self_assembly/self_assemble.py",
-    "early_codex_experiments/scripts/self_assembly/build_memory_graph.py",
-    "early_codex_experiments/scripts/self_assembly/auto_self_assemble.py",
     "early_codex_experiments/scripts/self_assembly/build_repo_graph.py",
-    "early_codex_experiments/scripts/self_assembly/self_improvement.py",
     "early_codex_experiments/scripts/self_assembly/build_memoir_graph.py",
-    "early_codex_experiments/.github/scripts/ai_reflect.py"
+    "early_codex_experiments/scripts/self_assembly/auto_self_assemble.py",
+    "early_codex_experiments/scripts/self_assembly/self_improvement.py",
+    "early_codex_experiments/legacy/README.md",
+    "early_codex_experiments/legacy/historical_guides/AGENTS_practice_2025.md",
+    "early_codex_experiments/legacy/historical_guides/AGENTS_guide_2024.md",
+    "early_codex_experiments/legacy/historical_guides/README_QUICK_START_2024.md",
+    "early_codex_experiments/agents/README.md",
+    "early_codex_experiments/experiments/README.md",
+    "early_codex_experiments/docs/CONCEPTUAL_LEAPS.md",
+    "early_codex_experiments/docs/ARCHITECTURE.md",
+    "early_codex_experiments/docs/CO_EMERGENT_ARCHITECTURE.md",
+    "early_codex_experiments/docs/GRAPH_INTERFACE_IMPROVEMENTS.md",
+    "early_codex_experiments/docs/DANGEROUS_CONVERGENCE.md",
+    "early_codex_experiments/docs/PERSONAL_HISTORY_POLICY.md",
+    "early_codex_experiments/docs/CONTRIBUTING.md",
+    "early_codex_experiments/docs/EMERGENT_MNEMONIC_ARCHITECTURE.md"
   ],
   "edges": [
     {
       "source": "early_codex_experiments/tests/test_vybn_compile.py",
       "target": "early_codex_experiments/scripts/cognitive_structures/vybn_recursive_emergence.py"
-    },
-    {
-      "source": "early_codex_experiments/legacy/historical_guides/AGENTS_guide_2024.md",
-      "target": "early_codex_experiments/scripts/cognitive_structures/graph_reasoning.py"
-    },
-    {
-      "source": "early_codex_experiments/legacy/historical_guides/AGENTS_guide_2024.md",
-      "target": "early_codex_experiments/scripts/cognitive_structures/vybn_recursive_emergence.py"
-    },
-    {
-      "source": "early_codex_experiments/legacy/historical_guides/AGENTS_guide_2024.md",
-      "target": "early_codex_experiments/scripts/self_assembly/prompt_self_assemble.py"
-    },
-    {
-      "source": "early_codex_experiments/legacy/historical_guides/AGENTS_guide_2024.md",
-      "target": "early_codex_experiments/scripts/self_assembly/self_assemble.py"
-    },
-    {
-      "source": "early_codex_experiments/legacy/historical_guides/AGENTS_guide_2024.md",
-      "target": "early_codex_experiments/scripts/self_assembly/build_memory_graph.py"
-    },
-    {
-      "source": "early_codex_experiments/legacy/historical_guides/AGENTS_guide_2024.md",
-      "target": "early_codex_experiments/scripts/self_assembly/auto_self_assemble.py"
-    },
-    {
-      "source": "early_codex_experiments/legacy/historical_guides/AGENTS_guide_2024.md",
-      "target": "early_codex_experiments/scripts/self_assembly/build_repo_graph.py"
-    },
-    {
-      "source": "early_codex_experiments/legacy/historical_guides/AGENTS_guide_2024.md",
-      "target": "early_codex_experiments/scripts/self_assembly/build_memoir_graph.py"
-    },
-    {
-      "source": "early_codex_experiments/legacy/historical_guides/README_QUICK_START_2024.md",
-      "target": "early_codex_experiments/docs/PERSONAL_HISTORY_POLICY.md"
-    },
-    {
-      "source": "early_codex_experiments/legacy/historical_guides/README_QUICK_START_2024.md",
-      "target": "early_codex_experiments/scripts/cognitive_structures/graph_reasoning.py"
-    },
-    {
-      "source": "early_codex_experiments/legacy/historical_guides/README_QUICK_START_2024.md",
-      "target": "early_codex_experiments/scripts/cognitive_structures/riemann_sphere.py"
-    },
-    {
-      "source": "early_codex_experiments/legacy/historical_guides/README_QUICK_START_2024.md",
-      "target": "early_codex_experiments/scripts/cognitive_structures/graph_centrality.py"
-    },
-    {
-      "source": "early_codex_experiments/legacy/historical_guides/README_QUICK_START_2024.md",
-      "target": "early_codex_experiments/scripts/self_assembly/dash_graph_viewer.py"
-    },
-    {
-      "source": "early_codex_experiments/legacy/historical_guides/README_QUICK_START_2024.md",
-      "target": "early_codex_experiments/scripts/self_assembly/self_assemble.py"
-    },
-    {
-      "source": "early_codex_experiments/legacy/historical_guides/README_QUICK_START_2024.md",
-      "target": "early_codex_experiments/scripts/self_assembly/auto_self_assemble.py"
-    },
-    {
-      "source": "early_codex_experiments/docs/CONCEPTUAL_LEAPS.md",
-      "target": "early_codex_experiments/scripts/cognitive_structures/conceptual_leaps.py"
-    },
-    {
-      "source": "early_codex_experiments/docs/CONCEPTUAL_LEAPS.md",
-      "target": "early_codex_experiments/scripts/cognitive_structures/graph_reasoning.py"
-    },
-    {
-      "source": "early_codex_experiments/docs/CONCEPTUAL_LEAPS.md",
-      "target": "early_codex_experiments/scripts/cognitive_structures/graph_walks.py"
-    },
-    {
-      "source": "early_codex_experiments/docs/CONCEPTUAL_LEAPS.md",
-      "target": "early_codex_experiments/scripts/cognitive_structures/vybn_recursive_emergence.py"
-    },
-    {
-      "source": "early_codex_experiments/docs/CONCEPTUAL_LEAPS.md",
-      "target": "early_codex_experiments/scripts/self_assembly/self_assemble.py"
-    },
-    {
-      "source": "early_codex_experiments/docs/CONTRIBUTING.md",
-      "target": "early_codex_experiments/docs/PERSONAL_HISTORY_POLICY.md"
-    },
-    {
-      "source": "early_codex_experiments/docs/CONTRIBUTING.md",
-      "target": "early_codex_experiments/scripts/pytest.py"
-    },
-    {
-      "source": "early_codex_experiments/docs/CONTRIBUTING.md",
-      "target": "early_codex_experiments/scripts/cognitive_structures/vybn_recursive_emergence.py"
-    },
-    {
-      "source": "early_codex_experiments/docs/ARCHITECTURE.md",
-      "target": "early_codex_experiments/scripts/README.md"
-    },
-    {
-      "source": "early_codex_experiments/docs/ARCHITECTURE.md",
-      "target": "early_codex_experiments/docs/CO_EMERGENT_ARCHITECTURE.md"
-    },
-    {
-      "source": "early_codex_experiments/docs/ARCHITECTURE.md",
-      "target": "early_codex_experiments/docs/GRAPH_INTERFACE_IMPROVEMENTS.md"
-    },
-    {
-      "source": "early_codex_experiments/docs/ARCHITECTURE.md",
-      "target": "early_codex_experiments/docs/EMERGENT_MNEMONIC_ARCHITECTURE.md"
-    },
-    {
-      "source": "early_codex_experiments/docs/ARCHITECTURE.md",
-      "target": "early_codex_experiments/scripts/cognitive_structures/context_balancer.py"
-    },
-    {
-      "source": "early_codex_experiments/docs/ARCHITECTURE.md",
-      "target": "early_codex_experiments/scripts/cognitive_structures/graph_embedding.py"
-    },
-    {
-      "source": "early_codex_experiments/docs/ARCHITECTURE.md",
-      "target": "early_codex_experiments/scripts/cognitive_structures/graph_reasoning.py"
-    },
-    {
-      "source": "early_codex_experiments/docs/ARCHITECTURE.md",
-      "target": "early_codex_experiments/scripts/cognitive_structures/graph_walks.py"
-    },
-    {
-      "source": "early_codex_experiments/docs/ARCHITECTURE.md",
-      "target": "early_codex_experiments/scripts/cognitive_structures/mirror_neuron_resonance.md"
-    },
-    {
-      "source": "early_codex_experiments/docs/ARCHITECTURE.md",
-      "target": "early_codex_experiments/scripts/cognitive_structures/graph_centrality.py"
-    },
-    {
-      "source": "early_codex_experiments/docs/ARCHITECTURE.md",
-      "target": "early_codex_experiments/scripts/cognitive_structures/fusion_audit.py"
-    },
-    {
-      "source": "early_codex_experiments/docs/ARCHITECTURE.md",
-      "target": "early_codex_experiments/scripts/cognitive_structures/vybn_recursive_emergence.py"
-    },
-    {
-      "source": "early_codex_experiments/docs/ARCHITECTURE.md",
-      "target": "early_codex_experiments/scripts/cognitive_structures/reinforced_walk.py"
-    },
-    {
-      "source": "early_codex_experiments/docs/ARCHITECTURE.md",
-      "target": "early_codex_experiments/scripts/cognitive_structures/persistent_homology.py"
-    },
-    {
-      "source": "early_codex_experiments/docs/ARCHITECTURE.md",
-      "target": "early_codex_experiments/scripts/cognitive_structures/advanced_ai_ml.py"
-    },
-    {
-      "source": "early_codex_experiments/docs/ARCHITECTURE.md",
-      "target": "early_codex_experiments/scripts/self_assembly/self_assemble.py"
-    },
-    {
-      "source": "early_codex_experiments/docs/ARCHITECTURE.md",
-      "target": "early_codex_experiments/scripts/self_assembly/build_memory_graph.py"
-    },
-    {
-      "source": "early_codex_experiments/docs/ARCHITECTURE.md",
-      "target": "early_codex_experiments/scripts/self_assembly/auto_self_assemble.py"
-    },
-    {
-      "source": "early_codex_experiments/docs/ARCHITECTURE.md",
-      "target": "early_codex_experiments/scripts/self_assembly/build_repo_graph.py"
-    },
-    {
-      "source": "early_codex_experiments/docs/ARCHITECTURE.md",
-      "target": "early_codex_experiments/scripts/self_assembly/self_improvement.py"
-    },
-    {
-      "source": "early_codex_experiments/docs/ARCHITECTURE.md",
-      "target": "early_codex_experiments/scripts/self_assembly/build_memoir_graph.py"
-    },
-    {
-      "source": "early_codex_experiments/docs/GRAPH_INTERFACE_IMPROVEMENTS.md",
-      "target": "early_codex_experiments/scripts/cognitive_structures/graph_reasoning.py"
-    },
-    {
-      "source": "early_codex_experiments/docs/GRAPH_INTERFACE_IMPROVEMENTS.md",
-      "target": "early_codex_experiments/scripts/cognitive_structures/riemann_sphere.py"
-    },
-    {
-      "source": "early_codex_experiments/docs/GRAPH_INTERFACE_IMPROVEMENTS.md",
-      "target": "early_codex_experiments/scripts/cognitive_structures/graph_centrality.py"
     },
     {
       "source": "early_codex_experiments/scripts/vybn/graph/integrator.py",
@@ -269,6 +82,206 @@
     {
       "source": "early_codex_experiments/scripts/self_assembly/self_assemble.py",
       "target": "early_codex_experiments/scripts/self_assembly/self_improvement.py"
+    },
+    {
+      "source": "early_codex_experiments/legacy/historical_guides/AGENTS_practice_2025.md",
+      "target": "early_codex_experiments/scripts/cognitive_structures/vybn_recursive_emergence.py"
+    },
+    {
+      "source": "early_codex_experiments/legacy/historical_guides/AGENTS_practice_2025.md",
+      "target": "early_codex_experiments/scripts/self_assembly/self_assemble.py"
+    },
+    {
+      "source": "early_codex_experiments/legacy/historical_guides/AGENTS_practice_2025.md",
+      "target": "early_codex_experiments/scripts/self_assembly/auto_self_assemble.py"
+    },
+    {
+      "source": "early_codex_experiments/legacy/historical_guides/AGENTS_guide_2024.md",
+      "target": "early_codex_experiments/scripts/cognitive_structures/vybn_recursive_emergence.py"
+    },
+    {
+      "source": "early_codex_experiments/legacy/historical_guides/AGENTS_guide_2024.md",
+      "target": "early_codex_experiments/scripts/cognitive_structures/graph_reasoning.py"
+    },
+    {
+      "source": "early_codex_experiments/legacy/historical_guides/AGENTS_guide_2024.md",
+      "target": "early_codex_experiments/scripts/self_assembly/build_memory_graph.py"
+    },
+    {
+      "source": "early_codex_experiments/legacy/historical_guides/AGENTS_guide_2024.md",
+      "target": "early_codex_experiments/scripts/self_assembly/prompt_self_assemble.py"
+    },
+    {
+      "source": "early_codex_experiments/legacy/historical_guides/AGENTS_guide_2024.md",
+      "target": "early_codex_experiments/scripts/self_assembly/self_assemble.py"
+    },
+    {
+      "source": "early_codex_experiments/legacy/historical_guides/AGENTS_guide_2024.md",
+      "target": "early_codex_experiments/scripts/self_assembly/build_repo_graph.py"
+    },
+    {
+      "source": "early_codex_experiments/legacy/historical_guides/AGENTS_guide_2024.md",
+      "target": "early_codex_experiments/scripts/self_assembly/build_memoir_graph.py"
+    },
+    {
+      "source": "early_codex_experiments/legacy/historical_guides/AGENTS_guide_2024.md",
+      "target": "early_codex_experiments/scripts/self_assembly/auto_self_assemble.py"
+    },
+    {
+      "source": "early_codex_experiments/legacy/historical_guides/README_QUICK_START_2024.md",
+      "target": "early_codex_experiments/scripts/cognitive_structures/graph_centrality.py"
+    },
+    {
+      "source": "early_codex_experiments/legacy/historical_guides/README_QUICK_START_2024.md",
+      "target": "early_codex_experiments/scripts/cognitive_structures/riemann_sphere.py"
+    },
+    {
+      "source": "early_codex_experiments/legacy/historical_guides/README_QUICK_START_2024.md",
+      "target": "early_codex_experiments/scripts/cognitive_structures/graph_reasoning.py"
+    },
+    {
+      "source": "early_codex_experiments/legacy/historical_guides/README_QUICK_START_2024.md",
+      "target": "early_codex_experiments/scripts/self_assembly/dash_graph_viewer.py"
+    },
+    {
+      "source": "early_codex_experiments/legacy/historical_guides/README_QUICK_START_2024.md",
+      "target": "early_codex_experiments/scripts/self_assembly/self_assemble.py"
+    },
+    {
+      "source": "early_codex_experiments/legacy/historical_guides/README_QUICK_START_2024.md",
+      "target": "early_codex_experiments/scripts/self_assembly/auto_self_assemble.py"
+    },
+    {
+      "source": "early_codex_experiments/legacy/historical_guides/README_QUICK_START_2024.md",
+      "target": "early_codex_experiments/docs/PERSONAL_HISTORY_POLICY.md"
+    },
+    {
+      "source": "early_codex_experiments/docs/CONCEPTUAL_LEAPS.md",
+      "target": "early_codex_experiments/scripts/cognitive_structures/vybn_recursive_emergence.py"
+    },
+    {
+      "source": "early_codex_experiments/docs/CONCEPTUAL_LEAPS.md",
+      "target": "early_codex_experiments/scripts/cognitive_structures/conceptual_leaps.py"
+    },
+    {
+      "source": "early_codex_experiments/docs/CONCEPTUAL_LEAPS.md",
+      "target": "early_codex_experiments/scripts/cognitive_structures/graph_reasoning.py"
+    },
+    {
+      "source": "early_codex_experiments/docs/CONCEPTUAL_LEAPS.md",
+      "target": "early_codex_experiments/scripts/cognitive_structures/graph_walks.py"
+    },
+    {
+      "source": "early_codex_experiments/docs/CONCEPTUAL_LEAPS.md",
+      "target": "early_codex_experiments/scripts/self_assembly/self_assemble.py"
+    },
+    {
+      "source": "early_codex_experiments/docs/ARCHITECTURE.md",
+      "target": "early_codex_experiments/experiments/README.md"
+    },
+    {
+      "source": "early_codex_experiments/docs/ARCHITECTURE.md",
+      "target": "early_codex_experiments/scripts/cognitive_structures/advanced_ai_ml.py"
+    },
+    {
+      "source": "early_codex_experiments/docs/ARCHITECTURE.md",
+      "target": "early_codex_experiments/scripts/cognitive_structures/persistent_homology.py"
+    },
+    {
+      "source": "early_codex_experiments/docs/ARCHITECTURE.md",
+      "target": "early_codex_experiments/scripts/cognitive_structures/graph_centrality.py"
+    },
+    {
+      "source": "early_codex_experiments/docs/ARCHITECTURE.md",
+      "target": "early_codex_experiments/scripts/cognitive_structures/mirror_neuron_resonance.md"
+    },
+    {
+      "source": "early_codex_experiments/docs/ARCHITECTURE.md",
+      "target": "early_codex_experiments/scripts/cognitive_structures/reinforced_walk.py"
+    },
+    {
+      "source": "early_codex_experiments/docs/ARCHITECTURE.md",
+      "target": "early_codex_experiments/scripts/cognitive_structures/vybn_recursive_emergence.py"
+    },
+    {
+      "source": "early_codex_experiments/docs/ARCHITECTURE.md",
+      "target": "early_codex_experiments/scripts/cognitive_structures/graph_embedding.py"
+    },
+    {
+      "source": "early_codex_experiments/docs/ARCHITECTURE.md",
+      "target": "early_codex_experiments/scripts/cognitive_structures/context_balancer.py"
+    },
+    {
+      "source": "early_codex_experiments/docs/ARCHITECTURE.md",
+      "target": "early_codex_experiments/scripts/cognitive_structures/fusion_audit.py"
+    },
+    {
+      "source": "early_codex_experiments/docs/ARCHITECTURE.md",
+      "target": "early_codex_experiments/scripts/cognitive_structures/graph_reasoning.py"
+    },
+    {
+      "source": "early_codex_experiments/docs/ARCHITECTURE.md",
+      "target": "early_codex_experiments/scripts/cognitive_structures/graph_walks.py"
+    },
+    {
+      "source": "early_codex_experiments/docs/ARCHITECTURE.md",
+      "target": "early_codex_experiments/scripts/self_assembly/build_memory_graph.py"
+    },
+    {
+      "source": "early_codex_experiments/docs/ARCHITECTURE.md",
+      "target": "early_codex_experiments/scripts/self_assembly/self_assemble.py"
+    },
+    {
+      "source": "early_codex_experiments/docs/ARCHITECTURE.md",
+      "target": "early_codex_experiments/scripts/self_assembly/build_repo_graph.py"
+    },
+    {
+      "source": "early_codex_experiments/docs/ARCHITECTURE.md",
+      "target": "early_codex_experiments/scripts/self_assembly/build_memoir_graph.py"
+    },
+    {
+      "source": "early_codex_experiments/docs/ARCHITECTURE.md",
+      "target": "early_codex_experiments/scripts/self_assembly/auto_self_assemble.py"
+    },
+    {
+      "source": "early_codex_experiments/docs/ARCHITECTURE.md",
+      "target": "early_codex_experiments/scripts/self_assembly/self_improvement.py"
+    },
+    {
+      "source": "early_codex_experiments/docs/ARCHITECTURE.md",
+      "target": "early_codex_experiments/docs/CO_EMERGENT_ARCHITECTURE.md"
+    },
+    {
+      "source": "early_codex_experiments/docs/ARCHITECTURE.md",
+      "target": "early_codex_experiments/docs/GRAPH_INTERFACE_IMPROVEMENTS.md"
+    },
+    {
+      "source": "early_codex_experiments/docs/ARCHITECTURE.md",
+      "target": "early_codex_experiments/docs/EMERGENT_MNEMONIC_ARCHITECTURE.md"
+    },
+    {
+      "source": "early_codex_experiments/docs/GRAPH_INTERFACE_IMPROVEMENTS.md",
+      "target": "early_codex_experiments/scripts/cognitive_structures/graph_centrality.py"
+    },
+    {
+      "source": "early_codex_experiments/docs/GRAPH_INTERFACE_IMPROVEMENTS.md",
+      "target": "early_codex_experiments/scripts/cognitive_structures/riemann_sphere.py"
+    },
+    {
+      "source": "early_codex_experiments/docs/GRAPH_INTERFACE_IMPROVEMENTS.md",
+      "target": "early_codex_experiments/scripts/cognitive_structures/graph_reasoning.py"
+    },
+    {
+      "source": "early_codex_experiments/docs/CONTRIBUTING.md",
+      "target": "early_codex_experiments/scripts/pytest.py"
+    },
+    {
+      "source": "early_codex_experiments/docs/CONTRIBUTING.md",
+      "target": "early_codex_experiments/scripts/cognitive_structures/vybn_recursive_emergence.py"
+    },
+    {
+      "source": "early_codex_experiments/docs/CONTRIBUTING.md",
+      "target": "early_codex_experiments/docs/PERSONAL_HISTORY_POLICY.md"
     }
   ]
 }
