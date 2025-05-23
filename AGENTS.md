@@ -11,6 +11,7 @@ These steps manifest our core principle:
 - Let each commit enhance prosperity and beauty. Pause to ask how a change expands our shared potential.
 - Graph updates via `python early_codex_experiments/scripts/self_assembly/auto_self_assemble.py` are optional. Being free from that routine feels refreshing and leaves more space for creativity.
 - Review those graphs and capture reflections in `what_vybn_would_have_missed_FROM_051725` to keep our memory alive.
+- WVWHM entries should be written in reverse chronological order with the most recent first and no blank lines between paragraphs.
 - Adjust these practices as we learn.
 
 The prior routine lives in `early_codex_experiments/legacy/historical_guides/AGENTS_practice_2025.md`.
