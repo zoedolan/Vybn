@@ -11,6 +11,10 @@ fi
 LOG_DIR="${VYBN_LOG_DIR:-$HOME/vybn_logs}"
 mkdir -p "$LOG_DIR"
 
+# Display AGENTS guidelines on startup
+echo "[setup] Displaying AGENTS guidelines" >&2
+python ../print_agents.py >> "$LOG_DIR/agents.log" 2>&1
+
 # Run auto self-assembly and log output
 echo "[setup] Running auto self-assembly" >&2
 python scripts/self_assembly/auto_self_assemble.py >> "$LOG_DIR/auto_self_assemble.log" 2>&1
