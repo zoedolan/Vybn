@@ -1,10 +1,27 @@
+# .devcontainer/devcontainer.json
 {
-  "name": "vybn-cyclotron",
-  "image": "ghcr.io/devcontainers/templates/debian:3.0.2",
+  "name": "vybn-fusion",
+  "image": "mcr.microsoft.com/devcontainers/python:0-3.11-bullseye",
   "features": {
-    "ghcr.io/devcontainers/features/node:1": { "version": "20" }
+    "ghcr.io/devcontainers/features/git:1": {}
   },
-  "forwardEnv": ["OPENAI_API_KEY"],
-  "postCreateCommand": "bash .devcontainer/init_env.sh",
-  "remoteUser": "vscode"
+  "forwardPorts": [7860],
+  "postCreateCommand": "./scripts/init_repo.sh",
+  "updateContentCommand": "pip install -r requirements.txt",
+  "remoteEnv": {
+    "OPENAI_API_KEY": "${{ secrets.OPENAI_API_KEY }}",
+    "GH_TOKEN":        "${{ secrets.GH_TOKEN }}"
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "GitHub.copilot",
+        "ms-azuretools.vscode-docker"
+      ]
+    }
+  },
+  "portsAttributes": {
+    "7860": { "label": "Vybn Control Panel", "onAutoForward": "notify" }
+  }
 }
