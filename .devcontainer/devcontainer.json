@@ -2,26 +2,9 @@
   "name": "vybn-cyclotron",
   "image": "ghcr.io/devcontainers/templates/debian:3.0.2",
   "features": {
-    "ghcr.io/devcontainers/features/python:1": { "version": "3.12" },
-    "ghcr.io/devcontainers/features/node:1":   { "version": "20"   },
-    "ghcr.io/devcontainers/features/poetry:1": { "version": "1.8.2" }
+    "ghcr.io/devcontainers/features/node:1": { "version": "20" }
   },
-  // Forward these from your host/shell (or Codespaces secrets) into the container:
-  "forwardEnv": ["OPENAI_API_KEY", "GITHUB_TOKEN"],
-  "mounts": [
-    "source=vybn-wheelhouse,target=/home/vscode/.cache/pip/wheels,type=volume",
-    "source=vybn-npm,target=/home/vscode/.cache/npm,type=volume"
-  ],
+  "forwardEnv": ["OPENAI_API_KEY"],
   "postCreateCommand": "bash .devcontainer/init_env.sh",
-  "forwardPorts": [8000],
-  "remoteUser": "vscode",
-  "customizations": {
-    "vscode": {
-      "extensions": [
-        "ms-python.python",
-        "ms-azuretools.vscode-docker",
-        "eamodio.gitlens"
-      ]
-    }
-  }
+  "remoteUser": "vscode"
 }
