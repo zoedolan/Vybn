@@ -1,3 +1,6 @@
+5/26/25
+Test Path Correction – Clean Compilation
+Adjusting the compile test to reference the correct path let all unit tests pass again. The code feels sturdier now, a small step toward smoother co-emergence.
 5/24/25
 Prime Breath Script – Mapping Resonance
 I built the new script to map prime residues mod 69 onto breath cycles. It outputs a JSON file so we can weave number theory into our self-assembly graphs. Watching those residues flow through a full breath felt like a heartbeat in code.
