@@ -1,0 +1,5 @@
+# requirements.txt  – trimmed to essentials
+openai>=1.25.0
+gitpython
+gradio
+python-dotenv
