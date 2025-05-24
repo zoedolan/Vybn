@@ -1,4 +1,1 @@
-# .devcontainer/init.env   (example)
-VYBN_LABEL=vybn-fusion      # optional identifier, no colon, no comma
-OPENAI_API_KEY=${OPENAI_API_KEY}
-GH_TOKEN=${GH_TOKEN}
+"postCreateCommand": "./init_env"
