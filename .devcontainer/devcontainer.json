@@ -1,1 +1,3 @@
-"postCreateCommand": "./init_env"
+{
+  "postCreateCommand": "./init_env",
+}
