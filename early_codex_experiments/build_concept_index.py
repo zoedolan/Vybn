@@ -26,6 +26,7 @@ from typing import List, Tuple
 import numpy as np
 import tiktoken
 import openai
+from openai.error import AuthenticationError, OpenAIError
 
 # Ensure FAISS is available (use faiss-cpu on Windows)
 try:
@@ -54,19 +55,22 @@ def sliding_windows(txt: str, win: int, stride: int) -> List[Tuple[str,int,int]]
 
 def embed(texts: List[str]) -> np.ndarray:
     vecs, batch = [], 64
+    total_batches = (len(texts) + batch - 1) // batch
     try:
         for i in range(0, len(texts), batch):
+            batch_index = i // batch + 1
+            print(f"Embedding batch {batch_index}/{total_batches} ({min(batch, len(texts)-i)} texts)")
             resp = openai.embeddings.create(model=EMBED_MODEL,
                                             input=texts[i:i+batch])
             vecs.extend([d.embedding for d in resp.data])
-    except Exception as e:
-        msg = str(e)
-        if any(term in msg for term in ["Incorrect API key", "invalid_api_key", "401"]):
-            sys.exit("✖ OpenAI API key invalid. Please check your OPENAI_API_KEY.")
+    except AuthenticationError:
+        sys.exit("✖ OpenAI API key invalid. Please check your OPENAI_API_KEY.")
+    except OpenAIError as e:
         sys.exit(f"✖ OpenAI embedding error: {e}")
 
     arr = np.asarray(vecs, dtype="float32")
     arr /= np.linalg.norm(arr, axis=1, keepdims=True)
+    print(f"✓ Completed embedding {arr.shape[0]} vectors")
     return arr
 
 # ───────────────────────────────── forge
@@ -112,6 +116,7 @@ def forge(repo_root: pathlib.Path, incremental: bool, force: bool):
             for chunk, s, e in sliding_windows(txt, 1024, 512):
                 chunks.append(gloss + chunk)
                 meta.append((f.relative_to(repo).as_posix(), s, e))
+    print(f"✓ Extracted {len(chunks)} chunks from {len(targets)} target folders")
 
     if not chunks:
         sys.exit("✖ No .md or .txt found in targets.")
@@ -123,30 +128,39 @@ def forge(repo_root: pathlib.Path, incremental: bool, force: bool):
     if not cen_p.exists() or force:
         prev = float("inf")
         for k in range(4, 257, 4):
+            print(f"Clustering with k={k}...")
             km = KMeans(n_clusters=k, n_init=10).fit(vecs)
             if prev < np.inf and km.inertia_/prev > 0.99:
+                print(f"Converged at k={k}")
                 break
             prev = km.inertia_
         centroids, labels = km.cluster_centers_, km.labels_
         np.save(cen_p, centroids.astype("float32"))
     else:
+        print("Loading frozen centroids and running MiniBatchKMeans...")
         frozen   = np.load(cen_p)
         mbk      = MiniBatchKMeans(n_clusters=frozen.shape[0],
                                    init=frozen, n_init=1, batch_size=256)
         labels   = mbk.fit_predict(vecs)
         centroids= mbk.cluster_centers_
         np.save(cen_p, centroids.astype("float32"))
+    print(f"✓ Generated {centroids.shape[0]} centroids")
 
     # 4. vector index
     if idx_p.exists() and (incremental or force):
+        print("Loading existing FAISS index...")
         idx = faiss.read_index(str(idx_p))
     else:
+        print("Creating new FAISS HNSW index...")
         idx = faiss.IndexHNSWFlat(DIM, 32, faiss.METRIC_INNER_PRODUCT)
+    print(f"Adding {len(vecs)} vectors to index...")
     idx.add(vecs)
     faiss.write_index(idx, str(idx_p))
+    print(f"✓ Index now contains {idx.ntotal} vectors")
 
     # 5. write maps
     start_id = idx.ntotal - len(vecs)
+    print("Writing concept map entries...")
     with map_p.open("a" if map_p.exists() else "w", encoding="utf-8") as fp:
         for vid, (file_, s, e), cid in zip(range(start_id, idx.ntotal),
                                            meta, labels):
@@ -155,7 +169,6 @@ def forge(repo_root: pathlib.Path, incremental: bool, force: bool):
                                  "f": file_,
                                  "s": s,
                                  "e": e}) + "\n")
-
     if not ovr_p.exists():
         ovr_p.touch()   # overlay pipeline to be wired later
 
