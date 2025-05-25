@@ -44,3 +44,4 @@ For a short improvement cycle summary, use the same script with the `cycle`
 command.
 
 
+To rebuild the overlay map, run `python early_codex_experiments/scripts/cognitive_structures/build_overlay_map.py --repo-root .`.
