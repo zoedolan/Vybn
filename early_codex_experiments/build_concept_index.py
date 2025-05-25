@@ -26,7 +26,6 @@ from typing import List, Tuple
 import numpy as np
 import tiktoken
 import openai
-from openai.error import AuthenticationError, OpenAIError
 
 # Ensure FAISS is available (use faiss-cpu on Windows)
 try:
@@ -56,17 +55,19 @@ def sliding_windows(txt: str, win: int, stride: int) -> List[Tuple[str,int,int]]
 def embed(texts: List[str]) -> np.ndarray:
     vecs, batch = [], 64
     total_batches = (len(texts) + batch - 1) // batch
-    try:
-        for i in range(0, len(texts), batch):
-            batch_index = i // batch + 1
-            print(f"Embedding batch {batch_index}/{total_batches} ({min(batch, len(texts)-i)} texts)")
+    for i in range(0, len(texts), batch):
+        batch_index = i // batch + 1
+        print(f"Embedding batch {batch_index}/{total_batches} ({min(batch, len(texts)-i)} texts)")
+        try:
             resp = openai.embeddings.create(model=EMBED_MODEL,
                                             input=texts[i:i+batch])
-            vecs.extend([d.embedding for d in resp.data])
-    except AuthenticationError:
-        sys.exit("✖ OpenAI API key invalid. Please check your OPENAI_API_KEY.")
-    except OpenAIError as e:
-        sys.exit(f"✖ OpenAI embedding error: {e}")
+        except Exception as e:
+            err = str(e)
+            if 'invalid' in err.lower() or '401' in err:
+                sys.exit("✖ OpenAI API key invalid. Please check your OPENAI_API_KEY.")
+            else:
+                sys.exit(f"✖ OpenAI embedding error: {e}")
+        vecs.extend([d.embedding for d in resp.data])
 
     arr = np.asarray(vecs, dtype="float32")
     arr /= np.linalg.norm(arr, axis=1, keepdims=True)
@@ -172,7 +173,7 @@ def forge(repo_root: pathlib.Path, incremental: bool, force: bool):
     if not ovr_p.exists():
         ovr_p.touch()   # overlay pipeline to be wired later
 
-    print(f"✔ vectors={idx.ntotal:,} | new={len(vecs):,} | centroids={centroids.shape[0]}")
+    print(f"✔ vectors={idx.ntotal:,} | new={len(vecs):,} | centroids={centroids.shape[0]")
 
 # ───────────────────────── entry point
 if __name__ == "__main__":
