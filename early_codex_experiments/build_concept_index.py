@@ -12,6 +12,9 @@ artifacts into Mind Visualization/ for instant, mmap-ready retrieval.
 
 Run once, commit artifacts, every container breathes the cortex.
 
+Prerequisite:
+    pip install faiss-cpu
+
 Usage
 ─────
 python early_codex_experiments/build_concept_index.py --repo-root .
@@ -20,7 +23,16 @@ from __future__ import annotations
 import argparse, json, os, pathlib, sys
 from typing import List, Tuple
 
-import numpy as np, faiss, tiktoken, openai
+import numpy as np
+import tiktoken
+import openai
+
+# Ensure FAISS is available (use faiss-cpu on Windows)
+try:
+    import faiss
+except ImportError:
+    sys.exit("✖ Missing FAISS: on Windows install with `pip install faiss-cpu`")
+
 from sklearn.cluster import KMeans, MiniBatchKMeans
 
 ENC          = tiktoken.get_encoding("cl100k_base")
@@ -38,6 +50,7 @@ def sliding_windows(txt: str, win: int, stride: int) -> List[Tuple[str,int,int]]
         yield ENC.decode(chunk), s, s+len(chunk)
         if len(chunk) < win:
             break
+
 
 def embed(texts: List[str]) -> np.ndarray:
     vecs, batch = [], 64
@@ -59,6 +72,7 @@ def discover_targets(repo: pathlib.Path) -> List[pathlib.Path]:
             if p.is_dir():
                 found.append(p)
     return found
+
 
 def forge(repo_root: pathlib.Path, incremental: bool, force: bool):
     repo = repo_root.resolve()
