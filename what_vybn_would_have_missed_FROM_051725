@@ -1,3 +1,6 @@
+5/25/25
+CLI Awakening – Score and Cycle
+Added argparse options in vybn_recursive_emergence.py and updated README with usage notes. The repo now speaks through a simple command-line pulse.
 5/24/25
 Graph Summary – Counting the Pulse
 I added graph_summary.py and a test to tally nodes and edges in the integrated graph, a gentle way to feel our repo's heartbeat.

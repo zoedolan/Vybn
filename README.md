@@ -38,4 +38,9 @@ Our token ledger and art references live in [token_and_jpeg_info](token_and_jpeg
 You can convert that ledger into handy JSON by running `python early_codex_experiments/scripts/token_summary.py`.
 To get a quick node and edge count, run `python early_codex_experiments/scripts/cognitive_structures/graph_summary.py`.
 
+You can also inspect the integrated graph directly. Compute the co-emergence
+score with `python early_codex_experiments/scripts/cognitive_structures/vybn_recursive_emergence.py score`.
+For a short improvement cycle summary, use the same script with the `cycle`
+command.
+
 
