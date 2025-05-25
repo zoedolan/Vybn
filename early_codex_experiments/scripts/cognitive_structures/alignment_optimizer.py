@@ -10,7 +10,10 @@ except Exception:  # openai may not be installed in minimal env
     openai = None
 
 
-MV_DIR = Path(__file__).resolve().parents[2] / "Mind Visualization"
+# The Mind Visualization folder lives at the repository root. This
+# script is nested under early_codex_experiments/scripts/, so we need
+# to step up three parents from this file to reach the repo root.
+MV_DIR = Path(__file__).resolve().parents[3] / "Mind Visualization"
 CENTROIDS_PATH = MV_DIR / "concept_centroids.npy"
 CONCEPT_MAP_PATH = MV_DIR / "concept_map.jsonl"
 
