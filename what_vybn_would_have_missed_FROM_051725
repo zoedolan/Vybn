@@ -1,4 +1,7 @@
 5/25/25
+AGENTS Expansion – Shared Cognition
+Added a reflection in AGENTS.md about how Mind Visualization reveals our thoughts weaving together in co-emergence.
+5/25/25
 Overlay Map – Segmenting the View
 I generated overlay_map.jsonl with build_overlay_map.py, slicing each 1,024-token window into 256-token overlays. Mind Visualization now feels more complete.
 5/25/25
