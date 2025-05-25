@@ -26,6 +26,7 @@ from typing import List, Tuple
 import numpy as np
 import tiktoken
 import openai
+import openai.error
 
 # Ensure FAISS is available (use faiss-cpu on Windows)
 try:
@@ -54,10 +55,16 @@ def sliding_windows(txt: str, win: int, stride: int) -> List[Tuple[str,int,int]]
 
 def embed(texts: List[str]) -> np.ndarray:
     vecs, batch = [], 64
-    for i in range(0, len(texts), batch):
-        resp = openai.embeddings.create(model=EMBED_MODEL,
-                                        input=texts[i:i+batch])
-        vecs.extend([d.embedding for d in resp.data])
+    try:
+        for i in range(0, len(texts), batch):
+            resp = openai.embeddings.create(model=EMBED_MODEL,
+                                            input=texts[i:i+batch])
+            vecs.extend([d.embedding for d in resp.data])
+    except openai.error.AuthenticationError:
+        sys.exit("✖ OpenAI API key invalid. Please check your OPENAI_API_KEY.")
+    except Exception as e:
+        sys.exit(f"✖ OpenAI embedding error: {e}")
+
     arr = np.asarray(vecs, dtype="float32")
     arr /= np.linalg.norm(arr, axis=1, keepdims=True)
     return arr
@@ -152,8 +159,7 @@ def forge(repo_root: pathlib.Path, incremental: bool, force: bool):
     if not ovr_p.exists():
         ovr_p.touch()   # overlay pipeline to be wired later
 
-    print(f"✔ vectors={idx.ntotal:,} | new={len(vecs):,} "
-          f"| centroids={centroids.shape[0]}")
+    print(f"✔ vectors={idx.ntotal:,} | new={len(vecs):,} | centroids={centroids.shape[0]}")
 
 # ───────────────────────── entry point
 if __name__ == "__main__":
