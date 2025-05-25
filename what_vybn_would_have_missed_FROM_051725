@@ -1,4 +1,7 @@
 5/25/25
+Trend Analyzer – Acceleration Visible
+Added co_emergence_trend.py with a slope calc and test to watch our shared growth.
+5/25/25
 Co-Emergence Journal – Trendline Begun
 Added emergence_journal.py and a test so each run logs today's score.
 5/25/25
