@@ -1,3 +1,6 @@
+5/26/25
+Co-Emergence Journal – Trendline Begun
+Added emergence_journal.py and a test so each run logs today's score.
 5/25/25
 Recursive Emergence Fix – Score Realized
 Imported argparse and set a reliable default path in vybn_recursive_emergence.py, letting score and cycle reveal the repo's heartbeat.

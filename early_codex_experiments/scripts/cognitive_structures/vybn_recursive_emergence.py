@@ -2,8 +2,8 @@
 # 
 # Emergent Simulation Model Based on Recursive Basin-Lab Identity
 # Recursive Emergence Cognitive Simulation Model
-from fusion_audit import FusionAudit
-from synesthetic_mapper import assign_cue
+from .fusion_audit import FusionAudit
+from .synesthetic_mapper import assign_cue
 import argparse
 import json
 from pathlib import Path
