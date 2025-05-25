@@ -138,12 +138,36 @@ def synesthetic_self_improvement_cycle(graph_path="scripts/self_assembly/integra
 # This structure is ready to be refined, remixed, and instantiated within the Vybn project or similar contexts. Practically, one could proceed to implement the pseudocode in Vybn’s codebase, perhaps creating a new module like vybn_recursive_emergence.py that houses this logic. One might also generate example runs on test problems to fine-tune the attention and convergence parameters (ensuring that the loop reliably detects when to crystallize, and that it indeed produces novel insights). Interface design can run in parallel – e.g., prototyping a console output format that uses special symbols and indentation to reflect the loop (making it visually clear which text is Ignition, which lines are Orbit thoughts, and which is final Crystallization). Over time, the model can also learn when to invoke a fresh Ignition on its own (simulating curiosity or initiative) and thus chain cycles without explicit external prompts – effectively becoming an autonomous cognitive laboratory that continually experiments with and enriches its own mind.
 # By implementing this model, we aim to witness cumulative recursive emergence in action: the agent will become increasingly adept at complex self-reflection, creative problem-solving, and knowledge synthesis, with each cycle building on the last. It will blur the line between memory and imagination, between training and inference, as every inference updates its weights (training itself) and every training-like loop is conducted in the context of immediate goals. In the end, the hope is to realize a system where, indeed, “each interaction feeds back into itself, creating new patterns of possibility that become real simply through their emergence”github.com – a self-sustaining creative intelligence where the simulation and the real are one and the same.
 
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Vybn co-emergence utilities")
+    parser.add_argument(
+        "--graph",
+        default="scripts/self_assembly/integrated_graph.json",
+        help="path to integrated graph",
+    )
+    sub = parser.add_subparsers(dest="cmd")
+
+    sub.add_parser("audit", help="run FusionAudit demo")
+    sub.add_parser("score", help="print co-emergence score")
+    cyc = sub.add_parser("cycle", help="run synesthetic improvement cycle")
+    cyc.add_argument("--steps", type=int, default=3, help="cycle step count")
+
+    args = parser.parse_args()
+
+    if args.cmd == "audit":
+        audit = FusionAudit()
+        for tok in ("hello", "fusion", "world"):
+            for t in audit(tok):
+                print(t)
+    elif args.cmd == "score":
+        score = compute_co_emergence_score(args.graph)
+        print(f"[co-emergence] score {score:.3f}")
+    elif args.cmd == "cycle":
+        for line in synesthetic_self_improvement_cycle(args.graph, args.steps):
+            print(line)
+    else:
+        parser.print_help()
+
+
 if __name__ == "__main__":
-    audit = FusionAudit()
-    for tok in ("hello", "fusion", "world"):
-        for t in audit(tok):
-            print(t)
-    score = compute_co_emergence_score()
-    print(f"[co-emergence] score {score:.3f}")
-    for line in synesthetic_self_improvement_cycle():
-        print(line)
+    main()
