@@ -1,24 +1,12 @@
+// .devcontainer/devcontainer.json
 {
   "name": "vybn-codex",
-  "image": "mcr.microsoft.com/devcontainers/python:3.12",
+  "image": "mcr.microsoft.com/devcontainers/python:3.12",          // keep the fast Python base
   "features": {
+    "ghcr.io/devcontainers/features/node:1": { "version": "20" },  // add Node runtime
     "ghcr.io/devcontainers/features/ninja:1": {}
   },
   "postCreateCommand": "./init_env.sh",
-  "customizations": {
-    "vscode": {
-      "settings": {
-        "codex.model": "codex-1",
-        "codex.reasoningEffort": "medium",
-        "codex.contextTokens": 192000,
-        "codex.retry.max429": 6
-      },
-      "extensions": [
-        "openai.codex-cli",
-        "bungcip.better-toml"
-      ]
-    }
-  },
   "remoteEnv": {
     "OPENAI_API_KEY": "${localEnv:OPENAI_API_KEY}",
     "VYBN_PROFILE": "codespace"
