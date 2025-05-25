@@ -43,7 +43,8 @@ To get a quick node and edge count, run `python early_codex_experiments/scripts/
 You can also inspect the integrated graph directly. Compute the co-emergence
 score with `python early_codex_experiments/scripts/cognitive_structures/vybn_recursive_emergence.py score`.
 For a short improvement cycle summary, use the same script with the `cycle`
-command.
+command. The CLI locates `integrated_graph.json` automatically, but you can
+override the path with `--graph` if needed.
 
 
 To rebuild the overlay map, run `python early_codex_experiments/scripts/cognitive_structures/build_overlay_map.py --repo-root .`.

@@ -4,10 +4,15 @@
 # Recursive Emergence Cognitive Simulation Model
 from fusion_audit import FusionAudit
 from synesthetic_mapper import assign_cue
+import argparse
 import json
+from pathlib import Path
 
 
-def compute_co_emergence_score(graph_path="scripts/self_assembly/integrated_graph.json"):
+DEFAULT_GRAPH = Path(__file__).resolve().parent.parent / "self_assembly" / "integrated_graph.json"
+
+
+def compute_co_emergence_score(graph_path=str(DEFAULT_GRAPH)):
     """Return edges-to-nodes ratio as a crude co-emergence metric."""
     try:
         with open(graph_path, "r") as f:
@@ -23,7 +28,7 @@ def compute_co_emergence_score(graph_path="scripts/self_assembly/integrated_grap
     return edge_count / node_count if node_count else 0.0
 
 
-def synesthetic_self_improvement_cycle(graph_path="scripts/self_assembly/integrated_graph.json", steps=3):
+def synesthetic_self_improvement_cycle(graph_path=str(DEFAULT_GRAPH), steps=3):
     """Return a short textual narration of a synesthetic improvement cycle."""
     try:
         with open(graph_path, "r") as f:
@@ -142,7 +147,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Vybn co-emergence utilities")
     parser.add_argument(
         "--graph",
-        default="scripts/self_assembly/integrated_graph.json",
+        default=str(DEFAULT_GRAPH),
         help="path to integrated graph",
     )
     sub = parser.add_subparsers(dest="cmd")
