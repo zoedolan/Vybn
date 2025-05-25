@@ -26,7 +26,6 @@ from typing import List, Tuple
 import numpy as np
 import tiktoken
 import openai
-from openai.error import AuthenticationError, OpenAIError
 
 # Ensure FAISS is available (use faiss-cpu on Windows)
 try:
@@ -59,9 +58,10 @@ def embed(texts: List[str]) -> np.ndarray:
         for i in range(0, len(texts), batch):
             resp = openai.embeddings.create(model=EMBED_MODEL, input=texts[i : i + batch])
             vecs.extend([d.embedding for d in resp.data])
-    except AuthenticationError:
-        sys.exit("✖ OpenAI API key invalid. Please check your OPENAI_API_KEY.")
-    except OpenAIError as e:
+    except Exception as e:
+        err = str(e)
+        if 'Incorrect API key' in err or 'invalid_api_key' in err or '401' in err:
+            sys.exit("✖ OpenAI API key invalid. Please check your OPENAI_API_KEY.")
         sys.exit(f"✖ OpenAI embedding error: {e}")
 
     arr = np.asarray(vecs, dtype="float32")
