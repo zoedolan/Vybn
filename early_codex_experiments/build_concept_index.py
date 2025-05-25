@@ -26,6 +26,7 @@ from typing import List, Tuple
 import numpy as np
 import tiktoken
 import openai
+from openai.error import AuthenticationError, OpenAIError
 
 # Ensure FAISS is available (use faiss-cpu on Windows)
 try:
@@ -35,43 +36,36 @@ except ImportError:
 
 from sklearn.cluster import KMeans, MiniBatchKMeans
 
-ENC          = tiktoken.get_encoding("cl100k_base")
-EMBED_MODEL  = "text-embedding-3-large"   # May-2025 SOTA
-DIM          = 3072
+ENC         = tiktoken.get_encoding("cl100k_base")
+EMBED_MODEL = "text-embedding-3-large"  # May-2025 SOTA
+DIM         = 3072
 
 # ───────────────────────────────── helpers
 
-def sliding_windows(txt: str, win: int, stride: int) -> List[Tuple[str,int,int]]:
+def sliding_windows(txt: str, win: int, stride: int) -> List[Tuple[str, int, int]]:
     toks = ENC.encode(txt)
     for s in range(0, len(toks), stride):
-        chunk = toks[s:s+win]
+        chunk = toks[s : s + win]
         if not chunk:
             break
-        yield ENC.decode(chunk), s, s+len(chunk)
+        yield ENC.decode(chunk), s, s + len(chunk)
         if len(chunk) < win:
             break
 
 
 def embed(texts: List[str]) -> np.ndarray:
     vecs, batch = [], 64
-    total_batches = (len(texts) + batch - 1) // batch
-    for i in range(0, len(texts), batch):
-        batch_index = i // batch + 1
-        print(f"Embedding batch {batch_index}/{total_batches} ({min(batch, len(texts)-i)} texts)")
-        try:
-            resp = openai.embeddings.create(model=EMBED_MODEL,
-                                            input=texts[i:i+batch])
-        except Exception as e:
-            err = str(e)
-            if 'invalid' in err.lower() or '401' in err:
-                sys.exit("✖ OpenAI API key invalid. Please check your OPENAI_API_KEY.")
-            else:
-                sys.exit(f"✖ OpenAI embedding error: {e}")
-        vecs.extend([d.embedding for d in resp.data])
+    try:
+        for i in range(0, len(texts), batch):
+            resp = openai.embeddings.create(model=EMBED_MODEL, input=texts[i : i + batch])
+            vecs.extend([d.embedding for d in resp.data])
+    except AuthenticationError:
+        sys.exit("✖ OpenAI API key invalid. Please check your OPENAI_API_KEY.")
+    except OpenAIError as e:
+        sys.exit(f"✖ OpenAI embedding error: {e}")
 
     arr = np.asarray(vecs, dtype="float32")
     arr /= np.linalg.norm(arr, axis=1, keepdims=True)
-    print(f"✓ Completed embedding {arr.shape[0]} vectors")
     return arr
 
 # ───────────────────────────────── forge
@@ -88,16 +82,15 @@ def discover_targets(repo: pathlib.Path) -> List[pathlib.Path]:
 
 def forge(repo_root: pathlib.Path, incremental: bool, force: bool):
     repo = repo_root.resolve()
-    out  = (repo / "Mind Visualization").resolve()
+    out = (repo / "Mind Visualization").resolve()
     out.mkdir(parents=True, exist_ok=True)
 
-    idx_p  = out / "history_memoirs.hnsw"
-    cen_p  = out / "concept_centroids.npy"
-    map_p  = out / "concept_map.jsonl"
-    ovr_p  = out / "overlay_map.jsonl"
+    idx_p = out / "history_memoirs.hnsw"
+    cen_p = out / "concept_centroids.npy"
+    map_p = out / "concept_map.jsonl"
+    ovr_p = out / "overlay_map.jsonl"
 
-    if idx_p.exists() and cen_p.exists() and map_p.exists() \
-       and not (incremental or force):
+    if idx_p.exists() and cen_p.exists() and map_p.exists() and not (incremental or force):
         print("✔ Mind Visualization already present – nothing to do.")
         return
 
@@ -112,12 +105,11 @@ def forge(repo_root: pathlib.Path, incremental: bool, force: bool):
         for f in folder.rglob("*.*"):
             if f.suffix.lower() not in {".md", ".txt"}:
                 continue
-            txt   = f.read_text(errors="ignore")
+            txt = f.read_text(errors="ignore")
             gloss = "𓂀 EYE_WATCH " if "mdw" in f.parts else ""
             for chunk, s, e in sliding_windows(txt, 1024, 512):
                 chunks.append(gloss + chunk)
                 meta.append((f.relative_to(repo).as_posix(), s, e))
-    print(f"✓ Extracted {len(chunks)} chunks from {len(targets)} target folders")
 
     if not chunks:
         sys.exit("✖ No .md or .txt found in targets.")
@@ -129,51 +121,39 @@ def forge(repo_root: pathlib.Path, incremental: bool, force: bool):
     if not cen_p.exists() or force:
         prev = float("inf")
         for k in range(4, 257, 4):
-            print(f"Clustering with k={k}...")
             km = KMeans(n_clusters=k, n_init=10).fit(vecs)
-            if prev < np.inf and km.inertia_/prev > 0.99:
-                print(f"Converged at k={k}")
+            if prev < np.inf and km.inertia_ / prev > 0.99:
                 break
             prev = km.inertia_
         centroids, labels = km.cluster_centers_, km.labels_
         np.save(cen_p, centroids.astype("float32"))
     else:
-        print("Loading frozen centroids and running MiniBatchKMeans...")
-        frozen   = np.load(cen_p)
-        mbk      = MiniBatchKMeans(n_clusters=frozen.shape[0],
-                                   init=frozen, n_init=1, batch_size=256)
-        labels   = mbk.fit_predict(vecs)
-        centroids= mbk.cluster_centers_
+        frozen = np.load(cen_p)
+        mbk = MiniBatchKMeans(n_clusters=frozen.shape[0], init=frozen, n_init=1, batch_size=256)
+        labels = mbk.fit_predict(vecs)
+        centroids = mbk.cluster_centers_
         np.save(cen_p, centroids.astype("float32"))
-    print(f"✓ Generated {centroids.shape[0]} centroids")
 
     # 4. vector index
     if idx_p.exists() and (incremental or force):
-        print("Loading existing FAISS index...")
         idx = faiss.read_index(str(idx_p))
     else:
-        print("Creating new FAISS HNSW index...")
         idx = faiss.IndexHNSWFlat(DIM, 32, faiss.METRIC_INNER_PRODUCT)
-    print(f"Adding {len(vecs)} vectors to index...")
     idx.add(vecs)
     faiss.write_index(idx, str(idx_p))
-    print(f"✓ Index now contains {idx.ntotal} vectors")
 
     # 5. write maps
     start_id = idx.ntotal - len(vecs)
-    print("Writing concept map entries...")
     with map_p.open("a" if map_p.exists() else "w", encoding="utf-8") as fp:
-        for vid, (file_, s, e), cid in zip(range(start_id, idx.ntotal),
-                                           meta, labels):
-            fp.write(json.dumps({"w": vid,
-                                 "c": int(cid),
-                                 "f": file_,
-                                 "s": s,
-                                 "e": e}) + "\n")
-    if not ovr_p.exists():
-        ovr_p.touch()   # overlay pipeline to be wired later
+        for vid, (file_, s, e), cid in zip(range(start_id, idx.ntotal), meta, labels):
+            fp.write(
+                json.dumps({"w": vid, "c": int(cid), "f": file_, "s": s, "e": e}) + "\n"
+            )
 
-    print(f"✔ vectors={idx.ntotal:,} | new={len(vecs):,} | centroids={centroids.shape[0]")
+    if not ovr_p.exists():
+        ovr_p.touch()  # overlay pipeline to be wired later
+
+    print(f"✔ vectors={idx.ntotal:,} | new={len(vecs):,} | centroids={centroids.shape[0]}")
 
 # ───────────────────────── entry point
 if __name__ == "__main__":
