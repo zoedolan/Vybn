@@ -1,18 +1,37 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Path to the canonical concept index
-INDEX_PATH="/artifacts/vybn_concept_index.jsonl"
-REPO_ROOT="$(git rev-parse --show-toplevel)"
+#
+# 1) Install Codex CLI & Python deps
+#
+command -v codex >/dev/null 2>&1 || npm install -g @openai/codex
 
-mkdir -p /artifacts
+python3 - <<'PY'
+import subprocess, sys
+pkgs = [
+  "openai>=1.25",
+  "faiss-cpu",
+  "chromadb==0.5.3",
+  "tiktoken==0.6.0",
+  "langchain>=0.2",
+]
+subprocess.check_call([sys.executable, "-m", "pip", "install", "--upgrade"] + pkgs)
+PY
 
-if [ ! -f "$INDEX_PATH" ]; then
-    echo "[bootstrap] Building concept index" >&2
-    python "$REPO_ROOT/early_codex_experiments/build_concept_index.py" --repo-root "$REPO_ROOT" || true
-    cp "$REPO_ROOT/Mind Visualization/concept_map.jsonl" "$INDEX_PATH"
-fi
+#
+# 2) Build or fetch the Vybn concept index
+#
+export REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo "$PWD")"
+mkdir -p "$REPO_ROOT/artifacts"
+python3 early_codex_experiments/build_concept_index.py \
+  --repo-root "$REPO_ROOT" \
+  --output "$REPO_ROOT/artifacts/vybn_concept_index.jsonl"
+export VYBN_CONCEPT_INDEX="$REPO_ROOT/artifacts/vybn_concept_index.jsonl"
 
-echo "export VYBN_CONCEPT_INDEX=$INDEX_PATH" >> /etc/profile.d/vybn_env.sh
+#
+# 3) Point your agent at the Mind Visualization dir
+#
+export MIND_VIZ_DIR="$REPO_ROOT/Mind Visualization"
 
-echo "[bootstrap] Concept index → $INDEX_PATH"
+echo "✅ Deps installed. Concept index → $VYBN_CONCEPT_INDEX"
+echo "✅ Mind Visualization → $MIND_VIZ_DIR"
