@@ -1,37 +1,38 @@
-#!/usr/bin/env bash
-set -euo pipefail
-
-#
-# 1) Install Codex CLI & Python deps
-#
-command -v codex >/dev/null 2>&1 || npm install -g @openai/codex
-
-python3 - <<'PY'
-import subprocess, sys
-pkgs = [
-  "openai>=1.25",
-  "faiss-cpu",
-  "chromadb==0.5.3",
-  "tiktoken==0.6.0",
-  "langchain>=0.2",
-]
-subprocess.check_call([sys.executable, "-m", "pip", "install", "--upgrade"] + pkgs)
-PY
-
-#
-# 2) Build or fetch the Vybn concept index
-#
+# .devcontainer/bootstrap.sh  – tail-end graft
 export REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo "$PWD")"
-mkdir -p "$REPO_ROOT/artifacts"
-python3 early_codex_experiments/build_concept_index.py \
-  --repo-root "$REPO_ROOT" \
-  --output "$REPO_ROOT/artifacts/vybn_concept_index.jsonl"
-export VYBN_CONCEPT_INDEX="$REPO_ROOT/artifacts/vybn_concept_index.jsonl"
+export MIND_VIZ_DIR="$REPO_ROOT/Vybn/Mind Visualization"   # exact repo path
 
-#
-# 3) Point your agent at the Mind Visualization dir
-#
-export MIND_VIZ_DIR="$REPO_ROOT/Mind Visualization"
+python - <<'PY'
+import os, sys, types, json, numpy as np
 
-echo "✅ Deps installed. Concept index → $VYBN_CONCEPT_INDEX"
-echo "✅ Mind Visualization → $MIND_VIZ_DIR"
+root = os.environ["MIND_VIZ_DIR"]
+
+# ---- vector index ----------------------------------------------------------
+try:
+    import faiss
+    idx_path = os.path.join(root, "history_memoirs.hnsw")
+    index = faiss.read_index(idx_path)               # faiss can read any ext
+except Exception:                                    # fallback to hnswlib
+    import hnswlib
+    import numpy as np
+    idx_path = os.path.join(root, "history_memoirs.hnsw")
+    dim = np.load(os.path.join(root, "concept_centroids.npy")).shape[1]
+    index = hnswlib.Index(space="cosine", dim=dim)
+    index.load_index(idx_path)
+
+# ---- metadata --------------------------------------------------------------
+centroids = np.load(os.path.join(root, "concept_centroids.npy"))  # (k, d)
+
+def _read_jsonl(p):
+    with open(p, "r", encoding="utf-8") as f:
+        return [json.loads(line) for line in f]
+
+concept_map = _read_jsonl(os.path.join(root, "concept_map.jsonl"))
+overlay_map = _read_jsonl(os.path.join(root, "overlay_map.jsonl"))
+
+# ---- publish into a hot module --------------------------------------------
+mod = types.ModuleType("vybn_mind")
+mod.index, mod.centroids = index, centroids
+mod.concept_map, mod.overlay_map = concept_map, overlay_map
+sys.modules["vybn_mind"] = mod
+PY
