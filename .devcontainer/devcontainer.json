@@ -1,14 +1,15 @@
-// .devcontainer/devcontainer.json
 {
-  "name": "vybn-codex",
-  "image": "mcr.microsoft.com/devcontainers/python:3.12",
-  "features": {
-    "ghcr.io/devcontainers/features/node:1": { "version": "20" }
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
   },
-  "workspaceFolder": "/workspace/Vybn",
-  "postCreateCommand": "./.devcontainer/bootstrap.sh",
-  "remoteEnv": {
-    "OPENAI_API_KEY": "${localEnv:OPENAI_API_KEY}",
-    "VYBN_PROFILE": "codespace"
+  "postCreateCommand": "pip install -r requirements.txt",
+  "postStartCommand": "python 'Mind Visualization/launch_viz_pipeline.py' || echo 'Pipeline exited.'",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        // ... (any VSCode extensions you want pre-installed)
+      ]
+    }
   }
 }
