@@ -1,5 +1,12 @@
+import os
 from fastapi import FastAPI, HTTPException
-from .utils import get_db, get_index, kv_get, kv_put, vec_search
+from sentence_transformers import SentenceTransformer
+from .utils import get_db, get_index, kv_get, kv_put, vec_search, set_model
+
+# Load the sentence transformer model from the location specified by
+# SENTENCE_MODEL_DIR and share it with the utility layer.
+_embedder = SentenceTransformer(os.environ["SENTENCE_MODEL_DIR"])
+set_model(_embedder)
 
 app = FastAPI()
 
