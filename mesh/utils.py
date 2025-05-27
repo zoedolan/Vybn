@@ -11,7 +11,6 @@ ROOT = Path(__file__).resolve().parent.parent
 DB_PATH = ROOT / 'mesh.db'
 INDEX_PATH = ROOT / 'mesh.faiss'
 EMBED_DIM = 384
-MODEL_NAME = 'sentence-transformers/all-MiniLM-L6-v2'
 
 _db = None
 _index = None
@@ -47,8 +46,15 @@ def get_index() -> faiss.Index:
 def get_model() -> SentenceTransformer:
     global _model
     if _model is None:
-        _model = SentenceTransformer(MODEL_NAME)
+        model_path = os.environ["SENTENCE_MODEL_DIR"]
+        _model = SentenceTransformer(model_path)
     return _model
+
+
+def set_model(model: SentenceTransformer) -> None:
+    """Allow external modules to set the sentence transformer instance."""
+    global _model
+    _model = model
 
 
 def embed(text: str) -> np.ndarray:
