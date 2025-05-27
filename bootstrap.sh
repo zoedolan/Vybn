@@ -14,3 +14,7 @@ export MESH_ENDPOINT="http://localhost:8000"
 if ! pgrep -f "uvicorn.*mesh.server" >/dev/null; then
     nohup python -m mesh.server > "$LOG_DIR/mesh.log" 2>&1 &
 fi
+
+if ! pgrep -f "python -m mesh.loop" >/dev/null; then
+    nohup python -m mesh.loop > "$LOG_DIR/loop.log" 2>&1 &
+fi
