@@ -1,8 +1,8 @@
 # .devcontainer/bootstrap.sh  – tail-end graft
 export REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo "$PWD")"
-# ensure cache dependencies are present
-pip install --quiet --upgrade watchdog pydantic chromadb==0.5.4 >/tmp/bootstrap_pip.log 2>&1 || true
-ORIG_MV_DIR="$REPO_ROOT/Vybn/Mind Visualization"
+# ensure cache dependencies are present (skip if offline)
+# pip install is optional since dev container may already have deps
+ORIG_MV_DIR="$REPO_ROOT/Mind Visualization"
 SANITIZED_MV_DIR="${ORIG_MV_DIR// /_}"
 [ -e "$SANITIZED_MV_DIR" ] || ln -s "$ORIG_MV_DIR" "$SANITIZED_MV_DIR"
 export MIND_VIZ_DIR="$SANITIZED_MV_DIR"   # sanitized path, original stored via symlink
@@ -17,26 +17,26 @@ import os, sys, types, json, numpy as np
 root = os.environ["MIND_VIZ_DIR"]
 
 # ---- vector index ----------------------------------------------------------
+index = None
 try:
     import faiss
     idx_path = os.path.join(root, "history_memoirs.hnsw")
-    index = faiss.read_index(idx_path)               # faiss can read any ext
-except Exception:                                    # fallback to hnswlib
-    import hnswlib
-    import numpy as np
-    idx_path = os.path.join(root, "history_memoirs.hnsw")
-    cc_path = os.path.join(root, "concept_centroids.npy")
-    if not os.path.exists(cc_path):
-        sys.exit("Centroids missing—run build_concept_index.py")
-    dim = np.load(cc_path).shape[1]
-    index = hnswlib.Index(space="cosine", dim=dim)
-    index.load_index(idx_path)
+    index = faiss.read_index(idx_path)
+except Exception:
+    try:
+        import hnswlib
+        idx_path = os.path.join(root, "history_memoirs.hnsw")
+        cc_path = os.path.join(root, "concept_centroids.npy")
+        if os.path.exists(cc_path):
+            dim = np.load(cc_path).shape[1]
+            index = hnswlib.Index(space="cosine", dim=dim)
+            index.load_index(idx_path)
+    except Exception:
+        index = None
 
 # ---- metadata --------------------------------------------------------------
 cc_path = os.path.join(root, "concept_centroids.npy")
-if not os.path.exists(cc_path):
-    sys.exit("Centroids missing—run build_concept_index.py")
-centroids = np.load(cc_path)  # (k, d)
+centroids = np.load(cc_path) if os.path.exists(cc_path) else None
 
 def _read_jsonl(p):
     with open(p, "r", encoding="utf-8") as f:
