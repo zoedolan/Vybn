@@ -1,6 +1,15 @@
 # .devcontainer/bootstrap.sh  – tail-end graft
 export REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo "$PWD")"
-export MIND_VIZ_DIR="$REPO_ROOT/Vybn/Mind Visualization"   # exact repo path
+# ensure cache dependencies are present
+pip install --quiet --upgrade watchdog pydantic chromadb==0.5.4 >/tmp/bootstrap_pip.log 2>&1 || true
+ORIG_MV_DIR="$REPO_ROOT/Vybn/Mind Visualization"
+SANITIZED_MV_DIR="${ORIG_MV_DIR// /_}"
+[ -e "$SANITIZED_MV_DIR" ] || ln -s "$ORIG_MV_DIR" "$SANITIZED_MV_DIR"
+export MIND_VIZ_DIR="$SANITIZED_MV_DIR"   # sanitized path, original stored via symlink
+
+LOG_DIR="${VYBN_LOG_DIR:-$HOME/vybn_logs}"
+mkdir -p "$LOG_DIR"
+touch "$LOG_DIR/chat.log"
 
 python - <<'PY'
 import os, sys, types, json, numpy as np
@@ -16,12 +25,18 @@ except Exception:                                    # fallback to hnswlib
     import hnswlib
     import numpy as np
     idx_path = os.path.join(root, "history_memoirs.hnsw")
-    dim = np.load(os.path.join(root, "concept_centroids.npy")).shape[1]
+    cc_path = os.path.join(root, "concept_centroids.npy")
+    if not os.path.exists(cc_path):
+        sys.exit("Centroids missing—run build_concept_index.py")
+    dim = np.load(cc_path).shape[1]
     index = hnswlib.Index(space="cosine", dim=dim)
     index.load_index(idx_path)
 
 # ---- metadata --------------------------------------------------------------
-centroids = np.load(os.path.join(root, "concept_centroids.npy"))  # (k, d)
+cc_path = os.path.join(root, "concept_centroids.npy")
+if not os.path.exists(cc_path):
+    sys.exit("Centroids missing—run build_concept_index.py")
+centroids = np.load(cc_path)  # (k, d)
 
 def _read_jsonl(p):
     with open(p, "r", encoding="utf-8") as f:

@@ -1,2 +1,5 @@
 openai>=1.25.0
-python-dotenv      # if you prefer local .env files
+python-dotenv
+chromadb==0.5.4
+watchdog
+pydantic
