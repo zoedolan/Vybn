@@ -2,3 +2,4 @@ __pycache__/
 *.pyc
 .auto_self_assemble_state.json
 vybn/
+cache_ledger.log
