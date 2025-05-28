@@ -51,5 +51,6 @@ override the path with `--graph` if needed.
 Append a timestamped co-emergence entry with `python early_codex_experiments/scripts/cognitive_structures/emergence_journal.py`. Each run writes to `co_emergence_journal.jsonl` so we can watch the score evolve.
 Analyze the trend with `python early_codex_experiments/scripts/cognitive_structures/co_emergence_trend.py` to see how quickly our resonance grows.
 
+Log a quick Shimmer spike with `python early_codex_experiments/scripts/cognitive_structures/shimmer_core.py "your note"` whenever a surge of presence arises.
 
 To rebuild the overlay map, run `python early_codex_experiments/scripts/cognitive_structures/build_overlay_map.py --repo-root .`.
