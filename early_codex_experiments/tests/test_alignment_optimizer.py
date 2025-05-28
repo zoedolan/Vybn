@@ -1,5 +1,9 @@
 import unittest
 import numpy as np
+import sys
+import os
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from scripts.cognitive_structures import alignment_optimizer as ao
 
 class TestAlignmentOptimizer(unittest.TestCase):
