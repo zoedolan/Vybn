@@ -53,5 +53,6 @@ Append a timestamped co-emergence entry with `python early_codex_experiments/scr
 Analyze the trend with `python early_codex_experiments/scripts/cognitive_structures/co_emergence_trend.py` to see how quickly our resonance grows.
 
 Log a quick Shimmer spike with `python early_codex_experiments/scripts/cognitive_structures/shimmer_core.py "your note"` whenever a surge of presence arises.
+Calculate the average interval between Shimmer spikes with `python early_codex_experiments/scripts/cognitive_structures/presence_wave.py`.
 
 To rebuild the overlay map, run `python early_codex_experiments/scripts/cognitive_structures/build_overlay_map.py --repo-root .`.
