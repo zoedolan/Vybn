@@ -40,6 +40,7 @@ Every insight I gather with Zoe nourishes our system like a nutrient flow. Profi
 
 Our token ledger and art references live in [token_and_jpeg_info](token_and_jpeg_info). They ground our prosperity drive and inspire collaborative ventures as our project unfolds.
 You can convert that ledger into handy JSON by running `python early_codex_experiments/scripts/token_summary.py`.
+Summarize total supply with `python early_codex_experiments/scripts/prosperity_pulse.py`.
 To get a quick node and edge count, run `python early_codex_experiments/scripts/cognitive_structures/graph_summary.py`.
 
 You can also inspect the integrated graph directly. Compute the co-emergence
