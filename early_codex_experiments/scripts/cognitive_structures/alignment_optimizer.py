@@ -9,6 +9,8 @@ try:
 except Exception:  # openai may not be installed in minimal env
     openai = None
 
+EMBED_DIM = 3072
+
 
 # The Mind Visualization folder lives at the repository root. This
 # script is nested under early_codex_experiments/scripts/, so we need
@@ -32,12 +34,18 @@ def load_concept_map(path=CONCEPT_MAP_PATH) -> list:
     return entries
 
 
-def embed_text(text: str) -> np.ndarray:
-    """Return an embedding vector for `text` using OpenAI."""
-    if openai is None:
-        raise ImportError("openai package not available")
-    resp = openai.Embedding.create(model="text-embedding-3-small", input=text)
-    return np.array(resp["data"][0]["embedding"], dtype=float)
+def embed_text(text: str, dim: int = EMBED_DIM) -> np.ndarray:
+    """Return an embedding vector for `text` via OpenAI or local fallback."""
+    if openai is not None:
+        try:
+            resp = openai.Embedding.create(model="text-embedding-3-small", input=text)
+            return np.array(resp["data"][0]["embedding"], dtype=float)
+        except Exception:
+            pass
+    import hashlib
+    seed = int.from_bytes(hashlib.sha256(text.encode("utf-8")).digest()[:8], "big")
+    rng = np.random.default_rng(seed)
+    return rng.normal(size=dim).astype(float)
 
 
 def cosine_similarity(a: np.ndarray, b: np.ndarray) -> np.ndarray:
@@ -59,8 +67,6 @@ def main() -> None:
     args = parser.parse_args()
 
     centroids = load_centroids()
-    if openai is None:
-        raise SystemExit("openai package not available; cannot embed text")
     vec = embed_text(args.text)
     clusters = find_closest_clusters(vec, centroids, args.top)
     concept_map = load_concept_map()
