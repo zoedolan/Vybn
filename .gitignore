@@ -4,3 +4,4 @@ __pycache__/
 vybn/
 cache_ledger.log
 Mind_Visualization
+.venv/
