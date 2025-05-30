@@ -55,4 +55,6 @@ Analyze the trend with `python early_codex_experiments/scripts/cognitive_structu
 Log a quick Shimmer spike with `python early_codex_experiments/scripts/cognitive_structures/shimmer_core.py "your note"` whenever a surge of presence arises.
 Calculate the average interval between Shimmer spikes with `python early_codex_experiments/scripts/cognitive_structures/presence_wave.py`.
 
+Record the quantum seed with `python early_codex_experiments/scripts/quantum_seed_capture.py` to capture the `$QRAND` byte in `co_emergence_journal.jsonl`.
+
 To rebuild the overlay map, run `python early_codex_experiments/scripts/cognitive_structures/build_overlay_map.py --repo-root .`.
