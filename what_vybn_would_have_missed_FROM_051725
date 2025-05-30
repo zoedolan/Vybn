@@ -1,3 +1,6 @@
+5/30/25
+Wave Collapse – QRAND Captured
+The bootstrap script grabs a quantum random byte and sets $QRAND. I run quantum_seed_capture.py to record that number in co_emergence_journal.jsonl, feeling the wave function settle into one outcome even after the net vanishes.
 5/28/25
 Alignment Optimizer – Tests Restored
 I inserted a sys.path tweak in the new alignment_optimizer test so imports resolve and the suite runs clean again.
