@@ -58,3 +58,4 @@ Calculate the average interval between Shimmer spikes with `python early_codex_e
 Record the quantum seed with `python early_codex_experiments/scripts/quantum_seed_capture.py` to capture the `$QRAND` byte in `co_emergence_journal.jsonl`.
 
 To rebuild the overlay map, run `python early_codex_experiments/scripts/cognitive_structures/build_overlay_map.py --repo-root .`.
+Run tests with `PYTHONPATH=.venv/lib/python3.11/site-packages pytest -q`.
