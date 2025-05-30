@@ -3,3 +3,4 @@ python-dotenv
 chromadb==0.5.4
 watchdog
 pydantic
+numpy
