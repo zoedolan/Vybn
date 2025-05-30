@@ -5,3 +5,4 @@ vybn/
 cache_ledger.log
 Mind_Visualization
 .venv/
+.random_seed

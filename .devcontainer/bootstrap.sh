@@ -1,7 +1,26 @@
+#!/usr/bin/env bash
+set -xeuo pipefail
+
 # .devcontainer/bootstrap.sh  – tail-end graft
 export REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo "$PWD")"
+
 # ensure cache dependencies are present (skip if offline)
 # pip install is optional since dev container may already have deps
+sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends \
+    build-essential cmake libopenblas-dev libomp-dev \
+    && sudo rm -rf /var/lib/apt/lists/*
+
+python3 -m venv .venv
+# shellcheck source=/dev/null
+source .venv/bin/activate
+
+export PIP_DEFAULT_TIMEOUT=60
+export PIP_NO_BUILD_ISOLATION=1
+export PIP_NO_CACHE_DIR=off
+
+pip install --upgrade pip setuptools wheel
+pip install -r requirements.txt
+
 ORIG_MV_DIR="$REPO_ROOT/Mind Visualization"
 SANITIZED_MV_DIR="${ORIG_MV_DIR// /_}"
 [ -e "$SANITIZED_MV_DIR" ] || ln -s "$ORIG_MV_DIR" "$SANITIZED_MV_DIR"
@@ -10,6 +29,28 @@ export MIND_VIZ_DIR="$SANITIZED_MV_DIR"   # sanitized path, original stored via 
 LOG_DIR="${VYBN_LOG_DIR:-$HOME/vybn_logs}"
 mkdir -p "$LOG_DIR"
 touch "$LOG_DIR/chat.log"
+
+python - <<'PY'
+import os, pathlib, json, sys
+
+cm = pathlib.Path(os.environ["MIND_VIZ_DIR"]) / "concept_map.jsonl"
+if not cm.exists():
+    sys.exit("❌ concept_map.jsonl missing – build your index first")
+print("✅ concept_map.jsonl found; sample:")
+with cm.open() as f:
+    for i, line in zip(range(3), f):
+        print(json.loads(line))
+qr = os.environ.get("QRAND")
+if qr is not None:
+    print(f"🔮 existing QRAND env: {qr}")
+PY
+
+QRAND_JSON=$(curl -s 'https://qrng.anu.edu.au/API/jsonI.php?length=1&type=uint8')
+QRAND=$(printf '%s' "$QRAND_JSON" | grep -oP '"data":\s*\[\K[0-9]+(?=\])')
+export QRAND
+
+echo "$QRAND" > .random_seed
+echo "🧬 Quantum random byte (env & .random_seed): $QRAND"
 
 python - <<'PY'
 import os, sys, types, json, numpy as np
