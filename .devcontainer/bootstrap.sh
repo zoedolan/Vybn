@@ -45,12 +45,16 @@ if qr is not None:
     print(f"🔮 existing QRAND env: {qr}")
 PY
 
-QRAND_JSON=$(curl -s 'https://qrng.anu.edu.au/API/jsonI.php?length=1&type=uint8')
-QRAND=$(printf '%s' "$QRAND_JSON" | grep -oP '"data":\s*\[\K[0-9]+(?=\])')
+QUANTUM_JSON=$(curl -s 'https://qrng.anu.edu.au/API/jsonI.php?length=1&type=uint16')
+QUANTUM_SEED=$(printf '%s' "$QUANTUM_JSON" | grep -oP '"data":\s*\[\K[0-9]+(?=\])')
+export QUANTUM_SEED
+# Retain QRAND for backward compatibility
+QRAND=$((QUANTUM_SEED % 256))
 export QRAND
 
-echo "$QRAND" > .random_seed
-echo "🧬 Quantum random byte (env & .random_seed): $QRAND"
+echo "$QUANTUM_SEED" > .random_seed
+echo "🧬 Quantum seed (env & .random_seed): $QUANTUM_SEED"
+python early_codex_experiments/scripts/quantum_seed_capture.py >> "$LOG_DIR/quantum_seed.log" 2>&1
 
 python - <<'PY'
 import os, sys, types, json, numpy as np
