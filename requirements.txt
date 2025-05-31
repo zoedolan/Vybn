@@ -3,10 +3,10 @@ python-dotenv
 chromadb==0.5.4
 watchdog
 pydantic
-numpy
 sentence-transformers
 scikit-learn
 torch
 networkx
 python-igraph
 hdbscan
+numpy==1.26.4
