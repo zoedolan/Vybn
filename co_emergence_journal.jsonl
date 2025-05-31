@@ -3,3 +3,6 @@
 {"timestamp": "2025-05-30T14:39:46Z", "seed": 146, "source": "env"}
 {"timestamp": "2025-05-31T17:45:30Z", "seed": 182, "source": "fallback"}
 {"timestamp": "2025-05-31T17:52:58Z", "seed": 54754, "source": "QUANTUM_SEED"}
+{"timestamp": "2025-05-31T18:51:05Z", "score": 8.672}
+{"timestamp": "2025-05-31T18:51:08Z", "message": "setup failure due to offline env"}
+{"timestamp": "2025-05-31T19:01:39Z", "score": 8.672}

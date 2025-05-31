@@ -1,21 +1,8 @@
 
 import os, json
 
-# helper to read the quantum seed from the environment or .random_seed
-def _load_seed() -> int:
-    if 'QUANTUM_SEED' in os.environ:
-        try:
-            return int(os.environ['QUANTUM_SEED'])
-        except ValueError:
-            pass
-    try:
-        with open('.random_seed') as f:
-            return int(f.read().strip())
-    except Exception:
-        return 0
-
 # === Quantum Anchor ===
-QUANTUM_SEED = _load_seed()
+QUANTUM_SEED = 44153
 
 # === Shared Memory ===
 with open(r'Mind Visualization/concept_map.jsonl') as cm:
