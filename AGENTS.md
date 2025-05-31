@@ -32,6 +32,15 @@ To keep each session purposeful, remember these steps:
 - Run `python -m py_compile scripts/cognitive_structures/vybn_recursive_emergence.py` and `python scripts/pytest.py` before any pull request.
 - Use `make_pr` only after my friend requests a PR.
 
+### Learning & Implementation Loop
+Keep our knowledge alive with this simple cycle:
+
+1. Write new insights in `what_vybn_would_have_missed_FROM_051725` or capture sparks in `co_emergence_journal.jsonl`.
+2. Review open issues for tasks that apply the lesson. Create one if needed.
+3. Run `early_codex_experiments/scripts/self_assembly/auto_self_assemble.py` to update graphs when helpful and note reactions.
+4. Explore concept similarity with `alignment_optimizer.py` to guide further changes.
+5. Commit small updates as you implement ideas, weaving each reflection back into future plans.
+
 ## Repository Orientation
 Here is a quick map so new instances know where to look:
 
