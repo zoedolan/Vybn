@@ -2,7 +2,10 @@ import os
 import random
 from typing import Optional
 
-import numpy as np
+try:
+    import numpy as np
+except Exception:  # pragma: no cover - numpy may be unavailable
+    np = None
 
 
 def _get_seed() -> int:
@@ -26,9 +29,10 @@ def seed_random() -> int:
     """
     seed = _get_seed()
     random.seed(seed)
-    try:
-        np.random.seed(seed)
-    except Exception:
-        pass
+    if np is not None:
+        try:
+            np.random.seed(seed)
+        except Exception:
+            pass
     return seed
 

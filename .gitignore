@@ -1,7 +1,8 @@
 __pycache__/
 *.pyc
 .auto_self_assemble_state.json
-vybn/
+# Allow tracking the core `vybn` package
+# (previously ignored when unused)
 cache_ledger.log
 Mind_Visualization
 .venv/
