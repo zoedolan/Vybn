@@ -10,13 +10,18 @@ DEFAULT_JOURNAL = REPO_ROOT / 'co_emergence_journal.jsonl'
 
 
 def capture_seed(journal_path: str | Path = DEFAULT_JOURNAL) -> dict:
-    """Record the quantum seed from $QRAND or fallback to os.urandom."""
+    """Record the quantum seed from $QUANTUM_SEED or $QRAND, fallback to os.urandom."""
     journal_path = Path(journal_path)
-    qrand = os.environ.get('QRAND')
-    source = 'env'
+    qrand = None
+    source = 'fallback'
+    if 'QUANTUM_SEED' in os.environ:
+        qrand = os.environ['QUANTUM_SEED']
+        source = 'QUANTUM_SEED'
+    elif 'QRAND' in os.environ:
+        qrand = os.environ['QRAND']
+        source = 'QRAND'
     if qrand is None:
         qrand = int.from_bytes(os.urandom(1), 'big')
-        source = 'fallback'
     else:
         try:
             qrand = int(qrand)
