@@ -3,7 +3,10 @@ import json
 import os
 from pathlib import Path
 
-import numpy as np
+try:
+    import numpy as np
+except Exception:  # pragma: no cover - numpy may be unavailable
+    np = None
 try:
     import openai
 except Exception:  # openai may not be installed in minimal env
@@ -20,8 +23,10 @@ CENTROIDS_PATH = MV_DIR / "concept_centroids.npy"
 CONCEPT_MAP_PATH = MV_DIR / "concept_map.jsonl"
 
 
-def load_centroids(path=CENTROIDS_PATH) -> np.ndarray:
+def load_centroids(path=CENTROIDS_PATH):
     """Load concept centroids from a .npy file."""
+    if np is None:
+        raise ImportError("numpy is required")
     return np.load(path)
 
 
@@ -34,7 +39,7 @@ def load_concept_map(path=CONCEPT_MAP_PATH) -> list:
     return entries
 
 
-def embed_text(text: str, dim: int = EMBED_DIM) -> np.ndarray:
+def embed_text(text: str, dim: int = EMBED_DIM):
     """Return an embedding vector for `text` via OpenAI or local fallback."""
     if openai is not None:
         try:
@@ -44,17 +49,25 @@ def embed_text(text: str, dim: int = EMBED_DIM) -> np.ndarray:
             pass
     import hashlib
     seed = int.from_bytes(hashlib.sha256(text.encode("utf-8")).digest()[:8], "big")
+    if np is None:
+        import random
+        rng = random.Random(seed)
+        return [rng.gauss(0.0, 1.0) for _ in range(dim)]
     rng = np.random.default_rng(seed)
     return rng.normal(size=dim).astype(float)
 
 
-def cosine_similarity(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+def cosine_similarity(a, b):
+    if np is None:
+        raise ImportError("numpy is required")
     a_norm = a / np.linalg.norm(a, axis=-1, keepdims=True)
     b_norm = b / np.linalg.norm(b, axis=-1, keepdims=True)
     return np.dot(a_norm, b_norm.T)
 
 
-def find_closest_clusters(vec: np.ndarray, centroids: np.ndarray, top_k=5):
+def find_closest_clusters(vec, centroids, top_k=5):
+    if np is None:
+        raise ImportError("numpy is required")
     sims = cosine_similarity(vec[None, :], centroids)[0]
     idx = np.argsort(sims)[::-1][:top_k]
     return [(int(i), float(sims[i])) for i in idx]

@@ -1,13 +1,18 @@
 import os
 import sys
 import random
-import numpy as np
+try:
+    import numpy as np
+except Exception:
+    np = None
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from scripts.quantum_rng import seed_random
 
 
 def test_seed_random_env():
+    if np is None:
+        return
     os.environ['QUANTUM_SEED'] = '42'
     seed_random()
     a_py = random.random()
@@ -20,6 +25,8 @@ def test_seed_random_env():
 
 
 def test_seed_random_qrand_fallback():
+    if np is None:
+        return
     os.environ.pop('QUANTUM_SEED', None)
     os.environ['QRAND'] = '99'
     seed_random()

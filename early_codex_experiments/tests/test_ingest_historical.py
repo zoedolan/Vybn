@@ -96,7 +96,10 @@ class TestIngestHistorical(unittest.TestCase):
                 self.assertEqual(rec['phase'], 'bootstrap')
 
     def test_ingest_centroids(self):
-        import numpy as np
+        try:
+            import numpy as np
+        except Exception:
+            self.skipTest("numpy not available")
         with tempfile.TemporaryDirectory() as tmpdir:
             mind_dir = os.path.join(tmpdir, 'mind')
             os.mkdir(mind_dir)
