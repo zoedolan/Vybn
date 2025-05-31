@@ -1,6 +1,10 @@
 import json
 import random
 
+from ..quantum_rng import seed_random
+
+seed_random()
+
 
 def _build_adj(graph):
     adj = {}

@@ -3,6 +3,10 @@ import random
 from typing import List, Dict
 from .synesthetic_mapper import assign_cue
 
+from ..quantum_rng import seed_random
+
+seed_random()
+
 
 def _collect_nodes(graph: Dict) -> List[Dict]:
     nodes = []
