@@ -94,5 +94,6 @@ overlay_map = _read_jsonl(os.path.join(root, "overlay_map.jsonl"))
 mod = types.ModuleType("vybn_mind")
 mod.index, mod.centroids = index, centroids
 mod.concept_map, mod.overlay_map = concept_map, overlay_map
+mod.quantum_seed = int(os.environ.get("QUANTUM_SEED", "0"))
 sys.modules["vybn_mind"] = mod
 PY

@@ -4,6 +4,7 @@ import base64
 import io
 import math
 import wave
+import random
 
 import numpy as np
 import networkx as nx
@@ -11,6 +12,10 @@ import dash
 from dash import html, dcc
 import dash_cytoscape as cyto
 import plotly.graph_objects as go
+
+from ..quantum_rng import seed_random
+
+seed_random()
 
 # Path to the integrated graph JSON shipped by the self-assembly pipeline
 GRAPH_PATH = os.path.join(os.path.dirname(__file__), "integrated_graph.json")
@@ -102,7 +107,8 @@ cytoscape_graph = cyto.Cytoscape(
 
 def create_sphere_figure(use_glyphs=True, loops_count=1):
     traces = []
-    theta = np.linspace(0, 2 * np.pi, 60)
+    offset = random.random() * 2 * np.pi
+    theta = np.linspace(0, 2 * np.pi, 60) + offset
     phi = np.linspace(0, np.pi, 30)
     theta, phi = np.meshgrid(theta, phi)
     x_s = np.cos(theta) * np.sin(phi)
@@ -138,7 +144,7 @@ def create_sphere_figure(use_glyphs=True, loops_count=1):
     for k in range(loops_count):
         t = np.linspace(0, 2 * np.pi, 300)
         r = 0.7
-        phase = k * np.pi / loops_count
+        phase = k * np.pi / loops_count + offset
         loop_x = r * np.cos(t + phase)
         loop_y = r * np.sin(t + phase)
         loop_z = 0.2 * np.sin(2 * t + phase)
@@ -152,7 +158,7 @@ def create_sphere_figure(use_glyphs=True, loops_count=1):
         xs, ys, zs, labels, colors = [], [], [], [], []
         for idx, node_id in enumerate(all_node_ids):
             phi = math.acos(1 - 2 * (idx + 0.5) / N)
-            theta = (idx + 0.5) * (math.pi * (3 - math.sqrt(5)))
+            theta = offset + (idx + 0.5) * (math.pi * (3 - math.sqrt(5)))
             xs.append(math.cos(theta) * math.sin(phi))
             ys.append(math.sin(theta) * math.sin(phi))
             zs.append(math.cos(phi))

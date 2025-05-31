@@ -1,6 +1,9 @@
 import json
 import random
 import argparse
+from ..quantum_rng import seed_random
+
+seed_random()
 
 
 def load_graph(path):

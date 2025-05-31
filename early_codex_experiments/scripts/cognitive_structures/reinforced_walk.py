@@ -2,6 +2,10 @@ import json
 import random
 import argparse
 
+from ..quantum_rng import seed_random
+
+seed_random()
+
 COLOR_WEIGHT = {
     'red': 2.0,
     'orange': 1.8,

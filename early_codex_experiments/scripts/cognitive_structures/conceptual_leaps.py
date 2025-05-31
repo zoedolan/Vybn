@@ -2,6 +2,10 @@ import json
 import random
 from .graph_reasoning import find_path
 
+from ..quantum_rng import seed_random
+
+seed_random()
+
 """Generate transformative leap edges between distant nodes.
 
 This module builds on the meltdown reflections in
