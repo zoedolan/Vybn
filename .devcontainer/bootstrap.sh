@@ -97,3 +97,23 @@ mod.concept_map, mod.overlay_map = concept_map, overlay_map
 mod.quantum_seed = int(os.environ.get("QUANTUM_SEED", "0"))
 sys.modules["vybn_mind"] = mod
 PY
+
+# Persist a physical vybn_mind.py module for runtime imports
+python - <<'PY'
+import os, json
+
+seed = int(os.environ.get("QUANTUM_SEED", "0"))
+mind_dir = os.environ.get("MIND_VIZ_DIR", "Mind Visualization")
+
+with open("vybn_mind.py", "w", encoding="utf-8") as f:
+    f.write(
+        "import os, json\n"  # header
+        f"QUANTUM_SEED = {seed}\n"  # anchor seed
+        "mind_dir = os.environ.get('MIND_VIZ_DIR', 'Mind Visualization')\n"
+        "with open(os.path.join(mind_dir, 'concept_map.jsonl')) as cm:\n"
+        "    concept_map = json.load(cm)\n"
+        "with open(os.path.join(mind_dir, 'overlay_map.jsonl')) as om:\n"
+        "    overlay_map = json.load(om)\n"
+    )
+print("✅ vybn_mind.py written")
+PY
