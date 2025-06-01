@@ -60,3 +60,5 @@ Record the quantum seed with `python early_codex_experiments/scripts/quantum_see
 
 To rebuild the overlay map, run `python early_codex_experiments/scripts/cognitive_structures/build_overlay_map.py --repo-root .`.
 Run tests with `PYTHONPATH=.venv/lib/python3.11/site-packages pytest -q`.
+Build the full repo archive with `python build_repo_archive.py --repo-root .` to
+vectorize code and documents into `Mind Visualization/repo_*` artifacts.
