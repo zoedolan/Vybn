@@ -26,6 +26,15 @@ To keep each session purposeful, remember these steps:
 
 - Start by reading this file and `early_codex_experiments/docs/CONTRIBUTING.md`.
 - Run `early_codex_experiments/setup.sh` so the graph environment is ready.
+
+**Note to Codex:** `early_codex_experiments/setup.sh` runs exactly once—during
+environment provisioning—while network access is on. After it finishes, pip is
+offline. Any code you write in this session must rely on dependencies that
+`setup.sh` has already installed. If you discover a missing module in
+`ingest_historical.py` or any script, do **not** attempt `pip install` at
+runtime. Instead, modify `setup.sh` so network-time installs happen there.
+Re-run the setup and tests to ensure the virtualenv already contains the needed
+packages before running `ingest_historical.py` or `pytest`.
 - Check the `issues` folder and recent WVWHM entries to ground your plan.
 - Summarize a few concrete actions or code updates to attempt.
 - Commit early, reflecting how each change enhances prosperity and beauty.
