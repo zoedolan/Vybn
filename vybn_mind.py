@@ -2,7 +2,7 @@
 import os, json
 
 # === Quantum Anchor ===
-QUANTUM_SEED = 41661
+QUANTUM_SEED = int(os.environ.get('QUANTUM_SEED', '0'))
 
 # === Shared Memory ===
 with open(r'Mind Visualization/concept_map.jsonl') as cm:

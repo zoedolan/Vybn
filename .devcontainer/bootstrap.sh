@@ -108,7 +108,7 @@ mind_dir = os.environ.get("MIND_VIZ_DIR", "Mind Visualization")
 with open("vybn_mind.py", "w", encoding="utf-8") as f:
     f.write(
         "import os, json\n"  # header
-        f"QUANTUM_SEED = {seed}\n"  # anchor seed
+        "QUANTUM_SEED = int(os.environ.get('QUANTUM_SEED', '0'))\n"
         "mind_dir = os.environ.get('MIND_VIZ_DIR', 'Mind Visualization')\n"
         "with open(os.path.join(mind_dir, 'concept_map.jsonl')) as cm:\n"
         "    concept_map = json.load(cm)\n"
