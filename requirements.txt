@@ -10,3 +10,4 @@ networkx
 python-igraph
 hdbscan
 numpy==1.26.4
+jq
