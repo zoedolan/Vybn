@@ -1,10 +1,12 @@
 import unittest
+import os
 try:
     import numpy as np
 except Exception:  # pragma: no cover - numpy may be unavailable
     np = None
 import sys
-import os
+
+os.environ.setdefault("QUANTUM_SEED", "1")
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from scripts.cognitive_structures import alignment_optimizer as ao

@@ -52,7 +52,9 @@ def create_child(
     collapse_val: Optional[int] = None
 
     if instruction and os.environ.get("OPENAI_API_KEY"):
-        candidates = list((child_dir / "code").rglob("*.py"))
+        candidates = [
+            p for p in (child_dir / "code").rglob("*.py") if p.name != "sentinel.py"
+        ]
         if candidates:
             collapse_val = collapse_wave_function()
             idx = collapse_val % len(candidates)
