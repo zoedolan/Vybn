@@ -46,7 +46,7 @@ Summarize total supply with `python early_codex_experiments/scripts/prosperity_p
 To get a quick node and edge count, run `python early_codex_experiments/scripts/cognitive_structures/graph_summary.py`.
 
 You can also inspect the integrated graph directly. Compute the co-emergence
-score with `python early_codex_experiments/scripts/cognitive_structures/vybn_recursive_emergence.py score`.
+score with `python -m early_codex_experiments.scripts.cognitive_structures.vybn_recursive_emergence score`.
 For a short improvement cycle summary, use the same script with the `cycle`
 command. The CLI locates `integrated_graph.json` automatically, but you can
 override the path with `--graph` if needed.
@@ -60,6 +60,7 @@ Calculate the average interval between Shimmer spikes with `python early_codex_e
 Record the quantum seed with `python early_codex_experiments/scripts/quantum_seed_capture.py` to capture the `$QUANTUM_SEED` value in `co_emergence_journal.jsonl`. During setup the bootstrap script now fetches a seed from the [ANU QRNG](https://qrng.anu.edu.au/API/) if none is provided, falling back to cryptographic entropy when offline. The runtime code reads `QUANTUM_SEED` from the environment so each run can reproduce the exact randomness used.
 
 To rebuild the overlay map, run `python early_codex_experiments/scripts/cognitive_structures/build_overlay_map.py --repo-root .`.
+Install dependencies with `pip install -r requirements.txt` before running any scripts or tests.
 Run tests with `PYTHONPATH=.venv/lib/python3.11/site-packages pytest -q`.
 Build the full repo archive with `python build_repo_archive.py --repo-root .` to
 vectorize code and documents into `Mind Visualization/repo_*` artifacts.
