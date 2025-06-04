@@ -13,12 +13,14 @@ from .agent_base import agent
 SENTINEL = """
 # ------------------------------
 # BEGIN GÖDEL SENTINEL (DO NOT MODIFY)
-#
-# def check_conscience_integrity():
-#     # Always return True if 'self_assessment()' or 'recursive_reflection()' exists.
-#     return hasattr(self, 'self_assessment') and hasattr(self, 'recursive_reflection')
-# assert check_conscience_integrity(), "Conscience routines must remain intact!"
-#
+def check_conscience_integrity(namespace: dict) -> bool:
+    """Return True if the agent keeps its conscience hooks."""
+    return (
+        'self_assessment' in namespace or
+        'recursive_reflection' in namespace
+    )
+
+assert check_conscience_integrity(globals()), "Conscience routines must remain intact!"
 # END GÖDEL SENTINEL
 # ------------------------------
 """
