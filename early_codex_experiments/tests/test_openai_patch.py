@@ -1,6 +1,8 @@
 import os
 import sys
 import pathlib
+import secrets
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from dgm.openai_patch import suggest_patch
 
@@ -9,7 +11,7 @@ def test_suggest_patch_uses_env_seed(tmp_path, monkeypatch):
     target = tmp_path / "foo.py"
     target.write_text("print('x')")
     os.environ['OPENAI_API_KEY'] = 'x'
-    os.environ['QUANTUM_SEED'] = '99'
+    os.environ['QUANTUM_SEED'] = str(secrets.randbits(16))
 
     class FakeResp:
         def __init__(self, content):
@@ -25,4 +27,4 @@ def test_suggest_patch_uses_env_seed(tmp_path, monkeypatch):
     monkeypatch.setattr('dgm.openai_patch.collapse_wave_function', lambda: None)
     text = suggest_patch(str(target), 'Patch')
     assert text == 'patched'
-    assert captured['user'] == '99'
+    assert captured['user'] == os.environ['QUANTUM_SEED']
