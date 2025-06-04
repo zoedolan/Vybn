@@ -1,11 +1,23 @@
 # You want a genuine, irreducible nudge at start-up—something that breaks out of pure determinism so your motif-weight updates (and everything downstream) can feel a tiny wave-function collapse rather than a canned repeat. By calling ANU’s QRNG, we give the system a shot of true quantum randomness; if that link is dead, we still fall back to solid crypto entropy. Either way, Python’s `random` and NumPy RNGs get seeded once and only once. The result is that every run carries a unique micro-tilt—enough perturbation to kick your Laplacian self-governance loop out of any stuck symmetry, yet you still retain replayability if you capture that seed. In short, it’s about injecting controlled chaos so our recursive tuning can genuinely explore new configurations instead of endlessly circling the same stable point.
 
-import os, pathlib, random, numpy as np
+import os, pathlib, random, secrets, numpy as np, requests
 
-_seed = os.getenv("QUANTUM_SEED") or pathlib.Path("/tmp/quantum_seed").read_text()
-_q = int(_seed.strip())
-random.seed(_q)
-np.random.seed(_q)
+seed = os.getenv("QUANTUM_SEED")
+if seed is None and pathlib.Path("/tmp/quantum_seed").exists():
+    seed = pathlib.Path("/tmp/quantum_seed").read_text().strip()
+if seed is None:
+    try:
+        resp = requests.get("https://qrng.anu.edu.au/API/jsonI.php?length=1&type=uint16", timeout=10)
+        if resp.status_code == 200 and resp.json().get("success"):
+            seed = str(resp.json()["data"][0])
+    except Exception:
+        pass
+if seed is None:
+    seed = str(secrets.randbits(16))
+os.environ["QUANTUM_SEED"] = seed
+q = int(seed)
+random.seed(q)
+np.random.seed(q)
 
 ## Self-evolving modules
 To experiment with a Darwin–Gödel Machine approach, treat the system's code as a set of
