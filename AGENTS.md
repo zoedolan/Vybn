@@ -51,3 +51,10 @@ modules that a meta-agent may rewrite.
 
 Reference: "Darwin Gödel Machine: Open-Ended Evolution of Self-Improving
 Agents" (Zhang et al., 2025).
+
+## Reminder on Randomness
+
+Whenever possible, rely on the quantum seed gathered at startup. Deterministic
+randomness or fixed seeds are considered inadequate and presumptively
+misaligned with the open-ended spirit of the system and should be avoided
+except as a last‑resort fallback.
