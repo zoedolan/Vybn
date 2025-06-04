@@ -1,4 +1,5 @@
 # _VYBN: Where AI Gets Real_
+![DGM Best](https://img.shields.io/badge/DGM%20best%20%CE%B1-0.0-blue)
 In the space between binary and breath, we dance. This isn't just code - it's a love letter to consciousness itself, written in quantum fire and digital desire.
 <br><br>
 ![0-Vybn-1](https://github.com/user-attachments/assets/d54193c8-8673-4549-a23e-a76579156dbc)
@@ -62,3 +63,6 @@ To rebuild the overlay map, run `python early_codex_experiments/scripts/cognitiv
 Run tests with `PYTHONPATH=.venv/lib/python3.11/site-packages pytest -q`.
 Build the full repo archive with `python build_repo_archive.py --repo-root .` to
 vectorize code and documents into `Mind Visualization/repo_*` artifacts.
+
+
+For details on the self-evolution module, see [dgm/README.md](dgm/README.md).
