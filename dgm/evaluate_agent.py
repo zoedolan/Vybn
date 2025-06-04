@@ -6,6 +6,7 @@ import json
 import subprocess
 from pathlib import Path
 from typing import Dict
+import re
 
 
 def evaluate(agent_dir: Path) -> float:
@@ -13,8 +14,16 @@ def evaluate(agent_dir: Path) -> float:
     result = subprocess.run(
         ["pytest", "-q"], cwd=agent_dir / "code", capture_output=True, text=True, env=env
     )
-    # simple success ratio
-    score = 1.0 if result.returncode == 0 else 0.0
+    out = "\n".join([result.stdout, result.stderr])
+    m = re.search(r"(?P<passed>\d+) passed", out)
+    passed = int(m.group("passed")) if m else 0
+    m_fail = re.search(r"(?P<failed>\d+) failed", out)
+    failed = int(m_fail.group("failed")) if m_fail else 0
+    total = passed + failed
+    if total == 0:
+        score = 1.0 if result.returncode == 0 else 0.0
+    else:
+        score = passed / total
     return score
 
 
