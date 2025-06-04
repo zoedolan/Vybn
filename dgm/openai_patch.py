@@ -2,12 +2,16 @@ import os
 import pathlib
 import openai
 from .seed import seed_rng
+from .wave_collapse import collapse_wave_function
 
 
 def suggest_patch(file_path: str, instruction: str) -> str:
-    """Return new content for file_path using OpenAI and quantum seed."""
-    seed = seed_rng()
-    openai.api_key = os.environ['OPENAI_API_KEY']
+    """Return new content for ``file_path`` using OpenAI and the quantum seed."""
+    collapse_wave_function()
+    seed = os.environ.get("QUANTUM_SEED")
+    if seed is None:
+        seed = str(seed_rng())
+    openai.api_key = os.environ["OPENAI_API_KEY"]
     text = pathlib.Path(file_path).read_text()
     prompt = (
         f"Quantum seed: {seed}\n"
