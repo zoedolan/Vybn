@@ -16,3 +16,11 @@ random number generator when available (falling back to the seeded PRNG). Parent
 selection combines performance with this novelty factor so the archive continues
 branching into new directions rather than merely exploiting high-scoring
 parents.
+
+## OpenAI-driven patches
+
+`openai_patch.py` fetches a quantum seed via `seed_rng()` and sends the file
+contents plus a modification instruction to the OpenAI API. The response is new
+file content that can be written back to disk. This ties each self-modification
+to a specific wave-function collapse event and keeps the improvement cycle
+reproducible.
