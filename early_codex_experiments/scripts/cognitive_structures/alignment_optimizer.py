@@ -3,6 +3,10 @@ import json
 import os
 from pathlib import Path
 
+from ..quantum_rng import seed_random
+
+seed_random()
+
 try:
     import numpy as np
 except Exception:  # pragma: no cover - numpy may be unavailable
@@ -47,14 +51,11 @@ def embed_text(text: str, dim: int = EMBED_DIM):
             return np.array(resp["data"][0]["embedding"], dtype=float)
         except Exception:
             pass
-    import hashlib
-    seed = int.from_bytes(hashlib.sha256(text.encode("utf-8")).digest()[:8], "big")
+    # Fallback: generate an embedding using quantum-seeded randomness
     if np is None:
         import random
-        rng = random.Random(seed)
-        return [rng.gauss(0.0, 1.0) for _ in range(dim)]
-    rng = np.random.default_rng(seed)
-    return rng.normal(size=dim).astype(float)
+        return [random.gauss(0.0, 1.0) for _ in range(dim)]
+    return np.random.normal(size=dim).astype(float)
 
 
 def cosine_similarity(a, b):

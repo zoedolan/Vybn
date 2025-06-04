@@ -1,5 +1,3 @@
-import random
-
 COLORS = ['red', 'orange', 'yellow', 'green', 'blue', 'indigo', 'violet']
 TONES = ['C', 'D', 'E', 'F', 'G', 'A', 'B']
 

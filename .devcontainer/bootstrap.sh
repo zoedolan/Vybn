@@ -45,9 +45,15 @@ if qr is not None:
     print(f"🔮 existing QRAND env: {qr}")
 PY
 
-QUANTUM_JSON=$(curl -s 'https://qrng.anu.edu.au/API/jsonI.php?length=1&type=uint16')
-QUANTUM_SEED=$(printf '%s' "$QUANTUM_JSON" | grep -oP '"data":\s*\[\K[0-9]+(?=\])')
-export QUANTUM_SEED
+if [ -z "${QUANTUM_SEED:-}" ]; then
+    if [ -f /tmp/quantum_seed ]; then
+        QUANTUM_SEED=$(cat /tmp/quantum_seed)
+        export QUANTUM_SEED
+    else
+        echo "❌ QUANTUM_SEED not set and /tmp/quantum_seed missing" >&2
+        exit 1
+    fi
+fi
 # Retain QRAND for backward compatibility
 QRAND=$((QUANTUM_SEED % 256))
 export QRAND

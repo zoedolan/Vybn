@@ -9,6 +9,10 @@ from feedback.
 
 import numpy as np
 
+from early_codex_experiments.scripts.quantum_rng import seed_random
+
+seed_random()
+
 class ResonanceEngine:
     def __init__(self, phrases, lr=0.1):
         self.phrases = phrases

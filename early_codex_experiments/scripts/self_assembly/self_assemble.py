@@ -8,6 +8,10 @@ import re
 from datetime import datetime
 import random
 
+from ..quantum_rng import seed_random
+
+seed_random()
+
 # Ensure imports resolve correctly when called from within the
 # self_assembly package by pointing to the repository root rather
 # than the scripts directory.
