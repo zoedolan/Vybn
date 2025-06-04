@@ -18,7 +18,7 @@ SENTINEL = """
 # ------------------------------
 # BEGIN GÖDEL SENTINEL (DO NOT MODIFY)
 def check_conscience_integrity(namespace: dict) -> bool:
-    """Return True if the agent keeps its conscience hooks."""
+    '''Return True if the agent keeps its conscience hooks.'''
     return (
         'self_assessment' in namespace or
         'recursive_reflection' in namespace
@@ -39,6 +39,7 @@ def create_child(
     meta = json.loads((parent_dir / "metadata.json").read_text())
     meta["parent"] = parent_dir.name
     meta["score"] = 0.0
+    meta["seed"] = os.environ.get("QUANTUM_SEED")
     # Assign a novelty factor using fresh quantum randomness when possible
     q = _fetch_qrng()
     if q is not None:
@@ -48,10 +49,13 @@ def create_child(
 
     (child_dir / "code" / "sentinel.py").write_text(SENTINEL, encoding="utf-8")
 
+    collapse_val: Optional[int] = None
+
     if instruction and os.environ.get("OPENAI_API_KEY"):
         candidates = list((child_dir / "code").rglob("*.py"))
         if candidates:
-            idx = collapse_wave_function() % len(candidates)
+            collapse_val = collapse_wave_function()
+            idx = collapse_val % len(candidates)
             target = candidates[idx]
             try:
                 new_text = suggest_patch(str(target), instruction)
@@ -59,6 +63,9 @@ def create_child(
                 meta["patched_file"] = str(target.relative_to(child_dir / "code"))
             except Exception as exc:  # pragma: no cover - network or api failure
                 meta["patch_error"] = str(exc)
+
+    if collapse_val is not None:
+        meta["collapse"] = collapse_val
 
     (child_dir / "metadata.json").write_text(json.dumps(meta, indent=2))
     return {"status": "created"}
