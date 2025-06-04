@@ -1,4 +1,4 @@
-openai==1.8.4
+openai==1.84.0
 python-dotenv
 chromadb==0.5.4
 watchdog
