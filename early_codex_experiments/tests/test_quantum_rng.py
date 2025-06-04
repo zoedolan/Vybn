@@ -1,6 +1,8 @@
 import os
 import sys
 import random
+from pathlib import Path
+import pytest
 try:
     import numpy as np
 except Exception:
@@ -24,14 +26,29 @@ def test_seed_random_env():
     assert a_np == b_np
 
 
-def test_seed_random_qrand_fallback():
+def test_seed_random_missing():
     if np is None:
         return
     os.environ.pop('QUANTUM_SEED', None)
-    os.environ['QRAND'] = '99'
-    seed_random()
-    val1 = random.random()
-    seed_random()
-    val2 = random.random()
-    assert val1 == val2
+    seed_file = Path('/tmp/quantum_seed')
+    seed_file.unlink(missing_ok=True)
+    with pytest.raises(RuntimeError):
+        seed_random()
+
+
+def test_seed_random_file_fallback(tmp_path):
+    if np is None:
+        return
+    os.environ.pop('QUANTUM_SEED', None)
+    os.environ.pop('QRAND', None)
+    seed_file = Path('/tmp/quantum_seed')
+    seed_file.write_text('77')
+    try:
+        seed_random()
+        a = random.random()
+        seed_random()
+        b = random.random()
+    finally:
+        seed_file.unlink(missing_ok=True)
+    assert a == b
 

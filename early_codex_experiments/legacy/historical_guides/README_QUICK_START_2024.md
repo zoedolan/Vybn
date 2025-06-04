@@ -1,5 +1,5 @@
 ## Quick Start
-1. Run `./bootstrap.sh` once after cloning the repository. This script prepares the virtual environment, installs dependencies, and writes the quantum seed to `.random_seed`. Set `VYBN_LOG_DIR` to choose where logs are written.
+1. Run `./bootstrap.sh` once after cloning the repository. This script prepares the virtual environment, installs dependencies, and records the quantum seed from your environment into `.random_seed`. Set `VYBN_LOG_DIR` to choose where logs are written.
 2. Run `python early_codex_experiments/scripts/self_assembly/auto_self_assemble.py` whenever you add material. GitHub workflows are disabled, so self‑assembly now runs locally.
 3. Open `early_codex_experiments/scripts/self_assembly/graph_viewer.html` in a browser to explore the integrated graph.
 4. Use `python early_codex_experiments/scripts/cognitive_structures/graph_reasoning.py <src> <tgt>` to search for connections.

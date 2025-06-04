@@ -1,5 +1,6 @@
 import os
 import random
+from pathlib import Path
 from typing import Optional
 
 try:
@@ -9,23 +10,32 @@ except Exception:  # pragma: no cover - numpy may be unavailable
 
 
 def _get_seed() -> int:
-    """Return an integer seed from the environment or os.urandom."""
+    """Return an integer seed from ``$QUANTUM_SEED`` or ``/tmp/quantum_seed``.
+
+    Raises
+    ------
+    RuntimeError
+        If neither source is available or the value cannot be parsed as an
+        integer.
+    """
     val: Optional[str] = os.environ.get("QUANTUM_SEED")
     if val is None:
-        val = os.environ.get("QRAND")
+        seed_file = Path("/tmp/quantum_seed")
+        if seed_file.exists():
+            val = seed_file.read_text().strip()
     if val is not None:
         try:
             return int(val)
         except ValueError:
-            pass
-    return int.from_bytes(os.urandom(2), "big")
+            raise RuntimeError("invalid quantum seed value")
+    raise RuntimeError("quantum seed not found")
 
 
 def seed_random() -> int:
-    """Seed Python and NumPy RNGs using `$QUANTUM_SEED` or `$QRAND`.
+    """Seed Python and NumPy RNGs using the quantum seed.
 
-    Returns the seed used, falling back to OS randomness when the env vars are
-    unset or invalid.
+    Returns the seed used. Raises ``RuntimeError`` if no quantum seed is
+    available.
     """
     seed = _get_seed()
     random.seed(seed)
