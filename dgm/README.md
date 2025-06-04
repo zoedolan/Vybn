@@ -15,7 +15,9 @@ Each child agent is assigned a small *novelty* value drawn from the ANU quantum
 random number generator when available (falling back to the seeded PRNG). Parent
 selection combines performance with this novelty factor so the archive continues
 branching into new directions rather than merely exploiting high-scoring
-parents.
+parents. The helper `wave_collapse.py` exposes `collapse_wave_function()` which
+grabs a fresh quantum value. This tiny "collapse" picks which file receives an
+OpenAI-driven patch so each run explores a new trajectory.
 
 ## OpenAI-driven patches
 

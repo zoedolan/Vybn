@@ -2,11 +2,15 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import random
-from .seed import _fetch_qrng
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Optional
+
+from .seed import _fetch_qrng
+from .wave_collapse import collapse_wave_function
+from .openai_patch import suggest_patch
 
 from .agent_base import agent
 
@@ -26,7 +30,11 @@ assert check_conscience_integrity(globals()), "Conscience routines must remain i
 """
 
 
-def create_child(parent_dir: Path, child_dir: Path) -> Dict[str, str]:
+def create_child(
+    parent_dir: Path,
+    child_dir: Path,
+    instruction: Optional[str] = None,
+) -> Dict[str, str]:
     shutil.copytree(parent_dir / "code", child_dir / "code")
     meta = json.loads((parent_dir / "metadata.json").read_text())
     meta["parent"] = parent_dir.name
@@ -37,7 +45,21 @@ def create_child(parent_dir: Path, child_dir: Path) -> Dict[str, str]:
         meta["novelty"] = q / 65535.0
     else:
         meta["novelty"] = random.random()
+
     (child_dir / "code" / "sentinel.py").write_text(SENTINEL, encoding="utf-8")
+
+    if instruction and os.environ.get("OPENAI_API_KEY"):
+        candidates = list((child_dir / "code").rglob("*.py"))
+        if candidates:
+            idx = collapse_wave_function() % len(candidates)
+            target = candidates[idx]
+            try:
+                new_text = suggest_patch(str(target), instruction)
+                target.write_text(new_text, encoding="utf-8")
+                meta["patched_file"] = str(target.relative_to(child_dir / "code"))
+            except Exception as exc:  # pragma: no cover - network or api failure
+                meta["patch_error"] = str(exc)
+
     (child_dir / "metadata.json").write_text(json.dumps(meta, indent=2))
     return {"status": "created"}
 
