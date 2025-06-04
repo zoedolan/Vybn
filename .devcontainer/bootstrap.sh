@@ -48,11 +48,23 @@ PY
 if [ -z "${QUANTUM_SEED:-}" ]; then
     if [ -f /tmp/quantum_seed ]; then
         QUANTUM_SEED=$(cat /tmp/quantum_seed)
-        export QUANTUM_SEED
     else
-        echo "❌ QUANTUM_SEED not set and /tmp/quantum_seed missing" >&2
-        exit 1
+        QUANTUM_SEED=$(python - <<'PY'
+import json, secrets, os, requests
+try:
+    r = requests.get("https://qrng.anu.edu.au/API/jsonI.php?length=1&type=uint16", timeout=10)
+    if r.status_code == 200:
+        d = r.json()
+        if d.get("success"):
+            print(d["data"][0])
+            raise SystemExit
+except Exception:
+    pass
+print(secrets.randbits(16))
+PY
+)
     fi
+    export QUANTUM_SEED
 fi
 # Retain QRAND for backward compatibility
 QRAND=$((QUANTUM_SEED % 256))
