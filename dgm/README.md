@@ -10,3 +10,9 @@ Randomness for parent selection and other stochastic steps is seeded from the
 `QUANTUM_SEED` environment variable (or `/tmp/quantum_seed` if unset). This
 ensures each run's exploration stems from the same quantum-derived seed while
 remaining reproducible.
+
+Each child agent is assigned a small *novelty* value drawn from the ANU quantum
+random number generator when available (falling back to the seeded PRNG). Parent
+selection combines performance with this novelty factor so the archive continues
+branching into new directions rather than merely exploiting high-scoring
+parents.

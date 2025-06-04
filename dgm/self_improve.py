@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import json
 import shutil
+import random
+from .seed import _fetch_qrng
 from pathlib import Path
 from typing import Dict
 
@@ -27,6 +29,12 @@ def create_child(parent_dir: Path, child_dir: Path) -> Dict[str, str]:
     meta = json.loads((parent_dir / "metadata.json").read_text())
     meta["parent"] = parent_dir.name
     meta["score"] = 0.0
+    # Assign a novelty factor using fresh quantum randomness when possible
+    q = _fetch_qrng()
+    if q is not None:
+        meta["novelty"] = q / 65535.0
+    else:
+        meta["novelty"] = random.random()
     (child_dir / "code" / "sentinel.py").write_text(SENTINEL, encoding="utf-8")
     (child_dir / "metadata.json").write_text(json.dumps(meta, indent=2))
     return {"status": "created"}
