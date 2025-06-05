@@ -32,8 +32,9 @@ def test_seed_random_missing():
     os.environ.pop('QUANTUM_SEED', None)
     seed_file = Path('/tmp/quantum_seed')
     seed_file.unlink(missing_ok=True)
-    with pytest.raises(RuntimeError):
-        seed_random()
+    val = seed_random()
+    assert isinstance(val, int)
+    assert os.environ.get('QUANTUM_SEED') is not None
 
 
 def test_seed_random_file_fallback(tmp_path):

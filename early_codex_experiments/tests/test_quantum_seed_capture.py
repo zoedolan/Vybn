@@ -41,5 +41,6 @@ def test_capture_seed_missing(tmp_path):
     os.environ.pop('QUANTUM_SEED', None)
     tmp_seed_path = Path('/tmp/quantum_seed')
     tmp_seed_path.unlink(missing_ok=True)
-    with pytest.raises(RuntimeError):
-        capture_seed(jpath)
+    entry = capture_seed(jpath)
+    assert entry['source'] == 'generated'
+    assert isinstance(entry['seed'], int)

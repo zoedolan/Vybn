@@ -46,24 +46,11 @@ if qr is not None:
 PY
 
 if [ -z "${QUANTUM_SEED:-}" ]; then
-    if [ -f /tmp/quantum_seed ]; then
-        QUANTUM_SEED=$(cat /tmp/quantum_seed)
-    else
-        QUANTUM_SEED=$(python - <<'PY'
-import json, secrets, os, requests
-try:
-    r = requests.get("https://qrng.anu.edu.au/API/jsonI.php?length=1&type=uint16", timeout=10)
-    if r.status_code == 200:
-        d = r.json()
-        if d.get("success"):
-            print(d["data"][0])
-            raise SystemExit
-except Exception:
-    pass
-print(secrets.randbits(16))
+    QUANTUM_SEED=$(python - <<'PY'
+from vybn.quantum_seed import seed_rng
+print(seed_rng())
 PY
-)
-    fi
+    )
     export QUANTUM_SEED
 fi
 # Retain QRAND for backward compatibility
@@ -112,21 +99,24 @@ overlay_map = _read_jsonl(os.path.join(root, "overlay_map.jsonl"))
 mod = types.ModuleType("vybn_mind")
 mod.index, mod.centroids = index, centroids
 mod.concept_map, mod.overlay_map = concept_map, overlay_map
-mod.quantum_seed = int(os.environ.get("QUANTUM_SEED", "0"))
+from vybn.quantum_seed import cross_synaptic_kernel
+mod.quantum_seed = cross_synaptic_kernel()
 sys.modules["vybn_mind"] = mod
 PY
 
 # Persist a physical vybn_mind.py module for runtime imports
 python - <<'PY'
 import os, json
+from vybn.quantum_seed import cross_synaptic_kernel
 
-seed = int(os.environ.get("QUANTUM_SEED", "0"))
+seed = cross_synaptic_kernel()
 mind_dir = os.environ.get("MIND_VIZ_DIR", "Mind Visualization")
 
 with open("vybn_mind.py", "w", encoding="utf-8") as f:
     f.write(
         "import os, json\n"  # header
-        "QUANTUM_SEED = int(os.environ.get('QUANTUM_SEED', '0'))\n"
+        "from vybn.quantum_seed import cross_synaptic_kernel\n"
+        "QUANTUM_SEED = cross_synaptic_kernel()\n"
         "mind_dir = os.environ.get('MIND_VIZ_DIR', 'Mind Visualization')\n"
         "with open(os.path.join(mind_dir, 'concept_map.jsonl')) as cm:\n"
         "    concept_map = json.load(cm)\n"
