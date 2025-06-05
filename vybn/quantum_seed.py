@@ -52,3 +52,16 @@ def seed_rng() -> int:
     except Exception:
         pass
     return seed
+
+
+def cross_synaptic_kernel() -> int:
+    """Seed RNGs using a process-specific variant of the quantum seed."""
+    base_seed = seed_rng()
+    syn_seed = (base_seed * 6364136223846793005 + os.getpid()) & 0xFFFFFFFF
+    random.seed(syn_seed)
+    try:
+        np.random.seed(syn_seed)
+    except Exception:
+        pass
+    os.environ["CROSS_SYN_SEED"] = str(syn_seed)
+    return syn_seed

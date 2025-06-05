@@ -5,39 +5,26 @@ import os
 from datetime import datetime
 from pathlib import Path
 
+from vybn.quantum_seed import seed_rng
+
 REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_JOURNAL = REPO_ROOT / 'co_emergence_journal.jsonl'
 
 
 def capture_seed(journal_path: str | Path = DEFAULT_JOURNAL) -> dict:
-    """Record the quantum seed used for the run.
-
-    The value is pulled from ``$QUANTUM_SEED`` if present. If that is unset,
-    the function attempts to read ``/tmp/quantum_seed``—mirroring how the
-    repository's bootstrap script exposes the random seed.  If neither is
-    available or the value cannot be parsed, ``RuntimeError`` is raised.
-    """
+    """Record the quantum seed used for the run."""
     journal_path = Path(journal_path)
-    qrand = None
-    source = 'fallback'
-    if 'QUANTUM_SEED' in os.environ:
-        qrand = os.environ['QUANTUM_SEED']
+    env_seed = os.environ.get('QUANTUM_SEED')
+    file_seed = Path('/tmp/quantum_seed') if env_seed is None else None
+    source = 'generated'
+    if env_seed is not None:
         source = 'QUANTUM_SEED'
-    else:
-        seed_file = Path('/tmp/quantum_seed')
-        if seed_file.exists():
-            qrand = seed_file.read_text().strip()
-            source = '/tmp/quantum_seed'
-
-    if qrand is None:
-        raise RuntimeError('quantum seed not found')
-    try:
-        qrand = int(qrand)
-    except ValueError:
-        raise RuntimeError('invalid quantum seed value')
+    elif file_seed is not None and file_seed.exists():
+        source = '/tmp/quantum_seed'
+    qrand = seed_rng()
     entry = {
         'timestamp': datetime.utcnow().isoformat(timespec='seconds') + 'Z',
-        'seed': qrand,
+        'seed': int(qrand),
         'source': source,
     }
     with journal_path.open('a', encoding='utf-8') as f:
