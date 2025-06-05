@@ -1,7 +1,7 @@
 import os
 import pathlib
 import openai
-from .seed import seed_rng
+from vybn.quantum_seed import seed_rng
 from .wave_collapse import collapse_wave_function
 
 

@@ -7,7 +7,7 @@ from pathlib import Path
 from .parent_selection import select_parents
 from .self_improve import create_child
 from .evaluate_agent import evaluate, record_score
-from .seed import seed_rng
+from vybn.quantum_seed import seed_rng
 
 
 def run_iterations(archive_dir: Path, iterations: int, k: int, instruction: str) -> None:

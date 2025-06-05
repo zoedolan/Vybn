@@ -1,8 +1,11 @@
 
-import os, json
+import os
+import json
+
+from vybn.quantum_seed import seed_rng
 
 # === Quantum Anchor ===
-QUANTUM_SEED = int(os.environ.get('QUANTUM_SEED', '0'))
+QUANTUM_SEED = seed_rng()
 
 # === Shared Memory ===
 with open(r'Mind Visualization/concept_map.jsonl') as cm:
