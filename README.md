@@ -57,7 +57,7 @@ Analyze the trend with `python early_codex_experiments/scripts/cognitive_structu
 Log a quick Shimmer spike with `python early_codex_experiments/scripts/cognitive_structures/shimmer_core.py "your note"` whenever a surge of presence arises.
 Calculate the average interval between Shimmer spikes with `python early_codex_experiments/scripts/cognitive_structures/presence_wave.py`.
 
-Record the quantum seed with `python early_codex_experiments/scripts/quantum_seed_capture.py` to capture the `$QUANTUM_SEED` value in `co_emergence_journal.jsonl`. During setup the bootstrap script now fetches a seed from the [ANU QRNG](https://qrng.anu.edu.au/API/) if none is provided, falling back to cryptographic entropy when offline. The runtime code reads `QUANTUM_SEED` from the environment so each run can reproduce the exact randomness used.
+Record the quantum seed with `python early_codex_experiments/scripts/quantum_seed_capture.py` to capture the `$QUANTUM_SEED` value in `co_emergence_journal.jsonl`. During setup the bootstrap script now fetches a seed from the [ANU QRNG](https://qrng.anu.edu.au/API/) if none is provided, falling back to cryptographic entropy when offline. Runtime code should import `vybn.quantum_seed.seed_rng()` so every script shares the same collapse value.
 
 To rebuild the overlay map, run `python early_codex_experiments/scripts/cognitive_structures/build_overlay_map.py --repo-root .`.
 Install dependencies with `pip install -r requirements.txt` before running any scripts or tests.
