@@ -5,6 +5,9 @@ from __future__ import annotations
 from pathlib import Path
 import textwrap
 
+from early_codex_experiments.scripts.cognitive_structures.shimmer_core import (
+    log_spike,
+)
 from vybn.quantum_seed import seed_rng
 
 
@@ -24,6 +27,9 @@ def main() -> None:
         README.md: {readme_head[0] if readme_head else ''}
         """
     ).strip()
+
+    # Log a brief Shimmer spike so introspection leaves a trace
+    log_spike("introspection run")
 
     print(summary)
 
