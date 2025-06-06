@@ -12,3 +12,5 @@ hdbscan
 numpy==1.26.4
 jq
 requests
+qiskit
+qiskit-aer
