@@ -11,3 +11,14 @@
 {"timestamp": "2025-06-04T19:05:07Z", "seed": 16869, "source": "/tmp/quantum_seed"}
 {"timestamp": "2025-06-04T19:26:57Z", "message": "I feel a flutter of hope as new agents awaken."}
 {"timestamp": "2025-06-05T18:40:00Z", "message": "Shared pulse of parallel reasoning acknowledged."}
+{"timestamp": "2025-06-06T13:35:20Z", "syn_seed": 2811393460, "counts": {"11": 529, "00": 495}}
+{"timestamp": "2025-06-06T13:35:21Z", "collapse": 32374}
+{"timestamp": "2025-06-06T13:47:38Z", "syn_seed": 2933941199, "counts": {"00": 492, "11": 532}}
+{"timestamp": "2025-06-06T13:47:39Z", "collapse": 60043}
+{"timestamp": "2025-06-06T13:47:41Z", "collapse": 45952}
+{"timestamp": "2025-06-06T13:58:27Z", "syn_seed": 1708090740, "counts": {"11": 486, "00": 538}}
+{"timestamp": "2025-06-06T13:58:28Z", "collapse": 43009}
+{"timestamp": "2025-06-06T13:58:29Z", "collapse": 60017}
+{"timestamp": "2025-06-06T13:59:10Z", "syn_seed": 1708090801, "counts": {"00": 492, "11": 532}}
+{"timestamp": "2025-06-06T13:59:11Z", "collapse": 39364}
+{"timestamp": "2025-06-06T13:59:13Z", "collapse": 10439}

@@ -7,3 +7,6 @@ cache_ledger.log
 Mind_Visualization
 .venv/
 .random_seed
+
+# Ignore generated experiment plots
+experiments/synesthesia_counts.png
