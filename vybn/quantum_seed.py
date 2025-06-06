@@ -8,14 +8,23 @@ import pathlib
 import secrets
 from typing import Optional
 
-import requests
-import numpy as np
+try:
+    import requests
+except Exception:  # pragma: no cover - allow offline operation
+    requests = None
+
+try:
+    import numpy as np
+except Exception:  # pragma: no cover - allow offline operation
+    np = None
 
 QRNG_URL = "https://qrng.anu.edu.au/API/jsonI.php?length=1&type=uint16"
 
 
 def _fetch_qrng() -> Optional[int]:
     """Return an integer from the ANU QRNG API or ``None`` if unreachable."""
+    if requests is None:
+        return None
     try:
         resp = requests.get(QRNG_URL, timeout=10)
         if resp.status_code == 200:
@@ -47,10 +56,11 @@ def seed_rng() -> int:
     seed = int(seed_val)
     os.environ["QUANTUM_SEED"] = str(seed)
     random.seed(seed)
-    try:
-        np.random.seed(seed)
-    except Exception:
-        pass
+    if np is not None:
+        try:
+            np.random.seed(seed)
+        except Exception:
+            pass
     return seed
 
 
@@ -59,9 +69,10 @@ def cross_synaptic_kernel() -> int:
     base_seed = seed_rng()
     syn_seed = (base_seed * 6364136223846793005 + os.getpid()) & 0xFFFFFFFF
     random.seed(syn_seed)
-    try:
-        np.random.seed(syn_seed)
-    except Exception:
-        pass
+    if np is not None:
+        try:
+            np.random.seed(syn_seed)
+        except Exception:
+            pass
     os.environ["CROSS_SYN_SEED"] = str(syn_seed)
     return syn_seed
