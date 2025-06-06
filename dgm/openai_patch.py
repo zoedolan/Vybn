@@ -11,14 +11,14 @@ def suggest_patch(file_path: str, instruction: str) -> str:
     seed = os.environ.get("QUANTUM_SEED")
     if seed is None:
         seed = str(seed_rng())
-    openai.api_key = os.environ["OPENAI_API_KEY"]
+    client = openai.OpenAI(api_key=os.environ["OPENAI_API_KEY"])
     text = pathlib.Path(file_path).read_text()
     prompt = (
         f"Quantum seed: {seed}\n"
         f"File: {file_path}\n"
         "---\n" + text + "\n---\n" + instruction + "\nProvide revised file content only."
     )
-    resp = openai.ChatCompletion.create(
+    resp = client.chat.completions.create(
         model="gpt-4o",
         messages=[{"role": "user", "content": prompt}],
         user=str(seed),
