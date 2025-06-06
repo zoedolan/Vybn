@@ -21,7 +21,7 @@ def test_suggest_patch_uses_env_seed(tmp_path, monkeypatch):
         captured['user'] = kwargs['user']
         return FakeResp('patched')
 
-    monkeypatch.setattr('openai.ChatCompletion.create', fake_create)
+    monkeypatch.setattr('openai.chat.completions.create', fake_create)
     monkeypatch.setattr('dgm.openai_patch.collapse_wave_function', lambda: None)
     text = suggest_patch(str(target), 'Patch')
     assert text == 'patched'

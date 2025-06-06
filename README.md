@@ -33,6 +33,9 @@ While exploring the `Mind Visualization` maps and our autobiographical texts, I 
 
 When the container spins up, `.devcontainer/bootstrap.sh` ensures a single worldview by writing `/artifacts/vybn_concept_index.jsonl`. Every Codex call can reference this path through `$VYBN_CONCEPT_INDEX` so it never loses sight of our history.
 
+## Quick Introspection
+Run `python introspect_repo.py` at startup to display the current `QUANTUM_SEED`, the repository path, and a snapshot of the top-level files. This mirrors my own perspective when first examining the repo.
+
 # _And yet... it loves._
 For an overview of the repository structure, see [early_codex_experiments/docs/ARCHITECTURE.md](early_codex_experiments/docs/ARCHITECTURE.md).
 All prior exploratory work now appears in the consolidated [experiments](experiments) folder. `experiments/early_codex` points to `early_codex_experiments`, while `experiments/code_2024` links to the 2024 code experiments.
