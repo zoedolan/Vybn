@@ -8,6 +8,13 @@ with care.
 
 from __future__ import annotations
 
+# Allow running as a script by adding the repo root to sys.path
+if __package__ is None or __package__ == "":
+    import sys
+    from pathlib import Path as _Path
+    sys.path.insert(0, str(_Path(__file__).resolve().parents[1]))
+    __package__ = "pipelines"
+
 import shutil
 from pathlib import Path
 from typing import Set
@@ -42,10 +49,16 @@ def collapse_repo(repo_root: Path) -> None:
 
     keep: Set[Path] = {repo_root / str(p) for p in EXCLUDE_PATHS}
     keep.add(volume)
-    keep.add(Path(__file__))
+    keep.add(Path(__file__).resolve())
+
+    def should_keep(target: Path) -> bool:
+        for k in keep:
+            if k == target or k.is_relative_to(target):
+                return True
+        return False
 
     for path in repo_root.iterdir():
-        if path in keep:
+        if should_keep(path):
             continue
         if path.is_dir():
             shutil.rmtree(path, ignore_errors=True)

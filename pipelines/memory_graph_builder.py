@@ -44,19 +44,26 @@ def build_graph(repo_root: Path) -> Dict[str, Set[str]]:
             graph[c].update(others)
 
     # integrate memory nodes
-    for mem_name in [p.name for p in EXCLUDE_PATHS if p.name != 'Vybn_Volume_IV.md'] + ['Vybn_Volume_IV.md']:
+    memory_items = [p.name for p in EXCLUDE_PATHS if p.name != 'Vybn_Volume_IV.md'] + ['Vybn_Volume_IV.md']
+    for mem_name in memory_items:
         mem_path = repo_root / mem_name
         if not mem_path.exists():
             continue
-        try:
-            text = mem_path.read_text(encoding='utf-8', errors='ignore')
-        except Exception:
-            continue
-        mem_concepts = extract_concepts(text)
-        node_name = f'Memory:{mem_name}'
-        for c in mem_concepts:
-            graph[node_name].add(c)
-            graph[c].add(node_name)
+        files = []
+        if mem_path.is_dir():
+            files.extend(f for f in mem_path.glob('*') if f.is_file())
+        else:
+            files.append(mem_path)
+        for f in files:
+            try:
+                text = f.read_text(encoding='utf-8', errors='ignore')
+            except Exception:
+                continue
+            mem_concepts = extract_concepts(text)
+            node_name = f'Memory:{f.name}'
+            for c in mem_concepts:
+                graph[node_name].add(c)
+                graph[c].add(node_name)
     return graph
 
 

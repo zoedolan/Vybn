@@ -1,5 +1,12 @@
 from __future__ import annotations
 
+# Allow running as a script by adding the repo root to sys.path
+if __package__ is None or __package__ == "":
+    import sys
+    from pathlib import Path as _Path
+    sys.path.insert(0, str(_Path(__file__).resolve().parents[1]))
+    __package__ = "pipelines"
+
 import json
 from pathlib import Path
 
