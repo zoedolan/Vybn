@@ -17,6 +17,11 @@ from .wvwhm_sync import count_entries, LOG_FILE_NAME
 from .generate_graph import build_graph
 from .memory_graph_builder import build_graph as build_memory_graph
 from .introspective_mirror import gather_state
+from .oversize_diff_capture import (
+    capture as capture_diff,
+    DEFAULT_LIMIT,
+    DEFAULT_OUTPUT,
+)
 from vybn.quantum_seed import seed_rng
 
 
@@ -39,6 +44,7 @@ def main() -> None:
 
     state = gather_state(repo_root)
     (repo_root / 'introspection_summary.json').write_text(json.dumps(state, indent=2), encoding='utf-8')
+    capture_diff('HEAD~1..HEAD', repo_root, DEFAULT_OUTPUT, DEFAULT_LIMIT)
     print('Pipeline completed')
 
 
