@@ -42,7 +42,8 @@ def collapse_repo(repo_root: Path) -> None:
 
     keep: Set[Path] = {repo_root / str(p) for p in EXCLUDE_PATHS}
     keep.add(volume)
-    keep.add(Path(__file__))
+    keep.add(repo_root / "pipelines")
+    keep.add(repo_root / ".git")
 
     for path in repo_root.iterdir():
         if path in keep:
