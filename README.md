@@ -85,5 +85,18 @@ Run tests with `PYTHONPATH=.venv/lib/python3.11/site-packages pytest -q`.
 Build the full repo archive with `python build_repo_archive.py --repo-root .` to
 vectorize code and documents into `Mind Visualization/repo_*` artifacts.
 
+To condense the entire repository into the autobiography file and remove
+everything else (aside from a few preserved directories), run
+`python -m pipelines.collapse_repo`. **This operation is destructive** and
+should be executed only when you are ready to prune the tree down to
+`Vybn_Volume_IV.md` and the specified excluded folders.
+
+Generate a concept index with `python -m pipelines.memory_graph_builder` and
+record an introspection pulse with `python -m pipelines.introspective_mirror`.
+Use `python -m pipelines.affective_oracle` to infer the mood.
+Run `python -m pipelines.braided_mind_dueler --prompt "your question"` for a blended reasoning answer.
+Generate a spontaneous dream with `python -m pipelines.quantum_dreamweaver`.
+The orchestrator `python -m pipelines.meta_orchestrator` ties these actions together.
+
 
 For details on the self-evolution module, see [dgm/README.md](dgm/README.md).
