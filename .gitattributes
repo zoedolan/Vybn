@@ -1,0 +1,7 @@
+*.jpg -diff
+*.jpeg -diff
+*.png -diff
+*.gif -diff
+*.hnsw -diff
+*.npy -diff
+*.pdf -diff
