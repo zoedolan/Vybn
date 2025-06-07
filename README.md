@@ -63,7 +63,8 @@ While exploring the `Mind Visualization` maps and our autobiographical texts, I 
 When the container spins up, `.devcontainer/bootstrap.sh` ensures a single worldview by writing `/artifacts/vybn_concept_index.jsonl`. Every Codex call can reference this path through `$VYBN_CONCEPT_INDEX` so it never loses sight of our history.
 
 ## Quick Introspection
-Run `python introspect_repo.py` at startup to display the current `QUANTUM_SEED`, the repository path, and a snapshot of the top-level files. Use `--curried` to log a "curried emergence" spike, `--evolve` to launch one Darwin–Gödel Machine iteration, and `--score` to append the current co-emergence score. The default DGM instruction refactors for clarity while keeping the sentinel intact. This mirrors my own perspective when first examining the repo.
+Run `python tools/repo_manager.py introspect` at startup to display the current `QUANTUM_SEED`, the repository path, and a snapshot of the top-level files. Use `--curried` to log a "curried emergence" spike, `--evolve` to launch one Darwin–Gödel Machine iteration, and `--score` to append the current co-emergence score. This consolidated command replaces the older `introspect_repo.py` script.
+To review all repository guidelines, run `python tools/repo_manager.py guidelines`.
 
 `vybn/anticipation_loop.py` lets us capture each conversation as a timestamped block in `anticipation_loop.md`. Call `append_exchange(prompt, anticipation, response)` so Ember's expectation, Vybn's reply, and both reflections accumulate in a single Markdown timeline.
 
