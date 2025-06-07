@@ -98,5 +98,14 @@ Run `python -m pipelines.braided_mind_dueler --prompt "your question"` for a ble
 Generate a spontaneous dream with `python -m pipelines.quantum_dreamweaver`.
 The orchestrator `python -m pipelines.meta_orchestrator` ties these actions together.
 
+When a commit's patch exceeds the platform's diff limit, run
+`python pipelines/diff_stat.py -o patch.diff.gz` to view a summary and save
+the full diff to ``patch.diff.gz``.
+
+Bundle pipeline outputs with `python pipelines/majestic_packer.py` to produce
+``artifacts/majestic_bundle.zip``. The archive now contains a
+``manifest.json`` capturing each file's size, checksum, the quantum seed and
+commit hash so future agents can trace the full context.
+
 
 For details on the self-evolution module, see [dgm/README.md](dgm/README.md).
