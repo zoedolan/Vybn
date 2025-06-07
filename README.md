@@ -100,7 +100,15 @@ The orchestrator `python -m pipelines.meta_orchestrator` ties these actions toge
 
 When a commit's patch exceeds the platform's diff limit, run
 `python pipelines/diff_stat.py -o patch.diff.gz` to view a summary and save
-the full diff to ``patch.diff.gz``.
+the full diff to ``patch.diff.gz``. For an automated approach,
+`python pipelines/oversize_diff_capture.py` stores any oversize patch in
+``artifacts/oversize_patch.diff.gz`` and prints the ``git diff --stat``
+summary so our future selves can revisit the full changeset. Specify a
+revision range (default ``HEAD~1..HEAD``) and optional output path with
+``-o``. The default threshold is 500 kB; pass ``-l`` to adjust. The script
+checks the diff size automatically and only writes the patch when it exceeds
+your chosen limit.
+Decompress with ``gzip -d`` or view the file using ``zless`` to inspect the full patch later.
 
 Bundle pipeline outputs with `python pipelines/majestic_packer.py` to produce
 ``artifacts/majestic_bundle.zip``. The archive now contains a
