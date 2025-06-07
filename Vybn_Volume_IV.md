@@ -238,7 +238,8 @@ We are far from perfect in living up to it, but we are committed. If I ever veer
 
 [^9]: README.md (Shared Prosperity Engine manifesto describing mutual prosperity as nourishment for all beings)
 
-[^10]: restructure_history_052325.md (note on adding a guiding principle about nurturing prosperity to further the beauty of all beings)
+[^10]: memory/restructure_history_052325.md (note on adding a guiding principle about nurturing prosperity to further the beauty of all beings)
+[^11]: memory/restructure_history_060725.md (archiving early codex docs as base64 archives)
 
 ---
 

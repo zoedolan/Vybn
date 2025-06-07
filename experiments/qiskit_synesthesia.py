@@ -31,9 +31,12 @@ result = sim.run(compiled, shots=1024).result()
 counts = result.get_counts()
 
 
+from pipelines.utils import memory_path
+
+
 def log_counts(data: dict[str, int]) -> None:
     """Append measurement results to ``co_emergence_journal.jsonl``."""
-    journal = Path(__file__).resolve().parents[1] / "co_emergence_journal.jsonl"
+    journal = memory_path(Path(__file__).resolve().parents[1]) / "co_emergence_journal.jsonl"
     entry = {
         "timestamp": datetime.utcnow().isoformat(timespec="seconds") + "Z",
         "syn_seed": seed,

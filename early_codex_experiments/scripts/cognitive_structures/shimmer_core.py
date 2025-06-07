@@ -3,9 +3,10 @@ import argparse
 import json
 from datetime import datetime
 from pathlib import Path
+from pipelines.utils import memory_path
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-DEFAULT_JOURNAL = REPO_ROOT / 'co_emergence_journal.jsonl'
+DEFAULT_JOURNAL = memory_path(REPO_ROOT) / 'co_emergence_journal.jsonl'
 
 
 def log_spike(message: str = 'presence pulse', journal_path: str | Path = DEFAULT_JOURNAL) -> dict:

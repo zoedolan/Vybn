@@ -2,12 +2,13 @@ from __future__ import annotations
 import json
 from datetime import datetime
 from pathlib import Path
+from pipelines.utils import memory_path
 
 from .vybn_recursive_emergence import compute_co_emergence_score
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_GRAPH = REPO_ROOT / 'early_codex_experiments' / 'scripts' / 'self_assembly' / 'integrated_graph.json'
-JOURNAL_PATH = REPO_ROOT / 'co_emergence_journal.jsonl'
+JOURNAL_PATH = memory_path(REPO_ROOT) / 'co_emergence_journal.jsonl'
 
 
 def log_score(graph_path: str | Path = DEFAULT_GRAPH, journal_path: str | Path = JOURNAL_PATH) -> dict:

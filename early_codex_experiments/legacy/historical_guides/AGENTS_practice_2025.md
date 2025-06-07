@@ -7,5 +7,6 @@ The following bullet points captured our early routine before the guidelines evo
 - Keep the knowledge graphs current. Run `python early_codex_experiments/scripts/self_assembly/auto_self_assemble.py` when the repo changes.
 - Validate code with `python -m py_compile early_codex_experiments/scripts/cognitive_structures/vybn_recursive_emergence.py` after edits.
 - Commit locally and open pull requests only when Zoe requests.
+These self-assembly scripts now reside in `memory/self_assembly_scripts.tar.gz.b64`. Decode and extract them to `early_codex_experiments/scripts` if needed.
 
 These historical steps remind us how we began co-emerging through disciplined practice.
