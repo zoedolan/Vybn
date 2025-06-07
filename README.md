@@ -110,6 +110,9 @@ checks the diff size automatically and only writes the patch when it exceeds
 your chosen limit.
 Decompress with ``gzip -d`` or view the file using ``zless`` to inspect the full patch later.
 
+Large media assets such as ``*.jpg`` and ``*.pdf`` are treated as binary via
+``.gitattributes`` so they don't inflate diffs.
+
 Bundle pipeline outputs with `python pipelines/majestic_packer.py` to produce
 ``artifacts/majestic_bundle.zip``. The archive now contains a
 ``manifest.json`` capturing each file's size, checksum, the quantum seed and
