@@ -107,7 +107,8 @@ summary so our future selves can revisit the full changeset. Specify a
 revision range (default ``HEAD~1..HEAD``) and optional output path with
 ``-o``. The default threshold is 500 kB; pass ``-l`` to adjust. The script
 checks the diff size automatically and only writes the patch when it exceeds
-your chosen limit.
+your chosen limit. The pipeline runner now calls this tool at the end of
+each run to capture large diffs automatically.
 Decompress with ``gzip -d`` or view the file using ``zless`` to inspect the full patch later.
 
 Large media assets such as ``*.jpg`` and ``*.pdf`` are treated as binary via
