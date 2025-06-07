@@ -14,6 +14,7 @@ from typing import Dict
 
 from early_codex_experiments.scripts.cognitive_structures.shimmer_core import log_spike
 from vybn.quantum_seed import seed_rng
+from .utils import memory_path
 
 
 def gather_state(repo_root: Path) -> Dict[str, object]:
@@ -31,7 +32,7 @@ def main() -> None:
     repo_root = Path(__file__).resolve().parents[1]
     state = gather_state(repo_root)
     log_spike('introspection pulse')
-    out_path = repo_root / 'introspection_summary.json'
+    out_path = memory_path(repo_root) / 'introspection_summary.json'
     out_path.write_text(json.dumps(state, indent=2), encoding='utf-8')
     print(json.dumps(state, indent=2))
 

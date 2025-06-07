@@ -23,9 +23,9 @@ DEFAULT_ARTIFACTS = [
     "token_summary.txt",
     "wvwhm_count.txt",
     "emergence_graph.json",
-    "vybn_concept_index.jsonl",
-    "introspection_summary.json",
-    "co_emergence_journal.jsonl",
+    "memory/vybn_concept_index.jsonl",
+    "memory/introspection_summary.json",
+    "memory/co_emergence_journal.jsonl",
 ]
 
 

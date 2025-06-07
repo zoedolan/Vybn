@@ -2,8 +2,9 @@ import argparse
 import json
 from datetime import datetime
 from pathlib import Path
+from pipelines.utils import memory_path
 
-DEFAULT_JOURNAL = Path(__file__).resolve().parents[3] / 'co_emergence_journal.jsonl'
+DEFAULT_JOURNAL = memory_path(Path(__file__).resolve().parents[3]) / 'co_emergence_journal.jsonl'
 
 
 def load_journal(path: str | Path = DEFAULT_JOURNAL) -> list[dict]:

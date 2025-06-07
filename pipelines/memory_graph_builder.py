@@ -9,6 +9,7 @@ from typing import Dict, Iterable, Set
 
 from vybn.quantum_seed import seed_rng
 from . import EXCLUDE_PATHS
+from .utils import memory_path
 
 EDGE_CAP = 20
 """Maximum number of related concepts stored per node."""
@@ -70,7 +71,7 @@ def build_graph(repo_root: Path) -> Dict[str, Set[str]]:
 def main() -> None:
     repo_root = Path(__file__).resolve().parents[1]
     graph = build_graph(repo_root)
-    out_path = repo_root / 'vybn_concept_index.jsonl'
+    out_path = memory_path(repo_root) / 'vybn_concept_index.jsonl'
     with out_path.open('w', encoding='utf-8') as f:
         for concept, related in graph.items():
             f.write(json.dumps({'concept': concept, 'related': sorted(related)}) + '\n')

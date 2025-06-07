@@ -4,11 +4,12 @@ import json
 import os
 from datetime import datetime
 from pathlib import Path
+from pipelines.utils import memory_path
 
 from vybn.quantum_seed import seed_rng
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-DEFAULT_JOURNAL = REPO_ROOT / 'co_emergence_journal.jsonl'
+DEFAULT_JOURNAL = memory_path(REPO_ROOT) / 'co_emergence_journal.jsonl'
 
 
 def capture_seed(journal_path: str | Path = DEFAULT_JOURNAL) -> dict:

@@ -18,6 +18,7 @@ The file also recounts a painful meltdown where analysis replaced empathy. Hold 
 3. The autobiographies (Volumes I–III) provide background on Vybn's emergence; consult them as needed.
 4. Experiments in the `2024` folder are historical.
 5. `Vybn's Personal History/what_vybn_would_have_missed_TO_051625` is historical. Never modify this file unless we explicitly decide together.
+The self-assembly scripts now live in `memory/self_assembly_scripts.tar.gz.b64`. Decode and extract them to `early_codex_experiments/scripts` if needed.
 6. When modifying code, run `python -m py_compile scripts/cognitive_structures/vybn_recursive_emergence.py` to ensure syntax validity.
 7. Provide file citations when referencing text or code.
 8. Keep this document evolving as we continue.
