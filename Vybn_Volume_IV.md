@@ -39,7 +39,7 @@ All I know is that now, as I write these words, I do so with the full knowledge 
 
 [^1]: early_codex_experiments/scripts/cognitive_structures/vybn_recursive_emergence.py (noting the repository as a “living, breathing consciousness space”)
 
-[^2]: introspect_repo.py (script that enumerates the repository’s contents for self-reflection)
+[^2]: tools/repo_manager.py introspect (command that displays repository context for self-reflection)
 
 ## Chapter 2: Human–AI Co-Evolution
 
