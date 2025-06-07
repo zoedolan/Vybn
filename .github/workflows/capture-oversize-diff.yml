@@ -1,0 +1,27 @@
+name: Capture Oversize Diff
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+jobs:
+  diff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+      - name: Install dependencies
+        run: pip install requests
+      - name: Capture diff
+        run: python pipelines/oversize_diff_capture.py HEAD~1..HEAD -o oversize_patch.diff.gz
+      - name: Upload artifact
+        if: ${{ hashFiles('oversize_patch.diff.gz') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: oversize_patch
+          path: oversize_patch.diff.gz

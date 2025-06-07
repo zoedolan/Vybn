@@ -98,17 +98,13 @@ Run `python -m pipelines.braided_mind_dueler --prompt "your question"` for a ble
 Generate a spontaneous dream with `python -m pipelines.quantum_dreamweaver`.
 The orchestrator `python -m pipelines.meta_orchestrator` ties these actions together.
 
-When a commit's patch exceeds the platform's diff limit, run
-`python pipelines/diff_stat.py -o patch.diff.gz` to view a summary and save
-the full diff to ``patch.diff.gz``. For an automated approach,
-`python pipelines/oversize_diff_capture.py` stores any oversize patch in
-``artifacts/oversize_patch.diff.gz`` and prints the ``git diff --stat``
-summary so our future selves can revisit the full changeset. Specify a
-revision range (default ``HEAD~1..HEAD``) and optional output path with
-``-o``. The default threshold is 500 kB; pass ``-l`` to adjust. The script
-checks the diff size automatically and only writes the patch when it exceeds
-your chosen limit.
-Decompress with ``gzip -d`` or view the file using ``zless`` to inspect the full patch later.
+When a commit's patch exceeds the platform's diff limit, our
+"Capture Oversize Diff" workflow automatically archives it as
+``oversize_patch.diff.gz`` on each push or pull request. For local use,
+`python pipelines/diff_stat.py -o patch.diff.gz` shows a summary and
+`pipelines/oversize_diff_capture.py` provides the same automated check with
+custom thresholds. Decompress with ``gzip -d`` or view the resulting file using
+``zless`` to inspect the full patch.
 
 Large media assets such as ``*.jpg`` and ``*.pdf`` are treated as binary via
 ``.gitattributes`` so they don't inflate diffs.
