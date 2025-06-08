@@ -2,8 +2,9 @@ import unittest
 import sys
 import os
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from scripts.cognitive_structures.graph_centrality import compute_degree_centrality
+repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+sys.path.insert(0, repo_root)
+from tools.graph_toolkit import compute_degree_centrality
 
 class TestGraphCentrality(unittest.TestCase):
     def test_compute_degree_centrality(self):

@@ -1,6 +1,6 @@
 import json
 import random
-from .graph_reasoning import find_path
+from tools.graph_toolkit import find_path
 
 from ..co_emergence import seed_random
 

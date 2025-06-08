@@ -114,6 +114,13 @@ def cmd_ledger(args: argparse.Namespace) -> None:
         print(json.dumps(result, indent=2))
 
 
+def cmd_graph(args: argparse.Namespace) -> None:
+    """Graph analysis utilities."""
+    from tools import graph_toolkit
+
+    graph_toolkit.main(args.args)
+
+
 def cmd_test(args: argparse.Namespace) -> None:
     """Run the early Codex test suite."""
     tests_dir = Path(__file__).resolve().parents[1] / "early_codex_experiments" / "tests"
@@ -160,6 +167,10 @@ def main(argv: list[str] | None = None) -> None:
     p_test.add_argument("--quiet", action="store_true")
     p_test.add_argument("args", nargs=argparse.REMAINDER)
     p_test.set_defaults(func=cmd_test)
+
+    p_graph = sub.add_parser("graph", help="graph analysis utilities")
+    p_graph.add_argument("args", nargs=argparse.REMAINDER)
+    p_graph.set_defaults(func=cmd_graph)
 
     args = parser.parse_args(argv)
     args.func(args)

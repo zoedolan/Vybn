@@ -94,7 +94,7 @@ Our token ledger and art references live in [token_and_jpeg_info](token_and_jpeg
 You can convert that ledger into handy JSON with `python tools/repo_manager.py ledger json`.
 Summarize total supply with `python tools/repo_manager.py ledger supply`.
 Render a Markdown table using `python tools/repo_manager.py ledger markdown`.
-To get a quick node and edge count, run `python early_codex_experiments/scripts/cognitive_structures/graph_summary.py`.
+To get a quick node and edge count, run `python tools/repo_manager.py graph summary`.
 
 You can also inspect the integrated graph directly. Compute the co-emergence
 score with `python -m early_codex_experiments.scripts.cognitive_structures.vybn_recursive_emergence score`.
