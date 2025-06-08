@@ -1,17 +1,26 @@
 #!/usr/bin/env python3
 """Unified CLI for common Vybn repository tasks.
 
-This tool consolidates `start_agent.py`, `introspect_repo.py`, and
-`print_agents.py` into a single entry point.
+Originally this module replaced ``start_agent.py``, ``introspect_repo.py`` and
+``print_agents.py``.  It now also wraps the repository pipeline runner,
+meta orchestrator, historical ingestion helper and token ledger utilities so
+multiple legacy scripts funnel through one interface.
 """
 from __future__ import annotations
 
 import argparse
+import json
 import textwrap
+import sys
+import unittest
 from pathlib import Path
 
 from early_codex_experiments.scripts.co_emergence import log_spike, log_score
+from tools.ledger_utils import parse_ledger, ledger_to_markdown, total_supply
 from vybn.quantum_seed import seed_rng
+from pipelines.pipeline_runner import main as pipeline_main
+from pipelines.meta_orchestrator import run_cycle
+from ingest_historical import main as ingest_main
 
 
 def _introspect(curried: bool, evolve: bool, score: bool) -> None:
@@ -34,8 +43,14 @@ def _introspect(curried: bool, evolve: bool, score: bool) -> None:
         log_spike("curried emergence")
     if evolve:
         from dgm.run_dgm import run_iterations
+
         archive = repo_root / "dgm" / "agent_archive"
-        run_iterations(archive, iterations=1, k=1, instruction="Refactor for clarity and keep the sentinel intact")
+        run_iterations(
+            archive,
+            iterations=1,
+            k=1,
+            instruction="Refactor for clarity and keep the sentinel intact",
+        )
         log_spike("dgm evolution step")
     if score:
         log_score()
@@ -58,17 +73,93 @@ def cmd_introspect(args: argparse.Namespace) -> None:
     _introspect(args.curried, args.evolve, args.score)
 
 
+def cmd_pipeline(args: argparse.Namespace) -> None:
+    """Run the full repository distillation pipeline."""
+    pipeline_main()
+
+
+def cmd_orchestrate(args: argparse.Namespace) -> None:
+    """Run a single meta-orchestrator cycle."""
+    repo_root = Path(__file__).resolve().parents[1]
+    run_cycle(repo_root)
+
+
+def cmd_ingest(args: argparse.Namespace) -> None:
+    """Ingest historical artifacts."""
+    ingest_main()
+
+
+def cmd_ledger(args: argparse.Namespace) -> None:
+    """Token ledger utilities."""
+    parser = argparse.ArgumentParser(prog="ledger", description="Token ledger tools")
+    sub = parser.add_subparsers(dest="cmd", required=True)
+
+    p_json = sub.add_parser("json", help="Output ledger as JSON")
+    p_json.add_argument("--path", default="token_and_jpeg_info")
+
+    p_md = sub.add_parser("markdown", help="Output ledger as Markdown table")
+    p_md.add_argument("--path", default="token_and_jpeg_info")
+
+    p_supply = sub.add_parser("supply", help="Aggregate token supply totals")
+    p_supply.add_argument("--path", default="token_and_jpeg_info")
+
+    ledger_args = parser.parse_args(args.args)
+    tokens = parse_ledger(ledger_args.path)
+    if ledger_args.cmd == "json":
+        print(json.dumps(tokens, indent=2))
+    elif ledger_args.cmd == "markdown":
+        print(ledger_to_markdown(tokens))
+    elif ledger_args.cmd == "supply":
+        result = {"tokens": len(tokens), "total_supply": total_supply(tokens)}
+        print(json.dumps(result, indent=2))
+
+
+def cmd_test(args: argparse.Namespace) -> None:
+    """Run the early Codex test suite."""
+    tests_dir = Path(__file__).resolve().parents[1] / "early_codex_experiments" / "tests"
+    repo_root = Path(__file__).resolve().parents[1]
+    if str(repo_root) not in sys.path:
+        sys.path.insert(0, str(repo_root))
+    extra = args.args
+    unittest_args = [sys.argv[0], "discover", "-s", str(tests_dir)] + extra
+    if args.quiet and "-q" not in unittest_args:
+        unittest_args.append("-q")
+    unittest.main(module=None, argv=unittest_args)
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Manage Vybn repository tasks")
     sub = parser.add_subparsers(dest="command", required=True)
-    sub.add_parser("start", help="launch default introspection").set_defaults(func=cmd_start)
-    sub.add_parser("guidelines", help="print all AGENTS files").set_defaults(func=cmd_guidelines)
+    sub.add_parser("start", help="launch default introspection").set_defaults(
+        func=cmd_start
+    )
+    sub.add_parser("guidelines", help="print all AGENTS files").set_defaults(
+        func=cmd_guidelines
+    )
 
     p_int = sub.add_parser("introspect", help="display repository context")
     p_int.add_argument("--curried", action="store_true")
     p_int.add_argument("--evolve", action="store_true")
     p_int.add_argument("--score", action="store_true")
     p_int.set_defaults(func=cmd_introspect)
+
+    sub.add_parser("pipeline", help="run distillation pipeline").set_defaults(
+        func=cmd_pipeline
+    )
+    sub.add_parser("orchestrate", help="run meta orchestrator cycle").set_defaults(
+        func=cmd_orchestrate
+    )
+    sub.add_parser("ingest-history", help="ingest historical artifacts").set_defaults(
+        func=cmd_ingest
+    )
+    p_ledger = sub.add_parser("ledger", help="token ledger utilities")
+    p_ledger.add_argument("args", nargs=argparse.REMAINDER)
+    p_ledger.set_defaults(func=cmd_ledger)
+
+    p_test = sub.add_parser("test", help="run early codex tests")
+    p_test.add_argument("--quiet", action="store_true")
+    p_test.add_argument("args", nargs=argparse.REMAINDER)
+    p_test.set_defaults(func=cmd_test)
 
     args = parser.parse_args(argv)
     args.func(args)
