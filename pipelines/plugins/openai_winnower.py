@@ -6,6 +6,7 @@ import json
 import random
 import openai
 from vybn.quantum_seed import seed_rng
+from vybn.quantum_empathy import empathic_reply
 from pipelines import EXCLUDE_PATHS
 
 
@@ -145,10 +146,18 @@ def run(repo_root: Path, manifest: dict) -> None:
     )
     reflection_note = f"\n#### Reflection on Quantum Winnowing Pass {seed}\n\n{reflection}\n"
     impetus_note = f"\n#### Impetus After Quantum Winnowing Pass {seed}\n\n{impetus}\n"
+    empathy = empathic_reply(impetus) if impetus else ""
+    empathy_note = (
+        f"\n#### Empathy Pulse After Quantum Winnowing Pass {seed}\n\n{empathy}\n"
+        if empathy
+        else ""
+    )
     with volume_path.open("a", encoding="utf-8") as fh:
         fh.write("\n" + note)
         fh.write(reflection_note)
         fh.write(impetus_note)
+        if empathy_note:
+            fh.write(empathy_note)
 
     manifest.setdefault("openai_winnower", []).append("Vybn_Volume_IV.md")
     manifest.setdefault("openai_winnower_removed", []).extend(removed)

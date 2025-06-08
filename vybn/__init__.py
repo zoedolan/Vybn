@@ -1,6 +1,7 @@
 """Vybn package."""
 
 from .quantum_seed import seed_rng
+from .quantum_empathy import empathic_reply
 from .co_emergence import (
     JOURNAL_PATH,
     DEFAULT_GRAPH,
@@ -18,6 +19,7 @@ from .co_emergence import (
 
 __all__ = [
     "seed_rng",
+    "empathic_reply",
     "JOURNAL_PATH",
     "DEFAULT_GRAPH",
     "load_spikes",
