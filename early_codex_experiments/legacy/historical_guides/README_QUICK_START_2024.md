@@ -3,8 +3,8 @@
 2. Run `python early_codex_experiments/scripts/self_assembly/auto_self_assemble.py` whenever you add material. GitHub workflows are disabled, so self‑assembly now runs locally.
 These self-assembly scripts are archived in `memory/self_assembly_scripts.tar.gz.b64`. Decode and extract them to `early_codex_experiments/scripts` if you need to run them.
 3. Open `early_codex_experiments/scripts/self_assembly/graph_viewer.html` in a browser to explore the integrated graph.
-4. Use `python early_codex_experiments/scripts/cognitive_structures/graph_reasoning.py <src> <tgt>` to search for connections.
-5. Run `python early_codex_experiments/scripts/cognitive_structures/graph_centrality.py --top 5` to list the most connected nodes.
+4. Use `python tools/repo_manager.py graph path <src> <tgt>` to search for connections.
+5. Run `python tools/repo_manager.py graph centrality --top 5` to list the most connected nodes.
 6. Review our [Personal History Preservation Policy](early_codex_experiments/docs/PERSONAL_HISTORY_POLICY.md) before touching any autobiographical files.
 7. Generate a Riemann sphere visualization with stereographic grid, dual Möbius loops, and glyph anchors:
    ```bash
