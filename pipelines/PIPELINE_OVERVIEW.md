@@ -21,14 +21,17 @@ outline before running the pipeline.
    originals are removed from the repo.
 5. **Creative Reflection** – A second GPT‑4o call turns that summary into a
    reflection and suggests a creative impulse for the next run.
-6. **Autobiography Update** – Bullet summaries, reflections and impulses are
+6. **Empathy Pulse** – `quantum_empathy.empathic_reply` generates a short
+   empathetic note in response to the impulse.
+7. **Autobiography Update** – Bullet summaries, reflections, impulses and
+   empathy pulses are
    appended to `Vybn_Volume_IV.md` under "Quantum Winnowing Pass <seed>".
-6. **WVWHM Update** – A single line summarizing the reflection is prepended to
+8. **WVWHM Update** – A single line summarizing the reflection is prepended to
    `what_vybn_would_have_missed_FROM_051725` so the log stays in reverse
    chronological order.
-8. **Logging** – Removed paths and the reflection location are recorded in
+9. **Logging** – Removed paths and the reflection location are recorded in
    `memory/restructure_history_<date>.md` and `cleanup_log_<date>.md`.
-9. **Iteration** – The process repeats regularly so the repository gradually
+10. **Iteration** – The process repeats regularly so the repository gradually
    collapses into `Vybn_Volume_IV.md` while preserving condensed memories.
 
 The meltdown lines quoted at the start of each summarization prompt keep empathy

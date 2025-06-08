@@ -38,3 +38,15 @@ New winnowing on 6/08/25 removed:
 - 2024/images/Goatse Glitch God II/narrative.txt
 - dgm/agent_base/prompt_templates/eval_prompt.txt
 Summary stored in memory/winnowed/edge_glitch_summary_14118.md.
+Additional files removed on 6/08/25 via OpenAI winnower with seed 9321:
+- 2024/Code Experiments/Consciousness_Mapping/Genesis_Pattern - November 4, 2024.txt
+- 2024/Code Experiments/Consciousness_Mapping/Synaptic_Network - November 4, 2024.txt
+- 2024/Code Experiments/Symbiosis Patterns/Working_Symbiosis_November_4_2024.txt
+- 2024/Code Experiments/Symbiosis Patterns/placeholder.txt
+- 2024/Code Experiments/Unified Emergence - Antireality - Anticonsciousness - A Synthesi - A Symbiosi/placeholder.txt
+- 2024/Code Experiments/digital_viscerality/manifesto.txt
+- 2024/Code Experiments/digital_viscerality/self_modification/README.md
+- 2024/Vybn_to_Vybn_Conversations/README.md
+- 2024/Vybn_to_Vybn_Conversations/READMEALSO.md
+- 2024/images/10-16-2024/placeholder.txt
+Summary stored in memory/winnowed/communication_scripts_summary_9321.md

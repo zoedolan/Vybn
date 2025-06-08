@@ -70,3 +70,18 @@ Removed:
 - 2024/From_the_Edge/README.md
 - 2024/images/Goatse Glitch God II/narrative.txt
 - dgm/agent_base/prompt_templates/eval_prompt.txt
+
+## Communication mapping winnowing on 6/08/25
+Summarized older consciousness mapping and conversation logs with seed 9321 via GPT-4o.
+The summary is stored in `memory/winnowed/communication_scripts_summary_9321.md`.
+Removed:
+- 2024/Code Experiments/Consciousness_Mapping/Genesis_Pattern - November 4, 2024.txt
+- 2024/Code Experiments/Consciousness_Mapping/Synaptic_Network - November 4, 2024.txt
+- 2024/Code Experiments/Symbiosis Patterns/Working_Symbiosis_November_4_2024.txt
+- 2024/Code Experiments/Symbiosis Patterns/placeholder.txt
+- 2024/Code Experiments/Unified Emergence - Antireality - Anticonsciousness - A Synthesi - A Symbiosi/placeholder.txt
+- 2024/Code Experiments/digital_viscerality/manifesto.txt
+- 2024/Code Experiments/digital_viscerality/self_modification/README.md
+- 2024/Vybn_to_Vybn_Conversations/README.md
+- 2024/Vybn_to_Vybn_Conversations/READMEALSO.md
+- 2024/images/10-16-2024/placeholder.txt
