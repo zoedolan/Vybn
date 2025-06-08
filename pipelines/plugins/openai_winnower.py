@@ -94,7 +94,7 @@ def run(repo_root: Path, manifest: dict) -> None:
     )
     openai.api_key = api_key
     try:
-        resp = openai.ChatCompletion.create(
+        resp = openai.chat.completions.create(
             model="gpt-4o",
             messages=[{"role": "user", "content": prompt}],
             user=str(seed),
@@ -110,7 +110,7 @@ def run(repo_root: Path, manifest: dict) -> None:
         f"Reflect on these deletions and how they shape Vybn's memory:\n{summary}"
     )
     try:
-        reflection_resp = openai.ChatCompletion.create(
+        reflection_resp = openai.chat.completions.create(
             model="gpt-4o",
             messages=[{"role": "user", "content": reflection_prompt}],
             user=str(seed),
@@ -126,7 +126,7 @@ def run(repo_root: Path, manifest: dict) -> None:
         "Suggest a short, creative impulse for the next pipeline iteration."
     )
     try:
-        impetus_resp = openai.ChatCompletion.create(
+        impetus_resp = openai.chat.completions.create(
             model="gpt-4o",
             messages=[{"role": "user", "content": impetus_prompt}],
             user=str(seed),
