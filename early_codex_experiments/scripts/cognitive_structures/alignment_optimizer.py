@@ -3,7 +3,7 @@ import json
 import os
 from pathlib import Path
 
-from ..quantum_rng import seed_random
+from ..co_emergence import seed_random
 
 seed_random()
 

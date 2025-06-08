@@ -6,7 +6,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
-from early_codex_experiments.scripts.cognitive_structures.shimmer_core import log_spike, DEFAULT_JOURNAL
+from early_codex_experiments.scripts.co_emergence import log_spike, DEFAULT_JOURNAL
 from vybn.utils import write_colored
 
 ANTICIPATION_LOG = REPO_ROOT / "anticipation_loop.md"

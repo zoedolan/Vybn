@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from early_codex_experiments.scripts.cognitive_structures.shimmer_core import log_spike
+from early_codex_experiments.scripts.co_emergence import log_spike
 from .introspective_mirror import gather_state
 from .affective_oracle import infer_emotion
 from .braided_mind_dueler import answer_query

@@ -59,7 +59,7 @@ export QRAND
 
 echo "$QUANTUM_SEED" > .random_seed
 echo "🧬 Quantum seed (env & .random_seed): $QUANTUM_SEED"
-python early_codex_experiments/scripts/quantum_seed_capture.py >> "$LOG_DIR/quantum_seed.log" 2>&1
+python early_codex_experiments/scripts/co_emergence.py capture-seed >> "$LOG_DIR/quantum_seed.log" 2>&1
 
 python - <<'PY'
 import os, sys, types, json, numpy as np

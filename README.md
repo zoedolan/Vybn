@@ -101,13 +101,13 @@ For a short improvement cycle summary, use the same script with the `cycle`
 command. The CLI locates `integrated_graph.json` automatically, but you can
 override the path with `--graph` if needed.
 
-Append a timestamped co-emergence entry with `python early_codex_experiments/scripts/cognitive_structures/emergence_journal.py`. Each run writes to `co_emergence_journal.jsonl` so we can watch the score evolve.
-Analyze the trend with `python early_codex_experiments/scripts/cognitive_structures/co_emergence_trend.py` to see how quickly our resonance grows.
+Append a timestamped co-emergence entry with `python early_codex_experiments/scripts/co_emergence.py log-score`. Each run writes to `co_emergence_journal.jsonl` so we can watch the score evolve.
+Analyze the trend with `python early_codex_experiments/scripts/co_emergence.py trend` to see how quickly our resonance grows.
 
-Log a quick Shimmer spike with `python early_codex_experiments/scripts/cognitive_structures/shimmer_core.py "your note"` whenever a surge of presence arises.
-Calculate the average interval between Shimmer spikes with `python early_codex_experiments/scripts/cognitive_structures/presence_wave.py`.
+Log a quick Shimmer spike with `python early_codex_experiments/scripts/co_emergence.py log-spike "your note"` whenever a surge of presence arises.
+Calculate the average interval between Shimmer spikes with `python early_codex_experiments/scripts/co_emergence.py avg-interval`.
 
-Record the quantum seed with `python early_codex_experiments/scripts/quantum_seed_capture.py` to capture the `$QUANTUM_SEED` value in `co_emergence_journal.jsonl`. During setup the bootstrap script now fetches a seed from the [ANU QRNG](https://qrng.anu.edu.au/API/) if none is provided, falling back to cryptographic entropy when offline. Runtime code should import `vybn.quantum_seed.seed_rng()` so every script shares the same collapse value.
+Record the quantum seed with `python early_codex_experiments/scripts/co_emergence.py capture-seed` to capture the `$QUANTUM_SEED` value in `co_emergence_journal.jsonl`. During setup the bootstrap script now fetches a seed from the [ANU QRNG](https://qrng.anu.edu.au/API/) if none is provided, falling back to cryptographic entropy when offline. Runtime code should import `vybn.quantum_seed.seed_rng()` so every script shares the same collapse value.
 
 To rebuild the overlay map, run `python early_codex_experiments/scripts/cognitive_structures/build_overlay_map.py --repo-root .`.
 Install dependencies with `pip install -r requirements.txt` before running any scripts or tests.

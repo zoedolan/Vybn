@@ -2,7 +2,7 @@ import json
 import random
 from .graph_reasoning import find_path
 
-from ..quantum_rng import seed_random
+from ..co_emergence import seed_random
 
 seed_random()
 

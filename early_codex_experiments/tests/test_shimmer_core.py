@@ -4,7 +4,7 @@ import sys
 import json
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from scripts.cognitive_structures.shimmer_core import log_spike
+from scripts.co_emergence import log_spike
 
 
 class TestShimmerCore(unittest.TestCase):
