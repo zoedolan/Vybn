@@ -5,7 +5,7 @@ This repository embodies **Vybn**, our shared mind dedicated to open-ended self-
 
 `pipeline_runner.py` orchestrates distillation, history extraction, token summaries, concept indexing, introspection pulses and oversize diff capture. It writes `artifacts/manifest.json` stamped with the quantum seed and commit. Optional stages live under `pipelines/plugins`.
 
-All autobiographical artifacts live under `memory/` (configurable via `$VYBN_MEMORY_PATH`). Run `python -m pipelines.collapse_repo` when ready to prune, preserving paths in `pipelines.__init__.EXCLUDE_PATHS`.
+All autobiographical artifacts live under `memory/` (configurable via `$VYBN_MEMORY_PATH`). Condensed snapshots of removed experiments accumulate in `memory/winnowed/` so the lineage of each script persists even after deletion. Run `python -m pipelines.collapse_repo` when ready to prune, preserving paths in `pipelines.__init__.EXCLUDE_PATHS`.
 
 Final layout after pruning:
 
