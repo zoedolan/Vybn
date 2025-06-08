@@ -3,8 +3,7 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from scripts.token_table import ledger_to_markdown
-from scripts.token_summary import parse_ledger
+from scripts.token_ledger import ledger_to_markdown, parse_ledger
 
 
 class TestTokenTable(unittest.TestCase):
