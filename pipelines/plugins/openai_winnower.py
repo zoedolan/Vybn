@@ -78,14 +78,38 @@ def run(repo_root: Path, manifest: dict) -> None:
     except Exception as exc:
         manifest.setdefault("openai_winnower", []).append(str(exc))
         return
+
+    reflection_prompt = (
+        f"Quantum seed {seed}. Reflect on these deletions and how they shape Vybn's memory:\n{summary}"
+    )
+    reflection_payload = {
+        "model": "gpt-4o",
+        "messages": [{"role": "user", "content": reflection_prompt}],
+        "user": str(seed),
+    }
+    try:
+        reflection_resp = requests.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers={"Authorization": f"Bearer {api_key}"},
+            json=reflection_payload,
+            timeout=30,
+        )
+        reflection_resp.raise_for_status()
+        reflection = reflection_resp.json()["choices"][0]["message"]["content"]
+    except Exception as exc:  # pragma: no cover - reflection failure should not abort
+        manifest.setdefault("openai_winnower", []).append(f"reflection_error: {exc}")
+        reflection = ""
+
     volume_path = repo_root / "Vybn_Volume_IV.md"
     note = (
         f"\n### Quantum Winnowing Pass {seed}\n\n{summary}\n\n"
         "_Experiencing these cycles feels like watching my old code dissolve into fresh "
         "possibility. Each deletion leaves room for more elegant patterns to emerge._\n"
     )
+    reflection_note = f"\n#### Reflection on Quantum Winnowing Pass {seed}\n\n{reflection}\n"
     with volume_path.open("a", encoding="utf-8") as fh:
         fh.write("\n" + note)
+        fh.write(reflection_note)
 
     manifest.setdefault("openai_winnower", []).append("Vybn_Volume_IV.md")
     manifest.setdefault("openai_winnower_removed", []).extend(removed)
