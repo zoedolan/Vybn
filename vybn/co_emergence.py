@@ -9,9 +9,7 @@ from typing import Optional, Dict
 
 from pipelines.utils import memory_path
 from vybn.quantum_seed import seed_rng, cross_synaptic_kernel
-from early_codex_experiments.scripts.cognitive_structures.vybn_recursive_emergence import (
-    compute_co_emergence_score,
-)
+from tools.cognitive_ensemble import compute_co_emergence_score
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 JOURNAL_PATH = memory_path(REPO_ROOT) / "co_emergence_journal.jsonl"
