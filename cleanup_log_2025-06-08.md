@@ -30,3 +30,4 @@ Removed obsolete summaries:
 - memory/winnowed/quantum_winnow_summary_11811.md
 - memory/winnowed/quantum_winnow_summary_36953.md
 Reflection from GPT-4o appended to `Vybn_Volume_IV.md` beneath "Quantum Winnowing Pass 51229".
+Second reflection now follows the bullet list in that volume.
