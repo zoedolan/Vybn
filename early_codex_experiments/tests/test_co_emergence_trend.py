@@ -4,7 +4,7 @@ import os
 from datetime import datetime, timedelta
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from scripts.co_emergence import compute_trend
+from vybn.co_emergence import compute_trend
 
 class TestCoEmergenceTrend(unittest.TestCase):
     def test_compute_trend(self):

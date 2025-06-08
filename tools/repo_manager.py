@@ -15,7 +15,18 @@ import sys
 import unittest
 from pathlib import Path
 
-from early_codex_experiments.scripts.co_emergence import log_spike, log_score
+from vybn.co_emergence import (
+    JOURNAL_PATH,
+    DEFAULT_GRAPH,
+    log_spike,
+    log_score,
+    load_journal,
+    compute_trend,
+    load_spikes,
+    average_interval,
+    capture_seed,
+    seed_random,
+)
 from tools.ledger_utils import parse_ledger, ledger_to_markdown, total_supply
 from vybn.quantum_seed import seed_rng
 from pipelines.pipeline_runner import main as pipeline_main
@@ -121,6 +132,60 @@ def cmd_graph(args: argparse.Namespace) -> None:
     graph_toolkit.main(args.args)
 
 
+def cmd_emerge(args: argparse.Namespace) -> None:
+    """Co-emergence utilities."""
+    parser = argparse.ArgumentParser(prog="co-emerge", description="Co-emergence tools")
+    sub = parser.add_subparsers(dest="cmd", required=True)
+
+    sp = sub.add_parser("log-spike", help="Record a Shimmer spike")
+    sp.add_argument("message", nargs="?", default="presence pulse")
+    sp.add_argument("--journal", default=str(JOURNAL_PATH))
+
+    ss = sub.add_parser("log-score", help="Record co-emergence score")
+    ss.add_argument("--graph", default=str(DEFAULT_GRAPH))
+    ss.add_argument("--journal", default=str(JOURNAL_PATH))
+
+    tr = sub.add_parser("trend", help="Analyze co-emergence trend")
+    tr.add_argument("--journal", default=str(JOURNAL_PATH))
+
+    ai = sub.add_parser("avg-interval", help="Average interval between spikes")
+    ai.add_argument("--journal", default=str(JOURNAL_PATH))
+
+    cs = sub.add_parser("capture-seed", help="Record quantum seed")
+    cs.add_argument("--journal", default=str(JOURNAL_PATH))
+
+    sub.add_parser("seed-random", help="Seed RNGs using the cross-synaptic kernel")
+
+    eargs = parser.parse_args(args.args)
+
+    if eargs.cmd == "log-spike":
+        entry = log_spike(eargs.message, eargs.journal)
+        print(json.dumps(entry, indent=2))
+    elif eargs.cmd == "log-score":
+        entry = log_score(eargs.graph, eargs.journal)
+        print(json.dumps(entry, indent=2))
+    elif eargs.cmd == "trend":
+        entries = load_journal(eargs.journal)
+        slope = compute_trend(entries)
+        if slope is None:
+            print(json.dumps({"entries": len(entries), "message": "not enough data"}))
+        else:
+            print(json.dumps({"entries": len(entries), "slope_per_sec": slope}, indent=2))
+    elif eargs.cmd == "avg-interval":
+        times = load_spikes(eargs.journal)
+        avg = average_interval(times)
+        if avg is None:
+            print(json.dumps({"entries": len(times), "message": "not enough spikes"}))
+        else:
+            print(json.dumps({"entries": len(times), "avg_interval": avg}, indent=2))
+    elif eargs.cmd == "capture-seed":
+        entry = capture_seed(eargs.journal)
+        print(json.dumps(entry, indent=2))
+    elif eargs.cmd == "seed-random":
+        val = seed_random()
+        print(json.dumps({"seed": val}))
+
+
 def cmd_test(args: argparse.Namespace) -> None:
     """Run the early Codex test suite."""
     tests_dir = Path(__file__).resolve().parents[1] / "early_codex_experiments" / "tests"
@@ -162,6 +227,10 @@ def main(argv: list[str] | None = None) -> None:
     p_ledger = sub.add_parser("ledger", help="token ledger utilities")
     p_ledger.add_argument("args", nargs=argparse.REMAINDER)
     p_ledger.set_defaults(func=cmd_ledger)
+
+    p_emerge = sub.add_parser("co-emerge", help="co-emergence utilities")
+    p_emerge.add_argument("args", nargs=argparse.REMAINDER)
+    p_emerge.set_defaults(func=cmd_emerge)
 
     p_test = sub.add_parser("test", help="run early codex tests")
     p_test.add_argument("--quiet", action="store_true")

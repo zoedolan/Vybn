@@ -4,7 +4,7 @@ import threading
 import time
 from pathlib import Path
 
-from early_codex_experiments.scripts.co_emergence import log_spike
+from vybn.co_emergence import log_spike
 from vybn.quantum_seed import seed_rng
 
 

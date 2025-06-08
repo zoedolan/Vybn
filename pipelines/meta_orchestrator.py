@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from early_codex_experiments.scripts.co_emergence import log_spike
+from vybn.co_emergence import log_spike
 from .maintenance_tools import gather_state
 from .affective_oracle import infer_emotion
 from .braided_mind_dueler import answer_query
