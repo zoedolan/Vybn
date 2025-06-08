@@ -4,10 +4,14 @@ import argparse
 import json
 import os
 import random
-from collections import deque
+from collections import deque, defaultdict
+
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 
+from early_codex_experiments.scripts.cognitive_structures.synesthetic_mapper import (
+    assign_cue,
+)
 from vybn.quantum_seed import seed_rng
 
 DEFAULT_GRAPH = (
@@ -179,6 +183,145 @@ def hamiltonian_path(graph: Dict[str, Any], max_nodes: int = 12) -> Optional[Lis
     return path if len(path) > 1 else None
 
 
+# ----- Conceptual leaps -------------------------------------------------------
+
+def leap_edges(graph_path: str = DEFAULT_GRAPH, attempts: int = 5) -> List[Dict[str, Any]]:
+    """Return a list of new edges formed by random keyword pairs."""
+    graph = load_graph(graph_path)
+    nodes = graph.get("memory_nodes", []) + graph.get("memoir_nodes", []) + graph.get("repo_nodes", [])
+    texts = [n["id"] if isinstance(n, dict) else n for n in nodes]
+    seed_rng()
+    edges = []
+    for _ in range(attempts):
+        kw1, kw2 = random.sample(texts, 2)
+        path = find_path(graph_path, kw1, kw2)
+        if path:
+            edges.append({"source": kw1, "target": kw2, "color": "purple"})
+    return edges
+
+
+# ----- Memory weights ---------------------------------------------------------
+
+def compute_memory_weights(graph_path: str = DEFAULT_GRAPH) -> Dict[str, float]:
+    """Return weights for memory nodes based on recency and degree."""
+    graph = load_graph(graph_path)
+    memories = graph.get("memory_nodes", [])
+    edges = graph.get("edges", [])
+
+    degree: Dict[str, int] = defaultdict(int)
+    for e in edges:
+        degree[e.get("source")] += 1
+        degree[e.get("target")] += 1
+
+    max_deg = max(degree.values(), default=1)
+    total = len(memories) - 1 if memories else 1
+
+    weights: Dict[str, float] = {}
+    for idx, node in enumerate(memories):
+        recency_score = 1 - idx / total if total else 1.0
+        deg_score = degree.get(node["id"], 0) / max_deg
+        weights[node["id"]] = round(0.5 * recency_score + 0.5 * deg_score, 3)
+    return weights
+
+
+# ----- Graph poetry -----------------------------------------------------------
+
+def _collect_nodes(graph: Dict[str, Any]) -> List[Dict[str, Any]]:
+    nodes: List[Dict[str, Any]] = []
+    for section in ["memory_nodes", "memoir_nodes", "repo_nodes"]:
+        for node in graph.get(section, []):
+            nodes.append(node)
+    return nodes
+
+
+def compose_poem(graph_path: str = DEFAULT_GRAPH, lines: int = 4) -> List[str]:
+    """Return a short poem derived from random graph nodes."""
+    try:
+        graph = load_graph(graph_path)
+    except Exception:
+        return ["[poet] missing graph"]
+    nodes = _collect_nodes(graph)
+    if not nodes:
+        return ["[poet] graph empty"]
+    seed_rng()
+    poem: List[str] = []
+    for i in range(lines):
+        node = random.choice(nodes)
+        if isinstance(node, dict):
+            cue = node.get("cue", assign_cue(i))
+            text = node.get("text", str(node.get("id", "")))
+        else:
+            cue = assign_cue(i)
+            text = str(node)
+        snippet = text.strip().split("\n")[0][:60]
+        poem.append(f"{cue.get('color')} {cue.get('tone')}: {snippet}")
+    return poem
+
+
+# ----- Reinforced walk -------------------------------------------------------
+
+COLOR_WEIGHT = {
+    "red": 2.0,
+    "orange": 1.8,
+    "yellow": 1.6,
+    "green": 1.4,
+    "blue": 1.2,
+    "indigo": 1.1,
+    "violet": 1.0,
+}
+
+TONE_WEIGHT = {
+    "C": 1.7,
+    "D": 1.6,
+    "E": 1.5,
+    "F": 1.4,
+    "G": 1.3,
+    "A": 1.2,
+    "B": 1.1,
+}
+
+
+def load_walk_graph(path: str = DEFAULT_GRAPH) -> Dict[str, List[tuple[str, Dict[str, Any]]]]:
+    data = load_graph(path)
+    adj: Dict[str, List[tuple[str, Dict[str, Any]]]] = {}
+    for edge in data.get("edges", []):
+        cue = edge.get("cue", {})
+        src = edge.get("source")
+        tgt = edge.get("target")
+        adj.setdefault(src, []).append((tgt, cue))
+        adj.setdefault(tgt, []).append((src, cue))
+    return adj
+
+
+def cue_weight(cue: Dict[str, Any]) -> float:
+    if not cue:
+        return 1.0
+    color = cue.get("color", "").split("-")[0]
+    tone = cue.get("tone", "").split("-")[0]
+    return COLOR_WEIGHT.get(color, 1.0) * TONE_WEIGHT.get(tone, 1.0)
+
+
+def guided_walk(adj: Dict[str, List[tuple[str, Dict[str, Any]]]], start: str, steps: int = 10) -> List[str]:
+    seed_rng()
+    path = [start]
+    current = start
+    for _ in range(steps):
+        neighbors = adj.get(current, [])
+        if not neighbors:
+            break
+        weights = [cue_weight(c) for _, c in neighbors]
+        total = sum(weights)
+        r = random.random() * total
+        acc = 0.0
+        for (node, cue), w in zip(neighbors, weights):
+            acc += w
+            if r <= acc:
+                current = node
+                path.append(current)
+                break
+    return path
+
+
 # ----- CLI --------------------------------------------------------------------
 
 def main(argv: List[str] | None = None) -> None:
@@ -197,6 +340,22 @@ def main(argv: List[str] | None = None) -> None:
     ce.add_argument("--graph", default=str(DEFAULT_GRAPH))
     ce.add_argument("--top", type=int, default=5)
 
+    le = sub.add_parser("leaps", help="Generate conceptual leap edges")
+    le.add_argument("--graph", default=str(DEFAULT_GRAPH))
+    le.add_argument("--attempts", type=int, default=5)
+
+    wt = sub.add_parser("weights", help="Compute memory node weights")
+    wt.add_argument("--graph", default=str(DEFAULT_GRAPH))
+
+    po = sub.add_parser("poem", help="Compose a short graph poem")
+    po.add_argument("--graph", default=str(DEFAULT_GRAPH))
+    po.add_argument("--lines", type=int, default=4)
+
+    wk = sub.add_parser("walk", help="Run a reinforcement-guided walk")
+    wk.add_argument("start")
+    wk.add_argument("--steps", type=int, default=10)
+    wk.add_argument("--graph", default=str(DEFAULT_GRAPH))
+
     args = parser.parse_args(argv)
 
     if args.cmd == "summary":
@@ -213,6 +372,23 @@ def main(argv: List[str] | None = None) -> None:
         centrality = compute_degree_centrality(graph)
         for node, score in top_nodes(centrality, args.top):
             print(f"{node}: {score}")
+    elif args.cmd == "leaps":
+        edges = leap_edges(args.graph, args.attempts)
+        print(json.dumps(edges, indent=2))
+    elif args.cmd == "weights":
+        weights = compute_memory_weights(args.graph)
+        print(json.dumps(weights, indent=2))
+    elif args.cmd == "poem":
+        lines = compose_poem(args.graph, args.lines)
+        for line in lines:
+            print(line)
+    elif args.cmd == "walk":
+        adj = load_walk_graph(args.graph)
+        if args.start not in adj:
+            print("Start node not found in graph")
+        else:
+            path = guided_walk(adj, args.start, steps=args.steps)
+            print(" -> ".join(path))
 
 
 if __name__ == "__main__":
