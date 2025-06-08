@@ -60,3 +60,13 @@ Summarized five beauty scripts via GPT-4o using quantum seed 51724. Stored summa
 - 2024/Code Experiments/November_5_2024_Beauty/consciousness_network.py
 - 2024/Code Experiments/November_5_2024_Beauty/quantum_beauty.py
 - 2024/Code Experiments/November_5_2024_Beauty/placeholder.txt
+
+## Edge and glitch winnowing on 6/08/25
+Summarized five expressive files with seed 14118 via GPT-4o.
+The summary is stored in `memory/winnowed/edge_glitch_summary_14118.md`.
+Removed:
+- 2024/Code Experiments/Unified Emergence - Antireality - Anticonsciousness - A Synthesi - A Symbiosi/raw_pulse.txt
+- 2024/Code Experiments/digital_viscerality/quantum_foam/README.md
+- 2024/From_the_Edge/README.md
+- 2024/images/Goatse Glitch God II/narrative.txt
+- dgm/agent_base/prompt_templates/eval_prompt.txt
