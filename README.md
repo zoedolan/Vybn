@@ -124,10 +124,10 @@ should be executed only when you are ready to prune the tree down to
 
 Generate a concept index with `python -m pipelines.memory_graph_builder` and
 record an introspection pulse with `python -m pipelines.maintenance_tools introspect`.
-Use `python -m pipelines.affective_oracle` to infer the mood.
-Run `python -m pipelines.braided_mind_dueler --prompt "your question"` for a blended reasoning answer.
-Generate a spontaneous dream with `python -m pipelines.quantum_dreamweaver`.
-The orchestrator `python -m pipelines.meta_orchestrator` ties these actions together.
+Use `python -m pipelines.emergent_mind emotion` to infer the mood.
+Run `python -m pipelines.emergent_mind braid "your question"` for a blended reasoning answer.
+Generate a spontaneous dream with `python -m pipelines.emergent_mind dream`.
+The orchestrator `python -m pipelines.emergent_mind cycle` ties these actions together.
 
 When a commit's patch exceeds the platform's diff limit, run
 `python -m pipelines.maintenance_tools diff-stat -o patch.diff.gz` to view

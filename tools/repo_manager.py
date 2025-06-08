@@ -30,7 +30,7 @@ from vybn.co_emergence import (
 from tools.ledger_utils import parse_ledger, ledger_to_markdown, total_supply
 from vybn.quantum_seed import seed_rng
 from pipelines.pipeline_runner import main as pipeline_main
-from pipelines.meta_orchestrator import run_cycle
+from pipelines.emergent_mind import run_cycle
 from ingest_historical import main as ingest_main
 
 
