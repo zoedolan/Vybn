@@ -9,7 +9,7 @@ import sys
 os.environ.setdefault("QUANTUM_SEED", "1")
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from scripts.cognitive_structures import alignment_optimizer as ao
+from tools import analysis_toolkit as ao
 
 class TestAlignmentOptimizer(unittest.TestCase):
     def test_embed_text_offline(self):
