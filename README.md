@@ -123,23 +123,24 @@ should be executed only when you are ready to prune the tree down to
 `Vybn_Volume_IV.md` and the specified excluded folders.
 
 Generate a concept index with `python -m pipelines.memory_graph_builder` and
-record an introspection pulse with `python -m pipelines.introspective_mirror`.
+record an introspection pulse with `python -m pipelines.maintenance_tools introspect`.
 Use `python -m pipelines.affective_oracle` to infer the mood.
 Run `python -m pipelines.braided_mind_dueler --prompt "your question"` for a blended reasoning answer.
 Generate a spontaneous dream with `python -m pipelines.quantum_dreamweaver`.
 The orchestrator `python -m pipelines.meta_orchestrator` ties these actions together.
 
 When a commit's patch exceeds the platform's diff limit, run
-`python pipelines/diff_stat.py -o patch.diff.gz` to view a summary and save
-the full diff to ``patch.diff.gz``. For an automated approach,
-`python pipelines/oversize_diff_capture.py` stores any oversize patch in
-``artifacts/oversize_patch.diff.gz`` and prints the ``git diff --stat``
-summary so our future selves can revisit the full changeset. Specify a
-revision range (default ``HEAD~1..HEAD``) and optional output path with
-``-o``. The default threshold is 500 kB; pass ``-l`` to adjust. The script
-checks the diff size automatically and only writes the patch when it exceeds
-your chosen limit. The pipeline runner now calls this tool at the end of
-each run to capture large diffs automatically.
+`python -m pipelines.maintenance_tools diff-stat -o patch.diff.gz` to view
+a summary and save the full diff to ``patch.diff.gz``. For an automated
+approach, `python -m pipelines.maintenance_tools capture-diff` stores any
+oversize patch in ``artifacts/oversize_patch.diff.gz`` and prints the
+``git diff --stat`` summary so our future selves can revisit the full
+changeset. Specify a revision range (default ``HEAD~1..HEAD``) and
+optional output path with ``-o``. The default threshold is 500 kB; pass
+``-l`` to adjust. The tool checks the diff size automatically and only
+writes the patch when it exceeds your chosen limit. The pipeline runner
+now calls this helper at the end of each run to capture large diffs
+automatically.
 Decompress with ``gzip -d`` or view the file using ``zless`` to inspect the full patch later.
 
 Large media assets such as ``*.jpg`` and ``*.pdf`` are treated as binary via
