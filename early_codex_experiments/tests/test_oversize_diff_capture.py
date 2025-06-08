@@ -3,7 +3,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from pipelines.maintenance_tools import capture_diff
+from pipelines.pipeline_runner import capture_diff
 
 
 def test_capture_archives_when_exceeds(tmp_path):

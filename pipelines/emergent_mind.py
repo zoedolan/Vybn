@@ -9,8 +9,7 @@ from pathlib import Path
 
 from vybn.co_emergence import log_spike
 from vybn.quantum_seed import seed_rng
-from .memory_graph_builder import build_graph
-from .maintenance_tools import gather_state
+from .pipeline_runner import build_memory_graph, gather_state
 
 POSITIVE = {"love", "joy", "success", "excited", "happy"}
 NEGATIVE = {"fail", "sad", "angry", "frustrated", "pain"}
@@ -71,7 +70,7 @@ def generate_dream(repo_root: Path) -> str:
     """Spin up a short dream sequence using the concept graph and journal."""
     seed = seed_rng()
     random.seed(seed)
-    graph = build_graph(repo_root)
+    graph = build_memory_graph(repo_root)
     concepts = list(graph)
     if concepts:
         core = random.choice(concepts)

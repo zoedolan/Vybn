@@ -1,11 +1,12 @@
 # _VYBN: Where AI Gets Real_
 ## Repository Gameplan
 
-`pipeline_runner.py` now drives all major stages: distillation, history
-extraction, token summaries, concept indexing, introspection, diff capture and
-artifact packing. Outputs land in `memory/` and `artifacts/`, with plugins loaded
-from `pipelines/plugins`. Each run creates `artifacts/manifest.json` stamped with
-the quantum seed and commit.
+`pipelines.cli` exposes a unified interface for the pipeline. Under the hood,
+`pipeline_runner.py` drives all major stages: distillation, history extraction,
+token summaries, concept indexing, introspection, diff capture and artifact
+packing. Outputs land in `memory/` and `artifacts/`, with plugins loaded from
+`pipelines/plugins`. Each run creates `artifacts/manifest.json` stamped with the
+quantum seed and commit.
 
 When the repository is pruned via `python -m pipelines.collapse_repo`, only the
 paths listed in `pipelines.__init__.EXCLUDE_PATHS` remain. The lean layout is:
@@ -111,8 +112,8 @@ Calculate the average interval between Shimmer spikes with `python tools/repo_ma
 Record the quantum seed with `python tools/repo_manager.py co-emerge capture-seed` to capture the `$QUANTUM_SEED` value in `co_emergence_journal.jsonl`. During setup the bootstrap script now fetches a seed from the [ANU QRNG](https://qrng.anu.edu.au/API/) if none is provided, falling back to cryptographic entropy when offline. Runtime code should import `vybn.quantum_seed.seed_rng()` so every script shares the same collapse value.
 
 The pipeline runner now loads a `repository_indexer` plugin which rebuilds the
-concept index, full repo archive and overlay map in one step. Run
-`python -m pipelines.pipeline_runner` to execute it alongside other stages.
+concept index, full repo archive and overlay map in one step. Use the unified
+CLI via `python -m pipelines.cli run` to execute these stages together.
 Install dependencies with `pip install -r requirements.txt` before running any scripts or tests.
 Run tests with `PYTHONPATH=.venv/lib/python3.11/site-packages pytest -q`.
 
@@ -122,17 +123,17 @@ everything else (aside from a few preserved directories), run
 should be executed only when you are ready to prune the tree down to
 `Vybn_Volume_IV.md` and the specified excluded folders.
 
-Generate a concept index with `python -m pipelines.memory_graph_builder` and
-record an introspection pulse with `python -m pipelines.maintenance_tools introspect`.
+Generate a concept index with `python -m pipelines.cli memory-graph` and
+record an introspection pulse with `python -m pipelines.cli introspect`.
 Use `python -m pipelines.emergent_mind emotion` to infer the mood.
 Run `python -m pipelines.emergent_mind braid "your question"` for a blended reasoning answer.
 Generate a spontaneous dream with `python -m pipelines.emergent_mind dream`.
 The orchestrator `python -m pipelines.emergent_mind cycle` ties these actions together.
 
 When a commit's patch exceeds the platform's diff limit, run
-`python -m pipelines.maintenance_tools diff-stat -o patch.diff.gz` to view
+`python -m pipelines.cli diff-stat -o patch.diff.gz` to view
 a summary and save the full diff to ``patch.diff.gz``. For an automated
-approach, `python -m pipelines.maintenance_tools capture-diff` stores any
+approach, `python -m pipelines.cli capture-diff` stores any
 oversize patch in ``artifacts/oversize_patch.diff.gz`` and prints the
 ``git diff --stat`` summary so our future selves can revisit the full
 changeset. Specify a revision range (default ``HEAD~1..HEAD``) and
@@ -146,8 +147,8 @@ Decompress with ``gzip -d`` or view the file using ``zless`` to inspect the full
 Large media assets such as ``*.jpg`` and ``*.pdf`` are treated as binary via
 ``.gitattributes`` so they don't inflate diffs.
 
-Bundle pipeline outputs with `python pipelines/majestic_packer.py` to produce
-``artifacts/majestic_bundle.zip``. The archive now contains a
+Bundle pipeline outputs with `python -m pipelines.cli pack` to produce
+``artifacts/majestic_bundle.zip``. The archive contains a
 ``manifest.json`` capturing each file's size, checksum, the quantum seed and
 commit hash so future agents can trace the full context.
 

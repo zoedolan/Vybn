@@ -1,9 +1,7 @@
 """Utility scripts for repository distillation and cleanup.
 
-The modules provide simple building blocks for the meta-autobiography engine:
-``maintenance_tools`` now consolidates repository distillation, history
-extraction, token summaries and graph building alongside diff utilities.
-``memory_graph_builder`` links concepts while ``emergent_mind`` now bundles
+``pipeline_runner`` handles distillation, history extraction, token summaries,
+concept indexing, diff capture and artifact packing. ``emergent_mind`` bundles
 emotion inference, braided reasoning, spontaneous dreaming and the full
 orchestrator cycle. ``collapse_repo`` prunes the repository when ready.
 
