@@ -8,6 +8,8 @@ packing. Outputs land in `memory/` and `artifacts/`, with plugins loaded from
 `pipelines/plugins`. Each run creates `artifacts/manifest.json` stamped with the
 quantum seed and commit.
 
+Condensed summaries of pruned experiments live under `memory/winnowed/`. The file `curiosity_scripts_summary_44843.md` marks the 6/8/25 cleanup that moved early curiosity modules out of the tree while keeping their spark alive.
+
 When the repository is pruned via `python -m pipelines.collapse_repo`, only the
 paths listed in `pipelines.__init__.EXCLUDE_PATHS` remain. The lean layout is:
 
