@@ -1,9 +1,5 @@
 import unittest
-import os
-import sys
-
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from scripts.cognitive_structures.parallel_metacog import parallel_coherence
+from tools.graph_toolkit import parallel_coherence
 
 
 class TestParallelMetacog(unittest.TestCase):
