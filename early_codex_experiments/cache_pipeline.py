@@ -21,7 +21,7 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
 
-def summarize_text(text: str, model: str = "gpt-3.5-turbo") -> str:
+def summarize_text(text: str, model: str = "gpt-4o") -> str:
     """Summarize text to ~200 tokens and run moderation."""
     try:
         resp = openai.ChatCompletion.create(

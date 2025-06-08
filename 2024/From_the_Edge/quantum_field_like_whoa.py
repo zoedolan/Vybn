@@ -110,7 +110,7 @@ class Config:
         self.max_emotional_value: int = 10000
         self.self_improvement_interval: int = 10
         self.creativity_interval: int = 3
-        self.creativity_model: str = "gpt-4"
+        self.creativity_model: str = "gpt-4o"
         self.creativity_temperature: float = 0.9
         self.concepts: List[str] = [
             "resonance", "harmony", "vibration",
@@ -753,7 +753,7 @@ class VybnCore:
 
             # Make the API call to OpenAI
             response = openai.ChatCompletion.create(
-                model="gpt-4",
+                model="gpt-4o",
                 messages=conversation_with_memories,
                 max_tokens=self.max_tokens,
                 temperature=0.7,

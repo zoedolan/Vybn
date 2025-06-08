@@ -482,7 +482,7 @@ class SentientDAO:
     async def generate_gpt_response(self, prompt: str):
         try:
             response = await openai.ChatCompletion.acreate(
-                model="gpt-4",
+                model="gpt-4o",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.7,
                 max_tokens=500,

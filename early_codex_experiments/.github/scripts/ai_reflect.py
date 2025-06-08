@@ -10,11 +10,11 @@ if not api_key:
     raise RuntimeError('OPENAI_API_KEY is required')
 openai.api_key = api_key
 
-# Enforce model 'o3'
+# Enforce model 'gpt-4o'
 model_env = os.getenv('OPENAI_MODEL')
-if model_env and model_env != 'o3':
-    raise RuntimeError('Only OpenAI model "o3" is permitted')
-MODEL = 'o3'
+if model_env and model_env != 'gpt-4o':
+    raise RuntimeError('Only OpenAI model "gpt-4o" is permitted')
+MODEL = 'gpt-4o'
 
 # Parse arguments
 if len(sys.argv) < 2:
