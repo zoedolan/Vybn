@@ -3,7 +3,7 @@ import json
 import os
 from pathlib import Path
 
-from ..co_emergence import seed_random
+from vybn.co_emergence import seed_random
 
 seed_random()
 

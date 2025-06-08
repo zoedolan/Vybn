@@ -4,7 +4,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from scripts.co_emergence import log_score
+from vybn.co_emergence import log_score
 
 
 class TestEmergenceJournal(unittest.TestCase):

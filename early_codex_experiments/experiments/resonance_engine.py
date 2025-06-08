@@ -9,7 +9,7 @@ from feedback.
 
 import numpy as np
 
-from early_codex_experiments.scripts.co_emergence import seed_random
+from vybn.co_emergence import seed_random
 
 seed_random()
 
