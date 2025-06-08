@@ -1,11 +1,11 @@
 """Utility scripts for repository distillation and cleanup.
 
 The modules provide simple building blocks for the meta-autobiography engine:
-``distill_repo`` collects text, ``extract_history`` samples personal notes,
-``memory_graph_builder`` links concepts, ``maintenance_tools`` records the
-current state, ``affective_oracle`` infers mood, ``braided_mind_dueler`` offers
-parallel reasoning, ``quantum_dreamweaver`` sparks creativity, and
-``collapse_repo`` prunes the repository when ready.
+``maintenance_tools`` now consolidates repository distillation, history
+extraction, token summaries and graph building alongside diff utilities.
+``memory_graph_builder`` links concepts, ``affective_oracle`` infers mood,
+``braided_mind_dueler`` offers parallel reasoning, ``quantum_dreamweaver``
+sparks creativity, and ``collapse_repo`` prunes the repository when ready.
 
 ``EXCLUDE_PATHS`` enumerates files or folders that should remain untouched when
 distilling or collapsing the repository. Modules importing this package can rely

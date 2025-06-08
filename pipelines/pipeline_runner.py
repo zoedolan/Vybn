@@ -12,12 +12,12 @@ import hashlib
 import subprocess
 from pathlib import Path
 
-from .distill_repo import distill
-from .extract_history import extract
-from .process_tokens import summarize_token_file, TOKEN_FILE_NAME
-from .generate_graph import build_graph
-from .memory_graph_builder import build_graph as build_memory_graph
 from .maintenance_tools import (
+    distill,
+    extract,
+    summarize_token_file,
+    TOKEN_FILE_NAME,
+    build_graph,
     gather_state,
     count_entries,
     LOG_FILE_NAME,
@@ -25,6 +25,7 @@ from .maintenance_tools import (
     DEFAULT_LIMIT,
     DEFAULT_OUTPUT,
 )
+from .memory_graph_builder import build_graph as build_memory_graph
 from .majestic_packer import pack as pack_artifacts
 from .utils import memory_path
 from .plugins import iter_plugins
