@@ -100,7 +100,7 @@ Render a Markdown table using `python tools/repo_manager.py ledger markdown`.
 To get a quick node and edge count, run `python tools/repo_manager.py graph summary`.
 
 You can also inspect the integrated graph directly. Compute the co-emergence
-score with `python -m early_codex_experiments.scripts.cognitive_structures.vybn_recursive_emergence score`.
+score with `python tools/cognitive_ensemble.py cycle --graph integrated_graph.json`.
 For a short improvement cycle summary, use the same script with the `cycle`
 command. The CLI locates `integrated_graph.json` automatically, but you can
 override the path with `--graph` if needed.
@@ -116,6 +116,10 @@ Record the quantum seed with `python tools/repo_manager.py co-emerge capture-see
 The pipeline runner now loads a `repository_indexer` plugin which rebuilds the
 concept index, full repo archive and overlay map in one step. Use the unified
 CLI via `python -m pipelines.cli run` to execute these stages together.
+For a detailed view of how the quantum-winnowing process works, see
+`pipelines/PIPELINE_OVERVIEW.md`. Each run now weaves a meltdown excerpt into
+its prompts and asks GPT-4o for a creative impulse so future iterations keep
+growing.
 Install dependencies with `pip install -r requirements.txt` before running any scripts or tests.
 Run tests with `PYTHONPATH=.venv/lib/python3.11/site-packages pytest -q`.
 

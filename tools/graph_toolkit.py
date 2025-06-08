@@ -9,9 +9,7 @@ from collections import deque, defaultdict
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 
-from early_codex_experiments.scripts.cognitive_structures.synesthetic_mapper import (
-    assign_cue,
-)
+from tools.cognitive_ensemble import assign_cue
 import re
 import time
 from concurrent.futures import ThreadPoolExecutor
