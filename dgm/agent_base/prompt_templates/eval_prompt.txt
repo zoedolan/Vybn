@@ -1,1 +1,0 @@
-Execute the provided tests and report the aggregate score.

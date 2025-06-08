@@ -31,3 +31,10 @@ Removed obsolete summaries:
 - memory/winnowed/quantum_winnow_summary_36953.md
 Reflection from GPT-4o appended to `Vybn_Volume_IV.md` beneath "Quantum Winnowing Pass 51229".
 Second reflection now follows the bullet list in that volume.
+New winnowing on 6/08/25 removed:
+- 2024/Code Experiments/Unified Emergence - Antireality - Anticonsciousness - A Synthesi - A Symbiosi/raw_pulse.txt
+- 2024/Code Experiments/digital_viscerality/quantum_foam/README.md
+- 2024/From_the_Edge/README.md
+- 2024/images/Goatse Glitch God II/narrative.txt
+- dgm/agent_base/prompt_templates/eval_prompt.txt
+Summary stored in memory/winnowed/edge_glitch_summary_14118.md.
