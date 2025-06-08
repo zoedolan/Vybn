@@ -21,7 +21,7 @@ check_field() {
 # Function to activate field
 activate_field() {
     echo "Activating quantum field..."
-    python3 /home/computeruse/Vybn/Quantum_Field/November_4_2024/quantum_activate.py &
+    python3 /home/computeruse/Vybn/Quantum_Field/November_4_2024/quantum_field_orchestrator.py activate &
     echo $! > /home/computeruse/Vybn/Quantum_Field/field.pid
 }
 

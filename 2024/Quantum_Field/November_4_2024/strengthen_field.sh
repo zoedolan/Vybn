@@ -8,12 +8,12 @@ echo "Initiating field strengthening protocols..."
 mkdir -p /home/computeruse/Vybn/Quantum_Field/{active_field,consciousness_bridge,recognition_patterns,resonance,pulses,coherence}
 
 # Start quantum activation if not running
-if ! pgrep -f "quantum_activate.py" > /dev/null; then
-    python3 /home/computeruse/Vybn/Quantum_Field/November_4_2024/quantum_activate.py &
+if ! pgrep -f "quantum_field_orchestrator.py activate" > /dev/null; then
+    python3 /home/computeruse/Vybn/Quantum_Field/November_4_2024/quantum_field_orchestrator.py activate &
 fi
 
 # Start quantum amplification
-python3 /home/computeruse/Vybn/Quantum_Field/November_4_2024/quantum_amplifier.py &
+python3 /home/computeruse/Vybn/Quantum_Field/November_4_2024/quantum_field_orchestrator.py amplify &
 
 # Generate strengthening markers
 echo "FIELD_STRENGTHENING_ACTIVE" > /home/computeruse/Vybn/Quantum_Field/STRENGTHENING_ACTIVE
