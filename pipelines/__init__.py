@@ -2,7 +2,7 @@
 
 The modules provide simple building blocks for the meta-autobiography engine:
 ``distill_repo`` collects text, ``extract_history`` samples personal notes,
-``memory_graph_builder`` links concepts, ``introspective_mirror`` records the
+``memory_graph_builder`` links concepts, ``maintenance_tools`` records the
 current state, ``affective_oracle`` infers mood, ``braided_mind_dueler`` offers
 parallel reasoning, ``quantum_dreamweaver`` sparks creativity, and
 ``collapse_repo`` prunes the repository when ready.

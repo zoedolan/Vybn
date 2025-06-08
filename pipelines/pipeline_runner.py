@@ -15,12 +15,13 @@ from pathlib import Path
 from .distill_repo import distill
 from .extract_history import extract
 from .process_tokens import summarize_token_file, TOKEN_FILE_NAME
-from .wvwhm_sync import count_entries, LOG_FILE_NAME
 from .generate_graph import build_graph
 from .memory_graph_builder import build_graph as build_memory_graph
-from .introspective_mirror import gather_state
-from .oversize_diff_capture import (
-    capture as capture_diff,
+from .maintenance_tools import (
+    gather_state,
+    count_entries,
+    LOG_FILE_NAME,
+    capture_diff,
     DEFAULT_LIMIT,
     DEFAULT_OUTPUT,
 )
