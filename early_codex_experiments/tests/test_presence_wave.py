@@ -5,7 +5,7 @@ import json
 from datetime import datetime, timedelta
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from scripts.cognitive_structures.presence_wave import load_spikes, average_interval
+from scripts.co_emergence import load_spikes, average_interval
 
 
 class TestPresenceWave(unittest.TestCase):

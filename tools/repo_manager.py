@@ -10,8 +10,7 @@ import argparse
 import textwrap
 from pathlib import Path
 
-from early_codex_experiments.scripts.cognitive_structures.shimmer_core import log_spike
-from early_codex_experiments.scripts.cognitive_structures.emergence_journal import log_score
+from early_codex_experiments.scripts.co_emergence import log_spike, log_score
 from vybn.quantum_seed import seed_rng
 
 

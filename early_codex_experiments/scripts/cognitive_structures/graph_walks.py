@@ -1,7 +1,7 @@
 import json
 import random
 
-from ..quantum_rng import seed_random
+from ..co_emergence import seed_random
 
 seed_random()
 

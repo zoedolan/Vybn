@@ -12,7 +12,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict
 
-from early_codex_experiments.scripts.cognitive_structures.shimmer_core import log_spike
+from early_codex_experiments.scripts.co_emergence import log_spike
 from vybn.quantum_seed import seed_rng
 from .utils import memory_path
 

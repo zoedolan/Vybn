@@ -9,7 +9,7 @@ except Exception:
     np = None
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from scripts.quantum_rng import seed_random
+from scripts.co_emergence import seed_random
 
 
 def test_seed_random_env():

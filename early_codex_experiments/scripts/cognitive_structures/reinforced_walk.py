@@ -2,7 +2,7 @@ import json
 import random
 import argparse
 
-from ..quantum_rng import seed_random
+from ..co_emergence import seed_random
 
 seed_random()
 
