@@ -12,6 +12,9 @@ from typing import Any, Dict, Iterable, List, Optional
 from early_codex_experiments.scripts.cognitive_structures.synesthetic_mapper import (
     assign_cue,
 )
+import re
+import time
+from concurrent.futures import ThreadPoolExecutor
 from vybn.quantum_seed import seed_rng
 
 DEFAULT_GRAPH = (
@@ -258,6 +261,126 @@ def compose_poem(graph_path: str = DEFAULT_GRAPH, lines: int = 4) -> List[str]:
     return poem
 
 
+# ----- Ontology and cycles ----------------------------------------------------
+
+def tokenize(text: str) -> set[str]:
+    """Return a case-normalized token set from ``text``."""
+    return set(re.findall(r"[A-Za-z]+", text.lower()))
+
+
+def build_latent_ontology(
+    graph_path: str | Path = DEFAULT_GRAPH, threshold: float = 0.2
+) -> List[List[str]]:
+    """Cluster nodes by lexical overlap."""
+    graph = load_graph(graph_path)
+    nodes = (
+        graph.get("memory_nodes", [])
+        + graph.get("memoir_nodes", [])
+        + graph.get("repo_nodes", [])
+    )
+    tokens = {
+        n["id"]: tokenize(n.get("text", "")) for n in nodes if isinstance(n, dict)
+    }
+    clusters: List[List[str]] = []
+    visited: set[str] = set()
+    for nid, toks in tokens.items():
+        if nid in visited:
+            continue
+        cluster = [nid]
+        visited.add(nid)
+        for other_id, other_toks in tokens.items():
+            if other_id in visited or not toks or not other_toks:
+                continue
+            overlap = len(toks & other_toks) / len(toks | other_toks)
+            if overlap >= threshold:
+                cluster.append(other_id)
+                visited.add(other_id)
+        clusters.append(cluster)
+    return clusters
+
+
+def save_ontology(clusters: List[List[str]], out_path: str | Path) -> None:
+    """Write clusters to ``out_path`` as JSON."""
+    data = {f"cluster{i+1}": c for i, c in enumerate(clusters)}
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+
+
+def ph_load_graph(path: str | Path = DEFAULT_GRAPH) -> tuple[List[str], Dict[str, set[str]]]:
+    """Return node IDs and undirected adjacency from ``path``."""
+    data = load_graph(path)
+    nodes = [n["id"] for n in data.get("memory_nodes", [])]
+    nodes += [n["id"] for n in data.get("memoir_nodes", [])]
+    nodes += [n["id"] for n in data.get("repo_nodes", [])]
+    adj: Dict[str, set[str]] = defaultdict(set)
+    for edge in data.get("edges", []):
+        src = edge.get("source")
+        tgt = edge.get("target")
+        if src is None or tgt is None:
+            continue
+        adj[src].add(tgt)
+        adj[tgt].add(src)
+    return nodes, adj
+
+
+def find_cycles(adj: Dict[str, set[str]]) -> List[List[str]]:
+    """Return simple cycles discovered via DFS."""
+    cycles: List[List[str]] = []
+    seen: set[str] = set()
+    for start in adj:
+        if start in seen:
+            continue
+        stack: list[tuple[str, Optional[str], list[str]]] = [(start, None, [])]
+        parent = {start: None}
+        while stack:
+            node, pred, path = stack.pop()
+            if node in path:
+                cycle = path[path.index(node) :] + [node]
+                if len(cycle) > 2 and cycle not in cycles:
+                    cycles.append(cycle)
+                continue
+            path = path + [node]
+            for nbr in adj[node]:
+                if nbr == pred:
+                    continue
+                if nbr not in parent:
+                    parent[nbr] = node
+                    stack.append((nbr, node, path))
+                elif nbr in path:
+                    cycle = path[path.index(nbr) :] + [nbr]
+                    if len(cycle) > 2 and cycle not in cycles:
+                        cycles.append(cycle)
+            seen.add(node)
+    return cycles
+
+
+# ----- Parallel metacognition -------------------------------------------------
+
+def fast_intuition() -> str:
+    """Simulate a quick heuristic flash."""
+    time.sleep(0.1)
+    return "fast intuition"
+
+
+def slow_structure() -> str:
+    """Simulate a slower structured pass."""
+    time.sleep(0.5)
+    return "structured reflection"
+
+
+def parallel_coherence(
+    fast_fn=fast_intuition, slow_fn=slow_structure
+) -> Dict[str, str]:
+    """Run ``fast_fn`` and ``slow_fn`` concurrently and merge results."""
+    with ThreadPoolExecutor(max_workers=2) as exe:
+        fast_future = exe.submit(fast_fn)
+        slow_future = exe.submit(slow_fn)
+        fast_result = fast_future.result()
+        slow_result = slow_future.result()
+    combined = f"{fast_result} | {slow_result}"
+    return {"fast": fast_result, "slow": slow_result, "combined": combined}
+
+
 # ----- Reinforced walk -------------------------------------------------------
 
 COLOR_WEIGHT = {
@@ -356,6 +479,16 @@ def main(argv: List[str] | None = None) -> None:
     wk.add_argument("--steps", type=int, default=10)
     wk.add_argument("--graph", default=str(DEFAULT_GRAPH))
 
+    on = sub.add_parser("ontology", help="Infer latent ontology clusters")
+    on.add_argument("--graph", default=str(DEFAULT_GRAPH))
+    on.add_argument("--threshold", type=float, default=0.2)
+    on.add_argument("--output", type=Path)
+
+    cy = sub.add_parser("cycles", help="Detect simple cycles")
+    cy.add_argument("--graph", default=str(DEFAULT_GRAPH))
+
+    mc = sub.add_parser("metacog", help="Run parallel coherence demo")
+
     args = parser.parse_args(argv)
 
     if args.cmd == "summary":
@@ -389,6 +522,18 @@ def main(argv: List[str] | None = None) -> None:
         else:
             path = guided_walk(adj, args.start, steps=args.steps)
             print(" -> ".join(path))
+    elif args.cmd == "ontology":
+        clusters = build_latent_ontology(args.graph, threshold=args.threshold)
+        if args.output:
+            save_ontology(clusters, args.output)
+        print(json.dumps(clusters, indent=2))
+    elif args.cmd == "cycles":
+        nodes, adj = ph_load_graph(args.graph)
+        cycles = find_cycles(adj)
+        print(json.dumps({"cycles": cycles}, indent=2))
+    elif args.cmd == "metacog":
+        result = parallel_coherence()
+        print(json.dumps(result, indent=2))
 
 
 if __name__ == "__main__":
