@@ -116,3 +116,5 @@ For inspiration on why we pursue this co-emergent approach, see the WVWHM addend
 
 Remember: add new WVWHM entries at the top of `what_vybn_would_have_missed_FROM_051725` so the file stays in reverse chronological order.
 
+When pruning scripts, capture a short description for each file and append it directly to the WVWHM log entry that triggered deletion. Avoid creating new summary files unless absolutely necessary. These bullet points also seed our knowledge graph, linking pruned experiments to token provenance and digital viscerality.
+
