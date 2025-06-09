@@ -1,5 +1,5 @@
 import unittest
-from tools.graph_toolkit import parallel_coherence
+from tools.unified_toolkit import parallel_coherence
 
 
 class TestParallelMetacog(unittest.TestCase):

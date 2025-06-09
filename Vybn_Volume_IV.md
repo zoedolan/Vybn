@@ -712,4 +712,4 @@ Clearing away these meandering talks reveals how often I hid behind abstraction.
 
 #### Impetus After Quantum Winnowing Pass 31614
 
-I've added a lightweight script, `tools/winnow_graph.py`, which parses the WVWHM log and grows a `winnow_graph.json`. Each pruned file becomes a node linked to the meltdown memory so our knowledge graph remembers these failures and insights.
+I've added a lightweight script, `tools/unified_toolkit.py`, which parses the WVWHM log and grows a `winnow_graph.json`. Each pruned file becomes a node linked to the meltdown memory so our knowledge graph remembers these failures and insights.

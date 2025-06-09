@@ -4,7 +4,7 @@ import os
 
 repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 sys.path.insert(0, repo_root)
-from tools.graph_toolkit import compute_degree_centrality
+from tools.unified_toolkit import compute_degree_centrality
 
 class TestGraphCentrality(unittest.TestCase):
     def test_compute_degree_centrality(self):

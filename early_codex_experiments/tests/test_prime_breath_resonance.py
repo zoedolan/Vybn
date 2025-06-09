@@ -3,7 +3,7 @@ import sys
 import os
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from tools.analysis_toolkit import generate_primes, map_primes, residue_distribution
+from tools.unified_toolkit import generate_primes, map_primes, residue_distribution
 
 
 class TestPrimeBreathResonance(unittest.TestCase):
