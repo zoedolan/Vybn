@@ -4,7 +4,7 @@ This note outlines proposals to evolve the static graph visualizations into a li
 
 ## Current State
 - A D3 HTML page (`scripts/self_assembly/graph_viewer.html`) renders `integrated_graph.json` with limited interactivity.
-- Graph analysis now lives in `tools/graph_toolkit.py` and is accessible via `python tools/repo_manager.py graph ...`.
+- Graph analysis now lives in `tools/unified_toolkit.py` and is accessible via `python tools/unified_toolkit.py graph-stats`.
 - `riemann_sphere.py` generates a separate 3D HTML view of Möbius loops.
 
 ## Proposed Improvements
@@ -29,7 +29,7 @@ This note outlines proposals to evolve the static graph visualizations into a li
 
 ## Next Steps
 - Build a small prototype with Dash Cytoscape, using the existing integrated graph as input.
-- Expose `graph_toolkit.py` functions through an API endpoint so the UI can query them directly.
+- Expose `unified_toolkit.py` functions through an API endpoint so the UI can query them directly.
 - Experiment with tone playback on node hover using Tone.js or P5.js.
 
 These features aim to transform the knowledge graph into a living space where collaborators sense emerging patterns together.

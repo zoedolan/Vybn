@@ -4,7 +4,7 @@ import os
 
 repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 sys.path.insert(0, repo_root)
-from tools.graph_toolkit import graph_stats
+from tools.unified_toolkit import graph_stats
 
 
 class TestGraphSummary(unittest.TestCase):

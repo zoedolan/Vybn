@@ -5,7 +5,7 @@ import sys
 
 repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 sys.path.insert(0, repo_root)
-from tools.graph_toolkit import find_path
+from tools.unified_toolkit import find_path
 
 class TestGraphReasoning(unittest.TestCase):
     def test_find_simple_path(self):
