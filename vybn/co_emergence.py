@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Optional, Dict
 
 from pipelines.utils import memory_path
-from vybn.quantum_seed import seed_rng, cross_synaptic_kernel
+from vybn.quantum_seed import seed_rng, cross_seed
 from tools.cognitive_ensemble import compute_co_emergence_score
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -111,8 +111,8 @@ def capture_seed(journal_path: str | Path = JOURNAL_PATH) -> dict:
 
 
 def seed_random() -> int:
-    """Seed Python and NumPy RNGs using the cross-synaptic kernel."""
-    return cross_synaptic_kernel()
+    """Seed Python and NumPy RNGs using the cross-process seed."""
+    return cross_seed()
 
 
 # ----- Graph utilities ---------------------------------------------------------

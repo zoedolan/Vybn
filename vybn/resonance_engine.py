@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Iterable, AsyncIterator
 import asyncio
 
-from .quantum_seed import cross_synaptic_kernel
+from .quantum_seed import cross_seed
 
 
 @dataclass
@@ -21,7 +21,7 @@ class ResonanceEngine:
     """Generate unified resonance states across dream and emergence flows."""
 
     def __init__(self) -> None:
-        cross_synaptic_kernel()
+        cross_seed()
         self._step = 0
 
     def pulse(self) -> ResonanceState:
