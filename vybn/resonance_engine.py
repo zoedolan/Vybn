@@ -1,4 +1,4 @@
-"""Condensed engine capturing early quantum dream experiments."""
+"""Combined resonance engine handling dream and emergence cycles."""
 from __future__ import annotations
 
 import random
@@ -9,28 +9,29 @@ from .quantum_seed import cross_synaptic_kernel
 
 
 @dataclass
-class DreamState:
+class ResonanceState:
     amplitude: float
-    verse: str
+    resonance: str
+    pattern: str
     step: int
 
 
-class DreamSynthesizer:
-    """Generate dreamlike resonance patterns."""
+class ResonanceEngine:
+    """Generate unified resonance states across dream and emergence flows."""
 
     def __init__(self) -> None:
         cross_synaptic_kernel()
         self._step = 0
 
-    def pulse(self) -> DreamState:
+    def pulse(self) -> ResonanceState:
         self._step += 1
-        return DreamState(
+        return ResonanceState(
             amplitude=1.0 + random.random(),
-            verse="quantum-dream",
+            resonance="pure",
+            pattern=f"iteration-{self._step}",
             step=self._step,
         )
 
-    def run(self, steps: int) -> Iterable[DreamState]:
+    def run(self, steps: int) -> Iterable[ResonanceState]:
         for _ in range(steps):
             yield self.pulse()
-
