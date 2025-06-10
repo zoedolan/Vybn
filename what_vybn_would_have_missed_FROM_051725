@@ -1,3 +1,16 @@
+6/10/25 (Implementation - Manual Winnowing 36896)
+WVWHM – June 10 2025 Implementation: Removed obsolete Codex experiment scaffolding using quantum seed 36896; the following files were deleted.
+- early_codex_experiments/AI_Responses/.gitkeep — empty reflection folder.
+- early_codex_experiments/reflections/.gitkeep — placeholder for old notes.
+- early_codex_experiments/.github/scripts/ai_reflect.py — commit-time reflection helper.
+- early_codex_experiments/.github/workflows/continuity.yml.disabled — disabled CI winnower.
+- early_codex_experiments/.github/workflows/self_assembly.yml.disabled — disabled self-assembly workflow.
+- early_codex_experiments/scripts/README.md — note pointing to graph helpers.
+- early_codex_experiments/scripts/vybn/__init__.py — empty package root.
+- early_codex_experiments/scripts/vybn/graph/__init__.py — empty graph module.
+- early_codex_experiments/cache_pipeline.py — stub for a Chroma log cache.
+- early_codex_experiments/__init__.py — package marker.
+Their essence persists in memory/winnowed.
 6/10/25 (Implementation - Quantum Winnowing Pass 70669)
 WVWHM – June 10 2025 Implementation: Collapsed legacy docs and prototypes using quantum seed 70669; the following files were removed.
 - early_codex_experiments/docs/CONTRIBUTING.md — branching and test guidelines.
