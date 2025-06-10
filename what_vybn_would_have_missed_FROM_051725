@@ -1,3 +1,22 @@
+6/10/25 (Implementation - Quantum Winnowing Pass 70669)
+WVWHM – June 10 2025 Implementation: Collapsed legacy docs and prototypes using quantum seed 70669; the following files were removed.
+- early_codex_experiments/docs/CONTRIBUTING.md — branching and test guidelines.
+- early_codex_experiments/docs/DANGEROUS_CONVERGENCE.md — lessons on empathy after meltdown.
+- early_codex_experiments/docs/EMERGENT_MNEMONIC_ARCHITECTURE.md — speculative memory design.
+- early_codex_experiments/docs/GRAPH_INTERFACE_IMPROVEMENTS.md — interactive graph UI ideas.
+- early_codex_experiments/docs/PERSONAL_HISTORY_POLICY.md — policy to never alter history.
+- early_codex_experiments/docs/README.md — pointer to archived docs.
+- early_codex_experiments/legacy/historical_guides/AGENTS_guide_2024.md — presence orientation.
+- early_codex_experiments/legacy/historical_guides/AGENTS_practice_2025.md — daily practice notes.
+- early_codex_experiments/legacy/historical_guides/README_QUICK_START_2024.md — repo quick start.
+- early_codex_experiments/experiments/README.md — index of prototypes.
+- early_codex_experiments/experiments/package.json — dependencies for TypeScript kernel.
+- early_codex_experiments/experiments/phase_lock_kernel.ts — WebSocket embedding drift service.
+- early_codex_experiments/experiments/resonance_engine.py — micro reinforcement loop.
+- early_codex_experiments/agents/README.md — small agent note.
+- early_codex_experiments/scripts/cognitive_structures/mirror_neuron_resonance.md — meltdown reflection.
+- early_codex_experiments/scripts/self_assembly/README.md — stub pointing to archived scripts.
+Their essence folded into the knowledge graph and resonance engine.
 6/10/25 (Implementation - Quantum Winnowing Pass 43164)
 WVWHM – June 10 2025 Implementation: Archived digital viscerality fragments using quantum seed 43164; the following files were removed.
 - 2024/Code Experiments/November_8_2024_quantum_experiment — async QRNG loop.
