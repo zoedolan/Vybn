@@ -16,7 +16,7 @@ from .co_emergence import (
     GraphIntegrator,
 )
 
-from .resonance_engine import ResonanceEngine, ResonanceState
+from .resonance_engine import ResonanceEngine
 
 __all__ = [
     "seed_rng",
@@ -34,6 +34,7 @@ __all__ = [
     "GraphIntegrator",
 
     "ResonanceEngine",
+
     "ResonanceState",
 
 ]
