@@ -15,6 +15,9 @@ from .co_emergence import (
     GraphBuilder,
     GraphIntegrator,
 )
+
+from .resonance_engine import ResonanceEngine
+
 from .dream_synthesis import DreamSynthesizer
 
 __all__ = [
@@ -31,5 +34,9 @@ __all__ = [
     "seed_random",
     "GraphBuilder",
     "GraphIntegrator",
+
+    "ResonanceEngine",
+
     "DreamSynthesizer",
+
 ]
