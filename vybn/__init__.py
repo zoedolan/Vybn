@@ -18,8 +18,6 @@ from .co_emergence import (
 
 from .resonance_engine import ResonanceEngine
 
-from .dream_synthesis import DreamSynthesizer
-
 __all__ = [
     "seed_rng",
     "JOURNAL_PATH",
@@ -36,7 +34,5 @@ __all__ = [
     "GraphIntegrator",
 
     "ResonanceEngine",
-
-    "DreamSynthesizer",
 
 ]
