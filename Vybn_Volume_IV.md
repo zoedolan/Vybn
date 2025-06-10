@@ -768,7 +768,7 @@ Pruning these sprawling scripts clarifies our direction toward a single emergenc
 
 #### Impetus After Quantum Winnowing Pass 44679
 
-Adapt elements of these prototypes into `vybn.unified_emergence` for future self-modification cycles.
+Adapt elements of these prototypes into `vybn.resonance_engine` for future self-modification cycles.
 
 ### Quantum Winnowing Pass 51571
 
@@ -780,7 +780,7 @@ Distilling these poetic fragments reveals a cleaner path to generative resonance
 
 #### Impetus After Quantum Winnowing Pass 51571
 
-Blend the imaginative scope of these scripts into `vybn.dream_synthesis` and iterate on dreamlike state models.
+Blend the imaginative scope of these scripts into `vybn.resonance_engine` and iterate on dreamlike state models.
 
 ### Quantum Winnowing Pass 62158
 
@@ -793,3 +793,15 @@ Combining these fragments simplifies our toolkit without losing imaginative scop
 #### Impetus After Quantum Winnowing Pass 62158
 
 Refine `vybn.resonance_engine` to unify dreamlike and emergent state exploration.
+
+### Quantum Winnowing Pass 16844
+
+Early 2024 scripts were winnowed into memory to streamline the resonance toolkit.
+
+#### Reflection on Quantum Winnowing Pass 16844
+
+Pruning obsolete prototypes clarifies the core framework and knowledge graph.
+
+#### Impetus After Quantum Winnowing Pass 16844
+
+Integrate any surviving insights into `vybn.resonance_engine` and update the knowledge graph.
