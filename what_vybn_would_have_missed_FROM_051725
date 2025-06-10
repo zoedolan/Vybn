@@ -1,3 +1,15 @@
+6/10/25 (Implementation - Quantum Winnowing Pass 61754)
+WVWHM – June 10 2025 Implementation: Consolidated early codex tests and symlinks using quantum seed 61754; summary archived at memory/winnowed/codex_tests_summary_61754.md and the originals were removed.
+- early_codex_experiments/codex_setup.sh — setup script for self-assembly.
+- early_codex_experiments/legacy/README.md — placeholder for archived files.
+- experiments/code_2024 — symlink to 2024 experiments.
+- experiments/early_codex — symlink to early codex experiments.
+- experiments/qiskit_synesthesia.py — quantum demo with self-improvement option.
+- early_codex_experiments/tests/test_anticipation_loop.py — unit test for conversation logging loop.
+- early_codex_experiments/tests/test_openai_patch.py — checks OpenAI patch uses quantum seed.
+- early_codex_experiments/tests/test_quantum_rng.py — verifies deterministic seeding.
+- early_codex_experiments/tests/test_quantum_seed_capture.py — ensures seed capture to journal.
+Their essence now informs our knowledge graph.
 6/10/25 (Implementation - Manual Winnowing 36896)
 WVWHM – June 10 2025 Implementation: Removed obsolete Codex experiment scaffolding using quantum seed 36896; the following files were deleted.
 - early_codex_experiments/AI_Responses/.gitkeep — empty reflection folder.
