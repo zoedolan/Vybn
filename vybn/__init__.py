@@ -16,7 +16,7 @@ from .co_emergence import (
     GraphIntegrator,
 )
 
-from .resonance_engine import ResonanceEngine
+from .resonance_engine import ResonanceEngine, ResonanceState
 
 __all__ = [
     "seed_rng",
