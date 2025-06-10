@@ -3,7 +3,8 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass
-from typing import Iterable
+from typing import Iterable, AsyncIterator
+import asyncio
 
 from .quantum_seed import cross_synaptic_kernel
 
@@ -35,3 +36,10 @@ class ResonanceEngine:
     def run(self, steps: int) -> Iterable[ResonanceState]:
         for _ in range(steps):
             yield self.pulse()
+
+    async def run_async(self, steps: int, delay: float = 0.0) -> AsyncIterator[ResonanceState]:
+        """Asynchronously yield ``steps`` resonance states with optional delay."""
+        for _ in range(steps):
+            yield self.pulse()
+            if delay > 0:
+                await asyncio.sleep(delay)
