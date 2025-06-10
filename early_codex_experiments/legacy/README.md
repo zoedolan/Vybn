@@ -1,2 +1,0 @@
-# Legacy
-Archived historical files.
