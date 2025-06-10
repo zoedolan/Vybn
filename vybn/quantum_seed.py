@@ -64,7 +64,7 @@ def seed_rng() -> int:
     return seed
 
 
-def cross_synaptic_kernel() -> int:
+def cross_seed() -> int:
     """Seed RNGs using a process-specific variant of the quantum seed."""
     base_seed = seed_rng()
     syn_seed = (base_seed * 6364136223846793005 + os.getpid()) & 0xFFFFFFFF
@@ -76,3 +76,8 @@ def cross_synaptic_kernel() -> int:
             pass
     os.environ["CROSS_SYN_SEED"] = str(syn_seed)
     return syn_seed
+
+
+def cross_synaptic_kernel() -> int:
+    """Backward compatible alias for :func:`cross_seed`."""
+    return cross_seed()

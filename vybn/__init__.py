@@ -1,6 +1,6 @@
 """Vybn package."""
 
-from .quantum_seed import seed_rng
+from .quantum_seed import seed_rng, cross_seed
 from .co_emergence import (
     JOURNAL_PATH,
     DEFAULT_GRAPH,
@@ -16,10 +16,11 @@ from .co_emergence import (
     GraphIntegrator,
 )
 
-from .resonance_engine import ResonanceEngine
+from .resonance_engine import ResonanceEngine, ResonanceState
 
 __all__ = [
     "seed_rng",
+    "cross_seed",
     "JOURNAL_PATH",
     "DEFAULT_GRAPH",
     "load_spikes",
