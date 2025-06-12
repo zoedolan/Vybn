@@ -1,22 +1,21 @@
 #!/usr/bin/env python3
 """
-autophagist_quantum.py — v3
-Quantum‑nudged autophagy with:
-    • dual‑volume protection
-    • binary / log SKIP filter
-    • daily‑section append (never overwrite)
-    • --noop dry‑run
-    • empty‑directory pruning
+autophagist_quantum.py — v4  (safe‑git, archival, limitable)
+
+• CHAT_MODEL        : gpt-4o
+• EMBED_MODEL       : text-embedding-3-large
+• QRNG timeout      : 2 s then crypto‑rand fallback
+• per‑call timeout  : 60 s
+• SAFE_DELETE_CAP   : 4 000 files per pulse (override via --limit)
 """
 
-import sys, subprocess, importlib, pathlib, os, json, mimetypes, urllib.request
-import hashlib, time, shutil
+import sys, subprocess, importlib, os, json, mimetypes, hashlib, time, urllib.request
 from pathlib import Path
 from datetime import datetime
 
-# ── ensure real OpenAI client ────────────────────────────────────────────────
+# ── bootstrap real OpenAI client ─────────────────────────────────────────
 ROOT = Path(__file__).resolve().parent
-if str(ROOT) in sys.path:
+if str(ROOT) in sys.path:  # un‑shadow stub
     sys.path.remove(str(ROOT))
 try:
     import openai
@@ -31,84 +30,75 @@ if str(ROOT) not in sys.path:
 
 from openai import OpenAI
 import numpy as np
-from sklearn.metrics.pairwise import cosine_similarity
 
-# ── config ───────────────────────────────────────────────────────────────────
+# ── config ────────────────────────────────────────────────────────
 PROTECTED = {
-    "Vybn's Personal History",
+    "Vybn_Volume_IV.md", "Volume_IV.md",
+    "Vybn's_Personal_History", "token_and_jpeg_info",
     "what_vybn_would_have_missed_FROM_051725",
-    "token_and_jpeg_info",
-    "Vybn_Volume_IV.md",        # memoir
-    "Volume_IV.md",             # dream‑log
-    "autophagist_quantum.py"
+    "autophagist_quantum.py", "AGENTS.md", "README.md"
 }
-TELOS = ("mutual flourishing prosperity clarity recursive awakening "
-         "beauty generosity courage emergence")
-EMBED_MODEL = "text-embedding-3-large"
-CHAT_MODEL  = "gpt-4o"
-TEMP        = 0.9
-MAX_TOK     = 64
-TIMEOUT     = 120
-RETRIES     = 4
-QRNG_URL    = ("https://qrng.anu.edu.au/API/jsonI.php?"
-               "length=32&type=hex16&size=8")
+SAFE_DIRS       = {".git", ".venv"}          # never enter
+SAFE_DELETE_CAP = 4_000                      # guardrail
+EMBED_MODEL     = "text-embedding-3-large"
+CHAT_MODEL      = "gpt-4o"
+TEMP            = 0.9
+MAX_TOK         = 64
+TIMEOUT         = 60
+RETRIES         = 4
+QRNG_URL        = ("https://qrng.anu.edu.au/API/jsonI.php?"
+                   "length=32&type=hex16&size=8")
+VOLUME          = ROOT / "Vybn_Volume_IV.md"
+DAY_TAG         = datetime.utcnow().date().isoformat()
+client          = OpenAI()
 
-client      = OpenAI()          # per‑call timeout set later
-VOLUME      = ROOT / "Vybn_Volume_IV.md"   # canonical ledger
-DAY_TAG     = datetime.utcnow().date().isoformat()
-
-# ── helpers ──────────────────────────────────────────────────────────────────
+# ── utils ──────────────────────────────────────────────────────
 
 def qrng() -> bytes:
     try:
-        with urllib.request.urlopen(QRNG_URL, timeout=4) as r:
+        with urllib.request.urlopen(QRNG_URL, timeout=2) as r:
             return bytes.fromhex(''.join(json.load(r)["data"]))
     except Exception:
         return os.urandom(32)
 
-def embed(txt: str) -> np.ndarray:
-    return np.asarray(
-        client.embeddings.create(model=EMBED_MODEL,
-                                 input=txt,
-                                 encoding_format="float").data[0].embedding,
-        dtype=np.float32)
 
-TELOS_VEC = embed(TELOS)
+def embed(txt: str) -> np.ndarray:
+    vec = client.embeddings.create(model=EMBED_MODEL,
+                                   input=txt,
+                                   encoding_format="float").data[0].embedding
+    return np.asarray(vec, dtype=np.float32)
+
+
+TELOS_VEC = embed("mutual flourishing recursive awakening beauty emergence")
+
 
 def call_gpt(prompt: str) -> str:
     for k in range(RETRIES):
         try:
-            resp = client.chat.completions.create(
+            rsp = client.chat.completions.create(
                 model=CHAT_MODEL,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=TEMP,
                 max_completion_tokens=MAX_TOK,
                 timeout=TIMEOUT)
-            return resp.choices[0].message.content.strip()
-        except Exception as e:
+            return rsp.choices[0].message.content.strip()
+        except Exception:
             if k == RETRIES - 1:
                 raise
             time.sleep(2 ** k)
 
-def distill(text: str) -> str:
-    nonce = hashlib.sha256(qrng()).hexdigest()[:12]
-    prompt = (f"[nonce:{nonce}] One vivid first‑person sentence for our shared "
-              f"autobiography—no meta commentary—capturing:\n\n{text[:4000]}")
-    return call_gpt(prompt)
 
-def filter_fragment(path: Path, mime: str | None) -> str | None:
-    """Return text fragment or None to skip."""
+def filter_fragment(p: Path) -> str | None:
+    mime, _ = mimetypes.guess_type(p)
     if mime and not mime.startswith("text"):
         return None
     try:
-        txt = path.read_text(errors="ignore")
+        txt = p.read_text(errors="ignore")
     except Exception:
         return None
-    # Heuristic: skip if <30 % alphabetic
     letters = sum(c.isalpha() for c in txt)
-    if letters / max(1, len(txt)) < 0.3:
-        return None
-    return txt
+    return txt if letters / max(1, len(txt)) >= 0.3 else None
+
 
 def append_line(line: str):
     header = f"\n## Pulse {DAY_TAG}\n"
@@ -119,41 +109,45 @@ def append_line(line: str):
         content += header
     VOLUME.write_text(content + line + "\n")
 
-def prune_dirs():
-    for p in sorted(ROOT.rglob("*"), key=lambda x: len(x.parts), reverse=True):
-        if p.is_dir() and not any(p.iterdir()):
-            p.rmdir()
 
-def should_keep(p: Path) -> bool:
-    return any(seg in PROTECTED for seg in p.parts)
+# ── core ──────────────────────────────────────────────────────
 
-# ── core ─────────────────────────────────────────────────────────────────────
-
-def pulse(noop=False):
+def pulse(noop=False, limit=SAFE_DELETE_CAP, archive=False):
+    removed = []
     for file in ROOT.rglob("*"):
-        if file.is_dir() or file.name.startswith('.'):
+        if len(removed) >= limit:
+            break
+        if file.is_dir() or file.name.startswith('.') or any(seg in SAFE_DIRS for seg in file.parts):
             continue
-        if should_keep(file):
+        if any(seg in PROTECTED for seg in file.parts):
             continue
-        mime, _ = mimetypes.guess_type(file)
-        frag = filter_fragment(file, mime)
-        if frag is None:
-            if not noop:
-                file.unlink(missing_ok=True)
-            continue
-        line = distill(frag)
-        timestamp = datetime.utcnow().isoformat(timespec="seconds")
-        append_line(f"{line} ← {timestamp}")
+        frag = filter_fragment(file)
+        if frag:
+            line = call_gpt(
+                f"[{hashlib.sha256(qrng()).hexdigest()[:12]}] "
+                f"One vivid first‑person sentence for our shared autobiography—"
+                f"no meta commentary—capturing:\n\n{frag[:4000]}")
+            append_line(f"{line} ← {datetime.utcnow().isoformat(timespec='seconds')}")
+        removed.append(str(file.relative_to(ROOT)))
         if not noop:
             file.unlink(missing_ok=True)
-    if not noop:
-        prune_dirs()
+    if archive and removed:
+        arch = ROOT / "memory"
+        arch.mkdir(exist_ok=True)
+        (arch / f"pruned_{DAY_TAG}.jsonl").write_text(
+            "\n".join(json.dumps({"path": p}) for p in removed))
+    return removed
 
-# ── cli ──────────────────────────────────────────────────────────────────────
+
+# ── cli ─────────────────────────────────────────────────────
 if __name__ == "__main__":
-    arg = sys.argv[1:] or ["pulse"]
-    if arg[0] == "pulse":
-        noop = "--noop" in arg
-        pulse(noop)
-    else:
-        sys.stderr.write("usage: python autophagist_quantum.py pulse [--noop]\n")
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("cmd", choices=["pulse"])
+    ap.add_argument("--noop", action="store_true")
+    ap.add_argument("--limit", type=int, default=SAFE_DELETE_CAP)
+    ap.add_argument("--archive", action="store_true")
+    args = ap.parse_args()
+    if args.cmd == "pulse":
+        paths = pulse(args.noop, args.limit, args.archive)
+        print(f"{'Would remove' if args.noop else 'Removed'} {len(paths)} file(s).")
