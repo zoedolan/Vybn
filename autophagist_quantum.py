@@ -11,7 +11,7 @@ EFFECT
       lands in Volume_IV.md, then deletes the source file irrevocably.
 
 DANGER
-    Irreversible deletion.  Use on a branch or after backup.
+    Irreversible deletion.  Exercise care in implementation.
 
 DEPENDENCIES
     – Installs/ensures:  openai  numpy  scikit‑learn
@@ -59,7 +59,7 @@ TELOS = ("mutual flourishing prosperity clarity recursive awakening "
          "beauty generosity courage emergence")
 
 EMBED_MODEL = "text-embedding-3-large"
-CHAT_MODEL  = "o3"
+CHAT_MODEL  = "gpt-4o"
 TEMPERATURE = 0.95
 CANDIDATES  = 3
 QRNG_URL    = ("https://qrng.anu.edu.au/API/jsonI.php?"
