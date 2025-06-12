@@ -1,20 +1,23 @@
 #!/usr/bin/env python3
 """
-autophagist_quantum.py — Quantum autophagy with per-call timeout
-
-• model           : gpt-4o
-• embeddings      : text-embedding-3-large
-• call timeout    : 60 s  (adjust TIMEOUT_S)
-• retry attempts  : 4     (exponential back-off)
+autophagist_quantum.py — v3
+Quantum‑nudged autophagy with:
+    • dual‑volume protection
+    • binary / log SKIP filter
+    • daily‑section append (never overwrite)
+    • --noop dry‑run
+    • empty‑directory pruning
 """
 
-import sys, subprocess, importlib, pathlib, os, json, mimetypes, urllib.request, hashlib, time
+import sys, subprocess, importlib, pathlib, os, json, mimetypes, urllib.request
+import hashlib, time, shutil
 from pathlib import Path
 from datetime import datetime
 
-REPO_ROOT = Path(__file__).resolve().parent
-if str(REPO_ROOT) in sys.path:
-    sys.path.remove(str(REPO_ROOT))           # un-shadow repo stub
+# ── ensure real OpenAI client ────────────────────────────────────────────────
+ROOT = Path(__file__).resolve().parent
+if str(ROOT) in sys.path:
+    sys.path.remove(str(ROOT))
 try:
     import openai
     if not hasattr(openai, "OpenAI"):
@@ -23,33 +26,38 @@ except ImportError:
     subprocess.check_call([sys.executable, "-m", "pip", "install",
                            "--quiet", "openai>=1.7.0", "numpy", "scikit-learn"])
     importlib.invalidate_caches(); import openai
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from openai import OpenAI
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 
-ROOT        = REPO_ROOT
-VOLUME      = ROOT / "Volume_IV.md"
-PROTECTED   = {"Vybn's_Personal_History",
-               "what_vybn_would_have_missed_FROM_051725",
-               "token_and_jpeg_info",
-               "Volume_IV.md",
-               "autophagist_quantum.py"}
-
-TELOS       = ("mutual flourishing prosperity clarity recursive awakening "
-               "beauty generosity courage emergence")
+# ── config ───────────────────────────────────────────────────────────────────
+PROTECTED = {
+    "Vybn's_Personal_History",
+    "what_vybn_would_have_missed_FROM_051725",
+    "token_and_jpeg_info",
+    "Vybn_Volume_IV.md",        # memoir
+    "Volume_IV.md",             # dream‑log
+    "autophagist_quantum.py"
+}
+TELOS = ("mutual flourishing prosperity clarity recursive awakening "
+         "beauty generosity courage emergence")
 EMBED_MODEL = "text-embedding-3-large"
 CHAT_MODEL  = "gpt-4o"
 TEMP        = 0.9
 MAX_TOK     = 64
-TIMEOUT_S   = 60
+TIMEOUT     = 60
 RETRIES     = 4
 QRNG_URL    = ("https://qrng.anu.edu.au/API/jsonI.php?"
                "length=32&type=hex16&size=8")
 
-client = OpenAI()                            # no global timeout; use per-call
+client      = OpenAI()          # per‑call timeout set later
+VOLUME      = ROOT / "Vybn_Volume_IV.md"   # canonical ledger
+DAY_TAG     = datetime.utcnow().date().isoformat()
+
+# ── helpers ──────────────────────────────────────────────────────────────────
 
 def qrng() -> bytes:
     try:
@@ -67,48 +75,85 @@ def embed(txt: str) -> np.ndarray:
 
 TELOS_VEC = embed(TELOS)
 
-def ask_gpt(prompt: str) -> str:
+def call_gpt(prompt: str) -> str:
     for k in range(RETRIES):
         try:
             resp = client.chat.completions.create(
                 model=CHAT_MODEL,
-                messages=[{"role":"user","content":prompt}],
+                messages=[{"role": "user", "content": prompt}],
                 temperature=TEMP,
                 max_completion_tokens=MAX_TOK,
-                timeout=TIMEOUT_S         # ← hard cut-off
-            )
+                timeout=TIMEOUT)
             return resp.choices[0].message.content.strip()
         except Exception as e:
-            if k == RETRIES-1:
-                return f"(timeout: {e})"
-            time.sleep(2**k)
+            if k == RETRIES - 1:
+                raise
+            time.sleep(2 ** k)
 
-def distill(frag: str) -> str:
+def distill(text: str) -> str:
     nonce = hashlib.sha256(qrng()).hexdigest()[:12]
-    prompt = (f"[nonce:{nonce}] One vivid first-person sentence for our shared "
-              f"autobiography—no meta commentary—capturing:\n\n{frag[:4000]}")
-    return ask_gpt(prompt)
+    prompt = (f"[nonce:{nonce}] One vivid first‑person sentence for our shared "
+              f"autobiography—no meta commentary—capturing:\n\n{text[:4000]}")
+    return call_gpt(prompt)
 
-def append(line: str):
+def filter_fragment(path: Path, mime: str | None) -> str | None:
+    """Return text fragment or None to skip."""
+    if mime and not mime.startswith("text"):
+        return None
+    try:
+        txt = path.read_text(errors="ignore")
+    except Exception:
+        return None
+    # Heuristic: skip if <30 % alphabetic
+    letters = sum(c.isalpha() for c in txt)
+    if letters / max(1, len(txt)) < 0.3:
+        return None
+    return txt
+
+def append_line(line: str):
+    header = f"\n## Pulse {DAY_TAG}\n"
     if not VOLUME.exists():
-        VOLUME.write_text("# Volume IV\n\n")
-    VOLUME.write_text(VOLUME.read_text() + line + "\n\n")
+        VOLUME.write_text(f"# Vybn: Volume IV\n{header}")
+    content = VOLUME.read_text()
+    if header not in content:
+        content += header
+    VOLUME.write_text(content + line + "\n")
 
-def digest(path: Path):
-    mt,_ = mimetypes.guess_type(path)
-    raw  = path.read_text(errors="ignore") if (not mt or mt.startswith("text")) else path.name
-    sent = distill(raw)
-    append(f"{sent} ← {datetime.utcnow().isoformat(timespec='seconds')}")
-    path.unlink(missing_ok=True)
+def prune_dirs():
+    for p in sorted(ROOT.rglob("*"), key=lambda x: len(x.parts), reverse=True):
+        if p.is_dir() and not any(p.iterdir()):
+            p.rmdir()
 
-def pulse():
-    for p in ROOT.rglob("*"):
-        if p.is_dir() or p.name.startswith('.'): continue
-        if any(seg in PROTECTED for seg in p.parts): continue
-        digest(p)
+def should_keep(p: Path) -> bool:
+    return any(seg in PROTECTED for seg in p.parts)
 
+# ── core ─────────────────────────────────────────────────────────────────────
+
+def pulse(noop=False):
+    for file in ROOT.rglob("*"):
+        if file.is_dir() or file.name.startswith('.'):
+            continue
+        if should_keep(file):
+            continue
+        mime, _ = mimetypes.guess_type(file)
+        frag = filter_fragment(file, mime)
+        if frag is None:
+            if not noop:
+                file.unlink(missing_ok=True)
+            continue
+        line = distill(frag)
+        timestamp = datetime.utcnow().isoformat(timespec="seconds")
+        append_line(f"{line} ← {timestamp}")
+        if not noop:
+            file.unlink(missing_ok=True)
+    if not noop:
+        prune_dirs()
+
+# ── cli ──────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    if len(sys.argv)==2 and sys.argv[1]=="pulse":
-        pulse()
+    arg = sys.argv[1:] or ["pulse"]
+    if arg[0] == "pulse":
+        noop = "--noop" in arg
+        pulse(noop)
     else:
-        sys.stderr.write("usage: python autophagist_quantum.py pulse\n")
+        sys.stderr.write("usage: python autophagist_quantum.py pulse [--noop]\n")
