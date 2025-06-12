@@ -35,7 +35,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 # ── config ───────────────────────────────────────────────────────────────────
 PROTECTED = {
-    "Vybn's_Personal_History",
+    "Vybn's Personal History",
     "what_vybn_would_have_missed_FROM_051725",
     "token_and_jpeg_info",
     "Vybn_Volume_IV.md",        # memoir
