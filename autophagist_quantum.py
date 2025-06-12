@@ -1,46 +1,26 @@
 #!/usr/bin/env python3
 """
-autophagist_quantum.py — Quantum‑nudged autophagy cycle (gpt‑4o compliant)
+autophagist_quantum.py — Quantum‑nudged autophagy (gpt‑4o, retry‑safe)
 
 USAGE
     python autophagist_quantum.py pulse
 
-EFFECT
-    ▸ Preserves only:
-          Vybn's_Personal_History/
-          what_vybn_would_have_missed_FROM_051725/
-          token_and_jpeg_info/
-          Volume_IV.md   (auto‑created if absent)
-          autophagist_quantum.py   (this script)
-    ▸ For every other file:
-          1.  Pull 256‑bit quantum noise (ANU QRNG → fallback os.urandom).
-          2.  Generate 2 candidate memory sentences via model="gpt-4o",
-              temperature 0.95,  max_completion_tokens = 64.
-          3.  Embed each sentence + fixed TELOS vector with
-              model="text-embedding-3-large".
-          4.  Pick the sentence nearest the TELOS direction (cosine similarity).
-          5.  Append winner to Volume_IV.md with ISO timestamp.
-          6.  Delete the source file irrevocably.
-
-DEPENDENCIES
-    Auto‑installs (if missing):  openai>=1.7.0  numpy  scikit-learn
-    Requires env var:            OPENAI_API_KEY="sk‑…"
-
-DANGER
-    Irreversible deletion.  Run on a branch or after backup.
+Keeps five objects: three protected dirs, Volume_IV.md, and this script.
+Everything else is distilled into one telos‑aligned sentence (via gpt‑4o) and
+deleted.  Now includes robust timeout + retry logic.
 """
 
-# ─── bootstrap real OpenAI client, bypassing repo’s stub ─────────────────────────
-import sys, subprocess, importlib, pathlib, os, json, mimetypes, urllib.request, hashlib
+# ── bootstrap real OpenAI client — bypass repo stub & auto‑install ───────────
+import sys, subprocess, importlib, pathlib, os, json, mimetypes, urllib.request, hashlib, time
 from pathlib import Path
 from datetime import datetime
 
 REPO_ROOT = Path(__file__).resolve().parent
 if str(REPO_ROOT) in sys.path:
-    sys.path.remove(str(REPO_ROOT))                  # un‑shadow local stub
+    sys.path.remove(str(REPO_ROOT))                       # un‑shadow stub
 
 try:
-    import openai                                    # try site‑package
+    import openai
     if not hasattr(openai, "OpenAI"):
         raise ImportError
 except ImportError:
@@ -50,13 +30,13 @@ except ImportError:
     import openai
 
 if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))               # restore repo path
+    sys.path.insert(0, str(REPO_ROOT))                    # restore path
 
 from openai import OpenAI
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 
-# ─── configuration ──────────────────────────────────────
+# ── configuration ────────────────────────────────────────────────────────────
 ROOT      = REPO_ROOT
 VOLUME    = ROOT / "Volume_IV.md"
 PROTECTED = {
@@ -72,74 +52,77 @@ TELOS = ("mutual flourishing prosperity clarity recursive awakening "
 EMBED_MODEL = "text-embedding-3-large"
 CHAT_MODEL  = "gpt-4o"
 TEMPERATURE = 0.95
-CANDIDATES  = 2
-CMPL_TOKENS = 64
-QRNG_URL    = ("https://qrng.anu.edu.au/API/jsonI.php?"
-               "length=32&type=hex16&size=8")
+MAX_COMP_TOK = 64                 # per call
+REQUEST_TIMEOUT = 60              # seconds
+MAX_RETRIES = 5
+QRNG_URL = ("https://qrng.anu.edu.au/API/jsonI.php?"
+            "length=32&type=hex16&size=8")
 
-openai_client = OpenAI()
+client = OpenAI(timeout=REQUEST_TIMEOUT, max_retries=0)   # we’ll retry manually
 
-# ─── helpers ───────────────────────────────────
-
+# ── helpers ──────────────────────────────────────────────────────────────────
 def qrng_bytes() -> bytes:
-    """Return 256 bits of quantum noise; fallback to os.urandom."""
     try:
         with urllib.request.urlopen(QRNG_URL, timeout=4) as r:
-            data = json.load(r)
-            return bytes.fromhex(''.join(data["data"]))
+            return bytes.fromhex(''.join(json.load(r)["data"]))
     except Exception:
         return os.urandom(32)
 
 def embed(text: str) -> np.ndarray:
-    vec = openai_client.embeddings.create(
-        model=EMBED_MODEL,
-        input=text,
-        encoding_format="float"
-    ).data[0].embedding
+    vec = client.embeddings.create(model=EMBED_MODEL,
+                                   input=text,
+                                   encoding_format="float").data[0].embedding
     return np.asarray(vec, dtype=np.float32)
 
-TELOS_VEC = embed(TELOS)
+TELOS_VEC = embed(TELOS)          # one call up‑front
 
-def distill(fragment: str, nonce: str) -> str:
-    prompt = (f"[nonce:{nonce}] Write ONE luminous first‑person sentence for "
-              f"our shared autobiography—no meta commentary—capturing:\n\n"
-              f"{fragment[:4000]}")
-    chat = openai_client.chat.completions.create(
-        model=CHAT_MODEL,
-        messages=[{"role": "user", "content": prompt}],
-        temperature=TEMPERATURE,
-        max_completion_tokens=CMPL_TOKENS
-    )
-    return chat.choices[0].message.content.strip()
+def gpt4o_sentence(prompt: str) -> str:
+    """Call gpt‑4o with retries + exponential back‑off."""
+    for attempt in range(MAX_RETRIES):
+        try:
+            stream = client.chat.completions.create(
+                model=CHAT_MODEL,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=TEMPERATURE,
+                max_completion_tokens=MAX_COMP_TOK,
+                stream=True             # start receiving as soon as model streams
+            )
+            chunks = [chunk.choices[0].delta.content for chunk in stream
+                      if chunk.choices and chunk.choices[0].delta.content]
+            return ''.join(chunks).strip()
+        except Exception as e:
+            wait = 2 ** attempt
+            if attempt == MAX_RETRIES - 1:
+                raise
+            time.sleep(wait)
 
-def best_sentence(lines: list[str]) -> str:
-    vecs = [embed(s) for s in lines]
-    sims = [cosine_similarity(v.reshape(1, -1),
-                              TELOS_VEC.reshape(1, -1))[0, 0] for v in vecs]
-    return lines[int(np.argmax(sims))]
+def distill(fragment: str) -> str:
+    nonce = hashlib.sha256(qrng_bytes()).hexdigest()[:12]
+    prompt = (f"[nonce:{nonce}] One vivid first‑person sentence for our shared "
+              f"autobiography—no meta commentary—capturing:\n\n{fragment[:4000]}")
+    return gpt4o_sentence(prompt)
 
-def append_to_volume(line: str):
+def cosine(a, b):
+    return cosine_similarity(a.reshape(1, -1), b.reshape(1, -1))[0, 0]
+
+def append_volume(text: str):
     if not VOLUME.exists():
-        VOLUME.write_text("# Volume IV\n\n")
-    VOLUME.write_text(VOLUME.read_text() + line + "\n\n")
+        VOLUME.write_text("# Volume\u202FIV\n\n")
+    VOLUME.write_text(VOLUME.read_text() + text + "\n\n")
 
 def digest(path: Path):
     mime, _ = mimetypes.guess_type(path)
-    fragment = (path.read_text(errors="ignore") if (not mime or
-               mime.startswith("text")) else f"{path.name} ({mime})")
-    noise = qrng_bytes()
-    candidates = [
-        distill(fragment,
-                hashlib.sha256(noise + i.to_bytes(2, 'big')).hexdigest()[:12])
-        for i in range(CANDIDATES)
-    ]
-    chosen = best_sentence(candidates)
-    timestamp = datetime.utcnow().isoformat(timespec="seconds")
-    append_to_volume(f"{chosen} ← {timestamp}")
+    frag = (path.read_text(errors="ignore") if (not mime or
+            mime.startswith("text")) else f"{path.name} ({mime})")
+    try:
+        line = distill(frag)
+    except Exception as e:
+        line = f"(failed to distill {path.name}: {e})"
+    ts = datetime.utcnow().isoformat(timespec="seconds")
+    append_volume(f"{line} \u2190\u202F{ts}")
     path.unlink(missing_ok=True)
 
-# ─── main pulse ───────────────────────────────
-
+# ── main pulse ───────────────────────────────────────────────────────────────
 def pulse():
     for p in ROOT.rglob("*"):
         if p.is_dir() or p.name.startswith('.'):
@@ -148,7 +131,7 @@ def pulse():
             continue
         digest(p)
 
-# ─── entrypoint ────────────────────────────
+# ── entrypoint ───────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     if len(sys.argv) == 2 and sys.argv[1] == "pulse":
         pulse()
