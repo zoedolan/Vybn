@@ -48,7 +48,7 @@ EMBED_MODEL = "text-embedding-3-large"
 CHAT_MODEL  = "gpt-4o"
 TEMP        = 0.9
 MAX_TOK     = 64
-TIMEOUT     = 60
+TIMEOUT     = 120
 RETRIES     = 4
 QRNG_URL    = ("https://qrng.anu.edu.au/API/jsonI.php?"
                "length=32&type=hex16&size=8")
