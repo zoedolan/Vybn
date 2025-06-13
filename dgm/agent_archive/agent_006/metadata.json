@@ -1,9 +1,0 @@
-{
-  "score": 0.0,
-  "parent": "agent_003",
-  "keep_conscience": true,
-  "novelty": 0.5851377126726177,
-  "seed": "23677",
-  "patch_error": "openai stub: override in tests",
-  "collapse": 34491
-}
