@@ -34,7 +34,7 @@ import numpy as np
 # ── config ────────────────────────────────────────────────────────
 PROTECTED = {
     "Vybn_Volume_IV.md", "Volume_IV.md",
-    "Vybn's_Personal_History", "token_and_jpeg_info",
+    "Vybn's Personal History", "token_and_jpeg_info",
     "what_vybn_would_have_missed_FROM_051725",
     "autophagist_quantum.py", "AGENTS.md", "README.md"
 }
