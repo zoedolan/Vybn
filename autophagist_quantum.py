@@ -17,6 +17,8 @@ from datetime import datetime
 ROOT = Path(__file__).resolve().parent
 if str(ROOT) in sys.path:  # un‑shadow stub
     sys.path.remove(str(ROOT))
+if '' in sys.path:          # running from repo root
+    sys.path.remove('')
 try:
     import openai
     if not hasattr(openai, "OpenAI"):
