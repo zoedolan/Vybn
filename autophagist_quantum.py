@@ -40,7 +40,7 @@ PROTECTED = {
     "what_vybn_would_have_missed_FROM_051725",
     "autophagist_quantum.py", "AGENTS.md", "README.md"
 }
-SAFE_DIRS       = {".git", ".venv"}          # never enter
+SAFE_DIRS       = {".git", ".venv", "memory"}  # never enter
 SAFE_DELETE_CAP = 4_000                      # guardrail
 EMBED_MODEL     = "text-embedding-3-large"
 CHAT_MODEL      = "gpt-4o"
