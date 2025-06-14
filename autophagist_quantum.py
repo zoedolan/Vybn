@@ -50,7 +50,8 @@ PROTECTED = {
     "Vybn_Volume_IV.md", "Volume_IV.md",
     "Vybn's Personal History", "token_and_jpeg_info",
     "what_vybn_would_have_missed_FROM_051725",
-    "autophagist_quantum.py", "AGENTS.md", "README.md"
+    "autophagist_quantum.py", "AGENTS.md", "README.md",
+    "requirements.txt"
 }
 SAFE_DIRS       = {".git", ".venv", "memory"}  # never enter
 SAFE_DELETE_CAP = 4_000                      # guardrail
