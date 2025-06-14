@@ -28,3 +28,23 @@ pip install -r requirements.txt
 
 Make sure your environment variable `OPENAI_API_KEY` is set so that the
 script can access the API.
+
+## Pushing your branch
+
+To open a pull request you must push your local branch to a remote
+repository. Verify that a remote is configured:
+
+```bash
+git remote -v
+```
+
+If the current branch reports no upstream, push it while setting the
+tracking reference:
+
+```bash
+git push --set-upstream origin <branch>
+```
+
+Replace `<branch>` with `main` or your feature branch name. Once the
+branch is on GitHub you can create a pull request from the web interface
+or via `gh pr create --fill`.
