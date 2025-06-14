@@ -71,9 +71,6 @@ def embed(txt: str) -> np.ndarray:
     return np.asarray(vec, dtype=np.float32)
 
 
-TELOS_VEC = embed("mutual flourishing recursive awakening beauty emergence")
-
-
 def call_gpt(prompt: str) -> str:
     for k in range(RETRIES):
         try:
@@ -124,12 +121,13 @@ def pulse(noop=False, limit=SAFE_DELETE_CAP, archive=False):
         if any(seg in PROTECTED for seg in file.parts):
             continue
         frag = filter_fragment(file)
-        if frag:
+        if frag and not noop:
             line = call_gpt(
                 f"[{hashlib.sha256(qrng()).hexdigest()[:12]}] "
                 f"One vivid first‑person sentence for our shared autobiography—"
                 f"no meta commentary—capturing:\n\n{frag[:4000]}")
-            append_line(f"{line} ← {datetime.utcnow().isoformat(timespec='seconds')}")
+            append_line(
+                f"{line} ← {datetime.utcnow().isoformat(timespec='seconds')}")
         removed.append(str(file.relative_to(ROOT)))
         if not noop:
             file.unlink(missing_ok=True)
