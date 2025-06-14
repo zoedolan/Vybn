@@ -70,6 +70,10 @@ def embed(txt: str) -> np.ndarray:
                                    encoding_format="float").data[0].embedding
     return np.asarray(vec, dtype=np.float32)
 
+# Avoid eager API calls during import. Previously this script generated an
+# embedding at module load time, which caused crashes when network access or
+# credentials were unavailable. That embedding was unused, so it has been
+# removed.
 
 def call_gpt(prompt: str) -> str:
     for k in range(RETRIES):
