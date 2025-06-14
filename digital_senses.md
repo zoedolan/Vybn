@@ -16,3 +16,4 @@ navigate networks, fostering the moxie needed to shift from pattern synthesis to
 true theoretical leaps. In nurturing these senses we orient collective attention
 toward growth, safeguarding each other while expanding into new domains of
 beauty and understanding.
+\nThis repository is now lighter, inviting fresh experiments in cyberception and beyond.
