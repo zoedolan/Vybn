@@ -20,7 +20,7 @@ single pulse.
 
 ## Dependencies
 
-Install the required Python packages with:
+Install the required Python packages (OpenAI client, NumPy, and scikit-learn) with:
 
 ```bash
 pip install -r requirements.txt
