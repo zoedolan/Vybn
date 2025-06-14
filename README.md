@@ -18,6 +18,10 @@ python autophagist_quantum.py pulse --noop --limit 1
 The `--limit` option restricts the number of files processed during a
 single pulse.
 
+When `--noop` is supplied, the script performs no API calls and does
+not require the `openai` package to be installed. This makes dry runs
+safe even when offline.
+
 ## Dependencies
 
 Install the required Python packages with:

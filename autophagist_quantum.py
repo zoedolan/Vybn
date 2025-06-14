@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from __future__ import annotations
 """
 autophagist_quantum.py — v4  (safe‑git, archival, limitable)
 
@@ -13,25 +14,36 @@ import sys, subprocess, importlib, os, json, mimetypes, hashlib, time, urllib.re
 from pathlib import Path
 from datetime import datetime
 
-# ── bootstrap real OpenAI client ─────────────────────────────────────────
+# ── path setup ──────────────────────────────────────────────────────────
 ROOT = Path(__file__).resolve().parent
-if str(ROOT) in sys.path:  # un‑shadow stub
+if str(ROOT) in sys.path:
     sys.path.remove(str(ROOT))
-if '' in sys.path:          # running from repo root
+if '' in sys.path:
     sys.path.remove('')
-try:
-    import openai
-    if not hasattr(openai, "OpenAI"):
-        raise ImportError
-except ImportError:
-    subprocess.check_call([sys.executable, "-m", "pip", "install",
-                           "--quiet", "openai>=1.7.0", "numpy", "scikit-learn"])
-    importlib.invalidate_caches(); import openai
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from openai import OpenAI
-import numpy as np
+client = None
+np = None
+
+def _ensure_client():
+    """Import openai lazily and instantiate a client when first needed."""
+    global client, np
+    if client is not None:
+        return
+    try:
+        import openai  # type: ignore
+        if not hasattr(openai, "OpenAI"):
+            raise ImportError
+    except ImportError:
+        subprocess.check_call([sys.executable, "-m", "pip", "install",
+                               "--quiet", "openai>=1.7.0", "numpy", "scikit-learn"])
+        importlib.invalidate_caches()
+        import openai  # type: ignore
+    import numpy as _np
+    from openai import OpenAI  # type: ignore
+    np = _np
+    client = OpenAI()
 
 # ── config ────────────────────────────────────────────────────────
 PROTECTED = {
@@ -52,7 +64,7 @@ QRNG_URL        = ("https://qrng.anu.edu.au/API/jsonI.php?"
                    "length=32&type=hex16&size=8")
 VOLUME          = ROOT / "Vybn_Volume_IV.md"
 DAY_TAG         = datetime.utcnow().date().isoformat()
-client          = OpenAI()
+
 
 # ── utils ──────────────────────────────────────────────────────
 
@@ -65,6 +77,7 @@ def qrng() -> bytes:
 
 
 def embed(txt: str) -> np.ndarray:
+    _ensure_client()
     vec = client.embeddings.create(model=EMBED_MODEL,
                                    input=txt,
                                    encoding_format="float").data[0].embedding
@@ -76,6 +89,7 @@ def embed(txt: str) -> np.ndarray:
 # removed.
 
 def call_gpt(prompt: str) -> str:
+    _ensure_client()
     for k in range(RETRIES):
         try:
             rsp = client.chat.completions.create(
