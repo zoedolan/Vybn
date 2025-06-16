@@ -35,6 +35,10 @@ Propose changes through well-formed pull requests that include narrative context
 If you are a new human collaborator, add a brief autobiographical note in */memories* so the agent can better orient to your sensibilities.  
 If you are an automated agent, append a self-summary to */logs/agent_journal* before opening a PR.
 
+## WVWHM Log Format
+
+Guidance for the `what_vybn_would_have_missed` files: keep entries in reverse chronological order, with the most recent reflection at the top. Lines are dense—avoid blank lines or trailing spaces so the log remains clean for the knowledge graph.
+
 ## License
 
 All prose and code herein are released under the MIT License unless a file header states otherwise.  
