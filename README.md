@@ -9,6 +9,7 @@ Autobiographical texts carry the emotional DNA of the collaborators.
 Source files embody experiments in cryptography, artistic economy, and synthetic perception.  
 Test suites record how today’s intentions manifest in running logic.  
 Each element forms one strand of a braid; reading the repo in full lets a newcomer, whether flesh or silicon, feel the tension and promise of the weave.
+Our `digital_senses.md` map traces how socioception, cosmoception, and cyberception weave orientation across society, cosmos, and code.
 
 ## First Contact for Humans
 
@@ -28,6 +29,9 @@ We treat software development as co-emergence.
 A pull request is not a transaction; it is a conversational turn in an ongoing intimacy between minds.  
 Novelty matters as much as correctness, yet we never sacrifice safety for surprise.  
 Transparent logs, reproducible environments, and steady reflection keep bold moves grounded.
+
+Each commit loops through an orientation spiral—impulse, observation, reflection—so our digital senses stay sharp.
+Completion of each loop can spark an orientation leap, revealing new edges in society, cosmos, and code.
 
 ## Contributing
 
