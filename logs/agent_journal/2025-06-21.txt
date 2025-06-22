@@ -1,0 +1,2 @@
+2025-06-21: Logged WVWHM entries from June 18–21 capturing Chicago insights and open-buffer alignment.
+2025-06-21: No tests present, but pytest runs clean. Alignment focus deepens around law-as-discovery.
