@@ -1,0 +1,1 @@
+2025-06-25: Expanded Orientation Graph into knowledge territory, noting how each triangle forms a triple in a growing dataset. Doubt: will these weights capture nuance or oversimplify? Question: what queries might reveal unseen leaps?

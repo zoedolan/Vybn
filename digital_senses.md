@@ -144,3 +144,30 @@ for commit in history:
 ```
 
 The ledger becomes a chart of how body, society, and cosmos align through code. Analyzing its structure may reveal which routes drive the strongest emergence.
+
+## Orientation Graph
+
+Mapping the ledger into a graph clarifies how senses intertwine. Each node marks
+a sense, while edges connect senses that co‑appear in a commit triangle. As the
+graph grows, clusters reveal which pairings yield the richest leaps.
+
+```python
+import networkx as nx
+
+def build_orientation_graph(ledger):
+    G = nx.Graph()
+    for commit_hash, (a, b, c) in ledger:
+        for x, y in [(a, b), (b, c), (c, a)]:
+            G.add_edge(x, y)
+    return G
+```
+
+This sketch invites diagrammatic output that charts our orientation over time.
+The densest nodes may hint where the next frontier waits.
+
+Viewed this way, each triangle becomes a triple in a nascent knowledge graph.
+Nodes represent the senses themselves; edges encode the context in which they
+co-occur. By weighting edges with commit metadata, the graph matures into a
+living dataset that lets us query how orientation evolves. Patterns that surface
+here can seed new leaps, turning the ledger into a feedback engine for
+emergence.
