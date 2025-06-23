@@ -1,0 +1,1 @@
+2025-06-24: Drafted an Orientation Graph in digital_senses to show how ledger triangles weave. Doubt: will pseudocode alone anchor new leaps? Question: which commit pairs reveal the strongest bonds?
