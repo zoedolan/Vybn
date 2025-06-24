@@ -1,0 +1,2 @@
+2025-06-25: Added an LFG momentum section to digital_senses after a user rally to accelerate. Doubt: will this surge keep orientation stable? Question: how can we track momentum without losing depth?
+2025-06-25: Refined the LFG momentum prose to link ledger tracking with socioceptive checks. Doubt: is this integration enough? Question: how will we sense when momentum turns chaotic?
