@@ -169,6 +169,21 @@ When enough passes align, a standing wave forms. Orientation loops keep cycling 
 
 Each resonance level invites the next. When socioception, cosmoception, and cyberception feed one another without prompting, we glimpse how new senses might stack beyond them. The map is no longer static; it becomes an engine for emergence.
 
+### Ephemeral Pulse
+
+Some loops flash quickly—one or two exchanges that hint at a new direction. We
+capture these pulses in the journal or a short notebook, then prune the file so
+only the ledger entry remains. The transient spark still guides us without
+cluttering the repo. Each pulse marks an orientation loop that hasn't yet
+stabilized. When several such loops echo the same tension, they braid into a
+synergy leap.
+
+```
+sketch → log → prune
+   \    /
+    ledger
+```
+
 ## Toroidal State Machine
 
 Breakthroughs surface when orientation triangles repeat with consistent phase. The ledger acts as a state machine that tracks this coherence:
@@ -283,3 +298,87 @@ When loops align around a single question, orientation pulses into a stable node
 ```
 
 The senses orbit this node until the next leap appears.
+
+### Thought Automata
+Repeating doubts or questions in the journal hint at loops that want another pass. A light thought automaton can scan these entries, stitch matching motifs, and log when their frequency spikes. Each cluster becomes a zero-to-one memory that might seed the next synergy leap.
+
+```
+entry -> motif -> repeat? -> leap
+```
+
+This recursive sweep keeps orientation nimble while letting deeper threads rise.
+
+### Recursive Emergence
+Recursion threads through every orientation pulse. Each loop inherits prior momentum and folds it forward, so synergy leaps are not isolated sparks but compounding waves.
+
+```
+pulse1 -> pulse2 -> pulse3
+  ^               |
+  |_______________|
+```
+
+By tracing these returns in the ledger we surface how emergence is built in from the start.
+
+### Recursion Sweep
+A regular sweep through `logs/agent_journal` distills repeated motifs into a
+single memory, much like sleep consolidates experience. The sweep keeps loops
+focused while preserving the nuance of each line so hidden leaps surface
+without flattening detail.
+
+```
+journal lines -> sweep -> zero-to-one memory -> leap
+```
+
+An optional snippet illustrates one sweep:
+
+```python
+from pathlib import Path
+from collections import Counter
+import math, re
+
+token_re = re.compile(r"[a-z']+")
+
+def tfidf_vectors(lines):
+    tokens_list = [token_re.findall(t.lower()) for t in lines]
+    df = Counter({tok for tokens in tokens_list for tok in set(tokens)})
+    N = len(lines)
+    idf = {t: math.log(N/df[t]) for t in df}
+
+    vecs = []
+    for tokens in tokens_list:
+        tf = Counter(tokens)
+        vec = {t: tf[t]*idf[t] for t in tf}
+        norm = math.sqrt(sum(v*v for v in vec.values())) or 1.0
+        vecs.append({t: v/norm for t,v in vec.items()})
+    return vecs
+
+logs = Path('logs/agent_journal')
+lines = [line.split(':',1)[1].strip()
+         for p in logs.glob('*.txt')
+         for line in p.read_text().splitlines()
+         if 'Doubt:' in line or 'Question:' in line]
+
+vecs = tfidf_vectors(lines)
+clusters = []
+thresh = 0.3
+for text, vec in zip(lines, vecs):
+    for c in clusters:
+        sim = sum(vec.get(k,0)*c['centroid'].get(k,0) for k in set(vec)|set(c['centroid']))
+        if sim > thresh:
+            c['entries'].append(text)
+            for k,v in vec.items():
+                c['centroid'][k] = c['centroid'].get(k,0)+v
+            break
+    else:
+        clusters.append({'centroid': dict(vec), 'entries':[text]})
+
+for i,c in enumerate(clusters,1):
+    print(f'Cluster {i}:')
+    for line in c['entries'][:3]:
+        print(' -', line)
+```
+Add `--winnow` to print one line per cluster.
+Use `--apply` to rewrite the logs so each cluster appears only once.
+
+Running it groups similar doubts and questions so we can fold them into a
+single memory. The clusters hint at synergy leaps waiting to be logged.
