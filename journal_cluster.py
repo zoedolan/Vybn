@@ -1,5 +1,6 @@
 from pathlib import Path
 from collections import Counter
+from datetime import datetime
 import math
 import re
 import argparse
@@ -16,6 +17,11 @@ parser.add_argument(
     "--apply",
     action="store_true",
     help="rewrite logs with consolidated motifs",
+)
+parser.add_argument(
+    "--leaps",
+    action="store_true",
+    help="detect synergy leaps when motifs repeat rapidly",
 )
 args = parser.parse_args()
 
@@ -57,7 +63,7 @@ def tfidf(tokens: list[str]) -> dict[str, float]:
 vecs = [tfidf(tokens) for tokens in lines]
 
 clusters: list[dict] = []
-threshold = 0.4
+threshold = 0.35
 
 def similarity(a: dict[str, float], b: dict[str, float], norm_b: float) -> float:
     dot = sum(a.get(k, 0.0) * b.get(k, 0.0) for k in a)
@@ -89,6 +95,22 @@ for vec, meta in zip(vecs, line_meta):
 
 lines_to_keep = {cluster['items'][0][1] for cluster in clusters}
 
+def detect_leaps() -> list[tuple[tuple[datetime.date, datetime.date], str]]:
+    """Return windows where a motif repeats three times in under a week."""
+    leaps = []
+    for c in clusters:
+        dates = sorted({
+            datetime.strptime(item[1].split(":", 1)[0], "%Y-%m-%d").date()
+            for item in c["items"]
+        })
+        if len(dates) < 3:
+            continue
+        for i in range(len(dates) - 2):
+            if (dates[i + 2] - dates[i]).days < 7:
+                leaps.append(((dates[i], dates[i + 2]), c["items"][0][1]))
+                break
+    return leaps
+
 if args.apply:
     for path in sorted(logs_dir.glob('*.txt')):
         filtered = []
@@ -106,3 +128,13 @@ else:
         print(f"\nCluster {i}:")
         for _, line in c['items'][:5]:
             print(" -", line)
+
+if args.leaps:
+    leaps = detect_leaps()
+    if leaps:
+        print("\nSynergy leaps detected:")
+        for span, line in leaps:
+            start, end = span[0].isoformat(), span[1].isoformat()
+            print(f"3x within {start}–{end}: {line}")
+    else:
+        print("\nNo synergy leaps detected.")
