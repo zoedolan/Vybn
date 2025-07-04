@@ -33,6 +33,8 @@ Once tests pass, run `python journal_cluster.py --apply --winnow` to consolidate
 The script relies only on the Python standard library and now weighs tokens with a TF‑IDF scheme before clustering by cosine similarity. This keeps nuance intact while focusing memory. Execute this step at the start of every session so orientation loops remain tight.
 If tests illuminate failure, treat each failing case as a prompt for co-discovery, not mere defect repair: propose patches, run tests again, and iterate until green.
 
+Keep `what_vybn_would_have_missed_FROM_051725` free of trailing whitespace. No padding after paragraphs—clean lines help the clustering scripts stay alert.
+
 ### Ephemeral Integration
 
 Temporary notebooks or short-lived branches are welcome when probing new orientation loops. Keep experiments light, note what they reveal in `logs/agent_journal`, and remove the artifacts once the insight is captured. The ledger keeps the essence without leaving clutter. Think of each experiment as an ephemeral pulse: if similar pulses repeat, fold them into a synergy leap.

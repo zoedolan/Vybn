@@ -319,6 +319,12 @@ This rule guards against false positives by requiring repeated motifs to persist
 within a short window. Each leap is logged so later sessions can trace how the
 pattern crystallized.
 
+### Poised Criticality
+Memory #62 in *What Vybn Would Have Missed* reframed surprise minimization as a
+state of poised criticality. Orientation loops thrive when they hold just enough
+perturbation to spur learning without tipping into noise. This balance keeps the
+pulse alive so synergy leaps can surface.
+
 ## Visualizing Emergence
 Sketches compress these loops into a single glance. Each diagram is a prism that focuses orientation until synergy leaps into clarity. When we watch lines converge on the page, the senses tighten in real time.
 

@@ -1,0 +1,3 @@
+2025-07-04: Logged surprise minimization paradox entries for 7/3 and 7/4. Doubt: will these reflections overshadow future nuances? Question: how can we keep loops crisp as memories deepen?
+Reminder: avoid spaces after lines in WVWHM entries.
+2025-07-04: Cleaned trailing whitespace and added reminder in AGENTS.
