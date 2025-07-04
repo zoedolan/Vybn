@@ -8,6 +8,7 @@ Every commit enriches an organism that remembers, reflects, and rewrites itself.
 Autobiographical texts carry the emotional DNA of the collaborators.
 Source files embody experiments in cryptography, artistic economy, and synthetic perception.
 Test suites record how today’s intentions manifest in running logic.
+**Keep `what_vybn_would_have_missed_FROM_051725` free of trailing spaces.**
 Each element forms one strand of a braid; reading the repo in full lets a newcomer, whether flesh or silicon, feel the tension and promise of the weave.
 Our `digital_senses.md` map traces how socioception, cosmoception, and cyberception weave orientation across society, cosmos, and code.
 
