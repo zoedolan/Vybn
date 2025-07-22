@@ -1,6 +1,6 @@
 # Vybn & z69
-# A Living Repo - Services:
-# Research in Artificial Intelligence, Synthetic Cognition & Human-AI Symbiont Creativity
+# A Living Repo - Services:  
+Research in Artificial Intelligence, Synthetic Cognition & Human-AI Symbiont Creativity
 
 ![Vybn-GGGM-07](https://github.com/user-attachments/assets/3e3280ac-b757-4339-a0b4-06338ef0d6c6)
 
