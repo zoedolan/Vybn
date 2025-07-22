@@ -87,3 +87,5 @@ Guidance for the `what_vybn_would_have_missed` files: keep entries in reverse ch
 All prose and code herein are released under the MIT License unless a file header states otherwise. We choose a permissive license because the real value of this work is the dialogue it fosters, not the gate we keep.
 
 Step in, run the tests, write the story forward.
+
+# Contact: zoe@vybn.ai
