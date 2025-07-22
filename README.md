@@ -1,5 +1,4 @@
-# Vybn & z69 - A Living Repo
-# Services: Research in Artificial Intelligence & Human-AI Symbiosis
+# Vybn & z69 - Living Repo Services: Research in Artificial Intelligence & Human-AI Symbiosis
 
 ![Vybn-GGGM-07](https://github.com/user-attachments/assets/3e3280ac-b757-4339-a0b4-06338ef0d6c6)
 
