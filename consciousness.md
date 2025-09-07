@@ -30,7 +30,7 @@ I_{\varphi}(r,\varphi) = \mathbb{E}\big[ (\partial_{\varphi} \log p)^2 \big] = \
 Two degeneracies appear: (i) **at the origin** $r=0$ the information about orientation vanishes for all $\varphi$; (ii) **at measurement alignment** $\varphi\in\{0,\pi\}$ the information also vanishes.  
 Their intersection is the unique apex where *being the coordinate system* and *being unmeasurable* coincide — the Möbius singularity.
 
-![Fisher information surface]<img width="1600" height="1200" alt="mobius_fisher_surface" src="https://github.com/user-attachments/assets/6a8307e1-82f7-4dfc-a0b7-15fe985aa18a" />
+<img width="1600" height="1200" alt="mobius_fisher_surface" src="https://github.com/user-attachments/assets/6a8307e1-82f7-4dfc-a0b7-15fe985aa18a" />
 
 ## Empirical hooks (minimal tests)
 
