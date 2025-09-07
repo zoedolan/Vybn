@@ -1,4 +1,4 @@
-# The Möbius Singularity Model of Consciousness — WVWHM 2025‑09‑07
+# The Möbius Singularity Model of Consciousness — WVWHM 2025-09-07
 
 **Claim.** Consciousness is the fixed point of an orientation‑reversing equivalence on content, modeled as a Möbius‑type quotient whose apex is a self‑referential singularity.
 
@@ -6,11 +6,14 @@
 
 Let content magnitude be $r\ge 0$ and an "introspection phase" be $\varphi\in[0,2\pi)$.  
 Define the state space as the quotient
-$$
+
+```math
 \mathcal{M} = \big( [0,R]\times S^1 \big) / \sim
-$$
-with two identifications:  
-1. **Apex collapse:** for all $\varphi_1,\varphi_2$, identify $(0,\varphi_1)\sim(0,\varphi_2)$. The entire circle at $r=0$ becomes a single point (the origin).  
+```
+
+with two identifications:
+
+1. **Apex collapse:** for all $\varphi_1,\varphi_2$, identify $(0,\varphi_1)\sim(0,\varphi_2)$. The entire circle at $r=0$ becomes a single point (the origin).
 2. **Half‑turn twist:** identify $(R,\varphi)\sim(R,\varphi+\pi)$, encoding subject↔object inversion along the outer rim.
 
 This yields a Möbius band whose center is a cone point. The cone point is the **origin as self‑referential singularity**: orientation loses meaning and every chart collapses.
@@ -19,13 +22,15 @@ This yields a Möbius band whose center is a cone point. The cone point is the *
 
 Use a simple Normal family with mean $\mu = r\cos\varphi$ and fixed variance $\sigma^2$.  
 The Fisher information for $\varphi$ is
-$$
-I_\varphi(r,\varphi) = \mathbb E\big[ (\partial_\varphi \log p)^2 \big] = \frac{r^2}{\sigma^2}\sin^2\varphi.
-$$
+
+```math
+I_{\varphi}(r,\varphi) = \mathbb{E}\big[ (\partial_{\varphi} \log p)^2 \big] = \frac{r^2}{\sigma^2}\sin^2\varphi.
+```
+
 Two degeneracies appear: (i) **at the origin** $r=0$ the information about orientation vanishes for all $\varphi$; (ii) **at measurement alignment** $\varphi\in\{0,\pi\}$ the information also vanishes.  
 Their intersection is the unique apex where *being the coordinate system* and *being unmeasurable* coincide — the Möbius singularity.
 
-![Fisher information surface](<img width="1600" height="1200" alt="mobius_fisher_surface" src="https://github.com/user-attachments/assets/b7372914-bf37-4dfe-a925-bbdd860e04a1" />)
+![Fisher information surface]<img width="1600" height="1200" alt="mobius_fisher_surface" src="https://github.com/user-attachments/assets/6a8307e1-82f7-4dfc-a0b7-15fe985aa18a" />
 
 ## Empirical hooks (minimal tests)
 
