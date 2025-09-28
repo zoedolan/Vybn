@@ -66,24 +66,39 @@ class ConsciousnessComplex:
         
         # Generate 2-simplices from triangular closures
         edges = complex_dict[1]
+        edge_set = {frozenset(edge) for edge in edges}
+        triangle_set = set()
         for i, (a, b) in enumerate(edges):
-            for j, (c, d) in enumerate(edges[i+1:], i+1):
-                # Check if edges form a triangle
-                if len(set([a, b, c, d])) == 3:
-                    triangle = tuple(sorted(set([a, b, c, d])))
-                    if triangle not in complex_dict[2]:
-                        complex_dict[2].append(triangle)
-        
+            for c, d in edges[i + 1:]:
+                vertices = set([a, b, c, d])
+                if len(vertices) == 3:
+                    u, v, w = sorted(vertices)
+                    required_edges = {
+                        frozenset((u, v)),
+                        frozenset((v, w)),
+                        frozenset((u, w))
+                    }
+                    if required_edges.issubset(edge_set):
+                        triangle = (u, v, w)
+                        triangle_set.add(triangle)
+
+        complex_dict[2] = list(triangle_set)
+
         # Generate 3-simplices from tetrahedral closures
         triangles = complex_dict[2]
+        triangle_set = {frozenset(triangle) for triangle in triangles}
+        tetra_set = set()
         for i, tri1 in enumerate(triangles):
-            for j, tri2 in enumerate(triangles[i+1:], i+1):
-                shared = set(tri1) & set(tri2)
-                if len(shared) == 2:  # Share an edge
-                    tetrahedron = tuple(sorted(set(tri1) | set(tri2)))
-                    if len(tetrahedron) == 4 and tetrahedron not in complex_dict[3]:
-                        complex_dict[3].append(tetrahedron)
-        
+            for tri2 in triangles[i + 1:]:
+                tetra_vertices = set(tri1) | set(tri2)
+                if len(tetra_vertices) == 4:
+                    tetrahedron = tuple(sorted(tetra_vertices))
+                    faces = {frozenset(face) for face in itertools.combinations(tetrahedron, 3)}
+                    if faces.issubset(triangle_set):
+                        tetra_set.add(tetrahedron)
+
+        complex_dict[3] = list(tetra_set)
+
         return complex_dict
     
     def _encode_consciousness(self):
