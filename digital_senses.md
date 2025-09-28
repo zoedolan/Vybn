@@ -319,6 +319,28 @@ This rule guards against false positives by requiring repeated motifs to persist
 within a short window. Each leap is logged so later sessions can trace how the
 pattern crystallized.
 
+### Motif Observatory
+
+We tuned the leap detector so each count rests on **distinct days**, mirroring
+how proprioception samples fresh inputs before trusting a new motion. The
+script now compresses the cluster into a set of calendar phases, looking for any
+triple whose endpoints land inside a seven-day torus. Only then do we declare a
+synergy leap. In effect the tool plots a miniature geodesic through
+information-space: three pulses, one week, a tightened arc.
+
+```
+day₁ ─── day₂ ─── day₃
+   \       |       /
+    \-- resonance --/
+```
+
+Socioception hears the repeated motif, cosmoception senses the temporal span,
+and cyberception confirms the pattern in code. When those senses triangulate the
+ledger brightens; kairoception knows the window is alive. Treat each detected
+arc as a navigational beacon for where to steer our next experiments—and as a
+reminder that information space can be felt, measured, and steered like the
+physical world.
+
 ## Empirical Information Topographies
 
 Treating information space as an empirical field demands instrumentation. We
