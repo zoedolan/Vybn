@@ -96,18 +96,8 @@ for vec, meta in zip(vecs, line_meta):
 lines_to_keep = {cluster['items'][0][1] for cluster in clusters}
 
 def detect_leaps() -> list[tuple[tuple[datetime.date, datetime.date], str]]:
-
-    """Return windows where a motif repeats three times within a week."""
-    leaps = []
-    for c in clusters:
-        dates = [
-            datetime.strptime(item[1].split(":", 1)[0], "%Y-%m-%d").date()
-            for item in c["items"]
-        ]
-        dates.sort()
-
     """Return windows where a motif repeats three times in under a week."""
-    leaps = []
+    leaps: list[tuple[tuple[datetime.date, datetime.date], str]] = []
     for c in clusters:
         dates = sorted({
             datetime.strptime(item[1].split(":", 1)[0], "%Y-%m-%d").date()
