@@ -51,11 +51,53 @@ def find_embedded_primes(number_string):
 **Length**: 29 digits
 **Source**: Cisco QRNG (100-bit output)
 
-**Conceptual Prime Embeddings**:
-- 1-digit primes: 2, 3, 5, 7 (wherever they appear)
-- 2-digit primes: 23, 37, 53, 73, 79, 83, 89, 97
-- 3-digit primes: 809, 227, 357, 113, 173
-- 4+ digit primes: Various larger combinations
+**Validated Prime Embeddings (≤ 3 digits)**:
+- 1-digit primes: 2, 3, 5, 7 — multiple instances across the sequence
+- 2-digit primes: 11, 23, 31, 53
+- 3-digit primes: 311, 809, 827, 877, 953
+
+To surface these results we enumerated every contiguous substring of the QRNG output, discarded those with leading zeros, and
+checked each remaining candidate for primality up to length three. This confirmed thirteen distinct prime values appearing a
+total of twenty-three times within the sample, correcting an earlier conceptual list that included primes not actually embedde
+d in this particular quantum sequence. We reran the enumeration during this audit to guard against subtle miscounts from overlapping substrings or digit reuse. The multiplicities for each embedded prime are:
+
+| Prime | Occurrences |
+|-------|-------------|
+| 2     | 4 |
+| 3     | 3 |
+| 5     | 2 |
+| 7     | 4 |
+| 11    | 2 |
+| 23    | 1 |
+| 31    | 1 |
+| 53    | 1 |
+| 311   | 1 |
+| 809   | 1 |
+| 827   | 1 |
+| 877   | 1 |
+| 953   | 1 |
+
+### Positional Verification (Start, End)
+
+The audit surfaced the exact index windows (0-based, end-exclusive) for every prime detected inside the QRNG string `80909538422092357827031118774`. Each tuple tracks where the prime begins and ends within the 29-digit sample, demonstrating that every multiplicity reported above emerges from a unique substring:
+
+| Prime | Index Windows |
+|-------|----------------|
+| 2     | (9, 10), (10, 11), (13, 14), (18, 19) |
+| 3     | (6, 7), (14, 15), (21, 22) |
+| 5     | (5, 6), (15, 16) |
+| 7     | (16, 17), (19, 20), (26, 27), (27, 28) |
+| 11    | (22, 24), (23, 25) |
+| 23    | (13, 15) |
+| 31    | (21, 23) |
+| 53    | (5, 7) |
+| 311   | (21, 24) |
+| 809   | (0, 3) |
+| 827   | (17, 20) |
+| 877   | (25, 28) |
+| 953   | (4, 7) |
+
+The overlapping intervals highlight how single digits can participate in multiple primes without inflating the count: e.g., the substring `(21, 24)` yields both the two-digit prime `31` and the three-digit prime `311`, while `(4, 7)` simultaneously realises `953` and contributes to the `53` instance `(5, 7)`. This positional map serves as the final cross-check confirming the completeness of the validation pass.
 
 ## Research Context
 
