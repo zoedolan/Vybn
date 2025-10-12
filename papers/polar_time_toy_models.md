@@ -144,76 +144,53 @@ For atomic systems (E_typical ~ eV, ℓ_t ~ 10^{-24} s if approaching Planck sca
 
 n_max ~ O(1) for laboratory scales
 
-## 4. Interferometry Proposal for θ_t Phase Detection
+## 4. Interferometry Recast as a Ramsey–Berry Qubit Protocol
 
-### 4.1 Experimental Setup
+An atomic or solid‑state two‑level system can be used as a holonomy probe. Prepare a coherent superposition with a π/2 pulse, steer the effective Hamiltonian adiabatically so that $(r_t,\theta_t)$ traces a closed loop, and close with a second π/2 pulse. With the Bloch dictionary
+$$\Phi_B=\theta_t,\qquad \cos\Theta_B=1-\frac{2E}{\hbar}\,r_t,$$
+the interferometric phase shift is purely geometric:
+$$\Delta\phi=\gamma_{\rm Berry}
+=\frac{E}{\hbar}\oint r_t\,d\theta_t
+=\tfrac12\Omega_{\rm Bloch}.$$
+On a circle of fixed $r_t$ the path is a Bloch latitude and the phase is $\Delta\phi=\pi(1-\cos\Theta_B)=2\pi(E/\hbar)r_t$. Reading the phase as a Ramsey fringe displacement converts your earlier coordinate integral into a qubit rotation. The centrifugal $n^2/r_t^2$ barrier derived above explains why a two‑level truncation is controlled near the temporal origin; the $\theta_t$-averaged limit reproduces standard quantum mechanics as the Bloch path collapses to a pole.
 
-**Atomic interferometer** with two paths experiencing different temporal metric components:
+A slow, periodic loop at frequency $f_{\rm loop}$ produces a steady frequency offset in continuous‑wave spectroscopy equal to the Berry phase accrued per cycle, divided by $2\pi$ and multiplied by the cycle rate:
+$$\Delta\nu_{\rm geo}=\frac{\gamma_{\rm Berry}}{2\pi}\,f_{\rm loop}
+=\frac{E}{\hbar}\,r_t\,f_{\rm loop}.$$
+Varying $E$ gives a slope $d\Delta\nu_{\rm geo}/dE=(r_t/\hbar)f_{\rm loop}$; this calibrates the unknown product $r_t f_{\rm loop}$ directly from data, leaving no dependence on dynamical details of the drive.
 
-1. **Path A**: Particle at spatial location where temporal geometry has one configuration
-2. **Path B**: Particle at location where temporal curvature differs
+## 5. Precision Spectroscopy: Geometric Readout and the Corrected Static Bound
 
-### 4.2 Phase Accumulation
+If $\theta_t$ is strictly a gauge angle, static level shifts from the $n\neq0$ tower are projected out and only the geometric offset just described survives. If, instead, residual $n$-sectors weakly admix, your toy‑model correction
+$$\Delta E_{n}\simeq \frac{n^2}{2m\,\ell_t^2}$$
+in natural units yields, for $n=1$, a fractional shift
+$$\frac{\Delta\nu}{\nu_0}\simeq \frac{\hbar^2}{2\,m c^2\,\hbar\omega_0\,\ell_t^2}
+=\frac{\hbar^2}{2m c^2 E_0\,\ell_t^2}.$$
+The absence of anomalies at the $10^{-18}$ level in optical lines implies a **lower** bound on the characteristic temporal scale, not an upper one. Taking $E_0\sim 2~\mathrm{eV}$, one finds $\ell_t\gtrsim 1.2~\mathrm{ps}$ if the relevant inertia is an atomic mass near $80~\mathrm{GeV}/c^2$, and $\ell_t\gtrsim 0.5~\mathrm{ns}$ if it is the electron mass $0.511~\mathrm{MeV}/c^2$. These are order‑of‑magnitude estimates, but they make the direction of the inequality unambiguous and remove twenty orders of magnitude of accidental "near‑Planckian" rhetoric. If future analysis tightens the constraint structure so that only holonomy is physical, the static $\Delta E$ channel closes and spectroscopy should be targeted at the dynamic geometric offset $\Delta\nu_{\rm geo}$ above.
 
-The quantum phase accumulated along each path:
+## 6. Testable Predictions and Parameter Bounds
 
-Δφ_A = ∫ (E r_t dθ_t) + corrections
-Δφ_B = ∫ (E r_t dθ_t)_B + corrections
-
-The observable phase difference:
-
-Δφ = Δφ_A - Δφ_B ≈ E · Δ(∫ r_t dθ_t)
-
-If temporal geometry varies, Δφ ≠ 0 even for symmetric spatial paths.
-
-### 4.3 Detection Mechanism
-
-**Observables**:
-- Interference fringe shift proportional to ΔΩ_t (temporal solid angle)
-- Fringe visibility reduction if θ_t fluctuates
-- Energy-dependent phase shift: Δφ ∝ E
-
-**Expected signal**:
-Δφ ~ (E/E_Planck) × (ℓ_t/τ_lab) × f(geometry)
-
-For E ~ 1 eV, τ_lab ~ 1 s, and ℓ_t at Planck scale:
-Δφ ~ 10^{-19} × f(geometry)
-
-Extremely small but potentially detectable with precision atomic interferometry if f(geometry) can be enhanced.
-
-### 4.4 Alternative: Precision Spectroscopy
-
-**Energy level corrections**:
-ΔE_n = (n²ℏ²)/(2m ℓ_t²)
-
-For n=1 and atomic transitions:
-ΔE_1/E_atomic ~ (ℏ/(mc))² / ℓ_t²
-
-Measurable if ℓ_t > 10^{-22} s using optical atomic clocks (fractional uncertainty ~ 10^{-18}).
-
-## 5. Testable Predictions and Parameter Bounds
-
-### 5.1 Direct Predictions
+### 6.1 Direct Predictions
 
 1. **Energy Level Corrections**:
-   - Δν_n = (n²ℏ)/(4πm ℓ_t²) for atomic transitions
-   - For hydrogen: Δν_1 ~ (2.2 × 10^{13} Hz) × (10^{-24} s / ℓ_t)²
-   - **Current bound**: ℓ_t < 10^{-18} s from optical clock precision
+   - For static corrections: $\Delta E_n \sim \frac{n^2 \hbar^2}{2m \ell_t^2}$
+   - **Corrected bounds**: $\ell_t \gtrsim 1.2$ ps (atomic mass) or $\ell_t \gtrsim 0.5$ ns (electron mass)
+   - **Dynamic geometric offset**: $\Delta\nu_{\rm geo} = (E/\hbar) r_t f_{\rm loop}$
 
 2. **Mode Suppression**:
    - Branching ratio for n≠0 modes: BR_n ~ exp(-2|n|ℓ_t/τ_decay)
-   - **Prediction**: Anomalous decay channels suppressed by exp(-10^6) for ℓ_t ~ 10^{-24} s
+   - **Prediction**: Anomalous decay channels suppressed for ℓ_t approaching characteristic scales
 
 3. **Effective Temperature**:
    - T_eff = ℏ/(2πk_B r_t)
    - For cosmological scales (r_t ~ t_universe ~ 10^{17} s): T_eff ~ 10^{-30} K
    - **Prediction**: Minimal observable effects at laboratory scales
 
-### 5.2 Parameter Constraints
+### 6.2 Parameter Constraints
 
 #### From Atomic Clocks
 - **Constraint**: No anomalous frequency shifts at Δν/ν < 10^{-18}
-- **Implies**: ℓ_t < 10^{-17} s (for n=1)
+- **Implies**: ℓ_t ≳ 1.2 ps (for atomic systems) - **lower bound, not upper**
 
 #### From Particle Physics
 - **Constraint**: No CPT violation from θ_t asymmetry
@@ -223,45 +200,39 @@ Measurable if ℓ_t > 10^{-22} s using optical atomic clocks (fractional uncerta
 - **Constraint**: No observable thermal-like effects in CMB beyond standard ΛCDM
 - **Implies**: r_t ≈ t_cosmic at large scales (consistency check)
 
-### 5.3 Experimental Targets
+### 6.3 Experimental Targets
 
 | Experiment Type | Observable | Sensitivity | ℓ_t Reach |
 |-----------------|------------|-------------|------------|
-| Optical atomic clocks | Δν/ν | 10^{-18} | 10^{-17} s |
-| Atom interferometry | Phase shift | 10^{-10} rad | 10^{-20} s |
-| Nuclear decays | Branching ratios | 10^{-6} | 10^{-18} s |
-| Gravitational wave detectors | Frequency drift | 10^{-15} | 10^{-16} s |
-| Quantum gravity phenomenology | Dispersion | E/E_Pl | 10^{-24} s |
+| Optical atomic clocks | Δν/ν | 10^{-18} | ≳ 1.2 ps |
+| Atom interferometry | Berry phase | 10^{-6} rad | Dynamic geometric effects |
+| Nuclear systems | Branching ratios | 10^{-6} | System-dependent |
+| Gravitational wave detectors | Frequency drift | 10^{-15} | Coupling-dependent |
+| Ramsey-Berry protocols | Geometric phase | 10^{-10} rad | Direct holonomy measurement |
 
-### 5.4 Null Results
+### 6.4 Smoking Gun Signatures
 
-If no effects are observed:
-- **Either**: ℓ_t < 10^{-24} s (approaching Planck scale)
-- **Or**: θ_t dynamics are even more suppressed than estimated
-- **Or**: n≠0 modes do not couple to matter fields at accessible energies
-
-### 5.5 Smoking Gun Signatures
-
-1. **Energy-squared scaling**: ΔE ∝ E² / ℓ_t² distinguishes from linear Lorentz violation
-2. **Angular momentum correlation**: Effects scale with |n|, not other quantum numbers
+1. **Energy-squared scaling**: ΔE ∝ n² / ℓ_t² distinguishes from linear Lorentz violation
+2. **Geometric phase scaling**: Berry phase ∝ enclosed temporal area
 3. **Universal ℓ_t**: Same ℓ_t appears in multiple systems (atoms, nuclei, mesons)
-4. **Temperature-like spectrum**: Excitation spectrum shows thermal-like distribution with T_eff = ℏ/(2πk_B r_t)
+4. **Bloch sphere dynamics**: Controllable geometric rotations via temporal holonomy
+5. **Dynamic vs. static separation**: Geometric offset $\Delta\nu_{\rm geo}$ vs. static level shifts
 
-## 6. Summary and Next Steps
+## 7. Summary and Next Steps
 
 This toy model framework provides:
-- Explicit mode equations and solutions
-- Concrete parameter bounds from existing experiments
-- Clear experimental proposals for detection
-- Testable predictions distinguishable from other BSM physics
+- **Ramsey-Berry interferometry protocols** for direct holonomy measurement
+- **Corrected parameter bounds** establishing ℓ_t ≳ picosecond scales
+- **Clear distinction** between static corrections and dynamic geometric effects
+- **Testable predictions** distinguishable from other beyond-standard-model physics
 
 **Next steps**:
-1. Full numerical solutions for R_n(r_t) with realistic potentials
-2. Coupling to electromagnetic fields for precision tests
-3. Extension to curved spacetime backgrounds
-4. Connection to black hole thermodynamics via θ_t periodicity
-5. Experimental collaborations for dedicated searches
+1. **Experimental implementation** of Ramsey-Berry protocols with trapped atoms/ions
+2. **Search for geometric frequency offsets** in precision spectroscopy
+3. **Analysis of existing datasets** for signatures of temporal holonomy
+4. **Connection to gravitational time dilation** experiments
+5. **Extension to many-body systems** and quantum field theory applications
 
 ---
 
-**References**: See main paper `polar_temporal_coordinates_qm_gr_reconciliation.md` for theoretical framework and motivation.
+**References**: See main paper `polar_temporal_coordinates_qm_gr_reconciliation.md` for theoretical framework and motivation, especially Section 8 on Bloch sphere reduction.

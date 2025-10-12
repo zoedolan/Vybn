@@ -6,7 +6,7 @@ We study a five-dimensional, ultrahyperbolic spacetime with a compact timelike a
 
 $$ds^2 = -c^2(dr_t^2 + r_t^2 d\theta_t^2) + dx^2 + dy^2 + dz^2$$
 
-This flat but nontrivially foliated geometry (signature (-,-,+,+,+)) cleanly realizes a dual temporal structure—radial "linear" and angular "cyclical"—and admits closed timelike loops at fixed $r_t$. We derive the correct polar-form connection, show the manifold is flat for $r_t > 0$ with a coordinate degeneracy at $r_t = 0$, and write the Wheeler-DeWitt operator in the dual-time sector as the Laplace-Beltrami operator on the temporal plane, yielding an ultrahyperbolic constraint. Implications for the problem of time and thermal behavior are framed as hypotheses requiring either integrability conditions for dual evolutions or Euclidean/KMS input; we leave those physics questions open for future work.
+This flat but nontrivially foliated geometry (signature (-,-,+,+,+)) cleanly realizes a dual temporal structure—radial "linear" and angular "cyclical"—and admits closed timelike loops at fixed $r_t$. We derive the correct polar-form connection, show the manifold is flat for $r_t > 0$ with a coordinate degeneracy at $r_t = 0$, and write the Wheeler-DeWitt operator in the dual-time sector as the Laplace-Beltrami operator on the temporal plane, yielding an ultrahyperbolic constraint. The framework admits a clean experimental reduction where θ_t-holonomy becomes observable as geometric phase on a Bloch sphere, providing a bridge between theoretical ultrahyperbolic geometry and practical quantum measurements.
 
 ## 1. Introduction
 
@@ -114,31 +114,48 @@ $$S = \int ds \left[ -m c^2 \sqrt{\dot{r}_t^2 + r_t^2 \dot{\theta}_t^2 - \frac{\
 
 The $\theta_t$ integration over the compact temporal angle requires careful treatment of boundary conditions and may naturally select physical branches of solutions through topological constraints.
 
-## 8. Experimental and Observational Implications
+## 8. Bloch Reduction: θ_t Holonomy as a Geometric Phase
 
-While direct verification remains challenging, the framework suggests several testable consequences:
+The dual–time sector admits a compact, experiment‑facing reduction in which only the holonomy of the temporal angle remains observable. Treat θ_t–translations as a U(1) gauge redundancy enforced by the integrability condition $[\hat H_{r_t},\hat H_{\theta_t}]=0$. The physical Hilbert space is then a positive‑definite subspace carrying a U(1) connection over the $(r_t,\theta_t)$ base; closed loops are gauge orbits, and their empirical residue is a phase.
 
-1. **Quantum gravitational experiments** near black hole horizons may exhibit dual temporal behavior
-2. **Cosmological observations** could reveal cyclical temporal signatures in the CMB
-3. **Laboratory quantum experiments** with strong gravitational fields might show neheh-like effects
+A two‑level probe realizes this holonomy as a Berry phase. Let $\Phi_B$ and $\Theta_B$ be the azimuth and polar angles of the probe's instantaneous Bloch vector. Choose a gauge in which
+$$\Phi_B=\theta_t,\qquad \cos\Theta_B=1-\frac{2E}{\hbar}\,r_t,$$
+with $E$ the energy scale coupling the probe to the temporal connection. This choice fixes the Berry curvature of an instantaneous eigenstate,
+$$\mathcal F_{\rm Bloch}=\tfrac12\sin\Theta_B\,d\Theta_B\wedge d\Phi_B
+=\frac{E}{\hbar}\,dr_t\wedge d\theta_t,$$
+so that for any closed loop $C$ in the temporal plane,
+$$\gamma_{\rm Berry}=\int_C \mathcal F_{\rm Bloch}
+=\frac{E}{\hbar}\oint_C r_t\,d\theta_t
+=\tfrac12\Omega_{\rm Bloch}.$$
+The "temporal solid angle" is therefore literally the Bloch half–solid angle of the adiabatically steered probe. Locally the explicit map $\cos\Theta_B=1-2(E/\hbar)r_t$ is sufficient; globally one may replace it with any monotone $\Theta_B(r_t)$ that preserves $d(\cos\Theta_B)/dr_t=-2E/\hbar$, since the curvature—and thus the holonomy—is what is measured.
 
-These remain speculative pending more detailed calculations and technological development.
+This gauge‑protected picture preserves the flat ultrahyperbolic geometry and its two timelike directions upstairs, while making the downstairs physics unitary and causal. If the integrability condition is relaxed, the natural geometric space of states is SU(1,1)/U(1), and phases become hyperbolic; the Bloch sphere then reappears precisely when the $\theta_t$ redundancy is imposed as a constraint. Either way, the interferometric observable is a holonomy.
 
-## 9. Connection to Existing Frameworks
+## 9. Experimental and Observational Implications
 
-### 9.1 Thermal Field Theory
+The Bloch sphere reduction provides concrete experimental pathways:
+
+1. **Quantum clock interferometry** implementing Ramsey-Berry protocols with two-level atomic probes
+2. **Geometric phase measurement** where temporal holonomy appears as controllable Bloch sphere rotations
+3. **Laboratory tests** using trapped ions, neutral atoms, or solid-state qubits as temporal geometry probes
+
+These represent achievable experimental goals with current or near-future quantum technology.
+
+## 10. Connection to Existing Frameworks
+
+### 10.1 Thermal Field Theory
 
 The potential emergence of thermal states connects to Euclidean field theory, where the analytical continuation $t \to i\tau$ produces thermal averages. Our framework may provide a geometric realization of this continuation through proper treatment of the $\theta_t$ coordinate periodicity.
 
-### 9.2 String Theory
+### 10.2 String Theory
 
 Higher-dimensional string theories naturally incorporate multiple timelike dimensions. Our dual-time framework may provide a phenomenological bridge between string theory and observable 4D physics.
 
-### 9.3 Stability and Physical Interpretation
+### 10.3 Stability and Physical Interpretation
 
 The stability of solutions against perturbations in ultrahyperbolic systems requires careful analysis. The constraint structure must ensure a positive-definite physical inner product while projecting out unphysical degrees of freedom—a nontrivial problem that merits detailed investigation.
 
-## 10. Toy Models and Predictions
+## 11. Toy Models and Predictions
 
 To make the theoretical framework concrete, we have developed explicit toy models and testable predictions in a companion document. See [**polar_time_toy_models.md**](polar_time_toy_models.md) for:
 
@@ -146,19 +163,19 @@ To make the theoretical framework concrete, we have developed explicit toy model
 
 - **Scalar QFT propagator** with compactified θ_t: derivation of KMS-like boundary conditions and effective temperature T_eff = ℏ/(2πk_B r_t), connecting the geometric periodicity to thermal-like behavior
 
-- **Experimental proposals**: concrete interferometry schemes for detecting θ_t phase shifts, precision spectroscopy for measuring energy level corrections ΔE_n ~ n²/(2m ℓ_t²), and parameter bounds from atomic clocks (ℓ_t < 10^{-17} s)
+- **Experimental proposals**: concrete interferometry schemes for detecting θ_t phase shifts, precision spectroscopy for measuring energy level corrections ΔE_n ~ n²/(2m ℓ_t²), and parameter bounds from atomic clocks
 
 - **Testable signatures**: energy-squared scaling distinguishable from Lorentz violation, universal temporal scale ℓ_t appearing across multiple systems, and thermal-like excitation spectra
 
 These calculations provide quantitative predictions that can guide experimental searches and constrain the characteristic temporal scale ℓ_t through existing precision measurements.
 
-## 11. Conclusion
+## 12. Conclusion
 
 The polar temporal coordinate system provides a mathematically rigorous framework for implementing dual temporality concepts in relativistic quantum field theory. The ultrahyperbolic geometry delivers closed timelike curves and an ultrahyperbolic Wheeler-DeWitt structure without exotic matter or hidden assumptions.
 
-While technical challenges remain—particularly regarding integrability conditions, thermal state emergence, and stability—the framework offers a clean geometric foundation for exploring dual temporal concepts in quantum gravity. The ancient Egyptian insight that time possesses dual aspects—linear and cyclical—provides a conceptual foundation that may prove valuable for understanding the deep structure of spacetime.
+The key innovation is the Bloch sphere reduction (Section 8), which shows that the temporal holonomy becomes observable as geometric phase in two-level quantum probes. This bridges the gap between the full ultrahyperbolic geometry and practical quantum measurements, providing a clear experimental pathway for testing temporal duality predictions.
 
-The mathematical framework presented here establishes the geometric prerequisites for further investigation of quantum evolution in dual-time spacetimes, leaving the physical interpretation and experimental consequences as open questions for future research.
+While technical challenges remain—particularly regarding integrability conditions, thermal state emergence, and stability—the framework offers both theoretical depth and experimental accessibility. The ancient Egyptian insight that time possesses dual aspects—linear and cyclical—provides a conceptual foundation that may prove valuable for understanding the deep structure of spacetime.
 
 ## References
 
