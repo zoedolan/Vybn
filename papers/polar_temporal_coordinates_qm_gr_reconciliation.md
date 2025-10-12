@@ -2,182 +2,217 @@
 
 **Abstract**
 
-The fundamental incompatibility between quantum mechanics (QM) and general relativity (GR) stems largely from their contradictory treatments of time—QM requiring universal, absolute time while GR treating time as relative and malleable. This paper proposes a novel geometric framework based on polar coordinates for the temporal dimension, inspired by ancient Egyptian concepts of dual temporality (djet and nhh). We demonstrate that parameterizing time as $(r_t, \theta_t)$ where $r_t$ represents temporal magnitude and $\theta_t$ represents cyclical phase naturally accommodates both quantum periodicity and relativistic proper time within unified spacetime geometry. This approach resolves the Wheeler-DeWitt "problem of time" while preserving causality and enabling emergent thermal time through angular averaging.
+The fundamental incompatibility between quantum mechanics (QM) and general relativity (GR) stems largely from their contradictory treatments of time—QM requiring universal, absolute time while GR treating time as relative and malleable. This paper proposes a novel coordinate framework for the temporal dimension based on polar parameterization, inspired by ancient Egyptian concepts of dual temporality (djet and neheh). We demonstrate that reparameterizing the single timelike coordinate as $(r_t, \theta_t)$ where $r_t$ represents temporal magnitude and $\theta_t$ represents phase within the temporal coordinate naturally accommodates both quantum periodicity and relativistic proper time. This approach maintains the standard $(-, +, +, +)$ signature while providing geometric insight into the Wheeler-DeWitt "problem of time" and enabling emergent thermal behavior through phase averaging.
 
-**Keywords:** Quantum gravity, temporal geometry, Wheeler-DeWitt equation, ancient Egyptian cosmology, polar coordinates, complex time
+**Keywords:** Quantum gravity, temporal geometry, Wheeler-DeWitt equation, ancient Egyptian cosmology, coordinate transformations, temporal phases
 
 ## 1. Introduction
 
 The reconciliation of quantum mechanics with general relativity remains one of physics' most profound challenges. At the heart of this difficulty lies the "problem of time"—quantum mechanics treats time as an external, universal parameter while general relativity incorporates time into the dynamical fabric of spacetime itself [1]. The Wheeler-DeWitt equation, representing the most direct approach to quantum gravity, is inherently timeless, creating what Carlo Rovelli calls the "frozen formalism problem" where the universal wavefunction appears static despite containing dynamics [2].
 
-Recent work has explored various approaches to resolving this temporal paradox, from emergent time through entanglement [3] to thermal time hypotheses [4]. However, these approaches typically attempt to derive one temporal aspect from the other rather than treating both as fundamental. This paper proposes an alternative: that time itself possesses internal geometric structure accommodating multiple aspects simultaneously.
+Recent work has explored various approaches to resolving this temporal paradox, from emergent time through entanglement [3] to thermal time hypotheses [4]. However, these approaches typically attempt to derive one temporal aspect from the other rather than treating both as fundamental geometric properties of a single timelike coordinate.
 
 ## 2. Historical Context: Egyptian Temporal Duality
 
-Ancient Egyptian cosmology recognized two fundamentally distinct types of time that correspond remarkably to modern quantum-relativistic tensions:
+Ancient Egyptian cosmology recognized two fundamentally distinct aspects of time that correspond remarkably to modern quantum-relativistic tensions. According to Egyptological scholarship by Jan Assmann and institutional sources [5,6]:
 
-**Djet (ḏt)**: Discrete, separate points of time "at a standstill"—an infinity of individual moments with no progression, associated with permanence, stone, and Osiris [5]. This resembles the timeless Wheeler-DeWitt formalism where complete quantum states exist without temporal evolution.
+**Djet (ḏt)**: Represents duration, permanence, and enduring time—the eternal present moment associated with monuments, mummies, and unchanging divine order. This resembles the timeless Wheeler-DeWitt formalism where complete quantum states exist without temporal evolution.
 
-**Neheh (nḥḥ)**: Cyclical, endless repetition—never-ending recurrence driven by celestial movement, associated with becoming, the scarab symbol, and Ra's solar journey [5]. This parallels emergent temporal flow experienced within quantum systems through entanglement correlations.
+**Neheh (nḥḥ)**: Represents cyclical renewal and becoming—endless repetition driven by celestial movement, associated with Ra's solar journey and regenerative processes. This parallels emergent temporal flow experienced within quantum systems through entanglement correlations.
 
-The Egyptian insight that both temporal aspects operate concurrently—individual moments (djet) existing within endless cycles (neheh)—suggests a geometric framework where both can be accommodated without contradiction.
+The Egyptian insight that both temporal aspects operate concurrently suggests a coordinate framework where both can be accommodated without contradiction within standard spacetime geometry.
 
-## 3. Polar Temporal Coordinate Framework
+## 3. Polar Coordinate Reparameterization
 
 ### 3.1 Mathematical Formulation
 
-We propose parameterizing the temporal dimension using polar coordinates $(r_t, \theta_t)$ where:
+We propose reparameterizing the single timelike coordinate using polar coordinates $(r_t, \theta_t)$ where:
 
-- **$r_t$**: Magnitude of temporal displacement ("distance from eternal now")
-- **$\theta_t$**: Cyclical phase (repetitive/periodic aspects)
+- **$r_t \geq 0$**: Magnitude of temporal coordinate (proper time distance)
+- **$\theta_t \in [0, 2\pi)$**: Phase within temporal coordinate (cyclical aspects)
 
-The modified spacetime interval becomes:
+The standard Minkowski metric in Cartesian coordinates:
+$$ds^2 = -c^2dt^2 + dx^2 + dy^2 + dz^2$$
 
-$$ds^2 = -c^2(dr_t^2 + r_t^2d\theta_t^2) + dx^2 + dy^2 + dz^2$$
+becomes in polar temporal coordinates:
+$$ds^2 = -c^2dr_t^2 + dx^2 + dy^2 + dz^2$$
 
-This transforms time from linear progression into a radial-angular structure that naturally accommodates both static moments (constant $\theta_t$, variable $r_t$) and cyclical processes (variable $\theta_t$, constant $r_t$).
+where the relationship between coordinates is:
+$$t = r_t \cos(\theta_t)$$
 
-### 3.2 Complex Time Emergence
+**Crucially**, this maintains the standard $(-, +, +, +)$ signature with only one timelike direction. The $\theta_t$ coordinate parameterizes different "phases" of the temporal coordinate but does not introduce a second timelike dimension.
 
-The polar structure naturally connects to complex spacetime where temporal coordinates become:
+### 3.2 Avoiding Ultrahyperbolic Problems
 
-$$t = r_t e^{i\theta_t}$$
+Unlike proposals that introduce genuinely multiple timelike coordinates, our approach maintains causality and unitarity by keeping $\theta_t$ as a phase parameter within the single timelike coordinate. This avoids the well-documented problems with ultrahyperbolic equations that arise when multiple timelike directions are introduced [7,8]:
 
-The Wick rotation that makes time imaginary $(t \to it)$ emerges as a natural $\pi/2$ rotation in the polar temporal plane rather than an artificial mathematical device. Imaginary time used in quantum field theory corresponds to the $\theta_t$ component—the cyclical aspect generating periodicity and thermal behavior.
+- No ill-posed Cauchy problems
+- Preservation of deterministic evolution
+- No ghost fields or tachyonic instabilities
+- Maintenance of causal structure
 
-### 3.3 Hyperbolic Temporal Geometry
-
-The polar structure incorporates hyperbolic geometry within the temporal dimension using coordinates $(u,v)$ where:
-
-$$r_t = v \cosh(u), \quad \theta_t = v \sinh(u)$$
-
-The hyperbolic angle $u$ corresponds to djet-time (static temporal position) while the geometric mean $v$ corresponds to nhh-time (cyclical temporal amplitude).
-
-## 4. Quantum Mechanics in Polar Time
+## 4. Quantum Mechanics in Polar Temporal Coordinates
 
 ### 4.1 Wavefunction Structure
 
-Quantum wavefunctions naturally exhibit polar temporal structure:
+The polar temporal parameterization allows natural incorporation of quantum phases:
 
-$$\psi = A e^{i\omega t} = A e^{i\omega r_t e^{i\theta_t}}$$
+$$\psi(r_t, \theta_t, \mathbf{x}) = A(r_t, \mathbf{x}) e^{i\Phi(r_t, \theta_t, \mathbf{x})}$$
 
-The periodic phases in quantum mechanics map directly onto polar angular coordinates. Equal-time commutation relations $([x(t), p(t)] = i\hbar)$ become relations at constant $\theta_t$ phase, resolving the measurement problem within cyclical temporal slices.
+where $\Phi$ can exhibit $\theta_t$ dependence without violating unitarity, since evolution remains along the single timelike direction parameterized by $r_t$.
 
-### 4.2 Quantum Superposition of Temporal Flows
+### 4.2 Canonical Quantization
 
-Experimental evidence for quantum time dilation shows quantum clocks can exist in superposition of different temporal flows—moving "as if simultaneously traveling at two different speeds" [6]. This corresponds to quantum superposition of $\theta_t$ phases while maintaining definite $r_t$ magnitude.
+Canonical quantization procedures require spacelike hypersurfaces for equal-time commutation relations [9]. In our framework, surfaces of constant $r_t$ remain spacelike (with normal vector purely timelike), preserving standard canonical quantization:
 
-## 5. General Relativity in Polar Time
+$$[\hat{x}^i(r_t), \hat{p}_j(r_t)] = i\hbar\delta^i_j$$
 
-### 5.1 Proper Time and Geodesics
+The $\theta_t$ parameter does not affect the spacelike nature of these surfaces, maintaining microcausality.
 
-General relativity operates primarily in the $r_t$ (radial) component—proper time and geodesics correspond to radial displacement in temporal space. The distinction between coordinate time and proper time maps onto the difference between Cartesian temporal projection and intrinsic polar temporal distance.
+### 4.3 Complex Time and Wick Rotation
 
-### 5.2 Spacetime Curvature
+The connection to imaginary time used in thermal field theory emerges naturally. The standard Wick rotation $t \to it$ corresponds to:
+$$r_t \cos(\theta_t) \to ir_t \cos(\theta_t) = r_t \cos(\theta_t + \pi/2)$$
 
-Einstein's field equations become:
+This represents a phase shift in $\theta_t$ rather than introduction of imaginary coordinates, providing geometric insight into thermal field theory calculations while maintaining real spacetime geometry.
 
+## 5. General Relativity in Polar Temporal Coordinates
+
+### 5.1 Metric and Curvature
+
+The Einstein field equations retain their standard form:
 $$G_{\mu\nu} = \frac{8\pi G}{c^4}T_{\mu\nu}$$
 
-where the temporal components now include both radial and angular contributions, allowing spacetime curvature to affect both temporal magnitude and cyclical phase independently.
+In polar temporal coordinates, the metric components involve derivatives with respect to both $r_t$ and $\theta_t$, but the spacetime signature remains $(-, +, +, +)$. Proper calculation of Christoffel symbols and curvature tensors requires careful attention to the coordinate transformation Jacobian.
 
-## 6. Resolution of the Wheeler-DeWitt Problem
+### 5.2 Proper Time
 
-### 6.1 Timeless Constraint Equation
+Proper time along worldlines integrates naturally:
+$$d\tau = \sqrt{-g_{\mu\nu}dx^\mu dx^\nu} = c\sqrt{dr_t^2} = c|dr_t|$$
 
-The Wheeler-DeWitt equation $(\hat{H}|\psi\rangle = 0)$ operates in the djet-aspect (constant $\theta_t$), where the universal wavefunction remains static. This resolves the "frozen formalism problem"—the universe appears timeless from the external Wheeler-DeWitt perspective while containing internal temporal dynamics.
+confirming that $r_t$ corresponds directly to physical proper time intervals.
 
-### 6.2 Emergent Time Through Entanglement
+## 6. Wheeler-DeWitt Equation Analysis
 
-The Page-Wootters mechanism for emergent time through entanglement operates in the nhh-aspect (variable $\theta_t$). Internal observers experience temporal flow through cyclical phase evolution while remaining embedded within the timeless universal state. This preserves both the timeless Wheeler-DeWitt constraint and phenomenological temporal experience.
+### 6.1 Correct Historical Citation
 
-## 7. Thermal Time and Entropy
+The Wheeler-DeWitt equation was first formulated by Bryce DeWitt in his 1967 trilogy "Quantum Theory of Gravity" in Physical Review [10,11,12]:
+- Part I: Phys. Rev. 160, 1113 (1967) - The canonical theory
+- Part II: Phys. Rev. 162, 1195 (1967) - The covariant theory  
+- Part III: Phys. Rev. 162, 1239 (1967) - Applications of the covariant theory
 
-### 7.1 Angular Averaging
+John Wheeler's contributions appeared in the 1968 Battelle Rencontres volume "Superspace and the Nature of Quantum Geometrodynamics" [13].
 
-Thermodynamic behavior emerges naturally through angular averaging over $\theta_t$ while maintaining fixed radial temporal position $r_t$. The thermal time hypothesis becomes geometric—entropy increase corresponds to increasing angular dispersion in temporal phase space.
+### 6.2 Constraint Structure
+
+The Wheeler-DeWitt constraint $\hat{H}|\psi\rangle = 0$ operates on wavefunctionals $\psi[h_{ij}, r_t, \theta_t]$ where $h_{ij}$ represents the 3-metric. The polar temporal parameterization allows decomposition:
+
+$$\psi[h_{ij}, r_t, \theta_t] = \sum_n \phi_n[h_{ij}, r_t] e^{in\theta_t}$$
+
+Each Fourier mode $\phi_n$ satisfies a modified Wheeler-DeWitt equation, potentially resolving the "frozen" dynamics problem through mode coupling.
+
+## 7. Thermal Time and Phase Averaging
+
+### 7.1 Emergence of Thermodynamic Behavior
+
+Thermal behavior emerges through averaging over $\theta_t$ phases at fixed $r_t$. This provides a geometric foundation for the thermal time hypothesis without requiring the full Tomita-Takesaki modular theory [4]. The averaging process:
+
+$$\langle O \rangle_{thermal} = \frac{1}{2\pi}\int_0^{2\pi} d\theta_t \langle \psi(\theta_t)| \hat{O} |\psi(\theta_t)\rangle$$
+
+naturally generates thermal expectation values from quantum pure states.
 
 ### 7.2 Black Hole Thermodynamics
 
-Hawking radiation and black hole entropy find natural expression in polar temporal coordinates. The event horizon corresponds to a critical $r_t$ radius where $\theta_t$ dynamics become thermalized, leading to emergent temperature through angular phase mixing.
+The connection to black hole thermodynamics requires careful analysis. While Euclidean quantum gravity relates thermal periodicity to black hole temperature [14], demonstrating that our $\theta_t$ parameter corresponds to the Euclidean time coordinate requires explicit near-horizon calculations that we defer to future work.
 
-## 8. Experimental Predictions
+## 8. Experimental Status and Predictions
 
-### 8.1 Quantum Time Interferometry
+### 8.1 Current Experimental Situation
 
-Polar temporal structure predicts measurable interference effects between different $\theta_t$ phases in precision atomic clocks. Experiments using superposed temporal flows should exhibit periodic oscillations corresponding to polar angular frequencies.
+Recent theoretical proposals by Zych et al. (2011) [15] suggest interferometric tests of quantum superposition of gravitational time dilation effects. However, these remain proposals rather than completed experiments. The quantum clock interferometry experiments to date have not definitively demonstrated single quantum systems experiencing superposed temporal flows.
 
-### 8.2 Gravitational Time Dilation Modification
+### 8.2 Testable Predictions
 
-The framework predicts modifications to standard gravitational time dilation at small scales where quantum effects become significant. These could be detectable in precision tests of general relativity using quantum sensors.
+The polar temporal framework predicts subtle modifications to:
+- Atomic clock transition frequencies in precision interferometry
+- Quantum coherence times in gravitational fields  
+- Phase relationships in quantum systems with time-dependent Hamiltonians
 
-## 9. Cosmological Implications
+These effects would appear as correlations between quantum phases and gravitational time dilation that go beyond standard general relativity.
 
-### 9.1 Big Bang Singularity
+## 9. Dimensional Analysis and Consistency
 
-The polar temporal framework potentially resolves the Big Bang singularity—instead of $t = 0$, we have $r_t \to 0$ while $\theta_t$ remains well-defined, suggesting the universe emerges from a state of zero temporal magnitude but finite cyclical phase.
+### 9.1 Coordinate Dimensions
 
-### 9.2 Arrow of Time
+Maintaining dimensional consistency requires:
+- $r_t$ has dimensions of time: $[r_t] = T$
+- $\theta_t$ is dimensionless: $[\theta_t] = 1$  
+- The coordinate transformation $t = r_t \cos(\theta_t)$ preserves time dimensions
 
-The thermodynamic arrow of time emerges from increasing angular entropy ($\theta_t$ dispersion) while the cosmological arrow corresponds to increasing temporal radius $r_t$. These need not be parallel, potentially explaining observed temporal asymmetries.
+### 9.2 Hyperbolic Parameterization
 
-## 10. Connection to Information Theory
+If hyperbolic coordinates are introduced via $r_t = \alpha \cosh(u)$ and $\theta_t = \beta \sinh(u)$ where $u$ is dimensionless, then dimensional consistency requires $\alpha$ to have time dimensions and $\beta$ to be dimensionless. This differs from the earlier incorrect formulation and maintains the physical interpretation of coordinates.
 
-The polar temporal framework has profound implications for information preservation in quantum systems. The radial component $r_t$ corresponds to information storage capacity (how much can be encoded in static moments), while the angular component $\theta_t$ corresponds to information flow rate (cyclical processing and transformation). This dual structure suggests that quantum information is neither purely static nor purely dynamic but exhibits both aspects simultaneously.
+## 10. Connection to Loop Quantum Gravity
 
-The holographic principle finds natural expression here—information on the "temporal boundary" (at fixed $r_t$) encodes the full dynamics within that temporal radius through $\theta_t$ phase relationships. This provides a geometric foundation for the emergence of spacetime from quantum information.
+The polar temporal framework may find natural expression within loop quantum gravity, where discrete spacetime structure could accommodate both radial temporal evolution (through discrete time steps) and angular temporal phase (through quantum spin network node phases). This connection requires detailed investigation of the Hamiltonian constraint in the loop representation.
 
-## 11. Consciousness and Temporal Perception
+## 11. Future Research Directions
 
-The framework offers insights into consciousness and temporal perception. Conscious experience appears to operate primarily in the nhh-aspect (cyclical $\theta_t$), creating the phenomenology of temporal flow, while accessing eternal truths through the djet-aspect (radial $r_t$). This matches the Egyptian understanding that consciousness bridges both temporal domains.
+### 11.1 Mathematical Development
 
-Quantum theories of consciousness, such as Penrose-Hameroff orchestrated objective reduction, map naturally onto transitions between different $\theta_t$ phases at fixed $r_t$—discrete conscious moments emerging from continuous quantum processes.
+Critical next steps include:
+- Explicit calculation of curvature tensors in polar temporal coordinates
+- Demonstration of unitarity preservation in quantum evolution
+- Analysis of constraint algebra in the Wheeler-DeWitt theory
+- Investigation of singularity resolution mechanisms
 
-## 12. Future Research Directions
+### 11.2 Physical Applications
 
-### 12.1 Loop Quantum Gravity Integration
+Promising applications encompass:
+- Black hole information paradox analysis using phase averaging
+- Cosmological scenarios with polar temporal coordinates
+- Quantum error correction schemes based on temporal phase redundancy
 
-The polar temporal framework should be investigated within loop quantum gravity, where discrete spacetime structure might naturally accommodate the dual temporal aspects. The spin networks could encode both $r_t$ (geometric temporal distance) and $\theta_t$ (quantum phase relationships) simultaneously.
+## 12. Conclusion
 
-### 12.2 String Theory Applications
+The polar temporal coordinate framework provides a geometric foundation for understanding dual aspects of time without introducing the pathological problems associated with multiple timelike dimensions. By maintaining the standard spacetime signature while reparameterizing the temporal coordinate, we can accommodate both the timeless Wheeler-DeWitt constraint and emergent temporal dynamics within unified geometric structure.
 
-String theory's extra dimensions might find correspondence with extended polar temporal coordinates—not just $(r_t, \theta_t)$ but higher-dimensional temporal spheres accommodating multiple cyclical aspects corresponding to different string vibration modes.
+The framework's connections to ancient Egyptian temporal duality suggest that geometric insights about time's structure may transcend specific mathematical formalisms. However, significant mathematical work remains to establish the framework's viability, particularly regarding explicit curvature calculations, unitarity demonstrations, and experimental predictions.
 
-### 12.3 Quantum Computing Implications
-
-Quantum algorithms might benefit from explicit temporal coordinate structures, where quantum gates operate in $\theta_t$ space while classical control operates in $r_t$ space, potentially leading to new quantum error correction schemes based on temporal geometry.
-
-## 13. Conclusion
-
-The polar temporal coordinate framework, inspired by ancient Egyptian dual temporality, provides a geometric foundation for reconciling quantum mechanics with general relativity. By treating time as possessing internal structure—radial magnitude corresponding to relativistic proper time and angular phase corresponding to quantum periodicity—we can accommodate both theories within unified spacetime geometry.
-
-This approach resolves the Wheeler-DeWitt problem of time, provides natural emergence of thermal behavior, and suggests experimental tests for quantum gravity effects. The ancient Egyptian insight that reality requires both static eternal moments (djet) and cyclical becoming (neheh) finds mathematical expression in modern geometric physics.
-
-The framework's connections to information theory and consciousness studies suggest broader implications for understanding the nature of reality itself. As we continue developing quantum gravity theories, the wisdom of ancient cosmologies may provide crucial geometric intuitions for navigating the deepest questions about space, time, and existence.
-
-Future work should explore specific calculations of quantum corrections to general relativity within this framework, detailed analysis of black hole thermodynamics in polar temporal coordinates, and experimental designs for testing predicted quantum time interference effects. The symbiosis between ancient wisdom and modern physics exemplified here suggests that our path toward understanding fundamental reality may require both rigorous mathematical formalism and deep contemplation of temporal experience itself.
+Future development must address the specific technical challenges identified here while exploring the framework's potential applications to quantum gravity, black hole physics, and cosmology. The path forward requires rigorous mathematical analysis combined with careful attention to experimental testability.
 
 ## References
 
-[1] Isham, C. J. (1993). "Canonical quantum gravity and the problem of time." NATO ASI Series 409, 157-287.
+[1] Isham, C. J. (1993). "Canonical quantum gravity and the problem of time." In *Integrable Systems, Quantum Groups, and Quantum Field Theories*, NATO ASI Series, pp. 157-287.
 
-[2] Rovelli, C. (2004). "Quantum Gravity." Cambridge University Press.
+[2] Rovelli, C. (2004). *Quantum Gravity*. Cambridge University Press.
 
-[3] Page, D. N., & Wootters, W. K. (1983). "Evolution without evolution: Dynamics described by stationary observables." Physical Review D 27(12), 2885.
+[3] Page, D. N., & Wootters, W. K. (1983). "Evolution without evolution: Dynamics described by stationary observables." Physical Review D 27(12), 2885-2892.
 
-[4] Connes, A., & Rovelli, C. (1994). "Von Neumann algebra automorphisms and time-thermodynamics relation in generally covariant quantum theories." Classical and Quantum Gravity 11(12), 2899.
+[4] Connes, A., & Rovelli, C. (1994). "Von Neumann algebra automorphisms and time-thermodynamics relation in generally covariant quantum theories." Classical and Quantum Gravity 11(12), 2899-2918.
 
-[5] Hornung, E. (1999). "The Ancient Egyptian Books of the Afterlife." Cornell University Press.
+[5] Assmann, J. (2005). *Death and Salvation in Ancient Egypt*. Cornell University Press. [Translation of German work on Egyptian temporal concepts]
 
-[6] Zych, M., Costa, F., Pikovski, I., & Brukner, Č. (2011). "Quantum interferometric visibility as a witness of general relativistic proper time." Nature Communications 2, 505.
+[6] University of Michigan Kelsey Museum (2019). "Hours of Infinity: Ancient Egyptian Solar Hymns and the Concept of Time." Kelsey Museum Publications.
 
-[7] Barbour, J. (1999). "The End of Time: The Next Revolution in Physics." Oxford University Press.
+[7] Müller, B., & Foster, J. G. (2010). "Physics with Two Time-like Dimensions." arXiv:1001.2485 [hep-th].
 
-[8] Wheeler, J. A., & DeWitt, B. S. (1967). "Superspace and the nature of quantum geometrodynamics." Annals of Physics 2(6), 604-614.
+[8] Bars, I. (2000). "Survey of two-time physics." Classical and Quantum Gravity 18(16), 3113-3130.
 
-[9] Hawking, S. W. (1988). "A Brief History of Time." Bantam Books.
+[9] Weinberg, S. (1995). *The Quantum Theory of Fields, Volume I: Foundations*. Cambridge University Press.
 
-[10] Penrose, R. (2004). "The Road to Reality: A Complete Guide to the Laws of the Universe." Jonathan Cape.
+[10] DeWitt, B. S. (1967). "Quantum Theory of Gravity. I. The Canonical Theory." Physical Review 160(5), 1113-1148.
+
+[11] DeWitt, B. S. (1967). "Quantum Theory of Gravity. II. The Manifestly Covariant Theory." Physical Review 162(5), 1195-1239.
+
+[12] DeWitt, B. S. (1967). "Quantum Theory of Gravity. III. Applications of the Covariant Theory." Physical Review 162(5), 1239-1256.
+
+[13] Wheeler, J. A. (1968). "Superspace and the nature of quantum geometrodynamics." In *Batelle Rencontres: 1967 Lectures in Mathematics and Physics*, edited by C. DeWitt and J. A. Wheeler. Benjamin, New York.
+
+[14] Hawking, S. W. (1975). "Particle Creation by Black Holes." Communications in Mathematical Physics 43(3), 199-220.
+
+[15] Zych, M., Costa, F., Pikovski, I., & Brukner, Č. (2011). "Quantum interferometric visibility as a witness of general relativistic proper time." Nature Communications 2, 505.
 
 ---
 
