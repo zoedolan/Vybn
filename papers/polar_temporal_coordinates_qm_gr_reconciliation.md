@@ -6,7 +6,7 @@ We study a five-dimensional, ultrahyperbolic spacetime with a compact timelike a
 
 $$ds^2 = -c^2(dr_t^2 + r_t^2 d\theta_t^2) + dx^2 + dy^2 + dz^2$$
 
-This flat but nontrivially foliated geometry (signature $(-,-,+,+,+)$) cleanly realizes a dual temporal structure—radial "linear" and angular "cyclical"—and admits closed timelike loops at fixed $r_t$. We derive the correct polar-form connection, show the manifold is flat for $r_t > 0$ with a coordinate degeneracy at $r_t = 0$, and write the Wheeler-DeWitt operator in the dual-time sector as the Laplace-Beltrami operator on the temporal plane, yielding an ultrahyperbolic constraint. Implications for the problem of time and thermal behavior are framed as hypotheses requiring either integrability conditions for dual evolutions or Euclidean/KMS input; we leave those physics questions open for future work.
+This flat but nontrivially foliated geometry (signature (-,-,+,+,+)) cleanly realizes a dual temporal structure—radial "linear" and angular "cyclical"—and admits closed timelike loops at fixed $r_t$. We derive the correct polar-form connection, show the manifold is flat for $r_t > 0$ with a coordinate degeneracy at $r_t = 0$, and write the Wheeler-DeWitt operator in the dual-time sector as the Laplace-Beltrami operator on the temporal plane, yielding an ultrahyperbolic constraint. Implications for the problem of time and thermal behavior are framed as hypotheses requiring either integrability conditions for dual evolutions or Euclidean/KMS input; we leave those physics questions open for future work.
 
 ## 1. Introduction
 
