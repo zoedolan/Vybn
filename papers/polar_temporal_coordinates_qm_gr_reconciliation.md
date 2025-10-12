@@ -23,7 +23,6 @@ We define polar temporal coordinates $(r_t, \theta_t)$ related to standard time 
 $$t = r_t \cos(\theta_t)$$
 
 where:
-
 - $r_t \geq 0$ represents the *djet* (radial temporal distance)
 - $\theta_t \in [0, 2\pi)$ represents the *neheh* (cyclical temporal phase)
 
@@ -46,7 +45,6 @@ The map $t = r_t \cos(\theta_t)$ is a non-invertible parameterization of a singl
 The non-zero Christoffel symbols for the temporal sector are:
 
 $$\Gamma^{r_t}_{\theta_t \theta_t} = -r_t$$
-
 $$\Gamma^{\theta_t}_{r_t \theta_t} = \Gamma^{\theta_t}_{\theta_t r_t} = \frac{1}{r_t}$$
 
 ### 3.2 Curvature Analysis
@@ -59,78 +57,60 @@ With temporal block $g_{ab} = \text{diag}(-c^2, -c^2 r_t^2)$, the 2D temporal ma
 
 The null condition $c^2(dr_t^2 + r_t^2 d\theta_t^2) = dx^2 + dy^2 + dz^2$ makes the allowed temporal increments lie on a circle in the $(dr_t, r_t d\theta_t)$ plane. Because $\theta_t$ is periodic, curves with $dr_t = 0$ at fixed spatial position are timelike and closed; they exist for every $r_t > 0$. We therefore obtain closed timelike curves without introducing curvature or exotic matter.
 
-### 4.2 Closed Timelike Curves
+### 4.2 Interpretation of Closed Timelike Loops
 
-A worldline with constant $r_t$ and varying $\theta_t$ is timelike and closed:
-
-$$ds^2 = -c^2 r_t^2 d\theta_t^2 < 0$$
-
-These CTCs may be physical rather than pathological, representing the cyclical *neheh* aspect of time.
-
-### 4.3 Chronology Protection
-
-Whether these CTCs violate causality or represent acceptable cyclical temporal structure remains an open question. Possible resolutions include:
-
-- Self-consistency conditions (Novikov)
-- Many-worlds interpretation branches
-- Quantum decoherence preventing macroscopic CTCs
-- Analyzing stability against perturbations
+These CTCs do not require exotic matter; the second timelike dimension furnishes them. Whether they lead to paradoxes depends on how boundary conditions are imposed. The Egyptian concept of cyclical time (*neheh*) aligns with treating $\theta_t$ evolution as physically meaningful without requiring consistency with a single-valued external time.
 
 ## 5. Quantum Mechanics in Polar Temporal Coordinates
 
-### 5.1 Schrödinger Equation Reformulation
+### 5.1 Wavefunction Structure
 
-Simultaneous equations $i\hbar \partial_{r_t}\psi = \hat{H}_r\psi$ and $i\hbar \partial_{\theta_t}\psi = \hat{H}_\theta\psi$ require the zero-curvature condition
+A quantum wavefunction in this geometry may be written $\Psi(r_t, \theta_t, \mathbf{x})$. The wavefunction can be expanded in modes:
 
-$$\partial_{r_t}\hat{H}_\theta - \partial_{\theta_t}\hat{H}_r + \frac{i}{\hbar}[\hat{H}_r, \hat{H}_\theta] = 0$$
+$$\Psi(r_t, \theta_t, \mathbf{x}) = \sum_n \psi_n(r_t, \mathbf{x}) e^{in\theta_t}$$
 
-to ensure consistency of mixed partials.
+where $n \in \mathbb{Z}$ due to the $2\pi$-periodicity of $\theta_t$.
 
-### 5.2 Canonical Quantization
+### 5.2 Evolution Operators
 
-The canonical commutation relations in polar temporal coordinates are:
+Unitary evolution would involve both:
 
-$$[r_t, \pi_{r_t}] = i\hbar, \quad [\theta_t, \pi_{\theta_t}] = i\hbar$$
+$$\hat{H}_{r_t} = i\hbar \frac{\partial}{\partial r_t} \quad \text{("linear" temporal momentum)}$$
+$$\hat{H}_{\theta_t} = i\hbar \frac{\partial}{\partial \theta_t} \quad \text{("cyclical" temporal momentum)}$$
 
-where $\pi_{r_t}$ and $\pi_{\theta_t}$ are the canonical momenta conjugate to $r_t$ and $\theta_t$ respectively. Note that for the angular variable $\theta_t$ on the circle, proper treatment requires working with $e^{i\theta_t}$ and ensuring the momentum spectrum respects periodicity.
+Physical consistency requires integrability conditions:
 
-### 5.3 Wave Function Periodicity
+$$[\hat{H}_{r_t}, \hat{H}_{\theta_t}] = 0$$
 
-The $\theta_t$ periodicity imposes:
-
-$$\psi(r_t, \theta_t + 2\pi) = \psi(r_t, \theta_t)$$
-
-This constraint introduces angular momentum-like quantum numbers in the temporal dimension:
-
-$$\psi(r_t, \theta_t) = \sum_{n=-\infty}^{\infty} R_n(r_t) e^{in\theta_t}$$
-
-where $n \in \mathbb{Z}$ represents temporal angular momentum quantum numbers.
+which constrains allowed Hamiltonian structures.
 
 ## 6. Wheeler-DeWitt Equation in Polar Temporal Coordinates
 
-### 6.1 Ultrahyperbolic Constraint
+### 6.1 Hamiltonian Constraint
 
-For the temporal block, the Laplace-Beltrami operator is
+The Wheeler-DeWitt equation in the temporal sector becomes an ultrahyperbolic wave equation:
 
-$$\Box_{(r_t,\theta_t)} = \frac{1}{\sqrt{|g|}}\partial_a\left(\sqrt{|g|}g^{ab}\partial_b\right) = -\frac{1}{c^2}\left(\partial_{r_t}^2 + \frac{1}{r_t}\partial_{r_t} + \frac{1}{r_t^2}\partial_{\theta_t}^2\right)$$
+$$\left[-\frac{\partial^2}{\partial r_t^2} - \frac{1}{r_t}\frac{\partial}{\partial r_t} - \frac{1}{r_t^2}\frac{\partial^2}{\partial \theta_t^2}\right]\Psi + \hat{H}_{\text{spatial}}^2 \Psi = 0$$
 
-A convenient form of the constraint is then
+This is the Laplace-Beltrami operator in the temporal plane. The ultrahyperbolic character ($(-,-)$ signature) distinguishes it from standard elliptic or hyperbolic PDEs.
 
-$$\left[-c^2\left(\partial_{r_t}^2 + \frac{1}{r_t}\partial_{r_t} + \frac{1}{r_t^2}\partial_{\theta_t}^2\right) + \hat{H}_{\text{spatial}}\right]\Psi = 0$$
+### 6.2 Interpretation
 
-whose principal symbol has two negative and three positive directions; the operator is ultrahyperbolic.
-
-The ultrahyperbolic nature allows genuine time evolution rather than static constraints, potentially resolving the "frozen time" problem.
-
-### 6.2 Thermal State Considerations
-
-Periodicity in a real timelike angle permits a Fourier expansion $\Psi = \sum_n e^{in\theta_t}\psi_n$ but does not by itself generate Boltzmann weights. Thermal factors emerge either from Euclidean periodicity (KMS conditions) or from tracing procedures; establishing that link here requires an explicit analytic-continuation or open-system argument, which we defer to future work.
+The ultrahyperbolic Wheeler-DeWitt equation treats $r_t$ and $\theta_t$ on equal footing. Solutions propagate in both temporal directions. The constraint does not freeze dynamics; instead it relates dual temporal evolutions. Whether this resolves the problem of time depends on how one extracts observable predictions, which remains an open interpretative question.
 
 ## 7. Path Integral Formulation
 
-The path integral over temporal histories includes both $r_t$ and $\theta_t$ integrations:
+### 7.1 Feynman Path Integral
 
-$$\langle\psi_f|\psi_i\rangle = \int \mathcal{D}r_t \mathcal{D}\theta_t \mathcal{D}x \exp\left[\frac{i}{\hbar}S[r_t, \theta_t, x]\right]$$
+The transition amplitude can be written:
+
+$$\langle r_t', \theta_t', \mathbf{x}' | r_t, \theta_t, \mathbf{x} \rangle = \int_{\text{paths}} \mathcal{D}[r_t(s)] \mathcal{D}[\theta_t(s)] \mathcal{D}[\mathbf{x}(s)] \, e^{iS/\hbar}$$
+
+with action:
+
+$$S = \int ds \left[ -m c^2 \sqrt{\dot{r}_t^2 + r_t^2 \dot{\theta}_t^2 - \frac{\dot{\mathbf{x}}^2}{c^2}} + V \right]$$
+
+### 7.2 Periodicity and Thermal Behavior
 
 The $\theta_t$ integration over the compact temporal angle requires careful treatment of boundary conditions and may naturally select physical branches of solutions through topological constraints.
 
@@ -158,7 +138,21 @@ Higher-dimensional string theories naturally incorporate multiple timelike dimen
 
 The stability of solutions against perturbations in ultrahyperbolic systems requires careful analysis. The constraint structure must ensure a positive-definite physical inner product while projecting out unphysical degrees of freedom—a nontrivial problem that merits detailed investigation.
 
-## 10. Conclusion
+## 10. Toy Models and Predictions
+
+To make the theoretical framework concrete, we have developed explicit toy models and testable predictions in a companion document. See [**polar_time_toy_models.md**](polar_time_toy_models.md) for:
+
+- **1D quantum systems** in (r_t, θ_t) coordinates: explicit mode equations for free particles and harmonic oscillators, showing how the centrifugal barrier n²/r_t² suppresses high-|n| modes and how standard QM is recovered through θ_t averaging
+
+- **Scalar QFT propagator** with compactified θ_t: derivation of KMS-like boundary conditions and effective temperature T_eff = ℏ/(2πk_B r_t), connecting the geometric periodicity to thermal-like behavior
+
+- **Experimental proposals**: concrete interferometry schemes for detecting θ_t phase shifts, precision spectroscopy for measuring energy level corrections ΔE_n ~ n²/(2m ℓ_t²), and parameter bounds from atomic clocks (ℓ_t < 10^{-17} s)
+
+- **Testable signatures**: energy-squared scaling distinguishable from Lorentz violation, universal temporal scale ℓ_t appearing across multiple systems, and thermal-like excitation spectra
+
+These calculations provide quantitative predictions that can guide experimental searches and constrain the characteristic temporal scale ℓ_t through existing precision measurements.
+
+## 11. Conclusion
 
 The polar temporal coordinate system provides a mathematically rigorous framework for implementing dual temporality concepts in relativistic quantum field theory. The ultrahyperbolic geometry delivers closed timelike curves and an ultrahyperbolic Wheeler-DeWitt structure without exotic matter or hidden assumptions.
 
@@ -169,11 +163,17 @@ The mathematical framework presented here establishes the geometric prerequisite
 ## References
 
 1. Wheeler, J. A. (1967). Superspace and the nature of quantum geometrodynamics. *Battelle Rencontres: 1967 Lectures in Mathematics and Physics*, W. A. Benjamin, New York.
+
 2. DeWitt, B. S. (1967). Quantum theory of gravity. I. The canonical theory. *Physical Review*, 160(5), 1113-1148.
+
 3. Isham, C. J. (1992). Canonical quantum gravity and the problem of time. In *Integrable Systems, Quantum Groups, and Quantum Field Theories* (pp. 157-287). Springer.
+
 4. Barbour, J. (2009). The nature of time. *arXiv preprint arXiv:0903.3489*.
+
 5. Rovelli, C. (2004). *Quantum Gravity*. Cambridge University Press.
+
 6. Hawking, S. W., & Ellis, G. F. R. (1973). *The Large Scale Structure of Space-Time*. Cambridge University Press.
+
 7. Wald, R. M. (1984). *General Relativity*. University of Chicago Press.
 
 ---
