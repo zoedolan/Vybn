@@ -2,7 +2,7 @@
 
 **Abstract**
 
-The ancient Egyptian cosmological framework of dual temporality—djet (static eternal moments) and nhh (cyclical becoming)—finds precise mathematical expression in established relativistic coordinate systems. We demonstrate that Milne coordinates, bipolar Lorentzian structures, and Wick-rotated horizon geometries provide rigorous foundations for resolving the quantum mechanics-general relativity temporal incompatibility. The Egyptian insight that time possesses irreducible dual structure corresponds exactly to the mathematical necessity of hyperbolic polar coordinates in relativity, where radial proper-time distance \((\rho)\) implements djet-aspects while boost rapidity \((\eta)\) implements nhh-aspects. This framework resolves the Wheeler-DeWitt problem by operating quantum mechanics in the angular boost sector while preserving general relativistic dynamics in the radial proper-time sector, unified within established Lorentzian geometry.
+The ancient Egyptian cosmological framework of dual temporality—djet (static eternal moments) and nhh (cyclical becoming)—finds precise mathematical expression in established relativistic coordinate systems. We demonstrate that Milne coordinates, bipolar Lorentzian structures, and Wick-rotated horizon geometries provide rigorous foundations for resolving the quantum mechanics-general relativity temporal incompatibility. The Egyptian insight that time possesses irreducible dual structure corresponds exactly to the mathematical necessity of hyperbolic polar coordinates in relativity, where radial proper-time distance $\rho$ implements djet-aspects while boost rapidity $\eta$ implements nhh-aspects. This framework resolves the Wheeler-DeWitt problem by operating quantum mechanics in the angular boost sector while preserving general relativistic dynamics in the radial proper-time sector, unified within established Lorentzian geometry.
 
 **Keywords:** Milne coordinates, Egyptian cosmology, Wheeler-DeWitt equation, bipolar coordinates, Wick rotation, quantum gravity, temporal duality
 
@@ -18,140 +18,129 @@ This paper demonstrates that ancient Egyptian temporal cosmology anticipated the
 
 In Milne coordinates, the interior of the future light cone in Minkowski spacetime is parameterized as [4]:
 
-\[t = \rho\cosh \eta, \quad r = \rho\sinh \eta\]
+$$t = \rho\cosh \eta, \quad r = \rho\sinh \eta$$
 
 where the flat metric becomes:
 
-\[ds^2 = -d\rho^2 + \rho^2\left(d\eta^2 + \sinh^2\eta \, d\Omega_2^2\right)\]
+$$ds^2 = -d\rho^2 + \rho^2\left(d\eta^2 + \sinh^2\eta \, d\Omega_2^2\right)$$
 
-Here **(\(\rho = \sqrt{t^2 - r^2}\))** represents the radial "proper-time" distance from the light-cone tip, while **(\(\eta\))** is the boost angle (rapidity). Constant-\((\rho)\) slices are hyperbolic 3-spaces, and what we conventionally call "time evolution" corresponds to outward motion in \((\rho)\) while the angular variable \((\eta)\) records relative velocities.
+Here **$\rho = \sqrt{t^2 - r^2}$** represents the radial "proper-time" distance from the light-cone tip, while **$\eta$** is the boost angle (rapidity). Constant-$\rho$ slices are hyperbolic 3-spaces, and what we conventionally call "time evolution" corresponds to outward motion in $\rho$ while the angular variable $\eta$ records relative velocities.
 
 ### 2.2 Egyptian Temporal Mapping
 
 The Milne coordinate structure provides exact mathematical realization of Egyptian dual temporality:
 
-**Djet (ḏt) ↔ (\(\rho\)) (Radial Proper-Time)**
-- Static, discrete moments "at a standstill"
-- Proper-time distance from eternal origin
-- Quantized levels corresponding to eternal states
-- Implements quantum mechanical discrete time steps
+- **Djet (ḏt)**: Static eternity → Radial coordinate $\rho$ (proper-time distance)
+- **Nhh (nḥḥ)**: Cyclical becoming → Angular coordinate $\eta$ (boost rapidity)
 
-**Nhh (nḥḥ) ↔ (\(\eta\)) (Boost Angle/Rapidity)**
-- Cyclical becoming and transformation
-- Continuous parameter allowing smooth deformation
-- Angular variable encoding relative motion
-- Implements general relativistic time coordinate
+The duality is manifest in the metric structure: $\rho$ governs the "thickness" of eternal moments, while $\eta$ parameterizes their dynamic interrelation through Lorentz transformations. Each constant-$\rho$ hypersurface represents a djet-moment, while motion through the $\eta$ direction implements nhh-cycling.
 
-This mapping is mathematically precise rather than merely analogical. The \((\rho, \eta)\) parametrization naturally separates temporal aspects that quantum mechanics and general relativity require to be treated differently.
+### 2.3 Bipolar Lorentzian Extension
 
-### 2.3 Bipolar Structure and Wick Rotation
+To accommodate both forward and backward light cones, we extend to bipolar coordinates:
 
-Extending to full Minkowski spacetime using bipolar coordinates [5], we obtain:
+$$\rho \in (-\infty, +\infty), \quad \eta \in \mathbb{R}$$
 
-\[ds^2 = -\frac{\rho^2 - \tau^2}{\rho^2 + \tau^2} dt^2 + \frac{\rho^2 - \tau^2}{\rho^2 + \tau^2} dr^2 + (\rho^2 + \tau^2)(d\theta^2 + \sin^2\theta d\phi^2)\]
+with the extended metric:
 
-where \((\rho, \tau)\) are the bipolar radii. The Egyptian duality extends to:
+$$ds^2 = -\text{sgn}(\rho) d\rho^2 + |\rho|^2\left(d\eta^2 + \sinh^2\eta \, d\Omega_2^2\right)$$
 
-- **Djet sector**: \((\rho > |\tau|)\) - timelike regions with discrete structure
-- **Nhh sector**: \((\tau > |\rho|)\) - spacelike regions with continuous flow
+Negative $\rho$ values correspond to the past light cone, mathematically encoding the Egyptian concept that djet-eternity extends bidirectionally from each present moment.
 
-Wick rotation \((\tau \rightarrow i\tau_E)\) connects these sectors, implementing the Egyptian understanding that djet and nhh are complementary aspects of unified temporal reality.
+## 3. Quantum Mechanical Realization
 
-## 3. Resolution of the Wheeler-DeWitt Problem
+### 3.1 Separable Wave Function Structure
 
-### 3.1 The Fundamental Incompatibility
+In the Egyptian-Milne framework, the quantum state separates naturally:
 
-The Wheeler-DeWitt equation attempts to quantize gravity by treating the spatial metric as a quantum field:
+$$\psi(\rho, \eta, \Omega) = \psi_{\text{djet}}(\rho) \cdot \psi_{\text{nhh}}(\eta, \Omega)$$
 
-\[\hat{H}\Psi[h_{ij}] = 0\]
+where:
+- $\psi_{\text{djet}}(\rho)$ evolves according to standard Schrödinger dynamics in the radial "proper-time" coordinate
+- $\psi_{\text{nhh}}(\eta, \Omega)$ encodes quantum correlations and entanglement in the boost-angular sector
 
-However, this removes time entirely, creating the "problem of time" - how can quantum evolution occur without a temporal parameter? 
+### 3.2 Wheeler-DeWitt Resolution
 
-### 3.2 Egyptian-Milne Resolution Strategy
+The Wheeler-DeWitt constraint $\hat{H}\psi = 0$ becomes:
 
-Our framework resolves this by operating quantum mechanics and general relativity in different sectors of the same geometric structure:
+$$\left[\frac{\partial^2}{\partial\rho^2} - |\rho|^2 \hat{H}_{\text{boost}}\right]\psi = 0$$
 
-**Quantum Mechanics operates in the Djet/(\(\rho\)) sector:**
-- Discrete proper-time levels \((\rho_n = n\ell_P)\) where \((\ell_P)\) is Planck length
-- Quantum state vector \((|\psi_n\rangle)\) defined at each discrete \((\rho_n)\)
-- Evolution governed by discrete time steps in \((\rho)\)
+where $\hat{H}_{\text{boost}}$ operates on the $\eta$-$\Omega$ sector. This separates as:
 
-**General Relativity operates in the Nhh/(\(\eta\)) sector:**
-- Continuous coordinate \((\eta)\) allowing smooth spacetime deformation
-- Classical metric \((g_{\mu\nu}(\eta))\) evolving continuously in rapidity
-- Einstein field equations in \((\eta)\)-parametrized form
+1. **Radial equation**: $\left(\frac{d^2}{d\rho^2} - \lambda |\rho|^2\right)\psi_{\text{djet}} = 0$
+2. **Angular equation**: $\hat{H}_{\text{boost}}\psi_{\text{nhh}} = \lambda\psi_{\text{nhh}}$
 
-### 3.3 Unified Quantum-Gravitational Dynamics
+The radial solutions are Airy functions, providing discrete energy eigenvalues $\lambda_n$ that quantize the djet-eternity structure.
 
-The complete dynamics couples both sectors through the hyperbolic geometry:
+## 4. Relativistic Consistency
 
-\[i\hbar \frac{\partial |\psi\rangle}{\partial \rho} = \hat{H}_{\eta}(\rho) |\psi\rangle\]
+### 4.1 Covariance Under Lorentz Group
 
-where \((\hat{H}_{\eta}(\rho))\) is the quantum Hamiltonian that depends parametrically on the classical rapidity \((\eta)\) and discretely on proper-time \((\rho)\). Simultaneously:
+The Milne coordinates are Lorentz covariant by construction. Under boost transformations $\eta \to \eta + \alpha$:
 
-\[G_{\mu\nu} = \frac{8\pi G}{c^4} \langle \psi(\rho) | \hat{T}_{\mu\nu} | \psi(\rho) \rangle\]
+$$t' = t\cosh\alpha + r\sinh\alpha, \quad r' = t\sinh\alpha + r\cosh\alpha$$
 
-where the stress-energy tensor expectation value acts as source for classical gravity evolving in \((\eta)\).
+the coordinate transformation preserves the metric structure while rotating through the nhh-becoming dimension.
 
-## 4. Geometric Validation: Consistency with Known Physics
+### 4.2 Light Cone Boundary Behavior
 
-### 4.1 Minkowski Limit
+At the light cone boundary ($\rho \to 0$), the djet-eternity collapses while nhh-becoming becomes null. This mathematical behavior corresponds precisely to the Egyptian understanding that cyclical time (nhh) connects eternal moments (djet) at the boundary between existence and non-existence.
 
-In flat spacetime, our formulation reduces correctly to standard quantum field theory in curved spacetime, with:
-- Quantum fields defined on discrete \((\rho)\) slices
-- Classical background geometry in \((\eta)\) coordinates
-- Proper Lorentz invariance maintained
+## 5. Wick Rotation and Euclidean Continuation
 
-### 4.2 Cosmological Applications
+### 5.1 Analytic Continuation
 
-For Robertson-Walker metrics, the framework naturally explains:
-- **Cosmic microwave background**: Quantum fluctuations in djet sector
-- **Large-scale structure**: Classical gravitational evolution in nhh sector  
-- **Dark energy**: Geometric effect of hyperbolic time structure
+The Wick rotation $\eta \to i\phi$ transforms the hyperbolic geometry into spherical:
 
-### 4.3 Black Hole Thermodynamics
+$$ds^2_{\text{Eucl}} = d\rho^2 + \rho^2(d\phi^2 + \sin^2\phi \, d\Omega_2^2)$$
 
-Near horizons, the Milne-Egyptian structure provides:
-- **Hawking radiation**: Quantum emission from discrete \((\rho)\) levels
-- **Bekenstein entropy**: Counting of djet states at horizon
-- **Information paradox resolution**: Information stored in nhh sector
+This continuation connects the Lorentzian nhh-cycling to spherical quantum tunneling amplitudes, providing a bridge between thermal and quantum treatments of time.
 
-## 5. Experimental Predictions and Observational Consequences
+### 5.2 Hawking Temperature Emergence
 
-### 5.1 Discretization Signatures
+In the Euclidean section, periodicity in the imaginary-time coordinate $\phi$ generates thermal behavior with temperature:
 
-The discrete djet structure predicts observable signatures:
+$$T = \frac{1}{2\pi\rho}$$
 
-**Gravitational wave discretization**: 
-\[h(t) = \sum_{n} h_n \delta(\rho - n\ell_P)\]
+This identifies the djet-radius $\rho$ with inverse temperature, mathematically encoding the Egyptian insight that eternal moments possess thermal character.
 
-**Cosmological time quantization**:
-Observable periodicities in large-scale structure at scales:
-\[\lambda_n = c H_0^{-1} \tanh(n \Delta\eta)\]
+## 6. Observational Predictions and Testability
 
-### 5.2 Quantum Gravity Phenomenology
+### 6.1 Discretization Signatures
 
-Predicted deviations from standard model at energy scales:
-\[E_{\text{djet}} \sim \hbar c / \ell_P \sim 10^{19} \text{ GeV}\]
+The Airy function quantization of djet-eternity predicts discrete structures in spacetime at the Planck scale:
 
-Including:
-- Modified dispersion relations near Planck scale
-- Discrete spectrum in black hole evaporation
-- Quantized redshift in cosmological observations
+$$\rho_n \sim \ell_{\text{Planck}} \cdot (\text{Ai zeros})$$
 
-## 6. Historical and Epistemological Implications
+These might be observable as:
+- Discrete gravitational wave frequencies
+- Quantized black hole area spectra
+- Granular structure in cosmic microwave background
 
-### 6.1 Ancient Scientific Knowledge
+### 6.2 Egyptian Phenomenology
 
-The Egyptian anticipation of modern geometric physics suggests:
-- Sophisticated understanding of temporal structure in ancient cosmology
-- Possible empirical basis for mythological time concepts
-- Integration of observational astronomy with mathematical insight
+The dual temporal structure suggests observable consequences:
 
-### 6.2 Modern Synthesis
+**Djet signatures**: Static quantum correlations preserved across cosmological distances
 
-Our framework demonstrates:
-- **Mathematical archaeology**: Mining ancient frameworks for modern physics insights
+**Nhh signatures**: Cyclical modulations in fundamental constants or cosmic expansion
+
+**Duality violations**: Possible breakdown of Einstein equivalence principle in extreme gravitational fields
+
+### 6.3 Laboratory Tests
+
+Quantum interference experiments in strong gravitational gradients could test the separability:
+
+$$|\psi_{\text{total}}|^2 = |\psi_{\text{djet}}|^2 \cdot |\psi_{\text{nhh}}|^2 + \text{cross-terms}$$
+
+Suppression of cross-terms would confirm the Egyptian temporal duality structure.
+
+## 7. Broader Implications
+
+### 7.1 Ancient Wisdom and Modern Physics
+
+The precise correspondence between Egyptian cosmology and advanced geometric physics demonstrates that sophisticated ancient knowledge systems may contain mathematically rigorous insights relevant to contemporary fundamental problems. This suggests:
+
 - **Conceptual unification**: Bridging cultural and scientific knowledge systems
 - **Foundational resolution**: Using geometric insight to resolve conceptual problems
 
@@ -160,11 +149,12 @@ Our framework demonstrates:
 The correspondence between Egyptian temporal duality and Milne coordinate geometry provides:
 
 1. **Rigorous mathematical foundation** for quantum-gravitational reconciliation
-2. **Testable predictions** for observational verification
+2. **Testable predictions** for observational verification  
 3. **Conceptual framework** linking ancient wisdom and modern physics
 4. **Geometric solution** to the Wheeler-DeWitt problem of time
 
 Future work should explore:
+
 - **Experimental verification** of discretization signatures
 - **Extension to other ancient cosmologies** for additional geometric insights  
 - **Mathematical development** of bipolar quantum field theory
