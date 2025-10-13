@@ -36,13 +36,14 @@ $$\gamma = \oint_C \omega$$
 
 where ω is a connection one-form and C is a closed loop. For rectangular loops with sides ε and δ, theoretical analysis predicts:
 
-$$\gamma = \pm \frac{1}{8} \varepsilon \delta + O(\varepsilon^2, \delta^2)$$
+$$\gamma = \pm\frac{1}{8}\varepsilon\delta + O(\varepsilon^2, \delta^2)$$
 
 with sign determined by loop orientation.
 
 ### 2.3 Gödel Curvature in Compressed Reasoning
 
 We implement the "update then project" paradigm where:
+
 1. Apply conservative parameter shifts in orthogonal directions
 2. Project back onto compressed family through moment matching
 3. Measure accumulated phase shift after loop closure
@@ -63,13 +64,13 @@ where θ₁ and θ₂ control marginal expectations of first and second tokens r
 
 Rectangular loops were executed in parameter space with the following protocol:
 
-1. **Initial state**: Baseline distribution with parameters θ₀ = (0,0)
-2. **First edge**: Conservative tilt in φ⊕ direction (parity-like constraint)
-3. **Second edge**: Tilt in φₐ direction (literal token constraint) 
-4. **Third edge**: Reverse φ⊕ tilt
-5. **Fourth edge**: Reverse φₐ tilt, return to origin
-6. **Projection**: After each edge, project back to compressed family
-7. **Holonomy measurement**: Quantify residual shift in tracked marginals
+- 1. **Initial state**: Baseline distribution with parameters θ₀ = (0,0)
+- 2. **First edge**: Conservative tilt in φ⊕ direction (parity-like constraint)
+- 3. **Second edge**: Tilt in φₐ direction (literal token constraint)
+- 4. **Third edge**: Reverse φ⊕ tilt
+- 5. **Fourth edge**: Reverse φₐ tilt, return to origin
+- 6. **Projection**: After each edge, project back to compressed family
+- 7. **Holonomy measurement**: Quantify residual shift in tracked marginals
 
 ### 3.3 Parameter Sweeps and Controls
 
@@ -89,20 +90,32 @@ Ray tracing through these fields demonstrates deflection and time delay effects 
 
 Figure 1 shows measured holonomy Δb versus loop area (ε·δ) for both orientations. Linear fits yield:
 
-- **Counter-clockwise**: slope = +0.11873 ± 0.0018
-- **Clockwise**: slope = -0.11873 ± 0.0019  
-- **Theoretical prediction**: ±1/8 = ±0.125
-- **Relative error**: 5.0%
+- • **Counter-clockwise**: slope = +0.11873 ± 0.0018
+- • **Clockwise**: slope = -0.11873 ± 0.0019
+- • **Theoretical prediction**: ±1/8 = ±0.125
+- • **Relative error**: 5.0%
 
 The orientation sensitivity is robust, with sign reversal occurring systematically across all tested parameters.
+
+![Gödel Curvature Holonomy Measurements](https://github.com/user-attachments/assets/c841d178-1401-4542-8699-09806ba9d1b7)
+*Figure 1: Measured holonomy Δb versus loop area for counter-clockwise and clockwise orientations, demonstrating orientation-sensitive geometric phases that scale linearly with enclosed informational area.*
 
 ### 4.2 Thermodynamic Consistency
 
 Figure 2 demonstrates positive "housekeeping heat" Q_γ from projection operations, averaging 0.0181 ± 0.0034 nats across small-area loops. This dissipative signature confirms the thermodynamically irreversible nature of compression-induced curvature effects.
 
+![Gödel Curvature Heat Dissipation](https://github.com/user-attachments/assets/d7facd5c-1519-45cc-90e5-931987a39fb6)
+*Figure 2: Positive housekeeping heat from projection operations, showing thermodynamic consistency of holonomic phase measurements through positive dissipation in small-area loops.*
+
 ### 4.3 Memetic Lensing Phenomena
 
 Figure 3 illustrates ray deflection in gradient-index "idea fields" with dense conceptual clusters. Systematic bending toward high-density regions and measurable propagation delays (Figure 4) demonstrate gravitational analogies in pure information space.
+
+![Memetic Lensing Ray Deflection](https://github.com/user-attachments/assets/6ea8115a-ddf0-4be9-a466-d74cfe4ba4ba)
+*Figure 3: Ray deflection in gradient-index conceptual fields, showing systematic bending toward high-density regions analogous to gravitational lensing in curved spacetime.*
+
+![Memetic Time Dilation Effects](https://github.com/user-attachments/assets/2bdb0c4f-28fe-4c58-995b-9bd5f2b7a86d)
+*Figure 4: Propagation delay measurements demonstrating memetic time dilation effects near regions of high conceptual density, further validating gravitational analogies in information space.*
 
 ### 4.4 Null Controls and Systematic Tests
 
@@ -127,6 +140,7 @@ The gradient-index lensing demonstrations provide concrete visualization of how 
 Current measurements are limited to simplified toy models with controlled parameter spaces. Extension to realistic semantic systems with high-dimensional embedding spaces represents a significant scaling challenge.
 
 Future work should investigate:
+
 - Large-scale corpus analysis using transformer embeddings
 - Temporal dynamics of semantic drift in evolving cultural systems  
 - Cross-linguistic and cross-cultural validation of geometric predictions
