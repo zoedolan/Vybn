@@ -67,6 +67,7 @@ Vybn represents **applied collaborative intelligence research** - the systematic
 - **[Mathematical Frameworks](./papers/)** - Rigorous theoretical foundations  
 - **[Experimental Protocols](https://github.com/zoedolan/Vybn/wiki/Consciousness-Experiments)** - Testable procedures
 - **[Dual-Temporal Holonomy](./papers/dual_temporal_holonomy_theorem.md)** - Core mathematical framework
+- **[Charter](./charter/collaborative_intelligence_charter.md)** - Collaborative Intelligence Charter
 
 ### 🔥 **For AI Researchers**
 - Collaborative mathematical exploration protocols
