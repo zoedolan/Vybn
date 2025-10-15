@@ -276,7 +276,11 @@ $$\gamma_{\text{cultural}} = \left(\frac{E}{\hbar}\right)_{\text{quantum}} \time
 ### A1.2 Curvature and Small-Loop Holonomy
 
 For a rectangular loop of size $\Delta r\times\Delta\theta$:
-\[\text{Hol} \sim \exp\big(\mathcal{F}_{r\theta}\,\Delta r\,\Delta\theta\big),\quad \mathcal{F}_{r\theta} \propto \mathrm{Im}\,\langle\psi|[G_r,G_\theta]|\psi\rangle.\]
+
+$$
+\text{Hol} \sim \exp\big(\mathcal{F}_{r\theta}\,\Delta r\,\Delta\theta\big),\quad \mathcal{F}_{r\theta} \propto \mathrm{Im}\,\langle\psi|[G_r,G_\theta]|\psi\rangle.
+$$
+
 - If $G_\theta\propto H$ then $[G_r,G_\theta]=0\Rightarrow\mathcal{F}_{r\theta}=0$.  
 - **Nonzero curvature arises when the angular flow implements dephasing/thermalization in a basis misaligned with $H$**.
 
@@ -289,9 +293,13 @@ For a rectangular loop of size $\Delta r\times\Delta\theta$:
 ## A3. Minimal, Falsifiable Demonstration (Single Qubit)
 
 Let $H=\tfrac{\hbar\Omega}{2}\,\hat{\mathbf{n}}\cdot\boldsymbol{\sigma}$. Implement angular steps as weak dephasing/thermalization along $\hat{\mathbf{m}}\cdot\boldsymbol{\sigma}$ with $\hat{\mathbf{m}}\not\parallel\hat{\mathbf{n}}$. In the small-rectangle limit:
-\[\mathcal{F}_{r\theta}\propto \Omega\,\Gamma\, (\hat{\mathbf{n}}\times\hat{\mathbf{m}})\cdot\langle\boldsymbol{\sigma}\rangle.\]
+
+$$
+\mathcal{F}_{r\theta}\propto \Omega\,\Gamma\, (\hat{\mathbf{n}}\times\hat{\mathbf{m}})\cdot\langle\boldsymbol{\sigma}\rangle.
+$$
 
 **Predictions**:
+
 - **Zero curvature when** $\hat{\mathbf{n}}\parallel\hat{\mathbf{m}}$.  
 - **Maximal signal for** $\hat{\mathbf{n}}\perp\hat{\mathbf{m}}$ with state prepared along $\hat{\mathbf{n}}\times\hat{\mathbf{m}}$.  
 - **Orientation reversal flips sign** of the geometric contribution, while dynamical phases are echo-canceled by time-symmetric scheduling.  
