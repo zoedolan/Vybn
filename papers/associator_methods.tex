@@ -1,0 +1,19 @@
+\section*{Methods: Associator Calibration}
+
+After echo cancellation, the residual phase for a small loop \(C=\partial\Sigma\) equals a surface integral
+
+\(\gamma(C)=\iint_{\Sigma}\Omega \ (\mathrm{mod}\ 2\pi)\). On a local patch with controls
+
+\((r,\theta,\beta)\) (amplitude, carrier phase, thermodynamic knob), write
+
+\(\Omega=\kappa(\beta,E)\,r\,dr\wedge d\theta + h(\beta,E)\,r\,d\theta\wedge d\beta\).
+
+Then \(H=d\Omega=[h+r\,\partial_\beta\kappa]\,dr\wedge d\theta\wedge d\beta\).
+
+For three tiny spans \(\delta r,\delta\theta,\delta\beta\),
+
+\(\Delta\gamma_{\rm assoc}=\iiint H = h_{\rm eff}\,\delta r\,\delta\theta\,\delta\beta + o(\delta^3)\),
+
+odd under reversing any one span, invariant under reparameterizations that preserve the signed three–volume,
+
+and zero iff \(H=0\) locally.
