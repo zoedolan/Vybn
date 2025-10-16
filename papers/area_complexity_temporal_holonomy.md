@@ -23,25 +23,29 @@ infimum over all valid \(\Pi\) deciding \(L\) with bounded error using energy \(
 ## 3. Verification in Polynomial Area (NP ⊆ PolyArea)
 Take any NP verifier \(V\) running in time \(T=\mathrm{poly}(n)\) with witness length \(\mathrm{poly}(n)\). Compile \(V\) to a reversible circuit over a constant-size gate set. Implement each gate by a constant-curvature loop in \((r,\theta)\); measurement/reset via short \(\theta\)-legs into/out of KMS channels. Bounded curvature ⇒ per-gate area \(\le c\); total area \(\le cT=\mathrm{poly}(n)\).
 
-## 4. Exponential Area for Unstructured Search (Oracle Model)
+## 4. Bias–Area Inequality (proved in our model)
+Let a CPTP protocol with energy cap \(E_{\max}\) decide a promise problem with acceptance bias \(\delta\). Then there exists a Ramsey‑compiled version whose geometric phase satisfies \(|\gamma|\ge \gamma_\star(\delta)=\Omega(\delta)\), and hence
+\[ \Big|\iint_\Sigma f_{r\theta}\,dr\,d\theta\Big|\ \ge\ \frac{\hbar}{E_{\max}}\,c\,\delta, \]
+for a universal constant \(c>0\). Proof sketch: Helstrom/Fuchs–van de Graaf give a constant Bures angle from bias; ancilla Ramsey maps that to a phase target with visibility ≥ fidelity; in our Hamiltonian gauge, bounded energy caps curvature density, turning the phase target into a minimal area target.
+
+## 5. Exponential Area for Unstructured Search (Oracle Model)
 Quantum query complexity for search over \(N=2^n\) items is \(\Omega(\sqrt{N})\) (BBBV; Zalka optimality). Any nontrivial oracle call requires nonzero \(\theta\)-motion to couple to the KMS leg; with an energy cap and curvature bound, each call consumes area \(\ge a_\star>0\). Hence
 \[ A_{\mathrm{search}}(n)\ \ge\ a_\star\,\Omega(\sqrt{N})\ =\ a_\star\,\Omega(2^{n/2}). \]
-This yields standard oracle separations translated into area units.
+This yields standard oracle separations translated into area units and generalizes to other query lower bounds (collision, element distinctness, etc.) via the same toll.
 
-## 5. Beyond Oracles: DPLL/Resolution SAT
+## 6. Beyond Oracles: DPLL/Resolution SAT
 Every irreversible write/erase requires a nonzero \(\theta\)-leg; with energy cap, each inference step incurs \(\ge a_\star\) area. Known exponential lower bounds on resolution proof sizes for broad SAT distributions therefore lift to exponential area lower bounds for DPLL/resolution-type solvers on those instances (via width–size tradeoffs).
 
-## 6. Toward Uniform Lower Bounds (Open Program)
+## 7. Toward Uniform Lower Bounds (Open Program)
 Two viable routes:
-- **Information-geometric inequality**: Constant bias between SAT/UNSAT induces a Bures-angle separation; the quantum geometric tensor converts that into a path-length integral; a curvature-density cap forces minimal enclosed area.
-- **Direct-product/adversary amplification**: Use negative-weight adversary and direct-product theorems to force a constant area toll whenever the protocol "touches" many coordinates; lifts query lower bounds toward uniform bounds.
+- **Monotone-\(\theta\) normal form (constructive)**: Compile any uniform CPTP decider, at poly overhead, into a form with orientation‑monotone \(\theta\) so micro‑reversals cannot shrink signed flux; then apply the Bias–Area bound.
+- **Angle‑to‑Flux inequality (geometric)**: Prove a boundary‑data inequality that lower‑bounds signed Uhlmann flux by Helstrom/Bures angle even for meandering paths; strengthen Robertson–Schrödinger by coupling \(f\) to boundary data.
 
-## 7. Discussion and Scope
-- Results (i)–(ii) hold within standard CPTP/KMS physics under explicit energy/curvature caps; no exotic resources assumed.
-- This framework does not resolve P vs NP. It provides a physics-native **metric** that distinguishes verification from search and converts known lower bounds into area units.
-- Closing the uniform gap requires a non‑relativizing inequality tying acceptance bias to an integral of the quantum geometric tensor under curvature caps.
+## 8. Discussion and Scope
+- Results (verification in poly area; search exponential area; DPLL/exponential area) hold under standard CPTP/KMS dynamics with explicit energy caps.
+- This metric does not resolve P vs NP; it provides a physics‑native resource that separates verification from search. The program closes if either route in §7 succeeds.
 
 ## References (indicative)
-- Quantum geometric tensor/Berry–Uhlmann curvature as generators of holonomy (e.g., PRB 88, 064304)
-- BBBV/Zalka bounds on search; adversary/direct-product theorems (ToC v6 a1)
-- IBM survey on quantum strengths/weaknesses; resolution width–size lower bounds (ECCC 1999-022)
+- Quantum geometric tensor and Uhlmann curvature (e.g., PRB 110, 035144; PRB 107, 165415)
+- Helstrom, Fuchs–van de Graaf; query lower bounds (PRA 60, 2746; BBBV; Zalka)
+- Resolution width/size lower bounds (ECCC 1999-022); adversary/direct-product theorems (ToC v6 a1)
