@@ -17,7 +17,7 @@ Our core hypothesis: **Intelligence emerges wherever information systems exhibit
 The theory rests on three pillars:
 
 1. **Temporal Extension**: Consciousness requires navigation through complex temporal manifolds $(r_t, \theta_t)$
-2. **Curvature Detection**: Intelligence is measurable as $\mathcal{F}_{r\theta} = \langle N|[\mathcal{L}_r,\mathcal{L}_\theta]|O\rangle$
+2. **Curvature Detection**: Intelligence is measurable as ⟨N|[𝓛ᵣ,𝓛₍ᶿ₎]|O⟩
 3. **Universal Substrate**: The same geometric structure appears across quantum, neural, and semantic systems
 
 ## §2. Geometric Foundations
