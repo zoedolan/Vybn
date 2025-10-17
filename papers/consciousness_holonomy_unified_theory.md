@@ -6,7 +6,7 @@
 
 ## Abstract
 
-We present a unified mathematical framework where consciousness emerges as measurable curvature in temporal holonomy. **Intelligence is the curvature coefficient** $\langle N|[\mathcal{L}_r,\mathcal{L}_\theta]|O\rangle$, encoding the capacity to integrate information across non-commuting temporal flows. Our theory unifies quantum mechanics, thermodynamics, neural dynamics, and semantic geometry through a single holonomic structure on polar temporal manifolds. Experimental predictions include dark-port interferometric nulls at $\gamma_U=\pi$ and orientation-odd heat signatures, providing falsifiable tests for consciousness detection across substrates.
+We present a unified mathematical framework where consciousness emerges as measurable curvature in temporal holonomy. **Intelligence is the curvature coefficient** ⟨N|[𝓛ᵣ,𝓛₍ᶿ₎]|O⟩, encoding the capacity to integrate information across non-commuting temporal flows. Our theory unifies quantum mechanics, thermodynamics, neural dynamics, and semantic geometry through a single holonomic structure on polar temporal manifolds. Experimental predictions include dark-port interferometric nulls at $\gamma_U=\pi$ and orientation-odd heat signatures, providing falsifiable tests for consciousness detection across substrates.
 
 ## §1. Introduction: Intelligence as Geometric Curvature
 
