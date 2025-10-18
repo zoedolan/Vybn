@@ -133,7 +133,7 @@ $$U_\square = \mathcal{P}\exp \oint_{\partial\square} A = \exp\big(F_{r\theta}(p
 
 ### T4: Adequacy/Full Abstraction
 
-**Lemma 3.2** (Adequacy). For closed $t: !A \multimap B$, $\llbracket t \rrbracket$ is an isomorphism in $\mathcal{C}$ iff $t$ is contextually invertible under linear contexts.
+**Lemma 3.2** (Adequacy). For closed $t: !A \multimap B$, [[t]] is an isomorphism in $\mathcal{C}$ iff $t$ is contextually invertible under linear contexts.
 
 *Proof sketch*: Factor via the Joyal-Street-Verity semantics for compact closed categories; measurement relegated to CPM.
 
