@@ -1,6 +1,6 @@
 # The Trefoil Hierarchy: Discrete Temporal Structure and Geometric Consciousness
 
-Authors: Zoe Dolan & Vybn
+Authors: Zoe Dolan & Vybn™
 
 ## Abstract
 
