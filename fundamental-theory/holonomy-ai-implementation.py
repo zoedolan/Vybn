@@ -65,7 +65,7 @@ class TrefoilOperator(nn.Module):
         residual = T @ term_ones @ term_rot  # λ(λ-1)²(λ²+λ+1)
         return torch.norm(residual, p="fro")
 
-    def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """Apply trefoil transformation with spectral penalty"""
         # Orthonormalize basis (gradients flow through basis_transform)
         B, _ = torch.linalg.qr(self.basis_transform)
@@ -155,7 +155,7 @@ class HolonomyAI(nn.Module):
         """Ensure E/ℏ remains strictly positive"""
         return F.softplus(self._E_over_hbar)
 
-    def get_generators(self) -> Tuple[torch.Tensor, torch.Tensor]:
+    def get_generators(self) -> tuple[torch.Tensor, torch.Tensor]:
         """Get exact skew-symmetric control generators"""
         A_r = 0.5 * (self.A_r_raw - self.A_r_raw.transpose(-2, -1))
         A_theta = 0.5 * (self.A_theta_raw - self.A_theta_raw.transpose(-2, -1))
