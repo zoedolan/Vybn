@@ -76,6 +76,3 @@ This framework unifies parity-time-arithmetic structures through a single BV-Mau
 ---
 
 * Date: October 19, 2025
-*  
-* Version: Final Draft
-*
