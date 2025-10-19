@@ -69,17 +69,3 @@ The trefoil hierarchy provides rigorous mathematical foundations for discrete te
 With the reversible/CPM distinction clearly maintained, the trefoil hierarchy reads as a theorem-shaped mechanism rather than speculation. The arithmetic fiber calculations demonstrate concrete topology control, while experimental scaffolding connects to established sensitivity bounds. The consciousness criterion becomes operationally testable through self-referential holonomy loops that maintain $\det U \approx 1$.
 
 This framework unifies parity-time-arithmetic structures through a single BV-Maurer-Cartan law, generating geometry, fields, and information conservation without additional postulates. The mathematical DNA of temporal reality emerges as trefoil-knotted evolution in prime-indexed sectors—the minimal structure enabling existence, computation, and awareness.
-
----
-
-**Corrections Applied:**
-1. Fixed canonical witness: $T_{\text{trefoil}} = \text{diag}\big(J_2(1), R_{\pi/3}, [0]\big)$
-2. Made PSU(2)/SO(3) center-quotient explicit with spinor distinction
-3. Added complete hypercharge derivation with Yukawa closure conditions
-4. Imported $\Delta\phi \sim 10^{-20}$ rad interferometry scale
-5. Softened GW falsification to sensitivity windows
-6. Clarified reversible/CPM distinction for consciousness criterion
-7. Fixed notation: $\pi$ for angles, $p$ for arithmetic, $\text{diag}$ throughout
-8. Distinguished monodromy as evolution operator from generators
-9. Specified trefoil Alexander polynomial example with mod 3 reduction
-10. Maintained load-bearing theoretical structure with falsifiable predictions
