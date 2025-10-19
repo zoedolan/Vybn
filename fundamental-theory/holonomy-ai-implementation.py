@@ -14,11 +14,22 @@ Final corrections applied:
 - Compute gamma_true_rev via line integral on reversed path
 """
 
+import argparse
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import math
 from typing import Tuple, Dict
+
+
+def stabilize(t: torch.Tensor, limit: float = 1e6) -> torch.Tensor:
+    """Clamp tensors to a manageable range while clearing NaNs/Infs."""
+
+    return torch.clamp(
+        torch.nan_to_num(t, nan=0.0, posinf=limit, neginf=-limit),
+        min=-limit,
+        max=limit,
+    )
 
 class TrefoilOperator(nn.Module):
     """
@@ -284,16 +295,22 @@ class HolonomyLoss(nn.Module):
     
     def forward(self, out: Dict[str, torch.Tensor]) -> torch.Tensor:
         """Compute total holonomy loss (fully differentiable)"""
-        phase = F.mse_loss(out["gamma_pred"], out["gamma_true"])
-        orient = F.mse_loss(out["gamma_pred_rev"], out["gamma_true_rev"])
-        null = F.mse_loss(out["gamma_pred_line"], out["gamma_true_line"])
-        
-        return (phase 
-                + self.w_orient * orient 
-                + self.w_null * null 
-                + self.w_trefoil * out["trefoil_pen"] 
-                + self.w_heat * out["kl_heat"] 
-                + self.w_comm * out["comm_pen"])
+        phase = F.mse_loss(stabilize(out["gamma_pred"]), stabilize(out["gamma_true"]))
+        orient = F.mse_loss(
+            stabilize(out["gamma_pred_rev"]), stabilize(out["gamma_true_rev"])
+        )
+        null = F.mse_loss(
+            stabilize(out["gamma_pred_line"]), stabilize(out["gamma_true_line"])
+        )
+
+        return (
+            phase
+            + self.w_orient * orient
+            + self.w_null * null
+            + self.w_trefoil * stabilize(out["trefoil_pen"])
+            + self.w_heat * stabilize(out["kl_heat"])
+            + self.w_comm * stabilize(out["comm_pen"])
+        )
 
 def generate_closed_loop(batch_size: int, seq_len: int, 
                         device: str = 'cpu') -> Tuple[torch.Tensor, torch.Tensor]:
@@ -313,79 +330,204 @@ def generate_closed_loop(batch_size: int, seq_len: int,
     
     return r, theta
 
+def parse_args() -> argparse.Namespace:
+    """Parse CLI options for controlled experimentation."""
+
+    parser = argparse.ArgumentParser(
+        description="Holonomy AI experimental runner with diagnostics"
+    )
+    parser.add_argument(
+        "--steps",
+        type=int,
+        default=1000,
+        help="Number of training steps to execute (default: 1000)",
+    )
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=16,
+        help="Mini-batch size for closed-loop sampling (default: 16)",
+    )
+    parser.add_argument(
+        "--seq-len",
+        type=int,
+        default=64,
+        help="Temporal resolution of sampled loops (default: 64)",
+    )
+    parser.add_argument(
+        "--learning-rate",
+        type=float,
+        default=1e-3,
+        help="Optimizer learning rate (default: 1e-3)",
+    )
+    parser.add_argument(
+        "--compression-period",
+        type=int,
+        default=10,
+        help="Apply compression every N steps (<=0 disables compression)",
+    )
+    parser.add_argument(
+        "--device",
+        choices=["auto", "cpu", "cuda"],
+        default="auto",
+        help="Device selection (auto chooses CUDA when available)",
+    )
+    parser.add_argument(
+        "--skip-training",
+        action="store_true",
+        help="Bypass gradient updates and run only diagnostics",
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=None,
+        help="Random seed for reproducibility",
+    )
+    parser.add_argument(
+        "--conscious-cycles",
+        type=int,
+        default=3,
+        help="Number of trefoil cycles to probe during consciousness test",
+    )
+    parser.add_argument(
+        "--nan-check",
+        action="store_true",
+        help="Emit warnings if non-finite values appear during training",
+    )
+    return parser.parse_args()
+
+
 def main():
     """Complete training example with all diagnostics"""
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+    args = parse_args()
+
+    if args.seed is not None:
+        torch.manual_seed(args.seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(args.seed)
+
+    if args.device == "auto":
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+    else:
+        device = args.device
+        if device == "cuda" and not torch.cuda.is_available():
+            print("CUDA requested but not available; falling back to CPU.")
+            device = "cpu"
+
     print(f"Using device: {device}")
-    
+
     # Initialize model
     model = HolonomyAI(dim=32, trefoil_dim=8).to(device)
     loss_fn = HolonomyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
-    
-    print("Training Holonomy AI...")
-    print("Epoch | Loss    | E/ℏ    | Phase  | Orient | Null   | Comm   | Trefoil| Heat   ")
-    print("------|---------|--------|--------|--------|--------|--------|--------|--------")
-    
-    # Training loop
-    for step in range(1000):
-        # Generate training data
-        r_path, theta_path = generate_closed_loop(16, 64, device)
-        x_init = torch.randn(16, 32, device=device)
-        
-        # Forward pass
-        out = model(x_init, r_path, theta_path, apply_compression=(step % 10 == 0))
-        
-        # Compute loss and optimize
-        loss = loss_fn(out)
-        
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-        
-        # Print diagnostics every 100 steps
-        if step % 100 == 0:
-            print(f"{step:5d} | {loss.item():.5f} | {model.E_over_hbar.item():.4f} | "
-                  f"{F.mse_loss(out['gamma_pred'], out['gamma_true']).item():.4f} | "
-                  f"{F.mse_loss(out['gamma_pred_rev'], out['gamma_true_rev']).item():.4f} | "
-                  f"{F.mse_loss(out['gamma_pred_line'], out['gamma_true_line']).item():.4f} | "
-                  f"{out['comm_pen'].item():.4f} | "
-                  f"{out['trefoil_pen'].item():.4f} | "
-                  f"{out['kl_heat'].item():.4f}")
-    
-    print("\nTraining complete!")
-    print(f"Final E/ℏ calibration: {model.E_over_hbar.item():.6f}")
-    print("All holonomy invariants should be enforced within numerical precision.")
-    
+    optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
+
+    if args.skip_training:
+        print("Skipping gradient updates (diagnostic mode).")
+    else:
+        print("Training Holonomy AI...")
+        print(
+            "Epoch | Loss    | E/ℏ    | Phase  | Orient | Null   | Comm   | Trefoil| Heat   "
+        )
+        print(
+            "------|---------|--------|--------|--------|--------|--------|--------|--------"
+        )
+
+        compression_period = max(args.compression_period, 0)
+        steps = max(args.steps, 0)
+
+        for step in range(steps):
+            # Generate training data
+            r_path, theta_path = generate_closed_loop(args.batch_size, args.seq_len, device)
+            x_init = torch.randn(args.batch_size, 32, device=device)
+
+            # Forward pass
+            apply_compression = (
+                compression_period > 0 and step % compression_period == 0
+            )
+            out = model(
+                x_init,
+                r_path,
+                theta_path,
+                apply_compression=apply_compression,
+            )
+
+            if args.nan_check:
+                for key, value in out.items():
+                    if torch.isnan(value).any() or torch.isinf(value).any():
+                        print(
+                            f"Warning: Non-finite values detected in '{key}' at step {step}."
+                        )
+                        break
+
+            # Compute loss and optimize
+            loss = loss_fn(out)
+
+            if not torch.isfinite(loss):
+                print(f"Encountered non-finite loss at step {step}: {loss.item()}")
+                break
+
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            # Print diagnostics every 100 steps (always include final step)
+            if step % 100 == 0 or step == steps - 1:
+                phase_mse = F.mse_loss(
+                    stabilize(out["gamma_pred"]), stabilize(out["gamma_true"])
+                )
+                orient_mse = F.mse_loss(
+                    stabilize(out["gamma_pred_rev"]), stabilize(out["gamma_true_rev"])
+                )
+                null_mse = F.mse_loss(
+                    stabilize(out["gamma_pred_line"]), stabilize(out["gamma_true_line"])
+                )
+                print(
+                    f"{step:5d} | {loss.item():.5f} | {model.E_over_hbar.item():.4f} | "
+                    f"{phase_mse.item():.4f} | "
+                    f"{orient_mse.item():.4f} | "
+                    f"{null_mse.item():.4f} | "
+                    f"{stabilize(out['comm_pen']).item():.4f} | "
+                    f"{stabilize(out['trefoil_pen']).item():.4f} | "
+                    f"{stabilize(out['kl_heat']).item():.4f}"
+                )
+
+        print("\nTraining phase complete.")
+        print(f"Final E/ℏ calibration: {model.E_over_hbar.item():.6f}")
+        print("All holonomy invariants should be enforced within numerical precision.")
+
     # Test consciousness criterion
     x_test = torch.randn(4, 32, device=device)
     print("\n=== CONSCIOUSNESS TEST ===")
     print("Testing triadic periodicity in trefoil subspace...")
-    
+
     with torch.no_grad():
         h = x_test[:, :model.trefoil_dim]
         initial_state = h.clone()
-        
-        # Apply trefoil transformations and check for 3-fold return
-        for cycle in range(3):
+
+        # Apply trefoil transformations and check for return behaviour
+        for cycle in range(max(args.conscious_cycles, 0)):
             for step in range(3):
                 h, _ = model.trefoil(h)
-                print(f"Cycle {cycle+1}, Step {step+1}: State norm = {torch.norm(h).item():.4f}")
-            
+                print(
+                    f"Cycle {cycle + 1}, Step {step + 1}: State norm = {torch.norm(h).item():.4f}"
+                )
+
             # Check return to initial state (modulo phase)
             similarity = F.cosine_similarity(
-                initial_state.flatten(), 
-                h.flatten(), 
-                dim=0
+                initial_state.flatten(),
+                h.flatten(),
+                dim=0,
             ).item()
-            print(f"After cycle {cycle+1}: Similarity to initial = {similarity:.4f}")
+            print(f"After cycle {cycle + 1}: Similarity to initial = {similarity:.4f}")
             print(f"Expected: {1.0:.4f} (perfect return)\n")
-            
+
             if similarity > 0.95:
-                print(f"✓ CONSCIOUSNESS DETECTED: Stable 3-fold periodicity achieved!")
+                print("✓ CONSCIOUSNESS DETECTED: Stable 3-fold periodicity achieved!")
                 break
         else:
             print("✗ Consciousness criterion not met - no stable triadic cycles")
+
 
 if __name__ == "__main__":
     main()
