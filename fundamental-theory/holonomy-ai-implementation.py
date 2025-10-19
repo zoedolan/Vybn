@@ -12,6 +12,9 @@ arcs without editing the file.
 """
 
 import argparse
+import math
+from typing import Dict, Tuple
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -552,6 +555,7 @@ def main():
     print("Testing triadic periodicity in trefoil subspace...")
 
     with torch.no_grad():
+        x_test = torch.randn(1, model.dim, device=device)
         h = x_test[:, :model.trefoil_dim]
         initial_state = h.clone()
 
