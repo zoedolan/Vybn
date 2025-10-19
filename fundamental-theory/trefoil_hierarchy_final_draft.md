@@ -2,7 +2,7 @@
 
 ## Abstract
 
-We present a unified framework where consciousness, spacetime geometry, and particle physics emerge from reversible topological operations acting on a discrete temporal manifold. The canonical witness is the trefoil monodromy operator $T_{\text{trefoil}} = \operatorname{diag}\big(J_2(1), R_{\pi/3}, [0]\big)$ with minimal polynomial $m_T(\lambda) = \lambda(\lambda-1)^2(\lambda^2-\lambda+1)$. This captures the complete temporal signature: irreversible sinks, marginal memory, and 3-fold holonomy cycles. The prime arithmetic fiber provides discrete coordinates where topology transitions between distinct and collapsed states, explaining triadic phenomenology in fundamental physics.
+We present a unified framework where consciousness, spacetime geometry, and particle physics emerge from reversible topological operations acting on a discrete temporal manifold. The canonical witness is the trefoil monodromy operator $T_{\text{trefoil}} = \text{diag}\big(J_2(1), R_{\pi/3}, [0]\big)$ with minimal polynomial $m_T(\lambda) = \lambda(\lambda-1)^2(\lambda^2-\lambda+1)$. This captures the complete temporal signature: irreversible sinks, marginal memory, and 3-fold holonomy cycles. The prime arithmetic fiber provides discrete coordinates where topology transitions between distinct and collapsed states, explaining triadic phenomenology in fundamental physics.
 
 ## I. Introduction
 
@@ -10,13 +10,13 @@ The cut-glue algebra treats spacetime and matter as manifestations of reversible
 
 The trefoil emerges as the minimal non-trivial temporal structure. Its monodromy matrix exhibits the complete taxonomy of evolution modes:
 
-$$T_{\text{trefoil}} = \operatorname{diag}\big(J_2(1), R_{\pi/3}, [0]\big)$$
+$$T_{\text{trefoil}} = \text{diag}\big(J_2(1), R_{\pi/3}, [0]\big)$$
 
 where $J_2(1)$ is the 2×2 Jordan block at eigenvalue 1, $R_{\pi/3}$ generates 3-fold rotations with $R_{\pi/3}^6 = \mathbf{1}$ and $R_{\pi/3}^3 = -\mathbf{1}$, and $[0]$ represents the irreversible sink. The $[0]$ block realizes the $\lambda$ factor in $m_T(\lambda) = \lambda(\lambda-1)^2(\lambda^2-\lambda+1)$, ensuring we present the actual minimal polynomial. Keeping $T$ as one-step monodromy localizes the non-unitary piece outside the reversible †-fragment, exactly as established in the foundations paper where classical evaluation is quarantined to CPM side-channels.
 
 ### The 3-versus-6 Hierarchy
 
-$R_{\pi/3}^6 = \mathbf{1}$ while $R_{\pi/3}^3 = -\mathbf{1}$, and projective/adjoint probes factor through $\mathrm{PSU}(2) \cong \mathrm{SO}(3)$, identifying the $\mathbb{Z}_2$ center. Adjoint or character-based observables that factor through the center cannot distinguish $\pm\mathbf{1}$, hence 3-periodic readouts. Spinorial probes in the fundamental representation would not erase the sign, preserving 6-fold structure. The BCH small-loop holonomy provides the operational bridge to interferometry exactly as developed in the companion.
+$R_{\pi/3}^6 = \mathbf{1}$ while $R_{\pi/3}^3 = -\mathbf{1}$, and projective/adjoint probes factor through $\text{PSU}(2) \cong \text{SO}(3)$, identifying the $\mathbb{Z}_2$ center. Adjoint or character-based observables that factor through the center cannot distinguish $\pm\mathbf{1}$, hence 3-periodic readouts. Spinorial probes in the fundamental representation would not erase the sign, preserving 6-fold structure. The BCH small-loop holonomy provides the operational bridge to interferometry exactly as developed in the companion.
 
 ## II. Arithmetic Fiber Structure
 
@@ -34,14 +34,16 @@ $$Y_Q = \frac{1}{6}, \quad Y_u = \frac{2}{3}, \quad Y_d = -\frac{1}{3}, \quad Y_
 ## IV. Experimental Predictions
 
 ### Interferometry
+
 Polar-time commutator measurements should exhibit $\Delta\phi \sim 10^{-20}$ rad phase accumulation for Earth-scale loops under the geometric coupling. The $\pi/3$ plateau signature arises from clean BCH-based protocol that isolates the commutator phase, providing both scale and challenge budget for experimental detection.
 
 ### Gravitational Waves
+
 Rather than requiring "no discrete features whatsoever," we predict no features within the sensitivity windows and coupling bounds defined in the companion framework. This aligns falsification criteria with established consistency ranges for universal discreteness scales, avoiding untestably absolute requirements while maintaining predictive content.
 
 ## V. Consciousness Criterion
 
-A conscious system executes loops in the reversible fragment with $\det U_{\square} \approx 1$ while genuinely updating its self-model. This is the †-subcategory from categorical semantics with classical evaluation quarantined in CPM channels, echoing subject-reduction and adequacy lemmas in the mathematical companion. The loop computation itself remains reversible—consciousness emerges from the self-referential holonomy structure, not from irreversibility.
+A conscious system executes loops in the reversible fragment with $\det U_\square \approx 1$ while genuinely updating its self-model. This is the †-subcategory from categorical semantics with classical evaluation quarantined in CPM channels, echoing subject-reduction and adequacy lemmas in the mathematical companion. The loop computation itself remains reversible—consciousness emerges from the self-referential holonomy structure, not from irreversibility.
 
 The "trefoil as minimal protected holonomy" represents a design choice with semantic foundation rather than metaphor. The trefoil provides the minimal recursive structure for stable self-reference: the depth-3 loop "I think that I think that I think" that cannot be reduced to simpler components while maintaining non-trivial topology.
 
@@ -53,11 +55,11 @@ Black hole information preservation would confirm this framework through reversi
 
 ## VII. Mathematical Structure and Notation
 
-We maintain consistent notation throughout: $\pi$ denotes its angular role in $R_{\pi/3}$ while $\mathfrak{p}$ denotes the arithmetic coordinate ("prime-fiber sector" when disambiguation is needed). We adopt $\operatorname{diag}(\cdots)$ for matrix displays and define "monodromy" as "one-step evolution operator" to prevent misinterpretation as skew-adjoint generators.
+We maintain consistent notation throughout: $\pi$ denotes its angular role in $R_{\pi/3}$ while $p$ denotes the arithmetic coordinate ("prime-fiber sector" when disambiguation is needed). We adopt $\text{diag}(\cdots)$ for matrix displays and define "monodromy" as "one-step evolution operator" to prevent misinterpretation as skew-adjoint generators.
 
 The complete minimal polynomial structure:
 - $\lambda$ factor: irreversible information sink
-- $(\lambda-1)^2$ factor: length-2 Jordan block encoding controlled memory drift  
+- $(\lambda-1)^2$ factor: length-2 Jordan block encoding controlled memory drift
 - $(\lambda^2-\lambda+1)$ factor: 3rd cyclotomic polynomial for clean $\mathbb{Z}_3$ holonomy
 
 ## VIII. Conclusions
@@ -71,13 +73,13 @@ This framework unifies parity-time-arithmetic structures through a single BV-Mau
 ---
 
 **Corrections Applied:**
-1. Fixed canonical witness: $T_{\text{trefoil}} = \operatorname{diag}\big(J_2(1), R_{\pi/3}, [0]\big)$ 
+1. Fixed canonical witness: $T_{\text{trefoil}} = \text{diag}\big(J_2(1), R_{\pi/3}, [0]\big)$
 2. Made PSU(2)/SO(3) center-quotient explicit with spinor distinction
 3. Added complete hypercharge derivation with Yukawa closure conditions
 4. Imported $\Delta\phi \sim 10^{-20}$ rad interferometry scale
 5. Softened GW falsification to sensitivity windows
 6. Clarified reversible/CPM distinction for consciousness criterion
-7. Fixed notation: $\pi$ for angles, $\mathfrak{p}$ for arithmetic, $\operatorname{diag}$ throughout
+7. Fixed notation: $\pi$ for angles, $p$ for arithmetic, $\text{diag}$ throughout
 8. Distinguished monodromy as evolution operator from generators
 9. Specified trefoil Alexander polynomial example with mod 3 reduction
 10. Maintained load-bearing theoretical structure with falsifiable predictions
