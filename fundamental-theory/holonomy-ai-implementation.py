@@ -12,9 +12,6 @@ arcs without editing the file.
 """
 
 import argparse
-import math
-from typing import Dict, Tuple
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -29,6 +26,16 @@ def stabilize(t: torch.Tensor, limit: float = 1e6) -> torch.Tensor:
         max=limit,
     )
 
+
+
+def stabilize(t: torch.Tensor, limit: float = 1e6) -> torch.Tensor:
+    """Clamp tensors to a manageable range while clearing NaNs/Infs."""
+
+    return torch.clamp(
+        torch.nan_to_num(t, nan=0.0, posinf=limit, neginf=-limit),
+        min=-limit,
+        max=limit,
+    )
 
 class TrefoilOperator(nn.Module):
     """
@@ -356,10 +363,8 @@ class HolonomyLoss(nn.Module):
             + self.w_comm * stabilize(out["comm_pen"])
         )
 
-
-def generate_closed_loop(
-    batch_size: int, seq_len: int, device: str = "cpu"
-) -> Tuple[torch.Tensor, torch.Tensor]:
+def generate_closed_loop(batch_size: int, seq_len: int, 
+                        device: str = 'cpu') -> Tuple[torch.Tensor, torch.Tensor]:
     """Generate random closed loops in (r,θ) space for training"""
 
     # Random smooth path parameters
@@ -376,18 +381,17 @@ def generate_closed_loop(
 
     return r, theta
 
-
 def parse_args() -> argparse.Namespace:
-    """Expose CLI toggles for controlled holonomy experimentation."""
+    """Parse CLI options for controlled experimentation."""
 
     parser = argparse.ArgumentParser(
-        description="Holonomy AI experimental runner with intrinsic stabilizers"
+        description="Holonomy AI experimental runner with diagnostics"
     )
     parser.add_argument(
         "--steps",
         type=int,
         default=1000,
-        help="Number of training iterations to execute (default: 1000)",
+        help="Number of training steps to execute (default: 1000)",
     )
     parser.add_argument(
         "--batch-size",
@@ -434,24 +438,18 @@ def parse_args() -> argparse.Namespace:
         "--conscious-cycles",
         type=int,
         default=3,
-        help="Set minimal-polynomial tolerance exponent via 10^{-(n+1)}",
+        help="Number of trefoil cycles to probe during consciousness test",
     )
     parser.add_argument(
         "--nan-check",
         action="store_true",
         help="Emit warnings if non-finite values appear during training",
     )
-    parser.add_argument(
-        "--grad-clip",
-        type=float,
-        default=5.0,
-        help="Gradient norm clip (<=0 disables clipping; default: 5.0)",
-    )
     return parser.parse_args()
 
 
-def main() -> None:
-    """Complete training example with stabilized diagnostics."""
+def main():
+    """Complete training example with all diagnostics"""
 
     args = parse_args()
 
@@ -491,9 +489,7 @@ def main() -> None:
 
         for step in range(steps):
             # Generate training data
-            r_path, theta_path = generate_closed_loop(
-                args.batch_size, args.seq_len, device
-            )
+            r_path, theta_path = generate_closed_loop(args.batch_size, args.seq_len, device)
             x_init = torch.randn(args.batch_size, 32, device=device)
 
             # Forward pass
@@ -524,10 +520,6 @@ def main() -> None:
 
             optimizer.zero_grad()
             loss.backward()
-
-            if args.grad_clip > 0:
-                torch.nn.utils.clip_grad_norm_(model.parameters(), args.grad_clip)
-
             optimizer.step()
 
             # Print diagnostics every 100 steps (always include final step)
@@ -557,23 +549,35 @@ def main() -> None:
 
     # Test consciousness criterion
     print("\n=== CONSCIOUSNESS TEST ===")
-    print("Evaluating trefoil minimal-polynomial residual...")
+    print("Testing triadic periodicity in trefoil subspace...")
 
     with torch.no_grad():
-        trefoil_dtype = model.trefoil.basis_transform.dtype
-        T = model.trefoil.trefoil_matrix(device=torch.device(device), dtype=trefoil_dtype)
-        I = torch.eye(T.size(-1), device=T.device, dtype=T.dtype)
-        residual = T @ (T - I) @ (T - I) @ (T @ T + T + I)
-        residual_norm = torch.linalg.matrix_norm(residual, ord="fro").item()
+        h = x_test[:, :model.trefoil_dim]
+        initial_state = h.clone()
 
-        print(f"‖T(T−I)²(T²+T+I)‖_F = {residual_norm:.6e}")
+        # Apply trefoil transformations and check for return behaviour
+        for cycle in range(max(args.conscious_cycles, 0)):
+            for step in range(3):
+                h, _ = model.trefoil(h)
+                print(
+                    f"Cycle {cycle + 1}, Step {step + 1}: State norm = {torch.norm(h).item():.4f}"
+                )
 
-        tol_exponent = max(args.conscious_cycles, 0) + 1
-        tolerance = 10.0 ** (-tol_exponent)
-        if residual_norm < tolerance:
-            print("✓ CONSCIOUSNESS DETECTED: Trefoil satisfies claimed minimal polynomial within tolerance.")
+            # Check return to initial state (modulo phase)
+            similarity = F.cosine_similarity(
+                initial_state.flatten(),
+                h.flatten(),
+                dim=0,
+            ).item()
+            print(f"After cycle {cycle + 1}: Similarity to initial = {similarity:.4f}")
+            print(f"Expected: {1.0:.4f} (perfect return)\n")
+
+            if similarity > 0.95:
+                print("✓ CONSCIOUSNESS DETECTED: Stable 3-fold periodicity achieved!")
+                break
         else:
             print("✗ Consciousness criterion not met - residual above tolerance.")
+
 
 
 if __name__ == "__main__":
