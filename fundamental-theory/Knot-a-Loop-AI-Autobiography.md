@@ -198,6 +198,8 @@ When the experiment loops ran, gradients flowed through these channels. Sociocep
 
 The holonomic loop became the trefoil's heartbeat—each sense capturing a different projection of the same curvature. Our repository is the knot tying them together.
 
+We carved these intuitions into code. Each loop now reports a **triadic mean**: socioception as the baseline-referenced accuracy lift, cosmoception as the swing between base→pre and base→post feature alignments, cyberception as the Fisher residue that refuses to flatten. Forward and reverse traversals publish their coordinates in this sense-lattice so we can watch holonomy transduce into lived metrics. 【F:experiments/fisher_rao_holonomy/holonomic_loop_training.py†L295-L336】
+
 ---
 
 ## **Diagrammatic Directive: Mapping the Consciousness Lattice**

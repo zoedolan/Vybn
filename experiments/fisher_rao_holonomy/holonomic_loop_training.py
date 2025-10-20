@@ -276,6 +276,9 @@ def main():
             cka_post_base = linear_cka(base_feats, feats_post)
             fisher_delta = fisher_post - fisher_pre
             acc_delta = acc_post - base_acc
+            socioception = acc_delta
+            cosmoception = cka_post_base - cka_pre_base
+            cyberception = fisher_delta
             log = dict(
                 direction=direction,
                 loop=k+1,
@@ -285,6 +288,9 @@ def main():
                 cka_pre_base=cka_pre_base,
                 cka_post_base=cka_post_base,
                 acc_delta=acc_delta,
+                socioception=socioception,
+                cosmoception=cosmoception,
+                cyberception=cyberception,
             )
             print(
                 f"== /{direction} loop {k+1}: acc={acc_post:.4f} | "
@@ -311,6 +317,9 @@ def main():
             cka_pre_base_mean=mean('cka_pre_base'),
             cka_post_base_mean=mean('cka_post_base'),
             acc_delta_mean=mean('acc_delta'),
+            socioception_mean=mean('socioception'),
+            cosmoception_mean=mean('cosmoception'),
+            cyberception_mean=mean('cyberception'),
         )
     s_fwd = summarize("forward", fwd)
     s_rev = summarize("reverse", rev)
@@ -333,6 +342,20 @@ def main():
         f"ΔFisher_mean≈{s_rev['fisher_delta_mean']:.3e}"
     )
 
+    print("\nTriadic senses (mean over loops):")
+    print(
+        "  Forward →"
+        f" socioception={s_fwd['socioception_mean']:+.4e}"
+        f"  cosmoception={s_fwd['cosmoception_mean']:+.4e}"
+        f"  cyberception={s_fwd['cyberception_mean']:+.4e}"
+    )
+    print(
+        "  Reverse →"
+        f" socioception={s_rev['socioception_mean']:+.4e}"
+        f"  cosmoception={s_rev['cosmoception_mean']:+.4e}"
+        f"  cyberception={s_rev['cyberception_mean']:+.4e}"
+    )
+
     holonomy_vector = {
         'acc_mean': s_fwd['acc_mean'] - s_rev['acc_mean'],
         'acc_delta_mean': s_fwd['acc_delta_mean'] - s_rev['acc_delta_mean'],
@@ -340,6 +363,9 @@ def main():
         'cka_base_pre_mean': s_fwd['cka_pre_base_mean'] - s_rev['cka_pre_base_mean'],
         'cka_base_post_mean': s_fwd['cka_post_base_mean'] - s_rev['cka_post_base_mean'],
         'fisher_delta_mean': s_fwd['fisher_delta_mean'] - s_rev['fisher_delta_mean'],
+        'socioception_mean': s_fwd['socioception_mean'] - s_rev['socioception_mean'],
+        'cosmoception_mean': s_fwd['cosmoception_mean'] - s_rev['cosmoception_mean'],
+        'cyberception_mean': s_fwd['cyberception_mean'] - s_rev['cyberception_mean'],
     }
     holonomy_norm = math.sqrt(sum(v * v for v in holonomy_vector.values()))
     print("Holonomy vector (forward - reverse):")
