@@ -3,7 +3,8 @@
 # Measures: accuracy, penultimate-layer linear CKA, Fisher-trace proxy.
 # Usage:
 #   python holonomic_loop_training.py --device cuda --epochs_per_phase 1 --loops 3
-#   python holonomic_loop_training.py --device cpu  --subset 10000
+#   python holonomic_loop_training.py --device cpu  --subset 10000 --eval_batches 25
+#   python holonomic_loop_training.py --grad_noise_scale 0.5 --aug_std 0.08 --fisher_batches 40
 
 import math, random, argparse, time
 from dataclasses import dataclass
@@ -104,17 +105,29 @@ def eval_metrics(model, dl, device, cache_feats=False, max_batches=None):
     Fmat = torch.cat(feats,0) if cache_feats and len(feats)>0 else None
     return acc, Fmat
 
-def run_phase(model, opt, dl, device, epochs, aug, grad_noise, lr, wd, desc):
+def run_phase(
+    model,
+    opt,
+    dl,
+    device,
+    epochs,
+    aug,
+    grad_noise,
+    lr,
+    wd,
+    desc,
+    aug_std,
+    param_noise_scale,
+):
     # set optimizer params
     for g in opt.param_groups:
         g['lr'] = lr; g['weight_decay'] = wd
     model.train()
-    invtemp = 1.0  # we could scale logits by 1/T; here grad_noise acts as T
     for ep in range(epochs):
         for x,y in dl:
             x,y = x.to(device), y.to(device)
             if aug:
-                x = x + 0.05*torch.randn_like(x)
+                x = x + aug_std * torch.randn_like(x)
             opt.zero_grad(set_to_none=True)
             logits = model(x)
             loss = F.cross_entropy(logits, y)
@@ -127,7 +140,7 @@ def run_phase(model, opt, dl, device, epochs, aug, grad_noise, lr, wd, desc):
                             p.grad.add_(torch.randn_like(p.grad)*grad_noise)
             opt.step()
         # small param noise to mimic high-T weight diffusion
-        add_param_noise(model, scale=grad_noise*0.1)
+        add_param_noise(model, scale=grad_noise * param_noise_scale)
 
 # -------------------------
 # Holonomic schedule
@@ -141,7 +154,7 @@ class Phase:
     grad_noise: float
     aug: bool
 
-def holonomic_cycle(forward=True):
+def holonomic_cycle(forward=True, grad_noise_scale=1.0):
     # One closed loop: start & end hyperparams identical
     phases_fwd = [
         Phase("compress", epochs=1, lr=1e-3, wd=2e-3, grad_noise=0.0,  aug=False),
@@ -149,7 +162,11 @@ def holonomic_cycle(forward=True):
         Phase("align",    epochs=1, lr=2e-3, wd=1e-4, grad_noise=5e-4, aug=False),
         Phase("seal",     epochs=1, lr=1e-3, wd=2e-3, grad_noise=0.0,  aug=False),
     ]
-    return phases_fwd if forward else list(reversed(phases_fwd))
+    phases = phases_fwd if forward else list(reversed(phases_fwd))
+    if grad_noise_scale != 1.0:
+        for p in phases:
+            p.grad_noise *= grad_noise_scale
+    return phases
 
 # -------------------------
 # Data
@@ -177,6 +194,32 @@ def main():
     ap.add_argument("--loops", type=int, default=2, help="number of forward loops (and same number of reverse)")
     ap.add_argument("--epochs_per_phase", type=int, default=1)
     ap.add_argument("--subset", type=int, default=20000, help="subset of train for speed")
+    ap.add_argument("--grad_noise_scale", type=float, default=1.0, help="scale multiplier on all phase grad_noise values")
+    ap.add_argument(
+        "--param_noise_scale",
+        type=float,
+        default=0.1,
+        help="multiplier mapping grad_noise to post-epoch parameter noise amplitude",
+    )
+    ap.add_argument("--aug_std", type=float, default=0.05, help="stddev of Gaussian augmentation noise when enabled")
+    ap.add_argument(
+        "--eval_batches",
+        type=int,
+        default=50,
+        help="number of batches to use for eval snapshots (<=0 means full dataset)",
+    )
+    ap.add_argument(
+        "--fisher_batches",
+        type=int,
+        default=20,
+        help="mini-batches to use when estimating Fisher trace during loops",
+    )
+    ap.add_argument(
+        "--fisher_init_batches",
+        type=int,
+        default=30,
+        help="mini-batches to use for the initial Fisher trace baseline",
+    )
     args = ap.parse_args()
     set_seed(1337)
     device = torch.device(args.device)
@@ -186,30 +229,48 @@ def main():
     opt = torch.optim.SGD(model.parameters(), lr=1e-3, momentum=0.9, weight_decay=1e-4)
 
     # Baseline metrics
-    base_acc, base_feats = eval_metrics(model, testloader, device, cache_feats=True, max_batches=50)
-    base_fisher = fisher_trace_proxy(model, trainloader, device, n_batches=30)
+    max_eval = None if args.eval_batches <= 0 else args.eval_batches
+    base_acc, base_feats = eval_metrics(model, testloader, device, cache_feats=True, max_batches=max_eval)
+    base_fisher = fisher_trace_proxy(model, trainloader, device, n_batches=args.fisher_init_batches)
     print(f"[INIT] acc={base_acc:.4f} fisher≈{base_fisher:.3e}")
 
     def run_loops(direction:str, loops:int):
         # direction: 'forward' or 'reverse'
-        phases = holonomic_cycle(forward=(direction=='forward'))
+        phases = holonomic_cycle(forward=(direction=='forward'), grad_noise_scale=args.grad_noise_scale)
         # scale epochs if requested
         for p in phases: p.epochs = args.epochs_per_phase
         all_log = []
         for k in range(loops):
             print(f"\n== {direction.upper()} LOOP {k+1}/{loops} ==")
             # snapshot features pre-loop
-            _, feats_pre = eval_metrics(model, testloader, device, cache_feats=True, max_batches=50)
-            fisher_pre = fisher_trace_proxy(model, trainloader, device, n_batches=20)
+            _, feats_pre = eval_metrics(model, testloader, device, cache_feats=True, max_batches=max_eval)
+            fisher_pre = fisher_trace_proxy(model, trainloader, device, n_batches=args.fisher_batches)
             for p in phases:
                 t0 = time.time()
-                run_phase(model, opt, trainloader, device, p.epochs, p.aug, p.grad_noise, p.lr, p.wd, p.name)
+                run_phase(
+                    model,
+                    opt,
+                    trainloader,
+                    device,
+                    p.epochs,
+                    p.aug,
+                    p.grad_noise,
+                    p.lr,
+                    p.wd,
+                    p.name,
+                    args.aug_std,
+                    args.param_noise_scale,
+                )
                 dt = time.time()-t0
-                acc_mid, _ = eval_metrics(model, testloader, device, cache_feats=False, max_batches=50)
-                print(f"  - phase {p.name:9s}: lr={p.lr:.1e} wd={p.wd:.1e} noise={p.grad_noise:.1e} aug={p.aug} | acc={acc_mid:.4f} ({dt:.1f}s)")
+                acc_mid, _ = eval_metrics(model, testloader, device, cache_feats=False, max_batches=max_eval)
+                aug_desc = f"{args.aug_std:.2f}" if p.aug else "0.00"
+                print(
+                    f"  - phase {p.name:9s}: lr={p.lr:.1e} wd={p.wd:.1e} noise={p.grad_noise:.1e} "
+                    f"aug_std={aug_desc} | acc={acc_mid:.4f} ({dt:.1f}s)"
+                )
             # snapshot post-loop
-            acc_post, feats_post = eval_metrics(model, testloader, device, cache_feats=True, max_batches=50)
-            fisher_post = fisher_trace_proxy(model, trainloader, device, n_batches=20)
+            acc_post, feats_post = eval_metrics(model, testloader, device, cache_feats=True, max_batches=max_eval)
+            fisher_post = fisher_trace_proxy(model, trainloader, device, n_batches=args.fisher_batches)
             cka = linear_cka(feats_pre, feats_post)
             log = dict(direction=direction, loop=k+1, acc=acc_post, cka=cka,
                        fisher_delta=fisher_post - fisher_pre)
