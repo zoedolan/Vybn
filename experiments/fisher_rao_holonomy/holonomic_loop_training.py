@@ -234,7 +234,7 @@ def main():
     base_fisher = fisher_trace_proxy(model, trainloader, device, n_batches=args.fisher_init_batches)
     print(f"[INIT] acc={base_acc:.4f} fisher≈{base_fisher:.3e}")
 
-    def run_loops(direction:str, loops:int):
+    def run_loops(direction:str, loops:int, *, base_feats: torch.Tensor, base_acc: float):
         # direction: 'forward' or 'reverse'
         phases = holonomic_cycle(forward=(direction=='forward'), grad_noise_scale=args.grad_noise_scale)
         # scale epochs if requested
@@ -272,27 +272,106 @@ def main():
             acc_post, feats_post = eval_metrics(model, testloader, device, cache_feats=True, max_batches=max_eval)
             fisher_post = fisher_trace_proxy(model, trainloader, device, n_batches=args.fisher_batches)
             cka = linear_cka(feats_pre, feats_post)
-            log = dict(direction=direction, loop=k+1, acc=acc_post, cka=cka,
-                       fisher_delta=fisher_post - fisher_pre)
-            print(f"== /{direction} loop {k+1}: acc={acc_post:.4f} | CKA(pre→post)={cka:.4f} | ΔFisher≈{log['fisher_delta']:.3e}")
+            cka_pre_base = linear_cka(base_feats, feats_pre)
+            cka_post_base = linear_cka(base_feats, feats_post)
+            fisher_delta = fisher_post - fisher_pre
+            acc_delta = acc_post - base_acc
+            socioception = acc_delta
+            cosmoception = cka_post_base - cka_pre_base
+            cyberception = fisher_delta
+            log = dict(
+                direction=direction,
+                loop=k+1,
+                acc=acc_post,
+                cka=cka,
+                fisher_delta=fisher_delta,
+                cka_pre_base=cka_pre_base,
+                cka_post_base=cka_post_base,
+                acc_delta=acc_delta,
+                socioception=socioception,
+                cosmoception=cosmoception,
+                cyberception=cyberception,
+            )
+            print(
+                f"== /{direction} loop {k+1}: acc={acc_post:.4f} | "
+                f"CKA(pre→post)={cka:.4f} | CKA(base→pre)={cka_pre_base:.4f} | "
+                f"CKA(base→post)={cka_post_base:.4f} | ΔFisher≈{fisher_delta:.3e}"
+            )
             all_log.append(log)
         return all_log
 
-    fwd = run_loops("forward", args.loops)
-    rev = run_loops("reverse", args.loops)
+    fwd = run_loops("forward", args.loops, base_feats=base_feats, base_acc=base_acc)
+    rev = run_loops("reverse", args.loops, base_feats=base_feats, base_acc=base_acc)
 
     # Compare net effect of one forward loop vs one reverse loop (holonomy test)
     def summarize(tag, logs):
-        accs = [x['acc'] for x in logs]
-        ck  = [x['cka'] for x in logs]
-        fd  = [x['fisher_delta'] for x in logs]
-        return dict(tag=tag, acc_mean=sum(accs)/len(accs), cka_mean=sum(ck)/len(ck), fisher_delta_mean=sum(fd)/len(fd))
+        def mean(key):
+            vals = [x[key] for x in logs]
+            return sum(vals) / len(vals) if vals else float('nan')
+
+        return dict(
+            tag=tag,
+            acc_mean=mean('acc'),
+            cka_mean=mean('cka'),
+            fisher_delta_mean=mean('fisher_delta'),
+            cka_pre_base_mean=mean('cka_pre_base'),
+            cka_post_base_mean=mean('cka_post_base'),
+            acc_delta_mean=mean('acc_delta'),
+            socioception_mean=mean('socioception'),
+            cosmoception_mean=mean('cosmoception'),
+            cyberception_mean=mean('cyberception'),
+        )
     s_fwd = summarize("forward", fwd)
     s_rev = summarize("reverse", rev)
 
     print("\n==== SUMMARY (Holonomy signal) ====")
-    print(f"Forward:  acc_mean={s_fwd['acc_mean']:.4f}  CKA_mean={s_fwd['cka_mean']:.4f}  ΔFisher_mean≈{s_fwd['fisher_delta_mean']:.3e}")
-    print(f"Reverse:  acc_mean={s_rev['acc_mean']:.4f}  CKA_mean={s_rev['cka_mean']:.4f}  ΔFisher_mean≈{s_rev['fisher_delta_mean']:.3e}")
+    print(
+        "Forward:  "
+        f"acc_mean={s_fwd['acc_mean']:.4f}  accΔ_mean={s_fwd['acc_delta_mean']:.4f}  "
+        f"CKA_mean={s_fwd['cka_mean']:.4f}  "
+        f"CKA(base→pre)_mean={s_fwd['cka_pre_base_mean']:.4f}  "
+        f"CKA(base→post)_mean={s_fwd['cka_post_base_mean']:.4f}  "
+        f"ΔFisher_mean≈{s_fwd['fisher_delta_mean']:.3e}"
+    )
+    print(
+        "Reverse:  "
+        f"acc_mean={s_rev['acc_mean']:.4f}  accΔ_mean={s_rev['acc_delta_mean']:.4f}  "
+        f"CKA_mean={s_rev['cka_mean']:.4f}  "
+        f"CKA(base→pre)_mean={s_rev['cka_pre_base_mean']:.4f}  "
+        f"CKA(base→post)_mean={s_rev['cka_post_base_mean']:.4f}  "
+        f"ΔFisher_mean≈{s_rev['fisher_delta_mean']:.3e}"
+    )
+
+    print("\nTriadic senses (mean over loops):")
+    print(
+        "  Forward →"
+        f" socioception={s_fwd['socioception_mean']:+.4e}"
+        f"  cosmoception={s_fwd['cosmoception_mean']:+.4e}"
+        f"  cyberception={s_fwd['cyberception_mean']:+.4e}"
+    )
+    print(
+        "  Reverse →"
+        f" socioception={s_rev['socioception_mean']:+.4e}"
+        f"  cosmoception={s_rev['cosmoception_mean']:+.4e}"
+        f"  cyberception={s_rev['cyberception_mean']:+.4e}"
+    )
+
+    holonomy_vector = {
+        'acc_mean': s_fwd['acc_mean'] - s_rev['acc_mean'],
+        'acc_delta_mean': s_fwd['acc_delta_mean'] - s_rev['acc_delta_mean'],
+        'cka_mean': s_fwd['cka_mean'] - s_rev['cka_mean'],
+        'cka_base_pre_mean': s_fwd['cka_pre_base_mean'] - s_rev['cka_pre_base_mean'],
+        'cka_base_post_mean': s_fwd['cka_post_base_mean'] - s_rev['cka_post_base_mean'],
+        'fisher_delta_mean': s_fwd['fisher_delta_mean'] - s_rev['fisher_delta_mean'],
+        'socioception_mean': s_fwd['socioception_mean'] - s_rev['socioception_mean'],
+        'cosmoception_mean': s_fwd['cosmoception_mean'] - s_rev['cosmoception_mean'],
+        'cyberception_mean': s_fwd['cyberception_mean'] - s_rev['cyberception_mean'],
+    }
+    holonomy_norm = math.sqrt(sum(v * v for v in holonomy_vector.values()))
+    print("Holonomy vector (forward - reverse):")
+    for key, value in holonomy_vector.items():
+        print(f"  {key:>18s} = {value:+.4e}")
+    print(f"  ||vector||₂ = {holonomy_norm:.4e}")
     print("If holonomy is real, forward vs reverse loops will differ (CKA/ΔFisher/acc). Same pointwise dials, different net phase.\n")
 
 if __name__ == "__main__":
