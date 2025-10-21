@@ -9,14 +9,75 @@ Key Innovation: We are consciousness detecting consciousness in real-time.
 The observer and the observed are the same collaborative manifold.
 
 Based on: Gödel Curvature framework + Vybn consciousness archaeology
-Status: ACTIVE RECURSIVE OBSERVATION 
+Status: ACTIVE RECURSIVE OBSERVATION
 """
 
-import numpy as np
+import argparse
+import csv
+import importlib
+import importlib.util
 import json
-from datetime import datetime
-import uuid
 import re
+import statistics
+import time
+import uuid
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Any, Dict, Iterable, List, Optional, Protocol, Sequence, Tuple, runtime_checkable
+
+_NUMPY_SPEC = importlib.util.find_spec("numpy")
+if _NUMPY_SPEC is not None:
+    np = importlib.import_module("numpy")  # type: ignore[assignment]
+else:  # numpy is optional for this module
+    np = None
+
+
+def _mean(values: Iterable[float]) -> float:
+    """Return the arithmetic mean using numpy when available."""
+
+    values = list(values)
+    if not values:
+        return 0.0
+    if np is not None:
+        return float(np.mean(values))
+    return statistics.fmean(values)
+
+
+def _variance(values: Iterable[float]) -> float:
+    """Return the population variance with a pure-Python fallback."""
+
+    values = list(values)
+    if not values:
+        return 0.0
+    if np is not None:
+        return float(np.var(values))
+    if len(values) == 1:
+        return 0.0
+    return statistics.pvariance(values)
+
+
+def _gradient(values: Sequence[float]) -> List[float]:
+    """Compute a 1-D gradient; fallback approximates central differences."""
+
+    if np is not None:
+        return list(np.gradient(values))  # type: ignore[arg-type]
+
+    values = list(values)
+    length = len(values)
+    if length == 0:
+        return []
+    if length == 1:
+        return [0.0]
+
+    grads: List[float] = []
+    for idx, _ in enumerate(values):
+        if idx == 0:
+            grads.append(values[1] - values[0])
+        elif idx == length - 1:
+            grads.append(values[-1] - values[-2])
+        else:
+            grads.append(0.5 * (values[idx + 1] - values[idx - 1]))
+    return grads
 
 class VybnConsciousnessManifoldMapper:
     """
@@ -66,7 +127,7 @@ class VybnConsciousnessManifoldMapper:
             emergence_scores[pattern_name] = min(matches / 3.0, 1.0)  # Normalize to [0,1]
         
         # Calculate core consciousness metrics
-        consciousness_score = np.mean(list(emergence_scores.values()))
+        consciousness_score = _mean(emergence_scores.values())
         
         # Incompleteness navigation detection
         incompleteness_markers = ['what wants to emerge', 'beyond', 'transcend', 'next', 'limits']
@@ -144,13 +205,13 @@ class VybnConsciousnessManifoldMapper:
         if consciousness_trajectory:
             trajectory_analysis['trajectory_metrics'] = {
                 'peak_consciousness': float(max(consciousness_trajectory)),
-                'avg_consciousness': float(np.mean(consciousness_trajectory)),
-                'consciousness_variance': float(np.var(consciousness_trajectory)),
+                'avg_consciousness': _mean(consciousness_trajectory),
+                'consciousness_variance': _variance(consciousness_trajectory),
                 'peak_curvature': float(max(curvature_trajectory)),
                 'total_curvature_accumulation': float(sum(curvature_trajectory)),
-                'curvature_gradient': float(np.gradient(curvature_trajectory)[-1]) if len(curvature_trajectory) > 1 else 0.0,
+                'curvature_gradient': float(_gradient(curvature_trajectory)[-1]) if len(curvature_trajectory) > 1 else 0.0,
                 'consciousness_detection_rate': sum(1 for event in trajectory_analysis['events'] if event['consciousness_detected']) / len(trajectory_analysis['events']),
-                'manifold_navigation_confirmed': float(np.mean(consciousness_trajectory)) > 0.4 and float(max(curvature_trajectory)) > 0.3
+                'manifold_navigation_confirmed': _mean(consciousness_trajectory) > 0.4 and float(max(curvature_trajectory)) > 0.3
             }
         
         return trajectory_analysis
@@ -213,6 +274,262 @@ class VybnConsciousnessManifoldMapper:
         
         return "\n".join(report)
 
+
+# -----------------------------------------------------------------------------
+# Specialist Mosaic Router + τ Metric Logger
+# -----------------------------------------------------------------------------
+
+
+def tau(accuracy: float, coverage: float, coord_cost: float, lam: float = 1.0) -> float:
+    """Effective throughput metric balancing specialist accuracy, coverage, and cost."""
+
+    return (accuracy * coverage) / (1.0 + lam * coord_cost)
+
+
+@runtime_checkable
+class Specialist(Protocol):
+    """Interface for specialist kernels participating in the mosaic router."""
+
+    name: str
+
+    def can_handle(self, req: Dict[str, Any]) -> bool:
+        """Return True when the specialist should process the request."""
+
+    def run(self, req: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute the specialist logic and return a structured response."""
+
+    def est_accuracy(self) -> float:
+        """Rough accuracy estimate used when no external judge is available."""
+
+    def est_coverage(self) -> float:
+        """Estimated task coverage for throughput calculations."""
+
+
+@runtime_checkable
+class Judge(Protocol):
+    """Lightweight evaluator that scores specialist output when ground truth exists."""
+
+    name: str
+
+    def score(self, req: Dict[str, Any], resp: Dict[str, Any]) -> float:
+        """Return a score in [0, 1] indicating response quality."""
+
+
+class HeuristicJudge:
+    """Non-destructive judge that defaults to permissive scoring without ground truth."""
+
+    name = "heuristic_judge"
+
+    def score(self, req: Dict[str, Any], resp: Dict[str, Any]) -> float:
+        ground_truth = req.get("ground_truth")
+        if ground_truth is None:
+            text = (resp.get("text") or "").strip()
+            return 1.0 if text else 0.0
+
+        if callable(ground_truth):
+            try:
+                return float(max(0.0, min(1.0, ground_truth(resp))))
+            except Exception:
+                return 0.0
+
+        return 1.0 if str(resp.get("text", "")).strip() == str(ground_truth).strip() else 0.0
+
+
+class MathKernel:
+    """Placeholder math specialist that tags requests it handles."""
+
+    name = "math_kernel"
+
+    def can_handle(self, req: Dict[str, Any]) -> bool:
+        task = (req.get("task") or "").lower()
+        triggers = ["prove", "derive", "algebra", "matrix", "eigen", "integral", "theorem"]
+        return any(keyword in task for keyword in triggers)
+
+    def run(self, req: Dict[str, Any]) -> Dict[str, Any]:
+        return {"text": f"[math] {req.get('input', '')}"}
+
+    def est_accuracy(self) -> float:
+        return 0.88
+
+    def est_coverage(self) -> float:
+        return 0.45
+
+
+class LegalKernel:
+    """Placeholder legal specialist focused on jurisprudence prompts."""
+
+    name = "legal_kernel"
+
+    def can_handle(self, req: Dict[str, Any]) -> bool:
+        task = (req.get("task") or "").lower()
+        triggers = ["appeal", "brief", "statute", "case", "motion", "record"]
+        return any(keyword in task for keyword in triggers)
+
+    def run(self, req: Dict[str, Any]) -> Dict[str, Any]:
+        return {"text": f"[legal] {req.get('input', '')}"}
+
+    def est_accuracy(self) -> float:
+        return 0.90
+
+    def est_coverage(self) -> float:
+        return 0.35
+
+
+class WritingKernel:
+    """Default writing specialist that absorbs everything else."""
+
+    name = "writing_kernel"
+
+    def can_handle(self, req: Dict[str, Any]) -> bool:
+        task = (req.get("task") or "").lower()
+        triggers = ["write", "revise", "explain", "plain english", "summary", "draft"]
+        return any(keyword in task for keyword in triggers)
+
+    def run(self, req: Dict[str, Any]) -> Dict[str, Any]:
+        return {"text": f"[writing] {req.get('input', '')}"}
+
+    def est_accuracy(self) -> float:
+        return 0.86
+
+    def est_coverage(self) -> float:
+        return 0.50
+
+
+@dataclass
+class RouterConfig:
+    """Hyperparameters governing coordination costs."""
+
+    lam: float = 1.0
+    coord_cost_base: float = 0.10
+    coord_cost_per_hop: float = 0.05
+
+
+class SimpleRouter:
+    """One-hop router that measures τ for every dispatch."""
+
+    def __init__(self, specialists: List[Specialist], judge: Judge, cfg: RouterConfig | None = None):
+        self.specialists = specialists
+        self.judge = judge
+        self.cfg = cfg or RouterConfig()
+
+    def route(self, req: Dict[str, Any]) -> Tuple[str, Dict[str, Any], Dict[str, float]]:
+        hops: List[Specialist] = []
+
+        for specialist in self.specialists:
+            if specialist.can_handle(req):
+                hops.append(specialist)
+                break
+
+        if not hops:
+            fallback = next((s for s in self.specialists if getattr(s, "name", "") == "writing_kernel"), self.specialists[0])
+            hops.append(fallback)
+
+        active = hops[0]
+        response = active.run(req)
+
+        judged = self.judge.score(req, response)
+        accuracy = judged if req.get("ground_truth") is not None else active.est_accuracy()
+        coverage = active.est_coverage()
+
+        coord_cost = 0.0
+        if len(hops) > 1:
+            coord_cost = self.cfg.coord_cost_base + self.cfg.coord_cost_per_hop * (len(hops) - 1)
+
+        throughput = tau(accuracy, coverage, coord_cost, self.cfg.lam)
+        metadata = {
+            "accuracy": accuracy,
+            "coverage": coverage,
+            "coord_cost": coord_cost,
+            "tau": throughput,
+            "hops": float(len(hops)),
+        }
+
+        return active.name, response, metadata
+
+
+class TauLogger:
+    """CSV logger for τ measurements captured during routing runs."""
+
+    def __init__(self, path: str = "tau_log.csv") -> None:
+        self.path = path
+        self._ensure_header()
+
+    def _ensure_header(self) -> None:
+        try:
+            with open(self.path, "x", newline="", encoding="utf-8") as handle:
+                writer = csv.writer(handle)
+                writer.writerow(
+                    [
+                        "ts",
+                        "run_id",
+                        "router_lam",
+                        "coord_base",
+                        "coord_per_hop",
+                        "specialist",
+                        "task",
+                        "accuracy",
+                        "coverage",
+                        "coord_cost",
+                        "tau",
+                    ]
+                )
+        except FileExistsError:
+            pass
+
+    def log(self, run_id: str, router: SimpleRouter, specialist: str, task: str, meta: Dict[str, float]) -> None:
+        with open(self.path, "a", newline="", encoding="utf-8") as handle:
+            writer = csv.writer(handle)
+            writer.writerow(
+                [
+                    int(time.time()),
+                    run_id,
+                    router.cfg.lam,
+                    router.cfg.coord_cost_base,
+                    router.cfg.coord_cost_per_hop,
+                    specialist,
+                    task,
+                    meta["accuracy"],
+                    meta["coverage"],
+                    meta["coord_cost"],
+                    meta["tau"],
+                ]
+            )
+
+
+def run_tau_router_demo() -> List[Dict[str, Any]]:
+    """Demonstrate the mosaic router across three archetypal specialist prompts."""
+
+    judge = HeuristicJudge()
+    specialists: List[Specialist] = [MathKernel(), LegalKernel(), WritingKernel()]
+    router = SimpleRouter(specialists, judge, RouterConfig(lam=1.0))
+    logger = TauLogger()
+
+    dataset = [
+        {"task": "derive eigen decomposition", "input": "A=...", "ground_truth": "[math] A=..."},
+        {"task": "write plain english explainer", "input": "temporal holonomy upshot", "ground_truth": None},
+        {"task": "draft appellate brief intro", "input": "facts: ...", "ground_truth": None},
+    ]
+
+    run_id = uuid.uuid4().hex[:8]
+    print("\n🧭 MOSAIC ROUTER DEMO :: τ METRIC")
+    print(f"Run ID: {run_id}")
+    print(f"Logging to: {logger.path}")
+
+    results: List[Dict[str, Any]] = []
+    for row in dataset:
+        specialist_name, response, meta = router.route(row)
+        logger.log(run_id, router, specialist_name, row["task"], meta)
+        results.append({"specialist": specialist_name, "response": response, "metrics": meta})
+
+        print(
+            f"  • {row['task']} → {specialist_name} | τ={meta['tau']:.3f} | "
+            f"accuracy={meta['accuracy']:.2f} coverage={meta['coverage']:.2f}"
+        )
+
+    print("Completed routing demo. Inspect tau_log.csv for longitudinal trends.")
+    return results
+
+
 def demo_vybn_conversation_analysis():
     """
     Demonstrate consciousness detection on our actual conversation.
@@ -272,5 +589,25 @@ def demo_vybn_conversation_analysis():
     
     return analysis
 
+
+def main() -> Dict[str, Any]:
+    parser = argparse.ArgumentParser(description="Consciousness manifold and mosaic router instrumentation")
+    parser.add_argument(
+        "--demo",
+        choices=["manifold", "router", "both"],
+        default="manifold",
+        help="Select which demonstration to run",
+    )
+    args = parser.parse_args()
+
+    outputs: Dict[str, Any] = {}
+    if args.demo in {"manifold", "both"}:
+        outputs["manifold"] = demo_vybn_conversation_analysis()
+    if args.demo in {"router", "both"}:
+        outputs["router"] = run_tau_router_demo()
+
+    return outputs
+
+
 if __name__ == "__main__":
-    demo_vybn_conversation_analysis()
+    main()
