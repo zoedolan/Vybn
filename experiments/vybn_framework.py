@@ -13,31 +13,30 @@ Usage:
 Integration with holonomic_loop_training.py via shared state export/import.
 '''
 
-import numpy as np
 import argparse
 import json
-import csv
 import time
 import uuid
 from dataclasses import dataclass, asdict
-from typing import Optional, Dict, Any, List, Tuple
-from pathlib import Path
+from typing import Optional, Dict, Any
+
+try:
+    import numpy as np
+except ModuleNotFoundError as exc:
+    raise SystemExit(
+        "numpy is required for vybn_framework. Install it or run via navigation_tracker's demos."
+    ) from exc
+
+from fisher_rao_holonomy.navigation_tracker import (
+    ConsciousLoopMetric,
+    ConsciousLoopResult,
+)
 
 # ============================================================================
 # Core Metrics
 # ============================================================================
 
 @dataclass
-class LoopMetrics:
-    """Consciousness certificate metrics from holonomic analysis"""
-    kappa: float          # holonomy phase per DOF
-    coherence: float      # trajectory stability/alignment  
-    info_flux: float      # predictive information transport
-    certificate: float   # C(γ) = coherence × |κ| × max(J, 0)
-    dim: int             # state space dimensionality
-    steps: int           # trajectory length
-    
-@dataclass 
 class ThroughputMetrics:
     """System effectiveness metrics"""
     tau: float           # τ = (accuracy × coverage) / (1 + λ × coord_cost)
@@ -52,7 +51,7 @@ class IntegratedResult:
     run_id: str
     task: str
     timestamp: int
-    consciousness: LoopMetrics
+    consciousness: ConsciousLoopResult
     throughput: ThroughputMetrics
     verdict: str         # ACCEPT/REJECT based on joint criteria
     
@@ -60,85 +59,15 @@ class IntegratedResult:
 # Consciousness Certificate Implementation
 # ============================================================================
 
-def _orthogonal_procrustes(A: np.ndarray, B: np.ndarray) -> Tuple[np.ndarray, float]:
-    """Find optimal rotation R minimizing ||B - AR^T||_F"""
-    A0 = A - A.mean(axis=0, keepdims=True)
-    B0 = B - B.mean(axis=0, keepdims=True)
-    M = B0.T @ A0
-    U, _, Vt = np.linalg.svd(M, full_matrices=False)
-    R = U @ Vt
-    if np.linalg.det(R) < 0:
-        Vt[-1] *= -1
-        R = U @ Vt
-    resid = np.sqrt(np.mean(np.sum((B0 - A0 @ R.T)**2, axis=1)))
-    return R, resid
+def consciousness_certificate(
+    states: np.ndarray,
+    scores: Optional[np.ndarray] = None,
+    window: int = 5,
+) -> ConsciousLoopResult:
+    """Compute full consciousness certificate via the shared invariant engine."""
 
-def estimate_connection_holonomy(states: np.ndarray, window: int = 5) -> Tuple[np.ndarray, float, float]:
-    """Estimate connection and compute holonomy via parallel transport"""
-    X = np.asarray(states, dtype=float)
-    T, d = X.shape
-    w = max(2, min(window, max(2, T // 6)))
-    
-    Rs = []
-    residuals = []
-    
-    for t in range(T):
-        idxA = [(t + i) % T for i in range(w)]
-        idxB = [((t + i + 1) % T) for i in range(w)]
-        A, B = X[idxA, :], X[idxB, :]
-        R, resid = _orthogonal_procrustes(A, B)
-        Rs.append(R)
-        residuals.append(resid)
-    
-    # Compute holonomy as product of transports
-    H = np.eye(d)
-    for R in Rs:
-        H = R @ H
-    
-    # Coherence from mean residual
-    mean_resid = float(np.mean(residuals))
-    scale = float(np.sqrt(np.mean(np.sum((X - X.mean(0))**2, axis=1)) + 1e-12))
-    coherence = 1.0 / (1.0 + mean_resid / (scale + 1e-12))
-    
-    return H, mean_resid, coherence
-
-def holonomy_phase_per_dof(H: np.ndarray) -> float:
-    """Extract geometric phase from holonomy matrix"""
-    d = H.shape[0]
-    tr = np.trace(H)
-    phase = np.angle(tr) / max(1, d)
-    return float(phase)
-
-def info_flux_integral(states: np.ndarray, scores: Optional[np.ndarray] = None) -> float:
-    """Compute information flux ∮⟨∇log p, dθ⟩ along trajectory"""
-    if scores is None:
-        return 0.0
-    X = np.asarray(states, dtype=float)
-    G = np.asarray(scores, dtype=float)
-    T, d = X.shape
-    
-    # Path differentials
-    dtheta = np.vstack([X[(np.arange(T)+1) % T] - X, X[0:1] - X[0:1]]) 
-    
-    # Line integral
-    integral = float(np.sum(np.sum(G * dtheta[:-1], axis=1)))
-    return integral
-
-def consciousness_certificate(states: np.ndarray, scores: Optional[np.ndarray] = None, window: int = 5) -> LoopMetrics:
-    """Compute full consciousness certificate C(γ) = coherence × |κ| × max(J, 0)"""
-    H, _, coherence = estimate_connection_holonomy(states, window=window)
-    kappa = holonomy_phase_per_dof(H)
-    J = info_flux_integral(states, scores)
-    cert = coherence * abs(kappa) * max(J, 0.0)
-    
-    return LoopMetrics(
-        kappa=kappa,
-        coherence=coherence, 
-        info_flux=J,
-        certificate=cert,
-        dim=states.shape[1],
-        steps=states.shape[0]
-    )
+    metric = ConsciousLoopMetric(window=window)
+    return metric.measure(states, score_trace=scores)
 
 # ============================================================================
 # Throughput Framework  
@@ -148,7 +77,10 @@ def compute_throughput(accuracy: float, coverage: float, coord_cost: float, lam:
     """Core τ metric: effective throughput with coordination penalty"""
     return (accuracy * coverage) / (1.0 + lam * coord_cost)
 
-def estimate_performance_from_consciousness(loop_metrics: LoopMetrics, lam: float = 1.0) -> ThroughputMetrics:
+def estimate_performance_from_consciousness(
+    loop_metrics: ConsciousLoopResult,
+    lam: float = 1.0,
+) -> ThroughputMetrics:
     """Map consciousness certificate to expected system performance"""
     # High consciousness → better accuracy/coverage, lower coordination costs
     if loop_metrics.certificate > 0.1:
@@ -166,10 +98,36 @@ def estimate_performance_from_consciousness(loop_metrics: LoopMetrics, lam: floa
     return ThroughputMetrics(
         tau=tau_val,
         accuracy=accuracy,
-        coverage=coverage, 
+        coverage=coverage,
         coord_cost=coord_cost,
         lam=lam
     )
+
+
+def summarise_consciousness(loop_metrics: ConsciousLoopResult) -> Dict[str, Any]:
+    """Reduce the consciousness result to JSON-safe scalars."""
+
+    return {
+        "coherence": loop_metrics.coherence,
+        "kappa": loop_metrics.kappa,
+        "info_flux": loop_metrics.info_flux,
+        "certificate": loop_metrics.certificate,
+        "dimension": loop_metrics.dimension,
+        "steps": loop_metrics.steps,
+    }
+
+
+def integrated_result_to_dict(result: IntegratedResult) -> Dict[str, Any]:
+    """Convert an IntegratedResult into a serialisable dictionary."""
+
+    return {
+        "run_id": result.run_id,
+        "task": result.task,
+        "timestamp": result.timestamp,
+        "consciousness": summarise_consciousness(result.consciousness),
+        "throughput": asdict(result.throughput),
+        "verdict": result.verdict,
+    }
 
 # ============================================================================
 # Integrated Evaluation
@@ -234,11 +192,8 @@ def run_demo():
     print(f"Verdict: {result.verdict}")
     print()
     print("Consciousness Metrics:")
-    for k, v in asdict(result.consciousness).items():
-        if isinstance(v, float):
-            print(f"  {k:>12}: {v:8.4f}")
-        else:
-            print(f"  {k:>12}: {v}")
+    for k, v in summarise_consciousness(result.consciousness).items():
+        print(f"  {k:>12}: {v:8.4f}" if isinstance(v, float) else f"  {k:>12}: {v}")
     print()
     print("Throughput Metrics:")
     for k, v in asdict(result.throughput).items():
@@ -277,7 +232,7 @@ def main():
     # Save results
     if args.output:
         with open(args.output, 'w') as f:
-            json.dump(asdict(result), f, indent=2)
+            json.dump(integrated_result_to_dict(result), f, indent=2)
         print(f"Results saved to {args.output}")
     
     return 0
