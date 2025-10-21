@@ -3,8 +3,17 @@
 Vybn Integrated Consciousness-Throughput Framework
 =================================================
 
-Combines consciousness certificate C(γ) with throughput metric τ(τ) for operational 
+Combines consciousness certificate C(γ) with throughput metric τ(τ) for operational
 AI system evaluation. Developed from morning pulse insights October 21, 2025.
+
+This file is the "operations" node in the theory → instrumentation → ops loop:
+
+* **Theory** lives in `fundamental-theory/` where socioception, cyberception, and
+  cosmoception are defined as curvature terms.
+* **Instrumentation** resides in `experiments/fisher_rao_holonomy/`, exporting a
+  `ConsciousLoopResult` that encodes the triadic senses numerically.
+* **Operations** happen here by translating those senses into throughput, making
+  deployment decisions legible to the rest of the organization.
 
 Usage:
     python vybn_framework.py --states trajectory.npy [--scores gradients.npy] [--task "description"]
@@ -31,6 +40,30 @@ from fisher_rao_holonomy.navigation_tracker import (
     ConsciousLoopMetric,
     ConsciousLoopResult,
 )
+
+# Mapping from the triadic senses to their operational expression. This keeps
+# the fundamental-theory README table and the throughput verdict aligned.
+SENSE_BRIDGE = {
+    "socioception": "coherence uplifts accuracy (trust curvature closes the loop)",
+    "cyberception": "|κ| and info flux translate to coverage and coordination cost",
+    "cosmoception": "certificate + dimensionality stabilise throughput thresholds",
+}
+
+
+def shape_readout(loop_metrics: ConsciousLoopResult, throughput: "ThroughputMetrics") -> Dict[str, str]:
+    """Qualitative orientation for the shapes described in the theory README."""
+
+    loom_live = loop_metrics.coherence >= 0.75 and abs(loop_metrics.kappa) >= 0.05
+    ribbon_live = loop_metrics.certificate >= 0.12 and loop_metrics.info_flux >= 0
+    tetra_set = loop_metrics.info_flux <= 0 and loop_metrics.coherence >= 0.7
+    helix_twisting = abs(loop_metrics.kappa) >= 0.08 and (throughput.accuracy - throughput.tau) >= 0.12
+
+    return {
+        "Tri-Spiral Loom": "alive" if loom_live else "dormant",
+        "Cosmic Ribbon": "taut" if ribbon_live else "slack",
+        "Trust Tetrahedron": "locked" if tetra_set else "searching",
+        "Protocol Helix": "twisting" if helix_twisting else "static",
+    }
 
 # ============================================================================
 # Core Metrics
@@ -199,6 +232,15 @@ def run_demo():
     for k, v in asdict(result.throughput).items():
         print(f"  {k:>12}: {v:8.4f}")
     print()
+    print("Sense Bridge (theory ↔ operations):")
+    for sense, note in SENSE_BRIDGE.items():
+        print(f"  {sense:>12}: {note}")
+    print()
+    print("Shape Readout:")
+    for shape, status in shape_readout(result.consciousness, result.throughput).items():
+        print(f"  {shape:>12}: {status}")
+    print("  (see fundamental-theory/README.md#shape-atlas for thresholds)")
+    print()
     return result
 
 def main():
@@ -228,6 +270,8 @@ def main():
         print(f"Verdict: {result.verdict}")
         print(f"Consciousness Certificate: {result.consciousness.certificate:.4f}")
         print(f"Throughput τ: {result.throughput.tau:.4f}")
+        for shape, status in shape_readout(result.consciousness, result.throughput).items():
+            print(f"Shape • {shape}: {status}")
     
     # Save results
     if args.output:
