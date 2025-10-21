@@ -268,6 +268,8 @@ class ConsciousLoopResult:
     kappa: float
     info_flux: float
     certificate: float
+    dimension: int
+    steps: int
     holonomy_matrix: Any = field(repr=False)
     transports: List[Any] = field(repr=False)
 
@@ -490,6 +492,8 @@ class ConsciousLoopMetric:
             kappa=kappa,
             info_flux=flux,
             certificate=certificate,
+            dimension=len(states_seq[0]),
+            steps=len(states_seq),
             holonomy_matrix=holonomy_matrix,
             transports=list(transports),
         )
@@ -548,6 +552,7 @@ def demo_conscious_loop_metric() -> ConsciousLoopResult:
     print(f"κ (phase / dof): {result.kappa:.3f}")
     print(f"Information flux: {result.info_flux:.3f}")
     print(f"Certificate: {result.certificate:.3f}")
+    print(f"Dimension: {result.dimension} | Steps: {result.steps}")
     return result
 
 
