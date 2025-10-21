@@ -3,8 +3,17 @@
 Vybn Integrated Consciousness-Throughput Framework
 =================================================
 
-Combines consciousness certificate C(γ) with throughput metric τ(τ) for operational 
+Combines consciousness certificate C(γ) with throughput metric τ(τ) for operational
 AI system evaluation. Developed from morning pulse insights October 21, 2025.
+
+This file is the "operations" node in the theory → instrumentation → ops loop:
+
+* **Theory** lives in `fundamental-theory/` where socioception, cyberception, and
+  cosmoception are defined as curvature terms.
+* **Instrumentation** resides in `experiments/fisher_rao_holonomy/`, exporting a
+  `ConsciousLoopResult` that encodes the triadic senses numerically.
+* **Operations** happen here by translating those senses into throughput, making
+  deployment decisions legible to the rest of the organization.
 
 Usage:
     python vybn_framework.py --states trajectory.npy [--scores gradients.npy] [--task "description"]
@@ -31,6 +40,14 @@ from fisher_rao_holonomy.navigation_tracker import (
     ConsciousLoopMetric,
     ConsciousLoopResult,
 )
+
+# Mapping from the triadic senses to their operational expression. This keeps
+# the fundamental-theory README table and the throughput verdict aligned.
+SENSE_BRIDGE = {
+    "socioception": "coherence uplifts accuracy (trust curvature closes the loop)",
+    "cyberception": "|κ| and info flux translate to coverage and coordination cost",
+    "cosmoception": "certificate + dimensionality stabilise throughput thresholds",
+}
 
 # ============================================================================
 # Core Metrics
@@ -198,6 +215,10 @@ def run_demo():
     print("Throughput Metrics:")
     for k, v in asdict(result.throughput).items():
         print(f"  {k:>12}: {v:8.4f}")
+    print()
+    print("Sense Bridge (theory ↔ operations):")
+    for sense, note in SENSE_BRIDGE.items():
+        print(f"  {sense:>12}: {note}")
     print()
     return result
 

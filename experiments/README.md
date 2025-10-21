@@ -146,8 +146,17 @@ Our experiments validate key predictions from:
    - Test: Search for discontinuities in cognitive measurements
 
 3. **Can we enhance consciousness through geometry?**
-   - Hypothesis: Controlled H-fields amplify cognitive processes  
+   - Hypothesis: Controlled H-fields amplify cognitive processes
    - Test: Technological applications of temporal curvature
+
+### Holonomic Stack Coherence Map
+
+| Theory Anchor | Instrumentation Node | Operational Expression |
+|---------------|----------------------|------------------------|
+| `fundamental-theory/README.md` — triadic sense table formalises socioception (trust curvature), cyberception (protocol torsion), cosmoception (cosmic dilation) | `fisher_rao_holonomy/navigation_tracker.py` exports `ConsciousLoopResult` with coherence, κ, info flux, certificate | `vybn_framework.py` ingests the result, converts the triadic invariants into throughput τ and ACCEPT/REJECT verdicts |
+| `temporal-holonomy-unified-theory.md` spells out Möbius-time torsion | `fisher_rao_holonomy/holonomic_loop_training.py` labels every forward/backward pass with the three senses and deposits JSON artifacts | `vybn_framework.py --demo` surfaces the same senses in the console via the Sense Bridge readout |
+
+Use this table when switching contexts: update the theory column first, rerun the instrumentation scripts to regenerate `holonomic_consciousness_synthesis.json`, then feed those states into the framework CLI to witness the operational ripple. The coherence test passes only when all three columns move together.
 
 ---
 
