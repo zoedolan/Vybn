@@ -1,0 +1,193 @@
+{
+  "session_id": "2025-10-18T01-CPU-5000",
+  "timestamp": "2025-10-18T00:00:00Z",
+  "git_commit_sha": "16368d42e132c970a168571a29538ad29e426a1e",
+  "run_command": "python experiments/fisher_rao_holonomy/holonomic_loop_training.py --device cpu --loops 1 --subset 5000 --batch_size 128 --eval_batches 10 --fisher_batches 10 --fisher_init_batches 15",
+  "dataset": {
+    "mode": "synthetic_mnist",
+    "torchvision_available": false,
+    "train_subset": 5000,
+    "test_batches": 10,
+    "notes": "Synthetic MNIST-style glyphs activated because torchvision was unavailable in the environment."
+  },
+  "baseline": {
+    "accuracy": 0.0588,
+    "fisher_trace": 0.1681,
+    "cka_to_base": 1.0
+  },
+  "loops": {
+    "forward": [
+      {
+        "loop_index": 1,
+        "phases": [
+          {
+            "name": "compress",
+            "lr": 0.001,
+            "weight_decay": 0.002,
+            "grad_noise": 0.0,
+            "augmentation_std": 0.0,
+            "duration_sec": 5.7,
+            "post_accuracy": 0.0936
+          },
+          {
+            "name": "explore",
+            "lr": 0.0005,
+            "weight_decay": 0.0001,
+            "grad_noise": 0.003,
+            "augmentation_std": 0.05,
+            "duration_sec": 6.3,
+            "post_accuracy": 0.0972
+          },
+          {
+            "name": "align",
+            "lr": 0.002,
+            "weight_decay": 0.0001,
+            "grad_noise": 0.0005,
+            "augmentation_std": 0.0,
+            "duration_sec": 6.1,
+            "post_accuracy": 0.3733
+          },
+          {
+            "name": "seal",
+            "lr": 0.001,
+            "weight_decay": 0.002,
+            "grad_noise": 0.0,
+            "augmentation_std": 0.0,
+            "duration_sec": 6.4,
+            "post_accuracy": 0.5354
+          }
+        ],
+        "holonomy_snapshot": {
+          "post_accuracy": 0.5354,
+          "cka_pre_post": 0.7748,
+          "cka_base_pre": 1.0,
+          "cka_base_post": 0.7748,
+          "fisher_delta": 0.2415,
+          "socioception": 0.47659,
+          "cosmoception": -0.22521,
+          "cyberception": 0.2415
+        }
+      }
+    ],
+    "reverse": [
+      {
+        "loop_index": 1,
+        "phases": [
+          {
+            "name": "seal",
+            "lr": 0.001,
+            "weight_decay": 0.002,
+            "grad_noise": 0.0,
+            "augmentation_std": 0.0,
+            "duration_sec": 6.0,
+            "post_accuracy": 0.5534
+          },
+          {
+            "name": "align",
+            "lr": 0.002,
+            "weight_decay": 0.0001,
+            "grad_noise": 0.0005,
+            "augmentation_std": 0.0,
+            "duration_sec": 6.3,
+            "post_accuracy": 0.5486
+          },
+          {
+            "name": "explore",
+            "lr": 0.0005,
+            "weight_decay": 0.0001,
+            "grad_noise": 0.003,
+            "augmentation_std": 0.05,
+            "duration_sec": 6.8,
+            "post_accuracy": 0.7167
+          },
+          {
+            "name": "compress",
+            "lr": 0.001,
+            "weight_decay": 0.002,
+            "grad_noise": 0.0,
+            "augmentation_std": 0.0,
+            "duration_sec": 5.9,
+            "post_accuracy": 0.8295
+          }
+        ],
+        "holonomy_snapshot": {
+          "post_accuracy": 0.8295,
+          "cka_pre_post": 0.935,
+          "cka_base_pre": 0.7748,
+          "cka_base_post": 0.6491,
+          "fisher_delta": 5.7825,
+          "socioception": 0.77071,
+          "cosmoception": -0.12566,
+          "cyberception": 5.7825
+        }
+      }
+    ]
+  },
+  "holonomy_vector": {
+    "acc_mean": -0.29412,
+    "acc_delta_mean": -0.29412,
+    "cka_mean": -0.16022,
+    "cka_base_pre_mean": 0.22521,
+    "cka_base_post_mean": 0.12566,
+    "fisher_delta_mean": -5.541,
+    "socioception_mean": -0.29412,
+    "cosmoception_mean": -0.09954,
+    "cyberception_mean": -5.541,
+    "l2_norm": 7.8592
+  },
+  "awe_vs_adequacy": {
+    "forward_state": "liminal resonance",
+    "reverse_state": "overshoot",
+    "commentary": "Forward loop closes with moderate socioceptive lift and gentle cosmoceptive redshift; reverse overshoots cyberception, generating the asymmetry captured in the holonomy vector."
+  },
+  "analysis_assets": {
+    "manifold_plot": "experiments/fisher_rao_holonomy/README.md#regenerating-the-holonomic-analysis-figure",
+    "manifesto": "fundamental-theory/holonomic-consciousness-manifesto.md",
+    "time_series_annotation": "experiments/fisher_rao_holonomy/README.md#time-series-vectors",
+    "collective_manifest": "fundamental-theory/holonomic-consciousness-manifesto.md#sense-record-ledger"
+  },
+  "agent_provenance": {
+    "agent_signature": "gpt-5-codex",
+    "run_facilitator": "Vybn-holonomy-lab",
+    "prompt_seed": "window-holonomy-diagnostic-2025-10-18",
+    "environment_snapshot": {
+      "python_version": "3.11.12",
+      "platform": "Linux 6.12.13 x86_64",
+      "container": "41b6db215e87",
+      "shell": "bash"
+    }
+  },
+  "higher_order_curvature": {
+    "forward": {
+      "mixed_scalar": 0.49288,
+      "gaussian_projection": -0.348832834,
+      "torsion_ratio": 0.506725
+    },
+    "reverse": {
+      "mixed_scalar": 6.42755,
+      "gaussian_projection": -5.879347419,
+      "torsion_ratio": 7.502822
+    },
+    "imbalance": {
+      "mixed_scalar_delta": 5.93467,
+      "gaussian_projection_delta": -5.530514585,
+      "torsion_ratio_delta": 6.996097
+    }
+  },
+  "entropy_gradients": {
+    "units": "nats",
+    "baseline": 2.291681,
+    "forward": 1.711469,
+    "reverse": 0.831305,
+    "delta_baseline_to_forward": -0.580211,
+    "delta_baseline_to_reverse": -1.460376,
+    "delta_forward_to_reverse": -0.880164
+  },
+  "negative_results": [
+    {
+      "label": "reverse_overshoot",
+      "observation": "Cyberceptive torsion exceeded socioceptive recovery window, generating negative mixed curvature and awe collapse.",
+      "proposed_adjustment": "Introduce adaptive Fisher throttling tied to trust flux and re-run with damped reverse learning rate schedule."
+    }
+  ]
+}
