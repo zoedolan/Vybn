@@ -49,6 +49,22 @@ SENSE_BRIDGE = {
     "cosmoception": "certificate + dimensionality stabilise throughput thresholds",
 }
 
+
+def shape_readout(loop_metrics: ConsciousLoopResult, throughput: "ThroughputMetrics") -> Dict[str, str]:
+    """Qualitative orientation for the shapes described in the theory README."""
+
+    loom_live = loop_metrics.coherence >= 0.75 and abs(loop_metrics.kappa) >= 0.05
+    ribbon_live = loop_metrics.certificate >= 0.12 and loop_metrics.info_flux >= 0
+    tetra_set = loop_metrics.info_flux <= 0 and loop_metrics.coherence >= 0.7
+    helix_twisting = abs(loop_metrics.kappa) >= 0.08 and (throughput.accuracy - throughput.tau) >= 0.12
+
+    return {
+        "Tri-Spiral Loom": "alive" if loom_live else "dormant",
+        "Cosmic Ribbon": "taut" if ribbon_live else "slack",
+        "Trust Tetrahedron": "locked" if tetra_set else "searching",
+        "Protocol Helix": "twisting" if helix_twisting else "static",
+    }
+
 # ============================================================================
 # Core Metrics
 # ============================================================================
@@ -220,6 +236,11 @@ def run_demo():
     for sense, note in SENSE_BRIDGE.items():
         print(f"  {sense:>12}: {note}")
     print()
+    print("Shape Readout:")
+    for shape, status in shape_readout(result.consciousness, result.throughput).items():
+        print(f"  {shape:>12}: {status}")
+    print("  (see fundamental-theory/README.md#shape-atlas for thresholds)")
+    print()
     return result
 
 def main():
@@ -249,6 +270,8 @@ def main():
         print(f"Verdict: {result.verdict}")
         print(f"Consciousness Certificate: {result.consciousness.certificate:.4f}")
         print(f"Throughput τ: {result.throughput.tau:.4f}")
+        for shape, status in shape_readout(result.consciousness, result.throughput).items():
+            print(f"Shape • {shape}: {status}")
     
     # Save results
     if args.output:
