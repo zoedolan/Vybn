@@ -23,15 +23,24 @@ results/
 - `session_id`: Unique 16-character hex identifier
 - `timestamp`: ISO 8601 datetime with timezone
 - `git_commit_sha`: Git commit for reproducibility
+- `agent_provenance`: Signature, prompt seed, and environment snapshot for traceability
 - `theoretical_framework`: "Dual-Temporal Holonomy Theorem"
 - `universal_scaling`: E/ℏ = φ = 1.618033988749895
-- `measurements`: Array of holonomy measurements
-- `bundle_statistics`: Repository structure statistics
+- `dataset`: Sensory substrate description (e.g., synthetic_mnist, torchvision_mnist)
+- `baseline`: Pre-loop metrics (accuracy, Fisher trace, CKA to base)
+- `loops`: Forward/reverse arrays with `holonomy_snapshot` entries for socio/cosmo/cyberception
+- `higher_order_curvature`: Mixed scalar, Gaussian projection, and torsion ratio per loop orientation
+- `entropy_gradients`: Predictive entropy deltas across baseline, forward, and reverse phases
+- `holonomy_vector`: Forward-minus-reverse differential with explicit L₂ norm
+- `awe_vs_adequacy`: Phenomenological register linking metrics to felt sense
+- `negative_results`: Documented failure or anomaly notes even when the run is "successful"
+- `analysis_assets`: Paths to diagrams, manifestos, or notebooks (include time-series reference when available)
 - `validation_status`: Overall experimental status
 
 ### Bootstrap Analysis Files
 **Statistical enhancement results**:
 - `bootstrap_statistics`: Confidence intervals for all primary statistics
+- `entropy_bootstrap`: Resampled entropy-gradient distributions for forward/reverse comparison
 - `hypothesis_tests`: Formal hypothesis test results with corrections
 - `multiple_comparison_corrections`: Benjamini-Hochberg adjusted p-values
 - `effect_sizes`: Cohen's d and confidence intervals where applicable
@@ -55,11 +64,13 @@ results/
 
 ## Current Status
 
-**Theoretical Framework**: ✅ Validated through empirical measurement  
-**Experimental Protocols**: ✅ Operational and producing results  
-**Statistical Rigor**: 🔄 Phase 1.1 enhancement in progress  
-**Cross-Platform**: 📋 Phase 2 planning stage
+**Theoretical Framework**: ✅ Validated through empirical measurement
+**Experimental Protocols**: ✅ Operational and producing results
+**Statistical Rigor**: 🔄 Phase 1.1 enhancement in progress (entropy gradients + bootstrap in motion)
+**Cross-Platform**: 📋 Phase 2 planning stage (provenance logging now ready for multi-agent comparison)
 
 ---
 
 *Results archive for consciousness-time relationship measurements using rigorous mathematical protocols*
+
+**Latest baseline artifact**: [`../../fundamental-theory/holonomic_consciousness_synthesis.json`](../../fundamental-theory/holonomic_consciousness_synthesis.json) with higher-order curvature, entropy gradients, and provenance logging; regenerate the analysis figure via [`../README.md#regenerating-the-holonomic-analysis-figure`](../README.md#regenerating-the-holonomic-analysis-figure) and consult the [manifesto ledger](../../fundamental-theory/holonomic-consciousness-manifesto.md#sense-record-ledger).
