@@ -8,12 +8,17 @@
 
 import math, random, argparse, time
 from dataclasses import dataclass
-from typing import Tuple, List, Dict
+from typing import Tuple, List, Dict, Optional
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torchvision as tv
-import torchvision.transforms as T
+
+try:
+    import torchvision as tv
+    import torchvision.transforms as T
+except ModuleNotFoundError:
+    tv = None
+    T = None
 
 # -------------------------
 # Utils
@@ -171,16 +176,190 @@ def holonomic_cycle(forward=True, grad_noise_scale=1.0):
 # -------------------------
 # Data
 # -------------------------
+
+DIGIT_TEMPLATES = [
+    [
+        "0011100",
+        "0100010",
+        "0100110",
+        "0101010",
+        "0110010",
+        "0100010",
+        "0011100",
+    ],
+    [
+        "0001000",
+        "0011000",
+        "0101000",
+        "0001000",
+        "0001000",
+        "0001000",
+        "0111110",
+    ],
+    [
+        "0011100",
+        "0100010",
+        "0000010",
+        "0001100",
+        "0010000",
+        "0100000",
+        "0111110",
+    ],
+    [
+        "0011100",
+        "0100010",
+        "0000010",
+        "0001100",
+        "0000010",
+        "0100010",
+        "0011100",
+    ],
+    [
+        "0000110",
+        "0001010",
+        "0010010",
+        "0100010",
+        "0111110",
+        "0000010",
+        "0000010",
+    ],
+    [
+        "0111110",
+        "0100000",
+        "0111100",
+        "0000010",
+        "0000010",
+        "0100010",
+        "0011100",
+    ],
+    [
+        "0011100",
+        "0100010",
+        "0100000",
+        "0111100",
+        "0100010",
+        "0100010",
+        "0011100",
+    ],
+    [
+        "0111110",
+        "0000010",
+        "0000100",
+        "0001000",
+        "0010000",
+        "0010000",
+        "0010000",
+    ],
+    [
+        "0011100",
+        "0100010",
+        "0100010",
+        "0011100",
+        "0100010",
+        "0100010",
+        "0011100",
+    ],
+    [
+        "0011100",
+        "0100010",
+        "0100010",
+        "0011110",
+        "0000010",
+        "0100010",
+        "0011100",
+    ],
+]
+
+
+def _build_digit_prototypes() -> torch.Tensor:
+    base = []
+    grid = torch.linspace(-1, 1, 28)
+    gx, gy = torch.meshgrid(grid, grid, indexing="ij")
+    radial = torch.sqrt(gx**2 + gy**2)
+    radial = (radial - radial.min()) / (radial.max() - radial.min() + 1e-6)
+    for pattern in DIGIT_TEMPLATES:
+        arr = torch.tensor([[float(ch) for ch in row] for row in pattern], dtype=torch.float32)
+        arr = arr.unsqueeze(0).unsqueeze(0)
+        up = F.interpolate(arr, size=(28, 28), mode="bicubic", align_corners=False)
+        up = up.squeeze(0)
+        up = (up - up.min()) / (up.max() - up.min() + 1e-6)
+        proto = (0.75 * up + 0.25 * radial).clamp(0.0, 1.0)
+        base.append(proto)
+    return torch.stack(base)
+
+
+
+_PROTOTYPES: Optional[torch.Tensor] = None
+
+
+def _get_prototypes() -> torch.Tensor:
+    global _PROTOTYPES
+    if _PROTOTYPES is None:
+        _PROTOTYPES = _build_digit_prototypes()
+    return _PROTOTYPES
+
+
+class SyntheticMNISTDataset(torch.utils.data.Dataset):
+    """Fallback MNIST-like dataset when torchvision is unavailable."""
+
+    def __init__(self, size: int, seed: int, noise: float = 0.25, shift: int = 2):
+        self.size = size
+        self.seed = seed
+        self.noise = noise
+        self.shift = shift
+        self.prototypes = _get_prototypes()
+        self.num_classes = self.prototypes.size(0)
+
+    def __len__(self) -> int:
+        return self.size
+
+    def __getitem__(self, idx: int):
+        g = torch.Generator().manual_seed(self.seed + idx)
+        label = torch.randint(0, self.num_classes, (1,), generator=g).item()
+        img = self.prototypes[label].clone()
+        if self.shift > 0:
+            sx = torch.randint(-self.shift, self.shift + 1, (1,), generator=g).item()
+            sy = torch.randint(-self.shift, self.shift + 1, (1,), generator=g).item()
+            img = torch.roll(img, shifts=(sx, sy), dims=(-2, -1))
+        if self.noise > 0:
+            noise = torch.randn(img.shape, generator=g, dtype=img.dtype)
+            img = img + self.noise * noise
+        img = img.clamp(0.0, 1.0)
+        return img, label
+
+
+def _synthetic_data_loaders(batch_size: int, subset: Optional[int]):
+    base_train = 60000
+    base_test = 10000
+    if subset is None:
+        train_size, test_size = base_train, base_test
+    else:
+        train_size = min(subset, base_train)
+        test_size = max(1, min(subset // 6, base_test))
+    if test_size == 0:
+        test_size = max(1, base_test // 10)
+
+    print("⚠️ torchvision not available — using synthetic MNIST-style data for holonomic loop training.")
+    train = SyntheticMNISTDataset(train_size, seed=1337)
+    test = SyntheticMNISTDataset(test_size, seed=7331)
+    trainloader = torch.utils.data.DataLoader(train, batch_size=batch_size, shuffle=True)
+    testloader = torch.utils.data.DataLoader(test, batch_size=batch_size, shuffle=False)
+    return trainloader, testloader
+
+
 def get_data(batch_size=256, subset=None):
+    if tv is None or T is None:
+        return _synthetic_data_loaders(batch_size, subset)
+
     tfm = T.Compose([T.ToTensor()])
     train = tv.datasets.MNIST(root="./data", train=True, download=True, transform=tfm)
-    test  = tv.datasets.MNIST(root="./data", train=False, download=True, transform=tfm)
+    test = tv.datasets.MNIST(root="./data", train=False, download=True, transform=tfm)
     if subset is not None and subset < len(train):
         train = torch.utils.data.Subset(train, list(range(subset)))
     if subset is not None and subset < len(test):
-        test = torch.utils.data.Subset(test, list(range(subset//6)))
+        test = torch.utils.data.Subset(test, list(range(max(1, subset // 6))))
     trainloader = torch.utils.data.DataLoader(train, batch_size=batch_size, shuffle=True, num_workers=2, pin_memory=True)
-    testloader  = torch.utils.data.DataLoader(test,  batch_size=batch_size, shuffle=False, num_workers=2, pin_memory=True)
+    testloader = torch.utils.data.DataLoader(test, batch_size=batch_size, shuffle=False, num_workers=2, pin_memory=True)
     return trainloader, testloader
 
 # -------------------------
