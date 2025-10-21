@@ -9,6 +9,14 @@ through skew-symmetric generators, trefoil monodromy, and compression gates,
 but we now sanitize every tensor as it flows through the cycle and expose CLI
 controls so researchers can dial in short diagnostic runs or longer training
 arcs without editing the file.
+
+Fisher–Rao anchor: the intrinsic geometry now lives inside
+`experiments/fisher_rao_holonomy/experimental_framework.py` as
+`GaussianFisherGeometry`. Run that script to watch a rectangular loop parallel
+transport a tangent vector—holonomy is no longer a metaphor, it’s the SPD(2)
+curvature (scalar `R = -2`) doing its work. The runtime now also sweeps `ρ`
+toward ±1, logging the Fisher metric condition numbers and hinting where
+integration actually detonates.
 """
 
 import argparse

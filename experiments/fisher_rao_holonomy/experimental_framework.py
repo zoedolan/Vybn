@@ -381,6 +381,227 @@ class FisherRaoHolonomyExperiment:
         print(f"\n💾 Results exported to: {output_path}")
         return output_path
 
+
+class GaussianFisherGeometry:
+    """Exact Fisher geometry for zero-mean bivariate Gaussians.
+
+    All coordinates obey |ρ| < 1. Approaching the boundary drives the
+    metric singular; we expose that blow-up explicitly so experiments can
+    log the symmetry collapse instead of stumbling into division-by-zero.
+    """
+
+    EPS = 1e-12
+
+    def metric(self, theta: np.ndarray) -> np.ndarray:
+        sigma1, sigma2, rho = theta
+        if abs(rho) >= 1.0:
+            raise ValueError("Correlation parameter must satisfy |ρ| < 1 for SPD(2) geometry")
+
+        denom = rho ** 2 - 1.0
+        if abs(denom) < self.EPS:
+            raise ValueError("Metric degenerates at |ρ| = 1; stay inside the open chart.")
+
+        g11 = (rho ** 2 - 2.0) / (sigma1 ** 2 * denom)
+        g22 = (rho ** 2 - 2.0) / (sigma2 ** 2 * denom)
+        g33 = (rho ** 2 + 1.0) / (denom ** 2)
+        g12 = rho ** 2 / (sigma1 * sigma2 * denom)
+        g13 = rho / (sigma1 * denom)
+        g23 = rho / (sigma2 * denom)
+        return np.array([[g11, g12, g13],
+                         [g12, g22, g23],
+                         [g13, g23, g33]], dtype=float)
+
+    def _metric_partials(self, theta: np.ndarray) -> np.ndarray:
+        sigma1, sigma2, rho = theta
+        denom = rho ** 2 - 1.0
+        denom_sq = denom ** 2
+        denom_cu = denom ** 3
+        inv_s1 = 1.0 / sigma1
+        inv_s2 = 1.0 / sigma2
+
+        dg = np.zeros((3, 3, 3), dtype=float)
+
+        # ∂/∂σ₁
+        dg[0, 0, 0] = -2.0 * (rho ** 2 - 2.0) * inv_s1 ** 3 / denom
+        dg[0, 0, 1] = 0.0
+        dg[0, 0, 2] = 2.0 * rho / (sigma1 ** 2 * denom_sq)
+
+        dg[0, 1, 0] = -rho ** 2 * inv_s1 ** 2 * inv_s2 / denom
+        dg[0, 1, 1] = -rho ** 2 * inv_s1 * inv_s2 ** 2 / denom
+        dg[0, 1, 2] = -2.0 * rho * inv_s1 * inv_s2 / denom_sq
+
+        dg[0, 2, 0] = -rho * inv_s1 ** 2 / denom
+        dg[0, 2, 1] = 0.0
+        dg[0, 2, 2] = -(rho ** 2 + 1.0) * inv_s1 / denom_sq
+
+        # ∂/∂σ₂
+        dg[1, 0, 0] = -rho ** 2 * inv_s1 ** 2 * inv_s2 / denom
+        dg[1, 0, 1] = -rho ** 2 * inv_s1 * inv_s2 ** 2 / denom
+        dg[1, 0, 2] = -2.0 * rho * inv_s1 * inv_s2 / denom_sq
+
+        dg[1, 1, 0] = 0.0
+        dg[1, 1, 1] = -2.0 * (rho ** 2 - 2.0) * inv_s2 ** 3 / denom
+        dg[1, 1, 2] = 2.0 * rho / (sigma2 ** 2 * denom_sq)
+
+        dg[1, 2, 0] = 0.0
+        dg[1, 2, 1] = -rho * inv_s2 ** 2 / denom
+        dg[1, 2, 2] = -(rho ** 2 + 1.0) * inv_s2 / denom_sq
+
+        # ∂/∂ρ
+        dg[2, 0, 0] = 2.0 * rho / (sigma1 ** 2 * denom_sq)
+        dg[2, 0, 1] = -2.0 * rho * inv_s1 * inv_s2 / denom_sq
+        dg[2, 0, 2] = -(rho ** 2 + 1.0) * inv_s1 / denom_sq
+
+        dg[2, 1, 0] = -2.0 * rho * inv_s1 * inv_s2 / denom_sq
+        dg[2, 1, 1] = 2.0 * rho / (sigma2 ** 2 * denom_sq)
+        dg[2, 1, 2] = -(rho ** 2 + 1.0) * inv_s2 / denom_sq
+
+        dg[2, 2, 0] = -(rho ** 2 + 1.0) * inv_s1 / denom_sq
+        dg[2, 2, 1] = -(rho ** 2 + 1.0) * inv_s2 / denom_sq
+        dg[2, 2, 2] = -2.0 * rho * (rho ** 2 + 3.0) / denom_cu
+
+        return dg
+
+    def christoffel(self, theta: np.ndarray) -> np.ndarray:
+        g = self.metric(theta)
+        g_inv = np.linalg.inv(g)
+        dg = self._metric_partials(theta)
+        Gamma = np.zeros((3, 3, 3), dtype=float)
+        for l in range(3):
+            for i in range(3):
+                for j in range(3):
+                    accum = 0.0
+                    for m in range(3):
+                        accum += g_inv[l, m] * (
+                            dg[j, m, i] + dg[i, m, j] - dg[i, j, m]
+                        )
+                    Gamma[l, i, j] = 0.5 * accum
+        return Gamma
+
+    @staticmethod
+    def scalar_curvature(_: np.ndarray) -> float:
+        return -2.0
+
+    def parallel_transport(self, path: np.ndarray, v0: np.ndarray) -> np.ndarray:
+        v = v0.astype(float).copy()
+        for idx in range(len(path) - 1):
+            theta = path[idx]
+            delta = path[idx + 1] - theta
+            if np.allclose(delta, 0.0):
+                continue
+            Gamma = self.christoffel(theta)
+            drift = np.zeros_like(v)
+            for l in range(3):
+                for i in range(3):
+                    for j in range(3):
+                        drift[l] += Gamma[l, i, j] * v[i] * delta[j]
+            v -= drift
+        return v
+
+    def _rectangular_loop(self, base: np.ndarray, delta: np.ndarray) -> np.ndarray:
+        return np.array([
+            base,
+            base + np.array([delta[0], 0.0, 0.0]),
+            base + np.array([delta[0], delta[1], 0.0]),
+            base + np.array([0.0, delta[1], 0.0]),
+            base,
+        ])
+
+    def holonomy_demo(self,
+                      base: np.ndarray = np.array([1.0, 1.5, 0.3]),
+                      delta: np.ndarray = np.array([0.025, 0.035, 0.0]),
+                      v0: np.ndarray = np.array([1.0, 0.0, 0.0])) -> Dict[str, float]:
+        loop = self._rectangular_loop(base, delta)
+        transported = self.parallel_transport(loop, v0)
+        cos_angle = np.clip(
+            np.dot(v0, transported) / (np.linalg.norm(v0) * np.linalg.norm(transported)),
+            -1.0,
+            1.0,
+        )
+        angle_deg = np.degrees(np.arccos(cos_angle))
+        return {
+            'base_sigma1': base[0],
+            'base_sigma2': base[1],
+            'base_rho': base[2],
+            'loop_sigma_step': delta[0],
+            'initial_vector': v0.tolist(),
+            'transported_vector': transported.tolist(),
+            'rotation_degrees': angle_deg,
+            'loop': loop.tolist(),
+        }
+
+    def degeneracy_profile(
+        self,
+        sigma1: float = 1.0,
+        sigma2: float = 1.5,
+        rho_values: Optional[np.ndarray] = None,
+    ) -> List[Dict[str, float]]:
+        """Sample how the metric behaves as |ρ| → 1."""
+
+        if rho_values is None:
+            rho_values = np.concatenate([
+                np.linspace(0.0, 0.8, 5),
+                np.linspace(0.9, 0.999, 6, endpoint=True),
+            ])
+
+        samples: List[Dict[str, float]] = []
+        for rho in rho_values:
+            theta = np.array([sigma1, sigma2, float(rho)])
+            try:
+                g = self.metric(theta)
+            except ValueError:
+                continue
+
+            eigvals = np.linalg.eigvalsh(g)
+            cond_number = np.linalg.cond(g)
+            samples.append({
+                'rho': float(rho),
+                'trace': float(np.trace(g)),
+                'min_eigenvalue': float(eigvals[0]),
+                'max_eigenvalue': float(eigvals[-1]),
+                'condition_number': float(cond_number),
+            })
+
+        return samples
+
+    def visualize_parallel_transport(
+        self,
+        report: Dict[str, float],
+        save_path: Optional[Path] = None,
+    ) -> Optional[Path]:
+        """Plot initial vs. transported tangent vectors if matplotlib is available."""
+
+        try:
+            import matplotlib.pyplot as plt  # type: ignore
+        except ImportError:
+            print("⚠️  matplotlib not available—skipping holonomy plot generation.")
+            return None
+
+        base_vector = np.array(report['initial_vector'], dtype=float)
+        transported_vector = np.array(report['transported_vector'], dtype=float)
+
+        fig, ax = plt.subplots(figsize=(4.5, 4.5))
+        ax.quiver(0, 0, base_vector[0], base_vector[1],
+                  angles='xy', scale_units='xy', scale=1, color='C0', label='initial')
+        ax.quiver(0, 0, transported_vector[0], transported_vector[1],
+                  angles='xy', scale_units='xy', scale=1, color='C3', label='transported')
+        ax.set_xlabel('$v_1$')
+        ax.set_ylabel('$v_2$')
+        ax.set_title('Gaussian Fisher parallel transport (σ₁-σ₂ plane)')
+        ax.set_aspect('equal', adjustable='box')
+        ax.legend()
+        ax.grid(True, alpha=0.25)
+
+        output_path: Optional[Path] = None
+        if save_path:
+            output_path = Path(save_path)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            fig.savefig(output_path, dpi=160, bbox_inches='tight')
+            print(f"🖼️  Saved holonomy visualization to {output_path}")
+
+        plt.close(fig)
+        return output_path
+
 def main():
     """Main experimental protocol execution."""
     print("🌊 Fisher-Rao Holonomy Experimental Framework")
@@ -401,7 +622,41 @@ def main():
         
         # Export results
         output_file = experiment.export_results()
-        
+
+        geometry = GaussianFisherGeometry()
+        holonomy_report = geometry.holonomy_demo()
+        print("\n📐 Fisher–Rao intrinsic geometry diagnostic")
+        print(f"  Base point (σ₁, σ₂, ρ): ({holonomy_report['base_sigma1']:.3f}, "
+              f"{holonomy_report['base_sigma2']:.3f}, {holonomy_report['base_rho']:.3f})")
+        print(f"  Parallel transport rotation: {holonomy_report['rotation_degrees']:.6f}°")
+        base_point = np.array([
+            holonomy_report['base_sigma1'],
+            holonomy_report['base_sigma2'],
+            holonomy_report['base_rho'],
+        ])
+        print(f"  Scalar curvature: {geometry.scalar_curvature(base_point):.0f}")
+
+        degeneracy_samples = geometry.degeneracy_profile(
+            sigma1=base_point[0],
+            sigma2=base_point[1],
+            rho_values=np.concatenate([
+                np.linspace(0.0, 0.9, 4),
+                np.linspace(0.93, 0.999, 8, endpoint=True),
+            ]),
+        )
+
+        print("\n🧮 Degeneracy profile approaching |ρ| → 1")
+        for sample in degeneracy_samples[-6:]:
+            print(
+                "  ρ = {rho:.3f} | cond(g) = {condition_number:.2e} | min λ = {min_eigenvalue:.3e}".format(
+                    **sample
+                )
+            )
+
+        print("\n🎨 Visualization hook: call")
+        print("  geometry.visualize_parallel_transport(holonomy_report, Path('experiments/fisher_rao_holonomy/holonomy_demo.png'))")
+        print("  to render initial vs. transported tangent vectors (requires matplotlib).")
+
         print("\n🎯 Experimental Protocol Complete")
         print(f"Status: {results.get('validation_status', 'UNKNOWN')}")
         print(f"Measurements: {len(results.get('measurements', []))}")

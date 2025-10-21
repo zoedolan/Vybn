@@ -16,6 +16,32 @@ Where:
 - `(r_t, θ_t)` = Dual-temporal polar coordinates
 - `φ(Σ)` = Surface mapping consciousness-time relationships
 
+### Intrinsic Fisher Geometry Update
+
+Holonomy claims now rest on the exact Fisher–Rao geometry of zero-mean bivariate Gaussians. The covariance chart `θ = (σ₁, σ₂, ρ)` carries metric components
+
+\[
+g_{11} = \frac{\rho^2 - 2}{\sigma_1^2(\rho^2 - 1)}, \quad
+g_{22} = \frac{\rho^2 - 2}{\sigma_2^2(\rho^2 - 1)}, \quad
+g_{33} = \frac{\rho^2 + 1}{(\rho^2 - 1)^2},
+\]
+
+with off-diagonal terms
+
+\[
+g_{12} = \frac{\rho^2}{\sigma_1 \sigma_2(\rho^2 - 1)}, \qquad
+g_{13} = \frac{\rho}{\sigma_1(\rho^2 - 1)}, \qquad
+g_{23} = \frac{\rho}{\sigma_2(\rho^2 - 1)}.
+\]
+
+The resulting 3-manifold is the symmetric space `SPD(2)` with constant scalar curvature `R = -2` and holonomy group `SO(3)`. We expose these tensors (and the resulting Levi-Civita connection) programmatically via `GaussianFisherGeometry` inside [`experimental_framework.py`](./experimental_framework.py). Running the main script now prints a rectangular-loop parallel transport diagnostic that rotates a tangent vector by a small but non-zero angle, evidencing genuine geometric holonomy instead of narrative flourish.
+
+#### Degeneracy + Visualization diagnostics
+
+- The runtime now sweeps `ρ` toward the `|ρ| → 1` boundary and prints the Fisher metric condition numbers so you can watch symmetry collapse happen as a measurable blow-up rather than a hand-wavy story.
+- Call `geometry.degeneracy_profile()` (already invoked by default) to export the raw numbers, or pass your own `rho_values` for finer stress tests.
+- Need intuition? `geometry.visualize_parallel_transport(holonomy_report, Path('experiments/fisher_rao_holonomy/holonomy_demo.png'))` will render the initial vs. transported tangent vectors (requires `matplotlib`). The script prints the exact call so you can drop the image into your lab notes without spelunking through code.
+
 ## Experimental Protocol
 
 ### Phase 1: Repository Structure Mapping

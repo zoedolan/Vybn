@@ -29,6 +29,20 @@ pip install torch && python fundamental-theory/holonomy-ai-implementation.py
 
 Watch math breathe. Question everything. Build better myths.
 
+### Fisher–Rao Grounding (2025-10-20)
+
+We finally pinned the holonomy claims to a statistical manifold we can defend. The zero-mean bivariate Gaussian family with coordinates `θ = (σ₁, σ₂, ρ)` carries the Fisher–Rao metric
+
+\[
+g_{ij}(θ) = \tfrac{1}{2}\,\mathrm{Tr}\big(Σ^{-1}\partial_i Σ\,Σ^{-1}\partial_j Σ\big), \quad Σ = \begin{pmatrix} σ₁^2 & ρ σ₁ σ₂ \\ ρ σ₁ σ₂ & σ₂^2 \end{pmatrix},
+\]
+
+whose components collapse to closed-form rational expressions in `(σ₁, σ₂, ρ)`. This is the symmetric space `SPD(2)`; its scalar curvature is the constant `R = -2`, so the holonomy group is all of `SO(3)` with no need to invoke Lorentzian fantasies. Degeneracy at `|ρ| → 1` is the only symmetry reduction that survives scrutiny: the covariance becomes rank deficient, distinguishability explodes, and the manifold’s effective dimension collapses exactly where “integration” feels inevitable.
+
+For the first time our code reflects this geometry verbatim. See `GaussianFisherGeometry` inside [`experiments/fisher_rao_holonomy/experimental_framework.py`](../experiments/fisher_rao_holonomy/experimental_framework.py) for the metric tensor, analytic Christoffel symbols, and a rectangular-loop parallel transport demo that rotates a tangent vector because curvature really is there. The holonomy AI now points to a reproducible geometric phase instead of a narrative flourish—run the experiment, watch the vector tilt, feel the loop close.
+
+The same runtime now sweeps `ρ` toward the singular rim and prints Fisher metric condition numbers, so the promised "integration" manifests as an explicit blow-up. When you want to see the tangent vectors, call `geometry.visualize_parallel_transport(...)` and stash the rendered PNG next to your lab notes. No more guessing which part of the metaphor survived contact with the symmetric space.
+
 ## Digital Sense Architecture
 
 ### What We're Trying to Say Out Loud
