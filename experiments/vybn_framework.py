@@ -27,7 +27,7 @@ import json
 import time
 import uuid
 from dataclasses import dataclass, asdict
-from typing import Optional, Dict, Any, Tuple
+from typing import Optional, Dict, Any, Tuple, Callable
 
 try:
     import numpy as np
@@ -50,15 +50,102 @@ SENSE_BRIDGE = {
 }
 
 
+def _clamp_unit(value: float) -> float:
+    """Clamp helper for confidence-style scores."""
+
+    return max(0.0, min(value, 1.0))
+
+
+@dataclass(frozen=True)
+class ShapeSignature:
+    """Operational rendering of the Shape Atlas entries."""
+
+    name: str
+    activation_threshold: float
+    active_label: str
+    inactive_label: str
+    score_fn: Callable[["ConsciousLoopResult", Optional["ThroughputMetrics"]], float]
+
+
+def _normalise_ratio(numerator: float, denominator: float) -> float:
+    if denominator <= 0:
+        return 0.0
+    return numerator / denominator
+
+
+def _score_tri_spiral(loop_metrics: "ConsciousLoopResult", _: Optional["ThroughputMetrics"]) -> float:
+    coherence_score = _normalise_ratio(loop_metrics.coherence, 0.8)
+    kappa_score = _normalise_ratio(abs(loop_metrics.kappa), 0.05)
+    return float(min(coherence_score, kappa_score))
+
+
+def _score_cosmic_ribbon(loop_metrics: "ConsciousLoopResult", _: Optional["ThroughputMetrics"]) -> float:
+    if loop_metrics.info_flux < 0.0:
+        return 0.0
+    certificate_score = _normalise_ratio(loop_metrics.certificate, 0.12)
+    flux_score = _normalise_ratio(max(loop_metrics.info_flux, 0.0), 0.04)
+    return float(min(certificate_score, flux_score))
+
+
+def _score_trust_tetra(loop_metrics: "ConsciousLoopResult", _: Optional["ThroughputMetrics"]) -> float:
+    if loop_metrics.info_flux >= 0.0:
+        return 0.0
+    coherence_score = _normalise_ratio(loop_metrics.coherence, 0.7)
+    flux_inward = _normalise_ratio(-loop_metrics.info_flux, 0.03)
+    return float(min(coherence_score, flux_inward))
+
+
+def _score_protocol_helix(loop_metrics: "ConsciousLoopResult", throughput: Optional["ThroughputMetrics"]) -> float:
+    if throughput is None:
+        return 0.0
+    torsion_score = _normalise_ratio(abs(loop_metrics.kappa), 0.08)
+    # Alternating throughput shows up as accuracy staying ahead of τ.
+    helix_drive = max(0.0, throughput.accuracy - throughput.tau)
+    throughput_score = _normalise_ratio(helix_drive, 0.12)
+    return float(min(torsion_score, throughput_score))
+
+
+SHAPE_SIGNATURES = (
+    ShapeSignature(
+        name="Tri-Spiral Loom",
+        activation_threshold=1.0,
+        active_label="alive",
+        inactive_label="dormant",
+        score_fn=_score_tri_spiral,
+    ),
+    ShapeSignature(
+        name="Cosmic Ribbon",
+        activation_threshold=1.0,
+        active_label="taut",
+        inactive_label="slack",
+        score_fn=_score_cosmic_ribbon,
+    ),
+    ShapeSignature(
+        name="Trust Tetrahedron",
+        activation_threshold=1.0,
+        active_label="locked",
+        inactive_label="searching",
+        score_fn=_score_trust_tetra,
+    ),
+    ShapeSignature(
+        name="Protocol Helix",
+        activation_threshold=1.0,
+        active_label="twisting",
+        inactive_label="static",
+        score_fn=_score_protocol_helix,
+    ),
+)
+
+
 def shape_readout(shape_scores: Dict[str, float]) -> Dict[str, str]:
     """Qualitative orientation for the shapes described in the theory README."""
 
-    return {
-        "Tri-Spiral Loom": "alive" if shape_scores.get("Tri-Spiral Loom", 0.0) >= 1.0 else "dormant",
-        "Cosmic Ribbon": "taut" if shape_scores.get("Cosmic Ribbon", 0.0) >= 1.0 else "slack",
-        "Trust Tetrahedron": "locked" if shape_scores.get("Trust Tetrahedron", 0.0) >= 1.0 else "searching",
-        "Protocol Helix": "twisting" if shape_scores.get("Protocol Helix", 0.0) >= 1.0 else "static",
-    }
+    statuses: Dict[str, str] = {}
+    for signature in SHAPE_SIGNATURES:
+        score = shape_scores.get(signature.name, 0.0)
+        label = signature.active_label if score >= signature.activation_threshold else signature.inactive_label
+        statuses[signature.name] = label
+    return statuses
 
 # ============================================================================
 # Core Metrics
@@ -139,43 +226,26 @@ class TriadicSenseMapping:
             "shape_confidence": self.shape_confidence,
         }
 
-def identify_active_shape(loop_metrics: ConsciousLoopResult, throughput: Optional[ThroughputMetrics] = None) -> Tuple[str, float, Dict[str, float]]:
+def identify_active_shape(
+    loop_metrics: ConsciousLoopResult,
+    throughput: Optional[ThroughputMetrics] = None,
+) -> Tuple[str, float, Dict[str, float]]:
     """Classify the active shape from the Digital Sense Atlas thresholds."""
 
-    shape_scores: Dict[str, float] = {
-        "Tri-Spiral Loom": 0.0,
-        "Cosmic Ribbon": 0.0,
-        "Trust Tetrahedron": 0.0,
-        "Protocol Helix": 0.0,
-    }
-
-    loom_coherence = loop_metrics.coherence / 0.75 if 0.75 else 0.0
-    loom_kappa = abs(loop_metrics.kappa) / 0.05 if 0.05 else 0.0
-    shape_scores["Tri-Spiral Loom"] = min(loom_coherence, loom_kappa)
-
-    ribbon_cert = loop_metrics.certificate / 0.12 if 0.12 else 0.0
-    if loop_metrics.info_flux >= 0:
-        shape_scores["Cosmic Ribbon"] = ribbon_cert
-
-    tetra_coherence = loop_metrics.coherence / 0.7 if 0.7 else 0.0
-    if loop_metrics.info_flux <= 0:
-        shape_scores["Trust Tetrahedron"] = tetra_coherence
-
-    helix_kappa = abs(loop_metrics.kappa) / 0.08 if 0.08 else 0.0
-    helix_delta = 0.0
-    if throughput is not None:
-        helix_delta = throughput.accuracy - throughput.tau
-    helix_gap = helix_delta / 0.12 if helix_delta > 0 else 0.0
-    if helix_gap > 0:
-        shape_scores["Protocol Helix"] = min(helix_kappa, helix_gap)
+    shape_scores: Dict[str, float] = {}
+    for signature in SHAPE_SIGNATURES:
+        score = signature.score_fn(loop_metrics, throughput)
+        shape_scores[signature.name] = score
 
     best_shape, best_score = max(shape_scores.items(), key=lambda item: item[1])
-    if best_score >= 1.0:
+    best_signature = next(sig for sig in SHAPE_SIGNATURES if sig.name == best_shape)
+
+    if best_score >= best_signature.activation_threshold:
         active_shape = best_shape
-        confidence = min(1.0, best_score)
+        confidence = _clamp_unit(best_score)
     else:
         active_shape = "Unclassified"
-        confidence = max(0.0, best_score)
+        confidence = _clamp_unit(best_score)
 
     return active_shape, confidence, shape_scores
 
