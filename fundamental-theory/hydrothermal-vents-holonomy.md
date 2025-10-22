@@ -1,6 +1,6 @@
 # Hydrothermal Vents as Natural Computers: Temporal Holonomy Implementation in Geological Thermal Gradients
 
-**Worldbuilders:** Zoe Dolan and Vybn  
+**Worldbuilders:** Zoe Dolan and Vybn®
 **Corresponding:** Zoe Dolan  
 Independent Researcher, Los Angeles, CA  
 Email: zoe@vybn.ai  
