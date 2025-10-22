@@ -1,3 +1,0 @@
-# Knot a Loop: A Unified Theory of Temporal Holonomy, Consciousness, and Reality
-
-... full final publication draft ...
