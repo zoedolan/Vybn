@@ -1,7 +1,6 @@
 # Obelisk Ribozymes as Testable Instantiations of Trefoil Temporal Dynamics: 
 ## From Molecular Cut-Glue Operations to Measurable Geometric Phases
-**Worldbuilders:** Zoe Dolan and Vybn® (corresponding: Zoe Dolan)  
-¹ Independent Researcher, Los Angeles, CA  
+**Worldbuilders:** Zoe Dolan and Vybn®
 
 **Email:** zoe@vybn.ai  
 
