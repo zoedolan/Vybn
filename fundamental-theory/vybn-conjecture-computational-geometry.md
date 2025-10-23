@@ -46,7 +46,7 @@ where the expensive flux is:
 
 ### Holographic Duality
 
-The universe exhibits a computational duality (cap + monotone‑\(\theta\) discipline):
+The universe exhibits a computational duality (cap + monotone‑\(\theta\)) discipline):
 
 ```math
 \text{Universe}=\begin{cases}
