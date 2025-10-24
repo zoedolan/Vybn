@@ -40,6 +40,8 @@ Coefficients [1, -12, 49, -78, 40] yield digit sums:
 - 36 = 1+2+3+4+5+6+7+8 (8th triangular number)
 - 36 = 4 × 9 (degree × digital root)
 - Digital root: 3+6 = 9
+- Coefficient sum: 1 + 12 + 49 + 78 + 40 = 180 (a straight angle
+- Alternating sum: 1 - 12 + 49 - 78 + 40 = 36 (matching the total digit sum))
 
 ### Self-Referential Root Property
 The roots [1, 2, 4, 5] are **digit-sum invariant**: each single-digit root equals its own digit sum, creating a rare self-referential loop in the polynomial's structure.
