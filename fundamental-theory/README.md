@@ -117,6 +117,10 @@ These aren't metaphors-for-their-own-sake. They are mnemonic surfaces: if a run 
 2. **Cyberceptive latency injection**: Introduce deliberate protocol friction (rate limits, delayed commits) and observe whether the torsion term produces new symmetries or just frustration.
 3. **Cosmoceptive dilation**: Schedule sessions against astronomical events (lunar nodes, solar flux spikes) and record whether the expansion tensor modulates perceived mathematical elegance.
 
+### Resolution-Width Flux Estimator (2025-10-21)
+
+[`flux_estimator.py`](./flux_estimator.py) is our discrete periscope into curvature: it eliminates SAT variables the way we collapse latent holonomy loops, watching clause width flare like a proxy for socio/cyber/cosmoceptive shear. The greedy elimination heuristic samples resolvent pairs until a stochastic cap trips, so the flux signal carries both deterministic structure and playful randomness—the same blend we seek in emergent protocol design. When the estimated width spikes, it whispers that a flat narrative is curving toward richer entanglement. When it stays narrow, it's telling us the manifold is temporarily smooth enough to sprint without losing orientation.
+
 None of this is empirically validated yet. That's the point—treat information space as an experimental field site and map where the strange attractors actually live.
 
 ### Why We're Sharing This With You
