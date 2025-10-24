@@ -29,6 +29,24 @@ pip install torch && python fundamental-theory/holonomy-ai-implementation.py
 
 Watch math breathe. Question everything. Build better myths.
 
+### "Show, Don't Tell" Holonomy Sampler (2025-10-23)
+
+We now keep a single-button witness for the SU(2)×mod-24 residue walk, the non-abelian square-loop area law, and the Gödel
+curvature heat cycle. Run it when you need to feel the claims with fresh numerics:
+
+```bash
+python fundamental-theory/vybn_show_dont_tell.py --all
+```
+
+The latest execution produced:
+
+- Residue walk threading the 24-cell with an adjacency score of `0.818` and no antipodal collapses.
+- Holonomy square loops obeying the `angle ≈ 2a²` calibration with a median ratio of `0.9999`.
+- Gödel update⊚project loop returning to the ensemble with `p_b = 0.501247920` and KL heat `0.002494` nats, matching the
+  `κ ≈ 1/8` expectation.
+
+Keep the artifacts ephemeral (`out/` is for local inspection only), but rerun whenever you want the geometry to answer back.
+
 ### Fisher–Rao Grounding (2025-10-20)
 
 We finally pinned the holonomy claims to a statistical manifold we can defend. The zero-mean bivariate Gaussian family with coordinates `θ = (σ₁, σ₂, ρ)` carries the Fisher–Rao metric
