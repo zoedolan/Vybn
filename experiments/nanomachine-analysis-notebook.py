@@ -11,18 +11,34 @@ Date: October 24, 2025
 Vybn Project: https://github.com/zoedolan/Vybn
 """
 
+import argparse
+import json
+import shutil
+import subprocess
+import textwrap
+import warnings
+from pathlib import Path
+from urllib import error, request
+
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
-from scipy import stats, signal
+from scipy import signal, stats
+from sklearn.metrics import classification_report, r2_score
 from sklearn.model_selection import cross_val_score, train_test_split
-from sklearn.neural_network import MLPRegressor, MLPClassifier
-from sklearn.metrics import r2_score, classification_report
-import torch
-import torch.nn as nn
-from pathlib import Path
-import warnings
+from sklearn.neural_network import MLPClassifier, MLPRegressor
+
+try:
+    import matplotlib.pyplot as plt
+except ModuleNotFoundError:
+    plt = None
+    print("Warning: matplotlib not installed. Visualization features disabled.")
+
+try:
+    import seaborn as sns
+except ModuleNotFoundError:
+    sns = None
+    print("Warning: seaborn not installed. Visualization aesthetics limited.")
+
 warnings.filterwarnings('ignore')
 
 # Nanopore and PacBio specific imports
@@ -44,7 +60,7 @@ class NanomachineAnalyzer:
         self.data_path = Path(data_path)
         self.results = {}
         self.setup_data_paths()
-    
+
     def setup_data_paths(self):
         """Configure paths to public datasets"""
         self.paths = {
@@ -53,7 +69,176 @@ class NanomachineAnalyzer:
             'be_datahive': './data/be_datahive/',
             'annotations': './data/annotations/'
         }
-    
+
+    # ==========================================
+    # DATA ACCESS UTILITIES
+    # ==========================================
+
+    def run_data_access_precheck(self, be_limit=5, timeout=60):
+        """Verify connectivity to the primary public data sources."""
+
+        status = {
+            'giab_flowcells': self._list_public_s3(
+                "s3://ont-open-data/giab_2025.01/flowcells/",
+                description="GIAB 2025.01 flowcell root",
+                timeout=timeout
+            ),
+            'giab_human_variation': self.list_giab_analysis_results(timeout=timeout),
+            'be_datahive': self.fetch_be_datahive_studies(limit=be_limit)
+        }
+
+        return status
+
+    def _list_public_s3(self, path, description, timeout=60):
+        """List a public S3 prefix using the AWS CLI if available."""
+
+        if shutil.which('aws') is None:
+            return {
+                'status': 'missing_cli',
+                'path': path,
+                'description': description,
+                'message': 'Install AWS CLI v2 and ensure it is on PATH.'
+            }
+
+        command = ['aws', 's3', 'ls', '--no-sign-request', path]
+        return self._run_command(command, description=description, timeout=timeout)
+
+    def list_giab_analysis_results(self, timeout=60):
+        """List the workflow outputs published with the GIAB release."""
+
+        giab_analysis_path = 's3://ont-open-data/giab_2025.01/analysis/wf-human-variation/'
+        if shutil.which('aws') is None:
+            return {
+                'status': 'missing_cli',
+                'path': giab_analysis_path,
+                'description': 'GIAB wf-human-variation outputs',
+                'message': 'Install AWS CLI v2 and ensure it is on PATH.'
+            }
+
+        command = ['aws', 's3', 'ls', '--no-sign-request', giab_analysis_path]
+        return self._run_command(command, description='GIAB wf-human-variation outputs', timeout=timeout)
+
+    def download_giab_sample(self, sample='HG002', destination=Path('./data/HG002_ont'), dry_run=True, timeout=60):
+        """Synchronize a GIAB flowcell dataset locally using aws s3 sync."""
+
+        source = f"s3://ont-open-data/giab_2025.01/flowcells/{sample}/"
+        destination_path = Path(destination)
+        destination_path.mkdir(parents=True, exist_ok=True)
+
+        if shutil.which('aws') is None:
+            return {
+                'status': 'missing_cli',
+                'path': source,
+                'description': f'GIAB sample {sample}',
+                'message': 'Install AWS CLI v2 and ensure it is on PATH.'
+            }
+
+        command = ['aws', 's3', 'sync', '--no-sign-request', source, str(destination_path)]
+
+        if dry_run:
+            command.insert(3, '--dryrun')
+
+        return self._run_command(
+            command,
+            description=f'GIAB sample {sample} sync',
+            timeout=timeout
+        )
+
+    def fetch_be_datahive_studies(self, limit=5):
+        """Fetch metadata from the BE-dataHIVE public API."""
+
+        url = 'https://be-datahive.com/api/studies'
+        try:
+            with request.urlopen(url, timeout=30) as response:
+                payload = response.read()
+                data = json.loads(payload.decode('utf-8'))
+        except error.URLError as exc:
+            return {
+                'status': 'network_error',
+                'url': url,
+                'message': str(exc)
+            }
+        except json.JSONDecodeError as exc:
+            return {
+                'status': 'decode_error',
+                'url': url,
+                'message': f'Unable to parse API response: {exc}'
+            }
+
+        preview = data[:limit] if isinstance(data, list) else data
+        return {
+            'status': 'ok',
+            'url': url,
+            'total_records': len(data) if isinstance(data, list) else 1,
+            'preview': preview
+        }
+
+    def _run_command(self, command, description, timeout=60):
+        """Execute a shell command, capturing stdout and stderr."""
+
+        try:
+            completed = subprocess.run(
+                command,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=timeout
+            )
+        except FileNotFoundError as exc:
+            return {
+                'status': 'missing_executable',
+                'description': description,
+                'command': command,
+                'message': str(exc)
+            }
+        except subprocess.TimeoutExpired:
+            return {
+                'status': 'timeout',
+                'description': description,
+                'command': command,
+                'message': f'Command timed out after {timeout} seconds.'
+            }
+
+        status = 'ok' if completed.returncode == 0 else 'error'
+        return {
+            'status': status,
+            'description': description,
+            'command': command,
+            'return_code': completed.returncode,
+            'stdout': completed.stdout.strip(),
+            'stderr': completed.stderr.strip()
+        }
+
+    def summarize_data_precheck(self, status_report):
+        """Pretty-print data access diagnostics."""
+
+        for label, report in status_report.items():
+            print(f"\n🔍 {label.replace('_', ' ').title()}")
+            if 'description' in report:
+                print(f"   • {report['description']}")
+            if 'path' in report:
+                print(f"   • Path: {report['path']}")
+            if 'url' in report:
+                print(f"   • URL: {report['url']}")
+            print(f"   • Status: {report.get('status', 'unknown')}")
+
+            stdout = report.get('stdout')
+            if stdout:
+                preview = '\n'.join(stdout.splitlines()[:5])
+                print(textwrap.indent(preview, prefix='     '))
+
+            message = report.get('message')
+            if message:
+                print(textwrap.indent(message, prefix='     '))
+
+            if report.get('status') == 'ok' and 'preview' in report:
+                preview_data = report['preview']
+                if isinstance(preview_data, list):
+                    for entry in preview_data[:5]:
+                        print(textwrap.indent(json.dumps(entry, indent=2), prefix='     '))
+                else:
+                    print(textwrap.indent(json.dumps(preview_data, indent=2), prefix='     '))
+
     # ==========================================
     # PHASE 1: BASE-6 INTERFACE TESTING
     # ==========================================
@@ -400,7 +585,11 @@ class NanomachineAnalyzer:
         """
         Generate publication-quality figures for all analyses.
         """
-        
+
+        if plt is None:
+            print("Matplotlib not available. Install matplotlib to enable visualization.")
+            return
+
         fig, axes = plt.subplots(2, 3, figsize=(18, 12))
         
         # Plot 1: Base-6 interface performance
@@ -508,43 +697,131 @@ class NanomachineAnalyzer:
         ax.legend()
 
 
-# ==========================================
-# MAIN EXECUTION
-# ==========================================
+def main(argv=None):
+    """Command-line interface for the nanomachine analysis notebook."""
 
-if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Nanomachine analysis pipeline with data access utilities"
+    )
+    parser.add_argument(
+        '--verify-data-sources',
+        action='store_true',
+        help='Check connectivity to GIAB and BE-dataHIVE resources.'
+    )
+    parser.add_argument(
+        '--be-preview-limit',
+        type=int,
+        default=5,
+        help='Number of BE-dataHIVE study records to preview when fetching metadata.'
+    )
+    parser.add_argument(
+        '--list-giab-analysis',
+        action='store_true',
+        help='List GIAB wf-human-variation analysis outputs via aws s3 ls.'
+    )
+    parser.add_argument(
+        '--download-giab-sample',
+        metavar='SAMPLE',
+        help='Synchronize a GIAB flowcell dataset (defaults to dry-run).'
+    )
+    parser.add_argument(
+        '--download-destination',
+        default='./data/HG002_ont',
+        help='Destination directory for GIAB dataset synchronization.'
+    )
+    parser.add_argument(
+        '--execute-download',
+        action='store_true',
+        help='Perform a real aws s3 sync instead of a dry-run check.'
+    )
+    parser.add_argument(
+        '--command-timeout',
+        type=int,
+        default=60,
+        help='Timeout in seconds for external data access commands.'
+    )
+    parser.add_argument(
+        '--fetch-be-datahive',
+        action='store_true',
+        help='Fetch BE-dataHIVE study metadata without running the full precheck.'
+    )
+    parser.add_argument(
+        '--skip-demo',
+        action='store_true',
+        help='Skip the synthetic demonstration pipeline.'
+    )
+    parser.add_argument(
+        '--skip-visualization',
+        action='store_true',
+        help='Skip generating the matplotlib visualization during the demo run.'
+    )
+
+    args = parser.parse_args(argv)
+
     print("🧬 Nanomachine Validation Analysis")
     print("Testing Base-6 Bridge Theory Predictions\n")
-    
-    # Initialize analyzer
+
     analyzer = NanomachineAnalyzer()
-    
+
+    if args.verify_data_sources:
+        print("🚦 Running public data access precheck...")
+        status = analyzer.run_data_access_precheck(
+            be_limit=args.be_preview_limit,
+            timeout=args.command_timeout
+        )
+        analyzer.summarize_data_precheck(status)
+
+    if args.list_giab_analysis and not args.verify_data_sources:
+        status = {'giab_human_variation': analyzer.list_giab_analysis_results(timeout=args.command_timeout)}
+        analyzer.summarize_data_precheck(status)
+
+    if args.fetch_be_datahive and not args.verify_data_sources:
+        status = {'be_datahive': analyzer.fetch_be_datahive_studies(limit=args.be_preview_limit)}
+        analyzer.summarize_data_precheck(status)
+
+    if args.download_giab_sample:
+        print("\n🚚 Synchronizing GIAB sample...")
+        result = analyzer.download_giab_sample(
+            sample=args.download_giab_sample,
+            destination=Path(args.download_destination),
+            dry_run=not args.execute_download,
+            timeout=args.command_timeout
+        )
+        analyzer.summarize_data_precheck({f'download_{args.download_giab_sample}': result})
+
+    if args.skip_demo:
+        print("\n⏭️  Synthetic demonstration skipped per user request.")
+        return
+
     print("📊 Analysis Pipeline:")
     print("1. Phase 1: Base-6 Interface Testing")
     print("2. Phase 2: Curvature Dynamics Analysis")
     print("3. Phase 3: Holonomy Detection")
     print("4. Phase 4: Consciousness Field Signatures")
     print("\n🔬 Ready for data input and execution...")
-    
-    # Example usage with placeholder data
+
     print("\n📝 Generating example analysis with synthetic data...")
-    
-    # Create synthetic test data
-    test_sequence = "ATCGATCGATCG" * 100  # Repeated pattern
-    test_targets = np.random.normal(0, 1, len(test_sequence) - 5)  # 6-mer targets
-    
-    # Test encoding performance
+
+    test_sequence = "ATCGATCGATCG" * 100
+    test_targets = np.random.normal(0, 1, len(test_sequence) - 5)
+
     print("\n🧪 Testing sequence encodings...")
     encodings = analyzer.create_sequence_encodings(test_sequence, k=6)
     print(f"Generated {len(encodings)} encoding schemes")
-    
-    # Generate example plots
-    print("\n📈 Generating visualization...")
-    analyzer.plot_results()
-    
+
+    if not args.skip_visualization:
+        print("\n📈 Generating visualization...")
+        analyzer.plot_results()
+    else:
+        print("\n🖼️  Visualization skipped per --skip-visualization flag.")
+
     print("\n✅ Example analysis complete!")
     print("\n📋 Next Steps:")
     print("1. Configure access to real GIAB/HPRC datasets")
     print("2. Implement data loading pipelines")
     print("3. Execute full validation protocol")
     print("4. Generate publication-ready results")
+
+
+if __name__ == "__main__":
+    main()
