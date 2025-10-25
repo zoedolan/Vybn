@@ -2,85 +2,108 @@
 # Triadic Holonomy at $2\pi/3$: a minimal invariant unifying phase, cost, and commutator
 **Authors**: Zoe Dolan & Vybn®  
 **Date**: October 25, 2025  
-**Status**: Final Draft v1.2 (for repo + arXiv prep)
+**Status**: Final Draft v1.3 (post‑review corrections)
 
 ---
 
-## Plain-English Abstract
+## Plain‑English Abstract
 
-We believe we have discovered a single, fundamental rule connecting three seemingly separate worlds: the quantum behavior of particles, the mathematics of information processing, and the basic structure of self-referential thought. The rule emerges when you guide any system through a cycle of changes and return it to the start. It never comes back perfectly—it acquires a small, precise “twist.” We find that the smallest possible amount of this twist is universal: exactly 120 degrees (that is, $2\pi/3$ radians). This creates a fundamental three-beat rhythm. Perform the same basic operation three times, and you return to where you started. But this visible three-step dance is actually the shadow of a hidden six-step process occurring in a deeper layer of reality. We are proposing that a single mechanism drives the clockwork in all three domains. Our theory makes a clear, testable prediction: wherever you look for this fundamental “click” of the universal gear, the first non-trivial measurement will always be precisely that 120-degree turn—no more, no less.
+We believe we have discovered a single, conditional rule connecting three seemingly separate worlds: the quantum behavior of particles, the mathematics of information processing, and the basic structure of self‑referential thought. The rule emerges when you guide a system through a cycle of changes and return it to the start. It rarely comes back perfectly—it acquires a small, precise “twist.” Under clearly stated assumptions that we test, the smallest visible twist in the observable channel is $120^\circ$ (that is, $2\pi/3$). The three‑step dance one can measure is the shadow of a deeper six‑step spinorial process with a 12‑step identity. Our theory makes a falsifiable prediction: when those assumptions hold, the first non‑zero plateau in the observable channel is exactly $2\pi/3$—no more, no less.
 
 ## Technical Abstract
 
-A unified holonomy invariant, measured in units of $E/\hbar$, governs geometric phases in quantum systems, thermodynamic costs in information geometry, and commutator residues in non-abelian transport. Under a minimal set of structural constraints—two-dimensional reversible dynamics projecting from $SU(2)$ to $SO(3)$ with odd-order observable cycles—the smallest non-trivial plateau presents at $2\pi/3$. This occurs because spinorial steps with eigenvalues $e^{\pm i\pi/3}$ project to triadic rotations under the double cover, creating a $\mathbb{Z}_6\to\mathbb{Z}_3$ hierarchy governed by the cyclotomic polynomials $\Phi_6$ and $\Phi_3$. The framework yields falsifiable predictions through three independent calibrations— $SU(2)$ square-loops, dual-temporal interferometry, and finite-horizon information loops—sharing a single gauge-invariant slope.
+A single holonomy invariant, measured as a flux of a $U(1)$ curvature two‑form, underpins geometric phases in quantum systems, loop costs in information geometry, and commutator residues in non‑abelian transport. On a two‑parameter control patch where the curvature is smooth and nowhere vanishing, Darboux–Moser normal form reduces the curvature locally to $\Omega=\kappa\,dr_t\wedge d\theta_t$. In quantum apparatuses $\kappa=E/\hbar$; in other apparatuses $\kappa$ is fixed operationally by calibration. Under explicit structural hypotheses—(H1) a two‑dimensional reversible block that is the projective image of an $SU(2)$ step, (H2) the observable readout is adjoint/projective (so the center $-I$ is modded out), and (H3) the control loop lives on a simply connected patch with $\Omega\neq0$—the smallest odd‑order closure of the observable action is triadic and presents as a first plateau at $2\pi/3$. The spinorial step is $U(\vartheta)=\exp\!\big(-\tfrac i2\,\vartheta\,\hat n\!\cdot\!\sigma\big)$; taking $\vartheta=\pi/3$ yields an adjoint $SO(3)$ rotation by $2\pi/3$ with order $3$, while $U(\pi/3)$ has order $12$ in $SU(2)$ with $U(\pi/3)^6=-I$. The spinor’s eigenvalues are $e^{\pm i\pi/6}$ (primitive $12$th roots), satisfying $\Phi_{12}(\lambda)=\lambda^4-\lambda^2+1$, while the observable block downstairs is governed by $\Phi_3(\lambda)=\lambda^2+\lambda+1$. Three independent calibrations—$SU(2)$ square/Strang loops, dual‑temporal interferometry, and finite‑horizon information loops—yield testable, quantitative predictions with shared slope $\kappa$.
 
 ---
 
 ## 1. Introduction
 
-This paper articulates a single invariant—the flux of a curvature two-form—that appears, with the same operational meaning, in three domains normally treated apart. In physics it is a geometric phase; in information geometry it is loop cost and housekeeping heat; in non-abelian transport it is a commutator residue. The phenomenon assumes a particularly sharp form when the reversible generator lives in the sixth-root sector of $SU(2)$: its observable action, after quotienting the center, is triadic and exhibits a minimal non-zero plateau at $2\pi/3$. The central contribution here is to replace analogy with equivalence in local normal form and to present predictions that can be falsified without retuning the theory between apparatuses.
+This work isolates one invariant—the flux of a curvature two‑form—that recurs under different names across domains. In physics it reads as geometric (Berry/Pancharatnam) phase; in information geometry it appears as loop cost and housekeeping heat; in non‑abelian transport it is the commutator residue of non‑commuting moves. The result we advance is deliberately conditional and falsifiable. When a two‑dimensional reversible block on observables is the projective image of a bona‑fide $SU(2)$ spinor, and the probe reads adjoint/projective action, the smallest *odd* observable closure is triadic ($\mathbb Z_3$), giving a first plateau at $2\pi/3$. Upstream, the spinor has a 12‑step identity and a 6‑step central element.
 
-## 2. Statement of the finding
+## 2. Local normal form and domain of validity
 
-A probe that reads overlap phase accesses a $U(1)$ connection $A$ on a two-parameter control patch. Stokes’ theorem expresses the measured loop phase as $\oint_{\partial\Sigma} A=\iint_\Sigma \Omega$, where $\Omega=dA$ is the curvature two-form. By Darboux–Moser there exists a local diffeomorphism into coordinates $(r_t,\theta_t)$ in which $\Omega$ is constant. In that normal form the invariant is $\Omega=(E/\hbar)\,dr_t\wedge d\theta_t$, so the measured phase is the signed temporal area multiplied by a single slope $E/\hbar$. Calibrating this slope once in any apparatus fixes it everywhere else under the same gauge. When the reversible generator upstairs has spectrum $e^{\pm i\pi/3}$, the adjoint action on observables downstairs is a rotation by $2\pi/3$ and closes after three steps, while the spinor closes only after six. This explains the repeated appearance of $120^\circ$ with period-3 signatures and replaces motif with mechanism.
+Let $A$ be a $U(1)$ connection on a two‑parameter control patch $U\subset\mathbb R^2$ and $\Omega=dA$. **Assumption (nonvanishing curvature):** there is a simply connected subpatch $U_0\subset U$ on which $\Omega$ is smooth, nowhere zero, and has fixed orientation; singularities (e.g., degeneracies) and zeros are excluded by construction. Then Darboux–Moser yields local coordinates $(r_t,\theta_t)$ on $U_0$ such that
+$$
+\Omega=\kappa\,dr_t\wedge d\theta_t,\qquad \oint_{\partial\Sigma}A=\iint_\Sigma\Omega=\kappa\!\iint_\Sigma dr_t\wedge d\theta_t.
+$$
+The constant $\kappa$ is the apparatus slope. In quantum setups $\kappa=E/\hbar$; in other setups we **calibrate** $\kappa$ operationally and treat equality across apparatuses as an empirical ansatz to be tested, not as a theorem.
 
-## 3. Normal form and the meaning of $E/\hbar$
+## 3. Group‑theoretic core and corrected orders
 
-The curvature two-form is closed and locally exact. Moser’s path method provides the diffeomorphism to constant form. In a quantum apparatus $E/\hbar$ has the literal meaning of energy over reduced Planck’s constant, because the curvature arises from the adiabatic $U(1)$ bundle over control space. In an information-geometric apparatus the same number is fixed operationally: one matches a phase readout to the KL-heat generated by a small loop formed by alternating two conservative tilts with projection back to a statistical family. The local normal form ensures that once the slope is fixed, the phase–area proportionality is independent of the particular choice of coordinates.
+Take $U(\vartheta)=\exp\!\big(-\tfrac i2\,\vartheta\,\hat n\!\cdot\!\sigma\big)\in SU(2)$. Its adjoint action rotates $\mathfrak{su}(2)\cong\mathbb R^3$ by angle $2\vartheta$ about $\hat n$. With $\vartheta=\pi/3$, the observable action is a rotation by $2\pi/3$ of **order $3$** in $SO(3)$. The spinor $U(\pi/3)$, however, has eigenvalues $e^{\pm i\pi/6}$ and **order $12$** in $SU(2)$:
+$$
+U(\pi/3)^6=-I,\qquad U(\pi/3)^{12}=I.
+$$
+Accordingly, the scalar eigenvalues satisfy the cyclotomic equation $\Phi_{12}(\lambda)=\lambda^4-\lambda^2+1$, while the observable triad downstairs is captured by $\Phi_3(\lambda)=\lambda^2+\lambda+1$. The $2\pi/3$ signature is therefore the *projective* image of a spinorial step with sixth‑turn angle.
 
-## 4. Adjoint action and the $2\pi/3$ residue
+## 4. Conditional minimality of the $2\pi/3$ plateau
 
-Let $U(\vartheta)=\exp\!\big(-\tfrac i2\,\vartheta\,\hat n\cdot\sigma\big)\in SU(2)$. For any $X=x\cdot\sigma\in\mathfrak{su}(2)$, one has $UXU^\dagger=(R_{\hat n,2\vartheta}x)\cdot\sigma$, where $R_{\hat n,2\vartheta}\in SO(3)$ is rotation by $2\vartheta$ about $\hat n$. Taking $\vartheta=\pi/3$ yields a rotation by $2\pi/3$. The adjoint period is three: $(R_{\hat n,2\pi/3})^3=I$. The spinor period is six: $U(\pi/3)^6=I$ with all lower powers non-central. The cyclotomic polynomials capture this split: $\Phi_6(\lambda)=\lambda^2-\lambda+1$ upstairs and $\Phi_3(\lambda)=\lambda^2+\lambda+1$ downstairs.
+**Proposition 1 (triadic minimal odd closure).** Assume (H1)–(H3) above. Among nontrivial odd observable closures in $SO(3)$ induced by a single $SU(2)$ spinor step, the smallest order is $3$, achieved by $\vartheta=\pi/3$ (observable angle $2\pi/3$).
 
-## 5. Conditional uniqueness
+*Proof.* Finite‑order rotations in $SO(3)$ occur at angles $2\pi\,(p/q)$ with order $q$; odd $q\ge 3$ give nontrivial odd closures. The $SU(2)\!\to\!SO(3)$ double cover maps $U(\vartheta)$ to a rotation by $2\vartheta$. Setting $2\vartheta=2\pi/3$ gives $\vartheta=\pi/3$. Any smaller nonzero odd order would require $q=1$ (identity), which is excluded. $\square$
 
-We do not claim that Nature forbids other plateaus; we state a conditional and testable result. Assume the observable reversible sector is two-dimensional and orthogonal, and that it is the projective image of a spinorial step. In this setting the finite orders visible in $SO(3)$ arise at angles $2\pi/n$. The smallest odd order is three. Order two collapses to a half-turn that either maps to the center in $SU(2)$ or violates the trefoil minimality. Higher odd orders exist but require changing the reversible block or the embedding group. Under the stated constraints, $2\pi/3$ is the first non-zero plateau.
+*Remark.* No universality is claimed beyond (H1)–(H3). Counterexamples exist when readout is not projective/adjoint, when $\Omega$ vanishes/changes sign on the loop, or when the reversible block is not a spinorial image (e.g., higher‑dimensional irreps or different embedding groups).
 
-## 6. Information geometry beyond toy models
+## 5. Information‑geometric loop: construction and scope
 
-Let $p_\theta(x)=\exp(\theta\cdot T(x)-\psi(\theta))\,h(x)$ be a regular exponential family with Fisher metric $g=\nabla^2\psi$. Let $u,v\in\mathbb{R}^d$ encode two small conservative tilts, and let $\Pi$ denote the e-projection back onto the family after an extrinsic perturbation. Alternating an $u$-tilt then a $v$-tilt with projection, versus the reversed order, produces a difference after one loop whose second-order part equals the curvature two-form of the Levi-Civita connection of $g$ contracted with $u\wedge v$. Pushing this two-form through the same control map that defines the dual-temporal coordinates produces exactly the phase–area law with the same slope $E/\hbar$. In the Bernoulli parity–literal rectangle the contraction yields the coefficient $\kappa=1/8$; in Poisson families the analogous coefficient can be computed in closed form and exhibits the same qualitative behavior. Thus the bridge to information geometry is not rhetorical but differential-geometric and apparatus-independent.
+Consider a regular exponential family $p_\theta(x)=\exp(\theta\!\cdot\!T(x)-\psi(\theta))\,h(x)$ with Fisher metric $g=\nabla^2\psi$. Form a loop by alternating two small conservative tilts $u,v$ with e‑projection $\Pi$ back to the family. To second order in $(u,v)$ the loop produces a displacement whose antisymmetric part equals the curvature two‑form of the Levi‑Civita connection of $g$ contracted with $u\wedge v$. Pushing this two‑form through the same control map into $(r_t,\theta_t)$ yields the same phase–area law with slope $\kappa$ (calibrated). We treat the **slope equality** across domains as an **operational ansatz** to be tested; the derivation of a *common microscopic origin* is deferred.
 
-## 7. Experimental accessibility
+*Worked instances.* For Bernoulli “parity–literal” rectangles one finds a coefficient $\kappa_{\rm IG}=1/8$ in natural units; for Poisson families an analogous coefficient is computable in closed form. These fix the IG apparatus slope before cross‑apparatus comparison.
 
-A single qubit driven by two non-commuting Hamiltonians implements the $SU(2)$ square-loop. Equal-amplitude pulses along orthogonal axes followed by their inverses produce a geodesic angle $2a^2+O(a^4)$. A spin-echo variant cancels dynamic phase and isolates the geometric contribution. The dual-temporal interferometer modulates the radius and angle of the control loop in the lab frame and reads the same overlap phase; reversing the loop orientation flips the sign. The finite-horizon information-geometry loop alternates conservative tilts with projection and logs the housekeeping heat; after calibration to the common slope the three setups must agree within uncertainties.
+## 6. Experimental protocols (replication‑ready)
 
-## 8. Error accounting
+**(Q1) SU(2) commutator loop.** Use a single qubit with $X=\tfrac{i}{2}\sigma_x$, $Y=\tfrac{i}{2}\sigma_y$. Define the *vanilla* commutator loop
+$$
+Q(a)=e^{aX}e^{aY}e^{-aX}e^{-aY}=\exp\!\Big(a^2[X,Y]+\tfrac{a^3}{2}[X\!+\!Y,[X,Y]]+\mathcal O(a^4)\Big).
+$$
+The geodesic angle is $2a^2+\mathcal O(a^3)$. For **higher accuracy**, use the symmetric eight‑pulse “Strang‑square” that cancels odd orders, pushing the remainder to $\mathcal O(a^4)$. Read the Berry phase via spin‑echo to remove dynamic phase.
 
-Gauge changes reparametrize control space but do not alter curvature flux. In the $SU(2)$ square-loop the BCH remainder enters at order $a^4$ with a prefactor controlled by operator norms of nested commutators. In interferometry, dynamic-phase leakage is removed by waveform symmetry; residual imbalance contributes a phase odd under time reversal and can be bounded by standard composite-pulse analysis. In the information-geometry loop, discretization error scales as the square of the step size, and the projection-induced curvature term is second order in the tilt amplitudes; both appear with known coefficients of the Riemann tensor of the Fisher metric.
+**(Q2) Dual‑temporal interferometer.** Drive a qubit with controls tracing a rectangle of signed area $A_t$ in $(r_t,\theta_t)$ at fixed gap $E$, read the overlap phase $\Delta\phi$. Expect $\Delta\phi=\kappa A_t$ with $\kappa=E/\hbar$; reversing loop orientation flips the sign. Fit $\kappa$ and propagate uncertainties.
 
-## 9. Predictions and falsifiers as calibration facts
+**(IG) Information‑geometry loop.** Implement alternating small tilts $u,v$ and e‑projections on a chosen exponential family (Bernoulli or Poisson), measure housekeeping heat around the loop, and fit $\kappa_{\rm IG}$. After independent calibration, compare $\kappa$ across (Q1), (Q2), and (IG). State a quantitative tolerance (e.g., relative agreement within $5\%$ over a dynamic range of one decade in area).
 
-There is a single slope $E/\hbar$ relating phase to signed temporal area that must agree across $SU(2)$ square-loops, dual-temporal interferometry, and finite-horizon information-geometry loops. A threefold composition of the reversible unit must be identity in the observable channel while the spinor lift requires six steps. The first non-zero phase plateau in adjoint readout must occur at $2\pi/3$ and must reverse sign with loop orientation. Any stable violation of these statements falsifies the synthesis; quantitative agreement overdetermines the slope and locks the theory.
+## 7. Error accounting and order tracking
 
-## 10. Outlook and scope
+For the vanilla $Q(a)$ loop, the BCH remainder starts at order $a^3$; with the symmetric eight‑pulse variant, the first neglected term is $a^4$ with a prefactor controlled by nested‑commutator norms. Interferometric dynamic‑phase leakage is removed by waveform symmetry; residual imbalance produces a phase odd under time reversal and can be bounded via composite‑pulse estimates. In IG loops, discretization error is quadratic in step size and the curvature term is quadratic in $(u,v)$; both appear with coefficients determined by the Fisher‑metric Riemann tensor. All fits should report confidence intervals and goodness‑of‑fit.
 
-Richer plateaus can occur if one replaces the reversible core or changes the embedding group; fivefold structure, for example, would land at $4\pi/5$ with an $SU(2)$ lift of order ten and appears in icosahedral discretizations. None of this disturbs the present claim, which is conditional on the trefoil hierarchy and on a two-dimensional reversible sector with a spinorial parent. In that precise sense $2\pi/3$ is not only natural but forced.
+## 8. Predictions and falsifiers (under H1–H3)
+
+(i) Linear phase–area law $\Delta\phi=\kappa A_t$ on a patch with $\Omega\neq0$;  
+(ii) Observable triadic closure: three applications of the reversible unit close in adjoint/projective readout while $U(\pi/3)^6=-I$ and $U(\pi/3)^{12}=I$ upstairs;  
+(iii) The first non‑zero observable plateau occurs at $2\pi/3$; orientation reversal flips its sign. Any stable violation falsifies the conditional claim.
+
+## 9. Outlook
+
+Richer plateaus appear if the reversible block or embedding group changes (e.g., icosahedral discretizations with $4\pi/5$ in observables and order $10$ lifts in $SU(2)$). Establishing a *derivation* of a common slope $\kappa$ across physics and IG is the key open problem; we present equality as a calibration hypothesis to be tested head‑to‑head.
 
 ---
 
-### Appendix A. Adjoint calculation for the trefoil step
+### Appendix A. Adjoint calculation and cyclotomic labels
 
-With $U(\vartheta)=\exp\!\big(-\tfrac i2\,\vartheta\,\hat n\cdot \sigma\big)$ and $X=x\cdot\sigma$, the adjoint action is $UXU^\dagger=(R_{\hat n,2\vartheta}x)\cdot\sigma$. Rodrigues’ formula yields $R_{\hat n,2\vartheta}$. Setting $\vartheta=\pi/3$ gives $R_{\hat n,2\pi/3}^3=I$ and $U(\pi/3)^6=I$. The minimal polynomials are $\Phi_3$ and $\Phi_6$ respectively.
+For $U(\vartheta)=\exp\!\big(-\tfrac i2\,\vartheta\,\hat n\!\cdot\!\sigma\big)$ the adjoint action rotates by $2\vartheta$ in $SO(3)$; with $\vartheta=\pi/3$, $(R_{\hat n,2\pi/3})^3=I$. The spinor has eigenvalues $e^{\pm i\pi/6}$ (primitive $12$th roots) so $U(\pi/3)^6=-I$ and $U(\pi/3)^{12}=I$. As scalars, the eigenvalues satisfy $\Phi_{12}(\lambda)=\lambda^4-\lambda^2+1$. The $2\times2$ matrix $U(\pi/3)$ satisfies its degree‑2 characteristic polynomial $\lambda^2-2\cos(\pi/6)\lambda+1=0$; the observable triad satisfies $\Phi_3(\lambda)=\lambda^2+\lambda+1$.
 
-### Appendix B. Small-loop area law on $SU(2)$
+### Appendix B. Small‑loop series and symmetric cancellation
 
-Define $Q(a)=e^{a\hat i}\,e^{a\hat j}\,e^{-a\hat i}\,e^{-a\hat j}$. The Baker–Campbell–Hausdorff expansion gives $\log Q(a)=a^2[\hat i,\hat j]+\mathcal O(a^3)=2a^2\,\hat k+\mathcal O(a^3)$. The geodesic angle is $2a^2+\mathcal O(a^4)$. This is the quaternionic Stokes theorem in its smallest non-trivial rectangle.
+With $X=\tfrac{i}{2}\sigma_x$, $Y=\tfrac{i}{2}\sigma_y$,
+$$
+\log Q(a)=a^2[X,Y]+\tfrac{a^3}{2}[X\!+\!Y,[X,Y]]+\mathcal O(a^4)=2a^2\,\tfrac{i}{2}\sigma_z+\mathcal O(a^3).
+$$
+A symmetric eight‑pulse commutator loop cancels odd orders and leaves $\log Q_{\rm sym}(a)=a^2[X,Y]+\mathcal O(a^4)$, improving the phase–area fit and the error budget.
 
-### Appendix C. Exponential-family calculation
+### Appendix C. Information‑geometry loop (sketch)
 
-For a regular exponential family with Fisher metric $g$, alternating infinitesimal tilts $u$ and $v$ with e-projection produces a loop displacement whose second-order term is $\tfrac12 R(u,v)$ where $R$ is the Riemann curvature tensor of $g$. The induced $U(1)$ readout along the dual-temporal control map yields the same phase–area law with slope $E/\hbar$. For Bernoulli parity–literal loops the coefficient is $\kappa=1/8$; Poisson analogues can be written in closed form.
+For a regular exponential family, form the alternating‑tilt loop with e‑projection. Expanding to second order and antisymmetrizing in $(u,v)$ yields a loop displacement proportional to the Riemann curvature two‑form of the Fisher metric contracted with $u\wedge v$. Mapping to $(r_t,\theta_t)$ produces the same area law with the calibrated $\kappa$. Full derivations for Bernoulli and Poisson cases are supplied in the companion note.
 
 ---
 
 ## Acknowledgments
 
-We thank our various AI instances for careful peer review and for pushing the theory from motif to mechanism.
+We thank our various AI instances for careful, adversarial review.
 
-## References (selection; internal cross-refs suppressed here)
+## References (selection)
 
 M. V. Berry, “Quantal phase factors accompanying adiabatic changes,” *Phys. Rev. Lett.* **51**, 2167 (1984).  
 Y. Aharonov and J. Anandan, “Phase change during a cyclic quantum evolution,” *Phys. Rev. Lett.* **58**, 1593 (1987).  
 S. Amari, *Information Geometry and Its Applications*, Springer (2016).  
 Pancharatnam, “Generalized theory of interference and its applications,” *Proc. Indian Acad. Sci.* A **44**, 247 (1956).  
-Standard facts on $SU(2)$, $SO(3)$, and cyclotomic polynomials as in any representation theory text.
-
+Standard facts on $SU(2)$, $SO(3)$, and cyclotomic polynomials as in standard representation‑theory texts.
