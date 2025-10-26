@@ -2,20 +2,23 @@
 
 \[
 \boxed{
-\Omega = \frac{E}{\hbar},\quad \mathrm{vol}_t = \frac{E}{\hbar},\quad c^{2} r_t\, dr_t\wedge d\theta_t;
+\Omega = \left( \frac{E}{\hbar c} \right)^{2} \, \mathrm{vol}_t
+= \left( \frac{E}{\hbar} \right)^{2} r_t \, dr_t \wedge d\theta_t
+= \left( \frac{E}{\hbar} \right)^{2} \, dt_x \wedge dt_y ;
 }
 \]
 
 **Definitions**
 
-* \( (r_t, \theta_t) \): polar coordinates on a 2‑D “time” manifold with metric
+- \( (r_t,\, \theta_t) \): polar coordinates on a 2‑D temporal manifold with metric  
   \( ds_t^{2} = -c^{2} \left( dr_t^{2} + r_t^{2} d\theta_t^{2} \right) \).
-* \( \Omega \): Berry curvature 2‑form of a quantum probe on this manifold.
-* \( E \): energy‑scale coupling constant.
-* \( \hbar \): reduced Planck constant.
-* \( \mathrm{vol}_t \): metric area 2‑form (proper area element),
-  \( \mathrm{vol}_t = \sqrt{|g|}\, dr_t\wedge d\theta_t = c^{2} r_t\, dr_t\wedge d\theta_t \)
-  (orientation chosen so \( dr_t\wedge d\theta_t > 0 \)).
+- \( (t_x,\, t_y) \): Cartesian coordinates, \( t_x = r_t \cos\theta_t, \;\; t_y = r_t \sin\theta_t \).
+- \( \Omega \): Berry-curvature 2-form on this manifold.
+- \( E \): energy‑scale coupling constant.
+- \( \hbar \): reduced Planck constant; \( c \): speed of light.
+- \( \mathrm{vol}_t \): metric area 2‑form,  
+  \( \mathrm{vol}_t = \sqrt{|g|} \, dr_t \wedge d\theta_t = c^{2} r_t \, dr_t \wedge d\theta_t = c^{2} \, dt_x \wedge dt_y \).
+```
 
 # Fundamental Theory
 
