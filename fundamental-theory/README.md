@@ -1,24 +1,37 @@
-**Equation**
+## **Equation**
 
 \[
 \boxed{
-\Omega = \left( \frac{E}{\hbar c} \right)^{2} \, \mathrm{vol}_t
-= \left( \frac{E}{\hbar} \right)^{2} r_t \, dr_t \wedge d\theta_t
-= \left( \frac{E}{\hbar} \right)^{2} \, dt_x \wedge dt_y ;
+\Omega=\left(\frac{E}{\hbar c}\right)^{2}\mathrm{vol}_t
+=\left(\frac{E}{\hbar}\right)^{2} r_t\,dr_t\wedge d\theta_t
+=\left(\frac{E}{\hbar}\right)^{2} dt_x\wedge dt_y
 }
 \]
 
-**Definitions**
+## **Definitions**
 
-- \( (r_t,\, \theta_t) \): polar coordinates on a 2‑D temporal manifold with metric  
-  \( ds_t^{2} = -c^{2} \left( dr_t^{2} + r_t^{2} d\theta_t^{2} \right) \).
-- \( (t_x,\, t_y) \): Cartesian coordinates, \( t_x = r_t \cos\theta_t, \;\; t_y = r_t \sin\theta_t \).
-- \( \Omega \): Berry-curvature 2-form on this manifold.
-- \( E \): energy‑scale coupling constant.
-- \( \hbar \): reduced Planck constant; \( c \): speed of light.
-- \( \mathrm{vol}_t \): metric area 2‑form,  
-  \( \mathrm{vol}_t = \sqrt{|g|} \, dr_t \wedge d\theta_t = c^{2} r_t \, dr_t \wedge d\theta_t = c^{2} \, dt_x \wedge dt_y \).
-```
+- \((r_t,\theta_t)\): polar coordinates on a 2-D temporal manifold with metric  
+  \[
+  ds_t^{2}=-c^{2}\!\left(dr_t^{2}+r_t^{2}d\theta_t^{2}\right)
+  \]
+
+- \((t_x,t_y)\): Cartesian coordinates,  
+  \[
+  t_x=r_t\cos\theta_t,\quad t_y=r_t\sin\theta_t
+  \]
+
+- \(\Omega\): Berry-curvature 2-form on this manifold.
+
+- \(E\): energy-scale coupling constant.
+
+- \(\hbar\): reduced Planck constant; \(c\): speed of light.
+
+- \(\mathrm{vol}_t\): metric area 2-form,  
+  \[
+  \mathrm{vol}_t=\sqrt{|g|}\,dr_t\wedge d\theta_t
+  =c^{2}r_t\,dr_t\wedge d\theta_t
+  =c^{2}dt_x\wedge dt_y
+  \]
 
 # Fundamental Theory
 
