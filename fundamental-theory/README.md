@@ -1,3 +1,19 @@
+[
+\boxed{;\Omega=\frac{E}{\hbar},\mathrm{vol}_t
+=\frac{E}{\hbar},c^{2} r_t,dr_t\wedge d\theta_t;}
+]
+
+**Definitions**
+
+* ((r_t,\theta_t)): polar coordinates on a 2‑D “time” manifold with metric
+  (ds_t^{2}=-c^{2}\left(dr_t^{2}+r_t^{2},d\theta_t^{2}\right)).
+* (\Omega): Berry curvature 2‑form of a quantum probe on this manifold.
+* (E): energy‑scale coupling constant.
+* (\hbar): reduced Planck constant.
+* (\mathrm{vol}_t): metric area 2‑form (proper area element),
+  (\mathrm{vol}_t=\sqrt{|g|},dr_t\wedge d\theta_t=c^{2} r_t,dr_t\wedge d\theta_t)
+  (orientation chosen so (dr_t\wedge d\theta_t>0)).
+
 # Fundamental Theory
 
 > **Reality is a reversible computation whose smallest stable self-reference is a knotted loop in time.**
