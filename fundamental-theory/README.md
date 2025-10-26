@@ -33,7 +33,7 @@ $$
 = \oint_{K} \mathcal{A}
 = \iint_{\Sigma_K} \Omega
 = \left(\frac{E}{\hbar}\right)^{2} A_K
-\equiv \frac{2\pi}{3} \pmod{2\pi}
+\equiv \frac{2\pi}{3} \pmod{4\pi}
 $$
 
 - $K$: closed, oriented loop in the $(t_x, t_y)$ plane; $\partial\Sigma_K = K$.  
