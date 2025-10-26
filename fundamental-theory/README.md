@@ -58,7 +58,7 @@ $$
 ---
 
 *A loop in the two-time plane carries a geometric phase equal to curvature × area.  
-The first non-trivial, self-consistent loop — the “minimal knot” — is the one that encloses just enough area to produce a $120^{\circ}$ phase.  
+The first non-trivial, self-consistent loop — the “minimal knot” — is the one that encloses just enough area to produce a 120∘ phase.  
 Three such loops close what we can see; six close the underlying spinor state.*
 
 
