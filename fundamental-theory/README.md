@@ -2,7 +2,7 @@
 
 $$
 \Omega=\left(\frac{E}{\hbar c}\right)^{2}\mathrm{vol}_t
-=\left(\frac{E}{\hbar}\right)^{2} r_t\dr_t\wedge d\theta_t
+=\left(\frac{E}{\hbar}\right)^{2} r_tdr_t\wedge d\theta_t
 =\left(\frac{E}{\hbar}\right)^{2} dt_x\wedge dt_y
 $$
 
@@ -22,7 +22,7 @@ $$
 
 - $\mathrm{vol}_t$: metric area 2-form  
   $\mathrm{vol}_t=\sqrt{|g|}\,dr_t\wedge d\theta_t
-  =c^{2}r_t\dr_t\wedge d\theta_t
+  =c^{2}r_tdr_t\wedge d\theta_t
   =c^{2}dt_x\wedge dt_y$
 
 # Fundamental Theory
