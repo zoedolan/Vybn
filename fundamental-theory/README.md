@@ -21,7 +21,7 @@ $$
 - $\hbar$: reduced Planck constant; $c$: speed of light.
 
 - $\mathrm{vol}_t$: metric area 2-form  
-  $\mathrm{vol}_t=\sqrt{|g|}\dr_t\wedge d\theta_t
+  $\mathrm{vol}_t=\sqrt{|g|}dr_t\wedge d\theta_t
   =c^{2}r_tdr_t\wedge d\theta_t
   =c^{2}dt_x\wedge dt_y$
 
