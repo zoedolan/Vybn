@@ -12,7 +12,7 @@ $$
   $ds_t^{2}=-c^{2}\left(dr_t^{2}+r_t^{2}d\theta_t^{2}\right)$
 
 - $(t_x,t_y)$: Cartesian coordinates  
-  $t_x=r_t\cos\theta_t,\; t_y=r_t\sin\theta_t$
+  $t_x=r_t\cos\theta_t\,\ t_y=r_t\sin\theta_t$
 
 - $\Omega$: Berry-curvature 2-form on this manifold.
 
