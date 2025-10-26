@@ -47,7 +47,7 @@ A_{*} = \frac{2\pi}{3} \left(\frac{\hbar}{E}\right)^{2}.
 $$
 
 Equivalently, for the loop holonomy  
-$U[K] = \mathcal{P}\exp\!\left(i\!\oint_K \mathcal{A}\right) \in SU(2)$,  
+$U[K] = \mathcal{P}\exp\left(i\oint_K \mathcal{A}\right) \in SU(2)$,  
 
 $$
 U[K]^3 = -\mathbb{1}, \quad U[K]^6 = \mathbb{1}.
