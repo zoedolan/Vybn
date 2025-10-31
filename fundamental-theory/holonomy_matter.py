@@ -1,4 +1,5 @@
 # holonomy_qmin.py
+# runtip: python holonomy_matter.py --area 1e-7 --replicates 8 --r-pulses 8 --theta-pulses 8 --timeout-sec 5 --overall-sec 20 --max-calls-per-src 200 --tape-scale 8
 # Minimal holonomy experiment with quantum-only randomness, fail-fast IO, and 1s heartbeats.
 # - Prints JSON lines continuously.
 # - Uses Cisco Outshift (if X_ID_API_KEY present) then ANU QRNG, with strict caps and timeouts.
