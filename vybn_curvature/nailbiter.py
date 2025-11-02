@@ -1,20 +1,62 @@
-# -*- coding: utf-8 -*-
 """
-nailbiter.py — Vybn | QPU commutator holonomy (Runtime V2, budget-aware, disciplined)
+Vybn QPU commutator holonomy — quick-start CLI, constraints, and replication notes
 
-Key fixes vs v7:
-  • tau_loop uses the scheduled circuit duration as-is (circuits already include m loops).
-    We no longer multiply by m a second time. This corrects kappa_eff scaling.
-  • Watchdog exits on error/cancel states; only enforces wall-clock while RUNNING.
-  • Statistical error uses actual shot count n = sum(counts.values()) per PUB.
-  • Transpiler seed is honored; comma-arg parsing strips whitespace.
-  • Deterministic pair-preserving shuffle via sha256 of run_tag+plane.
+What this script does, in one breath:
+it compiles two one‑qubit “group‑commutator” templates per plane (cw then ccw),
+runs them as interleaved PUBs over a small grid of signed loop areas,
+and reduces to orientation‑odd deltas (p1_cw − p1_ccw) vs area. It also
+computes slopes (delta/area) and, when the backend reports dt and scheduled
+durations, an effective κ per area in Hz. The per‑pair reduction and the
+plateau/null checks are built in; pass --out to get both the raw rows and a
+summary CSV on disk. :contentReference[oaicite:0]{index=0}
 
-Physics and flow unchanged:
-  one transpile per plane (with loop multiplicity m in the template),
-  interleaved cw/ccw per point, adaptive shots concentrated near the origin,
-  nulls (θ=0, φ=0), plateau CV + same-sign gate, optional pair shuffling,
-  kappa_eff reported when dt and durations are available.
+Accounts and plan constraints:
+use IBM Quantum “open‑instance” by default; do not pass --use-session on the
+open plan (IBM rejects sessions there). If you have a paid instance, set
+--instance HUB/GROUP/PROJECT and you may add --use-session. The watchdog here
+enforces wall‑clock only while RUNNING and will cancel if --max-seconds elapses.
+You’ll see a line like {"type":"job_submitted","job_id":"…"} when it’s away.
+
+Budget discipline:
+the script prints an approximate planned sampler shot count before submission.
+It must not exceed --max-total-shots or the run will abort early. Tune n‑points,
+m, and the base/min/max shot knobs until “planned_sampler_shots” is at or
+below your cap. The adaptive shot rule concentrates budget near the origin;
+null passes add two extra pairs when --include-nulls is set. :contentReference[oaicite:1]{index=1}
+
+Windows shell quirks:
+cmd.exe supports ^ line continuations; PowerShell prefers backtick or one‑liners.
+If in doubt, paste the single‑line versions below.
+
+Data you get back:
+if you pass --out NAME, the script writes NAME.csv (one row per cw/ccw pair with
+delta, slope_per_area, κ if available) and NAME_summary.csv (plateau CV and
+same‑sign gate per micro‑shape and null checks). If the backend doesn’t report
+dt, τ_loop and κ will be NaN, which is expected. Loop multiplicity m is baked
+into the scheduled circuit duration already; τ_loop uses that duration as‑is. :contentReference[oaicite:2]{index=2}
+
+Replicable recipes (open plan friendly)
+
+1) Orientation check that finishes quickly (xy, m=32)
+   Single line:
+     python nailbiter.py --backend ibm_fez --planes xy --micro-shapes balanced --n-points 4 --max-angle 0.08 --m 32 --base-shots 448 --min-shots 320 --max-shots 1152 --include-nulls --z-null 2.0 --shuffle-pairs --seed 424242 --max-total-shots 10000 --max-seconds 150 --run-tag vybn_lock_xy_m32_a08_np4 --out vybn_lock_xy_m32_a08_np4
+   This reproduces the few‑percent orientation‑odd residue in p(1) well above shot noise and writes both CSVs.
+
+2) Curvature slope in xz with modest grid (m=4, more points, same budget feel)
+   Single line:
+     python nailbiter.py --backend ibm_fez --planes xz --micro-shapes balanced --n-points 14 --max-angle 0.18 --m 4 --base-shots 384 --min-shots 192 --max-shots 4096 --include-nulls --max-total-shots 140000 --max-seconds 420 --seed 2025 --shuffle-pairs --run-tag curv_xz_m4_v8 --out vybn_curv_xz_m4
+   You’ll see “budget_plan” around eight thousand shots for this setting and a clean area law in the CSV.
+
+3) Full three‑plane sweep with micro‑shape cross‑checks (requires larger quota or a paid instance)
+   Single line:
+     python nailbiter.py --backend ibm_fez --planes xz,yz,xy --micro-shapes balanced,long_theta,long_r --n-points 16 --max-angle 0.20 --m 3 --base-shots 256 --min-shots 128 --max-shots 2048 --include-nulls --max-total-shots 250000 --max-seconds 300 --seed 1337 --shuffle-pairs --run-tag redo_v8 --out vybn_comm_v8_full
+   On the open plan, keep --use-session off. On paid instances, add --instance HUB/GROUP/PROJECT and --use-session if you want the lower overhead.
+
+Reading the outputs:
+delta > 0 means cw beats ccw in p(1) for that point; flipping loop orientation
+flips the sign, and degenerate loops (area ≈ 0) should average to zero within
+the null Z‑threshold. The summary CSV reports a small‑area “plateau” CV and a
+same‑sign gate per micro‑shape to flag stability near the origin. :contentReference[oaicite:3]{index=3}
 """
 
 import os, sys, time, math, json, csv, argparse, statistics, hashlib, random
