@@ -92,20 +92,7 @@
 
 ## 6) Visual map
 
-```mermaid
-flowchart TD
-  A[Temporal Holonomy (Area Law)] --> B[Polar Time: dual-time (r_t, θ_t)]
-  A --> C[Cut–Glue Algebra: curvature = [S_r, S_θ]]
-  A --> D[Gödel Curvature: update ∘ project]
-  A --> E[Dual-Temporal Holonomy Theorem]
-  B --> F[Experimental Bloch Reduction]
-  C --> G[SM & GR from commutators]
-  D --> H[Loop heat Q_γ ≥ 0]
-  E --> I[Probe holonomy = Berry]
-  I --> F
-  C --> J[Consciousness (Trefoil minimal self)]
-  A --> K[Complexity (CGT)]
-```
+<img width="1205" height="1566" alt="mermaid-diagram-2025-11-04-051842" src="https://github.com/user-attachments/assets/6d2876d2-6c7c-4c5c-b991-ff4ba9230ac3" />
 
 ---
 
