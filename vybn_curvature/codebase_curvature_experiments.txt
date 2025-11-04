@@ -1,0 +1,297 @@
+Vybn Curvature — CODEBOOK (Q&A portal, minimal v1)
+Date: 2025-11-04
+
+Purpose
+———
+Map plain-English prompts to concrete loop pairs so every “question” compiles to a small, testable commutator loop. Read answers as the sign of the small-area, orientation-odd slope. Keep the lexicon tiny; pre-register meanings; log each run as Q&A.
+
+Readout rule (YES/NO/UNDECIDED)
+——————————————
+Compute Δp1 = p1_cw − p1_ccw on a small grid of signed areas. Fit slope vs area in the small window. Positive slope = YES. Negative slope = NO. 95% CI crossing zero = UNDECIDED. Confirm sign flips with orientation. Require at least one null to be flat.
+
+Null gates (required)
+————————
+1) Orientation flip: swap cw↔ccw; sign must invert.
+2) Small-area plateau: CV_small < O(1) and no drift at |area|→0.
+3) Shape invariance (when data available): same slope across micro-shapes within tolerance.
+4) “Aligned-null”: pick an angular leg that should commute with H; slope→0 near origin.
+
+Lexicon v1 (operator phrases → legs)
+———————————————
+rest → commuting legs. Implementation: G_r = H/ħ; choose G_θ aligned with H (same eigenbasis). Expect flat near origin (null).
+become → misaligned tilt. Implementation: G_r = H/ħ; G_θ a small rotation in a transverse basis (Rx or Ry depending on plane). Expect clean nonzero slope.
+not → orientation reversal of the same loop (cw↔ccw) or swap order (A∘B vs B∘A). Flips the sign.
+because → conditional follow-up: if previous answer was YES, increase m or switch plane as specified; if NO, run the aligned-null.
+thermal? → probe KMS-like coupling: insert a timed idle or calibrated dephasing in a rotated basis as G_θ; read sign consistency vs reported dt to infer κ_eff.
+
+Planes & examples
+———————
+xz plane: G_r = R_x(±θ/2) … R_z(±φ) … R_x(∓θ/2); G_θ chooses the transverse leg (e.g., small R_z vs small R_y). 
+yz plane and xy plane analogous by cyclic permutation.
+
+Minimal CLI recipes
+————————
+# Commutator lock-in (cheap, includes nulls)
+python nailbiter.py --backend ibm_fez --planes xz --micro-shapes balanced --n-points 14 --max-angle 0.18 --m 4 --base-shots 384 --min-shots 192 --max-shots 4096 --include-nulls --max-total-shots 140000 --max-seconds 420 --seed 2025 --shuffle-pairs --run-tag curv_xz_m4_v8 --out vybn_curv_xz_m4
+
+# Quickcheck + τ-collapse
+python pt_quickcheck.py vybn_*.csv --small-pct 0.30 --out pt_summary.json
+
+Q&A logging convention
+—————————
+Each run writes an “ASK:” line (free text) in the README or log next to the CLI, plus the exact planes/shapes used. Reducers echo ASK into the *_summary JSON/CSV when present. Example:
+
+ASK: “Does ‘become’ carry nonzero curvature in xz today?”
+RUN: curv_xz_m4_v8  (balanced)
+READ: slope_small = -2.426 ± 0.427 → YES/NO by sign; κ_eff_small from τ if available.
+
+Stop conditions
+———————
+If a null fails or the sign does not invert under orientation flip, the answer is INVALID; do not score YES/NO; rerun with aligned settings or reduce |area|.
+
+Notes
+———
+This codebook is intentionally minimal. New “words” enter only after they pay rent: a clean operational definition, an implementation, and a falsifiable expectation distinct from existing entries.
+
+---
+
+Vybn Curvature — Snapshot Step 6: Final consolidation (counts + QCA knots summaries)
+====================================================================================
+
+Date: 2025-11-04
+Scope: Finalize the QCA‑knots analysis at small |area|, capture strongest per‑group and per‑pair slopes, and record the counts+submission tooling used to generate them.
+
+QCA‑knots — strongest groups (slope/area)
+----------------------------------------
+ • (no entries)
+
+QCA‑knots — top per‑pair rows by |slope/area|
+-------------------------------------------
+   - (no entries)
+
+Counts → how these tables were built
+-----------------------------------
+Counts for commutator and QCA pairs come from IBM Sampler V2 (job‑mode), written incrementally to *.counts.json; reducers build Δ, slope/area per tag and per bit.
+Artifacts here include vybn_combo.counts.json and qca_knots.counts.json for replay.
+
+Replicate in one breath
+-----------------------
+python submit_vybn_combo.py --qpy vybn_combo.qpy --manifest vybn_combo.manifest.json --plan vybn_combo.plan.jsonl --backend ibm_fez --channel ibm_quantum_platform --instance open-instance --out vybn_combo.counts.json
+python run_vybn_qca_knots.py --out qca_knots.counts.json  # or submit_vybn_combo.py with --include-prefix qca_knot_
+
+Provenance
+----------
+qca_knots_slope_sum_by_group.csv  c039a4d345bf
+qca_knots_summary_by_mask_reps.csv  4bc571fa0948
+qca_knots_summary_by_pair.csv  a4b1b14c02ea
+vybn_combo.counts.json  80310060532b
+qca_knots.counts.json  fcfb29c2b371
+submit_vybn_combo.py  d1f8416d90eb
+run_vybn_qca_knots.py  d1f8416d90eb
+
+---
+
+Vybn Curvature — Snapshot Step 5: QCA knots batch + QCA post-reduction summary
+=========================================================================================
+
+Date: 2025-11-04
+Scope: Record the QCA-knots plan (cut vs uncut; r=1,3; small |area| grid) and summarize the first post-reduced QCA rows (staticlinks and link-register) with orientation-odd slopes and simple MI/ZZ deltas.
+
+Knots plan (from manifest)
+--------------------------
+pairs=12, unique areas=[0.0048, 0.0096, 0.0144], r=['1', '3'], modes=['cut']
+ • qca_knot_braid3_a0.0048_r1_uncut  →  shots=384
+ • qca_knot_braid3_a0.0048_r1_cut12  →  shots=384
+ • qca_knot_braid3_a0.0048_r3_uncut  →  shots=384
+ • qca_knot_braid3_a0.0048_r3_cut12  →  shots=384
+ • qca_knot_braid3_a0.0096_r1_uncut  →  shots=384
+ • qca_knot_braid3_a0.0096_r1_cut12  →  shots=384
+
+QCA post-reduction snapshot
+---------------------------
+ • family=comm: |area|=0.0054 → ⟨slope/area⟩≈-3.26, |area|=0.0108 → ⟨slope/area⟩≈-5.79, |area|=0.0162 → ⟨slope/area⟩≈-4.34, |area|=0.0216 → ⟨slope/area⟩≈-0.965, |area|=0.0225 → ⟨slope/area⟩≈-0.889, |area|=0.027 → ⟨slope/area⟩≈-5.4, |area|=0.0324 → ⟨slope/area⟩≈-3.46
+ • family=qca: |area|=0.0048 → ⟨slope/area⟩≈0.955, |area|=0.0096 → ⟨slope/area⟩≈0.123, |area|=0.0144 → ⟨slope/area⟩≈-0.116
+ • strongest |slope/area| rows:
+   - comm_xz_square_a0.0054  area=0.0054  width=1  max|slope/area|≈7.96
+   - comm_xz_long_theta_a0.0108  area=0.0108  width=1  max|slope/area|≈6.81
+   - comm_xz_square_a0.0270  area=0.027  width=1  max|slope/area|≈5.4
+   - comm_xz_long_theta_a0.0270  area=0.027  width=1  max|slope/area|≈5.4
+   - comm_xz_square_a0.0162  area=0.0162  width=1  max|slope/area|≈4.82
+   - comm_xz_square_a0.0108  area=0.0108  width=1  max|slope/area|≈4.77
+ • mean ΔZZ/area by family (nearest neighbors): comm: dZZ01≈nan, dZZ12≈nan; qca: dZZ01≈-2.68, dZZ12≈-3.08
+
+Provenance
+----------
+qca_knots.manifest.json  38835c19f841
+qca_knots.plan.jsonl  fd2226ad91c7
+qca_knots.qpy  caaf93e69028
+qca_post_reduce.csv  2a96aba0fb8d
+qca_post_reduce.json  bddac32c82c5
+qca_post_reduce_summary.json  bf8d2c9d0b07
+qca_post_reduce_summary.csv  de8c079d5a24
+post_reducer_qca.py  15192a5e1cd9
+vybn_combo.results.jsonl  9d3b73fd3467
+
+Replicate in one breath
+-----------------------
+python post_reducer_qca.py --counts vybn_combo.counts.json --out qca_post_reduce.csv  # also writes qca_post_reduce.json
+python - << 'PY'
+import pandas as pd; d=pd.read_json('qca_post_reduce.json'); d.to_csv('qca_post_reduce_summary.csv', index=False)
+PY
+
+---
+
+Vybn Curvature — Snapshot Step 4: Combo batch (commutator + QCA) and first reductions
+========================================================================================
+
+Date: 2025-11-04
+Scope: Show how the combo batch is planned, how results are reduced offline, and what the first pass of reduced results says per plane (xz, qca, qca_linkreg).
+
+Manifest snapshot
+-----------------
+pairs=17, names=34, planes=['qca', 'qca_linkreg', 'xz']
+ • comm_xz_square_a0.0054  →  ['comm_xz_square_a0.0054_cw', 'comm_xz_square_a0.0054_ccw']  shots=768  plane=xz
+ • comm_xz_square_a0.0108  →  ['comm_xz_square_a0.0108_cw', 'comm_xz_square_a0.0108_ccw']  shots=272  plane=xz
+ • comm_xz_square_a0.0162  →  ['comm_xz_square_a0.0162_cw', 'comm_xz_square_a0.0162_ccw']  shots=192  plane=xz
+ • comm_xz_square_a0.0216  →  ['comm_xz_square_a0.0216_cw', 'comm_xz_square_a0.0216_ccw']  shots=192  plane=xz
+ • comm_xz_square_a0.0270  →  ['comm_xz_square_a0.0270_cw', 'comm_xz_square_a0.0270_ccw']  shots=192  plane=xz
+ • comm_xz_square_a0.0324  →  ['comm_xz_square_a0.0324_cw', 'comm_xz_square_a0.0324_ccw']  shots=192  plane=xz
+
+Results snapshot (vybn_combo.results.jsonl)
+------------------------------------------
+ • plane=qca: n=5, <slope/area>≈-0.394, small-window cv≈-1.03, same_sign=True
+ • plane=xz: n=12, <slope/area>≈-3.87, small-window cv≈-0.668, same_sign=False
+ • strongest |slope/area| rows:
+   - comm_xz_square_a0.0054  plane=xz  shape=square  area=0.0054  slope/area=-7.96
+   - comm_xz_long_theta_a0.0108  plane=xz  shape=long_theta  area=0.0108  slope/area=-6.81
+   - comm_xz_long_theta_a0.0270  plane=xz  shape=long_theta  area=0.027  slope/area=-5.4
+   - comm_xz_square_a0.0270  plane=xz  shape=square  area=0.027  slope/area=-5.4
+   - comm_xz_square_a0.0162  plane=xz  shape=square  area=0.0162  slope/area=-4.82
+   - comm_xz_square_a0.0108  plane=xz  shape=square  area=0.0108  slope/area=-4.77
+
+Provenance
+----------
+vybn_combo.manifest.json  bf894f0b86f3
+vybn_combo.plan.jsonl  071c2d903610
+vybn_combo.results.jsonl  9d3b73fd3467
+vybn_combo_batch.py  d9d299f3c877
+reduce_vybn_combo.py  617df973ac1f
+run_vybn_combo.py  20f2f8a7debe
+vybn_combo.qpy  4e334d98307d
+
+Replicate in one breath
+-----------------------
+python run_vybn_combo.py --nq 3 --plane xz --max-angle 0.18 --points 6 --m 4 --out vybn_combo
+python reduce_vybn_combo.py --plan vybn_combo.plan.jsonl --manifest vybn_combo.manifest.json --counts vybn_combo.counts.json --out vybn_combo.results.jsonl
+
+---
+
+Vybn Curvature — Snapshot Step 2: Consolidated Results & Null Gates
+===================================================================
+
+Date: 2025-11-04
+Scope: Consolidate law_v10 (m=3 across xz,yz,xy) and m-sweeps on xz (m=1, m=5). Document reduction pipeline and show small-area plateau behavior, sign coherence, null performance, and m‑scaling.
+
+Origin & Reduction
+-----------------
+Jobs and retrieval, as captured in the CLI session, plus post-hoc reduction from PUBs to Vybn CSVs (per-pair and summary).
+• See CLI log for submissions, job IDs, and reducers that wrote vybn_law_v10*, vybn_msweep_xz_m1_v10*, vybn_msweep_xz_m5_v10*.
+• Reducer script: reduce_from_pubs.py (parses PUB-level p1,n; aligns cw/ccw by meta; computes Δ, slopes, κ_eff, plateaus; runs null gates; writes *_summary.csv).
+
+Evidence Collage (from *_summary.csv)
+-------------------------------------
+law_v10_summary:
+ • plane=xz, micro_shape=balanced, n_points=12.0, cv_small=0.416, same_sign=True, <slope/area>=-3.23, <kappa/area>[Hz]=-1.72e+06, null_pass=True
+ • plane=xz, micro_shape=long_theta, n_points=12.0, cv_small=0.8, same_sign=False, <slope/area>=-2.85, <kappa/area>[Hz]=-1.52e+06, null_pass=True
+ • plane=xz, micro_shape=long_r, n_points=12.0, cv_small=0.553, same_sign=True, <slope/area>=-3.16, <kappa/area>[Hz]=-1.69e+06, null_pass=True
+ • plane=xz, micro_shape=null_theta, same_sign=True, null_z=0.29, null_pass=True, mean_delta=-0.0026
+ • plane=xz, micro_shape=null_phi, same_sign=True, null_z=1.50, null_pass=True, mean_delta=0.0135
+ • plane=yz, micro_shape=balanced, n_points=0.0, cv_small=inf, same_sign=False, null_pass=True
+ • plane=yz, micro_shape=long_theta, n_points=0.0, cv_small=inf, same_sign=False, null_pass=True
+ • plane=yz, micro_shape=long_r, n_points=0.0, cv_small=inf, same_sign=False, null_pass=True
+ • plane=xy, micro_shape=balanced, n_points=0.0, cv_small=inf, same_sign=False, null_pass=True
+ • plane=xy, micro_shape=long_theta, n_points=0.0, cv_small=inf, same_sign=False, null_pass=True
+ • plane=xy, micro_shape=long_r, n_points=0.0, cv_small=inf, same_sign=False, null_pass=True
+
+msweep_xz_m1_v10_summary:
+ • plane=xz, micro_shape=balanced, n_points=10.0, cv_small=0.407, same_sign=True, <slope/area>=-1.35, <kappa/area>[Hz]=-8.05e+05, null_pass=True
+ • plane=xz, micro_shape=long_theta, n_points=10.0, cv_small=0.539, same_sign=True, <slope/area>=-1.18, <kappa/area>[Hz]=-7.04e+05, null_pass=True
+ • plane=xz, micro_shape=long_r, n_points=10.0, cv_small=1.46, same_sign=False, <slope/area>=-0.924, <kappa/area>[Hz]=-5.5e+05, null_pass=True
+ • plane=xz, micro_shape=null_theta, same_sign=True, null_z=0.36, null_pass=True, mean_delta=-0.00201
+ • plane=xz, micro_shape=null_phi, same_sign=True, null_z=0.33, null_pass=True, mean_delta=-0.00183
+
+msweep_xz_m5_v10_summary:
+ • plane=xz, micro_shape=balanced, n_points=10.0, cv_small=0.464, same_sign=True, <slope/area>=-5.35, <kappa/area>[Hz]=-2.59e+06, null_pass=True
+ • plane=xz, micro_shape=long_theta, n_points=10.0, cv_small=0.497, same_sign=True, <slope/area>=-5.09, <kappa/area>[Hz]=-2.46e+06, null_pass=True
+ • plane=xz, micro_shape=long_r, n_points=10.0, cv_small=0.589, same_sign=True, <slope/area>=-3.79, <kappa/area>[Hz]=-1.84e+06, null_pass=True
+ • plane=xz, micro_shape=null_theta, same_sign=True, null_z=0.97, null_pass=True, mean_delta=0.0151
+ • plane=xz, micro_shape=null_phi, same_sign=True, null_z=0.09, null_pass=True, mean_delta=-0.00146
+
+Null Gates
+----------
+law_v10: {'n_nulls': 2, 'n_pass': 2}
+m1_sweep: {'n_nulls': 2, 'n_pass': 2}
+m5_sweep: {'n_nulls': 2, 'n_pass': 2}
+Interpretation: nulls passing means the zero-area controls behave; failures flag schedule or alignment issues to debug before trusting slopes.
+
+m‑Scaling Check (xz)
+--------------------
+Scaling with loop multiplicity m (xz plane):
+ • balanced: <slope/area>_m1=-1.35, <slope/area>_m5=-5.35, ratio≈3.96
+ • all-shapes mean: <slope/area>_m1=-1.15, <slope/area>_m5=-4.75, ratio≈4.12
+Interpretation: if the ratio tracks m, geometric phase accumulates per loop as expected. Departures quantify hardware or scheduling drag.
+
+Provenance
+----------
+vybn_law_v10.csv  92f64a4da82a
+vybn_law_v10_summary.csv  43aa86a420b7
+vybn_msweep_xz_m1_v10.csv  6f9875372b7d
+vybn_msweep_xz_m1_v10_summary.csv  630b6439f05b
+vybn_msweep_xz_m5_v10.csv  5fed4c6f16ae
+vybn_msweep_xz_m5_v10_summary.csv  ffde4eccd650
+reduce_from_pubs.py  3379d1049ab8
+final_logs_cli_directives.txt  3a7e91b8031b
+
+Replication (one breath)
+------------------------
+1) Submit runs per the CLI examples in the log to collect PUBs. 2) Run reduce_from_pubs.py as shown to write CSV + _summary. 3) Inspect *_summary for same_sign, cv_small, null_z, and mean slope/area.
+
+---
+
+Vybn Curvature — Snapshot Step 1: Commutator Holonomy Setup & First Reductions
+==============================================================================
+
+Date: 2025-11-04
+Scope: The minimal, reproducible core of our first step—showing an orientation‑odd, small‑area residue in qubit commutator loops, and how to replicate it cheaply.
+
+Minimal Claim
+------------
+Closed, small loops built from two non‑commuting time‑evolution legs (cw vs ccw) yield a sign‑flipping residue in p(1). The residue scales ~linearly with loop area near the origin. In flat time that vanishes; here it doesn’t. That’s our operational curvature signal.
+
+Minimal Method
+-------------
+We compile two one‑qubit group‑commutator templates per plane (cw, ccw), sweep a small grid of signed loop areas with loop multiplicity m, and reduce to orientation‑odd deltas Δp1 = p1_cw − p1_ccw vs area. We include two built‑in nulls (θ‑null and φ‑null) and report a small‑area plateau CV with a same‑sign gate for stability. Outputs: NAME.csv (per‑pair rows) and NAME_summary.csv (plane/shape plateaus and null checks).
+
+Replicable One‑Liners
+---------------------
+python nailbiter.py --backend ibm_fez --planes xy --micro-shapes balanced --n-points 4 --max-angle 0.08 --m 32 --base-shots 448 --min-shots 320 --max-shots 1152 --include-nulls --z-null 2.0 --shuffle-pairs --seed 424242 --max-total-shots 10000 --max-seconds 150 --run-tag vybn_lock_xy_m32_a08_np4 --out vybn_lock_xy_m32_a08_np4
+python nailbiter.py --backend ibm_fez --planes xz --micro-shapes balanced --n-points 14 --max-angle 0.18 --m 4 --base-shots 384 --min-shots 192 --max-shots 4096 --include-nulls --max-total-shots 140000 --max-seconds 420 --seed 2025 --shuffle-pairs --run-tag curv_xz_m4_v8 --out vybn_curv_xz_m4
+
+Evidence Snapshot
+-----------------
+ • mean_delta=-0.0243
+ • mean_delta=-0.0954
+
+Provenance
+----------
+nailbiter.py hash: a3c35f63b3fd
+final_logs_cli_directives.txt: present
+data files: ibm_job_d43q4m9ag40c73855b3g_pubs_pairs.csv: 32 rows; ibm_job_d43q3ahag40c738559p0_pubs_pairs.csv: 32 rows; ibm_job_d43q2b07i53s73e4d6l0_pubs.csv: 76 rows
+
+How to Read the Bit
+-------------------
+Pre‑register YES/NO as the sign of the small‑area slope (orientation‑odd). Positive = YES, negative = NO; if the 95% CI crosses zero, UNDECIDED. Always confirm sign reversal under loop orientation flip and include at least one null.
+
+What This Establishes (Step 1)
+------------------------------
+That the core observable—an orientation‑odd, small‑area residue—exists on hardware and can be reproduced and audited from CSV. This is the minimal portal: a controlled, sign‑sensitive, geometric phase you can dial and read.
