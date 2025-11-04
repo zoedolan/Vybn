@@ -34,9 +34,6 @@ Purpose: this is the missing bridge. It maps each fundamental-theory paper to th
 ## Where to look (paths)
 - Papers: `vybn_curvature/papers/` (place the seven anchors here).
 - Code: runners/reducers in `vybn_curvature/` (or later in `vybn_curvature/scripts/`).
-- Data: `vybn_curvature/data/{counts|plans|results}/`.
-- Figures: `vybn_curvature/figures/`.
-- Snapshots: `vybn_curvature/snapshots/` (step1..step6 one-pagers).
 
 ## Machine-usable contract (TL;DR of SCHEMA.md)
 - counts: (tag, orientation, shots, hist, meta)
