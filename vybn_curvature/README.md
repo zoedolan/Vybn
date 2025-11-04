@@ -88,35 +88,35 @@ Suggested defaults (tune later): `cv_small <= 0.35`, `|null_z| <= 2.0`, shape-in
 ## 5) Better poster: two Mermaid views
 
 ### 5a) Mindmap (why -> what -> how)
-```mermaid
-mindmap
-  root((Temporal holonomy))
-    Law: gamma ~ (E/hbar) * A_t
-      Reads: slope vs area (now)
-      Reads: phase vs area (planned)
-    Pillars
-      Polar time -> Bloch U(1)
-        Expect: linearity at tiny area
-        Check: orientation flip
-      Cut-Glue algebra
-        Curvature = commutator
-        Primitive: [A,B] group-commutator
-      Dual-temporal holonomy
-        Probe holonomy = Berry area
-        Tool: tau-collapse -> kappa_eff
-      Godel curvature
-        Update o Project heat >= 0
-      Knot-a-Loop (QCA knots)
-        Parity: cut/uncut, r=1/3 at fixed |area|
-      CGT (Vybn conjecture)
-        Expensive flux -> cheaper schedules
-    How (runnable)
-      Run: run_vybn_combo.py
-      Reduce: reduce_vybn_combo.py
-      Run QCA: run_vybn_qca_knots.py
-      Post: post_reducer_qca.py
-      Analyze: holonomy_pipeline.py
-```
+
+flowchart TD
+  T1[Temporal holonomy gamma ~ (E/hbar) * A_t]
+  T2[Polar time to Bloch]
+  T3[Dual temporal holonomy theorem]
+  T4[Cut Glue curvature = commutator]
+  T5[Godel curvature loop heat >= 0]
+  T6[Knot a Loop QCA parity]
+  T7[CGT expensive flux]
+
+  O1[dp1 slope vs signed area]
+  O2[tau collapse -> kappa_eff]
+  O3[QCA parity dZZ per area]
+
+  R1((reduce_vybn_combo.py))
+  R2((holonomy_pipeline.py))
+  R3((post_reducer_qca.py))
+
+  D1[[vybn_combo.results.jsonl]]
+  D2[[pt_summary.json / pt_collapse.png]]
+  D3[[qca_post_reduce.csv / json]]
+
+  T1 --> O1 --> R1 --> D1
+  T2 --> O1
+  T4 --> O1
+  T3 --> O2 --> R2 --> D2
+  T5 --> O2
+  T6 --> O3 --> R3 --> D3
+  T7 -. heuristic .-> O1
 
 ### 5b) Flowchart (theory -> observable -> reducer -> file -> falsifier)
 ```mermaid
