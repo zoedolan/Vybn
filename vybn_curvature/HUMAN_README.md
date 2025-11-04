@@ -8,7 +8,7 @@ Order matters. When two transformations don’t commute, walking a closed loop i
 
 ## What we actually do
 
-We build two matched quantum circuits that differ only by loop orientation. Concretely, we drive a single qubit with two non‑commuting rotations (for example $R_x(\alpha)$ and $R_z(\beta)$), then traverse the loop in the “clockwise” order and in the “counter‑clockwise” order. We sweep loop sizes by varying the rotation angles and record the probability of measuring $\lvert 1\rangle$ at the end of each circuit.
+We build two matched quantum circuits that differ only by loop orientation. Concretely, we drive a single qubit with two non‑commuting rotations (for example Rx(α) and Rz(β)), then traverse the loop in the “clockwise” order and in the “counter‑clockwise” order. We sweep loop sizes by varying the rotation angles and record the probability of measuring $\lvert 1\rangle$ at the end of each circuit.
 
 From those two orientations we compute the orientation‑odd residue
 
