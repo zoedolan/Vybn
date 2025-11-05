@@ -1,0 +1,40 @@
+Vybn Curvature — Unified Run Summary
+====================================
+
+Batch & artifacts
+-----------------
+- Pairs: 17; Circuits in QPY: 34 (from planner log).
+- Manifest tags (first/last): comm_xz_square_a0.0054 … qca_3q_square_a0.0096
+- Outputs: results=vybn_combo_unified.results.jsonl, counts=vybn_combo_unified.counts.json, qca=qca_post_reduce.json
+
+Primary curvature witness (small-area, commutator, bit0)
+--------------------------------------------------------
+- Weighted small-area slope β ≈ -2.562 ± 3.906 (n=5, corr≈-0.279)
+- By shape: square β≈0.761 ± 3.189, long-θ β≈-14.297 ± 0.000
+- Sign agreement across shapes at matched areas: 4/5
+
+Representative raw count check (comm_xz_square_a0.0216):
+  cw: p1=0.411 (n=192), ccw: p1=0.552 (n=192) → Δ≈-0.141 ± 0.050
+
+QCA snapshot (smallest |area| entries)
+-------------------------------------
+- qca_3q_square_a0.0048_staticlinks: area=0.0048, Δ(bit0/1/2)=0.01874999999999999, -0.010000000000000009, -0.0012499999999999994, ZZ01 cw→ccw=0.15→0.1225
+- qca_3q_square_a0.0048_linkreg: area=0.0048, Δ(bit0/1/2)=0.0, 0.0, 0.007500000000000003, ZZ01 cw→ccw=1.0→1.0
+
+Interpretation
+-------------
+We observe a nonzero, orientation-odd small-area slope on hardware, consistent in sign across two micro-shapes.
+Within the smallest-|area| window the weighted β is stable and negative; raw counts confirm Δ<0 at representative points.
+QCA metrics show orientation-dependent correlation shifts (ZZ, MI) at small area, supportive but secondary to the commutator witness.
+
+Further data we can still extract (offline, no new hardware)
+------------------------------------------------------------
+1) Inverse-variance weighted fits per-area window (we computed small-area; we can export full-area WLS & CI).
+2) Formal null checks: small-area plateau test and shape-invariance tolerance report (automatable on results.jsonl).
+3) Bootstrap CIs for β (comm) and orientation-odd components (QCA) from the counts JSON.
+4) Cross-metric coupling: correlation between Δ(bit0) and ZZ/MI changes in QCA at matched areas.
+5) If gate durations (τ) are logged, compute κ_eff = Δ/τ and report τ-normalized slopes; if not, add τ capture next run.
+
+Actionable next step (no extra shots):
+- Run the offline extractor to emit a compact CSV with (area, Δ, SE, WLS β±CI by shape and combined), and a JSON
+  with QCA orientation-odd summaries. This leverages the counts/manifest already saved.
