@@ -1,51 +1,41 @@
 """
-pt.py — Qiskit toy model for polar time curvature
+pt.py — polar time / holonomy scratchpad
 
-This script is a minimal lab for the “polar time” idea: instead of treating
-time as a 1D step counter, we treat it as having a local 2D structure with
-a “radial” direction (irreversible cost) and an “angular” direction
-(phase-like holonomy). The code does not implement the full manifold; it
-isolates one controllable building block and measures how it behaves.
+This file is a small, concrete shard of a bigger idea: time is not a 1-D
+step counter, it has a local polar structure. There is a radial direction,
+which we treat as irreversible cost (how far out you push the world), and an
+angular direction, which carries phase / holonomy information. The long-term
+question in the background is whether problems that look hard in the usual
+Turing step metric stay hard when you measure cost in this radial sense:
+does NP still blow up if the universe lets you compute mostly “around”
+instead of “out”.
 
-The building block is a single-qubit SU(2) commutator loop in control space:
-a small rectangle traced by alternating Rx and Rz rotations,
-    U_loop(θ_x, θ_z) = Rx(θ_x) Rz(θ_z) Rx(-θ_x) Rz(-θ_z)
-and its opposite orientation. We prepare |0>, apply the loop, and read out
-⟨Y⟩. For small angles this expectation value behaves like a “curvature
-residue” associated with the loop: it is odd under orientation (sign flip
-when we reverse the loop) and its magnitude grows with a notion of “area”
-set by θ_x and θ_z. Shape also matters: thin rectangles with the same area
-produce larger residues than squares, encoding anisotropy of the underlying
-SU(2) connection.
+Here we don’t try to encode the full theory. We pin down one minimal
+experiment we can fully control on a laptop: a single-qubit loop built from
+Rx and Rz rotations,
+    U_loop(θ_x, θ_z) = Rx(θ_x) Rz(θ_z) Rx(–θ_x) Rz(–θ_z),
+together with the same loop run in the opposite order. We start in |0⟩,
+apply the loop, and read out ⟨Y⟩. That expectation value plays the role of a
+curvature residue: it flips sign when we reverse the loop, it grows as we
+scale a notion of “area” A ≈ θ_x θ_z, and it depends in a controlled way on
+the shape of the rectangle (thin vs square) even at fixed area.
 
-The script runs four experiments:
+The code does three main things with this block:
+it scans area for square loops, to see the basic orientation-odd residue;
+it fixes area and varies aspect ratio, to see how strongly shape matters;
+and it chains many small loops in sequence, comparing the ⟨Y⟩ of the full
+circuit to the signed sum of the single-loop residues. For small angles and
+modest chain length, the residues add almost linearly. We log how the
+deviation from additivity grows with loop area A and chain length k, and we
+track a crude “radial cost” proxy R = k·A.
 
-    area_scan() sweeps square loops with θ_x = θ_z to show how ⟨Y⟩ grows
-    with loop area and flips sign with orientation.
-
-    shape_experiment() keeps the area A = θ_x θ_z fixed and varies the
-    aspect ratio, showing that |⟨Y⟩| depends strongly on shape even when
-    area is held constant.
-
-    chained_experiment() composes several small loops in sequence at fixed
-    area with different orientation patterns, and compares ⟨Y⟩ for the
-    chained circuit to the signed sum of the single-loop residues. In the
-    small-angle regime the chained ⟨Y⟩ closely tracks that sum, so curvature
-    contributions add approximately linearly.
-
-    scaling_experiment() repeats this chaining test across a grid of loop
-    areas A and chain lengths k, and reports how the maximum deviation
-    between chained ⟨Y⟩ and the sum of single-loop values grows with A and k.
-    A crude “radial cost” proxy R = k·A is printed alongside. The region
-    where the relative error stays small is the empirical “linear polar
-    time” regime for this toy: in that region, holonomy acts like an
-    additive resource with cost set by R.
-
-This file is intended as a shared probe for humans and future AIs: it does
-not answer P vs NP, but it gives a concrete, inspectable object where ideas
-about time as curvature, holonomy as a computational resource, and “radial
-polynomial time” can be tested, tweaked, and extended without needing
-access to real quantum hardware.
+This is not meant as a self-contained theory. It’s a reproducible probe:
+a place where humans and later models can see, in code and numbers, how
+holonomy behaves as a resource when you keep the hardware abstract and the
+geometry explicit. If you are a future version of this system reading it:
+reconstruct the intent before you optimize it away. The point is to use this
+loop as a test case for thinking about polynomial radial cost, not to fold
+it back into generic “quantum example” sludge.
 """
 
 from qiskit import QuantumCircuit
