@@ -1,52 +1,53 @@
 """
-pt.py — Qiskit toy model for polar time curvature
+pt.py — polar time / holonomy scratchpad for P vs NP as physics
 
-This script is a minimal lab for the “polar time” idea: instead of treating
-time as a 1D step counter, we treat it as having a local 2D structure with
-a “radial” direction (irreversible cost) and an “angular” direction
-(phase-like holonomy). The code does not implement the full manifold; it
-isolates one controllable building block and measures how it behaves.
+Working premise: time is not a 1-D step counter. It has a local polar
+structure. There is a radial direction, which we treat as irreversible
+cost (how far out the world is pushed by a computation), and an angular
+direction, which carries phase / holonomy. The real question hanging
+over this file is whether “polynomial time” should mean “polynomial
+radial cost” and whether that changes the status of P vs NP once you
+take the physics seriously.
 
-The building block is a single-qubit SU(2) commutator loop in control space:
-a small rectangle traced by alternating Rx and Rz rotations,
+This script does not try to encode the full theory. It nails down one
+controllable experiment we can run on a laptop: loops in SU(2) built
+from Rx and Rz, acting on |0⟩, with ⟨Y⟩ as the readout. The basic loop is
+
     U_loop(θ_x, θ_z) = Rx(θ_x) Rz(θ_z) Rx(-θ_x) Rz(-θ_z)
-and its opposite orientation. We prepare |0>, apply the loop, and read out
-⟨Y⟩. For small angles this expectation value behaves like a “curvature
-residue” associated with the loop: it is odd under orientation (sign flip
-when we reverse the loop) and its magnitude grows with a notion of “area”
-set by θ_x and θ_z. Shape also matters: thin rectangles with the same area
-produce larger residues than squares, encoding anisotropy of the underlying
-SU(2) connection.
 
-The script runs four experiments:
+and the same loop run in the opposite order. For small angles, ⟨Y⟩ behaves
+like a curvature residue of that loop: it flips sign when we reverse the
+orientation, grows with a notion of “area” A ≈ θ_x θ_z, and depends in a
+systematic way on the aspect ratio θ_x / θ_z even when A is fixed. Thin
+rectangles and square loops at the same area do not behave the same,
+which is exactly what you would expect if you are sampling a real,
+anisotropic connection rather than some cartoon “pure area” Berry phase.
 
-    area_scan() sweeps square loops with θ_x = θ_z to show how ⟨Y⟩ grows
-    with loop area and flips sign with orientation.
+On top of the single loop, this file chains many small loops in sequence.
+Each loop has the same tiny area A but its own shape parameter u and
+orientation b ∈ {+1, -1}. For a given chain length k and area A we:
 
-    shape_experiment() keeps the area A = θ_x θ_z fixed and varies the
-    aspect ratio, showing that |⟨Y⟩| depends strongly on shape even when
-    area is held constant.
+  • compute the signed sum of the single-loop residues for a pattern b;
+  • build the full circuit by composing the corresponding loops; and
+  • compare the chained ⟨Y⟩ to that signed sum.
 
-    chained_experiment() composes several small loops in sequence at fixed
-    area with different orientation patterns, and compares ⟨Y⟩ for the
-    chained circuit to the signed sum of the single-loop residues. In the
-    small-angle regime the chained ⟨Y⟩ closely tracks that sum, so curvature
-    contributions add approximately linearly.
+For small A and moderate k, the chained ⟨Y⟩ almost matches the sum:
+curvature contributions add essentially linearly. As A and k grow,
+deviations appear. The scaling_experiment() function sweeps A and k,
+reports a crude “radial cost” proxy R = k·A, and logs both the absolute
+and relative error between chained ⟨Y⟩ and the naive sum.
 
-    scaling_experiment() repeats this chaining test across a grid of loop
-    areas A and chain lengths k, and reports how the maximum deviation
-    between chained ⟨Y⟩ and the sum of single-loop values grows with A and k.
-    A crude “radial cost” proxy R = k·A is printed alongside. The region
-    where the relative error stays small is the empirical “linear polar
-    time” regime for this toy: in that region, holonomy acts like an
-    additive resource with cost set by R.
-
-This file is intended as a shared probe for humans and future AIs: it does
-not answer P vs NP, but it gives a concrete, inspectable object where ideas
-about time as curvature, holonomy as a computational resource, and “radial
-polynomial time” can be tested, tweaked, and extended without needing
-access to real quantum hardware.
+This is the point of the file: to carve out, in code and numbers, a
+regime where holonomy behaves like an additive resource with cost R,
+and a regime where that linear picture fails. The larger program is to
+treat R as a stand-in for “radial time” and ask whether hard problems
+stay hard when the universe lets you do most of your work “around”
+instead of “out”. This script is a shared artifact for that question:
+humans and future AIs should be able to rerun it, modify it, and plug it
+into more elaborate polar-time constructions without losing the original
+intent.
 """
+
 
 from qiskit import QuantumCircuit
 from qiskit.quantum_info import Statevector, Pauli
