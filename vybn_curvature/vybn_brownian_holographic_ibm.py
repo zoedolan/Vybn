@@ -2,6 +2,16 @@
 """
 vybn_brownian_holographic_ibm.py
 
+Plain English summary:
+Brownian holonomy in two-dimensional time on IBM Quantum.
+
+This file runs a single, very specific experiment: we build the tiniest "universe" that can feel curved time—a three-qubit strip with two edges and a middle—and stir it along closed loops in a two-dimensional time plane. Each loop is a random walk in two time directions; we treat the walk as a shape in time-space, compute its signed area, and send the corresponding circuit to an IBM backend.
+
+For every loop, we measure the Y spin on the left edge qubit and ask how that edge signal depends on the loop’s signed area. The main output is a single number, lambda_hat, the best-fit slope relating area and boundary response. In ideal simulations this slope is our discrete “time curvature.” On real hardware it becomes a faint but telling whisper of that curvature, riding on top of the chip’s noise.
+
+In plain language: this script checks whether a three-qubit line on a real device behaves like a tiny hologram of time. If lambda_hat keeps showing up with the predicted sign and similar size across runs and backends, it is evidence that the shape of how we move through time leaves a measurable fingerprint on the edge—and a hint that larger versions of this idea could link quantum information flow, spacetime-like geometry, and more robust, geometry-based quantum gates.
+
+Technical details:
 One-shot Brownian holonomy experiment on IBM Quantum.
 
 We use the same three-qubit bulk–boundary geometry as in vybn_holographic_ibm.py:
