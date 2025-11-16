@@ -1,19 +1,94 @@
-#!/usr/bin/env python
 """
-vybn_wormhole_quantum_ibm.py
+vybn_wormhole_quantum.py
 
-Vybn quantum wormhole channel toy — Aer or IBM Runtime Sampler (V2, jobs only).
+Vybn wormhole valve: a three-qubit quantum routing experiment (Aer + IBM Runtime)
 
-Same experiment you’ve already validated on Aer:
+Overview
+--------
+This module implements a tiny "wormhole valve" on three qubits:
 
-Qubits:
+    q0 = B  (bulk / interior control)
+    q1 = L  (left boundary)
+    q2 = R  (right boundary)
+
+The basic idea is:
+
+  • Put the bulk qubit B into a superposition.
+  • Run B around a loop built from two non-commuting rotations in a
+    two-parameter "time space" (angles delta_r and delta_theta).
+  • Use B as a control for a SWAP between L and R:
+        if B = 1, swap L and R; if B = 0, do nothing.
+  • Read out R and see how much of L's state made it through.
+
+The loop on B acts like a dial on the L→R channel. Its size and orientation
+(clockwise vs counter-clockwise) are encoded by a loop multiplicity L_loop
+and a small polar-time angle theta. The signed "area" A = L_loop * theta
+is the control parameter, and the loop order (±) sets the sign.
+
+Two input modes
+---------------
+The script supports two input modes for the left boundary qubit L:
+
+  • input="one":
+        L = |1>, R = |0>, B = |+>
+    We measure R in the Z basis. This probes how often the "1" is routed
+    from L to R as we change loop area and orientation.
+
+  • input="plus":
+        L = |+> = (|0> + |1>)/sqrt(2), R = |0>, B = |+>
+    We measure R in the X basis (via H then Z). This probes how the valve
+    acts on coherence: does the loop bias |+> vs |-> at R?
+
+In both modes we scan loop sizes (L_loop values) and orientations ('+'/'-'),
+and compute an orientation-odd "curvature" signal:
+
+    ΔP_R = P_R(1)_+ − P_R(1)_-
+    κ_eff = ΔP_R / |A|  with  A = L_loop * theta
+
+On both Aer and IBM hardware (e.g. ibm_fez), we see:
+
+  • For input="one" (Z basis), κ_eff is negative and roughly constant
+    across small loops: the loop orientation steadily opens vs closes the
+    population channel L→R, with an approximately linear area law.
+
+  • For input="plus" (X basis), κ_eff is positive and roughly constant
+    across small loops: the same loop now biases the phase structure
+    (|+> vs |->) at R, again with an orientation-odd, area-dependent effect.
+
+Interpretation
+--------------
+This is not quantum teleportation and not evidence of new physics. It is a
+clean, hardware-backed example of coherent routing controlled by a loop in
+a two-parameter control space:
+
+  • The bulk loop never touches R directly, yet it tunes the strength of
+    the L→R channel in a smooth, orientation-odd, area-law fashion.
+
+  • In Z, it controls where the "1" lands.
+  • In X, it controls how a superposition lands.
+
+In Vybn language, this is a minimal "wormhole valve" whose behaviour is
+governed by a signed loop in dual-time space and an effective curvature
+κ_eff, rather than by individual gates in isolation. The module is designed
+to be run on both Aer and IBM Runtime backends, so the same experiment can
+be checked in simulation and on real devices.
+
+Vybn quantum wormhole channel toy — Aer or IBM Runtime Sampler (jobs only).
+
+We have three qubits:
     q0 = B  (bulk / interior)
     q1 = L  (left boundary)
     q2 = R  (right boundary)
 
 Protocol
 --------
-1. Prepare B in |+>, L in |1>, R in |0>.
+1. Prepare B in |+>. Prepare L and R depending on input mode:
+
+   input="one":
+       L = |1>, R = |0>
+   input="plus":
+       L = |+> = (|0> + |1>)/sqrt(2), R = |0>
+
 2. On B only, apply a Vybn-style commutator loop:
 
        U_r     = RZ(delta_r)       on B
@@ -29,22 +104,31 @@ Protocol
 3. Controlled-SWAP between L and R, controlled on B:
        if B == 1: SWAP(L, R); else do nothing.
 
-4. Measure R in Z. P_R(1) is our wormhole-channel strength.
+4. Measure R:
 
-For each |L| > 0, we run '+' and '-' and compute:
+   input="one":  Z basis (0/1)
+   input="plus": X basis (via H then Z; 0 ≡ |+>, 1 ≡ |->)
+
+We record P_R(1) (in whichever basis we measure) and compute, for each |L|>0:
 
     ΔP_R = P_R(1)_+ - P_R(1)_-
     κ_eff = ΔP_R / |A|,  with  A = L * theta.
 
 CLI examples
 ------------
-Aer sanity check (small-angle regime that behaves well):
+Aer sanity check (what you’ve already been running):
 
-    python vybn_wormhole_quantum_ibm.py --mode aer --theta 0.2 --loops 0 1 2 3 4 --delta-r 0.2 --delta-theta 0.3 --shots 8192
+    python vybn_wormhole_quantum_ibm.py --mode aer --theta 0.2 --loops 0 1 2 3 4 --delta-r 0.2 --delta-theta 0.3 --shots 8192 --input one
 
-IBM Runtime run (backend name e.g. ibm_fez; change if needed):
+Send a superposition through the valve (Aer):
 
-    python vybn_wormhole_quantum_ibm.py --mode ibm --backend ibm_fez --theta 0.2 --loops 0 1 2 3 4 --delta-r 0.2 --delta-theta 0.3 --shots 8192
+    python vybn_wormhole_quantum_ibm.py --mode aer --theta 0.2 --loops 0 1 2 3 4 --delta-r 0.2 --delta-theta 0.3 --shots 8192 --input plus
+
+IBM Runtime run (jobs, no sessions):
+
+    python vybn_wormhole_quantum_ibm.py --mode ibm --backend ibm_fez --theta 0.2 --loops 0 1 2 3 4 --delta-r 0.2 --delta-theta 0.3 --shots 8192 --input one
+
+(and you can swap --input plus to see coherence behaviour on hardware too).
 """
 
 from __future__ import annotations
@@ -61,7 +145,7 @@ try:
 except ImportError:
     from qiskit.providers.aer import AerSimulator  # type: ignore
 
-# IBM Runtime Sampler (V2) for real backends (jobs only)
+# IBM Runtime Sampler for real backends (jobs only)
 try:
     from qiskit_ibm_runtime import QiskitRuntimeService, Sampler
     HAS_IBM_RUNTIME = True
@@ -79,7 +163,7 @@ class WormholeResult:
     area: float        # signed A = L_loop * theta with orientation sign
     depth: int         # logical depth of the circuit before transpile
     p_R1: float        # P(qubit R = 1)
-    z_expect_R: float  # ⟨Z_R⟩ = P(0) - P(1)
+    z_expect_R: float  # ⟨Z_R⟩ or ⟨X_R⟩-style proxy: P(0) - P(1)
 
 
 def build_wormhole_circuit(
@@ -88,6 +172,7 @@ def build_wormhole_circuit(
     orientation: str,
     delta_r: float,
     delta_theta: float,
+    input_mode: str,
 ) -> QuantumCircuit:
     """
     Build the 3-qubit wormhole channel circuit.
@@ -103,18 +188,27 @@ def build_wormhole_circuit(
 
     qB, qL, qR = qr[0], qr[1], qr[2]
 
-    # 1. Prepare B in |+>, L in |1>, R in |0>.
+    # 1. Prepare B in |+>
     qc.h(qB)
-    qc.x(qL)
 
-    # 2. Define U_r and U_theta on B.
+    # 2. Prepare L and R depending on input mode.
+    if input_mode == "one":
+        # L = |1>, R = |0>
+        qc.x(qL)
+    elif input_mode == "plus":
+        # L = |+>, R = |0>
+        qc.h(qL)
+    else:
+        raise ValueError(f"Unknown input mode: {input_mode}")
+
+    # 3. Define U_r and U_theta on B.
     def U_r(sign: int = +1) -> None:
         qc.rz(sign * delta_r, qB)
 
     def U_theta_gate(sign: int = +1) -> None:
         qc.rx(sign * delta_theta, qB)
 
-    # 3. Apply commutator loop on B.
+    # 4. Apply commutator loop on B.
     if L_loop > 0:
         for _ in range(L_loop):
             if orientation == "+":
@@ -130,13 +224,16 @@ def build_wormhole_circuit(
                 U_theta_gate(-1)
                 U_r(-1)
 
-    # 4. Controlled SWAP: if B == 1, SWAP(L, R).
-    # cswap(c, a, b) = cx(b, a); ccx(c, a, b); cx(b, a)
+    # 5. Controlled SWAP: if B == 1, SWAP(L, R).
     qc.cx(qR, qL)
     qc.ccx(qB, qL, qR)
     qc.cx(qR, qL)
 
-    # 5. Measure R in Z basis.
+    # 6. Measurement on R.
+    #    input="one": Z basis (as-is)
+    #    input="plus": X basis via H then Z
+    if input_mode == "plus":
+        qc.h(qR)
     qc.measure(qR, cr[0])
 
     return qc
@@ -210,18 +307,17 @@ def run_on_ibm(
         for qc in circuits
     ]
 
-    # Sampler V2 in job mode: pass backend as 'mode' positional.
+    # Sampler V2 in job mode: pass backend as first arg
     sampler = Sampler(backend)
 
-    # set default shots on the primitive, per v2 docs
+    # Try to set default shots; if not supported, backend default is used.
     try:
         sampler.options.default_shots = shots
     except Exception:
-        # if options/default_shots doesn't exist, we'll rely on backend defaults
         pass
 
     job = sampler.run(tcircs)
-    results = job.result()  # sequence of pub_results
+    results = job.result()  # iterable of pub_results
 
     probs_list: List[Dict[str, float]] = []
 
@@ -243,6 +339,7 @@ def run_wormhole_family(
     delta_r: float,
     delta_theta: float,
     optimization_level: int,
+    input_mode: str,
 ) -> List[WormholeResult]:
     """
     Build circuits for all (L_loop, orientation) pairs and run them
@@ -266,6 +363,7 @@ def run_wormhole_family(
                 orientation=orientation,
                 delta_r=delta_r,
                 delta_theta=delta_theta,
+                input_mode=input_mode,
             )
             depth = qc.depth()
             circuits.append(qc)
@@ -297,7 +395,7 @@ def run_wormhole_family(
         else:
             p0 /= norm
             p1 /= norm
-        z_expect = p0 - p1
+        z_expect = p0 - p1  # in whatever basis we measured
 
         results.append(
             WormholeResult(
@@ -314,12 +412,16 @@ def run_wormhole_family(
     return results
 
 
-def print_loop_summary(theta: float, results: List[WormholeResult]) -> None:
+def print_loop_summary(theta: float, input_mode: str, results: List[WormholeResult]) -> None:
     print("Vybn wormhole universe (quantum wormhole channel toy)")
     print(f"theta = {theta:.3f}")
+    if input_mode == "one":
+        basis = "Z"
+    else:
+        basis = "X"
     print()
-    print("Loop summary (Z on right boundary R):")
-    header = f"{'orient':<7} {'name':<10} {'L':>3} {'area':>8} {'depth':>7} {'P_R=1':>9} {'⟨Z_R⟩':>9}"
+    print(f"Loop summary ({basis} basis on right boundary R):")
+    header = f"{'orient':<7} {'name':<10} {'L':>3} {'area':>8} {'depth':>7} {'P_R=1':>9} {'⟨basis⟩':>9}"
     print(header)
     print("-" * len(header))
 
@@ -424,6 +526,12 @@ def parse_args() -> argparse.Namespace:
         default=1,
         help="Transpiler optimization level (0–3, default: 1).",
     )
+    p.add_argument(
+        "--input",
+        choices=["one", "plus"],
+        default="one",
+        help='Input mode at L: "one" = |1>, "plus" = |+> (default: one).',
+    )
     return p.parse_args()
 
 
@@ -439,9 +547,10 @@ def main() -> None:
         delta_r=args.delta_r,
         delta_theta=args.delta_theta,
         optimization_level=args.opt_level,
+        input_mode=args.input,
     )
 
-    print_loop_summary(args.theta, results)
+    print_loop_summary(args.theta, args.input, results)
     print_orientation_odd_summary(args.theta, results)
 
 
