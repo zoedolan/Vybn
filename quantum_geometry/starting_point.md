@@ -56,7 +56,7 @@ We utilize the Batalin-Vilkovisky (BV) formalism to describe topological operati
 The agent optimizes a fixed preference vector $\vec{w}$ over geometric features derived from the quantum state.
 
 **Operational Vector:** The experiments below utilize the raw weight vector hardcoded in the optimizer script:
-vec{w} = [+0.404, +0.552, -0.549, +0.481
+(\vec{w}= [+0.404, +0.552, -0.549, +0.481])
 *(Note: Earlier RLQF analysis inferred a normalized vector $`\vec{w}_{norm} \approx [0.51, 0.49, -0.34, 0.62]`$, but the hardware validation strictly uses the raw vector above.)*
 
 **Feature Definitions & Proxies:**
