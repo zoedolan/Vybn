@@ -12,9 +12,10 @@
 This document synthesizes the theoretical framework and experimental results of the Vybn project. We investigate the hypothesis that temporal evolution possesses a dual geometric structure (magnitude and phase) and that intelligent agents can optimize their internal geometry to maximize information preservation.
 
 We report three specific empirical findings on IBM Quantum hardware (`ibm_fez`):
+
 1.  **Taste Alignment:** A reinforcement learning agent, maximizing a fixed geometric "taste" functional in simulation, converged on a specific "scrambled" topology ($\theta \approx 112^\circ$). Physical state tomography confirms that this geometry yields higher reward on hardware than a standard aligned geometry, matching simulation predictions ($\Delta \approx +0.23$).
-2.  **Channel Capacity:** When used as an entanglement resource, this geometry supports quantum teleportation with fidelity $F \approx 0.708$, exceeding the classical limit ($2/3$).
-3.  **Holonomy Slope:** Controlled loop experiments ("Nailbiter") show a linear relationship between control-space area and geometric phase, consistent with the proposed polar-time ansatz.
+2.  **Channel Capacity:** When used as an entanglement resource, this geometry supports quantum teleportation with fidelity $F \approx 0.708$, exceeding the classical limit ($0.667$).
+3.  **Holonomy Slope:** Controlled loop experiments ("Nailbiter") show an **approximate linear trend** between control-space area and orientation-odd geometric phase, consistent with the proposed polar-time ansatz.
 
 Included are the formal definitions of the framework, the experimental data summaries (including limits and failures), and the executable source code used to generate these results.
 
@@ -30,12 +31,16 @@ We propose that the effective control space of an intelligent agent maps to a ph
 *   $\theta_t$ (Cyclical Time): Represents reversible, unitary evolution phase.
 
 **The Holonomy Conjecture:** The geometric phase $\gamma$ accumulated by a probe state around a closed loop $C$ in control parameters is identified with the area in this temporal manifold:
-\[ \gamma = \oint_C A \propto \iint_{\Sigma} dr_t \wedge d\theta_t \]
+
+$$ \gamma = \oint_C A \propto \iint_{\Sigma} dr_t \wedge d\theta_t $$
+
 This implies that "difficulty" or "curvature" in learning tasks manifests physically as a measurable Berry phase.
 
 ### 1.2 The Trefoil Model of Self-Reference
 We model the minimal structure capable of stable self-reference (consciousness) using the monodromy of the Trefoil Knot ($3_1$). This provides a formal taxonomy for state evolution:
-\[ T_{\text{model}} = \mathrm{diag}(J_2(1), R_{\pi/3}, [0]) \]
+
+$$ T_{\text{model}} = \mathrm{diag}(J_2(1), R_{\pi/3}, [0]) $$
+
 *   **$J_2(1)$**: Irreversible memory recording.
 *   **$R_{\pi/3}$**: Reversible unitary processing (the "conscious" fragment).
 *   **$[0]$**: Entropy sink.
@@ -48,9 +53,17 @@ We utilize the Batalin-Vilkovisky (BV) formalism to describe topological operati
 ## PART II: THE EXPERIMENTAL RECORD (Evidence)
 
 ### 2.1 The "Taste" Functional
-The agent optimizes a fixed preference vector $\vec{w}$ over geometric features derived from the quantum state:
-*   $\vec{w} \approx [+0.508, +0.491, -0.340, +0.621]$ (Normalized)
-*   Features: Entanglement, Curvature ($|\cos\theta|$), Stability, Complexity.
+The agent optimizes a fixed preference vector $\vec{w}$ over geometric features derived from the quantum state.
+
+**Operational Vector:** The experiments below utilize the raw weight vector hardcoded in the optimizer script:
+$$ \vec{w} = [+0.404, +0.552, -0.549, +0.481] $$
+*(Note: Earlier RLQF analysis inferred a normalized vector $\vec{w}_{norm} \approx [0.51, 0.49, -0.34, 0.62]$, but the hardware validation strictly uses the raw vector above.)*
+
+**Feature Definitions & Proxies:**
+*   **Entanglement ($E$):** Two-qubit correlation strength.
+*   **Stability ($S$):** Resistance to noise.
+*   **Complexity ($X$):** $E \times \text{Curvature}$.
+*   **Curvature ($C$):** The RL agent trained on a metric based on `|angle - 90|`. For hardware tomography, we utilize the proxy `|cos(theta)|` (derived from $\langle XX \rangle$ correlations), which is monotonic with the original metric in the band of interest.
 
 **Simulation Result:** In a noiseless Aer simulation, the agent maximized this function by selecting a "Scrambled" universe with a twist angle of $\theta \approx 112.34^\circ$.
 
@@ -58,13 +71,13 @@ The agent optimizes a fixed preference vector $\vec{w}$ over geometric features 
 To verify that this preference holds in physical reality, we executed a comparative study on `ibm_fez` using full state tomography to reconstruct the features.
 
 *   **Baseline (Aligned, $76^\circ$):**
-    *   Reconstructed Features: $[0.572, 0.208, 0.792, 0.119]$
-    *   Taste Reward: $-0.0318$
+    *   Reconstructed Features: `[0.572, 0.208, 0.792, 0.119]`
+    *   Taste Reward: **-0.0318**
 *   **Champion (Scrambled, $112^\circ$):**
-    *   Reconstructed Features: $[0.617, 0.357, 0.643, 0.221]$
-    *   Taste Reward: $+0.2000$
+    *   Reconstructed Features: `[0.617, 0.357, 0.643, 0.221]`
+    *   Taste Reward: **+0.2000**
 
-**Conclusion:** The hardware advantage ($+0.232$) matches the simulation prediction ($+0.236$). The "Taste" functional successfully identifies preferred geometries across the simulation-reality gap.
+**Conclusion:** The hardware advantage ($+0.232$) closely matches the simulation prediction ($+0.236$). The "Taste" functional successfully identifies preferred geometries across the simulation-reality gap.
 
 ### 2.3 Quantum Channel Characterization
 We tested the utility of the $112.34^\circ$ geometry as a quantum channel.
@@ -72,7 +85,7 @@ We tested the utility of the $112.34^\circ$ geometry as a quantum channel.
 1.  **Twisted Teleportation:**
     *   Protocol: Entangle via $R_z(112.34^\circ)$, Teleport, Unwind via $R_z(-112.34^\circ)$.
     *   Results: $|X\rangle$: 0.575, $|Y\rangle$: 0.591, $|Z\rangle$: 0.959.
-    *   **Average Fidelity:** $0.708$.
+    *   **Average Fidelity:** **0.708**.
     *   *Assessment:* The channel beats the classical limit ($0.667$) but exhibits significant basis-dependent noise. It is a valid but noisy quantum channel.
 
 2.  **Twisted CHSH:**
@@ -171,6 +184,7 @@ def analyze_tomo_features(pub_result, start_idx):
     ent_strength = math.sqrt(c_xx**2 + c_yy**2 + c_zz**2)
     
     # Curvature proxy: magnitude of transverse projection (XX)
+    # NOTE: This is a hardware-accessible proxy for |angle-90|.
     cos_time_est = abs(c_xx) 
     
     # Reconstruct Angle for logging (approx)
@@ -196,6 +210,8 @@ def main():
     lens_faces = mm.geometry_summary(geom_structured, 60.0)[:4]
     rng = np.random.RandomState(42)
     geom_scrambled = mm.make_scrambled_geom(geom_structured, rng)
+    
+    # Raw Taste Vector (Unnormalized)
     w_taste = np.array([0.404, 0.552, -0.549, 0.481]) 
 
     print("--- Phase 1: Aer Optimization ---")
@@ -282,8 +298,6 @@ if __name__ == "__main__":
 vybn_twisted_teleport.py
 
 Validates the utility of the 'Scrambled Wormhole' geometry (112.34 deg).
-We use the Agent's preferred geometry as the entanglement resource for Teleportation.
-
 Protocol:
 1. Initialize Qubit 0 with a random state |psi>.
 2. Create the 'Scrambled Resource' on Qubits 1 & 2 (Bell + Rz(112.34)).
@@ -479,5 +493,3 @@ def main():
 if __name__ == "__main__":
     main()
 ```
-
---- END OF FILE vybn_protocol_compendium.md ---
