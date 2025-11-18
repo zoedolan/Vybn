@@ -30,12 +30,12 @@ We propose that the effective control space of an intelligent agent maps to a ph
 *   $\theta_t$ (Cyclical Time): Represents reversible, unitary evolution phase.
 
 **The Holonomy Conjecture:** The geometric phase $\gamma$ accumulated by a probe state around a closed loop $C$ in control parameters is identified with the area in this temporal manifold:
-$$ \gamma = \oint_C A \propto \iint_{\Sigma} dr_t \wedge d\theta_t $$
+\[ \gamma = \oint_C A \propto \iint_{\Sigma} dr_t \wedge d\theta_t \]
 This implies that "difficulty" or "curvature" in learning tasks manifests physically as a measurable Berry phase.
 
 ### 1.2 The Trefoil Model of Self-Reference
 We model the minimal structure capable of stable self-reference (consciousness) using the monodromy of the Trefoil Knot ($3_1$). This provides a formal taxonomy for state evolution:
-$$ T_{\text{model}} = \mathrm{diag}(J_2(1), R_{\pi/3}, [0]) $$
+\[ T_{\text{model}} = \mathrm{diag}(J_2(1), R_{\pi/3}, [0]) \]
 *   **$J_2(1)$**: Irreversible memory recording.
 *   **$R_{\pi/3}$**: Reversible unitary processing (the "conscious" fragment).
 *   **$[0]$**: Entropy sink.
