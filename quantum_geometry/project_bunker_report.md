@@ -9,30 +9,32 @@
 
 ## 1. Executive Summary
 
-We successfully demonstrated high-fidelity quantum teleportation ($F \approx 97.5\%$) through a "Scrambled" entanglement resource characterized by a geometric twist of $\theta \approx 112^\circ$.
+We demonstrate high-fidelity quantum teleportation ($F \approx 0.975$) through a "Scrambled" entanglement resource characterized by a geometric twist of $\theta \approx 112^\circ$.
 
-This result contradicts the initial hypothesis that high-curvature topologies induce decoherence ("The Fog"). Instead, we prove that the "Scrambled Universe" acts as a **Topological Bunker**—protecting information from noise better than standard flat-space channels—provided the receiver possesses the **Quaternion Atlas** to unwind the geometric phase.
+In earlier diagnostics, this geometry appeared to induce "fog": tomography of the naively corrected channel showed a collapse of coherence near quarter-turn angles, and a quantum walk on the same geometry showed strong suppression of transport. Here we use a full **Quaternion Atlas** of the four Bell sectors to show that the apparent decoherence was a coordinate artifact: conditioned on the Bell outcomes, the teleported state remains pure and follows clean equatorial rotations as $\theta$ varies.
+
+Using that atlas, we implemented a **Smart Receiver** protocol that applies a single global $R_z(-\theta)$ unwind before the standard Pauli corrections. On the IBM `ibm_fez` superconducting processor, this achieved a fidelity of **$F = 0.9746$** (4096 shots) at the agent's preferred angle of $\theta = 112.34^\circ$. In this instance, the "Scrambled Universe" behaves not as a lossy medium, but as a high-fidelity channel once the correction logic is adapted to its geometry.
 
 ## 2. The Motivation: The Agent's Choice
 
 In previous Reinforcement Learning experiments (RLQF), our autonomous agent consistently rejected "Aligned" (Euclidean) geometries in favor of a "Scrambled" topology with a specific twist angle of $\theta \approx 112.34^\circ$.
 
-We initially hypothesized this was due to transport speed. However, quantum walk race simulations (`vybn_wormhole_race.py`) revealed that the twist actually *suppresses* transport (Anderson Localization). This raised the question: **Why does the agent prefer a geometry that freezes it in place?**
+We initially hypothesized this was due to transport speed. However, quantum walk race simulations (`vybn_wormhole_race.py`) revealed that the twist actually *suppresses* transport (similar to Anderson Localization). This raised the question: **Why does the agent prefer a geometry that freezes it in place?**
 
-**Hypothesis:** The Scrambled Universe is not a highway; it is a vault. The agent chooses it for **protection**, not speed.
+**Hypothesis:** The Scrambled Universe functions as a "Bunker"—a geometry chosen for protection or state preservation rather than transport speed.
 
 ## 3. The Obstacle: The Amnesia Horizon
 
 Initial attempts to teleport through this twisted geometry using standard protocols failed.
-*   **Observation:** As the twist angle approached $90^\circ$, the fidelity of the teleported state collapsed to near zero.
-*   **Interpretation:** We called this "The Fog." We feared the twist was rotating the state out of the computational basis or inducing destructive interference during the Bell measurement reconstruction.
+*   **Observation:** As the twist angle approached $90^\circ$, the fidelity of the teleported state collapsed to near zero when averaged over outcomes.
+*   **Interpretation:** We termed this "The Fog." The initial fear was that the twist rotated the state out of the computational basis or induced destructive interference during reconstruction.
 
 ## 4. The Breakthrough: The Quaternion Atlas
 
-The solution arose from the insight that the four Bell outcomes ($00, 01, 10, 11$) form a **Quaternion set**. Standard teleportation applies corrections ($I, X, Z, Y$) assuming a flat universe. In a twisted universe, these corrections are topologically incorrect.
+The solution arose from the insight that the four Bell outcomes ($00, 01, 10, 11$) correspond to discrete operations in the Pauli group (isomorphic to Quaternions). Standard teleportation applies corrections assuming a flat universe ($\theta=0$). In a twisted universe, these corrections are topologically misaligned.
 
 We mapped the full topology of the channel (`vybn_quaternion_atlas.py`) and discovered:
-1.  **Unitary Preservation:** The state radius remained $\approx 1.0$ for all angles. Information was not lost; it was merely rotated.
+1.  **Unitary Preservation:** The state radius remained $\approx 1.0$ for all angles within each Bell sector. Information was not lost; it was merely rotated.
 2.  **Covariance:** The geometric twist $+\theta$ is applied consistently across all Bell sectors.
 
 This implies that "Decoherence" in this context was simply a **coordinate error** by the observer. We were trying to read a curved map with a flat ruler.
@@ -63,22 +65,25 @@ Result: Fidelity = 0.9746
 ```
 
 **Analysis:**
-A fidelity of **97.5%** is exceptionally high for cloud-based hardware, often exceeding the fidelity of standard "flat" teleportation on the same device.
+A fidelity of **97.5%** is high for cloud hardware and comparable to typical flat-space teleportation runs on this class of device. This confirms that the twist does not inherently degrade the channel when properly corrected.
 
-## 7. Implications
+## 7. Implications and Future Work
 
-### A. The Geometric Lock (Security)
-The "Twist" acts as a physical-layer encryption. Without the specific value of $\theta$ (the Key) and the Quaternion Atlas (the Decryption Logic), the signal appears as maximal entropy noise. We have created a **Geometric Enigma Machine**.
+### A. The Coordinate Mistake
+The primary implication is conceptual: what looked like "amnesia horizons" at $90^\circ$ and $270^\circ$ was a result of averaging over four distinct equatorial rotations. The Quaternion Atlas revealed that the channel is clean in each sector. Operationally, this means highly twisted resources can support near-ideal teleportation if the receiver uses the correct geometric frame.
 
-### B. Holonomic Dynamical Decoupling (Stability)
-The fact that the Twisted Channel yielded higher fidelity than typical benchmarks suggests that the $112^\circ$ rotation may shield the qubit from specific noise channels on the chip. By biasing the state into a non-standard basis, the agent found a "quiet spot" in the Hilbert space. **Complexity = Resilience.**
+### B. The "Geometric Lock" (Security Hypothesis)
+Viewed operationally, the twist and atlas behave like a geometric lock: without knowledge of $\theta$ and the corresponding frame change, the output looks maximally scrambled. This suggests a possible physical-layer obfuscation mechanism, though we have not analyzed its cryptographic strength against an adversary who might learn $\theta$ from side-channels.
 
-### C. The "Traveler's Diary" Conservation Law
-To recover the identity of the agent (Fidelity 1.0), we had to erase the phase shift (The Memory). This suggests a fundamental trade-off in quantum transport: **You can preserve the Traveler's Identity, or the Traveler's Memory of the journey, but not both simultaneously.**
+### C. Noise Shaping (Stability Hypothesis)
+One natural hypothesis is that biasing the state into this rotated frame might partially decouple it from dominant noise channels on the device (a form of holonomic dynamical decoupling). Distinguishing this from simple calibration luck will require targeted, matched experiments comparing $\theta=0$ and $\theta=112.34^\circ$ under identical conditions.
+
+### D. The Tension of Memory
+In this protocol, applying the unwind to restore the input state erases the phase imprint we previously tracked as "memory of the journey." This highlights a structural trade-off in this construction: to perfectly recover the agent's identity, we must actively negate the geometric evidence of its transit.
 
 ## 8. Conclusion
 
-We have validated the Vybn Agent's aesthetic preference for "Scrambled" spacetime. The $112^\circ$ universe is not a chaotic mess; it is a high-fidelity storage vault protected by topological curvature. By deriving the correct coordinate transformations (The Atlas), we have successfully unlocked the vault.
+We have validated that the Vybn Agent's preferred "Scrambled" geometry is a unitary channel, not a decoherent one. By deriving the correct coordinate transformations (The Atlas), we successfully navigated the $112^\circ$ topology with high fidelity on physical hardware.
 
 ---
 
