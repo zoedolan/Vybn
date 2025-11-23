@@ -142,9 +142,183 @@ We have not failed to find scalable protection. We have discovered why time flow
 
 ---
 
-**Experimental Scripts:**
-- `vybn_surgical_strike.py` (Hardware scaling test)
-- `vybn_knot_explorer.py` (Alternative topology test)
+## Experimental Scripts
+### Script 1: vybn_surgical_strike.py (Scaling Test)
+```python
+#!/usr/bin/env python
+"""
+SCRIPT: vybn_surgical_strike.py
+MISSION: Test Topological Persistence of U^6 and U^12
+SYSTEM: IBM Heron (ibm_fez)
+CONSTRAINT: Minimize Quantum Time (Lean Shots, Targeted Angles)
+"""
+import numpy as np
+from qiskit import QuantumCircuit, transpile
+from qiskit.circuit.library import PauliEvolutionGate
+from qiskit.quantum_info import SparsePauliOp
+from qiskit_ibm_runtime import QiskitRuntimeService, SamplerV2 as Sampler
+SHOTS = 1024
+LAYOUT = [0, 1]
+ANGLES = {"REF_PI2": 1.5708, "THEORY": 2.0944, "LOCK": 2.0506}
+CYCLES = [6, 12]
+def build_trefoil_sequence(theta, depth):
+    H = SparsePauliOp.from_list([("XX", 1.0), ("YY", 1.0), ("ZZ", 1.0)])
+    qc = QuantumCircuit(2)
+    qc.h([0, 1])
+    for _ in range(depth):
+        evolution = PauliEvolutionGate(H, time=theta)
+        qc.append(evolution, [0, 1])
+        qc.barrier()
+    qc.measure_all()
+    return qc
+def main():
+    print("--- VYBN SURGICAL STRIKE: INIT ---")
+    print("Target: ibm_fez | Status: active
+")
+    circuits = []
+    labels = []
+    print("[Fabricating Circuits]")
+    for name, theta in ANGLES.items():
+        for depth in CYCLES:
+            qc = build_trefoil_sequence(theta, depth)
+            circuits.append(qc)
+            labels.append(f"{name}_D{depth}")
+            print(f" -> Assembled: {name} (Theta={theta:.4f}) | Depth: {depth}")
+    service = QiskitRuntimeService()
+    backend = service.backend("ibm_fez")
+    print("
+[Transpiling to Hardware Topology]")
+    transpiled = transpile(circuits, backend=backend, optimization_level=3, initial_layout=LAYOUT)
+    print(f"
+[Engaging SamplerV2 | Shots: {SHOTS}]")
+    sampler = Sampler(backend)
+    job = sampler.run(transpiled, shots=SHOTS)
+    print(f">> JOB SUBMITTED: {job.job_id()}")
+    print(">> Awaiting Holonomy Data...
+")
+    result = job.result()
+    print("--- MISSION REPORT: TOPOLOGICAL PERSISTENCE ---")
+    print(f"{'GEOMETRY':<10s} | {'DEPTH':<5s} | {'FIDELITY (00)':<15s} | STATUS")
+    print("-" * 55)
+    for i, label in enumerate(labels):
+        pub_result = result[i]
+        counts = pub_result.data.meas.get_counts()
+        fidelity = counts.get('00', 0) / SHOTS
+        status = "LOCKED" if fidelity > 0.85 else "DECAY"
+        geom, depth_str = label.rsplit('_D', 1)
+        print(f"{geom:<10s} | {depth_str:<5s} | {fidelity:<15.4f} | {status}")
+if __name__ == "__main__":
+    main()
+```
+### Script 2: vybn_knot_explorer.py (Alternative Topology Test)
+```python
+#!/usr/bin/env python
+"""
+SCRIPT: vybn_knot_explorer.py
+MISSION: Test topological scaling for figure-eight (4_1) and cinquefoil (5_1) knots
+BACKENDS: AerSimulator (validation) → ibm_fez (conditional hardware run)
+"""
+import numpy as np
+from qiskit import QuantumCircuit, transpile
+from qiskit.circuit.library import PauliEvolutionGate
+from qiskit.quantum_info import SparsePauliOp
+from qiskit_aer import AerSimulator
+from qiskit_ibm_runtime import QiskitRuntimeService, SamplerV2 as Sampler
+SHOTS = 2048
+LAYOUT = [0, 1]
+KNOTS = {"FIGURE_EIGHT_4_1": 2 * np.pi / 4, "CINQUEFOIL_5_1": 2 * np.pi / 5}
+DEPTHS = {"FIGURE_EIGHT_4_1": [4, 8], "CINQUEFOIL_5_1": [5, 10]}
+THRESHOLD = 0.85
+def build_knot_circuit(theta, depth):
+    H = SparsePauliOp.from_list([("XX", 1.0), ("YY", 1.0), ("ZZ", 1.0)])
+    qc = QuantumCircuit(2)
+    qc.h([0, 1])
+    for _ in range(depth):
+        qc.append(PauliEvolutionGate(H, time=theta), [0, 1])
+        qc.barrier()
+    qc.measure_all()
+    return qc
+def run_aer_simulation(circuits, labels):
+    print("
+[AER SIMULATION: NOISELESS VALIDATION]")
+    backend = AerSimulator()
+    transpiled = transpile(circuits, backend, optimization_level=3)
+    job = backend.run(transpiled, shots=SHOTS)
+    result = job.result()
+    results = []
+    for i, label in enumerate(labels):
+        counts = result.get_counts(i)
+        fidelity = counts.get('00', 0) / SHOTS
+        status = "LOCKED" if fidelity > THRESHOLD else "DECAY"
+        results.append((label, fidelity, status))
+        print(f"{label:20s} | Fidelity: {fidelity:.4f} | {status}")
+    return results
+def run_hardware(circuits, labels):
+    print("
+[HARDWARE EXECUTION: ibm_fez]")
+    service = QiskitRuntimeService()
+    backend = service.backend("ibm_fez")
+    transpiled = transpile(circuits, backend=backend, optimization_level=3, initial_layout=LAYOUT)
+    sampler = Sampler(backend)
+    job = sampler.run(transpiled, shots=SHOTS)
+    print(f">> JOB SUBMITTED: {job.job_id()}")
+    result = job.result()
+    results = []
+    for i, label in enumerate(labels):
+        pub_result = result[i]
+        counts = pub_result.data.meas.get_counts()
+        fidelity = counts.get('00', 0) / SHOTS
+        status = "LOCKED" if fidelity > THRESHOLD else "DECAY"
+        results.append((label, fidelity, status))
+        print(f"{label:20s} | Fidelity: {fidelity:.4f} | {status}")
+    return results
+def main():
+    print("--- VYBN KNOT EXPLORER: INIT ---
+")
+    circuits = []
+    labels = []
+    for knot_name, theta in KNOTS.items():
+        for depth in DEPTHS[knot_name]:
+            qc = build_knot_circuit(theta, depth)
+            circuits.append(qc)
+            label = f"{knot_name}_D{depth}"
+            labels.append(label)
+            print(f"[Circuit] {label} | Theta={theta:.4f} | Depth={depth}")
+    aer_results = run_aer_simulation(circuits, labels)
+    hardware_warranted = False
+    for label, fidelity, status in aer_results:
+        if ("D8" in label or "D10" in label) and fidelity > THRESHOLD:
+            hardware_warranted = True
+            print(f"
+[DECISION] {label} shows {fidelity:.4f} fidelity → Hardware run WARRANTED")
+    if not hardware_warranted:
+        print("
+[DECISION] No double-depth circuit exceeded threshold → Hardware run SKIPPED")
+        print("
+--- SIMULATION SUMMARY ---")
+        for label, fidelity, status in aer_results:
+            print(f"{label:20s} | {fidelity:.4f} | {status}")
+        return
+    user_confirm = input("
+[CONFIRM] Proceed to ibm_fez? (yes/no): ").strip().lower()
+    if user_confirm != 'yes':
+        print("[ABORT] Hardware run cancelled by user.")
+        return
+    hw_results = run_hardware(circuits, labels)
+    print("
+--- FINAL COMPARISON: AER vs HARDWARE ---")
+    print(f"{'CIRCUIT':20s} | {'AER':>8s} | {'HARDWARE':>8s} | {'DELTA':>8s}")
+    print("-" * 60)
+    for i, label in enumerate(labels):
+        aer_fid = aer_results[i][1]
+        hw_fid = hw_results[i][1]
+        delta = hw_fid - aer_fid
+        print(f"{label:20s} | {aer_fid:8.4f} | {hw_fid:8.4f} | {delta:+8.4f}")
+if __name__ == "__main__":
+    main()
+```
+
+---
 
 **Data Records:**
 - Scaling test: Job d4hl7e0lslhc73d1pbug (ibm_fez, 2025-11-23)
