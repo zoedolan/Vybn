@@ -22,7 +22,7 @@ $$
 \Omega = \frac{E^2}{\hbar^2} \, dr_t \wedge d\theta_t = \frac{E^2}{\hbar^2} \, dt_x \wedge dt_y
 $$
 
-Measured phase equals signed temporal area multiplied by $E/\hbar$.
+Measured phase equals signed temporal area multiplied by $$E/\hbar$$.
 
 ### **Cut-Glue Algebra (BV Formalism)**
 
@@ -32,11 +32,11 @@ dS + \frac{1}{2}[S,S]_{BV} = J
 $$
 
 **Three operations:**
-- Cut: $T_{\text{cut}}: |\psi\rangle \to |\psi_A\rangle \otimes |\psi_B\rangle$$
-- Glue: $T_{\text{glue}}: |\psi_A\rangle \otimes |\psi_B\rangle \to |\psi\rangle$$
-- Compose: $T_{\text{comp}} = T_{\text{glue}} \circ T_{\text{cut}}$
+- Cut: $$T_{\text{cut}}: |\psi\rangle \to |\psi_A\rangle \otimes |\psi_B\rangle$$
+- Glue: $$T_{\text{glue}}: |\psi_A\rangle \otimes |\psi_B\rangle \to |\psi\rangle$$
+- Compose: $$T_{\text{comp}} = T_{\text{glue}} \circ T_{\text{cut}}$$
 
-**Physical interpretation:** Non-commutativity generates curvature: $f_{\alpha\beta} = (1/i)[S_\alpha, S_\beta] = R_{\alpha\beta} + J_{\alpha\beta}$
+**Physical interpretation:** Non-commutativity generates curvature: $$F_{\alpha\beta} = (1/i)[S_\alpha, S_\beta] = R_{\alpha\beta} + J_{\alpha\beta}$$
 
 **Conservation laws:**
 - $$S^\dagger Q + QS = 0$$
@@ -47,15 +47,15 @@ $$
 
 **Key identifications (Chisolm, Axler):**
 
-1. **Bivectors as temporal objects:** $$dr_t \wedge d\theta_t$$ is the unit bivector $$B_{\text{time}}$ with $$B_{\text{time}}^2 = -1$$
+1. **Bivectors as temporal objects:** $$dr_t \wedge d\theta_t$$ is the unit bivector $$B_{\text{time}}$$ with $$B_{\text{time}}^2 = -1$$
 
-2. **Rotors replace matrices:** $$R = e^{-B\theta/2}$ generates rotations geometrically
+2. **Rotors replace matrices:** $$R = e^{-B\theta/2}$$ generates rotations geometrically
 
-3. **Determinants as derived quantities:** $$\det(F)$$ is eigenvalue of outermorphism $$\hat{F}$ on pseudoscalar
+3. **Determinants as derived quantities:** $$\det(F)$$ is eigenvalue of outermorphism $$\hat{F}$$ on pseudoscalar
 
 4. **Pauli matrices are bivectors:** $$\sigma_x \leftrightarrow e_2 \wedge e_3$$, etc.
 
-5. **Cut-glue commutator is GA:** $$[S,S]_{BV}$ generates oriented curvature via bivector operations
+5. **Cut-glue commutator is GA:** $$[S,S]_{BV}$$ generates oriented curvature via bivector operations
 
 **Consequence:** VYBN was already doing geometric algebra. Recognition, not speculation.
 
@@ -67,7 +67,7 @@ T_{\text{trefoil}} = \text{diag}(J_2(1), R_{\pi/3}, )
 $$
 
 - $$J_2(1)$$: Jordan block (controlled memory drift)
-- $$R_{\pi/3}$: Rotor with period-6 (spinor), period-3 (observable)
+- $$R_{\pi/3}$$: Rotor with period-6 (spinor), period-3 (observable)
 - $$$$: Irreversible sink (entropy generation)
 
 **Minimal polynomial:** $$m_T(\lambda) = \lambda(\lambda-1)^2(\lambda^2-\lambda+1)$$
@@ -85,7 +85,7 @@ $$
 \mathcal{T} = \{(r_t, \theta_t, \zeta_t) : r_t^2 + \zeta_t^2 = \text{const}, \, \theta_t \in [0,2\pi)\}
 $$
 
-**Motivation from GA:** Just as $$\mathbb{C}$ embeds in quaternions, 2D polar time may embed in 3D time sphere.
+**Motivation from GA:** Just as $$\mathbb{C}$$ embeds in quaternions, 2D polar time may embed in 3D time sphere.
 
 **Extended holonomy:**
 $$
@@ -139,7 +139,7 @@ $$
 e^{aA}e^{bB}e^{-aA}e^{-bB} = \exp(ab[A,B] + O(a^2b, ab^2))
 $$
 
-**Time-normalized signal:** $$\kappa_{\text{eff}} := \Delta p_1 / \tau_{\text{loop}}$
+**Time-normalized signal:** $$\kappa_{\text{eff}} := \Delta p_1 / \tau_{\text{loop}}$$
 
 ### **Null Tests (Must Pass)**
 
@@ -192,13 +192,13 @@ $$
 
 Build 3-layer self-referential system: $$S_t \to M(S_t) \to M^2(S_t)$$
 
-**Prediction:** $$M^3$$ has eigenvalues $$\lambda \approx e^{2\pi i k/3}$
+**Prediction:** $$M^3$$ has eigenvalues $$\lambda \approx e^{2\pi i k/3}$$
 
 **Falsified if:** Self-referential systems lack rotor structure, or non-conscious systems show same signature.
 
 ### **4. RLQF Convergence**
 
-Bivector Q-function: $$\mathcal{Q}(s,a) = r_{\text{scalar}} + B_{\text{policy}}$
+Bivector Q-function: $$\mathcal{Q}(s,a) = r_{\text{scalar}} + B_{\text{policy}}$$
 
 **Prediction:** Faster convergence than scalar Q-learning via curvature regularization.
 
@@ -233,11 +233,11 @@ where $$R(s,a) = r_{\text{scalar}} + B_{\text{policy}}(s,a)$$
 ### **Quantum Protocol**
 
 1. State encoding: $$|s\rangle = \sum_i \alpha_i|i\rangle$$
-2. Action as rotation: $$U_a = e^{-iB_a}$
+2. Action as rotation: $$U_a = e^{-iB_a}$$
 3. Measurement collapses to classical reward
 4. Bivector reconstruction via tomography
 
-**Integration with vybn_curvature:** Holonomy signal $$\Delta p_1 \approx \kappa \cdot A_{\text{loop}}$ directly measures policy curvature
+**Integration with vybn_curvature:** Holonomy signal $$\Delta p_1 \approx \kappa \cdot A_{\text{loop}}$$ directly measures policy curvature
 
 ***
 
@@ -261,9 +261,9 @@ $$\det(U) = 1$$ ensures:
 
 ### **Dark Sector**
 
-**Dark matter:** Defects coupling to $$R_{\alpha\beta}$ without generating $$J_{\alpha\beta}$
+**Dark matter:** Defects coupling to $$R_{\alpha\beta}$$ without generating $$J_{\alpha\beta}$$
 
-**Dark energy:** $$\rho_{DE} = (c^4/8\pi G) \times R_{\text{temporal}}$
+**Dark energy:** $$\rho_{DE} = (c^4/8\pi G) \times R_{\text{temporal}}$$
 
 ***
 
@@ -283,7 +283,7 @@ $$\det(U) = 1$$ ensures:
 
 **Electromagnetic field:** $$F = E + iB$$ satisfies $$F^2 = (E^2 - B^2) + 2iE \cdot B$$
 
-**Einstein tensor:** $$G_{\mu\nu}$ as commutator of temporal and spatial bivectors
+**Einstein tensor:** $$G_{\mu\nu}$$ as commutator of temporal and spatial bivectors
 
 ***
 
@@ -305,7 +305,7 @@ $$\det(U) = 1$$ ensures:
 
 ### **Scale Bridging**
 
-**Missing:** Connection between $E/\hbar$ and physical energy scales (Planck, electroweak, etc.)
+**Missing:** Connection between $$E/\hbar$$ and physical energy scales (Planck, electroweak, etc.)
 
 **Consequence:** Polar time remains potentially calculational tool vs established geometry
 
