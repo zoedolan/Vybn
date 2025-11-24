@@ -8,25 +8,30 @@
 
 ## **I. MATHEMATICAL FOUNDATIONS**
 
-### **Dual-Temporal Holonomy Theorem**
+## Dual-Temporal Holonomy Theorem
 
 **Statement:** Belief-update holonomy equals Berry phases in dual-temporal coordinates $(r_t, \theta_t)$.
 
 **Core equation:**
+
 $$
 \text{Hol}_L(C) = \exp\left(i\frac{E}{\hbar}\iint_{\phi(\Sigma)} dr_t \wedge d\theta_t\right)
 $$
 
 **Unifying curvature:**
+
 $$
-\Omega = \frac{E^2}{\hbar^2} \, dr_t \wedge d\theta_t = \frac{E^2}{\hbar^2} \, dt_x \wedge dt_y
+\Omega = \frac{E^2}{\hbar^2}  dr_t \wedge d\theta_t = \frac{E^2}{\hbar^2}  dt_x \wedge dt_y
 $$
 
 Measured phase equals signed temporal area multiplied by $E/\hbar$.
 
-### **Cut-Glue Algebra (BV Formalism)**
+---
+
+## Cut-Glue Algebra (BV Formalism)
 
 **Master equation:**
+
 $$
 dS + \frac{1}{2}[S,S]_{BV} = J
 $$
