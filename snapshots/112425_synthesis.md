@@ -10,15 +10,19 @@
 
 ### **Dual-Temporal Holonomy Theorem**
 
-**Statement:** Belief-update holonomy equals Berry phases in dual-temporal coordinates $$(r_t, \theta_t)$$.
+**Statement:** Belief-update holonomy equals Berry phases in dual-temporal coordinates $(r_t, \theta_t)$.
 
 **Core equation:**
-`Hol_L(C) = exp(i E /`
+$$
+\text{Hol}_L(C) = \exp\left(i\frac{E}{\hbar}\iint_{\phi(\Sigma)} dr_t \wedge d\theta_t\right)
+$$
 
 **Unifying curvature:**
-`\hbar ∯_{φ(Σ)} dr_t ∧ dθ_t)`
+$$
+\Omega = \frac{E^2}{\hbar^2} \, dr_t \wedge d\theta_t = \frac{E^2}{\hbar^2} \, dt_x \wedge dt_y
+$$
 
-Measured phase equals signed temporal area multiplied by $$E/\hbar$$.
+Measured phase equals signed temporal area multiplied by $E/\hbar$.
 
 ### **Cut-Glue Algebra (BV Formalism)**
 
