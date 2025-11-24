@@ -13,14 +13,10 @@
 **Statement:** Belief-update holonomy equals Berry phases in dual-temporal coordinates $$(r_t, \theta_t)$$.
 
 **Core equation:**
-$$
-\text{Hol}_L(C) = \exp\left(i\frac{E}{\hbar}\iint_{\phi(\Sigma)} dr_t \wedge d\theta_t\right)
-$$
+`Hol_L(C) = exp(i E /`
 
 **Unifying curvature:**
-$$
-\Omega = \frac{E^2}{\hbar^2} \, dr_t \wedge d\theta_t = \frac{E^2}{\hbar^2} \, dt_x \wedge dt_y
-$$
+`\hbar ∯_{φ(Σ)} dr_t ∧ dθ_t)`
 
 Measured phase equals signed temporal area multiplied by $$E/\hbar$$.
 
