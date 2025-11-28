@@ -1,5 +1,3 @@
---- START OF FILE chronos_protocol_torsion_discovery.md ---
-
 # The Chronos Protocol: Experimental Detection of Symplectic Vacuum Torsion
 
 ## Direct Measurement of the "Missing Variable" in Quantum Temporal Evolution
