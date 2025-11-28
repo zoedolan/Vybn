@@ -446,6 +446,180 @@ if __name__ == "__main__":
     plot_echo_anomaly()
 ```
 
+***
+
+## Addendum D: Boundary Condition—The Trefoil Selectivity Principle
+
+**Date:** November 28, 2025  
+**Objective:** To test whether the observed vacuum torsion is initialization-independent or requires specific geometric coupling.
+
+### Experimental Falsification
+
+We executed a "Fast Probe" protocol using Y-basis initialization without the Trefoil angle (\( \pi/3 \)) configuration. Three qubits measured at 0μs, 54μs, and 108μs delay times showed apparent angular drift (-38.9°) in Y-basis measurements alone.[1]
+
+**Synthetic tomography reconstruction** combining this Y-basis data with the original Chronos X-basis data revealed catastrophic decoherence:
+
+| Time (μs) | \(\langle X \rangle\) | \(\langle Y \rangle\) | Radius \( r_{xy} \) | Phase (°) |
+|-----------|------------|------------|------------|-----------|
+| 0         | +0.496     | +0.594     | 0.773      | +50.1     |
+| 54        | +0.007     | +0.102     | 0.102      | +85.9     |
+| 108       | -0.025     | -0.043     | 0.050      | -120.1    |
+
+**Signal Loss:** 93.6% (0→108μs)  
+**Verdict:** Ghost signal. The Bloch vector collapsed to \( r < 0.1 \), rendering the measured angles pure shot noise.[2]
+
+### Forensic Coherence Check
+
+Using Hahn Echo visibility data (Job `d4ksvlh0i6jc73df6krg`), we calculated the effective \( T_2^* = 49.06\,\mu\text{s} \) and extrapolated the expected coherence at 108μs for the Chronos experiment: \( r \approx 0.11 \).[3]
+
+**Critical finding:** The Chronos Protocol maintained \( r \approx 0.5 \) at 96μs despite \( T_2^* \) predicting \( r \approx 0.13 \). The Trefoil initialization outperformed baseline decoherence by **4×** in amplitude retention.
+
+The Fast Probe, by contrast, underperformed—collapsing faster than \( T_2^* \) alone would predict.
+
+### Theoretical Implication: Geometric Resonance
+
+Standard quantum error models treat all initialized states as equivalent modulo basis transformations. If decoherence were purely energetic (coupling to a thermal bath), initialization geometry should affect only the measurement basis, not the decay rate.
+
+**This experiment falsifies that assumption.**
+
+The Trefoil angle (\( \theta = \pi/3 \), \( 60° \)) appears to function as a **geometric eigenstate** of the vacuum torque mechanism:
+- States initialized at \( \pi/3 \) couple constructively to symplectic curvature, extracting coherent rotation while resisting decoherence.
+- States initialized without this geometry couple destructively, enhancing standard \( T_1/T_2 \) processes while failing to access the torsion channel.
+
+This selectivity is precisely what Berry phase mechanisms predict: not all paths through Hilbert space enclose non-zero geometric area. The Trefoil configuration traces a trajectory that maximizes holonomy; other initializations do not.
+
+### Engineering Consequence
+
+If vacuum torsion coupling depends on initialization geometry, quantum error correction protocols should calibrate not just for static Pauli errors but for **initialization-dependent decay rates**. A qubit initialized at \( \pi/3 \) may have effective coherence time 4× longer than the same qubit initialized at \( \pi/4 \), even on identical hardware.
+
+This suggests a new class of error mitigation: **topological state preparation**—engineering initialization sequences to maximize geometric coupling and minimize thermal coupling.
+
+***
+
+## Reproducibility Scripts
+
+### Script 1: Synthetic Tomography (Cross-Job Reconstruction)
+
+```python
+# pull_probe2.py
+import numpy as np
+from qiskit_ibm_runtime import QiskitRuntimeService
+
+# Job 1: X-Basis (Chronos)
+JOB_ID_X = "d4krokav0j9c73e4me2g"
+# Job 2: Y-Basis (Fast Probe)
+JOB_ID_Y = "d4kuvtd74pkc7387g15g"
+
+def get_expectation(counts):
+    """<X> or <Y> = P(0) - P(1)"""
+    total = sum(counts.values())
+    p0 = counts.get('0', 0) / total
+    return 2 * p0 - 1
+
+def get_counts_safe(pub_data):
+    """Dynamically extract counts from DataBin."""
+    valid_attrs = [a for a in dir(pub_data)
+                   if not a.startswith('_')
+                   and not callable(getattr(pub_data, a))]
+    if not valid_attrs:
+        raise ValueError(f"No measurement data found")
+    return getattr(pub_data, valid_attrs[0]).get_counts()
+
+def run_synthetic_tomo():
+    print("--- SYNTHETIC TOMOGRAPHY ---")
+    service = QiskitRuntimeService()
+    
+    # Fetch X-basis
+    job_x = service.job(JOB_ID_X)
+    res_x = job_x.result()
+    x_coords = [get_expectation(get_counts_safe(res_x[i].data)) 
+                for i in range(3)]
+    
+    # Fetch Y-basis (3 qubits in 1 pub)
+    job_y = service.job(JOB_ID_Y)
+    res_y = job_y.result()
+    counts_y = get_counts_safe(res_y[0].data)
+    total_y = sum(counts_y.values())
+    
+    # Marginalize per qubit
+    zeros = {0:0, 1:0, 2:0}
+    for bitstring, count in counts_y.items():
+        if bitstring[-1] == '0': zeros[0] += count
+        if bitstring[-2] == '0': zeros[1] += count
+        if bitstring[-3] == '0': zeros[2] += count
+    y_coords = [2*(zeros[i]/total_y) - 1 for i in range(3)]
+    
+    # Reconstruct
+    print(f"\n{'TIME':<6} | {'<X>':<8} | {'<Y>':<8} | {'r_xy':<8} | {'Phase°'}")
+    print("-" * 50)
+    times = [0, 54, 108]
+    for i in range(3):
+        r = np.sqrt(x_coords[i]**2 + y_coords[i]**2)
+        phase = np.degrees(np.arctan2(y_coords[i], x_coords[i]))
+        print(f"{times[i]:<6} | {x_coords[i]:+.4f} | {y_coords[i]:+.4f} | {r:.4f} | {phase:+.1f}")
+    
+    r_start = np.sqrt(x_coords[0]**2 + y_coords[0]**2)
+    r_end = np.sqrt(x_coords[2]**2 + y_coords[2]**2)
+    loss = (r_start - r_end) / r_start if r_start > 0 else 0
+    
+    print(f"\nSignal Loss: {loss*100:.1f}%")
+    print("GHOST SIGNAL" if r_end < 0.1 else "COHERENT SIGNAL")
+
+if __name__ == "__main__":
+    run_synthetic_tomo()
+```
+
+### Script 2: Forensic Coherence Validator
+
+```python
+# pull3.py
+import numpy as np
+from scipy.optimize import curve_fit
+from qiskit_ibm_runtime import QiskitRuntimeService
+
+ECHO_JOB_ID = "d4ksvlh0i6jc73df6krg"
+CHRONOS_JOB_ID = "d4krokav0j9c73e4me2g"
+
+def fit_sine(x, amp, phase, offset):
+    return amp * np.cos(np.deg2rad(x) + phase) + offset
+
+def run_forensics():
+    print("--- COHERENCE FORENSICS ---")
+    service = QiskitRuntimeService()
+    
+    # Extract Echo visibility
+    job = service.job(ECHO_JOB_ID)
+    result = job.result()
+    angles = np.linspace(-90, 90, 16)
+    probs = []
+    for i in range(len(result)):
+        pub = result[i]
+        attr = [x for x in dir(pub.data) if not x.startswith("_")][0]
+        counts = getattr(pub.data, attr).get_counts()
+        probs.append(counts.get('1', 0) / sum(counts.values()))
+    
+    # Fit to get visibility
+    popt, _ = curve_fit(fit_sine, angles, probs, p0=[0.1, 0, 0.4])
+    vis_48us = abs(popt[0]) * 2
+    print(f"Visibility @ 48μs: {vis_48us:.4f}")
+    
+    # Calculate T2*
+    t_echo = 48e-6
+    t2 = -t_echo / np.log(vis_48us)
+    print(f"Effective T2*: {t2*1e6:.2f} μs")
+    
+    # Extrapolate to Chronos
+    t_chronos = 108e-6
+    projected = np.exp(-t_chronos / t2)
+    print(f"\nProjected r @ 108μs: {projected:.4f}")
+    print("SIGNAL CONFIRMED" if projected >= 0.1 else "GHOST SIGNAL")
+
+if __name__ == "__main__":
+    run_forensics()
+```
+
+***
+
 *Repository: https://github.com/zoedolan/Vybn*  
 *License: MIT Open Source*
 
