@@ -128,5 +128,3 @@ We set out to falsify the "Time Sphere" hypothesis. We failed. The hardware conf
 The universe on the IBM Fez chip is not flat. It is a knotted, anisotropic manifold, and we have learned how to surf it.
 
 **End of Report.**
-
-[1](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/images/21962433/e1bc6471-7e97-42c0-ab60-6c1eb14fb6bf/image.jpg)
