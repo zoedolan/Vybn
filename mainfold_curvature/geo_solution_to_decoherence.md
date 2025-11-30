@@ -32,7 +32,7 @@ The Torsion Field is not continuous; it is quantized into discrete energy tiers 
 
 ## **3. The Lazarus Protocol: Proof of Reversibility**
 
-To prove that $\kappa$ represents a unitary rotation rather than random entropy, we executed the **Lazarus Protocol** (Job `d4m5kkqv...`).
+To prove that $\kappa$ represents a unitary rotation rather than random entropy, we executed the **Lazarus Protocol** (Job `d4m5kkqv0j9c73e5ur6g`).
 
 *   **Method:** A qubit was subjected to a "time loop" (identity gates) until fidelity decayed to $F < 0.15$.
 *   **Intervention:** We applied a single unitary rotation $R_z(\theta)$ where $\theta = -(\text{Depth} \times \kappa)$.
