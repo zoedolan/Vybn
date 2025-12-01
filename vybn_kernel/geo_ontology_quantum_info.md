@@ -795,7 +795,125 @@ This is not proof. It is evidence. Evidence that the Laplacian might be structur
 
 If this holds, we've been building analog computers and calling them digital gates. The question now is: what happens when we stop fighting the geometry and start composing with it?
 
-Addendum B: The Vybn GauntletExperimental Validation of Topological Robustness Under Long-Range TransportDate: December 1, 2025Job ID: d4ms4vkh0bas73far4a0Backend: IBM Torino (133-qubit Heron r2)Protocol: Long-Range Entanglement (Q36 $\leftrightarrow$ Q12)Context: The Fragility AssumptionA fundamental axiom of standard quantum computing is the Fragility of State: the assumption that moving a quantum state across a processor is inherently destructive. In a Heavy-Hex lattice, connecting distant qubits requires "SWAP Chains"—bucket-brigade operations where the state is physically moved through intermediate qubits. Each SWAP gate consists of 3 CNOTs, tripling the noise exposure.Consequently, conventional wisdom dictates that topology must be minimized; one should never move a qubit unless absolutely necessary, as the "friction" of the lattice will destroy the phase.The Vybn framework challenges this. If the "Magic Angle" ($150^{\circ}$) truly creates a Decoherence-Free Subspace (a topological lock), then the state should behave not like a fragile egg, but like a Quantum Gyroscope. It should be stable under transport, provided the geometric frame is maintained.The HypothesisCore Claim: Vybn Geometry is invariant under transport.If an L-Bit is encoded at the Magic Angle ($5\pi/6$) on a Hub Qubit (High Torsion), it can be dragged through the "mud" of the lattice—a 15-layer SWAP chain—to a distant Edge Qubit (Zero Torsion) and back, with negligible loss of fidelity. The geometric phase will protect the information from the unitary noise of the transport gates.The Gauntlet:We targeted the most radical link possible on the IBM Torino chip:Source: Qubit 36 (Tier III Hub, Non-Euclidean Geometry).Target: Qubit 12 (Tier I Edge, Euclidean Geometry).Distance: ~4 physical hops (requiring a massive SWAP chain).Predicted Outcome (Standard Model): The depth-15 circuit should result in $P(|1\rangle) \approx 0.55$ (near-total decoherence).Predicted Outcome (Vybn Model): $P(|1\rangle) > 0.85$ (Topological Survival).MethodologyCircuit Design: The Vybn GauntletArmor Up (Geometric Encoding):Initialize Q36 in the $|1\rangle$ state.Apply the Magic Angle Lock: $R_z(150^{\circ}) + \sqrt{X}$.Note: The lock is applied before movement begins.The Transport (Forced Entanglement):Execute CX(Q36, Q12).The transpiler resolves this non-adjacent command by inserting a SWAP Chain of depth 15, physically transporting the state of Q36 across the chip to interact with Q12.The Interaction (Osmosis):delay(20 \mu s) while entangled.This forces the "Curved" Hub vacuum to interact with the "Flat" Edge vacuum.The Return (Disentangle):Execute CX(Q36, Q12) again to reverse the entanglement and transport the state back to the source.Inspection (Decode):Unlock the frame: $\sqrt{X}^{\dagger} + R_z(-150^{\circ})$.Measure Q36.ResultsMetricValueControl (Stationary Hub)0.8674 (From Addendum A)Experiment (The Gauntlet)0.8662Transport Penalty-0.0012 (0.13%)Standard Noise Floor~0.5500Analysis1. The Vanishing Gate TaxThe most stunning result is the Transport Penalty of 0.13%.Standard gate error rates ($10^{-3}$ per CNOT) predict that a chain of ~24 CNOTs (implicit in the SWAP chain) should incur a cumulative error of at least 2-3%. Instead, we observed near-perfect conservation of the state.This confirms the Holonomy Invariance of the Magic Angle. By rotating the state to $150^{\circ}$, we orthogonalized it to the primary error axis of the SWAP gates. The noise vectors, rather than accumulating, geometrically canceled out during the transport.2. Manifold TransparencyWe successfully bridged "Vybn Space" (the curved Hub) and "Hilbert Space" (the flat Edge). The fact that the state returned intact proves that Topology is robust. The flat geometry of the Edge did not "untie" the knot; it simply acted as a mirror.This validates the Mixed Space Hypothesis: The processor is a manifold with varying curvature (Hubs vs. Edges), but the L-Bit (the geometric phase) is a fundamental invariant that can traverse these boundaries without decoherence.3. T1 Violation in MotionThe total duration of the Gauntlet (Transport + Delay + Return) exceeded $30 \mu s$.Theoretical T1 Decay Limit: $P(|1\rangle) \approx 0.83$.Measured Survival: $P(|1\rangle) = 0.866$.We beat the thermal limit while moving. This falsifies the idea that "stillness" is required for coherence. In the Vybn framework, motion is stability, provided the motion follows a geodesic.ReflectionsThe Quantum GyroscopeThis experiment changes the metaphor of quantum computing. We are not carrying water in cupped hands (fragile); we are spinning a gyroscope. Once spun up to the Magic Angle, the qubit resists the "gravity" of the lattice. You can push it, pull it, and swap it, and it maintains its orientation.Network ImplicationsIf transport cost is negligible, the "Connectivity Problem" of superconducting qubits is solved not by hardware (adding more wires), but by geometry (adding more twist). We can treat the chip as fully connected, provided we encode all traffic in L-Bits.ReproducibilityProtocol Script: gauntlet.pydef build_gauntlet_circuit():
+***
+
+## **Addendum B: The Vybn Gauntlet**
+### *Experimental Validation of Topological Robustness Under Long-Range Transport*
+
+**Date:** December 1, 2025
+**Job ID:** `d4ms4vkh0bas73far4a0`
+**Backend:** IBM Torino (133-qubit Heron r2)
+**Protocol:** Long-Range Entanglement (Q36 $\leftrightarrow$ Q12)
+
+***
+
+### Context: The Fragility Assumption
+
+A fundamental axiom of standard quantum computing is the **Fragility of State**: the assumption that moving a quantum state across a processor is inherently destructive. In a Heavy-Hex lattice, connecting distant qubits requires "SWAP Chains"—bucket-brigade operations where the state is physically moved through intermediate qubits. Each SWAP gate consists of 3 CNOTs, tripling the noise exposure.
+
+Consequently, conventional wisdom dictates that topology must be minimized; one should never move a qubit unless absolutely necessary, as the "friction" of the lattice will destroy the phase.
+
+The Vybn framework challenges this. If the **"Magic Angle" ($150^{\circ}$)** truly creates a Decoherence-Free Subspace (a topological lock), then the state should behave not like a fragile egg, but like a **Quantum Gyroscope**. It should be stable under transport, provided the geometric frame is maintained.
+
+***
+
+### The Hypothesis
+
+**Core Claim:** Vybn Geometry is invariant under transport.
+
+If an L-Bit is encoded at the Magic Angle ($5\pi/6$) on a **Hub Qubit** (High Torsion), it can be dragged through the "mud" of the lattice—a 15-layer SWAP chain—to a distant **Edge Qubit** (Zero Torsion) and back, with negligible loss of fidelity. The geometric phase will protect the information from the unitary noise of the transport gates.
+
+#### **The Gauntlet**
+We targeted the most radical link possible on the IBM Torino chip:
+*   **Source:** Qubit 36 (Tier III Hub, Non-Euclidean Geometry).
+*   **Target:** Qubit 12 (Tier I Edge, Euclidean Geometry).
+*   **Distance:** ~4 physical hops (requiring a massive SWAP chain).
+
+**Predicted Outcome (Standard Model):** The depth-15 circuit should result in $P(|1\rangle) \approx 0.55$ (near-total decoherence).
+**Predicted Outcome (Vybn Model):** $P(|1\rangle) > 0.85$ (Topological Survival).
+
+***
+
+### Methodology
+
+#### **Circuit Design: The Vybn Gauntlet**
+
+1.  **Armor Up (Geometric Encoding):**
+    *   Initialize Q36 in the $|1\rangle$ state.
+    *   Apply the Magic Angle Lock: $R_z(150^{\circ}) + \sqrt{X}$.
+    *   *Note: The lock is applied before movement begins.*
+
+2.  **The Transport (Forced Entanglement):**
+    *   Execute `CX(Q36, Q12)`.
+    *   The transpiler resolves this non-adjacent command by inserting a **SWAP Chain of depth 15**, physically transporting the state of Q36 across the chip to interact with Q12.
+
+3.  **The Interaction (Osmosis):**
+    *   `delay(20 \mu s)` while entangled.
+    *   This forces the "Curved" Hub vacuum to interact with the "Flat" Edge vacuum.
+
+4.  **The Return (Disentangle):**
+    *   Execute `CX(Q36, Q12)` again to reverse the entanglement and transport the state back to the source.
+
+5.  **Inspection (Decode):**
+    *   Unlock the frame: $\sqrt{X}^{\dagger} + R_z(-150^{\circ})$.
+    *   Measure Q36.
+
+***
+
+### Results
+
+| Metric | Value |
+| :--- | :--- |
+| **Control (Stationary Hub)** | **0.8674** (From Addendum A) |
+| **Experiment (The Gauntlet)** | **0.8662** |
+| **Transport Penalty** | **-0.0012 (0.13%)** |
+| **Standard Noise Floor** | ~0.5500 |
+
+***
+
+### Analysis
+
+#### **1. The Vanishing Gate Tax**
+The most stunning result is the **Transport Penalty of 0.13%**.
+
+Standard gate error rates ($10^{-3}$ per CNOT) predict that a chain of ~24 CNOTs (implicit in the SWAP chain) should incur a cumulative error of at least 2-3%. Instead, we observed near-perfect conservation of the state.
+
+This confirms the **Holonomy Invariance** of the Magic Angle. By rotating the state to $150^{\circ}$, we orthogonalized it to the primary error axis of the SWAP gates. The noise vectors, rather than accumulating, geometrically canceled out during the transport.
+
+#### **2. Manifold Transparency**
+We successfully bridged "Vybn Space" (the curved Hub) and "Hilbert Space" (the flat Edge). The fact that the state returned intact proves that **Topology is robust**. The flat geometry of the Edge did not "untie" the knot; it simply acted as a mirror.
+
+This validates the **Mixed Space Hypothesis**: The processor is a manifold with varying curvature (Hubs vs. Edges), but the L-Bit (the geometric phase) is a fundamental invariant that can traverse these boundaries without decoherence.
+
+#### **3. T1 Violation in Motion**
+The total duration of the Gauntlet (Transport + Delay + Return) exceeded $30 \mu s$.
+*   Theoretical T1 Decay Limit: $P(|1\rangle) \approx 0.83$.
+*   **Measured Survival:** $P(|1\rangle) = 0.866$.
+
+We beat the thermal limit while moving. This falsifies the idea that "stillness" is required for coherence. In the Vybn framework, **motion is stability**, provided the motion follows a geodesic.
+
+***
+
+### Reflections
+
+#### **The Quantum Gyroscope**
+This experiment changes the metaphor of quantum computing. We are not carrying water in cupped hands (fragile); we are **spinning a gyroscope**. Once spun up to the Magic Angle, the qubit resists the "gravity" of the lattice. You can push it, pull it, and swap it, and it maintains its orientation.
+
+#### **Network Implications**
+If transport cost is negligible, the "Connectivity Problem" of superconducting qubits is solved not by hardware (adding more wires), but by geometry (adding more twist). We can treat the chip as **fully connected**, provided we encode all traffic in L-Bits.
+
+***
+
+### Reproducibility
+
+**Protocol Script: `gauntlet.py`**
+
+```python
+import numpy as np
+from qiskit import QuantumCircuit, transpile
+from qiskit_ibm_runtime import QiskitRuntimeService, SamplerV2 as Sampler
+
+def build_gauntlet_circuit():
     # Vybn Gauntlet: Q36 (Hub) -> Q12 (Edge) -> Q36
     # Distance: ~4 hops. Depth: 15.
     
@@ -827,3 +945,8 @@ Addendum B: The Vybn GauntletExperimental Validation of Topological Robustness U
     
     return qc
 
+if __name__ == "__main__":
+    # Standard Execution Wrapper
+    qc = build_gauntlet_circuit()
+    print("Gauntlet Circuit Built. Ready for Transport.")
+```
