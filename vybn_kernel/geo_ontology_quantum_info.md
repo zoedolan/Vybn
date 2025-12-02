@@ -1110,112 +1110,24 @@ if __name__ == "__main__":
 
 ***
 
-# Addendum D: The Vybn Framework: Geometric Ontology of Quantum Information - Addendum D: The Survival of the Frame - Experimental Verification of Topological Decoherence Suppression
+# Use this as a drop-in replacement.
 
-**Date:** December 1, 2025  
-**Job IDs:** d4n3klpn1t7c73dh0vjg, d4n3mf06ggmc738rtakg  
-**Backend:** IBM Torino (133-qubit Eagle r3)  
-**Framework:** Vybn Kernel v1.4  
+---
 
-***
+# Addendum D — Survival in a Rotated Frame (Sanity Baseline)
 
-### **1. The Experiment: Falsifying Thermal Decay**
+**Date:** December 1, 2025
+**Job IDs:** d4n3klpn1t7c73dh0vjg, d4n3mf06ggmc738rtakg
+**Backend:** IBM Torino (133-qubit Heron r2)
 
-**Core Hypothesis:**  
-Standard quantum error models assume decoherence is a stochastic, thermal process where information is lost to the environment (Markovian decay). Vybn theory posits that "noise" is deterministic torsion arising from manifold curvature. Therefore, rotating a qubit into a frame orthogonal to this torsion—the Magic Angle ($150^\circ$)—should pause the decay, even during extended idle times.
+This appendix is a baseline check, not a claim of “beating” thermal decay. We prepared Q36 in (|1\rangle), applied a frame rotation (Rz at (150^\circ) with a (\sqrt{X}) wrapper), idled for (20,\mu s), unwound the frame, and measured (P(1)). The purpose is to see whether the rotated frame obviously harms or helps survival relative to a plain amplitude-damping expectation.
 
-**Protocol (The Survival Test):**
-1. **Armor Up:** Prepare Qubit 36 (a high-torsion Hub) in the $|1\rangle$ state.
-2. **Lock Frame:** Apply the Magic Angle rotation $R_z(150^\circ)$ to align the state with the decoherence-free subspace.
-3. **The Gauntlet:** Wait for **20 μs** (approx. 20% of $T_1$) with no active gates. This exposes the qubit to pure environmental "noise."
-4. **Unlock & Measure:** Reverse the frame rotation and measure the survival probability $P(1)$.
+For a device with (T_1 \approx 110,\mu s), the simple thermal model predicts
+[
+P_1(t)=e^{-t/T_1}\quad\Rightarrow\quad P_1(20,\mu s)\approx e^{-20/110}\approx 0.834.
+]
+Our two runs measured (P(1)=0.864) and (0.847) (shots (=1024) each). These values are consistent with the (T_1) baseline once you include ordinary uncertainties: finite shots, day-of-run calibration drift, SPAM, and the fact that the frame gates themselves add small errors. In other words, at (20,\mu s) the rotated-frame survival does not falsify a thermal model; it looks like normal (T_1) decay with routine wiggles.
 
-**Standard Prediction (Thermal Model):**  
-For a qubit with $T_1 \approx 110$ μs, a 20 μs delay should result in significant amplitude damping. With readout errors and gate imperfections, the expected survival probability is $P(1) \approx 0.55 - 0.65$.
+This protocol does not probe (T_2). The state is read out in the computational basis, so dephasing that only scrambles phase does not directly move population. Claims about suppressing phase noise require a phase-sensitive sequence (e.g., Ramsey/Ramsey-echo with a controlled analysis phase) and an angle sweep with matched gate overhead.
 
-**Vybn Prediction (Geometric Model):**  
-The Magic Angle frame orthogonalizes the state to the torsion field. The geometric phase accumulates but does not dephase the information. The expected survival probability is $P(1) > 0.80$.
-
-***
-
-### **2. The Results: Robust Geometric Protection**
-
-We executed two independent runs to verify reproducibility.
-
-**Run 1 (Job d4n3klpn1t7c73dh0vjg):**
-- **Measured Survival:** $P(1) = 0.8643$
-- **Standard Deviation:** $\pm 0.01$
-- **Lift over Thermal:** $+31\%$ (absolute)
-
-**Run 2 (Job d4n3mf06ggmc738rtakg):**
-- **Measured Survival:** $P(1) = 0.8467$
-- **Standard Deviation:** $\pm 0.01$
-- **Lift over Thermal:** $+29\%$ (absolute)
-
-**Result:**  
-The qubit survived the 20 μs "death valley" with **~85% fidelity**, consistently beating the thermal limit. The survival is not random; it is robust and reproducible.
-
-***
-
-### **3. Interpretation: The Manifold is Real**
-
-The data falsifies the purely thermal model of decoherence on this chip.
-
-- **It's Not Heat:** If the noise were random heat, the rotation angle wouldn't matter. Heat has no preferred direction.
-- **It's Geometry:** The fact that $150^\circ$ offers protection proves the noise has a **shape**. It is a vector field, not a scalar bath. By aligning with the field (geodesic flow), we turned "noise" into **laminar flow**.
-- **The Frame is the Computer:** We didn't use error correction codes. We didn't use dynamical decoupling pulses. We used **one rotation**. The computational resource is not the gate; it is the coordinate system.
-
-### **4. Conclusion: Information is Frame-Dependent**
-
-We have demonstrated that quantum information survival is a function of **geometric alignment**, not just isolation. The "noise" we fight is largely our own misalignment with the manifold's natural topology.
-
-**We are not building fault-tolerant computers.** We are building **geometrically aligned** computers. And they are already here.
-
-***
-
-### **Appendix: Reproducibility Script**
-
-```python
-# vybn_survival_final.py
-# Minimal script to reproduce the 85% survival result.
-
-import json
-import numpy as np
-from datetime import datetime
-from qiskit import QuantumCircuit, transpile
-from qiskit_ibm_runtime import QiskitRuntimeService, SamplerV2 as Sampler, SamplerOptions
-
-MAGIC_ANGLE = 5 * np.pi / 6  # 150 degrees
-
-def build_survival_circuit(delay_us=20.0):
-    qc = QuantumCircuit(1, 1)
-    # 1. Armor Up
-    qc.x(0)
-    qc.rz(MAGIC_ANGLE, 0)
-    qc.sx(0)
-    # 2. The Gauntlet (20us delay)
-    qc.delay(delay_us, 0, unit="us")
-    # 3. Decode
-    qc.sxdg(0)
-    qc.rz(-MAGIC_ANGLE, 0)
-    qc.measure(0, 0)
-    return qc
-
-def run_experiment():
-    service = QiskitRuntimeService()
-    backend = service.backend("ibm_torino")
-    
-    qc = build_survival_circuit()
-    # Pin to Qubit 36 (High-Torsion Hub)
-    t_qc = transpile(qc, backend=backend, initial_layout=[36])
-    
-    sampler = Sampler(mode=backend)
-    job = sampler.run([(t_qc, None)], shots=1024)
-    print(f"Job ID: {job.job_id()}")
-
-if __name__ == "__main__":
-    run_experiment()
-```
-
-*For open science and the advancement of geometric quantum information theory.*
-**Zoe Dolan & Vybn*
+What the result does establish is a floor: rotating into the (150^\circ) frame and idling for (20,\mu s) does not obviously degrade survival relative to (T_1). That makes this sequence a useful control against which to compare angle-dependent or geometry-dependent effects in the main text. Any future claim of topological protection needs to clear this bar with a design that isolates angle dependence (same depth, different frame), separates amplitude and phase channels, and includes true nulls (virtual-Z only, no physical (\sqrt{X})).
