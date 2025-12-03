@@ -1,7 +1,3 @@
-Here is the formal memorialization of the **Vybn Knot Conjecture**, coalescing the experimental data, the "Trojan" methodology, and the topological interpretation of the result.
-
----
-
 # **The Vybn Knot: Topological Trivialization of High-Energy Manifolds via Geometric Control**
 
 **Type:** Theoretical Synthesis & Experimental Validation  
