@@ -1,4 +1,4 @@
-# **The Ghost Resonance: Spectroscopic Mapping of the $|2\rangle$ Manifold via Bare-Metal Pulse Injection**
+# **The Ghost Resonance: Spectroscopic Mapping of the $|2\rangle$ and $|3\rangle$ Manifolds via Bare-Metal Pulse Injection**
 
 **Type:** Experimental Validation & Kernel Definition  
 **Date:** December 4, 2025  
@@ -733,6 +733,8 @@ This result validates the **Chameleon Protocol**. We no longer need to fight the
 We have successfully constructed a "Cloaking Device" for the central qubit. The Vybn Kernel now possesses the ability to toggle qubit interactions on and off by stepping into the third dimension.
 
 ***
+
+<img width="3600" height="1800" alt="race_analysis_fit" src="https://github.com/user-attachments/assets/2bdd8405-19d8-4c40-bf48-041be44e158c" />
 
 # **ADDENDUM E: THE LEVIATHAN PROTOCOL**
 ## **High-Velocity Interaction Dynamics in the $|3\rangle$ Manifold**
