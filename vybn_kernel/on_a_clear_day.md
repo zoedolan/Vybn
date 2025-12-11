@@ -1,179 +1,4 @@
-"""
-═══════════════════════════════════════════════════════════════════
-HYBRID LAZARUS V3: SYNCHRONIZED RESONANCE
-═══════════════════════════════════════════════════════════════════
-Status:     INTEGRATED (Physics + Engineering)
-Theory:     Stroboscopic Asymptotic Coherence (Odd-Harmonic Law)
-Mechanism:  Dynamic Time Dilation matching Gap_k = 248 * k
-Target:     Resonant Depth ~2.5M (Hop 142)
-═══════════════════════════════════════════════════════════════════
-"""
-
-import sys
-import numpy as np
-
-# --- VERSION CHECK ---
-from qiskit import __version__ as qiskit_version
-major = int(qiskit_version.split('.')[0])
-if major >= 2:
-    sys.exit("Error: Qiskit v1.3 required. v2.0+ detected.")
-
-try:
-    import qiskit.pulse as pulse
-    from qiskit.pulse import DriveChannel
-except ImportError:
-    sys.exit("Error: qiskit.pulse module missing.")
-
-from qiskit import QuantumCircuit, transpile
-from qiskit_ibm_runtime import QiskitRuntimeService, SamplerV2 as Sampler
-
-# ═══════════════════════════════════════════════════════════════════
-# PHYSICS ENGINE (THE INTEGRATION)
-# ═══════════════════════════════════════════════════════════════════
-
-BACKEND_NAME = "ibm_torino"
-N_QUBITS = 3
-
-# RESONANCE PARAMETERS
-# Gap grows as 248 * k. We map this to bulk delay.
-# BASE_DELAY represents the time to bridge the first gap (248 steps).
-# Adjusted for Leviathan Factor (6x speedup).
-BASE_DELAY = 2048            
-BULK_HOPS = 142              
-HOP_INTERVAL = 35            # Surface triggers
-SURFACE_DEPTH = 5_000        # Physical gate limit
-
-# CALIBRATION
-GHOST_FREQ_SHIFT = -330.4e6  
-GHOST_AMP = 0.851            
-GHOST_DURATION = 320         
-GHOST_SIGMA = 60
-SCRAMBLE_ANGLE = 1.0472      # The Cloak (pi/3)
-SHOTS = 32
-
-print("\n" + "═" * 70)
-print("HYBRID LAZARUS V3: QUADRATIC SYNCHRONIZATION")
-print("═" * 70)
-print(f"Physics Model: Gap_k = 248 * k (Linear Growth)")
-print(f"Base Delay:    {BASE_DELAY} dt")
-print(f"Max Delay:     {BASE_DELAY * BULK_HOPS:,} dt (at Hop {BULK_HOPS})")
-print(f"Target Depth:  ~2.5 Million (Resonant Node k={BULK_HOPS})")
-
-# ═══════════════════════════════════════════════════════════════════
-# PULSE BUILDER
-# ═══════════════════════════════════════════════════════════════════
-
-def build_ghost_pulses(backend, qubit=1):
-    with pulse.build(backend, name=f"ghost_up_q{qubit}") as ghost_up:
-        d = DriveChannel(qubit)
-        pulse.shift_frequency(GHOST_FREQ_SHIFT, d)
-        pulse.play(pulse.Gaussian(duration=GHOST_DURATION, amp=GHOST_AMP, sigma=GHOST_SIGMA), d)
-        pulse.shift_frequency(-GHOST_FREQ_SHIFT, d)
-
-    with pulse.build(backend, name=f"ghost_down_q{qubit}") as ghost_down:
-        d = DriveChannel(qubit)
-        pulse.shift_frequency(GHOST_FREQ_SHIFT, d)
-        pulse.play(pulse.Gaussian(duration=GHOST_DURATION, amp=-GHOST_AMP, sigma=GHOST_SIGMA), d)
-        pulse.shift_frequency(-GHOST_FREQ_SHIFT, d)
-
-    return ghost_up, ghost_down
-
-# ═══════════════════════════════════════════════════════════════════
-# CIRCUIT FACTORY (DYNAMIC)
-# ═══════════════════════════════════════════════════════════════════
-
-def build_synchronized_lazarus(backend):
-    qc = QuantumCircuit(N_QUBITS)
-    ghost_up, ghost_down = build_ghost_pulses(backend, qubit=1)
-
-    # Init |111>
-    qc.x(range(N_QUBITS))
-    qc.barrier()
-
-    hop_counter = 1 # Start at k=1
-
-    # EVOLUTION LOOP
-    for n in range(1, SURFACE_DEPTH + 1):
-        # 1. Surface Physics (Rotation + Ring)
-        theta = np.sqrt(n / np.pi)
-        for q in range(N_QUBITS):
-            qc.rz(theta, q)
-        qc.cx(0, 1); qc.cx(1, 2); qc.cx(2, 0)
-
-        # 2. Bulk Physics (The Time Machine)
-        if n % HOP_INTERVAL == 0 and hop_counter <= BULK_HOPS:
-            # Calculate Dynamic Delay based on Resonance Gap
-            # Gap grows linearly with k
-            current_delay = BASE_DELAY * hop_counter
-            
-            # Ascent to |2>
-            qc.sx(1)
-            qc.add_calibration('sx', [1], ghost_up)
-            
-            # Dynamic Time Dilation
-            qc.delay(int(current_delay), unit='dt')
-            
-            # Descent to |1>
-            qc.sx(1)
-            qc.add_calibration('sx', [1], ghost_down)
-            
-            hop_counter += 1
-
-    # 3. Forensic Readout
-    qc.barrier()
-    qc.h(range(N_QUBITS)) # The Shock
-    for q in range(N_QUBITS):
-        qc.ry(SCRAMBLE_ANGLE, q) # The Cloak
-
-    qc.measure_all()
-    return qc
-
-def build_vacuum_reference():
-    qc = QuantumCircuit(N_QUBITS)
-    
-    # Calculate exact total duration of the variable delays
-    # Sum of arithmetic series: n/2 * (2a + (n-1)d)
-    # Here roughly: Sum(BASE * k) for k=1 to BULK_HOPS
-    total_bulk_delay = sum([BASE_DELAY * k for k in range(1, BULK_HOPS + 1)])
-    
-    # Add surface time estimate
-    total_dt = (SURFACE_DEPTH * 1000) + total_bulk_delay
-    
-    qc.delay(total_dt, unit='dt')
-    qc.h(range(N_QUBITS))
-    qc.measure_all()
-    return qc
-
-# ═══════════════════════════════════════════════════════════════════
-# MAIN EXECUTION
-# ═══════════════════════════════════════════════════════════════════
-
-if __name__ == "__main__":
-    service = QiskitRuntimeService(channel="ibm_quantum")
-    backend = service.backend(BACKEND_NAME)
-    
-    print("\nBuilding Synchronized Circuits...")
-    qc_lazarus = build_synchronized_lazarus(backend)
-    qc_void = build_vacuum_reference()
-    
-    print(f"Lazarus Size: {qc_lazarus.size():,} gates")
-    
-    print("Transpiling (Level 1)...")
-    t_lazarus = transpile(qc_lazarus, backend, optimization_level=1, initial_layout=[0,1,2])
-    t_void = transpile(qc_void, backend, optimization_level=1, initial_layout=[0,1,2])
-    
-    if t_lazarus.size() > 500_000:
-        print(f"Gate limit exceeded ({t_lazarus.size()}). Adjust parameters.")
-        sys.exit(1)
-        
-    print(f"\n>> SUBMITTING TO {BACKEND_NAME}...")
-    print(f"   Mode: Dynamic Resonance Tracking")
-    sampler = Sampler(backend=backend)
-    job = sampler.run([t_void, t_lazarus], shots=SHOTS)
-    
-    print(f"JOB ID: {job.job_id()}")
-    with open("lazarus_v3_job.txt", "w") as f:
-        f.write(job.job_id())# **Stroboscopic Asymptotic Coherence in NISQ Processors via Non-Linear Geometric Phase Alignment**
+# **Stroboscopic Asymptotic Coherence in NISQ Processors via Non-Linear Geometric Phase Alignment**
 
 **Authors:** Zoe Dolan, Vybn™  
 **Date:** December 11, 2025  
@@ -311,6 +136,7 @@ The Truth Serum circuit shows **maximal distinguishability** from the standard p
 **Script:**
 
 ```python
+
 """
 ═══════════════════════════════════════════════════════════════════
 HYBRID LAZARUS V3: SYNCHRONIZED RESONANCE
@@ -750,6 +576,12 @@ All experiments conducted December 10-11, 2025 on IBM Quantum hardware.
 **Job IDs:**
 - Truth Serum: `d4tdbfleastc73cg0rc0` (*ibm_torino*, 32 shots)
 - Lazarus V3: `d4td4l5eastc73cg0l00` (*ibm_torino*, 32 shots)
+
+**Analysis Scripts:**
+- `falsify_lazarus.py` — Truth Serum circuit generation
+- `analyze_fl.py` — Hellinger distance computation
+- `lazarus.py` — V3 hybrid surface-bulk construction
+- `analyze_lazarus.py` — Symplectic volume, entropy, scar map extraction
 
 **Data:**
 - `truth_serum_d4tdbfleastc73cg0rc0.json` — Raw counts and metrics
