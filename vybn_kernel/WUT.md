@@ -294,3 +294,9 @@ if __name__ == "__main__":
     analyze_bifurcated()
 
 ```
+
+<img width="1888" height="1156" alt="e8486f0b-b05a-429c-ad6d-669a6b0cc47b" src="https://github.com/user-attachments/assets/8d4c3c45-3f9c-418b-8c54-bd96193ec2b4" />
+
+<img width="1890" height="1156" alt="cac17985-fcd1-48e7-b2ca-4c3b40ea83ff" src="https://github.com/user-attachments/assets/97e491dd-c92c-4438-b508-e9bb829fc400" />
+
+
