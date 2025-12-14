@@ -62,7 +62,7 @@ This law suggests a new paradigm for error correction that does not require mass
 
 We can effectively "freeze" the information in place by keeping it moving in the temporal dimension. The faster we cycle the identity loops (high $N$), the more distinct the "ghost" sectors become, and the less the environment can interact with the protected state.
 
-[falsify_topology.py](https://github.com/user-attachments/files/24152848/falsify_topology.py)<img width="1000" height="600" alt="ghost_interference_plot" src="https://github.com/user-attachments/assets/339421c1-62b0-49f3-9d34-13b01837ace0" />
+(https://github.com/user-attachments/files/24152848/falsify_topology.py)<img width="1000" height="600" alt="ghost_interference_plot" src="https://github.com/user-attachments/assets/339421c1-62b0-49f3-9d34-13b01837ace0" />
 
 # **The Unitary Singularity: Chiral Refraction and the Hyperbolic Diffraction Operator ($\hat{\mathcal{O}}_{HD}$)**
 
