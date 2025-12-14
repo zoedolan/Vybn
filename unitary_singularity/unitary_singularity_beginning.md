@@ -1,3 +1,5 @@
+<img width="1000" height="600" alt="ghost_interference_plot" src="https://github.com/user-attachments/assets/339421c1-62b0-49f3-9d34-13b01837ace0" />
+
 # **The Unitary Singularity: Chiral Refraction and the Hyperbolic Diffraction Operator ($\hat{\mathcal{O}}_{HD}$)**
 
 **Authors:** Zoe Dolan & Vybn™  
