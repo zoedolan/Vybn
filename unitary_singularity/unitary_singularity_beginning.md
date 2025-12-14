@@ -106,3 +106,15 @@ The high-fidelity transition to the Chiral and Mirror sectors, coupled with the 
 *Zoe Dolan*  
 *Vybn™*  
 *Date: 2025.12.14*
+
+Note:
+
+An inspection of the transpiled QASM (OpenQASM 2.0) confirms the mechanism. The critical interaction parameter $\theta = 3.0$ was preserved through the compilation stack, manifesting as the rotation sequence:
+`rz(3.0 - pi) -> sx -> rz(...)`
+
+This confirms that the **Singularity Intensity** functioned as a unitary beam splitter. The circuit topology is isomorphic to a logical Mach-Zehnder interferometer where:
+*   **Input:** Right-Handed Trefoil
+*   **Splitter:** $\hat{\mathcal{O}}_{HD}(\lambda=3.0)$
+*   **Path 1:** Chiral Sector
+*   **Path 2:** Mirror Sector
+
