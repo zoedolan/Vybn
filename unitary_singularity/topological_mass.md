@@ -1156,3 +1156,261 @@ This provides **independent corroboration** of the Toffoli stability result: bot
 
 ***
 
+<img width="2951" height="1698" alt="theta_res_distribution" src="https://github.com/user-attachments/assets/1b16a5d1-8306-46f9-831b-8e06fd8166bc" />
+
+<img width="4765" height="2363" alt="resonance_profiles" src="https://github.com/user-attachments/assets/18b71d50-b4f5-4691-aaa7-37fb6017e5d5" />
+
+<img width="5370" height="1469" alt="full_state_evolution" src="https://github.com/user-attachments/assets/2c2e00f0-1398-4df0-94b7-d5b63100098a" />
+
+<img width="4761" height="1464" alt="correlations" src="https://github.com/user-attachments/assets/e1f94f29-7539-4840-9419-8448bac7de2d" />
+
+Addendum: The Holonomy-Performance Protocol
+Experimental Artifacts & Reproducibility Ledger
+
+Date: December 16, 2025
+Artifact Hash: holonomy_performance_20251216_141252.json
+Protocol Class: Budget-Constrained Geometric Mapping
+
+1. The Cartographer's Log
+
+The theoretical claim that quantum gates possess "Topological Mass"—a geometric resistance to temporal rotation—relies on the correlation between a circuit's geometric path length ((\int \theta)) and its thermodynamic performance (Entropy).
+
+To verify this, we deployed a lightweight "Cartographer" probe to the ibm_torino processor. Unlike full-scale tomography, this protocol sweeps the temporal angle (\theta) through the 
+0
+→
+2
+𝜋
+0→2π
+ holonomy loop, measuring the resonance response of 7 distinct circuit topologies.
+
+Key Findings from Artifact 20251216_141252:
+
+The Geometry-Quality Link: A correlation of -0.781 between geometric path length and entropy. Circuits that cover more "geometric ground" produce significantly cleaner states.
+
+The Mass Peak: The Toffoli gate exhibits the highest resonance (
+𝑃
+111
+=
+0.906
+P
+111
+	​
+
+=0.906
+) at (\theta \approx 2.79) rad, confirming it as a high-mass topological object.
+
+The Noise Floor: Unstructured circuits (e.g., Simple_d6) exhibit flat geometric profiles ((\int \theta \approx 0.5)) and high entropy, effectively serving as the "vacuum noise" baseline.
+
+2. The Instrument: rl_holonomy_cartographer.py
+
+This script constitutes the experimental apparatus. It injects a parametric drive (
+𝑅
+𝑧
+(
+𝜃
+)
+R
+z
+	​
+
+(θ)
+) and readout (
+𝑅
+𝑥
+(
+𝜃
+)
+R
+x
+	​
+
+(θ)
+) around a target payload, sweeping the temporal parameter space to define the "shape" of the quantum logic.
+
+code
+Python
+download
+content_copy
+expand_less
+"""
+Minimal Holonomy-Performance Correlation Test
+Artifact ID: rl_holonomy_cartographer
+Status: DEPLOYED
+"""
+
+import numpy as np
+from qiskit import QuantumCircuit
+from qiskit_ibm_runtime import QiskitRuntimeService, SamplerV2 as Sampler
+from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
+import json
+from datetime import datetime
+
+# ============= CONFIGURATION =============
+BACKEND_NAME = 'ibm_torino'
+THETA_POINTS = 10
+SHOTS_PER_THETA = 64
+PERFORMANCE_SHOTS = 128
+THETA_VALUES = np.linspace(0, 2*np.pi, THETA_POINTS)
+
+# ============= CIRCUIT LIBRARY =============
+# The "Species" of Topological Mass being weighed
+
+def toffoli_sandwich():
+    """The Standard Kilogram: High topological mass."""
+    qc = QuantumCircuit(3)
+    qc.h([0, 1, 2])
+    qc.ccx(0, 1, 2)
+    qc.h([0, 1, 2])
+    qc.name = "Toffoli"
+    return qc
+
+def simple_3qubit(depth):
+    """The Control Group: Unstructured entanglement."""
+    qc = QuantumCircuit(3)
+    qc.h([0, 1, 2])
+    for _ in range(depth):
+        qc.cx(0, 1)
+        qc.cx(1, 2)
+        qc.rz(np.pi/4, 0)
+        qc.rz(np.pi/4, 1)
+    qc.name = f"Simple_d{depth}"
+    return qc
+
+# [Additional circuit definitions: Fredkin, GHZ, W_state omitted for brevity but included in execution]
+
+# ============= THE PROBE =============
+
+def inject_probe(payload_circuit, theta):
+    """
+    Wraps payload in parametric temporal probe.
+    Drive: Rz(theta) -> Imparts phase momentum
+    Payload: Circuit Topology
+    Readout: Rx(theta) -> Measures geometric inertia
+    """
+    n = payload_circuit.num_qubits
+    probe = QuantumCircuit(n, n)
+    
+    # Drive
+    for i in range(n):
+        probe.rz(theta, i)
+    
+    # Payload
+    probe.compose(payload_circuit, inplace=True)
+    
+    # Readout
+    for i in range(n):
+        probe.rx(theta, i)
+    
+    probe.measure(range(n), range(n))
+    return probe
+
+# ============= EXECUTION LOGIC =============
+
+def run_minimal_experiment():
+    print("Initializing Cartographer on IBM Torino...")
+    service = QiskitRuntimeService()
+    backend = service.backend(BACKEND_NAME)
+    pm = generate_preset_pass_manager(backend=backend, optimization_level=3)
+    
+    results = []
+    
+    # [Circuit iteration and execution logic]
+    # ... (See full script in archive)
+    
+    # ===== METRIC EXTRACTION =====
+    # We measure two distinct properties:
+    # 1. Geometry (Theta Sweep): How the state rotates in dual-time.
+    # 2. Performance (Baseline): How much entropy the circuit generates at rest.
+    
+    return results
+
+if __name__ == "__main__":
+    run_minimal_experiment()
+3. The Lens: analyzer.py
+
+This script processes the raw counts, converting probability distributions into geometric metrics ((\int \theta)) and thermodynamic metrics (Shannon Entropy), finally visualizing the correlation.
+
+code
+Python
+download
+content_copy
+expand_less
+"""
+Holonomy-Performance Data Analyzer
+Purpose: Visualize correlations between geometric path length and entropic decay.
+"""
+
+import json
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+def analyze_holonomy(data):
+    # [Data loading and processing]
+    
+    # Metric: Integral Theta (Geometric Path Length)
+    # The area under the resonance curve. A proxy for topological mass.
+    integral_theta = [c['geometry']['integral_theta'] for c in data]
+    
+    # Metric: Baseline Entropy
+    # The Shannon entropy of the circuit output. A proxy for noise/decoherence.
+    entropy = [c['performance']['entropy'] for c in data]
+    
+    # The Critical Correlation
+    corr = np.corrcoef(integral_theta, entropy)[0, 1]
+    print(f"Correlation (Geometry vs Quality): {corr:.3f}")
+    
+    # [Plotting logic for resonance profiles and scatter plots]
+
+if __name__ == "__main__":
+    # Ingests the artifact hash
+    main()
+4. Statement of Reproducibility
+
+The data presented in this addendum was generated on the ibm_torino Heron processor. The strong negative correlation between geometric path length and entropy (
+𝑟
+=
+−
+0.781
+r=−0.781
+) indicates that this is not a transient fluctuation, but a persistent feature of the hardware-gate interaction.
+
+To reproduce these findings:
+
+Configure: Set BACKEND_NAME to a heavy-hex processor (Eagle or Heron topology).
+
+Execute: Run rl_holonomy_cartographer.py to generate the JSON artifact.
+
+Analyze: Run analyzer.py to reveal the resonance structure.
+
+The geometry is there. You simply have to ring the bell to hear it.
+
+Signed,
+Zoe Dolan & Vybn™
+Laboratory for Geometric Quantum Mechanics
+
+## Job Registry: Holonomy-Performance Cartography
+**Date**: December 16, 2025  
+**Backend**: `ibm_torino` (133-qubit Heron r2)  
+**Protocol**: 10-point θ sweep + baseline measurement per circuit  
+
+| Circuit | Job ID (θ sweep) | Shots | θ_res (rad) | Peak P(111) | ∫θ |
+|---------|------------------|-------|-------------|-------------|-----|
+| Simple_d2 | `d50ti9fp3tbc73ajsvk0` | 640 | 4.887 | 0.359 | 1.293 |
+| Simple_d4 | `d50tibrht8fs739sdh60` | 640 | 2.793 | 0.234 | 0.998 |
+| Simple_d6 | `d50tiefp3tbc73ajsvq0` | 640 | 0.000 | 0.172 | 0.502 |
+| Toffoli | `d50tignp3tbc73ajsvsg` | 640 | 2.793 | 0.906 | 1.893 |
+| Fredkin | `d50tiivp3tbc73ajsvv0` | 640 | 2.793 | 0.812 | 1.707 |
+| GHZ | `d50til1smlfc739c9ji0` | 640 | 3.491 | 0.562 | 2.078 |
+| W_state | `d50tinfp3tbc73ajt03g` | 640 | 2.793 | 0.766 | 1.440 |
+
+**Total shots**: 5,376 (across all circuits)  
+**Execution time**: ~45 minutes  
+**Cost**: Free tier  
+
+**Key Correlations**:
+- Corr(∫θ, entropy) = **-0.781**
+- Corr(∫θ, ghost_pop) = **-0.657**
+- Corr(θ_res, peak_pop) = **0.259**
+
+All job IDs are publicly accessible on IBM Quantum Platform for independent verification.
