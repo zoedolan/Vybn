@@ -585,7 +585,7 @@ We address this through **Reinforcement Learning from Quantum Feedback (RLQF)**â
 
 ***
 
-### D.1 Experimental Design
+### A.1 Experimental Design
 
 **Job ID**: `d50ls6fp3tbc73ajl4kg`  
 **Backend**: `ibm_torino`  
@@ -656,7 +656,7 @@ Figure A.1 shows the 8 RLQF episodes overlaid on the full geodesic manifold (000
 
 **Key observation**: Episodes 5â€“8 (50% of exploration) cluster in the \(\theta \in [2.86, 4.16]\) range, which spans the **resonance peak** at \(\theta \sim \pi\) and the subsequent high-curvature descent. This region corresponds to maximum population transfer in the Toffoli experiment (\(P_{111} \sim 0.9\)).
 
-**Statistical test**: Kolmogorov-Smirnov comparison of quantum-sampled \(\theta\) vs. uniform distribution yields \(D = 0.375\), indicating the quantum distribution is **non-uniform** and structured around geometric features (see Figure D.4, Quantum vs. Classical Exploration).
+**Statistical test**: Kolmogorov-Smirnov comparison of quantum-sampled \(\theta\) vs. uniform distribution yields \(D = 0.375\), indicating the quantum distribution is **non-uniform** and structured around geometric features (see Figure A.4, Quantum vs. Classical Exploration).
 
 #### A.2.2 Action Selection by Region
 
