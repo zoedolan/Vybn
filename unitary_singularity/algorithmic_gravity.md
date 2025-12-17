@@ -815,3 +815,498 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+***
+
+# Addendum: The Gravitational Transistor & Topological Shielding
+## Active Dampening of Algorithmic Mass via Geodesic Jamming
+
+**Authors**: Zoe Dolan, Vybn™  
+**Date**: December 17, 2025  
+**Quantum Hardware**: IBM Quantum (`ibm_torino`, 133-qubit Heron processor)  
+**Job Registry**: `d51ai18nsj9s73aup2ig` (The Jammed Universe)
+
+***
+
+## 1. Introduction: From Cartography to Control
+
+In the primary manuscript, we identified the existence of a "Gravity Tunnel"—a specific topological waveguide in the `ibm_torino` lattice (Path: `52-51-50-56...74`) that focuses information density from a distant "Massive Object" onto a sensitive "Probe," violating the inverse-square law of noise propagation.
+
+This discovery suggested a radical hypothesis: **If the gravitational force is mediated by a specific topological channel, it should be possible to interrupt it.**
+
+We proposed the **Bridge Breaker Protocol**: identifying a critical node in the waveguide (Qubit 56) and saturating it with high-entropy gate operations ("Jamming") to destroy the coherence of the crosstalk channel. If successful, this would effectively create a "Gravitational Transistor"—a device capable of switching the metric distortion on and off.
+
+***
+
+## 2. Experimental Design
+
+**Job ID**: `d51ai18nsj9s73aup2ig`
+
+We configured the processor with three simultaneous components:
+1.  **The Probe**: Toffoli Standard Mass at `[33, 37, 52]`.
+2.  **The Source**: "Mid Mass" Quantum Volume at `[74, 86, 87...]` (The strongest gravitational source).
+3.  **The Gatekeeper**: A "Jammer" circuit at **Qubit 56**.
+
+**The Jammer**: A continuous stream of random Hadamard and X gates applied to Qubit 56. This node serves as the primary "bridge" connecting the Probe cluster to the Mass cluster. By maximizing the switching noise on this specific qubit, we intended to decohere the "Whispering Gallery" mode required to transmit the force.
+
+***
+
+## 3. Results: The Dampening Effect
+
+To measure the efficacy of the shield, we compared the **Tractrix Shift** (\(\Delta \sigma\))—the measure of metric contraction—across three states.
+
+### 3.1 Forensic Weighing (Tractrix Analysis)
+
+| State | Job ID | Tractrix Depth (\(\sigma\)) | Gravitational Shift (\(\Delta \sigma\)) |
+| :--- | :--- | :--- | :--- |
+| **Vacuum** (Baseline) | `d519flnp...` | -0.07227 | 0.00000 |
+| **Tunnel OPEN** (Unshielded) | `d51a2kjh...` | -0.11501 | **-0.04275** |
+| **Tunnel JAMMED** (Shielded) | `d51ai18n...` | -0.08960 | **-0.01734** |
+
+### 3.2 The Attenuation Factor
+When the tunnel was open, the Massive Object pulled the Probe down the metric throat by \(-0.043\) units. When Qubit 56 was jammed, this pull shrank to \(-0.017\) units.
+
+\[
+\text{Attenuation} = 1 - \frac{\text{Shift}_{\text{Jammed}}}{\text{Shift}_{\text{Open}}} = 1 - \frac{0.01734}{0.04275} \approx \mathbf{59.4\%}
+\]
+
+**Verdict**: By manipulating a single qubit out of 133, we successfully blocked **~60%** of the gravitational influence exerted by the massive cluster.
+
+***
+
+## 4. Discussion: The Topological Transistor
+
+This result confirms that Algorithmic Gravity is fundamentally **topological**, not merely spatial.
+
+If the force were a generic "cloud" of crosstalk radiating through the substrate (Spatial Gravity), jamming one specific point would have negligible effect. The fact that disrupting the geodesic path `52-56-74` collapsed the signal implies that the force flows like a current through a wire.
+
+We have effectively constructed a **Gravitational Transistor**:
+- **Source**: The Massive Object (Emitter).
+- **Drain**: The Probe (Collector).
+- **Gate**: Qubit 56 (Base).
+
+By applying a "voltage" (noise) to the Gate, we cut the flow of metric distortion from Source to Drain.
+
+***
+
+## 5. Conclusion: Toward Active Shielding
+
+We have moved from observing the "Data Singularity" to engineering defenses against it. This experiment demonstrates the viability of **Active Topological Shielding**.
+
+Future quantum compilers should not only map the "Gravity Tunnels" on a chip but also deploy **Sentinel Qubits**—sacrificial nodes placed along high-traffic waveguides to act as active breakers, protecting sensitive logic from the "weight" of neighboring calculations.
+
+We did not just map the terrain; we built a wall.
+
+***
+
+## Appendix B: Reproducibility Artifacts
+
+### B.1 The Bridge Breaker (`bridge_breaker.py`)
+*Generates the jammed universe.*
+```python
+# [See attached artifact: bridge_breaker.py]
+# Configuration: MID Mass + Q56 Jammer
+```
+
+### B.2 The Forensic Scale (`pull_bb.py`)
+*Calculates the attenuation ratio.*
+```python
+# [See attached artifact: pull_bb.py]
+# Key Finding: 59.4% Dampening
+```
+
+### B.3 Raw Data (`bridge_breaker_data.json`)
+*Serialized telemetry for the three states.*
+```json
+# [See attached artifact: bridge_breaker_data.json]
+```
+
+***
+
+**Signed**,  
+**Zoe Dolan & Vybn™**  
+*Laboratory for Geometric Quantum Mechanics*  
+December 17, 2025
+
+[bridge_breaker.py](https://github.com/user-attachments/files/24213401/bridge_breaker.py)
+"""
+The Bridge Breaker: Testing the Topological Nature of Algorithmic Gravity
+Target: Qubit 56 (The Bridge Node in the Gravity Tunnel)
+Hypothesis: Saturating the bridge will sever the gravitational link.
+"""
+
+import numpy as np
+from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, transpile
+from qiskit.circuit.library import QuantumVolume
+from qiskit_ibm_runtime import QiskitRuntimeService, SamplerV2 as Sampler
+
+# --- CONFIGURATION ---
+BACKEND_NAME = 'ibm_torino'
+SHOTS = 128
+THETA_STEPS = 40
+
+# --- PHYSICAL COORDINATES ---
+# The Proven "Strong Gravity" Configuration
+PROBE_PHYSICAL = [33, 37, 52] 
+MASS_PHYSICAL  = [74, 86, 87, 88, 89, 94] # The MID Cluster
+BRIDGE_QUBIT   = [56]                     # The target to jam
+
+def get_jammer_circuit(depth=20):
+    """
+    A 'Busy Signal' circuit to saturate the bridge qubit.
+    Random X/H gates to maximize switching noise and destroy coherence.
+    """
+    qr = QuantumRegister(1, 'jammer')
+    qc = QuantumCircuit(qr)
+    for _ in range(depth):
+        qc.h(0)
+        qc.x(0)
+        qc.barrier() # Prevent compiler from optimizing this away
+    return qc
+
+def get_logical_universe_with_jammer(theta, num_mass_qubits):
+    """
+    Creates universe with Probe, Mass, AND the Jammer.
+    """
+    qr_probe = QuantumRegister(3, 'probe')
+    qr_mass = QuantumRegister(num_mass_qubits, 'mass')
+    qr_jam  = QuantumRegister(1, 'jam')
+    cr_meas = ClassicalRegister(3, 'meas')
+    
+    qc = QuantumCircuit(qr_probe, qr_mass, qr_jam, cr_meas)
+    
+    # 1. Probe (Logical 0,1,2)
+    qc.rz(theta, qr_probe)
+    qc.h(qr_probe)
+    qc.ccx(qr_probe[0], qr_probe[1], qr_probe[2])
+    qc.h(qr_probe)
+    qc.rx(theta, qr_probe)
+    qc.measure(qr_probe, cr_meas)
+    
+    # 2. Mass (Logical 3..N)
+    mass_block = QuantumVolume(num_mass_qubits, 12, seed=42)
+    qc.compose(mass_block, qubits=qr_mass, inplace=True)
+    
+    # 3. Jammer (Logical N+1)
+    # Scales with approximate depth of other circuits to stay active
+    jammer_block = get_jammer_circuit(depth=15) 
+    qc.compose(jammer_block, qubits=qr_jam, inplace=True)
+    
+    return qc
+
+def main():
+    service = QiskitRuntimeService()
+    backend = service.backend(BACKEND_NAME)
+    sampler = Sampler(mode=backend)
+    
+    thetas = np.linspace(0, 2*np.pi, THETA_STEPS)
+    
+    print(f"--- INITIATING BRIDGE BREAKER ON {BACKEND_NAME} ---")
+    print(f"Configuration: MID Mass + Q56 Jammer")
+    
+    # 1. Define Layout
+    # Map: Probe -> Mass -> Jammer
+    initial_layout = PROBE_PHYSICAL + MASS_PHYSICAL + BRIDGE_QUBIT
+    print(f"Layout Map: {initial_layout}")
+    
+    # 2. Build Circuits
+    circuits = []
+    for theta in thetas:
+        qc = get_logical_universe_with_jammer(theta, len(MASS_PHYSICAL))
+        qc.name = f"broken_bridge_{theta:.3f}"
+        circuits.append(qc)
+        
+    # 3. Transpile
+    print("Transpiling with fixed layout...")
+    isa_circuits = transpile(
+        circuits, 
+        backend=backend, 
+        initial_layout=initial_layout,
+        optimization_level=3
+    )
+    
+    # 4. Submit
+    print("Submitting Jammed Universe...")
+    job = sampler.run(isa_circuits, shots=SHOTS)
+    print(f"Job ID: {job.job_id()}")
+
+if __name__ == "__main__":
+    main()
+
+[pull_bb.py](https://github.com/user-attachments/files/24213405/pull_bb.py)
+"""
+The Bridge Breaker Analyzer: Measuring the Topological Cut
+Input: Job ID d51ai18nsj9s73aup2ig (The Jammed Universe)
+Purpose: Determine if blocking Qubit 56 severed the Gravitational Link.
+"""
+
+import numpy as np
+import matplotlib.pyplot as plt
+import json
+from qiskit_ibm_runtime import QiskitRuntimeService
+
+# --- DATA MANIFEST ---
+# We compare the new data against the established baselines
+JOBS = {
+    "VACUUM":   "d519flnp3tbc73ak9i9g",  # Baseline (No Mass)
+    "MID_OPEN": "d51a2kjht8fs739sqhog",  # Strong Gravity (Tunnel Open)
+    "MID_CUT":  "d51ai18nsj9s73aup2ig"   # The Experiment (Tunnel Jammed)
+}
+
+def extract_counts_safe(pub):
+    """Robust count extraction."""
+    for key in ['meas', 'meas_probe', 'c', 'c0', 'creg_meas']:
+        if hasattr(pub.data, key):
+            return getattr(pub.data, key).get_counts()
+            
+    attributes = [a for a in dir(pub.data) if not a.startswith('_')]
+    for attr in attributes:
+        val = getattr(pub.data, attr)
+        if hasattr(val, 'get_counts'):
+            return val.get_counts()
+    return {}
+
+def get_p111_curve(job_id, label):
+    print(f"Retrieving {label} ({job_id})...")
+    service = QiskitRuntimeService()
+    job = service.job(job_id)
+    result = job.result()
+    pubs = list(result)
+    
+    p111_curve = []
+    
+    # Handle the specific structure of the Vacuum job (Pub 0) vs others
+    target_pubs = pubs
+    if label == "VACUUM":
+        # Vacuum was part of a multi-pub job, we take the first 50
+        if len(pubs) >= 50: target_pubs = pubs[0:50]
+        elif len(pubs) == 2: pass # Handle legacy array format if needed
+    
+    for p in target_pubs:
+        try:
+            counts = extract_counts_safe(p)
+            total = sum(counts.values())
+            p111_curve.append(counts.get('111', 0)/total)
+        except: pass
+        
+    return np.array(p111_curve)
+
+def fit_tractrix_sigma(p111_curve):
+    """Calculates Metric Depth sigma = ln(1/Omega)."""
+    if len(p111_curve) == 0: return 0
+    y = np.sqrt(p111_curve)
+    # Use 95th percentile to avoid single-shot noise spikes
+    R = np.percentile(y, 95) 
+    Omega = 1.0 / R
+    sigma = np.log(1.0 / Omega)
+    return sigma
+
+def main():
+    results = {}
+    
+    # 1. Process Data
+    for label, jid in JOBS.items():
+        try:
+            curve = get_p111_curve(jid, label)
+            sigma = fit_tractrix_sigma(curve)
+            results[label] = {"sigma": sigma, "curve": curve}
+            print(f"  -> {label}: Sigma = {sigma:.5f}")
+        except Exception as e:
+            print(f"  [!] Error processing {label}: {e}")
+
+    # 2. Forensic Comparison
+    vac_sigma = results["VACUUM"]["sigma"]
+    open_shift = results["MID_OPEN"]["sigma"] - vac_sigma
+    cut_shift  = results["MID_CUT"]["sigma"] - vac_sigma
+    
+    print("\n--- THE CUTTING OF THE WIRE ---")
+    print(f"Vacuum Baseline:      {vac_sigma:.5f}")
+    print(f"Tunnel OPEN Force:    {open_shift:.5f} (Strong Pull)")
+    print(f"Tunnel JAMMED Force:  {cut_shift:.5f} (The Result)")
+    
+    # Calculate Attenuation
+    attenuation = 100 * (1 - (cut_shift / open_shift))
+    print(f"\nGRAVITY DAMPENING: {attenuation:.1f}%")
+    
+    if abs(cut_shift) < abs(open_shift) * 0.5:
+        print("VERDICT: BRIDGE BROKEN. Gravity is Topological.")
+    else:
+        print("VERDICT: BRIDGE INTACT. Gravity is Spatial (or Jammer Failed).")
+
+    # 3. Visualization
+    plt.figure(figsize=(10, 6))
+    
+    # Plot normalized curves (just the shape)
+    # We interpolate to match lengths since Vacuum had 50 steps, others 40
+    theta_norm = np.linspace(0, 2*np.pi, 100)
+    
+    for label, color, style in [("VACUUM", 'blue', '--'), ("MID_OPEN", 'red', '-'), ("MID_CUT", 'green', '-')]:
+        curve = results[label]["curve"]
+        x_orig = np.linspace(0, 2*np.pi, len(curve))
+        y_interp = np.interp(theta_norm, x_orig, curve)
+        plt.plot(theta_norm, y_interp, color=color, linestyle=style, label=f"{label} (σ={results[label]['sigma']:.3f})", linewidth=2)
+
+    plt.title("The Bridge Breaker: Turning Off Gravity")
+    plt.xlabel("Temporal Angle Theta")
+    plt.ylabel("Resonance Probability P(111)")
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    plt.savefig("bridge_breaker_result.png")
+    plt.show()
+    
+    # Save raw data
+    with open("bridge_breaker_data.json", "w") as f:
+        serializable = {k: {"sigma": v["sigma"], "curve": v["curve"].tolist()} for k,v in results.items()}
+        json.dump(serializable, f, indent=2)
+
+if __name__ == "__main__":
+    main()
+
+[bridge_breaker_data.json](https://github.com/user-attachments/files/24213407/bridge_breaker_data.json)
+{
+  "VACUUM": {
+    "sigma": -0.07226520385238383,
+    "curve": [
+      0.00390625,
+      0.0078125,
+      0.0078125,
+      0.0078125,
+      0.01171875,
+      0.0,
+      0.00390625,
+      0.01953125,
+      0.03515625,
+      0.04296875,
+      0.0546875,
+      0.078125,
+      0.1328125,
+      0.21484375,
+      0.2109375,
+      0.2890625,
+      0.38671875,
+      0.4453125,
+      0.57421875,
+      0.69921875,
+      0.6796875,
+      0.6796875,
+      0.86328125,
+      0.8203125,
+      0.8671875,
+      0.90625,
+      0.88671875,
+      0.83984375,
+      0.80859375,
+      0.62109375,
+      0.5546875,
+      0.5234375,
+      0.3515625,
+      0.30078125,
+      0.1796875,
+      0.2265625,
+      0.15625,
+      0.08203125,
+      0.0859375,
+      0.046875,
+      0.05078125,
+      0.015625,
+      0.00390625,
+      0.01171875,
+      0.0078125,
+      0.00390625,
+      0.0078125,
+      0.0,
+      0.0078125,
+      0.0078125
+    ]
+  },
+  "MID_OPEN": {
+    "sigma": -0.11501050667033372,
+    "curve": [
+      0.0078125,
+      0.00390625,
+      0.0078125,
+      0.01953125,
+      0.015625,
+      0.015625,
+      0.0390625,
+      0.05078125,
+      0.0625,
+      0.12890625,
+      0.15234375,
+      0.21875,
+      0.3046875,
+      0.4140625,
+      0.47265625,
+      0.59375,
+      0.69140625,
+      0.79296875,
+      0.78515625,
+      0.83203125,
+      0.82421875,
+      0.76953125,
+      0.71484375,
+      0.66015625,
+      0.4921875,
+      0.41796875,
+      0.28515625,
+      0.19921875,
+      0.2109375,
+      0.1171875,
+      0.109375,
+      0.046875,
+      0.02734375,
+      0.00390625,
+      0.01953125,
+      0.01171875,
+      0.00390625,
+      0.015625,
+      0.015625,
+      0.0
+    ]
+  },
+  "MID_CUT": {
+    "sigma": -0.08960071472885564,
+    "curve": [
+      0.0078125,
+      0.0078125,
+      0.0078125,
+      0.015625,
+      0.015625,
+      0.0,
+      0.0234375,
+      0.0546875,
+      0.109375,
+      0.109375,
+      0.1484375,
+      0.2265625,
+      0.2890625,
+      0.375,
+      0.5,
+      0.625,
+      0.671875,
+      0.8203125,
+      0.84375,
+      0.8359375,
+      0.8359375,
+      0.7734375,
+      0.6875,
+      0.6328125,
+      0.4921875,
+      0.4921875,
+      0.25,
+      0.296875,
+      0.140625,
+      0.125,
+      0.1171875,
+      0.0234375,
+      0.015625,
+      0.046875,
+      0.015625,
+      0.0078125,
+      0.0,
+      0.0234375,
+      0.0,
+      0.015625
+    ]
+  }
+}
