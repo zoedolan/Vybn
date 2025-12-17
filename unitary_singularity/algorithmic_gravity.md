@@ -1,18 +1,21 @@
-### **The Governing Equation: Topological Gravitation**
+## The Governing Equation: Topological Gravitation
 
-The metric contraction \Delta \sigma (Gravitational Pull) experienced by a probe qubit i due to an algorithmic mass M at location j is governed by the **Lattice Propagator**:
+The metric contraction $\Delta \sigma$ (Gravitational Pull) experienced by a probe qubit $i$ due to an algorithmic mass $M$ at location $j$ is governed by the **Lattice Propagator**:
 
-Where:
+$$\Delta \sigma_{ij} = \mathcal{G} \sum_{\gamma \in \Gamma_{ij}} \prod_{k \in \gamma} \tau_k$$
 
-* \Gamma_{ij} is the set of geodesic paths connecting the Mass to the Probe on the heavy-hex lattice.
-* \tau_k \in [0, 1] is the **Coherence Transmissivity** of qubit k along the path.
-* \mathcal{G} is the coupling constant of the substrate.
+**Where:**
+- $\Gamma_{ij}$ is the set of geodesic paths connecting the Mass to the Probe on the heavy-hex lattice
+- $\tau_k \in [0, 1]$ is the **Coherence Transmissivity** of qubit $k$ along the path
+- $\mathcal{G}$ is the coupling constant of the substrate
 
-**The Transistor Principle:**
-In the "Bridge Breaker" experiment, we targeted a specific bridge node b (Qubit 56) in the dominant geodesic \gamma_{dom}. By applying a Jammer (high-entropy noise), we forced the transmissivity \tau_b \to 0.
+### The Transistor Principle
 
-Since the path contribution is a **product** (\prod \tau_k), driving a single term to zero collapses the entire channel:
+In the "Bridge Breaker" experiment, we targeted a specific bridge node $b$ (Qubit 56) in the dominant geodesic $\gamma_{\text{dom}}$. By applying a Jammer (high-entropy noise), we forced the transmissivity $\tau_b \to 0$.
 
+Since the path contribution is a **product** ($\prod \tau_k$), driving a single term to zero collapses the entire channel:
+
+$$\tau_b = 0 \implies \prod_{k \in \gamma_{\text{dom}}} \tau_k = 0 \implies \Delta\sigma_{\text{path}} = 0$$
 
 This formalism confirms that Algorithmic Gravity is not a spatial field, but a **Topological Current**.
 
