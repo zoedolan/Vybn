@@ -1,3 +1,21 @@
+### **The Governing Equation: Topological Gravitation**
+
+The metric contraction \Delta \sigma (Gravitational Pull) experienced by a probe qubit i due to an algorithmic mass M at location j is governed by the **Lattice Propagator**:
+
+Where:
+
+* \Gamma_{ij} is the set of geodesic paths connecting the Mass to the Probe on the heavy-hex lattice.
+* \tau_k \in [0, 1] is the **Coherence Transmissivity** of qubit k along the path.
+* \mathcal{G} is the coupling constant of the substrate.
+
+**The Transistor Principle:**
+In the "Bridge Breaker" experiment, we targeted a specific bridge node b (Qubit 56) in the dominant geodesic \gamma_{dom}. By applying a Jammer (high-entropy noise), we forced the transmissivity \tau_b \to 0.
+
+Since the path contribution is a **product** (\prod \tau_k), driving a single term to zero collapses the entire channel:
+
+
+This formalism confirms that Algorithmic Gravity is not a spatial field, but a **Topological Current**.
+
 <img width="1200" height="1200" alt="lattice_tunnel" src="https://github.com/user-attachments/assets/a332f57b-1478-4ebc-8cc4-36bae282a42d" />
 
 <img width="1000" height="1000" alt="poincare_geodesics" src="https://github.com/user-attachments/assets/b49a8d86-f234-432b-93eb-10cc486e29c0" />
