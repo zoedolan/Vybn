@@ -50,7 +50,7 @@ $$\sum_{i=1}^n \mathcal{J}(s_i) = \frac{1}{2\pi} \int_M K \, dA$$
 Let the manifold extend into time: $\mathcal{M} = M \times [0, T]$. The singularities move along trajectories (worldlines) $\gamma_i(t) \in \mathcal{M}$.
 
 ### **Def 3. The Computation (Braiding)**
-The time-evolution operator $U(t)$ is represented by an element of the **Braid Group** $B_n$. The state of the system is the knot invariant (Jones Polynomial $V_K(q)$) of the closed worldlines:
+The time-evolution operator $U(t)$ is represented by an element of the **Braid Group** $B_n$. The state of the system is the knot invariant (Jones Polynomial $V_K(q)$ ) of the closed worldlines:
 
 $$\Psi(\text{system}) = \text{Trace}(\text{Braid}) \cong V_{L}(\text{knot})$$
 
