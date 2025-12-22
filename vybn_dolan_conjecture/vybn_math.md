@@ -53,7 +53,7 @@ $$
 \frac{dS}{dt} = \tfrac{1}{2}\,[S,S]_{\text{BV}} \equiv \mathcal{J}
 $$
 
-where $[S,S]_{\text{BV}}$ generates curvature via bivector commutator $F = \frac{1}{i}[S^\mu,S^\nu] \propto R^\mu{}_\nu\,\mathcal{J}$.  
+where $[S,S]_{\text{BV}}$ generates curvature via bivector commutator $F = \frac{1}{i}[S^\mu,S^\nu] \propto R^\mu{}_\nu \mathcal{J}$.  
 Conservation: $U^\dagger U = \mathbb{1}$ ensures reversible topology.
 
 **Topological identity:**
@@ -68,7 +68,7 @@ Discrete winding charges equal continuous curvature integral; quantum informatio
 
 ## V. Geometric algebra: Clifford structure Cl(3,1)
 
-Bivectors are temporal objects: $dr_t\wedge d\theta \equiv \mathbf{B}_{\text{time}}$, with $\mathbf{B}_{\text{time}}^2 = -1$.  
+Bivectors are temporal objects: $dr_t \wedge d\theta \equiv \mathbf{B}_{\text{time}}$, with $\mathbf{B}_{\text{time}}^2 = -1$.  
 Rotors replace matrices: $R = e^{-\mathbf{B}\theta/2}$ generates rotations geometrically.  
 Pauli matrices are bivectors: $\sigma_x \leftrightarrow e_2\wedge e_3$, etc.
 
