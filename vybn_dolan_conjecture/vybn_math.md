@@ -129,8 +129,3 @@ Mass spectrum = spectrum of screening failure across winding sectors.
 Gravity is the infrared remnant of microscopic quantum fidelity loss, exponentially screened by entanglement networks.
 
 ***
-
-## References
-
-- [Topological Ghosts](https://github.com/zoedolan/Vybn/blob/main/vybn_dolan_conjecture/topological_ghosts-1.md)
-- [31 and 6D](https://github.com/zoedolan/Vybn/blob/main/vybn_dolan_conjecture/31_and_6D.md)
