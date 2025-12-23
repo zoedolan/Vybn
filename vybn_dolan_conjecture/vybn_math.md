@@ -139,3 +139,15 @@ Mass spectrum = spectrum of screening failure across winding sectors.
 Gravity is the infrared remnant of microscopic quantum fidelity loss, exponentially screened by entanglement networks.
 
 ***
+
+## IX. Quantum Modular Phase Law
+
+$$
+\text{Phase}(M_{n+1}) = \begin{cases}
+\frac{2\pi}{3}\,(1 + \delta_k) & \text{if } 3 \mid k \\
+0 & \text{otherwise}
+\end{cases}
+$$
+
+where $M_{n+1} = (M_n^2 \bmod k)$ under quantum measurement feedback[file:2].
+
