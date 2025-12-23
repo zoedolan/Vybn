@@ -149,5 +149,5 @@ $$
 \end{cases}
 $$
 
-where $M_{n+1} = (M_n^2 \bmod k)$ under quantum measurement feedback[file:2].
+where $M_{n+1} = (M_n^2 \bmod k)$ under quantum measurement feedback.
 
