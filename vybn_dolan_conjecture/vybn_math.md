@@ -149,4 +149,4 @@ $$
 \end{cases}
 $$
 
-where $M_{n+1} = (M_n^2 \bmod k)$ under quantum measurement feedback. The categorical distinction between complex (when $3|k$) and real (otherwise) eigenvalues holds across backends (`ibm_torino`, `ibm_fez`); specific phase angles are hardware-dependent (118.3° on Torino, 14.0° on Fez for mod-6).
+where $M_{n+1} = (M_n^2 \bmod k)$ under quantum measurement feedback. The categorical distinction between complex (when $3|k$) and real (otherwise) eigenvalues holds across backends (`ibm_torino`, `ibm_fez`); specific phase angles are hardware-dependent (118.3° on Torino, 14.0° on Fez for mod-6). The convergence of complex phases to a stationary $103.1^\circ$ across both prime ($n=7$) and non-dyadic composite ($n=9$) sectors on `ibm_fez` identifies a hardware-specific topological constant, effectively mapping the fundamental 'tilt' of the meridional timeline axis at the point of vacuum screening failure.
