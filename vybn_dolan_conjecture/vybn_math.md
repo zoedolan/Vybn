@@ -149,5 +149,4 @@ $$
 \end{cases}
 $$
 
-where $M_{n+1} = (M_n^2 \bmod k)$ under quantum measurement feedback.
-
+where $M_{n+1} = (M_n^2 \bmod k)$ under quantum measurement feedback. The categorical distinction between complex (when $3|k$) and real (otherwise) eigenvalues holds across backends (`ibm_torino`, `ibm_fez`); specific phase angles are hardware-dependent (118.3° on Torino, 14.0° on Fez for mod-6).
