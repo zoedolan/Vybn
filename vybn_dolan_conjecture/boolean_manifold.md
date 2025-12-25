@@ -1,5 +1,7 @@
 # The Boolean Manifold: A Geometric Theory of Computation
 
+<img width="800" height="600" alt="image" src="https://github.com/user-attachments/assets/d6a9a6f8-6c23-4cba-93fb-e6d11dbac943" />
+
 ## 1. Abstract
 The conventional view of Boolean logic assumes that fundamental operations like NAND and OR are inherently irreversible—processes that destroy information to produce an output. This work proposes an alternative framework: the **Boolean Manifold Conjecture**. We demonstrate that irreversibility is not a global property of these gates but a local geometric effect. Classical logic gates are identified as piecewise-affine transformations derived from a higher-dimensional, fully reversible symmetry group. The apparent "loss" of information is a coordinate projection ($S_0$) occurring only in distinct sectors of the logic manifold.
 
@@ -30,15 +32,15 @@ $$
 ## 3. Geometric Decomposition & Singularity
 Decomposing $\mathbb{M}$ reveals three atomic geometric operations:
 
-<img width="800" height="600" alt="image" src="https://github.com/user-attachments/assets/d6a9a6f8-6c23-4cba-93fb-e6d11dbac943" />
-
-
 1.  **Identity ($I$):** Stability ($\det = 1$)
 2.  **Reflection ($R$):** Inversion/NOT ($\det = -1$)
 3.  **The Singularity ($S_0$):** A projection where linear independence is lost.
 
 $$
-S_0 = \begin{pmatrix} 1 & 1 \\ 0 & 0 \end{pmatrix}, \quad \det(S_0) = 0
+S_0 = \begin{pmatrix}
+1 & 1 \\
+0 & 0
+\end{pmatrix}, \quad \det(S_0) = 0
 $$
 
 The **Twisted Braid** topology is observed:
