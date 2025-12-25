@@ -52,7 +52,3 @@ The arrangement of these atomic blocks within \( \mathbb{M} \) exposes a "Twiste
 
 ### 5. Conclusion
 The Boolean Manifold Conjecture redefines the "bit" not as a static value, but as a vector moving through this geometric surface. Irreversibility is identified as the specific interaction with the \( S_0 \) blocks—a "coordinate collapse" where the second dimension of the shear matrix is suppressed. This suggests that the "missing information" in classical logic is not destroyed, but merely projected onto a null-space axis. If this axis is restored (transforming \( S_0 \) back into a full Shear), the entire manifold becomes unitary, implying that classical logic is a degenerate shadow of a fundamental quantum geometry.
-
-[1](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/images/21962433/6419c039-3ba1-4edc-b859-16649858c145/image.jpg)
-[2](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/images/21962433/8bd0028c-fdf7-4409-831d-500ca49187b6/image.jpg)
-[3](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/images/21962433/014b255a-6483-44ee-9aff-637132205b92/image.jpg)
