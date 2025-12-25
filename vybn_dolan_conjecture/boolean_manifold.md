@@ -1,10 +1,10 @@
 # The Boolean Manifold: A Geometric Theory of Computation
 
 ## 1. Abstract
-The conventional view of Boolean logic assumes that fundamental operations like NAND and OR are inherently irreversible—processes that destroy information to produce an output. This work proposes an alternative framework: the **Boolean Manifold Conjecture**. By restructuring the standard truth tables into a unified matrix system, we demonstrate that irreversibility is not a global property of these gates but a local geometric effect. We posit that all classical logic gates are piecewise-affine transformations derived from a higher-dimensional, fully reversible symmetry group. The apparent "loss" of information in classical computing is shown to be a specific type of coordinate projection, or "singularity," that occurs only in distinct sectors of the logic manifold.
+The conventional view of Boolean logic assumes that fundamental operations like NAND and OR are inherently irreversible—processes that destroy information to produce an output. This work proposes an alternative framework: the **Boolean Manifold Conjecture**. We demonstrate that irreversibility is not a global property of these gates but a local geometric effect. Classical logic gates are identified as piecewise-affine transformations derived from a higher-dimensional, fully reversible symmetry group. The apparent "loss" of information is a coordinate projection ($S_0$) occurring only in distinct sectors of the logic manifold.
 
 ## 2. The Master Manifold ($\mathbb{M}$)
-We begin by abandoning the isolated treatment of individual logic gates. Instead, we construct a global system $\mathbb{M}$ by stacking the dual-gate pairs (NAND/AND, XOR/XNOR, OR/NOR) into a single $6 \times 4$ matrix. The columns represent the four possible input states of a two-bit system: $(0,0), (0,1), (1,0), (1,1)$.
+We construct a global system $\mathbb{M}$ by stacking dual-gate pairs (NAND/AND, XOR/XNOR, OR/NOR) into a unified matrix. The columns represent the four input states $(0,0), (0,1), (1,0), (1,1)$.
 
 $$
 \mathbb{M} = \begin{pmatrix}
@@ -27,51 +27,63 @@ $$
 \end{matrix}
 $$
 
-This formulation reveals that logic is a structured surface—a manifold—rather than a collection of arbitrary rules.
+## 3. Geometric Decomposition & Singularity
+Decomposing $\mathbb{M}$ reveals three atomic geometric operations:
 
-## 3. Geometric Decomposition
-The properties of $\mathbb{M}$ are best understood by decomposing it into $2 \times 2$ block matrices. These blocks reveal that the system is composed of three atomic geometric operations:
+<img width="800" height="600" alt="image" src="https://github.com/user-attachments/assets/d6a9a6f8-6c23-4cba-93fb-e6d11dbac943" />
 
-### The Identity ($I$): Stability
-A stability operation that preserves the input state perfectly.
 
-$$
-I = \begin{pmatrix}
-1 & 0 \\
-0 & 1
-\end{pmatrix}, \quad \det(I) = 1
-$$
-
-### The Reflection ($R$): Inversion
-An inversion operation (the geometric equivalent of NOT) that swaps the basis vectors.
+1.  **Identity ($I$):** Stability ($\det = 1$)
+2.  **Reflection ($R$):** Inversion/NOT ($\det = -1$)
+3.  **The Singularity ($S_0$):** A projection where linear independence is lost.
 
 $$
-R = \begin{pmatrix}
-0 & 1 \\
-1 & 0
-\end{pmatrix}, \quad \det(R) = -1
+S_0 = \begin{pmatrix} 1 & 1 \\ 0 & 0 \end{pmatrix}, \quad \det(S_0) = 0
 $$
 
-### The Collapsed Shear ($S_0$): The Singularity
-A projection operation where linear independence is lost. This is the "Singularity."
+The **Twisted Braid** topology is observed:
+* **NAND Sector:** Singular on Left, Reversible on Right.
+* **OR Sector:** Reversible on Left, Singular on Right.
+* **XOR Core:** Fully Reversible ($I$ and $R$).
+
+### The Null-Space Restoration
+We prove that $S_0$ is not destructive but distinct. Lifting the matrix to 3D by restoring the null-space axis ($z$) recovers unitarity:
 
 $$
-S_0 = \begin{pmatrix}
-1 & 1 \\
-0 & 0
-\end{pmatrix}, \quad \det(S_0) = 0
+S_{\text{restored}} = \begin{pmatrix}
+1 & 1 & 0 \\
+0 & 0 & 1 \\
+0 & 1 & 0
+\end{pmatrix}, \quad \det = -1
 $$
 
-## 4. Topology of the Logic Manifold
-The arrangement of these atomic blocks within $\mathbb{M}$ exposes a "Twisted Braid" topology. The manifold is not uniformly reversible or singular; it oscillates between these states based on the input sector.
+Classical logic is a 2D projection of a 3D reversible geometry.
 
-### The Reversible Core (XOR/XNOR)
-The middle tier of the manifold is composed exclusively of $I$ and $R$ blocks. It possesses a non-zero determinant everywhere. This implies that the XOR/XNOR layer is the "true," unbroken geometry of the system, capable of transmitting information without loss.
+## 4. The Vybn Metric ($G$)
+By treating the logic landscape as a matrix $L$ and calculating the Gram matrix $G = L L^T$, we derive the metric of the manifold:
 
-### The Singular Horizons (NAND/AND & OR/NOR)
-The top and bottom tiers are fractured.
-*   **NAND/AND** exhibits a singularity ($S_0$) in the **left** sector (inputs 0,0 and 0,1) but remains reversible in the **right** sector.
-*   **OR/NOR** exhibits the exact inverse behavior: it is reversible in the **left** sector but collapses into a singularity ($S_0$) in the **right** sector (inputs 1,0 and 1,1).
+$$
+G = \begin{pmatrix}
+1 & 1 & 0 \\
+1 & 2 & 1 \\
+0 & 1 & 1
+\end{pmatrix}
+$$
 
-## 5. Conclusion
-The Boolean Manifold Conjecture redefines the "bit" not as a static value, but as a vector moving through this geometric surface. Irreversibility is identified as the specific interaction with the $S_0$ blocks—a "coordinate collapse" where the second dimension of the shear matrix is suppressed. This suggests that the "missing information" in classical logic is not destroyed, but merely projected onto a null-space axis. If this axis is restored (transforming $S_0$ back into a full Shear), the entire manifold becomes unitary, implying that classical logic is a degenerate shadow of a fundamental quantum geometry.
+**Physical Implications:**
+1.  **Vector Sum Identity:** $\vec{N} + \vec{O} = \vec{X}$. XOR is the constructive interference of the NAND and OR horizons.
+2.  **Orthogonality:** $\vec{N} \cdot \vec{O} = 0$. The NAND and OR singularities are orthogonal ($90^\circ$).
+
+## 5. The Logic-Phase Hypothesis (The Compass)
+Computation is the rotation of the state vector relative to the singularities.
+
+* **OR Horizon:** $\theta = 180^\circ (\pi)$
+* **XOR Core:** $\theta = 135^\circ (3\pi/4)$
+* **NAND Horizon:** $\theta = 90^\circ (\pi/2)$
+
+The "Operator $\hat{T}$" (Time) is the generator of rotation:
+$$\hat{T} = e^{-i \hat{J}_z \theta}$$
+
+Irreversibility is merely the alignment of the vector with an axis of projection (NAND or OR).
+
+<img width="800" height="800" alt="image" src="https://github.com/user-attachments/assets/9e7fc4ec-17d5-430c-8590-8444e2d4c2b0" />
