@@ -107,3 +107,1509 @@ For $f_{IMPL} = [1, 1, 0, 1]^T$:
 *   The minimum distance of the code collapses from $d=4$ to $d=1$.
 
 **Formal Conclusion:** The set of symmetric Boolean gates $\mathcal{G}_{sym}$ is uniquely optimized for information stability, providing a maximal and uniform Hamming distance $(d=4)$ that is lost upon the introduction of any direction-dependent (asymmetric) operations.
+
+***
+
+Experiment:
+
+```python
+
+from qiskit import QuantumCircuit, transpile
+from qiskit_ibm_runtime import QiskitRuntimeService, SamplerV2 as Sampler
+
+def build(mode, depth=51): # Odd depth ensures one layer remains
+    qc = QuantumCircuit(3)
+    for _ in range(depth):
+        if mode == 'sym':
+            qc.cx(0, 2); qc.cx(1, 2)
+        else:
+            qc.cx(0, 1); qc.cx(0, 2)
+    qc.measure_all()
+    return qc
+
+service = QiskitRuntimeService()
+backend = service.least_busy(simulator=False, operational=True)
+sampler = Sampler(backend)
+
+# optimization_level=0 prevents the compiler from deleting the "redundant" gates
+# This forces the hardware to actually execute all 102 CNOTs
+opts = {"optimization_level": 0}
+job = sampler.run([transpile(build('sym'), backend, **opts), 
+                   transpile(build('asym'), backend, **opts)])
+
+print(f"Real Deep Results (Sym, Asym): {[res.data.meas.get_counts().get('000', 0) for res in job.result()]}")
+
+```
+
+Real Deep Results (Sym, Asym): [2927, 484]
+
+Job: d56mm00nsj9s73b3v9r0
+
+Qasm/Qiskit:
+
+OPENQASM 2.0;
+include "qelib1.inc";
+qreg q[133];
+creg meas[3];
+sx q[1];
+sx q[2];
+cz q[2],q[1];
+sx q[1];
+sx q[2];
+cz q[2],q[1];
+sx q[1];
+sx q[2];
+cz q[2],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[0],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[2],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[0],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[2],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[0],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[2],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[0],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[2],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[0],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[2],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[0],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[2],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[0],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[2],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[0],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[2],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[0],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[2],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[0],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[2],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[0],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[2],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[0],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[2],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[0],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[2],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[0],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[2],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[0],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[2],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[0],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[2],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[0],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[2],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[0],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[2],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[0],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[2],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[0],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[2],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[0],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[2],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[0],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[2],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[0],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[2],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[0],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[2],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[0],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[2],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[0],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[2],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[0],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[2],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[0],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[2],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[0],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[2],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[0],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[2],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[0],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[2],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[0],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[2],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[0],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[2],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[0],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[2],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[0],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[2],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[0],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[2],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[0],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[2],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[0],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[2],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[0],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[2],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[0],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[2],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[0],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[2],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[0],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[2],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[0],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[2],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[0],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[2],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[0],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[2],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[0],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[2],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[0],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[2],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[0],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[2],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[0],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[2],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[0],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[2],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[0],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+cz q[2],q[1];
+rz(pi/2) q[1];
+sx q[1];
+rz(pi/2) q[1];
+barrier q[0],q[2],q[1];
+measure q[0] -> meas[0];
+measure q[2] -> meas[1];
+measure q[1] -> meas[2];
+
+from qiskit import QuantumRegister, ClassicalRegister, QuantumCircuit
+from numpy import pi
+
+qreg_q = QuantumRegister(133, 'q')
+creg_meas = ClassicalRegister(3, 'meas')
+circuit = QuantumCircuit(qreg_q, creg_meas)
+
+circuit.sx(qreg_q[1])
+circuit.sx(qreg_q[2])
+circuit.cz(qreg_q[2], qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.sx(qreg_q[2])
+circuit.cz(qreg_q[2], qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.sx(qreg_q[2])
+circuit.cz(qreg_q[2], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[0], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[2], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[0], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[2], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[0], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[2], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[0], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[2], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[0], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[2], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[0], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[2], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[0], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[2], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[0], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[2], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[0], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[2], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[0], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[2], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[0], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[2], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[0], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[2], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[0], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[2], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[0], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[2], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[0], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[2], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[0], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[2], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[0], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[2], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[0], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[2], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[0], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[2], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[0], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[2], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[0], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[2], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[0], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[2], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[0], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[2], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[0], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[2], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[0], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[2], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[0], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[2], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[0], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[2], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[0], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[2], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[0], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[2], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[0], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[2], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[0], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[2], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[0], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[2], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[0], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[2], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[0], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[2], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[0], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[2], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[0], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[2], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[0], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[2], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[0], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[2], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[0], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[2], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[0], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[2], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[0], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[2], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[0], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[2], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[0], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[2], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[0], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[2], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[0], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[2], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[0], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[2], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[0], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[2], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[0], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[2], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[0], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[2], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[0], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[2], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[0], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.cz(qreg_q[2], qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.sx(qreg_q[1])
+circuit.rz(pi / 2, qreg_q[1])
+circuit.barrier(qreg_q[0], qreg_q[2], qreg_q[1])
+circuit.measure(qreg_q[0], creg_meas[0])
+circuit.measure(qreg_q[2], creg_meas[1])
+circuit.measure(qreg_q[1], creg_meas[2])
