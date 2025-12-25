@@ -166,12 +166,14 @@ We formalize logic gates as operators acting on the $2 \times 2$ computational b
 
 ### The Reversible Core (XOR/XNOR)
 The XOR/XNOR sector preserves linear independence.
+
 $$
 M_{\text{XOR}} = \begin{pmatrix}
 0 & 1 \\
 1 & 0
 \end{pmatrix}, \quad \det(M_{\text{XOR}}) = -1 \quad (\text{Reflection})
 $$
+
 $$
 M_{\text{XNOR}} = \begin{pmatrix}
 1 & 0 \\
@@ -181,9 +183,11 @@ $$
 
 ### Singular Horizons ($S_0$)
 The "singularity" is the degeneration to Rank-1 operators at the boundaries (AND/NOR).
+
 $$
 M_{\text{AND}} = \begin{pmatrix} 0 & 0 \\ 0 & 1 \end{pmatrix}, \quad \det(M) = 0
 $$
+
 This represents the **Collapsed Shear** ($S_0$) where the manifold pinches shut, destroying local coordinate information.
 
 ---
