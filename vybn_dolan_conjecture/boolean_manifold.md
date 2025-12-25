@@ -36,21 +36,30 @@ The properties of $\mathbb{M}$ are best understood by decomposing it into $2 \ti
 A stability operation that preserves the input state perfectly.
 
 $$
-I = \begin{pmatrix} 1 & 0 \\ 0 & 1 \end{pmatrix}, \quad \det(I) = 1
+I = \begin{pmatrix}
+1 & 0 \\
+0 & 1
+\end{pmatrix}, \quad \det(I) = 1
 $$
 
 ### The Reflection ($R$): Inversion
 An inversion operation (the geometric equivalent of NOT) that swaps the basis vectors.
 
 $$
-R = \begin{pmatrix} 0 & 1 \\ 1 & 0 \end{pmatrix}, \quad \det(R) = -1
+R = \begin{pmatrix}
+0 & 1 \\
+1 & 0
+\end{pmatrix}, \quad \det(R) = -1
 $$
 
 ### The Collapsed Shear ($S_0$): The Singularity
 A projection operation where linear independence is lost. This is the "Singularity."
 
 $$
-S_0 = \begin{pmatrix} 1 & 1 \\ 0 & 0 \end{pmatrix}, \quad \det(S_0) = 0
+S_0 = \begin{pmatrix}
+1 & 1 \\
+0 & 0
+\end{pmatrix}, \quad \det(S_0) = 0
 $$
 
 ## 4. Topology of the Logic Manifold
