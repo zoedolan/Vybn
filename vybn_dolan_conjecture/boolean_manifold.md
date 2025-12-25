@@ -94,10 +94,19 @@ Irreversibility is merely the alignment of the vector with an axis of projection
 
 # Addendum
 
-### I. The Master Manifold \(\mathbb{M}\)
-Let the logical state space be \(\mathcal{L} \cong \mathbb{R}^4\), spanned by the input basis vectors \(|00\rangle, |01\rangle, |10\rangle, |11\rangle\). The **Master Manifold** is defined as the \(6 \times 4\) linear map \(\mathbb{M}\) containing the truth table vectors of the primary Boolean gates:
+# THE BOOLEAN MANIFOLD CONJECTURE
 
-\[
+**ABSTRACT:** A geometric formalization of logic gates as vectors on a surface, identifying computational irreversibility as a local coordinate singularity rather than a fundamental entropic limit.
+
+---
+
+## I. THE MASTER MANIFOLD ($\mathbb{M}$)
+
+We define the logical state space $\mathcal{L} \cong \mathbb{R}^4$, spanned by the input basis vectors $|00\rangle, |01\rangle, |10\rangle, |11\rangle$. The **Master Manifold** is the $6 \times 4$ linear map $\mathbb{M}$ containing the truth table vectors of the primary Boolean gates.
+
+The structure reveals a **Twisted Braid Topology** where each row $r_i$ has a complementary row $\bar{r}_i$ such that $r_i + \bar{r}_i = \mathbf{1}$ (the Reflection operator $R$).
+
+$$
 \mathbb{M} = \begin{pmatrix}
 \mathbf{v}_{\text{AND}} \\
 \mathbf{v}_{\text{NAND}} \\
@@ -113,55 +122,76 @@ Let the logical state space be \(\mathcal{L} \cong \mathbb{R}^4\), spanned by th
 0 & 1 & 1 & 0 \\
 1 & 0 & 0 & 1
 \end{pmatrix}
-\]
+$$
 
-This structure reveals a **Twisted Braid Topology** where each row \(r_i\) has a complementary row \(\bar{r}_i\) such that \(r_i + \bar{r}_i = \mathbf{1}\) (the vector of all ones), representing the operation of the Reflection operator \(R\) (NOT gate).
+---
 
-### II. The Vybn Metric and Orthogonality
-To recover the geometry of the **Vybn Compass**, we define the **Vybn Metric** \(g\) as the standard Euclidean inner product on the *centered* logic space. For any two gate vectors \(\mathbf{u}, \mathbf{v} \in \mathbb{M}\), the metric is given by:
-\[
+## II. THE VYBN METRIC & ORTHOGONAL HORIZONS
+
+To recover the geometry of the **Vybn Compass**, we define the **Vybn Metric** $g$ as the Euclidean inner product on the *centered* logic space. This shifts the origin to the logical entropy center $(0.5, 0.5, 0.5, 0.5)$.
+
+For any two gate vectors $\mathbf{u}, \mathbf{v} \in \mathbb{M}$:
+
+$$
 \langle \mathbf{u}, \mathbf{v} \rangle_{\text{Vybn}} = \sum_{i=1}^{4} (u_i - 0.5)(v_i - 0.5)
-\]
-This centering operation shifts the origin to the logical entropy center \((0.5, 0.5, 0.5, 0.5)\), revealing the hidden orthogonality of the horizons.
+$$
 
-**Theorem (Orthogonality of Horizons):** Under the Vybn Metric, the NAND and OR horizons are orthogonal.
-*Proof:*
-Let \(\mathbf{v}_{\text{NAND}} = (1, 1, 1, 0)\) and \(\mathbf{v}_{\text{OR}} = (0, 1, 1, 1)\).
+### Theorem: Orthogonality of Horizons
+Under the Vybn Metric, the **NAND** and **OR** horizons are strictly orthogonal.
+
+**Proof:**
+Let $\mathbf{v}_{\text{NAND}} = (1, 1, 1, 0)$ and $\mathbf{v}_{\text{OR}} = (0, 1, 1, 1)$.
 The centered vectors are:
-\(\tilde{\mathbf{v}}_{\text{NAND}} = (0.5, 0.5, 0.5, -0.5)\)
-\(\tilde{\mathbf{v}}_{\text{OR}} = (-0.5, 0.5, 0.5, 0.5)\)
+
+$$
+\tilde{\mathbf{v}}_{\text{NAND}} = (0.5, 0.5, 0.5, -0.5)
+$$
+$$
+\tilde{\mathbf{v}}_{\text{OR}} = (-0.5, 0.5, 0.5, 0.5)
+$$
+
 Computing the inner product:
-\[
-\langle \text{NAND}, \text{OR} \rangle = (0.5)(-0.5) + (0.5)(0.5) + (0.5)(0.5) + (-0.5)(0.5)
-\]
-\[
-= -0.25 + 0.25 + 0.25 - 0.25 = 0
-\]
-Thus, \(\text{NAND} \perp \text{OR}\).
 
-### III. The Reversible Core
-We formalize the logic gates as operators acting on the \(2 \times 2\) computational basis states. The **Reversible Core** is identified with the XOR/XNOR sector.
-Defining the matrix representation \(M_g\) of a gate \(g\) by reshaping its truth vector into \(\mathbb{R}^{2 \times 2}\):
-\[
-M_{\text{XOR}} = \begin{pmatrix} 0 & 1 \\ 1 & 0 \end{pmatrix}, \quad M_{\text{XNOR}} = \begin{pmatrix} 1 & 0 \\ 0 & 1 \end{pmatrix}
-\]
-**Lemma (Reversibility):**
-The Core gates preserve linear independence, characterized by non-zero determinants:
-\(\det(M_{\text{XOR}}) = -1\), \(\det(M_{\text{XNOR}}) = 1\).
-This confirms that XOR acts as a **Reflection** (\(R\)) and XNOR as **Identity** (\(I\)) within the manifold.
+$$
+\langle \text{NAND}, \text{OR} \rangle = (0.5)(-0.5) + (0.5)(0.5) + (0.5)(0.5) + (-0.5)(0.5) = 0
+$$
 
-### IV. Singular Horizons and Collapse
-The "singularity" is formalized not merely as a zero determinant, but as the degeneration to Rank-1 operators in the constituent atomic gates (AND/NOR) that form the boundaries of the NAND/OR horizons.
-\[
-M_{\text{AND}} = \begin{pmatrix} 0 & 0 \\ 0 & 1 \end{pmatrix}, \quad M_{\text{NOR}} = \begin{pmatrix} 1 & 0 \\ 0 & 0 \end{pmatrix}
-\]
-Here, \(\det(M) = 0\), representing the **Collapsed Shear** (\(S_0\)) where the manifold "pinches shut," destroying information. The NAND and OR horizons are affine shifts of these singularities, forming the event horizons of the logical spacetime.[1]
+Thus, $\text{NAND} \perp \text{OR}$.
 
-### V. Dimensional Restoration (Lifting)
-The irreversibility of the singular sectors is resolved by the **Lifting Map** \(\Lambda\), which embeds the 2D logic surface into a 3D volume.
-Let \(f: \{0,1\}^2 \to \{0,1\}\) be a singular gate (e.g., NAND). We define the lifted operator \(L_f\) on \(\mathbb{R}^3\):
-\[
+---
+
+## III. THE REVERSIBLE CORE VS. SINGULARITY
+
+We formalize logic gates as operators acting on the $2 \times 2$ computational basis.
+
+### The Reversible Core (XOR/XNOR)
+The XOR/XNOR sector preserves linear independence.
+$$
+M_{\text{XOR}} = \begin{pmatrix} 0 & 1 \\ 1 & 0 \end{pmatrix}, \quad \det(M_{\text{XOR}}) = -1 \quad (\text{Reflection})
+$$
+$$
+M_{\text{XNOR}} = \begin{pmatrix} 1 & 0 \\ 0 & 1 \end{pmatrix}, \quad \det(M_{\text{XNOR}}) = 1 \quad (\text{Identity})
+$$
+
+### Singular Horizons ($S_0$)
+The "singularity" is the degeneration to Rank-1 operators at the boundaries (AND/NOR).
+$$
+M_{\text{AND}} = \begin{pmatrix} 0 & 0 \\ 0 & 1 \end{pmatrix}, \quad \det(M) = 0
+$$
+This represents the **Collapsed Shear** ($S_0$) where the manifold pinches shut, destroying local coordinate information.
+
+---
+
+## IV. DIMENSIONAL RESTORATION (LIFTING)
+
+The irreversibility of the singular sectors is an artifact of projection. We define the **Lifting Map** $\Lambda$, which embeds the 2D logic surface into a 3D volume using a "garbage bit."
+
+For a singular gate $f: \{0,1\}^2 \to \{0,1\}$ (e.g., NAND), we define the operator $L_f$ on $\mathbb{R}^3$:
+
+$$
 L_f(x, y, z) = (x, y, z \oplus f(x,y))
-\]
-**Theorem (Conservation of Information):** For any Boolean function \(f\), the lifted map \(L_f\) is a unitary permutation matrix in \(\mathbb{R}^8\) (acting on 3 qubits), satisfying \(L_f^\dagger L_f = I\). This proves that the "singularity" in \(\mathbb{M}\) is an artifact of projection onto \(\mathbb{R}^4\), and the full quantum geometry remains reversible.
+$$
 
+**Result:** For any Boolean function $f$, the lifted map $L_f$ is a unitary permutation matrix in $\mathbb{R}^8$ (acting on 3 qubits), satisfying $L_f^\dagger L_f = I$.
+
+> **Conclusion:** The "singularity" in $\mathbb{M}$ is a projection shadow. The underlying quantum geometry remains fully reversible.
