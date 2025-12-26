@@ -12,9 +12,9 @@ $$
 M^2 = \langle e^{2\mathbf{I}\theta} \rangle_0 + \langle (-\mathbf{I}\mathbf{e}_t)^2 \rangle_0 + \epsilon^2 \langle \mathbf{e}_\tau^2 \rangle_0
 $$
 
-**3. The Geometric Contradiction (Standard Spacetime \(G_{1,3}\))**
+**3. The Geometric Contradiction (Standard Spacetime $\(G_{1,3}\)$)**
 
-If $ \(\mathbf{e}_{\tau}\) $ is **Space** \ $ (\big(\mathbf{e}_{\tau}^{2} $ = -1\big)\):
+If \(\mathbf{e}_{\tau}\) is **Space** \((\mathbf{e}_{\tau}^{2} = -1)\):
 
 $$
 M^2 = \cos(2\theta) - 1 - \epsilon^2 = 0 \quad \implies \quad \epsilon = \sqrt{\text{negative}} \quad (\text{Impossible})
