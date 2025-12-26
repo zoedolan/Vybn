@@ -14,11 +14,17 @@ $$
 
 **3. The Hyperbolic Solution (G₃,₁)**
 If $e(\tau)$ is Space ($e(\tau)^2 = -1$):
-$$M^2 = \cos(2\theta) - 1 - \epsilon^2 = 0 \quad \Rightarrow \quad \epsilon = \sqrt{\text{negative}} \quad \text{(Impossible)}$$
+
+$$
+M^2 = \cos(2\theta) - 1 - \epsilon^2 = 0 \quad \Rightarrow \quad \epsilon = \sqrt{\text{negative}} \quad \text{(Impossible)}
+$$
 
 **4. The Ultrahyperbolic Solution (G₂,₂)**
 If $e(\tau)$ is Time ($e(\tau)^2 = +1$):
-$$M^2 = \cos(2\theta) - 1 + \epsilon^2 = 0 \quad \Rightarrow \quad \epsilon^2 = 1 - \cos(2\theta)$$
+
+$$
+M^2 = \cos(2\theta) - 1 + \epsilon^2 = 0 \quad \Rightarrow \quad \epsilon^2 = 1 - \cos(2\theta)
+$$
 
 $$
 \epsilon(\theta) = \pm \sqrt{2}\sin(\theta)
