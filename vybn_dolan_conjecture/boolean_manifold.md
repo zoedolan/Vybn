@@ -185,7 +185,10 @@ $$
 The "singularity" is the degeneration to Rank-1 operators at the boundaries (AND/NOR).
 
 $$
-M_{\text{AND}} = \begin{pmatrix} 0 & 0 \\ 0 & 1 \end{pmatrix}, \quad \det(M) = 0
+M_{\text{AND}} = \begin{pmatrix}
+0 & 0 \\ 
+0 & 1
+\end{pmatrix}, \quad \det(M) = 0
 $$
 
 This represents the **Collapsed Shear** ($S_0$) where the manifold pinches shut, destroying local coordinate information.
