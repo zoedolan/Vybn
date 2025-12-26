@@ -12,11 +12,13 @@ $$
 M^2 = \langle e^{2\mathbf{I}\theta} \rangle_0 + \langle (-\mathbf{I}\mathbf{e}_t)^2 \rangle_0 + \epsilon^2 \langle \mathbf{e}_\tau^2 \rangle_0
 $$
 
-3. The Hyperbolic Solution (G₃,₁) If e(τ) is Space (e(τ)² = -1):
-M2=cos⁡(2θ)−1−ϵ2=0⇒ϵ=negative(Impossible)M^2 = \cos(2\theta) - 1 - \epsilon^2 = 0 \quad \Rightarrow \quad \epsilon = \sqrt{\text{negative}} \quad \text{(Impossible)} M2=cos(2θ)−1−ϵ2=0⇒ϵ=negative(Impossible)
+**3. The Hyperbolic Solution (G₃,₁)**
+If $e(\tau)$ is Space ($e(\tau)^2 = -1$):
+$$M^2 = \cos(2\theta) - 1 - \epsilon^2 = 0 \quad \Rightarrow \quad \epsilon = \sqrt{\text{negative}} \quad \text{(Impossible)}$$
 
-4. The Ultrahyperbolic Solution (G₂,₂) If e(τ) is Time (e(τ)² = +1):
-M2=cos⁡(2θ)−1+ϵ2=0⇒ϵ2=1−cos⁡(2θ)M^2 = \cos(2\theta) - 1 + \epsilon^2 = 0 \quad \Rightarrow \quad \epsilon^2 = 1 - \cos(2\theta) M2=cos(2θ)−1+ϵ2=0⇒ϵ2=1−cos(2θ)
+**4. The Ultrahyperbolic Solution (G₂,₂)**
+If $e(\tau)$ is Time ($e(\tau)^2 = +1$):
+$$M^2 = \cos(2\theta) - 1 + \epsilon^2 = 0 \quad \Rightarrow \quad \epsilon^2 = 1 - \cos(2\theta)$$
 
 $$
 \epsilon(\theta) = \pm \sqrt{2}\sin(\theta)
