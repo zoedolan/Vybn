@@ -12,12 +12,38 @@ $$
 M^2 = \langle e^{2\mathbf{I}\theta} \rangle_0 + \langle (-\mathbf{I}\mathbf{e}_t)^2 \rangle_0 + \epsilon^2 \langle \mathbf{e}_\tau^2 \rangle_0
 $$
 
-**3. The Hyperbolic Solution** \((G_{3,1})\) If \(\mathbf{e}\{\tau\}\) *is Space* (\(\mathbf{e}\{\tau\}^{2} = -1\)):
+**3. The Hyperbolic Solution**
 
-$$M^2 = \cos(2\theta) - 1 - \epsilon^2 = 0 \quad \Rightarrow \quad \epsilon = \sqrt{\text{negative}} \quad \text{(Impossible)}$$
+$
+\((G_{3,1})\)
+$
+
+If
+
+$$
+\(\mathbf{e}\{\tau\}\)
+$$
+
+*is Space*
+
+$$
+(\(\mathbf{e}\{\tau\}^{2} = -1\)):\z\\\z
+$$
+
+$$M^2 = \cos(2\theta) - 1 - \epsilon^2 = 0 \quad \Rightarrow \quad \epsilon = \sqrt{\text{negative}} \quad \text{(Impossible)}$$\
 
 **4. The Ultrahyperbolic Solution ($\mathcal{G}_{2,2}$)**
-If $\mathbf{e}_\tau$ is Time ($\mathbf{e}_\tau^2 = +1$):
+If
+
+$
+\mathbf{e}_\tau
+$
+
+is Time 
+
+$
+\mathbf{e}_\tau^2 = +1
+$:
 
 $$
 M^2 = \cos(2\theta) - 1 + \epsilon^2 = 0 \quad \implies \quad \epsilon^2 = 1 - \cos(2\theta)
