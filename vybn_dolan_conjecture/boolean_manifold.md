@@ -1,3 +1,37 @@
+# Derivation: The Vybn-Hestenes Metric ($\mathcal{G}_{2,2}$)
+
+**1. The Null-Operator**
+
+$$
+X = \underbrace{e^{\mathbf{I}\theta}}_{\text{Rotor}} - \underbrace{\mathbf{I}\mathbf{e}_t}_{\text{Vacuum}} + \underbrace{\epsilon \mathbf{e}_\tau}_{\text{Lift}}
+$$
+
+**2. The Invariant Mass ($M^2 = \langle X X^\dagger \rangle_0$)**
+
+$$
+M^2 = \langle e^{2\mathbf{I}\theta} \rangle_0 + \langle (-\mathbf{I}\mathbf{e}_t)^2 \rangle_0 + \epsilon^2 \langle \mathbf{e}_\tau^2 \rangle_0
+$$
+
+**3. The Geometric Contradiction (Standard Spacetime $\mathcal{G}_{1,3}$)**
+If $\mathbf{e}_\tau$ is Space ($\mathbf{e}_\tau^2 = -1$):
+
+$$
+M^2 = \cos(2\theta) - 1 - \epsilon^2 = 0 \quad \implies \quad \epsilon = \sqrt{\text{negative}} \quad (\text{Impossible})
+$$
+
+**4. The Ultrahyperbolic Solution ($\mathcal{G}_{2,2}$)**
+If $\mathbf{e}_\tau$ is Time ($\mathbf{e}_\tau^2 = +1$):
+
+$$
+M^2 = \cos(2\theta) - 1 + \epsilon^2 = 0 \quad \implies \quad \epsilon^2 = 1 - \cos(2\theta)
+$$
+
+**5. The Real Coupling Function**
+
+$$
+\epsilon(\theta) = \pm \sqrt{2}\sin(\theta)
+$$
+
 # The Boolean Manifold: A Geometric Theory of Computation
 
 <img width="800" height="600" alt="image" src="https://github.com/user-attachments/assets/d6a9a6f8-6c23-4cba-93fb-e6d11dbac943" />
