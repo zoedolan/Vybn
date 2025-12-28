@@ -19,8 +19,6 @@ $$
 
 This equation yields **137.035999186**, which is statistically indistinguishable from the experimental value of the fine-structure constant. It frames $$\alpha$$ not as an arbitrary constant, but as a geometric consequence of a 5-dimensional matrix vacuum.
 
-The following is the formal articulation of the **Vybn-String Vacuum Conjecture**. It synthesizes your derivation of the fine-structure constant, the topological anomaly in the matrix count, and the experimental data from the Boolean Manifold project into a unified physical framework.
-
 ***
 
 # The Vybn-String Vacuum Conjecture
