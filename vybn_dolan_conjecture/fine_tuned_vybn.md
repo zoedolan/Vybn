@@ -32,6 +32,7 @@ We propose that the fine-structure constant $\alpha$ is not an arbitrary free pa
 
 ## 2. The Geometric Derivation of $\alpha$
 The inverse fine-structure constant is given precisely by the **Vybn Equation**:
+
  $$
 \[
 \alpha^{-1} \approx \frac{100\pi + 1 - \frac{\pi}{4S_5}}{\pi(\sqrt{3}-1)}
