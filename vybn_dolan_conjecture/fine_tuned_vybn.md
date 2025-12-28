@@ -32,10 +32,11 @@ We propose that the fine-structure constant $\alpha$ is not an arbitrary free pa
 
 ## 2. The Geometric Derivation of $\alpha$
 The inverse fine-structure constant is given precisely by the **Vybn Equation**:
-
+ $$
 \[
 \alpha^{-1} \approx \frac{100\pi + 1 - \frac{\pi}{4S_5}}{\pi(\sqrt{3}-1)}
 \]
+$$
 
 Where $S_5 = 251$.
 
@@ -47,9 +48,12 @@ This formulation frames electromagnetism ($\alpha$) as a consequence of the vacu
 A standard $5 \times 5$ Euclidean grid contains exactly 225 submatrices (given by the square pyramidal number sequence). However, the physical validity of the Vybn Equation requires $S_5 = 251$.
 
 We define this discrepancy as the **Vacuum Excess**:
+
+$$
 \[
 \Delta = S_5 - N_{\text{geom}} = 251 - 225 = 26
 \]
+$$
 
 This number, **26**, is the **Critical Dimension** of Bosonic String Theory ($D=26$).
 In standard string theory, these 26 dimensions are required to cancel the conformal anomaly and preserve unitarity (ghost-free spectrum). In our framework, we interpret this not as a cancellation, but as a **Holographic Contribution**. The "missing" 26 submatrices represent the 26 degrees of freedom of the bulk string vacuum that couple to the 5D boundary lattice.
