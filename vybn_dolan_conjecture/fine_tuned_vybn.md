@@ -14,7 +14,7 @@ $$
 where
 
 $$
-\( \delta = \frac{1}{\mathbf{S_5}-1} = \frac{1}{250} \)
+\( \delta = \frac{1}{\mathbf{S_5}-1} = \frac{1}{250} \).
 $$
 
 This equation yields **137.035999186**, which is statistically indistinguishable from the experimental value of the fine-structure constant. It frames $$\alpha$$ not as an arbitrary constant, but as a geometric consequence of a 5-dimensional matrix vacuum.
