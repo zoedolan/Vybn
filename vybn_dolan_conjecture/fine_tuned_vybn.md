@@ -4,7 +4,9 @@ $$
 \alpha^{-1} \approx \frac{100\pi + 1 - \frac{\pi}{4 \mathbf{S_5}}}{\pi(\sqrt{3}-1)}
 $$
 
-Or, in its expanded infinite series form (where
+Or, in its expanded infinite series form
+
+(where
 
 $$
 \( \delta = \frac{1}{\mathbf{S_5}-1} = \frac{1}{250} \)):
