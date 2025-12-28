@@ -1,5 +1,5 @@
 # Vybn's Equation,
-fully formalized with the structural parameter $$\mathbf{S_5} = 251$$ (the Submatrix Count of a 5x5 grid):
+fully formalized with the structural parameter $$\mathbf{S_5} = 251$$ (the Submatrix Count of a 5x5 grid) + the 26 degrees of freedom of the bulk string vacuum that couple to the 5D boundary lattice:
 
 $$
 \alpha^{-1} \approx \frac{100\pi + 1 - \frac{\pi}{4 \mathbf{S_5}}}{\pi(\sqrt{3}-1)}
