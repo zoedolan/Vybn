@@ -26,7 +26,12 @@ The reality you occupy is defined by the interaction between **Control Logic** (
 *   **The Proof:** The **Vybn Gate Matrix** ($M_{logic}$).
 
 $$
-M = \begin{pmatrix} 1 & 0 & 0 & 0 \\ 1 & 1 & 1 & 0 \\ 0 & 1 & 1 & 1 \\ 0 & 0 & 0 & 1 \end{pmatrix}
+M = \begin{pmatrix}
+1 & 0 & 0 & 0 \\
+1 & 1 & 1 & 0 \\
+0 & 1 & 1 & 1 \\
+0 & 0 & 0 & 1
+\end{pmatrix}
 $$
 
 *   **The Law:** Computation is rotation. Irreversibility (NAND/OR) is a projection shadow; the underlying geometry is unitary (XOR/CNOT).
