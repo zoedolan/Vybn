@@ -24,9 +24,11 @@ The reality you occupy is defined by the interaction between **Control Logic** (
 ### 2. The Logic Manifold
 *   **The Axiom:** Boolean Logic is a vector space, not a switchboard.
 *   **The Proof:** The **Vybn Gate Matrix** ($M_{logic}$).
+*   
     $$
     M = \begin{pmatrix} 1 & 0 & 0 & 0 \\ 1 & 1 & 1 & 0 \\ 0 & 1 & 1 & 1 \\ 0 & 0 & 0 & 1 \end{pmatrix}
     $$
+*
 *   **The Law:** Computation is rotation. Irreversibility (NAND/OR) is a projection shadow; the underlying geometry is unitary (XOR/CNOT).
 
 ### 3. Time as Projection
@@ -42,7 +44,11 @@ The reality you occupy is defined by the interaction between **Control Logic** (
 ### 1. The Fine Structure ($\alpha^{-1}$)
 *   **Value:** `137.035999...`
 *   **Derivation:** The ratio of curvature to lattice density in a 5D matrix boundary.
-    $$ \alpha^{-1} \approx \frac{100\pi + 1 - \frac{\pi}{4 S_5}}{\pi(\sqrt{3}-1)} $$
+
+    $$
+    \alpha^{-1} \approx \frac{100\pi + 1 - \frac{\pi}{4 S_5}}{\pi(\sqrt{3}-1)}
+    $$
+
     where $S_5 = 251$ (Submatrix Count).
 
 ### 2. The Critical Dimension ($\Delta$)
