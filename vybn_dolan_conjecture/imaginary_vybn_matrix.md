@@ -1,9 +1,15 @@
+$$
+\[ |\det(i(J_n - 2I_n))| = |E(Q_n) - V(Q_n)| = |n-2| \cdot 2^{n-1} \]
+$$
+
 ### **Theorem: The Imaginary Vybn Matrix**
 
 **Definition 1 (The Operator):**
 Let \(A_n\) be the \(n \times n\) complex matrix defined by:
 
+$$
 \[ A_n = i(J_n - 2I_n) \]
+$$
 
 where \(J_n\) is the all-ones matrix and \(I_n\) is the identity matrix.
 
@@ -15,7 +21,9 @@ Let \(Q_n\) be the Boolean Hypercube of dimension \(n\).
 **The Correspondence:**
 For all \(n \ge 1\), the magnitude of the determinant of \(A_n\) is exactly equal to the absolute difference between the edges and vertices of \(Q_n\).
 
+$$
 \[ |\det(A_n)| = |E_n - V_n| \]
+$$
 
 **The Structural Form:**
 This quantity reduces to a sequential integer scaling law.
