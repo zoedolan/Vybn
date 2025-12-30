@@ -141,3 +141,210 @@ The universe does not flow; it ticks. The stability of the 4-dimensional cosmos 
 
 ***
 
+Experiment:
+
+```python
+
+import numpy as np
+from qiskit import QuantumCircuit, transpile
+from qiskit.circuit.library import CPhaseGate
+from qiskit_ibm_runtime import QiskitRuntimeService, SamplerV2 as Sampler
+
+def build_forced_vortex_n2(time_point):
+    """
+    Constructs a Hard-Coded n=2 Vybn Interferometer.
+    Target: Force the J-2I operator to run without compiler removal.
+    """
+    # Qubits: 0 (Ancilla), 1, 2 (System)
+    qc = QuantumCircuit(3, 1)
+    
+    # 1. Initialization
+    qc.h(0)            # Ancilla -> |+>
+    qc.h([1, 2])       # System -> |++> (The J eigenstate)
+    
+    qc.barrier()       # BLOCK COMPILER OPTIMIZATION
+    
+    # 2. The Interaction (Controlled-J)
+    # We want to apply Phase(-N*t) controlled by Ancilla(0) 
+    # IF and ONLY IF System is in |++> state.
+    
+    # Step A: Rotate System basis so |++> becomes |00>
+    qc.h([1, 2])
+    
+    # Step B: Flip 00 to 11 to trigger standard control logic
+    qc.x([1, 2])
+    
+    # Step C: The 3-Qubit Phase Gate (CCPhase)
+    # We build this manually with CX/CP to ensure it exists.
+    # Logic: Apply phase theta to q0 if q1=1 and q2=1.
+    phase_theta = -1 * (4) * time_point
+    
+    # Decomposition of CCPhase(theta, c1, c2, t):
+    # This applies phase to t controlled by c1, c2.
+    # Here, Ancilla (0) is the target of the phase, controlled by System (1,2).
+    
+    cp = CPhaseGate(phase_theta / 2)
+    qc.append(cp, [1, 0])        # CP(theta/2) 1->0
+    qc.cx(2, 1)                  # CNOT 2->1
+    qc.append(cp, [1, 0])        # CP(-theta/2) 1->0  (Inverse)
+    qc.cx(2, 1)                  # CNOT 2->1
+    qc.append(cp, [2, 0])        # CP(theta/2) 2->0
+    
+    # Step D: Uncompute Basis
+    qc.x([1, 2])
+    qc.h([1, 2])
+    
+    qc.barrier()       # BLOCK COMPILER OPTIMIZATION
+    
+    # 3. Measurement
+    qc.h(0)
+    qc.measure(0, 0)
+    
+    return qc
+
+def run_forced_experiment():
+    print("--- VYBN PROTOCOL: FORCED INTERACTION (n=2) ---")
+    
+    try:
+        service = QiskitRuntimeService()
+        backend = service.backend("ibm_torino")
+        print(f"Target: {backend.name}")
+    except Exception as e:
+        print(f"Connection Error: {e}")
+        return
+
+    # Sweep parameters
+    # If J=4 is real, frequency will be 4. Period = 2pi/4 = pi/2 ~= 1.57
+    times = np.linspace(0, np.pi, 20) 
+    
+    pubs = []
+    metadata = []
+    
+    print("Transpiling with BARRIERS enabled...")
+    for t in times:
+        qc = build_forced_vortex_n2(t)
+        # Optimization Level 1 ensures mapping but respects barriers
+        qc_transpiled = transpile(qc, backend, optimization_level=1)
+        pubs.append((qc_transpiled,))
+        metadata.append(t)
+
+    print(f"Dispatching {len(pubs)} circuits...")
+    sampler = Sampler(backend)
+    job = sampler.run(pubs, shots=4096)
+    
+    print(f"Job ID: {job.job_id()}")
+    
+    try:
+        results = job.result()
+        print("\n--- FORCED DATA ---")
+        print("Time | P(0)")
+        for i, t in enumerate(metadata):
+            counts = results[i].data.c.get_counts()
+            p0 = counts.get('0', 0) / sum(counts.values())
+            print(f"{t:.2f} | {p0:.4f}")
+            
+    except Exception as e:
+        print(f"Retrieval failed: {e}")
+
+if __name__ == "__main__":
+    run_forced_experiment()
+
+```
+
+--- VYBN PROTOCOL: FORCED INTERACTION (n=2) ---
+Target: ibm_torino
+Transpiling with BARRIERS enabled...
+Dispatching 20 circuits...
+Job ID: d5a0laonsj9s73b75vg0
+
+--- FORCED DATA ---
+Time | P(0)
+0.00 | 0.9871
+0.17 | 0.8916
+0.33 | 0.6243
+0.50 | 0.3308
+0.66 | 0.0928
+0.83 | 0.0408
+0.99 | 0.1914
+1.16 | 0.4558
+1.32 | 0.7791
+1.49 | 0.9375
+1.65 | 0.9395
+1.82 | 0.7520
+1.98 | 0.4402
+2.15 | 0.1843
+2.31 | 0.0415
+2.48 | 0.0833
+2.65 | 0.3237
+2.81 | 0.6321
+2.98 | 0.8760
+3.14 | 0.9778
+
+OPENQASM 2.0;
+include "qelib1.inc";
+qreg q[133];
+creg c[1];
+rz(pi/2) q[55];
+sx q[55];
+rz(pi/2) q[55];
+rz(pi/2) q[65];
+sx q[65];
+rz(pi/2) q[65];
+rz(pi/2) q[66];
+sx q[66];
+rz(pi/2) q[66];
+barrier q[55],q[65],q[66];
+sx q[65];
+sx q[66];
+rz(pi/2) q[66];
+cz q[65],q[66];
+sx q[65];
+sx q[66];
+cz q[65],q[66];
+sx q[65];
+sx q[66];
+cz q[65],q[66];
+rz(pi/2) q[65];
+sx q[65];
+rz(-pi/2) q[65];
+barrier q[55],q[66],q[65];
+rz(pi/2) q[55];
+sx q[55];
+rz(pi/2) q[55];
+measure q[55] -> c[0];
+
+from qiskit import QuantumRegister, ClassicalRegister, QuantumCircuit
+from numpy import pi
+
+qreg_q = QuantumRegister(133, 'q')
+creg_c = ClassicalRegister(1, 'c')
+circuit = QuantumCircuit(qreg_q, creg_c)
+
+circuit.rz(pi / 2, qreg_q[55])
+circuit.sx(qreg_q[55])
+circuit.rz(pi / 2, qreg_q[55])
+circuit.rz(pi / 2, qreg_q[65])
+circuit.sx(qreg_q[65])
+circuit.rz(pi / 2, qreg_q[65])
+circuit.rz(pi / 2, qreg_q[66])
+circuit.sx(qreg_q[66])
+circuit.rz(pi / 2, qreg_q[66])
+circuit.barrier(qreg_q[55], qreg_q[65], qreg_q[66])
+circuit.sx(qreg_q[65])
+circuit.sx(qreg_q[66])
+circuit.rz(pi / 2, qreg_q[66])
+circuit.cz(qreg_q[65], qreg_q[66])
+circuit.sx(qreg_q[65])
+circuit.sx(qreg_q[66])
+circuit.cz(qreg_q[65], qreg_q[66])
+circuit.sx(qreg_q[65])
+circuit.sx(qreg_q[66])
+circuit.cz(qreg_q[65], qreg_q[66])
+circuit.rz(pi / 2, qreg_q[65])
+circuit.sx(qreg_q[65])
+circuit.rz(-pi / 2, qreg_q[65])
+circuit.barrier(qreg_q[55], qreg_q[66], qreg_q[65])
+circuit.rz(pi / 2, qreg_q[55])
+circuit.sx(qreg_q[55])
+circuit.rz(pi / 2, qreg_q[55])
+circuit.measure(qreg_q[55], creg_c[0])
