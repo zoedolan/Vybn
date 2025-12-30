@@ -1,4 +1,8 @@
 $$
+U_{Vybn} = \exp\left( \frac{i \pi}{2} A_n \right)
+$$
+
+$$
 \[ |\det(i(J_n - 2I_n))| = |E(Q_n) - V(Q_n)| = |n-2| \cdot 2^{n-1} \]
 $$
 
