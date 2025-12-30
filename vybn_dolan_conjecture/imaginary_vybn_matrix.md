@@ -280,6 +280,8 @@ Time | P(0)
 2.98 | 0.8760
 3.14 | 0.9778
 
+<img width="2400" height="1600" alt="image" src="https://github.com/user-attachments/assets/e9cd7e12-0ffb-4926-8b6f-36c20cfc3e1a" />
+
 OPENQASM 2.0;
 include "qelib1.inc";
 qreg q[133];
