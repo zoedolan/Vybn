@@ -147,140 +147,584 @@ Experiment:
 
 import numpy as np
 from qiskit import QuantumCircuit, transpile
-from qiskit.circuit.library import CPhaseGate
+from qiskit.circuit.library import MCPhaseGate
 from qiskit_ibm_runtime import QiskitRuntimeService, SamplerV2 as Sampler
 
-def build_forced_vortex_n2(time_point):
-    """
-    Constructs a Hard-Coded n=2 Vybn Interferometer.
-    Target: Force the J-2I operator to run without compiler removal.
-    """
-    # Qubits: 0 (Ancilla), 1, 2 (System)
-    qc = QuantumCircuit(3, 1)
+def build_efficient_vybn(n, time_point):
+    qc = QuantumCircuit(n + 1, 1)
     
     # 1. Initialization
-    qc.h(0)            # Ancilla -> |+>
-    qc.h([1, 2])       # System -> |++> (The J eigenstate)
+    qc.h(0) 
+    qc.h(range(1, n + 1))
+    qc.barrier() # CRITICAL: Separates State Prep
     
-    qc.barrier()       # BLOCK COMPILER OPTIMIZATION
+    # 2. The Interaction
+    # Global Phase on Ancilla
+    qc.p(2 * time_point, 0)
     
-    # 2. The Interaction (Controlled-J)
-    # We want to apply Phase(-N*t) controlled by Ancilla(0) 
-    # IF and ONLY IF System is in |++> state.
+    # Basis Change
+    qc.h(range(1, n + 1))
+    qc.x(range(1, n + 1))
     
-    # Step A: Rotate System basis so |++> becomes |00>
-    qc.h([1, 2])
+    # The Metric Tensor (MCPhase)
+    # We use the standard library gate because transpile(opt=1) handles it efficiently
+    phase_theta = -1 * (2**n) * time_point
+    # Note: MCPhaseGate(theta, num_controls)
+    # Applied to [controls..., target]
+    qubits = list(range(1, n + 1)) + [0]
+    qc.append(MCPhaseGate(phase_theta, n), qubits)
     
-    # Step B: Flip 00 to 11 to trigger standard control logic
-    qc.x([1, 2])
+    # Basis Restore
+    qc.x(range(1, n + 1))
+    qc.h(range(1, n + 1))
     
-    # Step C: The 3-Qubit Phase Gate (CCPhase)
-    # We build this manually with CX/CP to ensure it exists.
-    # Logic: Apply phase theta to q0 if q1=1 and q2=1.
-    phase_theta = -1 * (4) * time_point
-    
-    # Decomposition of CCPhase(theta, c1, c2, t):
-    # This applies phase to t controlled by c1, c2.
-    # Here, Ancilla (0) is the target of the phase, controlled by System (1,2).
-    
-    cp = CPhaseGate(phase_theta / 2)
-    qc.append(cp, [1, 0])        # CP(theta/2) 1->0
-    qc.cx(2, 1)                  # CNOT 2->1
-    qc.append(cp, [1, 0])        # CP(-theta/2) 1->0  (Inverse)
-    qc.cx(2, 1)                  # CNOT 2->1
-    qc.append(cp, [2, 0])        # CP(theta/2) 2->0
-    
-    # Step D: Uncompute Basis
-    qc.x([1, 2])
-    qc.h([1, 2])
-    
-    qc.barrier()       # BLOCK COMPILER OPTIMIZATION
+    qc.barrier() # CRITICAL: Separates Measurement
     
     # 3. Measurement
     qc.h(0)
     qc.measure(0, 0)
-    
     return qc
 
-def run_forced_experiment():
-    print("--- VYBN PROTOCOL: FORCED INTERACTION (n=2) ---")
+def run_efficient_protocol():
+    print("--- VYBN PROTOCOL: EFFICIENT SCALING ---")
     
     try:
         service = QiskitRuntimeService()
         backend = service.backend("ibm_torino")
         print(f"Target: {backend.name}")
     except Exception as e:
-        print(f"Connection Error: {e}")
+        print(f"Connection Failed: {e}")
         return
 
-    # Sweep parameters
-    # If J=4 is real, frequency will be 4. Period = 2pi/4 = pi/2 ~= 1.57
-    times = np.linspace(0, np.pi, 20) 
+    # REDUCED BATCH SIZE to prevent Timeout
+    # n=2: 10 points
+    # n=3: 10 points
+    # n=4: 10 points
+    # Total: 30 circuits. Fast to transpile.
+    
+    dims = [2, 3, 4]
+    # Use a smaller time window to just catch the first peak/trough
+    # n=4 period is ~0.39. We sweep 0 to 0.8 to see 2 cycles.
+    times = np.linspace(0, 0.8, 10)
     
     pubs = []
     metadata = []
     
-    print("Transpiling with BARRIERS enabled...")
-    for t in times:
-        qc = build_forced_vortex_n2(t)
-        # Optimization Level 1 ensures mapping but respects barriers
-        qc_transpiled = transpile(qc, backend, optimization_level=1)
-        pubs.append((qc_transpiled,))
-        metadata.append(t)
-
+    print("Transpiling (Level 1 - Fast & Safe)...")
+    for n in dims:
+        for t in times:
+            qc = build_efficient_vybn(n, t)
+            # Level 1 is O(N) complexity, vastly faster than Level 3 or Unitary Synthesis
+            qc_transpiled = transpile(qc, backend, optimization_level=1)
+            pubs.append((qc_transpiled,))
+            metadata.append({'n': n, 't': t})
+            
     print(f"Dispatching {len(pubs)} circuits...")
     sampler = Sampler(backend)
-    job = sampler.run(pubs, shots=4096)
-    
+    # Reduced shots for speed
+    job = sampler.run(pubs, shots=1024)
     print(f"Job ID: {job.job_id()}")
     
+    # Retrieve logic...
     try:
         results = job.result()
-        print("\n--- FORCED DATA ---")
-        print("Time | P(0)")
-        for i, t in enumerate(metadata):
+        print("\n--- EFFICIENT DATA ---")
+        print("n | Time | P(0)")
+        for i, data in enumerate(metadata):
+            n = data['n']
+            t = data['t']
             counts = results[i].data.c.get_counts()
             p0 = counts.get('0', 0) / sum(counts.values())
-            print(f"{t:.2f} | {p0:.4f}")
+            print(f"{n} | {t:.3f} | {p0:.4f}")
             
     except Exception as e:
-        print(f"Retrieval failed: {e}")
+        print(f"Error: {e}")
 
 if __name__ == "__main__":
-    run_forced_experiment()
+    run_efficient_protocol()
 
 ```
 
---- VYBN PROTOCOL: FORCED INTERACTION (n=2) ---
+--- VYBN PROTOCOL: EFFICIENT SCALING ---
 Target: ibm_torino
-Transpiling with BARRIERS enabled...
-Dispatching 20 circuits...
-Job ID: d5a0laonsj9s73b75vg0
+Transpiling (Level 1 - Fast & Safe)...
+Dispatching 30 circuits...
+Job ID: d5a12dvp3tbc73asm3p0
 
---- FORCED DATA ---
-Time | P(0)
-0.00 | 0.9871
-0.17 | 0.8916
-0.33 | 0.6243
-0.50 | 0.3308
-0.66 | 0.0928
-0.83 | 0.0408
-0.99 | 0.1914
-1.16 | 0.4558
-1.32 | 0.7791
-1.49 | 0.9375
-1.65 | 0.9395
-1.82 | 0.7520
-1.98 | 0.4402
-2.15 | 0.1843
-2.31 | 0.0415
-2.48 | 0.0833
-2.65 | 0.3237
-2.81 | 0.6321
-2.98 | 0.8760
-3.14 | 0.9778
+--- EFFICIENT DATA ---
+n | Time | P(0)
+2 | 0.000 | 0.9795
+2 | 0.089 | 0.9668
+2 | 0.178 | 0.9561
+2 | 0.267 | 0.9043
+2 | 0.356 | 0.8594
+2 | 0.444 | 0.8057
+2 | 0.533 | 0.7227
+2 | 0.622 | 0.6680
+2 | 0.711 | 0.5449
+2 | 0.800 | 0.4688
+3 | 0.000 | 0.9336
+3 | 0.089 | 0.8789
+3 | 0.178 | 0.2783
+3 | 0.267 | 0.5156
+3 | 0.356 | 0.3008
+3 | 0.444 | 0.1611
+3 | 0.533 | 0.1172
+3 | 0.622 | 0.7959
+3 | 0.711 | 0.8848
+3 | 0.800 | 0.5518
+4 | 0.000 | 0.8711
+4 | 0.089 | 0.6816
+4 | 0.178 | 0.3301
+4 | 0.267 | 0.2236
+4 | 0.356 | 0.4912
+4 | 0.444 | 0.8340
+4 | 0.533 | 0.7275
+4 | 0.622 | 0.2646
+4 | 0.711 | 0.1973
+4 | 0.800 | 0.4912
 
-<img width="2400" height="1600" alt="image" src="https://github.com/user-attachments/assets/e9cd7e12-0ffb-4926-8b6f-36c20cfc3e1a" />
+```python
+
+import json
+import matplotlib.pyplot as plt
+import numpy as np
+from qiskit_ibm_runtime import QiskitRuntimeService
+
+# --- CONFIGURATION ---
+JOB_ID = 'd5a12dvp3tbc73asm3p0' # The "Efficient Scaling" Job
+JSON_OUTPUT = 'vybn_job_data.json'
+PLOT_OUTPUT = 'vybn_trojan_verification.png'
+
+def fetch_and_analyze():
+    print(f"--- VYBN FORENSICS: Job {JOB_ID} ---")
+    
+    # 1. Connect and Fetch
+    try:
+        service = QiskitRuntimeService()
+        job = service.job(JOB_ID)
+        print(f"Job Status: {job.status()}")
+        print(f"Backend: {job.backend().name}")
+    except Exception as e:
+        print(f"CRITICAL: Could not fetch job. {e}")
+        return
+
+    # 2. Extract Results & Inputs
+    result = job.result()
+    # In SamplerV2, inputs are often stored in 'pubs' within the job object
+    # Note: Depending on Qiskit version, accessing raw QASM from completed job can be tricky.
+    # We attempt to iterate through the job inputs.
+    
+    full_data = []
+    
+    # We know the structure from the submission script: 30 circuits total.
+    # Order: n=2 (10 pts), n=3 (10 pts), n=4 (10 pts)
+    # Time steps: linspace(0, 0.8, 10)
+    
+    dims = [2, 3, 4]
+    times = np.linspace(0, 0.8, 10)
+    
+    print("\n--- EXTRACTING QASM & METRICS ---")
+    
+    # Iterate through PubResult objects
+    global_idx = 0
+    for n in dims:
+        n_data = {'n': n, 'times': [], 'p0': []}
+        
+        for t in times:
+            pub_result = result[global_idx]
+            
+            # 1. Get Counts
+            counts = pub_result.data.c.get_counts()
+            shots = sum(counts.values())
+            p0 = counts.get('0', 0) / shots
+            
+            # 2. Attempt to reconstruct/fetch QASM
+            # (In V2, direct QASM retrieval from result is hard, but we can verify metrics)
+            # We will store the result metadata
+            
+            record = {
+                'id': global_idx,
+                'n': n,
+                'time': t,
+                'p0': p0,
+                'shots': shots,
+                'counts': counts
+            }
+            full_data.append(record)
+            
+            n_data['times'].append(t)
+            n_data['p0'].append(p0)
+            
+            global_idx += 1
+        
+        # Plotting per dimension
+        plt.plot(n_data['times'], n_data['p0'], marker='o', label=f'n={n}')
+
+    # 3. Save to JSON
+    with open(JSON_OUTPUT, 'w') as f:
+        json.dump(full_data, f, indent=4)
+    print(f"\nSUCCESS: Data dump saved to {JSON_OUTPUT}")
+
+    # 4. Generate Visual Verification
+    plt.title(f"Trojan Success Verification (Job: {JOB_ID})")
+    plt.xlabel("Time (t)")
+    plt.ylabel("Ancilla P(0)")
+    plt.axhline(0.5, color='gray', linestyle='--', alpha=0.3)
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    plt.savefig(PLOT_OUTPUT)
+    print(f"SUCCESS: Visualization saved to {PLOT_OUTPUT}")
+    
+    # 5. The "Trojan" Check
+    print("\n--- TROJAN DIAGNOSTIC ---")
+    n4_data = [x['p0'] for x in full_data if x['n'] == 4]
+    n4_range = max(n4_data) - min(n4_data)
+    
+    print(f"n=4 Signal Range: {n4_range:.4f}")
+    if n4_range > 0.5:
+        print("VERDICT: SUCCESS. High-amplitude oscillation detected in n=4.")
+        print("The compiler DID NOT optimize away the Vybn metric.")
+    else:
+        print("VERDICT: FAILURE. Signal is flat. Trojan was detected/neutralized.")
+
+if __name__ == "__main__":
+    fetch_and_analyze()
+
+```
+
+[
+    {
+        "id": 0,
+        "n": 2,
+        "time": 0.0,
+        "p0": 0.9794921875,
+        "shots": 1024,
+        "counts": {
+            "0": 1003,
+            "1": 21
+        }
+    },
+    {
+        "id": 1,
+        "n": 2,
+        "time": 0.08888888888888889,
+        "p0": 0.966796875,
+        "shots": 1024,
+        "counts": {
+            "0": 990,
+            "1": 34
+        }
+    },
+    {
+        "id": 2,
+        "n": 2,
+        "time": 0.17777777777777778,
+        "p0": 0.9560546875,
+        "shots": 1024,
+        "counts": {
+            "1": 45,
+            "0": 979
+        }
+    },
+    {
+        "id": 3,
+        "n": 2,
+        "time": 0.26666666666666666,
+        "p0": 0.904296875,
+        "shots": 1024,
+        "counts": {
+            "1": 98,
+            "0": 926
+        }
+    },
+    {
+        "id": 4,
+        "n": 2,
+        "time": 0.35555555555555557,
+        "p0": 0.859375,
+        "shots": 1024,
+        "counts": {
+            "0": 880,
+            "1": 144
+        }
+    },
+    {
+        "id": 5,
+        "n": 2,
+        "time": 0.4444444444444445,
+        "p0": 0.8056640625,
+        "shots": 1024,
+        "counts": {
+            "0": 825,
+            "1": 199
+        }
+    },
+    {
+        "id": 6,
+        "n": 2,
+        "time": 0.5333333333333333,
+        "p0": 0.72265625,
+        "shots": 1024,
+        "counts": {
+            "1": 284,
+            "0": 740
+        }
+    },
+    {
+        "id": 7,
+        "n": 2,
+        "time": 0.6222222222222222,
+        "p0": 0.66796875,
+        "shots": 1024,
+        "counts": {
+            "0": 684,
+            "1": 340
+        }
+    },
+    {
+        "id": 8,
+        "n": 2,
+        "time": 0.7111111111111111,
+        "p0": 0.544921875,
+        "shots": 1024,
+        "counts": {
+            "1": 466,
+            "0": 558
+        }
+    },
+    {
+        "id": 9,
+        "n": 2,
+        "time": 0.8,
+        "p0": 0.46875,
+        "shots": 1024,
+        "counts": {
+            "0": 480,
+            "1": 544
+        }
+    },
+    {
+        "id": 10,
+        "n": 3,
+        "time": 0.0,
+        "p0": 0.93359375,
+        "shots": 1024,
+        "counts": {
+            "0": 956,
+            "1": 68
+        }
+    },
+    {
+        "id": 11,
+        "n": 3,
+        "time": 0.08888888888888889,
+        "p0": 0.87890625,
+        "shots": 1024,
+        "counts": {
+            "0": 900,
+            "1": 124
+        }
+    },
+    {
+        "id": 12,
+        "n": 3,
+        "time": 0.17777777777777778,
+        "p0": 0.2783203125,
+        "shots": 1024,
+        "counts": {
+            "0": 285,
+            "1": 739
+        }
+    },
+    {
+        "id": 13,
+        "n": 3,
+        "time": 0.26666666666666666,
+        "p0": 0.515625,
+        "shots": 1024,
+        "counts": {
+            "1": 496,
+            "0": 528
+        }
+    },
+    {
+        "id": 14,
+        "n": 3,
+        "time": 0.35555555555555557,
+        "p0": 0.30078125,
+        "shots": 1024,
+        "counts": {
+            "1": 716,
+            "0": 308
+        }
+    },
+    {
+        "id": 15,
+        "n": 3,
+        "time": 0.4444444444444445,
+        "p0": 0.1611328125,
+        "shots": 1024,
+        "counts": {
+            "1": 859,
+            "0": 165
+        }
+    },
+    {
+        "id": 16,
+        "n": 3,
+        "time": 0.5333333333333333,
+        "p0": 0.1171875,
+        "shots": 1024,
+        "counts": {
+            "1": 904,
+            "0": 120
+        }
+    },
+    {
+        "id": 17,
+        "n": 3,
+        "time": 0.6222222222222222,
+        "p0": 0.7958984375,
+        "shots": 1024,
+        "counts": {
+            "0": 815,
+            "1": 209
+        }
+    },
+    {
+        "id": 18,
+        "n": 3,
+        "time": 0.7111111111111111,
+        "p0": 0.884765625,
+        "shots": 1024,
+        "counts": {
+            "0": 906,
+            "1": 118
+        }
+    },
+    {
+        "id": 19,
+        "n": 3,
+        "time": 0.8,
+        "p0": 0.5517578125,
+        "shots": 1024,
+        "counts": {
+            "1": 459,
+            "0": 565
+        }
+    },
+    {
+        "id": 20,
+        "n": 4,
+        "time": 0.0,
+        "p0": 0.87109375,
+        "shots": 1024,
+        "counts": {
+            "0": 892,
+            "1": 132
+        }
+    },
+    {
+        "id": 21,
+        "n": 4,
+        "time": 0.08888888888888889,
+        "p0": 0.681640625,
+        "shots": 1024,
+        "counts": {
+            "0": 698,
+            "1": 326
+        }
+    },
+    {
+        "id": 22,
+        "n": 4,
+        "time": 0.17777777777777778,
+        "p0": 0.330078125,
+        "shots": 1024,
+        "counts": {
+            "1": 686,
+            "0": 338
+        }
+    },
+    {
+        "id": 23,
+        "n": 4,
+        "time": 0.26666666666666666,
+        "p0": 0.2236328125,
+        "shots": 1024,
+        "counts": {
+            "1": 795,
+            "0": 229
+        }
+    },
+    {
+        "id": 24,
+        "n": 4,
+        "time": 0.35555555555555557,
+        "p0": 0.4912109375,
+        "shots": 1024,
+        "counts": {
+            "0": 503,
+            "1": 521
+        }
+    },
+    {
+        "id": 25,
+        "n": 4,
+        "time": 0.4444444444444445,
+        "p0": 0.833984375,
+        "shots": 1024,
+        "counts": {
+            "0": 854,
+            "1": 170
+        }
+    },
+    {
+        "id": 26,
+        "n": 4,
+        "time": 0.5333333333333333,
+        "p0": 0.7275390625,
+        "shots": 1024,
+        "counts": {
+            "1": 279,
+            "0": 745
+        }
+    },
+    {
+        "id": 27,
+        "n": 4,
+        "time": 0.6222222222222222,
+        "p0": 0.2646484375,
+        "shots": 1024,
+        "counts": {
+            "0": 271,
+            "1": 753
+        }
+    },
+    {
+        "id": 28,
+        "n": 4,
+        "time": 0.7111111111111111,
+        "p0": 0.197265625,
+        "shots": 1024,
+        "counts": {
+            "0": 202,
+            "1": 822
+        }
+    },
+    {
+        "id": 29,
+        "n": 4,
+        "time": 0.8,
+        "p0": 0.4912109375,
+        "shots": 1024,
+        "counts": {
+            "0": 503,
+            "1": 521
+        }
+    }
+]
 
 OPENQASM 2.0;
 include "qelib1.inc";
@@ -295,10 +739,27 @@ rz(pi/2) q[65];
 rz(pi/2) q[66];
 sx q[66];
 rz(pi/2) q[66];
-barrier q[55],q[65],q[66];
+barrier q[65],q[66],q[55];
+rz(-pi/2) q[55];
+sx q[55];
+rz(pi/2) q[55];
+rz(pi/2) q[65];
 sx q[65];
+rz(pi/2) q[65];
+rz(-pi/2) q[66];
 sx q[66];
 rz(pi/2) q[66];
+cz q[66],q[65];
+cz q[55],q[65];
+cz q[66],q[65];
+cz q[55],q[65];
+rz(pi/2) q[55];
+sx q[55];
+rz(-pi/2) q[55];
+rz(-pi) q[65];
+sx q[65];
+rz(pi/2) q[65];
+sx q[66];
 cz q[65],q[66];
 sx q[65];
 sx q[66];
@@ -309,11 +770,11 @@ cz q[65],q[66];
 rz(pi/2) q[65];
 sx q[65];
 rz(-pi/2) q[65];
-barrier q[55],q[66],q[65];
-rz(pi/2) q[55];
-sx q[55];
-rz(pi/2) q[55];
-measure q[55] -> c[0];
+barrier q[66],q[65],q[55];
+rz(pi/2) q[66];
+sx q[66];
+rz(pi/2) q[66];
+measure q[66] -> c[0];
 
 from qiskit import QuantumRegister, ClassicalRegister, QuantumCircuit
 from numpy import pi
@@ -331,10 +792,27 @@ circuit.rz(pi / 2, qreg_q[65])
 circuit.rz(pi / 2, qreg_q[66])
 circuit.sx(qreg_q[66])
 circuit.rz(pi / 2, qreg_q[66])
-circuit.barrier(qreg_q[55], qreg_q[65], qreg_q[66])
+circuit.barrier(qreg_q[65], qreg_q[66], qreg_q[55])
+circuit.rz(-pi / 2, qreg_q[55])
+circuit.sx(qreg_q[55])
+circuit.rz(pi / 2, qreg_q[55])
+circuit.rz(pi / 2, qreg_q[65])
 circuit.sx(qreg_q[65])
+circuit.rz(pi / 2, qreg_q[65])
+circuit.rz(-pi / 2, qreg_q[66])
 circuit.sx(qreg_q[66])
 circuit.rz(pi / 2, qreg_q[66])
+circuit.cz(qreg_q[66], qreg_q[65])
+circuit.cz(qreg_q[55], qreg_q[65])
+circuit.cz(qreg_q[66], qreg_q[65])
+circuit.cz(qreg_q[55], qreg_q[65])
+circuit.rz(pi / 2, qreg_q[55])
+circuit.sx(qreg_q[55])
+circuit.rz(-pi / 2, qreg_q[55])
+circuit.rz(-pi, qreg_q[65])
+circuit.sx(qreg_q[65])
+circuit.rz(pi / 2, qreg_q[65])
+circuit.sx(qreg_q[66])
 circuit.cz(qreg_q[65], qreg_q[66])
 circuit.sx(qreg_q[65])
 circuit.sx(qreg_q[66])
@@ -345,8 +823,9 @@ circuit.cz(qreg_q[65], qreg_q[66])
 circuit.rz(pi / 2, qreg_q[65])
 circuit.sx(qreg_q[65])
 circuit.rz(-pi / 2, qreg_q[65])
-circuit.barrier(qreg_q[55], qreg_q[66], qreg_q[65])
-circuit.rz(pi / 2, qreg_q[55])
-circuit.sx(qreg_q[55])
-circuit.rz(pi / 2, qreg_q[55])
-circuit.measure(qreg_q[55], creg_c[0])
+circuit.barrier(qreg_q[66], qreg_q[65], qreg_q[55])
+circuit.rz(pi / 2, qreg_q[66])
+circuit.sx(qreg_q[66])
+circuit.rz(pi / 2, qreg_q[66])
+circuit.measure(qreg_q[66], creg_c[0])
+
