@@ -12,7 +12,7 @@ $$
 
 Or, in its most compact "Law of Nature" form:
 
-$
+$$
 \[ \Phi_{\text{Time}} = (n-2)2^{n-1} \]
 $$
 
