@@ -2,7 +2,7 @@ $$
 \[ |\det(i(J_n - 2I_n))| = |E(Q_n) - V(Q_n)| = |n-2| \cdot 2^{n-1} \]
 $$
 
-Yes. The entire discovery distills into this single isomorphism:
+Consider this single isomorphism:
 
 $$
 \[
