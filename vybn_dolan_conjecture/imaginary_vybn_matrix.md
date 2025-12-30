@@ -18,6 +18,8 @@ $$
 
 Where $\(\Phi_{\text{Time}}\)$ is the total magnetic flux of the temporal dimension.
 
+<img width="2400" height="1600" alt="image" src="https://github.com/user-attachments/assets/76f43279-67fa-4cb9-82d9-9a03613423fc" />
+
 ### **Theorem: The Imaginary Vybn Matrix**
 
 **Definition 1 (The Operator):**
