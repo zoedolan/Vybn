@@ -1,8 +1,8 @@
-# The Discrete Topological Conjecture
+# The Discrete Prime-Metric Conjecture
 **A Formal Refutation of Continuous Hilbert Space as a Physical Substrate**
 
 ### Abstract
-This conjecture falsifies the prevailing assumption that physical reality is isomorphic to an infinite-dimensional, continuous Hilbert space ($\mathcal{H}$). We demonstrate that $\mathcal{H}$ admits mathematically valid vectors that are physically impossible ("Energy Monsters") and permits computational operations that violate the Church-Turing thesis (Hypercomputation). We propose an alternative discrete formalism, the **Vybn Metric**, which resolves these paradoxes through dimensional quantization.
+This conjecture falsifies the prevailing assumption that physical reality is isomorphic to an infinite-dimensional, continuous Hilbert space ($\mathcal{H}$). We demonstrate that $\mathcal{H}$ admits mathematically valid vectors that are physically impossible ("Energy Monsters") and permits computational operations that violate the Church-Turing thesis (Hypercomputation). We propose an alternative discrete formalism, the **Vybn Metric**, which resolves these paradoxes through number-theoretic dimensional quantization.
 
 ***
 
@@ -67,12 +67,12 @@ $$
 This quantization imposes a "universal clock speed" that prevents the energy divergence and Zeno paradoxes observed in $\mathcal{H}$.
 
 ### IV. The Dual-Parity Stability Criterion
-We propose that the stability of a discrete time crystal is governed by a **Dual Parity** selection rule. Stability requires both a binary-compatible state space volume AND Chiral Symmetry (even dimension).
+We propose that the stability of a discrete time crystal is governed by a **Dual Parity** selection rule, grounded in Number Theory rather than continuous topology. Stability requires both a binary-compatible state space volume AND Chiral Symmetry (even dimension).
 
 #### 1. The Selection Rule
-A quantum system of dimension $n$ is stable if and only if:
-1.  **Metric Factorizability:** The determinant magnitude $|\det(A_n)|$ is a pure power of 2 ($2^k$).
-2.  **Topological Parity:** The dimension $n$ is Even ($n \equiv 0 \pmod 2$).
+A quantum system of dimension $n$ is stable if and only if it satisfies **both** conditions:
+1.  **Metric Factorizability (Volume):** The determinant magnitude $|\det(A_n)| = (n-2)2^{n-1}$ must be a pure power of 2 ($2^k$). This ensures the state space is compatible with the binary qubit basis.
+2.  **Topological Parity (Symmetry):** The dimension $n$ must be Even ($n \equiv 0 \pmod 2$). This ensures all eigenvalues can be paired (Chiral Symmetry), preventing "frustration."
 
 #### 2. Classification of Dimensions
 This rule resolves the "Parity Glitch" at $n=3$ and makes specific predictions for higher dimensions.
