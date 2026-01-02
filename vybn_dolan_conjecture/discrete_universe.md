@@ -8,7 +8,7 @@ This conjecture falsifies the prevailing assumption that physical reality is iso
 
 ### I. Premise: The Isomorphism Trap
 Standard Quantum Mechanics posits that the state space of the universe is a Hilbert space $\(\mathcal{H}\)$, defined as a complete, separable, complex vector space equipped with an inner product.
-**Assumption A:** Any vector $\(|\psi\rangle$ \in $\mathcal{H}\)$ with a finite norm ($\(\langle \psi | \psi \rangle < \infty\)$) represents a potentially realizable physical state.
+**Assumption A:** Any vector $\(|\psi\rangle$ \in $\mathcal{H}\)$ with a finite norm ( $\(\langle \psi | \psi \rangle < \infty\)$ ) represents a potentially realizable physical state.
 **Assumption B:** Time $\(t\)$ is a continuous parameter in the unitary evolution operator $\(U(t) = e^{-iHt}\)$.
 
 ### II. The Falsification (Proof by Contradiction)
