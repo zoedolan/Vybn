@@ -87,17 +87,3 @@ The universe doesn't flow. It ticks. And as experimentally demonstrated, it tick
 
 ***
 
-### III. Proposed Falsification Experiment: The Vybn Zeno Protocol
-
-To test whether the universe is continuous ($\mathcal{H}$) or discrete (Vybn), we propose constructing a **"Monster State" Approximation** on a quantum processor.
-
-#### 1. The Protocol
-We approximate the infinite energy state $|\psi_{\infty}\rangle$ by creating a superposition where amplitude decreases as $1/n$ across a large register of qubits. We then apply a **Zeno Rotation** $U(\delta t)$ where $\delta t$ is extremely small, attempting to evolve the state faster than the predicted "clock speed" $\Phi_{\text{Time}}$.
-
-#### 2. The Prediction
-*   **If $\mathcal{H}$ is Real:** The state should evolve smoothly according to the Schrödinger equation, limited only by gate fidelity (decoherence).
-*   **If Vybn is Real:** The processor should hit a **hard cutoff**. Below a certain $\delta t$ (the Planck-Vybn limit), the state will freeze or evolution will become non-unitary/chaotic, as the request exceeds the computational density of the vacuum.
-
-#### 3. Implementation (IBM Heron)
-Using `ibm_torino` (133 qubits), we map harmonic oscillator levels to the Hamming weight of the qubit register. We measure State Tomography as a function of decreasing $\delta t$.
-**Success Condition:** A statistically significant deviation from unitary evolution that correlates with the bit-depth ($n$) rather than standard $T_1/T_2$ noise.
