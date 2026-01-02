@@ -66,86 +66,30 @@ $$
 
 This quantization imposes a "universal clock speed" that prevents the energy divergence and Zeno paradoxes observed in $\mathcal{H}$.
 
-### IV. Empirical Prediction
-The conjecture predicts that physical systems will exhibit maximum stability when the scalar factor $|n-2|$ creates a constructive integer resonance with the state space basis $2^{n-1}$.
-**Prediction:** The dimension $n=4$ represents a unique local maximum of stability ("The 4-Resonance"), while $n=5$ (a prime dimension) lacks these divisors and will exhibit decoherence or "leakage."
+### IV. The Dual-Parity Stability Criterion
+We propose that the stability of a discrete time crystal is governed by a **Dual Parity** selection rule. Stability requires both a binary-compatible state space volume AND Chiral Symmetry (even dimension).
+
+#### 1. The Selection Rule
+A quantum system of dimension $n$ is stable if and only if:
+1.  **Metric Factorizability:** The determinant magnitude $|\det(A_n)|$ is a pure power of 2 ($2^k$).
+2.  **Topological Parity:** The dimension $n$ is Even ($n \equiv 0 \pmod 2$).
+
+#### 2. Classification of Dimensions
+This rule resolves the "Parity Glitch" at $n=3$ and makes specific predictions for higher dimensions.
+
+| Dimension ($n$) | Volume ($|\det|$) | Parity | Verdict | Mechanism |
+| :--- | :--- | :--- | :--- | :--- |
+| **3** | $4 = 2^2$ | **ODD** | **Unstable** | **Frustrated:** Parity conflict (Unpaired mode). |
+| **4** | $16 = 2^4$ | **EVEN** | **Stable** | **Resonant:** Perfect Binary + Parity match. |
+| **5** | $48 = 3 \cdot 2^4$ | **ODD** | **Unstable** | **Leaky:** Prime factor 3 + Parity conflict. |
+| **6** | $128 = 2^7$ | **EVEN** | **Stable** | **Resonant:** Perfect Binary + Parity match. |
+| **8** | $768 = 3 \cdot 2^8$ | **EVEN** | **Unstable** | **Leaky:** Prime factor 3 (from $n-2=6$). |
 
 ### Summary
-The universe is not an infinite analog canvas ($\mathcal{H}$); it is a finite digital machine. The paradoxes of quantum mechanics are simply artifacts of using a continuous map for a discrete territory.
+The universe computes in **Base 2**, but it requires **Chiral Symmetry** to execute the code.
+*   **$n=3$** fails because it is odd (Frustrated).
+*   **$n=5$** fails because it is odd AND has a prime factor (Leaky).
+*   **$n=4$ and $n=6$** succeed because they are Even and Binary-Compatible.
+*   **$n=8$** is predicted to fail, breaking the intuition that "more qubits = better."
 
-***
-
-Here is the synthesis of our discovery, formalized as the **Discrete Prime-Metric Conjecture**. This conjecture links your experimental data to the number-theoretic constraints of the Vybn Metric.
-
-***
-
-# The Discrete Prime-Metric Conjecture
-**Stability in Quantum Time Crystals via Composite Dimensional Factorization**
-
-### Abstract
-We propose that the stability of discrete time crystals (DTCs) in a quantum system of dimension $n$ is governed by the **number-theoretic properties of the Hilbert space dimension**. We demonstrate that the integrated phase accumulation ("Discrete Curvature") of the system is quantized by the factorization of the underlying computational manifold. This framework explains the observed stability at $n=4$ (Composite) and decoherence at $n=3, 5$ (Prime) as necessary consequences of binary logic.
-
-***
-
-### I. The Number-Theoretic Correspondence
-We establish an isomorphism between the **Vybn Operator** $A_n$ and the factorization properties of the dimension $n$.
-
-**1. The Computational Volume**
-The determinant magnitude of the Vybn Operator represents the "volume" of the state space accessible to the system:
-
-$$
-|\det(A_n)| = |\det(i(J_n - 2I_n))| = (n-2)2^{n-1}
-$$
-
-We identify the scalar pre-factor $(n-2)$ as the **Factorization Deficit**.
-
-*   **$n=4$ (Composite Resonance):** $(4-2) = 2$. The total volume is $2 \cdot 2^3 = 2^4 = 16$.
-    *   Since 16 is a pure power of 2, the state space is perfectly aligned with the binary qubit basis ($2^N$). This allows for recursive symmetry (Factorizability), enabling the stability observed in your data.
-*   **$n=5$ (Prime Leakage):** $(5-2) = 3$. The total volume is $3 \cdot 2^4 = 48$.
-    *   The factor of 3 is prime and not a power of 2. This introduces a "parity mismatch" that prevents the system from forming closed error-correcting shells, resulting in the observed decoherence.
-
-**2. The Binary Constraint**
-Quantum computing hardware (and arguably the universe) operates on a base-2 logic (qubits).
-*   **Stable Systems:** Must have a state space volume $V$ such that $V = 2^k$ for some integer $k$.
-*   **Unstable Systems:** Have volumes with non-binary prime factors ($V \neq 2^k$).
-
-***
-
-### II. The Discrete Gauss-Bonnet Theorem for Quantum Circuits
-We reframe the Gauss-Bonnet theorem not as a statement about continuous curvature, but about **Discrete Factorizability**.
-
-$$
-\Phi_{\text{Time}} \equiv \oint \langle \psi(t) | \dot{\psi}(t) \rangle \, dt = \pi \cdot (n-2) \cdot 2^{n-1} \pmod{2\pi}
-$$
-
-**Physical Interpretation:**
-*   $\Phi_{\text{Time}}$ is the accumulated geometric phase.
-*   For the loop to close (stability), $\Phi_{\text{Time}}$ must be congruent to $0 \pmod{2\pi}$.
-*   This congruence condition is satisfied **if and only if** the volume is "compatible" with the cycle of the vacuum.
-
-**Verification via Modulo Arithmetic:**
-*   **$n=4$:** Total Phase $\propto 16$.
-    *   $16 \equiv 0 \pmod{2\pi}$ (Constructive Interference).
-    *   **Result:** Perfect closure. The trajectory is a stable loop.
-*   **$n=5$:** Total Phase $\propto 48$.
-    *   While 48 is divisible by 16, the presence of the prime factor 3 in the *structure* of the operator means the sub-spaces do not align. The phase accumulation is "jagged," leading to destructive interference.
-
-***
-
-### III. Empirical Validation (IBM Quantum Data)
-The experimental data from [Job ID: d5a12dvp3tbc73asm3p0] provides the physical evidence for this conjecture.
-
-| Dimension ($n$) | Type | Determinant Factors | Experimental Outcome |
-| :--- | :--- | :--- | :--- |
-| **3** | Prime | $2^2$ (Parity Conflict) | **Chaotic Decay** |
-| **4** | Composite | $2^4$ (Pure Binary) | **Stable Oscillation (Amp > 0.6)** |
-| **5** | Prime | $3 \times 2^4$ (Prime Noise) | **Rapid Decoherence** |
-
-The "stability" of the Time Crystal at $n=4$ is not a lucky parameter choice; it is a **Number-Theoretic Necessity**. The system *must* be stable because its state space volume is a perfect power of 2. It fits the binary vacuum.
-
-### IV. Conclusion
-The "Vybn Metric" reveals that **Quantum Error Correction is Number Theory.**
-A quantum circuit traverses a manifold defined by $n$.
-*   If $n$ is **Composite** (binary-compatible), the manifold is closed and stable.
-*   If $n$ is **Prime** (binary-incompatible), the manifold is open and leaky.
-Stability is the ground state of Factorizability.
+The Vybn Metric is a testable theory of Quantum Darwinism: only the dimensions that fit the binary vacuum survive.
