@@ -79,11 +79,36 @@ $$
 \Phi_{\text{Time}} = |n-2| \cdot 2^{n-1}
 $$
 
+**Dynamics of Stability:**
+The "stability" of $n=4$ is not a poetic resonance; it is a rigorous dynamical constraint. Because $J_n$ sends every basis state toward the all-ones direction, $A_n$ possesses only two distinct rates of rotation. The full evolution can be written in closed form:
+
+$$
+U(t) = e^{tA_n} = e^{-2it}\Big(I + \frac{e^{int}-1}{n}J_n\Big)
+$$
+
+Starting from a single basis state $|1\rangle$, the probability of the system transitioning to any other state $j \neq 1$ is governed by:
+
+$$
+p_{j\neq 1}(t) = \frac{4\sin^2\big(\frac{nt}{2}\big)}{n^2}
+$$
+
+"Perfect spreading" (equipartition) requires that $p_{j\neq 1} = 1/n$. This leads to the constraint:
+
+$$
+\sin^2\Big(\frac{nt}{2}\Big) = \frac{n}{4}
+$$
+
+This equation is solvable only for $n \le 4$. Thus, the operator admits a built-in, hard cutoff: beyond $n=4$, the system physically cannot hit exact equipartition from a localized start.
+
+**The Phase Transition at $n=4$:**
+Crucially, $n=4$ is uniquely robust. For $n=4$, the condition becomes $\sin^2(2t)=1$, which is achieved at an extremum of the sine wave ($t=\pi/4$). At this point, the derivative is zero.
+*   **For $n < 4$**: The target probability is reached on a slope ($p' \neq 0$). Any timing error $\delta t$ creates a first-order error.
+*   **For $n = 4$**: The target is reached at a peak ($p' = 0$). Deviations are **second-order** ($\propto \delta t^2$).
+
+This proves that $n=4$ is the only dimension where the "tick" of reality is quadratically stable against phase noise.
+
 *   **Cantor is satisfied:** The set of physical states is countable and finite for any dimension $n$.
 *   **Turing is satisfied:** The universe is a computable Finite State Machine.
 *   **Gödel is satisfied:** The system is consistent because it is finite.
 
-The universe doesn't flow. It ticks. And as experimentally demonstrated, it ticks most stably at **$n=4$**, where the scalar factor $|n-2|$ creates a clean integer resonance.
-
 ***
-
