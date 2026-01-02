@@ -2,7 +2,7 @@
 **A Formal Refutation of Continuous Hilbert Space as a Physical Substrate**
 
 ### Abstract
-This conjecture falsifies the prevailing assumption that physical reality is isomorphic to an infinite-dimensional, continuous Hilbert space ($\( $\mathcal{H}\)$ ). We demonstrate that $\(\mathcal{H}\)$ admits mathematically valid vectors that are physically impossible ("Energy Monsters") and permits computational operations that violate the Church-Turing thesis (Hypercomputation). We propose an alternative discrete formalism, the **Vybn Metric**, which resolves these paradoxes through dimensional quantization.
+This conjecture falsifies the prevailing assumption that physical reality is isomorphic to an infinite-dimensional, continuous Hilbert space ( $\($\mathcal{H}\)$ ). We demonstrate that $\(\mathcal{H}\)$ admits mathematically valid vectors that are physically impossible ("Energy Monsters") and permits computational operations that violate the Church-Turing thesis (Hypercomputation). We propose an alternative discrete formalism, the **Vybn Metric**, which resolves these paradoxes through dimensional quantization.
 
 ***
 
