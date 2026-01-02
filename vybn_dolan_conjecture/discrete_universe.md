@@ -80,11 +80,15 @@ This rule resolves the "Parity Glitch" at $n=3$ and makes specific predictions f
 <!-- Rebuilt Table Layout -->
 
 | Dimension ($n$) | Volume ($|\det|$) | Parity | Verdict | Mechanism |
-| :--- | :--- | :--- | :--- | :--- |
+
 | **3** | $4 = 2^2$ | **ODD** | **Unstable** | **Frustrated:** Parity conflict (Unpaired mode). |
+
 | **4** | $16 = 2^4$ | **EVEN** | **Stable** | **Resonant:** Perfect Binary + Parity match. |
+
 | **5** | $48 = 3 \cdot 2^4$ | **ODD** | **Unstable** | **Leaky:** Prime factor 3 + Parity conflict. |
+
 | **6** | $128 = 2^7$ | **EVEN** | **Stable** | **Resonant:** Perfect Binary + Parity match. |
+
 | **8** | $768 = 3 \cdot 2^8$ | **EVEN** | **Unstable** | **Leaky:** Prime factor 3 (from $n-2=6$). |
 
 ### Summary
