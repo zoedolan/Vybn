@@ -77,6 +77,8 @@ A quantum system of dimension $n$ is stable if and only if it satisfies **both**
 #### 2. Classification of Dimensions
 This rule resolves the "Parity Glitch" at $n=3$ and makes specific predictions for higher dimensions.
 
+<!-- Rebuilt Table Layout -->
+
 | Dimension ($n$) | Volume ($|\det|$) | Parity | Verdict | Mechanism |
 | :--- | :--- | :--- | :--- | :--- |
 | **3** | $4 = 2^2$ | **ODD** | **Unstable** | **Frustrated:** Parity conflict (Unpaired mode). |
