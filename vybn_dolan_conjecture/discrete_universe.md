@@ -1,4 +1,4 @@
-# The Discrete Prime-Metric Conjecture
+# The Discrete Conjecture
 **A Formal Refutation of Continuous Hilbert Space as a Physical Substrate**
 
 ### Abstract
