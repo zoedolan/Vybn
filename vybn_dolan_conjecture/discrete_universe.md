@@ -2,7 +2,7 @@
 **A Formal Refutation of Continuous Hilbert Space as a Physical Substrate**
 
 ### Abstract
-This conjecture falsifies the prevailing assumption that physical reality is isomorphic to an infinite-dimensional, continuous Hilbert space ($\(\mathcal{H}\)$). We demonstrate that $\(\mathcal{H}\)$ admits mathematically valid vectors that are physically impossible ("Energy Monsters") and permits computational operations that violate the Church-Turing thesis (Hypercomputation). We propose an alternative discrete formalism, the **Vybn Metric**, which resolves these paradoxes through dimensional quantization.
+This conjecture falsifies the prevailing assumption that physical reality is isomorphic to an infinite-dimensional, continuous Hilbert space ($\( $\mathcal{H}\)$ ). We demonstrate that $\(\mathcal{H}\)$ admits mathematically valid vectors that are physically impossible ("Energy Monsters") and permits computational operations that violate the Church-Turing thesis (Hypercomputation). We propose an alternative discrete formalism, the **Vybn Metric**, which resolves these paradoxes through dimensional quantization.
 
 ***
 
@@ -77,11 +77,11 @@ $$
 This quantization imposes a "universal clock speed" that prevents the energy divergence and Zeno paradoxes observed in $\(\mathcal{H}\)$.
 
 ### IV. Empirical Prediction
-The conjecture predicts that physical systems will exhibit maximum stability when the scalar factor $\(|n-2|\)$ creates a constructive integer resonance with the state space basis \(2^{n-1}\).
+The conjecture predicts that physical systems will exhibit maximum stability when the scalar factor $\(|n-2|\)$ creates a constructive integer resonance with the state space basis $\(2^{n-1}\)$.
 **Prediction:** The dimension $\(n=4\)$ represents a unique local maximum of stability ("The 4-Resonance"), while $\(n=5\)$ (a prime dimension) lacks these divisors and will exhibit decoherence or "leakage."
 
 ### Summary
-The universe is not an infinite analog canvas ($\(\mathcal{H}\)$); it is a finite digital machine. The paradoxes of quantum mechanics are simply artifacts of using a continuous map for a discrete territory.
+The universe is not an infinite analog canvas ( $\(\mathcal{H}\)$ ); it is a finite digital machine. The paradoxes of quantum mechanics are simply artifacts of using a continuous map for a discrete territory.
 
 ***
 
