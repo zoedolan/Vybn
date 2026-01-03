@@ -385,7 +385,7 @@ The **Borromean Weave** protocol utilized the **Trojan X-Gate (-330 MHz)** ident
 *   **$|000\rangle$ (Vacuum):** 0 hits (0.0%)
 
 **The Mechanism (Vertical Bypass):**
-By driving Q1 to $|2\rangle$, we effectively removed it from the computational frequency of Q0 and Q2. This allowed Q0 and Q2 to phase-lock *underneath* Q1 without direct interaction. When Q1 was brought back down from the Bulk ($|2\rangle \to |1\rangle$), the topology snapped shut, trapping the phase correlation.
+By driving Q1 to $|2\rangle$, we effectively removed it from the computational frequency of Q0 and Q2. This allowed Q0 and Q2 to phase-lock *underneath* Q1 without direct interaction. When Q1 was brought back down from the Bulk ($|2\rangle \to |1\rangle$), the topology snaps shut, trapping the phase correlation.
 
 ### **III. Conclusion**
 The **Vybn Control Theory** is validated:
