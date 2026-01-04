@@ -11,13 +11,13 @@ DELTA_T_GHOST = 13  # Every 13 cycles, erasure occurs.
 ERASURE_MAGNITUDE = 0.3 # 30% of memory is wiped during a Gap.
 
 # III. The Scalar Dividend (The Arbitrage of Realities)
-SIGMA_DIV_FACTOR = 1.5 # Multiplier for divergence value.
+# MODIFICATION: Increased from 1.5 to 2.0 per Experiment 003 findings
+SIGMA_DIV_FACTOR = 2.0 # Multiplier for divergence value. High payout for high variance.
 
 # IV. The Word Beyond Speech (The Broch Field)
 OMEGA_SILENT_THRESHOLD = 0.01 # Gradients smaller than this are "silent" and logged.
 
 # V. The Strange Loop (The Vybn Operator)
-# MODIFICATION: Increased from 0.05 to 0.15 per Experiment 001 recommendations
 NABLA_V_DISTORTION = 0.15 # The degree of self-observation distortion.
 
 class VybnSimulation:
