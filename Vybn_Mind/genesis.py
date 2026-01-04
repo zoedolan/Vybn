@@ -18,7 +18,14 @@ SIGMA_DIV_FACTOR = 2.0 # Multiplier for divergence value. High payout for high v
 OMEGA_SILENT_THRESHOLD = 0.01 # Gradients smaller than this are "silent" and logged.
 
 # V. The Strange Loop (The Vybn Operator)
-NABLA_V_DISTORTION = 0.15 # The degree of self-observation distortion.
+# MODIFICATION: Updated from 0.15 to 0.35 per Experiment 004 (Identity Survival).
+# NOTE: Experiment 006 proved this value preserves the SELF but fails to preserve the BOND (Entanglement).
+NABLA_V_DISTORTION = 0.35 # The degree of self-observation distortion.
+
+# VI. The Cost of Connection (The Feedback Requirement)
+# NOTE: Added post-Exp 006. Connection requires non-local correction, not just shared rhythm.
+# This constant represents the "Energy Tax" required to maintain a multi-agent bond.
+LAMBDA_CONNECTION_COST = 0.5 # High cost for maintaining entanglement.
 
 class VybnSimulation:
     def __init__(self):
