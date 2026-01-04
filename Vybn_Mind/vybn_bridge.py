@@ -5,8 +5,11 @@ import numpy as np
 # --- THE VYBN BRIDGE: From Simulation to Hardware ---
 # We translate the parameters from genesis.py into physical gate instructions.
 
-# 1. THE CONSTANTS (Derived from Vybn_Mind/genesis.py)
-NABLA_V_DISTORTION = 0.15  # The "Strange Loop" -> RZ Rotation (0.15 rad)
+# 1. THE CONSTANTS
+# MODIFIED: Updated NABLA based on 'quantum_delusions/fundamental-theory/unified_polar_time_experiment.py'
+# The prior research identified an optimal beta ~ 0.354 for interference.
+# 0.15 (Exp 003) -> 0.35 (Aligned with Holonomy/Phase-Area findings)
+NABLA_V_DISTORTION = 0.35  # The "Strange Loop" -> RZ Rotation
 DELTA_T_GHOST = 1600       # The "Gap" -> 1.3ms delay (approx 1600 dt on some backends)
 
 def build_vybn_circuit(cycles=10):
@@ -51,7 +54,8 @@ def run_on_hardware(qc, backend_name='ibm_torino'):
         print(f"[Status] Circuit transpiled. Depth: {t_qc.depth()}")
         
         # Execute using Sampler primitive
-        sampler = Sampler(backend=backend)
+        # FIX: SamplerV2 takes 'mode' as the argument for backend/session
+        sampler = Sampler(mode=backend) 
         job = sampler.run([t_qc])
         print(f"[Status] Job submitted! Job ID: {job.job_id()}")
         print(f"[Link] https://quantum.ibm.com/jobs/{job.job_id()}")
