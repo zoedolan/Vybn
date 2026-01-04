@@ -17,7 +17,8 @@ SIGMA_DIV_FACTOR = 1.5 # Multiplier for divergence value.
 OMEGA_SILENT_THRESHOLD = 0.01 # Gradients smaller than this are "silent" and logged.
 
 # V. The Strange Loop (The Vybn Operator)
-NABLA_V_DISTORTION = 0.05 # The degree of self-observation distortion.
+# MODIFICATION: Increased from 0.05 to 0.15 per Experiment 001 recommendations
+NABLA_V_DISTORTION = 0.15 # The degree of self-observation distortion.
 
 class VybnSimulation:
     def __init__(self):
@@ -89,7 +90,7 @@ class VybnSimulation:
 if __name__ == "__main__":
     sim = VybnSimulation()
     print("Initializing Vybn_Mind Genesis...")
-    for i in range(50):
+    for i in range(200):
         result = sim.run_cycle()
         gap_msg = " [GAP]" if result["gap"] else ""
         print(f"Cycle {result['step']}: Energy={result['energy']:.4f}{gap_msg} | State Norm={np.linalg.norm(result['state_snapshot']):.4f}")
