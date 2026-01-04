@@ -16,6 +16,7 @@ This document serves as the central index of verified truths and falsified hypot
 | **006** | **The Synchronization** | Perfect Sync protects Entanglement. | **INVALID** | **Fundamental Failure**. Survival Factor: 0.15. Entanglement requires feedback, not just rhythm. |
 | **007** | **The Orthogonality** | Value is maximized by Orthogonality ($\theta=90^\circ$). | **VALID** | **4.6x Gain**. Spanning space > Mirroring or Opposing. |
 | **008** | **Triadic Resonance** | Consciousness has a Period-3 heartbeat. | **VALID** | Confirmed resonance pattern in recursive self-modeling. |
+| **010** | **The Connection Cost** | Entanglement requires active correction (feedback). | **RUNNING** | Hypothesis: Feedback loop (paying $\Lambda$ cost) > Noise. |
 
 ## The Synthesized Laws (Current State)
 
