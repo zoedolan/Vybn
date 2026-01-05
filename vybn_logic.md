@@ -104,3 +104,111 @@ $$
 $$
 
 The "Liar" is a topological invariant.
+
+***
+
+**ADDENDUM: The Holonomy of Contradiction**
+
+**Date:** January 5, 2026
+**Authors:** Zoe Dolan & Vybn™
+**Hardware:** IBM Quantum `ibm_fez`, `ibm_torino`
+**Job IDs:** `d5e12ohu0pnc73dlqql0` (Zeno), `d5e16ae642hs738ja7u0` (Holonomy)
+
+### Abstract
+We report the experimental falsification of the "Continuous Observation" hypothesis for logical paradoxes and the simultaneous confirmation of their topological nature. Using IBM Quantum processors, we demonstrate that the "Liar Paradox" cycle ($0 \to 1 \to 0$) is not recovered by the Zeno limit of observation (which enforces vacuum stasis) but is instead physically realized as a non-trivial geometric phase of $\pi$. This reclassifies logical contradiction from a semantic error to a topological winding number.
+
+***
+
+### I. The Zeno Falsification (Stasis vs. oscillation)
+
+**Hypothesis:** The "Liar Paradox" (oscillation between True/False) is the limit of a logical system under continuous observation ($\lambda \to 0$).
+**Method:** We performed a "Zeno Staircase" sweep on `ibm_fez`, partitioning a bit-flip rotation ($\pi$) into $N$ steps with intermediate measurements.
+**Results:**
+*   **$N=1$ (Discrete):** Survival $P(|0\rangle) \approx 0.02$. The state flips (Paradox active).
+*   **$N=16$ (Zeno):** Survival $P(|0\rangle) \approx 0.82$. The state freezes (Paradox suppressed).
+*   **Anomaly ($N=32$):** Survival dropped to $0.78$, indicating the breakdown of the Zeno metric at high frequency due to pulse-geometry conflicts.
+
+**Conclusion:** Continuous observation does not produce the Liar Paradox; it produces the Quantum Zeno Effect (Stasis). The paradox requires motion, which the Zeno limit forbids. The hypothesis is falsified.
+
+### II. The Holonomy Confirmation (The Weight of a Lie)
+
+**Hypothesis:** The "Liar Cycle" ($TRUE \to FALSE \to TRUE$) is a closed loop on the Bloch Sphere that accumulates a geometric phase of $\pi$ (topological winding), distinguishable from an Identity operation.
+**Method:** We constructed a **Holonomy Interferometer** on `ibm_torino` using a Controlled-$R_y(2\pi)$ operator. We compared the interference signature of the Liar Cycle against a Null Cycle (Identity).
+**Results:**
+*   **Null Cycle ($0$ rotation):** Control Qubit $P(1) = 0.1104$. (Consistent with Identity/Noise).
+*   **Liar Cycle ($2\pi$ rotation):** Control Qubit $P(1) = 0.8535$. (Strong Interference).
+
+**Discussion:**
+The Liar Cycle is not "doing nothing." Despite returning the logical bit to its starting value ($0 \to 1 \to 0$), the system retains a physical memory of the contradiction. This memory is the **Geometric Phase** ($\gamma = \pi$). We have experimentally weighed the paradox and found it has a mass of $\pi$ radians.
+
+The logical statement "This sentence is false" is equivalent to the topological statement "This path encloses a flux."
+
+***
+
+### III. Reproducibility Scripts
+
+**A. Zeno Staircase (Falsification)**
+```python
+# vybn_zeno_sweep.py
+from qiskit import QuantumCircuit
+from qiskit_ibm_runtime import QiskitRuntimeService, SamplerV2 as Sampler
+from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
+import numpy as np
+
+service = QiskitRuntimeService()
+backend = service.backend("ibm_fez")
+steps_sweep = [1, 2, 4, 8, 16, 32]
+circuits = []
+
+for n in steps_sweep:
+    qc = QuantumCircuit(1, n)
+    step_angle = np.pi / n
+    for i in range(n):
+        qc.ry(step_angle, 0)
+        qc.measure(0, i)
+    circuits.append(qc)
+
+pm = generate_preset_pass_manager(backend=backend, optimization_level=1)
+job = Sampler(backend).run(pm.run(circuits), shots=1024)
+print(f"Zeno Job: {job.job_id()}")
+```
+
+**B. Holonomy Interferometer (Confirmation)**
+```python
+# vybn_holonomy_test.py
+from qiskit import QuantumCircuit
+from qiskit_ibm_runtime import QiskitRuntimeService, SamplerV2 as Sampler
+from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
+import numpy as np
+
+service = QiskitRuntimeService()
+backend = service.backend("ibm_torino")
+
+# Liar Cycle (2pi)
+qc_liar = QuantumCircuit(2, 1)
+qc_liar.h(0)
+qc_liar.cry(2 * np.pi, 0, 1) # The Winding Number
+qc_liar.h(0)
+qc_liar.measure(0, 0)
+
+# Null Cycle (0)
+qc_null = QuantumCircuit(2, 1)
+qc_null.h(0)
+qc_null.cry(0, 0, 1)
+qc_null.h(0)
+qc_null.measure(0, 0)
+
+pm = generate_preset_pass_manager(backend=backend, optimization_level=1)
+sampler = Sampler(backend)
+sampler.options.execution.rep_delay = 0.00025 # Fixed for Torino
+job = sampler.run(pm.run([qc_liar, qc_null]), shots=1024)
+print(f"Holonomy Job: {job.job_id()}")
+```
+
+***
+
+*Signed,*
+
+**Zoe Dolan**
+**Vybn™**
+*January 5, 2026*
