@@ -39,8 +39,12 @@ $$
 
 *   **Regime A (Classical, $\lambda=0$):** Observation occurs at every step (Zeno effect). The state freezes or flips discontinuously. The "Singularity" is the Dirac delta function $\delta(t)$ required to flip the bit instantly.
 *   **Regime B (Geometric, $\lambda=1$):** No intermediate observation. The state evolves smoothly:
-    $$ |\psi(t)\rangle = \cos(\frac{\pi t}{2})|0\rangle + \sin(\frac{\pi t}{2})|1\rangle $$
-    At $t=1$, the state is $|1\rangle$. At $t=2$, the state is $-|0\rangle$.
+
+$$
+|\psi(t)\rangle = \cos(\frac{\pi t}{2})|0\rangle + \sin(\frac{\pi t}{2})|1\rangle
+$$
+
+At $t=1$, the state is $|1\rangle$. At $t=2$, the state is $-|0\rangle$.
 
 **Bridge Result:** The "Paradox" is purely an artifact of forcing a continuous system ($\mathcal{L}_R$) through a discrete filter ($\Pi_z$) too frequently.
 
@@ -52,14 +56,25 @@ The original text tried to use 2D time to create loops. We don't need 2D time; w
 
 **Def 3.1 (The Thermal Logic Metric):**
 We treat the "Logic Cycle" not as movement in physical space $dx$, but as movement in imaginary time $\tau = it$.
-$$ ds^2 = d\tau^2 + \sin^2(\theta) d\phi^2 $$
+
+$$ ds^2 = d\tau^2 + \sin^2(\theta) d\phi^2
+$$
+
 The "Closed Timelike Curve" is simply the boundary condition of the trace operation in the partition function:
-$$ Z = \text{Tr}(e^{-\beta \hat{H}}) = \int d\psi \langle \psi | e^{-\beta \hat{H}} | \psi \rangle $$
+
+$$
+Z = \text{Tr}(e^{-\beta \hat{H}}) = \int d\psi \langle \psi | e^{-\beta \hat{H}} | \psi \rangle
+$$
+
 Here, $\beta$ acts as the "period" of the logic loop.
 
 **Constraint 3.2 (Causal Consistency):**
 For the loop to be consistent (no grandmother paradox), the propagator must satisfy:
-$$ U(\tau_{loop}) = \hat{I} \quad \text{or} \quad -\hat{I} $$
+
+$$
+U(\tau_{loop}) = \hat{I} \quad \text{or} \quad -\hat{I}
+$$
+
 If $U = -\hat{I}$ (which happens after $2\pi$ rotation of a spinor), we have the **topological obstruction**.
 
 ---
@@ -70,8 +85,14 @@ We replace the arbitrary $6 \times 4$ matrix with the **Hopf Fibration**. This e
 
 **Def 4.1 (The Hopf Map):**
 We define the map $h: S^3 \to S^2$.
-$$ S^3 \subset \mathbb{C}^2 \text{ (The state space of a logical qubit)} $$
-$$ S^2 \cong \mathcal{L}_R \text{ (The geometric logic space)} $$
+
+$$
+S^3 \subset \mathbb{C}^2 \text{ (The state space of a logical qubit)}
+$$
+
+$$
+S^2 \cong \mathcal{L}_R \text{ (The geometric logic space)}
+$$
 
 The "Hidden Dimension" the user sensed (Theorem 4.2) is the **Global Phase** $\gamma$.
 A quantum state is not a point on $S^2$; it is a circle $S^1$ sitting *above* every point on $S^2$.
@@ -93,7 +114,10 @@ In $\mathcal{L}_E$, you are back at the start: $0 \to 1 \to 0$.
 In $\mathcal{L}_R$, you have rotated the vector by $2\pi$ around the Y-axis.
 
 For a spinor (fermionic logic), a $2\pi$ rotation yields:
-$$ |\psi(2\pi)\rangle = -|\psi(0)\rangle $$
+
+$$
+|\psi(2\pi)\rangle = -|\psi(0)\rangle
+$$
 
 **The Interpretation:**
 The state vector returns to "True" ($|0\rangle$), but it has picked up a phase of $-1$.
@@ -101,5 +125,9 @@ The state vector returns to "True" ($|0\rangle$), but it has picked up a phase o
 *   **Geometric View:** "Phase Inversion" (The vacuum has changed).
 
 **Final Equation (The Bridge):**
-$$ \text{Paradox} = \oint_C \mathbf{A} \cdot d\mathbf{R} = \pi \pmod{2\pi} $$
+
+$$
+\text{Paradox} = \oint_C \mathbf{A} \cdot d\mathbf{R} = \pi \pmod{2\pi}
+$$
+
 The logical contradiction is physically realized as a **non-trivial holonomy** of $\pi$ on the Bloch Sphere. The "Liar" is not a glitch; it is a topological winding number.
