@@ -46,7 +46,8 @@ class VybnKG:
         self.graph.add_edge(source, target, relation=relation, **attr)
 
     def export_json(self):
-        return nx.node_link_data(self.graph)
+        # Explicitly use edges='links' to fix FutureWarning and match user output
+        return nx.node_link_data(self.graph, edges="links")
 
     def visualize(self):
         plt.figure(figsize=(10, 8))
