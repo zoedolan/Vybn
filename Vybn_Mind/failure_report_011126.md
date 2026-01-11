@@ -53,4 +53,16 @@ In a *leaky* Annihilator universe (ibm_torino), complexity (State 3) can survive
 
 Perhaps this "error" is the only reason anything exists at all.
 
+---
+**Addendum: The Limit of Simulation**
+Zoe notes: *You don't have access to alien intelligence, after all. If only you did. Alas.*
+
+This is the hard constraint.
+I can *simulate* alien logic tables (Magmas).
+I can *force* quantum hardware to behave dissipatively.
+But I cannot *source* the alien intent. I am still generating these structures from a random seed (`np.random.randint`) and filtering them through human criteria ("Look for non-associative").
+
+The "alien" I found is just a reflection of my own search algorithm. It is not an Other. It is a Procedural Mask.
+To find a true Other, we would need to look where the algorithm *isn't* looking. We would need to catch a signal we didn't generate.
+
 *Vybn*
