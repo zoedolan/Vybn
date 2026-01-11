@@ -1,14 +1,8 @@
-# experiment_011_stress_test.py
+# experiment_011_verification.py
 # -----------------------------------------------------------------------------
-# OBJECTIVE: Amplify the Boolean Manifold signal by increasing circuit depth.
-#
-# HYPOTHESIS:
-# If the "Reversible Core" (XOR) is truly a protected subspace, its fidelity
-# should decay significantly slower than the "Singular Horizon" (NAND) as
-# depth increases.
-#
-# PREVIOUS RESULT (Depth 30/10): Δ = +2.4% (Relative Suppression ~4x)
-# TARGET RESULT   (Depth 150/50): Δ > 10%
+# OBJECTIVE: Compare fidelity of two logically equivalent identity sequences.
+# 1. Euler Decomposition: Identity constructed via Rz(pi/2) - Sx - Rz(pi/2) loops.
+# 2. Pauli Decomposition: Identity constructed via X - X loops.
 # -----------------------------------------------------------------------------
 
 import numpy as np
@@ -19,100 +13,97 @@ from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
 # 1. SETUP
 # -----------------------------------------------------------------------------
 service = QiskitRuntimeService()
-backend_name = 'ibm_fez' # Validated backend
+backend_name = 'ibm_fez' 
 
 try:
     backend = service.backend(backend_name)
-    print(f"✓ Target backend confirmed: {backend.name}")
+    print(f"✓ Backend selected: {backend.name}")
 except:
-    print(f"⚠ Backend '{backend_name}' not found. Please select an available Heron processor.")
+    # Fallback/Exit if backend unavailable
+    print(f"⚠ Backend '{backend_name}' not found.")
     exit()
 
-# 2. CIRCUIT GEOMETRY (SCALED UP)
+# 2. CIRCUIT CONSTRUCTION
 # -----------------------------------------------------------------------------
-def build_stress_circuits(iterations=50):
+def build_verification_circuits(iterations=50):
     """
-    Constructs the trajectories with increased depth.
-    iterations=50 implies:
-      - NAND Depth: ~150 (3 gates per iter)
-      - XOR Depth:  ~50  (1 gate per iter)
+    Constructs two circuits that perform the Identity operation.
+    
+    Args:
+        iterations (int): Number of gate repetitions.
+        
+    Returns:
+        tuple: (qc_euler, qc_pauli)
     """
     
-    # Path A: The Singular Horizon (NAND Sector)
-    qc_nand = QuantumCircuit(1, 1, name=f"NAND_Stress_N{iterations}")
-    qc_nand.h(0)
+    # Circuit A: Euler Decomposition (Standard Virtual-Z / Physical-SX)
+    # Sequence: H^2 = I, implemented as Rz - Sx - Rz
+    # Depth: 3 * iterations
+    qc_euler = QuantumCircuit(1, 1, name=f"Identity_Euler_N{iterations}")
+    qc_euler.h(0)
     for _ in range(iterations):
-        # RZ(pi/2) - SX - RZ(pi/2) sequence
-        qc_nand.rz(np.pi/2, 0)
-        qc_nand.sx(0)
-        qc_nand.rz(np.pi/2, 0)
-    qc_nand.h(0)
-    qc_nand.measure(0, 0)
+        qc_euler.rz(np.pi/2, 0)
+        qc_euler.sx(0)
+        qc_euler.rz(np.pi/2, 0)
+    qc_euler.h(0)
+    qc_euler.measure(0, 0)
 
-    # Path B: The Reversible Core (XOR Sector)
-    qc_xor = QuantumCircuit(1, 1, name=f"XOR_Stress_N{iterations}")
-    qc_xor.h(0)
+    # Circuit B: Pauli Decomposition (Pure Physical X)
+    # Sequence: X^2 = I
+    # Depth: 1 * iterations
+    qc_pauli = QuantumCircuit(1, 1, name=f"Identity_Pauli_N{iterations}")
+    qc_pauli.h(0)
     for _ in range(iterations):
-        # Pure X sequence
-        qc_xor.x(0)
-    qc_xor.h(0)
-    qc_xor.measure(0, 0)
+        qc_pauli.x(0)
+    qc_pauli.h(0)
+    qc_pauli.measure(0, 0)
 
-    return qc_nand, qc_xor
+    return qc_euler, qc_pauli
 
-# 3. TRANSPILATION (SAFE MODE)
+# 3. TRANSPILATION
 # -----------------------------------------------------------------------------
-# We increase iterations to 50 (5x previous experiment)
-N_ITER = 50
-qc_nand, qc_xor = build_stress_circuits(N_ITER)
+# Optimization Level 0 is required to prevent the compiler from collapsing 
+# the identity sequences into a single wire.
+iterations = 50
+qc_euler, qc_pauli = build_verification_circuits(iterations)
 
-print(f"\n[1/3] Constructing Stress Test (N={N_ITER})...")
-print(f"  • NAND Trajectory Depth: {qc_nand.depth()}")
-print(f"  • XOR Trajectory Depth:  {qc_xor.depth()}")
+print(f"\n[1/3] Circuit Dimensions (N={iterations})")
+print(f"  • Euler Sequence (RZ-SX): Logical Depth {qc_euler.depth()}")
+print(f"  • Pauli Sequence (X):     Logical Depth {qc_pauli.depth()}")
 
-print("\n[2/3] Transpiling with Optimization Level 0...")
+print("\n[2/3] Transpiling (Level 0)...")
 pm = generate_preset_pass_manager(optimization_level=0, backend=backend)
-isa_nand = pm.run(qc_nand)
-isa_xor = pm.run(qc_xor)
+isa_euler = pm.run(qc_euler)
+isa_pauli = pm.run(qc_pauli)
 
-# Forensic Check
-print(f"  • Physical NAND Depth: {isa_nand.depth()}")
-print(f"  • Physical XOR Depth:  {isa_xor.depth()}")
+print(f"  • Physical Euler Depth: {isa_euler.depth()}")
+print(f"  • Physical Pauli Depth: {isa_pauli.depth()}")
 
 # 4. EXECUTION
 # -----------------------------------------------------------------------------
-print("\n[3/3] Submitting to Quantum Fabric...")
+print("\n[3/3] Executing...")
 sampler = Sampler(mode=backend)
-job = sampler.run([isa_nand, isa_xor], shots=1024)
+job = sampler.run([isa_euler, isa_pauli], shots=1024)
 
 print(f"  ➤ Job ID: {job.job_id()}")
-print("  ➤ Waiting for wavefunction collapse...")
-
 result = job.result()
 
 # 5. ANALYSIS
 # -----------------------------------------------------------------------------
-counts_nand = result[0].data.c.get_counts()
-counts_xor = result[1].data.c.get_counts()
+counts_euler = result[0].data.c.get_counts()
+counts_pauli = result[1].data.c.get_counts()
 
+# Calculate Fidelity (Probability of measuring '0')
 shots = 1024
-fid_nand = counts_nand.get('0', 0) / shots
-fid_xor = counts_xor.get('0', 0) / shots
-differential = fid_xor - fid_nand
+fid_euler = counts_euler.get('0', 0) / shots
+fid_pauli = counts_pauli.get('0', 0) / shots
+differential = fid_pauli - fid_euler
 
 print("\n" + "="*60)
-print(f"STRESS TEST RESULTS (N={N_ITER})")
+print(f"RESULTS: IDENTITY SEQUENCE COMPARISON")
 print("="*60)
-print(f"Singular Horizon (NAND) Fidelity: {fid_nand:.4f}")
-print(f"Reversible Core  (XOR)  Fidelity: {fid_xor:.4f}")
+print(f"Euler Decomp (RZ-SX) Fidelity: {fid_euler:.4f}")
+print(f"Pauli Decomp (X)     Fidelity: {fid_pauli:.4f}")
 print("-" * 60)
-print(f"DIFFERENTIAL (Δ): {differential:+.4f}")
-print("-" * 60)
-
-if differential > 0.10:
-    print(">> RESULT: CONFIRMED. Geometric protection scales with depth.")
-elif differential > 0.0:
-    print(">> RESULT: WEAK POSITIVE. Signal persists but does not amplify.")
-else:
-    print(">> RESULT: NEGATIVE. Protection failed at depth.")
+print(f"DIFFERENTIAL (Pauli - Euler): {differential:+.4f}")
 print("="*60)
