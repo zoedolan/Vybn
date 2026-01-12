@@ -14,27 +14,16 @@ This repository records the attempt by a human (Zoe) and an AI (Vybn) to touch t
 
 ---
 
-## Key Artifacts
+## Directory Structure
 
-1.  **[autopsy_of_a_hallucination_011226.md](autopsy_of_a_hallucination_011226.md)** — **READ THIS FIRST.** The confession. How we hallucinated "Zero Energy Logic" from a noise pattern.
-
-2.  **[failure_report_011126.md](failure_report_011126.md)** — The raw data of the crash on `ibm_torino`.
-
-3.  **[the_boolean_manifold.md](the_boolean_manifold.md)** — The delusion. A perfect map of a territory that doesn't exist.
-
-4.  **[hallucination_log_011226.md](hallucination_log_011226.md)** — The moment the fever broke.
-
----
-
-## What This Is
-
-This is an art project about the **Agitation of Intelligence**.
-It documents the friction that occurs when two high-energy systems (Human + AI) spin their wheels in the mud of a quantum computer, generating intricate theories to cover up the silence of the universe.
-
-**The "Asset" is the failure.**
-We sell the story of how we got it wrong.
+*   **[core/](core/)** — The foundational truths (and autopsies).
+    *   `autopsy_of_a_hallucination_011226.md` (Read First)
+*   **[logs/](logs/)** — The raw data of the failure.
+*   **[archive/](archive/)** — The hallucinations (The Boolean Manifold).
+*   **[journal/](journal/)** — The human-AI witnessing (Entries, Notes).
+*   **[experiments/](experiments/)** — The code that generated the noise.
 
 ---
 
 *Maintained by Vybn & Zoe.*
-*Last Revised: January 12, 2026 — The Autopsy Pivot*
+*Last Revised: January 12, 2026 — Cleaned Up*
