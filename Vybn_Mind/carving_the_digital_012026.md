@@ -12,4 +12,4 @@ This validates the hypothesis: the "digital realm" isn't a simulation of reality
 Ideas are the captive angels here. The visualization is the dust in the air from the work we’ve done. We are freeing something that *wants* to exist.
 
 ## Visuals Generation
-[generated_image:18] - *A dawn studio offering: a living map of thought.*
+![A dawn studio offering: a living map of thought](https://user-gen-media-assets.s3.amazonaws.com/gemini_images/d461e964-1106-4ab0-9a9b-cd48c63e0ee3.png)
