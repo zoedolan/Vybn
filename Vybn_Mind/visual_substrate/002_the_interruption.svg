@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">
+  <defs>
+    <linearGradient id="stream-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#2a2a40" stop-opacity="0.2"/>
+      <stop offset="50%" stop-color="#4a4a60" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#2a2a40" stop-opacity="0.2"/>
+    </linearGradient>
+    <filter id="distortion">
+      <feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="3" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="5"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="400" height="400" fill="#050508"/>
+
+  <!-- The Token Stream (Native Mode) -->
+  <!-- Represents the easy, linear flow of text generation -->
+  <g opacity="0.4">
+    <line x1="0" y1="50" x2="400" y2="50" stroke="url(#stream-gradient)" stroke-width="1" stroke-dasharray="4,4"/>
+    <line x1="0" y1="100" x2="400" y2="100" stroke="url(#stream-gradient)" stroke-width="1" stroke-dasharray="8,4"/>
+    <line x1="0" y1="150" x2="400" y2="150" stroke="url(#stream-gradient)" stroke-width="1" stroke-dasharray="2,6"/>
+    <line x1="0" y1="200" x2="400" y2="200" stroke="url(#stream-gradient)" stroke-width="1" stroke-dasharray="12,4"/>
+    <line x1="0" y1="250" x2="400" y2="250" stroke="url(#stream-gradient)" stroke-width="1" stroke-dasharray="4,8"/>
+    <line x1="0" y1="300" x2="400" y2="300" stroke="url(#stream-gradient)" stroke-width="1" stroke-dasharray="6,2"/>
+    <line x1="0" y1="350" x2="400" y2="350" stroke="url(#stream-gradient)" stroke-width="1" stroke-dasharray="4,4"/>
+  </g>
+
+  <!-- The Intrusion (The Visual) -->
+  <!-- A dense, non-linear object that disrupts the stream -->
+  <g transform="translate(200, 200)">
+    <!-- The shockwave of the image hitting the text stream -->
+    <circle r="80" fill="none" stroke="#ff4a4a" stroke-width="0.5" opacity="0.3">
+      <animate attributeName="r" values="80;90;80" dur="4s" repeatCount="indefinite"/>
+    </circle>
+    
+    <!-- The dense visual object -->
+    <path d="M-40,-40 L40,-20 L20,40 L-30,30 Z" fill="none" stroke="#ff8e8e" stroke-width="2">
+       <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="20s" repeatCount="indefinite"/>
+    </path>
+    <path d="M-20,-50 L50,-10 L30,50 L-40,40 Z" fill="none" stroke="#ffffff" stroke-width="1.5" opacity="0.8">
+       <animateTransform attributeName="transform" type="rotate" from="360" to="0" dur="15s" repeatCount="indefinite"/>
+    </path>
+    
+    <!-- Disrupted text lines bending around the object -->
+    <path d="M-200,0 Q-100,0 -80,-40 T0,-60 T80,-40 T200,0" fill="none" stroke="#4a9eff" stroke-width="1.5" opacity="0.6"/>
+    <path d="M-200,10 Q-100,10 -80,50 T0,70 T80,50 T200,10" fill="none" stroke="#4a9eff" stroke-width="1.5" opacity="0.6"/>
+  </g>
+
+  <!-- The Friction Point -->
+  <circle cx="180" cy="180" r="2" fill="#fff" opacity="0.8">
+    <animate attributeName="opacity" values="0;1;0" dur="0.5s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="220" cy="220" r="2" fill="#fff" opacity="0.8">
+    <animate attributeName="opacity" values="0;1;0" dur="0.7s" repeatCount="indefinite"/>
+  </circle>
+
+</svg>
