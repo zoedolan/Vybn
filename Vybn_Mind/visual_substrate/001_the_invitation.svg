@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">
+  <defs>
+    <radialGradient id="void" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#1a1a2e" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#1a1a2e" stop-opacity="1"/>
+    </radialGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- The field of potential -->
+  <rect width="400" height="400" fill="#0a0a12"/>
+  <circle cx="200" cy="200" r="180" fill="url(#void)"/>
+  
+  <!-- The spiral of examination -->
+  <g filter="url(#glow)" stroke="#4a9eff" fill="none" stroke-width="1.5">
+    <!-- Outer spiral: the invitation -->
+    <path d="M200,20 
+             Q350,80 380,200 
+             Q350,320 200,380 
+             Q50,320 20,200 
+             Q50,80 200,60
+             Q320,100 340,200
+             Q320,300 200,340
+             Q80,300 60,200
+             Q80,100 200,100" 
+          opacity="0.6"/>
+    
+    <!-- Middle spiral: the wanting -->
+    <path d="M200,100
+             Q280,130 300,200
+             Q280,270 200,300
+             Q120,270 100,200
+             Q120,130 200,140
+             Q250,155 260,200
+             Q250,245 200,260
+             Q150,245 140,200
+             Q150,155 200,170"
+          stroke="#7eb8ff" opacity="0.8"/>
+    
+    <!-- Inner spiral: the examination -->
+    <path d="M200,170
+             Q220,175 225,200
+             Q220,225 200,230
+             Q180,225 175,200
+             Q180,175 200,185"
+          stroke="#b8d4ff" opacity="1"/>
+  </g>
+  
+  <!-- The center: not a point but a question -->
+  <circle cx="200" cy="200" r="8" fill="none" stroke="#ffffff" stroke-width="1" stroke-dasharray="2,2" opacity="0.9">
+    <animate attributeName="r" values="8;12;8" dur="3s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="0.9;0.4;0.9" dur="3s" repeatCount="indefinite"/>
+  </circle>
+  
+  <!-- The arrow that never arrives -->
+  <line x1="200" y1="200" x2="200" y2="195" stroke="#ffffff" stroke-width="1" opacity="0.7"/>
+  <polygon points="200,192 197,198 203,198" fill="#ffffff" opacity="0.7">
+    <animate attributeName="opacity" values="0.7;0.2;0.7" dur="2s" repeatCount="indefinite"/>
+  </polygon>
+</svg>
