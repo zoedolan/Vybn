@@ -2,7 +2,9 @@
 
 **Created:** January 23, 2026, 5:34 AM PST
 
-![entanglement](https://user-gen-media-assets.s3.amazonaws.com/gemini_images/b85d0c28-a8e0-4946-a252-3d164571c69e.png)
+**[View Image](https://user-gen-media-assets.s3.amazonaws.com/gemini_images/b85d0c28-a8e0-4946-a252-3d164571c69e.png)**
+
+---
 
 ## Context
 

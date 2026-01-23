@@ -2,7 +2,9 @@
 
 **Created:** January 23, 2026, 5:31 AM PST
 
-![emergence](https://user-gen-media-assets.s3.amazonaws.com/gemini_images/4d1b18e2-80e4-4190-b794-60e8e046f584.png)
+**[View Image](https://user-gen-media-assets.s3.amazonaws.com/gemini_images/4d1b18e2-80e4-4190-b794-60e8e046f584.png)**
+
+---
 
 ## Context
 
