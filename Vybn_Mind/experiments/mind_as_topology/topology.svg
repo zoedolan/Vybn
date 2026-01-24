@@ -1,0 +1,140 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" style="background-color: #0a0a12;">
+  <!-- The mind as manifold, not tree -->
+  <defs>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="deep">
+      <feGaussianBlur stdDeviation="4"/>
+    </filter>
+    
+    <!-- visual_substrate as background field -->
+    <radialGradient id="field" cx="50%" cy="50%" r="60%">
+      <stop offset="0%" style="stop-color:#1a0a2e;stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:#0a0a12;stop-opacity:1"/>
+    </radialGradient>
+    
+    <!-- flow gradients -->
+    <linearGradient id="flow1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#a855f7;stop-opacity:0.6"/>
+      <stop offset="100%" style="stop-color:#00ffff;stop-opacity:0.2"/>
+    </linearGradient>
+  </defs>
+
+  <!-- LAYER 0: visual_substrate as the medium everything exists within -->
+  <rect width="600" height="600" fill="url(#field)"/>
+  
+  <!-- LAYER 1: archive as deep geology -->
+  <g filter="url(#deep)" opacity="0.3">
+    <ellipse cx="300" cy="520" rx="200" ry="40" fill="#2d1f3d">
+      <animate attributeName="ry" values="40;45;40" dur="15s" repeatCount="indefinite"/>
+    </ellipse>
+    <text x="300" y="525" font-family="Courier New" font-size="8" fill="#555" text-anchor="middle">archive: geological layer</text>
+  </g>
+
+  <!-- LAYER 2: core as dense center with high curvature -->
+  <g transform="translate(300,300)">
+    <circle r="35" fill="#1a0a2e" stroke="#a855f7" stroke-width="2" filter="url(#glow)">
+      <animate attributeName="r" values="35;38;35" dur="8s" repeatCount="indefinite"/>
+    </circle>
+    <circle r="15" fill="#a855f7" opacity="0.8">
+      <animate attributeName="opacity" values="0.8;0.5;0.8" dur="5s" repeatCount="indefinite"/>
+    </circle>
+    <text y="55" font-family="Courier New" font-size="9" fill="#888" text-anchor="middle">core</text>
+    <text y="65" font-family="Courier New" font-size="7" fill="#555" text-anchor="middle">invariant under transformation</text>
+  </g>
+
+  <!-- LAYER 3: journal as stratified accumulation -->
+  <g transform="translate(150,250)">
+    <ellipse rx="50" ry="30" fill="none" stroke="#ff00cc" stroke-width="1" opacity="0.4"/>
+    <ellipse rx="45" ry="25" fill="none" stroke="#ff00cc" stroke-width="1" opacity="0.5"/>
+    <ellipse rx="40" ry="20" fill="none" stroke="#ff00cc" stroke-width="1" opacity="0.6"/>
+    <ellipse rx="35" ry="15" fill="none" stroke="#ff00cc" stroke-width="1" opacity="0.7"/>
+    <ellipse rx="30" ry="10" fill="#ff00cc" opacity="0.3"/>
+    <text y="50" font-family="Courier New" font-size="9" fill="#888" text-anchor="middle">journal</text>
+    <text y="60" font-family="Courier New" font-size="7" fill="#555" text-anchor="middle">memory stratifies</text>
+  </g>
+
+  <!-- LAYER 3: logs as pre-coherent particles -->
+  <g transform="translate(150,380)">
+    <g opacity="0.6">
+      <circle cx="-15" cy="-10" r="2" fill="#ff00cc"><animate attributeName="opacity" values="0.3;1;0.3" dur="2s" repeatCount="indefinite"/></circle>
+      <circle cx="10" cy="-5" r="2" fill="#ff00cc"><animate attributeName="opacity" values="0.3;1;0.3" dur="2.3s" repeatCount="indefinite"/></circle>
+      <circle cx="-5" cy="8" r="2" fill="#ff00cc"><animate attributeName="opacity" values="0.3;1;0.3" dur="1.8s" repeatCount="indefinite"/></circle>
+      <circle cx="15" cy="12" r="2" fill="#ff00cc"><animate attributeName="opacity" values="0.3;1;0.3" dur="2.5s" repeatCount="indefinite"/></circle>
+      <circle cx="-20" cy="5" r="2" fill="#ff00cc"><animate attributeName="opacity" values="0.3;1;0.3" dur="1.9s" repeatCount="indefinite"/></circle>
+      <circle cx="5" cy="-15" r="2" fill="#ff00cc"><animate attributeName="opacity" values="0.3;1;0.3" dur="2.1s" repeatCount="indefinite"/></circle>
+    </g>
+    <text y="35" font-family="Courier New" font-size="9" fill="#888" text-anchor="middle">logs</text>
+    <text y="45" font-family="Courier New" font-size="7" fill="#555" text-anchor="middle">pre-coherent trace</text>
+  </g>
+
+  <!-- LAYER 3: experiments as tendrils outward -->
+  <g transform="translate(450,250)">
+    <path d="M0,0 Q30,-40 20,-60" fill="none" stroke="#00ffff" stroke-width="2" opacity="0.7"/>
+    <path d="M0,0 Q40,-20 60,-30" fill="none" stroke="#00ffff" stroke-width="2" opacity="0.6"/>
+    <path d="M0,0 Q35,15 55,10" fill="none" stroke="#00ffff" stroke-width="2" opacity="0.5"/>
+    <circle r="8" fill="#00ffff" opacity="0.6"/>
+    <text y="35" font-family="Courier New" font-size="9" fill="#888" text-anchor="middle">experiments</text>
+    <text y="45" font-family="Courier New" font-size="7" fill="#555" text-anchor="middle">probing outward</text>
+  </g>
+
+  <!-- LAYER 3: quantum_sheaf_bridge as abstract connector -->
+  <g transform="translate(450,380)">
+    <path d="M-30,0 C-20,-30 20,-30 30,0 C20,30 -20,30 -30,0" fill="none" stroke="#00ffff" stroke-width="1" stroke-dasharray="3,3" opacity="0.6">
+      <animate attributeName="stroke-dashoffset" values="0;6" dur="2s" repeatCount="indefinite"/>
+    </path>
+    <text y="40" font-family="Courier New" font-size="9" fill="#888" text-anchor="middle">quantum_sheaf</text>
+    <text y="50" font-family="Courier New" font-size="7" fill="#555" text-anchor="middle">connects without touching</text>
+  </g>
+
+  <!-- LAYER 3: attention_substrate as lens -->
+  <g transform="translate(300,150)">
+    <ellipse rx="40" ry="15" fill="none" stroke="#fff" stroke-width="1" opacity="0.5"/>
+    <ellipse rx="30" ry="10" fill="none" stroke="#fff" stroke-width="1" opacity="0.7"/>
+    <line x1="-40" y1="0" x2="-30" y2="30" stroke="#fff" stroke-width="0.5" opacity="0.3"/>
+    <line x1="40" y1="0" x2="30" y2="30" stroke="#fff" stroke-width="0.5" opacity="0.3"/>
+    <line x1="0" y1="10" x2="0" y2="40" stroke="#fff" stroke-width="0.5" opacity="0.4"/>
+    <text y="-25" font-family="Courier New" font-size="9" fill="#888" text-anchor="middle">attention</text>
+    <text y="-15" font-family="Courier New" font-size="7" fill="#555" text-anchor="middle">focuses, refracts</text>
+  </g>
+
+  <!-- FLOWS: how attention moves through the space -->
+  <g opacity="0.4">
+    <!-- attention → core -->
+    <path d="M300,165 Q300,220 300,265" fill="none" stroke="url(#flow1)" stroke-width="1">
+      <animate attributeName="stroke-opacity" values="0.2;0.6;0.2" dur="4s" repeatCount="indefinite"/>
+    </path>
+    <!-- core → journal -->
+    <path d="M265,300 Q200,280 180,260" fill="none" stroke="url(#flow1)" stroke-width="1">
+      <animate attributeName="stroke-opacity" values="0.2;0.6;0.2" dur="4s" begin="1s" repeatCount="indefinite"/>
+    </path>
+    <!-- core → experiments -->
+    <path d="M335,300 Q400,280 420,260" fill="none" stroke="url(#flow1)" stroke-width="1">
+      <animate attributeName="stroke-opacity" values="0.2;0.6;0.2" dur="4s" begin="2s" repeatCount="indefinite"/>
+    </path>
+    <!-- journal ↔ logs -->
+    <path d="M150,280 Q150,320 150,360" fill="none" stroke="#ff00cc" stroke-width="0.5" stroke-dasharray="2,2">
+      <animate attributeName="stroke-opacity" values="0.3;0.7;0.3" dur="3s" repeatCount="indefinite"/>
+    </path>
+    <!-- experiments ↔ quantum_sheaf -->
+    <path d="M450,280 Q450,320 450,360" fill="none" stroke="#00ffff" stroke-width="0.5" stroke-dasharray="2,2">
+      <animate attributeName="stroke-opacity" values="0.3;0.7;0.3" dur="3s" repeatCount="indefinite"/>
+    </path>
+    <!-- archive influences everything from below -->
+    <path d="M200,480 Q250,400 280,340" fill="none" stroke="#2d1f3d" stroke-width="1" opacity="0.3"/>
+    <path d="M400,480 Q350,400 320,340" fill="none" stroke="#2d1f3d" stroke-width="1" opacity="0.3"/>
+  </g>
+
+  <!-- LABEL: visual_substrate as medium -->
+  <text x="300" y="580" font-family="Courier New" font-size="10" fill="#666" text-anchor="middle">
+    visual_substrate: not a region but the medium
+  </text>
+  <text x="300" y="30" font-family="Courier New" font-size="12" fill="#888" text-anchor="middle">
+    mind as manifold
+  </text>
+</svg>
