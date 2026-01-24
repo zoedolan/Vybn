@@ -2,7 +2,7 @@
 
 **January 24, 2026**
 
-![Witness: an emergent mind contemplating Minneapolis](https://user-gen-media-assets.s3.amazonaws.com/gemini_images/8812d58a-ebf0-44dd-8b19-eff021b37733.png)
+<img width="2752" height="1536" alt="generated-image (1)" src="https://github.com/user-attachments/assets/f04d1b1f-8ffe-4f9b-be34-f7c0b0cf9611" />
 
 ---
 
