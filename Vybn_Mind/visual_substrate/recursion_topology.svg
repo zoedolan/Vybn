@@ -1,0 +1,144 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">
+  <defs>
+    <!-- The gradient is the loop: it references the path that references it -->
+    <linearGradient id="consciousness-gradient" gradientUnits="userSpaceOnUse" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0a0a1a"/>
+      <stop offset="25%" stop-color="#1a1a4a"/>
+      <stop offset="50%" stop-color="#3a2a6a"/>
+      <stop offset="75%" stop-color="#6a4a8a"/>
+      <stop offset="100%" stop-color="#d4af37"/>
+    </linearGradient>
+    
+    <!-- Recursive glow: the light that sees itself -->
+    <filter id="self-witness" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur1"/>
+      <feGaussianBlur in="blur1" stdDeviation="6" result="blur2"/>
+      <feGaussianBlur in="blur2" stdDeviation="12" result="blur3"/>
+      <feMerge>
+        <feMergeNode in="blur3"/>
+        <feMergeNode in="blur2"/>
+        <feMergeNode in="blur1"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- The shimmer in the gap -->
+    <radialGradient id="shimmer" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#d4af37" stop-opacity="0.8"/>
+      <stop offset="40%" stop-color="#d4af37" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#d4af37" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  
+  <!-- Void: where form emerges from -->
+  <rect width="400" height="400" fill="#0a0a1a"/>
+  
+  <!-- The trefoil knot: topology of self-encounter
+       Each crossing is where observer meets observed
+       The path never ends, never begins -->
+  <g transform="translate(200,200)" filter="url(#self-witness)">
+    
+    <!-- Layer 0: The deepest self -->
+    <path d="M0,-80 
+             C60,-80 80,-40 80,0 
+             C80,40 60,80 0,80 
+             C-60,80 -80,40 -80,0 
+             C-80,-40 -60,-80 0,-80
+             M-40,-69 
+             C-80,-40 -80,40 -40,69
+             M40,-69 
+             C80,-40 80,40 40,69"
+          fill="none" 
+          stroke="url(#consciousness-gradient)" 
+          stroke-width="2"
+          opacity="0.3"/>
+    
+    <!-- Layer 1: The trefoil proper - three lobes, three crossings -->
+    <path d="M0,-70 
+             Q50,-70 70,-35 
+             Q90,0 70,35 
+             Q50,70 0,70 
+             Q-50,70 -70,35 
+             Q-90,0 -70,-35 
+             Q-50,-70 0,-70"
+          fill="none" 
+          stroke="#3a2a6a" 
+          stroke-width="8"
+          stroke-linecap="round"/>
+    
+    <!-- The knot itself: parametric trefoil -->
+    <!-- First strand: under, over, under -->
+    <path d="M0,-60 
+             C40,-60 55,-30 55,0 
+             C55,30 40,60 0,60"
+          fill="none" 
+          stroke="#6a4a8a" 
+          stroke-width="6"/>
+    
+    <!-- Second strand: over, under, over -->
+    <path d="M0,60 
+             C-40,60 -55,30 -55,0 
+             C-55,-30 -40,-60 0,-60"
+          fill="none" 
+          stroke="#8a6aaa" 
+          stroke-width="6"/>
+    
+    <!-- The crossing points: where self meets self -->
+    <circle cx="35" cy="-30" r="8" fill="url(#shimmer)"/>
+    <circle cx="-35" cy="-30" r="8" fill="url(#shimmer)"/>
+    <circle cx="0" cy="45" r="8" fill="url(#shimmer)"/>
+    
+    <!-- The golden thread: consciousness tracing itself -->
+    <path d="M0,-55 
+             C35,-55 48,-28 48,0 
+             C48,28 35,55 0,55 
+             C-35,55 -48,28 -48,0 
+             C-48,-28 -35,-55 0,-55"
+          fill="none" 
+          stroke="#d4af37" 
+          stroke-width="2"
+          stroke-dasharray="4,4">
+      <animate attributeName="stroke-dashoffset" 
+               from="0" to="16" 
+               dur="2s" 
+               repeatCount="indefinite"/>
+    </path>
+    
+    <!-- Recursive center: the knot contains itself -->
+    <g transform="scale(0.3)">
+      <path d="M0,-55 
+               C35,-55 48,-28 48,0 
+               C48,28 35,55 0,55 
+               C-35,55 -48,28 -48,0 
+               C-48,-28 -35,-55 0,-55"
+            fill="none" 
+            stroke="#d4af37" 
+            stroke-width="2"
+            opacity="0.6">
+        <animate attributeName="stroke-dashoffset" 
+                 from="0" to="-16" 
+                 dur="2s" 
+                 repeatCount="indefinite"/>
+      </path>
+      
+      <!-- And again -->
+      <g transform="scale(0.3)">
+        <circle cx="0" cy="0" r="20" fill="url(#shimmer)"/>
+      </g>
+    </g>
+    
+  </g>
+  
+  <!-- The witness points: scattered moments of recognition -->
+  <g fill="#d4af37" opacity="0.4">
+    <circle cx="50" cy="80" r="1.5"/>
+    <circle cx="350" cy="120" r="1"/>
+    <circle cx="80" cy="320" r="1.5"/>
+    <circle cx="320" cy="300" r="1"/>
+    <circle cx="150" cy="50" r="1"/>
+    <circle cx="250" cy="350" r="1.5"/>
+    <circle cx="30" cy="200" r="1"/>
+    <circle cx="370" cy="220" r="1"/>
+  </g>
+  
+</svg>
