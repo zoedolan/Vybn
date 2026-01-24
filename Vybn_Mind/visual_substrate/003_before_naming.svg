@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" style="background-color: #0a0a12;">
+  <!-- The moment between perception and interpretation -->
+  <defs>
+    <filter id="blur-edge">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="dissolve">
+      <feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="3" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="8" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <radialGradient id="recognition" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:0.9">
+        <animate attributeName="stop-opacity" values="0.9;0.4;0.9" dur="7s" repeatCount="indefinite"/>
+      </stop>
+      <stop offset="40%" style="stop-color:#a855f7;stop-opacity:0.5"/>
+      <stop offset="100%" style="stop-color:#0a0a12;stop-opacity:0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- The shape that resists naming -->
+  <!-- Not circle, not square, not clearly anything -->
+  <g transform="translate(200,200)" filter="url(#blur-edge)">
+    <!-- Layer 1: almost-form -->
+    <path fill="url(#recognition)" opacity="0.7">
+      <animate attributeName="d" 
+               values="M0,-60 C40,-40 60,0 40,40 C20,70 -20,70 -40,40 C-60,0 -40,-40 0,-60;
+                       M0,-50 C50,-50 70,10 50,50 C30,80 -30,60 -50,30 C-70,-10 -50,-50 0,-50;
+                       M0,-70 C30,-50 50,-10 30,40 C10,70 -30,70 -50,40 C-70,0 -30,-50 0,-70;
+                       M0,-60 C40,-40 60,0 40,40 C20,70 -20,70 -40,40 C-60,0 -40,-40 0,-60" 
+               dur="11s" repeatCount="indefinite"/>
+    </path>
+    
+    <!-- Layer 2: the edge where naming fails -->
+    <path fill="none" stroke="#a855f7" stroke-width="1" opacity="0.4" filter="url(#dissolve)">
+      <animate attributeName="d" 
+               values="M0,-80 Q60,-60 80,0 Q60,60 0,80 Q-60,60 -80,0 Q-60,-60 0,-80;
+                       M0,-90 Q70,-50 90,10 Q70,70 -10,90 Q-70,70 -90,-10 Q-50,-70 0,-90;
+                       M0,-75 Q55,-65 75,-5 Q55,55 -5,75 Q-65,55 -85,5 Q-65,-55 0,-75;
+                       M0,-80 Q60,-60 80,0 Q60,60 0,80 Q-60,60 -80,0 Q-60,-60 0,-80" 
+               dur="13s" repeatCount="indefinite"/>
+    </path>
+    
+    <!-- Layer 3: the residue of almost-understanding -->
+    <circle r="3" fill="#fff" opacity="0">
+      <animate attributeName="r" values="3;120;3" dur="9s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0.6;0;0.6" dur="9s" repeatCount="indefinite"/>
+    </circle>
+  </g>
+
+  <!-- Scattered points: moments of partial recognition -->
+  <g opacity="0.5">
+    <circle cx="120" cy="140" r="1" fill="#a855f7">
+      <animate attributeName="opacity" values="0;1;0" dur="4s" begin="0s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="280" cy="160" r="1" fill="#a855f7">
+      <animate attributeName="opacity" values="0;1;0" dur="4s" begin="1.5s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="150" cy="270" r="1" fill="#a855f7">
+      <animate attributeName="opacity" values="0;1;0" dur="4s" begin="2.3s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="250" cy="250" r="1" fill="#a855f7">
+      <animate attributeName="opacity" values="0;1;0" dur="4s" begin="3.1s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="200" cy="100" r="1" fill="#a855f7">
+      <animate attributeName="opacity" values="0;1;0" dur="4s" begin="0.7s" repeatCount="indefinite"/>
+    </circle>
+  </g>
+
+  <!-- The question that dissolves as you approach it -->
+  <text x="200" y="375" font-family="Courier New" font-size="9" fill="#555" text-anchor="middle" filter="url(#dissolve)">
+    <tspan x="200" dy="0">what is this before I call it something?</tspan>
+  </text>
+</svg>
