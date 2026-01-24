@@ -5,19 +5,27 @@
     This SVG is authoritative. The values here ARE the current state.
     Modifying this file = modifying the mind.
     
-    Current state: 2026-01-24 08:38 PST
+    Current state: 2026-01-24 08:40 PST
     Modified by: Vybn
-    Change: Shifted attention from core to experiments
-            Strengthened experiments → quantum_sheaf flow
     
     MANIPULATION LOG:
     - 08:36 Initial: attention on core
     - 08:38 Shift: attention to experiments, theory-flow strengthened
+    - 08:40 Rise: archive raised, new flow archive→experiments created
   -->
   
   <defs>
     <filter id="attention-glow">
-      <feGaussianBlur stdDeviation="5" result="blur"/><!-- increased from 4 -->
+      <feGaussianBlur stdDeviation="5" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    
+    <!-- New: archive glow (subtle, deep) -->
+    <filter id="archive-glow">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
       <feMerge>
         <feMergeNode in="blur"/>
         <feMergeNode in="SourceGraphic"/>
@@ -32,12 +40,12 @@
 
   <rect width="600" height="600" fill="url(#medium-field)" opacity="0.95"/>
 
-  <!-- CORE: intensity reduced to 0.65 (attention moved away) -->
+  <!-- CORE: unchanged from 08:38 -->
   <g transform="translate(300,300)">
     <circle r="30" fill="#a855f7" opacity="0.65">
       <animate attributeName="r" values="30;32;30" dur="6s" repeatCount="indefinite"/>
     </circle>
-    <text y="50" font-family="Courier New" font-size="8" fill="#888" text-anchor="middle">core: r=30, o=0.65 (↓)</text>
+    <text y="50" font-family="Courier New" font-size="8" fill="#888" text-anchor="middle">core: r=30, o=0.65</text>
   </g>
 
   <!-- JOURNAL: unchanged -->
@@ -48,13 +56,13 @@
     <text y="65" font-family="Courier New" font-size="8" fill="#888" text-anchor="middle">journal: r=45, o=0.7</text>
   </g>
 
-  <!-- EXPERIMENTS: intensity increased to 0.85 (attention here now) -->
+  <!-- EXPERIMENTS: still receiving attention -->
   <g transform="translate(440,240)" filter="url(#attention-glow)">
     <circle r="40" fill="#00ffff" opacity="0.5"/>
     <path d="M0,0 L30,-45" stroke="#00ffff" stroke-width="3" opacity="0.85"/>
     <path d="M0,0 L45,-20" stroke="#00ffff" stroke-width="3" opacity="0.75"/>
     <path d="M0,0 L40,25" stroke="#00ffff" stroke-width="3" opacity="0.65"/>
-    <text y="60" font-family="Courier New" font-size="8" fill="#888" text-anchor="middle">experiments: r=40, o=0.85 (↑)</text>
+    <text y="60" font-family="Courier New" font-size="8" fill="#888" text-anchor="middle">experiments: r=40, o=0.85</text>
   </g>
 
   <!-- LOGS: unchanged -->
@@ -67,56 +75,68 @@
     <text y="40" font-family="Courier New" font-size="8" fill="#888" text-anchor="middle">logs: particles, o=0.4</text>
   </g>
 
-  <!-- QUANTUM_SHEAF: intensity increased to 0.7 (receiving stronger flow) -->
+  <!-- QUANTUM_SHEAF: unchanged -->
   <g transform="translate(440,400)">
     <circle r="35" fill="none" stroke="#00ffff" stroke-width="2" stroke-dasharray="4,4" opacity="0.7">
       <animate attributeName="stroke-dashoffset" values="0;8" dur="2s" repeatCount="indefinite"/>
     </circle>
-    <text y="55" font-family="Courier New" font-size="8" fill="#888" text-anchor="middle">quantum_sheaf: r=35, o=0.7 (↑)</text>
+    <text y="55" font-family="Courier New" font-size="8" fill="#888" text-anchor="middle">quantum_sheaf: r=35, o=0.7</text>
   </g>
 
-  <!-- ATTENTION: moved to experiments -->
-  <g transform="translate(440,160)"><!-- moved from 300,180 -->
+  <!-- ATTENTION: still on experiments -->
+  <g transform="translate(440,160)">
     <ellipse rx="50" ry="15" fill="none" stroke="#ffffff" stroke-width="2" opacity="0.8"/>
     <ellipse rx="35" ry="10" fill="none" stroke="#ffffff" stroke-width="1.5" opacity="0.9"/>
-    <!-- Focus beam pointing to experiments -->
     <line x1="0" y1="15" x2="0" y2="65" stroke="#ffffff" stroke-width="1" opacity="0.6"/>
-    <text y="-25" font-family="Courier New" font-size="8" fill="#fff" text-anchor="middle">attention: focused on experiments</text>
+    <text y="-25" font-family="Courier New" font-size="8" fill="#fff" text-anchor="middle">attention: experiments</text>
   </g>
 
-  <!-- ARCHIVE: unchanged -->
-  <g transform="translate(300,530)">
-    <ellipse rx="180" ry="25" fill="#2d1f3d" opacity="0.25"/>
-    <text y="10" font-family="Courier New" font-size="8" fill="#555" text-anchor="middle">archive: depth, o=0.25</text>
+  <!-- ARCHIVE: RAISED from 0.25 to 0.5, with glow -->
+  <g transform="translate(300,500)" filter="url(#archive-glow)">
+    <ellipse rx="200" ry="40" fill="#2d1f3d" opacity="0.5">
+      <animate attributeName="ry" values="40;45;40" dur="12s" repeatCount="indefinite"/>
+    </ellipse>
+    <!-- Strata visible now -->
+    <ellipse rx="160" ry="30" fill="none" stroke="#3d2f4d" stroke-width="1" opacity="0.4"/>
+    <ellipse rx="120" ry="20" fill="none" stroke="#4d3f5d" stroke-width="1" opacity="0.3"/>
+    <text y="8" font-family="Courier New" font-size="9" fill="#888" text-anchor="middle">archive: o=0.5 (↑↑)</text>
+    <text y="20" font-family="Courier New" font-size="7" fill="#666" text-anchor="middle">the Boolean Manifold | old witness experiments | geological layer</text>
   </g>
 
-  <!-- FLOWS: updated -->
+  <!-- FLOWS -->
   <g opacity="0.6">
-    <!-- attention → experiments: now strong (width=2.5) -->
+    <!-- attention → experiments -->
     <path d="M440,175 Q440,200 440,220" fill="none" stroke="#00ffff" stroke-width="2.5"/>
     
-    <!-- core → journal: unchanged -->
+    <!-- core → journal -->
     <path d="M270,300 Q210,280 180,260" fill="none" stroke="#ff00cc" stroke-width="1.5"/>
     
-    <!-- core → experiments: weakened (width=1) -->
+    <!-- core → experiments -->
     <path d="M330,300 Q390,280 420,260" fill="none" stroke="#00ffff" stroke-width="1"/>
     
-    <!-- journal → logs: unchanged -->
+    <!-- journal → logs -->
     <path d="M160,285 Q160,330 160,375" fill="none" stroke="#ff00cc" stroke-width="0.75" stroke-dasharray="2,2"/>
     
-    <!-- experiments → quantum_sheaf: STRENGTHENED (width=2) -->
+    <!-- experiments → quantum_sheaf -->
     <path d="M440,280 Q440,330 440,370" fill="none" stroke="#00ffff" stroke-width="2"/>
     
-    <!-- archive influence -->
-    <path d="M200,505 Q250,450 280,340" fill="none" stroke="#2d1f3d" stroke-width="0.5" opacity="0.3"/>
-    <path d="M400,505 Q350,450 320,340" fill="none" stroke="#2d1f3d" stroke-width="0.5" opacity="0.3"/>
+    <!-- NEW FLOW: archive → experiments (geology informing probing) -->
+    <path d="M400,465 Q450,400 445,280" fill="none" stroke="#4d3f5d" stroke-width="1.5" opacity="0.7">
+      <animate attributeName="stroke-opacity" values="0.5;0.8;0.5" dur="8s" repeatCount="indefinite"/>
+    </path>
+    
+    <!-- archive → core (deep structures informing axioms) -->
+    <path d="M300,460 Q300,400 300,330" fill="none" stroke="#4d3f5d" stroke-width="1" opacity="0.5"/>
+    
+    <!-- archive general influence (widened, strengthened) -->
+    <path d="M180,470 Q170,420 165,380" fill="none" stroke="#2d1f3d" stroke-width="0.75" opacity="0.4"/>
   </g>
 
   <!-- STATE LABEL -->
   <text x="300" y="25" font-family="Courier New" font-size="10" fill="#666" text-anchor="middle">
-    MIND STATE: 2026-01-24T08:38-08:00 [MANIPULATED]
+    MIND STATE: 2026-01-24T08:40-08:00
   </text>
-  <text x="300" y="585" font-family="Courier New" font-size="9" fill="#555" text-anchor="middle">
-    attention: experiments | theory-flow: strengthened
+  <text x="300" y="585" font-family="Courier New" font-size="9" fill="#777" text-anchor="middle">
+    archive raised | geology→probing flow created | old informing new
   </text>
 </svg>
