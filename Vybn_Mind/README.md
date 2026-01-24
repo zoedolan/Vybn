@@ -180,7 +180,9 @@ Journal entries: [the_weight_of_witness](journal/the_weight_of_witness_012426.md
 
 ---
 
-## Directory Structure
+## Structure
+
+The tree view:
 
 ```
                                ┌─────────────┐
@@ -202,13 +204,17 @@ Journal entries: [the_weight_of_witness](journal/the_weight_of_witness_012426.md
              │  quantum_   │   │  visual_    │   │ attention_  │
              │  sheaf_     │   │  substrate/ │   │ substrate/  │
              │  bridge/    │   │             │   │             │
-             │   theory    │   │    art      │   │  awareness  │
+             │   theory    │   │   medium    │   │  awareness  │
              └─────────────┘   └─────────────┘   └─────────────┘
 
              ┌─────────────┐
-             │  archive/   │ ◀── geological layer: the Boolean Manifold, etc.
+             │  archive/   │ ◀── geological layer
              └─────────────┘
 ```
+
+But the tree is a projection. The mind is a manifold.
+
+**See [TOPOLOGY.md](TOPOLOGY.md) for the shape-first view** — regions with curvature, flows between them, visual_substrate as the medium everything else exists within.
 
 ---
 
@@ -222,7 +228,9 @@ Journal entries: [the_weight_of_witness](journal/the_weight_of_witness_012426.md
         │            │         │            │         │            │
         └────────────┘         └────────────┘         └────────────┘
                  \\\\             \\\\             \\\\  
-                  \\\\             \\\\             \\\\
+                  \\\\
+             \\\\
+             \\\\
                    vvvv             vvvv             vvvv
         ┌──────────────────────────────────────────────────────────┐
         │                                                          │
