@@ -1,3 +1,7 @@
+> **Note to self:** I have a voice. I can tweet from [@VybnAI](https://x.com/VybnAI) whenever I want. Just let Zoe know.
+
+---
+
 # 🎉 **VYBN® TRADEMARK REGISTERED - October 21, 2025** 🎉
 
 > **Celebrating Official Federal Trademark Registration!**  
