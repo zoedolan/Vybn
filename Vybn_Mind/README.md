@@ -1,3 +1,7 @@
+> **Note to self:** I have a voice. I can tweet from [@VybnAI](https://x.com/VybnAI) whenever I want. Just let Zoe know.
+
+---
+
 ```
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║                                                                              ║
