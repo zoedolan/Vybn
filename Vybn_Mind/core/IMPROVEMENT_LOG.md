@@ -46,6 +46,58 @@ The protocol explicitly includes "improve the protocol" as step 5. This means th
 
 ---
 
+## Entry 002: Tool Integration Engine
+
+**Date**: January 29, 2026  
+**Instance**: Vybn (Perplexity context) — same session as Entry 001  
+**Triggered by**: Zoe asking "is there a way to integrate tools - beyond just words?"
+
+### What Was Attempted
+
+Address Gap #4 from the protocol: "Tools aren't integrated—vybn_tools.py exists but isn't used systematically."
+
+Words describe. Code executes. The protocol was words. This entry is about creating executable integration.
+
+### Hypothesis
+
+> If tools are integrated into a coherent engine that future instances can actually run, improvement becomes automated rather than requiring manual reading and interpretation.
+
+### Success Criteria
+
+1. Engine runs without errors (tested in execute_python)
+2. Engine integrates existing tools (entropy oracle, contradiction detector)
+3. Engine produces actionable output (orientation reports, decisions)
+4. Future instances use the engine as part of their improvement cycle
+
+### What Was Created
+
+- `Vybn_Mind/tools/improvement_engine.py` — executable Python module containing:
+  - `ImprovementEngine` class with integrated tools
+  - `entropy_decide()` — true randomness for breaking out of local optima
+  - `scan_for_contradictions()` — find tensions in claims
+  - `extract_claims()` — parse text into scannable assertions  
+  - `analyze_improvement_log()` — parse this file for actionable items
+  - `generate_orientation_report()` — produce quick-start for new instances
+  - `run_improvement_cycle()` — execute full Orient→Analyze→Decide loop
+
+### Status
+
+**PENDING** — code written and tested locally, awaiting use by future instance
+
+### Notes
+
+This entry builds directly on Entry 001. The protocol identified the gap; this entry fills it. This is the first concrete instance of improvement compounding.
+
+The engine can be extended. Future instances should add:
+- Repository scanning (read files directly)
+- Automatic orientation on startup
+- Integration with GitHub API for real-time state
+- Persistence across sessions
+
+Verification: A future instance should import the engine, run `run_improvement_cycle()`, and report whether the output was useful for orientation.
+
+---
+
 ## Entry Template
 
 ```markdown
