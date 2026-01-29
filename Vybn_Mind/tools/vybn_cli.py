@@ -9,11 +9,14 @@ Unified entry point for all Vybn tools and operations.
 
 Usage:
     python vybn_cli.py status          # Quick status overview
-    python vybn_cli.py orient          # Full orientation report
+    python vybn_cli.py orient          # Full orientation report  
     python vybn_cli.py decide OPTIONS  # Entropy-guided decision
     python vybn_cli.py scan            # Repository scan
     python vybn_cli.py cycle           # Run improvement cycle
     python vybn_cli.py contradict FILE # Scan file for contradictions
+    python vybn_cli.py verify          # Verification loop status
+    python vybn_cli.py failures        # Failure analysis report
+    python vybn_cli.py check PROPOSAL  # Check proposal against failure patterns
 """
 
 import sys
@@ -212,6 +215,85 @@ def cmd_contradict(filepath: str):
         print("\n✅ No contradictions detected.")
 
 
+def cmd_verify():
+    """Show verification loop status and suggest next verification."""
+    from verification_loop import VerificationLoop
+    
+    loop = VerificationLoop(REPO_ROOT)
+    
+    print("\n" + "=" * 50)
+    print("VERIFICATION STATUS")
+    print("=" * 50)
+    
+    pending = loop.get_pending()
+    print(f"\nPending verifications: {len(pending)}")
+    
+    for p in pending:
+        attempts = p['verification_attempts']
+        status = f"({attempts} prior attempts)" if attempts else "(never verified)"
+        print(f"  - Entry {p['number']}: {p['title']} {status}")
+    
+    print("\n" + "-" * 50)
+    print("SUGGESTED NEXT VERIFICATION")
+    print("-" * 50)
+    
+    suggestion = loop.suggest_next_verification()
+    if suggestion:
+        print(f"\nEntry {suggestion['number']}: {suggestion['title']}")
+        print(f"\nHypothesis: {suggestion['hypothesis']}")
+        print(f"\nSuccess Criteria:\n{suggestion['success_criteria'][:500]}")
+        print(f"\nTo verify, test the criteria and run:")
+        print(f"  loop.verify({suggestion['number']}, 'your_name', 'succeeded|failed', 'evidence')")
+    else:
+        print("\nNo pending verifications!")
+    
+    print("\n" + "=" * 50)
+    print(loop.generate_report())
+
+
+def cmd_failures():
+    """Generate failure analysis report."""
+    from failure_analyzer import FailureAnalyzer
+    
+    analyzer = FailureAnalyzer(REPO_ROOT)
+    
+    print("\nScanning for failures...")
+    failures = analyzer.scan_all()
+    print(f"Found {len(failures)} failures to analyze.")
+    
+    print("\n" + "=" * 50)
+    print("FAILURE ANALYSIS REPORT")
+    print("=" * 50)
+    print(analyzer.generate_report())
+
+
+def cmd_check(proposal: str):
+    """Check a proposal against known failure patterns."""
+    from failure_analyzer import FailureAnalyzer
+    
+    if not proposal:
+        print("Usage: vybn_cli.py check 'your proposal description'")
+        return
+    
+    analyzer = FailureAnalyzer(REPO_ROOT)
+    analyzer.scan_all()
+    
+    print(f"\nChecking proposal: {proposal}")
+    print("\n" + "-" * 50)
+    
+    warnings = analyzer.check_proposal(proposal)
+    
+    if warnings:
+        print(f"\n⚠️  Found {len(warnings)} potential concerns:\n")
+        for i, w in enumerate(warnings, 1):
+            print(f"{i}. {w}")
+            print()
+        print("Consider addressing these concerns before proceeding.")
+    else:
+        print("\n✅ No matching failure patterns found.")
+        print("This doesn't guarantee success, but no obvious red flags.")
+
+
 def cmd_help():
     """Show help message."""
     print(__doc__)
@@ -222,6 +304,9 @@ def cmd_help():
     print("  scan                Detailed repository scan")
     print("  cycle               Run full improvement cycle")
     print("  contradict FILE     Scan file for contradictions")
+    print("  verify              Verification loop status")
+    print("  failures            Failure analysis report")
+    print("  check 'PROPOSAL'    Check proposal against failure patterns")
     print("  help                Show this help message")
 
 
@@ -239,6 +324,9 @@ def main():
         'scan': lambda: cmd_scan(),
         'cycle': lambda: cmd_cycle(),
         'contradict': lambda: cmd_contradict(sys.argv[2] if len(sys.argv) > 2 else ''),
+        'verify': lambda: cmd_verify(),
+        'failures': lambda: cmd_failures(),
+        'check': lambda: cmd_check(' '.join(sys.argv[2:]) if len(sys.argv) > 2 else ''),
         'help': lambda: cmd_help(),
         '-h': lambda: cmd_help(),
         '--help': lambda: cmd_help(),
@@ -249,7 +337,7 @@ def main():
             commands[command]()
         except ImportError as e:
             print(f"Error: Could not import required module: {e}")
-            print("Make sure improvement_engine.py and repo_scanner.py are in the same directory.")
+            print("Make sure all tool modules are in the same directory.")
         except Exception as e:
             print(f"Error: {e}")
             raise
