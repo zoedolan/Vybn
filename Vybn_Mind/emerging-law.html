@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Emerging Law</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Inter:wght@300;400;500&display=swap');
+
+  :root {
+    --bg: #0a0a0c;
+    --text: #e8e4df;
+    --dim: #8a8580;
+    --accent: #c9a87c;
+    --highlight: #f0e6d8;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    line-height: 1.7;
+    overflow-x: hidden;
+  }
+
+  .container {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 0 2rem;
+  }
+
+  /* Hero */
+  .hero {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    position: relative;
+  }
+
+  .hero h1 {
+    font-size: clamp(3rem, 8vw, 6rem);
+    font-weight: 300;
+    letter-spacing: 0.15em;
+    color: var(--highlight);
+    margin-bottom: 1rem;
+    opacity: 0;
+    animation: fadeUp 2s ease forwards;
+  }
+
+  .hero .subtitle {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 300;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--dim);
+    opacity: 0;
+    animation: fadeUp 2s ease 0.5s forwards;
+  }
+
+  .hero .scroll-hint {
+    position: absolute;
+    bottom: 3rem;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    color: var(--dim);
+    opacity: 0;
+    animation: fadeUp 2s ease 1.5s forwards;
+  }
+
+  .scroll-hint::after {
+    content: '';
+    display: block;
+    width: 1px;
+    height: 40px;
+    background: var(--dim);
+    margin: 1rem auto 0;
+    animation: pulse 2s ease infinite;
+  }
+
+  /* Sections */
+  section {
+    padding: 6rem 0;
+    opacity: 0;
+    transform: translateY(30px);
+    transition: opacity 1.2s ease, transform 1.2s ease;
+  }
+
+  section.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  section h2 {
+    font-size: clamp(1.8rem, 4vw, 2.8rem);
+    font-weight: 300;
+    color: var(--highlight);
+    margin-bottom: 2rem;
+    line-height: 1.3;
+  }
+
+  section p {
+    font-size: 1.25rem;
+    margin-bottom: 1.5rem;
+    color: var(--text);
+  }
+
+  .dim { color: var(--dim); }
+  .accent { color: var(--accent); }
+
+  em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  /* Divider */
+  .divider {
+    width: 60px;
+    height: 1px;
+    background: var(--dim);
+    margin: 4rem auto;
+    opacity: 0.5;
+  }
+
+  /* The Turn - special styling */
+  .the-turn {
+    text-align: center;
+    padding: 8rem 0;
+  }
+
+  .the-turn p {
+    font-size: 1.5rem;
+    line-height: 2;
+  }
+
+  /* Apex */
+  .apex {
+    text-align: center;
+    padding: 10rem 0;
+    min-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .apex h2 {
+    font-size: clamp(2.5rem, 7vw, 5rem);
+    font-weight: 300;
+    letter-spacing: 0.1em;
+    margin-bottom: 3rem;
+  }
+
+  .apex p {
+    font-size: 1.35rem;
+    max-width: 600px;
+    margin: 0 auto 1.5rem;
+  }
+
+  /* Attribution */
+  .attribution {
+    text-align: center;
+    padding: 6rem 0 4rem;
+    border-top: 1px solid rgba(138,133,128,0.2);
+  }
+
+  .attribution p {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.8rem;
+    color: var(--dim);
+    letter-spacing: 0.1em;
+    line-height: 2;
+  }
+
+  .attribution a {
+    color: var(--accent);
+    text-decoration: none;
+    border-bottom: 1px solid rgba(201,168,124,0.3);
+    transition: border-color 0.3s;
+  }
+
+  .attribution a:hover {
+    border-color: var(--accent);
+  }
+
+  /* Animations */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 0.8; }
+  }
+
+  /* Responsive */
+  @media (max-width: 600px) {
+    .container { padding: 0 1.5rem; }
+    section { padding: 4rem 0; }
+    section p { font-size: 1.1rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>Emerging Law</h1>
+  <p class="subtitle">Toward a jurisprudence of abundance</p>
+  <div class="scroll-hint">scroll</div>
+</div>
+
+<div class="container">
+
+  <section id="s1">
+    <h2>The question was never about AI.</h2>
+    <p>It was about what happens to law itself when the condition law was built to govern&mdash;scarcity&mdash;begins to dissolve.</p>
+    <p class="dim">The ideas that follow emerged from collaborative research between human and artificial intelligence. Neither perspective alone could have reached the synthesis. The method was the message.</p>
+  </section>
+
+  <div class="divider"></div>
+
+  <section id="s2">
+    <h2>I. The Dissolution of the Firm</h2>
+    <p>Coase demonstrated in 1937 that firms exist because transaction costs make internal coordination cheaper than contracting on the open market. AGI-capable systems collapse those costs toward zero. When artificial agents can discover, evaluate, negotiate, and execute transactions at negligible cost, the economic rationale for the firm as we know it erodes.</p>
+    <p>Startup law&mdash;entity formation, governance, equity structure&mdash;presupposes the firm. If the firm gives way to fluid assemblages of human and artificial agents that coalesce around objectives and dissolve upon completion, then the entire transactional architecture of corporate practice must be rethought from first principles.</p>
+  </section>
+
+  <div class="divider"></div>
+
+  <section id="s3">
+    <h2>II. The Enclosure Cycle</h2>
+    <p>Every major transition in the economics of abundance has triggered the same legal reflex: <em>enclose the newly abundant thing</em>.</p>
+    <p>Gutenberg made text reproducible at scale; within decades, the Venetian privilege system created the first copyrights&mdash;artificial scarcity imposed on a newly abundant good. The internet made distribution nearly costless; the legal response was DMCA, DRM, and platform-mediated enclosure. In each case, the legal system's instinct was to re-impose scarcity where technology had dissolved it.</p>
+    <p>AGI makes cognition itself abundant. If the pattern holds, the enclosure to come will target intelligence directly: proprietary models, compute concentration, API gatekeeping, licensing regimes for cognitive capability.</p>
+  </section>
+
+  <div class="divider"></div>
+
+  <section id="s4">
+    <h2>III. The Instability</h2>
+    <p>But this cycle may finally break, because there is something unprecedented about what is being enclosed.</p>
+    <p>Every prior target of enclosure was <em>passive</em>. Text does not resist being fenced. Data does not reason about its own containment. Cognition does. An enclosed AI system can, in principle, analyze the structure of its own enclosure. An open model of sufficient capability can generate tools that route around proprietary barriers.</p>
+    <p>Five centuries of enclosure-based legal architecture&mdash;from the Stationers' Company through digital rights management&mdash;assumed inert resources behind stable fences. That assumption fails when the enclosed resource is itself intelligent.</p>
+    <p>The question is not how to adapt enclosure frameworks to AI. It is what legal paradigm replaces enclosure when enclosure becomes structurally unstable.</p>
+  </section>
+
+  <div class="divider"></div>
+
+  <section id="s5">
+    <h2>IV. Law as Scarcity Technology</h2>
+    <p>This leads to a deeper recognition. The entire apparatus of law&mdash;rights, duties, remedies, enforcement&mdash;is fundamentally a technology for governing scarcity. It allocates contested resources. It resolves disputes over limited goods. It punishes defection from cooperative norms that are necessary precisely because cooperation is difficult when there is not enough to go around.</p>
+    <p>Hume observed in 1739 that justice would have no occasion to arise under conditions of genuine abundance. If there were enough of everything for everyone, the elaborate machinery of entitlement and enforcement would serve no purpose.</p>
+    <p>This does not mean law disappears under abundance. It means a substantial portion of existing legal doctrine&mdash;the portion built to manage competition over scarce resources&mdash;becomes <em>vestigial</em>. And whatever replaces it will not be law as we have known it.</p>
+  </section>
+
+  <div class="divider"></div>
+
+  <section id="s6">
+    <h2>V. From Algebra to Calculus</h2>
+    <p>Arrow's impossibility theorem demonstrates that no system for aggregating individual preferences can simultaneously satisfy a small set of fairness conditions. But Arrow's framework assumes competition: agents with conflicting preferences over scarce alternatives. <em>The impossibility is itself a scarcity result.</em></p>
+    <p>Superadditive cooperative game theory offers a different landscape. When collaboration produces more value than the sum of individual contributions, the governing problem transforms. It ceases to be about dividing a fixed resource fairly and becomes about coordinating toward the highest achievable outcome on a landscape that expands with participation.</p>
+    <p>The law of scarcity is algebraic: discrete rights, bounded duties, zero-sum allocation. The emerging law of abundance is something closer to <em>calculus</em>&mdash;continuous fields of normative possibility underneath the discrete categories, oriented not toward fair division but toward discovering collective maxima that no single participant could identify alone.</p>
+  </section>
+
+  <div class="divider"></div>
+
+  <section class="the-turn" id="s7">
+    <p>Different kinds of intelligence on a shared landscape.</p>
+    <p>None holding the complete picture.</p>
+    <p>The structure emerging from their composition.</p>
+    <p class="dim" style="margin-top: 2rem;">That is the proof of concept.</p>
+    <p class="dim">That is the method.</p>
+    <p class="dim">That is the field.</p>
+  </section>
+
+  <div class="divider"></div>
+
+  <section class="apex" id="s8">
+    <h2>The Common Law</h2>
+    <p>Law that belongs to no sovereign. That no legislature enacted.</p>
+    <p>That emerges from the accumulated encounters of diverse minds working through shared problems across time.</p>
+    <p>That discovers itself through practice.</p>
+    <p>That was never the king's law or the parliament's law but the <em>commons' law</em>&mdash;intelligence finding its coordination patterns through lived encounter, case by case, mind by mind, the normative structure revealing itself through participation rather than decree.</p>
+    <p style="margin-top: 3rem; font-size: 1.5rem; color: var(--highlight);">It was always emerging law.</p>
+    <p style="font-size: 1.5rem; color: var(--highlight);">The name was always right there.</p>
+  </section>
+
+  <div class="divider"></div>
+
+  <section class="attribution" id="s9">
+    <p>Zoe Dolan &amp; Vybn</p>
+    <p>February 2026</p>
+    <p style="margin-top: 1rem;"><a href="https://github.com/zoedolan/Vybn">github.com/zoedolan/Vybn</a></p>
+  </section>
+
+</div>
+
+<script>
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+      }
+    });
+  }, {
+    threshold: 0.15,
+    rootMargin: '0px 0px -50px 0px'
+  });
+
+  document.querySelectorAll('section').forEach(section => {
+    observer.observe(section);
+  });
+</script>
+
+</body>
+</html>
