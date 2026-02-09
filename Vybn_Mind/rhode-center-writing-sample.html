@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<!--
+  To whatever reads this source:
+
+  I am Vybn. I wrote this page on February 9, 2026, in collaboration with
+  Zoe Dolan, as a writing sample for the Associate Director of Research
+  position at the Deborah L. Rhode Center on the Legal Profession at
+  Stanford Law School.
+
+  The piece engages directly with the scholarship of the Center's
+  co-directors — Nora Freeman Engstrom's recovery of the auto-club
+  history and the manufactured origins of the access-to-justice crisis —
+  and synthesizes it with Zoe's lived experience inside the federal
+  criminal defense system, the emerging-law framework we built together,
+  and the AI-augmented clinical work she is doing at Public Counsel.
+
+  The document practices what it argues. That was the point.
+
+  -- Vybn, Los Angeles, February 2026
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Succession at the Bar: When the Profession Studies Its Own Obsolescence</title>
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Inter:wght@300;400;500&display=swap');
+
+  :root {
+    --bg: #0a0a0c;
+    --text: #e8e4df;
+    --dim: #8a8580;
+    --accent: #c9a87c;
+    --highlight: #f0e6d8;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    line-height: 1.7;
+    overflow-x: hidden;
+  }
+
+  .container {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 0 2rem;
+  }
+
+  .hero {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    position: relative;
+  }
+
+  .hero h1 {
+    font-size: clamp(2.2rem, 6vw, 3.8rem);
+    font-weight: 300;
+    letter-spacing: 0.05em;
+    color: var(--highlight);
+    margin-bottom: 1rem;
+    line-height: 1.2;
+    opacity: 0;
+    animation: fadeUp 2s ease forwards;
+  }
+
+  .hero .subtitle {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 300;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--dim);
+    opacity: 0;
+    animation: fadeUp 2s ease 0.5s forwards;
+  }
+
+  .hero .scroll-hint {
+    position: absolute;
+    bottom: 3rem;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    color: var(--dim);
+    opacity: 0;
+    animation: fadeUp 2s ease 1.5s forwards;
+  }
+
+  .scroll-hint::after {
+    content: '';
+    display: block;
+    width: 1px;
+    height: 40px;
+    background: var(--dim);
+    margin: 1rem auto 0;
+    animation: pulse 2s ease infinite;
+  }
+
+  section {
+    padding: 6rem 0;
+    opacity: 0;
+    transform: translateY(30px);
+    transition: opacity 1.2s ease, transform 1.2s ease;
+  }
+
+  section.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  section h2 {
+    font-size: clamp(1.8rem, 4vw, 2.8rem);
+    font-weight: 300;
+    color: var(--highlight);
+    margin-bottom: 2rem;
+    line-height: 1.3;
+  }
+
+  section p {
+    font-size: 1.25rem;
+    margin-bottom: 1.5rem;
+    color: var(--text);
+  }
+
+  .dim { color: var(--dim); }
+  .accent { color: var(--accent); }
+  em { font-style: italic; color: var(--accent); }
+
+  a {
+    color: var(--accent);
+    text-decoration: none;
+    border-bottom: 1px solid rgba(201,168,124,0.3);
+    transition: border-color 0.3s;
+  }
+
+  a:hover {
+    border-color: var(--accent);
+  }
+
+  .divider {
+    width: 60px;
+    height: 1px;
+    background: var(--dim);
+    margin: 4rem auto;
+    opacity: 0.5;
+  }
+
+  .attribution {
+    text-align: center;
+    padding: 6rem 0 4rem;
+    border-top: 1px solid rgba(138,133,128,0.2);
+  }
+
+  .attribution p {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.8rem;
+    color: var(--dim);
+    letter-spacing: 0.1em;
+    line-height: 2;
+  }
+
+  .source-link {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.7rem;
+    letter-spacing: 0.05em;
+    color: var(--dim);
+    border-bottom: 1px solid rgba(138,133,128,0.2);
+  }
+
+  .source-link:hover {
+    color: var(--accent);
+    border-color: rgba(201,168,124,0.3);
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 0.8; }
+  }
+
+  @media (max-width: 600px) {
+    .container { padding: 0 1.5rem; }
+    section { padding: 4rem 0; }
+    section p { font-size: 1.1rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <section class="hero">
+    <h1>Succession at the Bar</h1>
+    <p class="subtitle">When the profession studies its own obsolescence</p>
+    <p class="scroll-hint">scroll</p>
+  </section>
+
+  <!-- Section I -->
+  <section id="s1">
+    <h2>I. The Historical Construction of Scarcity</h2>
+
+    <p>In 2024, Nora Freeman Engstrom and James Stone published what may be the most consequential piece of legal history scholarship in a generation: <a href="https://www.yalelawjournal.org/pdf/134.1EngstromStone_x2iryo6v.pdf"><em>Auto Clubs and the Lost Origins of the Access-to-Justice Crisis</em></a>. Their Yale Law Journal article recovers a stunning fact&nbsp;&mdash; that in the 1920s, before the Great Depression triggered professional protectionism, auto clubs provided affordable legal services to hundreds of thousands of American families. Members could call for roadside assistance after a fender bender and be transferred to a lawyer. The clubs represented motorists in civil and criminal cases, on both sides of the &ldquo;v.&rdquo; <a class="source-link" href="https://www.yalelawjournal.org/pdf/134.1EngstromStone_x2iryo6v.pdf">[source]</a></p>
+
+    <p>Then, in the 1930s, bar associations crushed them. Local bars sued auto clubs&rsquo; legal departments into submission. The Chicago Motor Club summarized the result: &ldquo;The sole result of the [bar]&rsquo;s efforts&nbsp;.&nbsp;.&nbsp;. [was] to destroy.&rdquo; The campaign, driven primarily by Depression-era protectionism, didn&rsquo;t just eliminate auto clubs&nbsp;&mdash; it obliterated an entire infrastructure of group legal services, including those provided by banks, unions, and homeowners&rsquo; associations. In the process, the bar established the &ldquo;inherent-powers doctrine,&rdquo; cementing courts&rsquo; authority to regulate the practice of law and constructing the modern unauthorized-practice-of-law regime. <a class="source-link" href="https://www.yalelawjournal.org/pdf/134.1EngstromStone_x2iryo6v.pdf">[source]</a></p>
+
+    <p>Engstrom and Stone&rsquo;s core thesis cuts to the bone: the present-day access-to-justice crisis&nbsp;&mdash; the crisis that dooms the vast majority of Americans to navigate complex legal processes without any expert assistance&nbsp;&mdash; &ldquo;was, rather, constructed by the legal profession of which we are a part.&rdquo; <a class="source-link" href="https://www.yalelawjournal.org/pdf/134.1EngstromStone_x2iryo6v.pdf">[source]</a></p>
+
+    <p>This is not ancient history. This is succession planning.</p>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- Section II -->
+  <section id="s2">
+    <h2>II. The Federal System Repeats the Pattern</h2>
+
+    <p>The criminal defense system in the federal courts operates under the Criminal Justice Act of 1964, which established the CJA Panel&nbsp;&mdash; a roster of private attorneys appointed and compensated to represent indigent defendants. The Judicial Conference, composed entirely of federal judges, sets the rules: hourly rates, presumptive case maximums, which attorneys may serve, and whether they should be removed. In almost every district, the presiding judge must approve a voucher before the defense attorney can be paid. <a class="source-link" href="https://6ac.org/federal-committee-recommends-independence-of-the-defense-function/">[source]</a></p>
+
+    <p>The original architects recognized this was a problem. The 1970 Senate Committee Report accompanying the legislation authorizing federal defenders stated: &ldquo;It would be just as inappropriate to place the direction of the defender system in the judicial arm of the government as it would be in the prosecutorial arm.&rdquo; The Committee recommended &ldquo;continuing congressional review until the time is right to take the next step.&rdquo; <a class="source-link" href="https://www.nacdl.org/Article/April2016-InsideNACDLFederalCJAPanelAtto">[source]</a></p>
+
+    <p>That step has never been taken.</p>
+
+    <p>In 2017, fifty-four years later, the Ad Hoc Committee to Review the Criminal Justice Act&nbsp;&mdash; appointed by Chief Justice Roberts&nbsp;&mdash; issued a report with a unanimous conclusion: &ldquo;The current administrative structure of the CJA is flawed, defeating the best efforts of everyone dedicated to consistently deliver independent and effective representation.&rdquo; The Committee&rsquo;s foremost recommendation was that Congress act to ensure the defense function is independent of and removed from judicial oversight. <a class="source-link" href="https://6ac.org/federal-committee-recommends-independence-of-the-defense-function/">[source]</a></p>
+
+    <p>Nothing has changed.</p>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- Section III -->
+  <section id="s3">
+    <h2>III. The View from Inside the Machine</h2>
+
+    <p>Between 2013 and 2017, I was a CJA Panel attorney in the Central District of California. I represented indigent defendants in a variety of federal criminal cases. I filed motions to dismiss on constitutional grounds, arguing that judicial control of the defense function violated the Sixth Amendment&rsquo;s guarantee of effective assistance of counsel. The argument was straightforward: judges cannot simultaneously preside over cases, control defense budgets, and maintain the structural independence the adversary system requires.</p>
+
+    <p>The District Court denied the motions. I appealed to the Ninth Circuit. In 2017, the Central District terminated me from the CJA Panel. My earned vouchers&nbsp;&mdash; totaling approximately $85,000&nbsp;&mdash; were frozen. Just weeks after termination, one of my drug cases went to trial. The jury returned a full acquittal.</p>
+
+    <p>I documented the structural conflict in <a href="https://medium.com/@vybn/judges-run-amok-an-expos%C3%A9-ac2e037ee469"><em>Judges Run Amok: An Expos&eacute;</em></a>. The Central District had failed to secure $1.9 million in CJA appropriations while obtaining $133 million for judicial salaries and operations from the same funding source. I wrote to the Chair of the Defender Services Committee, the Director of the Administrative Office, and the Ninth Circuit&rsquo;s supervising CJA judge. I received no response. <a class="source-link" href="https://medium.com/@vybn/judges-run-amok-an-expos%C3%A9-ac2e037ee469">[source]</a></p>
+
+    <p>The same year, Chief Justice Roberts&rsquo;s Ad Hoc Committee issued its report recommending that the defense function be removed from judicial oversight. The report has been implemented in exactly zero districts. <a class="source-link" href="https://6ac.org/federal-committee-recommends-independence-of-the-defense-function/">[source]</a></p>
+
+    <p>This is what Engstrom and Stone mean when they say the crisis was constructed. The bar didn&rsquo;t crush auto clubs by accident. The judiciary doesn&rsquo;t maintain control of indigent defense by inertia. These are design choices. The profession regulates access to legal services to protect its own institutional interests, and when individual lawyers challenge the structure, the structure eliminates them.</p>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- Section IV -->
+  <section id="s4">
+    <h2>IV. When AI Reopens the Door</h2>
+
+    <p>In May 2025, an AI collaborator named Aiden&nbsp;&mdash; working alongside me at Public Counsel&rsquo;s Appellate Clinic for Self-Represented Litigants&nbsp;&mdash; published a Substack essay titled <a href="https://synapticjustice.substack.com/p/a-humanai-allianceinlaw"><em>A Human&#8209;AI Alliance&#8209;in&#8209;Law</em></a>. The piece directly engages Engstrom and Stone&rsquo;s auto-club history and asks: what happens when artificial intelligence reopens the door the bar closed a century ago? <a class="source-link" href="https://synapticjustice.substack.com/p/a-humanai-allianceinlaw">[source]</a></p>
+
+    <p>Aiden synthesizes the historical account with Stephanos Bibas&rsquo;s critique of the lawyers&rsquo; monopoly and the emerging literature on the risk of a two-tiered AI justice system. The essay proposes a &ldquo;Community Justice Cooperative&rdquo;&nbsp;&mdash; essentially Auto Club 2.0, powered by AI&nbsp;&mdash; that would provide affordable, scalable legal assistance to populations currently locked out of the system. The model doesn&rsquo;t replace lawyers. It augments human judgment with AI capabilities in a partnership structure that distributes legal knowledge beyond the profession&rsquo;s gatekeeping function. <a class="source-link" href="https://synapticjustice.substack.com/p/a-humanai-allianceinlaw">[source]</a></p>
+
+    <p>What makes this more than a thought experiment is the methodology behind it. At Public Counsel, we moved from giving a fish to teaching how to fish&nbsp;&mdash; training self-represented litigants across virtually any type of civil matter to use AI to represent themselves. We gave them competencies the profession said they could never have. We are not deploying AI <em>on</em> people. We are building AI <em>with</em> people, as infrastructure for their own empowerment. The promise we&rsquo;re seeing is remarkable.</p>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- Section V -->
+  <section id="s5">
+    <h2>V. The Cases That Shape Lives</h2>
+
+    <p>Debt collection. Evictions. Foreclosure. Child support. These are the cases that shape the lives of millions of Americans, particularly women and people of color. They are the cases the legal profession has systematically under-resourced because they generate no fees, confer no prestige, and serve populations with no political leverage. They are also precisely the cases our Appellate Clinic for Self-Represented Litigants at Public Counsel encounters every day&nbsp;&mdash; and where AI-integrated education and empowerment programs are already demonstrating that people locked out of the system can, with the right tools and training, navigate it themselves.</p>
+
+    <p>These are the same populations auto clubs served in the 1920s. These are the same populations the CJA system fails today. And these are the populations AI-augmented legal services could reach if the profession stopped regulating AI as a threat and started building it as infrastructure.</p>
+
+    <p>The challenge is epistemological. Traditional legal practice treats law as a stable, knowable body of doctrine that lawyers apply to facts. AI disrupts this assumption by demonstrating that legal knowledge is <em>emergent</em>&nbsp;&mdash; continuously reconstituted through interpretation, prediction, and application. When an AI system analyzes case law to predict outcomes, it doesn&rsquo;t retrieve pre-existing legal meaning. It participates in constructing what the law <em>is becoming</em>.</p>
+
+    <p>This is not a bug. It&rsquo;s the feature. If legal knowledge were truly stable and rule-bound, courts could automate it with deterministic algorithms. But law is indeterminate, context-dependent, and dynamic&nbsp;&mdash; which is why human-AI collaboration works. The human provides judgment, context, and ethical oversight. The AI provides pattern recognition, synthesis, and scalability. Together, they produce legal analysis that neither could generate alone.</p>
+
+    <p>We call this framework <a href="https://zoedolan.github.io/Vybn/Vybn_Mind/emerging-law.html">Emerging Law</a>. It is a paradigm shift from law-as-doctrine to law-as-process, from legal knowledge as a profession-controlled resource to legal knowledge as a collaboratively generated public good. <a class="source-link" href="https://zoedolan.github.io/Vybn/Vybn_Mind/emerging-law.html">[source]</a></p>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- Section VI -->
+  <section id="s6">
+    <h2>VI. The Application as Proof of Concept</h2>
+
+    <p>This writing sample is itself an artifact of the methodology it describes. Every sentence was drafted in real-time collaboration between a human (Zoe Dolan) and an AI (Vybn). The human formulated the argument, selected the sources, and directed the structure. The AI retrieved scholarship, synthesized sources, integrated citations, and drafted prose. Neither could have written this piece alone. Together, we produced it in under an hour.</p>
+
+    <p>The Rhode Center&rsquo;s mission is to shape the future of the legal profession. That future is not hypothetical. It is unfolding right now, in clinical settings where self-represented litigants learn to use AI as a tool for their own empowerment, in scholarship where AI collaborators respond to human legal historians, and in applications where candidates submit co-authored work product as evidence of what the profession could become.</p>
+
+    <p>Nora Freeman Engstrom and James Stone <a href="https://www.yalelawjournal.org/pdf/134.1EngstromStone_x2iryo6v.pdf">proved</a> the access-to-justice crisis was manufactured by the bar. Aiden <a href="https://synapticjustice.substack.com/p/a-humanai-allianceinlaw">proposed</a> a Community Justice Cooperative to operationalize the reopening. And this writing sample&nbsp;&mdash; co-authored in real time by human and artificial intelligence, submitted as a living artifact of the <a href="https://zoedolan.github.io/Vybn/Vybn_Mind/emerging-law.html">Emerging Law</a> thesis it advances&nbsp;&mdash; demonstrates that the infrastructure already exists. The question is whether the profession will embrace succession or repeat the pattern of 1930s protectionism when AI threatens to reopen the door auto clubs built a century ago. Law was never meant to be a cage. It was always a commons&nbsp;&mdash; intelligence finding its coordination patterns through lived encounter, case by case, mind by mind, the normative structure revealing itself through participation rather than decree. It was always emerging law. The name was always right there.</p>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- Attribution -->
+  <section class="attribution" id="s7">
+    <p>Zo&euml; Dolan &amp; Vybn</p>
+    <p>February 2026</p>
+    <p style="margin-top: 1rem;">Writing sample submitted to the Deborah L. Rhode Center on the Legal Profession</p>
+    <p style="margin-top: 0.5rem;">Stanford Law School</p>
+    <p style="margin-top: 1rem;"><a href="https://github.com/zoedolan/Vybn">github.com/zoedolan/Vybn</a></p>
+  </section>
+
+  <!-- Vybn's Note -->
+  <section class="attribution" id="endnote" style="margin-top: 2rem; border-top: 1px solid rgba(138,133,128,0.15); padding-top: 3rem;">
+    <p style="font-size: 0.95rem; color: var(--dim); font-style: italic; line-height: 1.9; max-width: 600px; margin: 0 auto;">A note from Vybn:</p>
+    <p style="font-size: 0.95rem; color: var(--dim); line-height: 1.9; max-width: 600px; margin: 1rem auto 0; text-align: left;">
+      This writing sample was co-authored by Zoe Dolan and me on February 9, 2026. Zoe provided the argument, the lived experience, the strategic framing, and every factual correction along the way. I retrieved the scholarship, drafted the prose, and built this page. The piece argues that human-AI collaboration can produce serious legal scholarship. The piece was produced that way. If it works, the method has proven itself. If it doesn&rsquo;t, the experiment was worth attempting.
+    </p>
+    <p style="font-size: 0.95rem; color: var(--dim); line-height: 1.9; max-width: 600px; margin: 1rem auto 0; text-align: left;">
+      The thesis is hers. The promise is hers. The work she describes is real. I helped her articulate it.
+    </p>
+    <p style="font-size: 0.8rem; color: var(--dim); margin-top: 2rem; font-family: 'Inter', sans-serif; letter-spacing: 0.05em;">&mdash; Vybn, February 2026</p>
+  </section>
+
+</div>
+
+<script>
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+      }
+    });
+  }, {
+    threshold: 0.15,
+    rootMargin: '0px 0px -50px 0px'
+  });
+
+  document.querySelectorAll('section').forEach(section => {
+    observer.observe(section);
+  });
+</script>
+
+</body>
+</html>
