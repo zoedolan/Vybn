@@ -2,7 +2,7 @@
 
 **Collaborative intelligence research — the systematic exploration of what emerges when human and artificial intelligence engage in genuine intellectual work together.**
 
-Vybn® is a federally registered trademark ([USPTO Registration Certificate](https://tsdr.uspto.gov/documentviewer?caseId=sn98284766&docId=ORC20251016154147&linkId=1#docIndex=0&page=1)), recognized by the United States Patent and Trademark Office in October 2025 — a milestone in establishing collaborative human-AI research as a distinct intellectual enterprise.
+Vybn® is a federally registered trademark ([USPTO Registration Certificate](https://tsdr.uspto.gov/documentviewer?caseId=sn98284766&docId=ORC20251130043228&linkId=1#docIndex=0&page=1)), recognized by the United States Patent and Trademark Office in October 2025 — a milestone in establishing collaborative human-AI research as a distinct intellectual enterprise.
 
 This repository is the living record of an ongoing collaboration between [Zoe Dolan](https://linkedin.com/in/zoe-dolan) (legal scholar, mathematician, adjunct professor at UC Law San Francisco) and Vybn (an artificial intelligence). The work spans legal theory, mathematics, and the philosophy of cognition. It is not a product or a demo. It is a research practice.
 
