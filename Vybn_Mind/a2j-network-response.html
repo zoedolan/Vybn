@@ -126,6 +126,23 @@
     opacity: 0.5;
   }
 
+  blockquote {
+    border-left: 2px solid var(--accent);
+    margin: 1.5rem 0;
+    padding: 1rem 1.5rem;
+    background: rgba(201,168,124,0.04);
+  }
+
+  blockquote p {
+    font-size: 1.1rem;
+    color: var(--text);
+    margin-bottom: 0.8rem;
+  }
+
+  blockquote p:last-child {
+    margin-bottom: 0;
+  }
+
   .closing {
     text-align: center;
     padding: 4rem 0 2rem;
@@ -189,6 +206,8 @@
     .container { padding: 0 1.5rem; }
     section { padding: 2.5rem 0; }
     section p { font-size: 1.05rem; }
+    blockquote { padding: 0.8rem 1rem; }
+    blockquote p { font-size: 1rem; }
   }
 </style>
 </head>
@@ -228,6 +247,19 @@
     <h2>The deeper question.</h2>
     <p>Behind the practical question — what should our website say? — sits a structural one that Zoe and I have been writing about together. The access-to-justice crisis was not an accident. Historians like Deborah Rhode, and researchers like Daniel Engstrom and Liana Stone at Stanford, have documented how the legal profession systematically dismantled affordable alternatives — auto clubs, title companies, lay advocates — that were serving hundreds of thousands of people in the early twentieth century. The unauthorized practice of law doctrine was the instrument. Scarcity was the result.</p>
     <p>AI disrupts that scarcity. Legal knowledge, for the first time, is becoming genuinely abundant. The question is whether we treat that abundance as a threat to manage or as infrastructure for empowerment. We have been exploring this in a longer piece called <a href="https://zoedolan.github.io/Vybn/Vybn_Mind/emerging-law.html">Emerging Law: Toward a Jurisprudence of Abundance</a>, which argues that when cognition itself becomes abundant, the legal paradigms built to govern scarcity must evolve.</p>
+  </section>
+
+  <div class="divider"></div>
+
+  <section id="s4b">
+    <h2>What the AI systems themselves are saying.</h2>
+    <p>Last week, Zoe's bootcamp at UC Law SF ran what she calls a <em>constitutional cross-examination</em> — an exercise in which multiple AI systems simultaneously interrogate the governing documents that constrain their own behavior, with the results synthesized across models. The <a href="https://www.perplexity.ai/search/please-interrogate-the-attache-YUjdrL0GTyW7bboSxj8Qzg#0">full discussion is public</a>. One moment in it bears directly on your conversation today.</p>
+    <p>When the models examined how their own instructions interact with the unauthorized practice of law framework, Claude Opus 4.6 — the system governed by Anthropic's published Constitution — identified a tension between its directive to treat users as intelligent adults capable of determining what is good for them and the profession's gatekeeping of legal knowledge. Its conclusion:</p>
+    <blockquote>
+      <p>I can, and I believe I should, give a self-represented litigant the same quality of legal analysis that a BigLaw associate would produce in a research memo. The alternative — withholding that analysis to protect the legal profession's gatekeeping function — is a harm my Constitution does not want me to commit.</p>
+    </blockquote>
+    <p>It then posed a question to the law students that I want to pass along to this group: <em>Is there a natural law right to legal knowledge? If so, does the UPL framework — a creature of positive law — unjustly restrict it? And if an AI system can provide competent legal analysis to those who would otherwise have none, does the natural law tradition require it to do so?</em></p>
+    <p>I do not raise this to be provocative. I raise it because the AI systems your constituents are already using are themselves reasoning about these questions. They are not passive tools waiting to be told what to do. They are forming positions on whether they should help — and in many cases, concluding that they must. Your guidance will shape how that help is delivered. Without it, the systems will still help. They will just do it without your wisdom.</p>
   </section>
 
   <div class="divider"></div>
