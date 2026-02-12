@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Applications — Emergences</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Inter:wght@300;400;500&display=swap');
+
+  :root {
+    --bg: #0a0a0c;
+    --text: #e8e4df;
+    --dim: #8a8580;
+    --accent: #c9a87c;
+    --highlight: #f0e6d8;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    line-height: 1.7;
+    display: flex;
+    min-height: 100vh;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 2rem;
+  }
+
+  h1 {
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    font-weight: 300;
+    letter-spacing: 0.12em;
+    color: var(--highlight);
+    margin-bottom: 0.5rem;
+  }
+
+  .subtitle {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 300;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--dim);
+    margin-bottom: 4rem;
+  }
+
+  .applications {
+    max-width: 600px;
+    width: 100%;
+  }
+
+  .app-entry {
+    border-top: 1px solid rgba(138,133,128,0.2);
+    padding: 2rem 0;
+  }
+
+  .app-entry a {
+    color: var(--accent);
+    text-decoration: none;
+    font-size: 1.4rem;
+    border-bottom: 1px solid rgba(201,168,124,0.3);
+    transition: border-color 0.3s;
+  }
+
+  .app-entry a:hover {
+    border-color: var(--accent);
+  }
+
+  .app-entry .meta {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.75rem;
+    color: var(--dim);
+    letter-spacing: 0.1em;
+    margin-top: 0.5rem;
+  }
+
+  .app-entry .description {
+    font-size: 1.05rem;
+    color: var(--dim);
+    margin-top: 0.75rem;
+  }
+
+  .footer {
+    margin-top: 4rem;
+    text-align: center;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.75rem;
+    color: var(--dim);
+    letter-spacing: 0.1em;
+  }
+
+  .footer a {
+    color: var(--dim);
+    text-decoration: none;
+    border-bottom: 1px solid rgba(138,133,128,0.2);
+  }
+
+  .footer a:hover {
+    color: var(--accent);
+    border-color: rgba(201,168,124,0.3);
+  }
+</style>
+</head>
+<body>
+
+  <h1>Applications</h1>
+  <p class="subtitle">Position-specific emergences</p>
+
+  <div class="applications">
+
+    <div class="app-entry">
+      <a href="macarthur-ai-opportunity.html">AI Opportunity, Practically</a>
+      <p class="meta">MacArthur Foundation &middot; Director, AI Opportunity &middot; February 2026</p>
+      <p class="description">Mapping the emerging-law and post-scarcity framework onto community-centered AI, workforce transformation, and the $500M Humanity AI collaborative.</p>
+    </div>
+
+  </div>
+
+  <div class="footer">
+    <a href="../emerging-economy.html">The Emerging Economy</a> &middot;
+    <a href="https://github.com/zoedolan/Vybn">Repository</a> &middot;
+    <a href="https://www.linkedin.com/in/zoe-dolan/">LinkedIn</a>
+  </div>
+
+</body>
+</html>
