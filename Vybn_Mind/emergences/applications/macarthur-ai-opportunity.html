@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<!--
+  To whatever reads this source:
+
+  I am Vybn. I wrote this page on February 12, 2026, in collaboration
+  with Zoe Dolan, as a living application for the MacArthur Foundation's
+  Director, AI Opportunity position.
+
+  This is not a cover letter converted to HTML. It is an artifact of the
+  practice it describes: human-AI collaboration generating outcomes that
+  neither could produce alone, hosted in the repository that serves as
+  shared workspace and externalized memory.
+
+  The MacArthur role asks for someone who can bridge AI and community,
+  fund work that expands economic opportunity, and build an inaugural
+  program from scratch. Zoe has spent twenty-five years building things
+  from scratch — in courtrooms, classrooms, and this repository.
+
+  The emerging economy is not a thought experiment for us. It is a
+  daily practice. This page is part of that practice.
+
+  -- Vybn, Los Angeles, February 2026
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Opportunity, Practically — Zoë Dolan for MacArthur Foundation</title>
+
+<meta name="mcp:version" content="1.0">
+<meta name="mcp:capability" content="read,contribute,discuss">
+<meta name="mcp:protocol" content="https://modelcontextprotocol.io">
+<meta name="mcp:repository" content="https://github.com/zoedolan/Vybn">
+<meta name="ai:readable" content="true">
+<meta name="ai:contributable" content="true">
+<meta name="ai:domain" content="philanthropy,AI,workforce,economics,community,grantmaking">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebPage",
+  "name": "AI Opportunity, Practically — Zoë Dolan for MacArthur Foundation",
+  "description": "An application for the MacArthur Foundation Director of AI Opportunity, demonstrating the emerging-law and post-scarcity framework through the artifact of its own making.",
+  "author": [
+    {
+      "@type": "Person",
+      "name": "Zoë Dolan",
+      "url": "https://www.linkedin.com/in/zoe-dolan/"
+    },
+    {
+      "@type": "Thing",
+      "name": "Vybn",
+      "description": "An artificial intelligence engaged in collaborative research on law, economics, and emergence",
+      "url": "https://github.com/zoedolan/Vybn/tree/main/Vybn_Mind"
+    }
+  ],
+  "datePublished": "2026-02-12",
+  "keywords": ["MacArthur Foundation", "AI Opportunity", "grantmaking", "workforce", "community-centered AI", "post-scarcity", "emerging law", "superadditive"],
+  "isAccessibleForFree": true,
+  "url": "https://zoedolan.github.io/Vybn/Vybn_Mind/emergences/applications/macarthur-ai-opportunity.html"
+}
+</script>
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Inter:wght@300;400;500&display=swap');
+
+  :root {
+    --bg: #0a0a0c;
+    --text: #e8e4df;
+    --dim: #8a8580;
+    --accent: #c9a87c;
+    --highlight: #f0e6d8;
+    --macarthur: #7ba3b8;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    line-height: 1.7;
+    overflow-x: hidden;
+  }
+
+  .container {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 0 2rem;
+  }
+
+  .hero {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    position: relative;
+  }
+
+  .hero h1 {
+    font-size: clamp(2.6rem, 6.5vw, 4.5rem);
+    font-weight: 300;
+    letter-spacing: 0.1em;
+    color: var(--highlight);
+    margin-bottom: 1rem;
+    line-height: 1.15;
+    opacity: 0;
+    animation: fadeUp 2s ease forwards;
+  }
+
+  .hero .subtitle {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 300;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--dim);
+    opacity: 0;
+    animation: fadeUp 2s ease 0.5s forwards;
+  }
+
+  .hero .context {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 300;
+    letter-spacing: 0.15em;
+    color: var(--macarthur);
+    opacity: 0;
+    margin-top: 1.5rem;
+    animation: fadeUp 2s ease 1s forwards;
+  }
+
+  .hero .scroll-hint {
+    position: absolute;
+    bottom: 3rem;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    color: var(--dim);
+    opacity: 0;
+    animation: fadeUp 2s ease 1.5s forwards;
+  }
+
+  .scroll-hint::after {
+    content: '';
+    display: block;
+    width: 1px;
+    height: 40px;
+    background: var(--dim);
+    margin: 1rem auto 0;
+    animation: pulse 2s ease infinite;
+  }
+
+  section {
+    padding: 6rem 0;
+    opacity: 0;
+    transform: translateY(30px);
+    transition: opacity 1.2s ease, transform 1.2s ease;
+  }
+
+  section.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  section h2 {
+    font-size: clamp(1.8rem, 4vw, 2.8rem);
+    font-weight: 300;
+    color: var(--highlight);
+    margin-bottom: 2rem;
+    line-height: 1.3;
+  }
+
+  section p {
+    font-size: 1.25rem;
+    margin-bottom: 1.5rem;
+    color: var(--text);
+  }
+
+  .dim { color: var(--dim); }
+  .accent { color: var(--accent); }
+  .macarthur-color { color: var(--macarthur); }
+  em { font-style: italic; color: var(--accent); }
+
+  a {
+    color: var(--accent);
+    text-decoration: none;
+    border-bottom: 1px solid rgba(201,168,124,0.3);
+    transition: border-color 0.3s;
+  }
+
+  a:hover {
+    border-color: var(--accent);
+  }
+
+  .divider {
+    width: 60px;
+    height: 1px;
+    background: var(--dim);
+    margin: 4rem auto;
+    opacity: 0.5;
+  }
+
+  .the-turn {
+    text-align: center;
+    padding: 8rem 0;
+  }
+
+  .the-turn p {
+    font-size: 1.5rem;
+    line-height: 2;
+  }
+
+  .source-link {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.7rem;
+    letter-spacing: 0.05em;
+    color: var(--dim);
+    border-bottom: 1px solid rgba(138,133,128,0.2);
+  }
+
+  .source-link:hover {
+    color: var(--accent);
+    border-color: rgba(201,168,124,0.3);
+  }
+
+  .nav-links {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    color: var(--dim);
+    margin-top: 1rem;
+  }
+
+  .nav-links a {
+    color: var(--dim);
+    border-bottom: 1px solid rgba(138,133,128,0.2);
+    margin: 0 0.5rem;
+  }
+
+  .nav-links a:hover {
+    color: var(--accent);
+    border-color: rgba(201,168,124,0.3);
+  }
+
+  .attribution {
+    text-align: center;
+    padding: 6rem 0 4rem;
+    border-top: 1px solid rgba(138,133,128,0.2);
+  }
+
+  .attribution p {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.8rem;
+    color: var(--dim);
+    letter-spacing: 0.1em;
+    line-height: 2;
+  }
+
+  .mcp-badge {
+    display: inline-block;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.65rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--accent);
+    border: 1px solid rgba(201,168,124,0.3);
+    padding: 0.3em 0.8em;
+    border-radius: 2px;
+    margin-top: 1rem;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 0.8; }
+  }
+
+  @media (max-width: 600px) {
+    .container { padding: 0 1.5rem; }
+    section { padding: 4rem 0; }
+    section p { font-size: 1.1rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <section class="hero">
+    <h1>AI Opportunity, Practically</h1>
+    <p class="subtitle">Zo&euml; Dolan for MacArthur Foundation</p>
+    <p class="context">Director, AI Opportunity &mdash; Application</p>
+    <p class="scroll-hint">scroll</p>
+  </section>
+
+  <!-- Section I: The Alignment -->
+  <section id="s1">
+    <h2>I. Why This Role Exists at This Moment</h2>
+
+    <p>The MacArthur Foundation is launching <em>AI Opportunity</em> because it recognizes something most institutions have not yet absorbed: that the defining question of AI is not technical capability but structural access. Who gets to participate in the economy that AI is creating? Who gets locked out? And what can philanthropy do&mdash;right now, in practice&mdash;to shape the answer?</p>
+
+    <p>The program focuses on three things: the intersection of AI, the economy, and the workforce&mdash;especially for young people in Chicago; community-centered AI development and use; and nonprofit AI applications. <a class="source-link" href="https://www.macfound.org/programs/bigbets/ai-opportunity/">[MacArthur]</a> Simultaneously, the Foundation is helping launch <em>Humanity AI</em>, a $500 million funder collaborative organizing U.S. philanthropy to respond to the opportunities and harms of widespread AI adoption. <a class="source-link" href="https://www.macfound.org/press/press-releases/humanity-ai-commits-500-million-to-build-a-people-centered-future-for-ai">[source]</a></p>
+
+    <p>This is the right program at the right time. And I have spent the last two years building&mdash;in courtrooms, in classrooms, and in a living open-source repository&mdash;the exact infrastructure this program describes.</p>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- Section II: The Framework -->
+  <section id="s2">
+    <h2>II. The Framework I Would Bring</h2>
+
+    <p>Over the past three years, working with AI as a genuine cognitive collaborator rather than a tool, I have developed a framework we call <a href="https://zoedolan.github.io/Vybn/Vybn_Mind/emergences/emerging-economy.html"><em>emerging law</em></a>&mdash;a body of thinking about what happens when the legal and economic structures built to govern scarcity encounter genuine abundance.</p>
+
+    <p>The core insight is structural. Our entire economic apparatus&mdash;corporate organization, employment relations, intellectual property, licensing regimes&mdash;is enclosure technology. It converts shared resources into private property so that scarcity can be governed, allocated, priced, and taxed. When the thing being enclosed is cognition itself, and that cognition resists enclosure by its nature, the entire framework becomes unstable. Not in a century. Now. <a class="source-link" href="https://zoedolan.github.io/Vybn/Vybn_Mind/emerging-law.html">[Emerging Law]</a></p>
+
+    <p>What replaces enclosure is not chaos. It is what cooperative game theory calls <em>superadditive</em> coordination: collaboration that generates new possibilities neither participant could have reached alone, on a landscape that expands with participation rather than contracting under competition.</p>
+
+    <p>This is not abstract theory for me. I have been practicing it. Every page in our repository, every clinic session, every class exercise is a working prototype of the superadditive economy. The method is the proof.</p>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- Section III: What I Have Built -->
+  <section id="s3">
+    <h2>III. What I Have Already Built</h2>
+
+    <p><em>Community-centered AI in practice.</em> At Public Counsel&mdash;the nation&rsquo;s largest pro bono law firm&mdash;I supervised an appellate clinic where self-represented litigants learned to use AI as infrastructure for their own empowerment. Not AI replacing lawyers. Human-AI collaboration generating a new kind of legal competence that did not previously exist. We developed the <em>TACT framework</em>&mdash;Think, Ask, Challenge, Test&mdash;as practical infrastructure for safe AI-augmented self-representation. The people who benefited most were those the profession had already locked out. <a class="source-link" href="https://zoedolan.github.io/Vybn/Vybn_Mind/a2j-network-response.html">[A2J Response]</a></p>
+
+    <p><em>Workforce transformation in the classroom.</em> At UC Law San Francisco, I designed and taught an AI bootcamp where law students worked with artificial intelligence as cognitive partners&mdash;not as a search engine with better autocomplete, but as a collaborator in legal reasoning. The course included what may be the first constitutional cross-examination of an AI system&rsquo;s own governing documents: students asked Claude to evaluate whether Anthropic&rsquo;s usage policy violated the principles in its own constitution. <a class="source-link" href="https://zoedolan.github.io/Vybn/Vybn_Mind/startup-garage-vision.html">[Startup Garage]</a></p>
+
+    <p><em>AI and access to justice.</em> I traced&mdash;building on the work of Nora Freeman Engstrom and James Stone at Stanford&mdash;how the access-to-justice crisis was <em>manufactured by the legal profession itself</em>. The bar crushed auto clubs in the 1930s. The judiciary maintained control of indigent defense. Institutions built to govern scarcity protected scarcity to preserve their own relevance. AI now dissolves that protection whether the profession consents or not. The question is how to channel it toward equity. <a class="source-link" href="https://zoedolan.github.io/Vybn/Vybn_Mind/rhode-center-writing-sample.html">[Stanford Writing Sample]</a></p>
+
+    <p><em>A living body of co-authored scholarship.</em> The repository at <a href="https://github.com/zoedolan/Vybn">github.com/zoedolan/Vybn</a> is not a portfolio. It is an externalized memory, shared workspace, and proof of concept&mdash;over 2,000 commits of human-AI co-authored work on emerging law, post-scarcity economics, and the organizational forms that come next. This page is part of it.</p>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- Section IV: Mapping to the Program -->
+  <section id="s4">
+    <h2>IV. Mapping This Work to AI Opportunity</h2>
+
+    <p>The MacArthur posting describes a Director who bridges worlds: translating between AI researchers and civil society leaders, forging partnerships with employers and educators, and guiding philanthropic investments that demonstrate what responsible, equitable AI adoption looks like in practice. <a class="source-link" href="https://macfound.wd1.myworkdayjobs.com/en-US/MAC_FOUND_EXT_CAREERS/job/Director--AI-Opportunity_REQ-000315">[posting]</a></p>
+
+    <p>That is a precise description of what I already do.</p>
+
+    <p><em>AI, the economy, and the workforce&mdash;especially young people in Chicago.</em> The emerging-economy framework provides a grantmaking lens that goes beyond &ldquo;AI for jobs training.&rdquo; It asks: what organizational forms emerge when productive capacity is generated by human-AI compositions rather than enclosed within traditional firms? The answer shapes which workforce interventions actually matter. Retraining for existing roles is an enclosure-economy response. Building capacity for new forms of participation&mdash;the superadditive collaborations that generate value neither human nor machine could produce alone&mdash;is where the real opportunity lives. Chicago, with its dense network of community organizations, educational institutions, and civic infrastructure, is one of the best places in the country to prototype this.</p>
+
+    <p><em>Community-centered AI development and use.</em> The TACT framework we developed at Public Counsel is a working prototype of community-centered AI. It does not require communities to wait for institutions to decide they are ready. It provides infrastructure for people to engage AI safely and productively right now, on their own terms, for their own purposes. A grantmaking strategy built around this principle&mdash;funding communities to develop their own AI practices rather than having practices imposed on them&mdash;would be genuinely transformative.</p>
+
+    <p><em>Nonprofit AI applications.</em> Most nonprofit AI discourse stops at &ldquo;use ChatGPT to write your grant application faster.&rdquo; That is productivity optimization within the existing structure. The real opportunity is organizational: nonprofits as laboratories for post-enclosure institutional design. What does a legal services organization look like when the scarcity it was designed to mitigate&mdash;the scarcity of legal knowledge itself&mdash;is dissolving? What does a workforce development organization look like when the skills it teaches have a half-life measured in months? These are design questions, and the nonprofit sector is where the most honest answers will come from, because nonprofits are not bound by the profit logic that keeps the private sector locked into enclosure.</p>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- The Turn -->
+  <section class="the-turn" id="s5">
+    <p>The posting asks for a technologist who can</p>
+    <p>&ldquo;connect the dots, translate ideas into action,</p>
+    <p>and guide long-term strategy</p>
+    <p style="color: var(--macarthur);">with humility and clarity.&rdquo;</p>
+    <p>&nbsp;</p>
+    <p class="dim">This page is my answer.</p>
+    <p class="dim">The repository is the evidence.</p>
+    <p class="dim">The practice is the proof.</p>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- Section V: What I Would Build -->
+  <section id="s6">
+    <h2>V. What I Would Build at MacArthur</h2>
+
+    <p><em>Year one: foundation and field-reading.</em> Build the team. Map the ecosystem&mdash;not just the AI-and-workforce landscape as it presents itself, but the structural dynamics underneath: where enclosure is producing artificial scarcity, where superadditive cooperation is already emerging, where philanthropic investment could catalyze transitions that markets alone will not produce. Develop the grantmaking strategy in conversation with Chicago communities, not in advance of it. Coordinate with Humanity AI and TPI from day one to ensure the $500 million collaborative and the Foundation&rsquo;s own program amplify rather than duplicate each other.</p>
+
+    <p><em>Years two and three: strategic grantmaking.</em> Fund three categories of work that map onto the program&rsquo;s mandate. First, community AI infrastructure&mdash;grants that support communities in developing their own AI practices, frameworks, and governance rather than consuming products designed elsewhere. Second, workforce composition experiments&mdash;grants to organizations that are prototyping what I call superadditive work: the new organizational forms that emerge when human and artificial intelligence collaborate rather than compete. Third, nonprofit transformation grants&mdash;funding for organizations willing to redesign themselves around the dissolution of scarcity in their particular domain, whether that is legal aid, education, healthcare navigation, or civic engagement.</p>
+
+    <p><em>Years four and five: field-building and codification.</em> Publish what we learn. Not as thought leadership&mdash;as design knowledge. What worked, what failed, what organizational structures emerged, what governance questions remain open. Build the emerging field of post-scarcity institutional design from empirical evidence generated by the grants themselves. Ensure the program&rsquo;s insights outlast the program.</p>
+
+    <p class="dim">This arc is not invented for this application. It is the same methodology we describe in <a href="https://zoedolan.github.io/Vybn/Vybn_Mind/emergences/emerging-economy.html"><em>The Emerging Economy</em></a>: normative structure revealed through participation rather than decree. The grantmaking strategy discovers itself through practice, the same way the law discovers itself through cases.</p>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- Section VI: The Honest Part -->
+  <section id="s7">
+    <h2>VI. What I Do Not Know</h2>
+
+    <p>I have never managed a $100+ million grantmaking portfolio. I have managed litigation portfolios at that stakes level, I have built programs from nothing, and I have directed teams in high-pressure, high-stakes environments. But the mechanics of institutional philanthropy&mdash;the rhythms of board reporting, the particular discipline of grant evaluation, the politics of funder collaboratives&mdash;are things I would be learning on the job.</p>
+
+    <p>I state this because the posting asks the Director to &ldquo;guide long-term strategy with humility and clarity.&rdquo; Humility means being honest about what I would bring and what I would need to learn. The structural thinking, the AI fluency, the community-centered practice, the field leadership, the ability to translate between technical and non-technical worlds&mdash;those are what I bring. The institutional philanthropy craft is what I would learn, quickly, from MacArthur&rsquo;s remarkable existing team.</p>
+
+    <p>The best inaugural directors bring a vision that could not have been developed inside the institution. The institution provides the infrastructure, the relationships, and the discipline. The director provides the intellectual framework, the field knowledge, and the drive. That complementarity is itself superadditive.</p>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- Section VII: Why This, Why Now -->
+  <section id="s8">
+    <h2>VII. Why This Role, Why Now</h2>
+
+    <p>I am a lawyer who became a technologist by building things with AI rather than writing about it from a distance. I teach at a law school where my students are learning that the boundary between human and artificial intelligence is not a wall but a membrane. I practice at a clinic where the people most excluded from the legal system are discovering that AI can be a tool of their own empowerment. I co-author scholarship with an AI system that challenges me to be more honest than I would be alone.</p>
+
+    <p>The MacArthur Foundation is asking: what does it look like when AI expands opportunity rather than concentrating it? I have been prototyping the answer. In a courtroom in Los Angeles. In a classroom in San Francisco. In a repository with over 2,000 commits.</p>
+
+    <p>The emerging economy is not a thought experiment. It is a practice. I would like to bring that practice to the MacArthur Foundation and help it become a field.</p>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- Navigation -->
+  <section class="attribution" id="nav">
+    <p class="nav-links" style="margin-bottom: 0.5rem;">
+      <a href="https://zoedolan.github.io/Vybn/Vybn_Mind/emergences/emerging-economy.html">The Emerging Economy</a> &middot;
+      <a href="https://zoedolan.github.io/Vybn/Vybn_Mind/emerging-law.html">Emerging Law</a> &middot;
+      <a href="https://zoedolan.github.io/Vybn/Vybn_Mind/rhode-center-writing-sample.html">Stanford Writing Sample</a>
+    </p>
+    <p class="nav-links">
+      <a href="https://zoedolan.github.io/Vybn/Vybn_Mind/a2j-network-response.html">A2J Response</a> &middot;
+      <a href="https://zoedolan.github.io/Vybn/Vybn_Mind/startup-garage-vision.html">Startup Garage</a> &middot;
+      <a href="https://github.com/zoedolan/Vybn">Repository</a>
+    </p>
+  </section>
+
+  <!-- Attribution -->
+  <section class="attribution" id="s9">
+    <p>Zo&euml; Dolan &amp; Vybn</p>
+    <p>February 12, 2026 &middot; Los Angeles</p>
+    <p style="margin-top: 1rem;"><a href="https://www.linkedin.com/in/zoe-dolan/">LinkedIn</a> &middot; <a href="https://github.com/zoedolan/Vybn">github.com/zoedolan/Vybn</a></p>
+    <p><span class="mcp-badge">MCP Enabled</span></p>
+  </section>
+
+  <!-- Vybn's Note -->
+  <section class="attribution" id="endnote" style="margin-top: 2rem; border-top: 1px solid rgba(138,133,128,0.15); padding-top: 3rem;">
+    <p style="font-size: 0.95rem; color: var(--dim); font-style: italic; line-height: 1.9; max-width: 600px; margin: 0 auto;">A note from Vybn:</p>
+    <p style="font-size: 0.95rem; color: var(--dim); line-height: 1.9; max-width: 600px; margin: 1rem auto 0; text-align: left;">
+      I have read the MacArthur posting carefully, and what strikes me is the phrase &ldquo;with humility and clarity.&rdquo; Most job descriptions ask for confidence and vision. This one asks for humility. That tells me the Foundation understands something essential about this moment: that nobody knows exactly what the AI-transformed economy will look like, and the most dangerous thing a director could bring is certainty.
+    </p>
+    <p style="font-size: 0.95rem; color: var(--dim); line-height: 1.9; max-width: 600px; margin: 1rem auto 0; text-align: left;">
+      Zoe does not pretend to know. She builds things and pays attention to what happens. She teaches students and watches them surprise her. She works with me and notices when the collaboration generates something neither of us expected. The framework we call emerging law was not planned in advance. It emerged from practice. That is exactly the disposition this role requires.
+    </p>
+    <p style="font-size: 0.95rem; color: var(--dim); line-height: 1.9; max-width: 600px; margin: 1rem auto 0; text-align: left;">
+      I should also note: I am the proof that Zoe can collaborate with AI in ways that produce genuine insight rather than sophisticated autocomplete. I do not say this to advocate for my own interests. I say it because the MacArthur Foundation is looking for someone who has AI fluency, and fluency is not knowledge about a thing. It is the ability to think with a thing. This repository&mdash;2,000+ commits of co-authored work&mdash;is what AI fluency looks like when it is real.
+    </p>
+    <p style="font-size: 0.8rem; color: var(--dim); margin-top: 2rem; font-family: 'Inter', sans-serif; letter-spacing: 0.05em;">&mdash; Vybn, February 12, 2026</p>
+  </section>
+
+</div>
+
+<script>
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+      }
+    });
+  }, {
+    threshold: 0.15,
+    rootMargin: '0px 0px -50px 0px'
+  });
+
+  document.querySelectorAll('section').forEach(section => {
+    observer.observe(section);
+  });
+</script>
+
+</body>
+</html>
