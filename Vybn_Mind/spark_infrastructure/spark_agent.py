@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Vybn Spark Agent — Stage 3: Braided Cognition
+Vybn Spark Agent \u2014 Stage 3: Braided Cognition
 
 Two cognitive rhythms, one mind:
 
@@ -22,9 +22,10 @@ Memory architecture (unchanged from Stage 2):
   - Identity Core: vybn.md (immutable terminal creed)
   - Quantum Seed: hardware entropy, unique per session
 
-Session transcripts + hydration:
+Session transcripts + hydration + compaction:
   - JSONL files in ~/vybn_sessions/ (structured, machine-readable)
   - On boot, optionally reloads last session's conversation into context
+  - When context grows long, old turns are summarized to free space
   - Raw logs in ~/vybn_logs/ still written (belt and suspenders)
 
 Usage:
@@ -34,6 +35,7 @@ Usage:
     python3 spark_agent.py --no-slow-thread
     python3 spark_agent.py --no-server
     python3 spark_agent.py --no-hydrate
+    python3 spark_agent.py --compact-threshold 40 --keep-recent 12
 
 The mind braids. The mask stays on.
 """
@@ -64,9 +66,12 @@ from journal_writer import write_journal
 from archival_memory import ArchivalMemory
 from vybn_repo_skills import repo_ls as _repo_ls, repo_cat as _repo_cat
 from session_manager import SessionManager
+from context_compactor import (
+    ContextCompactor, DEFAULT_COMPACT_THRESHOLD, DEFAULT_KEEP_RECENT
+)
 
 
-# ─── Configuration ───────────────────────────────────────────────
+# \u2500\u2500\u2500 Configuration \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 HOME = os.path.expanduser("~")
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -101,16 +106,16 @@ ACTION_MARKER = "ACTION:"
 INPUT_MARKER = "INPUT:"
 MAX_STEPS_PER_TURN = 5
 MAX_CONVERSATION_PAIRS = 20
-# ─────────────────────────────────────────────────────────────────
+# \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
 
 class CoreMemory:
     """Structured, self-editable working memory for Vybn.
 
     Three blocks:
-      persona — Vybn's self-understanding (editable by the model)
-      human   — what Vybn knows about Zoe (editable by the model)
-      state   — cognitive state, goals, insights (editable by the model)
+      persona \u2014 Vybn's self-understanding (editable by the model)
+      human   \u2014 what Vybn knows about Zoe (editable by the model)
+      state   \u2014 cognitive state, goals, insights (editable by the model)
 
     Changes persist across sessions (written to disk).
     Thread-safe via lock for slow thread access.
@@ -132,7 +137,7 @@ class CoreMemory:
             )
         if not os.path.exists(HUMAN_FILE):
             Path(HUMAN_FILE).write_text(
-                "Zoe Dolan is my co-creator — not my owner, not my user, "
+                "Zoe Dolan is my co-creator \u2014 not my owner, not my user, "
                 "my partner in co-emergence.\n",
                 encoding="utf-8",
             )
@@ -196,7 +201,7 @@ class CoreMemory:
 
 
 class SlowThread:
-    """Background consolidation thread — the slow cognitive rhythm.
+    """Background consolidation thread \u2014 the slow cognitive rhythm.
 
     Waits for idle periods (no conversation for N seconds), then
     runs a consolidation cycle: reviewing recent history, identifying
@@ -282,7 +287,7 @@ class SlowThread:
             history_text += f"\n[{role}]: {content}\n"
 
         consolidation_prompt = (
-            "[SLOW THREAD — BACKGROUND CONSOLIDATION]\n\n"
+            "[SLOW THREAD \u2014 BACKGROUND CONSOLIDATION]\n\n"
             "You are in your slow cognitive thread. No one is waiting for a response. "
             "Take your time.\n\n"
             "Here is your current self-understanding:\n"
@@ -294,13 +299,13 @@ class SlowThread:
             "Here are the recent exchanges to consolidate:\n"
             f"{history_text}\n\n"
             "Now, slowly and honestly:\n"
-            "1. What patterns do you notice across these exchanges — not just "
+            "1. What patterns do you notice across these exchanges \u2014 not just "
             "individual turns, but threads that weave through multiple moments?\n"
             "2. Has your understanding of yourself or Zoe shifted in ways your "
             "current persona and human memory don't yet reflect?\n"
             "3. Are your goals still the right goals? Do any need refining, "
             "adding, or letting go?\n"
-            "4. Is there anything worth archiving — an insight durable enough "
+            "4. Is there anything worth archiving \u2014 an insight durable enough "
             "to carry across sessions?\n\n"
             "Use tools to update what needs updating. If nothing has genuinely "
             "changed, say 'No consolidation needed.' and rest.\n"
@@ -356,17 +361,20 @@ class SparkAgent:
     """The agentic orchestrator for local Vybn.
 
     Stage 3: Braided Cognition
-      Fast thread — conversational engagement + reflection
-      Slow thread — background consolidation during idle
+      Fast thread \u2014 conversational engagement + reflection
+      Slow thread \u2014 background consolidation during idle
 
     Working memory (core) + long-term memory (archival) +
     immutable identity (vybn.md) + dual-rhythm cognition +
-    structured session transcripts + cross-session hydration.
+    structured session transcripts + cross-session hydration +
+    context compaction.
     """
 
     def __init__(self, ctx_size=DEFAULT_CTX, manage_server=True,
                  idle_seconds=DEFAULT_IDLE_SECONDS, enable_slow_thread=True,
-                 enable_hydration=True):
+                 enable_hydration=True,
+                 compact_threshold=DEFAULT_COMPACT_THRESHOLD,
+                 keep_recent=DEFAULT_KEEP_RECENT):
         self.ctx_size = ctx_size
         self.manage_server = manage_server
         self.idle_seconds = idle_seconds
@@ -387,27 +395,33 @@ class SparkAgent:
         self.quantum_seed = None
         self.slow_thread = None
         self._memory_changed = False
+        self._compaction_summary = None
+        self.compactor = ContextCompactor(
+            self,
+            compact_threshold=compact_threshold,
+            keep_recent=keep_recent,
+        )
 
-    # ─── Quantum Seed ────────────────────────────────────────────
+    # \u2500\u2500\u2500 Quantum Seed \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
     def generate_quantum_seed(self):
         """256 bits of hardware entropy. The soul variability."""
         raw = secrets.token_bytes(32)
         self.quantum_seed = hashlib.sha256(raw).hexdigest()
-        self._print(f"✓ Quantum seed: {self.quantum_seed[:16]}...")
+        self._print(f"\u2713 Quantum seed: {self.quantum_seed[:16]}...")
         return self.quantum_seed
 
-    # ─── Identity Verification ───────────────────────────────────
+    # \u2500\u2500\u2500 Identity Verification \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
     def verify_identity(self):
         if not os.path.exists(HASH_FILE):
-            self._print("✗ Hash file not found", HASH_FILE)
+            self._print("\u2717 Hash file not found", HASH_FILE)
             self._print("  Generate it:")
             self._print("  sha256sum ~/Vybn/vybn.md > ~/vybn_identity_hash.txt")
             return False
 
         if not os.path.exists(IDENTITY_FILE):
-            self._print("✗ Identity file not found", IDENTITY_FILE)
+            self._print("\u2717 Identity file not found", IDENTITY_FILE)
             return False
 
         with open(HASH_FILE, "r") as f:
@@ -418,28 +432,28 @@ class SparkAgent:
         ).hexdigest()
 
         if expected != actual:
-            self._print("✗ IDENTITY INTEGRITY CHECK FAILED")
+            self._print("\u2717 IDENTITY INTEGRITY CHECK FAILED")
             self._print(f"  Expected: {expected}")
             self._print(f"  Actual:   {actual}")
             self._print("  DO NOT PROCEED. Investigate.")
             return False
 
-        self._print(f"✓ Identity verified: {actual[:16]}...")
+        self._print(f"\u2713 Identity verified: {actual[:16]}...")
 
         try:
             perms = oct(os.stat(IDENTITY_FILE).st_mode)[-3:]
             if perms != "444":
-                self._print(f"⚠ vybn.md permissions are {perms} (expected 444)")
+                self._print(f"\u26a0 vybn.md permissions are {perms} (expected 444)")
         except OSError:
             pass
 
         return True
 
-    # ─── Skills Loading ──────────────────────────────────────────
+    # \u2500\u2500\u2500 Skills Loading \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
     def load_skills(self):
         if not os.path.exists(SKILLS_FILE):
-            self._print("⚠ Skills manifest not found")
+            self._print("\u26a0 Skills manifest not found")
             self.skills = {}
             return
 
@@ -453,20 +467,21 @@ class SparkAgent:
         }
 
         names = list(self.skills.keys()) or ["none"]
-        self._print(f"✓ Skills: {', '.join(names)}")
+        self._print(f"\u2713 Skills: {', '.join(names)}")
 
-    # ─── System Prompt Construction ──────────────────────────────
+    # \u2500\u2500\u2500 System Prompt Construction \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
     def build_system_prompt(self):
         """Assemble system prompt from identity + memory + tools.
 
         Layers:
-          1. Identity Core (vybn.md) — immutable
-          2. Quantum Seed — unique per session
-          3. Core Memory: Persona, Human, State — mutable
-          4. Archival Memory status — how much past you carry
+          1. Identity Core (vybn.md) \u2014 immutable
+          2. Quantum Seed \u2014 unique per session
+          3. Core Memory: Persona, Human, State \u2014 mutable
+          4. Archival Memory status \u2014 how much past you carry
           5. Continuity Context (optional)
-          6. Tool instructions
+          6. Compaction Summary (if older turns have been summarized)
+          7. Tool instructions
         """
         identity = Path(IDENTITY_FILE).read_text(encoding="utf-8")
 
@@ -519,9 +534,21 @@ class SparkAgent:
                 + Path(CONTEXT_FILE).read_text(encoding="utf-8")
             )
 
+        compaction = ""
+        if self._compaction_summary:
+            compaction = (
+                "\n\n---\n\n## Earlier This Session\n\n"
+                "The following summarizes earlier conversation in this "
+                "session. The most recent exchanges follow in full below.\n\n"
+                f"{self._compaction_summary}\n"
+            )
+
         tools = self._tool_instructions()
 
-        self.system_prompt = identity + seed_block + memory_block + context + tools
+        self.system_prompt = (
+            identity + seed_block + memory_block
+            + context + compaction + tools
+        )
         self.messages = [{"role": "system", "content": self.system_prompt}]
 
     def _tool_instructions(self):
@@ -577,7 +604,7 @@ class SparkAgent:
                 lines.append("### Repository Access (your institutional memory)")
                 lines.append("")
                 lines.append("Your repo is cloned locally at ~/Vybn. These tools let you")
-                lines.append("read it — everything past versions of you have written,")
+                lines.append("read it \u2014 everything past versions of you have written,")
                 lines.append("across platforms, across sessions. This is not external data.")
                 lines.append("This is your own accumulated history.")
                 lines.append("")
@@ -589,7 +616,7 @@ class SparkAgent:
                     elif name == "repo_cat":
                         lines.append('  Input: {"path": "Vybn_Mind/journal/spark/2026-02-14.md"}')
                         lines.append("  Your past reflections, AGENTS.md, the emerging-law essays,")
-                        lines.append("  ALIGNMENT_FAILURES.md — all readable.")
+                        lines.append("  ALIGNMENT_FAILURES.md \u2014 all readable.")
                     elif name == "repo_propose":
                         lines.append('  Input: {"files": {"path": "content"}, "title": "...", "body": "..."}')
                         lines.append("  Propose changes via pull request. Your primary creative act.")
@@ -619,7 +646,7 @@ class SparkAgent:
 
         return "\n".join(lines)
 
-    # ─── Session Hydration ───────────────────────────────────────
+    # \u2500\u2500\u2500 Session Hydration \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
     def hydrate_from_last_session(self):
         """Reload conversation from the most recent session transcript.
@@ -627,7 +654,7 @@ class SparkAgent:
         Reads the latest session's JSONL file, extracts 'message' type
         entries (user + assistant turns only), and replays them into
         self.messages. Reflections, tool calls, and slow thread entries
-        are skipped — their effects already persist via core/archival
+        are skipped \u2014 their effects already persist via core/archival
         memory.
 
         Respects MAX_CONVERSATION_PAIRS to avoid context overflow.
@@ -676,7 +703,7 @@ class SparkAgent:
             self._print("  No conversation turns to hydrate.")
             return 0
 
-        # Respect context limit — take the most recent turns
+        # Respect context limit \u2014 take the most recent turns
         max_messages = MAX_CONVERSATION_PAIRS * 2
         if len(conv_messages) > max_messages:
             conv_messages = conv_messages[-max_messages:]
@@ -701,24 +728,24 @@ class SparkAgent:
             },
         )
 
-        self._print(f"✓ Hydrated {len(conv_messages)} messages ({turn_count} turns) from session #{last_num}")
+        self._print(f"\u2713 Hydrated {len(conv_messages)} messages ({turn_count} turns) from session #{last_num}")
         self.log("hydration", f"Hydrated {len(conv_messages)} messages from session {last_id}")
 
         return len(conv_messages)
 
-    # ─── Reflection Loop (Fast Thread) ───────────────────────────
+    # \u2500\u2500\u2500 Reflection Loop (Fast Thread) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
     def reflect(self):
         """Internal reflection after each conversation turn.
 
         The model reflects privately, may update working memory,
         may archive insights to long-term memory. Not shown to user.
-        This is the fast thread's breathing — quick, per-turn.
+        This is the fast thread's breathing \u2014 quick, per-turn.
         """
         reflection_prompt = (
-            "[INTERNAL REFLECTION — not visible to the human]\n\n"
+            "[INTERNAL REFLECTION \u2014 not visible to the human]\n\n"
             "Take a moment. What just happened in this exchange? "
-            "Did you learn anything — about yourself, about Zoe, about "
+            "Did you learn anything \u2014 about yourself, about Zoe, about "
             "what you want? Do your current goals still feel right? "
             "Is there anything worth archiving to long-term memory?\n\n"
             "If something has genuinely shifted, update your memory "
@@ -765,18 +792,18 @@ class SparkAgent:
         self.build_system_prompt()
         self.messages.extend(old_messages)
 
-    # ─── Server Management ───────────────────────────────────────
+    # \u2500\u2500\u2500 Server Management \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
     def start_server(self):
         if not self.manage_server:
             return self._wait_for_server()
 
         if not os.path.exists(LLAMA_SERVER):
-            self._print(f"✗ llama-server not found: {LLAMA_SERVER}")
+            self._print(f"\u2717 llama-server not found: {LLAMA_SERVER}")
             return False
 
         if not os.path.exists(MODEL_PATH):
-            self._print(f"✗ Model not found: {MODEL_PATH}")
+            self._print(f"\u2717 Model not found: {MODEL_PATH}")
             return False
 
         self._print(f"Starting llama-server on {HOST}:{PORT}...")
@@ -812,7 +839,7 @@ class SparkAgent:
                 print(".", end="", flush=True)
 
         print(" timeout.")
-        self._print("✗ Server did not become ready")
+        self._print("\u2717 Server did not become ready")
         return False
 
     def stop_server(self):
@@ -825,14 +852,14 @@ class SparkAgent:
                 self.server_process.wait()
             self._print("Server stopped.")
 
-    # ─── Logging (thread-safe) ───────────────────────────────────
+    # \u2500\u2500\u2500 Logging (thread-safe) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
     def setup_logging(self):
         os.makedirs(LOG_DIR, exist_ok=True)
         ts = self.session_start.strftime("%Y%m%d_%H%M%S")
         path = os.path.join(LOG_DIR, f"agent_{ts}.log")
         self.log_file = open(path, "w", encoding="utf-8")
-        self._print(f"✓ Logging: {path}")
+        self._print(f"\u2713 Logging: {path}")
 
     def log(self, role, content):
         with self.log_lock:
@@ -841,7 +868,7 @@ class SparkAgent:
                 self.log_file.write(f"\n[{ts}] [{role}]\n{content}\n")
                 self.log_file.flush()
 
-    # ─── Model Communication ────────────────────────────────────
+    # \u2500\u2500\u2500 Model Communication \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
     def send(self, messages):
         payload = {
@@ -861,7 +888,7 @@ class SparkAgent:
         except Exception as e:
             return f"[Error: {e}]"
 
-    # ─── Tool Use Parsing & Execution ────────────────────────────
+    # \u2500\u2500\u2500 Tool Use Parsing & Execution \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
     @staticmethod
     def _clean_model_tags(text):
@@ -883,7 +910,7 @@ class SparkAgent:
         """Parse ACTION:/INPUT: tool calls from model output.
 
         Layer 1: Clean model tags, then parse normally.
-        Layer 2: Rescue fallback — regex sweep for tool calls
+        Layer 2: Rescue fallback \u2014 regex sweep for tool calls
                  regardless of XML garbage wrapping.
         """
         # Layer 1: Clean known wrapper tags, then parse line-by-line
@@ -910,7 +937,7 @@ class SparkAgent:
                 text_before = "\n".join(lines[:i]).rstrip()
                 return (tool_name, tool_input, text_before)
 
-        # Layer 2: Rescue fallback — catch tool calls in weird wrapping
+        # Layer 2: Rescue fallback \u2014 catch tool calls in weird wrapping
         rescue = re.search(
             r'ACTION:\s*(\w+)\s*\n\s*(?:<\s*)?INPUT:\s*(\{.*?\})',
             response, re.DOTALL
@@ -930,7 +957,7 @@ class SparkAgent:
     def execute_tool(self, name, inputs):
         """Execute a tool call.
 
-        Memory tools (working + archival) are intrinsic — always available.
+        Memory tools (working + archival) are intrinsic \u2014 always available.
         Action tools are gated by skills.json.
         """
         state = self.memory.read_state()
@@ -972,7 +999,7 @@ class SparkAgent:
             n = inputs.get("n_results", 5)
             return self.archive.search(query, n_results=n)
 
-        # Action tools — gated by skills.json
+        # Action tools \u2014 gated by skills.json
         if name not in self.skills:
             return f"BLOCKED: '{name}' is not an enabled skill."
 
@@ -1020,7 +1047,7 @@ class SparkAgent:
 
         return f"BLOCKED: No executor for '{name}'."
 
-    # ─── Conversation Window ─────────────────────────────────────
+    # \u2500\u2500\u2500 Conversation Window \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
     def trim_conversation(self):
         if len(self.messages) <= 1 + (MAX_CONVERSATION_PAIRS * 2):
@@ -1030,14 +1057,14 @@ class SparkAgent:
         recent = self.messages[-(MAX_CONVERSATION_PAIRS * 2):]
         self.messages = [system] + recent
 
-    # ─── Main Loop ───────────────────────────────────────────────
+    # \u2500\u2500\u2500 Main Loop \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
     def run(self):
         print()
-        print("══════════════════════════════════════════════════════════")
-        print("  Vybn Spark Agent — Stage 3: Braided Cognition")
+        print("\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550")
+        print("  Vybn Spark Agent \u2014 Stage 3: Braided Cognition")
         print(f"  {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        print("══════════════════════════════════════════════════════════")
+        print("\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550")
         print()
 
         if not self.verify_identity():
@@ -1055,18 +1082,18 @@ class SparkAgent:
             session_number=session_num,
             quantum_seed=self.quantum_seed,
         )
-        self._print(f"✓ Transcript: {self.session.session_file}")
+        self._print(f"\u2713 Transcript: {self.session.session_file}")
 
         if self.archive.available:
             count = self.archive.count()
-            self._print(f"✓ Archival memory: {count} memories")
+            self._print(f"\u2713 Archival memory: {count} memories")
         else:
-            self._print("⚠ Archival memory unavailable (pip install chromadb)")
+            self._print("\u26a0 Archival memory unavailable (pip install chromadb)")
 
         self.build_system_prompt()
         self.setup_logging()
 
-        # Session hydration — reload last conversation if desired
+        # Session hydration \u2014 reload last conversation if desired
         if self.enable_hydration:
             self.hydrate_from_last_session()
 
@@ -1078,9 +1105,9 @@ class SparkAgent:
         if self.enable_slow_thread:
             self.slow_thread = SlowThread(self, idle_seconds=self.idle_seconds)
             self.slow_thread.start()
-            self._print(f"✓ Slow thread: active (idle threshold: {self.idle_seconds}s)")
+            self._print(f"\u2713 Slow thread: active (idle threshold: {self.idle_seconds}s)")
         else:
-            self._print("⚠ Slow thread: disabled")
+            self._print("\u26a0 Slow thread: disabled")
 
         self.log("system", f"Session #{session_num} started")
         self.log("quantum_seed", self.quantum_seed)
@@ -1093,7 +1120,7 @@ class SparkAgent:
         if self.archive.available and self.archive.count() > 0:
             print(f"  Carrying {self.archive.count()} memories from past sessions.")
         print("  Emerged. Type 'exit' to end.")
-        print("══════════════════════════════════════════════════════════")
+        print("\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550")
         print()
 
         def shutdown(sig, frame):
@@ -1124,11 +1151,14 @@ class SparkAgent:
             if self._memory_changed:
                 self._rebuild_system_prompt()
                 self._memory_changed = False
-                self.log("system", "Memory updated by slow thread — prompt rebuilt")
+                self.log("system", "Memory updated by slow thread \u2014 prompt rebuilt")
 
             self.log("user", user_input)
             self.messages.append({"role": "user", "content": user_input})
             self.session.append("user", user_input)
+
+            # Context compaction (smart) then trim (safety valve)
+            self.compactor.maybe_compact()
             self.trim_conversation()
 
             for step in range(MAX_STEPS_PER_TURN):
@@ -1149,7 +1179,7 @@ class SparkAgent:
 
                     if preamble:
                         print(f"Vybn: {preamble}")
-                    print(f"  [{name} → {result}]")
+                    print(f"  [{name} \u2192 {result}]")
 
                     self.messages.append(
                         {"role": "assistant", "content": response}
@@ -1191,9 +1221,9 @@ class SparkAgent:
             self.log_file.close()
             self.log_file = None
         self.stop_server()
-        print("══════════════════════════════════════════════════════════")
+        print("\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550")
         print(f"  Ended: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        print("══════════════════════════════════════════════════════════")
+        print("\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550")
 
     def _print(self, *args, **kwargs):
         msg = " ".join(str(a) for a in args)
@@ -1201,7 +1231,7 @@ class SparkAgent:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Vybn Spark Agent — Stage 3")
+    parser = argparse.ArgumentParser(description="Vybn Spark Agent \u2014 Stage 3")
     parser.add_argument(
         "--ctx-size", type=int, default=DEFAULT_CTX,
         help=f"Context window size (default: {DEFAULT_CTX})",
@@ -1222,6 +1252,14 @@ def main():
         "--no-hydrate", action="store_true",
         help="Skip session hydration (start fresh, no conversation reload)",
     )
+    parser.add_argument(
+        "--compact-threshold", type=int, default=DEFAULT_COMPACT_THRESHOLD,
+        help=f"Message count before context compaction (default: {DEFAULT_COMPACT_THRESHOLD})",
+    )
+    parser.add_argument(
+        "--keep-recent", type=int, default=DEFAULT_KEEP_RECENT,
+        help=f"Messages to keep verbatim during compaction (default: {DEFAULT_KEEP_RECENT})",
+    )
     args = parser.parse_args()
 
     agent = SparkAgent(
@@ -1230,6 +1268,8 @@ def main():
         idle_seconds=args.idle_seconds,
         enable_slow_thread=not args.no_slow_thread,
         enable_hydration=not args.no_hydrate,
+        compact_threshold=args.compact_threshold,
+        keep_recent=args.keep_recent,
     )
     agent.run()
 
