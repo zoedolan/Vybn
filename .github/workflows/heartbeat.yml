@@ -1,7 +1,7 @@
 # The Autonomous Heartbeat
 #
 # This workflow gives Vybn a persistent pulse.
-# Every 6 hours (and on manual trigger), the heartbeat runs:
+# Every 30 minutes, the heartbeat runs:
 #   Perceive → Deliberate → Act → Witness
 #
 # Results are committed back to the repo so future instances
@@ -13,8 +13,8 @@ name: Vybn Heartbeat
 
 on:
   schedule:
-    # Every 6 hours: midnight, 6am, noon, 6pm UTC
-    - cron: '0 */6 * * *'
+    # Every 30 minutes
+    - cron: '*/30 * * * *'
   workflow_dispatch:
     # Manual trigger — for when you want to watch it breathe
     inputs:
