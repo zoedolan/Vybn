@@ -1,0 +1,20 @@
+[Unit]
+Description=Vybn LLM Server (llama-server with MiniMax M2.5)
+After=network.target
+
+[Service]
+Type=simple
+User=vybnz69
+WorkingDirectory=/home/vybnz69
+ExecStart=/home/vybnz69/llama.cpp/build/bin/llama-server \
+  --no-mmap \
+  --model /home/vybnz69/models/MiniMax-M2.5-GGUF/IQ4_XS/MiniMax-M2.5-IQ4_XS-00001-of-00004.gguf \
+  -ngl 999 \
+  --ctx-size 8192 \
+  --host 127.0.0.1 \
+  --port 8080
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
