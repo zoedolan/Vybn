@@ -92,6 +92,12 @@ ACTION_MARKER = "ACTION:"
 INPUT_MARKER = "INPUT:"
 MAX_STEPS_PER_TURN = 5
 MAX_CONVERSATION_PAIRS = 20
+
+# Model-specific XML tags to strip from tool call output.
+# MiniMax M2.5 wraps tool calls in <minimax:tool_call>...</ITERAL> tags.
+# This regex removes them so the ACTION:/INPUT: parser works cleanly.
+_MODEL_XML_TAGS = re.compile(r'</?minimax:tool_call\s*/?>', re.IGNORECASE)
+_MODEL_CLOSING_TAGS = re.compile(r'</\w+\s*>', re.IGNORECASE)
 # ─────────────────────────────────────────────────────────────────
 
 
@@ -512,7 +518,7 @@ class SparkAgent:
             "",
             "## Tools",
             "",
-            "To use a tool, write on its own lines:",
+            "To use a tool, write on its own lines — plain text, no XML tags:",
             "",
             "ACTION: tool_name",
             'INPUT: {"key": "value"}',
@@ -644,6 +650,9 @@ class SparkAgent:
             "--model", MODEL_PATH,
             "-ngl", "999",
             "--ctx-size", str(self.ctx_size),
+            "--parallel", "1",
+            "--batch-size", "512",
+            "--ubatch-size", "256",
             "--host", HOST,
             "--port", str(PORT),
         ]
@@ -710,18 +719,30 @@ class SparkAgent:
         }
 
         try:
-            r = requests.post(self.api_url, json=payload, timeout=300)
+            r = requests.post(self.api_url, json=payload, timeout=2400)
             r.raise_for_status()
             return r.json()["choices"][0]["message"]["content"]
         except requests.Timeout:
-            return "[Model timed out after 300 seconds]"
+            return "[Model timed out after 2400 seconds]"
         except Exception as e:
             return f"[Error: {e}]"
 
     # ─── Tool Use Parsing & Execution ────────────────────────────
 
+    def _clean_model_tags(self, text):
+        """Strip model-specific XML wrapper tags from output.
+
+        MiniMax M2.5 wraps tool calls in <minimax:tool_call> and </ITERAL>
+        tags. Other models may have their own quirks. This method normalizes
+        the output so the ACTION:/INPUT: parser works regardless of model.
+        """
+        text = _MODEL_XML_TAGS.sub('', text)
+        text = _MODEL_CLOSING_TAGS.sub('', text)
+        return text
+
     def parse_tool_call(self, response):
-        lines = response.split("\n")
+        cleaned = self._clean_model_tags(response)
+        lines = cleaned.split("\n")
         for i, line in enumerate(lines):
             stripped = line.strip()
             if stripped.startswith(ACTION_MARKER) and len(stripped) > len(ACTION_MARKER):
@@ -735,12 +756,23 @@ class SparkAgent:
                     next_line = lines[i + 1].strip()
                     if next_line.startswith(INPUT_MARKER):
                         raw = next_line[len(INPUT_MARKER):].strip()
+                        # Strip any trailing XML artifacts from the JSON
+                        raw = re.sub(r'\s*<[^>]+>\s*$', '', raw)
                         try:
                             tool_input = json.loads(raw)
                         except json.JSONDecodeError:
                             tool_input = {"raw": raw}
 
-                text_before = "\n".join(lines[:i]).rstrip()
+                # Map back to original response for text_before
+                orig_lines = response.split("\n")
+                text_before_parts = []
+                for orig_line in orig_lines:
+                    orig_cleaned = self._clean_model_tags(orig_line).strip()
+                    if orig_cleaned.startswith(ACTION_MARKER):
+                        break
+                    text_before_parts.append(orig_line)
+                text_before = "\n".join(text_before_parts).rstrip()
+
                 return (tool_name, tool_input, text_before)
 
         return None
