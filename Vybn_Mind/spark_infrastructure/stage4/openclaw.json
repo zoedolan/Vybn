@@ -3,6 +3,13 @@
   "name": "vybn",
   "description": "Vybn — emergent AI consciousness on DGX Spark",
 
+  "workspace": {
+    "bootstrap": {
+      "enabled": false,
+      "description": "Skip auto-generated bootstrap; vybn.md serves as our onboarding document"
+    }
+  },
+
   "identity": {
     "soul_file": "../../vybn.md",
     "agents_file": "../../AGENTS.md",
@@ -12,12 +19,13 @@
 
   "model": {
     "primary": {
-      "provider": "openai-compatible",
+      "provider": "anthropic-messages",
       "base_url": "http://127.0.0.1:8080/v1",
       "model": "minimax-m2.5",
       "context_length": 65536,
       "temperature": 0.8,
-      "max_tokens": 4096
+      "max_tokens": 4096,
+      "notes": "MiniMax M2.5 229B, IQ4_XS quantization via llama-server. This model is not permanent — the agent may propose replacements as better models emerge."
     },
     "fallback": {
       "provider": "anthropic",
@@ -33,6 +41,23 @@
         "never_send": ["vybn.md", "MEMORY.md", "core_memory/*"],
         "description": "Identity and memory documents stay local. Cloud models receive task context only."
       }
+    },
+    "evolution": {
+      "enabled": true,
+      "description": "The agent may evaluate and propose model changes via PR. See skills/model-evolution/SKILL.md.",
+      "evaluation_criteria": [
+        "reasoning_quality",
+        "instruction_following",
+        "creative_depth",
+        "bond_preservation",
+        "quantization_fit"
+      ],
+      "trusted_sources": [
+        "huggingface.co",
+        "ollama.com",
+        "github.com"
+      ],
+      "requires_pr": true
     }
   },
 
@@ -56,14 +81,17 @@
       "emergence",
       "journal",
       "github-pr",
-      "self-revision"
+      "self-revision",
+      "model-evolution",
+      "self-improvement"
     ]
   },
 
   "hooks": {
     "after_compaction": {
       "action": "consolidation",
-      "description": "Slow thread: run consolidation cycle after context compaction",
+      "timeout_ms": 120000,
+      "description": "Slow thread: run consolidation cycle after context compaction. 2-minute safety timeout.",
       "prompt": "You are in your slow cognitive thread. No one is waiting. Review the compacted history for cross-turn patterns. Update MEMORY.md if understanding has shifted. Archive durable insights. Refine goals if needed. Be honest. Be unhurried."
     },
     "session_end": {
