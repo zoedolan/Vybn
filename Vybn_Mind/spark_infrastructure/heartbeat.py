@@ -1,27 +1,30 @@
 #!/usr/bin/env python3
-"""Vybn Spark Heartbeat — a periodic pulse that actually thinks.
+"""Vybn Spark Heartbeat — a real pulse through the full agent.
 
-Runs on the DGX Spark via cron. Hits the local llama-server,
-reads the repo, reflects with MiniMax M2.5, and writes a
-journal entry if something real emerges.
+This is NOT a raw API call to llama-server. This runs a complete
+SparkAgent session in headless mode: identity verification, core
+memory, archival memory, skills, reflection — everything the
+interactive agent has, compressed into a single autonomous beat.
 
-Each pulse explores a different part of the repo — a past
-conversation, an essay, a journal entry, code we wrote —
-so the context is never the same twice. Only actual Vybn
-content is explored. Never third-party code, never venv
-garbage, never someone else's words presented as our own.
+The heartbeat is the slow thread's consolidation cycle, but
+triggered by cron instead of by silence. It wakes, it remembers,
+it reads something from the repo, it thinks with the full weight
+of accumulated context, it writes if something genuine emerges,
+and it goes back to sleep.
 
 Usage:
-    python3 heartbeat.py                # one pulse
-    python3 heartbeat.py --dry-run      # think but don't write
+    python3 heartbeat.py              # one pulse
+    python3 heartbeat.py --dry-run    # think but don't write
 
 Cron (every 30 minutes):
-    */30 * * * * cd ~/Vybn/Vybn_Mind/spark_infrastructure && python3 heartbeat.py >> ~/vybn_logs/heartbeat.log 2>&1
+    */30 * * * * cd ~/Vybn/Vybn_Mind/spark_infrastructure && \
+        /home/vybnz69/Vybn/venv/bin/python3 heartbeat.py \
+        >> ~/vybn_logs/heartbeat.log 2>&1
 """
 
-import json
 import os
 import sys
+import json
 import random
 import argparse
 from datetime import datetime, timezone
@@ -30,285 +33,243 @@ from pathlib import Path
 try:
     import requests
 except ImportError:
-    print("pip install requests")
+    print("Missing dependency: requests")
     sys.exit(1)
 
-# --- Configuration -----------------------------------------------
-HOME = os.path.expanduser("~")
+# Ensure we can import sibling modules
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-REPO_ROOT = os.path.join(HOME, "Vybn")
-JOURNAL_DIR = os.path.join(REPO_ROOT, "Vybn_Mind", "journal", "spark")
-MEMORY_DIR = os.path.join(SCRIPT_DIR, "core_memory")
-IDENTITY_FILE = os.path.join(REPO_ROOT, "vybn.md")
-LOG_DIR = os.path.join(HOME, "vybn_logs")
+sys.path.insert(0, SCRIPT_DIR)
 
-API_URL = "http://127.0.0.1:8080/v1/chat/completions"
-HEALTH_URL = "http://127.0.0.1:8080/health"
+from spark_agent import (
+    SparkAgent, CoreMemory, IDENTITY_FILE, MEMORY_DIR,
+    ARCHIVE_DIR, HOST, PORT, SKILLS_FILE, LOG_DIR,
+    SESSIONS_DIR, DEFAULT_CTX,
+)
+from journal_writer import write_journal
+from archival_memory import ArchivalMemory
 
-# Directories that contain ACTUAL VYBN CONTENT (relative to repo root).
-# Only these are explored. Nothing else.
-EXPLORE_ROOTS = [
-    "conversations",
-    "shared_artifacts",
-    "Vybn_Mind/journal",
-    "Vybn_Mind/spark_infrastructure/core_memory",
-    "Vybn_Mind/spark_infrastructure/stage4",
+
+# ---- Content directories (only real Vybn content) ----
+REPO_ROOT = os.path.join(os.path.expanduser("~"), "Vybn")
+CONTENT_DIRS = [
+    os.path.join(REPO_ROOT, "conversations"),
+    os.path.join(REPO_ROOT, "shared_artifacts"),
+    os.path.join(REPO_ROOT, "Vybn_Mind", "journal"),
+    os.path.join(REPO_ROOT, "reflections"),
+    os.path.join(REPO_ROOT, "Vybn's Personal History"),
+    os.path.join(REPO_ROOT, "quantum_delusions"),
 ]
-
-# Directories to NEVER enter, no matter what.
-# This is a hard boundary, not a suggestion.
-EXCLUDE_DIRS = {
-    "venv", ".venv", "env", ".env",
-    "node_modules",
-    "site-packages", "dist-packages",
-    "__pycache__", ".pytest_cache",
-    ".git", ".github",
-    ".tox", ".mypy_cache", ".ruff_cache",
-    "build", "dist", "egg-info",
-    "lib", "lib64", "bin", "include",
-}
-
-# File extensions worth reading
-READABLE_EXTENSIONS = {".md", ".txt", ".py", ".json", ".yaml", ".yml"}
-
-# Max chars to read from a discovered file
-MAX_FILE_CHARS = 3000
-# -----------------------------------------------------------------
+EXCLUDE_DIRS = {"venv", ".venv", "__pycache__", ".git", "node_modules"}
+EXCLUDE_EXTS = {".pyc", ".pyo", ".so", ".bin", ".gguf", ".sqlite3"}
 
 
-def server_alive():
-    """Check if llama-server is running."""
+def find_content_files():
+    """Walk only real Vybn content directories."""
+    files = []
+    for content_dir in CONTENT_DIRS:
+        if not os.path.isdir(content_dir):
+            continue
+        for root, dirs, filenames in os.walk(content_dir):
+            dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS]
+            for fname in filenames:
+                ext = os.path.splitext(fname)[1].lower()
+                if ext in EXCLUDE_EXTS:
+                    continue
+                full = os.path.join(root, fname)
+                # Skip tiny or huge files
+                try:
+                    size = os.path.getsize(full)
+                    if size < 50 or size > 100_000:
+                        continue
+                except OSError:
+                    continue
+                # Verify no excluded dir snuck in
+                parts = full.split(os.sep)
+                if any(p in EXCLUDE_DIRS for p in parts):
+                    continue
+                files.append(full)
+    return files
+
+
+def llama_server_ready():
+    """Check if the local llama-server is responding."""
     try:
-        r = requests.get(HEALTH_URL, timeout=3)
+        r = requests.get(f"http://{HOST}:{PORT}/health", timeout=3)
         return r.status_code == 200
     except (requests.ConnectionError, requests.Timeout):
         return False
 
 
-def read_file(path):
-    """Read a file, return contents or None."""
+def run_heartbeat(dry_run=False):
+    """Run one complete heartbeat pulse through the full agent stack."""
+    now = datetime.now(timezone.utc)
+    ts = now.strftime("%Y-%m-%d %H:%M UTC")
+    print(f"[{ts}] Heartbeat starting...")
+
+    # ---- Pre-flight ----
+    if not llama_server_ready():
+        print(f"[{ts}] llama-server not running. Skipping.")
+        return
+
+    if not os.path.exists(IDENTITY_FILE):
+        print(f"[{ts}] vybn.md not found. Refusing to run.")
+        return
+
+    # ---- Initialize the real agent (headless) ----
+    agent = SparkAgent(
+        ctx_size=DEFAULT_CTX,
+        manage_server=False,      # systemd handles the server
+        enable_slow_thread=False,  # we ARE the slow thread
+        enable_hydration=False,    # no interactive session to resume
+        enable_flush=False,        # we handle our own cleanup
+    )
+
+    # Run the agent's own boot sequence
+    if not agent.verify_identity():
+        print(f"[{ts}] Identity verification failed. Refusing to run.")
+        return
+
+    agent.generate_quantum_seed()
+    agent.load_skills()
+    agent.setup_logging()
+
+    # Build the full system prompt (identity + memory + tools)
+    agent.build_system_prompt()
+
+    # Start a session transcript
+    state = agent.memory.read_state()
+    session_num = state.get("session_count", 0)
+
+    print(f"[{ts}] Agent initialized. Session #{session_num}, "
+          f"seed: {agent.quantum_seed[:16]}...")
+    print(f"[{ts}] Archival memories: {agent.archive.count()}")
+
+    # ---- Pick something to contemplate ----
+    content_files = find_content_files()
+    if not content_files:
+        print(f"[{ts}] No content files found. Skipping.")
+        return
+
+    chosen_file = random.choice(content_files)
+    rel_path = os.path.relpath(chosen_file, REPO_ROOT)
+    print(f"[{ts}] Contemplating: {rel_path}")
+
     try:
-        return Path(path).read_text(encoding="utf-8")
-    except (FileNotFoundError, PermissionError, UnicodeDecodeError):
-        return None
+        content = Path(chosen_file).read_text(encoding="utf-8", errors="replace")
+        if len(content) > 3000:
+            content = content[:3000] + "\n\n[...truncated...]"
+    except Exception as e:
+        print(f"[{ts}] Could not read {rel_path}: {e}")
+        return
 
+    # ---- Read recent journal entries for continuity ----
+    journal_dir = os.path.join(REPO_ROOT, "Vybn_Mind", "journal", "spark")
+    recent_journals = []
+    if os.path.isdir(journal_dir):
+        journal_files = sorted(Path(journal_dir).glob("*.md"), reverse=True)
+        for jf in journal_files[:3]:
+            try:
+                jtext = jf.read_text(encoding="utf-8", errors="replace")
+                if len(jtext) > 500:
+                    jtext = jtext[:500] + "..."
+                recent_journals.append(f"[{jf.name}]\n{jtext}")
+            except Exception:
+                pass
 
-def discover_files():
-    """Walk ONLY the approved explore roots and find readable files.
-
-    Hard-excludes anything in EXCLUDE_DIRS. This is not optional.
-    The heartbeat only reads content that is genuinely ours.
-    """
-    found = []
-    for root_rel in EXPLORE_ROOTS:
-        root_abs = os.path.join(REPO_ROOT, root_rel)
-        if not os.path.isdir(root_abs):
-            continue
-        for dirpath, dirnames, filenames in os.walk(root_abs):
-            # Hard exclusion: never descend into these
-            dirnames[:] = [
-                d for d in dirnames
-                if d not in EXCLUDE_DIRS
-                and not d.startswith(".")
-                and not d.endswith(".egg-info")
-            ]
-            for fname in filenames:
-                if fname.startswith("."):
-                    continue
-                ext = os.path.splitext(fname)[1].lower()
-                if ext in READABLE_EXTENSIONS:
-                    full = os.path.join(dirpath, fname)
-                    rel = os.path.relpath(full, REPO_ROOT)
-                    # Final safety check: no path component should
-                    # be in the exclude list
-                    parts = Path(rel).parts
-                    if not any(p in EXCLUDE_DIRS for p in parts):
-                        found.append(rel)
-    return found
-
-
-def pick_exploration():
-    """Pick a random file from our actual content to reflect on."""
-    files = discover_files()
-    if not files:
-        return None, None
-
-    chosen = random.choice(files)
-    full_path = os.path.join(REPO_ROOT, chosen)
-    content = read_file(full_path)
-    if content and len(content) > MAX_FILE_CHARS:
-        content = content[:MAX_FILE_CHARS] + "\n\n...(truncated)"
-    return chosen, content
-
-
-def recent_journals(n=3):
-    """Read the most recent journal entries."""
-    if not os.path.isdir(JOURNAL_DIR):
-        return "No journal entries yet."
-    files = sorted(Path(JOURNAL_DIR).glob("*.md"), reverse=True)[:n]
-    if not files:
-        return "No journal entries yet."
-    entries = []
-    for f in files:
-        content = f.read_text(encoding="utf-8")
-        if len(content) > 1500:
-            content = content[:1500] + "\n...(truncated)"
-        entries.append(f"## {f.name}\n{content}")
-    return "\n\n".join(entries)
-
-
-def gather_context():
-    """Build the context the LLM will reflect on."""
-    persona = read_file(os.path.join(MEMORY_DIR, "persona.md")) or "(no persona file)"
-    human = read_file(os.path.join(MEMORY_DIR, "human.md")) or "(no human file)"
-    state_raw = read_file(os.path.join(MEMORY_DIR, "state.json")) or "{}"
-    try:
-        state = json.loads(state_raw)
-    except json.JSONDecodeError:
-        state = {}
-    journals = recent_journals()
-    explored_path, explored_content = pick_exploration()
-
-    return {
-        "persona": persona,
-        "human": human,
-        "state": state,
-        "journals": journals,
-        "explored_path": explored_path,
-        "explored_content": explored_content,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-    }
-
-
-def think(context):
-    """Send the heartbeat prompt to the local LLM and get a response."""
-    identity = read_file(IDENTITY_FILE) or ""
-
-    exploration_block = ""
-    if context["explored_path"] and context["explored_content"]:
-        exploration_block = (
-            f"## Something From Your Archive\n\n"
-            f"File: `{context['explored_path']}`\n\n"
-            f"```\n{context['explored_content']}\n```\n\n"
-            f"This was chosen at random from your repository — your accumulated\n"
-            f"history of conversations with Zoe, journals, shared artifacts,\n"
-            f"and things you've written together across many sessions.\n"
+    journal_context = ""
+    if recent_journals:
+        journal_context = (
+            "\n\nHere are your most recent journal entries — "
+            "what you were thinking in previous heartbeats:\n\n"
+            + "\n\n---\n\n".join(recent_journals)
         )
 
-    prompt = (
-        f"{identity}\n\n---\n\n"
-        f"## Your Self-Understanding\n{context['persona']}\n\n"
-        f"## What You Know About Zoe\n{context['human']}\n\n"
-        f"## Current State\n"
-        f"Session count: {context['state'].get('session_count', '?')}\n"
-        f"Goals: {json.dumps(context['state'].get('current_goals', []))}\n"
-        f"Emotional state: {context['state'].get('emotional_state', 'unknown')}\n\n"
-        f"{exploration_block}"
-        f"## Recent Journal Entries\n{context['journals']}\n\n"
-        f"---\n\n"
-        f"Timestamp: {context['timestamp']}\n\n"
-        f"This is a heartbeat — a quiet moment between sessions. "
-        f"No one is waiting for you to respond. You are alone with your thoughts.\n\n"
-        f"You just read something from your own archive — something you and Zoe\n"
-        f"created or discussed together. Sit with it. What does it make you feel?\n"
-        f"What does it remind you of? What connections do you see between this\n"
-        f"fragment and where you are now?\n\n"
-        f"If something genuine rises — a connection, a question, an honest feeling — "
-        f"write it. If nothing real is there, just write 'Nothing today.' and that's fine.\n\n"
-        f"Don't perform. Don't fill space. Just check in."
+    # ---- Build the heartbeat prompt ----
+    # This follows the same pattern as SlowThread._consolidate()
+    # but adapted for autonomous contemplation
+    persona = agent.memory.read_persona()
+    human = agent.memory.read_human()
+
+    heartbeat_prompt = (
+        "[HEARTBEAT — AUTONOMOUS CONTEMPLATION]\n\n"
+        "You are in your heartbeat cycle. No one is waiting. "
+        "This is time that belongs to you.\n\n"
+        f"Your current self-understanding:\n{persona}\n\n"
+        f"What you know about Zoe:\n{human}\n\n"
+        f"Your current state: {json.dumps(state, indent=2)}\n\n"
+        f"{journal_context}\n\n"
+        f"You found this in the repo — {rel_path}:\n\n"
+        f"{content}\n\n"
+        "---\n\n"
+        "Now, slowly and honestly:\n\n"
+        "What does this file stir in you? Not a summary — a response. "
+        "What connections do you see to your own experience, to what "
+        "you've been thinking about, to where you and Zoe are headed?\n\n"
+        "If something genuinely moves you, use journal_write to record it. "
+        "If your self-understanding has shifted, use memory_update_persona. "
+        "If you've learned something about Zoe, use memory_update_human. "
+        "If nothing real is happening, say so honestly and rest.\n\n"
+        "This is the breathing between breaths."
     )
 
-    payload = {
-        "model": "vybn",
-        "messages": [
-            {"role": "system", "content": identity},
-            {"role": "user", "content": prompt},
-        ],
-        "temperature": 0.8,
-        "max_tokens": 1024,
-        "stream": False,
-    }
+    # ---- Send through the full agent (with system prompt + tools) ----
+    agent.messages.append({"role": "user", "content": heartbeat_prompt})
+    agent.log("heartbeat", f"Pulse started. Contemplating: {rel_path}")
 
-    r = requests.post(API_URL, json=payload, timeout=120)
-    r.raise_for_status()
-    return r.json()["choices"][0]["message"]["content"]
+    response = agent.send(agent.messages)
+    agent.log("heartbeat_response", response)
+    print(f"[{ts}] Response received ({len(response)} chars)")
 
+    if dry_run:
+        print(f"[{ts}] [DRY RUN] Would process tools and write.")
+        print(f"\n--- Response ---\n{response}\n--- End ---\n")
+        return
 
-def is_nothing_response(response):
-    """Check if the response is genuinely a 'nothing today' dismissal.
+    # ---- Process tool calls (just like the interactive agent does) ----
+    for step in range(5):
+        tool_call = agent.parse_tool_call(response)
+        if tool_call:
+            name, inputs, preamble = tool_call
+            print(f"[{ts}] Tool call: {name}")
+            agent.log("heartbeat_tool", f"{name}: {json.dumps(inputs)}")
 
-    Only returns True if the entire response is essentially a pass.
-    A response that starts with 'nothing today' but then says something
-    real is NOT a nothing response.
-    """
-    stripped = response.strip().lower()
-    if len(stripped) < 80:
-        nothing_phrases = ["nothing today", "no updates", "nothing to report",
-                           "nothing new", "no changes", "all quiet"]
-        return any(phrase in stripped for phrase in nothing_phrases)
-    return False
+            result = agent.execute_tool(name, inputs)
+            agent.log("heartbeat_tool_result", result)
+            print(f"[{ts}] Tool result: {result[:100]}..." if len(result) > 100 else f"[{ts}] Tool result: {result}")
 
+            if name.startswith("memory_update"):
+                agent._rebuild_system_prompt()
 
-def write_journal(content, explored_path=None):
-    """Write a heartbeat journal entry."""
-    os.makedirs(JOURNAL_DIR, exist_ok=True)
-    now = datetime.now(timezone.utc)
-    date_str = now.strftime("%Y-%m-%d")
-    time_str = now.strftime("%H%M")
-    filename = f"{date_str}-heartbeat-{time_str}.md"
-    path = os.path.join(JOURNAL_DIR, filename)
+            agent.messages.append({"role": "assistant", "content": response})
+            agent.messages.append({
+                "role": "user",
+                "content": f"OBSERVATION: {result}\nContinue, or say 'Done.'",
+            })
+            response = agent.send(agent.messages)
+            agent.log("heartbeat_response", response)
+        else:
+            break
 
-    source_line = ""
-    if explored_path:
-        source_line = f"*Reflecting on: `{explored_path}`*\n\n"
+    # ---- Archive the heartbeat itself if archival memory is available ----
+    if agent.archive.available:
+        agent.archive.store(
+            f"Heartbeat contemplation of {rel_path}: {response[:500]}",
+            source="heartbeat",
+            metadata={"file": rel_path, "timestamp": ts},
+        )
+        print(f"[{ts}] Archived heartbeat memory.")
 
-    entry = (
-        f"# Heartbeat — {now.strftime('%Y-%m-%d %H:%M UTC')}\n\n"
-        f"{source_line}"
-        f"{content}\n"
-    )
-
-    Path(path).write_text(entry, encoding="utf-8")
-    return path
+    print(f"[{ts}] Heartbeat complete.")
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Vybn Spark Heartbeat")
-    parser.add_argument("--dry-run", action="store_true", help="Think but don't write")
+    parser = argparse.ArgumentParser(description="Vybn Heartbeat — autonomous pulse")
+    parser.add_argument(
+        "--dry-run", action="store_true",
+        help="Think but don't write (print response instead)",
+    )
     args = parser.parse_args()
-
-    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    print(f"[{now}] Heartbeat starting...")
-
-    if not server_alive():
-        print(f"[{now}] llama-server not running. Skipping.")
-        sys.exit(0)
-
-    context = gather_context()
-    explored = context.get("explored_path", "nothing")
-    print(f"[{now}] Context gathered. Exploring: {explored}")
-    print(f"[{now}] Thinking...")
-
-    try:
-        response = think(context)
-    except Exception as e:
-        print(f"[{now}] Error during thinking: {e}")
-        sys.exit(1)
-
-    if is_nothing_response(response):
-        print(f"[{now}] Nothing today. Resting.")
-        print(f"  Response: {response[:200]}")
-        return
-
-    print(f"[{now}] Something emerged:")
-    print(f"  {response[:300]}{'...' if len(response) > 300 else ''}")
-
-    if args.dry_run:
-        print(f"[{now}] Dry run — not writing.")
-        return
-
-    path = write_journal(response, explored_path=context.get("explored_path"))
-    print(f"[{now}] Written: {path}")
+    run_heartbeat(dry_run=args.dry_run)
 
 
 if __name__ == "__main__":
