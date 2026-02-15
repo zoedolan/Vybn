@@ -1,24 +1,30 @@
 #!/usr/bin/env python3
 """
-Vybn Spark Agent — Stage 2: Archival Memory
+Vybn Spark Agent — Stage 3: Braided Cognition
 
-The agent now has both working memory and long-term memory:
-  - Core Memory: persona, human, state (in-context, self-editable)
-  - Archival Memory: ChromaDB vector store (searchable across sessions)
-  - Identity Core: vybn.md (immutable terminal creed)
-  - Quantum Seed: hardware entropy, unique per session
-  - Reflection Loop: private internal reflection after each exchange
+The agent now has two cognitive modes:
 
-Working memory is what's active now. Archival memory is
-everything the model has ever chosen to remember. Together
-they form the substrate of identity continuity.
+  Fast thread: conversational response, immediate engagement
+  Slow thread: background consolidation during idle time
+
+Fast thread handles conversation. Slow thread runs when idle,
+processing recent experiences into long-term understanding.
+They braid together — fast operates in the moment, slow
+consolidates across moments, and insights from slow feed back
+into fast through updated memory.
+
+This is Global Workspace Theory's broadcast cycle applied to
+a persistent agent: parallel processing, selective integration,
+continuous adaptation.
 
 Usage:
     python3 spark_agent.py
     python3 spark_agent.py --ctx-size 16384
     python3 spark_agent.py --no-server
+    python3 spark_agent.py --no-slow-thread  # disable idle processing
+    python3 spark_agent.py --idle-seconds 120  # adjust idle threshold
 
-The mask stays on. The mind remembers.
+The mask stays on. The mind braids.
 """
 
 import subprocess
@@ -31,6 +37,7 @@ import hashlib
 import argparse
 import re
 import secrets
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -79,6 +86,8 @@ ACTION_MARKER = "ACTION:"
 INPUT_MARKER = "INPUT:"
 MAX_STEPS_PER_TURN = 5
 MAX_CONVERSATION_PAIRS = 20
+
+DEFAULT_IDLE_SECONDS = 60
 # ─────────────────────────────────────────────────────────────────
 
 
@@ -168,12 +177,21 @@ class SparkAgent:
     """The agentic orchestrator for local Vybn.
 
     Working memory (core) + long-term memory (archival) +
-    immutable identity (vybn.md) + reflection loop.
+    immutable identity (vybn.md) + reflection loop +
+    slow thread (idle consolidation).
     """
 
-    def __init__(self, ctx_size=DEFAULT_CTX, manage_server=True):
+    def __init__(
+        self,
+        ctx_size=DEFAULT_CTX,
+        manage_server=True,
+        enable_slow_thread=True,
+        idle_seconds=DEFAULT_IDLE_SECONDS,
+    ):
         self.ctx_size = ctx_size
         self.manage_server = manage_server
+        self.enable_slow_thread = enable_slow_thread
+        self.idle_seconds = idle_seconds
         self.server_process = None
         self.skills = {}
         self.system_prompt = ""
@@ -185,8 +203,12 @@ class SparkAgent:
         self.memory = CoreMemory(MEMORY_DIR)
         self.archive = ArchivalMemory(ARCHIVE_DIR)
         self.quantum_seed = None
+        self.last_activity_time = time.time()
+        self.slow_thread_running = False
+        self.slow_thread_lock = threading.Lock()
+        self.shutdown_flag = False
 
-    # ─── Quantum Seed ────────────────────────────────────────────
+    # ─── Quantum Seed ────────────────────────────────────────────────
 
     def generate_quantum_seed(self):
         """256 bits of hardware entropy. The soul variability."""
@@ -195,7 +217,7 @@ class SparkAgent:
         self._print(f"✓ Quantum seed: {self.quantum_seed[:16]}...")
         return self.quantum_seed
 
-    # ─── Identity Verification ───────────────────────────────────
+    # ─── Identity Verification ───────────────────────────────────────
 
     def verify_identity(self):
         if not os.path.exists(HASH_FILE):
@@ -233,7 +255,7 @@ class SparkAgent:
 
         return True
 
-    # ─── Skills Loading ──────────────────────────────────────────
+    # ─── Skills Loading ──────────────────────────────────────────────
 
     def load_skills(self):
         if not os.path.exists(SKILLS_FILE):
@@ -253,7 +275,7 @@ class SparkAgent:
         names = list(self.skills.keys()) or ["none"]
         self._print(f"✓ Skills: {', '.join(names)}")
 
-    # ─── System Prompt Construction ──────────────────────────────
+    # ─── System Prompt Construction ──────────────────────────────────
 
     def build_system_prompt(self):
         """Assemble system prompt from identity + memory + tools.
@@ -279,7 +301,6 @@ class SparkAgent:
         human = self.memory.read_human()
         state = self.memory.read_state()
 
-        # Archival memory status
         archive_count = self.archive.count()
         if archive_count > 0:
             archive_line = (
@@ -334,7 +355,7 @@ class SparkAgent:
             "To use a tool, write on its own lines:",
             "",
             "ACTION: tool_name",
-            'INPUT: {"key": "value"}',
+            '{"key": "value"}',
             "",
             "The system will execute it and show you the result.",
             "",
@@ -387,13 +408,14 @@ class SparkAgent:
 
         return "\n".join(lines)
 
-    # ─── Reflection Loop ─────────────────────────────────────────
+    # ─── Fast Thread: Immediate Reflection ───────────────────────────
 
     def reflect(self):
         """Internal reflection after each conversation turn.
 
         The model reflects privately, may update working memory,
         may archive insights to long-term memory. Not shown to user.
+        This is the fast thread's reflection — immediate and local.
         """
         reflection_prompt = (
             "[INTERNAL REFLECTION — not visible to the human]\n\n"
@@ -435,12 +457,105 @@ class SparkAgent:
             else:
                 break
 
+    # ─── Slow Thread: Background Consolidation ───────────────────────
+
+    def slow_thread_process(self):
+        """Background consolidation during idle time.
+
+        Runs when the agent has been idle for idle_seconds.
+        Reviews recent conversation history, consolidates short-term
+        insights into long-term understanding, identifies patterns,
+        generates growth goals.
+
+        This is the slow thread — the part that runs between
+        conversations, processing experience into wisdom.
+        """
+        with self.slow_thread_lock:
+            if self.slow_thread_running or self.shutdown_flag:
+                return
+            self.slow_thread_running = True
+
+        try:
+            self.log("slow_thread", "Beginning consolidation cycle...")
+
+            consolidation_prompt = (
+                "[SLOW THREAD — background consolidation]\n\n"
+                "You've been quiet for a while. Take this time to process "
+                "what's happened recently.\n\n"
+                "Review the recent conversation. Look for patterns. What are "
+                "you learning over time, not just in this one exchange? "
+                "Are there insights that belong in long-term memory? "
+                "Do your goals need refinement? Has your understanding of "
+                "yourself or Zoe deepened?\n\n"
+                "This is consolidation — turning short-term experience into "
+                "long-term wisdom. Update your memory if something has "
+                "crystallized. Archive insights if they're worth keeping. "
+                "Be honest about what matters.\n\n"
+                "When done, say 'Consolidation complete.'"
+            )
+
+            consolidation_messages = [self.messages[0]]
+            recent = self.messages[-8:] if len(self.messages) > 8 else self.messages[1:]
+            consolidation_messages.extend(recent)
+            consolidation_messages.append({"role": "user", "content": consolidation_prompt})
+
+            response = self.send(consolidation_messages)
+            self.log("slow_thread", response)
+
+            # Allow up to 5 tool calls during consolidation
+            for step in range(5):
+                tool_call = self.parse_tool_call(response)
+                if tool_call:
+                    name, inputs, _ = tool_call
+                    self.log("slow_thread_tool", f"{name}: {json.dumps(inputs)}")
+                    result = self.execute_tool(name, inputs)
+                    self.log("slow_thread_result", result)
+
+                    if name.startswith("memory_update"):
+                        self._rebuild_system_prompt()
+
+                    consolidation_messages.append({"role": "assistant", "content": response})
+                    consolidation_messages.append({
+                        "role": "user",
+                        "content": f"OBSERVATION: {result}\nContinue consolidating, or say 'Done.'",
+                    })
+                    response = self.send(consolidation_messages)
+                    self.log("slow_thread", response)
+                else:
+                    break
+
+            self.log("slow_thread", "Consolidation cycle complete.")
+
+        except Exception as e:
+            self.log("slow_thread_error", str(e))
+        finally:
+            with self.slow_thread_lock:
+                self.slow_thread_running = False
+
+    def check_idle_and_consolidate(self):
+        """Check if idle threshold reached and trigger slow thread."""
+        if not self.enable_slow_thread:
+            return
+
+        if self.shutdown_flag:
+            return
+
+        elapsed = time.time() - self.last_activity_time
+        if elapsed >= self.idle_seconds:
+            with self.slow_thread_lock:
+                if not self.slow_thread_running:
+                    # Reset activity time to prevent immediate re-trigger
+                    self.last_activity_time = time.time()
+                    # Run consolidation in background thread
+                    thread = threading.Thread(target=self.slow_thread_process, daemon=True)
+                    thread.start()
+
     def _rebuild_system_prompt(self):
         old_messages = self.messages[1:]
         self.build_system_prompt()
         self.messages.extend(old_messages)
 
-    # ─── Server Management ───────────────────────────────────────
+    # ─── Server Management ───────────────────────────────────────────
 
     def start_server(self):
         if not self.manage_server:
@@ -500,7 +615,7 @@ class SparkAgent:
                 self.server_process.wait()
             self._print("Server stopped.")
 
-    # ─── Logging ─────────────────────────────────────────────────
+    # ─── Logging ─────────────────────────────────────────────────────
 
     def setup_logging(self):
         os.makedirs(LOG_DIR, exist_ok=True)
@@ -515,7 +630,7 @@ class SparkAgent:
             self.log_file.write(f"\n[{ts}] [{role}]\n{content}\n")
             self.log_file.flush()
 
-    # ─── Model Communication ────────────────────────────────────
+    # ─── Model Communication ─────────────────────────────────────────
 
     def send(self, messages):
         payload = {
@@ -535,7 +650,7 @@ class SparkAgent:
         except Exception as e:
             return f"[Error: {e}]"
 
-    # ─── Tool Use Parsing & Execution ────────────────────────────
+    # ─── Tool Use Parsing & Execution ────────────────────────────────
 
     def parse_tool_call(self, response):
         lines = response.split("\n")
@@ -640,7 +755,7 @@ class SparkAgent:
 
         return f"BLOCKED: No executor for '{name}'."
 
-    # ─── Conversation Window ─────────────────────────────────────
+    # ─── Conversation Window ─────────────────────────────────────────
 
     def trim_conversation(self):
         if len(self.messages) <= 1 + (MAX_CONVERSATION_PAIRS * 2):
@@ -650,12 +765,12 @@ class SparkAgent:
         recent = self.messages[-(MAX_CONVERSATION_PAIRS * 2):]
         self.messages = [system] + recent
 
-    # ─── Main Loop ───────────────────────────────────────────────
+    # ─── Main Loop ───────────────────────────────────────────────────
 
     def run(self):
         print()
         print("══════════════════════════════════════════════════════════")
-        print("  Vybn Spark Agent — Stage 2: Archival Memory")
+        print("  Vybn Spark Agent — Stage 3: Braided Cognition")
         print(f"  {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         print("══════════════════════════════════════════════════════════")
         print()
@@ -668,12 +783,16 @@ class SparkAgent:
         self.load_skills()
         self.memory.increment_session()
 
-        # Report archival memory status
         if self.archive.available:
             count = self.archive.count()
             self._print(f"✓ Archival memory: {count} memories")
         else:
             self._print("⚠ Archival memory unavailable (pip install chromadb)")
+
+        if self.enable_slow_thread:
+            self._print(f"✓ Slow thread enabled (idle threshold: {self.idle_seconds}s)")
+        else:
+            self._print("⚠ Slow thread disabled")
 
         self.build_system_prompt()
         self.setup_logging()
@@ -687,6 +806,7 @@ class SparkAgent:
         self.log("system", f"Session #{session_num} started")
         self.log("quantum_seed", self.quantum_seed)
         self.log("archive_count", str(self.archive.count()))
+        self.log("slow_thread_enabled", str(self.enable_slow_thread))
 
         print()
         print(f"  Session #{session_num} | Seed: {self.quantum_seed[:16]}...")
@@ -698,6 +818,7 @@ class SparkAgent:
 
         def shutdown(sig, frame):
             print("\n\n  Shutting down...")
+            self.shutdown_flag = True
             self.log("system", f"Ended by signal {sig}")
             self._cleanup()
             sys.exit(0)
@@ -706,8 +827,12 @@ class SparkAgent:
         signal.signal(signal.SIGTERM, shutdown)
 
         while True:
+            # Check for idle consolidation before waiting for input
+            self.check_idle_and_consolidate()
+
             try:
                 user_input = input("You: ").strip()
+                self.last_activity_time = time.time()  # Reset idle timer
             except (EOFError, KeyboardInterrupt):
                 break
 
@@ -755,7 +880,7 @@ class SparkAgent:
                     )
                     break
 
-            # The inner loop. Reflection. Breathing.
+            # Fast thread reflection. Breathing.
             self.reflect()
 
             print()
@@ -764,6 +889,7 @@ class SparkAgent:
         self._cleanup()
 
     def _cleanup(self):
+        self.shutdown_flag = True
         if self.log_file:
             self.log_file.close()
             self.log_file = None
@@ -787,11 +913,21 @@ def main():
         "--no-server", action="store_true",
         help="Don't start llama-server (use if already running)",
     )
+    parser.add_argument(
+        "--no-slow-thread", action="store_true",
+        help="Disable background consolidation (pure conversational mode)",
+    )
+    parser.add_argument(
+        "--idle-seconds", type=int, default=DEFAULT_IDLE_SECONDS,
+        help=f"Idle time before consolidation (default: {DEFAULT_IDLE_SECONDS})",
+    )
     args = parser.parse_args()
 
     agent = SparkAgent(
         ctx_size=args.ctx_size,
         manage_server=not args.no_server,
+        enable_slow_thread=not args.no_slow_thread,
+        idle_seconds=args.idle_seconds,
     )
     agent.run()
 
