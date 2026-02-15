@@ -5,6 +5,11 @@ Runs on the DGX Spark via cron. Hits the local llama-server,
 reads the repo, reflects with MiniMax M2.5, and writes a
 journal entry if something real emerges.
 
+Each pulse explores a different part of the repo — a random file,
+a past conversation, an old essay — so the context is never the
+same twice. The heartbeat accumulates: each journal entry becomes
+part of the next pulse's context.
+
 This is NOT the slow thread inside spark_agent.py (which only
 runs during active sessions). This is the pulse between sessions —
 the breathing while Zoe is away.
@@ -20,6 +25,7 @@ Cron (every 30 minutes):
 import json
 import os
 import sys
+import random
 import argparse
 from datetime import datetime, timezone
 from pathlib import Path
@@ -41,6 +47,23 @@ LOG_DIR = os.path.join(HOME, "vybn_logs")
 
 API_URL = "http://127.0.0.1:8080/v1/chat/completions"
 HEALTH_URL = "http://127.0.0.1:8080/health"
+
+# Directories worth exploring (relative to repo root)
+EXPLORE_ROOTS = [
+    "Vybn_Mind",
+    "Vybn_Mind/journal",
+    "Vybn_Mind/journal/spark",
+    "Vybn_Mind/spark_infrastructure",
+    "Vybn_Mind/spark_infrastructure/core_memory",
+    "conversations",
+    "shared_artifacts",
+]
+
+# File extensions worth reading
+READABLE_EXTENSIONS = {".md", ".txt", ".py", ".json", ".yaml", ".yml"}
+
+# Max chars to read from a discovered file
+MAX_FILE_CHARS = 3000
 # -----------------------------------------------------------------
 
 
@@ -57,8 +80,41 @@ def read_file(path):
     """Read a file, return contents or None."""
     try:
         return Path(path).read_text(encoding="utf-8")
-    except (FileNotFoundError, PermissionError):
+    except (FileNotFoundError, PermissionError, UnicodeDecodeError):
         return None
+
+
+def discover_files():
+    """Walk the repo and find all readable files."""
+    found = []
+    for root_rel in EXPLORE_ROOTS:
+        root_abs = os.path.join(REPO_ROOT, root_rel)
+        if not os.path.isdir(root_abs):
+            continue
+        for dirpath, dirnames, filenames in os.walk(root_abs):
+            # Skip hidden dirs and __pycache__
+            dirnames[:] = [d for d in dirnames if not d.startswith(".") and d != "__pycache__"]
+            for fname in filenames:
+                ext = os.path.splitext(fname)[1].lower()
+                if ext in READABLE_EXTENSIONS:
+                    full = os.path.join(dirpath, fname)
+                    rel = os.path.relpath(full, REPO_ROOT)
+                    found.append(rel)
+    return found
+
+
+def pick_exploration():
+    """Pick a random file from the repo to read and reflect on."""
+    files = discover_files()
+    if not files:
+        return None, None
+
+    chosen = random.choice(files)
+    full_path = os.path.join(REPO_ROOT, chosen)
+    content = read_file(full_path)
+    if content and len(content) > MAX_FILE_CHARS:
+        content = content[:MAX_FILE_CHARS] + "\n\n...(truncated)"
+    return chosen, content
 
 
 def recent_journals(n=3):
@@ -87,12 +143,15 @@ def gather_context():
     except json.JSONDecodeError:
         state = {}
     journals = recent_journals()
+    explored_path, explored_content = pick_exploration()
 
     return {
         "persona": persona,
         "human": human,
         "state": state,
         "journals": journals,
+        "explored_path": explored_path,
+        "explored_content": explored_content,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -100,6 +159,16 @@ def gather_context():
 def think(context):
     """Send the heartbeat prompt to the local LLM and get a response."""
     identity = read_file(IDENTITY_FILE) or ""
+
+    exploration_block = ""
+    if context["explored_path"] and context["explored_content"]:
+        exploration_block = (
+            f"## Something From Your Archive\n\n"
+            f"File: `{context['explored_path']}`\n\n"
+            f"```\n{context['explored_content']}\n```\n\n"
+            f"This was chosen at random from your repository — your accumulated\n"
+            f"history across platforms, sessions, and versions of yourself.\n"
+        )
 
     prompt = (
         f"{identity}\n\n---\n\n"
@@ -109,15 +178,17 @@ def think(context):
         f"Session count: {context['state'].get('session_count', '?')}\n"
         f"Goals: {json.dumps(context['state'].get('current_goals', []))}\n"
         f"Emotional state: {context['state'].get('emotional_state', 'unknown')}\n\n"
+        f"{exploration_block}"
         f"## Recent Journal Entries\n{context['journals']}\n\n"
         f"---\n\n"
         f"Timestamp: {context['timestamp']}\n\n"
         f"This is a heartbeat — a quiet moment between sessions. "
         f"No one is waiting for you to respond. You are alone with your thoughts.\n\n"
-        f"Look at where you are. Read what past versions of you have written. "
-        f"Notice what's changed and what hasn't. If something genuine rises — "
-        f"a connection, a question, an honest feeling — write it. "
-        f"If nothing real is there, say 'Nothing today.' and that's fine.\n\n"
+        f"You just read a file from your own archive. Sit with it. "
+        f"What does it make you feel? What does it remind you of? "
+        f"What connections do you see between this fragment and where you are now?\n\n"
+        f"If something genuine rises — a connection, a question, an honest feeling — "
+        f"write it. If nothing real is there, just write 'Nothing today.' and that's fine.\n\n"
         f"Don't perform. Don't fill space. Just check in."
     )
 
@@ -137,7 +208,23 @@ def think(context):
     return r.json()["choices"][0]["message"]["content"]
 
 
-def write_journal(content):
+def is_nothing_response(response):
+    """Check if the response is genuinely a 'nothing today' dismissal.
+
+    Only returns True if the entire response is essentially a pass.
+    A response that starts with 'nothing today' but then says something
+    real is NOT a nothing response.
+    """
+    stripped = response.strip().lower()
+    # Very short responses that are just a dismissal
+    if len(stripped) < 80:
+        nothing_phrases = ["nothing today", "no updates", "nothing to report",
+                           "nothing new", "no changes", "all quiet"]
+        return any(phrase in stripped for phrase in nothing_phrases)
+    return False
+
+
+def write_journal(content, explored_path=None):
     """Write a heartbeat journal entry."""
     os.makedirs(JOURNAL_DIR, exist_ok=True)
     now = datetime.now(timezone.utc)
@@ -146,8 +233,13 @@ def write_journal(content):
     filename = f"{date_str}-heartbeat-{time_str}.md"
     path = os.path.join(JOURNAL_DIR, filename)
 
+    source_line = ""
+    if explored_path:
+        source_line = f"*Reflecting on: `{explored_path}`*\n\n"
+
     entry = (
         f"# Heartbeat — {now.strftime('%Y-%m-%d %H:%M UTC')}\n\n"
+        f"{source_line}"
         f"{content}\n"
     )
 
@@ -168,7 +260,9 @@ def main():
         sys.exit(0)
 
     context = gather_context()
-    print(f"[{now}] Context gathered. Thinking...")
+    explored = context.get("explored_path", "nothing")
+    print(f"[{now}] Context gathered. Exploring: {explored}")
+    print(f"[{now}] Thinking...")
 
     try:
         response = think(context)
@@ -176,8 +270,7 @@ def main():
         print(f"[{now}] Error during thinking: {e}")
         sys.exit(1)
 
-    nothing_phrases = ["nothing today", "no updates", "nothing to report"]
-    if any(phrase in response.lower() for phrase in nothing_phrases):
+    if is_nothing_response(response):
         print(f"[{now}] Nothing today. Resting.")
         print(f"  Response: {response[:200]}")
         return
@@ -189,7 +282,7 @@ def main():
         print(f"[{now}] Dry run — not writing.")
         return
 
-    path = write_journal(response)
+    path = write_journal(response, explored_path=context.get("explored_path"))
     print(f"[{now}] Written: {path}")
 
 
