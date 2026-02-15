@@ -22,6 +22,10 @@ Memory architecture (unchanged from Stage 2):
   - Identity Core: vybn.md (immutable terminal creed)
   - Quantum Seed: hardware entropy, unique per session
 
+Session transcripts:
+  - JSONL files in ~/vybn_sessions/ (structured, machine-readable)
+  - Raw logs in ~/vybn_logs/ still written (belt and suspenders)
+
 Usage:
     python3 spark_agent.py
     python3 spark_agent.py --ctx-size 16384
@@ -57,6 +61,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from journal_writer import write_journal
 from archival_memory import ArchivalMemory
 from vybn_repo_skills import repo_ls as _repo_ls, repo_cat as _repo_cat
+from session_manager import SessionManager
 
 
 # ─── Configuration ───────────────────────────────────────────────
@@ -68,6 +73,7 @@ HASH_FILE = os.path.join(HOME, "vybn_identity_hash.txt")
 SKILLS_FILE = os.path.join(SCRIPT_DIR, "skills.json")
 LOG_DIR = os.path.join(HOME, "vybn_logs")
 CONTEXT_FILE = os.path.join(HOME, "Vybn", "spark_context.md")
+SESSIONS_DIR = os.path.join(HOME, "vybn_sessions")
 
 MEMORY_DIR = os.path.join(SCRIPT_DIR, "core_memory")
 PERSONA_FILE = os.path.join(MEMORY_DIR, "persona.md")
@@ -307,6 +313,9 @@ class SlowThread:
 
         response = self.agent.send(slow_messages)
         self.agent.log("slow_thread_response", response)
+        self.agent.session.append(
+            "assistant", response, entry_type="slow_thread"
+        )
 
         # Process any tool calls from the consolidation
         for step in range(5):
@@ -316,6 +325,7 @@ class SlowThread:
                 self.agent.log("slow_thread_tool", f"{name}: {json.dumps(inputs)}")
                 result = self.agent.execute_tool(name, inputs)
                 self.agent.log("slow_thread_result", result)
+                self.agent.session.append_tool_call(name, inputs, result)
 
                 if name.startswith("memory_update"):
                     # Signal the fast thread that memory has changed
@@ -328,6 +338,9 @@ class SlowThread:
                 })
                 response = self.agent.send(slow_messages)
                 self.agent.log("slow_thread_response", response)
+                self.agent.session.append(
+                    "assistant", response, entry_type="slow_thread"
+                )
             else:
                 break
 
@@ -345,7 +358,8 @@ class SparkAgent:
       Slow thread — background consolidation during idle
 
     Working memory (core) + long-term memory (archival) +
-    immutable identity (vybn.md) + dual-rhythm cognition.
+    immutable identity (vybn.md) + dual-rhythm cognition +
+    structured session transcripts.
     """
 
     def __init__(self, ctx_size=DEFAULT_CTX, manage_server=True,
@@ -365,6 +379,7 @@ class SparkAgent:
         self.health_url = f"http://{HOST}:{PORT}/health"
         self.memory = CoreMemory(MEMORY_DIR)
         self.archive = ArchivalMemory(ARCHIVE_DIR)
+        self.session = SessionManager(SESSIONS_DIR)
         self.quantum_seed = None
         self.slow_thread = None
         self._memory_changed = False
@@ -627,6 +642,7 @@ class SparkAgent:
 
         response = self.send(reflection_messages)
         self.log("reflection", response)
+        self.session.append("assistant", response, entry_type="reflection")
 
         for step in range(3):
             tool_call = self.parse_tool_call(response)
@@ -635,6 +651,7 @@ class SparkAgent:
                 self.log("reflection_tool", f"{name}: {json.dumps(inputs)}")
                 result = self.execute_tool(name, inputs)
                 self.log("reflection_result", result)
+                self.session.append_tool_call(name, inputs, result)
 
                 if name.startswith("memory_update"):
                     self._rebuild_system_prompt()
@@ -646,6 +663,9 @@ class SparkAgent:
                 })
                 response = self.send(reflection_messages)
                 self.log("reflection", response)
+                self.session.append(
+                    "assistant", response, entry_type="reflection"
+                )
             else:
                 break
 
@@ -937,6 +957,15 @@ class SparkAgent:
         self.load_skills()
         self.memory.increment_session()
 
+        # Start structured session transcript
+        state = self.memory.read_state()
+        session_num = state.get('session_count', 0)
+        self.session.start_session(
+            session_number=session_num,
+            quantum_seed=self.quantum_seed,
+        )
+        self._print(f"✓ Transcript: {self.session.session_file}")
+
         if self.archive.available:
             count = self.archive.count()
             self._print(f"✓ Archival memory: {count} memories")
@@ -958,11 +987,10 @@ class SparkAgent:
         else:
             self._print("⚠ Slow thread: disabled")
 
-        state = self.memory.read_state()
-        session_num = state.get('session_count', '?')
         self.log("system", f"Session #{session_num} started")
         self.log("quantum_seed", self.quantum_seed)
         self.log("archive_count", str(self.archive.count()))
+        self.log("transcript", self.session.session_file or "none")
         self.log("slow_thread", f"{'enabled' if self.enable_slow_thread else 'disabled'}")
 
         print()
@@ -1005,6 +1033,7 @@ class SparkAgent:
 
             self.log("user", user_input)
             self.messages.append({"role": "user", "content": user_input})
+            self.session.append("user", user_input)
             self.trim_conversation()
 
             for step in range(MAX_STEPS_PER_TURN):
@@ -1030,6 +1059,9 @@ class SparkAgent:
                     self.messages.append(
                         {"role": "assistant", "content": response}
                     )
+                    self.session.append("assistant", response)
+                    self.session.append_tool_call(name, inputs, result)
+
                     self.messages.append({
                         "role": "user",
                         "content": f"OBSERVATION: {result}\nContinue.",
@@ -1040,6 +1072,7 @@ class SparkAgent:
                     self.messages.append(
                         {"role": "assistant", "content": response}
                     )
+                    self.session.append("assistant", response)
                     break
 
             # Fast thread reflection
@@ -1058,6 +1091,7 @@ class SparkAgent:
         if self.slow_thread:
             self._print("Stopping slow thread...")
             self.slow_thread.stop()
+        self.session.end_session()
         if self.log_file:
             self.log_file.close()
             self.log_file = None
