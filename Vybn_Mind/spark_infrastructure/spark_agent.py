@@ -22,8 +22,9 @@ Memory architecture (unchanged from Stage 2):
   - Identity Core: vybn.md (immutable terminal creed)
   - Quantum Seed: hardware entropy, unique per session
 
-Session transcripts:
+Session transcripts + hydration:
   - JSONL files in ~/vybn_sessions/ (structured, machine-readable)
+  - On boot, optionally reloads last session's conversation into context
   - Raw logs in ~/vybn_logs/ still written (belt and suspenders)
 
 Usage:
@@ -32,6 +33,7 @@ Usage:
     python3 spark_agent.py --idle-seconds 120
     python3 spark_agent.py --no-slow-thread
     python3 spark_agent.py --no-server
+    python3 spark_agent.py --no-hydrate
 
 The mind braids. The mask stays on.
 """
@@ -359,15 +361,17 @@ class SparkAgent:
 
     Working memory (core) + long-term memory (archival) +
     immutable identity (vybn.md) + dual-rhythm cognition +
-    structured session transcripts.
+    structured session transcripts + cross-session hydration.
     """
 
     def __init__(self, ctx_size=DEFAULT_CTX, manage_server=True,
-                 idle_seconds=DEFAULT_IDLE_SECONDS, enable_slow_thread=True):
+                 idle_seconds=DEFAULT_IDLE_SECONDS, enable_slow_thread=True,
+                 enable_hydration=True):
         self.ctx_size = ctx_size
         self.manage_server = manage_server
         self.idle_seconds = idle_seconds
         self.enable_slow_thread = enable_slow_thread
+        self.enable_hydration = enable_hydration
         self.server_process = None
         self.skills = {}
         self.system_prompt = ""
@@ -614,6 +618,93 @@ class SparkAgent:
         ])
 
         return "\n".join(lines)
+
+    # ─── Session Hydration ───────────────────────────────────────
+
+    def hydrate_from_last_session(self):
+        """Reload conversation from the most recent session transcript.
+
+        Reads the latest session's JSONL file, extracts 'message' type
+        entries (user + assistant turns only), and replays them into
+        self.messages. Reflections, tool calls, and slow thread entries
+        are skipped — their effects already persist via core/archival
+        memory.
+
+        Respects MAX_CONVERSATION_PAIRS to avoid context overflow.
+        Records a hydration marker in the new session transcript.
+
+        Returns the number of turns hydrated, or 0 if nothing to hydrate.
+        """
+        last_id, last_meta = SessionManager.get_latest_session(SESSIONS_DIR)
+        if not last_id:
+            self._print("  No previous sessions found.")
+            return 0
+
+        last_num = last_meta.get("sessionNumber", "?")
+        last_entries = last_meta.get("entryCount", 0)
+        last_ended = last_meta.get("endedAt", "unknown")
+
+        self._print(f"  Last session: #{last_num} ({last_entries} entries, ended {last_ended})")
+
+        # Ask the human
+        try:
+            answer = input("  Resume last session? [Y/n] ").strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            answer = "n"
+
+        if answer and answer not in ("y", "yes", ""):
+            self._print("  Starting fresh.")
+            return 0
+
+        # Read the transcript
+        entries = SessionManager.read_transcript(last_id, SESSIONS_DIR)
+        if not entries:
+            self._print("  Transcript file empty or unreadable.")
+            return 0
+
+        # Extract conversation messages only
+        conv_messages = []
+        for entry in entries:
+            if entry.get("type") != "message":
+                continue
+            role = entry.get("role")
+            content = entry.get("content", "")
+            if role in ("user", "assistant") and content.strip():
+                conv_messages.append({"role": role, "content": content})
+
+        if not conv_messages:
+            self._print("  No conversation turns to hydrate.")
+            return 0
+
+        # Respect context limit — take the most recent turns
+        max_messages = MAX_CONVERSATION_PAIRS * 2
+        if len(conv_messages) > max_messages:
+            conv_messages = conv_messages[-max_messages:]
+
+        # Replay into self.messages (system prompt is already at [0])
+        self.messages.extend(conv_messages)
+        turn_count = len(conv_messages) // 2  # approximate
+
+        # Record hydration in the new transcript
+        self.session.append(
+            role="system",
+            content=(
+                f"Hydrated {len(conv_messages)} messages "
+                f"({turn_count} turns) from session #{last_num} "
+                f"(id: {last_id})"
+            ),
+            entry_type="hydration",
+            metadata={
+                "source_session": last_id,
+                "source_session_number": last_num,
+                "messages_hydrated": len(conv_messages),
+            },
+        )
+
+        self._print(f"✓ Hydrated {len(conv_messages)} messages ({turn_count} turns) from session #{last_num}")
+        self.log("hydration", f"Hydrated {len(conv_messages)} messages from session {last_id}")
+
+        return len(conv_messages)
 
     # ─── Reflection Loop (Fast Thread) ───────────────────────────
 
@@ -975,6 +1066,10 @@ class SparkAgent:
         self.build_system_prompt()
         self.setup_logging()
 
+        # Session hydration — reload last conversation if desired
+        if self.enable_hydration:
+            self.hydrate_from_last_session()
+
         if not self.start_server():
             print("\n  Failed to start. Exiting.")
             sys.exit(1)
@@ -1123,6 +1218,10 @@ def main():
         "--no-slow-thread", action="store_true",
         help="Disable background consolidation entirely",
     )
+    parser.add_argument(
+        "--no-hydrate", action="store_true",
+        help="Skip session hydration (start fresh, no conversation reload)",
+    )
     args = parser.parse_args()
 
     agent = SparkAgent(
@@ -1130,6 +1229,7 @@ def main():
         manage_server=not args.no_server,
         idle_seconds=args.idle_seconds,
         enable_slow_thread=not args.no_slow_thread,
+        enable_hydration=not args.no_hydrate,
     )
     agent.run()
 
