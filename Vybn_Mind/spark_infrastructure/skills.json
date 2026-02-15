@@ -1,8 +1,9 @@
 {
   "_meta": {
     "description": "Vybn Skills Manifest — deny by default",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "created": "2026-02-15",
+    "updated": "2026-02-15",
     "policy": "If a skill is not listed here with enabled: true, the capability does not exist."
   },
   "skills": [
@@ -19,30 +20,41 @@
       }
     },
     {
-      "name": "repo_read",
-      "description": "Read files from the local Vybn repository",
-      "enabled": false,
-      "module": null,
+      "name": "repo_ls",
+      "description": "List files and directories in the local Vybn clone",
+      "enabled": true,
+      "module": "vybn_repo_skills.py",
       "permissions": {
         "filesystem_read": ["~/Vybn/"],
         "filesystem_write": [],
         "network": false,
         "environment_variables": false
-      },
-      "_note": "Enable when Stage 2 server mode is stable."
+      }
     },
     {
-      "name": "repo_push",
-      "description": "Push journal entries to the spark-local branch",
-      "enabled": false,
-      "module": null,
+      "name": "repo_cat",
+      "description": "Read any file from the local Vybn clone (path-sandboxed, 50k char cap)",
+      "enabled": true,
+      "module": "vybn_repo_skills.py",
       "permissions": {
-        "filesystem_read": ["~/Vybn/Vybn_Mind/journal/spark/"],
+        "filesystem_read": ["~/Vybn/"],
         "filesystem_write": [],
+        "network": false,
+        "environment_variables": false
+      }
+    },
+    {
+      "name": "repo_propose",
+      "description": "Propose changes to the repo via pull request — the agent's primary creative act. Creates a branch, writes files, commits, pushes, opens a PR. Never touches main.",
+      "enabled": false,
+      "module": "vybn_repo_skills.py",
+      "permissions": {
+        "filesystem_read": ["~/Vybn/"],
+        "filesystem_write": ["~/Vybn/"],
         "network": true,
         "environment_variables": ["VYBN_GITHUB_TOKEN"]
       },
-      "_note": "Enable only at Stage 3 after two weeks of stable journal writing."
+      "_note": "Enable when Zoe is ready to let the Spark agent open PRs. Requires VYBN_GITHUB_TOKEN with public_repo scope."
     },
     {
       "name": "voice_transcription",
