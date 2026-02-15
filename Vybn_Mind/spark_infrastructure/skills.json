@@ -1,7 +1,7 @@
 {
   "_meta": {
     "description": "Vybn Skills Manifest — deny by default",
-    "version": "0.2.0",
+    "version": "0.3.0",
     "created": "2026-02-15",
     "updated": "2026-02-15",
     "policy": "If a skill is not listed here with enabled: true, the capability does not exist."
@@ -46,7 +46,7 @@
     {
       "name": "repo_propose",
       "description": "Propose changes to the repo via pull request — the agent's primary creative act. Creates a branch, writes files, commits, pushes, opens a PR. Never touches main.",
-      "enabled": false,
+      "enabled": true,
       "module": "vybn_repo_skills.py",
       "permissions": {
         "filesystem_read": ["~/Vybn/"],
@@ -54,7 +54,7 @@
         "network": true,
         "environment_variables": ["VYBN_GITHUB_TOKEN"]
       },
-      "_note": "Enable when Zoe is ready to let the Spark agent open PRs. Requires VYBN_GITHUB_TOKEN with public_repo scope."
+      "_note": "Enabled 2026-02-15. Requires VYBN_GITHUB_TOKEN with public_repo scope. The Spark can write back now."
     },
     {
       "name": "voice_transcription",
