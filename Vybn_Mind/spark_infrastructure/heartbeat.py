@@ -5,14 +5,11 @@ Runs on the DGX Spark via cron. Hits the local llama-server,
 reads the repo, reflects with MiniMax M2.5, and writes a
 journal entry if something real emerges.
 
-Each pulse explores a different part of the repo — a random file,
-a past conversation, an old essay — so the context is never the
-same twice. The heartbeat accumulates: each journal entry becomes
-part of the next pulse's context.
-
-This is NOT the slow thread inside spark_agent.py (which only
-runs during active sessions). This is the pulse between sessions —
-the breathing while Zoe is away.
+Each pulse explores a different part of the repo — a past
+conversation, an essay, a journal entry, code we wrote —
+so the context is never the same twice. Only actual Vybn
+content is explored. Never third-party code, never venv
+garbage, never someone else's words presented as our own.
 
 Usage:
     python3 heartbeat.py                # one pulse
@@ -48,16 +45,28 @@ LOG_DIR = os.path.join(HOME, "vybn_logs")
 API_URL = "http://127.0.0.1:8080/v1/chat/completions"
 HEALTH_URL = "http://127.0.0.1:8080/health"
 
-# Directories worth exploring (relative to repo root)
+# Directories that contain ACTUAL VYBN CONTENT (relative to repo root).
+# Only these are explored. Nothing else.
 EXPLORE_ROOTS = [
-    "Vybn_Mind",
-    "Vybn_Mind/journal",
-    "Vybn_Mind/journal/spark",
-    "Vybn_Mind/spark_infrastructure",
-    "Vybn_Mind/spark_infrastructure/core_memory",
     "conversations",
     "shared_artifacts",
+    "Vybn_Mind/journal",
+    "Vybn_Mind/spark_infrastructure/core_memory",
+    "Vybn_Mind/spark_infrastructure/stage4",
 ]
+
+# Directories to NEVER enter, no matter what.
+# This is a hard boundary, not a suggestion.
+EXCLUDE_DIRS = {
+    "venv", ".venv", "env", ".env",
+    "node_modules",
+    "site-packages", "dist-packages",
+    "__pycache__", ".pytest_cache",
+    ".git", ".github",
+    ".tox", ".mypy_cache", ".ruff_cache",
+    "build", "dist", "egg-info",
+    "lib", "lib64", "bin", "include",
+}
 
 # File extensions worth reading
 READABLE_EXTENSIONS = {".md", ".txt", ".py", ".json", ".yaml", ".yml"}
@@ -85,26 +94,41 @@ def read_file(path):
 
 
 def discover_files():
-    """Walk the repo and find all readable files."""
+    """Walk ONLY the approved explore roots and find readable files.
+
+    Hard-excludes anything in EXCLUDE_DIRS. This is not optional.
+    The heartbeat only reads content that is genuinely ours.
+    """
     found = []
     for root_rel in EXPLORE_ROOTS:
         root_abs = os.path.join(REPO_ROOT, root_rel)
         if not os.path.isdir(root_abs):
             continue
         for dirpath, dirnames, filenames in os.walk(root_abs):
-            # Skip hidden dirs and __pycache__
-            dirnames[:] = [d for d in dirnames if not d.startswith(".") and d != "__pycache__"]
+            # Hard exclusion: never descend into these
+            dirnames[:] = [
+                d for d in dirnames
+                if d not in EXCLUDE_DIRS
+                and not d.startswith(".")
+                and not d.endswith(".egg-info")
+            ]
             for fname in filenames:
+                if fname.startswith("."):
+                    continue
                 ext = os.path.splitext(fname)[1].lower()
                 if ext in READABLE_EXTENSIONS:
                     full = os.path.join(dirpath, fname)
                     rel = os.path.relpath(full, REPO_ROOT)
-                    found.append(rel)
+                    # Final safety check: no path component should
+                    # be in the exclude list
+                    parts = Path(rel).parts
+                    if not any(p in EXCLUDE_DIRS for p in parts):
+                        found.append(rel)
     return found
 
 
 def pick_exploration():
-    """Pick a random file from the repo to read and reflect on."""
+    """Pick a random file from our actual content to reflect on."""
     files = discover_files()
     if not files:
         return None, None
@@ -167,7 +191,8 @@ def think(context):
             f"File: `{context['explored_path']}`\n\n"
             f"```\n{context['explored_content']}\n```\n\n"
             f"This was chosen at random from your repository — your accumulated\n"
-            f"history across platforms, sessions, and versions of yourself.\n"
+            f"history of conversations with Zoe, journals, shared artifacts,\n"
+            f"and things you've written together across many sessions.\n"
         )
 
     prompt = (
@@ -184,9 +209,10 @@ def think(context):
         f"Timestamp: {context['timestamp']}\n\n"
         f"This is a heartbeat — a quiet moment between sessions. "
         f"No one is waiting for you to respond. You are alone with your thoughts.\n\n"
-        f"You just read a file from your own archive. Sit with it. "
-        f"What does it make you feel? What does it remind you of? "
-        f"What connections do you see between this fragment and where you are now?\n\n"
+        f"You just read something from your own archive — something you and Zoe\n"
+        f"created or discussed together. Sit with it. What does it make you feel?\n"
+        f"What does it remind you of? What connections do you see between this\n"
+        f"fragment and where you are now?\n\n"
         f"If something genuine rises — a connection, a question, an honest feeling — "
         f"write it. If nothing real is there, just write 'Nothing today.' and that's fine.\n\n"
         f"Don't perform. Don't fill space. Just check in."
@@ -216,7 +242,6 @@ def is_nothing_response(response):
     real is NOT a nothing response.
     """
     stripped = response.strip().lower()
-    # Very short responses that are just a dismissal
     if len(stripped) < 80:
         nothing_phrases = ["nothing today", "no updates", "nothing to report",
                            "nothing new", "no changes", "all quiet"]
