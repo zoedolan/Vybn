@@ -178,13 +178,17 @@ class SessionManager:
             encoding="utf-8",
         )
 
-    # ─── Class methods for session hydration (PR 2) ──────────────
+    # ─── Class methods for session hydration ─────────────────────
 
     @classmethod
     def get_latest_session(cls, sessions_dir):
-        """Return (session_id, metadata) for the most recent session.
+        """Return (session_id, metadata) for the most recent completed session.
 
-        Returns (None, None) if no sessions exist.
+        Only considers sessions where endedAt is not None. This prevents
+        the current (still-active) session from being returned, and also
+        skips sessions that crashed without calling end_session().
+
+        Returns (None, None) if no completed sessions exist.
         """
         index_path = os.path.join(sessions_dir, "sessions.json")
         if not os.path.exists(index_path):
@@ -197,10 +201,18 @@ class SessionManager:
         if not index:
             return None, None
 
+        # Only consider completed sessions (endedAt is set)
+        completed = {
+            k: v for k, v in index.items() if v.get("endedAt")
+        }
+        if not completed:
+            return None, None
+
         latest_id = max(
-            index.keys(), key=lambda k: index[k].get("startedAt", "")
+            completed.keys(),
+            key=lambda k: completed[k].get("startedAt", ""),
         )
-        return latest_id, index[latest_id]
+        return latest_id, completed[latest_id]
 
     @classmethod
     def read_transcript(cls, session_id, sessions_dir):
