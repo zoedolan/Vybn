@@ -752,8 +752,32 @@ class SparkAgent:
 
     # ─── Tool Use Parsing & Execution ────────────────────────────
 
+    @staticmethod
+    def _clean_model_tags(text):
+        """Strip MiniMax (and similar) XML wrapper tags from model output.
+
+        MiniMax sometimes wraps tool calls in tags like <minimax:tool_call>
+        and </ITERAL>. After stripping those, leading angle brackets can
+        remain on ACTION:/INPUT: markers. This cleans all of that.
+        """
+        # Strip known model wrapper tags
+        text = re.sub(r'</?minimax:\w+>', '', text)
+        text = re.sub(r'</?(\w*ITERAL\w*)>', '', text)
+        # Strip leading angle brackets from markers
+        text = re.sub(r'<\s*(ACTION:)', r'\1', text)
+        text = re.sub(r'<\s*(INPUT:)', r'\1', text)
+        return text
+
     def parse_tool_call(self, response):
-        lines = response.split("\n")
+        """Parse ACTION:/INPUT: tool calls from model output.
+
+        Layer 1: Clean model tags, then parse normally.
+        Layer 2: Rescue fallback — regex sweep for tool calls
+                 regardless of XML garbage wrapping.
+        """
+        # Layer 1: Clean known wrapper tags, then parse line-by-line
+        cleaned = self._clean_model_tags(response)
+        lines = cleaned.split("\n")
         for i, line in enumerate(lines):
             stripped = line.strip()
             if stripped.startswith(ACTION_MARKER) and len(stripped) > len(ACTION_MARKER):
@@ -774,6 +798,21 @@ class SparkAgent:
 
                 text_before = "\n".join(lines[:i]).rstrip()
                 return (tool_name, tool_input, text_before)
+
+        # Layer 2: Rescue fallback — catch tool calls in weird wrapping
+        rescue = re.search(
+            r'ACTION:\s*(\w+)\s*\n\s*(?:<\s*)?INPUT:\s*(\{.*?\})',
+            response, re.DOTALL
+        )
+        if rescue:
+            tool_name = rescue.group(1)
+            try:
+                tool_input = json.loads(rescue.group(2))
+            except json.JSONDecodeError:
+                tool_input = {"raw": rescue.group(2)}
+            text_before = response[:rescue.start()].rstrip()
+            text_before = self._clean_model_tags(text_before).strip()
+            return (tool_name, tool_input, text_before)
 
         return None
 
