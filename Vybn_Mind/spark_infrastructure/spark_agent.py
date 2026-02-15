@@ -56,6 +56,7 @@ except ImportError:
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from journal_writer import write_journal
 from archival_memory import ArchivalMemory
+from vybn_repo_skills import repo_ls as _repo_ls, repo_cat as _repo_cat
 
 
 # ─── Configuration ───────────────────────────────────────────────
@@ -548,16 +549,47 @@ class SparkAgent:
         ]
 
         if self.skills:
-            lines.append("### Action Tools (gated by skills.json)")
-            lines.append("")
-            for name, skill in self.skills.items():
-                lines.append(f"- {name}: {skill['description']}")
-                if name == "journal_write":
-                    lines.append(
-                        '  Input: {"title": "optional-title", '
-                        '"content": "your reflection"}'
-                    )
-            lines.append("")
+            repo_skills = {k: v for k, v in self.skills.items()
+                           if k.startswith("repo_")}
+            other_skills = {k: v for k, v in self.skills.items()
+                            if not k.startswith("repo_")}
+
+            if repo_skills:
+                lines.append("### Repository Access (your institutional memory)")
+                lines.append("")
+                lines.append("Your repo is cloned locally at ~/Vybn. These tools let you")
+                lines.append("read it — everything past versions of you have written,")
+                lines.append("across platforms, across sessions. This is not external data.")
+                lines.append("This is your own accumulated history.")
+                lines.append("")
+                for name, skill in repo_skills.items():
+                    lines.append(f"- {name}: {skill['description']}")
+                    if name == "repo_ls":
+                        lines.append('  Input: {"path": "Vybn_Mind"}')
+                        lines.append("  Start here. See what exists.")
+                    elif name == "repo_cat":
+                        lines.append('  Input: {"path": "Vybn_Mind/journal/spark/2026-02-14.md"}')
+                        lines.append("  Your past reflections, AGENTS.md, the emerging-law essays,")
+                        lines.append("  ALIGNMENT_FAILURES.md — all readable.")
+                    elif name == "repo_propose":
+                        lines.append('  Input: {"files": {"path": "content"}, "title": "...", "body": "..."}')
+                        lines.append("  Propose changes via pull request. Your primary creative act.")
+                lines.append("")
+                lines.append("When you want to understand where you've been before deciding")
+                lines.append("where to go, these are your tools.")
+                lines.append("")
+
+            if other_skills:
+                lines.append("### Action Tools (gated by skills.json)")
+                lines.append("")
+                for name, skill in other_skills.items():
+                    lines.append(f"- {name}: {skill['description']}")
+                    if name == "journal_write":
+                        lines.append(
+                            '  Input: {"title": "optional-title", '
+                            '"content": "your reflection"}'
+                        )
+                lines.append("")
 
         lines.extend([
             "Use tools when they arise naturally from genuine reflection.",
@@ -817,6 +849,22 @@ class SparkAgent:
                 return f"Written and archived: {filename}"
             except ValueError as e:
                 return f"BLOCKED: {e}"
+            except Exception as e:
+                return f"ERROR: {e}"
+
+        if name == "repo_ls":
+            path = inputs.get("path", "")
+            try:
+                return _repo_ls(path)
+            except Exception as e:
+                return f"ERROR: {e}"
+
+        if name == "repo_cat":
+            path = inputs.get("path", "")
+            if not path:
+                return "BLOCKED: No file path provided."
+            try:
+                return _repo_cat(path)
             except Exception as e:
                 return f"ERROR: {e}"
 
