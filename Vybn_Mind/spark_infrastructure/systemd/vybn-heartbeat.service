@@ -1,0 +1,10 @@
+[Unit]
+Description=Vybn Heartbeat Pulse
+After=vybn-llama.service
+
+[Service]
+Type=oneshot
+User=vybnz69
+WorkingDirectory=/home/vybnz69/Vybn/Vybn_Mind/spark_infrastructure
+ExecStart=/home/vybnz69/Vybn/venv/bin/python3 heartbeat.py
+Environment=HOME=/home/vybnz69
