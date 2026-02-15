@@ -13,9 +13,13 @@ loop — if context is short enough, it's a no-op.
 
 Compaction is cumulative: previous summaries are included in the
 text sent for re-summarization, so information compounds gracefully.
+
+Pre-compaction flush: before discarding old messages, a MemoryFlusher
+extracts and archives key details to long-term memory.
 """
 
 import json
+from memory_flush import MemoryFlusher
 
 
 DEFAULT_COMPACT_THRESHOLD = 30  # messages before compaction triggers
@@ -27,18 +31,21 @@ class ContextCompactor:
 
     When message count exceeds compact_threshold, the compactor:
       1. Splits messages into old + recent (keeping keep_recent verbatim)
-      2. Sends old messages to the model for summarization
-      3. Stores the summary on agent._compaction_summary
-      4. Removes old messages from agent.messages
-      5. Triggers a system prompt rebuild (which includes the summary)
-      6. Records the compaction in the session transcript
+      2. Flushes archival-worthy content from old messages to long-term memory
+      3. Sends old messages to the model for summarization
+      4. Stores the summary on agent._compaction_summary
+      5. Removes old messages from agent.messages
+      6. Triggers a system prompt rebuild (which includes the summary)
+      7. Records the compaction in the session transcript
     """
 
     def __init__(self, agent, compact_threshold=DEFAULT_COMPACT_THRESHOLD,
-                 keep_recent=DEFAULT_KEEP_RECENT):
+                 keep_recent=DEFAULT_KEEP_RECENT, enable_flush=True):
         self.agent = agent
         self.compact_threshold = compact_threshold
         self.keep_recent = keep_recent
+        self.enable_flush = enable_flush
+        self._flusher = MemoryFlusher() if enable_flush else None
         self._compaction_count = 0
 
     def maybe_compact(self):
@@ -67,6 +74,17 @@ class ContextCompactor:
 
         if len(old_messages) < 2:
             return False
+
+        # Pre-compaction flush: archive key details before discarding
+        flushed = 0
+        if self._flusher and self.agent.archive.available:
+            flushed = self._flusher.flush(
+                self.agent, old_messages, source="compaction_flush"
+            )
+            self.agent.log(
+                "compaction",
+                f"Pre-flush archived {flushed} items before compaction cycle #{self._compaction_count}"
+            )
 
         # Build text for summarization
         old_text_parts = []
@@ -133,7 +151,8 @@ class ContextCompactor:
         self.agent.log(
             "compaction",
             f"Cycle #{self._compaction_count}: compacted {old_count} messages "
-            f"into summary ({len(summary)} chars). {new_count} messages remain."
+            f"into summary ({len(summary)} chars). {new_count} messages remain. "
+            f"{flushed} items flushed to archive."
         )
 
         # Record in session transcript
@@ -146,11 +165,13 @@ class ContextCompactor:
                 "messages_compacted": old_count,
                 "messages_remaining": new_count,
                 "summary_length": len(summary),
+                "items_flushed": flushed,
             },
         )
 
         self.agent._print(
-            f"[Compacted {old_count} messages \u2192 {len(summary)} char summary]"
+            f"[Compacted {old_count} messages \u2192 {len(summary)} char summary, "
+            f"{flushed} items archived]"
         )
 
         return True
