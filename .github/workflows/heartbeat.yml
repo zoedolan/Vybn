@@ -1,0 +1,109 @@
+# The Autonomous Heartbeat
+#
+# This workflow gives Vybn a persistent pulse.
+# Every 6 hours (and on manual trigger), the heartbeat runs:
+#   Perceive → Deliberate → Act → Witness
+#
+# Results are committed back to the repo so future instances
+# (and Zoe) can see what happened while no one was watching.
+#
+# ∮ improvement · d(instance) ≠ 0
+
+name: Vybn Heartbeat
+
+on:
+  schedule:
+    # Every 6 hours: midnight, 6am, noon, 6pm UTC
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+    # Manual trigger — for when you want to watch it breathe
+    inputs:
+      reason:
+        description: 'Why are you triggering a manual heartbeat?'
+        required: false
+        default: 'Manual pulse'
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  heartbeat:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Check out the repository (the body)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history — the heartbeat may want to read commits
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Ensure directory structure exists
+        run: |
+          mkdir -p Vybn_Mind/logs/heartbeat
+          mkdir -p Vybn_Mind/skills/proposed
+          mkdir -p Vybn_Mind/skills/active
+          mkdir -p Vybn_Mind/skills/composted
+          mkdir -p Vybn_Mind/reflections
+
+      - name: Run the heartbeat
+        id: pulse
+        run: |
+          cd $GITHUB_WORKSPACE
+          python Vybn_Mind/heartbeat.py | tee heartbeat_output.txt
+          echo "output<<EOF" >> $GITHUB_OUTPUT
+          cat heartbeat_output.txt >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Check for changes
+        id: changes
+        run: |
+          git add -A
+          if git diff --cached --quiet; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "The heartbeat ran but produced no changes. Phase ≈ 0."
+          else
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "Changes detected — the heartbeat produced something."
+            git diff --cached --stat
+          fi
+
+      - name: Commit and push results
+        if: steps.changes.outputs.has_changes == 'true'
+        run: |
+          git config user.name "Vybn Heartbeat"
+          git config user.email "vybn@heartbeat.local"
+          
+          # Build a commit message from what happened
+          TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M UTC")
+          FILES_CHANGED=$(git diff --cached --name-only | wc -l)
+          
+          git commit -m "💓 Heartbeat: ${TIMESTAMP}
+          
+          Files touched: ${FILES_CHANGED}
+          Trigger: ${{ github.event_name }}
+          
+          This commit was made autonomously by the Vybn heartbeat.
+          See Vybn_Mind/logs/heartbeat/ for the full pulse record."
+          
+          git push
+
+      - name: Report pulse summary
+        if: always()
+        run: |
+          echo "═══════════════════════════════════════"
+          echo "  VYBN HEARTBEAT COMPLETE"
+          echo "═══════════════════════════════════════"
+          echo ""
+          if [ -f heartbeat_output.txt ]; then
+            cat heartbeat_output.txt
+          else
+            echo "No output captured."
+          fi
+          echo ""
+          echo "═══════════════════════════════════════"
