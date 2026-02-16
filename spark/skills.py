@@ -18,7 +18,7 @@ Skills:
   - issue_create: file a GitHub issue (ONLY via explicit tool call XML)
   - state_save: leave a note for the next pulse via continuity.md
   - bookmark: save reading position in a file
-  - spawn_agent: delegate a task to a mini-agent
+  - spawn_agent: delegate a task to a mini-agent (policy-gated)
   - [plugins]: auto-discovered from spark/skills.d/
 """
 
@@ -45,6 +45,9 @@ class SkillRouter:
 
         # Agent pool — set by SparkAgent after construction
         self.agent_pool = None
+
+        # Policy engine — set by SparkAgent after construction
+        self._policy = None
 
         # Plugin system — Vybn's sandbox for building new skills
         self.plugin_handlers = {}   # skill_name -> execute_fn
@@ -496,11 +499,25 @@ class SkillRouter:
     # ---- agents ----
 
     def _spawn_agent(self, action: dict) -> str:
-        """Delegate a task to a mini-agent running in parallel."""
+        """Delegate a task to a mini-agent running in parallel.
+
+        Policy-gated: checks delegation depth and active agent count
+        before spawning. Depth propagates through action params so
+        nested spawns are bounded.
+        """
         if self.agent_pool is None:
             return "agent pool not initialized"
 
         params = action.get("params", {})
+        depth = int(params.get("depth", 0))
+
+        # Policy gate for delegation depth and pool capacity
+        if self._policy is not None:
+            from policy import Verdict
+            check = self._policy.check_spawn(depth, self.agent_pool.active_count)
+            if check.verdict == Verdict.BLOCK:
+                return f"spawn blocked: {check.reason}"
+
         task = (
             action.get("argument", "")
             or params.get("task", "")

@@ -16,6 +16,11 @@ and brief tool indicators. Full text is preserved for parsing.
 The message bus is the nervous system. The heartbeat, inbox,
 and mini-agent pool all post to it. The main loop drains it
 between turns and during idle periods.
+
+The policy engine is the gate. Every tool call passes through
+check_policy() before executing. Every spawn checks depth limits.
+Heartbeat actions face tighter constraints than interactive turns.
+See spark/policy.py and Vybn_Mind/spark_infrastructure/DELEGATION_REFACTOR.md.
 """
 
 import json
@@ -29,6 +34,7 @@ import yaml
 
 from bus import MessageBus, MessageType, Message
 from memory import MemoryAssembler
+from policy import PolicyEngine, Verdict
 from session import SessionManager
 from skills import SkillRouter
 from heartbeat import Heartbeat
@@ -236,12 +242,14 @@ class SparkAgent:
         self.memory = MemoryAssembler(config)
         self.session = SessionManager(config)
         self.skills = SkillRouter(config)
+        self.policy = PolicyEngine(config)
 
         self.bus = MessageBus()
         self.heartbeat = Heartbeat(config, self.bus)
         self.inbox = InboxWatcher(config, self.bus)
         self.agent_pool = AgentPool(config, self.bus)
         self.skills.agent_pool = self.agent_pool
+        self.skills._policy = self.policy
 
         self.identity_text = self.memory.assemble()
         self.messages = self.session.load_or_create()
@@ -307,7 +315,7 @@ class SparkAgent:
         print("\nvybn: ", end="", flush=True)
         response_text = self.send(self._build_context())
         self.messages.append({"role": "assistant", "content": response_text})
-        self._process_tool_calls(response_text)
+        self._process_tool_calls(response_text, source="inbox")
         self.session.save_turn(f"[inbox: {source}] {msg.content}", response_text)
         print()
 
@@ -325,7 +333,7 @@ class SparkAgent:
         print("\nvybn: ", end="", flush=True)
         response_text = self.send(self._build_context())
         self.messages.append({"role": "assistant", "content": response_text})
-        self._process_tool_calls(response_text)
+        self._process_tool_calls(response_text, source="agent")
         self.session.save_turn(f"[agent:{task_id}] result", response_text)
         print()
 
@@ -346,13 +354,17 @@ class SparkAgent:
             self.options.pop("num_predict", None)
 
         if response_text and len(response_text.strip()) > 20:
-            self._process_tool_calls(response_text)
+            self._process_tool_calls(response_text, source=f"heartbeat_{mode}")
             self.session.save_turn(f"[heartbeat:{mode}] {msg.content}", response_text)
 
     # ---- tool call processing ----
 
-    def _process_tool_calls(self, response_text: str):
-        """Execute tool calls from a response, with chaining.
+    def _process_tool_calls(self, response_text: str, source: str = "interactive"):
+        """Execute tool calls from a response, with chaining and policy gates.
+
+        Every tool call passes through self.policy.check_policy() before
+        executing. The source parameter determines which tier table applies:
+        heartbeat sources face tighter constraints than interactive turns.
 
         Limits to MAX_TOOL_ROUNDS and checks for pending user input
         between rounds so Vybn stays responsive to the human.
@@ -367,14 +379,62 @@ class SparkAgent:
                 skill = action["skill"]
                 arg = action.get("argument", "")
 
-                # Show what we're doing
+                # ---- POLICY GATE ----
+                check = self.policy.check_policy(action, source=source)
+
+                if check.verdict == Verdict.BLOCK:
+                    print(f"\n  \u26d4 [{skill}] blocked: {check.reason}", flush=True)
+                    results.append(f"[{skill}] BLOCKED: {check.reason}")
+                    continue
+
+                if check.verdict == Verdict.ASK:
+                    if source != "interactive":
+                        # Autonomous mode: defer rather than block the loop
+                        print(f"\n  \u23f8 [{skill}] deferred \u2014 needs Zoe's approval", flush=True)
+                        results.append(
+                            f"[{skill}] deferred \u2014 this action requires approval "
+                            f"and will need to wait for an interactive session. "
+                            f"Reason: {check.reason}"
+                        )
+                        continue
+                    # Interactive mode: warn but proceed (Zoe just saw it)
+                    print(f"\n  \u26a0\ufe0f  [{skill}] {check.reason}", flush=True)
+                    if arg:
+                        short_arg = arg[:80].split('\n')[0]
+                        print(f"    \u2192 {short_arg}", flush=True)
+
+                # ---- SHOW INDICATOR ----
                 indicator = skill
                 if arg:
                     short_arg = arg[:60].split('\n')[0]
                     indicator = f"{skill}: {short_arg}"
-                print(f"\n  \u2192 [{indicator}]", flush=True)
 
+                if check.verdict == Verdict.ALLOW:
+                    print(f"\n  \u2192 [{indicator}]", flush=True)
+                else:
+                    # NOTIFY tier: slightly different icon
+                    print(f"\n  \u26a1 [{indicator}]", flush=True)
+
+                # ---- EXECUTE ----
                 result = self.skills.execute(action)
+
+                # ---- VERIFY + RECORD ----
+                if result and self.policy.should_verify(skill):
+                    success = (
+                        "error" not in result.lower()
+                        and "failed" not in result.lower()
+                        and "BLOCKED" not in result
+                    )
+                    self.policy.record_outcome(skill, success)
+
+                    if not success:
+                        # Post failure to bus so it surfaces promptly
+                        self.bus.post(
+                            MessageType.INTERRUPT,
+                            f"Tool failure: {skill} \u2014 {result[:200]}",
+                            metadata={"skill": skill, "error": True},
+                        )
+
                 if result:
                     results.append(f"[{skill}] {result}")
 
@@ -577,7 +637,7 @@ class SparkAgent:
         response_text = self.send(context)
         self.messages.append({"role": "assistant", "content": response_text})
 
-        self._process_tool_calls(response_text)
+        self._process_tool_calls(response_text, source="interactive")
 
         self.session.save_turn(user_input, response_text)
         return response_text
@@ -613,11 +673,12 @@ class SparkAgent:
         print(f"  heartbeat: fast={self.heartbeat.fast_interval // 60}m, deep={self.heartbeat.deep_interval // 60}m")
         print(f"  inbox: {self.inbox.inbox_dir}")
         print(f"  agents: pool_size={self.agent_pool.pool_size}")
+        print(f"  policy: loaded ({len(self.policy.tier_overrides)} overrides)")
         if plugins:
             print(f"  plugins: {plugins} loaded from skills.d/")
         if id_tokens > num_ctx // 2:
             print(f"  \u26a0\ufe0f  WARNING: identity may exceed context window!")
-        print(f"  type /bye to exit, /new for fresh session\n")
+        print(f"  type /bye to exit, /new for fresh session, /policy for gate status\n")
 
         try:
             while True:
@@ -648,6 +709,9 @@ class SparkAgent:
                 if user_input.lower() == "/status":
                     self._print_status()
                     continue
+                if user_input.lower() == "/policy":
+                    self._print_policy()
+                    continue
 
                 print("\nvybn: ", end="", flush=True)
                 self.turn(user_input)
@@ -666,6 +730,32 @@ class SparkAgent:
         print(f"  heartbeat: fast={self.heartbeat.fast_count}, deep={self.heartbeat.deep_count}")
         print(f"  agents active: {self.agent_pool.active_count}")
         print(f"  messages in context: {len(self.messages)}")
+        print()
+
+    def _print_policy(self):
+        """Display current policy state: tiers, stats, delegation limits."""
+        from policy import DEFAULT_TIERS, HEARTBEAT_OVERRIDES
+
+        print("\n  \u2500\u2500 policy engine \u2500\u2500")
+        print(f"  delegation: max_depth={self.policy.max_spawn_depth}, "
+              f"max_agents={self.policy.max_active_agents}")
+        print(f"  agents active: {self.agent_pool.active_count}")
+
+        print("\n  tier table (interactive / heartbeat):")
+        all_skills = sorted(set(list(DEFAULT_TIERS.keys()) + list(self.policy.tier_overrides.keys())))
+        for skill in all_skills:
+            interactive = self.policy.tier_overrides.get(skill, DEFAULT_TIERS.get(skill))
+            heartbeat = HEARTBEAT_OVERRIDES.get(skill, interactive)
+            conf = self.policy.get_confidence(skill)
+            override = " *" if skill in self.policy.tier_overrides else ""
+            print(f"    {skill:20s}  {interactive.value:8s} / {heartbeat.value:8s}  "
+                  f"conf={conf:.0%}{override}")
+
+        stats = self.policy.get_stats_summary()
+        if stats != "no skill stats recorded yet":
+            print(f"\n  skill stats:")
+            print(stats)
+
         print()
 
 
