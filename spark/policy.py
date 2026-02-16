@@ -18,6 +18,8 @@ Design principles:
     prior so confidence starts at 0.5 and updates with evidence.
   - Bus-compatible. Uses the same MessageType enum from bus.py.
     Emits no messages itself — that's agent.py's job.
+  - Graduated autonomy. Skills earn AUTO tier through consistent
+    success and lose it after failures. Thresholds are config-driven.
 
 Three verdicts:
   ALLOW  — execute silently
@@ -69,6 +71,8 @@ class PolicyResult:
     verdict: Verdict
     reason: str = ""
     tier: Tier = Tier.AUTO
+    promoted: bool = False
+    demoted: bool = False
 
 
 @dataclass
@@ -151,6 +155,11 @@ DANGEROUS_PATTERNS = [
 MAX_SPAWN_DEPTH = 2
 MAX_ACTIVE_AGENTS = 3
 
+# Graduated autonomy defaults
+DEFAULT_PROMOTE_THRESHOLD = 0.85
+DEFAULT_DEMOTE_THRESHOLD = 0.40
+DEFAULT_MIN_OBSERVATIONS = 8
+
 
 # ---------------------------------------------------------------------------
 # Policy engine
@@ -166,6 +175,12 @@ class PolicyEngine:
     The engine never touches the bus or the model. It receives an
     action dict and returns a PolicyResult. The caller (agent.py)
     decides what to do with it.
+
+    Graduated autonomy: skills start at their default tier and can
+    earn promotion (NOTIFY → AUTO) through consistent successful
+    execution, or suffer demotion (AUTO → NOTIFY) after failures.
+    Heartbeat overrides are never relaxed — structural friction for
+    autonomous actions is preserved regardless of trust score.
     """
 
     def __init__(self, config: dict):
@@ -188,6 +203,11 @@ class PolicyEngine:
             except ValueError:
                 pass
 
+        # Runtime tier overrides from graduated autonomy demotions.
+        # These persist in-memory for the session and are rebuilt
+        # from stats on restart.
+        self._runtime_overrides: dict[str, Tier] = {}
+
         # Delegation limits from config (with sane defaults)
         delegation_cfg = config.get("delegation", {})
         self.max_spawn_depth = delegation_cfg.get(
@@ -196,6 +216,23 @@ class PolicyEngine:
         self.max_active_agents = delegation_cfg.get(
             "max_active_agents", MAX_ACTIVE_AGENTS
         )
+
+        # Graduated autonomy thresholds from config
+        ga_cfg = config.get("graduated_autonomy", {})
+        self.ga_enabled = ga_cfg.get("enabled", True)
+        self.promote_threshold = ga_cfg.get(
+            "promote_threshold", DEFAULT_PROMOTE_THRESHOLD
+        )
+        self.demote_threshold = ga_cfg.get(
+            "demote_threshold", DEFAULT_DEMOTE_THRESHOLD
+        )
+        self.min_observations = ga_cfg.get(
+            "minimum_observations", DEFAULT_MIN_OBSERVATIONS
+        )
+
+        # Rebuild runtime demotions from persisted stats
+        if self.ga_enabled:
+            self._rebuild_demotions()
 
     # ----- gate checks -----
 
@@ -222,9 +259,10 @@ class PolicyEngine:
         """
         skill = action.get("skill", "")
         argument = action.get("argument", "")
+        is_heartbeat = source.startswith("heartbeat")
 
         # Resolve tier: config override > heartbeat override > default
-        if source.startswith("heartbeat"):
+        if is_heartbeat:
             tier = HEARTBEAT_OVERRIDES.get(
                 skill,
                 self.tier_overrides.get(
@@ -235,6 +273,12 @@ class PolicyEngine:
             tier = self.tier_overrides.get(
                 skill, DEFAULT_TIERS.get(skill, Tier.NOTIFY)
             )
+
+        # Apply runtime demotions (from graduated autonomy failures)
+        if skill in self._runtime_overrides:
+            demoted_tier = self._runtime_overrides[skill]
+            if _tier_rank(demoted_tier) > _tier_rank(tier):
+                tier = demoted_tier
 
         # Path safety for file operations
         if skill in ("file_write", "self_edit", "file_read"):
@@ -261,11 +305,33 @@ class PolicyEngine:
                         tier=Tier.APPROVE,
                     )
 
+        # --- Graduated autonomy: promotion check ---
+        # Only promote in interactive mode (never relax heartbeat friction)
+        promoted = False
+        if (
+            self.ga_enabled
+            and not is_heartbeat
+            and tier == Tier.NOTIFY
+            and skill not in self.tier_overrides
+        ):
+            conf = self.get_confidence(skill)
+            obs = self._observation_count(skill)
+            if conf >= self.promote_threshold and obs >= self.min_observations:
+                tier = Tier.AUTO
+                promoted = True
+
         # Map tier to verdict
         if tier == Tier.AUTO:
-            return PolicyResult(verdict=Verdict.ALLOW, tier=tier)
+            return PolicyResult(
+                verdict=Verdict.ALLOW,
+                tier=tier,
+                promoted=promoted,
+            )
         elif tier == Tier.NOTIFY:
-            return PolicyResult(verdict=Verdict.NOTIFY, tier=tier)
+            return PolicyResult(
+                verdict=Verdict.NOTIFY,
+                tier=tier,
+            )
         else:
             return PolicyResult(
                 verdict=Verdict.ASK,
@@ -312,6 +378,8 @@ class PolicyEngine:
 
         Updates the Beta distribution parameters for the skill.
         Persists to disk so trust carries across sessions.
+
+        On failure, checks whether the skill should be demoted.
         """
         if skill not in self.stats:
             self.stats[skill] = {
@@ -325,6 +393,10 @@ class PolicyEngine:
             datetime.now(timezone.utc).isoformat()
         )
         self._save_stats()
+
+        # --- Graduated autonomy: demotion check on failure ---
+        if not success and self.ga_enabled:
+            self._check_demotion(skill)
 
     def get_confidence(self, skill: str) -> float:
         """Bayesian confidence for a skill.
@@ -347,9 +419,10 @@ class PolicyEngine:
         for skill, s in sorted(self.stats.items()):
             conf = self.get_confidence(skill)
             total = s["success"] + s["failure"]
+            status = self._graduation_status(skill, conf, total)
             lines.append(
                 f"  {skill}: {conf:.0%} confidence "
-                f"({s['success']}/{total} succeeded)"
+                f"({s['success']}/{total} succeeded){status}"
             )
         return "\n".join(lines)
 
@@ -378,7 +451,59 @@ class PolicyEngine:
             depth=depth,
         )
 
-    # ----- internals -----
+    # ----- graduated autonomy internals -----
+
+    def _observation_count(self, skill: str) -> int:
+        """Total observations (successes + failures) for a skill."""
+        s = self.stats.get(skill, {"success": 0, "failure": 0})
+        return s["success"] + s["failure"]
+
+    def _check_demotion(self, skill: str):
+        """After a failure, check if the skill should be demoted.
+
+        A skill is demoted from AUTO → NOTIFY if its confidence
+        drops below demote_threshold. This only affects skills
+        whose default tier is AUTO or that were previously promoted.
+        APPROVE-tier skills are never demoted further.
+        """
+        conf = self.get_confidence(skill)
+        if conf < self.demote_threshold:
+            default = DEFAULT_TIERS.get(skill, Tier.NOTIFY)
+            if default in (Tier.AUTO, Tier.NOTIFY):
+                self._runtime_overrides[skill] = Tier.NOTIFY
+
+    def _rebuild_demotions(self):
+        """On startup, reapply demotions from persisted stats.
+
+        Any skill whose confidence is below demote_threshold gets
+        a runtime override to NOTIFY. This ensures trust state
+        survives across restarts.
+        """
+        for skill in self.stats:
+            conf = self.get_confidence(skill)
+            if conf < self.demote_threshold:
+                default = DEFAULT_TIERS.get(skill, Tier.NOTIFY)
+                if default in (Tier.AUTO, Tier.NOTIFY):
+                    self._runtime_overrides[skill] = Tier.NOTIFY
+
+    def _graduation_status(self, skill: str, conf: float, total: int) -> str:
+        """Annotation for get_stats_summary showing graduation state."""
+        if not self.ga_enabled:
+            return ""
+        if skill in self._runtime_overrides:
+            return " [demoted]"
+        if (
+            conf >= self.promote_threshold
+            and total >= self.min_observations
+            and DEFAULT_TIERS.get(skill) == Tier.NOTIFY
+        ):
+            return " [promoted→auto]"
+        remaining = self.min_observations - total
+        if remaining > 0 and DEFAULT_TIERS.get(skill) == Tier.NOTIFY:
+            return f" [{remaining} more to promote]"
+        return ""
+
+    # ----- path safety -----
 
     def _path_is_safe(self, path_str: str) -> bool:
         """Check if a file path is within allowed directories."""
@@ -419,3 +544,12 @@ class PolicyEngine:
             )
         except Exception:
             pass
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _tier_rank(tier: Tier) -> int:
+    """Numeric rank for tier comparison. Higher = more restrictive."""
+    return {Tier.AUTO: 0, Tier.NOTIFY: 1, Tier.APPROVE: 2}.get(tier, 1)
