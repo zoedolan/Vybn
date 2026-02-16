@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+venv/
+env/
+vybn-env/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Backup files from self-edit
+*.bak
+
+# Logs
+*.log
+
+# Session artifacts (sessions are saved separately)
+*.session.json
+
+# Model files (too large for git)
+*.gguf
+*.bin
+*.safetensors
