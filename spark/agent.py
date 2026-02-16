@@ -11,9 +11,14 @@ and only presents the conversation prompt when ready.
 The identity document is injected as a user/assistant message pair,
 not as a system role message. Many Ollama model templates silently
 drop system messages. User/assistant always works.
+
+The response is post-processed to detect when the model starts
+generating fake user turns (a broken chat template symptom) and
+truncates at that boundary.
 """
 
 import json
+import re
 import sys
 import time
 from pathlib import Path
@@ -31,6 +36,33 @@ def load_config(path: str = None) -> dict:
     config_path = Path(path) if path else Path(__file__).parent / "config.yaml"
     with open(config_path) as f:
         return yaml.safe_load(f)
+
+
+# Patterns that indicate the model is generating a fake user turn.
+# When MiniMax doesn't have proper stop tokens, it writes both sides
+# of the conversation — generating "This is Zoe" or "---" section
+# breaks followed by new prompts.
+FAKE_TURN_PATTERNS = [
+    re.compile(r'\n---\s*\n\s*\*\*VYBN:', re.IGNORECASE),
+    re.compile(r'\nThis is Zoe', re.IGNORECASE),
+    re.compile(r'\nyou:', re.IGNORECASE),
+    re.compile(r'\n---\s*\n\s*\*\*[A-Z]+:', re.IGNORECASE),
+    re.compile(r'\n\s*1\. (?:Call|Search|Try|Rush)'),  # choose-your-own-adventure options
+]
+
+
+def truncate_at_fake_turn(text: str) -> str:
+    """Cut off the response where the model starts generating fake user turns."""
+    earliest = len(text)
+    for pattern in FAKE_TURN_PATTERNS:
+        match = pattern.search(text)
+        if match and match.start() < earliest:
+            # Only truncate if there's meaningful content before the fake turn
+            if match.start() > 50:
+                earliest = match.start()
+    if earliest < len(text):
+        return text[:earliest].rstrip()
+    return text
 
 
 class SparkAgent:
@@ -86,7 +118,6 @@ class SparkAgent:
     # ---- model lifecycle ----
 
     def check_ollama(self) -> bool:
-        """Check if the Ollama server is reachable."""
         try:
             r = requests.get(f"{self.ollama_host}/api/ps", timeout=5)
             return r.status_code == 200
@@ -94,7 +125,6 @@ class SparkAgent:
             return False
 
     def check_model_loaded(self) -> bool:
-        """Check if our model is currently loaded in GPU memory."""
         try:
             r = requests.get(f"{self.ollama_host}/api/ps", timeout=5)
             if r.status_code == 200:
@@ -107,7 +137,6 @@ class SparkAgent:
             return False
 
     def warmup(self, callback=None) -> bool:
-        """Ensure model is loaded and ready. Blocks until ready or fails."""
         def tell(status, msg):
             if callback:
                 callback(status, msg)
@@ -183,11 +212,13 @@ class SparkAgent:
                     if chunk.get("done"):
                         break
             print()
-            return "".join(full_response)
+            raw = "".join(full_response)
+            return truncate_at_fake_turn(raw)
         else:
             response = requests.post(self.ollama_url, json=payload)
             response.raise_for_status()
-            return response.json()["message"]["content"]
+            raw = response.json()["message"]["content"]
+            return truncate_at_fake_turn(raw)
 
     def turn(self, user_input: str) -> str:
         self.messages.append({"role": "user", "content": user_input})
@@ -241,7 +272,7 @@ class SparkAgent:
         if id_tokens_est > num_ctx // 2:
             print(f"  \u26a0\ufe0f  WARNING: identity may exceed context window!")
         print(f"  injection: user/assistant pair (template-safe)")
-        print(f"  type /bye to exit\n")
+        print(f"  type /bye to exit, /new for fresh session\n")
 
         try:
             while True:
