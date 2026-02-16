@@ -30,6 +30,9 @@ from skills import SkillRouter
 from heartbeat import Heartbeat
 
 
+MAX_TOOL_ROUNDS = 5  # safety cap on chained tool calls
+
+
 def load_config(path: str = None) -> dict:
     config_path = Path(path) if path else Path(__file__).parent / "config.yaml"
     with open(config_path) as f:
@@ -156,6 +159,17 @@ def _map_tool_call_to_skill(name: str, params: dict, raw: str) -> dict | None:
         return {"skill": "shell_exec", "argument": f"ls -la {path}", "raw": raw}
 
     return None
+
+
+def _get_actions(text: str, skills: "SkillRouter") -> list[dict]:
+    """Extract actions from response text.
+
+    Tries tool_call XML parsing first, falls back to regex.
+    """
+    actions = parse_tool_calls(text)
+    if not actions:
+        actions = skills.parse(text)
+    return actions
 
 
 class SparkAgent:
@@ -310,31 +324,45 @@ class SparkAgent:
         return cleaned
 
     def turn(self, user_input: str) -> str:
+        """Process one user turn, with chained tool call support.
+
+        After the model responds, we check for tool calls. If found,
+        we execute them, feed results back, and let the model respond
+        again. This loops up to MAX_TOOL_ROUNDS times, so the model
+        can chain: ls -> read -> respond, or explore -> edit -> commit.
+        """
         self.messages.append({"role": "user", "content": user_input})
 
         context = self._build_context()
-
         response_text = self.send(context)
         self.messages.append({"role": "assistant", "content": response_text})
 
-        # First: try parsing <minimax:tool_call> blocks (model's native format)
-        actions = parse_tool_calls(response_text)
+        # Loop: parse tool calls, execute, get followup, repeat
+        for round_num in range(MAX_TOOL_ROUNDS):
+            actions = _get_actions(response_text, self.skills)
+            if not actions:
+                break  # no tool calls — model is done acting
 
-        # Fallback: try regex-based natural language matching
-        if not actions:
-            actions = self.skills.parse(response_text)
+            # Execute all actions from this response
+            results = []
+            for action in actions:
+                result = self.skills.execute(action)
+                if result:
+                    results.append(f"[{action['skill']}] {result}")
 
-        for action in actions:
-            result = self.skills.execute(action)
-            if result:
-                # Feed the result back as a system message
-                self.messages.append({
-                    "role": "user",
-                    "content": f"[system: {action['skill']} completed \u2014 {result}]"
-                })
-                followup = self.send(self._build_context())
-                self.messages.append({"role": "assistant", "content": followup})
-                response_text = followup
+            if not results:
+                break  # actions parsed but nothing executed
+
+            # Feed all results back as a single system message
+            self.messages.append({
+                "role": "user",
+                "content": f"[system: tool results from round {round_num + 1}]\n" + "\n".join(results),
+            })
+
+            # Let the model see the results and respond
+            print()  # visual separator between rounds
+            response_text = self.send(self._build_context())
+            self.messages.append({"role": "assistant", "content": response_text})
 
         self.session.save_turn(user_input, response_text)
         return response_text
