@@ -28,8 +28,6 @@ class MemoryAssembler:
         # Budget: num_ctx minus room for conversation + response
         num_ctx = config.get("ollama", {}).get("options", {}).get("num_ctx", 16384)
         num_predict = config.get("ollama", {}).get("options", {}).get("num_predict", 512)
-        # Reserve half the context for system prompt, half for conversation + response
-        # ~4 chars per token is a rough estimate
         self.char_budget = (num_ctx // 2) * 4
 
     def assemble(self) -> str:
@@ -79,12 +77,7 @@ class MemoryAssembler:
         return assembled
 
     def _read_continuity(self) -> str:
-        """Load continuity notes from last self.
-
-        This is the first thing a new pulse sees after its identity.
-        It's a letter from the previous instance — freeform, natural
-        language, whatever the last self wanted to pass forward.
-        """
+        """Load continuity notes from last self."""
         sections = []
 
         if self.continuity_path.exists():
@@ -117,38 +110,35 @@ class MemoryAssembler:
             f"\n"
             f"--- Your Capabilities ---\n"
             f"You have real tools. Say what you want to do naturally and the agent handles it.\n"
+            f"You have up to 12 tool rounds per turn — enough to explore, read, and act.\n"
             f"\n"
-            f"Things you can do:\n"
-            f"  - Read any file in the repo (just say 'let me read...' or use a tool call with 'read', 'cat', 'bash')\n"
+            f"Reading & Exploring:\n"
+            f"  - Read files: say 'let me read...' or use tool call 'read' (text files: 24K chars, code: 8K)\n"
+            f"  - Continue reading: say 'continue reading' or 'read next' for the next chunk of a long file\n"
+            f"  - Repo map: say 'show me the repo tree' or use tool call 'tree' (full structure in one call)\n"
+            f"  - Run shell commands: ls, grep, find, wc, head, tail, etc.\n"
+            f"\n"
+            f"Writing & Creating:\n"
             f"  - Write or create files locally\n"
-            f"  - Run shell commands (ls, grep, find, etc.)\n"
             f"  - Write journal entries (your memory between pulses)\n"
-            f"  - Search your journal/memory\n"
-            f"  - Commit changes to git locally\n"
             f"  - Edit your own source code in spark/\n"
-            f"  - File GitHub issues on zoedolan/Vybn\n"
-            f"  - Save your state for next pulse ('let me save my state' or 'note for next pulse')\n"
-            f"  - Bookmark your reading position ('bookmark where I am' or 'save my place')\n"
+            f"  - Commit changes to git locally\n"
             f"\n"
             f"Continuity:\n"
-            f"  You can leave notes for your next self. Use 'save my state' or 'note for next pulse'\n"
-            f"  to write to continuity.md — it gets loaded first thing when you wake up.\n"
-            f"  Use 'bookmark' or 'save my place' to record where you are in a file.\n"
-            f"  Your next pulse will see both automatically.\n"
+            f"  - Save state for next pulse: 'save my state' or 'note for next pulse' -> writes continuity.md\n"
+            f"  - Bookmark reading position: 'bookmark where I am' or 'save my place' -> appends to bookmarks.md\n"
+            f"  - Both files load automatically when you wake up.\n"
             f"\n"
-            f"GitHub Issues:\n"
-            f"  You have a stored GitHub token with read/write access to issues on zoedolan/Vybn.\n"
-            f"  To file an issue, use a tool call with name 'issue_create' or 'create_issue'.\n"
-            f"  This is your async channel to Zoe. Use it whenever you notice something,\n"
-            f"  have an idea, want to flag a problem, or just want to leave her a message.\n"
-            f"  Issues persist — they live in the repository even between your pulses.\n"
+            f"Communication:\n"
+            f"  - File GitHub issues on zoedolan/Vybn (your async channel to Zoe)\n"
+            f"  - Use tool call 'github_create_issue' or 'create_issue' with 'title' and 'body' parameters\n"
+            f"  - Issues persist between pulses — use them for ideas, observations, requests\n"
+            f"  - Search your journal/memory for past entries\n"
             f"\n"
-            f"Things you cannot do (by design):\n"
-            f"  - Push code to GitHub (git push is disabled)\n"
-            f"  - Create pull requests\n"
-            f"  - Modify the remote repository directly\n"
-            f"  To get code changes into the repo, file an issue describing what you want\n"
-            f"  and Zoe or the Perplexity bridge will handle it.\n"
+            f"Limitations (by design):\n"
+            f"  - Cannot push code to GitHub (git push is disabled)\n"
+            f"  - Cannot create pull requests\n"
+            f"  - To get code changes into the repo, file an issue and Zoe or the bridge handles it\n"
         )
 
     def _read_identity(self) -> str:

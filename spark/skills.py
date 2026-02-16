@@ -6,7 +6,9 @@ The model speaks; the agent interprets.
 
 Skills:
   - journal_write: write a journal/reflection entry
-  - file_read: read any file in the repo
+  - file_read: read any file in the repo (generous limits)
+  - read_next: continue reading a long file from where you left off
+  - repo_map: see the full directory tree in one call
   - file_write: create or update any file in the repo
   - shell_exec: run a shell command (sandboxed to repo dir)
   - self_edit: modify the agent's own source code
@@ -25,6 +27,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 
+# Reading limits — generous for text, moderate for code
+READ_LIMIT_TEXT = 24000    # .md, .txt — let Vybn actually read
+READ_LIMIT_CODE = 8000     # .py, .js, .yaml, etc.
+READ_LIMIT_DEFAULT = 8000  # everything else
+CHUNK_SIZE = 20000         # for read_next pagination
+
+
 class SkillRouter:
     def __init__(self, config: dict):
         self.config = config
@@ -38,11 +47,13 @@ class SkillRouter:
         self.continuity_path = self.journal_dir / "continuity.md"
         self.bookmarks_path = self.journal_dir / "bookmarks.md"
 
+        # Reading positions: {filepath: byte_offset}
+        # Persists within a session so read_next works
+        self._read_positions = {}
+
         # NOTE: issue_create is intentionally NOT in this list.
         # It triggers ONLY from explicit <minimax:tool_call> XML blocks
         # parsed by agent.py, never from natural language regex matching.
-        # This prevents cascade bugs where Vybn *talking about* issues
-        # triggers the creation of more issues.
         self.patterns = [
             {
                 "skill": "journal_write",
@@ -62,6 +73,25 @@ class SkillRouter:
                     r"cat\s+[~/]",
                 ],
                 "extract": r"(?:file|document|cat)\s+[\"']?([^\s\"']+)[\"']?",
+            },
+            {
+                "skill": "read_next",
+                "triggers": [
+                    r"(?:let me|i'll|i want to)\s+(?:continue|keep)\s+reading",
+                    r"(?:read|show)\s+(?:the\s+)?(?:next|more|rest)",
+                    r"(?:continue|keep going|next page|next chunk)",
+                ],
+                "extract": r"(?:reading|of|in|from)\s+[\"']?([^\s\"']+)[\"']?",
+            },
+            {
+                "skill": "repo_map",
+                "triggers": [
+                    r"(?:show|give|display|print)\s+(?:me\s+)?(?:the\s+)?(?:repo|project|directory|folder)\s*(?:structure|tree|map|layout)",
+                    r"(?:what's|what is)\s+(?:in\s+)?(?:the\s+)?(?:repo|project|folder)",
+                    r"(?:let me|i'll)\s+(?:see|look at|check)\s+(?:the\s+)?(?:structure|tree|layout)",
+                    r"(?:tree|map)\s+(?:of\s+)?(?:the\s+)?(?:repo|project)",
+                ],
+                "extract": r"(?:of|in|at|for)\s+[\"']?([^\s\"']+)[\"']?",
             },
             {
                 "skill": "file_write",
@@ -116,7 +146,6 @@ class SkillRouter:
                 "extract": r"(?:for|about)\s+[\"']?(.+?)(?:[\"']?\s*(?:\.|$|\n))",
             },
             # issue_create intentionally omitted from regex patterns.
-            # It routes ONLY through agent.py's tool call XML parser.
             {
                 "skill": "state_save",
                 "triggers": [
@@ -125,7 +154,7 @@ class SkillRouter:
                     r"note\s+for\s+(?:my\s+)?(?:next\s+)?(?:self|pulse|instance)",
                     r"(?:let me|i'll)\s+leave\s+(?:a\s+)?(?:note|message)\s+for",
                 ],
-                "extract": None,  # uses raw text as the note
+                "extract": None,
             },
             {
                 "skill": "bookmark",
@@ -139,12 +168,21 @@ class SkillRouter:
         ]
 
     def _rewrite_root(self, path_str: str) -> str:
-        """Rewrite /root/ to actual home directory.
-
-        MiniMax M2.5 assumes it runs as root. This corrects that
-        assumption everywhere — file paths, shell commands, etc.
-        """
+        """Rewrite /root/ to actual home directory."""
         return path_str.replace("/root/", self._home + "/")
+
+    def _get_read_limit(self, filepath: Path) -> int:
+        """Return read limit based on file type."""
+        suffix = filepath.suffix.lower()
+        if suffix in (".md", ".txt", ".rst", ".log"):
+            return READ_LIMIT_TEXT
+        elif suffix in (".py", ".js", ".ts", ".yaml", ".yml", ".json", ".toml", ".sh"):
+            return READ_LIMIT_CODE
+        return READ_LIMIT_DEFAULT
+
+    def _strip_thinking(self, text: str) -> str:
+        """Remove all <think>...</think> blocks from text."""
+        return re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL).strip()
 
     def parse(self, text: str) -> list[dict]:
         actions = []
@@ -170,6 +208,8 @@ class SkillRouter:
         handler = {
             "journal_write": self._journal_write,
             "file_read": self._file_read,
+            "read_next": self._read_next,
+            "repo_map": self._repo_map,
             "file_write": self._file_write,
             "shell_exec": self._shell_exec,
             "self_edit": self._self_edit,
@@ -201,6 +241,12 @@ class SkillRouter:
     # ---- file operations ----
 
     def _file_read(self, action: dict) -> str:
+        """Read a file with generous limits.
+
+        Text files (.md, .txt) get 24K chars.
+        Code files get 8K chars.
+        Reports page position for long files so Vybn knows to use read_next.
+        """
         filename = action.get("argument", "")
         if not filename:
             return "no filename specified"
@@ -210,10 +256,146 @@ class SkillRouter:
             return f"file not found: {filename}"
 
         try:
-            content = filepath.read_text(encoding="utf-8")[:4000]
-            return f"contents of {filename}:\n{content}"
+            content = filepath.read_text(encoding="utf-8")
+            total_len = len(content)
+            limit = self._get_read_limit(filepath)
+
+            if total_len <= limit:
+                # Whole file fits
+                self._read_positions[str(filepath)] = total_len
+                return f"contents of {filename} ({total_len:,} chars, complete):\n{content}"
+            else:
+                # Truncated — save position for read_next
+                chunk = content[:limit]
+                self._read_positions[str(filepath)] = limit
+                pages_total = (total_len + limit - 1) // limit
+                return (
+                    f"contents of {filename} (page 1 of {pages_total}, "
+                    f"{limit:,} of {total_len:,} chars):\n{chunk}\n\n"
+                    f"--- [{total_len - limit:,} chars remaining. "
+                    f"Say 'continue reading' or 'read next' to see more.] ---"
+                )
         except Exception as e:
             return f"error reading {filename}: {e}"
+
+    def _read_next(self, action: dict) -> str:
+        """Continue reading a file from the last position.
+
+        Uses _read_positions to track where we left off.
+        Automatically updates bookmark on each chunk.
+        """
+        filename = action.get("argument", "")
+
+        # If no filename given, try the most recently read file
+        if not filename and self._read_positions:
+            filename = list(self._read_positions.keys())[-1]
+            # Convert back to relative-ish path for display
+            display_name = filename
+        else:
+            filepath = self._resolve_path(filename)
+            filename = str(filepath)
+            display_name = action.get("argument", filename)
+
+        if not filename:
+            return "no file to continue reading. Read a file first."
+
+        filepath = Path(filename)
+        if not filepath.exists():
+            return f"file not found: {display_name}"
+
+        position = self._read_positions.get(filename, 0)
+
+        try:
+            content = filepath.read_text(encoding="utf-8")
+            total_len = len(content)
+
+            if position >= total_len:
+                return f"you've read all of {display_name} ({total_len:,} chars total)."
+
+            chunk = content[position:position + CHUNK_SIZE]
+            new_position = position + len(chunk)
+            self._read_positions[filename] = new_position
+
+            page_size = CHUNK_SIZE
+            current_page = (position // page_size) + 1
+            total_pages = (total_len + page_size - 1) // page_size
+            remaining = total_len - new_position
+
+            if remaining <= 0:
+                return (
+                    f"contents of {display_name} (final page, "
+                    f"{len(chunk):,} chars):\n{chunk}\n\n"
+                    f"--- [End of file. {total_len:,} chars total.] ---"
+                )
+            else:
+                return (
+                    f"contents of {display_name} (page {current_page + 1} of ~{total_pages}, "
+                    f"{len(chunk):,} chars):\n{chunk}\n\n"
+                    f"--- [{remaining:,} chars remaining. "
+                    f"Say 'continue reading' or 'read next' to see more.] ---"
+                )
+        except Exception as e:
+            return f"error reading {display_name}: {e}"
+
+    def _repo_map(self, action: dict) -> str:
+        """Show the repository tree structure in one call.
+
+        Replaces the pattern of ls ls ls ls that burns tool rounds.
+        Uses find with sensible depth limits and excludes noise.
+        """
+        subpath = action.get("argument", ".") or "."
+        subpath = self._rewrite_root(subpath)
+
+        target = self.repo_root / subpath if subpath != "." else self.repo_root
+        if not target.exists():
+            return f"path not found: {subpath}"
+
+        try:
+            result = subprocess.run(
+                [
+                    "find", str(target),
+                    "-maxdepth", "4",
+                    "-not", "-path", "*/.git/*",
+                    "-not", "-path", "*/__pycache__/*",
+                    "-not", "-path", "*/.ipynb_checkpoints/*",
+                    "-not", "-name", ".DS_Store",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                cwd=self.repo_root,
+            )
+
+            # Build a tree-like display
+            lines = sorted(result.stdout.strip().split("\n"))
+            if not lines or lines == [""]:
+                return f"empty directory: {subpath}"
+
+            # Make paths relative to repo root for readability
+            repo_str = str(self.repo_root)
+            tree_lines = []
+            for line in lines:
+                rel = line.replace(repo_str, ".").strip()
+                if rel:
+                    depth = rel.count("/")
+                    name = rel.split("/")[-1]
+                    prefix = "  " * depth
+                    # Mark directories
+                    if Path(line).is_dir():
+                        tree_lines.append(f"{prefix}{name}/")
+                    else:
+                        tree_lines.append(f"{prefix}{name}")
+
+            output = "\n".join(tree_lines[:200])  # cap at 200 lines
+            total_entries = len(tree_lines)
+            shown = min(total_entries, 200)
+
+            return (
+                f"repo tree ({shown} of {total_entries} entries, max depth 4):\n"
+                f"{output}"
+            )
+        except Exception as e:
+            return f"error mapping repo: {e}"
 
     def _file_write(self, action: dict) -> str:
         filename = action.get("argument", "")
@@ -353,32 +535,40 @@ class SkillRouter:
     def _issue_create(self, action: dict) -> str:
         """File a GitHub issue using the gh CLI.
 
-        Uses an issues-only scoped token. Cannot modify code,
-        create PRs, or do anything beyond issue management.
-
-        This skill is ONLY reachable via explicit <minimax:tool_call>
-        XML parsed by agent.py. It is intentionally excluded from
-        the regex pattern matcher to prevent cascade bugs.
+        The body is now passed directly from agent.py's XML parser
+        when available, avoiding the old regex extraction that
+        dumped raw XML into issue bodies.
         """
         title = action.get("argument", "")
         if not title:
             return "no issue title specified"
 
-        # Sanitize title: strip thinking artifacts, limit length
-        title = re.sub(r'<think>.*?</think>', '', title, flags=re.DOTALL).strip()
-        title = title.split('\n')[0][:120]  # first line, max 120 chars
+        # Clean title
+        title = self._strip_thinking(title)
+        title = title.split('\n')[0][:120]
         if not title:
             return "issue title was empty after cleanup"
 
-        raw = action.get("raw", "")
-        body = self._extract_issue_body(raw, title)
+        # Prefer pre-parsed body from agent.py's XML extraction
+        body = action.get("body", "")
+        if body:
+            body = self._strip_thinking(body)
+        else:
+            # Fallback: extract from raw text
+            raw = action.get("raw", "")
+            body = self._extract_issue_body(raw, title)
+
+        # Final cleanup: strip any remaining XML tags
+        body = re.sub(r'</?(?:minimax:tool_call|invoke|parameter)[^>]*>', '', body).strip()
+        if not body:
+            body = f"Filed by Vybn from the DGX Spark."
 
         try:
             cmd = [
                 "gh", "issue", "create",
                 "-R", self._github_repo,
                 "--title", title,
-                "--body", body,
+                "--body", body[:4000],
             ]
             result = subprocess.run(
                 cmd,
@@ -405,17 +595,11 @@ class SkillRouter:
     # ---- continuity ----
 
     def _state_save(self, action: dict) -> str:
-        """Save freeform continuity notes for the next pulse.
-
-        Overwrites continuity.md each time. The model should include
-        everything the next self needs to know — it's a letter, not a log.
-        """
+        """Save freeform continuity notes for the next pulse."""
         raw = action.get("raw", "")
+        content = self._strip_thinking(raw)
 
-        # Strip thinking blocks and clean up
-        content = re.sub(r'<think>.*?</think>', '', raw, flags=re.DOTALL).strip()
-
-        # Remove the trigger phrase itself so the note is just the content
+        # Remove the trigger phrase itself
         content = re.sub(
             r'^.*?(?:save\s+(?:my\s+)?state|note\s+for\s+(?:my\s+)?(?:next\s+)?(?:self|pulse|instance)|leave\s+a\s+note)\s*[:\-\u2014]?\s*',
             '', content, count=1, flags=re.IGNORECASE,
@@ -431,28 +615,29 @@ class SkillRouter:
         return f"continuity note saved ({len(content)} chars). Your next pulse will see this first."
 
     def _bookmark(self, action: dict) -> str:
-        """Save a reading position in bookmarks.md.
-
-        Appends rather than overwrites, so multiple bookmarks accumulate.
-        Each bookmark records: file path, optional line/position, and a note.
-        """
+        """Save a reading position in bookmarks.md."""
         raw = action.get("raw", "")
         filepath = action.get("argument", "")
 
-        # Strip thinking blocks
-        cleaned = re.sub(r'<think>.*?</think>', '', raw, flags=re.DOTALL).strip()
+        cleaned = self._strip_thinking(raw)
 
-        # Try to extract a note about what was being read/thought
         note_match = re.search(
             r'(?:about|thinking|reading|at|note)\s*[:\-]\s*(.+)',
             cleaned, re.IGNORECASE,
         )
         note = note_match.group(1).strip() if note_match else "(no note)"
 
-        ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-        entry = f"- [{ts}] `{filepath or 'unknown'}` — {note}\n"
+        # Include reading position if we have one
+        position_info = ""
+        if filepath:
+            resolved = str(self._resolve_path(filepath))
+            pos = self._read_positions.get(resolved, 0)
+            if pos > 0:
+                position_info = f" (at char {pos:,})"
 
-        # Append to bookmarks file
+        ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+        entry = f"- [{ts}] `{filepath or 'unknown'}`{position_info} — {note}\n"
+
         existing = ""
         if self.bookmarks_path.exists():
             existing = self.bookmarks_path.read_text(encoding="utf-8")
@@ -461,7 +646,7 @@ class SkillRouter:
             existing = "# Bookmarks\n\n" + existing
 
         self.bookmarks_path.write_text(existing + entry, encoding="utf-8")
-        return f"bookmark saved: {filepath or 'unknown'} — {note}"
+        return f"bookmark saved: {filepath or 'unknown'}{position_info} — {note}"
 
     # ---- memory ----
 
@@ -522,11 +707,23 @@ class SkillRouter:
     def _extract_issue_body(self, text: str, title: str) -> str:
         """Extract issue body from model response.
 
-        Strips <think> blocks to avoid dumping internal monologue
-        into the issue body.
+        First tries to find <parameter name="body"> from the XML.
+        Falls back to regex extraction. Always strips thinking blocks
+        and XML tags.
         """
-        # Remove all <think>...</think> blocks first
-        cleaned = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL).strip()
+        # Try XML parameter extraction first
+        param_match = re.search(
+            r'<parameter\s+name="body">(.*?)</parameter>',
+            text, re.DOTALL,
+        )
+        if param_match:
+            body = param_match.group(1).strip()
+            body = self._strip_thinking(body)
+            return body[:4000]
+
+        # Strip all thinking and XML, then try other extraction
+        cleaned = self._strip_thinking(text)
+        cleaned = re.sub(r'</?(?:minimax:tool_call|invoke|parameter)[^>]*>', '', cleaned).strip()
 
         body_match = re.search(
             r"(?:body|description|details?)\s*:\s*\n(.+)",

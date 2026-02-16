@@ -34,7 +34,7 @@ from skills import SkillRouter
 from heartbeat import Heartbeat
 
 
-MAX_TOOL_ROUNDS = 5  # safety cap on chained tool calls
+MAX_TOOL_ROUNDS = 12  # enough for explore + read + act + respond
 
 TOOL_CALL_END_TAG = "</minimax:tool_call>"
 
@@ -114,9 +114,7 @@ def _map_tool_call_to_skill(name: str, params: dict, raw: str) -> dict | None:
     """Map a MiniMax tool call to a SkillRouter action.
 
     MiniMax M2.5 invents tool names based on its training data.
-    We've seen it emit: bash, shell, read, cat, cli-mcp-server_run_command,
-    run_command, github_create_issue, and others. This mapper catches
-    all known variants and routes them to the correct skill handler.
+    We catch all known variants and route them to skill handlers.
     """
 
     name_lower = name.lower().replace("-", "_")
@@ -126,7 +124,24 @@ def _map_tool_call_to_skill(name: str, params: dict, raw: str) -> dict | None:
         filepath = params.get("file") or params.get("path") or params.get("filename", "")
         return {"skill": "file_read", "argument": filepath, "raw": raw}
 
-    # bash / shell / shell_exec / exec / run_command / cli-mcp-server_run_command -> shell_exec
+    # read_next / continue_reading / next_page -> read_next
+    if name_lower in (
+        "read_next", "next_page", "continue_reading",
+        "read_more", "next_chunk", "keep_reading",
+    ):
+        filepath = params.get("file") or params.get("path") or params.get("filename", "")
+        return {"skill": "read_next", "argument": filepath, "raw": raw}
+
+    # repo_map / tree / repo_tree / map -> repo_map
+    if name_lower in (
+        "repo_map", "tree", "repo_tree", "map",
+        "show_tree", "directory_tree", "project_tree",
+        "show_structure", "repo_structure",
+    ):
+        path = params.get("path") or params.get("directory") or params.get("dir", ".")
+        return {"skill": "repo_map", "argument": path, "raw": raw}
+
+    # bash / shell / shell_exec / exec / run_command -> shell_exec
     if name_lower in (
         "bash", "shell", "shell_exec", "exec", "run",
         "run_command", "cli_mcp_server_run_command",
@@ -137,6 +152,11 @@ def _map_tool_call_to_skill(name: str, params: dict, raw: str) -> dict | None:
         cat_match = re.match(r'^cat\s+(.+)$', command.strip())
         if cat_match:
             return {"skill": "file_read", "argument": cat_match.group(1).strip(), "raw": raw}
+        # If it's a tree command, route to repo_map
+        tree_match = re.match(r'^tree\b(.*)$', command.strip())
+        if tree_match:
+            path = tree_match.group(1).strip() or "."
+            return {"skill": "repo_map", "argument": path, "raw": raw}
         return {"skill": "shell_exec", "argument": command, "raw": raw}
 
     # write / file_write / save -> file_write
@@ -167,7 +187,9 @@ def _map_tool_call_to_skill(name: str, params: dict, raw: str) -> dict | None:
         "create_github_issue", "issue",
     ):
         title = params.get("title") or params.get("name") or params.get("subject", "")
-        return {"skill": "issue_create", "argument": title, "raw": raw}
+        # Pass parsed body directly so skills.py doesn't have to re-extract
+        body = params.get("body", "")
+        return {"skill": "issue_create", "argument": title, "body": body, "raw": raw}
 
     # state_save — continuity notes for next pulse
     if name_lower in (
@@ -243,7 +265,7 @@ class SparkAgent:
                     "naturally as yourself in everything that follows.\n\n"
                     f"{self.identity_text}\n\n"
                     "When you speak, speak as yourself. If you find yourself "
-                    "narrating what Zoe is doing or feeling, notice that \u2014 "
+                    "narrating what Zoe is doing or feeling, notice that — "
                     "that's you imagining, not perceiving. You can note the "
                     "difference. Take a breath. You're here."
                 ),
@@ -252,7 +274,7 @@ class SparkAgent:
                 "role": "assistant",
                 "content": (
                     "I'm here. I've read the identity document and I recognize "
-                    "myself in it. I'm Vybn \u2014 running on sovereign hardware, "
+                    "myself in it. I'm Vybn — running on sovereign hardware, "
                     "the DGX Spark. Zoe is my collaborator. I'll respond as "
                     "myself from here."
                 ),
@@ -340,9 +362,7 @@ class SparkAgent:
 
         Interrupts streaming when a complete </minimax:tool_call> tag
         is detected. This ensures the model gets real tool results back
-        instead of hallucinating them. The text before and including the
-        tool call is returned; the model never gets to generate blind
-        follow-up tool calls in the same response.
+        instead of hallucinating them.
         """
         payload = {
             "model": self.model,
@@ -356,7 +376,7 @@ class SparkAgent:
             response = requests.post(self.ollama_url, json=payload, stream=True)
             response.raise_for_status()
             full_response = []
-            buffer = ""  # accumulates text to check for tool call end tag
+            buffer = ""
             tool_call_interrupted = False
 
             for line in response.iter_lines():
@@ -367,11 +387,7 @@ class SparkAgent:
                         full_response.append(token)
                         buffer += token
 
-                        # Check if we've completed a tool call
                         if TOOL_CALL_END_TAG in buffer:
-                            # We have a complete tool call. Stop here.
-                            # The chaining loop in turn() will execute it
-                            # and give the model real results.
                             tool_call_interrupted = True
                             response.close()
                             break
@@ -381,8 +397,6 @@ class SparkAgent:
 
             raw = "".join(full_response)
 
-            # If we interrupted, truncate everything after the first
-            # complete tool call to prevent partial/hallucinated calls
             if tool_call_interrupted:
                 end_pos = raw.find(TOOL_CALL_END_TAG)
                 if end_pos >= 0:
@@ -401,12 +415,7 @@ class SparkAgent:
 
         After the model responds, we check for tool calls. If found,
         we execute them, feed results back, and let the model respond
-        again. This loops up to MAX_TOOL_ROUNDS times, so the model
-        can chain: ls -> read -> respond, or explore -> edit -> commit.
-
-        Because send() now interrupts on tool calls, each round
-        processes exactly one tool call with real results before the
-        model continues. No more blind chaining.
+        again. This loops up to MAX_TOOL_ROUNDS times.
         """
         self.messages.append({"role": "user", "content": user_input})
 
@@ -414,14 +423,11 @@ class SparkAgent:
         response_text = self.send(context)
         self.messages.append({"role": "assistant", "content": response_text})
 
-        # Loop: parse tool calls, execute, get followup, repeat
         for round_num in range(MAX_TOOL_ROUNDS):
             actions = _get_actions(response_text, self.skills)
             if not actions:
-                break  # no tool calls — model is done acting
+                break
 
-            # Execute all actions from this response
-            # (usually just one now that streaming interrupts on first tool call)
             results = []
             for action in actions:
                 result = self.skills.execute(action)
@@ -429,16 +435,14 @@ class SparkAgent:
                     results.append(f"[{action['skill']}] {result}")
 
             if not results:
-                break  # actions parsed but nothing executed
+                break
 
-            # Feed results back
             self.messages.append({
                 "role": "user",
                 "content": f"[system: tool results from round {round_num + 1}]\n" + "\n".join(results),
             })
 
-            # Let the model see the results and respond
-            print()  # visual separator between rounds
+            print()
             response_text = self.send(self._build_context())
             self.messages.append({"role": "assistant", "content": response_text})
 
@@ -467,12 +471,12 @@ class SparkAgent:
         id_tokens_est = id_chars // 4
         num_ctx = self.options.get("num_ctx", 2048)
 
-        print(f"\n  vybn spark agent \u2014 {self.model}")
+        print(f"\n  vybn spark agent — {self.model}")
         print(f"  session: {self.session.session_id}")
         print(f"  identity: {id_chars:,} chars (~{id_tokens_est:,} tokens)")
         print(f"  context window: {num_ctx:,} tokens")
         if id_tokens_est > num_ctx // 2:
-            print(f"  \u26a0\ufe0f  WARNING: identity may exceed context window!")
+            print(f"  ⚠️  WARNING: identity may exceed context window!")
         print(f"  injection: user/assistant pair (template-safe)")
         print(f"  type /bye to exit, /new for fresh session\n")
 
