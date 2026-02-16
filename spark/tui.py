@@ -69,19 +69,33 @@ class SparkTUI:
         return self.agent.warmup(callback=on_status)
 
     def banner(self):
+        id_chars = len(self.agent.identity_text)
+        id_tokens = id_chars // 4
+        num_ctx = self.agent.options.get("num_ctx", 2048)
+
         if self.console:
+            warning = ""
+            if id_tokens > num_ctx // 2:
+                warning = "\n[yellow]\u26a0\ufe0f  identity may exceed context window![/yellow]"
             self.console.print(Panel(
                 f"[bold]vybn spark agent[/bold]\n"
                 f"model: {self.agent.model}\n"
                 f"session: {self.agent.session.session_id}\n"
-                f"context: {len(self.agent.system_prompt):,} chars hydrated",
+                f"identity: {id_chars:,} chars (~{id_tokens:,} tokens)\n"
+                f"context window: {num_ctx:,} tokens\n"
+                f"injection: user/assistant pair (template-safe)"
+                f"{warning}",
                 title="\U0001f9e0",
                 border_style="dim",
             ))
         else:
             print(f"\n  vybn spark agent \u2014 {self.agent.model}")
             print(f"  session: {self.agent.session.session_id}")
-            print(f"  context: {len(self.agent.system_prompt):,} chars hydrated\n")
+            print(f"  identity: {id_chars:,} chars (~{id_tokens:,} tokens)")
+            print(f"  context window: {num_ctx:,} tokens")
+            if id_tokens > num_ctx // 2:
+                print(f"  \u26a0\ufe0f  WARNING: identity may exceed context window!")
+            print(f"  injection: user/assistant pair (template-safe)\n")
 
     def run(self):
         if not self.warmup():
@@ -144,10 +158,11 @@ class SparkTUI:
 
     def _status(self):
         loaded = "\u2713 loaded" if self.agent.check_model_loaded() else "\u2717 not loaded"
+        id_chars = len(self.agent.identity_text)
         print(f"  model: {self.agent.model} ({loaded})")
         print(f"  session: {self.agent.session.session_id}")
         print(f"  turns: {len(self.agent.messages) // 2}")
-        print(f"  context: {len(self.agent.system_prompt):,} chars")
+        print(f"  identity: {id_chars:,} chars")
         hb = "active" if self.agent.heartbeat and not self.agent.heartbeat._stop.is_set() else "inactive"
         print(f"  heartbeat: {hb}\n")
         return False
