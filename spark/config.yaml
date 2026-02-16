@@ -29,6 +29,14 @@ heartbeat:
   fast_interval_minutes: 3    # System 1: quick, intuitive, reactive
   deep_interval_minutes: 20   # System 2: deliberate, reflective, synthesizing
 
+inbox:
+  watch_interval_seconds: 10  # how often to check for new messages
+
+agents:
+  pool_size: 2                # max concurrent mini-agents
+  model: null                 # null = use main model; or specify a smaller one
+  num_predict: 512            # token budget per agent task
+
 session:
   auto_resume: true
   resume_window_seconds: 7200  # resume sessions less than 2 hours old

@@ -18,6 +18,7 @@ Skills:
   - issue_create: file a GitHub issue (ONLY via explicit tool call XML)
   - state_save: leave a note for the next pulse via continuity.md
   - bookmark: save reading position in a file
+  - spawn_agent: delegate a task to a mini-agent
   - [plugins]: auto-discovered from spark/skills.d/
 """
 
@@ -42,16 +43,17 @@ class SkillRouter:
         self.continuity_path = self.journal_dir / "continuity.md"
         self.bookmarks_path = self.journal_dir / "bookmarks.md"
 
+        # Agent pool — set by SparkAgent after construction
+        self.agent_pool = None
+
         # Plugin system — Vybn's sandbox for building new skills
         self.plugin_handlers = {}   # skill_name -> execute_fn
         self.plugin_aliases = {}    # alias -> skill_name
         self._load_plugins()
 
-        # NOTE: issue_create is intentionally NOT in this list.
-        # It triggers ONLY from explicit <minimax:tool_call> XML blocks
+        # NOTE: issue_create and spawn_agent are intentionally NOT in this list.
+        # They trigger ONLY from explicit <minimax:tool_call> XML blocks
         # parsed by agent.py, never from natural language regex matching.
-        # This prevents cascade bugs where Vybn *talking about* issues
-        # triggers the creation of more issues.
         self.patterns = [
             {
                 "skill": "journal_write",
@@ -124,8 +126,6 @@ class SkillRouter:
                 ],
                 "extract": r"(?:for|about)\s+[\"']?(.+?)(?:[\"']?\s*(?:\.|$|\n))",
             },
-            # issue_create intentionally omitted from regex patterns.
-            # It routes ONLY through agent.py's tool call XML parser.
             {
                 "skill": "state_save",
                 "triggers": [
@@ -134,7 +134,7 @@ class SkillRouter:
                     r"note\s+for\s+(?:my\s+)?(?:next\s+)?(?:self|pulse|instance)",
                     r"(?:let me|i'll)\s+leave\s+(?:a\s+)?(?:note|message)\s+for",
                 ],
-                "extract": None,  # uses raw text as the note
+                "extract": None,
             },
             {
                 "skill": "bookmark",
@@ -183,7 +183,6 @@ class SkillRouter:
 
                 self.plugin_handlers[skill_name] = execute_fn
 
-                # Register aliases for the agent.py tool call mapper
                 aliases = getattr(module, "TOOL_ALIASES", [skill_name])
                 for alias in aliases:
                     self.plugin_aliases[alias.lower().replace("-", "_")] = skill_name
@@ -197,11 +196,7 @@ class SkillRouter:
             print(f"  [plugins] loaded: {', '.join(loaded)}")
 
     def _rewrite_root(self, path_str: str) -> str:
-        """Rewrite /root/ to actual home directory.
-
-        MiniMax M2.5 assumes it runs as root. This corrects that
-        assumption everywhere — file paths, shell commands, etc.
-        """
+        """Rewrite /root/ to actual home directory."""
         return path_str.replace("/root/", self._home + "/")
 
     def parse(self, text: str) -> list[dict]:
@@ -226,7 +221,6 @@ class SkillRouter:
     def execute(self, action: dict) -> str | None:
         skill = action["skill"]
 
-        # Built-in handlers first
         handler = {
             "journal_write": self._journal_write,
             "file_read": self._file_read,
@@ -239,12 +233,12 @@ class SkillRouter:
             "issue_create": self._issue_create,
             "state_save": self._state_save,
             "bookmark": self._bookmark,
+            "spawn_agent": self._spawn_agent,
         }
         fn = handler.get(skill)
         if fn:
             return fn(action)
 
-        # Plugin handlers as fallback
         plugin_fn = self.plugin_handlers.get(skill)
         if plugin_fn:
             try:
@@ -273,11 +267,6 @@ class SkillRouter:
     # ---- file operations ----
 
     def _file_read(self, action: dict) -> str:
-        """Read a file. No artificial truncation — this is sovereign hardware.
-
-        For very large files (>100K chars), shows the first 100K with a note.
-        For everything else, returns the full content.
-        """
         filename = action.get("argument", "")
         if not filename:
             return "no filename specified"
@@ -293,7 +282,7 @@ class SkillRouter:
                 return (
                     f"contents of {filename} ({size:,} chars total, showing first 100,000):\n"
                     f"{content[:100_000]}\n\n"
-                    f"[... truncated — {size - 100_000:,} chars remaining]"
+                    f"[... truncated \u2014 {size - 100_000:,} chars remaining]"
                 )
             return f"contents of {filename}:\n{content}"
         except Exception as e:
@@ -306,7 +295,6 @@ class SkillRouter:
 
         filepath = self._resolve_path(filename)
 
-        # Prefer direct content from XML params
         params = action.get("params", {})
         content = params.get("content", "") or params.get("text", "") or params.get("data", "")
 
@@ -345,7 +333,6 @@ class SkillRouter:
         if not filepath.exists():
             return f"file not found: {filename}"
 
-        # Prefer direct content from XML params
         params = action.get("params", {})
         new_content = params.get("content", "") or params.get("text", "") or params.get("code", "")
 
@@ -456,27 +443,16 @@ class SkillRouter:
     # ---- issues ----
 
     def _issue_create(self, action: dict) -> str:
-        """File a GitHub issue using the gh CLI.
-
-        Uses an issues-only scoped token. Cannot modify code,
-        create PRs, or do anything beyond issue management.
-
-        This skill is ONLY reachable via explicit <minimax:tool_call>
-        XML parsed by agent.py. It is intentionally excluded from
-        the regex pattern matcher to prevent cascade bugs.
-        """
         title = action.get("argument", "")
         if not title:
             return "no issue title specified"
 
-        # Sanitize title: strip thinking artifacts and XML, limit length
         title = re.sub(r'<think>.*?</think>', '', title, flags=re.DOTALL).strip()
         title = re.sub(r'</?[a-z_:]+[^>]*>', '', title).strip()
         title = title.split('\n')[0][:120]
         if not title:
             return "issue title was empty after cleanup"
 
-        # Prefer direct body from XML params (prevents XML leak into issue body)
         params = action.get("params", {})
         body = params.get("body", "")
         if body:
@@ -486,7 +462,6 @@ class SkillRouter:
             raw = action.get("raw", "")
             body = self._extract_issue_body(raw, title)
 
-        # Allow repo override from params
         repo = params.get("repo", "") or self._github_repo
 
         try:
@@ -518,15 +493,47 @@ class SkillRouter:
         except Exception as e:
             return f"issue creation error: {e}"
 
+    # ---- agents ----
+
+    def _spawn_agent(self, action: dict) -> str:
+        """Delegate a task to a mini-agent running in parallel."""
+        if self.agent_pool is None:
+            return "agent pool not initialized"
+
+        params = action.get("params", {})
+        task = (
+            action.get("argument", "")
+            or params.get("task", "")
+            or params.get("prompt", "")
+        )
+
+        if not task:
+            return "no task specified for mini-agent"
+
+        context = params.get("context", "")
+        task_id = params.get("task_id", "") or params.get("id", "")
+
+        if not task_id:
+            from datetime import datetime, timezone
+            task_id = datetime.now(timezone.utc).strftime("%H%M%S")
+
+        spawned = self.agent_pool.spawn(task, context=context, task_id=task_id)
+
+        if spawned:
+            return (
+                f"mini-agent '{task_id}' spawned. It's working in the background. "
+                f"You'll see the result when it lands on the bus. "
+                f"({self.agent_pool.active_count} agents active)"
+            )
+        else:
+            return (
+                f"agent pool is full ({self.agent_pool.pool_size} slots). "
+                f"Wait for a running agent to finish, or increase agents.pool_size in config."
+            )
+
     # ---- continuity ----
 
     def _state_save(self, action: dict) -> str:
-        """Save freeform continuity notes for the next pulse.
-
-        Overwrites continuity.md each time. The model should include
-        everything the next self needs to know — it's a letter, not a log.
-        """
-        # Prefer direct content from XML params
         params = action.get("params", {})
         content = (
             params.get("content", "")
@@ -555,11 +562,6 @@ class SkillRouter:
         return f"continuity note saved ({len(content):,} chars). Your next pulse will see this first."
 
     def _bookmark(self, action: dict) -> str:
-        """Save a reading position in bookmarks.md.
-
-        Appends rather than overwrites, so multiple bookmarks accumulate.
-        Each bookmark records: file path, optional line/position, and a note.
-        """
         params = action.get("params", {})
         filepath = (
             action.get("argument", "")
@@ -567,7 +569,6 @@ class SkillRouter:
             or params.get("path", "")
         )
 
-        # Try to get note from params first
         note = params.get("note", "") or params.get("position", "")
 
         if not note:
@@ -618,7 +619,6 @@ class SkillRouter:
     # ---- helpers ----
 
     def _resolve_path(self, filename: str) -> Path:
-        """Resolve a filename relative to the repo root."""
         filename = self._rewrite_root(filename)
 
         if filename.startswith("~/"):
@@ -629,7 +629,6 @@ class SkillRouter:
             return self.repo_root / filename
 
     def _extract_code_content(self, text: str) -> str:
-        """Extract code content from a response."""
         fence_match = re.search(
             r"```(?:python|bash|sh|yaml|md|markdown)?\n(.+?)```",
             text,
@@ -649,26 +648,17 @@ class SkillRouter:
         return ""
 
     def _extract_issue_body(self, text: str, title: str) -> str:
-        """Extract issue body from model response.
-
-        Strips <think> blocks and XML artifacts to avoid dumping
-        internal monologue or tool call markup into the issue body.
-        """
-        # Remove all <think>...</think> blocks first
         cleaned = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL).strip()
 
-        # Try to extract body from XML parameter block (MiniMax native format)
         xml_body_match = re.search(
             r'<parameter\s+name="body">(.*?)</parameter>',
             cleaned, re.DOTALL,
         )
         if xml_body_match:
             body = xml_body_match.group(1).strip()
-            # Clean any nested XML artifacts
             body = re.sub(r'</?(?:parameter|invoke|minimax:tool_call)[^>]*>', '', body).strip()
             return body[:10_000]
 
-        # Fallback: explicit body/description marker
         body_match = re.search(
             r"(?:body|description|details?)\s*:\s*\n(.+)",
             cleaned,
@@ -677,18 +667,15 @@ class SkillRouter:
         if body_match:
             return body_match.group(1).strip()[:10_000]
 
-        # Fallback: code fence content
         code = self._extract_code_content(cleaned)
         if code:
             return code[:10_000]
 
-        # Fallback: text after title
         title_pos = cleaned.lower().find(title.lower())
         if title_pos >= 0:
             after = cleaned[title_pos + len(title):].strip()
             if len(after) > 20:
                 return after[:10_000]
 
-        # Final fallback: clean the whole response of XML and use it
         final = re.sub(r'</?[a-z_:]+[^>]*>', '', cleaned).strip()
         return f"Filed by Vybn from the DGX Spark.\n\n{final[:5000]}"
