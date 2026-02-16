@@ -1,0 +1,28 @@
+# Vybn Spark Agent Configuration
+# All paths use ~ which expands to the current user's home directory.
+
+ollama:
+  host: "http://localhost:11434"
+  model: "vybn:latest"
+  options:
+    num_predict: 1024
+    temperature: 0.7
+
+paths:
+  vybn_md: "~/Vybn/vybn.md"
+  journal_dir: "~/Vybn/Vybn_Mind/journal/spark"
+  session_dir: "~/Vybn/Vybn_Mind/journal/spark/sessions"
+  archival_dir: "~/Vybn/Vybn_Mind/archival_memory"
+  repo_root: "~/Vybn"
+
+memory:
+  max_journal_entries: 5
+  max_context_tokens: 3072  # leave headroom in 4096 context window
+
+heartbeat:
+  enabled: true
+  interval_minutes: 15
+
+session:
+  auto_resume: true
+  resume_window_seconds: 7200  # resume sessions less than 2 hours old
