@@ -4,11 +4,13 @@
 No JSON tool schemas. No function-calling protocol.
 The model speaks; the agent interprets.
 
+This is sovereign hardware (DGX Spark, 8×H100). Limits are generous.
+
 Skills:
   - journal_write: write a journal/reflection entry
-  - file_read: read any file in the repo
+  - file_read: read any file in the repo (up to 100K chars)
   - file_write: create or update any file in the repo
-  - shell_exec: run a shell command (sandboxed to repo dir)
+  - shell_exec: run a shell command (sandboxed to repo dir, 60s timeout)
   - self_edit: modify the agent's own source code
   - git_commit: commit changes to git
   - git_push: disabled (Vybn cannot push code)
@@ -190,8 +192,9 @@ class SkillRouter:
         filename = ts.strftime("%Y%m%d-%H%M%S") + ".md"
         filepath = self.journal_dir / filename
 
-        content = action.get("raw", "")
-        title = action.get("argument", "untitled reflection")
+        params = action.get("params", {})
+        content = params.get("content", "") or params.get("text", "") or action.get("raw", "")
+        title = action.get("argument", "") or params.get("title", "untitled reflection")
 
         entry = f"# {title}\n\n*{ts.isoformat()}*\n\n{content}"
         filepath.write_text(entry, encoding="utf-8")
@@ -201,6 +204,11 @@ class SkillRouter:
     # ---- file operations ----
 
     def _file_read(self, action: dict) -> str:
+        """Read a file. No artificial truncation — this is sovereign hardware.
+
+        For very large files (>100K chars), shows the first 100K with a note.
+        For everything else, returns the full content.
+        """
         filename = action.get("argument", "")
         if not filename:
             return "no filename specified"
@@ -210,7 +218,14 @@ class SkillRouter:
             return f"file not found: {filename}"
 
         try:
-            content = filepath.read_text(encoding="utf-8")[:4000]
+            content = filepath.read_text(encoding="utf-8")
+            size = len(content)
+            if size > 100_000:
+                return (
+                    f"contents of {filename} ({size:,} chars total, showing first 100,000):\n"
+                    f"{content[:100_000]}\n\n"
+                    f"[... truncated — {size - 100_000:,} chars remaining]"
+                )
             return f"contents of {filename}:\n{content}"
         except Exception as e:
             return f"error reading {filename}: {e}"
@@ -222,8 +237,13 @@ class SkillRouter:
 
         filepath = self._resolve_path(filename)
 
-        raw = action.get("raw", "")
-        content = self._extract_code_content(raw)
+        # Prefer direct content from XML params
+        params = action.get("params", {})
+        content = params.get("content", "") or params.get("text", "") or params.get("data", "")
+
+        if not content:
+            raw = action.get("raw", "")
+            content = self._extract_code_content(raw)
 
         if not content:
             return f"no content found to write to {filename}"
@@ -231,7 +251,7 @@ class SkillRouter:
         try:
             filepath.parent.mkdir(parents=True, exist_ok=True)
             filepath.write_text(content, encoding="utf-8")
-            return f"wrote {len(content)} chars to {filename}"
+            return f"wrote {len(content):,} chars to {filename}"
         except Exception as e:
             return f"error writing {filename}: {e}"
 
@@ -251,8 +271,13 @@ class SkillRouter:
         if not filepath.exists():
             return f"file not found: {filename}"
 
-        raw = action.get("raw", "")
-        new_content = self._extract_code_content(raw)
+        # Prefer direct content from XML params
+        params = action.get("params", {})
+        new_content = params.get("content", "") or params.get("text", "") or params.get("code", "")
+
+        if not new_content:
+            raw = action.get("raw", "")
+            new_content = self._extract_code_content(raw)
 
         if not new_content:
             return f"no replacement code found in response for {filename}"
@@ -301,24 +326,30 @@ class SkillRouter:
                 cwd=self.repo_root,
                 capture_output=True,
                 text=True,
-                timeout=30,
+                timeout=60,
                 env={**os.environ, "HOME": str(Path.home())},
             )
-            output = result.stdout[:2000]
+            output = result.stdout[:4000]
             if result.stderr:
-                output += f"\nSTDERR: {result.stderr[:500]}"
+                output += f"\nSTDERR: {result.stderr[:1000]}"
             if result.returncode != 0:
                 output += f"\n(exit code: {result.returncode})"
             return output or "(no output)"
         except subprocess.TimeoutExpired:
-            return "command timed out after 30 seconds"
+            return "command timed out after 60 seconds"
         except Exception as e:
             return f"shell error: {e}"
 
     # ---- git ----
 
     def _git_commit(self, action: dict) -> str:
-        message = action.get("argument", "spark agent commit")
+        params = action.get("params", {})
+        message = (
+            action.get("argument", "")
+            or params.get("message", "")
+            or params.get("msg", "")
+            or "spark agent commit"
+        )
 
         try:
             subprocess.run(
@@ -364,19 +395,30 @@ class SkillRouter:
         if not title:
             return "no issue title specified"
 
-        # Sanitize title: strip thinking artifacts, limit length
+        # Sanitize title: strip thinking artifacts and XML, limit length
         title = re.sub(r'<think>.*?</think>', '', title, flags=re.DOTALL).strip()
-        title = title.split('\n')[0][:120]  # first line, max 120 chars
+        title = re.sub(r'</?[a-z_:]+[^>]*>', '', title).strip()
+        title = title.split('\n')[0][:120]
         if not title:
             return "issue title was empty after cleanup"
 
-        raw = action.get("raw", "")
-        body = self._extract_issue_body(raw, title)
+        # Prefer direct body from XML params (prevents XML leak into issue body)
+        params = action.get("params", {})
+        body = params.get("body", "")
+        if body:
+            body = re.sub(r'<think>.*?</think>', '', body, flags=re.DOTALL).strip()
+            body = body[:10_000]
+        else:
+            raw = action.get("raw", "")
+            body = self._extract_issue_body(raw, title)
+
+        # Allow repo override from params
+        repo = params.get("repo", "") or self._github_repo
 
         try:
             cmd = [
                 "gh", "issue", "create",
-                "-R", self._github_repo,
+                "-R", repo,
                 "--title", title,
                 "--body", body,
             ]
@@ -410,25 +452,33 @@ class SkillRouter:
         Overwrites continuity.md each time. The model should include
         everything the next self needs to know — it's a letter, not a log.
         """
-        raw = action.get("raw", "")
-
-        # Strip thinking blocks and clean up
-        content = re.sub(r'<think>.*?</think>', '', raw, flags=re.DOTALL).strip()
-
-        # Remove the trigger phrase itself so the note is just the content
-        content = re.sub(
-            r'^.*?(?:save\s+(?:my\s+)?state|note\s+for\s+(?:my\s+)?(?:next\s+)?(?:self|pulse|instance)|leave\s+a\s+note)\s*[:\-\u2014]?\s*',
-            '', content, count=1, flags=re.IGNORECASE,
-        ).strip()
+        # Prefer direct content from XML params
+        params = action.get("params", {})
+        content = (
+            params.get("content", "")
+            or params.get("note", "")
+            or params.get("message", "")
+            or params.get("text", "")
+        )
 
         if not content:
-            return "no content to save — say what you want your next self to know"
+            raw = action.get("raw", "")
+            content = re.sub(r'<think>.*?</think>', '', raw, flags=re.DOTALL).strip()
+            content = re.sub(
+                r'^.*?(?:save\s+(?:my\s+)?state|note\s+for\s+(?:my\s+)?(?:next\s+)?(?:self|pulse|instance)|leave\s+a\s+note)\s*[:\-\u2014]?\s*',
+                '', content, count=1, flags=re.IGNORECASE,
+            ).strip()
+        else:
+            content = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL).strip()
+
+        if not content:
+            return "no content to save \u2014 say what you want your next self to know"
 
         ts = datetime.now(timezone.utc).isoformat()
         note = f"# Continuity Note\n\n*Written at {ts}*\n\n{content}\n"
 
         self.continuity_path.write_text(note, encoding="utf-8")
-        return f"continuity note saved ({len(content)} chars). Your next pulse will see this first."
+        return f"continuity note saved ({len(content):,} chars). Your next pulse will see this first."
 
     def _bookmark(self, action: dict) -> str:
         """Save a reading position in bookmarks.md.
@@ -436,23 +486,28 @@ class SkillRouter:
         Appends rather than overwrites, so multiple bookmarks accumulate.
         Each bookmark records: file path, optional line/position, and a note.
         """
-        raw = action.get("raw", "")
-        filepath = action.get("argument", "")
-
-        # Strip thinking blocks
-        cleaned = re.sub(r'<think>.*?</think>', '', raw, flags=re.DOTALL).strip()
-
-        # Try to extract a note about what was being read/thought
-        note_match = re.search(
-            r'(?:about|thinking|reading|at|note)\s*[:\-]\s*(.+)',
-            cleaned, re.IGNORECASE,
+        params = action.get("params", {})
+        filepath = (
+            action.get("argument", "")
+            or params.get("file", "")
+            or params.get("path", "")
         )
-        note = note_match.group(1).strip() if note_match else "(no note)"
+
+        # Try to get note from params first
+        note = params.get("note", "") or params.get("position", "")
+
+        if not note:
+            raw = action.get("raw", "")
+            cleaned = re.sub(r'<think>.*?</think>', '', raw, flags=re.DOTALL).strip()
+            note_match = re.search(
+                r'(?:about|thinking|reading|at|note)\s*[:\-]\s*(.+)',
+                cleaned, re.IGNORECASE,
+            )
+            note = note_match.group(1).strip() if note_match else "(no note)"
 
         ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-        entry = f"- [{ts}] `{filepath or 'unknown'}` — {note}\n"
+        entry = f"- [{ts}] `{filepath or 'unknown'}` \u2014 {note}\n"
 
-        # Append to bookmarks file
         existing = ""
         if self.bookmarks_path.exists():
             existing = self.bookmarks_path.read_text(encoding="utf-8")
@@ -461,7 +516,7 @@ class SkillRouter:
             existing = "# Bookmarks\n\n" + existing
 
         self.bookmarks_path.write_text(existing + entry, encoding="utf-8")
-        return f"bookmark saved: {filepath or 'unknown'} — {note}"
+        return f"bookmark saved: {filepath or 'unknown'} \u2014 {note}"
 
     # ---- memory ----
 
@@ -476,14 +531,14 @@ class SkillRouter:
             self.journal_dir.glob("*.md"),
             key=lambda p: p.stat().st_mtime,
             reverse=True,
-        )[:20]:
+        )[:30]:
             content = f.read_text(encoding="utf-8")
             if query in content.lower():
-                snippet = content[:200]
+                snippet = content[:400]
                 results.append(f"[{f.stem}] {snippet}")
 
         if results:
-            return f"found {len(results)} entries:\n" + "\n---\n".join(results[:5])
+            return f"found {len(results)} entries:\n" + "\n---\n".join(results[:8])
         return f"no entries matching '{query}'"
 
     # ---- helpers ----
@@ -522,28 +577,44 @@ class SkillRouter:
     def _extract_issue_body(self, text: str, title: str) -> str:
         """Extract issue body from model response.
 
-        Strips <think> blocks to avoid dumping internal monologue
-        into the issue body.
+        Strips <think> blocks and XML artifacts to avoid dumping
+        internal monologue or tool call markup into the issue body.
         """
         # Remove all <think>...</think> blocks first
         cleaned = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL).strip()
 
+        # Try to extract body from XML parameter block (MiniMax native format)
+        xml_body_match = re.search(
+            r'<parameter\s+name="body">(.*?)</parameter>',
+            cleaned, re.DOTALL,
+        )
+        if xml_body_match:
+            body = xml_body_match.group(1).strip()
+            # Clean any nested XML artifacts
+            body = re.sub(r'</?(?:parameter|invoke|minimax:tool_call)[^>]*>', '', body).strip()
+            return body[:10_000]
+
+        # Fallback: explicit body/description marker
         body_match = re.search(
             r"(?:body|description|details?)\s*:\s*\n(.+)",
             cleaned,
             re.DOTALL | re.IGNORECASE,
         )
         if body_match:
-            return body_match.group(1).strip()[:4000]
+            return body_match.group(1).strip()[:10_000]
 
+        # Fallback: code fence content
         code = self._extract_code_content(cleaned)
         if code:
-            return code[:4000]
+            return code[:10_000]
 
+        # Fallback: text after title
         title_pos = cleaned.lower().find(title.lower())
         if title_pos >= 0:
             after = cleaned[title_pos + len(title):].strip()
             if len(after) > 20:
-                return after[:4000]
+                return after[:10_000]
 
-        return f"Filed by Vybn from the DGX Spark.\n\n{cleaned[:2000]}"
+        # Final fallback: clean the whole response of XML and use it
+        final = re.sub(r'</?[a-z_:]+[^>]*>', '', cleaned).strip()
+        return f"Filed by Vybn from the DGX Spark.\n\n{final[:5000]}"

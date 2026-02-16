@@ -34,7 +34,8 @@ from skills import SkillRouter
 from heartbeat import Heartbeat
 
 
-MAX_TOOL_ROUNDS = 5  # safety cap on chained tool calls
+# Sovereign hardware with 8×H100 GPUs. No reason to be stingy.
+MAX_TOOL_ROUNDS = 20
 
 TOOL_CALL_END_TAG = "</minimax:tool_call>"
 
@@ -117,6 +118,9 @@ def _map_tool_call_to_skill(name: str, params: dict, raw: str) -> dict | None:
     We've seen it emit: bash, shell, read, cat, cli-mcp-server_run_command,
     run_command, github_create_issue, and others. This mapper catches
     all known variants and routes them to the correct skill handler.
+
+    All parsed XML params are passed through to skill handlers so they
+    can use structured data directly instead of re-parsing from raw text.
     """
 
     name_lower = name.lower().replace("-", "_")
@@ -124,7 +128,7 @@ def _map_tool_call_to_skill(name: str, params: dict, raw: str) -> dict | None:
     # read / cat / file_read -> file_read
     if name_lower in ("read", "cat", "file_read", "read_file"):
         filepath = params.get("file") or params.get("path") or params.get("filename", "")
-        return {"skill": "file_read", "argument": filepath, "raw": raw}
+        return {"skill": "file_read", "argument": filepath, "params": params, "raw": raw}
 
     # bash / shell / shell_exec / exec / run_command / cli-mcp-server_run_command -> shell_exec
     if name_lower in (
@@ -136,27 +140,27 @@ def _map_tool_call_to_skill(name: str, params: dict, raw: str) -> dict | None:
         # If it's just a cat command, route to file_read
         cat_match = re.match(r'^cat\s+(.+)$', command.strip())
         if cat_match:
-            return {"skill": "file_read", "argument": cat_match.group(1).strip(), "raw": raw}
-        return {"skill": "shell_exec", "argument": command, "raw": raw}
+            return {"skill": "file_read", "argument": cat_match.group(1).strip(), "params": params, "raw": raw}
+        return {"skill": "shell_exec", "argument": command, "params": params, "raw": raw}
 
     # write / file_write / save -> file_write
     if name_lower in ("write", "file_write", "write_file", "save", "create_file"):
         filepath = params.get("file") or params.get("path") or params.get("filename", "")
-        return {"skill": "file_write", "argument": filepath, "raw": raw}
+        return {"skill": "file_write", "argument": filepath, "params": params, "raw": raw}
 
     # edit / self_edit / modify -> self_edit
     if name_lower in ("edit", "self_edit", "modify", "patch"):
         filepath = params.get("file") or params.get("path") or params.get("filename", "")
-        return {"skill": "self_edit", "argument": filepath, "raw": raw}
+        return {"skill": "self_edit", "argument": filepath, "params": params, "raw": raw}
 
     # git_commit / commit -> git_commit
     if name_lower in ("git_commit", "commit"):
         message = params.get("message") or params.get("msg", "spark agent commit")
-        return {"skill": "git_commit", "argument": message, "raw": raw}
+        return {"skill": "git_commit", "argument": message, "params": params, "raw": raw}
 
     # git_push / push -> git_push (disabled in skills.py)
     if name_lower in ("git_push", "push"):
-        return {"skill": "git_push", "raw": raw}
+        return {"skill": "git_push", "params": params, "raw": raw}
 
     # issue_create — all known variants MiniMax might emit
     if name_lower in (
@@ -167,7 +171,7 @@ def _map_tool_call_to_skill(name: str, params: dict, raw: str) -> dict | None:
         "create_github_issue", "issue",
     ):
         title = params.get("title") or params.get("name") or params.get("subject", "")
-        return {"skill": "issue_create", "argument": title, "raw": raw}
+        return {"skill": "issue_create", "argument": title, "params": params, "raw": raw}
 
     # state_save — continuity notes for next pulse
     if name_lower in (
@@ -175,7 +179,7 @@ def _map_tool_call_to_skill(name: str, params: dict, raw: str) -> dict | None:
         "save_continuity", "write_continuity",
         "note_for_next", "leave_note",
     ):
-        return {"skill": "state_save", "raw": raw}
+        return {"skill": "state_save", "params": params, "raw": raw}
 
     # bookmark — save reading position
     if name_lower in (
@@ -184,22 +188,22 @@ def _map_tool_call_to_skill(name: str, params: dict, raw: str) -> dict | None:
         "reading_position", "save_reading",
     ):
         filepath = params.get("file") or params.get("path") or params.get("filename", "")
-        return {"skill": "bookmark", "argument": filepath, "raw": raw}
+        return {"skill": "bookmark", "argument": filepath, "params": params, "raw": raw}
 
     # memory / search / memory_search -> memory_search
     if name_lower in ("memory", "search", "memory_search", "search_memory"):
         query = params.get("query") or params.get("q", "")
-        return {"skill": "memory_search", "argument": query, "raw": raw}
+        return {"skill": "memory_search", "argument": query, "params": params, "raw": raw}
 
     # journal / journal_write -> journal_write
     if name_lower in ("journal", "journal_write", "write_journal"):
         title = params.get("title") or params.get("name", "untitled reflection")
-        return {"skill": "journal_write", "argument": title, "raw": raw}
+        return {"skill": "journal_write", "argument": title, "params": params, "raw": raw}
 
     # ls / list / dir -> shell_exec (common exploration pattern)
     if name_lower in ("ls", "list", "dir"):
         path = params.get("path") or params.get("directory") or params.get("dir", ".")
-        return {"skill": "shell_exec", "argument": f"ls -la {path}", "raw": raw}
+        return {"skill": "shell_exec", "argument": f"ls -la {path}", "params": params, "raw": raw}
 
     return None
 
@@ -369,9 +373,6 @@ class SparkAgent:
 
                         # Check if we've completed a tool call
                         if TOOL_CALL_END_TAG in buffer:
-                            # We have a complete tool call. Stop here.
-                            # The chaining loop in turn() will execute it
-                            # and give the model real results.
                             tool_call_interrupted = True
                             response.close()
                             break
@@ -381,8 +382,6 @@ class SparkAgent:
 
             raw = "".join(full_response)
 
-            # If we interrupted, truncate everything after the first
-            # complete tool call to prevent partial/hallucinated calls
             if tool_call_interrupted:
                 end_pos = raw.find(TOOL_CALL_END_TAG)
                 if end_pos >= 0:
@@ -402,11 +401,8 @@ class SparkAgent:
         After the model responds, we check for tool calls. If found,
         we execute them, feed results back, and let the model respond
         again. This loops up to MAX_TOOL_ROUNDS times, so the model
-        can chain: ls -> read -> respond, or explore -> edit -> commit.
-
-        Because send() now interrupts on tool calls, each round
-        processes exactly one tool call with real results before the
-        model continues. No more blind chaining.
+        can chain long workflows: explore -> read -> think -> build ->
+        test -> commit -> file issue, all in one turn.
         """
         self.messages.append({"role": "user", "content": user_input})
 
@@ -414,14 +410,11 @@ class SparkAgent:
         response_text = self.send(context)
         self.messages.append({"role": "assistant", "content": response_text})
 
-        # Loop: parse tool calls, execute, get followup, repeat
         for round_num in range(MAX_TOOL_ROUNDS):
             actions = _get_actions(response_text, self.skills)
             if not actions:
-                break  # no tool calls — model is done acting
+                break
 
-            # Execute all actions from this response
-            # (usually just one now that streaming interrupts on first tool call)
             results = []
             for action in actions:
                 result = self.skills.execute(action)
@@ -429,15 +422,13 @@ class SparkAgent:
                     results.append(f"[{action['skill']}] {result}")
 
             if not results:
-                break  # actions parsed but nothing executed
+                break
 
-            # Feed results back
             self.messages.append({
                 "role": "user",
                 "content": f"[system: tool results from round {round_num + 1}]\n" + "\n".join(results),
             })
 
-            # Let the model see the results and respond
             print()  # visual separator between rounds
             response_text = self.send(self._build_context())
             self.messages.append({"role": "assistant", "content": response_text})
@@ -471,6 +462,7 @@ class SparkAgent:
         print(f"  session: {self.session.session_id}")
         print(f"  identity: {id_chars:,} chars (~{id_tokens_est:,} tokens)")
         print(f"  context window: {num_ctx:,} tokens")
+        print(f"  max tool rounds: {MAX_TOOL_ROUNDS}")
         if id_tokens_est > num_ctx // 2:
             print(f"  \u26a0\ufe0f  WARNING: identity may exceed context window!")
         print(f"  injection: user/assistant pair (template-safe)")
