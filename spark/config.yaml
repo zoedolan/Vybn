@@ -26,7 +26,8 @@ memory:
 
 heartbeat:
   enabled: true
-  interval_minutes: 15
+  fast_interval_minutes: 3    # System 1: quick, intuitive, reactive
+  deep_interval_minutes: 20   # System 2: deliberate, reflective, synthesizing
 
 session:
   auto_resume: true
