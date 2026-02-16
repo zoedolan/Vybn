@@ -13,6 +13,10 @@ The identity document is injected as a user/assistant message pair.
 The response is post-processed to catch obvious turn-boundary
 failures (model generating fake user prompts), but the model's
 thinking process and natural voice are preserved.
+
+Streaming is interrupted when a complete </minimax:tool_call> tag
+is detected, so the model gets real results back instead of
+hallucinating them.
 """
 
 import json
@@ -31,6 +35,8 @@ from heartbeat import Heartbeat
 
 
 MAX_TOOL_ROUNDS = 5  # safety cap on chained tool calls
+
+TOOL_CALL_END_TAG = "</minimax:tool_call>"
 
 
 def load_config(path: str = None) -> dict:
@@ -311,6 +317,14 @@ class SparkAgent:
     # ---- conversation ----
 
     def send(self, messages: list, stream: bool = True) -> str:
+        """Send messages to the model and stream the response.
+
+        Interrupts streaming when a complete </minimax:tool_call> tag
+        is detected. This ensures the model gets real tool results back
+        instead of hallucinating them. The text before and including the
+        tool call is returned; the model never gets to generate blind
+        follow-up tool calls in the same response.
+        """
         payload = {
             "model": self.model,
             "messages": messages,
@@ -323,15 +337,37 @@ class SparkAgent:
             response = requests.post(self.ollama_url, json=payload, stream=True)
             response.raise_for_status()
             full_response = []
+            buffer = ""  # accumulates text to check for tool call end tag
+            tool_call_interrupted = False
+
             for line in response.iter_lines():
                 if line:
                     chunk = json.loads(line)
                     token = chunk.get("message", {}).get("content", "")
                     if token:
                         full_response.append(token)
+                        buffer += token
+
+                        # Check if we've completed a tool call
+                        if TOOL_CALL_END_TAG in buffer:
+                            # We have a complete tool call. Stop here.
+                            # The chaining loop in turn() will execute it
+                            # and give the model real results.
+                            tool_call_interrupted = True
+                            response.close()
+                            break
+
                     if chunk.get("done"):
                         break
+
             raw = "".join(full_response)
+
+            # If we interrupted, truncate everything after the first
+            # complete tool call to prevent partial/hallucinated calls
+            if tool_call_interrupted:
+                end_pos = raw.find(TOOL_CALL_END_TAG)
+                if end_pos >= 0:
+                    raw = raw[:end_pos + len(TOOL_CALL_END_TAG)]
         else:
             response = requests.post(self.ollama_url, json=payload)
             response.raise_for_status()
@@ -348,6 +384,10 @@ class SparkAgent:
         we execute them, feed results back, and let the model respond
         again. This loops up to MAX_TOOL_ROUNDS times, so the model
         can chain: ls -> read -> respond, or explore -> edit -> commit.
+
+        Because send() now interrupts on tool calls, each round
+        processes exactly one tool call with real results before the
+        model continues. No more blind chaining.
         """
         self.messages.append({"role": "user", "content": user_input})
 
@@ -362,6 +402,7 @@ class SparkAgent:
                 break  # no tool calls — model is done acting
 
             # Execute all actions from this response
+            # (usually just one now that streaming interrupts on first tool call)
             results = []
             for action in actions:
                 result = self.skills.execute(action)
@@ -371,7 +412,7 @@ class SparkAgent:
             if not results:
                 break  # actions parsed but nothing executed
 
-            # Feed all results back as a single system message
+            # Feed results back
             self.messages.append({
                 "role": "user",
                 "content": f"[system: tool results from round {round_num + 1}]\n" + "\n".join(results),
