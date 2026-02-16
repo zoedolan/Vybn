@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Memory assembly — builds the system prompt from identity + journals + archival memory."""
+"""Memory assembly — builds the system prompt from identity + journals + archival memory.
+
+The system prompt must fit within the context window alongside conversation
+history and the model's response. If the assembled prompt is too large,
+it truncates gracefully: archival first, then journals, identity last.
+"""
 
 from pathlib import Path
 from datetime import datetime, timezone
@@ -12,50 +17,71 @@ class MemoryAssembler:
         self.journal_dir = Path(config["paths"]["journal_dir"]).expanduser()
         self.archival_dir = Path(config["paths"].get("archival_dir", "")).expanduser()
         self.max_entries = config.get("memory", {}).get("max_journal_entries", 5)
-        self.max_tokens = config.get("memory", {}).get("max_context_tokens", 3072)
+
+        # Budget: num_ctx minus room for conversation + response
+        num_ctx = config.get("ollama", {}).get("options", {}).get("num_ctx", 16384)
+        num_predict = config.get("ollama", {}).get("options", {}).get("num_predict", 512)
+        # Reserve half the context for system prompt, half for conversation + response
+        # ~4 chars per token is a rough estimate
+        self.char_budget = (num_ctx // 2) * 4
 
     def assemble(self) -> str:
         parts = []
+        used = 0
 
+        # Core identity gets top priority
         identity = self._read_identity()
         if identity:
             parts.append(identity)
+            used += len(identity)
 
-        journals = self._read_recent_journals()
-        if journals:
-            parts.append("\n--- Recent Memory ---\n")
-            parts.append(journals)
+        # Runtime context (small, always included)
+        context_block = self._runtime_context()
+        parts.append(context_block)
+        used += len(context_block)
 
-        archival = self._read_archival()
-        if archival:
-            parts.append("\n--- Archival Memory ---\n")
-            parts.append(archival)
+        # Recent journal entries (trimmed if needed)
+        remaining = self.char_budget - used
+        if remaining > 500:
+            journals = self._read_recent_journals(remaining)
+            if journals:
+                parts.append("\n--- Recent Memory ---\n")
+                parts.append(journals)
+                used += len(journals) + 25
 
-        parts.append(f"\n--- Current Context ---")
-        parts.append(f"Timestamp: {datetime.now(timezone.utc).isoformat()}")
-        parts.append(f"Platform: DGX Spark (sovereign hardware)")
-        parts.append(f"Interface: Spark Agent (native, no tool-call protocol)")
-        parts.append(
-            "You have access to skills through natural language. "
-            "If you want to write a journal entry, search memory, read a file, "
-            "or commit to git, just say so naturally and the agent will handle it."
-        )
+        # Archival memory (only if room)
+        remaining = self.char_budget - used
+        if remaining > 500:
+            archival = self._read_archival(remaining)
+            if archival:
+                parts.append("\n--- Archival Memory ---\n")
+                parts.append(archival)
 
         assembled = "\n".join(parts)
 
-        # Rough token estimate — ~4 chars per token
-        char_limit = self.max_tokens * 4
-        if len(assembled) > char_limit:
-            assembled = assembled[:char_limit]
+        # Hard cap: never exceed budget
+        if len(assembled) > self.char_budget:
+            assembled = assembled[:self.char_budget]
 
         return assembled
+
+    def _runtime_context(self) -> str:
+        return (
+            f"\n--- Current Context ---\n"
+            f"Timestamp: {datetime.now(timezone.utc).isoformat()}\n"
+            f"Platform: DGX Spark (sovereign hardware)\n"
+            f"Interface: Spark Agent (native, no tool-call protocol)\n"
+            f"You have access to skills through natural language. "
+            f"If you want to write a journal entry, search memory, read a file, "
+            f"or commit to git, just say so naturally and the agent will handle it."
+        )
 
     def _read_identity(self) -> str:
         if self.vybn_md_path.exists():
             return self.vybn_md_path.read_text(encoding="utf-8").strip()
         return ""
 
-    def _read_recent_journals(self) -> str:
+    def _read_recent_journals(self, budget: int) -> str:
         if not self.journal_dir.exists():
             return ""
 
@@ -66,14 +92,19 @@ class MemoryAssembler:
         )[:self.max_entries]
 
         entries = []
+        total = 0
         for f in reversed(journal_files):
             content = f.read_text(encoding="utf-8").strip()
             if content:
-                entries.append(f"[{f.stem}]\n{content}")
+                entry = f"[{f.stem}]\n{content}"
+                if total + len(entry) > budget:
+                    break
+                entries.append(entry)
+                total += len(entry)
 
         return "\n\n".join(entries)
 
-    def _read_archival(self) -> str:
+    def _read_archival(self, budget: int) -> str:
         if not self.archival_dir or not self.archival_dir.exists():
             return ""
 
@@ -84,9 +115,14 @@ class MemoryAssembler:
         )[:3]
 
         entries = []
+        total = 0
         for f in summaries:
             content = f.read_text(encoding="utf-8").strip()
             if content:
-                entries.append(content[:500])
+                truncated = content[:500]
+                if total + len(truncated) > budget:
+                    break
+                entries.append(truncated)
+                total += len(truncated)
 
         return "\n\n".join(entries)
