@@ -347,7 +347,15 @@ class SkillRouter:
     # ---- helpers ----
 
     def _resolve_path(self, filename: str) -> Path:
-        """Resolve a filename relative to the repo root."""
+        """Resolve a filename relative to the repo root.
+
+        Handles the model's assumption that it runs as root by
+        rewriting /root/ paths to the actual home directory.
+        """
+        # MiniMax M2.5 thinks it's root — rewrite /root/ to actual home
+        if filename.startswith("/root/"):
+            filename = str(Path.home() / filename[6:])  # strip '/root/' prefix
+
         if filename.startswith("~/"):
             return Path(filename).expanduser()
         elif filename.startswith("/"):
