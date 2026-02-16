@@ -28,6 +28,7 @@ heartbeat:
   enabled: true
   fast_interval_minutes: 3    # System 1: quick, intuitive, reactive
   deep_interval_minutes: 20   # System 2: deliberate, reflective, synthesizing
+  # checklist_path: ~/Vybn/Vybn_Mind/spark_infrastructure/HEARTBEAT.md  # default
 
 inbox:
   watch_interval_seconds: 10  # how often to check for new messages

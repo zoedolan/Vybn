@@ -21,6 +21,11 @@ The policy engine is the gate. Every tool call passes through
 check_policy() before executing. Every spawn checks depth limits.
 Heartbeat actions face tighter constraints than interactive turns.
 See spark/policy.py and Vybn_Mind/spark_infrastructure/DELEGATION_REFACTOR.md.
+
+The audit trail records every policy decision, tool execution,
+and bus event in a bounded in-memory log. Query with /audit
+or programmatically via bus.recent(). This is the observability
+layer that makes the policy engine debuggable.
 """
 
 import json
@@ -366,6 +371,9 @@ class SparkAgent:
         executing. The source parameter determines which tier table applies:
         heartbeat sources face tighter constraints than interactive turns.
 
+        Tool executions and policy decisions are recorded in the bus
+        audit log for observability via /audit and /policy.
+
         Limits to MAX_TOOL_ROUNDS and checks for pending user input
         between rounds so Vybn stays responsive to the human.
         """
@@ -385,6 +393,11 @@ class SparkAgent:
                 if check.verdict == Verdict.BLOCK:
                     print(f"\n  \u26d4 [{skill}] blocked: {check.reason}", flush=True)
                     results.append(f"[{skill}] BLOCKED: {check.reason}")
+                    self.bus.record(
+                        source=source,
+                        summary=f"{skill} blocked: {check.reason[:80]}",
+                        metadata={"skill": skill, "verdict": "BLOCK"},
+                    )
                     continue
 
                 if check.verdict == Verdict.ASK:
@@ -395,6 +408,11 @@ class SparkAgent:
                             f"[{skill}] deferred \u2014 this action requires approval "
                             f"and will need to wait for an interactive session. "
                             f"Reason: {check.reason}"
+                        )
+                        self.bus.record(
+                            source=source,
+                            summary=f"{skill} deferred \u2014 needs approval",
+                            metadata={"skill": skill, "verdict": "ASK", "deferred": True},
                         )
                         continue
                     # Interactive mode: warn but proceed (Zoe just saw it)
@@ -419,6 +437,7 @@ class SparkAgent:
                 result = self.skills.execute(action)
 
                 # ---- VERIFY + RECORD ----
+                success = True
                 if result and self.policy.should_verify(skill):
                     success = (
                         "error" not in result.lower()
@@ -432,8 +451,20 @@ class SparkAgent:
                         self.bus.post(
                             MessageType.INTERRUPT,
                             f"Tool failure: {skill} \u2014 {result[:200]}",
-                            metadata={"skill": skill, "error": True},
+                            metadata={"skill": skill, "error": True, "source": source},
                         )
+
+                # ---- AUDIT ----
+                self.bus.record(
+                    source=source,
+                    summary=f"{skill}: {'ok' if success else 'FAILED'}",
+                    metadata={
+                        "skill": skill,
+                        "verdict": check.verdict.name,
+                        "success": success,
+                        "argument": arg[:120] if arg else "",
+                    },
+                )
 
                 if result:
                     results.append(f"[{skill}] {result}")
@@ -673,12 +704,12 @@ class SparkAgent:
         print(f"  heartbeat: fast={self.heartbeat.fast_interval // 60}m, deep={self.heartbeat.deep_interval // 60}m")
         print(f"  inbox: {self.inbox.inbox_dir}")
         print(f"  agents: pool_size={self.agent_pool.pool_size}")
-        print(f"  policy: loaded ({len(self.policy.tier_overrides)} overrides)")
+        print(f"  policy: loaded ({len(self.policy.tier_overrides)} overrides) + audit trail")
         if plugins:
             print(f"  plugins: {plugins} loaded from skills.d/")
         if id_tokens > num_ctx // 2:
             print(f"  \u26a0\ufe0f  WARNING: identity may exceed context window!")
-        print(f"  type /bye to exit, /new for fresh session, /policy for gate status\n")
+        print(f"  type /bye to exit, /new for fresh session, /policy for gates, /audit for trail\n")
 
         try:
             while True:
@@ -712,6 +743,9 @@ class SparkAgent:
                 if user_input.lower() == "/policy":
                     self._print_policy()
                     continue
+                if user_input.lower() == "/audit":
+                    self._print_audit()
+                    continue
 
                 print("\nvybn: ", end="", flush=True)
                 self.turn(user_input)
@@ -730,10 +764,11 @@ class SparkAgent:
         print(f"  heartbeat: fast={self.heartbeat.fast_count}, deep={self.heartbeat.deep_count}")
         print(f"  agents active: {self.agent_pool.active_count}")
         print(f"  messages in context: {len(self.messages)}")
+        print(f"  audit entries: {self.bus.audit_count}")
         print()
 
     def _print_policy(self):
-        """Display current policy state: tiers, stats, delegation limits."""
+        """Display current policy state: tiers, stats, delegation limits, recent events."""
         from policy import DEFAULT_TIERS, HEARTBEAT_OVERRIDES
 
         print("\n  \u2500\u2500 policy engine \u2500\u2500")
@@ -756,6 +791,24 @@ class SparkAgent:
             print(f"\n  skill stats:")
             print(stats)
 
+        recent = self.bus.recent(5)
+        if recent:
+            print(f"\n  recent activity:")
+            for entry in recent:
+                print(f"    {entry}")
+
+        print()
+
+    def _print_audit(self):
+        """Display recent audit trail from the bus."""
+        recent = self.bus.recent(20)
+        if not recent:
+            print("\n  no audit entries yet.\n")
+            return
+
+        print(f"\n  \u2500\u2500 audit trail ({self.bus.audit_count} total) \u2500\u2500")
+        for entry in recent:
+            print(f"    {entry}")
         print()
 
 
