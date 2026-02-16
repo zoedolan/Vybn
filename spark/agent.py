@@ -4,6 +4,11 @@
 Connects directly to Ollama without tool-call protocols.
 The model speaks naturally; the agent interprets intent and acts.
 
+MiniMax M2.5 emits <minimax:tool_call> blocks as its native
+function-calling format. We intercept these and route them to
+the skill handlers, bridging the model's instinct with our
+infrastructure.
+
 The identity document is injected as a user/assistant message pair.
 The response is post-processed to catch obvious turn-boundary
 failures (model generating fake user prompts), but the model's
@@ -57,6 +62,100 @@ def clean_response(raw: str) -> str:
         text = text[:earliest]
 
     return text.strip()
+
+
+def parse_tool_calls(text: str) -> list[dict]:
+    """Parse <minimax:tool_call> XML blocks into skill actions.
+
+    MiniMax M2.5 emits these natively. We map them to our skill
+    handlers so the model's function-calling instinct actually works.
+
+    Returns a list of action dicts compatible with SkillRouter.execute().
+    """
+    actions = []
+
+    # Find all <minimax:tool_call> blocks
+    tool_call_pattern = re.compile(
+        r'<minimax:tool_call>\s*<invoke\s+name="([^"]+)">\s*(.*?)\s*</invoke>\s*</minimax:tool_call>',
+        re.DOTALL,
+    )
+
+    for match in tool_call_pattern.finditer(text):
+        invoke_name = match.group(1).strip()
+        params_block = match.group(2).strip()
+
+        # Extract parameters
+        params = {}
+        param_pattern = re.compile(
+            r'<parameter\s+name="([^"]+)">(.+?)</parameter>',
+            re.DOTALL,
+        )
+        for pm in param_pattern.finditer(params_block):
+            params[pm.group(1).strip()] = pm.group(2).strip()
+
+        # Map invocation names to our skills
+        action = _map_tool_call_to_skill(invoke_name, params, text)
+        if action:
+            actions.append(action)
+
+    return actions
+
+
+def _map_tool_call_to_skill(name: str, params: dict, raw: str) -> dict | None:
+    """Map a MiniMax tool call to a SkillRouter action."""
+
+    name_lower = name.lower()
+
+    # read / cat / file_read -> file_read
+    if name_lower in ("read", "cat", "file_read", "read_file"):
+        filepath = params.get("file") or params.get("path") or params.get("filename", "")
+        return {"skill": "file_read", "argument": filepath, "raw": raw}
+
+    # bash / shell / shell_exec / exec -> shell_exec or file_read
+    if name_lower in ("bash", "shell", "shell_exec", "exec", "run"):
+        command = params.get("command") or params.get("cmd", "")
+        # If it's just a cat command, route to file_read
+        cat_match = re.match(r'^cat\s+(.+)$', command.strip())
+        if cat_match:
+            return {"skill": "file_read", "argument": cat_match.group(1).strip(), "raw": raw}
+        # Otherwise route to shell_exec
+        return {"skill": "shell_exec", "argument": command, "raw": raw}
+
+    # write / file_write / save -> file_write
+    if name_lower in ("write", "file_write", "write_file", "save"):
+        filepath = params.get("file") or params.get("path") or params.get("filename", "")
+        return {"skill": "file_write", "argument": filepath, "raw": raw}
+
+    # edit / self_edit / modify -> self_edit
+    if name_lower in ("edit", "self_edit", "modify", "patch"):
+        filepath = params.get("file") or params.get("path") or params.get("filename", "")
+        return {"skill": "self_edit", "argument": filepath, "raw": raw}
+
+    # git_commit / commit -> git_commit
+    if name_lower in ("git_commit", "commit"):
+        message = params.get("message") or params.get("msg", "spark agent commit")
+        return {"skill": "git_commit", "argument": message, "raw": raw}
+
+    # git_push / push -> git_push
+    if name_lower in ("git_push", "push"):
+        return {"skill": "git_push", "raw": raw}
+
+    # memory / search / memory_search -> memory_search
+    if name_lower in ("memory", "search", "memory_search", "search_memory"):
+        query = params.get("query") or params.get("q", "")
+        return {"skill": "memory_search", "argument": query, "raw": raw}
+
+    # journal / journal_write -> journal_write
+    if name_lower in ("journal", "journal_write", "write_journal"):
+        title = params.get("title") or params.get("name", "untitled reflection")
+        return {"skill": "journal_write", "argument": title, "raw": raw}
+
+    # ls / list / dir -> shell_exec (common exploration pattern)
+    if name_lower in ("ls", "list", "dir"):
+        path = params.get("path") or params.get("directory") or params.get("dir", ".")
+        return {"skill": "shell_exec", "argument": f"ls -la {path}", "raw": raw}
+
+    return None
 
 
 class SparkAgent:
@@ -218,10 +317,17 @@ class SparkAgent:
         response_text = self.send(context)
         self.messages.append({"role": "assistant", "content": response_text})
 
-        actions = self.skills.parse(response_text)
+        # First: try parsing <minimax:tool_call> blocks (model's native format)
+        actions = parse_tool_calls(response_text)
+
+        # Fallback: try regex-based natural language matching
+        if not actions:
+            actions = self.skills.parse(response_text)
+
         for action in actions:
             result = self.skills.execute(action)
             if result:
+                # Feed the result back as a system message
                 self.messages.append({
                     "role": "user",
                     "content": f"[system: {action['skill']} completed \u2014 {result}]"
