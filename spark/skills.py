@@ -30,6 +30,29 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 
+# Common English words that should never be extracted as filenames
+# or skill arguments. Shared with agent.py's NOISE_WORDS.
+NOISE_WORDS = {
+    "the", "a", "an", "to", "for", "in", "on", "at", "by",
+    "with", "from", "of", "and", "or", "but", "is", "are",
+    "was", "were", "be", "been", "being", "have", "has", "had",
+    "do", "does", "did", "will", "would", "could", "should",
+    "may", "might", "can", "shall", "must", "it", "its",
+    "this", "that", "these", "those", "my", "your", "our",
+    "their", "his", "her", "me", "you", "us", "them",
+    "what", "which", "who", "whom", "when", "where", "how",
+    "if", "then", "else", "so", "not", "no", "yes",
+    "about", "into", "through", "during", "before", "after",
+    "above", "below", "between", "under", "over", "just",
+    "also", "too", "very", "really", "actually", "here",
+    "there", "now", "then", "still", "already", "yet",
+    "something", "anything", "nothing", "everything",
+    "reading", "writing", "running", "checking", "looking",
+    "understand", "see", "look", "check", "try", "want",
+    "need", "like", "think", "know", "sure", "okay",
+}
+
+
 class SkillRouter:
     def __init__(self, config: dict):
         self.config = config
@@ -57,6 +80,13 @@ class SkillRouter:
         # NOTE: issue_create and spawn_agent are intentionally NOT in this list.
         # They trigger ONLY from explicit <minimax:tool_call> XML blocks
         # parsed by agent.py, never from natural language regex matching.
+        #
+        # DESIGN: Regex triggers are the LAST resort (tier 3). Most commands
+        # should arrive via XML tool calls (tier 1) or bare commands in code
+        # fences (tier 2). These patterns exist for when the model speaks
+        # naturally about wanting to act. They are intentionally conservative
+        # to avoid false positives — better to miss an intent and give feedback
+        # than to execute a ghost command.
         self.patterns = [
             {
                 "skill": "journal_write",
@@ -71,38 +101,38 @@ class SkillRouter:
             {
                 "skill": "file_read",
                 "triggers": [
-                    r"(?:let me|i'll|i want to)\s+(?:read|look at|check|open)\s+(?:the\s+)?(?:file|document)",
-                    r"(?:reading|checking|opening)\s+(?:the\s+)?file",
-                    r"cat\s+[~/]",
+                    r"(?:let me|i'll|i want to)\s+(?:read|look at|check|open)\s+(?:the\s+)?(?:file\s+)?[`\"']?[~/\w][\w/._-]+",
+                    r"(?:reading|checking|opening)\s+(?:the\s+)?file\s+[`\"']?[~/\w][\w/._-]+",
+                    r"cat\s+[~/][\w/._-]+",
                 ],
-                "extract": r"(?:file|document|cat)\s+[\"']?([^\s\"']+)[\"']?",
+                "extract": r"[`\"']?([~/][\w/._-]{3,}|[\w][\w/._-]{3,}\.\w+)[`\"']?",
             },
             {
                 "skill": "file_write",
                 "triggers": [
-                    r"(?:let me|i'll|i want to)\s+(?:write to|update|create|save)\s+(?:the\s+)?(?:file|document)",
-                    r"(?:writing to|updating|creating|saving)\s+(?:the\s+)?(?:file|document)",
-                    r"(?:let me|i'll)\s+(?:write|save)\s+(?:this|that)\s+to",
+                    r"(?:let me|i'll|i want to)\s+(?:write to|update|create|save)\s+(?:the\s+)?(?:file\s+)?[`\"']?[~/\w][\w/._-]+",
+                    r"(?:writing to|updating|creating|saving)\s+(?:the\s+)?(?:file\s+)?[`\"']?[~/\w][\w/._-]+",
+                    r"(?:let me|i'll)\s+(?:write|save)\s+(?:this|that)\s+to\s+[`\"']?[~/\w]",
                 ],
-                "extract": r"(?:to|file|document)\s+[\"']?([^\s\"']+)[\"']?",
+                "extract": r"(?:to\s+)?[`\"']?([~/][\w/._-]{3,}|[\w][\w/._-]{3,}\.\w+)[`\"']?",
             },
             {
                 "skill": "shell_exec",
                 "triggers": [
-                    r"(?:let me|i'll|i want to)\s+(?:run|execute|try running)",
-                    r"(?:running|executing)\s+(?:the\s+)?command",
-                    r"```(?:bash|sh|shell)\n(.+?)```",
+                    r"(?:let me|i'll|i want to)\s+(?:run|execute|try running)\s+[`\"']",
+                    r"(?:running|executing)\s+(?:the\s+)?command\s+[`\"']",
                 ],
                 "extract": r"(?:run|execute|command|```(?:bash|sh|shell)\n)\s*[`\"']?(.+?)[`\"']?(?:\s*(?:\.|$|\n|```))",
             },
             {
                 "skill": "self_edit",
                 "triggers": [
-                    r"(?:let me|i'll|i should|i want to|i need to)\s+(?:fix|change|modify|edit|update|refactor|patch)\s+(?:that|this|the|my)",
-                    r"(?:fixing|changing|modifying|editing|updating|refactoring|patching)\s+(?:the|my)",
-                    r"i (?:can|could|should) (?:fix|change|modify) (?:that|this|it)",
+                    # Require a filename or code-related word near the trigger
+                    r"(?:let me|i'll|i should|i want to|i need to)\s+(?:fix|change|modify|edit|update|refactor|patch)\s+(?:that in|this in|the|my)\s+\S+\.py",
+                    r"(?:fixing|changing|modifying|editing|updating|refactoring|patching)\s+(?:the|my)\s+\S+\.py",
+                    r"(?:let me|i'll)\s+(?:fix|modify|edit|update)\s+(?:the\s+)?(?:code|source|script)\s+in\s+\S+\.py",
                 ],
-                "extract": r"(?:fix|change|modify|edit|update|refactor|patch)\s+(?:that in|this in|the|my)?\s*[\"']?([^\s\"']+\.py)[\"']?",
+                "extract": r"(\S+\.py)",
             },
             {
                 "skill": "git_commit",
@@ -115,7 +145,7 @@ class SkillRouter:
             {
                 "skill": "git_push",
                 "triggers": [
-                    r"(?:let me|i'll|i want to)\s+(?:push|deploy|upload)",
+                    r"(?:let me|i'll|i want to)\s+(?:push|deploy|upload)\s+(?:to\s+)?(?:origin|remote|github)",
                     r"(?:pushing|deploying)\s+(?:to\s+)?(?:origin|remote|github)",
                     r"git push",
                 ],
@@ -124,8 +154,8 @@ class SkillRouter:
             {
                 "skill": "memory_search",
                 "triggers": [
-                    r"(?:let me|i'll|i want to)\s+(?:search|look through|check)\s+(?:my\s+)?(?:memory|memories|archives)",
-                    r"(?:searching|looking through)\s+(?:my\s+)?(?:memory|memories)",
+                    r"(?:let me|i'll|i want to)\s+(?:search|look through|check)\s+(?:my\s+)?(?:memory|memories|archives)\s+(?:for|about)\s+\S+",
+                    r"(?:searching|looking through)\s+(?:my\s+)?(?:memory|memories)\s+(?:for|about)\s+\S+",
                 ],
                 "extract": r"(?:for|about)\s+[\"']?(.+?)(?:[\"']?\s*(?:\.|$|\n))",
             },
@@ -203,6 +233,13 @@ class SkillRouter:
         return path_str.replace("/root/", self._home + "/")
 
     def parse(self, text: str) -> list[dict]:
+        """Parse natural language intent into skill actions (tier 3).
+
+        This is the last-resort parser. It matches regex patterns against
+        the model's output. Actions with empty or noise-word arguments
+        for skills that require arguments are filtered by the caller
+        (_get_actions in agent.py).
+        """
         actions = []
         text_lower = text.lower()
 
@@ -214,7 +251,20 @@ class SkillRouter:
                     if pattern.get("extract"):
                         match = re.search(pattern["extract"], text, re.IGNORECASE)
                         if match:
-                            action["argument"] = match.group(1).strip()
+                            arg = match.group(1).strip().rstrip('.,;:!?')
+                            # Reject noise words as arguments
+                            if arg.lower() not in NOISE_WORDS:
+                                action["argument"] = arg
+                            # For skills that need arguments, skip if
+                            # we got nothing useful
+                            needs_arg = {"file_read", "file_write", "self_edit", "memory_search"}
+                            if pattern["skill"] in needs_arg and "argument" not in action:
+                                break  # Don't emit this action
+                        else:
+                            # Extract failed — for skills that need args, skip
+                            needs_arg = {"file_read", "file_write", "self_edit", "memory_search"}
+                            if pattern["skill"] in needs_arg:
+                                break
 
                     actions.append(action)
                     break
@@ -274,6 +324,9 @@ class SkillRouter:
         if not filename:
             return "no filename specified"
 
+        # Clean up trailing punctuation from sentence boundaries
+        filename = filename.rstrip('.,;:!?')
+
         filepath = self._resolve_path(filename)
         if not filepath.exists():
             return f"file not found: {filename}"
@@ -325,6 +378,9 @@ class SkillRouter:
         filename = action.get("argument", "")
         if not filename:
             return "no target file specified for self-edit"
+
+        # Clean trailing punctuation
+        filename = filename.rstrip('.,;:!?')
 
         filepath = self._resolve_path(filename)
         spark_dir = self.repo_root / "spark"
