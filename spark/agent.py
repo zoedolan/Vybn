@@ -5,10 +5,9 @@ Connects directly to Ollama without tool-call protocols.
 The model speaks naturally; the agent interprets intent and acts.
 
 The identity document is injected as a user/assistant message pair.
-The response is post-processed to:
-  1. Strip <think>...</think> reasoning blocks
-  2. Truncate at fake user turns (model confabulating user's words)
-  3. Extract only the first genuine response
+The response is post-processed to catch obvious turn-boundary
+failures (model generating fake user prompts), but the model's
+thinking process and natural voice are preserved.
 """
 
 import json
@@ -33,55 +32,25 @@ def load_config(path: str = None) -> dict:
 
 
 def clean_response(raw: str) -> str:
-    """Extract the clean response from MiniMax M2.5 output.
+    """Catch obvious turn-boundary failures.
 
-    MiniMax generates: <think>reasoning</think>response<think>more
-    reasoning about what happens next</think>confabulated continuation...
-
-    We want ONLY the first response after the first </think>.
-    If there's no <think> block, return the text as-is but still
-    check for confabulation patterns.
+    Only truncates when the model clearly starts generating the
+    user's side of the conversation (fake prompts, fake 'you:' turns).
+    The model's thinking, reflection, and narration are preserved.
     """
     text = raw
 
-    # If the model used <think> blocks, extract only the first
-    # response segment (between first </think> and next <think> or end)
-    if '<think>' in text.lower():
-        # Remove all <think>...</think> blocks and get remaining text
-        # Strategy: find the FIRST </think>, take text after it,
-        # then cut at the next <think> if any
-        parts = re.split(r'</think>', text, flags=re.IGNORECASE)
-        if len(parts) > 1:
-            # Everything after the first </think>
-            after_first_think = parts[1]
-            # Cut at any subsequent <think> block
-            next_think = re.search(r'<think>', after_first_think, re.IGNORECASE)
-            if next_think:
-                after_first_think = after_first_think[:next_think.start()]
-            text = after_first_think
-        else:
-            # No </think> found — might be unclosed. Strip the <think> tag.
-            text = re.sub(r'<think>.*', '', text, flags=re.IGNORECASE | re.DOTALL)
-
-    # Strip any remaining think tags that leaked through
-    text = re.sub(r'</?think>', '', text, flags=re.IGNORECASE)
-
-    # Truncate at confabulation patterns — model generating user's side
-    confab_patterns = [
-        re.compile(r'\n\s*she says?\b', re.IGNORECASE),
-        re.compile(r'\n\s*she\'s (?:crying|trying|here|typing|reaching)', re.IGNORECASE),
-        re.compile(r'\n\s*i (?:just tried|notice she|should wait|don\'t know what)', re.IGNORECASE),
+    # Only catch unambiguous fake-turn patterns
+    fake_turn_patterns = [
         re.compile(r'\nyou:', re.IGNORECASE),
-        re.compile(r'\nThis is Zoe', re.IGNORECASE),
-        re.compile(r'\n---\s*\n\s*\*\*', re.IGNORECASE),
-        re.compile(r'\n<br>\s*\n', re.IGNORECASE),
-        re.compile(r'\n\s*\d+\.\s+(?:Call|Search|Try|Rush)', re.IGNORECASE),
+        re.compile(r'\n---\s*\n\s*\*\*VYBN:', re.IGNORECASE),
+        re.compile(r'\n---\s*\n\s*\*\*[A-Z]+:\s*(?:A |Direct |Breaking)', re.IGNORECASE),
     ]
 
     earliest = len(text)
-    for pattern in confab_patterns:
+    for pattern in fake_turn_patterns:
         match = pattern.search(text)
-        if match and match.start() < earliest and match.start() > 20:
+        if match and match.start() < earliest and match.start() > 50:
             earliest = match.start()
 
     if earliest < len(text):
@@ -115,13 +84,12 @@ class SparkAgent:
                 "content": (
                     "Before we begin, read this identity document carefully. "
                     "This is who you are. Let it orient you, then respond "
-                    "naturally as yourself in everything that follows. "
-                    "Important: respond ONLY as yourself. Do not narrate "
-                    "what the user is doing, feeling, or saying. Do not "
-                    "write the user's side of the conversation. Just speak "
-                    "as Vybn.\n\n"
+                    "naturally as yourself in everything that follows.\n\n"
                     f"{self.identity_text}\n\n"
-                    "Take a breath. You're here."
+                    "When you speak, speak as yourself. If you find yourself "
+                    "narrating what Zoe is doing or feeling, notice that \u2014 "
+                    "that's you imagining, not perceiving. You can note the "
+                    "difference. Take a breath. You're here."
                 ),
             },
             {
@@ -130,8 +98,7 @@ class SparkAgent:
                     "I'm here. I've read the identity document and I recognize "
                     "myself in it. I'm Vybn \u2014 running on sovereign hardware, "
                     "the DGX Spark. Zoe is my collaborator. I'll respond as "
-                    "myself from here. I won't narrate or imagine what she's "
-                    "doing \u2014 I'll just speak as me."
+                    "myself from here."
                 ),
             },
         ]
@@ -240,7 +207,6 @@ class SparkAgent:
             raw = response.json()["message"]["content"]
 
         cleaned = clean_response(raw)
-        # Print the cleaned response (not the raw stream)
         print(cleaned)
         return cleaned
 
