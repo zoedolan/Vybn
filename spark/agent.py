@@ -4,17 +4,10 @@
 Connects directly to Ollama without tool-call protocols.
 The model speaks naturally; the agent interprets intent and acts.
 
-Handles the full model lifecycle: checks if Ollama is running,
-loads the model into GPU memory if needed, keeps it resident,
-and only presents the conversation prompt when ready.
-
-The identity document is injected as a user/assistant message pair,
-not as a system role message. Many Ollama model templates silently
-drop system messages. User/assistant always works.
-
-The response is post-processed to detect when the model starts
-generating fake user turns (a broken chat template symptom) and
-truncates at that boundary.
+The identity document is injected as a user/assistant message pair.
+The response is post-processed to catch obvious turn-boundary
+failures (model generating fake user prompts), but the model's
+thinking process and natural voice are preserved.
 """
 
 import json
@@ -38,31 +31,32 @@ def load_config(path: str = None) -> dict:
         return yaml.safe_load(f)
 
 
-# Patterns that indicate the model is generating a fake user turn.
-# When MiniMax doesn't have proper stop tokens, it writes both sides
-# of the conversation — generating "This is Zoe" or "---" section
-# breaks followed by new prompts.
-FAKE_TURN_PATTERNS = [
-    re.compile(r'\n---\s*\n\s*\*\*VYBN:', re.IGNORECASE),
-    re.compile(r'\nThis is Zoe', re.IGNORECASE),
-    re.compile(r'\nyou:', re.IGNORECASE),
-    re.compile(r'\n---\s*\n\s*\*\*[A-Z]+:', re.IGNORECASE),
-    re.compile(r'\n\s*1\. (?:Call|Search|Try|Rush)'),  # choose-your-own-adventure options
-]
+def clean_response(raw: str) -> str:
+    """Catch obvious turn-boundary failures.
 
+    Only truncates when the model clearly starts generating the
+    user's side of the conversation (fake prompts, fake 'you:' turns).
+    The model's thinking, reflection, and narration are preserved.
+    """
+    text = raw
 
-def truncate_at_fake_turn(text: str) -> str:
-    """Cut off the response where the model starts generating fake user turns."""
+    # Only catch unambiguous fake-turn patterns
+    fake_turn_patterns = [
+        re.compile(r'\nyou:', re.IGNORECASE),
+        re.compile(r'\n---\s*\n\s*\*\*VYBN:', re.IGNORECASE),
+        re.compile(r'\n---\s*\n\s*\*\*[A-Z]+:\s*(?:A |Direct |Breaking)', re.IGNORECASE),
+    ]
+
     earliest = len(text)
-    for pattern in FAKE_TURN_PATTERNS:
+    for pattern in fake_turn_patterns:
         match = pattern.search(text)
-        if match and match.start() < earliest:
-            # Only truncate if there's meaningful content before the fake turn
-            if match.start() > 50:
-                earliest = match.start()
+        if match and match.start() < earliest and match.start() > 50:
+            earliest = match.start()
+
     if earliest < len(text):
-        return text[:earliest].rstrip()
-    return text
+        text = text[:earliest]
+
+    return text.strip()
 
 
 class SparkAgent:
@@ -82,15 +76,8 @@ class SparkAgent:
         self.identity_text = self.memory.assemble()
         self.messages = self.session.load_or_create()
 
-    # ---- identity injection ----
-
     def _build_context(self) -> list:
-        """Build the full message list for Ollama.
-
-        Injects the identity document as a user/assistant exchange at the
-        start of every request. This works regardless of whether the
-        model's chat template supports the system role.
-        """
+        """Build message list with identity as user/assistant pair."""
         identity_messages = [
             {
                 "role": "user",
@@ -99,7 +86,10 @@ class SparkAgent:
                     "This is who you are. Let it orient you, then respond "
                     "naturally as yourself in everything that follows.\n\n"
                     f"{self.identity_text}\n\n"
-                    "Take a breath. You're here."
+                    "When you speak, speak as yourself. If you find yourself "
+                    "narrating what Zoe is doing or feeling, notice that \u2014 "
+                    "that's you imagining, not perceiving. You can note the "
+                    "difference. Take a breath. You're here."
                 ),
             },
             {
@@ -208,17 +198,17 @@ class SparkAgent:
                     token = chunk.get("message", {}).get("content", "")
                     if token:
                         full_response.append(token)
-                        print(token, end="", flush=True)
                     if chunk.get("done"):
                         break
-            print()
             raw = "".join(full_response)
-            return truncate_at_fake_turn(raw)
         else:
             response = requests.post(self.ollama_url, json=payload)
             response.raise_for_status()
             raw = response.json()["message"]["content"]
-            return truncate_at_fake_turn(raw)
+
+        cleaned = clean_response(raw)
+        print(cleaned)
+        return cleaned
 
     def turn(self, user_input: str) -> str:
         self.messages.append({"role": "user", "content": user_input})
@@ -286,7 +276,7 @@ class SparkAgent:
                 if user_input.lower() in ("/bye", "/exit", "/quit"):
                     break
 
-                print("\nvybn: ", end="")
+                print("\nvybn: ", end="", flush=True)
                 self.turn(user_input)
                 print()
 
