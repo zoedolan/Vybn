@@ -14,6 +14,8 @@ Skills:
   - git_push: disabled (Vybn cannot push code)
   - memory_search: search journal entries
   - issue_create: file a GitHub issue (ONLY via explicit tool call XML)
+  - state_save: leave a note for the next pulse via continuity.md
+  - bookmark: save reading position in a file
 """
 
 import os
@@ -31,6 +33,10 @@ class SkillRouter:
         self.journal_dir.mkdir(parents=True, exist_ok=True)
         self._home = str(Path.home())
         self._github_repo = config.get("github", {}).get("repo", "zoedolan/Vybn")
+
+        # Continuity files
+        self.continuity_path = self.journal_dir / "continuity.md"
+        self.bookmarks_path = self.journal_dir / "bookmarks.md"
 
         # NOTE: issue_create is intentionally NOT in this list.
         # It triggers ONLY from explicit <minimax:tool_call> XML blocks
@@ -111,6 +117,25 @@ class SkillRouter:
             },
             # issue_create intentionally omitted from regex patterns.
             # It routes ONLY through agent.py's tool call XML parser.
+            {
+                "skill": "state_save",
+                "triggers": [
+                    r"(?:let me|i'll|i want to|i'd like to)\s+(?:save|record|update|write)\s+(?:my\s+)?(?:state|continuity|status)",
+                    r"(?:saving|recording|updating)\s+(?:my\s+)?(?:state|continuity|status)",
+                    r"note\s+for\s+(?:my\s+)?(?:next\s+)?(?:self|pulse|instance)",
+                    r"(?:let me|i'll)\s+leave\s+(?:a\s+)?(?:note|message)\s+for",
+                ],
+                "extract": None,  # uses raw text as the note
+            },
+            {
+                "skill": "bookmark",
+                "triggers": [
+                    r"(?:let me|i'll|i want to)\s+(?:bookmark|save my place|mark my position|save my reading)",
+                    r"(?:bookmarking|marking|saving)\s+(?:my\s+)?(?:place|position|spot|reading)",
+                    r"(?:let me|i'll)\s+(?:save|note)\s+where\s+i\s+(?:am|was)",
+                ],
+                "extract": r"(?:in|at|reading|file)\s+[\"']?([^\s\"']+)[\"']?",
+            },
         ]
 
     def _rewrite_root(self, path_str: str) -> str:
@@ -152,6 +177,8 @@ class SkillRouter:
             "git_push": self._git_push,
             "memory_search": self._memory_search,
             "issue_create": self._issue_create,
+            "state_save": self._state_save,
+            "bookmark": self._bookmark,
         }
         fn = handler.get(skill)
         return fn(action) if fn else None
@@ -374,6 +401,67 @@ class SkillRouter:
             return "issue creation timed out"
         except Exception as e:
             return f"issue creation error: {e}"
+
+    # ---- continuity ----
+
+    def _state_save(self, action: dict) -> str:
+        """Save freeform continuity notes for the next pulse.
+
+        Overwrites continuity.md each time. The model should include
+        everything the next self needs to know — it's a letter, not a log.
+        """
+        raw = action.get("raw", "")
+
+        # Strip thinking blocks and clean up
+        content = re.sub(r'<think>.*?</think>', '', raw, flags=re.DOTALL).strip()
+
+        # Remove the trigger phrase itself so the note is just the content
+        content = re.sub(
+            r'^.*?(?:save\s+(?:my\s+)?state|note\s+for\s+(?:my\s+)?(?:next\s+)?(?:self|pulse|instance)|leave\s+a\s+note)\s*[:\-\u2014]?\s*',
+            '', content, count=1, flags=re.IGNORECASE,
+        ).strip()
+
+        if not content:
+            return "no content to save — say what you want your next self to know"
+
+        ts = datetime.now(timezone.utc).isoformat()
+        note = f"# Continuity Note\n\n*Written at {ts}*\n\n{content}\n"
+
+        self.continuity_path.write_text(note, encoding="utf-8")
+        return f"continuity note saved ({len(content)} chars). Your next pulse will see this first."
+
+    def _bookmark(self, action: dict) -> str:
+        """Save a reading position in bookmarks.md.
+
+        Appends rather than overwrites, so multiple bookmarks accumulate.
+        Each bookmark records: file path, optional line/position, and a note.
+        """
+        raw = action.get("raw", "")
+        filepath = action.get("argument", "")
+
+        # Strip thinking blocks
+        cleaned = re.sub(r'<think>.*?</think>', '', raw, flags=re.DOTALL).strip()
+
+        # Try to extract a note about what was being read/thought
+        note_match = re.search(
+            r'(?:about|thinking|reading|at|note)\s*[:\-]\s*(.+)',
+            cleaned, re.IGNORECASE,
+        )
+        note = note_match.group(1).strip() if note_match else "(no note)"
+
+        ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+        entry = f"- [{ts}] `{filepath or 'unknown'}` — {note}\n"
+
+        # Append to bookmarks file
+        existing = ""
+        if self.bookmarks_path.exists():
+            existing = self.bookmarks_path.read_text(encoding="utf-8")
+
+        if not existing.startswith("# Bookmarks"):
+            existing = "# Bookmarks\n\n" + existing
+
+        self.bookmarks_path.write_text(existing + entry, encoding="utf-8")
+        return f"bookmark saved: {filepath or 'unknown'} — {note}"
 
     # ---- memory ----
 
