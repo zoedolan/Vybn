@@ -28,6 +28,7 @@ class SkillRouter:
         self.repo_root = Path(config["paths"]["repo_root"]).expanduser()
         self.journal_dir = Path(config["paths"]["journal_dir"]).expanduser()
         self.journal_dir.mkdir(parents=True, exist_ok=True)
+        self._home = str(Path.home())
 
         self.patterns = [
             {
@@ -102,6 +103,14 @@ class SkillRouter:
                 "extract": r"(?:for|about)\s+[\"']?(.+?)(?:[\"']?\s*(?:\.|$|\n))",
             },
         ]
+
+    def _rewrite_root(self, path_str: str) -> str:
+        """Rewrite /root/ to actual home directory.
+
+        MiniMax M2.5 assumes it runs as root. This corrects that
+        assumption everywhere — file paths, shell commands, etc.
+        """
+        return path_str.replace("/root/", self._home + "/")
 
     def parse(self, text: str) -> list[dict]:
         actions = []
@@ -257,6 +266,9 @@ class SkillRouter:
         if not command:
             return "no command specified"
 
+        # Rewrite /root/ to actual home in shell commands
+        command = self._rewrite_root(command)
+
         # Safety: run in repo directory, with timeout
         try:
             result = subprocess.run(
@@ -353,8 +365,7 @@ class SkillRouter:
         rewriting /root/ paths to the actual home directory.
         """
         # MiniMax M2.5 thinks it's root — rewrite /root/ to actual home
-        if filename.startswith("/root/"):
-            filename = str(Path.home() / filename[6:])  # strip '/root/' prefix
+        filename = self._rewrite_root(filename)
 
         if filename.startswith("~/"):
             return Path(filename).expanduser()
