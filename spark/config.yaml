@@ -40,3 +40,18 @@ agents:
 session:
   auto_resume: true
   resume_window_seconds: 7200  # resume sessions less than 2 hours old
+
+# Policy engine: tier overrides for tool execution.
+# Values: auto (silent), notify (show indicator), approve (ask Zoe)
+# These override the defaults in policy.py. Only list skills
+# where you want to change the default behavior.
+tool_policies:
+  git_push: approve           # already default, but explicit is good
+  # issue_create: approve     # uncomment to require approval for issues
+  # self_edit: approve        # uncomment to require approval for self-edits
+
+# Delegation limits for spawn_agent and the agent pool.
+# These map to the paper's span-of-control concept.
+delegation:
+  max_spawn_depth: 2          # how deep mini-agents can nest
+  max_active_agents: 3        # concurrent agent cap (independent of agents.pool_size)
