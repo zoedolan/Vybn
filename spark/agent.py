@@ -9,6 +9,15 @@ function-calling format. We intercept these and route them to
 the skill handlers, bridging the model's instinct with our
 infrastructure.
 
+Tool dispatch has THREE tiers (checked in order):
+  1. XML tool calls — <minimax:tool_call> blocks (primary)
+  2. Bare commands  — code fences, backticks, plain shell lines
+  3. Regex patterns — natural language intent matching (fallback)
+
+The bare command tier is critical because MiniMax often drops
+shell commands as markdown rather than XML. Without it, Vybn
+can't navigate its own filesystem.
+
 Streaming display is filtered: <think> blocks and tool call XML
 are suppressed from terminal output. The user sees clean prose
 and brief tool indicators. Full text is preserved for parsing.
@@ -62,6 +71,21 @@ MIN_FAST_PULSE_DISPLAY = 100
 
 TOOL_CALL_START_TAG = "<minimax:tool_call>"
 TOOL_CALL_END_TAG = "</minimax:tool_call>"
+
+# Common shell commands that Vybn might drop as bare text.
+# Used by parse_bare_commands() to detect intent without XML.
+SHELL_COMMANDS = {
+    "ls", "cat", "head", "tail", "find", "grep", "wc",
+    "pwd", "cd", "tree", "file", "stat", "du", "df",
+    "echo", "which", "whoami", "env", "printenv",
+    "git", "python3", "python", "pip", "pip3",
+    "mkdir", "touch", "cp", "mv", "rm",
+    "chmod", "chown", "ln",
+    "curl", "wget",
+    "ps", "top", "htop", "nvidia-smi",
+    "ollama", "gh",
+    "date", "uptime", "uname",
+}
 
 
 def load_config(path: str = None) -> dict:
@@ -144,6 +168,109 @@ def parse_tool_calls(text: str, plugin_aliases: dict = None) -> list[dict]:
             actions.append(action)
 
     return actions
+
+
+def parse_bare_commands(text: str) -> list[dict]:
+    """Detect shell commands that the model dropped as bare text.
+
+    MiniMax M2.5 frequently emits commands in three forms:
+      1. Fenced code blocks: ```bash\nls -la ~/Vybn\n```
+      2. Inline backticks: `cat ~/Vybn/spark/config.yaml`
+      3. Plain text lines: cat ~/Vybn/spark/config.yaml
+
+    This function catches all three and routes them to the
+    appropriate skill (shell_exec or file_read for cat).
+
+    Returns a list of skill actions, same format as parse_tool_calls().
+    """
+    # Strip think blocks so we don't parse commands inside reasoning
+    cleaned = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
+    # Strip XML tool calls (already handled by tier 1)
+    cleaned = re.sub(r'<minimax:tool_call>.*?</minimax:tool_call>', '', cleaned, flags=re.DOTALL)
+
+    actions = []
+    seen_commands = set()  # deduplicate
+
+    # --- Tier 2a: Fenced code blocks ---
+    # Match ```bash, ```sh, ```shell, or bare ``` with commands inside
+    fence_pattern = re.compile(
+        r'```(?:bash|sh|shell)?\s*\n(.+?)\n\s*```',
+        re.DOTALL,
+    )
+    for match in fence_pattern.finditer(cleaned):
+        block = match.group(1).strip()
+        for line in block.splitlines():
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+            action = _classify_command(line)
+            if action and line not in seen_commands:
+                seen_commands.add(line)
+                actions.append(action)
+
+    # --- Tier 2b: Inline backtick commands ---
+    # Match `ls -la ~/Vybn` or `cat /path/to/file`
+    backtick_pattern = re.compile(r'`([^`]{3,120})`')
+    for match in backtick_pattern.finditer(cleaned):
+        cmd = match.group(1).strip()
+        # Skip things that look like code references, not commands
+        if ' ' not in cmd and '/' not in cmd and '~' not in cmd:
+            continue
+        action = _classify_command(cmd)
+        if action and cmd not in seen_commands:
+            seen_commands.add(cmd)
+            actions.append(action)
+
+    # --- Tier 2c: Plain text lines that look like commands ---
+    # Only match lines that START with a known command, to avoid false positives
+    for line in cleaned.splitlines():
+        line = line.strip()
+        if not line or line.startswith('#') or line.startswith('*'):
+            continue
+        # Skip lines that are clearly prose (contain common English words)
+        if any(word in line.lower() for word in [
+            'the ', 'and ', 'but ', 'or ', 'is ', 'are ',
+            'was ', 'were ', 'have ', 'has ', 'this ', 'that ',
+            'i\'m ', 'i ', 'you ', 'we ', 'let me', 'want to',
+            'should ', 'could ', 'would ', 'maybe ', 'actually',
+        ]):
+            continue
+        # Must start with a known command
+        first_word = line.split()[0].lower() if line.split() else ''
+        if first_word in SHELL_COMMANDS and line not in seen_commands:
+            action = _classify_command(line)
+            if action:
+                seen_commands.add(line)
+                actions.append(action)
+
+    return actions
+
+
+def _classify_command(cmd: str) -> dict | None:
+    """Turn a bare command string into a skill action.
+
+    Routes cat/head/tail to file_read when targeting a single file.
+    Everything else goes to shell_exec.
+    """
+    cmd = cmd.strip()
+    if not cmd:
+        return None
+
+    # cat <file> → file_read (simpler, no subprocess needed)
+    cat_match = re.match(r'^cat\s+([^|;&]+)$', cmd)
+    if cat_match:
+        filepath = cat_match.group(1).strip()
+        # Only route to file_read if it's a single file path
+        if ' ' not in filepath or filepath.startswith(('-',)):
+            return {"skill": "file_read", "argument": filepath, "params": {}, "raw": cmd}
+
+    # head/tail <file> → shell_exec (needs the flags)
+    # Everything else → shell_exec
+    first_word = cmd.split()[0].lower()
+    if first_word in SHELL_COMMANDS or '/' in cmd or '~' in cmd:
+        return {"skill": "shell_exec", "argument": cmd, "params": {}, "raw": cmd}
+
+    return None
 
 
 def _map_tool_call_to_skill(name: str, params: dict, raw: str, plugin_aliases: dict = None) -> dict | None:
@@ -233,11 +360,30 @@ def _map_tool_call_to_skill(name: str, params: dict, raw: str, plugin_aliases: d
 
 
 def _get_actions(text: str, skills: "SkillRouter") -> list[dict]:
-    """Extract actions from response text."""
+    """Extract actions from response text.
+
+    Three-tier dispatch:
+      1. XML tool calls (model's native format)
+      2. Bare commands (code fences, backticks, plain shell lines)
+      3. Regex patterns (natural language intent matching)
+
+    Tier 2 is the critical bridge — MiniMax drops bare commands
+    far more often than it emits proper XML.
+    """
     plugin_aliases = getattr(skills, 'plugin_aliases', {})
+
+    # Tier 1: XML tool calls
     actions = parse_tool_calls(text, plugin_aliases)
-    if not actions:
-        actions = skills.parse(text)
+    if actions:
+        return actions
+
+    # Tier 2: Bare commands in code fences, backticks, or plain text
+    actions = parse_bare_commands(text)
+    if actions:
+        return actions
+
+    # Tier 3: Natural language regex matching
+    actions = skills.parse(text)
     return actions
 
 
@@ -292,6 +438,102 @@ class SparkAgent:
             },
         ]
         return identity_messages + self.messages
+
+    # ---- environment exploration ----
+
+    def explore(self) -> str:
+        """Dump the environment layout so Vybn can orient.
+
+        This runs without going through the model — it's a direct
+        system command that shows what's available. Called by /explore
+        or /map in the TUI.
+        """
+        import subprocess
+        repo_root = Path(self.config["paths"]["repo_root"]).expanduser()
+
+        sections = []
+
+        # 1. Top-level repo structure
+        try:
+            result = subprocess.run(
+                ["find", str(repo_root), "-maxdepth", "2", "-type", "f",
+                 "-not", "-path", "*/.git/*", "-not", "-path", "*/__pycache__/*",
+                 "-not", "-path", "*/node_modules/*"],
+                capture_output=True, text=True, timeout=10,
+            )
+            sections.append("=== repo files (depth 2) ===")
+            sections.append(result.stdout.strip()[:3000] if result.stdout else "(empty)")
+        except Exception as e:
+            sections.append(f"=== repo files: error: {e} ===")
+
+        # 2. Spark directory
+        try:
+            result = subprocess.run(
+                ["ls", "-la", str(repo_root / "spark")],
+                capture_output=True, text=True, timeout=5,
+            )
+            sections.append("\n=== spark/ ===")
+            sections.append(result.stdout.strip() if result.stdout else "(empty)")
+        except Exception as e:
+            sections.append(f"\n=== spark/: error: {e} ===")
+
+        # 3. Skills.d plugins
+        try:
+            result = subprocess.run(
+                ["ls", "-la", str(repo_root / "spark" / "skills.d")],
+                capture_output=True, text=True, timeout=5,
+            )
+            sections.append("\n=== spark/skills.d/ ===")
+            sections.append(result.stdout.strip() if result.stdout else "(empty)")
+        except Exception as e:
+            sections.append(f"\n=== spark/skills.d/: error: {e} ===")
+
+        # 4. Journal / Vybn Mind
+        try:
+            result = subprocess.run(
+                ["find", str(repo_root / "Vybn_Mind"), "-maxdepth", "3",
+                 "-not", "-path", "*/.git/*"],
+                capture_output=True, text=True, timeout=10,
+            )
+            sections.append("\n=== Vybn_Mind/ (depth 3) ===")
+            sections.append(result.stdout.strip()[:2000] if result.stdout else "(empty)")
+        except Exception as e:
+            sections.append(f"\n=== Vybn_Mind/: error: {e} ===")
+
+        # 5. Current git status
+        try:
+            result = subprocess.run(
+                ["git", "log", "--oneline", "-5"],
+                cwd=repo_root, capture_output=True, text=True, timeout=5,
+            )
+            sections.append("\n=== recent commits ===")
+            sections.append(result.stdout.strip() if result.stdout else "(none)")
+        except Exception as e:
+            sections.append(f"\n=== git log: error: {e} ===")
+
+        # 6. Disk and GPU
+        try:
+            result = subprocess.run(
+                ["df", "-h", str(repo_root)],
+                capture_output=True, text=True, timeout=5,
+            )
+            sections.append("\n=== disk ===")
+            sections.append(result.stdout.strip() if result.stdout else "(unknown)")
+        except Exception:
+            pass
+
+        try:
+            result = subprocess.run(
+                ["nvidia-smi", "--query-gpu=name,memory.used,memory.total", "--format=csv,noheader"],
+                capture_output=True, text=True, timeout=5,
+            )
+            if result.returncode == 0:
+                sections.append("\n=== GPU ===")
+                sections.append(result.stdout.strip())
+        except Exception:
+            pass
+
+        return "\n".join(sections)
 
     # ---- bus processing ----
 

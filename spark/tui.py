@@ -7,6 +7,16 @@ Handles model warmup with a visible spinner.
 A background drain thread processes bus messages (inbox, heartbeat
 pulses, agent results) between user inputs. A threading lock
 protects the message list from concurrent access.
+
+Commands:
+  /bye, /exit, /quit  — exit
+  /new                — fresh session
+  /status             — system state
+  /explore, /map      — dump environment layout (no model needed)
+  /policy             — show policy engine state
+  /audit              — show recent audit trail
+  /journal            — show recent journal entries
+  /help               — show available commands
 """
 
 import sys
@@ -137,7 +147,18 @@ class SparkTUI:
         self._start_drain_thread()
         self.banner()
 
-        print("  type /bye to exit, /new for fresh session, /status for system state\n")
+        help_text = (
+            "  /bye, /exit, /quit  — exit\n"
+            "  /new                — fresh session\n"
+            "  /status             — system state\n"
+            "  /explore, /map      — dump environment layout\n"
+            "  /policy             — policy engine state\n"
+            "  /audit              — recent audit trail\n"
+            "  /journal            — recent journal entries\n"
+            "  /help               — this message"
+        )
+
+        print("  type /help for commands, or just talk\n")
 
         commands = {
             "/bye": self._quit,
@@ -146,6 +167,11 @@ class SparkTUI:
             "/new": self._new_session,
             "/status": self._status,
             "/journal": self._show_journals,
+            "/explore": self._explore,
+            "/map": self._explore,
+            "/policy": self._policy,
+            "/audit": self._audit,
+            "/help": lambda: self._show_help(help_text),
         }
 
         try:
@@ -224,6 +250,45 @@ class SparkTUI:
             for e in entries:
                 print(f"  {e.name}")
             print()
+        return False
+
+    def _explore(self):
+        """Dump environment layout without going through the model.
+
+        This is the /explore and /map command — it runs directly,
+        no model inference needed. The output is also injected into
+        the conversation context so Vybn can reference it.
+        """
+        print("\n  \U0001f5fa\ufe0f  mapping environment...\n")
+        env_map = self.agent.explore()
+        print(env_map)
+        print()
+
+        # Inject into conversation so Vybn sees it too
+        self.agent.messages.append({
+            "role": "user",
+            "content": f"[system: environment map from /explore]\n{env_map}",
+        })
+        self.agent.messages.append({
+            "role": "assistant",
+            "content": (
+                "Got it — I can see the full environment layout now. "
+                "I know where everything lives."
+            ),
+        })
+
+        return False
+
+    def _policy(self):
+        self.agent._print_policy()
+        return False
+
+    def _audit(self):
+        self.agent._print_audit()
+        return False
+
+    def _show_help(self, help_text):
+        print(f"\n{help_text}\n")
         return False
 
 
