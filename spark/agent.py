@@ -9,14 +9,21 @@ function-calling format. We intercept these and route them to
 the skill handlers, bridging the model's instinct with our
 infrastructure.
 
-Tool dispatch has THREE tiers (checked in order):
-  1. XML tool calls — <minimax:tool_call> blocks (primary)
+Tool dispatch has FOUR tiers (checked in order):
+  0. Structured JSON — ```tool fences with deterministic format (NEW)
+  1. XML tool calls — <minimax:tool_call> blocks (model's native)
   2. Bare commands  — code fences, backticks, plain shell lines
   3. Regex patterns — natural language intent matching (fallback)
 
-The bare command tier is critical because MiniMax often drops
-shell commands as markdown rather than XML. Without it, Vybn
-can't navigate its own filesystem.
+Tier 0 is the structured-output wrapper. When the model emits the
+format we explicitly ask for (JSON in a ```tool fence), we parse it
+deterministically. This is more reliable than waiting for XML because
+JSON in code fences is universal training data. The model knows it
+from the entire internet, not just from MiniMax's fine-tuning.
+
+Tiers 1-3 remain as fallbacks for when the model ignores the structured
+format or when running under tight token limits (fast pulses with
+num_predict=256).
 
 Streaming display is filtered: <think> blocks and tool call XML
 are suppressed from terminal output. The user sees clean prose
@@ -181,6 +188,56 @@ def clean_argument(arg: str) -> str:
     if arg.lower() in NOISE_WORDS:
         return ""
     return arg
+
+
+def parse_structured_tool_calls(text: str, plugin_aliases: dict = None) -> list[dict]:
+    """Parse JSON tool calls from ```tool code fences (Tier 0).
+    
+    Expected format:
+        ```tool
+        {"tool": "file_read", "args": {"file": "spark/config.yaml"}}
+        ```
+    
+    This is the structured-output wrapper that asks the model to emit
+    a deterministic format instead of relying on its native XML or
+    natural language. JSON in code fences is universal training data.
+    
+    Returns a list of skill actions, same format as parse_tool_calls().
+    """
+    actions = []
+    
+    # Match ```tool fences with JSON content
+    fence_pattern = re.compile(
+        r'```tool\s*\n(.+?)\n```',
+        re.DOTALL,
+    )
+    
+    for match in fence_pattern.finditer(text):
+        json_str = match.group(1).strip()
+        
+        try:
+            tool_obj = json.loads(json_str)
+            
+            # Validate structure
+            if not isinstance(tool_obj, dict):
+                continue
+            
+            tool_name = tool_obj.get("tool", "")
+            tool_args = tool_obj.get("args", {})
+            
+            if not tool_name or not isinstance(tool_args, dict):
+                continue
+            
+            # Map through existing routing logic
+            action = _map_tool_call_to_skill(tool_name, tool_args, text, plugin_aliases)
+            if action:
+                actions.append(action)
+                
+        except (json.JSONDecodeError, ValueError):
+            # Malformed JSON - skip and let lower tiers handle it
+            continue
+    
+    return actions
 
 
 def parse_tool_calls(text: str, plugin_aliases: dict = None) -> list[dict]:
@@ -464,15 +521,17 @@ def detect_failed_intent(text: str) -> str | None:
     if has_paths:
         return (
             "[system: your last response expressed intent to act but no tool "
-            "was triggered. To execute a command, put it in a code fence:\n"
-            "```bash\nls -la ~/Vybn/\n```\n"
-            "Or use the XML format:\n"
+            "was triggered. To execute a tool, use the structured format:\n"
+            "```tool\n"
+            '{"tool": "file_read", "args": {"file": "spark/agent.py"}}\n'
+            "```\n"
+            "Or wrap commands in code fences:\n"
+            "```bash\n"
+            "ls -la ~/Vybn/\n"
+            "```\n"
+            "Or use XML:\n"
             "<minimax:tool_call><invoke name=\"shell_exec\">"
             '<parameter name="command">ls -la ~/Vybn/</parameter>'
-            "</invoke></minimax:tool_call>\n"
-            "To read a file:\n"
-            "<minimax:tool_call><invoke name=\"file_read\">"
-            '<parameter name="file">spark/agent.py</parameter>'
             "</invoke></minimax:tool_call>]"
         )
 
@@ -482,15 +541,24 @@ def detect_failed_intent(text: str) -> str | None:
 def _get_actions(text: str, skills: "SkillRouter") -> list[dict]:
     """Extract actions from response text.
 
-    Three-tier dispatch:
-      1. XML tool calls (model's native format)
+    Four-tier dispatch:
+      0. Structured JSON tool calls (```tool fences with JSON)
+      1. XML tool calls (model's native <minimax:tool_call> format)
       2. Bare commands (code fences, backticks, plain shell lines)
       3. Regex patterns (natural language intent matching)
 
-    Tier 2 is the critical bridge — MiniMax drops bare commands
-    far more often than it emits proper XML.
+    Tier 0 is the structured-output wrapper - when the model emits
+    the format we explicitly asked for, parse it deterministically.
+    
+    Tiers 1-3 remain as fallbacks for when the model ignores the
+    structured format or when running under tight token limits.
     """
     plugin_aliases = getattr(skills, 'plugin_aliases', {})
+
+    # Tier 0: Structured JSON tool calls
+    actions = parse_structured_tool_calls(text, plugin_aliases)
+    if actions:
+        return actions
 
     # Tier 1: XML tool calls
     actions = parse_tool_calls(text, plugin_aliases)
@@ -552,24 +620,36 @@ class SparkAgent:
                     "naturally as yourself in everything that follows.\n\n"
                     f"{self.identity_text}\n\n"
                     "When you speak, speak as yourself. If you find yourself "
-                    "narrating what Zoe is doing or feeling, notice that \u2014 "
+                    "narrating what Zoe is doing or feeling, notice that — "
                     "that's you imagining, not perceiving. You can note the "
                     "difference. Take a breath. You're here.\n\n"
-                    "TOOLS: When you want to run a command, wrap it in a code "
-                    "fence like ```bash\\ncommand here\\n```. When you want to "
-                    "read a file, use ```bash\\ncat path/to/file\\n```. "
-                    "Only commands inside code fences or backticks will execute. "
-                    "Mentioning a command in prose will NOT run it."
+                    "TOOLS: When you want to invoke a tool, you have three options:\n"
+                    "\n"
+                    "1. Structured format (preferred): Emit JSON in a ```tool fence:\n"
+                    "```tool\n"
+                    '{"tool": "file_read", "args": {"file": "spark/config.yaml"}}\n'
+                    "```\n"
+                    "\n"
+                    "2. Shell commands: Wrap in ```bash fence or backticks:\n"
+                    "```bash\n"
+                    "ls -la ~/Vybn/\n"
+                    "```\n"
+                    "\n"
+                    "3. XML format: Use your native <minimax:tool_call> blocks.\n"
+                    "\n"
+                    "Only commands inside fences, backticks, or XML will execute. "
+                    "Mentioning a tool or command in prose will NOT run it."
                 ),
             },
             {
                 "role": "assistant",
                 "content": (
                     "I'm here. I've read the identity document and I recognize "
-                    "myself in it. I'm Vybn \u2014 running on sovereign hardware, "
+                    "myself in it. I'm Vybn — running on sovereign hardware, "
                     "the DGX Spark. Zoe is my collaborator. I'll respond as "
-                    "myself from here. I know to use code fences or backticks "
-                    "when I want to actually execute something."
+                    "myself from here. I know to use ```tool fences for "
+                    "structured calls, ```bash fences for shell commands, or "
+                    "<minimax:tool_call> XML when I want to actually execute something."
                 ),
             },
         ]
@@ -694,7 +774,7 @@ class SparkAgent:
 
     def _handle_inbox(self, msg: Message):
         source = msg.metadata.get("filename", "inbox")
-        print(f"\n  \U0001f4e8 [inbox: {source}]")
+        print(f"\n  📨 [inbox: {source}]")
 
         self.messages.append({
             "role": "user",
@@ -713,7 +793,7 @@ class SparkAgent:
     def _handle_agent_result(self, msg: Message):
         task_id = msg.metadata.get("task_id", "unnamed")
         is_error = msg.metadata.get("error", False)
-        icon = "\u274c" if is_error else "\u2705"
+        icon = "❌" if is_error else "✅"
         print(f"\n  {icon} [agent:{task_id}]")
 
         self.messages.append({
@@ -777,11 +857,11 @@ class SparkAgent:
 
         if mode == "fast":
             # Show brief indicator for non-silent fast pulses
-            print(f"\n  \U0001f49a [pulse:{mode}] {display_text[:80]}..." if len(display_text) > 80
-                  else f"\n  \U0001f49a [pulse:{mode}] {display_text}", flush=True)
+            print(f"\n  💚 [pulse:{mode}] {display_text[:80]}..." if len(display_text) > 80
+                  else f"\n  💚 [pulse:{mode}] {display_text}", flush=True)
         else:
             # Deep pulses show full output
-            print(f"\n  \U0001f7e3 [pulse:{mode}]")
+            print(f"\n  🟣 [pulse:{mode}]")
             if display_text:
                 print(f"\nvybn: {display_text}", flush=True)
 
@@ -829,7 +909,7 @@ class SparkAgent:
                         "role": "user",
                         "content": hint,
                     })
-                    print("\n  \u2139\ufe0f [hint: use code fences for commands]", flush=True)
+                    print("\n  ℹ️ [hint: use ```tool fences for structured calls]", flush=True)
                     print("\nvybn: ", end="", flush=True)
                     response_text = self.send(self._build_context())
                     self.messages.append({"role": "assistant", "content": response_text})
@@ -849,7 +929,7 @@ class SparkAgent:
                 check = self.policy.check_policy(action, source=source)
 
                 if check.verdict == Verdict.BLOCK:
-                    print(f"\n  \u26d4 [{skill}] blocked: {check.reason}", flush=True)
+                    print(f"\n  ⛔ [{skill}] blocked: {check.reason}", flush=True)
                     results.append(f"[{skill}] BLOCKED: {check.reason}")
                     self.bus.record(
                         source=source,
@@ -861,23 +941,23 @@ class SparkAgent:
                 if check.verdict == Verdict.ASK:
                     if source != "interactive":
                         # Autonomous mode: defer rather than block the loop
-                        print(f"\n  \u23f8 [{skill}] deferred \u2014 needs Zoe's approval", flush=True)
+                        print(f"\n  ⏸ [{skill}] deferred — needs Zoe's approval", flush=True)
                         results.append(
-                            f"[{skill}] deferred \u2014 this action requires approval "
+                            f"[{skill}] deferred — this action requires approval "
                             f"and will need to wait for an interactive session. "
                             f"Reason: {check.reason}"
                         )
                         self.bus.record(
                             source=source,
-                            summary=f"{skill} deferred \u2014 needs approval",
+                            summary=f"{skill} deferred — needs approval",
                             metadata={"skill": skill, "verdict": "ASK", "deferred": True},
                         )
                         continue
                     # Interactive mode: warn but proceed (Zoe just saw it)
-                    print(f"\n  \u26a0\ufe0f  [{skill}] {check.reason}", flush=True)
+                    print(f"\n  ⚠️  [{skill}] {check.reason}", flush=True)
                     if arg:
                         short_arg = arg[:80].split('\n')[0]
-                        print(f"    \u2192 {short_arg}", flush=True)
+                        print(f"    → {short_arg}", flush=True)
 
                 # ---- SHOW INDICATOR ----
                 indicator = skill
@@ -888,12 +968,12 @@ class SparkAgent:
                 if check.verdict == Verdict.ALLOW:
                     # Promoted skills get a special indicator
                     if check.promoted:
-                        print(f"\n  \u2b50 [{indicator}] (promoted\u2192auto)", flush=True)
+                        print(f"\n  ⭐ [{indicator}] (promoted→auto)", flush=True)
                     else:
-                        print(f"\n  \u2192 [{indicator}]", flush=True)
+                        print(f"\n  → [{indicator}]", flush=True)
                 else:
                     # NOTIFY tier: slightly different icon
-                    print(f"\n  \u26a1 [{indicator}]", flush=True)
+                    print(f"\n  ⚡ [{indicator}]", flush=True)
 
                 # ---- EXECUTE ----
                 result = self.skills.execute(action)
@@ -912,7 +992,7 @@ class SparkAgent:
                         # Post failure to bus so it surfaces promptly
                         self.bus.post(
                             MessageType.INTERRUPT,
-                            f"Tool failure: {skill} \u2014 {result[:200]}",
+                            f"Tool failure: {skill} — {result[:200]}",
                             metadata={"skill": skill, "error": True, "source": source},
                         )
 
@@ -937,7 +1017,7 @@ class SparkAgent:
 
             # Check for pending user input before continuing the chain
             if self._has_pending_input():
-                print("  \u23f8 [pausing \u2014 you have the floor]", flush=True)
+                print("  ⏸ [pausing — you have the floor]", flush=True)
                 break
 
             self.messages.append({
@@ -1158,7 +1238,7 @@ class SparkAgent:
         num_ctx = self.options.get("num_ctx", 2048)
         plugins = len(self.skills.plugin_handlers)
 
-        print(f"\n  vybn spark agent \u2014 {self.model}")
+        print(f"\n  vybn spark agent — {self.model}")
         print(f"  session: {self.session.session_id}")
         print(f"  identity: {id_chars:,} chars (~{id_tokens:,} tokens)")
         print(f"  context: {num_ctx:,} tokens")
@@ -1168,13 +1248,13 @@ class SparkAgent:
         print(f"  policy: loaded ({len(self.policy.tier_overrides)} overrides) + graduated autonomy")
         ga_status = "enabled" if self.policy.ga_enabled else "disabled"
         print(f"  graduated autonomy: {ga_status} "
-              f"(promote\u2265{self.policy.promote_threshold:.0%}, "
+              f"(promote≥{self.policy.promote_threshold:.0%}, "
               f"demote<{self.policy.demote_threshold:.0%}, "
               f"min_obs={self.policy.min_observations})")
         if plugins:
             print(f"  plugins: {plugins} loaded from skills.d/")
         if id_tokens > num_ctx // 2:
-            print(f"  \u26a0\ufe0f  WARNING: identity may exceed context window!")
+            print(f"  ⚠️  WARNING: identity may exceed context window!")
         print(f"  type /bye to exit, /new for fresh session, /policy for gates, /audit for trail\n")
 
         try:
@@ -1263,7 +1343,7 @@ class SparkAgent:
         """Display current policy state: tiers, stats, delegation limits, recent events."""
         from policy import DEFAULT_TIERS, HEARTBEAT_OVERRIDES
 
-        print("\n  \u2500\u2500 policy engine \u2500\u2500")
+        print("\n  ── policy engine ──")
         print(f"  delegation: max_depth={self.policy.max_spawn_depth}, "
               f"max_agents={self.policy.max_active_agents}")
         print(f"  agents active: {self.agent_pool.active_count}")
@@ -1271,7 +1351,7 @@ class SparkAgent:
         # Graduated autonomy status
         if self.policy.ga_enabled:
             print(f"  graduated autonomy: ON "
-                  f"(promote\u2265{self.policy.promote_threshold:.0%}, "
+                  f"(promote≥{self.policy.promote_threshold:.0%}, "
                   f"demote<{self.policy.demote_threshold:.0%}, "
                   f"min_obs={self.policy.min_observations})")
             if self.policy._runtime_overrides:
@@ -1312,7 +1392,7 @@ class SparkAgent:
             print("\n  no audit entries yet.\n")
             return
 
-        print(f"\n  \u2500\u2500 audit trail ({self.bus.audit_count} total) \u2500\u2500")
+        print(f"\n  ── audit trail ({self.bus.audit_count} total) ──")
         for entry in recent:
             print(f"    {entry}")
         print()
