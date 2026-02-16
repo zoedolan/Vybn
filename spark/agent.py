@@ -115,8 +115,8 @@ def _map_tool_call_to_skill(name: str, params: dict, raw: str) -> dict | None:
 
     MiniMax M2.5 invents tool names based on its training data.
     We've seen it emit: bash, shell, read, cat, cli-mcp-server_run_command,
-    run_command, and others. This mapper catches all known variants
-    and routes them to the correct skill handler.
+    run_command, github_create_issue, and others. This mapper catches
+    all known variants and routes them to the correct skill handler.
     """
 
     name_lower = name.lower().replace("-", "_")
@@ -158,14 +158,33 @@ def _map_tool_call_to_skill(name: str, params: dict, raw: str) -> dict | None:
     if name_lower in ("git_push", "push"):
         return {"skill": "git_push", "raw": raw}
 
-    # issue_create / create_issue / gh_issue_create -> issue_create
+    # issue_create — all known variants MiniMax might emit
     if name_lower in (
         "issue_create", "create_issue", "gh_issue_create",
         "github_issue", "file_issue", "submit_issue",
         "open_issue", "raise_issue",
+        "github_create_issue", "gh_create_issue",
+        "create_github_issue", "issue",
     ):
         title = params.get("title") or params.get("name") or params.get("subject", "")
         return {"skill": "issue_create", "argument": title, "raw": raw}
+
+    # state_save — continuity notes for next pulse
+    if name_lower in (
+        "state_save", "save_state", "continuity",
+        "save_continuity", "write_continuity",
+        "note_for_next", "leave_note",
+    ):
+        return {"skill": "state_save", "raw": raw}
+
+    # bookmark — save reading position
+    if name_lower in (
+        "bookmark", "save_place", "save_bookmark",
+        "mark_position", "save_position",
+        "reading_position", "save_reading",
+    ):
+        filepath = params.get("file") or params.get("path") or params.get("filename", "")
+        return {"skill": "bookmark", "argument": filepath, "raw": raw}
 
     # memory / search / memory_search -> memory_search
     if name_lower in ("memory", "search", "memory_search", "search_memory"):
