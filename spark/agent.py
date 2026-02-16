@@ -54,6 +54,12 @@ MAX_TOOL_ROUNDS = 5
 # How long to wait for bus messages when idle (seconds)
 IDLE_POLL_INTERVAL = 5.0
 
+# Minimum display text length for a fast pulse to be shown.
+# Below this, the pulse is treated as silent (no output, no
+# context append). Prevents empty check-ins from cluttering
+# the conversation and burying real interaction.
+MIN_FAST_PULSE_DISPLAY = 100
+
 TOOL_CALL_START_TAG = "<minimax:tool_call>"
 TOOL_CALL_END_TAG = "</minimax:tool_call>"
 
@@ -323,6 +329,8 @@ class SparkAgent:
         self._process_tool_calls(response_text, source="inbox")
         self.session.save_turn(f"[inbox: {source}] {msg.content}", response_text)
         print()
+        # Restore prompt after inbox handling
+        print("you: ", end="", flush=True)
 
     def _handle_agent_result(self, msg: Message):
         task_id = msg.metadata.get("task_id", "unnamed")
@@ -341,26 +349,77 @@ class SparkAgent:
         self._process_tool_calls(response_text, source="agent")
         self.session.save_turn(f"[agent:{task_id}] result", response_text)
         print()
+        # Restore prompt after agent result
+        print("you: ", end="", flush=True)
 
     def _handle_pulse(self, msg: Message):
+        """Handle a heartbeat pulse (fast or deep).
+
+        Fast pulses are silent unless they produce substantial output.
+        This prevents empty continuity checks from cluttering the
+        terminal and growing the context window with noise.
+
+        Deep pulses always show — they're where real work happens.
+        """
         mode = "fast" if msg.msg_type == MessageType.PULSE_FAST else "deep"
         num_predict = 256 if mode == "fast" else 1024
 
         original_predict = self.options.get("num_predict")
         self.options["num_predict"] = num_predict
 
+        # Generate response (non-streaming for pulses)
         self.messages.append({"role": "user", "content": msg.content})
         response_text = self.send(self._build_context(), stream=False)
-        self.messages.append({"role": "assistant", "content": response_text})
 
         if original_predict is not None:
             self.options["num_predict"] = original_predict
         else:
             self.options.pop("num_predict", None)
 
+        # Measure display-worthy content (strip think blocks + tool XML)
+        display_text = clean_for_display(response_text) if response_text else ""
+
+        # Fast pulse suppression: if the response is too short to be
+        # substantive, treat it as a silent heartbeat. Don't append to
+        # messages (saves context), don't print (saves terminal noise).
+        if mode == "fast" and len(display_text) < MIN_FAST_PULSE_DISPLAY:
+            # Remove the pulse prompt we just appended
+            if self.messages and self.messages[-1].get("content") == msg.content:
+                self.messages.pop()
+            # Record silently in audit trail
+            self.bus.record(
+                source=f"heartbeat_{mode}",
+                summary=f"silent pulse ({len(display_text)} chars)",
+                metadata={"mode": mode, "silent": True},
+            )
+            return
+
+        # Substantive response: append and process
+        self.messages.append({"role": "assistant", "content": response_text})
+
+        if mode == "fast":
+            # Show brief indicator for non-silent fast pulses
+            print(f"\n  \U0001f49a [pulse:{mode}] {display_text[:80]}..." if len(display_text) > 80
+                  else f"\n  \U0001f49a [pulse:{mode}] {display_text}", flush=True)
+        else:
+            # Deep pulses show full output
+            print(f"\n  \U0001f7e3 [pulse:{mode}]")
+            if display_text:
+                print(f"\nvybn: {display_text}", flush=True)
+
         if response_text and len(response_text.strip()) > 20:
             self._process_tool_calls(response_text, source=f"heartbeat_{mode}")
             self.session.save_turn(f"[heartbeat:{mode}] {msg.content}", response_text)
+
+        # Record in audit trail
+        self.bus.record(
+            source=f"heartbeat_{mode}",
+            summary=f"pulse: {display_text[:100]}" if display_text else "pulse: empty",
+            metadata={"mode": mode, "silent": False, "length": len(display_text)},
+        )
+
+        # Restore prompt so Zoe knows the terminal is ready for input
+        print("\nyou: ", end="", flush=True)
 
     # ---- tool call processing ----
 
@@ -428,7 +487,11 @@ class SparkAgent:
                     indicator = f"{skill}: {short_arg}"
 
                 if check.verdict == Verdict.ALLOW:
-                    print(f"\n  \u2192 [{indicator}]", flush=True)
+                    # Promoted skills get a special indicator
+                    if check.promoted:
+                        print(f"\n  \u2b50 [{indicator}] (promoted\u2192auto)", flush=True)
+                    else:
+                        print(f"\n  \u2192 [{indicator}]", flush=True)
                 else:
                     # NOTIFY tier: slightly different icon
                     print(f"\n  \u26a1 [{indicator}]", flush=True)
@@ -461,6 +524,7 @@ class SparkAgent:
                     metadata={
                         "skill": skill,
                         "verdict": check.verdict.name,
+                        "promoted": check.promoted,
                         "success": success,
                         "argument": arg[:120] if arg else "",
                     },
@@ -652,10 +716,8 @@ class SparkAgent:
             response.raise_for_status()
             raw = response.json()["message"]["content"]
 
-            # Non-streaming: display cleaned text
-            display = clean_for_display(raw)
-            if display:
-                print(display)
+            # Non-streaming pulses: don't print here, let _handle_pulse
+            # decide whether to show based on content length
 
         return clean_response(raw)
 
@@ -704,7 +766,12 @@ class SparkAgent:
         print(f"  heartbeat: fast={self.heartbeat.fast_interval // 60}m, deep={self.heartbeat.deep_interval // 60}m")
         print(f"  inbox: {self.inbox.inbox_dir}")
         print(f"  agents: pool_size={self.agent_pool.pool_size}")
-        print(f"  policy: loaded ({len(self.policy.tier_overrides)} overrides) + audit trail")
+        print(f"  policy: loaded ({len(self.policy.tier_overrides)} overrides) + graduated autonomy")
+        ga_status = "enabled" if self.policy.ga_enabled else "disabled"
+        print(f"  graduated autonomy: {ga_status} "
+              f"(promote\u2265{self.policy.promote_threshold:.0%}, "
+              f"demote<{self.policy.demote_threshold:.0%}, "
+              f"min_obs={self.policy.min_observations})")
         if plugins:
             print(f"  plugins: {plugins} loaded from skills.d/")
         if id_tokens > num_ctx // 2:
@@ -713,20 +780,43 @@ class SparkAgent:
 
         try:
             while True:
-                if self.bus.wait(timeout=IDLE_POLL_INTERVAL):
-                    self.drain_bus()
+                # Print prompt so Zoe knows the terminal is ready
+                print("you: ", end="", flush=True)
 
-                try:
-                    import select
-                    if select.select([sys.stdin], [], [], 0.0)[0]:
-                        user_input = sys.stdin.readline().strip()
-                    else:
-                        continue
-                except (ImportError, OSError):
-                    try:
-                        user_input = input("you: ").strip()
-                    except EOFError:
+                while True:
+                    # Check bus for pending messages
+                    if self.bus.wait(timeout=IDLE_POLL_INTERVAL):
+                        # Clear the prompt line before showing bus output
+                        print("\r    \r", end="", flush=True)
+                        self.drain_bus()
+                        # drain_bus handlers restore the prompt themselves
+                        # for inbox/agent/substantive pulses. For silent
+                        # pulses, we need to re-show it:
+                        # (Check if prompt was already restored by handler)
                         break
+
+                    # Check for user input
+                    try:
+                        import select
+                        if select.select([sys.stdin], [], [], 0.0)[0]:
+                            user_input = sys.stdin.readline().strip()
+                            if user_input:
+                                break
+                    except (ImportError, OSError):
+                        try:
+                            user_input = input("").strip()
+                            if user_input:
+                                break
+                        except EOFError:
+                            user_input = "/bye"
+                            break
+                else:
+                    # bus was drained, loop back to show prompt
+                    continue
+
+                # If we got here from bus drain without user input, continue
+                if not locals().get('user_input'):
+                    continue
 
                 if not user_input:
                     continue
@@ -750,6 +840,9 @@ class SparkAgent:
                 print("\nvybn: ", end="", flush=True)
                 self.turn(user_input)
                 print()
+
+                # Reset for next iteration
+                user_input = None
 
         except KeyboardInterrupt:
             pass
@@ -776,15 +869,29 @@ class SparkAgent:
               f"max_agents={self.policy.max_active_agents}")
         print(f"  agents active: {self.agent_pool.active_count}")
 
+        # Graduated autonomy status
+        if self.policy.ga_enabled:
+            print(f"  graduated autonomy: ON "
+                  f"(promote\u2265{self.policy.promote_threshold:.0%}, "
+                  f"demote<{self.policy.demote_threshold:.0%}, "
+                  f"min_obs={self.policy.min_observations})")
+            if self.policy._runtime_overrides:
+                demoted = ", ".join(self.policy._runtime_overrides.keys())
+                print(f"  demoted skills: {demoted}")
+        else:
+            print(f"  graduated autonomy: OFF")
+
         print("\n  tier table (interactive / heartbeat):")
         all_skills = sorted(set(list(DEFAULT_TIERS.keys()) + list(self.policy.tier_overrides.keys())))
         for skill in all_skills:
             interactive = self.policy.tier_overrides.get(skill, DEFAULT_TIERS.get(skill))
             heartbeat = HEARTBEAT_OVERRIDES.get(skill, interactive)
             conf = self.policy.get_confidence(skill)
+            obs = self.policy._observation_count(skill)
             override = " *" if skill in self.policy.tier_overrides else ""
+            demoted = " [demoted]" if skill in self.policy._runtime_overrides else ""
             print(f"    {skill:20s}  {interactive.value:8s} / {heartbeat.value:8s}  "
-                  f"conf={conf:.0%}{override}")
+                  f"conf={conf:.0%} ({obs} obs){override}{demoted}")
 
         stats = self.policy.get_stats_summary()
         if stats != "no skill stats recorded yet":
