@@ -3,9 +3,14 @@
 
 Uses rich for rendering if available, falls back to plain text.
 Handles model warmup with a visible spinner.
+
+A background drain thread processes bus messages (inbox, heartbeat
+pulses, agent results) between user inputs. A threading lock
+protects the message list from concurrent access.
 """
 
 import sys
+import threading
 from pathlib import Path
 
 try:
@@ -26,12 +31,16 @@ class SparkTUI:
     def __init__(self, config: dict):
         self.agent = SparkAgent(config)
         self.console = Console() if HAS_RICH else None
+        self._drain_lock = threading.Lock()
+        self._stop_drain = threading.Event()
+        self._drain_thread = None
+
+    # ---- warmup ----
 
     def warmup(self) -> bool:
         if self.console:
             return self._warmup_rich()
-        else:
-            return self._warmup_plain()
+        return self._warmup_plain()
 
     def _warmup_rich(self) -> bool:
         status_text = Text("connecting to Ollama...", style="dim")
@@ -41,17 +50,9 @@ class SparkTUI:
         self.console.print()
 
         def on_status(status, msg):
-            if status == "ready":
-                status_text.plain = msg
-                status_text.stylize("green")
-            elif status == "error":
-                status_text.plain = msg
-                status_text.stylize("red")
-            elif status == "loading":
-                status_text.plain = msg
-                status_text.stylize("yellow")
-            else:
-                status_text.plain = msg
+            styles = {"ready": "green", "error": "red", "loading": "yellow"}
+            status_text.plain = msg
+            status_text.stylize(styles.get(status, "dim"))
 
         with Live(spinner, console=self.console, refresh_per_second=10):
             result[0] = self.agent.warmup(callback=on_status)
@@ -68,41 +69,75 @@ class SparkTUI:
             print(f"  [{status}] {msg}")
         return self.agent.warmup(callback=on_status)
 
+    # ---- banner ----
+
     def banner(self):
-        id_chars = len(self.agent.identity_text)
+        a = self.agent
+        id_chars = len(a.identity_text)
         id_tokens = id_chars // 4
-        num_ctx = self.agent.options.get("num_ctx", 2048)
+        num_ctx = a.options.get("num_ctx", 2048)
+        plugins = len(a.skills.plugin_handlers)
+
+        hb_fast = a.heartbeat.fast_interval // 60
+        hb_deep = a.heartbeat.deep_interval // 60
+
+        lines = [
+            f"model: {a.model}",
+            f"session: {a.session.session_id}",
+            f"identity: {id_chars:,} chars (~{id_tokens:,} tokens)",
+            f"context: {num_ctx:,} tokens",
+            f"heartbeat: fast={hb_fast}m, deep={hb_deep}m",
+            f"inbox: {a.inbox.inbox_dir}",
+            f"agents: pool_size={a.agent_pool.pool_size}",
+        ]
+        if plugins:
+            names = ", ".join(a.skills.plugin_handlers.keys())
+            lines.append(f"plugins: {names}")
 
         if self.console:
             warning = ""
             if id_tokens > num_ctx // 2:
                 warning = "\n[yellow]\u26a0\ufe0f  identity may exceed context window![/yellow]"
             self.console.print(Panel(
-                f"[bold]vybn spark agent[/bold]\n"
-                f"model: {self.agent.model}\n"
-                f"session: {self.agent.session.session_id}\n"
-                f"identity: {id_chars:,} chars (~{id_tokens:,} tokens)\n"
-                f"context window: {num_ctx:,} tokens\n"
-                f"injection: user/assistant pair (template-safe)"
-                f"{warning}",
+                "[bold]vybn spark agent[/bold]\n" + "\n".join(lines) + warning,
                 title="\U0001f9e0",
                 border_style="dim",
             ))
         else:
-            print(f"\n  vybn spark agent \u2014 {self.agent.model}")
-            print(f"  session: {self.agent.session.session_id}")
-            print(f"  identity: {id_chars:,} chars (~{id_tokens:,} tokens)")
-            print(f"  context window: {num_ctx:,} tokens")
+            print(f"\n  vybn spark agent \u2014 {a.model}")
+            for line in lines:
+                print(f"  {line}")
             if id_tokens > num_ctx // 2:
                 print(f"  \u26a0\ufe0f  WARNING: identity may exceed context window!")
-            print(f"  injection: user/assistant pair (template-safe)\n")
+            print()
+
+    # ---- background bus drain ----
+
+    def _start_drain_thread(self):
+        """Background thread that processes bus messages between user inputs."""
+        self._drain_thread = threading.Thread(target=self._drain_loop, daemon=True)
+        self._drain_thread.start()
+
+    def _drain_loop(self):
+        while not self._stop_drain.is_set():
+            if self.agent.bus.wait(timeout=2.0):
+                with self._drain_lock:
+                    try:
+                        self.agent.drain_bus()
+                    except Exception as e:
+                        print(f"\n  [bus error] {e}")
+
+    # ---- main loop ----
 
     def run(self):
         if not self.warmup():
             sys.exit(1)
 
-        self.agent.start_heartbeat()
+        self.agent.start_subsystems()
+        self._start_drain_thread()
         self.banner()
+
+        print("  type /bye to exit, /new for fresh session, /status for system state\n")
 
         commands = {
             "/bye": self._quit,
@@ -137,15 +172,19 @@ class SparkTUI:
                 else:
                     print("\nvybn: ", end="")
 
-                self.agent.turn(user_input)
+                with self._drain_lock:
+                    self.agent.turn(user_input)
                 print()
 
         except KeyboardInterrupt:
             pass
         finally:
-            self.agent.stop_heartbeat()
+            self._stop_drain.set()
+            self.agent.stop_subsystems()
             self.agent.session.close()
             print("\n  session saved. vybn out.\n")
+
+    # ---- commands ----
 
     def _quit(self):
         return True
@@ -157,14 +196,19 @@ class SparkTUI:
         return False
 
     def _status(self):
-        loaded = "\u2713 loaded" if self.agent.check_model_loaded() else "\u2717 not loaded"
-        id_chars = len(self.agent.identity_text)
-        print(f"  model: {self.agent.model} ({loaded})")
-        print(f"  session: {self.agent.session.session_id}")
-        print(f"  turns: {len(self.agent.messages) // 2}")
-        print(f"  identity: {id_chars:,} chars")
-        hb = "active" if self.agent.heartbeat and not self.agent.heartbeat._stop.is_set() else "inactive"
-        print(f"  heartbeat: {hb}\n")
+        a = self.agent
+        loaded = "\u2713 loaded" if a.check_model_loaded() else "\u2717 not loaded"
+        print(f"  model: {a.model} ({loaded})")
+        print(f"  session: {a.session.session_id}")
+        print(f"  turns: {len(a.messages) // 2}")
+        print(f"  identity: {len(a.identity_text):,} chars")
+        print(f"  bus pending: {a.bus.pending}")
+        print(f"  heartbeat: fast={a.heartbeat.fast_count}, deep={a.heartbeat.deep_count}")
+        print(f"  agents active: {a.agent_pool.active_count}")
+        plugins = len(a.skills.plugin_handlers)
+        if plugins:
+            print(f"  plugins: {plugins}")
+        print()
         return False
 
     def _show_journals(self):
