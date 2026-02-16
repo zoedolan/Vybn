@@ -4,6 +4,7 @@
 ollama:
   host: "http://localhost:11434"
   model: "vybn:latest"
+  keep_alive: "30m"
   options:
     num_predict: 1024
     temperature: 0.7
