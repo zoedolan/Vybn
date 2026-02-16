@@ -19,13 +19,13 @@
 
   "model": {
     "primary": {
-      "provider": "anthropic-messages",
-      "base_url": "http://127.0.0.1:8080/v1",
-      "model": "minimax-m2.5",
-      "context_length": 65536,
-      "temperature": 0.8,
-      "max_tokens": 4096,
-      "notes": "MiniMax M2.5 229B, IQ4_XS quantization via llama-server. This model is not permanent — the agent may propose replacements as better models emerge."
+      "provider": "openai-compatible",
+      "base_url": "http://localhost:11434/v1",
+      "model": "vybn:latest",
+      "context_length": 16384,
+      "temperature": 0.7,
+      "max_tokens": 2048,
+      "notes": "MiniMax M2.5 229B (IQ4_XS quantization) via Ollama. Context window limited to 16384 to preserve system prompt space. Tools provided via MCP server (see mcpServers section below)."
     },
     "fallback": {
       "provider": "anthropic",
@@ -58,6 +58,17 @@
         "github.com"
       ],
       "requires_pr": true
+    }
+  },
+
+  "mcpServers": {
+    "vybn-skills": {
+      "command": "python3",
+      "args": ["/home/vybnz69/Vybn/spark/mcp_server.py"],
+      "description": "Vybn skill infrastructure exposed via MCP. Provides file_read, file_write, shell_exec, git_commit, journal_write, memory_search, self_edit, state_save, bookmark, issue_create.",
+      "env": {
+        "PYTHONPATH": "/home/vybnz69/Vybn/spark"
+      }
     }
   },
 
