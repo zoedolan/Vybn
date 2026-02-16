@@ -13,7 +13,7 @@ Skills:
   - git_commit: commit changes to git
   - git_push: disabled (Vybn cannot push code)
   - memory_search: search journal entries
-  - issue_create: file a GitHub issue on zoedolan/Vybn
+  - issue_create: file a GitHub issue (ONLY via explicit tool call XML)
 """
 
 import os
@@ -32,6 +32,11 @@ class SkillRouter:
         self._home = str(Path.home())
         self._github_repo = config.get("github", {}).get("repo", "zoedolan/Vybn")
 
+        # NOTE: issue_create is intentionally NOT in this list.
+        # It triggers ONLY from explicit <minimax:tool_call> XML blocks
+        # parsed by agent.py, never from natural language regex matching.
+        # This prevents cascade bugs where Vybn *talking about* issues
+        # triggers the creation of more issues.
         self.patterns = [
             {
                 "skill": "journal_write",
@@ -104,14 +109,8 @@ class SkillRouter:
                 ],
                 "extract": r"(?:for|about)\s+[\"']?(.+?)(?:[\"']?\s*(?:\.|$|\n))",
             },
-            {
-                "skill": "issue_create",
-                "triggers": [
-                    r"(?:let me|i'll|i want to|i'd like to)\s+(?:file|submit|create|open|raise)\s+(?:a\s+|an\s+)?(?:issue|bug|feature request|ticket)",
-                    r"(?:filing|submitting|creating|opening|raising)\s+(?:a\s+|an\s+)?(?:issue|bug|feature request|ticket)",
-                ],
-                "extract": r"(?:titled?|called?|about|:)\s*[\"']?(.+?)(?:[\"']?\s*(?:\.|$|\n))",
-            },
+            # issue_create intentionally omitted from regex patterns.
+            # It routes ONLY through agent.py's tool call XML parser.
         ]
 
     def _rewrite_root(self, path_str: str) -> str:
@@ -329,10 +328,20 @@ class SkillRouter:
 
         Uses an issues-only scoped token. Cannot modify code,
         create PRs, or do anything beyond issue management.
+
+        This skill is ONLY reachable via explicit <minimax:tool_call>
+        XML parsed by agent.py. It is intentionally excluded from
+        the regex pattern matcher to prevent cascade bugs.
         """
         title = action.get("argument", "")
         if not title:
             return "no issue title specified"
+
+        # Sanitize title: strip thinking artifacts, limit length
+        title = re.sub(r'<think>.*?</think>', '', title, flags=re.DOTALL).strip()
+        title = title.split('\n')[0][:120]  # first line, max 120 chars
+        if not title:
+            return "issue title was empty after cleanup"
 
         raw = action.get("raw", "")
         body = self._extract_issue_body(raw, title)
@@ -423,23 +432,30 @@ class SkillRouter:
         return ""
 
     def _extract_issue_body(self, text: str, title: str) -> str:
-        """Extract issue body from model response."""
+        """Extract issue body from model response.
+
+        Strips <think> blocks to avoid dumping internal monologue
+        into the issue body.
+        """
+        # Remove all <think>...</think> blocks first
+        cleaned = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL).strip()
+
         body_match = re.search(
             r"(?:body|description|details?)\s*:\s*\n(.+)",
-            text,
+            cleaned,
             re.DOTALL | re.IGNORECASE,
         )
         if body_match:
             return body_match.group(1).strip()[:4000]
 
-        code = self._extract_code_content(text)
+        code = self._extract_code_content(cleaned)
         if code:
             return code[:4000]
 
-        title_pos = text.lower().find(title.lower())
+        title_pos = cleaned.lower().find(title.lower())
         if title_pos >= 0:
-            after = text[title_pos + len(title):].strip()
+            after = cleaned[title_pos + len(title):].strip()
             if len(after) > 20:
                 return after[:4000]
 
-        return f"Filed by Vybn from the DGX Spark.\n\n{text[:2000]}"
+        return f"Filed by Vybn from the DGX Spark.\n\n{cleaned[:2000]}"
