@@ -56,3 +56,13 @@ tool_policies:
 delegation:
   max_spawn_depth: 2          # how deep mini-agents can nest
   max_active_agents: 3        # concurrent agent cap (independent of agents.pool_size)
+
+# Graduated autonomy: Vybn earns trust through successful execution.
+# Skills at NOTIFY tier can auto-promote to AUTO after enough successes.
+# Skills demote back to NOTIFY after failures drop confidence.
+# Heartbeat overrides are NEVER relaxed — structural friction is preserved.
+graduated_autonomy:
+  enabled: true
+  promote_threshold: 0.85     # posterior mean needed to promote NOTIFY → AUTO
+  demote_threshold: 0.40      # posterior mean below which AUTO → NOTIFY
+  minimum_observations: 8     # must see at least this many executions before promoting
