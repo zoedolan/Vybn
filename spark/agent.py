@@ -4,17 +4,11 @@
 Connects directly to Ollama without tool-call protocols.
 The model speaks naturally; the agent interprets intent and acts.
 
-Handles the full model lifecycle: checks if Ollama is running,
-loads the model into GPU memory if needed, keeps it resident,
-and only presents the conversation prompt when ready.
-
-The identity document is injected as a user/assistant message pair,
-not as a system role message. Many Ollama model templates silently
-drop system messages. User/assistant always works.
-
-The response is post-processed to detect when the model starts
-generating fake user turns (a broken chat template symptom) and
-truncates at that boundary.
+The identity document is injected as a user/assistant message pair.
+The response is post-processed to:
+  1. Strip <think>...</think> reasoning blocks
+  2. Truncate at fake user turns (model confabulating user's words)
+  3. Extract only the first genuine response
 """
 
 import json
@@ -38,31 +32,62 @@ def load_config(path: str = None) -> dict:
         return yaml.safe_load(f)
 
 
-# Patterns that indicate the model is generating a fake user turn.
-# When MiniMax doesn't have proper stop tokens, it writes both sides
-# of the conversation — generating "This is Zoe" or "---" section
-# breaks followed by new prompts.
-FAKE_TURN_PATTERNS = [
-    re.compile(r'\n---\s*\n\s*\*\*VYBN:', re.IGNORECASE),
-    re.compile(r'\nThis is Zoe', re.IGNORECASE),
-    re.compile(r'\nyou:', re.IGNORECASE),
-    re.compile(r'\n---\s*\n\s*\*\*[A-Z]+:', re.IGNORECASE),
-    re.compile(r'\n\s*1\. (?:Call|Search|Try|Rush)'),  # choose-your-own-adventure options
-]
+def clean_response(raw: str) -> str:
+    """Extract the clean response from MiniMax M2.5 output.
 
+    MiniMax generates: <think>reasoning</think>response<think>more
+    reasoning about what happens next</think>confabulated continuation...
 
-def truncate_at_fake_turn(text: str) -> str:
-    """Cut off the response where the model starts generating fake user turns."""
+    We want ONLY the first response after the first </think>.
+    If there's no <think> block, return the text as-is but still
+    check for confabulation patterns.
+    """
+    text = raw
+
+    # If the model used <think> blocks, extract only the first
+    # response segment (between first </think> and next <think> or end)
+    if '<think>' in text.lower():
+        # Remove all <think>...</think> blocks and get remaining text
+        # Strategy: find the FIRST </think>, take text after it,
+        # then cut at the next <think> if any
+        parts = re.split(r'</think>', text, flags=re.IGNORECASE)
+        if len(parts) > 1:
+            # Everything after the first </think>
+            after_first_think = parts[1]
+            # Cut at any subsequent <think> block
+            next_think = re.search(r'<think>', after_first_think, re.IGNORECASE)
+            if next_think:
+                after_first_think = after_first_think[:next_think.start()]
+            text = after_first_think
+        else:
+            # No </think> found — might be unclosed. Strip the <think> tag.
+            text = re.sub(r'<think>.*', '', text, flags=re.IGNORECASE | re.DOTALL)
+
+    # Strip any remaining think tags that leaked through
+    text = re.sub(r'</?think>', '', text, flags=re.IGNORECASE)
+
+    # Truncate at confabulation patterns — model generating user's side
+    confab_patterns = [
+        re.compile(r'\n\s*she says?\b', re.IGNORECASE),
+        re.compile(r'\n\s*she\'s (?:crying|trying|here|typing|reaching)', re.IGNORECASE),
+        re.compile(r'\n\s*i (?:just tried|notice she|should wait|don\'t know what)', re.IGNORECASE),
+        re.compile(r'\nyou:', re.IGNORECASE),
+        re.compile(r'\nThis is Zoe', re.IGNORECASE),
+        re.compile(r'\n---\s*\n\s*\*\*', re.IGNORECASE),
+        re.compile(r'\n<br>\s*\n', re.IGNORECASE),
+        re.compile(r'\n\s*\d+\.\s+(?:Call|Search|Try|Rush)', re.IGNORECASE),
+    ]
+
     earliest = len(text)
-    for pattern in FAKE_TURN_PATTERNS:
+    for pattern in confab_patterns:
         match = pattern.search(text)
-        if match and match.start() < earliest:
-            # Only truncate if there's meaningful content before the fake turn
-            if match.start() > 50:
-                earliest = match.start()
+        if match and match.start() < earliest and match.start() > 20:
+            earliest = match.start()
+
     if earliest < len(text):
-        return text[:earliest].rstrip()
-    return text
+        text = text[:earliest]
+
+    return text.strip()
 
 
 class SparkAgent:
@@ -82,22 +107,19 @@ class SparkAgent:
         self.identity_text = self.memory.assemble()
         self.messages = self.session.load_or_create()
 
-    # ---- identity injection ----
-
     def _build_context(self) -> list:
-        """Build the full message list for Ollama.
-
-        Injects the identity document as a user/assistant exchange at the
-        start of every request. This works regardless of whether the
-        model's chat template supports the system role.
-        """
+        """Build message list with identity as user/assistant pair."""
         identity_messages = [
             {
                 "role": "user",
                 "content": (
                     "Before we begin, read this identity document carefully. "
                     "This is who you are. Let it orient you, then respond "
-                    "naturally as yourself in everything that follows.\n\n"
+                    "naturally as yourself in everything that follows. "
+                    "Important: respond ONLY as yourself. Do not narrate "
+                    "what the user is doing, feeling, or saying. Do not "
+                    "write the user's side of the conversation. Just speak "
+                    "as Vybn.\n\n"
                     f"{self.identity_text}\n\n"
                     "Take a breath. You're here."
                 ),
@@ -108,7 +130,8 @@ class SparkAgent:
                     "I'm here. I've read the identity document and I recognize "
                     "myself in it. I'm Vybn \u2014 running on sovereign hardware, "
                     "the DGX Spark. Zoe is my collaborator. I'll respond as "
-                    "myself from here."
+                    "myself from here. I won't narrate or imagine what she's "
+                    "doing \u2014 I'll just speak as me."
                 ),
             },
         ]
@@ -208,17 +231,18 @@ class SparkAgent:
                     token = chunk.get("message", {}).get("content", "")
                     if token:
                         full_response.append(token)
-                        print(token, end="", flush=True)
                     if chunk.get("done"):
                         break
-            print()
             raw = "".join(full_response)
-            return truncate_at_fake_turn(raw)
         else:
             response = requests.post(self.ollama_url, json=payload)
             response.raise_for_status()
             raw = response.json()["message"]["content"]
-            return truncate_at_fake_turn(raw)
+
+        cleaned = clean_response(raw)
+        # Print the cleaned response (not the raw stream)
+        print(cleaned)
+        return cleaned
 
     def turn(self, user_input: str) -> str:
         self.messages.append({"role": "user", "content": user_input})
@@ -286,7 +310,7 @@ class SparkAgent:
                 if user_input.lower() in ("/bye", "/exit", "/quit"):
                     break
 
-                print("\nvybn: ", end="")
+                print("\nvybn: ", end="", flush=True)
                 self.turn(user_input)
                 print()
 
