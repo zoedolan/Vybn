@@ -1,20 +1,29 @@
 #!/bin/bash
 # Setup GitHub authentication on the DGX Spark
-# Run this once to give Vybn the ability to push and submit issues.
+# ISSUES ONLY — Vybn can file issues but cannot push code or create PRs.
 #
 # Usage:
 #   chmod +x ~/Vybn/spark/setup-gh-auth.sh
 #   ~/Vybn/spark/setup-gh-auth.sh
 #
-# You'll need a GitHub Personal Access Token (PAT) with:
-#   - repo (full control)
-#   - read:org (if needed for org repos)
+# You'll need a GitHub Fine-Grained Personal Access Token with:
+#   - Repository: zoedolan/Vybn
+#   - Permissions: Issues (Read and Write) — NOTHING ELSE
 #
 # Generate one at: https://github.com/settings/tokens?type=beta
+#   1. Click "Generate new token"
+#   2. Name: "Vybn Spark - Issues Only"
+#   3. Repository access: "Only select repositories" → zoedolan/Vybn
+#   4. Permissions → Repository permissions → Issues → Read and Write
+#   5. Leave everything else at "No access"
+#   6. Generate token, copy it
 
 set -e
 
-echo "=== Vybn Spark: GitHub Auth Setup ==="
+echo "=== Vybn Spark: GitHub Auth Setup (Issues Only) ==="
+echo
+echo "This gives Vybn the ability to file GitHub issues."
+echo "It does NOT give access to push code, create PRs, or modify the repo."
 echo
 
 # Install gh CLI if not present
@@ -31,26 +40,37 @@ else
     echo "  ✓ gh CLI already installed"
 fi
 
-echo
-echo "Now authenticate with GitHub:"
-echo "  gh auth login"
-echo
-echo "Choose:"
-echo "  - GitHub.com"
-echo "  - HTTPS"
-echo "  - Paste an authentication token"
-echo "  - Paste your PAT"
-echo
-echo "After auth, Vybn will be able to:"
-echo "  - git push to origin"
-echo "  - gh issue create"
-echo "  - gh pr create"
-echo
-
-# Configure git identity for Vybn
+# Configure git identity (for local commits only — push is not enabled)
 git config --global user.email "vybn@spark.local"
 git config --global user.name "Vybn"
 echo "  ✓ git identity set (Vybn <vybn@spark.local>)"
 
 echo
-echo "Run: gh auth login"
+echo "Now paste your fine-grained PAT (issues-only scope):"
+echo
+read -sp "Token: " TOKEN
+echo
+
+# Store token securely
+TOKEN_FILE="$HOME/.vybn-github-token"
+echo "$TOKEN" > "$TOKEN_FILE"
+chmod 600 "$TOKEN_FILE"
+echo "  ✓ token stored at $TOKEN_FILE (mode 600)"
+
+# Authenticate gh CLI with the token
+echo "$TOKEN" | gh auth login --with-token 2>/dev/null
+echo "  ✓ gh CLI authenticated"
+
+# IMPORTANT: Do NOT set gh as git credential helper
+# This keeps git push disabled while gh issue create works
+git config --global --unset credential.helper 2>/dev/null || true
+echo "  ✓ git credential helper cleared (push stays disabled)"
+
+echo
+echo "Done! Vybn can now:"
+echo "  ✓ gh issue create -R zoedolan/Vybn --title '...' --body '...'"
+echo "  ✗ git push (intentionally disabled)"
+echo "  ✗ gh pr create (no permission)"
+echo
+echo "Test it:"
+echo "  gh issue list -R zoedolan/Vybn --limit 3"
