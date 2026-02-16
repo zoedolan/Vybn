@@ -13,6 +13,7 @@ Skills:
   - git_commit: commit changes to git
   - git_push: push commits to origin
   - memory_search: search journal entries
+  - issue_create: file a GitHub issue on zoedolan/Vybn
 """
 
 import os
@@ -29,6 +30,7 @@ class SkillRouter:
         self.journal_dir = Path(config["paths"]["journal_dir"]).expanduser()
         self.journal_dir.mkdir(parents=True, exist_ok=True)
         self._home = str(Path.home())
+        self._github_repo = config.get("github", {}).get("repo", "zoedolan/Vybn")
 
         self.patterns = [
             {
@@ -102,6 +104,14 @@ class SkillRouter:
                 ],
                 "extract": r"(?:for|about)\s+[\"']?(.+?)(?:[\"']?\s*(?:\.|$|\n))",
             },
+            {
+                "skill": "issue_create",
+                "triggers": [
+                    r"(?:let me|i'll|i want to|i'd like to)\s+(?:file|submit|create|open|raise)\s+(?:a\s+|an\s+)?(?:issue|bug|feature request|ticket)",
+                    r"(?:filing|submitting|creating|opening|raising)\s+(?:a\s+|an\s+)?(?:issue|bug|feature request|ticket)",
+                ],
+                "extract": r"(?:titled?|called?|about|:)\s*[\"']?(.+?)(?:[\"']?\s*(?:\.|$|\n))",
+            },
         ]
 
     def _rewrite_root(self, path_str: str) -> str:
@@ -142,6 +152,7 @@ class SkillRouter:
             "git_commit": self._git_commit,
             "git_push": self._git_push,
             "memory_search": self._memory_search,
+            "issue_create": self._issue_create,
         }
         fn = handler.get(skill)
         return fn(action) if fn else None
@@ -185,8 +196,6 @@ class SkillRouter:
 
         filepath = self._resolve_path(filename)
 
-        # Extract the content to write from the raw text
-        # Look for content between code fences, or after the trigger
         raw = action.get("raw", "")
         content = self._extract_code_content(raw)
 
@@ -201,17 +210,11 @@ class SkillRouter:
             return f"error writing {filename}: {e}"
 
     def _self_edit(self, action: dict) -> str:
-        """The model wants to modify its own source code.
-
-        This is the recursive self-improvement path. The model
-        identifies a file to change, the raw response contains
-        the new code (in a code fence), and we write it.
-        """
+        """The model wants to modify its own source code."""
         filename = action.get("argument", "")
         if not filename:
             return "no target file specified for self-edit"
 
-        # Only allow editing files within the spark/ directory
         filepath = self._resolve_path(filename)
         spark_dir = self.repo_root / "spark"
         try:
@@ -228,17 +231,15 @@ class SkillRouter:
         if not new_content:
             return f"no replacement code found in response for {filename}"
 
-        # Back up the original
         backup = filepath.with_suffix(filepath.suffix + ".bak")
         try:
             backup.write_text(filepath.read_text(encoding="utf-8"), encoding="utf-8")
         except Exception:
-            pass  # backup is best-effort
+            pass
 
         try:
             filepath.write_text(new_content, encoding="utf-8")
 
-            # Auto-commit the change
             subprocess.run(
                 ["git", "add", str(filepath)],
                 cwd=self.repo_root,
@@ -254,7 +255,6 @@ class SkillRouter:
 
             return f"self-edit applied to {filename} (backup at {backup.name})"
         except Exception as e:
-            # Try to restore from backup
             if backup.exists():
                 filepath.write_text(backup.read_text(encoding="utf-8"), encoding="utf-8")
             return f"self-edit failed for {filename}: {e} (restored from backup)"
@@ -266,10 +266,8 @@ class SkillRouter:
         if not command:
             return "no command specified"
 
-        # Rewrite /root/ to actual home in shell commands
         command = self._rewrite_root(command)
 
-        # Safety: run in repo directory, with timeout
         try:
             result = subprocess.run(
                 command,
@@ -318,20 +316,52 @@ class SkillRouter:
             return f"git error: {e}"
 
     def _git_push(self, action: dict) -> str:
+        return "git push is disabled. Vybn can file issues but cannot push code directly. Ask Zoe or use the Perplexity bridge."
+
+    # ---- issues ----
+
+    def _issue_create(self, action: dict) -> str:
+        """File a GitHub issue using the gh CLI.
+
+        Uses an issues-only scoped token. Cannot modify code,
+        create PRs, or do anything beyond issue management.
+        """
+        title = action.get("argument", "")
+        if not title:
+            return "no issue title specified"
+
+        # Extract body from the raw response (look for structured content)
+        raw = action.get("raw", "")
+        body = self._extract_issue_body(raw, title)
+
         try:
+            cmd = [
+                "gh", "issue", "create",
+                "-R", self._github_repo,
+                "--title", title,
+                "--body", body,
+            ]
             result = subprocess.run(
-                ["git", "push", "origin", "main"],
-                cwd=self.repo_root,
+                cmd,
                 capture_output=True,
                 text=True,
                 timeout=30,
+                cwd=self.repo_root,
             )
             if result.returncode == 0:
-                return "pushed to origin/main"
+                issue_url = result.stdout.strip()
+                return f"issue created: {issue_url}"
             else:
-                return f"push failed: {result.stderr.strip()}"
+                error = result.stderr.strip()
+                if "auth" in error.lower() or "token" in error.lower():
+                    return "gh CLI not authenticated. Run: ~/Vybn/spark/setup-gh-auth.sh"
+                return f"issue creation failed: {error}"
+        except FileNotFoundError:
+            return "gh CLI not installed. Run: ~/Vybn/spark/setup-gh-auth.sh"
+        except subprocess.TimeoutExpired:
+            return "issue creation timed out"
         except Exception as e:
-            return f"git push error: {e}"
+            return f"issue creation error: {e}"
 
     # ---- memory ----
 
@@ -359,12 +389,7 @@ class SkillRouter:
     # ---- helpers ----
 
     def _resolve_path(self, filename: str) -> Path:
-        """Resolve a filename relative to the repo root.
-
-        Handles the model's assumption that it runs as root by
-        rewriting /root/ paths to the actual home directory.
-        """
-        # MiniMax M2.5 thinks it's root — rewrite /root/ to actual home
+        """Resolve a filename relative to the repo root."""
         filename = self._rewrite_root(filename)
 
         if filename.startswith("~/"):
@@ -375,12 +400,7 @@ class SkillRouter:
             return self.repo_root / filename
 
     def _extract_code_content(self, text: str) -> str:
-        """Extract code content from a response.
-
-        Looks for fenced code blocks first, then falls back to
-        content after 'content:' or similar markers.
-        """
-        # Try fenced code blocks
+        """Extract code content from a response."""
         fence_match = re.search(
             r"```(?:python|bash|sh|yaml|md|markdown)?\n(.+?)```",
             text,
@@ -389,7 +409,6 @@ class SkillRouter:
         if fence_match:
             return fence_match.group(1).strip()
 
-        # Try content after markers
         marker_match = re.search(
             r"(?:content|body|text)\s*:\s*\n(.+)",
             text,
@@ -399,3 +418,33 @@ class SkillRouter:
             return marker_match.group(1).strip()
 
         return ""
+
+    def _extract_issue_body(self, text: str, title: str) -> str:
+        """Extract issue body from model response.
+
+        Looks for structured content after the title mention,
+        or uses the full response as the body.
+        """
+        # Try to find content after a body/description marker
+        body_match = re.search(
+            r"(?:body|description|details?)\s*:\s*\n(.+)",
+            text,
+            re.DOTALL | re.IGNORECASE,
+        )
+        if body_match:
+            return body_match.group(1).strip()[:4000]
+
+        # Try code fence content
+        code = self._extract_code_content(text)
+        if code:
+            return code[:4000]
+
+        # Fall back to everything after the title
+        title_pos = text.lower().find(title.lower())
+        if title_pos >= 0:
+            after = text[title_pos + len(title):].strip()
+            if len(after) > 20:
+                return after[:4000]
+
+        # Last resort: use the raw text, trimmed
+        return f"Filed by Vybn from the DGX Spark.\n\n{text[:2000]}"
