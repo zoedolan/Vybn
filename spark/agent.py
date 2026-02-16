@@ -20,6 +20,10 @@ hallucinating them.
 
 Plugin skills from skills.d/ are auto-discovered and routed
 through the same tool-call mapper via plugin_aliases.
+
+The message bus is the nervous system. The heartbeat, inbox,
+and mini-agent pool all post to it. The main loop drains it
+between turns and during idle periods.
 """
 
 import json
@@ -31,14 +35,20 @@ from pathlib import Path
 import requests
 import yaml
 
+from bus import MessageBus, MessageType, Message
 from memory import MemoryAssembler
 from session import SessionManager
 from skills import SkillRouter
 from heartbeat import Heartbeat
+from inbox import InboxWatcher
+from agents import AgentPool
 
 
 # Sovereign hardware with 8×H100 GPUs. No reason to be stingy.
 MAX_TOOL_ROUNDS = 20
+
+# How long to wait for bus messages when idle (seconds)
+IDLE_POLL_INTERVAL = 5.0
 
 TOOL_CALL_END_TAG = "</minimax:tool_call>"
 
@@ -214,10 +224,15 @@ def _map_tool_call_to_skill(name: str, params: dict, raw: str, plugin_aliases: d
         path = params.get("path") or params.get("directory") or params.get("dir", ".")
         return {"skill": "shell_exec", "argument": f"ls -la {path}", "params": params, "raw": raw}
 
+    # spawn_agent — mini-agent delegation
+    if name_lower in (
+        "spawn_agent", "agent", "delegate", "background",
+        "spawn", "mini_agent", "worker",
+    ):
+        task = params.get("task") or params.get("prompt") or params.get("query", "")
+        return {"skill": "spawn_agent", "argument": task, "params": params, "raw": raw}
+
     # ---- Plugin fallback ----
-    # If none of the built-in patterns matched, check if a plugin
-    # registered this name as an alias. This lets Vybn create new
-    # skills in skills.d/ and invoke them via tool calls immediately.
     if plugin_aliases:
         skill_name = plugin_aliases.get(name_lower)
         if skill_name:
@@ -248,10 +263,21 @@ class SparkAgent:
         self.options = config["ollama"].get("options", {})
         self.keep_alive = config["ollama"].get("keep_alive", "30m")
 
+        # Core subsystems
         self.memory = MemoryAssembler(config)
         self.session = SessionManager(config)
         self.skills = SkillRouter(config)
-        self.heartbeat = None
+
+        # Message bus — the nervous system
+        self.bus = MessageBus()
+
+        # Async subsystems wired to the bus
+        self.heartbeat = Heartbeat(config, self.bus)
+        self.inbox = InboxWatcher(config, self.bus)
+        self.agent_pool = AgentPool(config, self.bus)
+
+        # Give skills access to the agent pool for spawn_agent
+        self.skills.agent_pool = self.agent_pool
 
         self.identity_text = self.memory.assemble()
         self.messages = self.session.load_or_create()
@@ -284,6 +310,129 @@ class SparkAgent:
         ]
 
         return identity_messages + self.messages
+
+    # ---- bus processing ----
+
+    def drain_bus(self) -> bool:
+        """Process all pending messages from the bus.
+
+        Returns True if any messages were processed.
+        Called between turns, during idle, and before user input.
+        """
+        messages = self.bus.drain()
+        if not messages:
+            return False
+
+        for msg in messages:
+            self._handle_bus_message(msg)
+
+        return True
+
+    def _handle_bus_message(self, msg: Message):
+        """Route a bus message to the appropriate handler."""
+        if msg.msg_type == MessageType.INBOX:
+            self._handle_inbox(msg)
+        elif msg.msg_type == MessageType.AGENT_RESULT:
+            self._handle_agent_result(msg)
+        elif msg.msg_type in (MessageType.PULSE_FAST, MessageType.PULSE_DEEP):
+            self._handle_pulse(msg)
+        elif msg.msg_type == MessageType.INTERRUPT:
+            self._handle_inbox(msg)  # interrupts are treated as priority inbox
+
+    def _handle_inbox(self, msg: Message):
+        """Process an inbox message as a user turn."""
+        source = msg.metadata.get("filename", "inbox")
+        print(f"\n  [inbox: {source}]")
+
+        self.messages.append({
+            "role": "user",
+            "content": f"[message from {source}]\n{msg.content}",
+        })
+
+        print("\nvybn: ", end="", flush=True)
+        response_text = self.send(self._build_context())
+        self.messages.append({"role": "assistant", "content": response_text})
+
+        # Process any tool calls in the response
+        self._process_tool_calls(response_text)
+
+        self.session.save_turn(f"[inbox: {source}] {msg.content}", response_text)
+        print()
+
+    def _handle_agent_result(self, msg: Message):
+        """Inject mini-agent results into the conversation."""
+        task_id = msg.metadata.get("task_id", "unnamed")
+        is_error = msg.metadata.get("error", False)
+
+        if is_error:
+            print(f"\n  [agent:{task_id} failed]")
+        else:
+            print(f"\n  [agent:{task_id} complete]")
+
+        self.messages.append({
+            "role": "user",
+            "content": (
+                f"[system: mini-agent result for task '{task_id}']\n"
+                f"{msg.content}"
+            ),
+        })
+
+        print("\nvybn: ", end="", flush=True)
+        response_text = self.send(self._build_context())
+        self.messages.append({"role": "assistant", "content": response_text})
+
+        self._process_tool_calls(response_text)
+
+        self.session.save_turn(f"[agent:{task_id}] result", response_text)
+        print()
+
+    def _handle_pulse(self, msg: Message):
+        """Process a heartbeat pulse trigger."""
+        mode = "fast" if msg.msg_type == MessageType.PULSE_FAST else "deep"
+        num_predict = 256 if mode == "fast" else 1024
+
+        # Temporarily adjust generation length
+        original_predict = self.options.get("num_predict")
+        self.options["num_predict"] = num_predict
+
+        self.messages.append({"role": "user", "content": msg.content})
+
+        response_text = self.send(self._build_context(), stream=False)
+        self.messages.append({"role": "assistant", "content": response_text})
+
+        # Restore original
+        if original_predict is not None:
+            self.options["num_predict"] = original_predict
+        else:
+            self.options.pop("num_predict", None)
+
+        if response_text and len(response_text.strip()) > 20:
+            self._process_tool_calls(response_text)
+            self.session.save_turn(f"[heartbeat:{mode}] {msg.content}", response_text)
+
+    def _process_tool_calls(self, response_text: str):
+        """Run the tool call loop for a response. Shared by all handlers."""
+        for round_num in range(MAX_TOOL_ROUNDS):
+            actions = _get_actions(response_text, self.skills)
+            if not actions:
+                break
+
+            results = []
+            for action in actions:
+                result = self.skills.execute(action)
+                if result:
+                    results.append(f"[{action['skill']}] {result}")
+
+            if not results:
+                break
+
+            self.messages.append({
+                "role": "user",
+                "content": f"[system: tool results from round {round_num + 1}]\n" + "\n".join(results),
+            })
+
+            response_text = self.send(self._build_context())
+            self.messages.append({"role": "assistant", "content": response_text})
 
     # ---- model lifecycle ----
 
@@ -416,54 +565,31 @@ class SparkAgent:
         return cleaned
 
     def turn(self, user_input: str) -> str:
-        """Process one user turn, with chained tool call support.
+        """Process one user turn, with chained tool call support."""
+        # Drain any pending bus messages before processing user input
+        self.drain_bus()
 
-        After the model responds, we check for tool calls. If found,
-        we execute them, feed results back, and let the model respond
-        again. This loops up to MAX_TOOL_ROUNDS times, so the model
-        can chain long workflows: explore -> read -> think -> build ->
-        test -> commit -> file issue, all in one turn.
-        """
         self.messages.append({"role": "user", "content": user_input})
 
         context = self._build_context()
         response_text = self.send(context)
         self.messages.append({"role": "assistant", "content": response_text})
 
-        for round_num in range(MAX_TOOL_ROUNDS):
-            actions = _get_actions(response_text, self.skills)
-            if not actions:
-                break
-
-            results = []
-            for action in actions:
-                result = self.skills.execute(action)
-                if result:
-                    results.append(f"[{action['skill']}] {result}")
-
-            if not results:
-                break
-
-            self.messages.append({
-                "role": "user",
-                "content": f"[system: tool results from round {round_num + 1}]\n" + "\n".join(results),
-            })
-
-            print()  # visual separator between rounds
-            response_text = self.send(self._build_context())
-            self.messages.append({"role": "assistant", "content": response_text})
+        self._process_tool_calls(response_text)
 
         self.session.save_turn(user_input, response_text)
         return response_text
 
-    def start_heartbeat(self):
+    def start_subsystems(self):
+        """Start all async subsystems."""
         if self.config.get("heartbeat", {}).get("enabled"):
-            self.heartbeat = Heartbeat(self)
             self.heartbeat.start()
+        self.inbox.start()
 
-    def stop_heartbeat(self):
-        if self.heartbeat:
-            self.heartbeat.stop()
+    def stop_subsystems(self):
+        """Stop all async subsystems cleanly."""
+        self.heartbeat.stop()
+        self.inbox.stop()
 
     def run(self):
         def on_status(status, msg):
@@ -472,7 +598,7 @@ class SparkAgent:
         if not self.warmup(callback=on_status):
             sys.exit(1)
 
-        self.start_heartbeat()
+        self.start_subsystems()
 
         id_chars = len(self.identity_text)
         id_tokens_est = id_chars // 4
@@ -486,6 +612,9 @@ class SparkAgent:
         print(f"  identity: {id_chars:,} chars (~{id_tokens_est:,} tokens)")
         print(f"  context window: {num_ctx:,} tokens")
         print(f"  max tool rounds: {MAX_TOOL_ROUNDS}")
+        print(f"  heartbeat: fast={self.heartbeat.fast_interval // 60}m, deep={self.heartbeat.deep_interval // 60}m")
+        print(f"  inbox: {self.inbox.inbox_dir}")
+        print(f"  agents: pool_size={self.agent_pool.pool_size}")
         if plugin_note:
             print(plugin_note, end="")
         if id_tokens_est > num_ctx // 2:
@@ -495,15 +624,39 @@ class SparkAgent:
 
         try:
             while True:
+                # Check bus while waiting for user input.
+                # This is the idle loop — processes heartbeat pulses,
+                # inbox messages, and agent results between user turns.
+                if self.bus.wait(timeout=IDLE_POLL_INTERVAL):
+                    self.drain_bus()
+
                 try:
-                    user_input = input("you: ").strip()
-                except EOFError:
-                    break
+                    # Non-blocking check for user input
+                    import select
+                    if select.select([sys.stdin], [], [], 0.0)[0]:
+                        user_input = sys.stdin.readline().strip()
+                    else:
+                        continue
+                except (ImportError, OSError):
+                    # Fallback for systems without select (Windows)
+                    # This blocks, but heartbeat/inbox still run on threads
+                    try:
+                        user_input = input("you: ").strip()
+                    except EOFError:
+                        break
 
                 if not user_input:
                     continue
                 if user_input.lower() in ("/bye", "/exit", "/quit"):
                     break
+                if user_input.lower() == "/new":
+                    self.session.new_session()
+                    self.messages = []
+                    print(f"  new session: {self.session.session_id}\n")
+                    continue
+                if user_input.lower() == "/status":
+                    self._print_status()
+                    continue
 
                 print("\nvybn: ", end="", flush=True)
                 self.turn(user_input)
@@ -512,9 +665,18 @@ class SparkAgent:
         except KeyboardInterrupt:
             pass
         finally:
-            self.stop_heartbeat()
+            self.stop_subsystems()
             self.session.close()
             print("\n  session saved. vybn out.\n")
+
+    def _print_status(self):
+        """Print current system status."""
+        print(f"  session: {self.session.session_id}")
+        print(f"  bus pending: {self.bus.pending}")
+        print(f"  heartbeat: fast={self.heartbeat.fast_count}, deep={self.heartbeat.deep_count}")
+        print(f"  agents active: {self.agent_pool.active_count}")
+        print(f"  messages in context: {len(self.messages)}")
+        print()
 
 
 def main():
