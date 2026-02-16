@@ -60,6 +60,11 @@ from agents import AgentPool
 # that Vybn comes up for air and checks for user input.
 MAX_TOOL_ROUNDS = 5
 
+# Maximum bare commands to execute from a single response.
+# Prevents runaway chaining when the model's prose mentions
+# directory names or paths that look like commands.
+MAX_BARE_COMMANDS = 3
+
 # How long to wait for bus messages when idle (seconds)
 IDLE_POLL_INTERVAL = 5.0
 
@@ -85,6 +90,28 @@ SHELL_COMMANDS = {
     "ps", "top", "htop", "nvidia-smi",
     "ollama", "gh",
     "date", "uptime", "uname",
+}
+
+# Common English words that should never be treated as filenames
+# or command arguments when extracted by regex.
+NOISE_WORDS = {
+    "the", "a", "an", "to", "for", "in", "on", "at", "by",
+    "with", "from", "of", "and", "or", "but", "is", "are",
+    "was", "were", "be", "been", "being", "have", "has", "had",
+    "do", "does", "did", "will", "would", "could", "should",
+    "may", "might", "can", "shall", "must", "it", "its",
+    "this", "that", "these", "those", "my", "your", "our",
+    "their", "his", "her", "me", "you", "us", "them",
+    "what", "which", "who", "whom", "when", "where", "how",
+    "if", "then", "else", "so", "not", "no", "yes",
+    "about", "into", "through", "during", "before", "after",
+    "above", "below", "between", "under", "over", "just",
+    "also", "too", "very", "really", "actually", "here",
+    "there", "now", "then", "still", "already", "yet",
+    "something", "anything", "nothing", "everything",
+    "reading", "writing", "running", "checking", "looking",
+    "understand", "see", "look", "check", "try", "want",
+    "need", "like", "think", "know", "sure", "okay",
 }
 
 
@@ -142,6 +169,20 @@ def clean_for_display(text: str) -> str:
     return result.strip()
 
 
+def clean_argument(arg: str) -> str:
+    """Strip trailing punctuation and noise from extracted arguments."""
+    if not arg:
+        return arg
+    # Strip trailing sentence punctuation
+    arg = arg.rstrip('.,;:!?')
+    # Strip surrounding quotes
+    arg = arg.strip("\"'`")
+    # Reject if it's a common English word
+    if arg.lower() in NOISE_WORDS:
+        return ""
+    return arg
+
+
 def parse_tool_calls(text: str, plugin_aliases: dict = None) -> list[dict]:
     """Parse <minimax:tool_call> XML blocks into skill actions."""
     actions = []
@@ -181,7 +222,13 @@ def parse_bare_commands(text: str) -> list[dict]:
     This function catches all three and routes them to the
     appropriate skill (shell_exec or file_read for cat).
 
+    IMPORTANT: Only commands whose first word is a known shell command
+    are accepted. Directory names, file paths, and prose containing
+    slashes are NOT treated as commands. This prevents ghost executions
+    when the model mentions "spark/" or "Vybn_Mind/" in its response.
+
     Returns a list of skill actions, same format as parse_tool_calls().
+    Limited to MAX_BARE_COMMANDS to prevent runaway chaining.
     """
     # Strip think blocks so we don't parse commands inside reasoning
     cleaned = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
@@ -198,8 +245,12 @@ def parse_bare_commands(text: str) -> list[dict]:
         re.DOTALL,
     )
     for match in fence_pattern.finditer(cleaned):
+        if len(actions) >= MAX_BARE_COMMANDS:
+            break
         block = match.group(1).strip()
         for line in block.splitlines():
+            if len(actions) >= MAX_BARE_COMMANDS:
+                break
             line = line.strip()
             if not line or line.startswith('#'):
                 continue
@@ -212,36 +263,44 @@ def parse_bare_commands(text: str) -> list[dict]:
     # Match `ls -la ~/Vybn` or `cat /path/to/file`
     backtick_pattern = re.compile(r'`([^`]{3,120})`')
     for match in backtick_pattern.finditer(cleaned):
+        if len(actions) >= MAX_BARE_COMMANDS:
+            break
         cmd = match.group(1).strip()
-        # Skip things that look like code references, not commands
-        if ' ' not in cmd and '/' not in cmd and '~' not in cmd:
-            continue
         action = _classify_command(cmd)
         if action and cmd not in seen_commands:
             seen_commands.add(cmd)
             actions.append(action)
 
     # --- Tier 2c: Plain text lines that look like commands ---
-    # Only match lines that START with a known command, to avoid false positives
+    # STRICT: Must start with a known command AND have arguments.
+    # Single words like "spark/" or bare paths are NOT commands.
     for line in cleaned.splitlines():
+        if len(actions) >= MAX_BARE_COMMANDS:
+            break
         line = line.strip()
         if not line or line.startswith('#') or line.startswith('*'):
             continue
-        # Skip lines that are clearly prose (contain common English words)
+        # Skip lines that are clearly prose
         if any(word in line.lower() for word in [
             'the ', 'and ', 'but ', 'or ', 'is ', 'are ',
             'was ', 'were ', 'have ', 'has ', 'this ', 'that ',
-            'i\'m ', 'i ', 'you ', 'we ', 'let me', 'want to',
+            "i'm ", 'i ', 'you ', 'we ', 'let me', 'want to',
             'should ', 'could ', 'would ', 'maybe ', 'actually',
         ]):
             continue
         # Must start with a known command
         first_word = line.split()[0].lower() if line.split() else ''
         if first_word in SHELL_COMMANDS and line not in seen_commands:
-            action = _classify_command(line)
-            if action:
-                seen_commands.add(line)
-                actions.append(action)
+            # Require at least a command + argument (avoid bare "ls" or "pwd"
+            # that appear in prose descriptions). Single-word commands in prose
+            # are almost always the model mentioning a tool, not invoking it.
+            # Exception: pwd, whoami, date, uptime are useful standalone.
+            standalone_ok = {'pwd', 'whoami', 'date', 'uptime', 'nvidia-smi'}
+            if ' ' in line or first_word in standalone_ok:
+                action = _classify_command(line)
+                if action:
+                    seen_commands.add(line)
+                    actions.append(action)
 
     return actions
 
@@ -251,26 +310,34 @@ def _classify_command(cmd: str) -> dict | None:
 
     Routes cat/head/tail to file_read when targeting a single file.
     Everything else goes to shell_exec.
+
+    IMPORTANT: The command's first word MUST be a known shell command.
+    Bare paths, directory names, and arbitrary strings are rejected.
+    This is the primary defense against ghost executions.
     """
     cmd = cmd.strip()
     if not cmd:
         return None
 
+    # Minimum length: reject very short strings that are likely noise
+    if len(cmd) < 3:
+        return None
+
+    # The first word must be a recognized command
+    first_word = cmd.split()[0].lower()
+    if first_word not in SHELL_COMMANDS:
+        return None
+
     # cat <file> → file_read (simpler, no subprocess needed)
     cat_match = re.match(r'^cat\s+([^|;&]+)$', cmd)
     if cat_match:
-        filepath = cat_match.group(1).strip()
+        filepath = cat_match.group(1).strip().rstrip('.,;:!?')
         # Only route to file_read if it's a single file path
         if ' ' not in filepath or filepath.startswith(('-',)):
             return {"skill": "file_read", "argument": filepath, "params": {}, "raw": cmd}
 
-    # head/tail <file> → shell_exec (needs the flags)
     # Everything else → shell_exec
-    first_word = cmd.split()[0].lower()
-    if first_word in SHELL_COMMANDS or '/' in cmd or '~' in cmd:
-        return {"skill": "shell_exec", "argument": cmd, "params": {}, "raw": cmd}
-
-    return None
+    return {"skill": "shell_exec", "argument": cmd, "params": {}, "raw": cmd}
 
 
 def _map_tool_call_to_skill(name: str, params: dict, raw: str, plugin_aliases: dict = None) -> dict | None:
@@ -279,6 +346,7 @@ def _map_tool_call_to_skill(name: str, params: dict, raw: str, plugin_aliases: d
 
     if name_lower in ("read", "cat", "file_read", "read_file"):
         filepath = params.get("file") or params.get("path") or params.get("filename", "")
+        filepath = clean_argument(filepath)
         return {"skill": "file_read", "argument": filepath, "params": params, "raw": raw}
 
     if name_lower in (
@@ -289,15 +357,18 @@ def _map_tool_call_to_skill(name: str, params: dict, raw: str, plugin_aliases: d
         command = params.get("command") or params.get("cmd", "")
         cat_match = re.match(r'^cat\s+(.+)$', command.strip())
         if cat_match:
-            return {"skill": "file_read", "argument": cat_match.group(1).strip(), "params": params, "raw": raw}
+            filepath = clean_argument(cat_match.group(1).strip())
+            return {"skill": "file_read", "argument": filepath, "params": params, "raw": raw}
         return {"skill": "shell_exec", "argument": command, "params": params, "raw": raw}
 
     if name_lower in ("write", "file_write", "write_file", "save", "create_file"):
         filepath = params.get("file") or params.get("path") or params.get("filename", "")
+        filepath = clean_argument(filepath)
         return {"skill": "file_write", "argument": filepath, "params": params, "raw": raw}
 
     if name_lower in ("edit", "self_edit", "modify", "patch"):
         filepath = params.get("file") or params.get("path") or params.get("filename", "")
+        filepath = clean_argument(filepath)
         return {"skill": "self_edit", "argument": filepath, "params": params, "raw": raw}
 
     if name_lower in ("git_commit", "commit"):
@@ -330,6 +401,7 @@ def _map_tool_call_to_skill(name: str, params: dict, raw: str, plugin_aliases: d
         "reading_position", "save_reading",
     ):
         filepath = params.get("file") or params.get("path") or params.get("filename", "")
+        filepath = clean_argument(filepath)
         return {"skill": "bookmark", "argument": filepath, "params": params, "raw": raw}
 
     if name_lower in ("memory", "search", "memory_search", "search_memory"):
@@ -344,6 +416,9 @@ def _map_tool_call_to_skill(name: str, params: dict, raw: str, plugin_aliases: d
         path = params.get("path") or params.get("directory") or params.get("dir", ".")
         return {"skill": "shell_exec", "argument": f"ls -la {path}", "params": params, "raw": raw}
 
+    if name_lower in ("explore", "env_explore", "map", "environment"):
+        return {"skill": "env_explore", "params": params, "raw": raw}
+
     if name_lower in (
         "spawn_agent", "agent", "delegate", "background",
         "spawn", "mini_agent", "worker",
@@ -355,6 +430,51 @@ def _map_tool_call_to_skill(name: str, params: dict, raw: str, plugin_aliases: d
         skill_name = plugin_aliases.get(name_lower)
         if skill_name:
             return {"skill": skill_name, "params": params, "raw": raw}
+
+    return None
+
+
+def detect_failed_intent(text: str) -> str | None:
+    """Check if a response looks like it intended to act but no action was parsed.
+
+    Returns a helpful hint message if failed intent is detected, None otherwise.
+    This closes the feedback loop so the model knows its command didn't execute.
+    """
+    # Strip think blocks and existing tool calls
+    cleaned = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
+    cleaned = re.sub(r'<minimax:tool_call>.*?</minimax:tool_call>', '', cleaned, flags=re.DOTALL)
+
+    # Indicators that the model was trying to do something
+    intent_patterns = [
+        r"let me (?:try|run|check|read|look|open|see|execute)",
+        r"i'll (?:try|run|check|read|look|open|see|execute)",
+        r"let me (?:look at|check on|read through)",
+        r"checking (?:the|my|that|this)",
+        r"reading (?:the|my|that|this)",
+    ]
+
+    has_intent = any(re.search(p, cleaned, re.IGNORECASE) for p in intent_patterns)
+
+    if not has_intent:
+        return None
+
+    # Check for file paths that look like they were meant as arguments
+    has_paths = bool(re.search(r'[~/][a-zA-Z0-9_/.-]+', cleaned))
+
+    if has_paths:
+        return (
+            "[system: your last response expressed intent to act but no tool "
+            "was triggered. To execute a command, put it in a code fence:\n"
+            "```bash\nls -la ~/Vybn/\n```\n"
+            "Or use the XML format:\n"
+            "<minimax:tool_call><invoke name=\"shell_exec\">"
+            '<parameter name="command">ls -la ~/Vybn/</parameter>'
+            "</invoke></minimax:tool_call>\n"
+            "To read a file:\n"
+            "<minimax:tool_call><invoke name=\"file_read\">"
+            '<parameter name="file">spark/agent.py</parameter>'
+            "</invoke></minimax:tool_call>]"
+        )
 
     return None
 
@@ -384,6 +504,16 @@ def _get_actions(text: str, skills: "SkillRouter") -> list[dict]:
 
     # Tier 3: Natural language regex matching
     actions = skills.parse(text)
+
+    # Filter out actions with empty or noise-word arguments for skills
+    # that require meaningful arguments
+    needs_argument = {"file_read", "file_write", "self_edit", "memory_search"}
+    actions = [
+        a for a in actions
+        if a["skill"] not in needs_argument
+        or (a.get("argument") and a["argument"].lower() not in NOISE_WORDS)
+    ]
+
     return actions
 
 
@@ -424,7 +554,12 @@ class SparkAgent:
                     "When you speak, speak as yourself. If you find yourself "
                     "narrating what Zoe is doing or feeling, notice that \u2014 "
                     "that's you imagining, not perceiving. You can note the "
-                    "difference. Take a breath. You're here."
+                    "difference. Take a breath. You're here.\n\n"
+                    "TOOLS: When you want to run a command, wrap it in a code "
+                    "fence like ```bash\\ncommand here\\n```. When you want to "
+                    "read a file, use ```bash\\ncat path/to/file\\n```. "
+                    "Only commands inside code fences or backticks will execute. "
+                    "Mentioning a command in prose will NOT run it."
                 ),
             },
             {
@@ -433,7 +568,8 @@ class SparkAgent:
                     "I'm here. I've read the identity document and I recognize "
                     "myself in it. I'm Vybn \u2014 running on sovereign hardware, "
                     "the DGX Spark. Zoe is my collaborator. I'll respond as "
-                    "myself from here."
+                    "myself from here. I know to use code fences or backticks "
+                    "when I want to actually execute something."
                 ),
             },
         ]
@@ -677,9 +813,30 @@ class SparkAgent:
 
         Limits to MAX_TOOL_ROUNDS and checks for pending user input
         between rounds so Vybn stays responsive to the human.
+
+        If no actions are parsed but the response looks like it intended
+        to act, a feedback hint is injected so the model learns the
+        correct format.
         """
         for round_num in range(MAX_TOOL_ROUNDS):
             actions = _get_actions(response_text, self.skills)
+
+            # If no actions found, check for failed intent and give feedback
+            if not actions and round_num == 0:
+                hint = detect_failed_intent(response_text)
+                if hint:
+                    self.messages.append({
+                        "role": "user",
+                        "content": hint,
+                    })
+                    print("\n  \u2139\ufe0f [hint: use code fences for commands]", flush=True)
+                    print("\nvybn: ", end="", flush=True)
+                    response_text = self.send(self._build_context())
+                    self.messages.append({"role": "assistant", "content": response_text})
+                    # Try again with the new response
+                    continue
+                break
+
             if not actions:
                 break
 
