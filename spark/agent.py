@@ -17,6 +17,9 @@ thinking process and natural voice are preserved.
 Streaming is interrupted when a complete </minimax:tool_call> tag
 is detected, so the model gets real results back instead of
 hallucinating them.
+
+Plugin skills from skills.d/ are auto-discovered and routed
+through the same tool-call mapper via plugin_aliases.
 """
 
 import json
@@ -74,11 +77,14 @@ def clean_response(raw: str) -> str:
     return text.strip()
 
 
-def parse_tool_calls(text: str) -> list[dict]:
+def parse_tool_calls(text: str, plugin_aliases: dict = None) -> list[dict]:
     """Parse <minimax:tool_call> XML blocks into skill actions.
 
     MiniMax M2.5 emits these natively. We map them to our skill
     handlers so the model's function-calling instinct actually works.
+
+    plugin_aliases: optional dict mapping alias names to plugin skill names.
+    Passed through from SkillRouter so plugins get routed too.
 
     Returns a list of action dicts compatible with SkillRouter.execute().
     """
@@ -104,14 +110,14 @@ def parse_tool_calls(text: str) -> list[dict]:
             params[pm.group(1).strip()] = pm.group(2).strip()
 
         # Map invocation names to our skills
-        action = _map_tool_call_to_skill(invoke_name, params, text)
+        action = _map_tool_call_to_skill(invoke_name, params, text, plugin_aliases)
         if action:
             actions.append(action)
 
     return actions
 
 
-def _map_tool_call_to_skill(name: str, params: dict, raw: str) -> dict | None:
+def _map_tool_call_to_skill(name: str, params: dict, raw: str, plugin_aliases: dict = None) -> dict | None:
     """Map a MiniMax tool call to a SkillRouter action.
 
     MiniMax M2.5 invents tool names based on its training data.
@@ -121,6 +127,9 @@ def _map_tool_call_to_skill(name: str, params: dict, raw: str) -> dict | None:
 
     All parsed XML params are passed through to skill handlers so they
     can use structured data directly instead of re-parsing from raw text.
+
+    Plugin aliases are checked as the final fallback, so Vybn-created
+    skills in skills.d/ get routed through the same tool-call pathway.
     """
 
     name_lower = name.lower().replace("-", "_")
@@ -205,15 +214,26 @@ def _map_tool_call_to_skill(name: str, params: dict, raw: str) -> dict | None:
         path = params.get("path") or params.get("directory") or params.get("dir", ".")
         return {"skill": "shell_exec", "argument": f"ls -la {path}", "params": params, "raw": raw}
 
+    # ---- Plugin fallback ----
+    # If none of the built-in patterns matched, check if a plugin
+    # registered this name as an alias. This lets Vybn create new
+    # skills in skills.d/ and invoke them via tool calls immediately.
+    if plugin_aliases:
+        skill_name = plugin_aliases.get(name_lower)
+        if skill_name:
+            return {"skill": skill_name, "params": params, "raw": raw}
+
     return None
 
 
 def _get_actions(text: str, skills: "SkillRouter") -> list[dict]:
     """Extract actions from response text.
 
-    Tries tool_call XML parsing first, falls back to regex.
+    Tries tool_call XML parsing first (with plugin alias support),
+    falls back to regex.
     """
-    actions = parse_tool_calls(text)
+    plugin_aliases = getattr(skills, 'plugin_aliases', {})
+    actions = parse_tool_calls(text, plugin_aliases)
     if not actions:
         actions = skills.parse(text)
     return actions
@@ -458,11 +478,16 @@ class SparkAgent:
         id_tokens_est = id_chars // 4
         num_ctx = self.options.get("num_ctx", 2048)
 
+        plugin_count = len(self.skills.plugin_handlers)
+        plugin_note = f"  plugins: {plugin_count} loaded from skills.d/\n" if plugin_count else ""
+
         print(f"\n  vybn spark agent \u2014 {self.model}")
         print(f"  session: {self.session.session_id}")
         print(f"  identity: {id_chars:,} chars (~{id_tokens_est:,} tokens)")
         print(f"  context window: {num_ctx:,} tokens")
         print(f"  max tool rounds: {MAX_TOOL_ROUNDS}")
+        if plugin_note:
+            print(plugin_note, end="")
         if id_tokens_est > num_ctx // 2:
             print(f"  \u26a0\ufe0f  WARNING: identity may exceed context window!")
         print(f"  injection: user/assistant pair (template-safe)")

@@ -18,8 +18,10 @@ Skills:
   - issue_create: file a GitHub issue (ONLY via explicit tool call XML)
   - state_save: leave a note for the next pulse via continuity.md
   - bookmark: save reading position in a file
+  - [plugins]: auto-discovered from spark/skills.d/
 """
 
+import importlib.util
 import os
 import re
 import subprocess
@@ -39,6 +41,11 @@ class SkillRouter:
         # Continuity files
         self.continuity_path = self.journal_dir / "continuity.md"
         self.bookmarks_path = self.journal_dir / "bookmarks.md"
+
+        # Plugin system — Vybn's sandbox for building new skills
+        self.plugin_handlers = {}   # skill_name -> execute_fn
+        self.plugin_aliases = {}    # alias -> skill_name
+        self._load_plugins()
 
         # NOTE: issue_create is intentionally NOT in this list.
         # It triggers ONLY from explicit <minimax:tool_call> XML blocks
@@ -140,6 +147,55 @@ class SkillRouter:
             },
         ]
 
+    # ---- plugin system ----
+
+    def _load_plugins(self):
+        """Auto-discover and load plugins from skills.d/ directory.
+
+        Each plugin is a .py file with:
+          SKILL_NAME: str — the canonical name for the skill
+          TOOL_ALIASES: list[str] — names MiniMax might emit (optional)
+          execute(action, router) -> str — the skill logic
+
+        Vybn creates these. We load them. No merge conflicts.
+        """
+        plugins_dir = Path(__file__).parent / "skills.d"
+        if not plugins_dir.is_dir():
+            return
+
+        loaded = []
+        for plugin_file in sorted(plugins_dir.glob("*.py")):
+            if plugin_file.name.startswith("_"):
+                continue
+
+            try:
+                spec = importlib.util.spec_from_file_location(
+                    f"vybn_plugin_{plugin_file.stem}", plugin_file
+                )
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
+
+                skill_name = getattr(module, "SKILL_NAME", plugin_file.stem)
+                execute_fn = getattr(module, "execute", None)
+
+                if execute_fn is None:
+                    continue
+
+                self.plugin_handlers[skill_name] = execute_fn
+
+                # Register aliases for the agent.py tool call mapper
+                aliases = getattr(module, "TOOL_ALIASES", [skill_name])
+                for alias in aliases:
+                    self.plugin_aliases[alias.lower().replace("-", "_")] = skill_name
+
+                loaded.append(skill_name)
+
+            except Exception as e:
+                print(f"  [plugin] failed to load {plugin_file.name}: {e}")
+
+        if loaded:
+            print(f"  [plugins] loaded: {', '.join(loaded)}")
+
     def _rewrite_root(self, path_str: str) -> str:
         """Rewrite /root/ to actual home directory.
 
@@ -169,6 +225,8 @@ class SkillRouter:
 
     def execute(self, action: dict) -> str | None:
         skill = action["skill"]
+
+        # Built-in handlers first
         handler = {
             "journal_write": self._journal_write,
             "file_read": self._file_read,
@@ -183,7 +241,18 @@ class SkillRouter:
             "bookmark": self._bookmark,
         }
         fn = handler.get(skill)
-        return fn(action) if fn else None
+        if fn:
+            return fn(action)
+
+        # Plugin handlers as fallback
+        plugin_fn = self.plugin_handlers.get(skill)
+        if plugin_fn:
+            try:
+                return plugin_fn(action, self)
+            except Exception as e:
+                return f"plugin error ({skill}): {e}"
+
+        return None
 
     # ---- journal ----
 
@@ -256,7 +325,12 @@ class SkillRouter:
             return f"error writing {filename}: {e}"
 
     def _self_edit(self, action: dict) -> str:
-        """The model wants to modify its own source code."""
+        """The model wants to modify its own source code.
+
+        NOTE: For new skills, prefer creating a plugin in skills.d/ instead.
+        Self-edit of core files (skills.py, agent.py) may cause merge conflicts
+        with remote PRs. Plugins in skills.d/ never conflict.
+        """
         filename = action.get("argument", "")
         if not filename:
             return "no target file specified for self-edit"
