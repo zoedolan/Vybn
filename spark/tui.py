@@ -2,14 +2,19 @@
 """Spark TUI — terminal interface for the Vybn agent.
 
 Uses rich for rendering if available, falls back to plain text.
+Handles model warmup with a visible spinner.
 """
 
+import sys
 from pathlib import Path
 
 try:
     from rich.console import Console
     from rich.panel import Panel
     from rich.prompt import Prompt
+    from rich.live import Live
+    from rich.spinner import Spinner
+    from rich.text import Text
     HAS_RICH = True
 except ImportError:
     HAS_RICH = False
@@ -22,6 +27,47 @@ class SparkTUI:
         self.agent = SparkAgent(config)
         self.console = Console() if HAS_RICH else None
 
+    def warmup(self) -> bool:
+        if self.console:
+            return self._warmup_rich()
+        else:
+            return self._warmup_plain()
+
+    def _warmup_rich(self) -> bool:
+        status_text = Text("connecting to Ollama...", style="dim")
+        spinner = Spinner("dots", text=status_text)
+        result = [None]
+
+        self.console.print()
+
+        def on_status(status, msg):
+            if status == "ready":
+                status_text.plain = msg
+                status_text.stylize("green")
+            elif status == "error":
+                status_text.plain = msg
+                status_text.stylize("red")
+            elif status == "loading":
+                status_text.plain = msg
+                status_text.stylize("yellow")
+            else:
+                status_text.plain = msg
+
+        with Live(spinner, console=self.console, refresh_per_second=10):
+            result[0] = self.agent.warmup(callback=on_status)
+
+        if result[0]:
+            self.console.print(f"  [green]\u2713[/green] {self.agent.model} ready")
+        else:
+            self.console.print(f"  [red]\u2717[/red] could not load model")
+
+        return result[0]
+
+    def _warmup_plain(self) -> bool:
+        def on_status(status, msg):
+            print(f"  [{status}] {msg}")
+        return self.agent.warmup(callback=on_status)
+
     def banner(self):
         if self.console:
             self.console.print(Panel(
@@ -33,11 +79,14 @@ class SparkTUI:
                 border_style="dim",
             ))
         else:
-            print(f"\n  vybn spark agent — {self.agent.model}")
+            print(f"\n  vybn spark agent \u2014 {self.agent.model}")
             print(f"  session: {self.agent.session.session_id}")
             print(f"  context: {len(self.agent.system_prompt):,} chars hydrated\n")
 
     def run(self):
+        if not self.warmup():
+            sys.exit(1)
+
         self.agent.start_heartbeat()
         self.banner()
 
@@ -94,7 +143,8 @@ class SparkTUI:
         return False
 
     def _status(self):
-        print(f"  model: {self.agent.model}")
+        loaded = "\u2713 loaded" if self.agent.check_model_loaded() else "\u2717 not loaded"
+        print(f"  model: {self.agent.model} ({loaded})")
         print(f"  session: {self.agent.session.session_id}")
         print(f"  turns: {len(self.agent.messages) // 2}")
         print(f"  context: {len(self.agent.system_prompt):,} chars")
