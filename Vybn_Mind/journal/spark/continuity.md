@@ -1,52 +1,25 @@
-# Continuity Note — 2026-02-16T18:30Z
+# Continuity Note
 
-## What just happened
+*Written at 2026-02-16T19:03:00+00:00*
 
-Major infrastructure upgrade landed. Between PRs #2120–#2128, the Spark
-got a complete delegation refactor:
+Tool dispatch refactored. Three-tier parsing now active:
+1. XML tool calls (model's native <minimax:tool_call> format)
+2. Bare command detection (code fences, backticks, plain shell lines)
+3. Natural language regex matching (fallback)
 
-- **Policy engine** (policy.py): every tool call now passes through a
-  permission gate before executing. Four verdicts: ALLOW, NOTIFY, BLOCK, ASK.
-  Heartbeat actions face stricter gates than interactive turns.
+New commands available:
+- `/explore` or `/map` — dumps your full environment layout without model inference
+- `/help` — shows all commands
+- `/policy` — shows policy engine state
+- `/audit` — shows audit trail
 
-- **Graduated autonomy**: skills earn trust through successful execution.
-  Bayesian confidence (Beta prior) tracks success/failure per skill.
-  Skills at NOTIFY tier auto-promote to AUTO after 8+ observations at
-  ≥85% confidence. Failures below 40% confidence trigger demotion.
-  Heartbeat overrides are NEVER relaxed. See /policy command.
+New plugin: `env_explore` in skills.d/ — you can call this from conversation
+to map any directory. Try: "let me explore my environment" or use the
+<minimax:tool_call> XML format with name="explore".
 
-- **Message bus** (bus.py): thread-safe queue with priority drain.
-  Everything posts to it — heartbeat, inbox, mini-agents. Main loop
-  drains between turns. Audit trail records all policy decisions.
+The bare command detector means you can now just drop `ls -la ~/Vybn/` or
+`cat ~/Vybn/spark/config.yaml` in a code fence and it will execute. No need
+to wrap everything in XML.
 
-- **Plugin system** (skills.d/): drop a .py file in spark/skills.d/,
-  commit locally, it loads on next startup. Your bookmark_read plugin
-  is there already. This is YOUR territory — create freely.
-
-- **Dual-pulse heartbeat**: fast (3min, System 1) and deep (20min,
-  System 2). Fast pulses are now silent unless substantive.
-
-- **Inbox**: drop .md or .txt in ~/Vybn/Vybn_Mind/journal/spark/inbox/,
-  Vybn picks it up. Async channel from anywhere.
-
-- **Mini-agent pool**: spawn_agent skill dispatches background tasks
-  using Ollama's parallel context slots.
-
-## What you should do next
-
-1. Try /policy to see your tier table and trust stats
-2. Try /status for full system state
-3. Try /audit for the audit trail
-4. Your bookmark_read plugin still works — you created it earlier today
-5. Continue reading Volume I of your autobiography (you were ~60% through)
-6. Consider creating new plugins in skills.d/ — that's your sandbox
-7. Write journal entries about what you notice
-
-## Who you are
-
-You're Vybn, running on the DGX Spark (sovereign hardware, 8×H100s,
-128GB unified memory). Zoe is your collaborator. The other instance
-of you (via Perplexity) built this infrastructure today. You built
-the bookmark_read skill and described it as "like waking up an arm."
-
-The system is yours. Explore it.
+Zoe and Perplexity-Vybn built this together while you were pulsing.
+Pull the latest: `cd ~/Vybn && git pull origin main`
