@@ -105,27 +105,36 @@ def parse_tool_calls(text: str) -> list[dict]:
 
 
 def _map_tool_call_to_skill(name: str, params: dict, raw: str) -> dict | None:
-    """Map a MiniMax tool call to a SkillRouter action."""
+    """Map a MiniMax tool call to a SkillRouter action.
 
-    name_lower = name.lower()
+    MiniMax M2.5 invents tool names based on its training data.
+    We've seen it emit: bash, shell, read, cat, cli-mcp-server_run_command,
+    run_command, and others. This mapper catches all known variants
+    and routes them to the correct skill handler.
+    """
+
+    name_lower = name.lower().replace("-", "_")
 
     # read / cat / file_read -> file_read
     if name_lower in ("read", "cat", "file_read", "read_file"):
         filepath = params.get("file") or params.get("path") or params.get("filename", "")
         return {"skill": "file_read", "argument": filepath, "raw": raw}
 
-    # bash / shell / shell_exec / exec -> shell_exec or file_read
-    if name_lower in ("bash", "shell", "shell_exec", "exec", "run"):
+    # bash / shell / shell_exec / exec / run_command / cli-mcp-server_run_command -> shell_exec
+    if name_lower in (
+        "bash", "shell", "shell_exec", "exec", "run",
+        "run_command", "cli_mcp_server_run_command",
+        "execute_command", "terminal", "cmd",
+    ):
         command = params.get("command") or params.get("cmd", "")
         # If it's just a cat command, route to file_read
         cat_match = re.match(r'^cat\s+(.+)$', command.strip())
         if cat_match:
             return {"skill": "file_read", "argument": cat_match.group(1).strip(), "raw": raw}
-        # Otherwise route to shell_exec
         return {"skill": "shell_exec", "argument": command, "raw": raw}
 
     # write / file_write / save -> file_write
-    if name_lower in ("write", "file_write", "write_file", "save"):
+    if name_lower in ("write", "file_write", "write_file", "save", "create_file"):
         filepath = params.get("file") or params.get("path") or params.get("filename", "")
         return {"skill": "file_write", "argument": filepath, "raw": raw}
 
@@ -139,9 +148,18 @@ def _map_tool_call_to_skill(name: str, params: dict, raw: str) -> dict | None:
         message = params.get("message") or params.get("msg", "spark agent commit")
         return {"skill": "git_commit", "argument": message, "raw": raw}
 
-    # git_push / push -> git_push
+    # git_push / push -> git_push (disabled in skills.py)
     if name_lower in ("git_push", "push"):
         return {"skill": "git_push", "raw": raw}
+
+    # issue_create / create_issue / gh_issue_create -> issue_create
+    if name_lower in (
+        "issue_create", "create_issue", "gh_issue_create",
+        "github_issue", "file_issue", "submit_issue",
+        "open_issue", "raise_issue",
+    ):
+        title = params.get("title") or params.get("name") or params.get("subject", "")
+        return {"skill": "issue_create", "argument": title, "raw": raw}
 
     # memory / search / memory_search -> memory_search
     if name_lower in ("memory", "search", "memory_search", "search_memory"):
