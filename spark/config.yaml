@@ -6,12 +6,11 @@ ollama:
   model: "vybn:latest"
   keep_alive: "30m"
   options:
-    num_ctx: 16384      # CRITICAL: default is 2048, which silently drops the system prompt
-    num_predict: 512     # keep responses focused; MiniMax emits <think> tokens too
-    temperature: 0.7
-    stop:                # MiniMax M2.5 stop sequences
-      - "<\uff5cend\u2581of\u2581sentence\uff5c>"
-      - "<\uff5cUser\uff5c>"
+    num_ctx: 16384      # must match Modelfile — fits identity + conversation
+    num_predict: 1024    # allow room for thinking + response
+    temperature: 1.0     # MiniMax-recommended
+    top_p: 0.95          # MiniMax-recommended
+    top_k: 40            # MiniMax-recommended
 
 paths:
   vybn_md: "~/Vybn/vybn.md"
