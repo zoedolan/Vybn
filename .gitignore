@@ -11,6 +11,7 @@ build/
 venv/
 env/
 vybn-env/
+vybn-venv/
 .venv/
 
 # IDE
@@ -30,13 +31,18 @@ Thumbs.db
 # Logs
 *.log
 
-# Session artifacts (sessions are saved separately)
-*.session.json
-# Spark session runtime data (updated during agent execution)
-Vybn_Mind/journal/spark/sessions/*.jsonl
-Vybn_Mind/journal/spark/skill_stats.json
-
 # Model files (too large for git)
 *.gguf
 *.bin
 *.safetensors
+
+# ---- Spark runtime data ----
+# The agent writes journals, sessions, inbox artifacts, and archival
+# memory at runtime. None of this should block git pull.
+Vybn_Mind/journal/spark/sessions/
+Vybn_Mind/journal/spark/inbox/processed/
+Vybn_Mind/journal/spark/skill_stats.json
+Vybn_Mind/journal/spark/*.jsonl
+Vybn_Mind/journal/spark/*.md.tmp
+Vybn_Mind/archival_memory/*.json
+*.session.json
