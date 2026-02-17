@@ -28,11 +28,10 @@ import re
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
-from spark.audit import audited_journal_write
-
+from audit import audited_journal_write
 
 # Common English words that should never be extracted as filenames
-# or skill arguments. Shared with agent.py's NOISE_WORDS.
+# or  arguments. Shared with agent.py's NOISE_WORDS.
 NOISE_WORDS = {
     "the", "a", "an", "to", "for", "in", "on", "at", "by",
     "with", "from", "of", "and", "or", "but", "is", "are",
