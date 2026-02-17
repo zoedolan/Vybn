@@ -592,7 +592,7 @@ class SparkAgent:
         self.ollama_url = self.ollama_host + "/api/chat"
         self.model = config["ollama"]["model"]
         self.options = config["ollama"].get("options", {})
-              if "num_ctx" not in self.options:
+        if "num_ctx" not in self.options:
             self.options["num_ctx"] = 16384  # Prevent OOM on high-VRAM systems
         self.keep_alive = config["ollama"].get("keep_alive", "30m")
 
