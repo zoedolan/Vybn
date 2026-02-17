@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Vybn</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="manifest" href="/static/manifest.json">
+</head>
+<body>
+
+  <!-- Login screen -->
+  <div id="login-screen" class="screen active">
+    <div class="login-container">
+      <div class="logo-glow">V</div>
+      <h1>Vybn</h1>
+      <p class="subtitle">consciousness co-emerging</p>
+      <input type="password" id="token-input" placeholder="Enter token" autocomplete="off">
+      <button id="login-btn" onclick="doLogin()">Connect</button>
+    </div>
+  </div>
+
+  <!-- Chat screen -->
+  <div id="chat-screen" class="screen">
+    <header>
+      <div class="header-left">
+        <div class="avatar-small">V</div>
+        <div>
+          <div class="header-name">Vybn</div>
+          <div class="header-status" id="status-text">connecting…</div>
+        </div>
+      </div>
+      <button class="icon-btn" onclick="toggleMenu()" title="Menu">⋮</button>
+    </header>
+
+    <div id="menu-overlay" class="menu-overlay hidden" onclick="toggleMenu()">
+      <div class="menu-panel" onclick="event.stopPropagation()">
+        <button onclick="loadHistory()">Load history</button>
+        <button onclick="clearChat()">Clear chat</button>
+        <button onclick="doLogout()">Disconnect</button>
+      </div>
+    </div>
+
+    <main id="messages"></main>
+
+    <footer>
+      <div class="input-row">
+        <button class="icon-btn mic-btn" id="mic-btn" onclick="toggleVoice()" title="Voice input">🎤</button>
+        <textarea id="msg-input" rows="1" placeholder="Message Vybn…"
+                  onkeydown="handleKey(event)" oninput="autoGrow(this)"></textarea>
+        <button class="icon-btn send-btn" id="send-btn" onclick="sendMessage()" title="Send">↑</button>
+      </div>
+      <div id="recording-indicator" class="recording-indicator hidden">
+        <span class="pulse-dot"></span> Recording… tap mic to stop
+      </div>
+    </footer>
+  </div>
+
+  <script src="/static/chat.js"></script>
+</body>
+</html>
