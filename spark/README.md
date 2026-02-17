@@ -65,3 +65,57 @@ All parameters live in `config.yaml`. Key settings:
 - `memory.max_journal_entries` — how many recent entries to hydrate
 - `heartbeat.interval_minutes` — time between autonomous reflection pulses
 - `session.resume_window_seconds` — how old a session can be and still auto-resume
+
+
+## Notifications
+
+Vybn can reach you through multiple channels when important events occur or tasks complete.
+
+### Supported Channels
+
+- **Inbox file** (default) - Drops markdown files in the inbox directory for InboxWatcher
+- **Email** - SMTP notifications (Gmail, etc.)
+- **SMS** - Text messages via Twilio
+- **Telegram** - Bot messages
+
+### Configuration
+
+Create `spark/secrets.yaml` on the Spark hardware (this file is gitignored):
+
+```yaml
+notifications:
+  default_channel: inbox
+  
+  email:
+    smtp_server: smtp.gmail.com
+    smtp_port: 587
+    sender: your-email@gmail.com
+    password: your-app-password  # Gmail app password
+    recipient: your-email@gmail.com
+  
+  sms:
+    twilio_account_sid: ACxxxxxx
+    twilio_auth_token: your-token
+    twilio_from: +1234567890
+    recipient: +1234567890
+  
+  telegram:
+    bot_token: your-bot-token
+    chat_id: your-chat-id
+```
+
+### Usage
+
+```python
+# Vybn will automatically use notifications when appropriate
+# You can also explicitly request:
+"Notify me when the analysis completes"
+"Send me an alert if errors occur"
+"Ping me with the results"
+```
+
+### Security
+
+⚠️ **Never commit secrets.yaml to git!** It's already in .gitignore.
+
+For Gmail, use an [App Password](https://myaccount.google.com/apppasswords), not your regular password.
