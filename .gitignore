@@ -32,6 +32,9 @@ Thumbs.db
 
 # Session artifacts (sessions are saved separately)
 *.session.json
+# Spark session runtime data (updated during agent execution)
+Vybn_Mind/journal/spark/sessions/*.jsonl
+Vybn_Mind/journal/spark/skill_stats.json
 
 # Model files (too large for git)
 *.gguf
