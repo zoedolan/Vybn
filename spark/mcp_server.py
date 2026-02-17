@@ -80,6 +80,9 @@ config = load_config()
 skills = SkillRouter(config)
 ollama_host = config.get("ollama", {}).get("host", "http://localhost:11434")
 ollama_model = config.get("ollama", {}).get("model", "vybn:latest")
+ollama_options = config.get("ollama", {}).get("options", {})
+if "num_ctx" not in ollama_options:
+    ollama_options["num_ctx"] = 16384  # Prevent OOM on high-VRAM systems
 
 logger.info(f"Vybn MCP Server starting (Ollama: {ollama_host}, model: {ollama_model})")
 
@@ -322,7 +325,7 @@ async def ollama_generate(prompt: str, system: str = "") -> str:
             "model": ollama_model,
             "prompt": prompt,
             "stream": False,
-            "options": config.get("ollama", {}).get("options", {})
+            "options": ollama_options
         }
         if system:
             payload["system"] = system
