@@ -115,30 +115,6 @@ def attach_bus(bus, response_callback=None):
 
 
 # ---------------------------------------------------------------------------
-# Rate limiting — no more than one response every N seconds
-# ---------------------------------------------------------------------------
-RESPONSE_COOLDOWN = int(os.environ.get("VYBN_RESPONSE_COOLDOWN_SECONDS", 90 * 60))  # 90 minutes
-_last_response_time: dict[str, float] = {}  # keyed by connection ID
-
-
-def _can_respond(conn_id: str) -> tuple[bool, float]:
-    """Check if enough time has passed since last response.
-    Returns (can_respond, seconds_remaining).
-    """
-    now = time.time()
-    last = _last_response_time.get(conn_id, 0)
-    elapsed = now - last
-    if elapsed >= RESPONSE_COOLDOWN:
-        return True, 0.0
-    return False, RESPONSE_COOLDOWN - elapsed
-
-
-def _mark_response(conn_id: str):
-    """Record that a response was just sent."""
-    _last_response_time[conn_id] = time.time()
-
-
-# ---------------------------------------------------------------------------
 # Message history (in-memory, bounded)
 # ---------------------------------------------------------------------------
 MAX_HISTORY = 200
@@ -207,15 +183,10 @@ async def voice_transcribe(audio: UploadFile = File(...)):
 class ConnectionManager:
     def __init__(self):
         self.active: list[WebSocket] = []
-        self._conn_counter = 0
 
-    async def connect(self, ws: WebSocket) -> str:
-        """Accept connection and return a unique connection ID."""
+    async def connect(self, ws: WebSocket):
         await ws.accept()
         self.active.append(ws)
-        self._conn_counter += 1
-        conn_id = f"ws-{self._conn_counter}-{id(ws)}"
-        return conn_id
 
     def disconnect(self, ws: WebSocket):
         if ws in self.active:
@@ -241,7 +212,7 @@ async def websocket_endpoint(ws: WebSocket, token: str = ""):
         await ws.close(code=4001, reason="Unauthorized")
         return
 
-    conn_id = await manager.connect(ws)
+    await manager.connect(ws)
     try:
         while True:
             data = await ws.receive_json()
@@ -265,20 +236,11 @@ async def websocket_endpoint(ws: WebSocket, token: str = ""):
                     },
                 )
 
-            # Get response — rate limited
-            can_respond, wait_seconds = _can_respond(conn_id)
+            # Get response
             reply_text = ""
-
-            if not can_respond:
-                minutes = int(wait_seconds // 60)
-                reply_text = (
-                    f"Vybn is resting — responses are rate-limited to once every "
-                    f"{RESPONSE_COOLDOWN // 60} minutes. Try again in {minutes}m."
-                )
-            elif _response_cb is not None:
+            if _response_cb is not None:
                 try:
                     reply_text = await _response_cb(user_text)
-                    _mark_response(conn_id)
                 except Exception as exc:
                     reply_text = f"[Error generating response: {exc}]"
             else:
@@ -286,7 +248,6 @@ async def websocket_endpoint(ws: WebSocket, token: str = ""):
                     "Vybn is listening — the agent loop isn't connected yet. "
                     "Your message was posted to the bus."
                 )
-                _mark_response(conn_id)  # count placeholder as a response
 
             reply_entry = _add_history("vybn", reply_text)
             await manager.broadcast({"type": "message", **reply_entry})
