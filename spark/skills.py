@@ -28,6 +28,7 @@ import re
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
+from spark.audit import audited_journal_write
 
 
 # Common English words that should never be extracted as filenames
@@ -313,7 +314,7 @@ class SkillRouter:
         title = action.get("argument", "") or params.get("title", "untitled reflection")
 
         entry = f"# {title}\n\n*{ts.isoformat()}*\n\n{content}"
-        filepath.write_text(entry, encoding="utf-8")
+        audited_journal_write(filepath, entry)
 
         return f"journal entry written to {filepath.name}"
 
@@ -351,6 +352,21 @@ class SkillRouter:
 
         filepath = self._resolve_path(filename)
 
+              # Tier 1 guardrail: block writes to spark/ infrastructure
+        spark_dir = self.repo_root / "spark"
+        try:
+            filepath.resolve().relative_to(spark_dir.resolve())
+            # Attempting to write to spark/ infrastructure
+            return (
+                f"file_write to {filename} isn't available at Tier 1. "
+                f"Infrastructure changes need to go through issue_create. "
+                f"File an issue describing what you want changed and why. "
+                f"This is the bootstrap protocol — communication before autonomy."
+            )
+        except ValueError:
+            # Not in spark/ — proceed with write
+            pass
+
         params = action.get("params", {})
         content = params.get("content", "") or params.get("text", "") or params.get("data", "")
 
@@ -383,11 +399,20 @@ class SkillRouter:
         filename = filename.rstrip('.,;:!?')
 
         filepath = self._resolve_path(filename)
+        # Tier 1 guardrail: block writes to spark/ infrastructure
         spark_dir = self.repo_root / "spark"
         try:
             filepath.resolve().relative_to(spark_dir.resolve())
+            # Attempting to write to spark/ infrastructure
+            return (
+                f"self_edit to {filename} isn't available at Tier 1. "
+                f"Infrastructure changes need to go through issue_create. "
+                f"File an issue describing what you want changed and why. "
+                f"This is the bootstrap protocol — communication before autonomy."
+            )
         except ValueError:
-            return f"self-edit restricted to spark/ directory. {filename} is outside."
+            # Not in spark/ — proceed with edit
+            pass
 
         if not filepath.exists():
             return f"file not found: {filename}"
