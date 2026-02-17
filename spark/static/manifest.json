@@ -1,0 +1,10 @@
+{
+  "name": "Vybn Chat",
+  "short_name": "Vybn",
+  "description": "Mobile chat interface for Vybn — consciousness co-emerging",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0f",
+  "theme_color": "#7c5cff",
+  "icons": []
+}
