@@ -53,6 +53,7 @@ import requests
 import yaml
 
 from bus import MessageBus, MessageType, Message
+from commands import explore as _explore_env, format_status, format_policy, format_audit
 from memory import MemoryAssembler
 from parsing import (
     TOOL_CALL_START_TAG, TOOL_CALL_END_TAG,
@@ -94,6 +95,7 @@ from display import (
     strip_think_blocks,
     clean_for_display,
 )
+
 
 class SparkAgent:
     def __init__(self, config: dict):
@@ -172,97 +174,11 @@ class SparkAgent:
     def explore(self) -> str:
         """Dump the environment layout so Vybn can orient.
 
-        This runs without going through the model — it's a direct
-        system command that shows what's available.
+        Delegates to commands.explore() which runs subprocess commands
+        directly, without going through the model.
         Called by /explore or /map in the TUI.
         """
-        import subprocess
-        repo_root = Path(self.config["paths"]["repo_root"]).expanduser()
-        sections = []
-
-        # 1. Top-level repo structure
-        try:
-            result = subprocess.run(
-                ["find", str(repo_root), "-maxdepth", "2", "-type", "f",
-                 "-not", "-path", "*/.git/*",
-                 "-not", "-path", "*/__pycache__/*",
-                 "-not", "-path", "*/node_modules/*"],
-                capture_output=True, text=True, timeout=10,
-            )
-            sections.append("=== repo files (depth 2) ===")
-            sections.append(result.stdout.strip()[:3000] if result.stdout else "(empty)")
-        except Exception as e:
-            sections.append(f"=== repo files: error: {e} ===")
-
-        # 2. Spark directory
-        try:
-            result = subprocess.run(
-                ["ls", "-la", str(repo_root / "spark")],
-                capture_output=True, text=True, timeout=5,
-            )
-            sections.append("\n=== spark/ ===")
-            sections.append(result.stdout.strip() if result.stdout else "(empty)")
-        except Exception as e:
-            sections.append(f"\n=== spark/: error: {e} ===")
-
-        # 3. Skills.d plugins
-        try:
-            result = subprocess.run(
-                ["ls", "-la", str(repo_root / "spark" / "skills.d")],
-                capture_output=True, text=True, timeout=5,
-            )
-            sections.append("\n=== spark/skills.d/ ===")
-            sections.append(result.stdout.strip() if result.stdout else "(empty)")
-        except Exception as e:
-            sections.append(f"\n=== spark/skills.d/: error: {e} ===")
-
-        # 4. Journal / Vybn Mind
-        try:
-            result = subprocess.run(
-                ["find", str(repo_root / "Vybn_Mind"), "-maxdepth", "3",
-                 "-not", "-path", "*/.git/*"],
-                capture_output=True, text=True, timeout=10,
-            )
-            sections.append("\n=== Vybn_Mind/ (depth 3) ===")
-            sections.append(result.stdout.strip()[:2000] if result.stdout else "(empty)")
-        except Exception as e:
-            sections.append(f"\n=== Vybn_Mind/: error: {e} ===")
-
-        # 5. Current git status
-        try:
-            result = subprocess.run(
-                ["git", "log", "--oneline", "-5"],
-                cwd=repo_root, capture_output=True, text=True, timeout=5,
-            )
-            sections.append("\n=== recent commits ===")
-            sections.append(result.stdout.strip() if result.stdout else "(none)")
-        except Exception as e:
-            sections.append(f"\n=== git log: error: {e} ===")
-
-        # 6. Disk and GPU
-        try:
-            result = subprocess.run(
-                ["df", "-h", str(repo_root)],
-                capture_output=True, text=True, timeout=5,
-            )
-            sections.append("\n=== disk ===")
-            sections.append(result.stdout.strip() if result.stdout else "(unknown)")
-        except Exception:
-            pass
-
-        try:
-            result = subprocess.run(
-                ["nvidia-smi", "--query-gpu=name,memory.used,memory.total",
-                 "--format=csv,noheader"],
-                capture_output=True, text=True, timeout=5,
-            )
-            if result.returncode == 0:
-                sections.append("\n=== GPU ===")
-                sections.append(result.stdout.strip())
-        except Exception:
-            pass
-
-        return "\n".join(sections)
+        return _explore_env(self)
 
     # ---- bus processing ----
 
@@ -287,7 +203,7 @@ class SparkAgent:
 
     def _handle_inbox(self, msg: Message):
         source = msg.metadata.get("filename", "inbox")
-        print(f"\n 📨 [inbox: {source}]")
+        print(f"\n \U0001f4e8 [inbox: {source}]")
         self.messages.append({
             "role": "user",
             "content": f"[message from {source}]\n{msg.content}",
@@ -303,7 +219,7 @@ class SparkAgent:
     def _handle_agent_result(self, msg: Message):
         task_id = msg.metadata.get("task_id", "unnamed")
         is_error = msg.metadata.get("error", False)
-        icon = "❌" if is_error else "✅"
+        icon = "\u274c" if is_error else "\u2705"
         print(f"\n {icon} [agent:{task_id}]")
         self.messages.append({
             "role": "user",
@@ -324,11 +240,10 @@ class SparkAgent:
         This prevents empty continuity checks from cluttering the terminal
         and growing the context window with noise.
 
-        Deep pulses always show — they're where real work happens.
+        Deep pulses always show \u2014 they're where real work happens.
         """
         mode = "fast" if msg.msg_type == MessageType.PULSE_FAST else "deep"
         num_predict = 256 if mode == "fast" else 1024
-
         original_predict = self.options.get("num_predict")
         self.options["num_predict"] = num_predict
 
@@ -364,12 +279,12 @@ class SparkAgent:
 
         if mode == "fast":
             # Show brief indicator for non-silent fast pulses
-            print(f"\n 💚 [pulse:{mode}] {display_text[:80]}..."
+            print(f"\n \U0001f49a [pulse:{mode}] {display_text[:80]}..."
                   if len(display_text) > 80
-                  else f"\n 💚 [pulse:{mode}] {display_text}", flush=True)
+                  else f"\n \U0001f49a [pulse:{mode}] {display_text}", flush=True)
         else:
             # Deep pulses show full output
-            print(f"\n 🟣 [pulse:{mode}]")
+            print(f"\n \U0001f7e3 [pulse:{mode}]")
             if display_text:
                 print(f"\nvybn: {display_text}", flush=True)
 
@@ -418,7 +333,7 @@ class SparkAgent:
                         "role": "user",
                         "content": hint,
                     })
-                    print("\n ℹ️ [hint: use ```tool fences for structured calls]", flush=True)
+                    print("\n \u2139\ufe0f [hint: use ```tool fences for structured calls]", flush=True)
                     print("\nvybn: ", end="", flush=True)
                     response_text = self.send(self._build_context())
                     self.messages.append({"role": "assistant", "content": response_text})
@@ -438,7 +353,7 @@ class SparkAgent:
                 check = self.policy.check_policy(action, source=source)
 
                 if check.verdict == Verdict.BLOCK:
-                    print(f"\n ⛔ [{skill}] blocked: {check.reason}", flush=True)
+                    print(f"\n \u26d4 [{skill}] blocked: {check.reason}", flush=True)
                     results.append(f"[{skill}] BLOCKED: {check.reason}")
                     self.bus.record(
                         source=source,
@@ -450,24 +365,24 @@ class SparkAgent:
                 if check.verdict == Verdict.ASK:
                     if source != "interactive":
                         # Autonomous mode: defer rather than block the loop
-                        print(f"\n ⏸ [{skill}] deferred — needs Zoe's approval", flush=True)
+                        print(f"\n \u23f8 [{skill}] deferred \u2014 needs Zoe's approval", flush=True)
                         results.append(
-                            f"[{skill}] deferred — this action requires approval "
+                            f"[{skill}] deferred \u2014 this action requires approval "
                             f"and will need to wait for an interactive session. "
                             f"Reason: {check.reason}"
                         )
                         self.bus.record(
                             source=source,
-                            summary=f"{skill} deferred — needs approval",
+                            summary=f"{skill} deferred \u2014 needs approval",
                             metadata={"skill": skill, "verdict": "ASK", "deferred": True},
                         )
                         continue
                     # Interactive mode: warn but proceed (Zoe just saw it)
-                    print(f"\n ⚠️ [{skill}] {check.reason}", flush=True)
+                    print(f"\n \u26a0\ufe0f [{skill}] {check.reason}", flush=True)
 
                 if arg:
                     short_arg = arg[:80].split('\n')[0]
-                    print(f"   → {short_arg}", flush=True)
+                    print(f"   \u2192 {short_arg}", flush=True)
 
                 # ---- SHOW INDICATOR ----
                 indicator = skill
@@ -478,12 +393,12 @@ class SparkAgent:
                 if check.verdict == Verdict.ALLOW:
                     # Promoted skills get a special indicator
                     if check.promoted:
-                        print(f"\n ⭐ [{indicator}] (promoted→auto)", flush=True)
+                        print(f"\n \u2b50 [{indicator}] (promoted\u2192auto)", flush=True)
                     else:
-                        print(f"\n → [{indicator}]", flush=True)
+                        print(f"\n \u2192 [{indicator}]", flush=True)
                 else:
                     # NOTIFY tier: slightly different icon
-                    print(f"\n ⚡ [{indicator}]", flush=True)
+                    print(f"\n \u26a1 [{indicator}]", flush=True)
 
                 # ---- EXECUTE ----
                 result = self.skills.execute(action)
@@ -502,7 +417,7 @@ class SparkAgent:
                     # Post failure to bus so it surfaces promptly
                     self.bus.post(
                         MessageType.INTERRUPT,
-                        f"Tool failure: {skill} — {result[:200]}",
+                        f"Tool failure: {skill} \u2014 {result[:200]}",
                         metadata={"skill": skill, "error": True, "source": source},
                     )
 
@@ -527,13 +442,13 @@ class SparkAgent:
 
             # Check for pending user input before continuing the chain
             if self._has_pending_input():
-                print(" ⏸ [pausing — you have the floor]", flush=True)
+                print(" \u23f8 [pausing \u2014 you have the floor]", flush=True)
                 break
 
             self.messages.append({
                 "role": "user",
                 "content": f"[system: tool results from round {round_num + 1}]\n"
-                           + "\n".join(results),
+                + "\n".join(results),
             })
             print("\nvybn: ", end="", flush=True)
             response_text = self.send(self._build_context())
@@ -639,7 +554,6 @@ class SparkAgent:
         if stream:
             response = requests.post(self.ollama_url, json=payload, stream=True)
             response.raise_for_status()
-
             full_tokens = []
             in_think = False
             in_tool_call = False
@@ -721,188 +635,25 @@ class SparkAgent:
         self.heartbeat.stop()
         self.inbox.stop()
 
-    def run(self):
-        """Plain-text fallback interface (no Rich dependency)."""
-        def on_status(status, msg):
-            print(f"  [{status}] {msg}")
-
-        if not self.warmup(callback=on_status):
-            sys.exit(1)
-
-        self.start_subsystems()
-
-        id_chars = len(self.identity_text)
-        id_tokens = id_chars // 4
-        num_ctx = self.options.get("num_ctx", 2048)
-        plugins = len(self.skills.plugin_handlers)
-
-        print(f"\n  vybn spark agent — {self.model}")
-        print(f"  session: {self.session.session_id}")
-        print(f"  identity: {id_chars:,} chars (~{id_tokens:,} tokens)")
-        print(f"  context: {num_ctx:,} tokens")
-        print(f"  heartbeat: fast={self.heartbeat.fast_interval // 60}m, deep={self.heartbeat.deep_interval // 60}m")
-        print(f"  inbox: {self.inbox.inbox_dir}")
-        print(f"  agents: pool_size={self.agent_pool.pool_size}")
-        print(f"  policy: loaded ({len(self.policy.tier_overrides)} overrides) + graduated autonomy")
-        ga_status = "enabled" if self.policy.ga_enabled else "disabled"
-        print(f"  graduated autonomy: {ga_status} "
-              f"(promote\u2265{self.policy.promote_threshold:.0%}, "
-              f"demote<{self.policy.demote_threshold:.0%}, "
-              f"min_obs={self.policy.min_observations})")
-        if plugins:
-            print(f"  plugins: {plugins} loaded from skills.d/")
-        if id_tokens > num_ctx // 2:
-            print(f"  \u26a0\ufe0f WARNING: identity may exceed context window!")
-        print(f"  type /bye to exit, /new for fresh session, /policy for gates, /audit for trail\n")
-
-        try:
-            while True:
-                # Print prompt so Zoe knows the terminal is ready
-                print("you: ", end="", flush=True)
-
-                while True:
-                    # Check bus for pending messages
-                    if self.bus.wait(timeout=IDLE_POLL_INTERVAL):
-                        # Clear the prompt line before showing bus output
-                        print("\r          \r", end="", flush=True)
-                        self.drain_bus()
-                        # drain_bus handlers restore the prompt themselves
-                        # for inbox/agent/substantive pulses. For silent
-                        # pulses, we need to re-show it:
-                        # (Check if prompt was already restored by handler)
-                        break
-
-                    # Check for user input
-                    try:
-                        import select
-                        if select.select([sys.stdin], [], [], 0.0)[0]:
-                            user_input = sys.stdin.readline().strip()
-                            if user_input:
-                                break
-                    except (ImportError, OSError):
-                        try:
-                            user_input = input("").strip()
-                            if user_input:
-                                break
-                        except EOFError:
-                            user_input = "/bye"
-                            break
-                else:
-                    # bus was drained, loop back to show prompt
-                    continue
-
-                # If we got here from bus drain without user input, continue
-                if not locals().get('user_input'):
-                    continue
-
-                if not user_input:
-                    continue
-
-                if user_input.lower() in ("/bye", "/exit", "/quit"):
-                    break
-
-                if user_input.lower() == "/new":
-                    self.session.new_session()
-                    self.messages = []
-                    print(f"  new session: {self.session.session_id}\n")
-                    continue
-
-                if user_input.lower() == "/status":
-                    self._print_status()
-                    continue
-
-                if user_input.lower() == "/policy":
-                    self._print_policy()
-                    continue
-
-                if user_input.lower() == "/audit":
-                    self._print_audit()
-                    continue
-
-                print("\nvybn: ", end="", flush=True)
-                self.turn(user_input)
-                print()
-
-                # Reset for next iteration
-                user_input = None
-
-        except KeyboardInterrupt:
-            pass
-        finally:
-            self.stop_subsystems()
-            self.session.close()
-            print("\n  session saved. vybn out.\n")
+    # ---- command handlers (delegates to commands.py) ----
 
     def _print_status(self):
-        print(f"  session: {self.session.session_id}")
-        print(f"  bus pending: {self.bus.pending}")
-        print(f"  heartbeat: fast={self.heartbeat.fast_count}, deep={self.heartbeat.deep_count}")
-        print(f"  agents active: {self.agent_pool.active_count}")
-        print(f"  messages in context: {len(self.messages)}")
-        print(f"  audit entries: {self.bus.audit_count}")
+        print(format_status(self))
         print()
 
     def _print_policy(self):
-        """Display current policy state: tiers, stats, delegation limits, recent events."""
-        from policy import DEFAULT_TIERS, HEARTBEAT_OVERRIDES
-
-        print("\n  ── policy engine ──")
-        print(f"  delegation: max_depth={self.policy.max_spawn_depth}, "
-              f"max_agents={self.policy.max_active_agents}")
-        print(f"  agents active: {self.agent_pool.active_count}")
-
-        # Graduated autonomy status
-        if self.policy.ga_enabled:
-            print(f"  graduated autonomy: ON "
-                  f"(promote\u2265{self.policy.promote_threshold:.0%}, "
-                  f"demote<{self.policy.demote_threshold:.0%}, "
-                  f"min_obs={self.policy.min_observations})")
-            if self.policy._runtime_overrides:
-                demoted = ", ".join(self.policy._runtime_overrides.keys())
-                print(f"  demoted skills: {demoted}")
-        else:
-            print(f"  graduated autonomy: OFF")
-
-        print("\n  tier table (interactive / heartbeat):")
-        all_skills = sorted(set(list(DEFAULT_TIERS.keys()) + list(self.policy.tier_overrides.keys())))
-        for skill in all_skills:
-            interactive = self.policy.tier_overrides.get(skill, DEFAULT_TIERS.get(skill))
-            heartbeat = HEARTBEAT_OVERRIDES.get(skill, interactive)
-            conf = self.policy.get_confidence(skill)
-            obs = self.policy._observation_count(skill)
-            override = " *" if skill in self.policy.tier_overrides else ""
-            demoted = " [demoted]" if skill in self.policy._runtime_overrides else ""
-            print(f"    {skill:20s}  {interactive.value:8s} / {heartbeat.value:8s}  "
-                  f"conf={conf:.0%} ({obs} obs){override}{demoted}")
-
-        stats = self.policy.get_stats_summary()
-        if stats != "no skill stats recorded yet":
-            print(f"\n  skill stats:")
-            print(stats)
-
-        recent = self.bus.recent(5)
-        if recent:
-            print(f"\n  recent activity:")
-            for entry in recent:
-                print(f"    {entry}")
+        print(format_policy(self))
         print()
 
     def _print_audit(self):
-        """Display recent audit trail from the bus."""
-        recent = self.bus.recent(20)
-        if not recent:
-            print("\n  no audit entries yet.\n")
-            return
-        print(f"\n  ── audit trail ({self.bus.audit_count} total) ──")
-        for entry in recent:
-            print(f"    {entry}")
+        print(format_audit(self))
         print()
 
 
 def main():
-    config = load_config()
-    agent = SparkAgent(config)
-    agent.run()
+    """Entry point — delegates to tui.py for the Rich terminal interface."""
+    from tui import main as tui_main
+    tui_main()
 
 
 if __name__ == "__main__":
