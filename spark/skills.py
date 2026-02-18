@@ -212,12 +212,15 @@ class SkillRouter:
         return path_str.replace("/root/", self._home + "/")
 
     def parse(self, text: str) -> list[dict]:
-filename = filename.rstrip        the model's output. Actions with empty or noise-word arguments
+    """Parse natural language intent into skill actions (tier 3).
+
+        This is the last-resort parser.  It matches regex patterns against
+            the model's output.  Actions with empty or noise-word arguments
         for skills that require arguments are filtered by the caller
         (_get_actions in agent.py).
         """
         actions = []
-                # Strip think blocks so </think> doesn't get parsed as path '/think'
+     # Strip think blocks so </think> doesn't get parsed as path '/think'
         text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
         text_lower = text.lower()
 
