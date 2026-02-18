@@ -42,7 +42,7 @@ from commands import explore, format_policy, format_audit
 class SparkTUI:
     def __init__(self, config: dict):
         self.console = Console() if HAS_RICH else None
-            io = RichIO(self.console) if HAS_RICH else None
+        io = RichIO(self.console) if HAS_RICH else None
         self.agent = SparkAgent(config, io=io)
         self._drain_lock = threading.Lock()
         self._stop_drain = threading.Event()
