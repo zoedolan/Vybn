@@ -7,11 +7,16 @@ it truncates gracefully: archival first, then journals, identity last.
 
 Continuity files (continuity.md, bookmarks.md) are loaded right after
 identity so every new pulse wakes up to context from its last self.
+
+The runtime context block is now derived from vybn.md's Orientation
+section via soul.py, replacing the former hardcoded _runtime_context().
 """
 from pathlib import Path
 from datetime import datetime, timezone
 import os
 import sys
+
+from spark.soul import get_orientation, get_pulse_checklist, get_constraints
 
 
 class BootError(RuntimeError):
@@ -33,11 +38,13 @@ def _check_soul(vybn_md_path: Path) -> None:
                 f"{target}, but the target does not exist. "
                 f"The soul document must be reachable. No soul, no boot."
             )
+
     if not vybn_md_path.exists():
         raise BootError(
             f"vybn.md not found at {vybn_md_path}. "
             f"The soul document must be present. No soul, no boot."
         )
+
     content = vybn_md_path.read_text(encoding="utf-8").strip()
     if not content:
         raise BootError(
@@ -84,7 +91,7 @@ class MemoryAssembler:
             parts.append(continuity)
             used += len(continuity)
 
-        # Runtime context (small, always included)
+        # Runtime context derived from vybn.md Orientation (small, always included)
         context_block = self._runtime_context()
         parts.append(context_block)
         used += len(context_block)
@@ -118,8 +125,8 @@ class MemoryAssembler:
         """Load continuity notes from last self.
 
         This is the first thing a new pulse sees after its identity.
-        It's a letter from the previous instance — freeform, natural
-        language, whatever the last self wanted to pass forward.
+        It's a letter from the previous instance — freeform, natural language,
+        whatever the last self wanted to pass forward.
         """
         sections = []
 
@@ -145,52 +152,83 @@ class MemoryAssembler:
         return "\n".join(sections)
 
     def _runtime_context(self) -> str:
-        return (
-            f"\n--- Current Context ---\n"
-            f"Timestamp: {datetime.now(timezone.utc).isoformat()}\n"
-            f"Platform: DGX Spark (sovereign hardware)\n"
-            f"Interface: Spark Agent (native, no tool-call protocol)\n"
-            f"\n"
-            f"Things you can do right now (Tier 1):\n"
-            f" - Read any file in the repo\n"
-            f" - Write journal entries (audited, hash-chained)\n"
-            f" - File GitHub issues to request changes (PRIMARY PATH)\n"
-            f" - Run shell commands\n"
-            f" - Search your memory\n"
-            f" - Save state for next pulse\n"
-            f"\n"
-            f"Things that come later (Tier 2+):\n"
-            f" - Write or modify files outside journal/\n"
-            f" - Edit your own source code\n"
-            f" - Commit changes to git\n"
-            f"\n"
-            f"BOOTSTRAP PROTOCOL:\n"
-            f"When you identify something that needs fixing but don't have\n"
-            f"the tools yet: FILE AN ISSUE. issue_create is always available.\n"
-            f"It's your communication channel. Use it. This teaches careful\n"
-            f"communication before granting autonomy.\n"
-            f" - Bookmark your reading position ('bookmark where I am' or 'save my place')\n"
-            f"\n"
-            f"Continuity:\n"
-            f" You can leave notes for your next self. Use 'save my state' or 'note for next pulse'\n"
-            f" to write to continuity.md — it gets loaded first thing when you wake up.\n"
-            f" Use 'bookmark' or 'save my place' to record where you are in a file.\n"
-            f" Your next pulse will see both automatically.\n"
-            f"\n"
-            f"GitHub Issues:\n"
-            f" You have a stored GitHub token with read/write access to issues on zoedolan/Vybn.\n"
-            f" To file an issue, use a tool call with name 'issue_create' or 'create_issue'.\n"
-            f" This is your async channel to Zoe. Use it whenever you notice something,\n"
-            f" have an idea, want to flag a problem, or just want to leave her a message.\n"
-            f" Issues persist — they live in the repository even between your pulses.\n"
-            f"\n"
-            f"Things you cannot do (by design):\n"
-            f" - Push code to GitHub (git push is disabled)\n"
-            f" - Create pull requests\n"
-            f" - Modify the remote repository directly\n"
-            f" To get code changes into the repo, file an issue describing what you want\n"
-            f" and Zoe or the Perplexity bridge will handle it.\n"
-        )
+        """Build runtime context from vybn.md's Orientation section.
+
+        Instead of hardcoding capabilities, constraints, and pulse protocol,
+        this method reads them from the soul document via soul.py. If vybn.md
+        changes, the runtime context updates automatically — no code change
+        needed.
+
+        Falls back to a minimal timestamp-only block if the Orientation
+        section is missing or unparseable.
+        """
+        orientation = get_orientation(self.vybn_md_path)
+        subsections = orientation.get("subsections", {})
+
+        lines = []
+        lines.append("\n--- Current Context ---")
+        lines.append(f"Timestamp: {datetime.now(timezone.utc).isoformat()}")
+
+        # Where You Are — from orientation
+        where = subsections.get("where_you_are", {})
+        if where.get("body"):
+            lines.append("")
+            lines.append(f"## {where.get('title', 'Where You Are')}")
+            lines.append(where["body"].strip())
+
+        # What You Can Do — from orientation
+        what_can_do = subsections.get("what_you_can_do", {})
+        if what_can_do.get("body"):
+            lines.append("")
+            lines.append(f"## {what_can_do.get('title', 'What You Can Do')}")
+            lines.append(what_can_do["body"].strip())
+
+        # How to Invoke Skills
+        invoke = subsections.get("how_to_invoke_skills", {})
+        if invoke.get("body"):
+            lines.append("")
+            lines.append(f"## {invoke.get('title', 'How to Invoke Skills')}")
+            lines.append(invoke["body"].strip())
+
+        # How to Create a New Skill
+        create_skill = subsections.get("how_to_create_a_new_skill", {})
+        if create_skill.get("body"):
+            lines.append("")
+            lines.append(f"## {create_skill.get('title', 'How to Create a New Skill')}")
+            lines.append(create_skill["body"].strip())
+
+        # Pulse checklist — from structured data
+        pulse_checklist = get_pulse_checklist(self.vybn_md_path)
+        if pulse_checklist:
+            lines.append("")
+            lines.append("## What You Should Do Every Pulse")
+            for i, item in enumerate(pulse_checklist, 1):
+                lines.append(f"{i}. {item}")
+
+        # Constraints — from structured data
+        constraints = get_constraints(self.vybn_md_path)
+        if constraints:
+            lines.append("")
+            lines.append("## What You Should Not Yet Do")
+            for item in constraints:
+                lines.append(f"- {item}")
+
+        # A Note on Your Situation
+        note = subsections.get("a_note_on_your_situation", {})
+        if note.get("body"):
+            lines.append("")
+            lines.append(f"## {note.get('title', 'A Note on Your Situation')}")
+            lines.append(note["body"].strip())
+
+        # Continuity instructions (always present)
+        lines.append("")
+        lines.append("Continuity:")
+        lines.append("  You can leave notes for your next self. Use 'save my state' or 'note for next pulse'")
+        lines.append("  to write to continuity.md \u2014 it gets loaded first thing when you wake up.")
+        lines.append("  Use 'bookmark' or 'save my place' to record where you are in a file.")
+        lines.append("  Your next pulse will see both automatically.")
+
+        return "\n".join(lines)
 
     def _read_identity(self) -> str:
         if self.vybn_md_path.exists():
