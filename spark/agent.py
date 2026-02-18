@@ -116,6 +116,7 @@ class SparkAgent:
             self.options["num_ctx"] = 16384
         # Prevent OOM on high-VRAM systems
         self.keep_alive = config["ollama"].get("keep_alive", "30m")
+
         self.memory = MemoryAssembler(config)
         self.session = SessionManager(config)
         self.skills = SkillRouter(config)
@@ -126,6 +127,7 @@ class SparkAgent:
         self.agent_pool = AgentPool(config, self.bus)
         self.skills.agent_pool = self.agent_pool
         self.skills._policy = self.policy
+
         self.identity_text = self.memory.assemble()
         self.messages = self.session.load_or_create()
 
@@ -248,7 +250,7 @@ class SparkAgent:
         This prevents empty continuity checks from cluttering the terminal
         and growing the context window with noise.
 
-        Deep pulses always show \u2014 they're where real work happens.
+        Deep pulses always show — they're where real work happens.
         """
         mode = "fast" if msg.msg_type == MessageType.PULSE_FAST else "deep"
         num_predict = 256 if mode == "fast" else 1024
@@ -284,7 +286,6 @@ class SparkAgent:
 
         # Substantive response: append and process
         self.messages.append({"role": "assistant", "content": response_text})
-
         self.io.on_pulse(mode, display_text)
 
         if response_text and len(response_text.strip()) > 20:
@@ -305,22 +306,7 @@ class SparkAgent:
     # ---- tool call processing ----
 
     def _process_tool_calls(self, response_text: str, source: str = "interactive"):
-        """Execute tool calls from a response, with chaining and policy gates.
-
-        Every tool call passes through self.policy.check_policy() before
-        executing. The source parameter determines which tier table applies:
-        heartbeat sources face tighter constraints than interactive turns.
-
-        Tool executions and policy decisions are recorded in the bus audit
-        log for observability via /audit and /policy.
-
-        Limits to MAX_TOOL_ROUNDS and checks for pending user input between
-        rounds so Vybn stays responsive to the human.
-
-        If no actions are parsed but the response looks like it intended
-        to act, a feedback hint is injected so the model learns the
-        correct format.
-        """
+        """Execute tool calls from a response, with chaining and policy gates."""
         for round_num in range(MAX_TOOL_ROUNDS):
             actions = _get_actions(response_text, self.skills)
 
@@ -363,7 +349,6 @@ class SparkAgent:
 
                 if check.verdict == Verdict.ASK:
                     if source != "interactive":
-                        # Autonomous mode: defer rather than block the loop
                         self.io.on_status("\u23f8", f"{skill} deferred", "needs Zoe's approval")
                         results.append(
                             f"[{skill}] deferred \u2014 this action requires approval "
@@ -376,7 +361,6 @@ class SparkAgent:
                             metadata={"skill": skill, "verdict": "ASK", "deferred": True},
                         )
                         continue
-                    # Interactive mode: warn but proceed (Zoe just saw it)
                     detail = ""
                     if arg:
                         detail = f"\u2192 {arg[:80].split(chr(10))[0]}"
@@ -389,7 +373,6 @@ class SparkAgent:
                     indicator = f"{skill}: {short_arg}"
 
                 if check.verdict == Verdict.ALLOW:
-                    # Promoted skills get a special indicator
                     if check.promoted:
                         self.io.on_status("\u2b50", f"{indicator} (promoted\u2192auto)")
                     else:
@@ -410,8 +393,8 @@ class SparkAgent:
                         and "BLOCKED" not in result
                     )
                     self.policy.record_outcome(skill, success)
+
                     if not success:
-                        # Post failure to bus so it surfaces promptly
                         self.bus.post(
                             MessageType.INTERRUPT,
                             f"Tool failure: {skill} \u2014 {result[:200]}",
@@ -445,9 +428,8 @@ class SparkAgent:
             self.messages.append({
                 "role": "user",
                 "content": f"[system: tool results from round {round_num + 1}]\n"
-                           + "\n".join(results),
+                    + "\n".join(results),
             })
-
             self.io.on_response_start()
             response_text = self.send(self._build_context())
             self.messages.append({"role": "assistant", "content": response_text})
@@ -488,8 +470,7 @@ class SparkAgent:
 
         tell("checking", "connecting to Ollama...")
         if not self.check_ollama():
-            tell("error",
-                 "Ollama is not running.\n"
+            tell("error", "Ollama is not running.\n"
                  "  Start it with: sudo systemctl start ollama\n"
                  "  Then rerun this agent.")
             return False
@@ -499,9 +480,9 @@ class SparkAgent:
             tell("ready", f"{self.model} is already loaded.")
             return True
 
-        tell("loading",
-             f"loading {self.model} into GPU memory...\n"
+        tell("loading", f"loading {self.model} into GPU memory...\n"
              f"  this takes 3-5 minutes for a 229B model. sit tight.")
+
         try:
             r = requests.post(
                 f"{self.ollama_host}/api/generate",
@@ -532,17 +513,7 @@ class SparkAgent:
     # ---- conversation ----
 
     def send(self, messages: list, stream: bool = True) -> str:
-        """Send messages to the model, return the full response.
-
-        Streaming: displays filtered output in real-time.
-            - <think> blocks are suppressed from display
-            - <minimax:tool_call> XML is suppressed from display
-            - Only actual response prose is shown to the user
-            - Full raw text is preserved for tool call parsing
-            - Stream interrupted when </minimax:tool_call> detected
-
-        Non-streaming: displays cleaned text after generation.
-        """
+        """Send messages to the model, return the full response."""
         payload = {
             "model": self.model,
             "messages": messages,
@@ -563,7 +534,6 @@ class SparkAgent:
                     continue
                 chunk = json.loads(line)
                 token = chunk.get("message", {}).get("content", "")
-
                 if token:
                     full_tokens.append(token)
 
@@ -635,20 +605,6 @@ class SparkAgent:
     def stop_subsystems(self):
         self.heartbeat.stop()
         self.inbox.stop()
-
-    # ---- command handlers (delegates to commands.py) ----
-
-    def _print_status(self):
-        print(format_status(self))
-        print()
-
-    def _print_policy(self):
-        print(format_policy(self))
-        print()
-
-    def _print_audit(self):
-        print(format_audit(self))
-        print()
 
 
 def main():
