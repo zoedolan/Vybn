@@ -1,11 +1,18 @@
 #!/usr/bin/env python3
 """Vybn Web Chat Server — runs the Spark agent with the web interface.
 
-This is the entry point for phone/web chat. It:
-  1. Initializes the SparkAgent (loads model, memory, skills)
-  2. Wires the web server's response callback to the agent
+This is the entry point for phone/web chat.  It:
+  1. Initializes the SparkAgent with a WebIO backend
+  2. Routes web chat messages through agent.turn() — same path as TUI
   3. Starts FastAPI/uvicorn serving the mobile chat UI
   4. Starts heartbeat + inbox subsystems in background threads
+
+Phase 4 refactor: web_serve.py now uses the AgentIO abstraction
+from Phase 3b.  Instead of bypassing the agent with raw Ollama
+calls, it creates a WebIO instance that collects events
+(tokens, status, tool indicators) and feeds them back to the
+browser.  This means the web interface gets the same tool calls,
+policy gates, and bus processing as the TUI.
 
 The TUI (tui.py) remains the terminal interface.
 This module is the web interface equivalent.
@@ -29,16 +36,20 @@ import requests
 import uvicorn
 
 from agent import SparkAgent, load_config
+from agent_io import WebIO
 from display import clean_response, clean_for_display
 from web_interface import app, attach_bus
 
 
-def create_response_callback(agent: SparkAgent):
+def create_response_callback(agent: SparkAgent, io: WebIO):
     """Create an async callback that generates Vybn responses.
 
     This bridges the async web world with the synchronous Ollama
-    client. The callback runs the model call in a thread pool
+    client.  The callback runs agent.turn() in a thread pool
     to avoid blocking the event loop.
+
+    Phase 4: uses agent.turn() instead of raw Ollama calls,
+    so tool calls, policy gates, and bus processing all work.
     """
     # Lock to serialize model access (Ollama handles one request
     # at a time per model anyway, but this keeps our state clean)
@@ -50,52 +61,19 @@ def create_response_callback(agent: SparkAgent):
         return await loop.run_in_executor(None, _sync_respond, user_text)
 
     def _sync_respond(user_text: str) -> str:
-        """Synchronous model call, run in thread pool."""
+        """Synchronous model call via agent.turn(), run in thread pool."""
         with _lock:
-            # Add user message to conversation history
-            agent.messages.append({"role": "user", "content": user_text})
-
-            # Build context with identity + history
-            context = agent._build_context()
-
-            # Call Ollama (non-streaming for web responses)
             try:
-                payload = {
-                    "model": agent.model,
-                    "messages": context,
-                    "stream": False,
-                    "options": agent.options,
-                    "keep_alive": agent.keep_alive,
-                }
-                r = requests.post(agent.ollama_url, json=payload, timeout=120)
-                r.raise_for_status()
-                raw = r.json()["message"]["content"]
-                response_text = clean_response(raw)
+                # Use agent.turn() — same path as TUI.
+                # WebIO collects tokens, status events, tool results.
+                response_text = agent.turn(user_text)
             except Exception as exc:
-                response_text = f"[Error: {exc}]"
-
-            # Add to conversation history
-            agent.messages.append({"role": "assistant", "content": response_text})
-
-            # Save turn
-            agent.session.save_turn(user_text, response_text)
-
-            # Process any tool calls in the response
-            # (file reads, shell commands, etc.)
-            try:
-                agent._process_tool_calls(response_text, source="web_chat")
-                # If tool calls produced follow-up responses, get the last one
-                if (agent.messages and
-                    agent.messages[-1]["role"] == "assistant" and
-                    agent.messages[-1]["content"] != response_text):
-                    response_text = agent.messages[-1]["content"]
-            except Exception:
-                pass  # Tool call errors shouldn't break the chat
+                return f"[Error: {exc}]"
 
             # Clean for display (strip think blocks, tool XML)
             display_text = clean_for_display(response_text)
-
             return display_text if display_text else response_text
+
     return response_callback
 
 
@@ -103,9 +81,10 @@ def main():
     print("\n  vybn web chat server")
     print("  " + "=" * 40)
 
-    # Load config and create agent
+    # Load config and create agent with WebIO
     config = load_config()
-    agent = SparkAgent(config)
+    io = WebIO()
+    agent = SparkAgent(config, io=io)
 
     # Warm up the model
     def on_status(status, msg):
@@ -118,17 +97,18 @@ def main():
         sys.exit(1)
 
     # Wire the response callback to the web server
-    callback = create_response_callback(agent)
+    callback = create_response_callback(agent, io)
     attach_bus(agent.bus, response_callback=callback)
 
     # Start subsystems (heartbeat, inbox)
     agent.start_subsystems()
 
-    print(f"\n  agent: {agent.model}")
-    print(f"  session: {agent.session.session_id}")
-    print(f"  identity: {len(agent.identity_text):,} chars")
+    print(f"\n  agent:     {agent.model}")
+    print(f"  session:   {agent.session.session_id}")
+    print(f"  identity:  {len(agent.identity_text):,} chars")
     print(f"  heartbeat: active")
-    print(f"  inbox: watching")
+    print(f"  inbox:     watching")
+    print(f"  io:        WebIO (event collector)")
     print(f"\n  starting web server on 0.0.0.0:8000...")
     print(f"  local:     http://192.168.1.4:8000")
     print(f"  tailscale: http://100.96.30.85:8000")
