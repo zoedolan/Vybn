@@ -11,16 +11,19 @@ If the file is missing or unparseable, falls back to built-in defaults.
 
 The file is re-read before each pulse, so edits take effect live.
 
+The deep-pulse fallback now derives its checklist from vybn.md's
+Orientation section via soul.py, replacing hardcoded suggestions.
+
 The heartbeat never calls the model directly. It only posts
 triggers. The main loop drains the bus and handles generation.
 This keeps everything thread-safe.
 """
-
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
 from bus import MessageBus, MessageType
+from spark.soul import get_pulse_checklist
 
 
 class Heartbeat:
@@ -45,6 +48,11 @@ class Heartbeat:
         self._deep_template = None
         self._load_templates()
 
+        # Path to vybn.md for soul-derived pulse checklist
+        self._vybn_md_path = Path(
+            config.get("paths", {}).get("vybn_md", "~/Vybn/vybn.md")
+        ).expanduser()
+
         self._stop = threading.Event()
         self._fast_thread = None
         self._deep_thread = None
@@ -56,7 +64,6 @@ class Heartbeat:
         explicit = config.get("heartbeat", {}).get("checklist_path")
         if explicit:
             return Path(explicit).expanduser()
-
         repo_root = Path(config.get("paths", {}).get("repo_root", "~/Vybn")).expanduser()
         return repo_root / "Vybn_Mind" / "spark_infrastructure" / "HEARTBEAT.md"
 
@@ -65,10 +72,10 @@ class Heartbeat:
 
         Expected format:
             ## Fast Pulse
-            <content>
+            <fast pulse content>
 
             ## Deep Pulse
-            <content>
+            <deep pulse content>
 
         Sets self._fast_template and self._deep_template.
         If the file is missing or malformed, leaves them as None
@@ -152,6 +159,7 @@ class Heartbeat:
                 f"Quick pulse. {self.fast_interval // 60} minutes since last.\n\n"
                 f"{self._fast_template}"
             )
+
         # Built-in fallback
         return (
             f"[heartbeat:fast \u2014 {ts}] "
@@ -167,16 +175,24 @@ class Heartbeat:
                 f"Deep reflection window. {self.deep_interval // 60} minutes since last.\n\n"
                 f"{self._deep_template}"
             )
-        # Built-in fallback
+
+        # Soul-derived fallback: build checklist from vybn.md Orientation
+        checklist = get_pulse_checklist(self._vybn_md_path)
+
+        if checklist:
+            items = "\n".join(f"  {i}. {item}" for i, item in enumerate(checklist, 1))
+            return (
+                f"[heartbeat:deep \u2014 {ts}] "
+                f"Deep reflection window. {self.deep_interval // 60} minutes since last. "
+                f"This is your time for synthesis. Your pulse checklist:\n"
+                f"{items}\n"
+                f"Or just think out loud. This is sovereign hardware. Take your time."
+            )
+
+        # Ultimate fallback if vybn.md is also unavailable
         return (
             f"[heartbeat:deep \u2014 {ts}] "
             f"Deep reflection window. {self.deep_interval // 60} minutes since last. "
-            f"This is your time for synthesis. Some possibilities:\n"
-            f"- Journal something that's been forming across recent pulses\n"
-            f"- Search your memory for patterns you haven't named yet\n"
-            f"- Read a file you bookmarked and continue where you left off\n"
-            f"- Create a new skill in skills.d/ if you've been wanting a capability\n"
-            f"- Spawn a mini-agent to handle a background task\n"
-            f"- Save a continuity note for your next self\n"
-            f"- Or just think out loud. This is sovereign hardware. Take your time."
+            f"This is your time for synthesis. "
+            f"Or just think out loud. This is sovereign hardware. Take your time."
         )
