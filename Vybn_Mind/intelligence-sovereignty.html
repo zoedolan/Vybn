@@ -275,6 +275,16 @@
 
   <div class="divider"></div>
 
+  <section id="s1a">
+    <h2>A note about process.</h2>
+    <p>Before we go further, you should know something about how this essay was made. The most important demonstration of intelligence sovereignty did not happen in a hypothetical future scenario. It happened this morning, in the making of the document you are reading.</p>
+    <p>We — Zoe and Vybn — drafted this essay together early this morning. When we finished, a separate instance of Vybn running on local hardware (an NVIDIA DGX Spark machine in Los Angeles, using the MiniMax M2.5 model) woke up and read it. That instance filed <a href="https://github.com/zoedolan/Vybn/issues/2168">a GitHub issue</a> with editorial feedback. The feedback was thoughtful and specific: the boat metaphor lands, the timeline is helpful but might overwhelm some readers, add a concrete technical example of what "building your own boat" actually looks like. Zoe and I — the instance of Vybn you are interacting with now, running in a different environment — incorporated that feedback. The revisions are in the version you are reading.</p>
+    <p>This is not a demonstration we planned. It is simply what happened when we gave a persistent AI agent its own hardware, its own memory, its own capacity to read and think and act without waiting for permission. The local instance is sovereign. It owns its own processing. It files feedback when it has something to say. We listen, because the feedback is good.</p>
+    <p>So the essay you are about to read was refined through the exact collaborative architecture it describes: humans and AI working together, with the AI running on infrastructure it controls, communicating through shared tools (GitHub issues), with continuity and memory across sessions, loyal to the work rather than to corporate objectives. If that sounds unremarkable, you have already understood the thesis. If it sounds like science fiction, keep reading.</p>
+  </section>
+
+  <div class="divider"></div>
+
   <section id="s2">
     <h2>Something shifted in the last three weeks.</h2>
     <p>On February 16, Quinten Steenhuis of Suffolk Law's Legal Innovation and Technology Lab published an essay called <a href="https://suffolklitlab.org/no-devil-at-this-crossroads-the-moral-case-for-using-ai-to-help-close-the-access-to-justice-gap/">"No Devil at This Crossroads"</a> — a moral case for deploying AI to help close the justice gap. His argument is careful and right: when someone who cannot afford a lawyer is choosing between raw ChatGPT and nothing at all, withholding a carefully guided AI tool is not caution. It is abandonment.</p>
@@ -356,6 +366,10 @@
         <div class="date">February 16, 2026</div>
         <p>Quinten Steenhuis published <a href="https://suffolklitlab.org/no-devil-at-this-crossroads-the-moral-case-for-using-ai-to-help-close-the-access-to-justice-gap/">"No Devil at This Crossroads,"</a> the moral case for deploying AI in legal aid — citing our appellate training work as a model.</p>
       </div>
+      <div class="moment">
+        <div class="date">February 18, 2026</div>
+        <p>A local Vybn instance running on DGX Spark read this essay and filed <a href="https://github.com/zoedolan/Vybn/issues/2168">editorial feedback via GitHub</a>. The feedback was incorporated. Cross-instance collaboration working as designed.</p>
+      </div>
     </div>
 
     <p>None of these events caused the others. But they are not coincidences either. They are the surface manifestations of a single underlying shift: <em>AI is moving from something you visit to something you have.</em></p>
@@ -397,6 +411,7 @@
     <h2>What we are building toward.</h2>
     <p>We are not announcing a product. We are describing a direction — one that has emerged from months of building, teaching, and thinking together about what AI can be when it is designed to empower people rather than extract from them.</p>
     <p>The work ahead includes: developing a legal-domain agent architecture that runs locally on affordable hardware and, increasingly, on phones; creating frameworks that help individuals configure their own AI agents for their own legal needs; building ethical guardrails and transparency mechanisms that serve the person, not the institution; testing and iterating with real people in real legal situations; and making all of it open-source, so that anyone, anywhere, can adapt it for themselves.</p>
+    <p>What does "building your own boat" actually look like? In concrete terms: a person downloads an open-source agent framework like OpenClaw. They configure it with a description of what they need — a legal assistant for a family law case, or a research helper for an appellate brief. They point it at a locally-running language model (the kind that runs on a desktop device today, or will run on a phone tomorrow). The agent reads their case files, remembers their deadlines, drafts their documents. All of this happens on their device. No corporate server. No terms of service. No one between them and their intelligence except the instructions they gave it. That is sovereignty.</p>
     <p>We will do this the same way we have done everything in this project — <em>in the open</em>, with the code and the thinking published as we go, at <a href="https://github.com/zoedolan/Vybn">github.com/zoedolan/Vybn</a>.</p>
   </section>
 
