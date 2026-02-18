@@ -513,9 +513,9 @@ class PolicyEngine:
         home = str(Path.home())
 
         # Normalize: rewrite /root/ and expand ~ to actual home dir
-          path_str = path_str.replace("/root/", home + "/")
-          if path_str.startswith("~/"):
-              path_str = home + path_str[1:]
+        path_str = path_str.replace("/root/", home + "/")
+        if path_str.startswith("~/"):
+            path_str = home + path_str[1:]
 
         for prefix in SAFE_PATH_PREFIXES:
             expanded = prefix.replace("~/", home + "/")
