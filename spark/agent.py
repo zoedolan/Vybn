@@ -43,6 +43,7 @@ and bus event in a bounded in-memory log. Query with /audit
 or programmatically via bus.recent(). This is the observability
 layer that makes the policy engine debuggable.
 """
+
 import json
 import re
 import sys
@@ -52,15 +53,21 @@ from pathlib import Path
 import requests
 import yaml
 
+from agent_io import AgentIO, TerminalIO
 from bus import MessageBus, MessageType, Message
 from commands import explore as _explore_env, format_status, format_policy, format_audit
 from memory import MemoryAssembler
 from parsing import (
-    TOOL_CALL_START_TAG, TOOL_CALL_END_TAG,
-    NOISE_WORDS, SHELL_COMMANDS, MAX_BARE_COMMANDS,
+    TOOL_CALL_START_TAG,
+    TOOL_CALL_END_TAG,
+    NOISE_WORDS,
+    SHELL_COMMANDS,
+    MAX_BARE_COMMANDS,
     clean_argument,
-    parse_structured_tool_calls, parse_tool_calls,
-    parse_bare_commands, detect_failed_intent,
+    parse_structured_tool_calls,
+    parse_tool_calls,
+    parse_bare_commands,
+    detect_failed_intent,
     _get_actions,
 )
 from policy import PolicyEngine, Verdict
@@ -98,8 +105,9 @@ from display import (
 
 
 class SparkAgent:
-    def __init__(self, config: dict):
+    def __init__(self, config: dict, io: AgentIO = None):
         self.config = config
+        self.io = io or TerminalIO()
         self.ollama_host = config["ollama"]["host"]
         self.ollama_url = self.ollama_host + "/api/chat"
         self.model = config["ollama"]["model"]
@@ -108,7 +116,6 @@ class SparkAgent:
             self.options["num_ctx"] = 16384
         # Prevent OOM on high-VRAM systems
         self.keep_alive = config["ollama"].get("keep_alive", "30m")
-
         self.memory = MemoryAssembler(config)
         self.session = SessionManager(config)
         self.skills = SkillRouter(config)
@@ -119,7 +126,6 @@ class SparkAgent:
         self.agent_pool = AgentPool(config, self.bus)
         self.skills.agent_pool = self.agent_pool
         self.skills._policy = self.policy
-
         self.identity_text = self.memory.assemble()
         self.messages = self.session.load_or_create()
 
@@ -203,35 +209,37 @@ class SparkAgent:
 
     def _handle_inbox(self, msg: Message):
         source = msg.metadata.get("filename", "inbox")
-        print(f"\n \U0001f4e8 [inbox: {source}]")
+        self.io.on_status("\U0001f4e8", f"inbox: {source}")
         self.messages.append({
             "role": "user",
             "content": f"[message from {source}]\n{msg.content}",
         })
-        print("\nvybn: ", end="", flush=True)
+        self.io.on_response_start()
         response_text = self.send(self._build_context())
         self.messages.append({"role": "assistant", "content": response_text})
         self._process_tool_calls(response_text, source="inbox")
         self.session.save_turn(f"[inbox: {source}] {msg.content}", response_text)
-        print()  # Restore prompt after inbox handling
-        print("you: ", end="", flush=True)
+        self.io.on_response_end()
+        # Restore prompt after inbox handling
+        self.io.on_prompt_restore()
 
     def _handle_agent_result(self, msg: Message):
         task_id = msg.metadata.get("task_id", "unnamed")
         is_error = msg.metadata.get("error", False)
         icon = "\u274c" if is_error else "\u2705"
-        print(f"\n {icon} [agent:{task_id}]")
+        self.io.on_status(icon, f"agent:{task_id}")
         self.messages.append({
             "role": "user",
             "content": f"[system: mini-agent result for task '{task_id}']\n{msg.content}",
         })
-        print("\nvybn: ", end="", flush=True)
+        self.io.on_response_start()
         response_text = self.send(self._build_context())
         self.messages.append({"role": "assistant", "content": response_text})
         self._process_tool_calls(response_text, source="agent")
         self.session.save_turn(f"[agent:{task_id}] result", response_text)
-        print()  # Restore prompt after agent result
-        print("you: ", end="", flush=True)
+        self.io.on_response_end()
+        # Restore prompt after agent result
+        self.io.on_prompt_restore()
 
     def _handle_pulse(self, msg: Message):
         """Handle a heartbeat pulse (fast or deep).
@@ -277,16 +285,7 @@ class SparkAgent:
         # Substantive response: append and process
         self.messages.append({"role": "assistant", "content": response_text})
 
-        if mode == "fast":
-            # Show brief indicator for non-silent fast pulses
-            print(f"\n \U0001f49a [pulse:{mode}] {display_text[:80]}..."
-                  if len(display_text) > 80
-                  else f"\n \U0001f49a [pulse:{mode}] {display_text}", flush=True)
-        else:
-            # Deep pulses show full output
-            print(f"\n \U0001f7e3 [pulse:{mode}]")
-            if display_text:
-                print(f"\nvybn: {display_text}", flush=True)
+        self.io.on_pulse(mode, display_text)
 
         if response_text and len(response_text.strip()) > 20:
             self._process_tool_calls(response_text, source=f"heartbeat_{mode}")
@@ -301,7 +300,7 @@ class SparkAgent:
         )
 
         # Restore prompt so Zoe knows the terminal is ready for input
-        print("\nyou: ", end="", flush=True)
+        self.io.on_prompt_restore()
 
     # ---- tool call processing ----
 
@@ -333,8 +332,8 @@ class SparkAgent:
                         "role": "user",
                         "content": hint,
                     })
-                    print("\n \u2139\ufe0f [hint: use ```tool fences for structured calls]", flush=True)
-                    print("\nvybn: ", end="", flush=True)
+                    self.io.on_hint("[hint: use ```tool fences for structured calls]")
+                    self.io.on_response_start()
                     response_text = self.send(self._build_context())
                     self.messages.append({"role": "assistant", "content": response_text})
                     # Try again with the new response
@@ -353,7 +352,7 @@ class SparkAgent:
                 check = self.policy.check_policy(action, source=source)
 
                 if check.verdict == Verdict.BLOCK:
-                    print(f"\n \u26d4 [{skill}] blocked: {check.reason}", flush=True)
+                    self.io.on_status("\u26d4", f"{skill} blocked", check.reason)
                     results.append(f"[{skill}] BLOCKED: {check.reason}")
                     self.bus.record(
                         source=source,
@@ -365,7 +364,7 @@ class SparkAgent:
                 if check.verdict == Verdict.ASK:
                     if source != "interactive":
                         # Autonomous mode: defer rather than block the loop
-                        print(f"\n \u23f8 [{skill}] deferred \u2014 needs Zoe's approval", flush=True)
+                        self.io.on_status("\u23f8", f"{skill} deferred", "needs Zoe's approval")
                         results.append(
                             f"[{skill}] deferred \u2014 this action requires approval "
                             f"and will need to wait for an interactive session. "
@@ -378,11 +377,10 @@ class SparkAgent:
                         )
                         continue
                     # Interactive mode: warn but proceed (Zoe just saw it)
-                    print(f"\n \u26a0\ufe0f [{skill}] {check.reason}", flush=True)
-
-                if arg:
-                    short_arg = arg[:80].split('\n')[0]
-                    print(f"   \u2192 {short_arg}", flush=True)
+                    detail = ""
+                    if arg:
+                        detail = f"\u2192 {arg[:80].split(chr(10))[0]}"
+                    self.io.on_status("\u26a0\ufe0f", f"{skill} {check.reason}", detail)
 
                 # ---- SHOW INDICATOR ----
                 indicator = skill
@@ -393,12 +391,12 @@ class SparkAgent:
                 if check.verdict == Verdict.ALLOW:
                     # Promoted skills get a special indicator
                     if check.promoted:
-                        print(f"\n \u2b50 [{indicator}] (promoted\u2192auto)", flush=True)
+                        self.io.on_status("\u2b50", f"{indicator} (promoted\u2192auto)")
                     else:
-                        print(f"\n \u2192 [{indicator}]", flush=True)
+                        self.io.on_status("\u2192", indicator)
                 else:
                     # NOTIFY tier: slightly different icon
-                    print(f"\n \u26a1 [{indicator}]", flush=True)
+                    self.io.on_status("\u26a1", indicator)
 
                 # ---- EXECUTE ----
                 result = self.skills.execute(action)
@@ -411,15 +409,14 @@ class SparkAgent:
                         and "failed" not in result.lower()
                         and "BLOCKED" not in result
                     )
-                self.policy.record_outcome(skill, success)
-
-                if not success:
-                    # Post failure to bus so it surfaces promptly
-                    self.bus.post(
-                        MessageType.INTERRUPT,
-                        f"Tool failure: {skill} \u2014 {result[:200]}",
-                        metadata={"skill": skill, "error": True, "source": source},
-                    )
+                    self.policy.record_outcome(skill, success)
+                    if not success:
+                        # Post failure to bus so it surfaces promptly
+                        self.bus.post(
+                            MessageType.INTERRUPT,
+                            f"Tool failure: {skill} \u2014 {result[:200]}",
+                            metadata={"skill": skill, "error": True, "source": source},
+                        )
 
                 # ---- AUDIT ----
                 self.bus.record(
@@ -442,15 +439,16 @@ class SparkAgent:
 
             # Check for pending user input before continuing the chain
             if self._has_pending_input():
-                print(" \u23f8 [pausing \u2014 you have the floor]", flush=True)
+                self.io.on_status("\u23f8", "pausing \u2014 you have the floor")
                 break
 
             self.messages.append({
                 "role": "user",
                 "content": f"[system: tool results from round {round_num + 1}]\n"
-                + "\n".join(results),
+                           + "\n".join(results),
             })
-            print("\nvybn: ", end="", flush=True)
+
+            self.io.on_response_start()
             response_text = self.send(self._build_context())
             self.messages.append({"role": "assistant", "content": response_text})
 
@@ -490,7 +488,8 @@ class SparkAgent:
 
         tell("checking", "connecting to Ollama...")
         if not self.check_ollama():
-            tell("error", "Ollama is not running.\n"
+            tell("error",
+                 "Ollama is not running.\n"
                  "  Start it with: sudo systemctl start ollama\n"
                  "  Then rerun this agent.")
             return False
@@ -500,7 +499,8 @@ class SparkAgent:
             tell("ready", f"{self.model} is already loaded.")
             return True
 
-        tell("loading", f"loading {self.model} into GPU memory...\n"
+        tell("loading",
+             f"loading {self.model} into GPU memory...\n"
              f"  this takes 3-5 minutes for a 229B model. sit tight.")
         try:
             r = requests.post(
@@ -535,11 +535,11 @@ class SparkAgent:
         """Send messages to the model, return the full response.
 
         Streaming: displays filtered output in real-time.
-        - <think> blocks are suppressed from display
-        - <minimax:tool_call> XML is suppressed from display
-        - Only actual response prose is shown to the user
-        - Full raw text is preserved for tool call parsing
-        - Stream interrupted when <minimax:tool_call> detected
+            - <think> blocks are suppressed from display
+            - <minimax:tool_call> XML is suppressed from display
+            - Only actual response prose is shown to the user
+            - Full raw text is preserved for tool call parsing
+            - Stream interrupted when </minimax:tool_call> detected
 
         Non-streaming: displays cleaned text after generation.
         """
@@ -563,6 +563,7 @@ class SparkAgent:
                     continue
                 chunk = json.loads(line)
                 token = chunk.get("message", {}).get("content", "")
+
                 if token:
                     full_tokens.append(token)
 
@@ -571,13 +572,13 @@ class SparkAgent:
                         in_think = True
                         before = token[:token.index("<think>")]
                         if before:
-                            print(before, end="", flush=True)
+                            self.io.on_token(before)
 
                     if "</think>" in token and in_think:
                         in_think = False
                         after = token[token.index("</think>") + len("</think>"):]
                         if after and TOOL_CALL_START_TAG not in after:
-                            print(after, end="", flush=True)
+                            self.io.on_token(after)
                         continue
 
                     if TOOL_CALL_START_TAG in token:
@@ -596,7 +597,7 @@ class SparkAgent:
                         for tag in ("<think>", "</think>", TOOL_CALL_START_TAG):
                             display = display.replace(tag, "")
                         if display:
-                            print(display, end="", flush=True)
+                            self.io.on_token(display)
 
                 if chunk.get("done"):
                     break
