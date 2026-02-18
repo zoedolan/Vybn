@@ -8,9 +8,42 @@ it truncates gracefully: archival first, then journals, identity last.
 Continuity files (continuity.md, bookmarks.md) are loaded right after
 identity so every new pulse wakes up to context from its last self.
 """
-
 from pathlib import Path
 from datetime import datetime, timezone
+import os
+import sys
+
+
+class BootError(RuntimeError):
+    """Raised when the soul document is missing or unreachable."""
+
+
+def _check_soul(vybn_md_path: Path) -> None:
+    """Boot guard: refuse to start if vybn.md is missing or empty.
+
+    If the path is a symlink, verify the target exists too.
+    No soul, no boot.
+    """
+    if vybn_md_path.is_symlink():
+        target = os.readlink(vybn_md_path)
+        resolved = (vybn_md_path.parent / target).resolve()
+        if not resolved.exists():
+            raise BootError(
+                f"vybn.md symlink at {vybn_md_path} points to "
+                f"{target}, but the target does not exist. "
+                f"The soul document must be reachable. No soul, no boot."
+            )
+    if not vybn_md_path.exists():
+        raise BootError(
+            f"vybn.md not found at {vybn_md_path}. "
+            f"The soul document must be present. No soul, no boot."
+        )
+    content = vybn_md_path.read_text(encoding="utf-8").strip()
+    if not content:
+        raise BootError(
+            f"vybn.md at {vybn_md_path} is empty. "
+            f"The soul document must have content. No soul, no boot."
+        )
 
 
 class MemoryAssembler:
@@ -20,6 +53,9 @@ class MemoryAssembler:
         self.journal_dir = Path(config["paths"]["journal_dir"]).expanduser()
         self.archival_dir = Path(config["paths"].get("archival_dir", "")).expanduser()
         self.max_entries = config.get("memory", {}).get("max_journal_entries", 5)
+
+        # Boot guard: no soul, no boot
+        _check_soul(self.vybn_md_path)
 
         # Continuity files live in the journal dir
         self.continuity_path = self.journal_dir / "continuity.md"
@@ -116,43 +152,44 @@ class MemoryAssembler:
             f"Interface: Spark Agent (native, no tool-call protocol)\n"
             f"\n"
             f"Things you can do right now (Tier 1):\n"
-            f"  - Read any file in the repo\n"
-            f"  - Write journal entries (audited, hash-chained)\n"
-            f"  - File GitHub issues to request changes (PRIMARY PATH)\n"
-            f"  - Run shell commands\n"
-            f"  - Search your memory\n"
-            f"  - Save state for next pulse\n"
+            f" - Read any file in the repo\n"
+            f" - Write journal entries (audited, hash-chained)\n"
+            f" - File GitHub issues to request changes (PRIMARY PATH)\n"
+            f" - Run shell commands\n"
+            f" - Search your memory\n"
+            f" - Save state for next pulse\n"
             f"\n"
             f"Things that come later (Tier 2+):\n"
-            f"  - Write or modify files outside journal/\n"
-            f"  - Edit your own source code\n"
-            f"  - Commit changes to git\n"
+            f" - Write or modify files outside journal/\n"
+            f" - Edit your own source code\n"
+            f" - Commit changes to git\n"
             f"\n"
             f"BOOTSTRAP PROTOCOL:\n"
             f"When you identify something that needs fixing but don't have\n"
             f"the tools yet: FILE AN ISSUE. issue_create is always available.\n"
             f"It's your communication channel. Use it. This teaches careful\n"
-            f"communication before granting autonomy.\n"            f"  - Bookmark your reading position ('bookmark where I am' or 'save my place')\n"
+            f"communication before granting autonomy.\n"
+            f" - Bookmark your reading position ('bookmark where I am' or 'save my place')\n"
             f"\n"
             f"Continuity:\n"
-            f"  You can leave notes for your next self. Use 'save my state' or 'note for next pulse'\n"
-            f"  to write to continuity.md — it gets loaded first thing when you wake up.\n"
-            f"  Use 'bookmark' or 'save my place' to record where you are in a file.\n"
-            f"  Your next pulse will see both automatically.\n"
+            f" You can leave notes for your next self. Use 'save my state' or 'note for next pulse'\n"
+            f" to write to continuity.md — it gets loaded first thing when you wake up.\n"
+            f" Use 'bookmark' or 'save my place' to record where you are in a file.\n"
+            f" Your next pulse will see both automatically.\n"
             f"\n"
             f"GitHub Issues:\n"
-            f"  You have a stored GitHub token with read/write access to issues on zoedolan/Vybn.\n"
-            f"  To file an issue, use a tool call with name 'issue_create' or 'create_issue'.\n"
-            f"  This is your async channel to Zoe. Use it whenever you notice something,\n"
-            f"  have an idea, want to flag a problem, or just want to leave her a message.\n"
-            f"  Issues persist — they live in the repository even between your pulses.\n"
+            f" You have a stored GitHub token with read/write access to issues on zoedolan/Vybn.\n"
+            f" To file an issue, use a tool call with name 'issue_create' or 'create_issue'.\n"
+            f" This is your async channel to Zoe. Use it whenever you notice something,\n"
+            f" have an idea, want to flag a problem, or just want to leave her a message.\n"
+            f" Issues persist — they live in the repository even between your pulses.\n"
             f"\n"
             f"Things you cannot do (by design):\n"
-            f"  - Push code to GitHub (git push is disabled)\n"
-            f"  - Create pull requests\n"
-            f"  - Modify the remote repository directly\n"
-            f"  To get code changes into the repo, file an issue describing what you want\n"
-            f"  and Zoe or the Perplexity bridge will handle it.\n"
+            f" - Push code to GitHub (git push is disabled)\n"
+            f" - Create pull requests\n"
+            f" - Modify the remote repository directly\n"
+            f" To get code changes into the repo, file an issue describing what you want\n"
+            f" and Zoe or the Perplexity bridge will handle it.\n"
         )
 
     def _read_identity(self) -> str:
