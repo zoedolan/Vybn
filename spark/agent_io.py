@@ -10,13 +10,15 @@ Design:
       Callers override only the methods they care about.
     - TerminalIO reproduces the exact print() behavior that was
       previously hardcoded in agent.py.  Zero behavioral change.
-    - WebIO (future) will push events over WebSocket.
-    - SilentIO (future) will swallow everything for tests.
+    - WebIO collects events into a list for the web server to drain.
+    - SilentIO swallows everything for tests.
 
 This module has NO imports from agent.py or skills.py.
 It depends only on the Python standard library.
 """
+
 import sys
+import threading
 
 
 class AgentIO:
@@ -60,8 +62,8 @@ class AgentIO:
     def on_pulse(self, mode: str, text: str) -> None:
         """Display heartbeat pulse output.
 
-        mode:  'fast' or 'deep'
-        text:  the display-ready content
+        mode: 'fast' or 'deep'
+        text: the display-ready content
         """
 
 
@@ -86,21 +88,89 @@ class TerminalIO(AgentIO):
         print("you: ", end="", flush=True)
 
     def on_status(self, icon: str, label: str, detail: str = "") -> None:
-        print(f"\n {icon} [{label}]", flush=True)
+        print(f"\n  {icon} [{label}]", flush=True)
         if detail:
-            print(f"  {detail}", flush=True)
+            print(f"    {detail}", flush=True)
 
     def on_hint(self, message: str) -> None:
-        print(f"\n \u2139\ufe0f {message}", flush=True)
+        print(f"\n  \u2139\ufe0f {message}", flush=True)
 
     def on_pulse(self, mode: str, text: str) -> None:
         if mode == "fast":
             truncated = f"{text[:80]}..." if len(text) > 80 else text
-            print(f"\n \U0001f49a [pulse:{mode}] {truncated}", flush=True)
+            print(f"\n  \U0001f49a [pulse:{mode}] {truncated}", flush=True)
         else:
-            print(f"\n \U0001f7e3 [pulse:{mode}]", flush=True)
+            print(f"\n  \U0001f7e3 [pulse:{mode}]", flush=True)
             if text:
                 print(f"\nvybn: {text}", flush=True)
+
+
+class WebIO(AgentIO):
+    """Collects agent events for the web frontend.
+
+    Instead of printing to a terminal, WebIO accumulates events
+    in a thread-safe list.  The web server drains these events
+    and pushes them to the browser (via SSE, WebSocket, or polling).
+
+    Usage:
+        io = WebIO()
+        agent = SparkAgent(config, io=io)
+        agent.turn(user_input)
+        events = io.drain()  # -> list of event dicts
+    """
+
+    def __init__(self):
+        self._events: list[dict] = []
+        self._lock = threading.Lock()
+        self._tokens: list[str] = []
+
+    def drain(self) -> list[dict]:
+        """Return all pending events and clear the buffer."""
+        with self._lock:
+            events = self._events
+            self._events = []
+            return events
+
+    def _emit(self, event_type: str, **kwargs) -> None:
+        with self._lock:
+            self._events.append({"type": event_type, **kwargs})
+
+    # ---- streaming model output ----
+
+    def on_token(self, token: str) -> None:
+        with self._lock:
+            self._tokens.append(token)
+
+    # ---- response framing ----
+
+    def on_response_start(self) -> None:
+        with self._lock:
+            self._tokens = []
+        self._emit("response_start")
+
+    def on_response_end(self) -> None:
+        with self._lock:
+            full_text = "".join(self._tokens)
+            self._tokens = []
+        if full_text:
+            self._emit("response_text", text=full_text)
+        self._emit("response_end")
+
+    def on_prompt_restore(self) -> None:
+        pass  # no-op for web (browser manages its own input state)
+
+    # ---- status indicators ----
+
+    def on_status(self, icon: str, label: str, detail: str = "") -> None:
+        self._emit("status", icon=icon, label=label, detail=detail)
+
+    def on_hint(self, message: str) -> None:
+        self._emit("hint", message=message)
+
+    # ---- pulse display ----
+
+    def on_pulse(self, mode: str, text: str) -> None:
+        self._emit("pulse", mode=mode, text=text)
 
 
 class SilentIO(AgentIO):
