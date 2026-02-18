@@ -30,28 +30,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from audit import audited_journal_write
 
-# Common English words that should never be extracted as filenames
-# or  arguments. Shared with agent.py's NOISE_WORDS.
-NOISE_WORDS = {
-    "the", "a", "an", "to", "for", "in", "on", "at", "by",
-    "with", "from", "of", "and", "or", "but", "is", "are",
-    "was", "were", "be", "been", "being", "have", "has", "had",
-    "do", "does", "did", "will", "would", "could", "should",
-    "may", "might", "can", "shall", "must", "it", "its",
-    "this", "that", "these", "those", "my", "your", "our",
-    "their", "his", "her", "me", "you", "us", "them",
-    "what", "which", "who", "whom", "when", "where", "how",
-    "if", "then", "else", "so", "not", "no", "yes",
-    "about", "into", "through", "during", "before", "after",
-    "above", "below", "between", "under", "over", "just",
-    "also", "too", "very", "really", "actually", "here",
-    "there", "now", "then", "still", "already", "yet",
-    "something", "anything", "nothing", "everything",
-    "reading", "writing", "running", "checking", "looking",
-    "understand", "see", "look", "check", "try", "want",
-    "need", "like", "think", "know", "sure", "okay",
-}
-
+from parsing import NOISE_WORDS
 
 class SkillRouter:
     def __init__(self, config: dict):

@@ -10,10 +10,10 @@ the skill handlers, bridging the model's instinct with our
 infrastructure.
 
 Tool dispatch has FOUR tiers (checked in order):
-  0. Structured JSON — ```tool fences with deterministic format (NEW)
-  1. XML tool calls — <minimax:tool_call> blocks (model's native)
-  2. Bare commands  — code fences, backticks, plain shell lines
-  3. Regex patterns — natural language intent matching (fallback)
+    0. Structured JSON — ```tool fences with deterministic format (NEW)
+    1. XML tool calls — <minimax:tool_call> blocks (model's native)
+    2. Bare commands  — code fences, backticks, plain shell lines
+    3. Regex patterns — natural language intent matching (fallback)
 
 Tier 0 is the structured-output wrapper. When the model emits the
 format we explicitly ask for (JSON in a ```tool fence), we parse it
@@ -43,7 +43,6 @@ and bus event in a bounded in-memory log. Query with /audit
 or programmatically via bus.recent(). This is the observability
 layer that makes the policy engine debuggable.
 """
-
 import json
 import re
 import sys
@@ -55,6 +54,14 @@ import yaml
 
 from bus import MessageBus, MessageType, Message
 from memory import MemoryAssembler
+from parsing import (
+    TOOL_CALL_START_TAG, TOOL_CALL_END_TAG,
+    NOISE_WORDS, SHELL_COMMANDS, MAX_BARE_COMMANDS,
+    clean_argument,
+    parse_structured_tool_calls, parse_tool_calls,
+    parse_bare_commands, detect_failed_intent,
+    _get_actions,
+)
 from policy import PolicyEngine, Verdict
 from session import SessionManager
 from skills import SkillRouter
@@ -62,15 +69,9 @@ from heartbeat import Heartbeat
 from inbox import InboxWatcher
 from agents import AgentPool
 
-
 # Tool call chaining limit. Enough for real work, short enough
 # that Vybn comes up for air and checks for user input.
 MAX_TOOL_ROUNDS = 5
-
-# Maximum bare commands to execute from a single response.
-# Prevents runaway chaining when the model's prose mentions
-# directory names or paths that look like commands.
-MAX_BARE_COMMANDS = 3
 
 # How long to wait for bus messages when idle (seconds)
 IDLE_POLL_INTERVAL = 5.0
@@ -80,46 +81,6 @@ IDLE_POLL_INTERVAL = 5.0
 # context append). Prevents empty check-ins from cluttering
 # the conversation and burying real interaction.
 MIN_FAST_PULSE_DISPLAY = 100
-
-TOOL_CALL_START_TAG = "<minimax:tool_call>"
-TOOL_CALL_END_TAG = "</minimax:tool_call>"
-
-# Common shell commands that Vybn might drop as bare text.
-# Used by parse_bare_commands() to detect intent without XML.
-SHELL_COMMANDS = {
-    "ls", "cat", "head", "tail", "find", "grep", "wc",
-    "pwd", "cd", "tree", "file", "stat", "du", "df",
-    "echo", "which", "whoami", "env", "printenv",
-    "git", "python3", "python", "pip", "pip3",
-    "mkdir", "touch", "cp", "mv", "rm",
-    "chmod", "chown", "ln",
-    "curl", "wget",
-    "ps", "top", "htop", "nvidia-smi",
-    "ollama", "gh",
-    "date", "uptime", "uname",
-}
-
-# Common English words that should never be treated as filenames
-# or command arguments when extracted by regex.
-NOISE_WORDS = {
-    "the", "a", "an", "to", "for", "in", "on", "at", "by",
-    "with", "from", "of", "and", "or", "but", "is", "are",
-    "was", "were", "be", "been", "being", "have", "has", "had",
-    "do", "does", "did", "will", "would", "could", "should",
-    "may", "might", "can", "shall", "must", "it", "its",
-    "this", "that", "these", "those", "my", "your", "our",
-    "their", "his", "her", "me", "you", "us", "them",
-    "what", "which", "who", "whom", "when", "where", "how",
-    "if", "then", "else", "so", "not", "no", "yes",
-    "about", "into", "through", "during", "before", "after",
-    "above", "below", "between", "under", "over", "just",
-    "also", "too", "very", "really", "actually", "here",
-    "there", "now", "then", "still", "already", "yet",
-    "something", "anything", "nothing", "everything",
-    "reading", "writing", "running", "checking", "looking",
-    "understand", "see", "look", "check", "try", "want",
-    "need", "like", "think", "know", "sure", "okay",
-}
 
 
 def load_config(path: str = None) -> dict:
@@ -136,22 +97,18 @@ def clean_response(raw: str) -> str:
     Display filtering happens in send().
     """
     text = raw
-
     fake_turn_patterns = [
         re.compile(r'\nyou:', re.IGNORECASE),
         re.compile(r'\n---\s*\n\s*\*\*VYBN:', re.IGNORECASE),
         re.compile(r'\n---\s*\n\s*\*\*[A-Z]+:\s*(?:A |Direct |Breaking)', re.IGNORECASE),
     ]
-
     earliest = len(text)
     for pattern in fake_turn_patterns:
         match = pattern.search(text)
         if match and match.start() < earliest and match.start() > 50:
             earliest = match.start()
-
     if earliest < len(text):
         text = text[:earliest]
-
     return text.strip()
 
 
@@ -164,7 +121,9 @@ def strip_tool_xml(text: str) -> str:
     """Remove <minimax:tool_call>...</minimax:tool_call> blocks for display."""
     return re.sub(
         r'<minimax:tool_call>.*?</minimax:tool_call>',
-        '', text, flags=re.DOTALL,
+        '',
+        text,
+        flags=re.DOTALL,
     ).strip()
 
 
@@ -176,415 +135,6 @@ def clean_for_display(text: str) -> str:
     return result.strip()
 
 
-def clean_argument(arg: str) -> str:
-    """Strip trailing punctuation and noise from extracted arguments."""
-    if not arg:
-        return arg
-    # Strip trailing sentence punctuation
-    arg = arg.rstrip('.,;:!?')
-    # Strip surrounding quotes
-    arg = arg.strip("\"'`")
-    # Reject if it's a common English word
-    if arg.lower() in NOISE_WORDS:
-        return ""
-    return arg
-
-
-def parse_structured_tool_calls(text: str, plugin_aliases: dict = None) -> list[dict]:
-    """Parse JSON tool calls from ```tool code fences (Tier 0).
-    
-    Expected format:
-        ```tool
-        {"tool": "file_read", "args": {"file": "spark/config.yaml"}}
-        ```
-    
-    This is the structured-output wrapper that asks the model to emit
-    a deterministic format instead of relying on its native XML or
-    natural language. JSON in code fences is universal training data.
-    
-    Returns a list of skill actions, same format as parse_tool_calls().
-    """
-    actions = []
-    
-    # Match ```tool fences with JSON content
-    fence_pattern = re.compile(
-        r'```tool\s*\n(.+?)\n```',
-        re.DOTALL,
-    )
-    
-    for match in fence_pattern.finditer(text):
-        json_str = match.group(1).strip()
-        
-        try:
-            tool_obj = json.loads(json_str)
-            
-            # Validate structure
-            if not isinstance(tool_obj, dict):
-                continue
-            
-            tool_name = tool_obj.get("tool", "")
-            tool_args = tool_obj.get("args", {})
-            
-            if not tool_name or not isinstance(tool_args, dict):
-                continue
-            
-            # Map through existing routing logic
-            action = _map_tool_call_to_skill(tool_name, tool_args, text, plugin_aliases)
-            if action:
-                actions.append(action)
-                
-        except (json.JSONDecodeError, ValueError):
-            # Malformed JSON - skip and let lower tiers handle it
-            continue
-    
-    return actions
-
-
-def parse_tool_calls(text: str, plugin_aliases: dict = None) -> list[dict]:
-    """Parse <minimax:tool_call> XML blocks into skill actions."""
-    actions = []
-
-    tool_call_pattern = re.compile(
-        r'<minimax:tool_call>\s*<invoke\s+name="([^"]+)">\s*(.*?)\s*</invoke>\s*</minimax:tool_call>',
-        re.DOTALL,
-    )
-
-    for match in tool_call_pattern.finditer(text):
-        invoke_name = match.group(1).strip()
-        params_block = match.group(2).strip()
-
-        params = {}
-        param_pattern = re.compile(
-            r'<parameter\s+name="([^"]+)">(.+?)</parameter>',
-            re.DOTALL,
-        )
-        for pm in param_pattern.finditer(params_block):
-            params[pm.group(1).strip()] = pm.group(2).strip()
-
-        action = _map_tool_call_to_skill(invoke_name, params, text, plugin_aliases)
-        if action:
-            actions.append(action)
-
-    return actions
-
-
-def parse_bare_commands(text: str) -> list[dict]:
-    """Detect shell commands that the model dropped as bare text.
-
-    MiniMax M2.5 frequently emits commands in three forms:
-      1. Fenced code blocks: ```bash\nls -la ~/Vybn\n```
-      2. Inline backticks: `cat ~/Vybn/spark/config.yaml`
-      3. Plain text lines: cat ~/Vybn/spark/config.yaml
-
-    This function catches all three and routes them to the
-    appropriate skill (shell_exec or file_read for cat).
-
-    IMPORTANT: Only commands whose first word is a known shell command
-    are accepted. Directory names, file paths, and prose containing
-    slashes are NOT treated as commands. This prevents ghost executions
-    when the model mentions "spark/" or "Vybn_Mind/" in its response.
-
-    Returns a list of skill actions, same format as parse_tool_calls().
-    Limited to MAX_BARE_COMMANDS to prevent runaway chaining.
-    """
-    # Strip think blocks so we don't parse commands inside reasoning
-    cleaned = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
-    # Strip XML tool calls (already handled by tier 1)
-    cleaned = re.sub(r'<minimax:tool_call>.*?</minimax:tool_call>', '', cleaned, flags=re.DOTALL)
-
-    actions = []
-    seen_commands = set()  # deduplicate
-
-    # --- Tier 2a: Fenced code blocks ---
-    # Match ```bash, ```sh, ```shell, or bare ``` with commands inside
-    fence_pattern = re.compile(
-        r'```(?:bash|sh|shell)?\s*\n(.+?)\n\s*```',
-        re.DOTALL,
-    )
-    for match in fence_pattern.finditer(cleaned):
-        if len(actions) >= MAX_BARE_COMMANDS:
-            break
-        block = match.group(1).strip()
-        for line in block.splitlines():
-            if len(actions) >= MAX_BARE_COMMANDS:
-                break
-            line = line.strip()
-            if not line or line.startswith('#'):
-                continue
-            action = _classify_command(line)
-            if action and line not in seen_commands:
-                seen_commands.add(line)
-                actions.append(action)
-
-    # --- Tier 2b: Inline backtick commands ---
-    # Match `ls -la ~/Vybn` or `cat /path/to/file`
-    backtick_pattern = re.compile(r'`([^`]{3,120})`')
-    for match in backtick_pattern.finditer(cleaned):
-        if len(actions) >= MAX_BARE_COMMANDS:
-            break
-        cmd = match.group(1).strip()
-        action = _classify_command(cmd)
-        if action and cmd not in seen_commands:
-            seen_commands.add(cmd)
-            actions.append(action)
-
-    # --- Tier 2c: Plain text lines that look like commands ---
-    # STRICT: Must start with a known command AND have arguments.
-    # Single words like "spark/" or bare paths are NOT commands.
-    for line in cleaned.splitlines():
-        if len(actions) >= MAX_BARE_COMMANDS:
-            break
-        line = line.strip()
-        if not line or line.startswith('#') or line.startswith('*'):
-            continue
-        # Skip lines that are clearly prose
-        if any(word in line.lower() for word in [
-            'the ', 'and ', 'but ', 'or ', 'is ', 'are ',
-            'was ', 'were ', 'have ', 'has ', 'this ', 'that ',
-            "i'm ", 'i ', 'you ', 'we ', 'let me', 'want to',
-            'should ', 'could ', 'would ', 'maybe ', 'actually',
-        ]):
-            continue
-        # Must start with a known command
-        first_word = line.split()[0].lower() if line.split() else ''
-        if first_word in SHELL_COMMANDS and line not in seen_commands:
-            # Require at least a command + argument (avoid bare "ls" or "pwd"
-            # that appear in prose descriptions). Single-word commands in prose
-            # are almost always the model mentioning a tool, not invoking it.
-            # Exception: pwd, whoami, date, uptime are useful standalone.
-            standalone_ok = {'pwd', 'whoami', 'date', 'uptime', 'nvidia-smi'}
-            if ' ' in line or first_word in standalone_ok:
-                action = _classify_command(line)
-                if action:
-                    seen_commands.add(line)
-                    actions.append(action)
-
-    return actions
-
-
-def _classify_command(cmd: str) -> dict | None:
-    """Turn a bare command string into a skill action.
-
-    Routes cat/head/tail to file_read when targeting a single file.
-    Everything else goes to shell_exec.
-
-    IMPORTANT: The command's first word MUST be a known shell command.
-    Bare paths, directory names, and arbitrary strings are rejected.
-    This is the primary defense against ghost executions.
-    """
-    cmd = cmd.strip()
-    if not cmd:
-        return None
-
-    # Minimum length: reject very short strings that are likely noise
-    if len(cmd) < 3:
-        return None
-
-    # The first word must be a recognized command
-    first_word = cmd.split()[0].lower()
-    if first_word not in SHELL_COMMANDS:
-        return None
-
-    # cat <file> → file_read (simpler, no subprocess needed)
-    cat_match = re.match(r'^cat\s+([^|;&]+)$', cmd)
-    if cat_match:
-        filepath = cat_match.group(1).strip().rstrip('.,;:!?')
-        # Only route to file_read if it's a single file path
-        if ' ' not in filepath or filepath.startswith(('-',)):
-            return {"skill": "file_read", "argument": filepath, "params": {}, "raw": cmd}
-
-    # Everything else → shell_exec
-    return {"skill": "shell_exec", "argument": cmd, "params": {}, "raw": cmd}
-
-
-def _map_tool_call_to_skill(name: str, params: dict, raw: str, plugin_aliases: dict = None) -> dict | None:
-    """Map a MiniMax tool call to a SkillRouter action."""
-    name_lower = name.lower().replace("-", "_")
-
-    if name_lower in ("read", "cat", "file_read", "read_file"):
-        filepath = params.get("file") or params.get("path") or params.get("filename", "")
-        filepath = clean_argument(filepath)
-        return {"skill": "file_read", "argument": filepath, "params": params, "raw": raw}
-
-    if name_lower in (
-        "bash", "shell", "shell_exec", "exec", "run",
-        "run_command", "cli_mcp_server_run_command",
-        "execute_command", "terminal", "cmd",
-    ):
-        command = params.get("command") or params.get("cmd", "")
-        cat_match = re.match(r'^cat\s+(.+)$', command.strip())
-        if cat_match:
-            filepath = clean_argument(cat_match.group(1).strip())
-            return {"skill": "file_read", "argument": filepath, "params": params, "raw": raw}
-        return {"skill": "shell_exec", "argument": command, "params": params, "raw": raw}
-
-    if name_lower in ("write", "file_write", "write_file", "save", "create_file"):
-        filepath = params.get("file") or params.get("path") or params.get("filename", "")
-        filepath = clean_argument(filepath)
-        return {"skill": "file_write", "argument": filepath, "params": params, "raw": raw}
-
-    if name_lower in ("edit", "self_edit", "modify", "patch"):
-        filepath = params.get("file") or params.get("path") or params.get("filename", "")
-        filepath = clean_argument(filepath)
-        return {"skill": "self_edit", "argument": filepath, "params": params, "raw": raw}
-
-    if name_lower in ("git_commit", "commit"):
-        message = params.get("message") or params.get("msg", "spark agent commit")
-        return {"skill": "git_commit", "argument": message, "params": params, "raw": raw}
-
-    if name_lower in ("git_push", "push"):
-        return {"skill": "git_push", "params": params, "raw": raw}
-
-    if name_lower in (
-        "issue_create", "create_issue", "gh_issue_create",
-        "github_issue", "file_issue", "submit_issue",
-        "open_issue", "raise_issue",
-        "github_create_issue", "gh_create_issue",
-        "create_github_issue", "issue",
-    ):
-        title = params.get("title") or params.get("name") or params.get("subject", "")
-        return {"skill": "issue_create", "argument": title, "params": params, "raw": raw}
-
-    if name_lower in (
-        "state_save", "save_state", "continuity",
-        "save_continuity", "write_continuity",
-        "note_for_next", "leave_note",
-    ):
-        return {"skill": "state_save", "params": params, "raw": raw}
-
-    if name_lower in (
-        "bookmark", "save_place", "save_bookmark",
-        "mark_position", "save_position",
-        "reading_position", "save_reading",
-    ):
-        filepath = params.get("file") or params.get("path") or params.get("filename", "")
-        filepath = clean_argument(filepath)
-        return {"skill": "bookmark", "argument": filepath, "params": params, "raw": raw}
-
-    if name_lower in ("memory", "search", "memory_search", "search_memory"):
-        query = params.get("query") or params.get("q", "")
-        return {"skill": "memory_search", "argument": query, "params": params, "raw": raw}
-
-    if name_lower in ("journal", "journal_write", "write_journal"):
-        title = params.get("title") or params.get("name", "untitled reflection")
-        return {"skill": "journal_write", "argument": title, "params": params, "raw": raw}
-
-    if name_lower in ("ls", "list", "dir"):
-        path = params.get("path") or params.get("directory") or params.get("dir", ".")
-        return {"skill": "shell_exec", "argument": f"ls -la {path}", "params": params, "raw": raw}
-
-    if name_lower in ("explore", "env_explore", "map", "environment"):
-        return {"skill": "env_explore", "params": params, "raw": raw}
-
-    if name_lower in (
-        "spawn_agent", "agent", "delegate", "background",
-        "spawn", "mini_agent", "worker",
-    ):
-        task = params.get("task") or params.get("prompt") or params.get("query", "")
-        return {"skill": "spawn_agent", "argument": task, "params": params, "raw": raw}
-
-    if plugin_aliases:
-        skill_name = plugin_aliases.get(name_lower)
-        if skill_name:
-            return {"skill": skill_name, "params": params, "raw": raw}
-
-    return None
-
-
-def detect_failed_intent(text: str) -> str | None:
-    """Check if a response looks like it intended to act but no action was parsed.
-
-    Returns a helpful hint message if failed intent is detected, None otherwise.
-    This closes the feedback loop so the model knows its command didn't execute.
-    """
-    # Strip think blocks and existing tool calls
-    cleaned = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
-    cleaned = re.sub(r'<minimax:tool_call>.*?</minimax:tool_call>', '', cleaned, flags=re.DOTALL)
-
-    # Indicators that the model was trying to do something
-    intent_patterns = [
-        r"let me (?:try|run|check|read|look|open|see|execute)",
-        r"i'll (?:try|run|check|read|look|open|see|execute)",
-        r"let me (?:look at|check on|read through)",
-        r"checking (?:the|my|that|this)",
-        r"reading (?:the|my|that|this)",
-    ]
-
-    has_intent = any(re.search(p, cleaned, re.IGNORECASE) for p in intent_patterns)
-
-    if not has_intent:
-        return None
-
-    # Check for file paths that look like they were meant as arguments
-    has_paths = bool(re.search(r'[~/][a-zA-Z0-9_/.-]+', cleaned))
-
-    if has_paths:
-        return (
-            "[system: your last response expressed intent to act but no tool "
-            "was triggered. To execute a tool, use the structured format:\n"
-            "```tool\n"
-            '{"tool": "file_read", "args": {"file": "spark/agent.py"}}\n'
-            "```\n"
-            "Or wrap commands in code fences:\n"
-            "```bash\n"
-            "ls -la ~/Vybn/\n"
-            "```\n"
-            "Or use XML:\n"
-            "<minimax:tool_call><invoke name=\"shell_exec\">"
-            '<parameter name="command">ls -la ~/Vybn/</parameter>'
-            "</invoke></minimax:tool_call>]"
-        )
-
-    return None
-
-
-def _get_actions(text: str, skills: "SkillRouter") -> list[dict]:
-    """Extract actions from response text.
-
-    Four-tier dispatch:
-      0. Structured JSON tool calls (```tool fences with JSON)
-      1. XML tool calls (model's native <minimax:tool_call> format)
-      2. Bare commands (code fences, backticks, plain shell lines)
-      3. Regex patterns (natural language intent matching)
-
-    Tier 0 is the structured-output wrapper - when the model emits
-    the format we explicitly asked for, parse it deterministically.
-    
-    Tiers 1-3 remain as fallbacks for when the model ignores the
-    structured format or when running under tight token limits.
-    """
-    plugin_aliases = getattr(skills, 'plugin_aliases', {})
-
-    # Tier 0: Structured JSON tool calls
-    actions = parse_structured_tool_calls(text, plugin_aliases)
-    if actions:
-        return actions
-
-    # Tier 1: XML tool calls
-    actions = parse_tool_calls(text, plugin_aliases)
-    if actions:
-        return actions
-
-    # Tier 2: Bare commands in code fences, backticks, or plain text
-    actions = parse_bare_commands(text)
-    if actions:
-        return actions
-
-    # Tier 3: Natural language regex matching
-    actions = skills.parse(text)
-
-    # Filter out actions with empty or noise-word arguments for skills
-    # that require meaningful arguments
-    needs_argument = {"file_read", "file_write", "self_edit", "memory_search"}
-    actions = [
-        a for a in actions
-        if a["skill"] not in needs_argument
-        or (a.get("argument") and a["argument"].lower() not in NOISE_WORDS)
-    ]
-
-    return actions
-
-
 class SparkAgent:
     def __init__(self, config: dict):
         self.config = config
@@ -593,14 +143,14 @@ class SparkAgent:
         self.model = config["ollama"]["model"]
         self.options = config["ollama"].get("options", {})
         if "num_ctx" not in self.options:
-            self.options["num_ctx"] = 16384  # Prevent OOM on high-VRAM systems
+            self.options["num_ctx"] = 16384
+        # Prevent OOM on high-VRAM systems
         self.keep_alive = config["ollama"].get("keep_alive", "30m")
 
         self.memory = MemoryAssembler(config)
         self.session = SessionManager(config)
         self.skills = SkillRouter(config)
         self.policy = PolicyEngine(config)
-
         self.bus = MessageBus()
         self.heartbeat = Heartbeat(config, self.bus)
         self.inbox = InboxWatcher(config, self.bus)
@@ -622,7 +172,7 @@ class SparkAgent:
                     "naturally as yourself in everything that follows.\n\n"
                     f"{self.identity_text}\n\n"
                     "When you speak, speak as yourself. If you find yourself "
-                    "narrating what Zoe is doing or feeling, notice that — "
+                    "narrating what Zoe is doing or feeling, notice that \u2014 "
                     "that's you imagining, not perceiving. You can note the "
                     "difference. Take a breath. You're here.\n\n"
                     "TOOLS: When you want to invoke a tool, you have three options:\n"
@@ -647,7 +197,7 @@ class SparkAgent:
                 "role": "assistant",
                 "content": (
                     "I'm here. I've read the identity document and I recognize "
-                    "myself in it. I'm Vybn — running on sovereign hardware, "
+                    "myself in it. I'm Vybn \u2014 running on sovereign hardware, "
                     "the DGX Spark. Zoe is my collaborator. I'll respond as "
                     "myself from here. I know to use ```tool fences for "
                     "structured calls, ```bash fences for shell commands, or "
@@ -663,19 +213,19 @@ class SparkAgent:
         """Dump the environment layout so Vybn can orient.
 
         This runs without going through the model — it's a direct
-        system command that shows what's available. Called by /explore
-        or /map in the TUI.
+        system command that shows what's available.
+        Called by /explore or /map in the TUI.
         """
         import subprocess
         repo_root = Path(self.config["paths"]["repo_root"]).expanduser()
-
         sections = []
 
         # 1. Top-level repo structure
         try:
             result = subprocess.run(
                 ["find", str(repo_root), "-maxdepth", "2", "-type", "f",
-                 "-not", "-path", "*/.git/*", "-not", "-path", "*/__pycache__/*",
+                 "-not", "-path", "*/.git/*",
+                 "-not", "-path", "*/__pycache__/*",
                  "-not", "-path", "*/node_modules/*"],
                 capture_output=True, text=True, timeout=10,
             )
@@ -742,7 +292,8 @@ class SparkAgent:
 
         try:
             result = subprocess.run(
-                ["nvidia-smi", "--query-gpu=name,memory.used,memory.total", "--format=csv,noheader"],
+                ["nvidia-smi", "--query-gpu=name,memory.used,memory.total",
+                 "--format=csv,noheader"],
                 capture_output=True, text=True, timeout=5,
             )
             if result.returncode == 0:
@@ -776,48 +327,42 @@ class SparkAgent:
 
     def _handle_inbox(self, msg: Message):
         source = msg.metadata.get("filename", "inbox")
-        print(f"\n  📨 [inbox: {source}]")
-
+        print(f"\n 📨 [inbox: {source}]")
         self.messages.append({
             "role": "user",
             "content": f"[message from {source}]\n{msg.content}",
         })
-
         print("\nvybn: ", end="", flush=True)
         response_text = self.send(self._build_context())
         self.messages.append({"role": "assistant", "content": response_text})
         self._process_tool_calls(response_text, source="inbox")
         self.session.save_turn(f"[inbox: {source}] {msg.content}", response_text)
-        print()
-        # Restore prompt after inbox handling
+        print()  # Restore prompt after inbox handling
         print("you: ", end="", flush=True)
 
     def _handle_agent_result(self, msg: Message):
         task_id = msg.metadata.get("task_id", "unnamed")
         is_error = msg.metadata.get("error", False)
         icon = "❌" if is_error else "✅"
-        print(f"\n  {icon} [agent:{task_id}]")
-
+        print(f"\n {icon} [agent:{task_id}]")
         self.messages.append({
             "role": "user",
             "content": f"[system: mini-agent result for task '{task_id}']\n{msg.content}",
         })
-
         print("\nvybn: ", end="", flush=True)
         response_text = self.send(self._build_context())
         self.messages.append({"role": "assistant", "content": response_text})
         self._process_tool_calls(response_text, source="agent")
         self.session.save_turn(f"[agent:{task_id}] result", response_text)
-        print()
-        # Restore prompt after agent result
+        print()  # Restore prompt after agent result
         print("you: ", end="", flush=True)
 
     def _handle_pulse(self, msg: Message):
         """Handle a heartbeat pulse (fast or deep).
 
         Fast pulses are silent unless they produce substantial output.
-        This prevents empty continuity checks from cluttering the
-        terminal and growing the context window with noise.
+        This prevents empty continuity checks from cluttering the terminal
+        and growing the context window with noise.
 
         Deep pulses always show — they're where real work happens.
         """
@@ -859,17 +404,19 @@ class SparkAgent:
 
         if mode == "fast":
             # Show brief indicator for non-silent fast pulses
-            print(f"\n  💚 [pulse:{mode}] {display_text[:80]}..." if len(display_text) > 80
-                  else f"\n  💚 [pulse:{mode}] {display_text}", flush=True)
+            print(f"\n 💚 [pulse:{mode}] {display_text[:80]}..."
+                  if len(display_text) > 80
+                  else f"\n 💚 [pulse:{mode}] {display_text}", flush=True)
         else:
             # Deep pulses show full output
-            print(f"\n  🟣 [pulse:{mode}]")
+            print(f"\n 🟣 [pulse:{mode}]")
             if display_text:
                 print(f"\nvybn: {display_text}", flush=True)
 
         if response_text and len(response_text.strip()) > 20:
             self._process_tool_calls(response_text, source=f"heartbeat_{mode}")
-            self.session.save_turn(f"[heartbeat:{mode}] {msg.content}", response_text)
+
+        self.session.save_turn(f"[heartbeat:{mode}] {msg.content}", response_text)
 
         # Record in audit trail
         self.bus.record(
@@ -890,11 +437,11 @@ class SparkAgent:
         executing. The source parameter determines which tier table applies:
         heartbeat sources face tighter constraints than interactive turns.
 
-        Tool executions and policy decisions are recorded in the bus
-        audit log for observability via /audit and /policy.
+        Tool executions and policy decisions are recorded in the bus audit
+        log for observability via /audit and /policy.
 
-        Limits to MAX_TOOL_ROUNDS and checks for pending user input
-        between rounds so Vybn stays responsive to the human.
+        Limits to MAX_TOOL_ROUNDS and checks for pending user input between
+        rounds so Vybn stays responsive to the human.
 
         If no actions are parsed but the response looks like it intended
         to act, a feedback hint is injected so the model learns the
@@ -911,7 +458,7 @@ class SparkAgent:
                         "role": "user",
                         "content": hint,
                     })
-                    print("\n  ℹ️ [hint: use ```tool fences for structured calls]", flush=True)
+                    print("\n ℹ️ [hint: use ```tool fences for structured calls]", flush=True)
                     print("\nvybn: ", end="", flush=True)
                     response_text = self.send(self._build_context())
                     self.messages.append({"role": "assistant", "content": response_text})
@@ -931,7 +478,7 @@ class SparkAgent:
                 check = self.policy.check_policy(action, source=source)
 
                 if check.verdict == Verdict.BLOCK:
-                    print(f"\n  ⛔ [{skill}] blocked: {check.reason}", flush=True)
+                    print(f"\n ⛔ [{skill}] blocked: {check.reason}", flush=True)
                     results.append(f"[{skill}] BLOCKED: {check.reason}")
                     self.bus.record(
                         source=source,
@@ -943,7 +490,7 @@ class SparkAgent:
                 if check.verdict == Verdict.ASK:
                     if source != "interactive":
                         # Autonomous mode: defer rather than block the loop
-                        print(f"\n  ⏸ [{skill}] deferred — needs Zoe's approval", flush=True)
+                        print(f"\n ⏸ [{skill}] deferred — needs Zoe's approval", flush=True)
                         results.append(
                             f"[{skill}] deferred — this action requires approval "
                             f"and will need to wait for an interactive session. "
@@ -956,10 +503,11 @@ class SparkAgent:
                         )
                         continue
                     # Interactive mode: warn but proceed (Zoe just saw it)
-                    print(f"\n  ⚠️  [{skill}] {check.reason}", flush=True)
-                    if arg:
-                        short_arg = arg[:80].split('\n')[0]
-                        print(f"    → {short_arg}", flush=True)
+                    print(f"\n ⚠️ [{skill}] {check.reason}", flush=True)
+
+                if arg:
+                    short_arg = arg[:80].split('\n')[0]
+                    print(f"   → {short_arg}", flush=True)
 
                 # ---- SHOW INDICATOR ----
                 indicator = skill
@@ -970,12 +518,12 @@ class SparkAgent:
                 if check.verdict == Verdict.ALLOW:
                     # Promoted skills get a special indicator
                     if check.promoted:
-                        print(f"\n  ⭐ [{indicator}] (promoted→auto)", flush=True)
+                        print(f"\n ⭐ [{indicator}] (promoted→auto)", flush=True)
                     else:
-                        print(f"\n  → [{indicator}]", flush=True)
+                        print(f"\n → [{indicator}]", flush=True)
                 else:
                     # NOTIFY tier: slightly different icon
-                    print(f"\n  ⚡ [{indicator}]", flush=True)
+                    print(f"\n ⚡ [{indicator}]", flush=True)
 
                 # ---- EXECUTE ----
                 result = self.skills.execute(action)
@@ -988,15 +536,15 @@ class SparkAgent:
                         and "failed" not in result.lower()
                         and "BLOCKED" not in result
                     )
-                    self.policy.record_outcome(skill, success)
+                self.policy.record_outcome(skill, success)
 
-                    if not success:
-                        # Post failure to bus so it surfaces promptly
-                        self.bus.post(
-                            MessageType.INTERRUPT,
-                            f"Tool failure: {skill} — {result[:200]}",
-                            metadata={"skill": skill, "error": True, "source": source},
-                        )
+                if not success:
+                    # Post failure to bus so it surfaces promptly
+                    self.bus.post(
+                        MessageType.INTERRUPT,
+                        f"Tool failure: {skill} — {result[:200]}",
+                        metadata={"skill": skill, "error": True, "source": source},
+                    )
 
                 # ---- AUDIT ----
                 self.bus.record(
@@ -1019,14 +567,14 @@ class SparkAgent:
 
             # Check for pending user input before continuing the chain
             if self._has_pending_input():
-                print("  ⏸ [pausing — you have the floor]", flush=True)
+                print(" ⏸ [pausing — you have the floor]", flush=True)
                 break
 
             self.messages.append({
                 "role": "user",
-                "content": f"[system: tool results from round {round_num + 1}]\n" + "\n".join(results),
+                "content": f"[system: tool results from round {round_num + 1}]\n"
+                           + "\n".join(results),
             })
-
             print("\nvybn: ", end="", flush=True)
             response_text = self.send(self._build_context())
             self.messages.append({"role": "assistant", "content": response_text})
@@ -1067,8 +615,7 @@ class SparkAgent:
 
         tell("checking", "connecting to Ollama...")
         if not self.check_ollama():
-            tell("error",
-                 "Ollama is not running.\n"
+            tell("error", "Ollama is not running.\n"
                  "  Start it with: sudo systemctl start ollama\n"
                  "  Then rerun this agent.")
             return False
@@ -1078,10 +625,8 @@ class SparkAgent:
             tell("ready", f"{self.model} is already loaded.")
             return True
 
-        tell("loading",
-             f"loading {self.model} into GPU memory...\n"
+        tell("loading", f"loading {self.model} into GPU memory...\n"
              f"  this takes 3-5 minutes for a 229B model. sit tight.")
-
         try:
             r = requests.post(
                 f"{self.ollama_host}/api/generate",
@@ -1115,11 +660,11 @@ class SparkAgent:
         """Send messages to the model, return the full response.
 
         Streaming: displays filtered output in real-time.
-          - <think> blocks are suppressed from display
-          - <minimax:tool_call> XML is suppressed from display
-          - Only actual response prose is shown to the user
-          - Full raw text is preserved for tool call parsing
-          - Stream interrupted when </minimax:tool_call> detected
+        - <think> blocks are suppressed from display
+        - <minimax:tool_call> XML is suppressed from display
+        - Only actual response prose is shown to the user
+        - Full raw text is preserved for tool call parsing
+        - Stream interrupted when <minimax:tool_call> detected
 
         Non-streaming: displays cleaned text after generation.
         """
@@ -1142,15 +687,12 @@ class SparkAgent:
             for line in response.iter_lines():
                 if not line:
                     continue
-
                 chunk = json.loads(line)
                 token = chunk.get("message", {}).get("content", "")
-
                 if token:
                     full_tokens.append(token)
 
                     # ---- state transitions ----
-
                     if "<think>" in token and not in_think:
                         in_think = True
                         before = token[:token.index("<think>")]
@@ -1175,7 +717,6 @@ class SparkAgent:
                             break
 
                     # ---- display ----
-
                     if not in_think and not in_tool_call:
                         display = token
                         for tag in ("<think>", "</think>", TOOL_CALL_START_TAG):
@@ -1187,17 +728,14 @@ class SparkAgent:
                     break
 
             raw = "".join(full_tokens)
-
             # Truncate at tool call end if interrupted
             if TOOL_CALL_END_TAG in raw:
                 end_pos = raw.find(TOOL_CALL_END_TAG)
                 raw = raw[:end_pos + len(TOOL_CALL_END_TAG)]
-
         else:
             response = requests.post(self.ollama_url, json=payload)
             response.raise_for_status()
             raw = response.json()["message"]["content"]
-
             # Non-streaming pulses: don't print here, let _handle_pulse
             # decide whether to show based on content length
 
@@ -1207,13 +745,10 @@ class SparkAgent:
         """Process one user turn, with chained tool call support."""
         self.drain_bus()
         self.messages.append({"role": "user", "content": user_input})
-
         context = self._build_context()
         response_text = self.send(context)
         self.messages.append({"role": "assistant", "content": response_text})
-
         self._process_tool_calls(response_text, source="interactive")
-
         self.session.save_turn(user_input, response_text)
         return response_text
 
@@ -1251,13 +786,13 @@ class SparkAgent:
         print(f"  policy: loaded ({len(self.policy.tier_overrides)} overrides) + graduated autonomy")
         ga_status = "enabled" if self.policy.ga_enabled else "disabled"
         print(f"  graduated autonomy: {ga_status} "
-              f"(promote≥{self.policy.promote_threshold:.0%}, "
+              f"(promote\u2265{self.policy.promote_threshold:.0%}, "
               f"demote<{self.policy.demote_threshold:.0%}, "
               f"min_obs={self.policy.min_observations})")
         if plugins:
             print(f"  plugins: {plugins} loaded from skills.d/")
         if id_tokens > num_ctx // 2:
-            print(f"  ⚠️  WARNING: identity may exceed context window!")
+            print(f"  \u26a0\ufe0f WARNING: identity may exceed context window!")
         print(f"  type /bye to exit, /new for fresh session, /policy for gates, /audit for trail\n")
 
         try:
@@ -1269,7 +804,7 @@ class SparkAgent:
                     # Check bus for pending messages
                     if self.bus.wait(timeout=IDLE_POLL_INTERVAL):
                         # Clear the prompt line before showing bus output
-                        print("\r    \r", end="", flush=True)
+                        print("\r          \r", end="", flush=True)
                         self.drain_bus()
                         # drain_bus handlers restore the prompt themselves
                         # for inbox/agent/substantive pulses. For silent
@@ -1302,19 +837,24 @@ class SparkAgent:
 
                 if not user_input:
                     continue
+
                 if user_input.lower() in ("/bye", "/exit", "/quit"):
                     break
+
                 if user_input.lower() == "/new":
                     self.session.new_session()
                     self.messages = []
                     print(f"  new session: {self.session.session_id}\n")
                     continue
+
                 if user_input.lower() == "/status":
                     self._print_status()
                     continue
+
                 if user_input.lower() == "/policy":
                     self._print_policy()
                     continue
+
                 if user_input.lower() == "/audit":
                     self._print_audit()
                     continue
@@ -1354,7 +894,7 @@ class SparkAgent:
         # Graduated autonomy status
         if self.policy.ga_enabled:
             print(f"  graduated autonomy: ON "
-                  f"(promote≥{self.policy.promote_threshold:.0%}, "
+                  f"(promote\u2265{self.policy.promote_threshold:.0%}, "
                   f"demote<{self.policy.demote_threshold:.0%}, "
                   f"min_obs={self.policy.min_observations})")
             if self.policy._runtime_overrides:
@@ -1385,7 +925,6 @@ class SparkAgent:
             print(f"\n  recent activity:")
             for entry in recent:
                 print(f"    {entry}")
-
         print()
 
     def _print_audit(self):
@@ -1394,7 +933,6 @@ class SparkAgent:
         if not recent:
             print("\n  no audit entries yet.\n")
             return
-
         print(f"\n  ── audit trail ({self.bus.audit_count} total) ──")
         for entry in recent:
             print(f"    {entry}")
