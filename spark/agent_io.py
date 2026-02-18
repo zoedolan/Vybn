@@ -220,7 +220,7 @@ class RichIO(AgentIO):
 
     def on_status(self, icon: str, label: str, detail: str = "") -> None:
         if self.console:
-            self.console.print(f"\n  {icon} [dim]\[{label}\][/dim]", highlight=False)
+            self.console.print(f"\n  {icon} [dim]\\[{label}\\][/dim]", highlight=False)
             if detail:
                 self.console.print(f"     {detail}", style="dim", highlight=False)
         else:
@@ -241,12 +241,12 @@ class RichIO(AgentIO):
             if mode == "fast":
                 truncated = f"{text[:80]}..." if len(text) > 80 else text
                 self.console.print(
-                    f"\n  \U0001f49a [dim]\[pulse:{mode}\][/dim] {truncated}",
+                    f"\n  \U0001f49a [dim]\\[pulse:{mode}\\][/dim] {truncated}",
                     highlight=False,
                 )
             else:
                 self.console.print(
-                    f"\n  \U0001f7e3 [dim]\[pulse:{mode}\][/dim]",
+                    f"\n  \U0001f7e3 [dim]\\[pulse:{mode}\\][/dim]",
                     highlight=False,
                 )
                 if text:
