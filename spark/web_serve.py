@@ -28,7 +28,8 @@ from pathlib import Path
 import requests
 import uvicorn
 
-from agent import SparkAgent, load_config, clean_response
+from agent import SparkAgent, load_config
+from display import clean_response, clean_for_display
 from web_interface import app, attach_bus
 
 
@@ -92,11 +93,9 @@ def create_response_callback(agent: SparkAgent):
                 pass  # Tool call errors shouldn't break the chat
 
             # Clean for display (strip think blocks, tool XML)
-            from agent import clean_for_display
             display_text = clean_for_display(response_text)
 
             return display_text if display_text else response_text
-
     return response_callback
 
 
