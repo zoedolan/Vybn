@@ -67,6 +67,9 @@ def clean_argument(arg: str) -> str:
     arg = arg.rstrip('.,;:!?')
     # Strip surrounding quotes
     arg = arg.strip("\"'`")
+        # Reject XML tag artifacts (e.g. '/think' from </think>)
+    if re.match(r'^/[a-z_:]+$', arg):
+        return ""
     # Reject if it's a common English word
     if arg.lower() in NOISE_WORDS:
         return ""
