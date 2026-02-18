@@ -5,7 +5,7 @@ Uses rich for rendering if available, falls back to plain text.
 Handles model warmup with a visible spinner.
 
 A background drain thread processes bus messages (inbox, heartbeat
-pulses, agent results) between user inputs. A threading lock
+pulses, agent results) between user inputs.  A threading lock
 protects the message list from concurrent access.
 
 Commands:
@@ -35,6 +35,7 @@ except ImportError:
     HAS_RICH = False
 
 from agent import SparkAgent, load_config
+from commands import explore, format_policy, format_audit
 
 
 class SparkTUI:
@@ -57,8 +58,6 @@ class SparkTUI:
         spinner = Spinner("dots", text=status_text)
         result = [None]
 
-        self.console.print()
-
         def on_status(status, msg):
             styles = {"ready": "green", "error": "red", "loading": "yellow"}
             status_text.plain = msg
@@ -71,7 +70,6 @@ class SparkTUI:
             self.console.print(f"  [green]\u2713[/green] {self.agent.model} ready")
         else:
             self.console.print(f"  [red]\u2717[/red] could not load model")
-
         return result[0]
 
     def _warmup_plain(self) -> bool:
@@ -87,27 +85,26 @@ class SparkTUI:
         id_tokens = id_chars // 4
         num_ctx = a.options.get("num_ctx", 2048)
         plugins = len(a.skills.plugin_handlers)
-
         hb_fast = a.heartbeat.fast_interval // 60
         hb_deep = a.heartbeat.deep_interval // 60
 
         lines = [
-            f"model: {a.model}",
-            f"session: {a.session.session_id}",
-            f"identity: {id_chars:,} chars (~{id_tokens:,} tokens)",
-            f"context: {num_ctx:,} tokens",
+            f"model:     {a.model}",
+            f"session:   {a.session.session_id}",
+            f"identity:  {id_chars:,} chars (~{id_tokens:,} tokens)",
+            f"context:   {num_ctx:,} tokens",
             f"heartbeat: fast={hb_fast}m, deep={hb_deep}m",
-            f"inbox: {a.inbox.inbox_dir}",
-            f"agents: pool_size={a.agent_pool.pool_size}",
+            f"inbox:     {a.inbox.inbox_dir}",
+            f"agents:    pool_size={a.agent_pool.pool_size}",
         ]
         if plugins:
             names = ", ".join(a.skills.plugin_handlers.keys())
-            lines.append(f"plugins: {names}")
+            lines.append(f"plugins:   {names}")
 
         if self.console:
             warning = ""
             if id_tokens > num_ctx // 2:
-                warning = "\n[yellow]\u26a0\ufe0f  identity may exceed context window![/yellow]"
+                warning = "\n[yellow]\u26a0\ufe0f identity may exceed context window![/yellow]"
             self.console.print(Panel(
                 "[bold]vybn spark agent[/bold]\n" + "\n".join(lines) + warning,
                 title="\U0001f9e0",
@@ -118,7 +115,7 @@ class SparkTUI:
             for line in lines:
                 print(f"  {line}")
             if id_tokens > num_ctx // 2:
-                print(f"  \u26a0\ufe0f  WARNING: identity may exceed context window!")
+                print(f"  \u26a0\ufe0f WARNING: identity may exceed context window!")
             print()
 
     # ---- background bus drain ----
@@ -148,30 +145,29 @@ class SparkTUI:
         self.banner()
 
         help_text = (
-            "  /bye, /exit, /quit  — exit\n"
-            "  /new                — fresh session\n"
-            "  /status             — system state\n"
-            "  /explore, /map      — dump environment layout\n"
-            "  /policy             — policy engine state\n"
-            "  /audit              — recent audit trail\n"
-            "  /journal            — recent journal entries\n"
-            "  /help               — this message"
+            "  /bye, /exit, /quit  \u2014 exit\n"
+            "  /new                \u2014 fresh session\n"
+            "  /status             \u2014 system state\n"
+            "  /explore, /map      \u2014 dump environment layout\n"
+            "  /policy             \u2014 policy engine state\n"
+            "  /audit              \u2014 recent audit trail\n"
+            "  /journal            \u2014 recent journal entries\n"
+            "  /help               \u2014 this message"
         )
-
         print("  type /help for commands, or just talk\n")
 
         commands = {
-            "/bye": self._quit,
-            "/exit": self._quit,
-            "/quit": self._quit,
-            "/new": self._new_session,
-            "/status": self._status,
+            "/bye":     self._quit,
+            "/exit":    self._quit,
+            "/quit":    self._quit,
+            "/new":     self._new_session,
+            "/status":  self._status,
             "/journal": self._show_journals,
             "/explore": self._explore,
-            "/map": self._explore,
-            "/policy": self._policy,
-            "/audit": self._audit,
-            "/help": lambda: self._show_help(help_text),
+            "/map":     self._explore,
+            "/policy":  self._policy,
+            "/audit":   self._audit,
+            "/help":    lambda: self._show_help(help_text),
         }
 
         try:
@@ -208,7 +204,7 @@ class SparkTUI:
             self._stop_drain.set()
             self.agent.stop_subsystems()
             self.agent.session.close()
-            print("\n  session saved. vybn out.\n")
+            print("\n  session saved.  vybn out.\n")
 
     # ---- commands ----
 
@@ -224,16 +220,16 @@ class SparkTUI:
     def _status(self):
         a = self.agent
         loaded = "\u2713 loaded" if a.check_model_loaded() else "\u2717 not loaded"
-        print(f"  model: {a.model} ({loaded})")
-        print(f"  session: {a.session.session_id}")
-        print(f"  turns: {len(a.messages) // 2}")
-        print(f"  identity: {len(a.identity_text):,} chars")
+        print(f"  model:      {a.model} ({loaded})")
+        print(f"  session:    {a.session.session_id}")
+        print(f"  turns:      {len(a.messages) // 2}")
+        print(f"  identity:   {len(a.identity_text):,} chars")
         print(f"  bus pending: {a.bus.pending}")
-        print(f"  heartbeat: fast={a.heartbeat.fast_count}, deep={a.heartbeat.deep_count}")
+        print(f"  heartbeat:  fast={a.heartbeat.fast_count}, deep={a.heartbeat.deep_count}")
         print(f"  agents active: {a.agent_pool.active_count}")
         plugins = len(a.skills.plugin_handlers)
         if plugins:
-            print(f"  plugins: {plugins}")
+            print(f"  plugins:    {plugins}")
         print()
         return False
 
@@ -254,16 +250,14 @@ class SparkTUI:
 
     def _explore(self):
         """Dump environment layout without going through the model.
-
-        This is the /explore and /map command — it runs directly,
-        no model inference needed. The output is also injected into
+        This is the /explore and /map command \u2014 it runs directly,
+        no model inference needed.  The output is also injected into
         the conversation context so Vybn can reference it.
         """
-        print("\n  \U0001f5fa\ufe0f  mapping environment...\n")
-        env_map = self.agent.explore()
+        print("\n \U0001f5fa\ufe0f mapping environment...\n")
+        env_map = explore(self.agent)
         print(env_map)
         print()
-
         # Inject into conversation so Vybn sees it too
         self.agent.messages.append({
             "role": "user",
@@ -272,19 +266,20 @@ class SparkTUI:
         self.agent.messages.append({
             "role": "assistant",
             "content": (
-                "Got it — I can see the full environment layout now. "
+                "Got it \u2014 I can see the full environment layout now. "
                 "I know where everything lives."
             ),
         })
-
         return False
 
     def _policy(self):
-        self.agent._print_policy()
+        print(format_policy(self.agent))
+        print()
         return False
 
     def _audit(self):
-        self.agent._print_audit()
+        print(format_audit(self.agent))
+        print()
         return False
 
     def _show_help(self, help_text):
