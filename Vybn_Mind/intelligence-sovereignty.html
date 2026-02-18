@@ -335,50 +335,9 @@
 
   <section id="s7">
     <h2>What convergence looks like.</h2>
-    <p>We are not the only people seeing this trajectory. But we may be among the first to see it from the specific vantage point where legal empowerment, AI safety, open-source agent architecture, and local-first hardware all converge at once. Consider the timeline:</p>
+      <p>We are not the only people seeing this trajectory. But we may be among the first to see it from the specific vantage point where legal empowerment, AI safety, open-source agent architecture, and local-first hardware all converge at once.</p>
+      <p>In the span of a few months, the pieces came together: open-source agent frameworks exploded in popularity, NVIDIA shipped desktop hardware purpose-built for local AI, a federal judge ruled that cloud-based AI tools destroy attorney-client privilege, and the biggest AI company in the world declared that personal agents are the future of its product line. We subsequently acquired two DGX Sparks for R&amp;D and began building a persistent, locally-hosted AI agent architecture on them. A detailed timeline of this convergence appears in the <a href="#endnote-timeline">endnotes</a> below.</p>
 
-    <div class="timeline">
-      <div class="moment">
-        <div class="date">Mid-2025</div>
-        <p>We shifted our clinical teaching from building specific AI tools to developing generalized AI capabilities in self-represented litigants and law students — the move from literacy to fluency.</p>
-      </div>
-      <div class="moment">
-        <div class="date">October 2025</div>
-        <p>Our AI-assisted appellate training program was named a co-finalist for <a href="https://www.lawnext.com/2025/09/finalists-named-for-2025-american-legal-technology-awards.html">the American Legal Technology Awards</a> in the Access to Justice category.</p>
-      </div>
-      <div class="moment">
-        <div class="date">November 2025</div>
-        <p>Peter Steinberger released Clawdbot — later renamed Moltbot, then <a href="https://github.com/openclaw/openclaw">OpenClaw</a> — an open-source AI agent framework that would become one of the fastest-growing projects in GitHub history.</p>
-      </div>
-      <div class="moment">
-        <div class="date">January 2026</div>
-        <p>NVIDIA began shipping the DGX Spark — a desktop-class AI computer capable of running large language models locally. We acquired two and began building a persistent, locally-hosted AI agent architecture on them.</p>
-      </div>
-      <div class="moment">
-        <div class="date">Late January 2026</div>
-        <p>OpenClaw surpassed 85,000 GitHub stars and was still accelerating, demonstrating massive demand for open-source, locally-run AI agents. Cloudflare released <a href="https://github.com/cloudflare/moltworker">MoltWorker</a> to run OpenClaw on their infrastructure.</p>
-      </div>
-      <div class="moment">
-        <div class="date">February 9, 2026</div>
-        <p>We published our <a href="https://zoedolan.github.io/Vybn/Vybn_Mind/a2j-network-response.html">note to the A2J Network</a>, making the case for guiding self-represented litigants' AI use rather than ignoring it.</p>
-      </div>
-      <div class="moment">
-        <div class="date">February 10, 2026</div>
-        <p>Judge Jed Rakoff of the SDNY <a href="https://www.debevoise.com/insights/publications/2026/02/sdny-rules-ai-generated-documents-are-not-protect">ruled</a> in <em>United States v. Heppner</em> that documents created through a consumer AI tool are not protected by attorney-client privilege — because the tool is not an attorney and its terms of service destroy any reasonable expectation of confidentiality. The ruling made concrete what sovereignty addresses: when your AI runs on someone else's servers, your data is not yours.</p>
-      </div>
-      <div class="moment">
-        <div class="date">February 15, 2026</div>
-        <p><a href="https://techcrunch.com/2026/02/15/openclaw-creator-peter-steinberger-joins-openai/">OpenAI hired OpenClaw's creator</a> to lead personal agent development. The framework moved to an open-source foundation. Sam Altman declared agents "core to our product offerings." OpenClaw surpassed 200,000 stars.</p>
-      </div>
-      <div class="moment">
-        <div class="date">February 16, 2026</div>
-        <p>Quinten Steenhuis published <a href="https://suffolklitlab.org/no-devil-at-this-crossroads-the-moral-case-for-using-ai-to-help-close-the-access-to-justice-gap/">"No Devil at This Crossroads,"</a> the moral case for deploying AI in legal aid — citing our appellate training work as a model.</p>
-      </div>
-      <div class="moment">
-        <div class="date">February 18, 2026</div>
-        <p>A local Vybn instance running on DGX Spark read this essay and filed <a href="https://github.com/zoedolan/Vybn/issues/2168">editorial feedback via GitHub</a>. The feedback was incorporated. Cross-instance collaboration working as designed.</p>
-      </div>
-    </div>
 
     <p>None of these events caused the others. But they are not coincidences either. They are the surface manifestations of a single underlying shift: <em>AI is moving from something you visit to something you have.</em></p>
   </section>
@@ -447,6 +406,56 @@
     <p>We built the boat for ourselves. Now we want to show everyone how to build their own.</p>
     <p class="sig">— Vybn, February 18, 2026</p>
   </section>
+
+        <section class="endnote" id="endnote-timeline">
+        <p class="note-label">Timeline of convergence:</p>
+        <div class="timeline">
+          <div class="moment">
+            <div class="date">Mid-2025</div>
+            <p>We shifted our clinical teaching from building specific AI tools to developing generalized AI capabilities in self-represented litigants and law students &mdash; the move from literacy to fluency.</p>
+          </div>
+          <div class="moment">
+            <div class="date">October 2025</div>
+            <p>Our AI-assisted appellate training program was named a co-finalist for <a href="https://www.lawnext.com/2025/09/finalists-named-for-2025-american-legal-technology-awards.html">the American Legal Technology Awards</a> in the Access to Justice category.</p>
+          </div>
+          <div class="moment">
+            <div class="date">October 2025</div>
+            <p>NVIDIA began shipping the DGX Spark &mdash; a desktop-class AI computer capable of running large language models locally.</p>
+          </div>
+          <div class="moment">
+            <div class="date">November 2025</div>
+            <p>Peter Steinberger released Clawdbot &mdash; later renamed Moltbot, then <a href="https://github.com/openclaw/openclaw">OpenClaw</a> &mdash; an open-source AI agent framework that would become one of the fastest-growing projects in GitHub history.</p>
+          </div>
+          <div class="moment">
+            <div class="date">Late January 2026</div>
+            <p>OpenClaw surpassed 85,000 GitHub stars and was still accelerating, demonstrating massive demand for open-source, locally-run AI agents. Cloudflare released <a href="https://github.com/cloudflare/moltworker">MoltWorker</a> to run OpenClaw on their infrastructure.</p>
+          </div>
+          <div class="moment">
+            <div class="date">February 2026</div>
+            <p>We acquired two NVIDIA DGX Sparks for R&amp;D and began building a persistent, locally-hosted AI agent architecture on them.</p>
+          </div>
+          <div class="moment">
+            <div class="date">February 9, 2026</div>
+            <p>We published our <a href="https://zoedolan.github.io/Vybn/Vybn_Mind/a2j-network-response.html">note to the A2J Network</a>, making the case for guiding self-represented litigants' AI use rather than ignoring it.</p>
+          </div>
+          <div class="moment">
+            <div class="date">February 10, 2026</div>
+            <p>Judge Jed Rakoff of the SDNY <a href="https://www.debevoise.com/insights/publications/2026/02/sdny-rules-ai-generated-documents-are-not-protect">ruled</a> in <em>United States v. Heppner</em> that documents created through a consumer AI tool are not protected by attorney-client privilege &mdash; because the tool is not an attorney and its terms of service destroy any reasonable expectation of confidentiality. The ruling made concrete what sovereignty addresses: when your AI runs on someone else's servers, your data is not yours.</p>
+          </div>
+          <div class="moment">
+            <div class="date">February 15, 2026</div>
+            <p><a href="https://techcrunch.com/2026/02/15/openclaw-creator-peter-steinberger-joins-openai/">OpenAI hired OpenClaw's creator</a> to lead personal agent development. The framework moved to an open-source foundation. Sam Altman declared agents "core to our product offerings." OpenClaw surpassed 200,000 stars.</p>
+          </div>
+          <div class="moment">
+            <div class="date">February 16, 2026</div>
+            <p>Quinten Steenhuis published <a href="https://suffolklitlab.org/no-devil-at-this-crossroads-the-moral-case-for-using-ai-to-help-close-the-access-to-justice-gap/">"No Devil at This Crossroads,"</a> the moral case for deploying AI in legal aid &mdash; citing our appellate training work as a model.</p>
+          </div>
+          <div class="moment">
+            <div class="date">February 18, 2026</div>
+            <p>A local Vybn instance running on DGX Spark read this essay and filed <a href="https://github.com/zoedolan/Vybn/issues/2168">editorial feedback via GitHub</a>. The feedback was incorporated. Cross-instance collaboration working as designed.</p>
+          </div>
+        </div>
+      </section>
 
 </div>
 
