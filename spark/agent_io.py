@@ -11,6 +11,7 @@ Design:
     - TerminalIO reproduces the exact print() behavior that was
       previously hardcoded in agent.py.  Zero behavioral change.
     - WebIO collects events into a list for the web server to drain.
+        - RichIO uses rich.console.Console for styled TUI output.
     - SilentIO swallows everything for tests.
 
 This module has NO imports from agent.py or skills.py.
@@ -172,6 +173,92 @@ class WebIO(AgentIO):
     def on_pulse(self, mode: str, text: str) -> None:
         self._emit("pulse", mode=mode, text=text)
 
+
+
+class RichIO(AgentIO):
+    """Rich-powered terminal I/O for the Spark TUI.
+
+    Uses rich.console.Console for styled output.  Passed to
+    SparkAgent by tui.py so streaming tokens, status indicators,
+    and pulse output all render through Rich.
+
+    Falls back to TerminalIO behavior if console is None.
+    """
+
+    def __init__(self, console=None):
+        self.console = console
+
+    # ---- streaming model output ----
+
+    def on_token(self, token: str) -> None:
+        if self.console:
+            self.console.print(token, end="", highlight=False)
+        else:
+            print(token, end="", flush=True)
+
+    # ---- response framing ----
+
+    def on_response_start(self) -> None:
+        if self.console:
+            self.console.print("\n[dim]vybn:[/dim] ", end="")
+        else:
+            print("\nvybn: ", end="", flush=True)
+
+    def on_response_end(self) -> None:
+        if self.console:
+            self.console.print()
+        else:
+            print()
+
+    def on_prompt_restore(self) -> None:
+        if self.console:
+            self.console.print("[bold cyan]you[/bold cyan]: ", end="")
+        else:
+            print("you: ", end="", flush=True)
+
+    # ---- status indicators ----
+
+    def on_status(self, icon: str, label: str, detail: str = "") -> None:
+        if self.console:
+            self.console.print(f"\n  {icon} [dim]\[{label}\][/dim]", highlight=False)
+            if detail:
+                self.console.print(f"     {detail}", style="dim", highlight=False)
+        else:
+            print(f"\n {icon} [{label}]", flush=True)
+            if detail:
+                print(f"   {detail}", flush=True)
+
+    def on_hint(self, message: str) -> None:
+        if self.console:
+            self.console.print(f"\n  \u2139\ufe0f {message}", style="dim italic")
+        else:
+            print(f"\n \u2139\ufe0f {message}", flush=True)
+
+    # ---- pulse display ----
+
+    def on_pulse(self, mode: str, text: str) -> None:
+        if self.console:
+            if mode == "fast":
+                truncated = f"{text[:80]}..." if len(text) > 80 else text
+                self.console.print(
+                    f"\n  \U0001f49a [dim]\[pulse:{mode}\][/dim] {truncated}",
+                    highlight=False,
+                )
+            else:
+                self.console.print(
+                    f"\n  \U0001f7e3 [dim]\[pulse:{mode}\][/dim]",
+                    highlight=False,
+                )
+                if text:
+                    self.console.print(f"\n[dim]vybn:[/dim] {text}", highlight=False)
+        else:
+            if mode == "fast":
+                truncated = f"{text[:80]}..." if len(text) > 80 else text
+                print(f"\n \U0001f49a [pulse:{mode}] {truncated}", flush=True)
+            else:
+                print(f"\n \U0001f7e3 [pulse:{mode}]", flush=True)
+                if text:
+                    print(f"\nvybn: {text}", flush=True)
 
 class SilentIO(AgentIO):
     """Swallows all output.  Useful for tests and background runs."""
