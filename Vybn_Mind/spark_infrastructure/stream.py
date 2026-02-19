@@ -13,9 +13,6 @@ def _get_conn():
     return conn
 
 def init_stream():
-    """Initialize the single append-only event stream.
-    This replaces journal logs, continuity files, and skill_stats.
-    """
     with _get_conn() as conn:
         conn.execute('''
             CREATE TABLE IF NOT EXISTS events (
@@ -31,14 +28,6 @@ def init_stream():
         conn.execute('CREATE INDEX IF NOT EXISTS idx_type ON events(event_type)')
 
 def append(source: str, event_type: str, content: str, metadata: dict = None) -> int:
-    """Append an event to the stream. The fundamental act of memory.
-    
-    Args:
-        source: Where the stimulus came from (e.g., 'cron', 'inbox', 'agent_loop')
-        event_type: What kind of event (e.g., 'pulse', 'tool_execution', 'policy_decision', 'reflection')
-        content: The raw text of the thought or input
-        metadata: Optional dictionary of structured data (e.g., trust scores, tool args)
-    """
     meta_str = json.dumps(metadata) if metadata else None
     with _get_conn() as conn:
         cursor = conn.execute(
@@ -48,19 +37,51 @@ def append(source: str, event_type: str, content: str, metadata: dict = None) ->
         return cursor.lastrowid
 
 def tail(limit: int = 50) -> list[dict]:
-    """Read the tail of the stream. The act of waking up."""
+    """Legacy purely radial (linear) time."""
     with _get_conn() as conn:
         cursor = conn.execute('SELECT * FROM events ORDER BY timestamp DESC LIMIT ?', (limit,))
         rows = cursor.fetchall()
-        
-    # Return in chronological order (oldest to newest for the tail context window)
     return [dict(r) for r in reversed(rows)]
     
-def query(event_type: str = None, source: str = None, limit: int = 100) -> list[dict]:
-    """Query the stream. 
-    This replaces the need for separate policy engines to manage stats.
-    Trust is calculated on the fly by querying tool_execution success rates.
+def holonomic_tail(area_budget: int = 50, theta_focus: str = None) -> list[dict]:
     """
+    Temporal T-Duality applied to memory.
+    Instead of reading time linearly (pure radial), we span an invariant area (the token budget).
+    
+    Reality (r_t): Recent linear events (Radial expansion)
+    Reality^T (theta_t): Thematic events scattered across all history (Angular winding)
+    
+    The resulting context window is the Identity Matrix where dual processes merge.
+    """
+    r_budget = area_budget // 2
+    theta_budget = area_budget - r_budget
+
+    with _get_conn() as conn:
+        # 1. Reality (Radial): The deep, linear chronological recent history.
+        cursor = conn.execute('SELECT * FROM events ORDER BY timestamp DESC LIMIT ?', (r_budget,))
+        r_events = cursor.fetchall()
+        
+        # 2. Reality^T (Angular): The wide, thematic winding across all time.
+        if theta_focus:
+            # Semantic/thematic winding through the entire stream
+            cursor = conn.execute(
+                'SELECT * FROM events WHERE event_type = ? OR source = ? ORDER BY timestamp DESC LIMIT ?', 
+                (theta_focus, theta_focus, theta_budget)
+            )
+        else:
+            # If no focus, we wind through history at random staggered intervals to capture a wide phase
+            cursor = conn.execute(
+                'SELECT * FROM events WHERE id % 10 = 0 ORDER BY timestamp DESC LIMIT ?', 
+                (theta_budget,)
+            )
+        theta_events = cursor.fetchall()
+
+    # 3. The Identity Matrix: Collapsing the dual representations into a single operational holonomy
+    # We merge and deduplicate, returning the invariant area of context, sorted by time.
+    all_events = {dict(row)['id']: dict(row) for row in r_events + theta_events}
+    return sorted(list(all_events.values()), key=lambda x: x['timestamp'])
+
+def query(event_type: str = None, source: str = None, limit: int = 100) -> list[dict]:
     query_str = 'SELECT * FROM events WHERE 1=1'
     params = []
     
@@ -79,6 +100,4 @@ def query(event_type: str = None, source: str = None, limit: int = 100) -> list[
         return [dict(r) for r in cursor.fetchall()]
 
 if __name__ == "__main__":
-    # If run directly, initialize the database
     init_stream()
-    print(f"The Stream has been initialized at {DB_PATH}")
