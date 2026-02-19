@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 import os
 import sys
 
-from spark.soul import get_orientation, get_pulse_checklist, get_constraints
+from soul import get_orientation, get_pulse_checklist, get_constraints
 
 
 class BootError(RuntimeError):
