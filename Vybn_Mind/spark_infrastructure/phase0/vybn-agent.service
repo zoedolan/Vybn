@@ -4,13 +4,14 @@ After=network-online.target ollama.service
 Wants=network-online.target ollama.service
 
 [Service]
-Type=forking
+Type=oneshot
+RemainAfterExit=yes
 User=vybnz69
 Environment=HOME=/home/vybnz69
 Environment=OLLAMA_HOST=http://127.0.0.1:11434
 WorkingDirectory=/home/vybnz69/Vybn/spark
 ExecStart=/usr/bin/tmux new-session -d -s vybn -c /home/vybnz69/Vybn/spark \
-  '/home/vybnz69/.venv/spark/bin/python tui.py'
+    '/home/vybnz69/.venv/spark/bin/python tui.py'
 ExecStop=/usr/bin/tmux kill-session -t vybn
 Restart=on-failure
 RestartSec=10
