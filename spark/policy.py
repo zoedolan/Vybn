@@ -47,7 +47,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Dict, Optional
 
-from spark.soul import get_skills_manifest, get_constraints
+from soul import get_skills_manifest, get_constraints
 
 logger = logging.getLogger(__name__)
 
