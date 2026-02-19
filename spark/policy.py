@@ -170,6 +170,16 @@ DEFAULT_PROMOTE_THRESHOLD = 0.85
 DEFAULT_DEMOTE_THRESHOLD = 0.40
 DEFAULT_MIN_OBSERVATIONS = 8
 
+# Tainted context tracking — prompt injection mitigation
+# When web content is fetched, the context becomes "tainted" for N turns.
+# During tainted turns, tier escalation prevents fetched content from
+# immediately triggering dangerous actions (shell_exec, file_write, etc.).
+TAINT_DECAY_TURNS = 3  # turns after web fetch before taint expires
+TAINTED_ESCALATION_SKILLS = {
+    "shell_exec", "file_write", "self_edit", "git_push",
+    "git_commit", "spawn_agent",
+}
+
 
 # ---------------------------------------------------------------------------
 # Soul-derived tier mapping (The Constitution)
@@ -329,6 +339,9 @@ class PolicyEngine:
         if self.ga_enabled:
             self._rebuild_demotions()
 
+            # Tainted context tracking (prompt injection mitigation)
+        self._tainted_turns = 0
+
     def _load_soul_tiers(self):
         """Derive tier assignments from vybn.md via soul.py.
 
@@ -362,6 +375,31 @@ class PolicyEngine:
             return self._soul_tiers[skill]
         return DEFAULT_TIERS.get(skill, Tier.NOTIFY)
 
+        # ----- tainted context tracking -----
+
+    def mark_tainted(self):
+        """Mark the context as tainted (called after web_fetch returns).
+
+        When web content enters the conversation, it may contain prompt
+        injection attempts. This sets a decay counter so that subsequent
+        tool calls face escalated tiers until the taint expires.
+        """
+        self._tainted_turns = TAINT_DECAY_TURNS
+        logger.info("Context marked tainted for %d turns", TAINT_DECAY_TURNS)
+
+    def _decay_taint(self):
+        """Decrement the taint counter. Called once per check_policy."""
+        if self._tainted_turns > 0:
+            self._tainted_turns -= 1
+            if self._tainted_turns == 0:
+                logger.info("Taint expired — context clean")
+
+    @property
+    def is_tainted(self) -> bool:
+        """Whether the current context is tainted by web content."""
+        return self._tainted_turns > 0
+
+    
     # ----- gate checks -----
 
     def check_policy(
@@ -384,6 +422,9 @@ class PolicyEngine:
         -------
         PolicyResult with verdict, reason, and resolved tier.
         """
+                # Decay taint counter each time policy is checked
+        self._decay_taint()
+
         skill = action.get("skill", "")
         argument = action.get("argument", "")
         is_heartbeat = source.startswith("heartbeat")
@@ -407,7 +448,18 @@ class PolicyEngine:
             if _tier_rank(demoted_tier) > _tier_rank(tier):
                 tier = demoted_tier
 
-        # Path safety for file operations
+                # SECURITY: Tainted context escalation (prompt injection mitigation)
+        # If web content was recently fetched, escalate tier for dangerous skills
+        # to prevent injected instructions from triggering harmful actions.
+        if self.is_tainted and skill in TAINTED_ESCALATION_SKILLS:
+            if _tier_rank(tier) < _tier_rank(Tier.APPROVE):
+                logger.warning(
+                    "Taint escalation: %s tier %s -> APPROVE (tainted turns: %d)",
+                    skill, tier.value, self._tainted_turns,
+                )
+                tier = Tier.APPROVE
+
+                # Path safety for file operations
         if skill in ("file_write", "self_edit", "file_read"):
             if not self._path_is_safe(argument):
                 return PolicyResult(
