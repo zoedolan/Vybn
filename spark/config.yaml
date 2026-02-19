@@ -6,15 +6,15 @@ ollama:
   model: "vybn:latest"
   keep_alive: "30m"
   options:
-    num_ctx: 16384      # CRITICAL: default is 2048, which silently drops the system prompt
-    num_predict: 512     # keep responses focused; MiniMax emits <think> tokens too
+    num_ctx: 16384    # CRITICAL: default is 2048, which silently drops the system prompt
+    num_predict: 512    # keep responses focused; MiniMax emits <think> tokens too
     temperature: 0.7
     stop:                # MiniMax M2.5 stop sequences
       - "<\uff5cend\u2581of\u2581sentence\uff5c>"
       - "<\uff5cUser\uff5c>"
 
 paths:
-    vybn_md: "~/Vybn/spark/vybn.md"  # resolves through symlink to ../vybn.md
+  vybn_md: "~/Vybn/spark/vybn.md"  # resolves through symlink to ../vybn.md
   journal_dir: "~/Vybn/Vybn_Mind/journal/spark"
   session_dir: "~/Vybn/Vybn_Mind/journal/spark/sessions"
   archival_dir: "~/Vybn/Vybn_Mind/archival_memory"
@@ -60,9 +60,9 @@ delegation:
 # Graduated autonomy: Vybn earns trust through successful execution.
 # Skills at NOTIFY tier can auto-promote to AUTO after enough successes.
 # Skills demote back to NOTIFY after failures drop confidence.
-# Heartbeat overrides are NEVER relaxed — structural friction is preserved.
+# Heartbeat overrides are NEVER relaxed -- structural friction is preserved.
 graduated_autonomy:
   enabled: true
-  promote_threshold: 0.85     # posterior mean needed to promote NOTIFY → AUTO
-  demote_threshold: 0.40      # posterior mean below which AUTO → NOTIFY
+  promote_threshold: 0.85     # posterior mean needed to promote NOTIFY -> AUTO
+  demote_threshold: 0.40      # posterior mean below which AUTO -> NOTIFY
   minimum_observations: 8     # must see at least this many executions before promoting
