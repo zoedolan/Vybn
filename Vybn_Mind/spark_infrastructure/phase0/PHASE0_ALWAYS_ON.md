@@ -3,6 +3,42 @@
 > **Goal**: The Spark agent survives laptop sleep, SSH drops, and network roaming.
 > **Method**: Zero new code. Three pillars: systemd, mosh+tmux, Open WebUI+Tailscale.
 
+## CRITICAL: Memory Situation
+
+The 229B model consumes 121 of 121GB RAM, leaving ~230MB free. The default
+16GB swap is already 1.7GB in use. **You MUST expand swap before deploying
+Phase 0**, or Docker + Open WebUI (~500MB-1GB) will trigger the OOM killer
+and crash the model.
+
+**Do this FIRST** (before anything else in this guide):
+
+```bash
+# Check current state
+free -h && swapon --show
+
+# Create 128GB swapfile (instant on ext4 NVMe)
+sudo fallocate -l 128G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+
+# Lower swappiness (keep model in RAM, swap only under pressure)
+sudo sysctl vm.swappiness=10
+
+# Persist across reboot
+sudo cp /etc/fstab /etc/fstab.backup
+sudo sed -i 's|^.*swap\.img|#&|' /etc/fstab
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+echo 'vm.swappiness=10' | sudo tee -a /etc/sysctl.conf
+
+# Verify
+free -h && swapon --show && cat /proc/sys/vm/swappiness
+```
+
+**Do NOT run `sudo swapoff /swap.img`** while the model is loaded.
+With 230MB free, forcing 1.7GB back into RAM risks OOM. Leave both
+swapfiles active; the old one will be retired on next reboot.
+
 ## Architecture
 
 ```
@@ -14,7 +50,7 @@
 |      tmux session 'vybn'  |
 |        tui.py (agent)     |
 |                           |
-|  Docker                   |
+|  Docker (mem-limited 2G)  |
 |    open-webui :3000       |
 |      -> Ollama :11434     |
 |                           |
@@ -34,12 +70,15 @@ web_serve.py simultaneously — two instances would compete for the same GPU on 
 **Open WebUI talks to raw Ollama** (Phase 0 only): This bypasses soul/memory/policy.
 Phase 1 will route through the full agent pipeline.
 
+**Docker is memory-capped**: `--memory=2g --memory-swap=4g` plus env vars that
+disable RAG/STT/image ML libraries, reducing idle footprint from ~1GB to ~300MB.
+
 ## Files in This Directory
 
 | File | Purpose |
 |---|---|
 | `vybn-agent.service` | systemd unit: runs tui.py in tmux, restarts on failure |
-| `phase0-preflight.sh` | Checks all prerequisites before deployment |
+| `phase0-preflight.sh` | Checks all prerequisites (including swap!) before deployment |
 | `phase0-setup.sh` | Automated deployment: mosh, systemd, Docker, Tailscale |
 | `PHASE0_ALWAYS_ON.md` | This guide |
 
@@ -49,6 +88,9 @@ Phase 1 will route through the full agent pipeline.
 # On the Spark, as vybnz69:
 cd ~/Vybn
 git pull
+
+# 0. Expand swap FIRST (if you haven't already)
+#    See "CRITICAL: Memory Situation" above
 
 # 1. Check prerequisites
 bash Vybn_Mind/spark_infrastructure/phase0/phase0-preflight.sh
@@ -61,6 +103,11 @@ tmux attach -t vybn   # see the TUI running; Ctrl-B D to detach
 ```
 
 ## Step-by-Step (Manual)
+
+### Step 0: Expand swap (REQUIRED)
+
+See the "CRITICAL: Memory Situation" section above. The scripts will
+refuse to proceed without >= 64GB of swap.
 
 ### Step 1: Install mosh (optional)
 
@@ -95,13 +142,18 @@ tmux attach -t vybn   # Ctrl-B D to detach
 Type=forking because tmux forks and the parent exits. Restart=on-failure
 means if tui.py crashes, systemd brings it back in 10 seconds.
 
-### Step 3: Deploy Open WebUI
+### Step 3: Deploy Open WebUI (memory-limited)
 
 ```bash
 docker run -d \
   -p 127.0.0.1:3000:8080 \
   --add-host=host.docker.internal:host-gateway \
   -e OLLAMA_BASE_URL=http://host.docker.internal:11434 \
+  -e RAG_EMBEDDING_ENGINE=openai \
+  -e AUDIO_STT_ENGINE=openai \
+  -e IMAGE_GENERATION_ENGINE=openai \
+  --memory=2g \
+  --memory-swap=4g \
   -v open-webui:/app/backend/data \
   --name open-webui \
   --restart always \
@@ -111,7 +163,8 @@ docker run -d \
 curl http://127.0.0.1:3000
 ```
 
-Bound to 127.0.0.1 only — no external access except through Tailscale.
+Bound to 127.0.0.1 only. Memory-capped at 2GB RAM / 4GB with swap.
+Env vars disable ML libraries that would bloat idle usage to ~1GB.
 
 ### Step 4: Expose via Tailscale Serve
 
@@ -148,12 +201,16 @@ sudo journalctl -u vybn-agent.service -n 50
 #   Fix: systemctl status ollama; the After= should handle this
 ```
 
-### TUI crashes in a loop
+### OOM kills or system unresponsive
 ```bash
-# Check restart count
-systemctl show vybn-agent.service | grep NRestarts
-# Check what's failing
-sudo journalctl -u vybn-agent.service --since '5 min ago'
+# Check if swap is active and large enough
+free -h && swapon --show
+# Check Docker memory usage
+docker stats open-webui --no-stream
+# Check for OOM events
+dmesg | grep -i 'oom\|killed' | tail -20
+# Monitor swap activity (si/so columns)
+vmstat 1 5
 ```
 
 ### Open WebUI can't reach Ollama
@@ -195,6 +252,7 @@ tmux ls                 # list sessions
 
 # Docker (Open WebUI)
 docker logs open-webui
+docker stats open-webui --no-stream  # check memory usage
 docker restart open-webui
 docker stop open-webui
 docker start open-webui
@@ -203,4 +261,9 @@ docker start open-webui
 tailscale serve status
 tailscale serve --bg 3000
 tailscale serve off
+
+# Memory monitoring
+free -h                 # RAM + swap overview
+vmstat 1 5              # si/so columns show swap activity
+dmesg | grep -i oom     # check for OOM events
 ```
