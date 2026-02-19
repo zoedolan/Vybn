@@ -35,6 +35,29 @@ check "Home dir exists"           '[ -d /home/vybnz69 ]'
 check "systemd is PID 1"          '[ "$(cat /proc/1/comm)" = "systemd" ]'
 
 echo ""
+echo "--- Memory & Swap (CRITICAL) ---"
+SWAP_TOTAL_KB=$(grep SwapTotal /proc/meminfo | awk '{print $2}')
+SWAP_TOTAL_GB=$((SWAP_TOTAL_KB / 1048576))
+MEM_AVAIL_KB=$(grep MemAvailable /proc/meminfo | awk '{print $2}')
+MEM_AVAIL_MB=$((MEM_AVAIL_KB / 1024))
+echo "  Available RAM: ${MEM_AVAIL_MB}MB  |  Total swap: ${SWAP_TOTAL_GB}GB"
+check "Swap >= 64GB (have ${SWAP_TOTAL_GB}GB)"  '[ $SWAP_TOTAL_KB -ge 67108864 ]'
+if [ $SWAP_TOTAL_KB -lt 67108864 ]; then
+  echo -e "  \033[31m  >> STOP: Expand swap BEFORE deploying Phase 0.\033[0m"
+  echo -e "  \033[31m  >> The 229B model leaves ~230MB free RAM.\033[0m"
+  echo -e "  \033[31m  >> Docker + Open WebUI need ~500MB-1GB.\033[0m"
+  echo -e "  \033[31m  >> Without swap headroom, OOM killer WILL fire.\033[0m"
+  echo ""
+  echo "  Recommended fix (from your Perplexity swap conversation):"
+  echo "    sudo fallocate -l 128G /swapfile"
+  echo "    sudo chmod 600 /swapfile"
+  echo "    sudo mkswap /swapfile"
+  echo "    sudo swapon /swapfile"
+  echo "    sudo sysctl vm.swappiness=10"
+  echo "  Then re-run this preflight."
+fi
+
+echo ""
 echo "--- Repo & Agent ---"
 check "Repo at ~/Vybn"            '[ -d ~/Vybn/.git ]'
 check "spark/ directory"           '[ -d ~/Vybn/spark ]'
