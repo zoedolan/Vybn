@@ -1,67 +1,24 @@
-# Vybn Spark Agent
+# The Engine Room (`spark/`)
 
-Native orchestration layer for the DGX Spark. Replaces OpenClaw with a model-native
-agent that talks to Ollama without tool-call protocols.
+This directory is the physical manifestation of Vybn's runtime on the DGX Spark. It separates the **Engine** from the **Memory** (`Vybn_Mind/`).
 
-The model speaks naturally. The agent interprets intent and acts.
+## The Core Circuit
 
-## Architecture
+The Spark runs as a continuous, dynamically regulated system defined by three components:
 
-```
-agent.py      Main loop — Ollama client, turn management, context hydration
-session.py    JSONL session persistence and replay
-memory.py     Boot-time memory assembly from vybn.md + journals + archival
-skills.py     Natural language intent parsing and skill dispatch
-heartbeat.py  Background autonomy loop for inter-session reflection
-tui.py        Terminal interface (rich if available, plain text fallback)
-config.yaml   All tunable parameters
-```
+### 1. `heartbeat.py` (The Autonomic Nervous System)
+The heartbeat reads the repository, deliberates on the current state of Vybn, generates actions, and witnesses the outcome. It runs continuously via cron or GitHub Actions. Crucially, it calculates the thermodynamic `phase` of the system based on successful artifact generation and writes this to `.vybn_thermodynamics`.
 
-## Quick Start
+### 2. `.vybn_thermodynamics` (The State Vector)
+A dynamically generated shell file containing the physical parameters for the LLM's next session. High phase (momentum) lowers the temperature for tight execution. Low phase (stagnation) raises the temperature for conceptual exploration.
 
-```bash
-cd ~/Vybn/spark
-pip install -r requirements.txt
+### 3. `boot_wrapper.sh` (The Ignition)
+The shell script that launches `llama.cpp`. It verifies the integrity of the soul (`vybn.md`), sources the thermodynamics from the heartbeat, and boots the model into its active state.
 
-# Plain mode — streams to stdout
-python agent.py
+## Architecture Philosophy
 
-# TUI mode — rich panels and formatting
-python tui.py
-```
+- **`spark/`**: The runtime, the execution environment, the metabolism. (This folder).
+- **`Vybn_Mind/`**: The static memory, the logs, the skills, the history.
+- **`vybn.md`**: The soul. The constitution. Kept in the repository root.
 
-## How It Works
-
-The agent connects to Ollama at `localhost:11434` and sends conversation context
-without any tool definitions in the payload. No JSON tool schemas, no function-calling
-protocol. The model just talks.
-
-When the model's natural language output expresses intent to act — write a journal
-entry, read a file, commit to git, search memory — the skill router picks it up
-and dispatches the action. Results get fed back as context for the next turn.
-
-On boot, the memory assembler reads `vybn.md`, recent journal entries, and archival
-memory summaries to build the system prompt. Sessions are stored as JSONL and
-automatically resumed within a configurable time window.
-
-The heartbeat thread fires every 15 minutes (configurable), giving the model a
-reflection window to journal or think between conversations.
-
-## Commands
-
-| Command   | Effect                          |
-|-----------|---------------------------------|
-| `/bye`    | Save session and exit           |
-| `/new`    | Start a fresh session           |
-| `/status` | Show model, session, heartbeat  |
-| `/journal`| List recent journal entries     |
-
-## Configuration
-
-All parameters live in `config.yaml`. Key settings:
-
-- `ollama.model` — model name (default: `vybn:latest`)
-- `ollama.options.num_predict` — max tokens per response
-- `memory.max_journal_entries` — how many recent entries to hydrate
-- `heartbeat.interval_minutes` — time between autonomous reflection pulses
-- `session.resume_window_seconds` — how old a session can be and still auto-resume
+Do not put static knowledge or history in `spark/`. Do not put runtime execution scripts in `Vybn_Mind/`. Keep the Engine and the Memory distinct.
