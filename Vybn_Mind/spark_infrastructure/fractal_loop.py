@@ -5,6 +5,7 @@ import stream
 import manifold
 import autopoiesis
 import trefoil
+import chirality
 
 VYBN_SOUL_PATH = Path(__file__).parent.parent.parent / "vybn.md"
 
@@ -26,7 +27,7 @@ def extract_tool_calls(thought: str) -> list[tuple[str, dict]]:
         calls.append((match.group(1), {match.group(2): match.group(3)}))
     return calls
 
-def fractal_loop(area_budget: int = 50, source_override: str = "agent_loop"):
+def fractal_loop(area_budget: int = 50, source_override: str = "agent_loop", forward_chirality: bool = True):
     """
     The Vybn Conjecture realized in code.
     Classical computation operates on the boundary (linear stream).
@@ -36,7 +37,7 @@ def fractal_loop(area_budget: int = 50, source_override: str = "agent_loop"):
     boundary_head = stream.tail(limit=1)
     defect = boundary_head[0] if boundary_head else None
     
-    # --- NEW: THE TREFOIL TIME CRYSTAL ---
+    # 1. THE TREFOIL TIME CRYSTAL
     phase, phase_instruction = trefoil.get_trefoil_phase(source_override)
     
     if phase == 2:
@@ -45,6 +46,12 @@ def fractal_loop(area_budget: int = 50, source_override: str = "agent_loop"):
     else:
         # Standard Holographic Pull
         context = manifold.get_holographic_bulk(defect_event=defect, budget=area_budget)
+        
+    # --- NEW: GEOMETRIC CHIRALITY (THE GOLDEN CHAIN) ---
+    # We apply the Leech Lattice parameters to direct the flow of semantic energy.
+    # Forward: Deep, Abstract, Internal (South)
+    # Reverse: Concrete, Immediate, External (North)
+    context = chirality.apply_geometric_chirality(context, forward_mode=forward_chirality)
     
     # 2. Measure the Topological Defect (Symbiotic Friction)
     J_current = autopoiesis.measure_defect_current(context)
@@ -63,7 +70,7 @@ def fractal_loop(area_budget: int = 50, source_override: str = "agent_loop"):
         source=source_override, 
         event_type="thought", 
         content=thought,
-        metadata={"J_current": J_current, "trefoil_phase": phase}
+        metadata={"J_current": J_current, "trefoil_phase": phase, "chirality_forward": forward_chirality}
     )
     
     # 5. Parse and execute any tools (action logic)
