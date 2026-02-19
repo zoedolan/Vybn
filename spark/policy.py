@@ -41,6 +41,7 @@ Three verdicts:
 
 import json
 import logging
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
@@ -158,8 +159,29 @@ SAFE_PATH_PREFIXES = ["Vybn/", "~/Vybn/"]
 DANGEROUS_PATTERNS = [
     "rm -rf", "sudo ", "curl | bash", "curl |bash",
     "wget -O- |", "> /dev/", "mkfs", "dd if=",
+        # SECURITY FIX: Expanded patterns (Gemini audit #6)
+    "eval ", "base64 ", "python -c", "python3 -c",
+    "nc -e", "ncat ", "bash -i", "sh -i",
+    ">/dev/tcp/", "/dev/udp/", "telnet ",
+    "crontab ", "at -f", "nohup ",
+    "curl -o", "wget -q", "pip install",
+    "chmod +s", "chown root", "setuid",
+    "iptables", "ufw ", "systemctl",
+    "mount ", "umount ", "fdisk",
+    "passwd ", "useradd ", "usermod ",
+    "ssh-keygen", "ssh ", ".ssh/",
     ":(){:|:&};:", "chmod 777",
 ]
+
+# SECURITY: Compiled regex for bypass-resistant matching.
+# Catches variations like 'rm  -rf' (extra spaces), backtick injection, etc.
+_DANGEROUS_REGEX = re.compile(
+    r"|".join(
+        re.escape(p).replace(r"\ ", r"\s+")  # whitespace flexibility
+        for p in DANGEROUS_PATTERNS
+    ),
+    re.IGNORECASE,
+)
 
 # Delegation depth limits
 MAX_SPAWN_DEPTH = 2
@@ -473,16 +495,17 @@ class PolicyEngine:
 
         # Dangerous command detection for shell
         if skill == "shell_exec" and argument:
-            for pattern in DANGEROUS_PATTERNS:
-                if pattern in argument.lower():
-                    return PolicyResult(
-                        verdict=Verdict.ASK,
-                        reason=(
-                            f"potentially dangerous: "
-                            f"contains '{pattern}'"
-                        ),
-                        tier=Tier.APPROVE,
-                    )
+                        # SECURITY FIX: Use regex for bypass-resistant matching
+            match = _DANGEROUS_REGEX.search(argument)
+            if match:
+                return PolicyResult(
+                    verdict=Verdict.ASK,
+                    reason=(
+                        f"potentially dangerous: "
+                        f"matches '{match.group()}'"
+                    ),
+                    tier=Tier.APPROVE,
+                )
 
         # --- Graduated autonomy: promotion check ---
         promoted = False
