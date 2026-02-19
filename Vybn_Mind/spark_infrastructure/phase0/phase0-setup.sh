@@ -5,7 +5,11 @@
 #   cd ~/Vybn/Vybn_Mind/spark_infrastructure/phase0
 #   bash phase0-setup.sh
 #
-# Prerequisites: run phase0-preflight.sh first to verify.
+# Prerequisites:
+#   1. Run phase0-preflight.sh first to verify.
+#   2. EXPAND SWAP FIRST if you haven't already.
+#      The 229B model leaves ~230MB free RAM. Docker needs ~500MB-1GB.
+#      Without adequate swap, OOM killer WILL fire.
 
 set -euo pipefail
 
@@ -15,6 +19,35 @@ SERVICE_DST="/etc/systemd/system/vybn-agent.service"
 
 echo ""
 echo "=== Phase 0: Always-On Deployment ==="
+echo ""
+
+# ---------------------------------------------------------------
+# SAFETY GATE: Check swap is adequate before proceeding
+# ---------------------------------------------------------------
+SWAP_TOTAL_KB=$(grep SwapTotal /proc/meminfo | awk '{print $2}')
+SWAP_TOTAL_GB=$((SWAP_TOTAL_KB / 1048576))
+MEM_AVAIL_KB=$(grep MemAvailable /proc/meminfo | awk '{print $2}')
+MEM_AVAIL_MB=$((MEM_AVAIL_KB / 1024))
+
+echo "  Available RAM: ${MEM_AVAIL_MB}MB  |  Total swap: ${SWAP_TOTAL_GB}GB"
+
+if [ $SWAP_TOTAL_KB -lt 67108864 ]; then
+  echo ""
+  echo -e "  \033[31mABORT: Insufficient swap (${SWAP_TOTAL_GB}GB < 64GB required).\033[0m"
+  echo -e "  \033[31mThe 229B model leaves ~230MB free. Docker needs ~500MB-1GB.\033[0m"
+  echo -e "  \033[31mWithout swap headroom, OOM killer WILL crash the model.\033[0m"
+  echo ""
+  echo "  Fix this first:"
+  echo "    sudo fallocate -l 128G /swapfile"
+  echo "    sudo chmod 600 /swapfile"
+  echo "    sudo mkswap /swapfile"
+  echo "    sudo swapon /swapfile"
+  echo "    sudo sysctl vm.swappiness=10"
+  echo ""
+  echo "  Then re-run this script."
+  exit 1
+fi
+echo -e "  \033[32m\u2713\033[0m Swap is adequate (${SWAP_TOTAL_GB}GB)"
 echo ""
 
 # ---------------------------------------------------------------
@@ -81,8 +114,10 @@ echo ""
 
 # ---------------------------------------------------------------
 # STEP 3: Deploy Open WebUI via Docker
+# Memory-constrained: cap at 2GB RAM, strip ML libraries,
+# disable RAG/STT/TTS to minimize footprint (~300MB vs ~1GB).
 # ---------------------------------------------------------------
-echo "--- Step 3: Open WebUI (Docker) ---"
+echo "--- Step 3: Open WebUI (Docker, memory-limited) ---"
 
 if ! command -v docker > /dev/null 2>&1; then
   echo -e "  \033[33m\u26a0\033[0m Docker not installed. Skipping Open WebUI."
@@ -95,11 +130,16 @@ else
     docker rm open-webui 2>/dev/null || true
   fi
 
-  echo "  Launching Open WebUI container..."
+  echo "  Launching Open WebUI container (memory-limited)..."
   docker run -d \
     -p 127.0.0.1:3000:8080 \
     --add-host=host.docker.internal:host-gateway \
     -e OLLAMA_BASE_URL=http://host.docker.internal:11434 \
+    -e RAG_EMBEDDING_ENGINE=openai \
+    -e AUDIO_STT_ENGINE=openai \
+    -e IMAGE_GENERATION_ENGINE=openai \
+    --memory=2g \
+    --memory-swap=4g \
     -v open-webui:/app/backend/data \
     --name open-webui \
     --restart always \
@@ -115,6 +155,7 @@ else
     echo -e "  \033[33m\u26a0\033[0m Open WebUI not responding yet (may need more time)"
     echo "  Check: docker logs open-webui"
   fi
+  echo "  Memory limit: 2GB RAM / 4GB with swap (prevents OOM of 229B model)"
 fi
 echo ""
 
