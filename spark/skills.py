@@ -269,18 +269,18 @@ class SkillRouter:
                 "soul validation passed: %d skills aligned", len(code_all)
             )
 
-      def _normalize_home(self, path_str: str) -> str:
-    """Normalize any hallucinated home directory to the actual home.
+        def _normalize_home(self, path_str: str) -> str:
+            """Normalize any hallucinated home directory to the actual home.
 
-    The model sometimes expands ~ to /home/user/, /root/, or other
-    training-data defaults instead of the real home directory.
-    This catches all variants: /home/<anything>/, /root/, etc.
-    """
-    home_match = re.match(r'^/(?:home/\w+|root)/', path_str)
-    if home_match and not path_str.startswith(self._home + "/"):
-      relative = path_str[len(home_match.group(0)):]
-      return self._home + "/" + relative
-    return path_str
+            The model sometimes expands ~ to /home/user/, /root/, or other
+            training-data defaults instead of the real home directory.
+            This catches all variants: /home/<anything>/, /root/, etc.
+        """
+            home_match = re.match(r'^/(?:home/\w+|root)/', path_str)
+            if home_match and not path_str.startswith(self._home + "/"):
+                relative = path_str[len(home_match.group(0)):]
+                return self._home + "/" + relative
+            return path_str
 
     def parse(self, text: str) -> list[dict]:
         """Parse natural language intent into skill actions (tier 3).
