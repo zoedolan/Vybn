@@ -60,9 +60,6 @@ class SkillRouter:
         self.plugin_aliases = {}    # alias -> skill_name
         self._load_plugins()
 
-        # Soul validation — cross-check registered skills against vybn.md
-        self._validate_against_soul()
-
         # NOTE: issue_create and spawn_agent are intentionally NOT in this list.
         # They trigger ONLY from explicit <minimax:tool_call> XML blocks
         # parsed by agent.py, never from natural language regex matching.
@@ -165,6 +162,8 @@ class SkillRouter:
                 "extract": r"(?:in|at|reading|file)\s+[\"']?([^\s\"']+)[\"']?",
             },
         ]
+        # Soul validation — cross-check registered skills against vybn.md
+        self._validate_against_soul()
 
     # ---- plugin system ----
 
