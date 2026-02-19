@@ -60,8 +60,8 @@ class SkillRouter:
         self.plugin_aliases = {}    # alias -> skill_name
         self._load_plugins()
 
-              # Soul validation — cross-check registered skills against vybn.md
-              self._validate_against_soul()
+          # Soul validation — cross-check registered skills against vybn.md
+          self._validate_against_soul()
 
         # NOTE: issue_create and spawn_agent are intentionally NOT in this list.
         # They trigger ONLY from explicit <minimax:tool_call> XML blocks
