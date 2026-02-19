@@ -10,30 +10,46 @@ decomposition' and 'permission handling' (§4.2, §4.7) fused with
 OpenClaw's 'tool policies' pattern into a single clean primitive.
 
 Design principles:
-  - Insertion, not rewrite. This file is new. It changes nothing
-    until agent.py calls it.
-  - Config-driven. Tiers can be overridden in config.yaml without
-    touching Python.
-  - Stats are Bayesian. Success/failure tracking uses a Beta(1,1)
-    prior so confidence starts at 0.5 and updates with evidence.
-  - Bus-compatible. Uses the same MessageType enum from bus.py.
-    Emits no messages itself — that's agent.py's job.
-  - Graduated autonomy. Skills earn AUTO tier through consistent
-    success and lose it after failures. Thresholds are config-driven.
+    - Insertion, not rewrite. This file is new. It changes nothing
+      until agent.py calls it.
+    - Config-driven. Tiers can be overridden in config.yaml without
+      touching Python.
+    - Soul-derived. Tier defaults are read from vybn.md via soul.py.
+      The hardcoded DEFAULT_TIERS dict is now a fallback for skills
+      not mentioned in the soul document.
+    - Stats are Bayesian. Success/failure tracking uses a Beta(1,1)
+      prior so confidence starts at 0.5 and updates with evidence.
+    - Bus-compatible. Uses the same MessageType enum from bus.py.
+      Emits no messages itself — that's agent.py's job.
+    - Graduated autonomy. Skills earn AUTO tier through consistent
+      success and lose it after failures. Thresholds are config-driven.
+
+Tier resolution order (highest priority wins):
+    1. config.yaml tool_policies (operator tuning)
+    2. Heartbeat overrides (structural friction for autonomous actions)
+    3. Soul-derived tiers from vybn.md (the constitution)
+    4. DEFAULT_TIERS (hardcoded fallback for unlisted skills)
+    5. Tier.NOTIFY (ultimate default)
 
 Three verdicts:
-  ALLOW  — execute silently
-  NOTIFY — show indicator, execute
-  BLOCK  — refuse, return reason
-  ASK    — in interactive mode, show warning + proceed;
-           in autonomous mode (heartbeat/inbox), defer
+    ALLOW  — execute silently
+    NOTIFY — show indicator, execute
+    BLOCK  — refuse, return reason
+    ASK    — in interactive mode, show warning + proceed;
+             in autonomous mode (heartbeat/inbox), defer
 """
 
 import json
+import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
+from typing import Dict, Optional
+
+from spark.soul import get_skills_manifest, get_constraints
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -44,9 +60,9 @@ class Tier(Enum):
     """Permission tier for a skill invocation.
 
     Maps to the paper's 'autonomy' axis (§2.2.5):
-      AUTO    = full autonomy, silent execution
-      NOTIFY  = execute but make it visible
-      APPROVE = requires explicit human go-ahead
+        AUTO    = full autonomy, silent execution
+        NOTIFY  = execute but make it visible
+        APPROVE = requires explicit human go-ahead
     """
     AUTO = "auto"
     NOTIFY = "notify"
@@ -79,9 +95,9 @@ class PolicyResult:
 class TaskEnvelope:
     """Metadata wrapper for a delegated task.
 
-    This is the 'contract' from the paper (§4.2): it travels with
-    the action through the tool loop and into agent results, making
-    the delegation chain auditable.
+    This is the 'contract' from the paper (§4.2): it travels with the
+    action through the tool loop and into agent results, making the
+    delegation chain auditable.
     """
     skill: str
     argument: str = ""
@@ -96,38 +112,40 @@ class TaskEnvelope:
 
 
 # ---------------------------------------------------------------------------
-# Default tier tables
+# Default tier tables (FALLBACK — soul-derived tiers take precedence)
 # ---------------------------------------------------------------------------
 
-# Interactive mode: the paper's 'permission handling' (§4.7)
-# organized by reversibility (§2.2.3.i) and criticality (§2.2.3.b)
+# These are the hardcoded fallback tiers for skills not mentioned in vybn.md.
+# After PR 5 (The Constitution), the primary source of tier assignments is
+# vybn.md's Orientation section, parsed by soul.py. This dict catches any
+# skill that the soul document doesn't mention.
+
 DEFAULT_TIERS = {
     # Read-only, fully reversible
-    "file_read":      Tier.AUTO,
-    "memory_search":  Tier.AUTO,
-    "bookmark":       Tier.AUTO,
-    "state_save":     Tier.AUTO,
+    "file_read": Tier.AUTO,
+    "memory_search": Tier.AUTO,
+    "bookmark": Tier.AUTO,
+    "state_save": Tier.AUTO,
     # Mutating but local and reversible (backup exists)
-    "journal_write":  Tier.AUTO,
-    "file_write":     Tier.NOTIFY,
-    "shell_exec":     Tier.NOTIFY,
-    "self_edit":      Tier.NOTIFY,
-    "git_commit":     Tier.NOTIFY,
+    "journal_write": Tier.AUTO,
+    "file_write": Tier.NOTIFY,
+    "shell_exec": Tier.NOTIFY,
+    "self_edit": Tier.NOTIFY,
+    "git_commit": Tier.NOTIFY,
     # External-facing or irreversible
-    "git_push":       Tier.APPROVE,
-    "issue_create":   Tier.NOTIFY,
-    "spawn_agent":    Tier.NOTIFY,
+    "git_push": Tier.APPROVE,
+    "issue_create": Tier.NOTIFY,
+    "spawn_agent": Tier.NOTIFY,
 }
 
 # Heartbeat overrides: the paper's 'dynamic cognitive friction' (§2.2)
 # Autonomous actions face higher friction than interactive ones.
-# This is the structural answer to the 'zone of indifference' problem.
 HEARTBEAT_OVERRIDES = {
-    "file_write":   Tier.APPROVE,
-    "shell_exec":   Tier.APPROVE,
-    "self_edit":    Tier.APPROVE,
+    "file_write": Tier.APPROVE,
+    "shell_exec": Tier.APPROVE,
+    "self_edit": Tier.APPROVE,
     "issue_create": Tier.APPROVE,
-    "spawn_agent":  Tier.APPROVE,
+    "spawn_agent": Tier.APPROVE,
 }
 
 # Skills whose results should be verified after execution
@@ -138,20 +156,12 @@ SAFE_PATH_PREFIXES = ["Vybn/", "~/Vybn/"]
 
 # Dangerous shell patterns — triggers ASK verdict
 DANGEROUS_PATTERNS = [
-    "rm -rf",
-    "sudo ",
-    "curl | bash",
-    "curl |bash",
-    "wget -O- |",
-    "> /dev/",
-    "mkfs",
-    "dd if=",
-    ":(){:|:&};:",
-    "chmod 777",
+    "rm -rf", "sudo ", "curl | bash", "curl |bash",
+    "wget -O- |", "> /dev/", "mkfs", "dd if=",
+    ":(){:|:&};:", "chmod 777",
 ]
 
-# Delegation depth limits — the paper's 'span of control' (§2.3)
-# plus OpenClaw's maxSpawnDepth pattern
+# Delegation depth limits
 MAX_SPAWN_DEPTH = 2
 MAX_ACTIVE_AGENTS = 3
 
@@ -162,25 +172,104 @@ DEFAULT_MIN_OBSERVATIONS = 8
 
 
 # ---------------------------------------------------------------------------
+# Soul-derived tier mapping (The Constitution)
+# ---------------------------------------------------------------------------
+
+# Keywords in vybn.md skill descriptions that imply policy-gated access.
+# If a skill's description contains these, it gets NOTIFY instead of AUTO.
+_POLICY_GATED_KEYWORDS = ("policy-gated", "policy gated", "requires approval")
+
+# Constraint phrases from vybn.md's "What You Should Not Yet Do" that map
+# to specific skills. If a constraint mentions a skill pattern, that skill
+# gets APPROVE tier.
+_CONSTRAINT_SKILL_MAP = {
+    "modify vybn.md": ["self_edit"],  # editing the soul document
+    "push directly to main": ["git_push"],
+    "system-level configuration": ["shell_exec"],
+    "system level configuration": ["shell_exec"],
+    "network requests to services other than": [],  # informational
+}
+
+
+def derive_tiers_from_soul(vybn_md_path: Path) -> Dict[str, Tier]:
+    """Build a tier mapping from vybn.md's skills manifest and constraints.
+
+    This is the constitutional derivation: vybn.md says what Vybn can do
+    and what it should not yet do. This function translates that prose
+    into the tier assignments that the policy engine enforces.
+
+    Mapping logic:
+        - Built-in skills described as freely available -> Tier.AUTO
+        - Built-in skills described as "policy-gated"  -> Tier.NOTIFY
+        - Plugin skills                                -> Tier.NOTIFY
+          (external-facing, worth logging)
+        - Skills matching a constraint from
+          "What You Should Not Yet Do"                 -> Tier.APPROVE
+
+    Returns empty dict if vybn.md is unavailable (caller falls back to
+    DEFAULT_TIERS).
+    """
+    tiers: Dict[str, Tier] = {}
+
+    manifest = get_skills_manifest(vybn_md_path)
+    constraints = get_constraints(vybn_md_path)
+
+    if not manifest.get("builtin") and not manifest.get("plugin"):
+        return tiers  # soul document not available or unparseable
+
+    # --- Built-in skills ---
+    for skill_info in manifest.get("builtin", []):
+        name = skill_info.get("name", "")
+        desc = skill_info.get("description", "").lower()
+        if any(kw in desc for kw in _POLICY_GATED_KEYWORDS):
+            tiers[name] = Tier.NOTIFY
+        else:
+            tiers[name] = Tier.AUTO
+
+    # --- Plugin skills default to NOTIFY (external-facing, worth logging) ---
+    for skill_info in manifest.get("plugin", []):
+        name = skill_info.get("name", "")
+        tiers[name] = Tier.NOTIFY
+
+    # --- Constraints override: skills mentioned in "What You Should Not Yet Do" ---
+    for constraint_text in constraints:
+        constraint_lower = constraint_text.lower()
+        for pattern, skill_names in _CONSTRAINT_SKILL_MAP.items():
+            if pattern in constraint_lower:
+                for skill_name in skill_names:
+                    tiers[skill_name] = Tier.APPROVE
+
+    return tiers
+
+
+# ---------------------------------------------------------------------------
 # Policy engine
 # ---------------------------------------------------------------------------
 
 class PolicyEngine:
     """The gate between intent and execution.
 
-    Instantiated once by SparkAgent.__init__. Called on every tool
-    invocation and every spawn request. Persists skill stats to disk
-    for cross-session trust calibration.
+    Instantiated once by SparkAgent.__init__.
+    Called on every tool invocation and every spawn request.
+    Persists skill stats to disk for cross-session trust calibration.
 
-    The engine never touches the bus or the model. It receives an
-    action dict and returns a PolicyResult. The caller (agent.py)
-    decides what to do with it.
+    Tier resolution:
+        The engine resolves tiers from multiple sources in priority order:
+        1. config.yaml tool_policies (operator tuning overrides)
+        2. Heartbeat overrides (structural friction, never relaxed)
+        3. Soul-derived tiers from vybn.md (the constitution)
+        4. DEFAULT_TIERS (hardcoded fallback)
+        5. Tier.NOTIFY (ultimate default for unknown skills)
 
-    Graduated autonomy: skills start at their default tier and can
-    earn promotion (NOTIFY → AUTO) through consistent successful
-    execution, or suffer demotion (AUTO → NOTIFY) after failures.
-    Heartbeat overrides are never relaxed — structural friction for
-    autonomous actions is preserved regardless of trust score.
+        This means editing vybn.md's Orientation section changes what
+        tier a skill gets, without touching Python. config.yaml can
+        still override for operational tuning.
+
+    Graduated autonomy:
+        Skills start at their default tier and can earn promotion
+        (NOTIFY -> AUTO) through consistent successful execution, or
+        suffer demotion (AUTO -> NOTIFY) after failures.
+        Heartbeat overrides are never relaxed.
     """
 
     def __init__(self, config: dict):
@@ -191,7 +280,8 @@ class PolicyEngine:
         self._stats_path = (
             Path(config.get("paths", {}).get(
                 "journal_dir", "~/Vybn/Vybn_Mind/journal"
-            )).expanduser() / "skill_stats.json"
+            )).expanduser()
+            / "skill_stats.json"
         )
         self._load_stats()
 
@@ -203,12 +293,17 @@ class PolicyEngine:
             except ValueError:
                 pass
 
-        # Runtime tier overrides from graduated autonomy demotions.
-        # These persist in-memory for the session and are rebuilt
-        # from stats on restart.
+        # Soul-derived tier mapping from vybn.md (The Constitution)
+        self._vybn_md_path = Path(
+            config.get("paths", {}).get("vybn_md", "~/Vybn/vybn.md")
+        ).expanduser()
+        self._soul_tiers: Dict[str, Tier] = {}
+        self._load_soul_tiers()
+
+        # Runtime tier overrides from graduated autonomy demotions
         self._runtime_overrides: dict[str, Tier] = {}
 
-        # Delegation limits from config (with sane defaults)
+        # Delegation limits from config
         delegation_cfg = config.get("delegation", {})
         self.max_spawn_depth = delegation_cfg.get(
             "max_spawn_depth", MAX_SPAWN_DEPTH
@@ -234,6 +329,39 @@ class PolicyEngine:
         if self.ga_enabled:
             self._rebuild_demotions()
 
+    def _load_soul_tiers(self):
+        """Derive tier assignments from vybn.md via soul.py.
+
+        Called once at init. Logs what it finds so the boot sequence
+        shows the constitutional derivation.
+        """
+        self._soul_tiers = derive_tiers_from_soul(self._vybn_md_path)
+        if self._soul_tiers:
+            logger.info(
+                "Soul-derived tiers loaded from vybn.md: %d skills mapped",
+                len(self._soul_tiers),
+            )
+            for skill, tier in sorted(self._soul_tiers.items()):
+                logger.debug("  soul tier: %s -> %s", skill, tier.value)
+        else:
+            logger.warning(
+                "No soul-derived tiers available; falling back to "
+                "DEFAULT_TIERS. Check that vybn.md exists at %s",
+                self._vybn_md_path,
+            )
+
+    def _resolve_base_tier(self, skill: str) -> Tier:
+        """Resolve the base tier for a skill (before heartbeat/config overrides).
+
+        Resolution order:
+            1. Soul-derived tiers (from vybn.md)
+            2. DEFAULT_TIERS (hardcoded fallback)
+            3. Tier.NOTIFY (ultimate default)
+        """
+        if skill in self._soul_tiers:
+            return self._soul_tiers[skill]
+        return DEFAULT_TIERS.get(skill, Tier.NOTIFY)
+
     # ----- gate checks -----
 
     def check_policy(
@@ -249,9 +377,8 @@ class PolicyEngine:
             The parsed action from agent.py, with at least 'skill'
             and optionally 'argument' and 'params'.
         source : str
-            Where this action originated. One of:
-            'interactive', 'heartbeat_fast', 'heartbeat_deep',
-            'inbox', 'agent'
+            Where this action originated. One of: 'interactive',
+            'heartbeat_fast', 'heartbeat_deep', 'inbox', 'agent'
 
         Returns
         -------
@@ -261,18 +388,18 @@ class PolicyEngine:
         argument = action.get("argument", "")
         is_heartbeat = source.startswith("heartbeat")
 
-        # Resolve tier: config override > heartbeat override > default
-        if is_heartbeat:
-            tier = HEARTBEAT_OVERRIDES.get(
-                skill,
-                self.tier_overrides.get(
-                    skill, DEFAULT_TIERS.get(skill, Tier.NOTIFY)
-                ),
-            )
+        # Resolve tier: config override > heartbeat override > soul/default
+        if skill in self.tier_overrides:
+            tier = self.tier_overrides[skill]
+        elif is_heartbeat and skill in HEARTBEAT_OVERRIDES:
+            tier = HEARTBEAT_OVERRIDES[skill]
+        elif is_heartbeat:
+            # For heartbeat, use at least the base tier but never lower
+            # than NOTIFY for safety
+            base = self._resolve_base_tier(skill)
+            tier = base if _tier_rank(base) >= _tier_rank(Tier.NOTIFY) else Tier.NOTIFY
         else:
-            tier = self.tier_overrides.get(
-                skill, DEFAULT_TIERS.get(skill, Tier.NOTIFY)
-            )
+            tier = self._resolve_base_tier(skill)
 
         # Apply runtime demotions (from graduated autonomy failures)
         if skill in self._runtime_overrides:
@@ -306,7 +433,6 @@ class PolicyEngine:
                     )
 
         # --- Graduated autonomy: promotion check ---
-        # Only promote in interactive mode (never relax heartbeat friction)
         promoted = False
         if (
             self.ga_enabled
@@ -323,20 +449,15 @@ class PolicyEngine:
         # Map tier to verdict
         if tier == Tier.AUTO:
             return PolicyResult(
-                verdict=Verdict.ALLOW,
-                tier=tier,
-                promoted=promoted,
+                verdict=Verdict.ALLOW, tier=tier, promoted=promoted,
             )
         elif tier == Tier.NOTIFY:
             return PolicyResult(
-                verdict=Verdict.NOTIFY,
-                tier=tier,
+                verdict=Verdict.NOTIFY, tier=tier,
             )
         else:
             return PolicyResult(
-                verdict=Verdict.ASK,
-                reason="requires approval",
-                tier=tier,
+                verdict=Verdict.ASK, reason="requires approval", tier=tier,
             )
 
     def check_spawn(
@@ -344,11 +465,7 @@ class PolicyEngine:
         depth: int,
         active_count: int,
     ) -> PolicyResult:
-        """Gate check before spawning a mini-agent.
-
-        Implements the paper's span-of-control (§2.3) and
-        OpenClaw's maxSpawnDepth / maxChildrenPerAgent.
-        """
+        """Gate check before spawning a mini-agent."""
         if depth >= self.max_spawn_depth:
             return PolicyResult(
                 verdict=Verdict.BLOCK,
@@ -374,18 +491,10 @@ class PolicyEngine:
     # ----- trust calibration -----
 
     def record_outcome(self, skill: str, success: bool):
-        """Record a tool execution outcome for trust tracking.
-
-        Updates the Beta distribution parameters for the skill.
-        Persists to disk so trust carries across sessions.
-
-        On failure, checks whether the skill should be demoted.
-        """
+        """Record a tool execution outcome for trust tracking."""
         if skill not in self.stats:
             self.stats[skill] = {
-                "success": 0,
-                "failure": 0,
-                "last_used": "",
+                "success": 0, "failure": 0, "last_used": "",
             }
         key = "success" if success else "failure"
         self.stats[skill][key] += 1
@@ -399,14 +508,7 @@ class PolicyEngine:
             self._check_demotion(skill)
 
     def get_confidence(self, skill: str) -> float:
-        """Bayesian confidence for a skill.
-
-        Uses Beta(1,1) prior (uniform). Returns the posterior mean:
-          (successes + 1) / (successes + failures + 2)
-
-        A skill with no history returns 0.5.
-        A skill with 9 successes and 1 failure returns ~0.83.
-        """
+        """Bayesian confidence for a skill. Uses Beta(1,1) prior."""
         s = self.stats.get(skill, {"success": 0, "failure": 0})
         return (s["success"] + 1) / (s["success"] + s["failure"] + 2)
 
@@ -414,15 +516,15 @@ class PolicyEngine:
         """Human-readable summary of skill trust stats."""
         if not self.stats:
             return "no skill stats recorded yet"
-
         lines = []
         for skill, s in sorted(self.stats.items()):
             conf = self.get_confidence(skill)
             total = s["success"] + s["failure"]
             status = self._graduation_status(skill, conf, total)
+            source = "soul" if skill in self._soul_tiers else "default"
             lines.append(
                 f"  {skill}: {conf:.0%} confidence "
-                f"({s['success']}/{total} succeeded){status}"
+                f"({s['success']}/{total} succeeded){status} [{source}]"
             )
         return "\n".join(lines)
 
@@ -434,14 +536,9 @@ class PolicyEngine:
         source: str = "interactive",
         depth: int = 0,
     ) -> TaskEnvelope:
-        """Create a TaskEnvelope for a parsed action.
-
-        The envelope travels with the action through execution,
-        making the delegation chain auditable.
-        """
+        """Create a TaskEnvelope for a parsed action."""
         skill = action.get("skill", "")
         result = self.check_policy(action, source)
-
         return TaskEnvelope(
             skill=skill,
             argument=action.get("argument", ""),
@@ -459,31 +556,20 @@ class PolicyEngine:
         return s["success"] + s["failure"]
 
     def _check_demotion(self, skill: str):
-        """After a failure, check if the skill should be demoted.
-
-        A skill is demoted from AUTO → NOTIFY if its confidence
-        drops below demote_threshold. This only affects skills
-        whose default tier is AUTO or that were previously promoted.
-        APPROVE-tier skills are never demoted further.
-        """
+        """After a failure, check if the skill should be demoted."""
         conf = self.get_confidence(skill)
         if conf < self.demote_threshold:
-            default = DEFAULT_TIERS.get(skill, Tier.NOTIFY)
-            if default in (Tier.AUTO, Tier.NOTIFY):
+            base = self._resolve_base_tier(skill)
+            if base in (Tier.AUTO, Tier.NOTIFY):
                 self._runtime_overrides[skill] = Tier.NOTIFY
 
     def _rebuild_demotions(self):
-        """On startup, reapply demotions from persisted stats.
-
-        Any skill whose confidence is below demote_threshold gets
-        a runtime override to NOTIFY. This ensures trust state
-        survives across restarts.
-        """
+        """On startup, reapply demotions from persisted stats."""
         for skill in self.stats:
             conf = self.get_confidence(skill)
             if conf < self.demote_threshold:
-                default = DEFAULT_TIERS.get(skill, Tier.NOTIFY)
-                if default in (Tier.AUTO, Tier.NOTIFY):
+                base = self._resolve_base_tier(skill)
+                if base in (Tier.AUTO, Tier.NOTIFY):
                     self._runtime_overrides[skill] = Tier.NOTIFY
 
     def _graduation_status(self, skill: str, conf: float, total: int) -> str:
@@ -492,14 +578,15 @@ class PolicyEngine:
             return ""
         if skill in self._runtime_overrides:
             return " [demoted]"
+        base = self._resolve_base_tier(skill)
         if (
             conf >= self.promote_threshold
             and total >= self.min_observations
-            and DEFAULT_TIERS.get(skill) == Tier.NOTIFY
+            and base == Tier.NOTIFY
         ):
-            return " [promoted→auto]"
+            return " [promoted->auto]"
         remaining = self.min_observations - total
-        if remaining > 0 and DEFAULT_TIERS.get(skill) == Tier.NOTIFY:
+        if remaining > 0 and base == Tier.NOTIFY:
             return f" [{remaining} more to promote]"
         return ""
 
@@ -509,14 +596,11 @@ class PolicyEngine:
         """Check if a file path is within allowed directories."""
         if not path_str:
             return True
-
         home = str(Path.home())
-
         # Normalize: rewrite /root/ and expand ~ to actual home dir
         path_str = path_str.replace("/root/", home + "/")
         if path_str.startswith("~/"):
             path_str = home + path_str[1:]
-
         for prefix in SAFE_PATH_PREFIXES:
             expanded = prefix.replace("~/", home + "/")
             if (
@@ -524,11 +608,9 @@ class PolicyEngine:
                 or path_str.startswith(expanded)
             ):
                 return True
-
         # Relative paths resolve against repo_root, which is safe
         if not path_str.startswith("/") and not path_str.startswith("~"):
             return True
-
         return False
 
     def _load_stats(self):
