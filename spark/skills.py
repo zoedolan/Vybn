@@ -60,8 +60,8 @@ class SkillRouter:
         self.plugin_aliases = {}    # alias -> skill_name
         self._load_plugins()
 
-          # Soul validation — cross-check registered skills against vybn.md
-          self._validate_against_soul()
+        # Soul validation — cross-check registered skills against vybn.md
+        self._validate_against_soul()
 
         # NOTE: issue_create and spawn_agent are intentionally NOT in this list.
         # They trigger ONLY from explicit <minimax:tool_call> XML blocks
@@ -214,63 +214,63 @@ class SkillRouter:
         if loaded:
             print(f"  [plugins] loaded: {', '.join(loaded)}")
 
-  def _validate_against_soul(self):
+    def _validate_against_soul(self):
         """Cross-check registered skills against the soul manifest.
 
-            Loads the skills manifest from vybn.md (via soul.py) and compares
-                it against the handler table and plugin registry. Logs warnings
-                    for any drift between what the soul document declares and what
-                        the code actually provides.
-                            """
+        Loads the skills manifest from vybn.md (via soul.py) and compares
+        it against the handler table and plugin registry. Logs warnings
+        for any drift between what the soul document declares and what
+        the code actually provides.
+        """
         soul_path = self.repo_root / "vybn.md"
         try:
-                manifest = get_skills_manifest(soul_path)
-              except Exception as exc:
-                      logger.warning("soul validation skipped — could not parse vybn.md: %s", exc)
-                      return
+            manifest = get_skills_manifest(soul_path)
+        except Exception as exc:
+            logger.warning("soul validation skipped — could not parse vybn.md: %s", exc)
+            return
 
-    # Collect soul-declared skill names
-    soul_builtins = {s["name"] for s in manifest.get("builtin", [])}
-    soul_plugins = {s["name"] for s in manifest.get("plugin", [])}
-    soul_all = soul_builtins | soul_plugins
+        # Collect soul-declared skill names
+        soul_builtins = {s["name"] for s in manifest.get("builtin", [])}
+        soul_plugins = {s["name"] for s in manifest.get("plugin", [])}
+        soul_all = soul_builtins | soul_plugins
 
-    # Collect code-registered skill names
-    code_builtins = set()
-    for pattern in self.patterns:
+        # Collect code-registered skill names
+        code_builtins = set()
+        for pattern in self.patterns:
             code_builtins.add(pattern["skill"])
-          # Also include handler-table skills not in patterns
-    # (issue_create, spawn_agent are XML-only, not regex-triggered)
-    code_builtins.update({"issue_create", "spawn_agent"})
-    code_plugins = set(self.plugin_handlers.keys())
-    code_all = code_builtins | code_plugins
+        # Also include handler-table skills not in patterns
+        # (issue_create, spawn_agent are XML-only, not regex-triggered)
+        code_builtins.update({"issue_create", "spawn_agent"})
+        code_plugins = set(self.plugin_handlers.keys())
+        code_all = code_builtins | code_plugins
 
-    # Skills in soul but missing from code
-    soul_only = soul_all - code_all
-    for name in sorted(soul_only):
+        # Skills in soul but missing from code
+        soul_only = soul_all - code_all
+        for name in sorted(soul_only):
             logger.warning(
-                      "soul declares skill '%s' but no handler is registered", name
-                    )
+                "soul declares skill '%s' but no handler is registered", name
+            )
 
-    # Skills in code but not declared in soul
-    code_only = code_all - soul_all
-    for name in sorted(code_only):
+        # Skills in code but not declared in soul
+        code_only = code_all - soul_all
+        for name in sorted(code_only):
             logger.warning(
-                      "code registers skill '%s' but soul manifest does not declare it", name
-                    )
+                "code registers skill '%s' but soul manifest does not declare it", name
+            )
 
-    # Plugin cross-check: soul-declared plugins vs loaded plugins
-    soul_plugin_missing = soul_plugins - code_plugins
-    for name in sorted(soul_plugin_missing):
+        # Plugin cross-check: soul-declared plugins vs loaded plugins
+        soul_plugin_missing = soul_plugins - code_plugins
+        for name in sorted(soul_plugin_missing):
             logger.warning(
-                      "soul declares plugin '%s' but it is not loaded from skills.d/", name
-                    )
+                "soul declares plugin '%s' but it is not loaded from skills.d/", name
+            )
 
-    if not soul_only and not code_only:
+        if not soul_only and not code_only:
             logger.info(
-                      "soul validation passed: %d skills aligned", len(code_all)
-                    )
-  
-def _rewrite_root(self, path_str: str) -> str:
+                "soul validation passed: %d skills aligned", len(code_all)
+            )
+
+    def _rewrite_root(self, path_str: str) -> str:
         """Rewrite /root/ to actual home directory."""
         return path_str.replace("/root/", self._home + "/")
 
@@ -278,12 +278,12 @@ def _rewrite_root(self, path_str: str) -> str:
         """Parse natural language intent into skill actions (tier 3).
 
         This is the last-resort parser.  It matches regex patterns against
-            the model's output.  Actions with empty or noise-word arguments
+        the model's output.  Actions with empty or noise-word arguments
         for skills that require arguments are filtered by the caller
         (_get_actions in agent.py).
         """
         actions = []
-     # Strip think blocks so </think> doesn't get parsed as path '/think'
+        # Strip think blocks so </think> doesn't get parsed as path '/think'
         text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
         text_lower = text.lower()
 
@@ -395,7 +395,7 @@ def _rewrite_root(self, path_str: str) -> str:
 
         filepath = self._resolve_path(filename)
 
-              # Tier 1 guardrail: block writes to spark/ infrastructure
+        # Tier 1 guardrail: block writes to spark/ infrastructure
         spark_dir = self.repo_root / "spark"
         try:
             filepath.resolve().relative_to(spark_dir.resolve())
@@ -404,7 +404,7 @@ def _rewrite_root(self, path_str: str) -> str:
                 f"file_write to {filename} isn't available at Tier 1. "
                 f"Infrastructure changes need to go through issue_create. "
                 f"File an issue describing what you want changed and why. "
-                f"This is the bootstrap protocol — communication before autonomy."
+                f"This is the bootstrap protocol \u2014 communication before autonomy."
             )
         except ValueError:
             # Not in spark/ — proceed with write
@@ -451,7 +451,7 @@ def _rewrite_root(self, path_str: str) -> str:
                 f"self_edit to {filename} isn't available at Tier 1. "
                 f"Infrastructure changes need to go through issue_create. "
                 f"File an issue describing what you want changed and why. "
-                f"This is the bootstrap protocol — communication before autonomy."
+                f"This is the bootstrap protocol \u2014 communication before autonomy."
             )
         except ValueError:
             # Not in spark/ — proceed with edit
