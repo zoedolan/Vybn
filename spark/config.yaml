@@ -6,7 +6,7 @@ ollama:
   model: "vybn:latest"
   keep_alive: "30m"
   options:
-    num_ctx: 16384    # CRITICAL: default is 2048, which silently drops the system prompt
+    num_ctx: 32768    # CRITICAL: default is 2048, which silently drops the system prompt
     num_predict: 512    # keep responses focused; MiniMax emits <think> tokens too
     temperature: 0.7
     stop:                # MiniMax M2.5 stop sequences
