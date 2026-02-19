@@ -593,25 +593,28 @@ class PolicyEngine:
     # ----- path safety -----
 
     def _path_is_safe(self, path_str: str) -> bool:
-        """Check if a file path is within allowed directories."""
+        """Check if a file path is within allowed directories.
+
+        SECURITY FIX: Resolves the path to an absolute path *before*
+        checking it against allowed prefixes, preventing path traversal
+        attacks like '../../../etc/shadow' which would bypass a
+        prefix-only check.
+        """
         if not path_str:
             return True
-        home = str(Path.home())
-        # Normalize: rewrite /root/ and expand ~ to actual home dir
-        path_str = path_str.replace("/root/", home + "/")
-        if path_str.startswith("~/"):
-            path_str = home + path_str[1:]
-        for prefix in SAFE_PATH_PREFIXES:
-            expanded = prefix.replace("~/", home + "/")
-            if (
-                path_str.startswith(prefix)
-                or path_str.startswith(expanded)
-            ):
-                return True
-        # Relative paths resolve against repo_root, which is safe
-        if not path_str.startswith("/") and not path_str.startswith("~"):
-            return True
-        return False
+        try:
+            repo = Path("~/Vybn").expanduser().resolve()
+            # Handle all path forms: absolute, relative, ~-prefixed
+            if path_str.startswith("~/"):
+                candidate = Path(path_str).expanduser().resolve()
+            elif path_str.startswith("/"):
+                candidate = Path(path_str).resolve()
+            else:
+                # Relative paths resolve against repo_root
+                candidate = (repo / path_str).resolve()
+            return candidate.is_relative_to(repo)
+        except (ValueError, OSError):
+            return False
 
     def _load_stats(self):
         if self._stats_path.exists():
