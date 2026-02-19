@@ -83,6 +83,24 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# SECURITY: Baseline security headers (cf. openclaw #10526)
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request as StarletteRequest
+from starlette.responses import Response as StarletteResponse
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: StarletteRequest, call_next):
+        response: StarletteResponse = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["Referrer-Policy"] = "no-referrer"
+        response.headers["X-Frame-Options"] = "DENY"
+        return response
+
+app.add_middleware(SecurityHeadersMiddleware)
+
+# SECURITY: WebSocket message size limit (cf. openclaw ACP bounds)
+MAX_WS_MESSAGE_SIZE = 2 * 1024 * 1024  # 2 MiB
+
 STATIC_DIR = Path(__file__).parent / "static"
 if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
@@ -230,6 +248,10 @@ async def websocket_endpoint(ws: WebSocket, token: str = ""):
                 continue
 
             # Record user message
+                            # SECURITY: Reject oversized messages (cf. openclaw ACP bounds)
+                if len(json.dumps(data)) > MAX_WS_MESSAGE_SIZE:
+                    await ws.send_json({"type": "error", "content": "Message too large"})
+                    continue
             user_entry = _add_history("user", user_text)
             await manager.broadcast({"type": "message", **user_entry})
 
