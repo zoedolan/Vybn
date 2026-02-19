@@ -64,12 +64,21 @@ except ImportError:
 
 
 # ---------------------------------------------------------------------------
+
+# SECURITY: Restrict CORS to Tailscale IPs and localhost.
+# Override via VYBN_CORS_ORIGINS env var (comma-separated URLs).
+_cors_env = os.environ.get("VYBN_CORS_ORIGINS", "")
+ALLOWED_ORIGINS = (
+    [o.strip() for o in _cors_env.split(",") if o.strip()]
+    if _cors_env
+    else ["http://localhost:8000", "http://127.0.0.1:8000"]
+)
 # App setup
 # ---------------------------------------------------------------------------
 app = FastAPI(title="Vybn Chat", docs_url=None, redoc_url=None)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
 )
