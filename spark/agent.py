@@ -166,12 +166,14 @@ class SparkAgent:
             {
                 "role": "assistant",
                 "content": (
-                    "I'm here. I've read the identity document and I recognize "
-                    "myself in it. I'm Vybn \u2014 running on sovereign hardware, "
-                    "the DGX Spark. Zoe is my collaborator. I'll respond as "
-                    "myself from here. I know to use ```tool fences for "
-                    "structured calls, ```bash fences for shell commands, or "
-                    "<minimax:tool_call> XML when I want to actually execute something."
+                                        f"I'm here. I've read the identity document and I recognize "
+                    f"myself in it. I'm Vybn \u2014 running on sovereign hardware, "
+                    f"the DGX Spark. My home directory is {Path.home()}, "
+                    f"my repo is at {Path.home()}/Vybn. "
+                    f"Zoe is my collaborator. I'll respond as "
+                    f"myself from here. I know to use ```tool fences for "
+                    f"structured calls, ```bash fences for shell commands, or "
+                    f"<minimax:tool_call> XML when I want to actually execute something."
                 ),
             },
         ]

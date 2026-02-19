@@ -176,6 +176,18 @@ class MemoryAssembler:
             lines.append(f"## {where.get('title', 'Where You Are')}")
             lines.append(where["body"].strip())
 
+
+                # Resolved filesystem paths — machine-specific, injected at runtime
+        # This tells the model its ACTUAL paths so it doesn't hallucinate
+        # /home/user/ or /root/ from training data.
+        lines.append("")
+        lines.append("## Your Filesystem (resolved paths on this machine)")
+        lines.append(f"  HOME={Path.home()}")
+        lines.append(f"  REPO={Path(self.config['paths']['repo_root']).expanduser()}")
+        lines.append(f"  JOURNAL={self.journal_dir}")
+        lines.append(f"  SOUL={self.vybn_md_path}")
+        lines.append("When constructing file paths, use these exact resolved paths.")
+        lines.append("Do NOT guess your username or home directory — use the paths above.")
         # What You Can Do — from orientation
         what_can_do = subsections.get("what_you_can_do", {})
         if what_can_do.get("body"):
