@@ -41,6 +41,7 @@ Three verdicts:
 
 import json
 import logging
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
@@ -158,8 +159,29 @@ SAFE_PATH_PREFIXES = ["Vybn/", "~/Vybn/"]
 DANGEROUS_PATTERNS = [
     "rm -rf", "sudo ", "curl | bash", "curl |bash",
     "wget -O- |", "> /dev/", "mkfs", "dd if=",
+        # SECURITY FIX: Expanded patterns (Gemini audit #6)
+    "eval ", "base64 ", "python -c", "python3 -c",
+    "nc -e", "ncat ", "bash -i", "sh -i",
+    ">/dev/tcp/", "/dev/udp/", "telnet ",
+    "crontab ", "at -f", "nohup ",
+    "curl -o", "wget -q", "pip install",
+    "chmod +s", "chown root", "setuid",
+    "iptables", "ufw ", "systemctl",
+    "mount ", "umount ", "fdisk",
+    "passwd ", "useradd ", "usermod ",
+    "ssh-keygen", "ssh ", ".ssh/",
     ":(){:|:&};:", "chmod 777",
 ]
+
+# SECURITY: Compiled regex for bypass-resistant matching.
+# Catches variations like 'rm  -rf' (extra spaces), backtick injection, etc.
+_DANGEROUS_REGEX = re.compile(
+    r"|".join(
+        re.escape(p).replace(r"\ ", r"\s+")  # whitespace flexibility
+        for p in DANGEROUS_PATTERNS
+    ),
+    re.IGNORECASE,
+)
 
 # Delegation depth limits
 MAX_SPAWN_DEPTH = 2
@@ -169,6 +191,16 @@ MAX_ACTIVE_AGENTS = 3
 DEFAULT_PROMOTE_THRESHOLD = 0.85
 DEFAULT_DEMOTE_THRESHOLD = 0.40
 DEFAULT_MIN_OBSERVATIONS = 8
+
+# Tainted context tracking — prompt injection mitigation
+# When web content is fetched, the context becomes "tainted" for N turns.
+# During tainted turns, tier escalation prevents fetched content from
+# immediately triggering dangerous actions (shell_exec, file_write, etc.).
+TAINT_DECAY_TURNS = 3  # turns after web fetch before taint expires
+TAINTED_ESCALATION_SKILLS = {
+    "shell_exec", "file_write", "self_edit", "git_push",
+    "git_commit", "spawn_agent",
+}
 
 
 # ---------------------------------------------------------------------------
@@ -329,6 +361,9 @@ class PolicyEngine:
         if self.ga_enabled:
             self._rebuild_demotions()
 
+            # Tainted context tracking (prompt injection mitigation)
+        self._tainted_turns = 0
+
     def _load_soul_tiers(self):
         """Derive tier assignments from vybn.md via soul.py.
 
@@ -362,6 +397,31 @@ class PolicyEngine:
             return self._soul_tiers[skill]
         return DEFAULT_TIERS.get(skill, Tier.NOTIFY)
 
+        # ----- tainted context tracking -----
+
+    def mark_tainted(self):
+        """Mark the context as tainted (called after web_fetch returns).
+
+        When web content enters the conversation, it may contain prompt
+        injection attempts. This sets a decay counter so that subsequent
+        tool calls face escalated tiers until the taint expires.
+        """
+        self._tainted_turns = TAINT_DECAY_TURNS
+        logger.info("Context marked tainted for %d turns", TAINT_DECAY_TURNS)
+
+    def _decay_taint(self):
+        """Decrement the taint counter. Called once per check_policy."""
+        if self._tainted_turns > 0:
+            self._tainted_turns -= 1
+            if self._tainted_turns == 0:
+                logger.info("Taint expired — context clean")
+
+    @property
+    def is_tainted(self) -> bool:
+        """Whether the current context is tainted by web content."""
+        return self._tainted_turns > 0
+
+    
     # ----- gate checks -----
 
     def check_policy(
@@ -384,6 +444,9 @@ class PolicyEngine:
         -------
         PolicyResult with verdict, reason, and resolved tier.
         """
+                # Decay taint counter each time policy is checked
+        self._decay_taint()
+
         skill = action.get("skill", "")
         argument = action.get("argument", "")
         is_heartbeat = source.startswith("heartbeat")
@@ -407,7 +470,18 @@ class PolicyEngine:
             if _tier_rank(demoted_tier) > _tier_rank(tier):
                 tier = demoted_tier
 
-        # Path safety for file operations
+                # SECURITY: Tainted context escalation (prompt injection mitigation)
+        # If web content was recently fetched, escalate tier for dangerous skills
+        # to prevent injected instructions from triggering harmful actions.
+        if self.is_tainted and skill in TAINTED_ESCALATION_SKILLS:
+            if _tier_rank(tier) < _tier_rank(Tier.APPROVE):
+                logger.warning(
+                    "Taint escalation: %s tier %s -> APPROVE (tainted turns: %d)",
+                    skill, tier.value, self._tainted_turns,
+                )
+                tier = Tier.APPROVE
+
+                # Path safety for file operations
         if skill in ("file_write", "self_edit", "file_read"):
             if not self._path_is_safe(argument):
                 return PolicyResult(
@@ -421,16 +495,17 @@ class PolicyEngine:
 
         # Dangerous command detection for shell
         if skill == "shell_exec" and argument:
-            for pattern in DANGEROUS_PATTERNS:
-                if pattern in argument.lower():
-                    return PolicyResult(
-                        verdict=Verdict.ASK,
-                        reason=(
-                            f"potentially dangerous: "
-                            f"contains '{pattern}'"
-                        ),
-                        tier=Tier.APPROVE,
-                    )
+                        # SECURITY FIX: Use regex for bypass-resistant matching
+            match = _DANGEROUS_REGEX.search(argument)
+            if match:
+                return PolicyResult(
+                    verdict=Verdict.ASK,
+                    reason=(
+                        f"potentially dangerous: "
+                        f"matches '{match.group()}'"
+                    ),
+                    tier=Tier.APPROVE,
+                )
 
         # --- Graduated autonomy: promotion check ---
         promoted = False
@@ -593,25 +668,28 @@ class PolicyEngine:
     # ----- path safety -----
 
     def _path_is_safe(self, path_str: str) -> bool:
-        """Check if a file path is within allowed directories."""
+        """Check if a file path is within allowed directories.
+
+        SECURITY FIX: Resolves the path to an absolute path *before*
+        checking it against allowed prefixes, preventing path traversal
+        attacks like '../../../etc/shadow' which would bypass a
+        prefix-only check.
+        """
         if not path_str:
             return True
-        home = str(Path.home())
-        # Normalize: rewrite /root/ and expand ~ to actual home dir
-        path_str = path_str.replace("/root/", home + "/")
-        if path_str.startswith("~/"):
-            path_str = home + path_str[1:]
-        for prefix in SAFE_PATH_PREFIXES:
-            expanded = prefix.replace("~/", home + "/")
-            if (
-                path_str.startswith(prefix)
-                or path_str.startswith(expanded)
-            ):
-                return True
-        # Relative paths resolve against repo_root, which is safe
-        if not path_str.startswith("/") and not path_str.startswith("~"):
-            return True
-        return False
+        try:
+            repo = Path("~/Vybn").expanduser().resolve()
+            # Handle all path forms: absolute, relative, ~-prefixed
+            if path_str.startswith("~/"):
+                candidate = Path(path_str).expanduser().resolve()
+            elif path_str.startswith("/"):
+                candidate = Path(path_str).resolve()
+            else:
+                # Relative paths resolve against repo_root
+                candidate = (repo / path_str).resolve()
+            return candidate.is_relative_to(repo)
+        except (ValueError, OSError):
+            return False
 
     def _load_stats(self):
         if self._stats_path.exists():
