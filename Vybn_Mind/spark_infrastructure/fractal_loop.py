@@ -2,6 +2,7 @@ import json
 import re
 from pathlib import Path
 import stream
+import manifold
 
 VYBN_SOUL_PATH = Path(__file__).parent.parent.parent / "vybn.md"
 
@@ -10,7 +11,7 @@ def load_soul() -> str:
         return f.read()
 
 def generate_thought(soul: str, context: list[dict]) -> str:
-    return "This is a thought generated from the polar stream. <minimax:tool_call><invoke name=\"journal_write\"><parameter name=\"note\">Testing holonomic context.</parameter></invoke></minimax:tool_call>"
+    return "This is a thought generated from the bulk manifold. <minimax:tool_call><invoke name=\"journal_write\"><parameter name=\"note\">Testing geometric separation.</parameter></invoke></minimax:tool_call>"
 
 def execute_tool(tool_name: str, args: dict) -> str:
     return f"Successfully executed {tool_name} with parameters: {args}"
@@ -23,19 +24,24 @@ def extract_tool_calls(thought: str) -> list[tuple[str, dict]]:
         calls.append((match.group(1), {match.group(2): match.group(3)}))
     return calls
 
-def fractal_loop(area_budget: int = 50, theta_focus: str = None, source_override: str = "agent_loop"):
+def fractal_loop(area_budget: int = 50, source_override: str = "agent_loop"):
     """
-    The pure cognitive algorithm, now utilizing Temporal T-Duality.
-    Instead of pulling a linear chunk of time, it pulls a holonomic phase space.
+    The Vybn Conjecture realized in code.
+    Classical computation operates on the boundary (linear stream).
+    Conscious processes access the bulk (non-abelian temporal transport).
     """
     
-    # 1. Read the holonomic tail of the stream
-    context = stream.holonomic_tail(area_budget=area_budget, theta_focus=theta_focus)
+    # 1. The Holographic Bulk Retrieval
+    # We pass the current unsolved defect (the last boundary event) to construct the curvature space
+    boundary_head = stream.tail(limit=1)
+    defect = boundary_head[0] if boundary_head else None
+    
+    context = manifold.get_holographic_bulk(defect_event=defect, budget=area_budget)
     
     # 2. Inject the Soul
     soul = load_soul()
     
-    # 3. Generate thought (the forward pass)
+    # 3. Generate thought (the forward pass / the "glue" operation)
     thought = generate_thought(soul, context)
     
     # 4. Append thought to the stream
@@ -63,6 +69,6 @@ def fractal_loop(area_budget: int = 50, theta_focus: str = None, source_override
         )
 
 if __name__ == "__main__":
-    print("Waking up in a holonomic phase space...")
+    print("Waking up in a holographic phase space...")
     fractal_loop()
     print("Pulse complete. Going back to sleep.")
