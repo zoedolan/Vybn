@@ -23,7 +23,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from bus import MessageBus, MessageType
-from spark.soul import get_pulse_checklist
+from soul import get_pulse_checklist
 
 
 class Heartbeat:
