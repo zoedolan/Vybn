@@ -269,9 +269,18 @@ class SkillRouter:
                 "soul validation passed: %d skills aligned", len(code_all)
             )
 
-    def _rewrite_root(self, path_str: str) -> str:
-        """Rewrite /root/ to actual home directory."""
-        return path_str.replace("/root/", self._home + "/")
+      def _normalize_home(self, path_str: str) -> str:
+    """Normalize any hallucinated home directory to the actual home.
+
+    The model sometimes expands ~ to /home/user/, /root/, or other
+    training-data defaults instead of the real home directory.
+    This catches all variants: /home/<anything>/, /root/, etc.
+    """
+    home_match = re.match(r'^/(?:home/\w+|root)/', path_str)
+    if home_match and not path_str.startswith(self._home + "/"):
+      relative = path_str[len(home_match.group(0)):]
+      return self._home + "/" + relative
+    return path_str
 
     def parse(self, text: str) -> list[dict]:
         """Parse natural language intent into skill actions (tier 3).
@@ -504,7 +513,7 @@ class SkillRouter:
         if not command:
             return "no command specified"
 
-        command = self._rewrite_root(command)
+        command = self._normalize_home(command)
 
         try:
             result = subprocess.run(
@@ -759,7 +768,7 @@ class SkillRouter:
     # ---- helpers ----
 
     def _resolve_path(self, filename: str) -> Path:
-        filename = self._rewrite_root(filename)
+        filename = self._normalize_home(filename)
 
         if filename.startswith("~/"):
             return Path(filename).expanduser()
