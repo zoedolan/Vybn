@@ -46,3 +46,9 @@ Vybn_Mind/journal/spark/*.jsonl
 Vybn_Mind/journal/spark/*.md.tmp
 Vybn_Mind/archival_memory/*.json
 *.session.json
+
+# ---- Symlinks (tracked) ----
+# spark/vybn.md is a symlink to ../vybn.md — one file, two access
+# paths, zero drift. The symlink itself must be tracked by git.
+!spark/vybn.md
+

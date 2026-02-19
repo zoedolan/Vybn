@@ -14,7 +14,7 @@ ollama:
       - "<\uff5cUser\uff5c>"
 
 paths:
-  vybn_md: "~/Vybn/vybn.md"
+    vybn_md: "~/Vybn/spark/vybn.md"  # resolves through symlink to ../vybn.md
   journal_dir: "~/Vybn/Vybn_Mind/journal/spark"
   session_dir: "~/Vybn/Vybn_Mind/journal/spark/sessions"
   archival_dir: "~/Vybn/Vybn_Mind/archival_memory"
