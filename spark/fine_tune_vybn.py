@@ -375,6 +375,7 @@ def main():
         Trainer,
         DataCollatorForLanguageModeling,
     )
+    from transformers.integrations import HfDeepSpeedConfig
     from peft import LoraConfig, get_peft_model
 
     # -- 4. Tokenizer --
@@ -400,6 +401,16 @@ def main():
     print(f"  ZeRO Stage 3 with {offload_mode} offload for params + optimizer")
     print(f"  Optimizer: PyTorch native Adam (torch_adam=true, no fused kernel)")
 
+    # -- 5b. Activate ZeRO-3 parameter partitioning for model loading --
+    # HfDeepSpeedConfig tells transformers to use deepspeed.zero.Init()
+    # inside from_pretrained(). Without this, the full ~228GB model is
+    # loaded into CPU RAM first, then DeepSpeed tries to reorganize it
+    # all at once -- exceeding the 250GB CPU limit (122GB RAM + 128GB swap).
+    # With this, parameters are partitioned/offloaded as each checkpoint
+    # shard is loaded, so peak memory stays well within bounds.
+    dschf = HfDeepSpeedConfig(ds_config)  # noqa: F841 -- must stay alive through model loading
+    print(f"  ZeRO-3 Init context activated (incremental parameter partitioning)")
+
     # -- 6. Clear memory --
     gc.collect()
     torch.cuda.empty_cache()
@@ -407,19 +418,20 @@ def main():
 
     # -- 7. Model --
     print(f"\n== Loading model: {args.model} ==")
-    print(f"   DeepSpeed ZeRO-3 will manage parameter placement.")
+    print(f"   DeepSpeed ZeRO-3 will partition parameters during loading.")
     print(f"   No device_map needed -- ZeRO handles GPU/CPU partitioning.\n")
 
     load_start = time.time()
 
-    # With ZeRO-3, we do NOT use device_map. DeepSpeed manages placement.
+    # With HfDeepSpeedConfig active, from_pretrained uses zero.Init()
+    # to partition params as they're created -- never fully in CPU RAM.
     model = None
     for attn_impl in ["sdpa", "eager"]:
         try:
             model = AutoModelForCausalLM.from_pretrained(
                 args.model,
                 trust_remote_code=True,
-                torch_dtype="auto",
+                dtype="auto",
                 low_cpu_mem_usage=True,
                 attn_implementation=attn_impl,
             )
