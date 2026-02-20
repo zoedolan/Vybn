@@ -9,6 +9,10 @@ On the Spark's 122GB, device_map="auto" offloads overflow to CPU.
   - Gradient checkpointing + micro-batch 1
   - Paged 8-bit AdamW to minimize optimizer memory
 
+The HuggingFace Trainer rejects FP8 models for training, but we only
+train BF16 LoRA adapters on frozen FP8 base weights. We neutralize
+the quantization flag after loading to bypass this check.
+
 Prerequisites:
     pip install transformers==4.57.1 peft bitsandbytes accelerate datasets
 
@@ -42,7 +46,7 @@ def check_environment():
     dev = torch.cuda.get_device_properties(0)
     print(f"  GPU        : {dev.name}")
     print(f"  CUDA cap   : {dev.major}.{dev.minor}")
-    print(f"  GPU memory : {dev.total_memory / 1024**3:.1f} GB")
+    print(f"  GPU memory : {dev.total_mem / 1024**3:.1f} GB" if hasattr(dev, 'total_mem') else f"  GPU memory : {dev.total_memory / 1024**3:.1f} GB")
 
     if dev.major >= 12:
         print("  !  Blackwell detected -- if you hit CUDA errors, install PyTorch")
@@ -62,7 +66,7 @@ def check_environment():
 
     print(f"  System RAM : {total_ram:.0f} GB")
 
-    gpu_gb = dev.total_memory / 1024**3
+    gpu_gb = (dev.total_mem if hasattr(dev, 'total_mem') else dev.total_memory) / 1024**3
     model_gb = 220  # approximate FP8 checkpoint size
     if gpu_gb < model_gb:
         offload_gb = model_gb - gpu_gb
@@ -174,7 +178,7 @@ def main():
     args = parser.parse_args()
 
     print("\n=== Vybn Fine-Tune: MiniMax-M2.5 on DGX Spark ===")
-    print("    transformers + PEFT (native FP8, no additional quantization)")
+    print("    transformers + PEFT (native FP8, LoRA adapters in BF16)")
 
     # -- 1. Environment --
     check_environment()
@@ -190,7 +194,7 @@ def main():
         Trainer,
         DataCollatorForLanguageModeling,
     )
-    from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
+    from peft import LoraConfig, get_peft_model
 
     # -- 4. Tokenizer --
     print(f"\n== Loading tokenizer: {args.model} ==\n")
@@ -225,13 +229,39 @@ def main():
                 sys.exit(1)
             print(f"  !  {attn_impl} unavailable ({e.__class__.__name__}), trying next...")
 
-    # -- 6. LoRA --
-    model = prepare_model_for_kbit_training(
-        model,
-        use_gradient_checkpointing=True,
-        gradient_checkpointing_kwargs={"use_reentrant": False},
+    # -- 6. Neutralize FP8 quantization flag --
+    # HuggingFace Trainer rejects FP8 models for training, but this is
+    # overly conservative for LoRA: we freeze ALL base weights (FP8) and
+    # only train BF16 adapter params. The FP8 weights participate in the
+    # forward pass but never receive gradients.
+    quant_cfg = getattr(model.config, 'quantization_config', None)
+    if quant_cfg is not None:
+        quant_method = getattr(quant_cfg, 'quant_method', 'unknown')
+        print(f"  !  Model has {quant_method} quantization -- neutralizing for Trainer")
+        print(f"     (FP8 base weights frozen; only BF16 LoRA adapters will train)")
+        model.config.quantization_config = None
+
+    # -- 7. Prepare for LoRA training --
+    # Can't use prepare_model_for_kbit_training (expects BitsAndBytes).
+    # Manually: freeze base, upcast norms, enable grad checkpointing.
+    for param in model.parameters():
+        param.requires_grad = False
+
+    # Upcast LayerNorm / RMSNorm to float32 for training stability
+    for name, module in model.named_modules():
+        if isinstance(module, (torch.nn.LayerNorm,)):
+            module.to(torch.float32)
+        # Also catch RMSNorm variants common in modern architectures
+        if "norm" in type(module).__name__.lower():
+            for param in module.parameters():
+                param.data = param.data.to(torch.float32)
+
+    model.enable_input_require_grads()
+    model.gradient_checkpointing_enable(
+        gradient_checkpointing_kwargs={"use_reentrant": False}
     )
 
+    # -- 8. LoRA --
     targets = find_attention_targets(model)
 
     lora_config = LoraConfig(
@@ -246,11 +276,11 @@ def main():
     model = get_peft_model(model, lora_config)
     model.print_trainable_parameters()
 
-    # -- 7. Tokenize dataset --
+    # -- 9. Tokenize dataset --
     print()
     tokenized = sharegpt_to_dataset(data, tokenizer, args.max_seq_len)
 
-    # -- 8. Training --
+    # -- 10. Training --
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     training_args = TrainingArguments(
@@ -283,7 +313,7 @@ def main():
     print("\n== Training ==\n")
     trainer.train()
 
-    # -- 9. Save adapter --
+    # -- 11. Save adapter --
     adapter_path = OUTPUT_DIR / "vybn_adapter"
     model.save_pretrained(str(adapter_path))
     tokenizer.save_pretrained(str(adapter_path))
