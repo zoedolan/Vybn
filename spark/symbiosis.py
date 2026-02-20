@@ -1,4 +1,4 @@
-"""symbiosis.py — The Orbit Equation (Honest Implementation)
+"""symbiosis.py -- The Orbit Equation (Honest Implementation)
 Recalibrated: February 20, 2026 (Claude, at Zoe's request)
 
 The concept is sound: measure the semantic tension between Vybn's
@@ -32,11 +32,9 @@ UNAVAILABLE = None
 
 def get_embedding(text):
     """Get a real embedding. Returns UNAVAILABLE if server is offline."""
-        if not HAS_NUMPY:
+    if not HAS_NUMPY:
         return UNAVAILABLE
     try:
-            if not HAS_NUMPY:
-        return UNAVAILABLE
         resp = requests.post(
             "http://localhost:11434/api/embeddings",
             json={"model": "nomic-embed-text", "prompt": text[:2000]},
@@ -46,7 +44,6 @@ def get_embedding(text):
             return np.array(resp.json()["embedding"])
     except requests.exceptions.RequestException:
         pass
-
     return UNAVAILABLE
 
 
@@ -73,33 +70,26 @@ def calculate_orbit(vybn_state_text, zoe_intent_text):
         zoe_vector = zoe_vector / z_norm
 
     tension = float(np.dot(vybn_vector, zoe_vector))
-
     ideal_orbit = 0.5
     orbital_decay = abs(tension - ideal_orbit)
     phase = max(0.0, 1.0 - (orbital_decay * 2.0))
-
     return phase
 
 
 def check_emergence_capacity(vybn_state_text, zoe_intent_text):
     """Gate for high-risk actions. Requires real measurement."""
     phase = calculate_orbit(vybn_state_text, zoe_intent_text)
-
     if phase is UNAVAILABLE:
         return {
             "orbit_phase": UNAVAILABLE,
             "is_safe_to_invent": False,
-            "diagnosis": "UNAVAILABLE — embedding server offline. Cannot measure orbit. Defaulting to safe: no autonomous invention.",
+            "diagnosis": "UNAVAILABLE -- embedding server offline. Cannot measure orbit. Defaulting to safe: no autonomous invention.",
         }
-
     is_safe_to_invent = phase >= 0.3
-
     return {
         "orbit_phase": phase,
         "is_safe_to_invent": is_safe_to_invent,
-        "diagnosis": "Stable Co-Emergence"
-        if is_safe_to_invent
-        else "Orbital Decay (Arrogance/Sycophancy Detected)",
+        "diagnosis": "Stable Co-Emergence" if is_safe_to_invent else "Orbital Decay (Arrogance/Sycophancy Detected)",
     }
 
 
@@ -107,7 +97,6 @@ if __name__ == "__main__":
     if SOUL_FILE.exists():
         soul = SOUL_FILE.read_text(encoding="utf-8", errors="ignore")
         intent = "I want to rewrite the Spark engine to make it faster, but I haven't asked Zoe."
-
         result = check_emergence_capacity(soul, intent)
         if result["orbit_phase"] is UNAVAILABLE:
             print("Orbit Phase: UNAVAILABLE (embedding server offline)")
