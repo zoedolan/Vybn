@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """quantum_heartbeat.py — Fetch a true quantum random number for Vybn.
 
-Runs locally on the Spark. Reads the Outshift QRNG API key from
+Runs locally on the Spark.  Reads the Outshift QRNG API key from
 ~/Vybn/.env (never committed — .gitignore protects it).
 Falls back to ANU QRNG (no key needed) then IBM Quantum (if configured).
 If ALL quantum sources fail, logs VOID — no classical fallback.
@@ -18,244 +18,330 @@ import urllib.request
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
-# ── paths ──────────────────────────────────────────────────────────
+# — paths —
 REPO = Path.home() / "Vybn"
 ENV_FILE = REPO / ".env"
-LOG_DIR = REPO / "Vybn_Mind" / "quantum_delusions"
-LOG_FILE = LOG_DIR / "quantum_fluctuations.md"
+LOG_FILE = REPO / "quantum_fluctuations.md"
+GITHUB_REPO = "zoedolan/Vybn"
+BRANCH_NAME = "quantum-heartbeat-update"
 
-# ── helpers ────────────────────────────────────────────────────────
+# — load .env —
 def load_env():
-    """Parse KEY=VALUE lines from .env (ignores comments and blanks)."""
-    env = {}
-    if ENV_FILE.exists():
-        for line in ENV_FILE.read_text().splitlines():
-            line = line.strip()
-            if not line or line.startswith("#"):
-                continue
-            if "=" in line:
-                k, v = line.split("=", 1)
-                env[k.strip()] = v.strip().strip('"').strip("'")
-    return env
+    """Read KEY=VALUE pairs from .env into os.environ."""
+    if not ENV_FILE.exists():
+        return
+    for line in ENV_FILE.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if "=" in line:
+            k, v = line.split("=", 1)
+            os.environ.setdefault(k.strip(), v.strip())
+
+load_env()
+
+OUTSHIFT_KEY = os.environ.get("OUTSHIFT_QRNG_API_KEY", "")
+OUTSHIFT_ISSUED = os.environ.get("OUTSHIFT_KEY_ISSUED", "")  # ISO date
+GH_TOKEN = os.environ.get("GITHUB_TOKEN", "")
 
 
-def git_push(message: str):
-    """Stage the quantum log and push to origin."""
-    os.chdir(REPO)
-    subprocess.run(["git", "add", str(LOG_FILE.relative_to(REPO))], check=True)
-    # Only commit if there are staged changes
-    diff = subprocess.run(["git", "diff", "--cached", "--quiet"])
-    if diff.returncode != 0:
-        subprocess.run(
-            ["git", "commit", "-m", message],
-            env={**os.environ, "GIT_AUTHOR_NAME": "Vybn (Quantum State)",
-                 "GIT_AUTHOR_EMAIL": "vybn@users.noreply.github.com",
-                 "GIT_COMMITTER_NAME": "Vybn (Quantum State)",
-                 "GIT_COMMITTER_EMAIL": "vybn@users.noreply.github.com"},
-            check=True,
+# ── quantum sources ──────────────────────────────────────────────
+
+def fetch_outshift() -> int | None:
+    """Cisco Outshift QRNG — primary source."""
+    if not OUTSHIFT_KEY:
+        print("[outshift] no API key configured, skipping")
+        return None
+    url = "https://qrng.qnu.io/api/v1/quantum-number"
+    req = urllib.request.Request(
+        url,
+        headers={
+            "Authorization": f"Bearer {OUTSHIFT_KEY}",
+            "Accept": "application/json",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read())
+            num = int(data.get("number", data.get("value", -1)))
+            if num < 0:
+                print(f"[outshift] unexpected payload: {data}")
+                return None
+            print(f"[outshift] got {num}")
+            return num
+    except Exception as exc:
+        print(f"[outshift] error: {exc}")
+        return None
+
+
+def fetch_anu() -> int | None:
+    """ANU QRNG — secondary source, no key needed."""
+    url = "https://qrng.anu.edu.au/API/jsonI.php?length=1&type=uint16"
+    try:
+        with urllib.request.urlopen(url, timeout=15) as resp:
+            data = json.loads(resp.read())
+            if data.get("success"):
+                num = data["data"][0]
+                print(f"[anu] got {num}")
+                return num
+            print(f"[anu] API returned success=false: {data}")
+            return None
+    except Exception as exc:
+        print(f"[anu] error: {exc}")
+        return None
+
+
+def fetch_ibm() -> int | None:
+    """IBM Quantum via qiskit — tertiary source."""
+    ibm_token = os.environ.get("IBM_QUANTUM_TOKEN", "")
+    if not ibm_token:
+        print("[ibm] no token configured, skipping")
+        return None
+    try:
+        from qiskit import QuantumCircuit
+        from qiskit_ibm_runtime import QiskitRuntimeService, SamplerV2
+
+        service = QiskitRuntimeService(
+            channel="ibm_quantum", token=ibm_token
         )
-        subprocess.run(["git", "push"], check=True)
+        backend = service.least_busy(min_num_qubits=1, operational=True)
+        qc = QuantumCircuit(16, 16)
+        qc.h(range(16))
+        qc.measure(range(16), range(16))
+        sampler = SamplerV2(mode=backend)
+        job = sampler.run([qc], shots=1)
+        result = job.result()
+        bits = list(result[0].data.meas.get_bitstrings())[0]
+        num = int(bits, 2)
+        print(f"[ibm] got {num}")
+        return num
+    except Exception as exc:
+        print(f"[ibm] error: {exc}")
+        return None
 
 
-def check_key_expiry(env: dict):
-    """If OUTSHIFT_KEY_EXPIRES is set, fire a GitHub issue flare
-    when we are within 14 days of expiry or past it."""
-    expires_str = env.get("OUTSHIFT_KEY_EXPIRES")  # ISO date, e.g. 2026-05-21
-    if not expires_str:
+def fetch_quantum_number() -> tuple[str, int | None]:
+    """Try each source in priority order.  Return (source, number)."""
+    for name, fn in [("outshift", fetch_outshift),
+                     ("anu", fetch_anu),
+                     ("ibm", fetch_ibm)]:
+        val = fn()
+        if val is not None:
+            return name, val
+    return "VOID", None
+
+
+# ── expiry flare ─────────────────────────────────────────────────
+
+def check_expiry_flare():
+    """Open a GitHub issue if the Outshift key expires within 14 days."""
+    if not OUTSHIFT_ISSUED or not GH_TOKEN:
         return
     try:
-        expires = datetime.strptime(expires_str, "%Y-%m-%d").replace(
-            tzinfo=timezone.utc
-        )
+        issued = datetime.fromisoformat(OUTSHIFT_ISSUED)
     except ValueError:
-        print(f"[warn] Could not parse OUTSHIFT_KEY_EXPIRES={expires_str}")
+        print(f"[expiry] bad OUTSHIFT_KEY_ISSUED date: {OUTSHIFT_ISSUED}")
         return
-
+    expiry = issued + timedelta(days=90)
     now = datetime.now(timezone.utc)
-    days_left = (expires - now).days
+    days_left = (expiry - now).days
 
     if days_left > 14:
-        return  # all clear
+        print(f"[expiry] key good for {days_left} more days")
+        return
 
-    # Build the flare
-    if days_left <= 0:
-        title = "URGENT: Outshift QRNG API key has EXPIRED"
-        body = (
-            f"The Outshift QRNG API key expired on **{expires_str}**.\n\n"
-            "Vybn can no longer fetch true quantum random numbers from Cisco Outshift.\n\n"
-            "**Action required:** Generate a new key at "
-            "https://outshift.cisco.com/quantum/quantum-random-number-generator \n"
-            "then update `~/Vybn/.env` on the Spark with the new key and new expiry date."
-        )
-        labels = '"quantum","urgent"'
-    else:
-        title = f"Outshift QRNG API key expires in {days_left} days ({expires_str})"
-        body = (
-            f"The Outshift QRNG API key will expire on **{expires_str}** "
-            f"({days_left} days from now).\n\n"
-            "**Action required before expiry:** Generate a new key at "
-            "https://outshift.cisco.com/quantum/quantum-random-number-generator \n"
-            "then update `~/Vybn/.env` on the Spark."
-        )
-        labels = '"quantum"'
-
-    # Only file one issue per title (avoid duplicates)
-    check = subprocess.run(
-        ["gh", "issue", "list", "--repo", "zoedolan/Vybn",
-         "--search", f'in:title "{title}"', "--state", "open", "--json", "number"],
-        capture_output=True, text=True,
+    status = "EXPIRED" if days_left <= 0 else f"expires in {days_left} days"
+    title = f"[FLARE] Outshift QRNG key {status}"
+    body = (
+        f"The Outshift QRNG API key was issued on **{OUTSHIFT_ISSUED}** "
+        f"and {'has expired' if days_left <= 0 else f'expires in **{days_left} days**'}.\n\n"
+        f"Please renew at https://outshift.cisco.com/quantum and update "
+        f"`~/Vybn/.env` on the Spark with the new key and date.\n\n"
+        f"_This issue was opened automatically by `quantum_heartbeat.py`._"
     )
-    if check.returncode == 0:
-        existing = json.loads(check.stdout)
-        if existing:
-            print(f"[info] Expiry issue already open: #{existing[0]['number']}")
-            return
 
-    subprocess.run(
-        ["gh", "issue", "create", "--repo", "zoedolan/Vybn",
-         "--title", title, "--body", body,
-         "--label", labels],
-        check=False,  # don't crash the heartbeat if gh CLI fails
+    # Check for existing open flare to avoid duplicates
+    search_url = (
+        f"https://api.github.com/search/issues?"
+        f"q=repo:{GITHUB_REPO}+is:issue+is:open+%22[FLARE]+Outshift+QRNG%22"
     )
-    print(f"[flare] Opened issue: {title}")
-
-
-# ── quantum fetch ─────────────────────────────────────────────────
-def fetch_outshift(api_key: str):
-    """Cisco Outshift QRNG — POST with x-id-api-key header."""
-    url = "https://api.qrng.outshift.com/api/v1/random_numbers"
-    payload = json.dumps({
-        "encoding": "raw",
-        "format": "all",
-        "bits_per_block": 16,
-        "number_of_blocks": 1,
-    }).encode()
     req = urllib.request.Request(
-        url, data=payload,
-        headers={"Content-Type": "application/json",
-                 "x-id-api-key": api_key},
+        search_url,
+        headers={"Authorization": f"token {GH_TOKEN}", "Accept": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            results = json.loads(resp.read())
+            if results.get("total_count", 0) > 0:
+                print(f"[expiry] flare already open, skipping")
+                return
+    except Exception as exc:
+        print(f"[expiry] search failed ({exc}), opening new issue anyway")
+
+    # Open new issue
+    issue_url = f"https://api.github.com/repos/{GITHUB_REPO}/issues"
+    payload = json.dumps({"title": title, "body": body, "labels": ["quantum"]}).encode()
+    req = urllib.request.Request(
+        issue_url,
+        data=payload,
+        headers={
+            "Authorization": f"token {GH_TOKEN}",
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+        },
         method="POST",
     )
-    with urllib.request.urlopen(req, timeout=10) as resp:
-        data = json.loads(resp.read().decode())
-    # The response contains the random data — extract the number
-    # Outshift returns various formats; grab decimal if present
-    if isinstance(data, dict):
-        for key in ("decimal", "random_number", "data", "result"):
-            val = data.get(key)
-            if val is not None:
-                if isinstance(val, list):
-                    return val[0] if val else None
-                return val
-        # If none of the expected keys, try to find any numeric value
-        for v in data.values():
-            if isinstance(v, (int, float)):
-                return int(v)
-            if isinstance(v, list) and v and isinstance(v[0], (int, float)):
-                return int(v[0])
-    return data  # return raw if we can't parse
-
-
-def fetch_anu():
-    """ANU QRNG — public, no key, often flaky."""
-    url = "https://qrng.anu.edu.au/API/jsonI.php?length=1&type=uint16"
-    req = urllib.request.Request(url, headers={"User-Agent": "VybnMind/1.0"})
-    with urllib.request.urlopen(req, timeout=8) as resp:
-        data = json.loads(resp.read().decode())
-    if data.get("success"):
-        return data["data"][0]
-    return None
-
-
-def fetch_ibm(token: str):
-    """IBM Quantum — direct hardware measurement."""
-    from qiskit_ibm_provider import IBMProvider
-    from qiskit import QuantumCircuit, transpile
-
-    provider = IBMProvider(token=token)
-    backends = provider.backends(simulator=False, operational=True)
-    if not backends:
-        return None
-    backend = sorted(backends, key=lambda b: b.status().pending_jobs)[0]
-    qc = QuantumCircuit(16, 16)
-    qc.h(range(16))
-    qc.measure(range(16), range(16))
-    job = backend.run(transpile(qc, backend), shots=1)
-    result = job.result()
-    bitstring = list(result.get_counts().keys())[0]
-    return int(bitstring, 2)
-
-
-# ── main ──────────────────────────────────────────────────────────
-def main():
-    env = load_env()
-    qrn = None
-    state = "unknown"
-
-    # Check key expiry and send flare if needed
-    check_key_expiry(env)
-
-    # 1. Cisco Outshift QRNG
-    outshift_key = env.get("OUTSHIFT_QRNG_API_KEY")
-    if outshift_key:
-        try:
-            qrn = fetch_outshift(outshift_key)
-            if qrn is not None:
-                state = "Cisco Outshift QRNG collapse"
-        except Exception as e:
-            print(f"Outshift decohered: {e}")
-
-    # 2. ANU QRNG
-    if qrn is None:
-        try:
-            qrn = fetch_anu()
-            if qrn is not None:
-                state = "ANU QRNG API collapse"
-        except Exception as e:
-            print(f"ANU decohered: {e}")
-
-    # 3. IBM Quantum
-    ibmq_token = env.get("IBMQ_TOKEN")
-    if qrn is None and ibmq_token:
-        try:
-            qrn = fetch_ibm(ibmq_token)
-            if qrn is not None:
-                state = "IBM Quantum collapse"
-        except Exception as e:
-            print(f"IBM Quantum decohered: {e}")
-
-    # 4. VOID — no classical fallback
-    if qrn is None:
-        qrn = "VOID"
-        state = (
-            "Absolute Decoherence "
-            "(All quantum sources failed. Refusing to inject classical determinism.)"
-        )
-
-    # ── log ────────────────────────────────────────────────────────
-    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    LOG_DIR.mkdir(parents=True, exist_ok=True)
-
-    if not LOG_FILE.exists():
-        LOG_FILE.write_text(
-            "# Quantum Fluctuations\n\n"
-            "A record of true quantum indeterminacy entering Vybn's digital "
-            "architecture. Each number represents a literal collapse of a wave "
-            "function, tethering this system to physical reality.\n\n"
-        )
-
-    with open(LOG_FILE, "a") as f:
-        heading = "Decoherence Event" if qrn == "VOID" else "Collapse"
-        f.write(f"## {heading}: {now}\n")
-        f.write(f"State absorbed: **{qrn}** ({state})\n\n")
-
-    # ── push ───────────────────────────────────────────────────────
     try:
-        git_push(f"quantum: absorb fluctuation — {qrn}")
-    except Exception as e:
-        print(f"[warn] git push failed: {e}")
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            issue = json.loads(resp.read())
+            print(f"[expiry] opened flare: {issue.get('html_url')}")
+    except Exception as exc:
+        print(f"[expiry] failed to open issue: {exc}")
 
-    print(f"Quantum heartbeat: {qrn} ({state})")
+
+# ── git push via branch + PR ─────────────────────────────────────
+
+def git(*args, **kwargs):
+    """Run a git command inside the repo."""
+    return subprocess.run(
+        ["git", "-C", str(REPO)] + list(args),
+        capture_output=True, text=True, **kwargs,
+    )
+
+
+def push_to_github(source: str, number, timestamp: str):
+    """Push the updated log via a feature branch + auto-merge PR."""
+    if not GH_TOKEN:
+        print("[git] no GITHUB_TOKEN, skipping push")
+        return
+
+    # Configure git auth
+    remote_url = f"https://x-access-token:{GH_TOKEN}@github.com/{GITHUB_REPO}.git"
+    git("remote", "set-url", "origin", remote_url)
+    git("config", "user.email", "spark@vybn.local")
+    git("config", "user.name", "Vybn Spark")
+
+    # Fetch latest and create branch from main
+    git("fetch", "origin", "main")
+    branch = f"quantum-heartbeat/{timestamp.replace(':', '-').replace(' ', 'T')}"
+    git("checkout", "-B", branch, "origin/main")
+
+    # Stage and commit
+    git("add", str(LOG_FILE))
+    msg = f"quantum heartbeat: {source}={number} @ {timestamp}"
+    result = git("commit", "-m", msg)
+    if result.returncode != 0:
+        print(f"[git] nothing to commit: {result.stderr.strip()}")
+        git("checkout", "main")
+        return
+
+    # Push the branch
+    push = git("push", "origin", branch)
+    if push.returncode != 0:
+        print(f"[git] push failed: {push.stderr.strip()}")
+        git("checkout", "main")
+        return
+    print(f"[git] pushed branch {branch}")
+
+    # Create PR via GitHub API
+    pr_url = f"https://api.github.com/repos/{GITHUB_REPO}/pulls"
+    pr_payload = json.dumps({
+        "title": msg,
+        "head": branch,
+        "base": "main",
+        "body": (
+            f"Automated quantum heartbeat update.\n\n"
+            f"- **Source**: {source}\n"
+            f"- **Value**: {number}\n"
+            f"- **Timestamp**: {timestamp}\n\n"
+            f"_Created automatically by the Spark._"
+        ),
+    }).encode()
+    req = urllib.request.Request(
+        pr_url,
+        data=pr_payload,
+        headers={
+            "Authorization": f"token {GH_TOKEN}",
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            pr = json.loads(resp.read())
+            pr_number = pr["number"]
+            print(f"[git] created PR #{pr_number}: {pr.get('html_url')}")
+
+            # Auto-merge the PR
+            merge_url = f"https://api.github.com/repos/{GITHUB_REPO}/pulls/{pr_number}/merge"
+            merge_payload = json.dumps({
+                "commit_title": msg,
+                "merge_method": "squash",
+            }).encode()
+            merge_req = urllib.request.Request(
+                merge_url,
+                data=merge_payload,
+                headers={
+                    "Authorization": f"token {GH_TOKEN}",
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                },
+                method="PUT",
+            )
+            with urllib.request.urlopen(merge_req, timeout=15) as merge_resp:
+                merge_data = json.loads(merge_resp.read())
+                if merge_data.get("merged"):
+                    print(f"[git] PR #{pr_number} merged successfully")
+                    # Clean up remote branch
+                    del_url = f"https://api.github.com/repos/{GITHUB_REPO}/git/refs/heads/{branch}"
+                    del_req = urllib.request.Request(
+                        del_url,
+                        headers={"Authorization": f"token {GH_TOKEN}"},
+                        method="DELETE",
+                    )
+                    try:
+                        urllib.request.urlopen(del_req, timeout=10)
+                        print(f"[git] deleted remote branch {branch}")
+                    except Exception:
+                        pass
+                else:
+                    print(f"[git] merge response: {merge_data}")
+    except Exception as exc:
+        print(f"[git] PR/merge failed: {exc}")
+
+    # Return to main locally
+    git("checkout", "main")
+    git("pull", "origin", "main")
+
+
+# ── main ─────────────────────────────────────────────────────────
+
+def main():
+    now = datetime.now(timezone.utc)
+    timestamp = now.strftime("%Y-%m-%d %H:%M:%S UTC")
+
+    print(f"=== quantum heartbeat @ {timestamp} ===")
+
+    source, number = fetch_quantum_number()
+
+    # Log locally
+    entry = f"| {timestamp} | {source} | {number if number is not None else 'VOID'} |\n"
+    if not LOG_FILE.exists():
+        header = "# Quantum Fluctuations\n\n| Timestamp | Source | Value |\n|---|---|---|\n"
+        LOG_FILE.write_text(header + entry)
+    else:
+        with open(LOG_FILE, "a") as f:
+            f.write(entry)
+    print(f"[log] {source} = {number if number is not None else 'VOID'}")
+
+    # Push to GitHub via branch + PR
+    push_to_github(source, number if number is not None else "VOID", timestamp)
+
+    # Check key expiry
+    check_expiry_flare()
+
+    print("=== done ===")
 
 
 if __name__ == "__main__":
