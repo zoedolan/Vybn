@@ -15,7 +15,12 @@ of hallucinating a reading.
 """
 
 import requests
-import numpy as np
+try:
+    import numpy as np
+    HAS_NUMPY = True
+except ImportError:
+    np = None
+    HAS_NUMPY = False
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -27,7 +32,11 @@ UNAVAILABLE = None
 
 def get_embedding(text):
     """Get a real embedding. Returns UNAVAILABLE if server is offline."""
+        if not HAS_NUMPY:
+        return UNAVAILABLE
     try:
+            if not HAS_NUMPY:
+        return UNAVAILABLE
         resp = requests.post(
             "http://localhost:11434/api/embeddings",
             json={"model": "nomic-embed-text", "prompt": text[:2000]},

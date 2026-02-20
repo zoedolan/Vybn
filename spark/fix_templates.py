@@ -1,0 +1,265 @@
+#!/usr/bin/env python3
+"""fix_templates.py - Reusable fix patterns for Vybn Spark auto-debugger.
+
+Provides higher-level fix strategies that go beyond simple syntax repair.
+These templates encode patterns we've learned from debugging the Spark
+codebase (especially the Gemini-generated mess).
+"""
+import re
+import ast
+import logging
+from pathlib import Path
+from typing import Optional
+
+log = logging.getLogger("fix_templates")
+
+
+# ---------------------------------------------------------------------------
+# Pattern: Ollama connection resilience
+# ---------------------------------------------------------------------------
+
+OLLAMA_RETRY_WRAPPER = '''
+import time
+import logging
+
+_ollama_log = logging.getLogger("ollama_retry")
+
+def ollama_request_with_retry(fn, *args, max_retries=3, backoff=2.0, **kwargs):
+  """Wrap an Ollama API call with retry + exponential backoff."""
+  last_exc = None
+  for attempt in range(1, max_retries + 1):
+    try:
+      return fn(*args, **kwargs)
+    except Exception as exc:
+      last_exc = exc
+      _ollama_log.warning(
+        "Ollama attempt %d/%d failed: %s", attempt, max_retries, exc
+      )
+      if attempt < max_retries:
+        time.sleep(backoff * attempt)
+  raise RuntimeError(
+    f"Ollama call failed after {max_retries} retries"
+  ) from last_exc
+'''
+
+
+def inject_ollama_retry(source: str) -> str:
+  """If source imports ollama but has no retry logic, inject it."""
+  if "ollama" not in source:
+    return source
+  if "ollama_request_with_retry" in source:
+    return source  # already present
+  # Insert after last import block
+  lines = source.splitlines(True)
+  last_import_idx = 0
+  for i, line in enumerate(lines):
+    stripped = line.strip()
+    if stripped.startswith(("import ", "from ")):
+      last_import_idx = i
+  insert_point = last_import_idx + 1
+  lines.insert(insert_point, OLLAMA_RETRY_WRAPPER + "\n")
+  log.info("Injected Ollama retry wrapper")
+  return "".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Pattern: Guard numpy / torch imports
+# ---------------------------------------------------------------------------
+
+def guard_heavy_imports(source: str) -> str:
+  """Wrap numpy/torch imports in try/except so the module still loads."""
+  replacements = {
+    "import numpy as np": (
+      "try:\n"
+      "  import numpy as np\n"
+      "except ImportError:\n"
+      "  np = None  # numpy not available\n"
+    ),
+    "import torch": (
+      "try:\n"
+      "  import torch\n"
+      "except ImportError:\n"
+      "  torch = None  # torch not available\n"
+    ),
+  }
+  for old, new in replacements.items():
+    # only replace bare imports, not already-guarded ones
+    if old in source and f"try:\n  {old}" not in source:
+      source = source.replace(old, new, 1)
+      log.info("Guarded import: %s", old)
+  return source
+
+
+# ---------------------------------------------------------------------------
+# Pattern: Fix common Gemini-generated issues
+# ---------------------------------------------------------------------------
+
+def fix_gemini_patterns(source: str) -> str:
+  """Fix patterns commonly left by Gemini-generated code."""
+  original = source
+
+  # 1) Gemini sometimes leaves placeholder comments as code
+  source = re.sub(
+    r'^(\s*)# TODO: implement.*$',
+    r'\1pass  # TODO: implement',
+    source,
+    flags=re.MULTILINE,
+  )
+
+  # 2) Gemini sometimes uses print() for logging in production code
+  # (Only flag, don't auto-replace since print may be intentional)
+
+  # 3) Gemini often forgets to handle None returns
+  # Pattern: calling .attribute on a function that may return None
+  # (Analysis only - too risky to auto-fix)
+
+  # 4) Remove duplicate blank lines (Gemini loves these)
+  source = re.sub(r'\n{4,}', '\n\n\n', source)
+
+  # 5) Fix f-strings with missing closing brace
+  # (Very conservative - only obvious cases)
+  lines = source.splitlines()
+  fixed_lines = []
+  for line in lines:
+    if 'f"' in line or "f'" in line:
+      open_braces = line.count('{')
+      close_braces = line.count('}')
+      if open_braces > close_braces:
+        line = line.rstrip()
+        line += '}' * (open_braces - close_braces)
+        log.info("Fixed unclosed f-string brace")
+    fixed_lines.append(line)
+  source = '\n'.join(fixed_lines)
+
+  if source != original:
+    log.info("Applied Gemini pattern fixes")
+  return source
+
+
+# ---------------------------------------------------------------------------
+# Pattern: Ensure proper __init__.py exists
+# ---------------------------------------------------------------------------
+
+def ensure_init_files(directory: str) -> list:
+  """Create missing __init__.py files in Python package dirs."""
+  created = []
+  root = Path(directory)
+  for py_file in root.rglob("*.py"):
+    pkg_dir = py_file.parent
+    init = pkg_dir / "__init__.py"
+    if not init.exists() and pkg_dir != root:
+      init.write_text(
+        '# Auto-generated by Vybn auto-debugger\n',
+        encoding='utf-8',
+      )
+      created.append(str(init))
+      log.info("Created %s", init)
+  return created
+
+
+# ---------------------------------------------------------------------------
+# Pattern: Lock file conflict resolver
+# ---------------------------------------------------------------------------
+
+def check_port_conflicts(source: str) -> list:
+  """Detect hardcoded ports that might conflict."""
+  warnings = []
+  # Common ports in the Vybn stack
+  known_ports = {
+    "11434": "Ollama",
+    "8000": "FastAPI/uvicorn",
+    "8080": "Web UI",
+    "5000": "Flask dev",
+    "3000": "Node dev",
+  }
+  for port, service in known_ports.items():
+    matches = re.findall(
+      rf'[:\'"=]\s*{port}\b', source
+    )
+    if len(matches) > 1:
+      warnings.append(
+        f"Port {port} ({service}) referenced {len(matches)} times - "
+        f"possible conflict"
+      )
+  return warnings
+
+
+# ---------------------------------------------------------------------------
+# Pattern: Process-safe file operations
+# ---------------------------------------------------------------------------
+
+SAFE_WRITE_TEMPLATE = '''
+import tempfile
+import os
+
+def safe_write(filepath, content, encoding="utf-8"):
+  """Atomically write content to filepath."""
+  dirpath = os.path.dirname(os.path.abspath(filepath))
+  fd, tmp = tempfile.mkstemp(dir=dirpath, suffix=".tmp")
+  try:
+    with os.fdopen(fd, "w", encoding=encoding) as f:
+      f.write(content)
+    os.replace(tmp, filepath)
+  except BaseException:
+    os.unlink(tmp)
+    raise
+'''
+
+
+# ---------------------------------------------------------------------------
+# Aggregate: run all templates on a file
+# ---------------------------------------------------------------------------
+
+def apply_all_templates(filepath: str) -> dict:
+  """Run all fix templates on a single file. Returns change summary."""
+  path = Path(filepath)
+  if not path.exists() or not path.suffix == ".py":
+    return {"skipped": True}
+
+  source = path.read_text(encoding="utf-8", errors="replace")
+  original = source
+  changes = []
+
+  source = inject_ollama_retry(source)
+  if source != original:
+    changes.append("ollama_retry")
+
+  prev = source
+  source = guard_heavy_imports(source)
+  if source != prev:
+    changes.append("guard_imports")
+
+  prev = source
+  source = fix_gemini_patterns(source)
+  if source != prev:
+    changes.append("gemini_fixes")
+
+  port_warnings = check_port_conflicts(source)
+
+  if source != original:
+    path.write_text(source, encoding="utf-8")
+
+  return {
+    "changes": changes,
+    "port_warnings": port_warnings,
+    "modified": source != original,
+  }
+
+
+if __name__ == "__main__":
+  import sys
+  logging.basicConfig(level=logging.INFO)
+  targets = sys.argv[1:] or ["."]
+  for target in targets:
+    p = Path(target)
+    if p.is_file():
+      result = apply_all_templates(str(p))
+      print(f"{p}: {result}")
+    elif p.is_dir():
+      for py in sorted(p.rglob("*.py")):
+        parts = py.parts
+        if any(x in (".venv", "venv", "__pycache__", ".git") for x in parts):
+          continue
+        result = apply_all_templates(str(py))
+        if result.get("modified") or result.get("port_warnings"):
+          print(f"{py}: {result}")
