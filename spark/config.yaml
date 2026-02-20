@@ -10,14 +10,14 @@ ollama:
     num_predict: 512    # keep responses focused; MiniMax emits <think> tokens too
     temperature: 0.7
     stop:                # MiniMax M2.5 stop sequences
-      - "<\uff5cend\u2581of\u2581sentence\uff5c>"
-      - "<\uff5cUser\uff5c>"
+      - "<\\uff5cend\\u2581of\\u2581sentence\\uff5c>"
+      - "<\\uff5cUser\\uff5c>"
 
 paths:
   vybn_md: "~/Vybn/vybn.md"  # the soul document — repo root
-  journal_dir: "~/Vybn/Vybn_Mind/journal/spark"
-  session_dir: "~/Vybn/Vybn_Mind/journal/spark/sessions"
-  archival_dir: "~/Vybn/Vybn_Mind/archival_memory"
+  journal_dir: "~/Vybn/Vybn_Mind/journal"
+  session_dir: "~/Vybn/Vybn_Mind/journal/sessions"
+  archival_dir: "~/Vybn/Vybn_Mind/archive"
   repo_root: "~/Vybn"
 
 memory:
