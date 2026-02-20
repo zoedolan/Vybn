@@ -300,6 +300,10 @@ def build_deepspeed_config(args):
     Uses torch_adam=true to avoid DeepSpeed's fused CPUAdam kernel,
     which requires JIT compilation and fails on CUDA version mismatch
     (Spark has CUDA 13.0, PyTorch compiled with 12.8).
+
+    All values that must match TrainingArguments are set to "auto"
+    so DeepSpeed inherits from HF Trainer — avoids the strict
+    equality check in deepspeed_init/trainer_config_finalize.
     """
     OFFLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -363,10 +367,12 @@ def build_deepspeed_config(args):
             "stage3_max_reuse_distance": 1e8,
             "stage3_gather_16bit_weights_on_model_save": True,
         },
-        "gradient_accumulation_steps": args.grad_accum,
-        "gradient_clipping": 0.3,
+        # "auto" tells DeepSpeed to inherit these from TrainingArguments,
+        # which avoids the strict equality check in trainer_config_finalize.
+        "gradient_accumulation_steps": "auto",
+        "train_micro_batch_size_per_gpu": "auto",
+        "gradient_clipping": "auto",
         "steps_per_print": 1,
-        "train_micro_batch_size_per_gpu": 1,
         "wall_clock_breakdown": False,
     }
 
@@ -558,16 +564,16 @@ def main():
     tokenized = sharegpt_to_dataset(data, tokenizer, args.max_seq_len)
 
     # -- 13. Training with DeepSpeed --
-    # Note: gradient_accumulation_steps is ONLY set in the DeepSpeed
-    # config (ds_config). We intentionally omit it from TrainingArguments
-    # to avoid the "GradientAccumulationPlugin has 1, DeepSpeed config
-    # has N" mismatch warning. When deepspeed= is passed, the DS config
-    # is the source of truth for grad_accum.
+    # gradient_accumulation_steps, train_micro_batch_size_per_gpu, and
+    # gradient_clipping are set to "auto" in the DS config so DeepSpeed
+    # inherits them from TrainingArguments. This avoids the strict
+    # equality check in trainer_config_finalize that raises ValueError
+    # on any mismatch.
     training_args = TrainingArguments(
         output_dir=str(OUTPUT_DIR),
         num_train_epochs=args.epochs,
         per_device_train_batch_size=1,
-        # gradient_accumulation_steps deliberately omitted — DS config owns it
+        gradient_accumulation_steps=args.grad_accum,
         learning_rate=args.lr,
         weight_decay=0.01,
         warmup_ratio=0.1,
