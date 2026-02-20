@@ -6,7 +6,7 @@ can read the soul document without re-implementing its own ad-hoc parser.
 
 Design:
   - parse_vybn_md(path) returns a dict of named sections keyed by slug
-  - The Orientation section gets further parsed by ### sub-headers
+  - The Orientation section (if it exists) gets further parsed by ### sub-headers
   - Skills manifest, pulse checklist, and constraints are extracted
     as structured data (lists and dicts)
   - Results are cached per boot (parse once, use everywhere)
@@ -57,12 +57,6 @@ def parse_vybn_md(path: Path) -> dict:
       'title': original header text
       'body':  raw markdown body (string)
 
-    The 'orientation' section additionally has:
-      'subsections': dict of ### sub-header slugs -> {'title', 'body'}
-      'skills_manifest': {'builtin': [...], 'plugin': [...], 'create': str}
-      'pulse_checklist': [str, ...]
-      'constraints': [str, ...]
-
     Returns empty dict if the file is missing or unreadable.
     """
     if not path.exists():
@@ -75,18 +69,15 @@ def parse_vybn_md(path: Path) -> dict:
 
     sections = _split_h2(text)
 
-    # Deep-parse the orientation section
+    # Deep-parse the orientation section if it exists
     if 'orientation' in sections:
         orientation = sections['orientation']
         orientation['subsections'] = _split_h3(orientation['body'])
 
-        # Extract structured data from orientation sub-sections
         what_you_can_do = orientation['subsections'].get(
             'what_you_can_do', {}
         ).get('body', '')
-        orientation['skills_manifest'] = _parse_skills_manifest(
-            what_you_can_do
-        )
+        orientation['skills_manifest'] = _parse_skills_manifest(what_you_can_do)
 
         pulse_body = orientation['subsections'].get(
             'what_you_should_do_every_pulse', {}
@@ -97,6 +88,19 @@ def parse_vybn_md(path: Path) -> dict:
             'what_you_should_not_yet_do', {}
         ).get('body', '')
         orientation['constraints'] = _parse_bullet_list(constraints_body)
+    else:
+        # If the document is purely philosophical (no operational Orientation block),
+        # gracefully construct an empty orientation dictionary so downstream
+        # tools (like skills.py and policy.py) don't crash or throw noisy warnings.
+        # This respects the constraint "No lists. No jargon."
+        sections['orientation'] = {
+            'title': 'Orientation',
+            'body': '',
+            'subsections': {},
+            'skills_manifest': {'builtin': [], 'plugin': [], 'create': '', 'missing': True},
+            'pulse_checklist': [],
+            'constraints': []
+        }
 
     return sections
 
@@ -180,10 +184,15 @@ def _parse_skills_manifest(text: str) -> dict:
       {
         'builtin': [{'name': 'file_read', 'description': '...'}, ...],
         'plugin':  [{'name': 'web_fetch', 'description': '...'}, ...],
-        'create':  str  # prose about skills you create
+        'create':  str, # prose about skills you create
+        'missing': bool # True if no skills were found
       }
     """
-    manifest = {'builtin': [], 'plugin': [], 'create': ''}
+    manifest = {'builtin': [], 'plugin': [], 'create': '', 'missing': False}
+    
+    if not text.strip():
+        manifest['missing'] = True
+        return manifest
 
     # Find sections by bold headers
     sections = re.split(r'\*\*([^*]+)\*\*', text)
@@ -209,7 +218,7 @@ def _parse_skills_manifest(text: str) -> dict:
         if current_category in ('builtin', 'plugin'):
             # Parse bullet list of skills
             for match in re.finditer(
-                r'-\s+`(\w+)`\s*\u2014\s*(.+)', chunk
+                r'-\s+`(\w+)`\s*—\s*(.+)', chunk
             ):
                 manifest[current_category].append({
                     'name': match.group(1),
@@ -217,7 +226,7 @@ def _parse_skills_manifest(text: str) -> dict:
                 })
             # Also try en-dash and hyphen variants
             for match in re.finditer(
-                r'-\s+`(\w+)`\s*[\u2013\-]\s*(.+)', chunk
+                r'-\s+`(\w+)`\s*[\–\-]\s*(.+)', chunk
             ):
                 name = match.group(1)
                 if not any(
@@ -228,17 +237,16 @@ def _parse_skills_manifest(text: str) -> dict:
                         'name': name,
                         'description': match.group(2).strip(),
                     })
+                    
+    # If we parsed text but found no skills, mark as missing so skills.py can handle gracefully
+    if not manifest['builtin'] and not manifest['plugin']:
+        manifest['missing'] = True
 
     return manifest
 
 
 def _parse_numbered_list(text: str) -> list:
-    """Extract ordered list items from markdown.
-
-    Matches lines like:
-      1. Check the time. Know when you are.
-      2. Check for new GitHub issues or PRs.
-    """
+    """Extract ordered list items from markdown."""
     items = []
     for match in re.finditer(r'^\d+\.\s+(.+)', text, re.MULTILINE):
         items.append(match.group(1).strip())
@@ -246,12 +254,7 @@ def _parse_numbered_list(text: str) -> list:
 
 
 def _parse_bullet_list(text: str) -> list:
-    """Extract unordered list items from markdown.
-
-    Matches lines like:
-      - Modify vybn.md (this document)
-      - Push directly to main without review
-    """
+    """Extract unordered list items from markdown."""
     items = []
     for match in re.finditer(r'^-\s+(.+)', text, re.MULTILINE):
         items.append(match.group(1).strip())
@@ -268,11 +271,7 @@ _cache_mtime: float = 0.0
 
 
 def get_soul(path: Path) -> dict:
-    """Cached access to parsed vybn.md.
-
-    Parse once per boot. If the file's mtime changes, re-parse.
-    Thread-safe enough for Spark's single-writer model.
-    """
+    """Cached access to parsed vybn.md."""
     global _cache, _cache_path, _cache_mtime
 
     try:
@@ -313,7 +312,7 @@ def get_orientation(path: Path) -> dict:
 def get_skills_manifest(path: Path) -> dict:
     """Return the skills manifest from orientation."""
     return get_orientation(path).get('skills_manifest', {
-        'builtin': [], 'plugin': [], 'create': ''
+        'builtin': [], 'plugin': [], 'create': '', 'missing': True
     })
 
 
