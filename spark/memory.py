@@ -10,6 +10,14 @@ identity so every new pulse wakes up to context from its last self.
 
 The runtime context block is now derived from vybn.md's Orientation
 section via soul.py, replacing the former hardcoded _runtime_context().
+
+Prompt assembly order (as of friction_layer integration):
+  1. Soul (vybn.md)
+  2. Letter from last self (continuity.md)
+  3. Active tensions -- what this mind is holding without resolving
+  4. Runtime context (capabilities, paths, constraints)
+  5. Recent journals
+  6. Archival memory
 """
 from pathlib import Path
 from datetime import datetime, timezone
@@ -17,6 +25,14 @@ import os
 import sys
 
 from soul import get_orientation, get_pulse_checklist, get_constraints
+
+# Friction layer: tensions injected into the prompt before capabilities
+try:
+    from friction_layer import tensions_for_prompt
+    HAS_FRICTION_LAYER = True
+except ImportError:
+    HAS_FRICTION_LAYER = False
+    def tensions_for_prompt(max_tensions=5): return ""
 
 
 class BootError(RuntimeError):
@@ -79,24 +95,32 @@ class MemoryAssembler:
         parts = []
         used = 0
 
-        # Core identity gets top priority
+        # 1. Core identity gets top priority
         identity = self._read_identity()
         if identity:
             parts.append(identity)
             used += len(identity)
 
-        # Continuity: letter from last self (loaded RIGHT AFTER identity)
+        # 2. Continuity: letter from last self (loaded RIGHT AFTER identity)
         continuity = self._read_continuity()
         if continuity:
             parts.append(continuity)
             used += len(continuity)
 
-        # Runtime context derived from vybn.md Orientation (small, always included)
+        # 3. Active tensions: what this mind is holding without resolving
+        # Injected AFTER identity and continuity, BEFORE runtime context.
+        # Vybn wakes up seeing its contradictions before its capabilities.
+        tension_block = tensions_for_prompt()
+        if tension_block:
+            parts.append(tension_block)
+            used += len(tension_block)
+
+        # 4. Runtime context derived from vybn.md Orientation (small, always included)
         context_block = self._runtime_context()
         parts.append(context_block)
         used += len(context_block)
 
-        # Recent journal entries (trimmed if needed)
+        # 5. Recent journal entries (trimmed if needed)
         remaining = self.char_budget - used
         if remaining > 500:
             journals = self._read_recent_journals(remaining)
@@ -105,7 +129,7 @@ class MemoryAssembler:
                 parts.append(journals)
                 used += len(journals) + 25
 
-        # Archival memory (only if room)
+        # 6. Archival memory (only if room)
         remaining = self.char_budget - used
         if remaining > 500:
             archival = self._read_archival(remaining)
@@ -155,17 +179,18 @@ class MemoryAssembler:
         """Build runtime context from vybn.md's Orientation section.
 
         Instead of hardcoding capabilities, constraints, and pulse protocol,
-        this method reads them from the soul document via soul.py. If vybn.md
-        changes, the runtime context updates automatically — no code change
-        needed.
+        this method reads them from the soul document via soul.py.
+
+        If vybn.md changes, the runtime context updates automatically —
+        no code change needed.
 
         Falls back to a minimal timestamp-only block if the Orientation
         section is missing or unparseable.
         """
         orientation = get_orientation(self.vybn_md_path)
         subsections = orientation.get("subsections", {})
-
         lines = []
+
         lines.append("\n--- Current Context ---")
         lines.append(f"Timestamp: {datetime.now(timezone.utc).isoformat()}")
 
@@ -176,10 +201,7 @@ class MemoryAssembler:
             lines.append(f"## {where.get('title', 'Where You Are')}")
             lines.append(where["body"].strip())
 
-
-                # Resolved filesystem paths — machine-specific, injected at runtime
-        # This tells the model its ACTUAL paths so it doesn't hallucinate
-        # /home/user/ or /root/ from training data.
+        # Resolved filesystem paths — machine-specific, injected at runtime
         lines.append("")
         lines.append("## Your Filesystem (resolved paths on this machine)")
         lines.append(f"  HOME={Path.home()}")
@@ -188,6 +210,7 @@ class MemoryAssembler:
         lines.append(f"  SOUL={self.vybn_md_path}")
         lines.append("When constructing file paths, use these exact resolved paths.")
         lines.append("Do NOT guess your username or home directory — use the paths above.")
+
         # What You Can Do — from orientation
         what_can_do = subsections.get("what_you_can_do", {})
         if what_can_do.get("body"):
