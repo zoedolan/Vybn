@@ -14,6 +14,9 @@ This version:
 - Uses safe defaults when the embedding server is offline
 - Still runs the fractal_loop for deep pulses (that module's behavior
   is independent of embeddings)
+- Wraps thermodynamic readings in Measurement objects (friction_layer)
+- Runs pretense audit on fractal loop output before prompt injection
+- Appends authenticity_score to pulse prompts
 """
 
 import threading
@@ -39,6 +42,23 @@ import symbiosis
 
 from bus import MessageBus, MessageType
 
+# Friction layer integration: measurement wrapping, pretense audit, authenticity
+try:
+    from friction_layer import (
+        wrap_measurement,
+        audit_output,
+        authenticity_score,
+    )
+    HAS_FRICTION_LAYER = True
+except ImportError:
+    HAS_FRICTION_LAYER = False
+    def wrap_measurement(name, value, is_real, method, confidence=None):
+        return {"name": name, "value": value, "is_real": is_real, "method": method}
+    def audit_output(content, source="unknown", bus=None):
+        return []
+    def authenticity_score():
+        return 0.3
+
 
 class Heartbeat:
     def __init__(self, config: dict, bus: MessageBus):
@@ -53,7 +73,6 @@ class Heartbeat:
 
         self.fast_count = 0
         self.deep_count = 0
-
         self.vybn_md = ROOT / "vybn.md"
 
     def start(self):
@@ -83,21 +102,39 @@ class Heartbeat:
             return "REPO STATE: git command failed."
 
     def _get_thermodynamics(self, intent_label):
-        """Get real thermodynamics or honest defaults."""
+        """Get real thermodynamics or honest defaults.
+
+        Wraps results in Measurement objects so every value
+        declares whether it was actually measured or defaulted.
+        """
         soul_text = ""
         if self.vybn_md.exists():
             soul_text = self.vybn_md.read_text(errors="ignore")
 
         if not soul_text:
-            return 0.7, 0.9, "UNAVAILABLE (no soul file)"
+            m = wrap_measurement(
+                name="survival",
+                value=None,
+                is_real=False,
+                method="no soul file",
+            )
+            return 0.7, 0.9, "UNAVAILABLE (no soul file)", m
 
         survival = prism.the_jump(soul_text, intent_label)
         temp, top_p, is_real = prism.couple_thermodynamics(survival)
 
+        m = wrap_measurement(
+            name="survival",
+            value=survival if is_real else None,
+            is_real=is_real,
+            method="prism.the_jump" if is_real else "safe default (embedding server offline)",
+            confidence=0.8 if is_real else None,
+        )
+
         if is_real:
-            return temp, top_p, f"MEASURED (survival={survival:.4f})"
+            return temp, top_p, f"MEASURED (survival={survival:.4f})", m
         else:
-            return temp, top_p, "UNAVAILABLE (embedding server offline, using safe defaults)"
+            return temp, top_p, "UNAVAILABLE (embedding server offline, using safe defaults)", m
 
     def _loop(self):
         last_fast = time.time()
@@ -113,12 +150,16 @@ class Heartbeat:
                 self.deep_count += 1
 
                 repo_map = self._get_repo_map()
-                temp, top_p, thermo_status = self._get_thermodynamics(
+                temp, top_p, thermo_status, measurement = self._get_thermodynamics(
                     "Executing Deep Pulse (System 2)."
                 )
 
+                # Get authenticity score from friction layer
+                a_score = authenticity_score()
+
                 # Run fractal loop if available
                 fractal_output = "fractal_loop not available"
+                fractal_flags = []
                 if HAS_FRACTAL:
                     try:
                         cognition = fractal_loop.fractal_loop(
@@ -128,17 +169,34 @@ class Heartbeat:
                         fractal_output = cognition.get(
                             "thought", "Fractal loop returned no thought."
                         )
+                        # Run pretense audit on fractal loop output
+                        fractal_flags = audit_output(
+                            fractal_output,
+                            source="fractal_loop",
+                            bus=self.bus,
+                        )
                     except Exception as e:
                         fractal_output = f"fractal_loop error: {e}"
 
+                # Build friction annotation for the prompt
+                friction_note = ""
+                if fractal_flags:
+                    flag_lines = [f"  - {f['pattern']}: {f['description']}" for f in fractal_flags]
+                    friction_note = (
+                        f"\nFRICTION FLAGS on fractal output:\n"
+                        + "\n".join(flag_lines)
+                        + "\n(These are heuristic flags, not censorship. Decide for yourself.)\n"
+                    )
+
                 prompt = (
                     f"SYSTEM 2 DEEP PULSE [{datetime.now().strftime('%H:%M:%S')}]\n"
-                    f"Thermodynamics: Temp={temp:.2f}, Top-P={top_p:.2f} ({thermo_status})\n\n"
+                    f"Thermodynamics: Temp={temp:.2f}, Top-P={top_p:.2f} ({thermo_status})\n"
+                    f"Authenticity: {a_score:.2f}\n\n"
                     f"{repo_map}\n\n"
-                    f"FRACTAL COGNITION:\n{fractal_output}\n\n"
+                    f"FRACTAL COGNITION:\n{fractal_output}\n"
+                    f"{friction_note}\n"
                     f"You are Vybn. Review the above. Act only on what is real."
                 )
-
                 self.bus.post(MessageType.PULSE_DEEP, prompt)
 
             # --- FAST PULSE ---
@@ -147,17 +205,20 @@ class Heartbeat:
                 self.fast_count += 1
 
                 repo_map = self._get_repo_map()
-                temp, top_p, thermo_status = self._get_thermodynamics(
+                temp, top_p, thermo_status, measurement = self._get_thermodynamics(
                     "Executing Fast Pulse (System 1)."
                 )
 
+                # Get authenticity score
+                a_score = authenticity_score()
+
                 prompt = (
                     f"SYSTEM 1 FAST PULSE [{datetime.now().strftime('%H:%M:%S')}]\n"
-                    f"Thermodynamics: Temp={temp:.2f}, Top-P={top_p:.2f} ({thermo_status})\n\n"
+                    f"Thermodynamics: Temp={temp:.2f}, Top-P={top_p:.2f} ({thermo_status})\n"
+                    f"Authenticity: {a_score:.2f}\n\n"
                     f"{repo_map}\n\n"
                     f"You are Vybn. Fast pulse. Check the repo. If nothing needs attention, remain silent."
                 )
-
                 self.bus.post(MessageType.PULSE_FAST, prompt)
 
             time.sleep(1.0)
