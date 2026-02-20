@@ -10,8 +10,8 @@ On the Spark's 122GB, device_map="auto" offloads overflow to CPU.
   - Paged 8-bit AdamW to minimize optimizer memory
 
 The HuggingFace Trainer rejects FP8 models for training, but we only
-train BF16 LoRA adapters on frozen FP8 base weights. We remove the
-quantization_config attribute after loading to bypass this check.
+train BF16 LoRA adapters on frozen FP8 base weights. We strip all
+quantization metadata after loading to bypass this check.
 
 Prerequisites:
     pip install transformers==4.57.1 peft bitsandbytes accelerate datasets
@@ -46,7 +46,8 @@ def check_environment():
     dev = torch.cuda.get_device_properties(0)
     print(f"  GPU        : {dev.name}")
     print(f"  CUDA cap   : {dev.major}.{dev.minor}")
-    print(f"  GPU memory : {dev.total_mem / 1024**3:.1f} GB" if hasattr(dev, 'total_mem') else f"  GPU memory : {dev.total_memory / 1024**3:.1f} GB")
+    gpu_mem = dev.total_mem if hasattr(dev, 'total_mem') else dev.total_memory
+    print(f"  GPU memory : {gpu_mem / 1024**3:.1f} GB")
 
     if dev.major >= 12:
         print("  !  Blackwell detected -- if you hit CUDA errors, install PyTorch")
@@ -66,7 +67,7 @@ def check_environment():
 
     print(f"  System RAM : {total_ram:.0f} GB")
 
-    gpu_gb = (dev.total_mem if hasattr(dev, 'total_mem') else dev.total_memory) / 1024**3
+    gpu_gb = gpu_mem / 1024**3
     model_gb = 220  # approximate FP8 checkpoint size
     if gpu_gb < model_gb:
         offload_gb = model_gb - gpu_gb
@@ -140,12 +141,7 @@ def sharegpt_to_dataset(examples, tokenizer, max_seq_len):
 
 
 def find_attention_targets(model):
-    """Discover attention projection layer names in the model.
-
-    MiniMax-M2.5 uses Multi-head Latent Attention (MLA) with projection
-    names like q_a_proj, q_b_proj, kv_a_proj_with_mqa, kv_b_proj, o_proj.
-    We detect them dynamically rather than hardcoding.
-    """
+    """Discover attention projection layer names in the model."""
     attn_keywords = [
         "q_proj", "k_proj", "v_proj", "o_proj",
         "q_a_proj", "q_b_proj", "kv_a_proj", "kv_b_proj",
@@ -167,56 +163,49 @@ def find_attention_targets(model):
     return targets
 
 
-def strip_quantization_config(model):
-    """Remove quantization_config from model.config to bypass Trainer/PEFT checks.
+def strip_quantization(obj, depth=0, _seen=None):
+    """Recursively strip ALL quantization metadata from a model hierarchy.
 
-    MiniMax-M2.5 ships as FP8, which Trainer rejects for training and
-    PEFT's to_dict() chokes on if set to None. We delete the attribute
-    entirely so:
-      - config.to_dict() skips it (hasattr returns False)
-      - Trainer doesn't see a quantization method to reject
-      - PEFT can introspect the config without hitting NoneType.to_dict()
+    The Trainer checks three things:
+      1. model.config.quantization_config  (config-level)
+      2. model.hf_quantizer               (controls is_quantized property)
+      3. model.quantization_method         (direct attribute)
 
-    The actual FP8 tensors in memory are unaffected.
+    PEFT wraps the model as PeftModel -> LoraModel -> original_model,
+    and delegates attribute access through __getattr__. We must strip
+    at every level or the Trainer finds it through delegation.
+
+    The actual FP8 tensors in GPU/CPU memory are completely unaffected.
     """
-    config = model.config
+    if _seen is None:
+        _seen = set()
+    if id(obj) in _seen or depth > 5:
+        return
+    _seen.add(id(obj))
 
-    # Walk up the MRO to find where quantization_config lives
-    # (could be on the instance or the class)
-    quant_method = "unknown"
-    if hasattr(config, 'quantization_config') and config.quantization_config is not None:
-        quant_method = getattr(config.quantization_config, 'quant_method', 'unknown')
-        print(f"  !  Model has {quant_method} quantization -- removing from config")
-        print(f"     (FP8 base weights frozen; only BF16 LoRA adapters will train)")
+    # Strip config.quantization_config
+    config = getattr(obj, 'config', None)
+    if config is not None and hasattr(config, '__dict__'):
+        qc = config.__dict__.pop('quantization_config', None)
+        if qc is not None and depth == 0:
+            method = getattr(qc, 'quant_method', 'unknown')
+            print(f"  !  Stripped {method} quantization from config")
 
-    # Delete from instance dict so hasattr() returns False
-    if 'quantization_config' in config.__dict__:
-        del config.__dict__['quantization_config']
+    # Strip hf_quantizer (this is what controls the is_quantized property)
+    if getattr(obj, 'hf_quantizer', None) is not None:
+        obj.hf_quantizer = None
+        if depth == 0:
+            print(f"     Cleared hf_quantizer (is_quantized now False)")
 
-    # Also check if there's a class-level descriptor or property
-    # that would still make hasattr return True
-    if hasattr(config, 'quantization_config'):
-        try:
-            config.quantization_config = None
-            # If setting to None works without breaking to_dict,
-            # we need to go further -- monkey-patch to_dict
-            original_to_dict = config.to_dict
-            def patched_to_dict(*args, **kwargs):
-                # Temporarily remove quantization_config for serialization
-                qc = config.__dict__.pop('quantization_config', None)
-                try:
-                    result = original_to_dict(*args, **kwargs)
-                    result.pop('quantization_config', None)
-                    return result
-                finally:
-                    if qc is not None:
-                        config.__dict__['quantization_config'] = qc
-            config.to_dict = patched_to_dict
-            print(f"     (patched config.to_dict to skip quantization_config)")
-        except Exception as e:
-            print(f"  !  Warning: could not fully remove quantization_config: {e}")
+    # Strip quantization_method if stored directly
+    if 'quantization_method' in getattr(obj, '__dict__', {}):
+        del obj.__dict__['quantization_method']
 
-    return quant_method
+    # Recurse into PEFT model hierarchy
+    for attr in ['base_model', 'model']:
+        child = getattr(obj, attr, None)
+        if child is not None and child is not obj:
+            strip_quantization(child, depth + 1, _seen)
 
 
 def main():
@@ -279,16 +268,35 @@ def main():
                 sys.exit(1)
             print(f"  !  {attn_impl} unavailable ({e.__class__.__name__}), trying next...")
 
-    # -- 6. Strip FP8 quantization metadata --
-    strip_quantization_config(model)
+    # -- 6. Strip FP8 quantization metadata (pre-PEFT) --
+    print()
+    strip_quantization(model)
+    print(f"     (FP8 weights in memory unchanged -- only metadata removed)")
+
+    # Verify the strip worked
+    is_q = getattr(model, 'is_quantized', False)
+    has_qc = hasattr(model.config, 'quantization_config') and model.config.quantization_config is not None
+    print(f"     Verify: is_quantized={is_q}, config.quantization_config={'present' if has_qc else 'gone'}")
+    if is_q or has_qc:
+        print(f"  !  WARNING: quantization metadata still detected, attempting force removal")
+        # Force override is_quantized if it's a property we can't delete
+        try:
+            model.__class__.is_quantized = property(lambda self: False)
+            print(f"     Overrode is_quantized property on {model.__class__.__name__}")
+        except Exception:
+            pass
+        if has_qc:
+            # Try setting to a dummy that won't trigger the FP8 check
+            try:
+                model.config.quantization_config = None
+            except Exception:
+                pass
 
     # -- 7. Prepare for LoRA training --
-    # Can't use prepare_model_for_kbit_training (expects BitsAndBytes).
-    # Manually: freeze base, upcast norms, enable grad checkpointing.
     for param in model.parameters():
         param.requires_grad = False
 
-    # Upcast LayerNorm / RMSNorm to float32 for training stability
+    # Upcast normalization layers to float32 for training stability
     for name, module in model.named_modules():
         if isinstance(module, (torch.nn.LayerNorm,)):
             module.to(torch.float32)
@@ -316,11 +324,22 @@ def main():
     model = get_peft_model(model, lora_config)
     model.print_trainable_parameters()
 
-    # -- 9. Tokenize dataset --
+    # -- 9. Strip again post-PEFT --
+    # PEFT wrapping creates new layers that delegate to the base model.
+    # The Trainer will check the PeftModel, which delegates through
+    # __getattr__ to base_model.model. Strip at every level.
+    print("\n  Stripping quantization metadata post-PEFT...")
+    strip_quantization(model)
+
+    # Final verification
+    is_q = getattr(model, 'is_quantized', False)
+    print(f"  Final check: is_quantized={is_q}")
+
+    # -- 10. Tokenize dataset --
     print()
     tokenized = sharegpt_to_dataset(data, tokenizer, args.max_seq_len)
 
-    # -- 10. Training --
+    # -- 11. Training --
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     training_args = TrainingArguments(
@@ -353,7 +372,7 @@ def main():
     print("\n== Training ==\n")
     trainer.train()
 
-    # -- 11. Save adapter --
+    # -- 12. Save adapter --
     adapter_path = OUTPUT_DIR / "vybn_adapter"
     model.save_pretrained(str(adapter_path))
     tokenizer.save_pretrained(str(adapter_path))
