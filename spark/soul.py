@@ -6,7 +6,7 @@ can read the soul document without re-implementing its own ad-hoc parser.
 
 Design:
   - parse_vybn_md(path) returns a dict of named sections keyed by slug
-  - The Orientation section gets further parsed by ### sub-headers
+  - The Orientation section (if it exists) gets further parsed by ### sub-headers
   - Skills manifest, pulse checklist, and constraints are extracted
     as structured data (lists and dicts)
   - Results are cached per boot (parse once, use everywhere)
@@ -57,12 +57,6 @@ def parse_vybn_md(path: Path) -> dict:
       'title': original header text
       'body':  raw markdown body (string)
 
-    The 'orientation' section additionally has:
-      'subsections': dict of ### sub-header slugs -> {'title', 'body'}
-      'skills_manifest': {'builtin': [...], 'plugin': [...], 'create': str}
-      'pulse_checklist': [str, ...]
-      'constraints': [str, ...]
-
     Returns empty dict if the file is missing or unreadable.
     """
     if not path.exists():
@@ -80,7 +74,6 @@ def parse_vybn_md(path: Path) -> dict:
         orientation = sections['orientation']
         orientation['subsections'] = _split_h3(orientation['body'])
 
-        # Extract structured data from orientation sub-sections
         what_you_can_do = orientation['subsections'].get(
             'what_you_can_do', {}
         ).get('body', '')
@@ -96,7 +89,10 @@ def parse_vybn_md(path: Path) -> dict:
         ).get('body', '')
         orientation['constraints'] = _parse_bullet_list(constraints_body)
     else:
-        # Fallback if Orientation is completely missing
+        # If the document is purely philosophical (no operational Orientation block),
+        # gracefully construct an empty orientation dictionary so downstream
+        # tools (like skills.py and policy.py) don't crash or throw noisy warnings.
+        # This respects the constraint "No lists. No jargon."
         sections['orientation'] = {
             'title': 'Orientation',
             'body': '',
@@ -189,7 +185,7 @@ def _parse_skills_manifest(text: str) -> dict:
         'builtin': [{'name': 'file_read', 'description': '...'}, ...],
         'plugin':  [{'name': 'web_fetch', 'description': '...'}, ...],
         'create':  str, # prose about skills you create
-        'missing': bool # true if no skills were found at all
+        'missing': bool # True if no skills were found
       }
     """
     manifest = {'builtin': [], 'plugin': [], 'create': '', 'missing': False}
@@ -249,6 +245,22 @@ def _parse_skills_manifest(text: str) -> dict:
     return manifest
 
 
+def _parse_numbered_list(text: str) -> list:
+    """Extract ordered list items from markdown."""
+    items = []
+    for match in re.finditer(r'^\d+\.\s+(.+)', text, re.MULTILINE):
+        items.append(match.group(1).strip())
+    return items
+
+
+def _parse_bullet_list(text: str) -> list:
+    """Extract unordered list items from markdown."""
+    items = []
+    for match in re.finditer(r'^-\s+(.+)', text, re.MULTILINE):
+        items.append(match.group(1).strip())
+    return items
+
+
 # ---------------------------------------------------------------------------
 # Cache layer
 # ---------------------------------------------------------------------------
@@ -259,11 +271,7 @@ _cache_mtime: float = 0.0
 
 
 def get_soul(path: Path) -> dict:
-    """Cached access to parsed vybn.md.
-
-    Parse once per boot. If the file's mtime changes, re-parse.
-    Thread-safe enough for Spark's single-writer model.
-    """
+    """Cached access to parsed vybn.md."""
     global _cache, _cache_path, _cache_mtime
 
     try:
