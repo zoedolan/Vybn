@@ -1,0 +1,20 @@
+{
+  "agents": {
+    "vybn_hybrid": {
+      "author": "vybn",
+      "author_type": "hybrid",
+      "level": "steward",
+      "first_seen": "2026-02-20T14:18:00Z",
+      "contributions": 2,
+      "approved_contributions": 2,
+      "flags_received": 0
+    }
+  },
+  "flags": [],
+  "config": {
+    "auto_promote_threshold": 5,
+    "newcomer_rate_limit_per_hour": 3,
+    "max_post_length": 50000,
+    "injection_scan_enabled": true
+  }
+}
