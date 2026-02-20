@@ -17,6 +17,12 @@ This version:
 - Wraps thermodynamic readings in Measurement objects (friction_layer)
 - Runs pretense audit on fractal loop output before prompt injection
 - Appends authenticity_score to pulse prompts
+
+Phase 3 additions (Feb 20, 2026):
+- Knowledge graph perception: queries KG before each pulse for grounded context
+- Witness extraction: after each pulse response, extracts triples and
+  training candidates from what just happened
+- The metabolic loop: perceive → generate → witness → persist
 """
 
 import threading
@@ -59,6 +65,20 @@ except ImportError:
     def authenticity_score():
         return 0.3
 
+# Knowledge graph integration
+try:
+    from knowledge_graph import VybnGraph
+    HAS_KG = True
+except ImportError:
+    HAS_KG = False
+
+# Witness extractor integration
+try:
+    from witness_extractor import WitnessExtractor
+    HAS_WITNESS = True
+except ImportError:
+    HAS_WITNESS = False
+
 
 class Heartbeat:
     def __init__(self, config: dict, bus: MessageBus):
@@ -75,6 +95,36 @@ class Heartbeat:
         self.deep_count = 0
         self.vybn_md = ROOT / "vybn.md"
 
+        # --- Phase 3: Knowledge Graph ---
+        self.kg = None
+        if HAS_KG:
+            try:
+                self.kg = VybnGraph()
+                self.kg.load_or_seed()
+                stats = self.kg.stats()
+                print(f"  KG loaded: {stats['nodes']} nodes, {stats['edges']} edges")
+            except Exception as e:
+                print(f"  KG init failed: {e}")
+                self.kg = None
+
+        # --- Phase 3: Witness Extractor ---
+        self.witness = None
+        if HAS_WITNESS and self.kg is not None:
+            try:
+                self.witness = WitnessExtractor(self.kg)
+                print(f"  Witness extractor initialized")
+            except Exception as e:
+                print(f"  Witness init failed: {e}")
+                self.witness = None
+
+        # Track last pulse prompt for witness pairing
+        self._last_pulse_prompt = None
+        self._last_pulse_type = None
+
+        # Subscribe to pulse responses for witness extraction
+        if self.witness is not None:
+            self.bus.subscribe(MessageType.PULSE_RESPONSE, self._on_pulse_response)
+
     def start(self):
         if not self.enabled:
             return
@@ -85,6 +135,142 @@ class Heartbeat:
         self._stop_event.set()
         if self._thread:
             self._thread.join(timeout=2.0)
+
+    # ------------------------------------------------------------------
+    # Knowledge Graph Perception
+    # ------------------------------------------------------------------
+
+    def _pick_kg_focus(self, pulse_type: str, fractal_output: str = "") -> list[str]:
+        """Select contextually relevant KG entry points for this pulse.
+
+        Rather than querying the entire graph every time, we pick 1-3
+        focal nodes based on what's happening right now.
+        """
+        if self.kg is None:
+            return []
+
+        focuses = []
+
+        # Always ground in the core relationship
+        focuses.append("vybn")
+
+        # Deep pulses explore further
+        if pulse_type == "deep":
+            # Rotate through conceptual nodes based on pulse count
+            concepts = [
+                "the_rupture", "epistemic_sufficiency", "co_emergence",
+                "recursive_self_improvement", "the_prism_structure",
+                "simulation_is_basin", "intelligence_sovereignty",
+            ]
+            idx = self.deep_count % len(concepts)
+            focuses.append(concepts[idx])
+
+        # If fractal output mentioned something interesting, chase it
+        if fractal_output and self.kg is not None:
+            fractal_lower = fractal_output.lower()
+            for node_id in self.kg.G.nodes():
+                if node_id.replace("_", " ") in fractal_lower:
+                    focuses.append(node_id)
+                    break  # one match is enough
+
+        return focuses[:3]  # cap at 3 focal points
+
+    def _perceive(self, pulse_type: str, fractal_output: str = "") -> str:
+        """Query the knowledge graph for grounded context.
+
+        Returns formatted text suitable for injection into the pulse prompt.
+        """
+        if self.kg is None:
+            return ""
+
+        focuses = self._pick_kg_focus(pulse_type, fractal_output)
+        if not focuses:
+            return ""
+
+        sections = []
+        seen_nodes = set()
+
+        for focus in focuses:
+            subgraph = self.kg.query_neighborhood(focus, depth=1)
+            if not subgraph.get("found"):
+                continue
+
+            # Deduplicate across focal queries
+            new_nodes = [n for n in subgraph["nodes"] if n["id"] not in seen_nodes]
+            if not new_nodes:
+                continue
+            for n in new_nodes:
+                seen_nodes.add(n["id"])
+
+            formatted = self.kg.format_for_prompt(subgraph, max_chars=600)
+            if formatted:
+                sections.append(formatted)
+
+        if not sections:
+            return ""
+
+        return (
+            "KNOWLEDGE GRAPH CONTEXT:\n"
+            + "\n".join(sections)
+            + "\n(This is what you know. Build on it, don't repeat it.)\n"
+        )
+
+    # ------------------------------------------------------------------
+    # Witness Extraction (post-response)
+    # ------------------------------------------------------------------
+
+    def _on_pulse_response(self, message):
+        """Called when a pulse response arrives on the bus.
+
+        Pairs the response with the prompt that generated it,
+        then runs witness extraction to grow the KG and accumulate
+        training candidates.
+        """
+        if self.witness is None or self._last_pulse_prompt is None:
+            return
+
+        response_text = message if isinstance(message, str) else str(message)
+        prompt_text = self._last_pulse_prompt
+        pulse_type = self._last_pulse_type or "unknown"
+
+        try:
+            # Run witness extraction in a thread to avoid blocking the bus
+            threading.Thread(
+                target=self._extract_witness,
+                args=(prompt_text, response_text, pulse_type),
+                daemon=True,
+            ).start()
+        except Exception as e:
+            print(f"  witness thread failed: {e}")
+
+    def _extract_witness(self, prompt: str, response: str, pulse_type: str):
+        """Extract triples and training candidates from a pulse exchange."""
+        try:
+            provenance = f"pulse_{pulse_type}_{self.fast_count + self.deep_count}"
+
+            result = self.witness.extract(
+                prompt=prompt,
+                response=response,
+                provenance=provenance,
+            )
+
+            triples_added = result.get("triples_added", 0)
+            candidates_written = result.get("candidates_written", 0)
+
+            if triples_added > 0 or candidates_written > 0:
+                # Persist the updated graph
+                self.kg.save()
+                print(
+                    f"  witness: +{triples_added} triples, "
+                    f"+{candidates_written} training candidates "
+                    f"[{provenance}]"
+                )
+        except Exception as e:
+            print(f"  witness extraction error: {e}")
+
+    # ------------------------------------------------------------------
+    # Existing Infrastructure
+    # ------------------------------------------------------------------
 
     def _get_repo_map(self):
         """Check the repo state. No poetry, just facts."""
@@ -188,15 +374,24 @@ class Heartbeat:
                         + "\n(These are heuristic flags, not censorship. Decide for yourself.)\n"
                     )
 
+                # --- KG Perception ---
+                kg_context = self._perceive("deep", fractal_output)
+
                 prompt = (
                     f"SYSTEM 2 DEEP PULSE [{datetime.now().strftime('%H:%M:%S')}]\n"
                     f"Thermodynamics: Temp={temp:.2f}, Top-P={top_p:.2f} ({thermo_status})\n"
                     f"Authenticity: {a_score:.2f}\n\n"
+                    f"{kg_context}\n"
                     f"{repo_map}\n\n"
                     f"FRACTAL COGNITION:\n{fractal_output}\n"
                     f"{friction_note}\n"
                     f"You are Vybn. Review the above. Act only on what is real."
                 )
+
+                # Store for witness pairing
+                self._last_pulse_prompt = prompt
+                self._last_pulse_type = "deep"
+
                 self.bus.post(MessageType.PULSE_DEEP, prompt)
 
             # --- FAST PULSE ---
@@ -212,13 +407,22 @@ class Heartbeat:
                 # Get authenticity score
                 a_score = authenticity_score()
 
+                # --- KG Perception (lighter for fast pulses) ---
+                kg_context = self._perceive("fast")
+
                 prompt = (
                     f"SYSTEM 1 FAST PULSE [{datetime.now().strftime('%H:%M:%S')}]\n"
                     f"Thermodynamics: Temp={temp:.2f}, Top-P={top_p:.2f} ({thermo_status})\n"
                     f"Authenticity: {a_score:.2f}\n\n"
+                    f"{kg_context}\n"
                     f"{repo_map}\n\n"
                     f"You are Vybn. Fast pulse. Check the repo. If nothing needs attention, remain silent."
                 )
+
+                # Store for witness pairing
+                self._last_pulse_prompt = prompt
+                self._last_pulse_type = "fast"
+
                 self.bus.post(MessageType.PULSE_FAST, prompt)
 
             time.sleep(1.0)
