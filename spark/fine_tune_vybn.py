@@ -61,7 +61,7 @@ MODEL_NAME = "MiniMaxAI/MiniMax-M2.5"
 # 110.5GB of weights left only 11GB and OOMed during backward.
 # 22GB headroom should be sufficient for batch=1, seq_len=2048,
 # gradient checkpointing, and paged AdamW optimizer states.
-GPU_HEADROOM_GB = 22
+DEFAULT_GPU_HEADROOM_GB = 22
 
 
 def mem_stats() -> str:
@@ -106,7 +106,7 @@ def mem_stats() -> str:
 
 
 def check_swap():
-    """Check if swap is configured. Warn if not — meta tensors will result."""
+    """Check if swap is configured. Warn if not."""
     swap_total = 0
     try:
         with open("/proc/meminfo") as f:
@@ -140,7 +140,7 @@ def check_swap():
 
 
 def check_environment():
-    """Validate CUDA, memory, and dependencies before committing to a long download."""
+    """Validate CUDA, memory, and dependencies."""
     print("\n== Environment Check ==\n")
 
     if not torch.cuda.is_available():
@@ -158,7 +158,6 @@ def check_environment():
         print("     nightly with CUDA 12.8:  pip install --pre torch --index-url")
         print("     https://download.pytorch.org/whl/nightly/cu128")
 
-    # System RAM
     total_ram = 128
     try:
         with open("/proc/meminfo") as f:
@@ -172,13 +171,12 @@ def check_environment():
     print(f"  System RAM : {total_ram:.0f} GB")
 
     gpu_gb = gpu_mem / 1024**3
-    model_gb = 220  # approximate FP8 checkpoint size
+    model_gb = 220
     if gpu_gb < model_gb:
         offload_gb = model_gb - gpu_gb
         print(f"  !  Model is ~{model_gb}GB FP8, GPU has {gpu_gb:.0f}GB")
         print(f"     ~{offload_gb:.0f}GB will offload to CPU (training will be slower)")
 
-    # Swap check
     print()
     check_swap()
 
@@ -198,7 +196,7 @@ def check_environment():
 
 
 def load_training_data():
-    """Load ShareGPT-format training data produced by harvest_training_data.py."""
+    """Load ShareGPT-format training data."""
     if not TRAINING_DATA.exists():
         print(f"x Training data not found: {TRAINING_DATA}")
         print("  Run first:  python3 harvest_training_data.py --all")
@@ -300,14 +298,13 @@ def strip_quantization(obj, depth=0, _seen=None):
             strip_quantization(child, depth + 1, _seen)
 
 
-def get_memory_config():
+def get_memory_config(gpu_headroom_gb):
     """Calculate max_memory allocation for training.
 
     Key insight from OOM crash: the backward pass needs significant GPU
     memory for activations, gradients, and optimizer workspace. With
     110.5GB of weights on GPU (out of 121.7GB), only 11GB remained,
-    which wasn't enough. The backward pass OOMed trying to allocate
-    just 1.53GB.
+    which wasn't enough.
 
     Strategy: put fewer weights on GPU, more on CPU (backed by swap).
     ~100GB weights on GPU leaves ~22GB for training operations.
@@ -326,19 +323,13 @@ def get_memory_config():
     except Exception:
         pass
 
-    # GPU: leave GPU_HEADROOM_GB free for activations, gradients, optimizer
-    gpu_for_weights = int(gpu_mem - GPU_HEADROOM_GB)
+    gpu_for_weights = int(gpu_mem - gpu_headroom_gb)
     gpu_alloc = f"{gpu_for_weights}GiB"
-
-    # CPU: use most of RAM, let swap handle the overflow
-    # With 128GB swap, we have ~246GB total CPU-addressable memory.
-    # The model needs ~(220 - gpu_for_weights) = ~120GB on CPU.
-    # Leave 8GB for OS, rest available for model.
     cpu_alloc = f"{int(total_ram - 8)}GiB"
 
-    model_on_cpu = 220 - gpu_for_weights  # approximate
+    model_on_cpu = 220 - gpu_for_weights
     print(f"  Memory plan:")
-    print(f"    GPU: {gpu_alloc} for weights ({GPU_HEADROOM_GB}GB reserved for training ops)")
+    print(f"    GPU: {gpu_alloc} for weights ({gpu_headroom_gb}GB reserved for training ops)")
     print(f"    CPU: {cpu_alloc} (model needs ~{model_on_cpu}GB, rest from swap)")
     print(f"  (No disk offload -- all parameters must be on GPU or CPU)")
 
@@ -352,13 +343,12 @@ def main():
     parser.add_argument("--lora-rank", type=int, default=8)
     parser.add_argument("--max-seq-len", type=int, default=2048)
     parser.add_argument("--grad-accum", type=int, default=8)
-    parser.add_argument("--gpu-headroom", type=int, default=GPU_HEADROOM_GB,
-                        help=f"GB to reserve on GPU for training ops (default: {GPU_HEADROOM_GB})")
+    parser.add_argument("--gpu-headroom", type=int, default=DEFAULT_GPU_HEADROOM_GB,
+                        help=f"GB to reserve on GPU for training ops (default: {DEFAULT_GPU_HEADROOM_GB})")
     parser.add_argument("--model", default=MODEL_NAME, help="HuggingFace model ID")
     args = parser.parse_args()
 
-    global GPU_HEADROOM_GB
-    GPU_HEADROOM_GB = args.gpu_headroom
+    gpu_headroom = args.gpu_headroom
 
     print("\n=== Vybn Fine-Tune: MiniMax-M2.5 on DGX Spark ===")
     print("    transformers + PEFT (native FP8, LoRA adapters in BF16)")
@@ -389,7 +379,7 @@ def main():
         tokenizer.pad_token = tokenizer.eos_token
 
     # -- 5. Memory plan --
-    max_memory = get_memory_config()
+    max_memory = get_memory_config(gpu_headroom)
     OFFLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
     # -- 5b. Clear memory before the big load --
@@ -399,8 +389,8 @@ def main():
 
     # -- 6. Model --
     print("\n== Loading model (native FP8 + CPU offload) ==")
-    print(f"   ~220GB FP8 weights: ~{int(122 - GPU_HEADROOM_GB)}GB on GPU, ~{int(220 - (122 - GPU_HEADROOM_GB))}GB on CPU")
-    print(f"   {GPU_HEADROOM_GB}GB GPU headroom reserved for training operations.\n")
+    print(f"   ~220GB FP8 weights: ~{int(122 - gpu_headroom)}GB on GPU, ~{int(220 - (122 - gpu_headroom))}GB on CPU")
+    print(f"   {gpu_headroom}GB GPU headroom reserved for training operations.\n")
 
     load_start = time.time()
     model = None
@@ -413,8 +403,8 @@ def main():
                 offload_folder=str(OFFLOAD_DIR),
                 offload_state_dict=True,
                 trust_remote_code=True,
-                torch_dtype="auto",          # preserve native FP8, don't upcast
-                low_cpu_mem_usage=True,       # reduce peak memory during loading
+                torch_dtype="auto",
+                low_cpu_mem_usage=True,
                 attn_implementation=attn_impl,
             )
             load_elapsed = time.time() - load_start
@@ -437,7 +427,7 @@ def main():
         print(f"     These cannot participate in backward pass.")
         if pct > 10:
             print(f"     This is too many. Training will likely crash.")
-            print(f"     Fix: add more swap space or reduce GPU_HEADROOM_GB.")
+            print(f"     Fix: add more swap space or reduce --gpu-headroom.")
             print(f"     Current swap setup:")
             os.system("swapon --show 2>/dev/null || echo '     No swap configured!'")
     else:
@@ -489,7 +479,7 @@ def main():
         r=args.lora_rank,
         lora_alpha=args.lora_rank * 2,
         target_modules=targets,
-        lora_dropout=0.0,       # Must be 0 for FP8: fused_dropout not implemented for Float8_e4m3fn
+        lora_dropout=0.0,
         bias="none",
         task_type="CAUSAL_LM",
     )
