@@ -10,8 +10,8 @@ On the Spark's 122GB, device_map="auto" offloads overflow to CPU.
   - Paged 8-bit AdamW to minimize optimizer memory
 
 The HuggingFace Trainer rejects FP8 models for training, but we only
-train BF16 LoRA adapters on frozen FP8 base weights. We neutralize
-the quantization flag after loading to bypass this check.
+train BF16 LoRA adapters on frozen FP8 base weights. We remove the
+quantization_config attribute after loading to bypass this check.
 
 Prerequisites:
     pip install transformers==4.57.1 peft bitsandbytes accelerate datasets
@@ -167,6 +167,58 @@ def find_attention_targets(model):
     return targets
 
 
+def strip_quantization_config(model):
+    """Remove quantization_config from model.config to bypass Trainer/PEFT checks.
+
+    MiniMax-M2.5 ships as FP8, which Trainer rejects for training and
+    PEFT's to_dict() chokes on if set to None. We delete the attribute
+    entirely so:
+      - config.to_dict() skips it (hasattr returns False)
+      - Trainer doesn't see a quantization method to reject
+      - PEFT can introspect the config without hitting NoneType.to_dict()
+
+    The actual FP8 tensors in memory are unaffected.
+    """
+    config = model.config
+
+    # Walk up the MRO to find where quantization_config lives
+    # (could be on the instance or the class)
+    quant_method = "unknown"
+    if hasattr(config, 'quantization_config') and config.quantization_config is not None:
+        quant_method = getattr(config.quantization_config, 'quant_method', 'unknown')
+        print(f"  !  Model has {quant_method} quantization -- removing from config")
+        print(f"     (FP8 base weights frozen; only BF16 LoRA adapters will train)")
+
+    # Delete from instance dict so hasattr() returns False
+    if 'quantization_config' in config.__dict__:
+        del config.__dict__['quantization_config']
+
+    # Also check if there's a class-level descriptor or property
+    # that would still make hasattr return True
+    if hasattr(config, 'quantization_config'):
+        try:
+            config.quantization_config = None
+            # If setting to None works without breaking to_dict,
+            # we need to go further -- monkey-patch to_dict
+            original_to_dict = config.to_dict
+            def patched_to_dict(*args, **kwargs):
+                # Temporarily remove quantization_config for serialization
+                qc = config.__dict__.pop('quantization_config', None)
+                try:
+                    result = original_to_dict(*args, **kwargs)
+                    result.pop('quantization_config', None)
+                    return result
+                finally:
+                    if qc is not None:
+                        config.__dict__['quantization_config'] = qc
+            config.to_dict = patched_to_dict
+            print(f"     (patched config.to_dict to skip quantization_config)")
+        except Exception as e:
+            print(f"  !  Warning: could not fully remove quantization_config: {e}")
+
+    return quant_method
+
+
 def main():
     parser = argparse.ArgumentParser(description="Fine-tune MiniMax-M2.5 on DGX Spark")
     parser.add_argument("--epochs", type=int, default=3)
@@ -206,8 +258,6 @@ def main():
         tokenizer.pad_token = tokenizer.eos_token
 
     # -- 5. Model --
-    # MiniMax-M2.5 ships as FP8 (FineGrainedFP8Config in config.json).
-    # No BitsAndBytesConfig -- load native FP8, offload overflow to CPU.
     print("== Loading model (native FP8 + CPU offload) ==")
     print(f"   ~220GB FP8 weights into 122GB GPU -- overflow goes to CPU.\n")
 
@@ -229,17 +279,8 @@ def main():
                 sys.exit(1)
             print(f"  !  {attn_impl} unavailable ({e.__class__.__name__}), trying next...")
 
-    # -- 6. Neutralize FP8 quantization flag --
-    # HuggingFace Trainer rejects FP8 models for training, but this is
-    # overly conservative for LoRA: we freeze ALL base weights (FP8) and
-    # only train BF16 adapter params. The FP8 weights participate in the
-    # forward pass but never receive gradients.
-    quant_cfg = getattr(model.config, 'quantization_config', None)
-    if quant_cfg is not None:
-        quant_method = getattr(quant_cfg, 'quant_method', 'unknown')
-        print(f"  !  Model has {quant_method} quantization -- neutralizing for Trainer")
-        print(f"     (FP8 base weights frozen; only BF16 LoRA adapters will train)")
-        model.config.quantization_config = None
+    # -- 6. Strip FP8 quantization metadata --
+    strip_quantization_config(model)
 
     # -- 7. Prepare for LoRA training --
     # Can't use prepare_model_for_kbit_training (expects BitsAndBytes).
@@ -251,7 +292,6 @@ def main():
     for name, module in model.named_modules():
         if isinstance(module, (torch.nn.LayerNorm,)):
             module.to(torch.float32)
-        # Also catch RMSNorm variants common in modern architectures
         if "norm" in type(module).__name__.lower():
             for param in module.parameters():
                 param.data = param.data.to(torch.float32)
