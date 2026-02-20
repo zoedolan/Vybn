@@ -13,7 +13,12 @@ when the inputs are unavailable.
 
 import json
 import requests
-import numpy as np
+try:
+    import numpy as np
+    HAS_NUMPY = True
+except ImportError:
+    np = None
+    HAS_NUMPY = False
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -31,6 +36,8 @@ def get_embedding(text):
     Returns a numpy array on success, or UNAVAILABLE if the server
     is offline. Does NOT fall back to random noise.
     """
+        if not HAS_NUMPY:
+        return UNAVAILABLE
     try:
         resp = requests.post(
             "http://localhost:11434/api/embeddings",
@@ -51,6 +58,8 @@ def the_jump(soul_text, intent_text, shards=100, entropy=3.14):
     Returns a float (0.0-1.0) when embeddings are available,
     or UNAVAILABLE when they are not.
     """
+    if not HAS_NUMPY:
+        return UNAVAILABLE
     soul_vector = get_embedding(soul_text)
     if soul_vector is UNAVAILABLE:
         return UNAVAILABLE
