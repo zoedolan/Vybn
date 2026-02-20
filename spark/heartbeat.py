@@ -72,9 +72,9 @@ try:
 except ImportError:
     HAS_KG = False
 
-# Witness extractor integration
+# Witness extractor integration — module-level functions, not a class
 try:
-    from witness_extractor import WitnessExtractor
+    from witness_extractor import witness_text, witness_conversation
     HAS_WITNESS = True
 except ImportError:
     HAS_WITNESS = False
@@ -107,23 +107,14 @@ class Heartbeat:
                 print(f"  KG init failed: {e}")
                 self.kg = None
 
-        # --- Phase 3: Witness Extractor ---
-        self.witness = None
-        if HAS_WITNESS and self.kg is not None:
-            try:
-                self.witness = WitnessExtractor(self.kg)
-                print(f"  Witness extractor initialized")
-            except Exception as e:
-                print(f"  Witness init failed: {e}")
-                self.witness = None
-
         # Track last pulse prompt for witness pairing
         self._last_pulse_prompt = None
         self._last_pulse_type = None
 
         # Subscribe to pulse responses for witness extraction
-        if self.witness is not None:
+        if HAS_WITNESS and self.kg is not None:
             self.bus.subscribe(MessageType.PULSE_RESPONSE, self._on_pulse_response)
+            print(f"  Witness subscribed to PULSE_RESPONSE")
 
     def start(self):
         if not self.enabled:
@@ -222,51 +213,75 @@ class Heartbeat:
     def _on_pulse_response(self, message):
         """Called when a pulse response arrives on the bus.
 
+        The message is a bus.Message object with .content and .metadata.
         Pairs the response with the prompt that generated it,
         then runs witness extraction to grow the KG and accumulate
         training candidates.
         """
-        if self.witness is None or self._last_pulse_prompt is None:
+        if self.kg is None or self._last_pulse_prompt is None:
+            return
+        if not HAS_WITNESS:
             return
 
-        response_text = message if isinstance(message, str) else str(message)
+        # Extract response text from the Message object
+        response_text = message.content if hasattr(message, 'content') else str(message)
         prompt_text = self._last_pulse_prompt
         pulse_type = self._last_pulse_type or "unknown"
 
         try:
-            # Run witness extraction in a thread to avoid blocking the bus
-            threading.Thread(
-                target=self._extract_witness,
-                args=(prompt_text, response_text, pulse_type),
-                daemon=True,
-            ).start()
-        except Exception as e:
-            print(f"  witness thread failed: {e}")
-
-    def _extract_witness(self, prompt: str, response: str, pulse_type: str):
-        """Extract triples and training candidates from a pulse exchange."""
-        try:
-            provenance = f"pulse_{pulse_type}_{self.fast_count + self.deep_count}"
-
-            result = self.witness.extract(
-                prompt=prompt,
-                response=response,
-                provenance=provenance,
-            )
-
-            triples_added = result.get("triples_added", 0)
-            candidates_written = result.get("candidates_written", 0)
-
-            if triples_added > 0 or candidates_written > 0:
-                # Persist the updated graph
-                self.kg.save()
-                print(
-                    f"  witness: +{triples_added} triples, "
-                    f"+{candidates_written} training candidates "
-                    f"[{provenance}]"
-                )
+            self._extract_witness(prompt_text, response_text, pulse_type)
         except Exception as e:
             print(f"  witness extraction error: {e}")
+
+    def _extract_witness(self, prompt: str, response: str, pulse_type: str):
+        """Extract triples and training candidates from a pulse exchange.
+
+        Uses the module-level witness_text() function from witness_extractor.py.
+        Processes both the response alone and the full prompt+response together
+        to catch cross-context relationships.
+        """
+        pulse_id = f"pulse_{pulse_type}_{self.fast_count + self.deep_count}"
+
+        # Witness the response (where the new content is)
+        result = witness_text(
+            response, self.kg,
+            source_label=f"heartbeat_{pulse_type}",
+            pulse_id=pulse_id,
+        )
+
+        triples_added = result.get("triples_added", 0)
+        training_saved = result.get("training_candidate_saved", False)
+
+        # Also witness prompt+response together for cross-turn relationships
+        combined = f"PROMPT:\n{prompt}\n\nRESPONSE:\n{response}"
+        combined_result = witness_text(
+            combined, self.kg,
+            source_label=f"heartbeat_{pulse_type}_combined",
+            pulse_id=pulse_id + "_combined",
+        )
+
+        total_triples = triples_added + combined_result.get("triples_added", 0)
+
+        if total_triples > 0 or training_saved:
+            self.kg.save()
+            print(
+                f"  witness: +{total_triples} triples"
+                + (f", training candidate saved" if training_saved else "")
+                + f" [{pulse_id}]"
+            )
+
+        # Post witness result to bus for audit trail
+        self.bus.post(
+            MessageType.WITNESS_RESULT,
+            f"Witness extracted {total_triples} triples from {pulse_id}",
+            metadata={
+                "source": "witness",
+                "pulse_id": pulse_id,
+                "triples_added": total_triples,
+                "high_value": result.get("high_value", False),
+                "entities_found": result.get("entities_found", 0),
+            },
+        )
 
     # ------------------------------------------------------------------
     # Existing Infrastructure

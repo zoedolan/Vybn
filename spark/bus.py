@@ -6,14 +6,21 @@ the main loop drains it. Nothing that writes to the bus
 ever calls the model directly.
 
 Message types:
-  INBOX       — file dropped in the inbox directory
-  PULSE_FAST  — System 1 heartbeat trigger
-  PULSE_DEEP  — System 2 heartbeat trigger
-  AGENT_RESULT— mini-agent completed its task
-  INTERRUPT   — priority message (tool failure, TUI interrupt)
+  INBOX         — file dropped in the inbox directory
+  PULSE_FAST    — System 1 heartbeat trigger
+  PULSE_DEEP    — System 2 heartbeat trigger
+  PULSE_RESPONSE— inference result from a pulse (closes the metabolic loop)
+  AGENT_RESULT  — mini-agent completed its task
+  WITNESS_RESULT— witness extractor finished processing
+  INTERRUPT     — priority message (tool failure, TUI interrupt)
 
 Priority determines drain order, not arrival time.
-INTERRUPT > INBOX > AGENT_RESULT > PULSE_FAST > PULSE_DEEP
+INTERRUPT > INBOX > AGENT_RESULT > PULSE_RESPONSE > WITNESS_RESULT > PULSE_FAST > PULSE_DEEP
+
+Subscriptions:
+  In addition to the drain-based main loop, components can subscribe
+  to specific message types via bus.subscribe(msg_type, callback).
+  Callbacks run in daemon threads to avoid blocking the poster.
 
 Audit log:
   Every message posted to the bus is recorded in a bounded
@@ -27,9 +34,10 @@ Audit log:
 
 import threading
 import time
-from collections import deque
+from collections import deque, defaultdict
 from dataclasses import dataclass, field
 from enum import IntEnum
+from typing import Callable
 
 
 class MessageType(IntEnum):
@@ -37,8 +45,10 @@ class MessageType(IntEnum):
     INTERRUPT = 0
     INBOX = 1
     AGENT_RESULT = 2
-    PULSE_FAST = 3
-    PULSE_DEEP = 4
+    PULSE_RESPONSE = 3
+    WITNESS_RESULT = 4
+    PULSE_FAST = 5
+    PULSE_DEEP = 6
 
 
 @dataclass(order=True)
@@ -83,7 +93,7 @@ class AuditEntry:
 
 
 class MessageBus:
-    """Thread-safe message queue with priority drain and audit log."""
+    """Thread-safe message queue with priority drain, pub/sub, and audit log."""
 
     AUDIT_CAPACITY = 200
 
@@ -96,11 +106,52 @@ class MessageBus:
         self._audit: deque[AuditEntry] = deque(maxlen=cap)
         self._audit_lock = threading.Lock()
 
+        # Pub/sub: msg_type -> list of callbacks
+        self._subscribers: dict[MessageType, list[Callable]] = defaultdict(list)
+        self._sub_lock = threading.Lock()
+
+    def subscribe(self, msg_type: MessageType, callback: Callable):
+        """Register a callback for a specific message type.
+
+        Callback receives the Message object. Runs in a daemon thread
+        to avoid blocking the poster. Multiple callbacks per type allowed.
+        """
+        with self._sub_lock:
+            self._subscribers[msg_type].append(callback)
+
+    def unsubscribe(self, msg_type: MessageType, callback: Callable):
+        """Remove a previously registered callback."""
+        with self._sub_lock:
+            try:
+                self._subscribers[msg_type].remove(callback)
+            except ValueError:
+                pass
+
+    def _notify_subscribers(self, msg: Message):
+        """Fire registered callbacks for this message type."""
+        with self._sub_lock:
+            callbacks = list(self._subscribers.get(msg.msg_type, []))
+
+        for cb in callbacks:
+            try:
+                threading.Thread(
+                    target=cb, args=(msg,), daemon=True,
+                    name=f"bus_sub_{msg.msg_type.name}_{id(cb)}",
+                ).start()
+            except Exception as e:
+                # Don't let subscriber failures break the bus
+                self.record(
+                    source="bus_subscriber",
+                    summary=f"Callback error for {msg.msg_type.name}: {e}",
+                    metadata={"event_type": "subscriber_error"},
+                )
+
     def post(self, msg_type: MessageType, content: str, metadata: dict = None):
         """Post a message to the bus. Thread-safe. Non-blocking.
 
-        Also records an audit entry. The 'source' field in metadata
-        is used as the audit source; defaults to the message type name.
+        Also records an audit entry and notifies any subscribers.
+        The 'source' field in metadata is used as the audit source;
+        defaults to the message type name.
         """
         meta = metadata or {}
         msg = Message(
@@ -124,6 +175,9 @@ class MessageBus:
         )
         with self._audit_lock:
             self._audit.append(entry)
+
+        # Notify subscribers
+        self._notify_subscribers(msg)
 
     def record(self, source: str, summary: str, metadata: dict = None):
         """Record an audit entry without posting a bus message.
