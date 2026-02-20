@@ -32,6 +32,8 @@ UNAVAILABLE = None
 
 def get_embedding(text):
     """Get a real embedding. Returns UNAVAILABLE if server is offline."""
+        if not HAS_NUMPY:
+        return UNAVAILABLE
     try:
             if not HAS_NUMPY:
         return UNAVAILABLE
