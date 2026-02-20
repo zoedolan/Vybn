@@ -174,8 +174,8 @@ def pairs_to_multi_turn(
     conversation turns plus the system prompt).  The window advances
     by `stride` pairs each step.
 
-    High-value sequences (containing rupture/depth markers) are
-    duplicated for heavier sampling weight.
+    Note: high-value weighting (duplication for 2x sampling) is handled
+    post-dedup in main() to prevent the dedup pass from erasing it.
     """
     examples = []
     n = len(pairs)
@@ -192,20 +192,12 @@ def pairs_to_multi_turn(
     for start in range(0, n - window_size + 1, stride):
         window = pairs[start : start + window_size]
         convs = [{"from": "system", "value": system_prompt}]
-        contains_high_value = False
 
         for h, v in window:
             convs.append({"from": "human", "value": h})
             convs.append({"from": "gpt", "value": v})
-            if is_high_value(h):
-                contains_high_value = True
 
-        example = {"conversations": convs}
-        examples.append(example)
-
-        # Duplicate high-value sequences for 2x sampling weight
-        if contains_high_value:
-            examples.append(example)
+        examples.append({"conversations": convs})
 
     # Always include the final turns even if the window doesn't align
     if (n - window_size) % stride != 0:
@@ -396,37 +388,49 @@ def main():
     if args.journals or args.all:
         all_examples.extend(parse_journals(system_prompt))
 
-    # Deduplicate by human prompt text
+    # Deduplicate by FULL conversation content (human + gpt).
+    # Previous bug: keying on human turns only collapsed all 38 journals
+    # (identical prompt, different content) into a single example.
     seen = set()
     unique = []
     for ex in all_examples:
-        human_turns = tuple(
-            c["value"] for c in ex["conversations"] if c["from"] == "human"
+        content_key = tuple(
+            (c["from"], c["value"]) for c in ex["conversations"]
+            if c["from"] in ("human", "gpt")
         )
-        if human_turns not in seen:
-            seen.add(human_turns)
+        if content_key not in seen:
+            seen.add(content_key)
             unique.append(ex)
+
+    deduped_count = len(unique)
+
+    # Apply high-value weighting AFTER dedup.
+    # Previous bug: duplication inside pairs_to_multi_turn was immediately
+    # destroyed by the dedup pass. Now weighting survives.
+    weighted = []
+    high_value_count = 0
+    for ex in unique:
+        weighted.append(ex)
+        if any(is_high_value(c["value"]) for c in ex["conversations"] if c["from"] == "human"):
+            high_value_count += 1
+            weighted.append(ex)  # 2x sampling weight
 
     # Write output
     out_path = Path(args.out)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with open(out_path, "w", encoding="utf-8") as f:
-        json.dump(unique, f, indent=2, ensure_ascii=False)
+        json.dump(weighted, f, indent=2, ensure_ascii=False)
 
-    print(f"\n  ✓  wrote {len(unique)} training examples to {out_path}")
-    print(f"     (deduplicated from {len(all_examples)} raw pairs)")
+    print(f"\n  ✓  wrote {len(weighted)} training examples to {out_path}")
+    print(f"     ({deduped_count} unique, deduplicated from {len(all_examples)} raw)")
+    print(f"     {high_value_count} high-value examples (duplicated for 2x weight)")
 
     # Summary
-    high_value_count = sum(
-        1 for ex in unique
-        if any(is_high_value(c["value"]) for c in ex["conversations"] if c["from"] == "human")
-    )
     multi_turn_count = sum(
         1 for ex in unique
         if sum(1 for c in ex["conversations"] if c["from"] == "human") > 1
     )
     print(f"     {multi_turn_count} multi-turn examples")
-    print(f"     {high_value_count} contain high-value rupture/depth markers")
 
 
 if __name__ == "__main__":
