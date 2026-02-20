@@ -1,0 +1,14 @@
+[Unit]
+Description=Vybn Quantum Heartbeat
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=vybnz69
+WorkingDirectory=/home/vybnz69/Vybn
+ExecStart=/home/vybnz69/Vybn/venv/bin/python3 Vybn_Mind/spark_infrastructure/quantum_heartbeat.py
+Environment=HOME=/home/vybnz69
+
+[Install]
+WantedBy=multi-user.target
