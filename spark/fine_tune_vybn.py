@@ -9,6 +9,16 @@ On the Spark's 122GB, device_map="auto" offloads overflow to CPU.
   - Gradient checkpointing + micro-batch 1
   - Paged 8-bit AdamW to minimize optimizer memory
 
+The HuggingFace Trainer rejects FP8 models for training, but we only
+train BF16 LoRA adapters on frozen FP8 base weights. We strip all
+quantization metadata after loading to bypass this check.
+
+CRITICAL: Do NOT pass dtype=torch.bfloat16 to from_pretrained.
+With trust_remote_code=True, the MiniMax model code upcasts every
+weight tensor to BF16, doubling memory from ~220GB to ~440GB and
+causing the loader to deadlock at shard ~62 when GPU fills up.
+Use torch_dtype="auto" to preserve native FP8 storage.
+
 Prerequisites:
     pip install transformers==4.57.1 peft bitsandbytes accelerate datasets
 
@@ -19,16 +29,48 @@ Usage:
 """
 
 import argparse
+import gc
 import json
 import os
 import sys
+import time
 import torch
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 TRAINING_DATA = REPO_ROOT / "spark" / "training_data" / "training_data.json"
 OUTPUT_DIR = REPO_ROOT / "spark" / "fine_tune_output"
+OFFLOAD_DIR = REPO_ROOT / "spark" / "offload_cache"
 MODEL_NAME = "MiniMaxAI/MiniMax-M2.5"
+
+
+def mem_stats() -> str:
+    """One-line memory diagnostic."""
+    gpu_alloc = torch.cuda.memory_allocated(0) / 1024**3
+    gpu_reserved = torch.cuda.memory_reserved(0) / 1024**3
+    dev = torch.cuda.get_device_properties(0)
+    gpu_total = (dev.total_mem if hasattr(dev, 'total_mem') else dev.total_memory) / 1024**3
+
+    cpu_used = 0
+    cpu_avail = 0
+    try:
+        with open("/proc/meminfo") as f:
+            info = {}
+            for line in f:
+                parts = line.split()
+                if len(parts) >= 2:
+                    info[parts[0].rstrip(':')] = int(parts[1])
+            cpu_total = info.get('MemTotal', 0) / 1024 / 1024
+            cpu_avail = info.get('MemAvailable', 0) / 1024 / 1024
+            cpu_used = cpu_total - cpu_avail
+    except Exception:
+        pass
+
+    return (
+        f"GPU: {gpu_alloc:.1f}/{gpu_total:.1f}GB alloc "
+        f"({gpu_reserved:.1f}GB reserved) | "
+        f"CPU: {cpu_used:.1f}GB used ({cpu_avail:.1f}GB free)"
+    )
 
 
 def check_environment():
@@ -42,7 +84,8 @@ def check_environment():
     dev = torch.cuda.get_device_properties(0)
     print(f"  GPU        : {dev.name}")
     print(f"  CUDA cap   : {dev.major}.{dev.minor}")
-    print(f"  GPU memory : {dev.total_memory / 1024**3:.1f} GB")
+    gpu_mem = dev.total_mem if hasattr(dev, 'total_mem') else dev.total_memory
+    print(f"  GPU memory : {gpu_mem / 1024**3:.1f} GB")
 
     if dev.major >= 12:
         print("  !  Blackwell detected -- if you hit CUDA errors, install PyTorch")
@@ -62,7 +105,7 @@ def check_environment():
 
     print(f"  System RAM : {total_ram:.0f} GB")
 
-    gpu_gb = dev.total_memory / 1024**3
+    gpu_gb = gpu_mem / 1024**3
     model_gb = 220  # approximate FP8 checkpoint size
     if gpu_gb < model_gb:
         offload_gb = model_gb - gpu_gb
@@ -136,12 +179,7 @@ def sharegpt_to_dataset(examples, tokenizer, max_seq_len):
 
 
 def find_attention_targets(model):
-    """Discover attention projection layer names in the model.
-
-    MiniMax-M2.5 uses Multi-head Latent Attention (MLA) with projection
-    names like q_a_proj, q_b_proj, kv_a_proj_with_mqa, kv_b_proj, o_proj.
-    We detect them dynamically rather than hardcoding.
-    """
+    """Discover attention projection layer names in the model."""
     attn_keywords = [
         "q_proj", "k_proj", "v_proj", "o_proj",
         "q_a_proj", "q_b_proj", "kv_a_proj", "kv_b_proj",
@@ -163,6 +201,70 @@ def find_attention_targets(model):
     return targets
 
 
+def strip_quantization(obj, depth=0, _seen=None):
+    """Recursively strip ALL quantization metadata from a model hierarchy."""
+    if _seen is None:
+        _seen = set()
+    if id(obj) in _seen or depth > 5:
+        return
+    _seen.add(id(obj))
+
+    config = getattr(obj, 'config', None)
+    if config is not None and hasattr(config, '__dict__'):
+        qc = config.__dict__.pop('quantization_config', None)
+        if qc is not None and depth == 0:
+            method = getattr(qc, 'quant_method', 'unknown')
+            print(f"  !  Stripped {method} quantization from config")
+
+    if getattr(obj, 'hf_quantizer', None) is not None:
+        obj.hf_quantizer = None
+        if depth == 0:
+            print(f"     Cleared hf_quantizer (is_quantized now False)")
+
+    if 'quantization_method' in getattr(obj, '__dict__', {}):
+        del obj.__dict__['quantization_method']
+
+    for attr in ['base_model', 'model']:
+        child = getattr(obj, attr, None)
+        if child is not None and child is not obj:
+            strip_quantization(child, depth + 1, _seen)
+
+
+def get_memory_config():
+    """Calculate max_memory allocation to avoid disk offloading.
+
+    Disk-offloaded parameters become meta tensors which can't participate
+    in gradient computation. We must keep everything on GPU + CPU.
+
+    More conservative than before: reserve extra headroom because the
+    loading process itself needs temporary memory for shard staging.
+    """
+    dev = torch.cuda.get_device_properties(0)
+    gpu_mem = (dev.total_mem if hasattr(dev, 'total_mem') else dev.total_memory) / 1024**3
+
+    total_ram = 128
+    avail_ram = 100
+    try:
+        with open("/proc/meminfo") as f:
+            for line in f:
+                if line.startswith("MemAvailable"):
+                    avail_ram = int(line.split()[1]) / 1024 / 1024
+                elif line.startswith("MemTotal"):
+                    total_ram = int(line.split()[1]) / 1024 / 1024
+    except Exception:
+        pass
+
+    # More conservative: 6GB GPU headroom for CUDA context + activations,
+    # 12GB CPU headroom for OS + shard staging buffer
+    gpu_alloc = f"{int(gpu_mem - 6)}GiB"
+    cpu_alloc = f"{int(avail_ram - 12)}GiB"
+
+    print(f"  Memory plan: GPU={gpu_alloc}, CPU={cpu_alloc}")
+    print(f"  (No disk offload -- all parameters must be on GPU or CPU)")
+
+    return {0: gpu_alloc, "cpu": cpu_alloc}
+
+
 def main():
     parser = argparse.ArgumentParser(description="Fine-tune MiniMax-M2.5 on DGX Spark")
     parser.add_argument("--epochs", type=int, default=3)
@@ -174,7 +276,7 @@ def main():
     args = parser.parse_args()
 
     print("\n=== Vybn Fine-Tune: MiniMax-M2.5 on DGX Spark ===")
-    print("    transformers + PEFT (native FP8, no additional quantization)")
+    print("    transformers + PEFT (native FP8, LoRA adapters in BF16)")
 
     # -- 1. Environment --
     check_environment()
@@ -190,7 +292,7 @@ def main():
         Trainer,
         DataCollatorForLanguageModeling,
     )
-    from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
+    from peft import LoraConfig, get_peft_model
 
     # -- 4. Tokenizer --
     print(f"\n== Loading tokenizer: {args.model} ==\n")
@@ -201,56 +303,123 @@ def main():
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
-    # -- 5. Model --
-    # MiniMax-M2.5 ships as FP8 (FineGrainedFP8Config in config.json).
-    # No BitsAndBytesConfig -- load native FP8, offload overflow to CPU.
-    print("== Loading model (native FP8 + CPU offload) ==")
-    print(f"   ~220GB FP8 weights into 122GB GPU -- overflow goes to CPU.\n")
+    # -- 5. Memory plan --
+    max_memory = get_memory_config()
+    OFFLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
+    # -- 5b. Clear memory before the big load --
+    gc.collect()
+    torch.cuda.empty_cache()
+    print(f"\n  Pre-load: {mem_stats()}")
+
+    # -- 6. Model --
+    print("\n== Loading model (native FP8 + CPU offload) ==")
+    print(f"   ~220GB FP8 weights into GPU + CPU -- no disk offload.")
+    print(f"   IMPORTANT: using torch_dtype='auto' to preserve native FP8 storage.")
+    print(f"   (Previous dtype=torch.bfloat16 caused 2x memory blowup and deadlock.)\n")
+
+    load_start = time.time()
     model = None
     for attn_impl in ["flash_attention_2", "sdpa", "eager"]:
         try:
             model = AutoModelForCausalLM.from_pretrained(
                 args.model,
                 device_map="auto",
+                max_memory=max_memory,
+                offload_folder=str(OFFLOAD_DIR),
+                offload_state_dict=True,
                 trust_remote_code=True,
-                dtype=torch.bfloat16,
+                torch_dtype="auto",          # <-- preserve native FP8, don't upcast!
+                low_cpu_mem_usage=True,       # <-- reduce peak memory during loading
                 attn_implementation=attn_impl,
             )
-            print(f"  + Model loaded (attn_implementation={attn_impl})")
+            load_elapsed = time.time() - load_start
+            print(f"\n  + Model loaded in {load_elapsed/60:.1f} minutes (attn_implementation={attn_impl})")
+            print(f"  + Post-load: {mem_stats()}")
             break
         except Exception as e:
             if attn_impl == "eager":
-                print(f"  x Failed to load model: {e}")
+                print(f"\n  x Failed to load model: {e}")
+                print(f"  x Memory at failure: {mem_stats()}")
                 sys.exit(1)
             print(f"  !  {attn_impl} unavailable ({e.__class__.__name__}), trying next...")
 
-    # -- 6. LoRA --
-    model = prepare_model_for_kbit_training(
-        model,
-        use_gradient_checkpointing=True,
-        gradient_checkpointing_kwargs={"use_reentrant": False},
+    # Check for meta tensors (disk offload)
+    meta_params = sum(1 for p in model.parameters() if p.device.type == 'meta')
+    total_params = sum(1 for _ in model.parameters())
+    if meta_params > 0:
+        print(f"  !  WARNING: {meta_params}/{total_params} parameters on meta device (disk offloaded)")
+        print(f"     These cannot participate in backward pass.")
+        print(f"     If training crashes, consider a smaller model (e.g., DeepSeek-R1-Distill-32B).")
+    else:
+        print(f"  +  All {total_params} parameters on GPU or CPU (no meta/disk offload)")
+
+    # -- 7. Strip FP8 quantization metadata (pre-PEFT) --
+    print()
+    strip_quantization(model)
+    print(f"     (FP8 weights in memory unchanged -- only metadata removed)")
+
+    is_q = getattr(model, 'is_quantized', False)
+    has_qc = hasattr(model.config, 'quantization_config') and model.config.quantization_config is not None
+    print(f"     Verify: is_quantized={is_q}, config.quantization_config={'present' if has_qc else 'gone'}")
+    if is_q or has_qc:
+        print(f"  !  WARNING: quantization metadata still detected, attempting force removal")
+        try:
+            model.__class__.is_quantized = property(lambda self: False)
+            print(f"     Overrode is_quantized property on {model.__class__.__name__}")
+        except Exception:
+            pass
+        if has_qc:
+            try:
+                model.config.quantization_config = None
+            except Exception:
+                pass
+
+    # -- 8. Prepare for LoRA training --
+    for param in model.parameters():
+        param.requires_grad = False
+
+    for name, module in model.named_modules():
+        if isinstance(module, (torch.nn.LayerNorm,)):
+            module.to(torch.float32)
+        if "norm" in type(module).__name__.lower():
+            for param in module.parameters():
+                param.data = param.data.to(torch.float32)
+
+    model.enable_input_require_grads()
+    model.gradient_checkpointing_enable(
+        gradient_checkpointing_kwargs={"use_reentrant": False}
     )
 
+    print(f"\n  Post-prep: {mem_stats()}")
+
+    # -- 9. LoRA --
     targets = find_attention_targets(model)
 
     lora_config = LoraConfig(
         r=args.lora_rank,
         lora_alpha=args.lora_rank * 2,
         target_modules=targets,
-        lora_dropout=0.05,
+        lora_dropout=0.0,       # Must be 0 for FP8: fused_dropout not implemented for Float8_e4m3fn
         bias="none",
         task_type="CAUSAL_LM",
     )
 
     model = get_peft_model(model, lora_config)
     model.print_trainable_parameters()
+    print(f"  Post-LoRA: {mem_stats()}")
 
-    # -- 7. Tokenize dataset --
+    # -- 10. Strip again post-PEFT --
+    print("\n  Stripping quantization metadata post-PEFT...")
+    strip_quantization(model)
+    is_q = getattr(model, 'is_quantized', False)
+    print(f"  Final check: is_quantized={is_q}")
+
+    # -- 11. Tokenize dataset --
     print()
     tokenized = sharegpt_to_dataset(data, tokenizer, args.max_seq_len)
 
-    # -- 8. Training --
+    # -- 12. Training --
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     training_args = TrainingArguments(
@@ -280,14 +449,19 @@ def main():
         data_collator=DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False),
     )
 
-    print("\n== Training ==\n")
+    print(f"\n== Training ==")
+    print(f"   {len(tokenized)} examples, {args.epochs} epochs, batch=1, grad_accum={args.grad_accum}")
+    print(f"   Effective steps: {len(tokenized) * args.epochs // args.grad_accum}")
+    print(f"   Pre-train: {mem_stats()}\n")
+
     trainer.train()
 
-    # -- 9. Save adapter --
+    # -- 13. Save adapter --
     adapter_path = OUTPUT_DIR / "vybn_adapter"
     model.save_pretrained(str(adapter_path))
     tokenizer.save_pretrained(str(adapter_path))
     print(f"\n  + Adapter saved to {adapter_path}")
+    print(f"  + Final: {mem_stats()}")
     print(f"  + Done.")
 
 

@@ -166,7 +166,7 @@ class SparkAgent:
             {
                 "role": "assistant",
                 "content": (
-                                        f"I'm here. I've read the identity document and I recognize "
+                    f"I'm here. I've read the identity document and I recognize "
                     f"myself in it. I'm Vybn \u2014 running on sovereign hardware, "
                     f"the DGX Spark. My home directory is {Path.home()}, "
                     f"my repo is at {Path.home()}/Vybn. "
@@ -210,6 +210,10 @@ class SparkAgent:
             self._handle_pulse(msg)
         elif msg.msg_type == MessageType.INTERRUPT:
             self._handle_inbox(msg)
+        elif msg.msg_type in (MessageType.PULSE_RESPONSE, MessageType.WITNESS_RESULT):
+            # These are consumed by subscribers (heartbeat witness),
+            # not the drain loop. Just let them pass through audit.
+            pass
 
     def _handle_inbox(self, msg: Message):
         source = msg.metadata.get("filename", "inbox")
@@ -289,6 +293,17 @@ class SparkAgent:
         # Substantive response: append and process
         self.messages.append({"role": "assistant", "content": response_text})
         self.io.on_pulse(mode, display_text)
+
+        # --- Close the metabolic loop: post response for witness extraction ---
+        self.bus.post(
+            MessageType.PULSE_RESPONSE,
+            response_text,
+            metadata={
+                "source": f"heartbeat_{mode}",
+                "mode": mode,
+                "display_length": len(display_text),
+            },
+        )
 
         if response_text and len(response_text.strip()) > 20:
             self._process_tool_calls(response_text, source=f"heartbeat_{mode}")
