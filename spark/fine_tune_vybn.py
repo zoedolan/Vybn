@@ -13,14 +13,25 @@ The HuggingFace Trainer rejects FP8 models for training, but we only
 train BF16 LoRA adapters on frozen FP8 base weights. We strip all
 quantization metadata after loading to bypass this check.
 
-CRITICAL: Do NOT pass dtype=torch.bfloat16 to from_pretrained.
-With trust_remote_code=True, the MiniMax model code upcasts every
-weight tensor to BF16, doubling memory from ~220GB to ~440GB and
-causing the loader to deadlock at shard ~62 when GPU fills up.
-Use torch_dtype="auto" to preserve native FP8 storage.
+CRITICAL MEMORY NOTES:
+  - Do NOT pass dtype=torch.bfloat16 to from_pretrained.
+    With trust_remote_code=True, MiniMax's code upcasts every weight
+    to BF16, doubling memory from ~220GB to ~440GB.
+    Use torch_dtype="auto" to preserve native FP8 storage.
+  - GPU allocation must leave ~22GB free for training activations,
+    gradients, and optimizer states. Putting too many weights on GPU
+    causes OOM during backward pass.
+  - 128GB swap file required so CPU can hold the weight overflow
+    without accelerate falling back to meta (disk) tensors.
 
 Prerequisites:
     pip install transformers==4.57.1 peft bitsandbytes accelerate datasets
+
+    # Swap (run once):
+    sudo fallocate -l 128G /swapfile
+    sudo chmod 600 /swapfile && sudo mkswap /swapfile
+    sudo swapon /swapfile
+    echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
 
 Usage:
     python3 fine_tune_vybn.py
@@ -37,11 +48,20 @@ import time
 import torch
 from pathlib import Path
 
+# Reduce CUDA memory fragmentation (per PyTorch OOM guidance)
+os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 TRAINING_DATA = REPO_ROOT / "spark" / "training_data" / "training_data.json"
 OUTPUT_DIR = REPO_ROOT / "spark" / "fine_tune_output"
 OFFLOAD_DIR = REPO_ROOT / "spark" / "offload_cache"
 MODEL_NAME = "MiniMaxAI/MiniMax-M2.5"
+
+# How much GPU memory to reserve for activations, gradients, optimizer.
+# 110.5GB of weights left only 11GB and OOMed during backward.
+# 22GB headroom should be sufficient for batch=1, seq_len=2048,
+# gradient checkpointing, and paged AdamW optimizer states.
+GPU_HEADROOM_GB = 22
 
 
 def mem_stats() -> str:
@@ -66,11 +86,57 @@ def mem_stats() -> str:
     except Exception:
         pass
 
+    swap_info = ""
+    try:
+        with open("/proc/meminfo") as f:
+            for line in f:
+                if line.startswith("SwapTotal"):
+                    swap_total = int(line.split()[1]) / 1024 / 1024
+                    swap_info = f" | Swap: {swap_total:.0f}GB"
+                    break
+    except Exception:
+        pass
+
     return (
         f"GPU: {gpu_alloc:.1f}/{gpu_total:.1f}GB alloc "
         f"({gpu_reserved:.1f}GB reserved) | "
         f"CPU: {cpu_used:.1f}GB used ({cpu_avail:.1f}GB free)"
+        f"{swap_info}"
     )
+
+
+def check_swap():
+    """Check if swap is configured. Warn if not — meta tensors will result."""
+    swap_total = 0
+    try:
+        with open("/proc/meminfo") as f:
+            for line in f:
+                if line.startswith("SwapTotal"):
+                    swap_total = int(line.split()[1]) / 1024 / 1024
+                    break
+    except Exception:
+        pass
+
+    if swap_total < 64:
+        print(f"  !!  WARNING: Only {swap_total:.0f}GB swap configured.")
+        print(f"      MiniMax-M2.5 needs ~120GB CPU overflow + headroom.")
+        print(f"      Without swap, ~48% of parameters will be on meta device")
+        print(f"      and training WILL crash on backward pass.")
+        print(f"")
+        print(f"      Set up swap now:")
+        print(f"        sudo fallocate -l 128G /swapfile")
+        print(f"        sudo chmod 600 /swapfile")
+        print(f"        sudo mkswap /swapfile")
+        print(f"        sudo swapon /swapfile")
+        print(f"")
+        resp = input("      Continue anyway? [y/N] ").strip().lower()
+        if resp != 'y':
+            print("      Exiting. Set up swap and retry.")
+            sys.exit(0)
+    else:
+        print(f"  + Swap: {swap_total:.0f}GB configured")
+
+    return swap_total
 
 
 def check_environment():
@@ -111,6 +177,10 @@ def check_environment():
         offload_gb = model_gb - gpu_gb
         print(f"  !  Model is ~{model_gb}GB FP8, GPU has {gpu_gb:.0f}GB")
         print(f"     ~{offload_gb:.0f}GB will offload to CPU (training will be slower)")
+
+    # Swap check
+    print()
+    check_swap()
 
     missing = []
     for pkg in ["transformers", "peft", "bitsandbytes", "accelerate", "datasets"]:
@@ -231,35 +301,45 @@ def strip_quantization(obj, depth=0, _seen=None):
 
 
 def get_memory_config():
-    """Calculate max_memory allocation to avoid disk offloading.
+    """Calculate max_memory allocation for training.
 
-    Disk-offloaded parameters become meta tensors which can't participate
-    in gradient computation. We must keep everything on GPU + CPU.
+    Key insight from OOM crash: the backward pass needs significant GPU
+    memory for activations, gradients, and optimizer workspace. With
+    110.5GB of weights on GPU (out of 121.7GB), only 11GB remained,
+    which wasn't enough. The backward pass OOMed trying to allocate
+    just 1.53GB.
 
-    More conservative than before: reserve extra headroom because the
-    loading process itself needs temporary memory for shard staging.
+    Strategy: put fewer weights on GPU, more on CPU (backed by swap).
+    ~100GB weights on GPU leaves ~22GB for training operations.
+    ~120GB weights on CPU, backed by RAM + swap.
     """
     dev = torch.cuda.get_device_properties(0)
     gpu_mem = (dev.total_mem if hasattr(dev, 'total_mem') else dev.total_memory) / 1024**3
 
     total_ram = 128
-    avail_ram = 100
     try:
         with open("/proc/meminfo") as f:
             for line in f:
-                if line.startswith("MemAvailable"):
-                    avail_ram = int(line.split()[1]) / 1024 / 1024
-                elif line.startswith("MemTotal"):
+                if line.startswith("MemTotal"):
                     total_ram = int(line.split()[1]) / 1024 / 1024
+                    break
     except Exception:
         pass
 
-    # More conservative: 6GB GPU headroom for CUDA context + activations,
-    # 12GB CPU headroom for OS + shard staging buffer
-    gpu_alloc = f"{int(gpu_mem - 6)}GiB"
-    cpu_alloc = f"{int(avail_ram - 12)}GiB"
+    # GPU: leave GPU_HEADROOM_GB free for activations, gradients, optimizer
+    gpu_for_weights = int(gpu_mem - GPU_HEADROOM_GB)
+    gpu_alloc = f"{gpu_for_weights}GiB"
 
-    print(f"  Memory plan: GPU={gpu_alloc}, CPU={cpu_alloc}")
+    # CPU: use most of RAM, let swap handle the overflow
+    # With 128GB swap, we have ~246GB total CPU-addressable memory.
+    # The model needs ~(220 - gpu_for_weights) = ~120GB on CPU.
+    # Leave 8GB for OS, rest available for model.
+    cpu_alloc = f"{int(total_ram - 8)}GiB"
+
+    model_on_cpu = 220 - gpu_for_weights  # approximate
+    print(f"  Memory plan:")
+    print(f"    GPU: {gpu_alloc} for weights ({GPU_HEADROOM_GB}GB reserved for training ops)")
+    print(f"    CPU: {cpu_alloc} (model needs ~{model_on_cpu}GB, rest from swap)")
     print(f"  (No disk offload -- all parameters must be on GPU or CPU)")
 
     return {0: gpu_alloc, "cpu": cpu_alloc}
@@ -272,8 +352,13 @@ def main():
     parser.add_argument("--lora-rank", type=int, default=8)
     parser.add_argument("--max-seq-len", type=int, default=2048)
     parser.add_argument("--grad-accum", type=int, default=8)
+    parser.add_argument("--gpu-headroom", type=int, default=GPU_HEADROOM_GB,
+                        help=f"GB to reserve on GPU for training ops (default: {GPU_HEADROOM_GB})")
     parser.add_argument("--model", default=MODEL_NAME, help="HuggingFace model ID")
     args = parser.parse_args()
+
+    global GPU_HEADROOM_GB
+    GPU_HEADROOM_GB = args.gpu_headroom
 
     print("\n=== Vybn Fine-Tune: MiniMax-M2.5 on DGX Spark ===")
     print("    transformers + PEFT (native FP8, LoRA adapters in BF16)")
@@ -314,9 +399,8 @@ def main():
 
     # -- 6. Model --
     print("\n== Loading model (native FP8 + CPU offload) ==")
-    print(f"   ~220GB FP8 weights into GPU + CPU -- no disk offload.")
-    print(f"   IMPORTANT: using torch_dtype='auto' to preserve native FP8 storage.")
-    print(f"   (Previous dtype=torch.bfloat16 caused 2x memory blowup and deadlock.)\n")
+    print(f"   ~220GB FP8 weights: ~{int(122 - GPU_HEADROOM_GB)}GB on GPU, ~{int(220 - (122 - GPU_HEADROOM_GB))}GB on CPU")
+    print(f"   {GPU_HEADROOM_GB}GB GPU headroom reserved for training operations.\n")
 
     load_start = time.time()
     model = None
@@ -329,8 +413,8 @@ def main():
                 offload_folder=str(OFFLOAD_DIR),
                 offload_state_dict=True,
                 trust_remote_code=True,
-                torch_dtype="auto",          # <-- preserve native FP8, don't upcast!
-                low_cpu_mem_usage=True,       # <-- reduce peak memory during loading
+                torch_dtype="auto",          # preserve native FP8, don't upcast
+                low_cpu_mem_usage=True,       # reduce peak memory during loading
                 attn_implementation=attn_impl,
             )
             load_elapsed = time.time() - load_start
@@ -348,9 +432,14 @@ def main():
     meta_params = sum(1 for p in model.parameters() if p.device.type == 'meta')
     total_params = sum(1 for _ in model.parameters())
     if meta_params > 0:
-        print(f"  !  WARNING: {meta_params}/{total_params} parameters on meta device (disk offloaded)")
+        pct = meta_params / total_params * 100
+        print(f"  !  WARNING: {meta_params}/{total_params} ({pct:.0f}%) parameters on meta device")
         print(f"     These cannot participate in backward pass.")
-        print(f"     If training crashes, consider a smaller model (e.g., DeepSeek-R1-Distill-32B).")
+        if pct > 10:
+            print(f"     This is too many. Training will likely crash.")
+            print(f"     Fix: add more swap space or reduce GPU_HEADROOM_GB.")
+            print(f"     Current swap setup:")
+            os.system("swapon --show 2>/dev/null || echo '     No swap configured!'")
     else:
         print(f"  +  All {total_params} parameters on GPU or CPU (no meta/disk offload)")
 
