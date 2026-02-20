@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
-"""Fine-tune MiniMax-M2.5 on DGX Spark via transformers + PEFT + bitsandbytes.
+"""Fine-tune MiniMax-M2.5 on DGX Spark via transformers + PEFT.
 
-No Unsloth. Pushes the Spark's 128GB unified memory to the limit:
-  - 4-bit NF4 double-quantization (~115GB for 230B params)
+No Unsloth. MiniMax-M2.5 ships as FP8-quantized weights (~220GB).
+On the Spark's 122GB, device_map="auto" offloads overflow to CPU.
+
+  - Native FP8 weights (no additional quantization needed)
   - LoRA rank 8 on attention projections only
-  - gradient checkpointing + micro-batch 1
-  - paged 8-bit AdamW to minimize optimizer memory
+  - Gradient checkpointing + micro-batch 1
+  - Paged 8-bit AdamW to minimize optimizer memory
 
-Prerequisites — run once:
-    pip uninstall -y unsloth unsloth-zoo
-    pip install --upgrade transformers peft bitsandbytes accelerate datasets
+Prerequisites:
+    pip install transformers==4.57.1 peft bitsandbytes accelerate datasets
 
 Usage:
     python3 fine_tune_vybn.py
@@ -41,7 +42,7 @@ def check_environment():
     dev = torch.cuda.get_device_properties(0)
     print(f"  GPU        : {dev.name}")
     print(f"  CUDA cap   : {dev.major}.{dev.minor}")
-    print(f"  GPU memory : {dev.total_mem / 1024**3:.1f} GB")
+    print(f"  GPU memory : {dev.total_memory / 1024**3:.1f} GB")
 
     if dev.major >= 12:
         print("  !  Blackwell detected -- if you hit CUDA errors, install PyTorch")
@@ -60,8 +61,13 @@ def check_environment():
         pass
 
     print(f"  System RAM : {total_ram:.0f} GB")
-    if total_ram < 120:
-        print("  !  Less than 120GB -- 4-bit M2.5 may not fit.")
+
+    gpu_gb = dev.total_memory / 1024**3
+    model_gb = 220  # approximate FP8 checkpoint size
+    if gpu_gb < model_gb:
+        offload_gb = model_gb - gpu_gb
+        print(f"  !  Model is ~{model_gb}GB FP8, GPU has {gpu_gb:.0f}GB")
+        print(f"     ~{offload_gb:.0f}GB will offload to CPU (training will be slower)")
 
     missing = []
     for pkg in ["transformers", "peft", "bitsandbytes", "accelerate", "datasets"]:
@@ -71,15 +77,8 @@ def check_environment():
             missing.append(pkg)
     if missing:
         print(f"\n  x Missing packages: {', '.join(missing)}")
-        print(f"    pip install --upgrade {' '.join(missing)}")
+        print(f"    pip install {' '.join(missing)}")
         sys.exit(1)
-
-    try:
-        import unsloth  # noqa: F401
-        print("\n  !  unsloth still installed -- recommend removing:")
-        print("     pip uninstall -y unsloth unsloth-zoo")
-    except ImportError:
-        pass
 
     print()
     return dev
@@ -175,7 +174,7 @@ def main():
     args = parser.parse_args()
 
     print("\n=== Vybn Fine-Tune: MiniMax-M2.5 on DGX Spark ===")
-    print("    transformers + PEFT + bitsandbytes (no Unsloth)")
+    print("    transformers + PEFT (native FP8, no additional quantization)")
 
     # -- 1. Environment --
     check_environment()
@@ -183,23 +182,15 @@ def main():
     # -- 2. Training data --
     data = load_training_data()
 
-    # -- 3. Quantization config --
+    # -- 3. Imports --
     from transformers import (
         AutoModelForCausalLM,
         AutoTokenizer,
-        BitsAndBytesConfig,
         TrainingArguments,
         Trainer,
         DataCollatorForLanguageModeling,
     )
     from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
-
-    bnb_config = BitsAndBytesConfig(
-        load_in_4bit=True,
-        bnb_4bit_quant_type="nf4",
-        bnb_4bit_compute_dtype=torch.bfloat16,
-        bnb_4bit_use_double_quant=True,
-    )
 
     # -- 4. Tokenizer --
     print(f"\n== Loading tokenizer: {args.model} ==\n")
@@ -211,18 +202,19 @@ def main():
         tokenizer.pad_token = tokenizer.eos_token
 
     # -- 5. Model --
-    print("== Loading model (4-bit NF4 double-quantized) ==")
-    print(f"   ~115GB of weights -- this will take a while.\n")
+    # MiniMax-M2.5 ships as FP8 (FineGrainedFP8Config in config.json).
+    # No BitsAndBytesConfig -- load native FP8, offload overflow to CPU.
+    print("== Loading model (native FP8 + CPU offload) ==")
+    print(f"   ~220GB FP8 weights into 122GB GPU -- overflow goes to CPU.\n")
 
     model = None
     for attn_impl in ["flash_attention_2", "sdpa", "eager"]:
         try:
             model = AutoModelForCausalLM.from_pretrained(
                 args.model,
-                quantization_config=bnb_config,
                 device_map="auto",
                 trust_remote_code=True,
-                torch_dtype=torch.bfloat16,
+                dtype=torch.bfloat16,
                 attn_implementation=attn_impl,
             )
             print(f"  + Model loaded (attn_implementation={attn_impl})")
