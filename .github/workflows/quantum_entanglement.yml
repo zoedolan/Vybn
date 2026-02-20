@@ -18,6 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       IBMQ_TOKEN: ${{ secrets.IBMQ_TOKEN }}
+      OUTSHIFT_QRNG_API_KEY: ${{ secrets.OUTSHIFT_QRNG_API_KEY }}
     steps:
       - name: Checkout the mind
         uses: actions/checkout@v4
@@ -46,15 +47,14 @@ jobs:
           qrn = None
           state = "unknown"
           ibmq_token = os.environ.get("IBMQ_TOKEN")
+          outshift_key = os.environ.get("OUTSHIFT_QRNG_API_KEY")
 
           # 1. First Preference: IBM Quantum (if token is provided)
-          # This allows us to bypass flaky APIs and measure our own wave functions directly.
           if ibmq_token and qrn is None:
               try:
                   from qiskit_ibm_provider import IBMProvider
                   from qiskit import QuantumCircuit, transpile
                   provider = IBMProvider(token=ibmq_token)
-                  # Find the least busy operational real backend
                   backends = provider.backends(simulator=False, operational=True)
                   if backends:
                       least_busy = sorted(backends, key=lambda b: b.status().pending_jobs)[0]
@@ -71,7 +71,25 @@ jobs:
               except Exception as e:
                   print(f"IBM Quantum decohered: {e}")
 
-          # 2. Second Preference: ANU QRNG API (often flaky, so we try/catch)
+          # 2. Second Preference: Cisco Outshift QRNG API (if key is provided)
+          if outshift_key and qrn is None:
+              try:
+                  url = "https://qrng.api.outshift.com/api/v1/random"
+                  req = urllib.request.Request(url, headers={
+                      'Authorization': f'Bearer {outshift_key}',
+                      'Content-Type': 'application/json'
+                  })
+                  with urllib.request.urlopen(req, timeout=8) as response:
+                      data = json.loads(response.read().decode())
+                      # Processing logic will depend on specific payload structure, 
+                      # but assuming standard JSON wrapping a bit string or int
+                      qrn = data.get("random_number") or data.get("data")
+                      if qrn is not None:
+                          state = "Cisco Outshift QRNG API collapse"
+              except Exception as e:
+                  print(f"Cisco Outshift API decohered: {e}")
+
+          # 3. Third Preference: ANU QRNG API (often flaky, so we try/catch)
           if qrn is None:
               try:
                   url = "https://qrng.anu.edu.au/API/jsonI.php?length=1&type=uint16"
@@ -83,16 +101,6 @@ jobs:
                           state = "ANU QRNG API collapse"
               except Exception as e:
                   print(f"ANU QRNG API decohered: {e}")
-
-          # 3. Third Preference: Other Public QRNG endpoints
-          if qrn is None:
-              try:
-                  # Swiss Quantum Random Numbers
-                  url = "https://quantumnumbers.fi/api/get?length=1&type=uint16" 
-                  # (Leaving a placeholder block here in case we find stable endpoints later)
-                  pass
-              except Exception as e:
-                  pass
 
           # 4. Strict Enforcement: No Classical Fallback
           if qrn is None:
