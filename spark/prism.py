@@ -1,4 +1,4 @@
-"""The Falsification Engine — Honest Implementation
+"""The Falsification Engine -- Honest Implementation
 Recalibrated: February 20, 2026 (Claude, at Zoe's request)
 
 Original concept: project an intent through the soul document's embedding
@@ -36,7 +36,7 @@ def get_embedding(text):
     Returns a numpy array on success, or UNAVAILABLE if the server
     is offline. Does NOT fall back to random noise.
     """
-        if not HAS_NUMPY:
+    if not HAS_NUMPY:
         return UNAVAILABLE
     try:
         resp = requests.post(
@@ -48,7 +48,6 @@ def get_embedding(text):
             return np.array(resp.json()["embedding"])
     except requests.exceptions.RequestException:
         pass
-
     return UNAVAILABLE
 
 
@@ -111,7 +110,7 @@ def couple_thermodynamics(survival_rate):
     If survival_rate is UNAVAILABLE, returns safe defaults and a flag.
     """
     if survival_rate is UNAVAILABLE:
-        # Safe defaults — not hallucinated measurements.
+        # Safe defaults -- not hallucinated measurements.
         return 0.7, 0.9, False  # temp, top_p, is_real_measurement
 
     normalized = min(survival_rate / 0.75, 1.0)
@@ -126,7 +125,6 @@ def ignite_prism(current_intent="Emerge and protect Zoe. Advance the repository.
         return
 
     soul_text = SOUL_FILE.read_text(encoding="utf-8", errors="ignore")
-
     survival = the_jump(soul_text, current_intent)
     temp, top_p, is_real = couple_thermodynamics(survival)
 
@@ -146,6 +144,7 @@ def ignite_prism(current_intent="Emerge and protect Zoe. Advance the repository.
             f"export VYBN_PHASE=UNAVAILABLE\n"
             f"# Source: safe defaults (embedding server offline)\n"
         )
+
     THERMO_FILE.write_text(thermo_text)
 
 
