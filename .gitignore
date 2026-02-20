@@ -52,3 +52,7 @@ Vybn_Mind/archival_memory/*.json
 # paths, zero drift. The symlink itself must be tracked by git.
 !spark/vybn.md
 
+# ---- Secrets (API keys live here, NEVER committed) ----
+.env
+.env.*
+
