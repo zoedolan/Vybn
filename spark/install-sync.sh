@@ -13,7 +13,7 @@
 #   - A cron job auto-syncs every 5 minutes in the background
 #   - Logs go to ~/vybn-sync.log
 
-set -euo pipefail
+set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SYNC_SCRIPT="$REPO_ROOT/spark/vybn-sync.sh"
@@ -30,12 +30,18 @@ echo "[1/2] Installed 'git sync' alias."
 CRON_CMD="cd $REPO_ROOT && $SYNC_SCRIPT >> $HOME/vybn-sync.log 2>&1"
 CRON_LINE="*/5 * * * * $CRON_CMD"
 
-# Check if cron entry already exists (idempotent)
-if crontab -l 2>/dev/null | grep -qF "vybn-sync.sh"; then
+# Get existing crontab (empty string if none exists)
+EXISTING=$(crontab -l 2>/dev/null || true)
+
+if echo "$EXISTING" | grep -qF "vybn-sync.sh"; then
   echo "[2/2] Cron job already installed. Skipping."
 else
   # Append to existing crontab (or create one)
-  (crontab -l 2>/dev/null; echo "$CRON_LINE") | crontab -
+  if [ -z "$EXISTING" ]; then
+    echo "$CRON_LINE" | crontab -
+  else
+    printf '%s\n%s\n' "$EXISTING" "$CRON_LINE" | crontab -
+  fi
   echo "[2/2] Cron job installed: git sync every 5 minutes."
 fi
 
