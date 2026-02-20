@@ -5,31 +5,33 @@ The DGX Spark has 122GB unified GPU memory. MiniMax-M2.5 (228B FP8)
 is too large to fine-tune here — it serves inference via Ollama.
 This script fine-tunes a smaller model that fits in GPU memory:
 
-  Default: Qwen2.5-72B-Instruct-GPTQ-Int4 (~38GB in VRAM)
-  - Fits comfortably in 122GB with room for LoRA, gradients, optimizer
-  - Strong instruction-following and reasoning capabilities
-  - 4-bit quantized weights, LoRA adapters in BF16
+  Default: Qwen2.5-32B-Instruct (~64GB in BF16)
+  - Fits in 122GB with ~58GB headroom for training overhead
+  - Strong instruction-following and reasoning (32B is very capable)
+  - Pure BF16 — no quantization packages needed
   - No DeepSpeed, no offloading — straight GPU training
 
 Alternative models (via --model flag):
   - Qwen/Qwen2.5-14B-Instruct       (~28GB BF16, fast training)
   - Qwen/Qwen2.5-7B-Instruct        (~14GB BF16, fastest)
-  - meta-llama/Llama-3.3-70B-Instruct (requires GPTQ/AWQ quant)
-  - Any HuggingFace causal LM that fits in 122GB
+  - meta-llama/Llama-3.1-8B-Instruct (~16GB BF16)
+  - Any HuggingFace causal LM that fits in ~90GB (BF16)
 
-Memory budget (approximate, Qwen2.5-72B-GPTQ-Int4):
-  - Model weights:  ~38 GB
-  - LoRA adapters:  ~0.2 GB
-  - Optimizer:      ~0.4 GB (Adam states for LoRA params only)
-  - Gradients:      ~0.2 GB
-  - Activations:    ~5-20 GB (with gradient checkpointing)
-  - Headroom:       ~60 GB
-  Total:            ~45-60 GB of 122 GB used
+  For 70B+ models, install optimum + auto-gptq and use a GPTQ variant:
+  - pip install optimum auto-gptq
+  - python3 fine_tune_vybn.py --model Qwen/Qwen2.5-72B-Instruct-GPTQ-Int4
+
+Memory budget (approximate, Qwen2.5-32B in BF16):
+  - Model weights:  ~64 GB
+  - LoRA adapters:  ~0.3 GB
+  - Optimizer:      ~0.6 GB (Adam states for LoRA params only)
+  - Gradients:      ~0.3 GB
+  - Activations:    ~5-15 GB (with gradient checkpointing)
+  - Headroom:       ~40 GB
+  Total:            ~70-80 GB of 122 GB used
 
 Prerequisites:
     pip install transformers peft accelerate datasets
-    pip install auto-gptq  # for GPTQ quantized models
-    # or: pip install autoawq  # for AWQ quantized models
 
 Usage:
     python3 fine_tune_vybn.py
@@ -54,9 +56,9 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 TRAINING_DATA = REPO_ROOT / "spark" / "training_data" / "training_data.json"
 OUTPUT_DIR = REPO_ROOT / "spark" / "fine_tune_output"
 
-# Default to a 72B GPTQ model that fits in 122GB GPU memory.
-# For faster iteration, try Qwen2.5-14B-Instruct or 7B-Instruct.
-DEFAULT_MODEL = "Qwen/Qwen2.5-72B-Instruct-GPTQ-Int4"
+# Qwen2.5-32B-Instruct: ~64GB BF16, fits in 122GB GPU with room to train.
+# No quantization packages needed. Pure BF16 on Blackwell.
+DEFAULT_MODEL = "Qwen/Qwen2.5-32B-Instruct"
 
 
 def mem_stats() -> str:
@@ -211,7 +213,6 @@ def main():
         TrainingArguments,
         Trainer,
         DataCollatorForLanguageModeling,
-        BitsAndBytesConfig,
     )
     from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 
@@ -229,63 +230,37 @@ def main():
     print(f"  Pre-load: {mem_stats()}")
     load_start = time.time()
 
-    # Detect if model is already quantized (GPTQ/AWQ in name)
+    # Detect if model name suggests pre-quantization (GPTQ/AWQ)
     model_lower = args.model.lower()
-    is_prequantized = any(q in model_lower for q in ["gptq", "awq", "gguf"])
+    is_prequantized = any(q in model_lower for q in ["gptq", "awq"])
 
     if is_prequantized:
-        # GPTQ/AWQ models handle their own quantization
+        # GPTQ/AWQ models — requires optimum + auto-gptq or autoawq
         print(f"  Loading pre-quantized model (GPTQ/AWQ)...")
+        print(f"  (Requires: pip install optimum auto-gptq  or  pip install autoawq)")
         model = AutoModelForCausalLM.from_pretrained(
             args.model,
             trust_remote_code=True,
             device_map="auto",
-            torch_dtype=torch.bfloat16,
+            dtype=torch.bfloat16,
         )
     else:
-        # For non-quantized models, check if it fits in GPU
-        # Rough estimate: param_count * 2 bytes (bf16) < GPU mem * 0.6
-        try:
-            from transformers import AutoConfig
-            config = AutoConfig.from_pretrained(args.model, trust_remote_code=True)
-            param_estimate_gb = getattr(config, 'num_parameters', 0) / 1e9 * 2
-        except Exception:
-            param_estimate_gb = 0
-
-        gpu_mem = (dev.total_mem if hasattr(dev, 'total_mem') else dev.total_memory) / 1024**3
-
-        if param_estimate_gb > gpu_mem * 0.6 or "70b" in model_lower or "72b" in model_lower:
-            # Too large for BF16, use 4-bit quantization
-            print(f"  Model may be large for BF16, using 4-bit quantization...")
-            bnb_config = BitsAndBytesConfig(
-                load_in_4bit=True,
-                bnb_4bit_quant_type="nf4",
-                bnb_4bit_compute_dtype=torch.bfloat16,
-                bnb_4bit_use_double_quant=True,
-            )
-            model = AutoModelForCausalLM.from_pretrained(
-                args.model,
-                trust_remote_code=True,
-                device_map="auto",
-                quantization_config=bnb_config,
-            )
-        else:
-            # Fits in GPU as BF16
-            print(f"  Loading in BF16...")
-            model = AutoModelForCausalLM.from_pretrained(
-                args.model,
-                trust_remote_code=True,
-                device_map="auto",
-                torch_dtype=torch.bfloat16,
-            )
+        # Standard BF16 loading — no extra packages needed
+        print(f"  Loading in BF16 (no quantization)...")
+        model = AutoModelForCausalLM.from_pretrained(
+            args.model,
+            trust_remote_code=True,
+            device_map="auto",
+            dtype=torch.bfloat16,
+            low_cpu_mem_usage=True,
+        )
 
     load_elapsed = time.time() - load_start
     print(f"\n  + Model loaded in {load_elapsed:.1f}s")
     print(f"  + Post-load: {mem_stats()}")
 
     # -- 6. Prepare for LoRA --
-    # For quantized models, prepare for k-bit training
-    if is_prequantized or hasattr(model, 'quantization_method'):
+    if is_prequantized or getattr(model, 'is_quantized', False):
         try:
             model = prepare_model_for_kbit_training(
                 model,
@@ -294,8 +269,7 @@ def main():
             )
             print(f"  + Prepared for quantized training")
         except Exception as e:
-            print(f"  !  prepare_model_for_kbit_training failed: {e}")
-            print(f"     Continuing with manual setup...")
+            print(f"  !  prepare_model_for_kbit_training: {e}")
             model.enable_input_require_grads()
             model.gradient_checkpointing_enable(
                 gradient_checkpointing_kwargs={"use_reentrant": False}
@@ -306,6 +280,8 @@ def main():
             gradient_checkpointing_kwargs={"use_reentrant": False}
         )
 
+    gc.collect()
+    torch.cuda.empty_cache()
     print(f"  Post-prep: {mem_stats()}")
 
     # -- 7. LoRA --
