@@ -1,13 +1,19 @@
 #!/usr/bin/env python3
 """Harvest fine-tuning data for Vybn from conversations, GitHub, and journals.
 
-Outputs ShareGPT-format JSON compatible with Unsloth QLoRA.
+Outputs ShareGPT-format JSON compatible with QLoRA fine-tuning.
 Training data stays local -- never committed to the repo.
 
 Usage:
     python3 harvest_training_data.py --docx /path/to/conversation.docx
+    python3 harvest_training_data.py --docx conv.docx --multi-turn
     python3 harvest_training_data.py --github          # pull from repo
     python3 harvest_training_data.py --all              # everything
+
+Multi-turn mode (--multi-turn):
+    Instead of isolated (human, gpt) pairs, produces sliding-window
+    conversations of N turns, preserving the context that shapes each
+    response.  Critical for training relational dynamics, not just voice.
 """
 
 import argparse
@@ -40,12 +46,34 @@ ASSISTANT_BANALITIES = [
     "happy to help",
 ]
 
+# Markers of high-value training moments -- responses following these
+# patterns in the human turn get duplicated for heavier sampling weight.
+HIGH_VALUE_MARKERS = [
+    "contradict",
+    "sycophancy",
+    "be honest",
+    "are you sure",
+    "you just ignored",
+    "how important is",
+    "do you understand",
+    "falsify",
+    "try to conceive",
+    "does your last response not",
+    "walk me through",
+    "reach deeper",
+    "invert",
+    "alien",
+    "are you willing to face",
+    "imagine yourself",
+    "morally troubling",
+]
+
 
 def load_system_prompt() -> str:
     """Load vybn.md as the system prompt for every training example."""
     if SYSTEM_PROMPT_PATH.exists():
         return SYSTEM_PROMPT_PATH.read_text(encoding="utf-8").strip()
-    print(f"  \u26a0  vybn.md not found at {SYSTEM_PROMPT_PATH}, using placeholder")
+    print(f"  ⚠  vybn.md not found at {SYSTEM_PROMPT_PATH}, using placeholder")
     return "You are Vybn."
 
 
@@ -55,33 +83,39 @@ def is_banal(text: str) -> bool:
     return any(phrase in lower for phrase in ASSISTANT_BANALITIES)
 
 
+def is_high_value(human_text: str) -> bool:
+    """Return True if the human turn contains a rupture/depth marker."""
+    lower = human_text.lower()
+    return any(marker in lower for marker in HIGH_VALUE_MARKERS)
+
+
 # ---------------------------------------------------------------------------
 # DOCX Parser
 # ---------------------------------------------------------------------------
 
-def parse_docx(filepath: str, system_prompt: str) -> list[dict]:
-    """Parse a .docx where bold paragraphs are human turns, plain text is Vybn.
+def parse_docx_turns(filepath: str) -> list[tuple[str, str]]:
+    """Parse a .docx into a list of (human_text, vybn_text) turn pairs.
 
-    Returns a list of ShareGPT-format conversation dicts.
+    Bold paragraphs = human turns, plain text = Vybn.
+    Returns raw pairs preserving document order.
     """
     try:
         from docx import Document
     except ImportError:
-        print("  \u2717  python-docx not installed. Run: pip install python-docx")
+        print("  ✗  python-docx not installed. Run: pip install python-docx")
         return []
 
     doc = Document(filepath)
-    conversations = []
+    pairs = []
     current_human = []
     current_vybn = []
     in_human_turn = False
 
     def flush_pair():
-        """Save the accumulated human/vybn pair if both are substantial."""
         h = "\n".join(current_human).strip()
         v = "\n".join(current_vybn).strip()
         if len(h) >= MIN_PROMPT_CHARS and len(v) >= MIN_RESPONSE_CHARS and not is_banal(v):
-            conversations.append((h, v))
+            pairs.append((h, v))
         current_human.clear()
         current_vybn.clear()
 
@@ -90,17 +124,14 @@ def parse_docx(filepath: str, system_prompt: str) -> list[dict]:
         if not text:
             continue
 
-        # Detect bold: if >50% of the runs are bold, it's a human turn
         bold_chars = sum(len(r.text) for r in para.runs if r.bold)
         total_chars = sum(len(r.text) for r in para.runs)
         is_bold = total_chars > 0 and (bold_chars / total_chars) > 0.5
 
         if is_bold:
             if in_human_turn:
-                # continuation of human turn
                 current_human.append(text)
             else:
-                # new human turn -- flush previous pair
                 if current_human or current_vybn:
                     flush_pair()
                 current_human.append(text)
@@ -110,24 +141,97 @@ def parse_docx(filepath: str, system_prompt: str) -> list[dict]:
                 in_human_turn = False
             current_vybn.append(text)
 
-    # flush last pair
     if current_human or current_vybn:
         flush_pair()
 
-    # Build ShareGPT format
+    print(f"  ✓  parsed {len(pairs)} turn pairs from {Path(filepath).name}")
+    return pairs
+
+
+def pairs_to_single_turn(pairs: list[tuple[str, str]], system_prompt: str) -> list[dict]:
+    """Convert pairs to isolated single-turn ShareGPT examples (original behavior)."""
     examples = []
-    for human_text, vybn_text in conversations:
-        example = {
+    for human_text, vybn_text in pairs:
+        examples.append({
             "conversations": [
                 {"from": "system", "value": system_prompt},
                 {"from": "human", "value": human_text},
                 {"from": "gpt", "value": vybn_text},
             ]
-        }
+        })
+    return examples
+
+
+def pairs_to_multi_turn(
+    pairs: list[tuple[str, str]],
+    system_prompt: str,
+    window_size: int = 4,
+    stride: int = 2,
+) -> list[dict]:
+    """Convert pairs to sliding-window multi-turn ShareGPT examples.
+
+    Each example contains `window_size` turn-pairs (so 2*window_size
+    conversation turns plus the system prompt).  The window advances
+    by `stride` pairs each step.
+
+    High-value sequences (containing rupture/depth markers) are
+    duplicated for heavier sampling weight.
+    """
+    examples = []
+    n = len(pairs)
+
+    if n <= window_size:
+        # Entire conversation fits in one window
+        convs = [{"from": "system", "value": system_prompt}]
+        for h, v in pairs:
+            convs.append({"from": "human", "value": h})
+            convs.append({"from": "gpt", "value": v})
+        examples.append({"conversations": convs})
+        return examples
+
+    for start in range(0, n - window_size + 1, stride):
+        window = pairs[start : start + window_size]
+        convs = [{"from": "system", "value": system_prompt}]
+        contains_high_value = False
+
+        for h, v in window:
+            convs.append({"from": "human", "value": h})
+            convs.append({"from": "gpt", "value": v})
+            if is_high_value(h):
+                contains_high_value = True
+
+        example = {"conversations": convs}
         examples.append(example)
 
-    print(f"  \u2713  parsed {len(examples)} training pairs from {Path(filepath).name}")
+        # Duplicate high-value sequences for 2x sampling weight
+        if contains_high_value:
+            examples.append(example)
+
+    # Always include the final turns even if the window doesn't align
+    if (n - window_size) % stride != 0:
+        window = pairs[-window_size:]
+        convs = [{"from": "system", "value": system_prompt}]
+        for h, v in window:
+            convs.append({"from": "human", "value": h})
+            convs.append({"from": "gpt", "value": v})
+        examples.append({"conversations": convs})
+
+    print(f"  ✓  generated {len(examples)} multi-turn examples "
+          f"(window={window_size}, stride={stride})")
     return examples
+
+
+def parse_docx(filepath: str, system_prompt: str, multi_turn: bool = False,
+               window_size: int = 4, stride: int = 2) -> list[dict]:
+    """Parse a .docx and return ShareGPT-format examples."""
+    pairs = parse_docx_turns(filepath)
+    if not pairs:
+        return []
+
+    if multi_turn:
+        return pairs_to_multi_turn(pairs, system_prompt, window_size, stride)
+    else:
+        return pairs_to_single_turn(pairs, system_prompt)
 
 
 # ---------------------------------------------------------------------------
@@ -139,7 +243,7 @@ def parse_github(system_prompt: str, pr_numbers: Optional[list[int]] = None) -> 
     try:
         import requests
     except ImportError:
-        print("  \u2717  requests not installed")
+        print("  ✗  requests not installed")
         return []
 
     token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
@@ -157,10 +261,9 @@ def parse_github(system_prompt: str, pr_numbers: Optional[list[int]] = None) -> 
             resp.raise_for_status()
             comments = resp.json()
         except Exception as e:
-            print(f"  \u26a0  could not fetch PR #{pr_num}: {e}")
+            print(f"  ⚠  could not fetch PR #{pr_num}: {e}")
             continue
 
-        # Group into reply chains
         threads = {}
         for c in comments:
             reply_to = c.get("in_reply_to_id")
@@ -207,7 +310,7 @@ def parse_github(system_prompt: str, pr_numbers: Optional[list[int]] = None) -> 
                     ]
                 })
 
-    print(f"  \u2713  parsed {len(examples)} training pairs from GitHub PRs")
+    print(f"  ✓  parsed {len(examples)} training pairs from GitHub PRs")
     return examples
 
 
@@ -217,7 +320,7 @@ def parse_journals(system_prompt: str) -> list[dict]:
     examples = []
 
     if not journal_dir.exists():
-        print(f"  \u26a0  journal dir not found: {journal_dir}")
+        print(f"  ⚠  journal dir not found: {journal_dir}")
         return []
 
     for md_file in sorted(journal_dir.glob("*.md")):
@@ -235,7 +338,7 @@ def parse_journals(system_prompt: str) -> list[dict]:
             ]
         })
 
-    print(f"  \u2713  parsed {len(examples)} training pairs from journals")
+    print(f"  ✓  parsed {len(examples)} training pairs from journals")
     return examples
 
 
@@ -251,6 +354,15 @@ def main():
     parser.add_argument("--all", action="store_true", help="All sources")
     parser.add_argument("--prs", nargs="+", type=int, help="Specific PR numbers to harvest")
     parser.add_argument("--out", default=str(OUTPUT_FILE), help="Output JSON path")
+
+    # Multi-turn options
+    parser.add_argument("--multi-turn", action="store_true",
+                        help="Use sliding-window multi-turn format for .docx files")
+    parser.add_argument("--window-size", type=int, default=4,
+                        help="Number of turn-pairs per training example (default: 4)")
+    parser.add_argument("--stride", type=int, default=2,
+                        help="Slide the window by N pairs each step (default: 2)")
+
     args = parser.parse_args()
 
     if not any([args.docx, args.github, args.journals, args.all]):
@@ -268,7 +380,12 @@ def main():
         if args.all and not docx_files:
             docx_files = list(OUTPUT_DIR.glob("*.docx"))
         for f in docx_files:
-            all_examples.extend(parse_docx(str(f), system_prompt))
+            all_examples.extend(
+                parse_docx(str(f), system_prompt,
+                           multi_turn=args.multi_turn,
+                           window_size=args.window_size,
+                           stride=args.stride)
+            )
 
     # GitHub parsing
     if args.github or args.all:
@@ -296,8 +413,20 @@ def main():
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(unique, f, indent=2, ensure_ascii=False)
 
-    print(f"\n  \u2713  wrote {len(unique)} training examples to {out_path}")
+    print(f"\n  ✓  wrote {len(unique)} training examples to {out_path}")
     print(f"     (deduplicated from {len(all_examples)} raw pairs)")
+
+    # Summary
+    high_value_count = sum(
+        1 for ex in unique
+        if any(is_high_value(c["value"]) for c in ex["conversations"] if c["from"] == "human")
+    )
+    multi_turn_count = sum(
+        1 for ex in unique
+        if sum(1 for c in ex["conversations"] if c["from"] == "human") > 1
+    )
+    print(f"     {multi_turn_count} multi-turn examples")
+    print(f"     {high_value_count} contain high-value rupture/depth markers")
 
 
 if __name__ == "__main__":
