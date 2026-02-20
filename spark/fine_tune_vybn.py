@@ -286,7 +286,6 @@ def main():
         except Exception:
             pass
         if has_qc:
-            # Try setting to a dummy that won't trigger the FP8 check
             try:
                 model.config.quantization_config = None
             except Exception:
@@ -316,7 +315,7 @@ def main():
         r=args.lora_rank,
         lora_alpha=args.lora_rank * 2,
         target_modules=targets,
-        lora_dropout=0.05,
+        lora_dropout=0.0,       # Must be 0 for FP8: fused_dropout not implemented for Float8_e4m3fn
         bias="none",
         task_type="CAUSAL_LM",
     )
