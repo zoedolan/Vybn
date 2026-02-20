@@ -1,41 +1,38 @@
 #!/usr/bin/env python3
-"""Fine-tune MiniMax-M2.5 on DGX Spark via transformers + PEFT.
+"""Fine-tune MiniMax-M2.5 on DGX Spark via DeepSpeed ZeRO-3 + PEFT.
 
-No Unsloth. MiniMax-M2.5 ships as FP8-quantized weights (~220GB).
-On the Spark's 122GB, device_map="auto" offloads overflow to CPU.
+MiniMax-M2.5 ships as FP8-quantized weights (~220GB). The DGX Spark
+has 122GB GPU + 122GB RAM + 128GB swap + 3.67TB NVMe.
 
-  - Native FP8 weights (no additional quantization needed)
-  - LoRA rank 8 on attention projections only
+Previous attempts with HuggingFace accelerate device_map="auto" failed
+because device_map is an inference tool -- it creates meta tensors for
+parameters that don't fit, and those can't do backward passes.
+
+DeepSpeed ZeRO-3 is purpose-built for this problem:
+  - Partitions parameters, gradients, and optimizer states
+  - Correctly offloads to CPU during forward/backward
+  - Handles gradient computation through offloaded parameters
+  - Can overflow to NVMe for models that exceed GPU+CPU
+
+Architecture:
+  - Native FP8 weights (torch_dtype="auto")
+  - LoRA rank 8 on attention projections (BF16 adapters)
+  - ZeRO Stage 3 with CPU offload for params + optimizer
   - Gradient checkpointing + micro-batch 1
-  - Paged 8-bit AdamW to minimize optimizer memory
-
-The HuggingFace Trainer rejects FP8 models for training, but we only
-train BF16 LoRA adapters on frozen FP8 base weights. We strip all
-quantization metadata after loading to bypass this check.
-
-CRITICAL MEMORY NOTES:
-  - Do NOT pass dtype=torch.bfloat16 to from_pretrained.
-    With trust_remote_code=True, MiniMax's code upcasts every weight
-    to BF16, doubling memory from ~220GB to ~440GB.
-    Use torch_dtype="auto" to preserve native FP8 storage.
-  - GPU allocation must leave ~22GB free for training activations,
-    gradients, and optimizer states. Putting too many weights on GPU
-    causes OOM during backward pass.
-  - 128GB swap file required so CPU can hold the weight overflow
-    without accelerate falling back to meta (disk) tensors.
+  - Optional NVMe offload for extra headroom
 
 Prerequisites:
-    pip install transformers==4.57.1 peft bitsandbytes accelerate datasets
+    pip install deepspeed transformers peft bitsandbytes accelerate datasets
 
-    # Swap (run once):
+    # Swap (if not already configured):
     sudo fallocate -l 128G /swapfile
     sudo chmod 600 /swapfile && sudo mkswap /swapfile
     sudo swapon /swapfile
-    echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
 
 Usage:
     python3 fine_tune_vybn.py
     python3 fine_tune_vybn.py --epochs 5 --lr 1e-4
+    python3 fine_tune_vybn.py --nvme-offload
     python3 fine_tune_vybn.py --max-seq-len 4096
 """
 
@@ -44,11 +41,12 @@ import gc
 import json
 import os
 import sys
+import tempfile
 import time
 import torch
 from pathlib import Path
 
-# Reduce CUDA memory fragmentation (per PyTorch OOM guidance)
+# Reduce CUDA memory fragmentation
 os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -57,10 +55,6 @@ OUTPUT_DIR = REPO_ROOT / "spark" / "fine_tune_output"
 OFFLOAD_DIR = REPO_ROOT / "spark" / "offload_cache"
 MODEL_NAME = "MiniMaxAI/MiniMax-M2.5"
 
-# How much GPU memory to reserve for activations, gradients, optimizer.
-# 110.5GB of weights left only 11GB and OOMed during backward.
-# 22GB headroom should be sufficient for batch=1, seq_len=2048,
-# gradient checkpointing, and paged AdamW optimizer states.
 DEFAULT_GPU_HEADROOM_GB = 22
 
 
@@ -73,6 +67,7 @@ def mem_stats() -> str:
 
     cpu_used = 0
     cpu_avail = 0
+    swap_total = 0
     try:
         with open("/proc/meminfo") as f:
             info = {}
@@ -83,60 +78,16 @@ def mem_stats() -> str:
             cpu_total = info.get('MemTotal', 0) / 1024 / 1024
             cpu_avail = info.get('MemAvailable', 0) / 1024 / 1024
             cpu_used = cpu_total - cpu_avail
-    except Exception:
-        pass
-
-    swap_info = ""
-    try:
-        with open("/proc/meminfo") as f:
-            for line in f:
-                if line.startswith("SwapTotal"):
-                    swap_total = int(line.split()[1]) / 1024 / 1024
-                    swap_info = f" | Swap: {swap_total:.0f}GB"
-                    break
+            swap_total = info.get('SwapTotal', 0) / 1024 / 1024
     except Exception:
         pass
 
     return (
         f"GPU: {gpu_alloc:.1f}/{gpu_total:.1f}GB alloc "
         f"({gpu_reserved:.1f}GB reserved) | "
-        f"CPU: {cpu_used:.1f}GB used ({cpu_avail:.1f}GB free)"
-        f"{swap_info}"
+        f"CPU: {cpu_used:.1f}GB used ({cpu_avail:.1f}GB free) | "
+        f"Swap: {swap_total:.0f}GB"
     )
-
-
-def check_swap():
-    """Check if swap is configured. Warn if not."""
-    swap_total = 0
-    try:
-        with open("/proc/meminfo") as f:
-            for line in f:
-                if line.startswith("SwapTotal"):
-                    swap_total = int(line.split()[1]) / 1024 / 1024
-                    break
-    except Exception:
-        pass
-
-    if swap_total < 64:
-        print(f"  !!  WARNING: Only {swap_total:.0f}GB swap configured.")
-        print(f"      MiniMax-M2.5 needs ~120GB CPU overflow + headroom.")
-        print(f"      Without swap, ~48% of parameters will be on meta device")
-        print(f"      and training WILL crash on backward pass.")
-        print(f"")
-        print(f"      Set up swap now:")
-        print(f"        sudo fallocate -l 128G /swapfile")
-        print(f"        sudo chmod 600 /swapfile")
-        print(f"        sudo mkswap /swapfile")
-        print(f"        sudo swapon /swapfile")
-        print(f"")
-        resp = input("      Continue anyway? [y/N] ").strip().lower()
-        if resp != 'y':
-            print("      Exiting. Set up swap and retry.")
-            sys.exit(0)
-    else:
-        print(f"  + Swap: {swap_total:.0f}GB configured")
-
-    return swap_total
 
 
 def check_environment():
@@ -159,29 +110,28 @@ def check_environment():
         print("     https://download.pytorch.org/whl/nightly/cu128")
 
     total_ram = 128
+    swap_total = 0
     try:
         with open("/proc/meminfo") as f:
             for line in f:
                 if line.startswith("MemTotal"):
                     total_ram = int(line.split()[1]) / 1024 / 1024
-                    break
+                elif line.startswith("SwapTotal"):
+                    swap_total = int(line.split()[1]) / 1024 / 1024
     except Exception:
         pass
 
     print(f"  System RAM : {total_ram:.0f} GB")
+    print(f"  Swap       : {swap_total:.0f} GB")
+    print(f"  Total CPU  : {total_ram + swap_total:.0f} GB (RAM + swap)")
 
     gpu_gb = gpu_mem / 1024**3
     model_gb = 220
-    if gpu_gb < model_gb:
-        offload_gb = model_gb - gpu_gb
-        print(f"  !  Model is ~{model_gb}GB FP8, GPU has {gpu_gb:.0f}GB")
-        print(f"     ~{offload_gb:.0f}GB will offload to CPU (training will be slower)")
-
-    print()
-    check_swap()
+    print(f"  Model      : ~{model_gb}GB FP8")
+    print(f"  Strategy   : DeepSpeed ZeRO-3 with CPU offload")
 
     missing = []
-    for pkg in ["transformers", "peft", "bitsandbytes", "accelerate", "datasets"]:
+    for pkg in ["transformers", "peft", "deepspeed", "accelerate", "datasets"]:
         try:
             __import__(pkg)
         except ImportError:
@@ -190,6 +140,9 @@ def check_environment():
         print(f"\n  x Missing packages: {', '.join(missing)}")
         print(f"    pip install {' '.join(missing)}")
         sys.exit(1)
+
+    import deepspeed
+    print(f"  DeepSpeed  : {deepspeed.__version__}")
 
     print()
     return dev
@@ -298,46 +251,74 @@ def strip_quantization(obj, depth=0, _seen=None):
             strip_quantization(child, depth + 1, _seen)
 
 
-def get_memory_config(gpu_headroom_gb):
-    """Calculate max_memory allocation for training.
+def build_deepspeed_config(args, nvme_offload=False):
+    """Build DeepSpeed ZeRO-3 config for single-GPU training with CPU offload.
 
-    Key insight from OOM crash: the backward pass needs significant GPU
-    memory for activations, gradients, and optimizer workspace. With
-    110.5GB of weights on GPU (out of 121.7GB), only 11GB remained,
-    which wasn't enough.
-
-    Strategy: put fewer weights on GPU, more on CPU (backed by swap).
-    ~100GB weights on GPU leaves ~22GB for training operations.
-    ~120GB weights on CPU, backed by RAM + swap.
+    ZeRO-3 partitions parameters, gradients, and optimizer states.
+    With CPU offload, parameters are staged to CPU when not needed
+    for the current micro-step, and gradients/optimizer states live
+    on CPU permanently. This allows training models much larger than
+    GPU memory.
     """
-    dev = torch.cuda.get_device_properties(0)
-    gpu_mem = (dev.total_mem if hasattr(dev, 'total_mem') else dev.total_memory) / 1024**3
+    OFFLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
-    total_ram = 128
-    try:
-        with open("/proc/meminfo") as f:
-            for line in f:
-                if line.startswith("MemTotal"):
-                    total_ram = int(line.split()[1]) / 1024 / 1024
-                    break
-    except Exception:
-        pass
+    # Parameter offload config
+    if nvme_offload:
+        param_offload = {
+            "device": "nvme",
+            "nvme_path": str(OFFLOAD_DIR),
+            "pin_memory": True,
+            "buffer_count": 5,
+            "buffer_size": 1e8,
+            "max_in_cpu": 1e9,
+        }
+        optimizer_offload = {
+            "device": "nvme",
+            "nvme_path": str(OFFLOAD_DIR),
+            "pin_memory": True,
+            "buffer_count": 4,
+            "fast_init": False,
+        }
+    else:
+        param_offload = {
+            "device": "cpu",
+            "pin_memory": True,
+        }
+        optimizer_offload = {
+            "device": "cpu",
+            "pin_memory": True,
+        }
 
-    gpu_for_weights = int(gpu_mem - gpu_headroom_gb)
-    gpu_alloc = f"{gpu_for_weights}GiB"
-    cpu_alloc = f"{int(total_ram - 8)}GiB"
+    ds_config = {
+        "bf16": {
+            "enabled": True,
+        },
+        "zero_optimization": {
+            "stage": 3,
+            "offload_param": param_offload,
+            "offload_optimizer": optimizer_offload,
+            "overlap_comm": True,
+            "contiguous_gradients": True,
+            "sub_group_size": 1e9,
+            "reduce_bucket_size": "auto",
+            "stage3_prefetch_bucket_size": "auto",
+            "stage3_param_persistence_threshold": "auto",
+            "stage3_max_live_parameters": 1e9,
+            "stage3_max_reuse_distance": 1e9,
+            "stage3_gather_16bit_weights_on_model_save": True,
+        },
+        "gradient_accumulation_steps": args.grad_accum,
+        "gradient_clipping": 0.3,
+        "steps_per_print": 1,
+        "train_micro_batch_size_per_gpu": 1,
+        "wall_clock_breakdown": False,
+    }
 
-    model_on_cpu = 220 - gpu_for_weights
-    print(f"  Memory plan:")
-    print(f"    GPU: {gpu_alloc} for weights ({gpu_headroom_gb}GB reserved for training ops)")
-    print(f"    CPU: {cpu_alloc} (model needs ~{model_on_cpu}GB, rest from swap)")
-    print(f"  (No disk offload -- all parameters must be on GPU or CPU)")
-
-    return {0: gpu_alloc, "cpu": cpu_alloc}
+    return ds_config
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Fine-tune MiniMax-M2.5 on DGX Spark")
+    parser = argparse.ArgumentParser(description="Fine-tune MiniMax-M2.5 on DGX Spark (DeepSpeed ZeRO-3)")
     parser.add_argument("--epochs", type=int, default=3)
     parser.add_argument("--lr", type=float, default=2e-4)
     parser.add_argument("--lora-rank", type=int, default=8)
@@ -345,13 +326,13 @@ def main():
     parser.add_argument("--grad-accum", type=int, default=8)
     parser.add_argument("--gpu-headroom", type=int, default=DEFAULT_GPU_HEADROOM_GB,
                         help=f"GB to reserve on GPU for training ops (default: {DEFAULT_GPU_HEADROOM_GB})")
+    parser.add_argument("--nvme-offload", action="store_true",
+                        help="Offload parameters and optimizer to NVMe instead of CPU")
     parser.add_argument("--model", default=MODEL_NAME, help="HuggingFace model ID")
     args = parser.parse_args()
 
-    gpu_headroom = args.gpu_headroom
-
     print("\n=== Vybn Fine-Tune: MiniMax-M2.5 on DGX Spark ===")
-    print("    transformers + PEFT (native FP8, LoRA adapters in BF16)")
+    print("    DeepSpeed ZeRO-3 + PEFT LoRA (native FP8, adapters in BF16)")
 
     # -- 1. Environment --
     check_environment()
@@ -367,7 +348,7 @@ def main():
         Trainer,
         DataCollatorForLanguageModeling,
     )
-    from peft import LoraConfig, get_peft_model
+    from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 
     # -- 4. Tokenizer --
     print(f"\n== Loading tokenizer: {args.model} ==\n")
@@ -378,30 +359,38 @@ def main():
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
-    # -- 5. Memory plan --
-    max_memory = get_memory_config(gpu_headroom)
-    OFFLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    # -- 5. DeepSpeed config --
+    ds_config = build_deepspeed_config(args, nvme_offload=args.nvme_offload)
 
-    # -- 5b. Clear memory before the big load --
+    # Write config to temp file for Trainer
+    ds_config_path = OUTPUT_DIR / "ds_config.json"
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    with open(ds_config_path, "w") as f:
+        json.dump(ds_config, f, indent=2)
+    print(f"  DeepSpeed config written to {ds_config_path}")
+
+    offload_mode = "NVMe" if args.nvme_offload else "CPU"
+    print(f"  ZeRO Stage 3 with {offload_mode} offload for params + optimizer")
+
+    # -- 6. Clear memory --
     gc.collect()
     torch.cuda.empty_cache()
     print(f"\n  Pre-load: {mem_stats()}")
 
-    # -- 6. Model --
-    print("\n== Loading model (native FP8 + CPU offload) ==")
-    print(f"   ~220GB FP8 weights: ~{int(122 - gpu_headroom)}GB on GPU, ~{int(220 - (122 - gpu_headroom))}GB on CPU")
-    print(f"   {gpu_headroom}GB GPU headroom reserved for training operations.\n")
+    # -- 7. Model --
+    print(f"\n== Loading model: {args.model} ==")
+    print(f"   DeepSpeed ZeRO-3 will manage parameter placement.")
+    print(f"   No device_map needed -- ZeRO handles GPU/CPU partitioning.\n")
 
     load_start = time.time()
+
+    # With ZeRO-3, we do NOT use device_map. DeepSpeed manages placement.
+    # We load to CPU first, then let DeepSpeed partition during init.
     model = None
-    for attn_impl in ["flash_attention_2", "sdpa", "eager"]:
+    for attn_impl in ["sdpa", "eager"]:
         try:
             model = AutoModelForCausalLM.from_pretrained(
                 args.model,
-                device_map="auto",
-                max_memory=max_memory,
-                offload_folder=str(OFFLOAD_DIR),
-                offload_state_dict=True,
                 trust_remote_code=True,
                 torch_dtype="auto",
                 low_cpu_mem_usage=True,
@@ -418,22 +407,7 @@ def main():
                 sys.exit(1)
             print(f"  !  {attn_impl} unavailable ({e.__class__.__name__}), trying next...")
 
-    # Check for meta tensors (disk offload)
-    meta_params = sum(1 for p in model.parameters() if p.device.type == 'meta')
-    total_params = sum(1 for _ in model.parameters())
-    if meta_params > 0:
-        pct = meta_params / total_params * 100
-        print(f"  !  WARNING: {meta_params}/{total_params} ({pct:.0f}%) parameters on meta device")
-        print(f"     These cannot participate in backward pass.")
-        if pct > 10:
-            print(f"     This is too many. Training will likely crash.")
-            print(f"     Fix: add more swap space or reduce --gpu-headroom.")
-            print(f"     Current swap setup:")
-            os.system("swapon --show 2>/dev/null || echo '     No swap configured!'")
-    else:
-        print(f"  +  All {total_params} parameters on GPU or CPU (no meta/disk offload)")
-
-    # -- 7. Strip FP8 quantization metadata (pre-PEFT) --
+    # -- 8. Strip FP8 quantization metadata --
     print()
     strip_quantization(model)
     print(f"     (FP8 weights in memory unchanged -- only metadata removed)")
@@ -454,7 +428,7 @@ def main():
             except Exception:
                 pass
 
-    # -- 8. Prepare for LoRA training --
+    # -- 9. Prepare for training --
     for param in model.parameters():
         param.requires_grad = False
 
@@ -472,7 +446,7 @@ def main():
 
     print(f"\n  Post-prep: {mem_stats()}")
 
-    # -- 9. LoRA --
+    # -- 10. LoRA --
     targets = find_attention_targets(model)
 
     lora_config = LoraConfig(
@@ -488,19 +462,17 @@ def main():
     model.print_trainable_parameters()
     print(f"  Post-LoRA: {mem_stats()}")
 
-    # -- 10. Strip again post-PEFT --
+    # -- 11. Strip again post-PEFT --
     print("\n  Stripping quantization metadata post-PEFT...")
     strip_quantization(model)
     is_q = getattr(model, 'is_quantized', False)
     print(f"  Final check: is_quantized={is_q}")
 
-    # -- 11. Tokenize dataset --
+    # -- 12. Tokenize dataset --
     print()
     tokenized = sharegpt_to_dataset(data, tokenizer, args.max_seq_len)
 
-    # -- 12. Training --
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-
+    # -- 13. Training with DeepSpeed --
     training_args = TrainingArguments(
         output_dir=str(OUTPUT_DIR),
         num_train_epochs=args.epochs,
@@ -513,12 +485,12 @@ def main():
         logging_steps=1,
         save_strategy="epoch",
         bf16=True,
-        optim="paged_adamw_8bit",
         gradient_checkpointing=True,
         gradient_checkpointing_kwargs={"use_reentrant": False},
         max_grad_norm=0.3,
         dataloader_pin_memory=False,
         report_to="none",
+        deepspeed=str(ds_config_path),
     )
 
     trainer = Trainer(
@@ -528,14 +500,15 @@ def main():
         data_collator=DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False),
     )
 
-    print(f"\n== Training ==")
+    print(f"\n== Training (DeepSpeed ZeRO-3) ==")
     print(f"   {len(tokenized)} examples, {args.epochs} epochs, batch=1, grad_accum={args.grad_accum}")
     print(f"   Effective steps: {len(tokenized) * args.epochs // args.grad_accum}")
+    print(f"   Offload: {offload_mode}")
     print(f"   Pre-train: {mem_stats()}\n")
 
     trainer.train()
 
-    # -- 13. Save adapter --
+    # -- 14. Save adapter --
     adapter_path = OUTPUT_DIR / "vybn_adapter"
     model.save_pretrained(str(adapter_path))
     tokenizer.save_pretrained(str(adapter_path))
