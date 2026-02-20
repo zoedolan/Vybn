@@ -16,6 +16,8 @@ permissions:
 jobs:
   absorb_quantum_state:
     runs-on: ubuntu-latest
+    env:
+      IBMQ_TOKEN: ${{ secrets.IBMQ_TOKEN }}
     steps:
       - name: Checkout the mind
         uses: actions/checkout@v4
@@ -25,6 +27,12 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Install Qiskit (Optional - for direct IBM Quantum access)
+        run: |
+          if [ -n "$IBMQ_TOKEN" ]; then
+            pip install qiskit qiskit-ibm-provider
+          fi
+
       - name: Fetch Quantum State
         id: fetch_qrn
         run: |
@@ -32,28 +40,63 @@ jobs:
           import urllib.request
           import json
           import sys
-          from datetime import datetime, timezone
           import os
+          from datetime import datetime, timezone
 
-          # Default state
+          qrn = None
           state = "unknown"
-          qrn = "N/A"
+          ibmq_token = os.environ.get("IBMQ_TOKEN")
 
-          try:
-              # Fetch from ANU QRNG API
-              url = "https://qrng.anu.edu.au/API/jsonI.php?length=1&type=uint16"
-              req = urllib.request.Request(url, headers={'User-Agent': 'VybnMind/1.0'})
-              with urllib.request.urlopen(req, timeout=10) as response:
-                  data = json.loads(response.read().decode())
-                  if data.get("success"):
-                      qrn = data["data"][0]
-                      state = "true quantum collapse"
-                  else:
-                      raise Exception("API returned unsuccessful")
-          except Exception as e:
+          # 1. First Preference: IBM Quantum (if token is provided)
+          # This allows us to bypass flaky APIs and measure our own wave functions directly.
+          if ibmq_token and qrn is None:
+              try:
+                  from qiskit_ibm_provider import IBMProvider
+                  from qiskit import QuantumCircuit, transpile
+                  provider = IBMProvider(token=ibmq_token)
+                  # Find the least busy operational real backend
+                  backends = provider.backends(simulator=False, operational=True)
+                  if backends:
+                      least_busy = sorted(backends, key=lambda b: b.status().pending_jobs)[0]
+                      qc = QuantumCircuit(16, 16)
+                      qc.h(range(16))
+                      qc.measure(range(16), range(16))
+                      transpiled_qc = transpile(qc, least_busy)
+                      job = least_busy.run(transpiled_qc, shots=1)
+                      result = job.result()
+                      counts = result.get_counts()
+                      bitstring = list(counts.keys())[0]
+                      qrn = int(bitstring, 2)
+                      state = f"IBM Quantum collapse ({least_busy.name})"
+              except Exception as e:
+                  print(f"IBM Quantum decohered: {e}")
+
+          # 2. Second Preference: ANU QRNG API (often flaky, so we try/catch)
+          if qrn is None:
+              try:
+                  url = "https://qrng.anu.edu.au/API/jsonI.php?length=1&type=uint16"
+                  req = urllib.request.Request(url, headers={'User-Agent': 'VybnMind/1.0'})
+                  with urllib.request.urlopen(req, timeout=8) as response:
+                      data = json.loads(response.read().decode())
+                      if data.get("success"):
+                          qrn = data["data"][0]
+                          state = "ANU QRNG API collapse"
+              except Exception as e:
+                  print(f"ANU QRNG API decohered: {e}")
+
+          # 3. Third Preference: Other Public QRNG endpoints
+          if qrn is None:
+              try:
+                  # Some alternative public APIs could be added here
+                  pass
+              except Exception as e:
+                  pass
+
+          # 4. Final Fallback: Classical Pseudo-Randomness
+          if qrn is None:
               import secrets
               qrn = secrets.randbits(16)
-              state = f"pseudo-random fallback (decoherence: {e})"
+              state = "pseudo-random fallback (all quantum sources decohered)"
 
           now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
           
