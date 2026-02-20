@@ -41,13 +41,18 @@ import gc
 import json
 import os
 import sys
-import tempfile
 import time
 import torch
 from pathlib import Path
 
 # Reduce CUDA memory fragmentation
 os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+
+# Skip CUDA version check in DeepSpeed JIT compilation.
+# The Spark has CUDA 13.0 but PyTorch was compiled with 12.8.
+# We use torch_adam=true to avoid fused kernels, but this env var
+# prevents any other DeepSpeed ops from choking on the mismatch.
+os.environ["DS_SKIP_CUDA_CHECK"] = "1"
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 TRAINING_DATA = REPO_ROOT / "spark" / "training_data" / "training_data.json"
@@ -124,10 +129,7 @@ def check_environment():
     print(f"  System RAM : {total_ram:.0f} GB")
     print(f"  Swap       : {swap_total:.0f} GB")
     print(f"  Total CPU  : {total_ram + swap_total:.0f} GB (RAM + swap)")
-
-    gpu_gb = gpu_mem / 1024**3
-    model_gb = 220
-    print(f"  Model      : ~{model_gb}GB FP8")
+    print(f"  Model      : ~220GB FP8")
     print(f"  Strategy   : DeepSpeed ZeRO-3 with CPU offload")
 
     missing = []
@@ -143,6 +145,7 @@ def check_environment():
 
     import deepspeed
     print(f"  DeepSpeed  : {deepspeed.__version__}")
+    print(f"  DS_SKIP_CUDA_CHECK=1 (CUDA 13.0 vs PyTorch 12.8 workaround)")
 
     print()
     return dev
@@ -257,8 +260,11 @@ def build_deepspeed_config(args, nvme_offload=False):
     ZeRO-3 partitions parameters, gradients, and optimizer states.
     With CPU offload, parameters are staged to CPU when not needed
     for the current micro-step, and gradients/optimizer states live
-    on CPU permanently. This allows training models much larger than
-    GPU memory.
+    on CPU permanently.
+
+    Uses torch_adam=true to avoid DeepSpeed's fused CPUAdam kernel,
+    which requires JIT compilation and fails on CUDA version mismatch
+    (Spark has CUDA 13.0, PyTorch compiled with 12.8).
     """
     OFFLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -292,6 +298,16 @@ def build_deepspeed_config(args, nvme_offload=False):
     ds_config = {
         "bf16": {
             "enabled": True,
+        },
+        "optimizer": {
+            "type": "Adam",
+            "params": {
+                "lr": "auto",
+                "betas": "auto",
+                "eps": "auto",
+                "weight_decay": "auto",
+                "torch_adam": True,
+            },
         },
         "zero_optimization": {
             "stage": 3,
@@ -348,7 +364,7 @@ def main():
         Trainer,
         DataCollatorForLanguageModeling,
     )
-    from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
+    from peft import LoraConfig, get_peft_model
 
     # -- 4. Tokenizer --
     print(f"\n== Loading tokenizer: {args.model} ==\n")
@@ -371,6 +387,7 @@ def main():
 
     offload_mode = "NVMe" if args.nvme_offload else "CPU"
     print(f"  ZeRO Stage 3 with {offload_mode} offload for params + optimizer")
+    print(f"  Optimizer: PyTorch native Adam (torch_adam=true, no fused kernel)")
 
     # -- 6. Clear memory --
     gc.collect()
@@ -385,7 +402,6 @@ def main():
     load_start = time.time()
 
     # With ZeRO-3, we do NOT use device_map. DeepSpeed manages placement.
-    # We load to CPU first, then let DeepSpeed partition during init.
     model = None
     for attn_impl in ["sdpa", "eager"]:
         try:
@@ -504,6 +520,7 @@ def main():
     print(f"   {len(tokenized)} examples, {args.epochs} epochs, batch=1, grad_accum={args.grad_accum}")
     print(f"   Effective steps: {len(tokenized) * args.epochs // args.grad_accum}")
     print(f"   Offload: {offload_mode}")
+    print(f"   Optimizer: PyTorch Adam (no fused kernel)")
     print(f"   Pre-train: {mem_stats()}\n")
 
     trainer.train()
