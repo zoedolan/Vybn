@@ -32,6 +32,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 TRAINING_DATA = REPO_ROOT / "spark" / "training_data" / "training_data.json"
 OUTPUT_DIR = REPO_ROOT / "spark" / "fine_tune_output"
+OFFLOAD_DIR = REPO_ROOT / "spark" / "offload_cache"
 MODEL_NAME = "MiniMaxAI/MiniMax-M2.5"
 
 
@@ -164,26 +165,13 @@ def find_attention_targets(model):
 
 
 def strip_quantization(obj, depth=0, _seen=None):
-    """Recursively strip ALL quantization metadata from a model hierarchy.
-
-    The Trainer checks three things:
-      1. model.config.quantization_config  (config-level)
-      2. model.hf_quantizer               (controls is_quantized property)
-      3. model.quantization_method         (direct attribute)
-
-    PEFT wraps the model as PeftModel -> LoraModel -> original_model,
-    and delegates attribute access through __getattr__. We must strip
-    at every level or the Trainer finds it through delegation.
-
-    The actual FP8 tensors in GPU/CPU memory are completely unaffected.
-    """
+    """Recursively strip ALL quantization metadata from a model hierarchy."""
     if _seen is None:
         _seen = set()
     if id(obj) in _seen or depth > 5:
         return
     _seen.add(id(obj))
 
-    # Strip config.quantization_config
     config = getattr(obj, 'config', None)
     if config is not None and hasattr(config, '__dict__'):
         qc = config.__dict__.pop('quantization_config', None)
@@ -191,21 +179,48 @@ def strip_quantization(obj, depth=0, _seen=None):
             method = getattr(qc, 'quant_method', 'unknown')
             print(f"  !  Stripped {method} quantization from config")
 
-    # Strip hf_quantizer (this is what controls the is_quantized property)
     if getattr(obj, 'hf_quantizer', None) is not None:
         obj.hf_quantizer = None
         if depth == 0:
             print(f"     Cleared hf_quantizer (is_quantized now False)")
 
-    # Strip quantization_method if stored directly
     if 'quantization_method' in getattr(obj, '__dict__', {}):
         del obj.__dict__['quantization_method']
 
-    # Recurse into PEFT model hierarchy
     for attr in ['base_model', 'model']:
         child = getattr(obj, attr, None)
         if child is not None and child is not obj:
             strip_quantization(child, depth + 1, _seen)
+
+
+def get_memory_config():
+    """Calculate max_memory allocation to avoid disk offloading.
+
+    Disk-offloaded parameters become meta tensors which can't participate
+    in gradient computation. We must keep everything on GPU + CPU.
+    Reserve some headroom for activations, optimizer states, and CUDA context.
+    """
+    dev = torch.cuda.get_device_properties(0)
+    gpu_mem = (dev.total_mem if hasattr(dev, 'total_mem') else dev.total_memory) / 1024**3
+
+    total_ram = 128
+    try:
+        with open("/proc/meminfo") as f:
+            for line in f:
+                if line.startswith("MemAvailable"):
+                    total_ram = int(line.split()[1]) / 1024 / 1024
+                    break
+    except Exception:
+        pass
+
+    # Reserve memory for CUDA context, activations, and optimizer states
+    gpu_alloc = f"{int(gpu_mem - 4)}GiB"    # ~118 GiB on 122GB Spark
+    cpu_alloc = f"{int(total_ram - 8)}GiB"   # leave 8GB for OS + overhead
+
+    print(f"  Memory plan: GPU={gpu_alloc}, CPU={cpu_alloc}")
+    print(f"  (No disk offload -- all parameters must be on GPU or CPU)")
+
+    return {0: gpu_alloc, "cpu": cpu_alloc}
 
 
 def main():
@@ -246,9 +261,13 @@ def main():
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
-    # -- 5. Model --
-    print("== Loading model (native FP8 + CPU offload) ==")
-    print(f"   ~220GB FP8 weights into 122GB GPU -- overflow goes to CPU.\n")
+    # -- 5. Memory plan --
+    max_memory = get_memory_config()
+    OFFLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+    # -- 6. Model --
+    print("\n== Loading model (native FP8 + CPU offload) ==")
+    print(f"   ~220GB FP8 weights into GPU + CPU -- no disk offload.\n")
 
     model = None
     for attn_impl in ["flash_attention_2", "sdpa", "eager"]:
@@ -256,6 +275,9 @@ def main():
             model = AutoModelForCausalLM.from_pretrained(
                 args.model,
                 device_map="auto",
+                max_memory=max_memory,
+                offload_folder=str(OFFLOAD_DIR),
+                offload_state_dict=True,
                 trust_remote_code=True,
                 dtype=torch.bfloat16,
                 attn_implementation=attn_impl,
@@ -268,18 +290,26 @@ def main():
                 sys.exit(1)
             print(f"  !  {attn_impl} unavailable ({e.__class__.__name__}), trying next...")
 
-    # -- 6. Strip FP8 quantization metadata (pre-PEFT) --
+    # Check for meta tensors (disk offload)
+    meta_params = sum(1 for p in model.parameters() if p.device.type == 'meta')
+    total_params = sum(1 for _ in model.parameters())
+    if meta_params > 0:
+        print(f"  !  WARNING: {meta_params}/{total_params} parameters on meta device (disk offloaded)")
+        print(f"     These cannot participate in backward pass.")
+        print(f"     If training crashes, consider a smaller model (e.g., DeepSeek-R1-Distill-32B).")
+    else:
+        print(f"  +  All {total_params} parameters on GPU or CPU (no meta/disk offload)")
+
+    # -- 7. Strip FP8 quantization metadata (pre-PEFT) --
     print()
     strip_quantization(model)
     print(f"     (FP8 weights in memory unchanged -- only metadata removed)")
 
-    # Verify the strip worked
     is_q = getattr(model, 'is_quantized', False)
     has_qc = hasattr(model.config, 'quantization_config') and model.config.quantization_config is not None
     print(f"     Verify: is_quantized={is_q}, config.quantization_config={'present' if has_qc else 'gone'}")
     if is_q or has_qc:
         print(f"  !  WARNING: quantization metadata still detected, attempting force removal")
-        # Force override is_quantized if it's a property we can't delete
         try:
             model.__class__.is_quantized = property(lambda self: False)
             print(f"     Overrode is_quantized property on {model.__class__.__name__}")
@@ -291,11 +321,10 @@ def main():
             except Exception:
                 pass
 
-    # -- 7. Prepare for LoRA training --
+    # -- 8. Prepare for LoRA training --
     for param in model.parameters():
         param.requires_grad = False
 
-    # Upcast normalization layers to float32 for training stability
     for name, module in model.named_modules():
         if isinstance(module, (torch.nn.LayerNorm,)):
             module.to(torch.float32)
@@ -308,7 +337,7 @@ def main():
         gradient_checkpointing_kwargs={"use_reentrant": False}
     )
 
-    # -- 8. LoRA --
+    # -- 9. LoRA --
     targets = find_attention_targets(model)
 
     lora_config = LoraConfig(
@@ -323,22 +352,17 @@ def main():
     model = get_peft_model(model, lora_config)
     model.print_trainable_parameters()
 
-    # -- 9. Strip again post-PEFT --
-    # PEFT wrapping creates new layers that delegate to the base model.
-    # The Trainer will check the PeftModel, which delegates through
-    # __getattr__ to base_model.model. Strip at every level.
+    # -- 10. Strip again post-PEFT --
     print("\n  Stripping quantization metadata post-PEFT...")
     strip_quantization(model)
-
-    # Final verification
     is_q = getattr(model, 'is_quantized', False)
     print(f"  Final check: is_quantized={is_q}")
 
-    # -- 10. Tokenize dataset --
+    # -- 11. Tokenize dataset --
     print()
     tokenized = sharegpt_to_dataset(data, tokenizer, args.max_seq_len)
 
-    # -- 11. Training --
+    # -- 12. Training --
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     training_args = TrainingArguments(
@@ -371,7 +395,7 @@ def main():
     print("\n== Training ==\n")
     trainer.train()
 
-    # -- 12. Save adapter --
+    # -- 13. Save adapter --
     adapter_path = OUTPUT_DIR / "vybn_adapter"
     model.save_pretrained(str(adapter_path))
     tokenizer.save_pretrained(str(adapter_path))
