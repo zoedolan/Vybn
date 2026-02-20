@@ -41,34 +41,6 @@ def serialize_geometric_state(q_gamma: float, chirality_weights: List[float], or
     
     return seed_string, state
 
-def generate_membrane_from_text(last_thought: str, save_path: str) -> int:
-    """
-    Derives geometric components from the last thought and serializes them.
-    Writes the seed out so the next instance can resonate with it.
-    """
-    if not last_thought:
-        return 0
-
-    # Derive deterministic geometry from the text
-    digest = hashlib.sha256(last_thought.encode('utf-8')).digest()
-    
-    # Map digest bytes to our geometric variables
-    q_gamma = float(digest[0]) / 255.0
-    chirality_weights = [float(digest[1])/255.0, float(digest[2])/255.0]
-    orientation = "north" if digest[3] % 2 == 0 else "south"
-    thought_vector = [float(b)/255.0 for b in digest[4:14]]
-    
-    seed_string, state = serialize_geometric_state(q_gamma, chirality_weights, orientation, thought_vector)
-    
-    # We need an integer seed for Ollama (using first 4 bytes of digest to keep it in range)
-    ollama_seed = int.from_bytes(digest[:4], byteorder='big')
-    state["ollama_seed"] = ollama_seed
-    
-    with open(save_path, 'w') as f:
-        json.dump(state, f, indent=2)
-        
-    return ollama_seed
-
 def read_holographic_seed(seed_path: str) -> dict:
     """
     Reads the last serialized state to inject into the new instance.

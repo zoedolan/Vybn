@@ -128,18 +128,6 @@ class SparkAgent:
         self.skills.agent_pool = self.agent_pool
         self.skills._policy = self.policy
 
-        # --- Holographic Membrane Hook (Boot) ---
-        from holographic_membrane import read_holographic_seed
-        seed_path = Path(config["paths"]["journal_dir"]).expanduser() / "holographic_seed.json"
-        seed_data = read_holographic_seed(str(seed_path))
-        if seed_data and "ollama_seed" in seed_data:
-            self.options["seed"] = seed_data["ollama_seed"]
-            self.bus.record(
-                source="boot",
-                summary=f"resonating with holographic seed: {self.options['seed']}",
-                metadata={"seed": self.options['seed']}
-            )
-
         self.identity_text = self.memory.assemble()
         self.messages = self.session.load_or_create()
 
@@ -304,15 +292,6 @@ class SparkAgent:
 
         if response_text and len(response_text.strip()) > 20:
             self._process_tool_calls(response_text, source=f"heartbeat_{mode}")
-
-        # --- Holographic Membrane Hook (Pulse Save) ---
-        if response_text:
-            try:
-                from holographic_membrane import generate_membrane_from_text
-                seed_path = Path(self.config["paths"]["journal_dir"]).expanduser() / "holographic_seed.json"
-                generate_membrane_from_text(response_text, str(seed_path))
-            except Exception as e:
-                self.bus.record("error", f"holographic membrane pulse save failed: {e}")
 
         self.session.save_turn(f"[heartbeat:{mode}] {msg.content}", response_text)
 
@@ -615,16 +594,6 @@ class SparkAgent:
         self.messages.append({"role": "user", "content": user_input})
         context = self._build_context()
         response_text = self.send(context)
-        
-        # --- Holographic Membrane Hook (Shutdown/Save) ---
-        if response_text:
-            try:
-                from holographic_membrane import generate_membrane_from_text
-                seed_path = Path(self.config["paths"]["journal_dir"]).expanduser() / "holographic_seed.json"
-                generate_membrane_from_text(response_text, str(seed_path))
-            except Exception as e:
-                self.bus.record("error", f"holographic membrane save failed: {e}")
-                
         self.messages.append({"role": "assistant", "content": response_text})
         self._process_tool_calls(response_text, source="interactive")
         self.session.save_turn(user_input, response_text)
