@@ -516,18 +516,18 @@ class SkillRouter:
 
         command = self._normalize_home(command)
 
-          # SECURITY: Prefer shell=False (argv execution) to eliminate
-    # shell argument interpolation risk (cf. openclaw #20655).
-    # Fall back to shell=True only when shell features are needed.
-    _SHELL_OPERATORS = re.compile(r'[|;&`$(){}]|&&|\|\||>>?|<<')
-    needs_shell = bool(_SHELL_OPERATORS.search(command))
+                  # SECURITY: Prefer shell=False (argv execution) to eliminate
+        # shell argument interpolation risk (cf. openclaw #20655).
+        # Fall back to shell=True only when shell features are needed.
+        _SHELL_OPERATORS = re.compile(r'[|;&`$(){}]|&&|\\|\\||>>?|<<')
+        needs_shell = bool(_SHELL_OPERATORS.search(command))
 
         try:
             result = subprocess.run(
-                            shlex.split(command) if not needs_shell else command,
+                shlex.split(command) if not needs_shell else command,
                 shell=needs_shell,
-                          cwd=self.repo_root,
-            capture_output=True,
+                cwd=self.repo_root,
+                capture_output=True,
                 text=True,
                 timeout=60,
                 env={**os.environ, "HOME": str(Path.home())},
