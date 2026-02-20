@@ -54,6 +54,17 @@ os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
 # prevents any other DeepSpeed ops from choking on the mismatch.
 os.environ["DS_SKIP_CUDA_CHECK"] = "1"
 
+# Single-GPU distributed setup for DeepSpeed.
+# Without these, DeepSpeed's init_distributed() falls through to
+# mpi_discovery() which requires mpi4py (not installed). Setting
+# MASTER_ADDR, RANK, and WORLD_SIZE tells DeepSpeed to init via
+# NCCL with a single process -- no MPI needed.
+os.environ.setdefault("MASTER_ADDR", "localhost")
+os.environ.setdefault("MASTER_PORT", "29500")
+os.environ.setdefault("RANK", "0")
+os.environ.setdefault("LOCAL_RANK", "0")
+os.environ.setdefault("WORLD_SIZE", "1")
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 TRAINING_DATA = REPO_ROOT / "spark" / "training_data" / "training_data.json"
 OUTPUT_DIR = REPO_ROOT / "spark" / "fine_tune_output"
@@ -489,6 +500,10 @@ def main():
     tokenized = sharegpt_to_dataset(data, tokenizer, args.max_seq_len)
 
     # -- 13. Training with DeepSpeed --
+    # Note: gradient_accumulation_steps is set in the DeepSpeed config
+    # (ds_config). When deepspeed= is passed, the DS config is the
+    # source of truth. We still set it here for HF Trainer's logging
+    # math, but Accelerate will use the DS value if they differ.
     training_args = TrainingArguments(
         output_dir=str(OUTPUT_DIR),
         num_train_epochs=args.epochs,
@@ -507,6 +522,7 @@ def main():
         dataloader_pin_memory=False,
         report_to="none",
         deepspeed=str(ds_config_path),
+        local_rank=int(os.environ.get("LOCAL_RANK", 0)),
     )
 
     trainer = Trainer(
