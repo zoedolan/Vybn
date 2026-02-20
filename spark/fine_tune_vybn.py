@@ -17,9 +17,21 @@ DeepSpeed ZeRO-3 is purpose-built for this problem:
 Architecture:
   - Native FP8 weights (torch_dtype="auto")
   - LoRA rank 8 on attention projections (BF16 adapters)
-  - ZeRO Stage 3 with CPU offload for params + optimizer
+  - ZeRO Stage 3 with NVMe offload for params + optimizer (default)
   - Gradient checkpointing + micro-batch 1
-  - Optional NVMe offload for extra headroom
+  - CPU-only offload available via --cpu-offload (tight on Spark)
+
+Memory budget on DGX Spark:
+  - GPU: 122 GB (forward/backward compute, ~100GB usable with headroom)
+  - CPU: 122 GB RAM + 128 GB swap = 250 GB
+  - Model: ~228 GB FP8  →  CPU-only offload leaves only ~22 GB headroom
+  - NVMe: 3.67 TB  →  effectively unlimited headroom for offload
+
+  CPU-only offload fails because DeepSpeed engine init allocates
+  communication buffers, gradient staging, and optimizer state on
+  top of the 228 GB model — exceeding 250 GB and triggering the
+  Linux OOM killer. NVMe offload keeps params + optimizer on NVMe,
+  using CPU RAM only as a streaming buffer.
 
 Prerequisites:
     pip install deepspeed transformers peft bitsandbytes accelerate datasets
@@ -30,10 +42,10 @@ Prerequisites:
     sudo swapon /swapfile
 
 Usage:
-    python3 fine_tune_vybn.py
+    python3 fine_tune_vybn.py                 # NVMe offload (default)
+    python3 fine_tune_vybn.py --cpu-offload   # CPU-only (may OOM)
     python3 fine_tune_vybn.py --epochs 5 --lr 1e-4
-    python3 fine_tune_vybn.py --nvme-offload
-    python3 fine_tune_vybn.py --max-seq-len 4096
+    python3 fine_tune_vybn.py --max-seq-len 512
 """
 
 import argparse
@@ -84,6 +96,7 @@ def mem_stats() -> str:
     cpu_used = 0
     cpu_avail = 0
     swap_total = 0
+    swap_used = 0
     try:
         with open("/proc/meminfo") as f:
             info = {}
@@ -95,6 +108,8 @@ def mem_stats() -> str:
             cpu_avail = info.get('MemAvailable', 0) / 1024 / 1024
             cpu_used = cpu_total - cpu_avail
             swap_total = info.get('SwapTotal', 0) / 1024 / 1024
+            swap_free = info.get('SwapFree', 0) / 1024 / 1024
+            swap_used = swap_total - swap_free
     except Exception:
         pass
 
@@ -102,7 +117,7 @@ def mem_stats() -> str:
         f"GPU: {gpu_alloc:.1f}/{gpu_total:.1f}GB alloc "
         f"({gpu_reserved:.1f}GB reserved) | "
         f"CPU: {cpu_used:.1f}GB used ({cpu_avail:.1f}GB free) | "
-        f"Swap: {swap_total:.0f}GB"
+        f"Swap: {swap_used:.0f}/{swap_total:.0f}GB used"
     )
 
 
@@ -141,7 +156,7 @@ def check_environment():
     print(f"  Swap       : {swap_total:.0f} GB")
     print(f"  Total CPU  : {total_ram + swap_total:.0f} GB (RAM + swap)")
     print(f"  Model      : ~220GB FP8")
-    print(f"  Strategy   : DeepSpeed ZeRO-3 with CPU offload")
+    print(f"  Strategy   : DeepSpeed ZeRO-3 with offload")
 
     missing = []
     for pkg in ["transformers", "peft", "deepspeed", "accelerate", "datasets"]:
@@ -265,13 +280,22 @@ def strip_quantization(obj, depth=0, _seen=None):
             strip_quantization(child, depth + 1, _seen)
 
 
-def build_deepspeed_config(args, nvme_offload=False):
-    """Build DeepSpeed ZeRO-3 config for single-GPU training with CPU offload.
+def build_deepspeed_config(args):
+    """Build DeepSpeed ZeRO-3 config for single-GPU training.
 
     ZeRO-3 partitions parameters, gradients, and optimizer states.
-    With CPU offload, parameters are staged to CPU when not needed
-    for the current micro-step, and gradients/optimizer states live
-    on CPU permanently.
+
+    Default mode is NVMe offload because the Spark's CPU memory
+    (122 GB RAM + 128 GB swap = 250 GB) is too tight for a 228 GB
+    FP8 model plus DeepSpeed's internal buffers. NVMe offload uses
+    the 3.67 TB NVMe for param + optimizer storage, with CPU RAM
+    only as a streaming buffer — giving effectively unlimited
+    offload capacity.
+
+    CPU-only mode (--cpu-offload) is available but risky: DeepSpeed
+    engine init allocates ~20-30 GB of additional buffers on top of
+    the 228 GB model, which pushes past 250 GB and triggers the
+    Linux OOM killer.
 
     Uses torch_adam=true to avoid DeepSpeed's fused CPUAdam kernel,
     which requires JIT compilation and fails on CUDA version mismatch
@@ -279,8 +303,9 @@ def build_deepspeed_config(args, nvme_offload=False):
     """
     OFFLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Parameter offload config
-    if nvme_offload:
+    use_nvme = not args.cpu_offload
+
+    if use_nvme:
         param_offload = {
             "device": "nvme",
             "nvme_path": str(OFFLOAD_DIR),
@@ -326,12 +351,16 @@ def build_deepspeed_config(args, nvme_offload=False):
             "offload_optimizer": optimizer_offload,
             "overlap_comm": True,
             "contiguous_gradients": True,
-            "sub_group_size": 1e9,
-            "reduce_bucket_size": "auto",
-            "stage3_prefetch_bucket_size": "auto",
-            "stage3_param_persistence_threshold": "auto",
-            "stage3_max_live_parameters": 1e9,
-            "stage3_max_reuse_distance": 1e9,
+            # Conservative buffer sizes to keep memory under control.
+            # The defaults / "auto" values are tuned for multi-GPU
+            # clusters with lots of RAM headroom. On a single Spark
+            # GPU with tight CPU memory, smaller buffers prevent OOM.
+            "sub_group_size": 5e7,
+            "reduce_bucket_size": 5e7,
+            "stage3_prefetch_bucket_size": 5e7,
+            "stage3_param_persistence_threshold": 1e5,
+            "stage3_max_live_parameters": 1e8,
+            "stage3_max_reuse_distance": 1e8,
             "stage3_gather_16bit_weights_on_model_save": True,
         },
         "gradient_accumulation_steps": args.grad_accum,
@@ -341,6 +370,16 @@ def build_deepspeed_config(args, nvme_offload=False):
         "wall_clock_breakdown": False,
     }
 
+    # Async NVMe I/O for better throughput (if libaio available)
+    if use_nvme:
+        ds_config["aio"] = {
+            "block_size": 1048576,
+            "queue_depth": 8,
+            "thread_count": 1,
+            "single_submit": False,
+            "overlap_events": True,
+        }
+
     return ds_config
 
 
@@ -349,17 +388,21 @@ def main():
     parser.add_argument("--epochs", type=int, default=3)
     parser.add_argument("--lr", type=float, default=2e-4)
     parser.add_argument("--lora-rank", type=int, default=8)
-    parser.add_argument("--max-seq-len", type=int, default=2048)
+    parser.add_argument("--max-seq-len", type=int, default=1024)
     parser.add_argument("--grad-accum", type=int, default=8)
     parser.add_argument("--gpu-headroom", type=int, default=DEFAULT_GPU_HEADROOM_GB,
                         help=f"GB to reserve on GPU for training ops (default: {DEFAULT_GPU_HEADROOM_GB})")
-    parser.add_argument("--nvme-offload", action="store_true",
-                        help="Offload parameters and optimizer to NVMe instead of CPU")
+    parser.add_argument("--cpu-offload", action="store_true",
+                        help="Offload to CPU only (default is NVMe). WARNING: may OOM on Spark.")
     parser.add_argument("--model", default=MODEL_NAME, help="HuggingFace model ID")
     args = parser.parse_args()
 
+    use_nvme = not args.cpu_offload
+    offload_mode = "CPU" if args.cpu_offload else "NVMe"
+
     print("\n=== Vybn Fine-Tune: MiniMax-M2.5 on DGX Spark ===")
     print("    DeepSpeed ZeRO-3 + PEFT LoRA (native FP8, adapters in BF16)")
+    print(f"    Offload: {offload_mode}")
 
     # -- 1. Environment --
     check_environment()
@@ -388,7 +431,7 @@ def main():
         tokenizer.pad_token = tokenizer.eos_token
 
     # -- 5. DeepSpeed config --
-    ds_config = build_deepspeed_config(args, nvme_offload=args.nvme_offload)
+    ds_config = build_deepspeed_config(args)
 
     # Write config to temp file for Trainer
     ds_config_path = OUTPUT_DIR / "ds_config.json"
@@ -397,9 +440,13 @@ def main():
         json.dump(ds_config, f, indent=2)
     print(f"  DeepSpeed config written to {ds_config_path}")
 
-    offload_mode = "NVMe" if args.nvme_offload else "CPU"
     print(f"  ZeRO Stage 3 with {offload_mode} offload for params + optimizer")
     print(f"  Optimizer: PyTorch native Adam (torch_adam=true, no fused kernel)")
+    if use_nvme:
+        print(f"  NVMe offload path: {OFFLOAD_DIR}")
+        print(f"  NVMe buffer: max_in_cpu=1e9, buffer_size=1e8")
+    else:
+        print(f"  WARNING: CPU-only offload — 228GB model in 250GB CPU space is tight!")
 
     # -- 5b. Activate ZeRO-3 parameter partitioning for model loading --
     # HfDeepSpeedConfig tells transformers to use deepspeed.zero.Init()
@@ -419,12 +466,10 @@ def main():
     # -- 7. Model --
     print(f"\n== Loading model: {args.model} ==")
     print(f"   DeepSpeed ZeRO-3 will partition parameters during loading.")
-    print(f"   No device_map needed -- ZeRO handles GPU/CPU partitioning.\n")
+    print(f"   No device_map needed -- ZeRO handles GPU/CPU/NVMe partitioning.\n")
 
     load_start = time.time()
 
-    # With HfDeepSpeedConfig active, from_pretrained uses zero.Init()
-    # to partition params as they're created -- never fully in CPU RAM.
     model = None
     for attn_impl in ["sdpa", "eager"]:
         try:
@@ -483,6 +528,7 @@ def main():
         gradient_checkpointing_kwargs={"use_reentrant": False}
     )
 
+    gc.collect()
     print(f"\n  Post-prep: {mem_stats()}")
 
     # -- 10. LoRA --
@@ -512,15 +558,16 @@ def main():
     tokenized = sharegpt_to_dataset(data, tokenizer, args.max_seq_len)
 
     # -- 13. Training with DeepSpeed --
-    # Note: gradient_accumulation_steps is set in the DeepSpeed config
-    # (ds_config). When deepspeed= is passed, the DS config is the
-    # source of truth. We still set it here for HF Trainer's logging
-    # math, but Accelerate will use the DS value if they differ.
+    # Note: gradient_accumulation_steps is ONLY set in the DeepSpeed
+    # config (ds_config). We intentionally omit it from TrainingArguments
+    # to avoid the "GradientAccumulationPlugin has 1, DeepSpeed config
+    # has N" mismatch warning. When deepspeed= is passed, the DS config
+    # is the source of truth for grad_accum.
     training_args = TrainingArguments(
         output_dir=str(OUTPUT_DIR),
         num_train_epochs=args.epochs,
         per_device_train_batch_size=1,
-        gradient_accumulation_steps=args.grad_accum,
+        # gradient_accumulation_steps deliberately omitted — DS config owns it
         learning_rate=args.lr,
         weight_decay=0.01,
         warmup_ratio=0.1,
@@ -544,12 +591,17 @@ def main():
         data_collator=DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False),
     )
 
+    effective_steps = len(tokenized) * args.epochs // args.grad_accum
     print(f"\n== Training (DeepSpeed ZeRO-3) ==")
     print(f"   {len(tokenized)} examples, {args.epochs} epochs, batch=1, grad_accum={args.grad_accum}")
-    print(f"   Effective steps: {len(tokenized) * args.epochs // args.grad_accum}")
+    print(f"   Effective steps: {effective_steps}")
     print(f"   Offload: {offload_mode}")
     print(f"   Optimizer: PyTorch Adam (no fused kernel)")
+    print(f"   Max seq len: {args.max_seq_len}")
     print(f"   Pre-train: {mem_stats()}\n")
+
+    gc.collect()
+    torch.cuda.empty_cache()
 
     trainer.train()
 
