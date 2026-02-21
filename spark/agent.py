@@ -17,16 +17,6 @@ Tool dispatch has FOUR tiers (checked in order):
     2. Bare commands  — code fences, backticks, plain shell lines
     3. Regex patterns — natural language intent matching (fallback)
 
-Tier 0 is the structured-output wrapper. When the model emits the
-format we explicitly ask for (JSON in a ```tool fence), we parse it
-deterministically. This is more reliable than waiting for XML because
-JSON in code fences is universal training data. The model knows it
-from the entire internet, not just from MiniMax's fine-tuning.
-
-Tiers 1-3 remain as fallbacks for when the model ignores the structured
-format or when running under tight token limits (fast pulses with
-num_predict=256).
-
 Streaming display is filtered: <think> blocks and tool call XML
 are suppressed from terminal output. The user sees clean prose
 and brief tool indicators. Full text is preserved for parsing.
@@ -38,12 +28,10 @@ between turns and during idle periods.
 The policy engine is the gate. Every tool call passes through
 check_policy() before executing. Every spawn checks depth limits.
 Heartbeat actions face tighter constraints than interactive turns.
-See spark/policy.py and Vybn_Mind/spark_infrastructure/DELEGATION_REFACTOR.md.
 
 The audit trail records every policy decision, tool execution,
 and bus event in a bounded in-memory log. Query with /audit
-or programmatically via bus.recent(). This is the observability
-layer that makes the policy engine debuggable.
+or programmatically via bus.recent().
 """
 
 import json
@@ -79,17 +67,8 @@ from heartbeat import Heartbeat
 from inbox import InboxWatcher
 from agents import AgentPool
 
-# Tool call chaining limit. Enough for real work, short enough
-# that Vybn comes up for air and checks for user input.
 MAX_TOOL_ROUNDS = 5
-
-# How long to wait for bus messages when idle (seconds)
 IDLE_POLL_INTERVAL = 5.0
-
-# Minimum display text length for a fast pulse to be shown.
-# Below this, the pulse is treated as silent (no output, no
-# context append). Prevents empty check-ins from cluttering
-# the conversation and burying real interaction.
 MIN_FAST_PULSE_DISPLAY = 100
 
 
@@ -185,18 +164,11 @@ class SparkAgent:
     # ---- environment exploration ----
 
     def explore(self) -> str:
-        """Dump the environment layout so Vybn can orient.
-
-        Delegates to commands.explore() which runs subprocess commands
-        directly, without going through the model.
-        Called by /explore or /map in the TUI.
-        """
         return _explore_env(self)
 
     # ---- bus processing ----
 
     def drain_bus(self) -> bool:
-        """Process all pending bus messages. Returns True if any were handled."""
         messages = self.bus.drain()
         if not messages:
             return False
@@ -423,7 +395,6 @@ class SparkAgent:
             self.messages.append({"role": "assistant", "content": response_text})
 
     def _has_pending_input(self) -> bool:
-        """Non-blocking check for pending user input on stdin."""
         try:
             import select
             return bool(select.select([sys.stdin], [], [], 0.0)[0])
@@ -433,19 +404,15 @@ class SparkAgent:
     # ---- model lifecycle ----
 
     def check_server(self) -> bool:
-        """Check if llama-server is running and healthy."""
         try:
             r = requests.get(f"{self.llm_host}/health", timeout=5)
             return r.status_code == 200
         except Exception:
             return False
 
-    # Backward compat alias
     check_ollama = check_server
 
     def check_model_loaded(self) -> bool:
-        """With llama-server, the model is loaded at startup.
-        If /health returns 200, the model is ready."""
         return self.check_server()
 
     def warmup(self, callback=None) -> bool:
@@ -461,7 +428,7 @@ class SparkAgent:
                  "  cd ~/llama.cpp && ./build/bin/llama-server \\\n"
                  "    -m models/UD-Q3_K_XL/MiniMax-M2.5-UD-Q3_K_XL-00001-of-00004.gguf \\\n"
                  "    -ngl 999 --host 0.0.0.0 --port 8000 \\\n"
-                 "    -c 32768 --no-mmap --flash-attn \\\n"
+                 "    -c 65536 --no-mmap --flash-attn \\\n"
                  "    --cache-type-k q4_0 --cache-type-v q4_0\n"
                  "  Then rerun this agent.")
             return False
@@ -477,12 +444,14 @@ class SparkAgent:
             "model": self.model,
             "messages": messages,
             "stream": stream,
-            "max_tokens": self.options.get("num_predict", 8192),
+            "max_tokens": self.options.get("num_predict", 4096),
             "temperature": self.options.get("temperature", 0.7),
         }
 
         if stream:
             response = requests.post(self.llm_url, json=payload, stream=True, timeout=300)
+            if response.status_code == 400:
+                return "[context window full \u2014 try /new for a fresh session or shorter messages]"
             response.raise_for_status()
             full_tokens = []
             in_think = False
@@ -492,7 +461,6 @@ class SparkAgent:
                 if not line:
                     continue
                 line_str = line.decode("utf-8") if isinstance(line, bytes) else line
-                # OpenAI SSE format: lines start with "data: "
                 if not line_str.startswith("data: "):
                     continue
                 data_str = line_str[6:]
@@ -503,7 +471,6 @@ class SparkAgent:
                 except json.JSONDecodeError:
                     continue
 
-                # Extract token from OpenAI delta format
                 choices = chunk.get("choices", [])
                 if not choices:
                     continue
@@ -531,7 +498,6 @@ class SparkAgent:
                 if TOOL_CALL_START_TAG in token:
                     in_tool_call = True
 
-                # Check for tool call completion in accumulated text
                 if in_tool_call:
                     accumulated = "".join(full_tokens)
                     if TOOL_CALL_END_TAG in accumulated:
@@ -547,19 +513,17 @@ class SparkAgent:
                         self.io.on_token(display)
 
             raw = "".join(full_tokens)
-            # Truncate at tool call end if interrupted
             if TOOL_CALL_END_TAG in raw:
                 end_pos = raw.find(TOOL_CALL_END_TAG)
                 raw = raw[:end_pos + len(TOOL_CALL_END_TAG)]
         else:
-            # Non-streaming request
             response = requests.post(self.llm_url, json=payload, timeout=300)
+            if response.status_code == 400:
+                return "[context window full \u2014 try /new for a fresh session]"
             response.raise_for_status()
             data = response.json()
             choice = data["choices"][0]["message"]
             raw = choice.get("content", "")
-            # If reasoning came back separately, wrap it in think tags
-            # so downstream parsing (strip_think_blocks) handles it
             reasoning = choice.get("reasoning_content", "")
             if reasoning:
                 raw = f"<think>{reasoning}</think>{raw}"
@@ -588,7 +552,7 @@ class SparkAgent:
 
 
 def main():
-    """Entry point — delegates to tui.py for the Rich terminal interface."""
+    """Entry point \u2014 delegates to tui.py for the Rich terminal interface."""
     from tui import main as tui_main
     tui_main()
 

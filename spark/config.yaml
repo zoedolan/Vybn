@@ -6,7 +6,7 @@ llm:
   model: "minimax"
   options:
     num_ctx: 32768    # context window - set at llama-server startup via -c flag
-    num_predict: 8192  # max_tokens per response - must be large enough for reasoning + reply
+    num_predict: 4096  # max_tokens per response - reasoning + reply
     temperature: 0.7
 
 paths:
@@ -21,21 +21,21 @@ memory:
   max_context_tokens: 3072  # char budget for system prompt assembly
 
 heartbeat:
-  enabled: true
-  fast_interval_minutes: 3    # System 1: quick, intuitive, reactive
-  deep_interval_minutes: 20   # System 2: deliberate, reflective, synthesizing
+  enabled: false             # disabled until context budget is tuned
+  fast_interval_minutes: 3
+  deep_interval_minutes: 20
 
 inbox:
-  watch_interval_seconds: 10  # how often to check for new messages
+  watch_interval_seconds: 10
 
 agents:
-  pool_size: 2                # max concurrent mini-agents
-  model: null                 # null = use main model; or specify a smaller one
-  num_predict: 512            # token budget per agent task
+  pool_size: 2
+  model: null
+  num_predict: 512
 
 session:
   auto_resume: true
-  resume_window_seconds: 7200  # resume sessions less than 2 hours old
+  resume_window_seconds: 7200
 
 tool_policies:
   git_push: approve
