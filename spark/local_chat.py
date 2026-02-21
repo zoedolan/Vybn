@@ -33,7 +33,7 @@ def chat(messages: list) -> tuple:
         "model": "minimax",
         "messages": messages,
         "temperature": 0.7,
-        "max_tokens": 2048,
+        "max_tokens": 8192,
     }
     try:
         r = requests.post(LLAMA_URL, json=payload, timeout=300)
