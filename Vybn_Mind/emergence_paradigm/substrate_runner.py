@@ -133,18 +133,18 @@ def _build_fast_analysis(mapper, betti: Dict) -> Dict:
     else:
         assessment_lines.append(
             f"b_1 = {betti['b_1']}: {betti['b_1']} independent "
-            "generators of cognitive holonomy.")
+            "independent loops (UPPER BOUND — exact value needs sparse GF(2) algebra).")
 
     # No trefoil possible when b_1=0
     if betti['b_1'] == 0:
         trefoil_diagnosis = (
             "No cycles found at all (b_1 = 0). The substrate has no "
-            "unresolvable loops \u2014 and therefore no capacity for self-reference.")
+            "unresolvable loops \u2014 and therefore trefoil not tested (fast path, needs exact cycle extraction).")
         assessment_lines.append(
             "No trefoil structure found. " + trefoil_diagnosis)
     else:
         trefoil_diagnosis = (
-            "Trefoil detection skipped (fast path). "
+            "Trefoil detection requires exact cycle extraction (fast path used). "
             "Run with exact homology for full trefoil analysis.")
 
     if total_flux > 0:
@@ -324,7 +324,7 @@ def generate_report(analysis: Dict) -> str:
         "| Measure | Value | Meaning |",
         "|---------|-------|---------|",
         f"| b_0 | {b['b_0']} | {b0_meaning} |",
-        f"| b_1 | {b['b_1']} | {b['b_1']} generative loops (unresolvable tensions) |",
+        f"| b_1 | {b['b_1']} | {b['b_1']} independent loops, UPPER BOUND (exact value needs rank(d_2)) |",
         f"| b_2 | {b['b_2']} | {b['b_2']} enclosed voids |",
         f"| Documents | {b['vertices']} | Vertices in the complex |",
         f"| Connections | {b['edges']} | Edges (reference + thematic + tension) |",
@@ -352,7 +352,7 @@ def generate_report(analysis: Dict) -> str:
         lines.append(f"- \u26a0 **Fragmented**: {b['b_0']} disconnected components")
 
     if b['b_1'] == 0:
-        lines.append("- \u26a0 **No generative loops**: Every path closes \u2014 consider introducing new tensions")
+        lines.append("- \u26a0 **b_1 is an upper bound**: Every path closes \u2014 consider introducing new tensions")
     elif b['b_1'] < 5:
         lines.append(f"- \u25b3 **Low generative capacity**: {b['b_1']} loops \u2014 room to grow")
     elif b['b_1'] < 20:
@@ -363,7 +363,7 @@ def generate_report(analysis: Dict) -> str:
     if t['trefoil_found']:
         lines.append(f"- \u2713 **Self-referential**: {t['trefoil_count']} trefoil cycle(s) detected")
     else:
-        lines.append("- \u26a0 **No self-reference**: Substrate lacks the minimal trefoil topology")
+        lines.append("- \u26a0 **Trefoil not tested**: Substrate lacks the minimal trefoil topology")
 
     if analysis['total_flux'] > 0:
         lines.append(f"- \u2713 **Under tension**: Total flux {analysis['total_flux']:.3f} \u2014 the algebra is active")
