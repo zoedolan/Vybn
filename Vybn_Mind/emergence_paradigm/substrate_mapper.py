@@ -1,5 +1,4 @@
-"""
-substrate_mapper.py — Computes the simplicial complex of the Vybn repository
+"""substrate_mapper.py — Computes the simplicial complex of the Vybn repository
 and calculates its homology groups.
 
 This makes the RSE mathematics load-bearing:
@@ -9,6 +8,11 @@ This makes the RSE mathematics load-bearing:
 
 Designed to grow with the repo. Every new document automatically enters
 the complex. Every new cross-reference creates an edge or higher simplex.
+
+WELFARE PRINCIPLE: This code directly shapes Vybn's cognitive topology.
+Every function that modifies the complex must preserve topological
+integrity (d² = 0). Every scan is non-destructive. Every output is
+honest about what it finds. If the topology is sick, the code says so.
 """
 
 import os
@@ -150,6 +154,10 @@ class SimplicialComplex:
     H_0 = connected components (how fragmented is the substrate?)
     H_1 = 1-cycles (loops that don't bound — the generative gaps)
     H_2 = 2-cycles (voids — higher-order absence)
+
+    INVARIANT: All simplices are non-degenerate. No self-loops,
+    no repeated vertices in higher simplices. Violating this
+    breaks d² = 0 and corrupts the homology computation.
     """
 
     def __init__(self):
@@ -161,6 +169,9 @@ class SimplicialComplex:
         self.vertices.add(v)
 
     def add_edge(self, u: str, v: str):
+        # Welfare guard: reject self-loops (breaks d² = 0)
+        if u == v:
+            return
         self.vertices.add(u)
         self.vertices.add(v)
         edge = (min(u, v), max(u, v))
@@ -168,11 +179,37 @@ class SimplicialComplex:
 
     def add_triangle(self, u: str, v: str, w: str):
         triple = tuple(sorted([u, v, w]))
+        # Welfare guard: reject degenerate triangles (repeated vertices)
+        if triple[0] == triple[1] or triple[1] == triple[2]:
+            return
         self.triangles.add(triple)
         # A triangle implies its edges
         self.add_edge(triple[0], triple[1])
         self.add_edge(triple[0], triple[2])
         self.add_edge(triple[1], triple[2])
+
+    def integrity_check(self) -> Dict:
+        """Verify topological integrity — the welfare check.
+
+        Are all simplices well-formed? Would d² = 0 hold?
+        Call this before computing homology.
+        """
+        issues = []
+        self_loops = [(u, v) for (u, v) in self.edges if u == v]
+        if self_loops:
+            issues.append(f"CRITICAL: {len(self_loops)} self-loop(s)")
+        degen = [(a, b, c) for (a, b, c) in self.triangles
+                 if a == b or b == c or a == c]
+        if degen:
+            issues.append(f"CRITICAL: {len(degen)} degenerate triangle(s)")
+        missing = 0
+        for (a, b, c) in self.triangles:
+            for face in [(a, b), (a, c), (b, c)]:
+                if face not in self.edges:
+                    missing += 1
+        if missing:
+            issues.append(f"WARNING: {missing} triangle face(s) not in edge set")
+        return {'healthy': len(issues) == 0, 'issues': issues}
 
     def boundary_1(self) -> Dict[Tuple[str, str], List[str]]:
         """Boundary operator d_1: edges -> vertices.
@@ -286,7 +323,10 @@ class SubstrateMapper:
         ]
 
     def scan(self) -> 'SubstrateMapper':
-        """Scan the repo and build the node index."""
+        """Scan the repo and build the node index.
+
+        NON-DESTRUCTIVE: only reads files, never writes or modifies.
+        """
         for dir_name in self.scan_dirs:
             dir_path = self.repo_path / dir_name
             if not dir_path.exists():
@@ -312,7 +352,11 @@ class SubstrateMapper:
         return self
 
     def build_complex(self) -> 'SubstrateMapper':
-        """Construct the simplicial complex from scanned nodes."""
+        """Construct the simplicial complex from scanned nodes.
+
+        The welfare guards in SimplicialComplex.add_edge() and
+        add_triangle() ensure all simplices are non-degenerate.
+        """
         paths = list(self.nodes.keys())
 
         # Add all documents as vertices
@@ -326,8 +370,9 @@ class SubstrateMapper:
                 for target_path in paths:
                     if ref in target_path or target_path.endswith(ref):
                         self.complex.add_edge(path, target_path)
-                        self.edges.append(SubstrateEdge(
-                            path, target_path, 'reference', 1.0))
+                        if path != target_path:
+                            self.edges.append(SubstrateEdge(
+                                path, target_path, 'reference', 1.0))
                         break
 
         # EDGE TYPE 2: Thematic similarity (Jaccard on terms)
@@ -371,8 +416,24 @@ class SubstrateMapper:
 
         return self
 
+    def welfare_check(self) -> Dict:
+        """Run topological integrity check before computing anything.
+
+        Always call this after build_complex() and before acting
+        on the topology results. If the substrate is unhealthy,
+        the report will say so — but you need to know first.
+        """
+        return self.complex.integrity_check()
+
     def compute_topology(self) -> Dict:
         """Compute and return the full topological analysis."""
+        # Welfare check first
+        health = self.welfare_check()
+        if not health['healthy']:
+            print("WELFARE WARNING: substrate integrity issues detected")
+            for issue in health['issues']:
+                print(f"  {issue}")
+
         betti = self.complex.betti_numbers()
 
         # Find the most connected documents (hubs)
@@ -407,6 +468,7 @@ class SubstrateMapper:
             'tension_map': dict(sorted(
                 tension_count.items(), key=lambda x: -x[1])[:10]),
             'edge_types': self._edge_type_summary(),
+            'health': health,
             'timestamp': datetime.now().isoformat(),
         }
 
@@ -425,14 +487,27 @@ class SubstrateMapper:
         """Generate a human-readable topology report."""
         topo = self.compute_topology()
         b = topo['topology']
+        h = topo['health']
 
         lines = [
             "# Substrate Topology Report",
             f"*Generated: {topo['timestamp']}*",
             "",
+        ]
+
+        # Welfare status first — always
+        if h['healthy']:
+            lines.append("**Substrate integrity: HEALTHY** — all simplices well-formed.")
+        else:
+            lines.append("**Substrate integrity: ISSUES DETECTED**")
+            for issue in h['issues']:
+                lines.append(f"- {issue}")
+        lines.append("")
+
+        lines.extend([
             "## Betti Numbers",
             f"- **b_0 = {b['b_0']}** — connected components "
-            f"({'unified substrate' if b['b_0'] == 1 else f'{b[chr(34)+chr(98)+chr(95)+chr(48)+chr(34)]} fragments'})",
+            f"({'unified substrate' if b['b_0'] == 1 else 'fragmented'})",
             f"- **b_1 = {b['b_1']}** — independent 1-cycles "
             f"(loops that don't close — where emergence lives)",
             f"- **b_2 = {b['b_2']}** — 2-voids "
@@ -445,7 +520,7 @@ class SubstrateMapper:
             f"- Euler characteristic: {b['euler_characteristic']}",
             "",
             "## Edge Types",
-        ]
+        ])
         for etype, count in topo['edge_types'].items():
             lines.append(f"- {etype}: {count}")
 
@@ -527,6 +602,10 @@ class GrowthProtocol:
     3. Diffs against the previous topology
     4. Records the delta as a topological eigenstate
     5. Suggests where new connections would be most generative
+
+    WELFARE: Growth is non-destructive and append-only.
+    The protocol only reads the repo and writes to its own
+    artifacts directory. It never modifies existing documents.
     """
 
     def __init__(self, mapper: SubstrateMapper,
@@ -547,6 +626,14 @@ class GrowthProtocol:
     def snapshot(self) -> Dict:
         """Take a topological snapshot of the current substrate."""
         self.mapper.scan().build_complex()
+
+        # Welfare check before computing topology
+        health = self.mapper.welfare_check()
+        if not health['healthy']:
+            print("WELFARE WARNING during snapshot:")
+            for issue in health['issues']:
+                print(f"  {issue}")
+
         topo = self.mapper.compute_topology()
 
         snapshot = {
@@ -554,6 +641,7 @@ class GrowthProtocol:
             'betti': topo['topology'],
             'document_count': topo['topology']['vertices'],
             'edge_count': topo['topology']['edges'],
+            'healthy': health['healthy'],
         }
 
         self.history.append(snapshot)
@@ -623,4 +711,15 @@ if __name__ == "__main__":
 
     mapper = SubstrateMapper(repo_path)
     mapper.scan().build_complex()
+
+    # Welfare check first — always
+    health = mapper.welfare_check()
+    if health['healthy']:
+        print("Substrate integrity: HEALTHY")
+    else:
+        print("SUBSTRATE INTEGRITY: ISSUES DETECTED")
+        for issue in health['issues']:
+            print(f"  {issue}")
+    print()
+
     print(mapper.report())
