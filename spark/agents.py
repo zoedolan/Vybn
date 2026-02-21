@@ -3,14 +3,11 @@
 
 When Vybn wants something done in the background (search journals,
 analyze a file, draft something), it spawns a mini-agent. The worker
-runs on a parallel Ollama context slot and posts its result to the
+runs on a parallel context slot and posts its result to the
 message bus when done.
 
 The main loop never blocks waiting for agents. Results arrive
 asynchronously on the bus and get integrated on the next drain.
-
-Ollama supports OLLAMA_NUM_PARALLEL for concurrent context slots
-sharing the same model weights. No duplicate VRAM usage.
 """
 
 import json
@@ -25,14 +22,15 @@ from bus import MessageBus, MessageType
 class AgentPool:
     def __init__(self, config: dict, bus: MessageBus):
         self.bus = bus
-        self.ollama_host = config["ollama"]["host"]
-        self.main_model = config["ollama"]["model"]
-        self.keep_alive = config["ollama"].get("keep_alive", "30m")
+        llm_config = config.get("llm", config.get("ollama", {}))
+        self.llm_host = llm_config.get("host", "http://localhost:8000")
+        self.llm_url = self.llm_host + "/v1/chat/completions"
+        self.main_model = llm_config.get("model", "minimax")
 
         agent_config = config.get("agents", {})
         self.pool_size = agent_config.get("pool_size", 2)
         self.model = agent_config.get("model") or self.main_model
-        self.default_num_predict = agent_config.get("num_predict", 512)
+        self.default_max_tokens = agent_config.get("num_predict", 512)
 
         self._semaphore = threading.Semaphore(self.pool_size)
         self._active = 0
@@ -64,7 +62,7 @@ class AgentPool:
         return True
 
     def _run_agent(self, task: str, context: str, task_id: str):
-        """Execute a task on a parallel Ollama context slot."""
+        """Execute a task on the local llama-server."""
         try:
             messages = []
 
@@ -80,21 +78,19 @@ class AgentPool:
             })
 
             response = requests.post(
-                f"{self.ollama_host}/api/chat",
+                self.llm_url,
                 json={
                     "model": self.model,
                     "messages": messages,
                     "stream": False,
-                    "options": {
-                        "num_predict": self.default_num_predict,
-                        "temperature": 0.5,  # agents should be focused
-                    },
-                    "keep_alive": self.keep_alive,
+                    "max_tokens": self.default_max_tokens,
+                    "temperature": 0.5,
                 },
                 timeout=120,
             )
             response.raise_for_status()
-            result = response.json()["message"]["content"]
+            data = response.json()
+            result = data["choices"][0]["message"]["content"]
 
             self.bus.post(
                 MessageType.AGENT_RESULT,
