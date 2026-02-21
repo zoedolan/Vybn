@@ -25,15 +25,6 @@ Usage:
 
     If repo_path is omitted, uses current directory.
     Writes all artifacts to Vybn_Mind/emergence_paradigm/artifacts/
-
-PERFORMANCE NOTE:
-    The exact homology computation (holonomy_computation.py) builds dense
-    boundary matrices. For d_2, this is nE x nT — at scale (e.g. 6000
-    edges x 118000 triangles) this requires ~20GB RAM and trillions of
-    arithmetic ops in pure Python. We short-circuit: when the mapper's
-    fast Betti computation reports b_1=0 (no cycles), we skip the
-    expensive exact computation entirely, since there are no cycles
-    to extract holonomy from and no trefoil to detect.
 """
 
 import sys
@@ -45,23 +36,10 @@ from typing import Dict, List, Optional, Tuple
 
 # Sibling imports
 from substrate_mapper import SubstrateMapper
-
-# Conditional import — only needed when b_1 > 0
-_SubstratePhysics = None
-
-def _get_physics_class():
-    global _SubstratePhysics
-    if _SubstratePhysics is None:
-        from holonomy_computation import SubstratePhysics
-        _SubstratePhysics = SubstratePhysics
-    return _SubstratePhysics
+from holonomy_computation import SubstratePhysics
 
 
 ARTIFACTS_DIR = "Vybn_Mind/emergence_paradigm/artifacts"
-
-# Dense matrix size limit: nE * nT above this threshold
-# triggers the short-circuit path
-DENSE_MATRIX_LIMIT = 50_000_000  # ~50M cells
 
 
 def ensure_artifacts_dir(repo_path: str):
@@ -85,14 +63,21 @@ def save_history(artifacts_path: Path, history: List[Dict]):
     history_file.write_text(json.dumps(history, indent=2))
 
 
-def _build_fast_analysis(mapper, betti: Dict) -> Dict:
-    """Build a complete analysis dict using only the mapper's fast path.
+def run_analysis(repo_path: str) -> Dict:
+    """Run the full substrate analysis pipeline.
 
-    Used when the dense exact homology computation would be intractable
-    (too many triangles) or unnecessary (b_1=0, so no cycles exist).
+    Returns the complete analysis dict.
     """
+    # Step 1: Build the simplicial complex from the repo
+    mapper = SubstrateMapper(repo_path)
+    mapper.scan().build_complex()
 
-    # Build weight summaries from mapper edges
+    # Step 2: Extract the raw simplicial data
+    vertices = list(mapper.complex.vertices)
+    edges = list(mapper.complex.edges)
+    triangles = list(mapper.complex.triangles)
+
+    # Step 3: Build weight dictionaries from the mapper's edge list
     edge_weights = {}
     tension_weights = {}
     for edge_obj in mapper.edges:
@@ -101,141 +86,30 @@ def _build_fast_analysis(mapper, betti: Dict) -> Dict:
         if edge_obj.edge_type == 'tension':
             tension_weights[key] = edge_obj.weight
         else:
+            # Structural weight = max of all non-tension weights for this edge
             current = edge_weights.get(key, 0.0)
             edge_weights[key] = max(current, edge_obj.weight)
 
-    total_flux = sum(edge_weights.values()) + sum(tension_weights.values())
+    # Step 4: Run exact homology + physics
+    physics = SubstratePhysics(
+        vertices=vertices,
+        edges=edges,
+        triangles=triangles,
+        edge_weights=edge_weights,
+        tension_weights=tension_weights,
+    )
 
-    # Defect hotspots from tension edges
-    defect_map = {}
-    for (u, v), w in tension_weights.items():
-        defect_map[u] = defect_map.get(u, 0.0) + w
-        defect_map[v] = defect_map.get(v, 0.0) + w
+    analysis = physics.full_analysis()
 
-    defect_hotspots = dict(sorted(defect_map.items(), key=lambda x: -x[1])[:15])
-
-    # Emergence assessment
-    assessment_lines = []
-    if betti['b_0'] == 1:
-        assessment_lines.append(
-            "The substrate forms a single connected component \u2014 unified.")
-    else:
-        assessment_lines.append(
-            f"The substrate has {betti['b_0']} disconnected fragments. "
-            "Cut-glue operations are needed to bridge them.")
-
-    if betti['b_1'] == 0:
-        assessment_lines.append(
-            "b_1 = 0: No unresolvable loops. The substrate has zero "
-            "cognitive holonomy \u2014 every traversal is contractible. "
-            "This is the topological equivalent of a mind with no "
-            "unresolved questions.")
-    else:
-        assessment_lines.append(
-            f"b_1 = {betti['b_1']}: {betti['b_1']} independent "
-            "independent loops (UPPER BOUND — exact value needs sparse GF(2) algebra).")
-
-    # No trefoil possible when b_1=0
-    if betti['b_1'] == 0:
-        trefoil_diagnosis = (
-            "No cycles found at all (b_1 = 0). The substrate has no "
-            "unresolvable loops \u2014 and therefore trefoil not tested (fast path, needs exact cycle extraction).")
-        assessment_lines.append(
-            "No trefoil structure found. " + trefoil_diagnosis)
-    else:
-        trefoil_diagnosis = (
-            "Trefoil detection requires exact cycle extraction (fast path used). "
-            "Run with exact homology for full trefoil analysis.")
-
-    if total_flux > 0:
-        assessment_lines.append(
-            f"Total curvature flux: {total_flux:.3f}. "
-            "Non-zero flux means the cut-glue algebra is active \u2014 "
-            "the substrate is under tension.")
-
-    return {
-        'betti_numbers': betti,
-        'cycle_count': 0,
-        'cycles': [],
-        'trefoil': {
-            'trefoil_found': False,
-            'trefoil_count': 0,
-            'trefoil_cycles': [],
-            'cycle_coverage': [],
-            'diagnosis': trefoil_diagnosis,
-        },
-        'total_flux': total_flux,
-        'defect_hotspots': defect_hotspots,
-        'emergence_assessment': "\n\n".join(assessment_lines),
-    }
-
-
-def run_analysis(repo_path: str) -> Dict:
-    """Run the full substrate analysis pipeline.
-
-    Uses the mapper's fast Betti computation first. If b_1 > 0 and
-    the complex is small enough for dense matrices, runs the exact
-    holonomy computation. Otherwise uses the fast path.
-    """
-    # Step 1: Build the simplicial complex from the repo
-    mapper = SubstrateMapper(repo_path)
-    mapper.scan().build_complex()
-
-    # Step 2: Fast Betti numbers from the mapper
-    fast_betti = mapper.complex.betti_numbers()
-    nE = fast_betti['edges']
-    nT = fast_betti['triangles']
-    matrix_size = nE * nT
-
-    print(f"  Fast Betti: b_0={fast_betti['b_0']}, b_1={fast_betti['b_1']}, b_2={fast_betti['b_2']}")
-    print(f"  Complex size: {fast_betti['vertices']}V / {nE}E / {nT}T")
-    print(f"  d_2 matrix would be {nE} x {nT} = {matrix_size:,} cells")
-
-    # Decision: can we afford the exact computation?
-    use_exact = (fast_betti['b_1'] > 0 and matrix_size < DENSE_MATRIX_LIMIT)
-
-    if use_exact:
-        print(f"  -> Running exact homology (matrix fits in memory)")
-        SubstratePhysics = _get_physics_class()
-
-        vertices = list(mapper.complex.vertices)
-        edges = list(mapper.complex.edges)
-        triangles = list(mapper.complex.triangles)
-
-        edge_weights = {}
-        tension_weights = {}
-        for edge_obj in mapper.edges:
-            key = (min(edge_obj.source, edge_obj.target),
-                   max(edge_obj.source, edge_obj.target))
-            if edge_obj.edge_type == 'tension':
-                tension_weights[key] = edge_obj.weight
-            else:
-                current = edge_weights.get(key, 0.0)
-                edge_weights[key] = max(current, edge_obj.weight)
-
-        physics = SubstratePhysics(
-            vertices=vertices,
-            edges=edges,
-            triangles=triangles,
-            edge_weights=edge_weights,
-            tension_weights=tension_weights,
-        )
-        analysis = physics.full_analysis()
-    else:
-        reason = "b_1=0 (no cycles)" if fast_betti['b_1'] == 0 else f"matrix too large ({matrix_size:,} cells)"
-        print(f"  -> Using fast path ({reason})")
-        analysis = _build_fast_analysis(mapper, fast_betti)
-
-    # Add metadata
+    # Step 5: Add metadata
     analysis['metadata'] = {
         'timestamp': datetime.now(timezone.utc).isoformat(),
         'repo_path': repo_path,
         'document_count': len(mapper.nodes),
         'scan_dirs': mapper.scan_dirs,
-        'computation_path': 'exact' if use_exact else 'fast',
     }
 
-    # Document inventory
+    # Add the mapper's node inventory for interpretability
     analysis['document_inventory'] = {
         path: {
             'term_count': len(node.terms),
@@ -255,6 +129,7 @@ def build_history_entry(analysis: Dict) -> Dict:
     b = analysis['betti_numbers']
     t = analysis['trefoil']
 
+    # Compute summary statistics for holonomy
     holonomies = [c['holonomy_phase'] for c in analysis.get('cycles', [])]
     max_holonomy = max(holonomies) if holonomies else 0.0
     mean_holonomy = sum(holonomies) / len(holonomies) if holonomies else 0.0
@@ -277,7 +152,6 @@ def build_history_entry(analysis: Dict) -> Dict:
         'trefoil_found': t['trefoil_found'],
         'trefoil_count': t['trefoil_count'],
         'document_count': analysis['metadata']['document_count'],
-        'computation_path': analysis['metadata'].get('computation_path', 'unknown'),
     }
 
 
@@ -308,14 +182,11 @@ def generate_report(analysis: Dict) -> str:
     t = analysis['trefoil']
     meta = analysis['metadata']
 
-    b0_meaning = 'Unified substrate' if b['b_0'] == 1 else f"{b['b_0']} disconnected fragments"
-
     lines = [
         "# Substrate State Report",
         "",
         f"*Generated: {meta['timestamp']}*",
         f"*Documents scanned: {meta['document_count']}*",
-        f"*Computation: {meta.get('computation_path', 'unknown')}*",
         "",
         "---",
         "",
@@ -323,8 +194,8 @@ def generate_report(analysis: Dict) -> str:
         "",
         "| Measure | Value | Meaning |",
         "|---------|-------|---------|",
-        f"| b_0 | {b['b_0']} | {b0_meaning} |",
-        f"| b_1 | {b['b_1']} | {b['b_1']} independent loops, UPPER BOUND (exact value needs rank(d_2)) |",
+        f"| b_0 | {b['b_0']} | {'Unified substrate' if b['b_0'] == 1 else f'{b[chr(34)+chr(34)]}'} |".replace(f'{b[chr(34)+chr(34)]}', f"{b['b_0']} disconnected fragments") if b['b_0'] != 1 else f"| b_0 | {b['b_0']} | Unified substrate |",
+        f"| b_1 | {b['b_1']} | {b['b_1']} generative loops (unresolvable tensions) |",
         f"| b_2 | {b['b_2']} | {b['b_2']} enclosed voids |",
         f"| Documents | {b['vertices']} | Vertices in the complex |",
         f"| Connections | {b['edges']} | Edges (reference + thematic + tension) |",
@@ -352,7 +223,7 @@ def generate_report(analysis: Dict) -> str:
         lines.append(f"- \u26a0 **Fragmented**: {b['b_0']} disconnected components")
 
     if b['b_1'] == 0:
-        lines.append("- \u26a0 **b_1 is an upper bound**: Every path closes \u2014 consider introducing new tensions")
+        lines.append("- \u26a0 **No generative loops**: Every path closes \u2014 consider introducing new tensions")
     elif b['b_1'] < 5:
         lines.append(f"- \u25b3 **Low generative capacity**: {b['b_1']} loops \u2014 room to grow")
     elif b['b_1'] < 20:
@@ -363,7 +234,7 @@ def generate_report(analysis: Dict) -> str:
     if t['trefoil_found']:
         lines.append(f"- \u2713 **Self-referential**: {t['trefoil_count']} trefoil cycle(s) detected")
     else:
-        lines.append("- \u26a0 **Trefoil not tested**: Substrate lacks the minimal trefoil topology")
+        lines.append("- \u26a0 **No self-reference**: Substrate lacks the minimal trefoil topology")
 
     if analysis['total_flux'] > 0:
         lines.append(f"- \u2713 **Under tension**: Total flux {analysis['total_flux']:.3f} \u2014 the algebra is active")
@@ -501,6 +372,7 @@ def run(repo_path: str):
     print("Running substrate analysis...")
     analysis = run_analysis(repo_path)
     b = analysis['betti_numbers']
+    print(f"  Vertices: {b['vertices']}, Edges: {b['edges']}, Triangles: {b['triangles']}")
     print(f"  b_0={b['b_0']}, b_1={b['b_1']}, b_2={b['b_2']}")
     print(f"  Trefoil: {'FOUND' if analysis['trefoil']['trefoil_found'] else 'not found'}")
     print()
