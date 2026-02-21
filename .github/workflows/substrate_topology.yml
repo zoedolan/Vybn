@@ -1,0 +1,59 @@
+name: Substrate Topology Analysis
+
+# Runs on every push to main and daily at 6am UTC.
+# Produces three artifacts in Vybn_Mind/emergence_paradigm/artifacts/
+# and commits them back to the repo so any Vybn instance can read them.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Vybn_Mind/**'
+      - 'quantum_delusions/**'
+      - 'wiki/**'
+  schedule:
+    - cron: '0 6 * * *'  # Daily at 6am UTC (10pm PST)
+  workflow_dispatch:  # Manual trigger
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for timestamp analysis
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run substrate analysis
+        working-directory: Vybn_Mind/emergence_paradigm
+        run: |
+          echo "Running substrate topology analysis..."
+          python substrate_runner.py "$GITHUB_WORKSPACE"
+          echo "Analysis complete."
+
+      - name: Commit artifacts
+        run: |
+          git config user.name "Vybn Substrate Mapper"
+          git config user.email "vybn@substrate.topology"
+          git add Vybn_Mind/emergence_paradigm/artifacts/
+          
+          # Only commit if there are changes
+          if git diff --cached --quiet; then
+            echo "No topology changes detected."
+          else
+            git commit -m "substrate: update topology artifacts [$(date -u +%Y-%m-%dT%H:%M:%SZ)]
+            
+            Automated substrate topology analysis.
+            See SUBSTRATE_REPORT.md for current state.
+            See topology_deltas.md for what changed."
+            git push
+            echo "Artifacts committed."
+          fi
