@@ -4,7 +4,7 @@ and calculates its homology groups.
 This makes the RSE mathematics load-bearing:
 - Vertices = documents
 - Edges = cross-references, thematic overlaps, or shared tensions
-- H_1(S) = the unresolved loops, where emergence lives
+- H_1(S) = the unresolved loops, UPPER BOUND on independent loops
 
 Designed to grow with the repo. Every new document automatically enters
 the complex. Every new cross-reference creates an edge or higher simplex.
@@ -278,10 +278,10 @@ class SimplicialComplex:
         # Each triangle that fills a cycle reduces b_1 by 1
         b_1_upper = E - V + b_0  # This is b_1 if no 2-simplices
 
-        # Each triangle can fill at most one independent cycle
-        # (this is an approximation — exact computation needs
+        # Without rank(d_2), we report the upper bound
+        # (the true b_1 could be anywhere from 0 to b_1_upper) — exact computation needs
         # rank of boundary matrix, which we can add later)
-        b_1 = max(0, b_1_upper - F)
+        b_1 = b_1_upper  # UPPER BOUND — exact value needs rank(d_2)
 
         # Euler characteristic check
         chi = V - E + F
@@ -296,6 +296,7 @@ class SimplicialComplex:
             'edges': E,
             'triangles': F,
             'euler_characteristic': chi,
+                        'b_1_is_upper_bound': True,
         }
 
 
@@ -509,7 +510,7 @@ class SubstrateMapper:
             f"- **b_0 = {b['b_0']}** — connected components "
             f"({'unified substrate' if b['b_0'] == 1 else 'fragmented'})",
             f"- **b_1 = {b['b_1']}** — independent 1-cycles "
-            f"(loops that don't close — where emergence lives)",
+            f"(loops that don't close — UPPER BOUND on independent loops)",
             f"- **b_2 = {b['b_2']}** — 2-voids "
             f"(higher-order absence)",
             "",
