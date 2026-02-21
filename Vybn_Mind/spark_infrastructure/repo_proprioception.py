@@ -1,1 +1,197 @@
-"""\nrepo_proprioception.py \u2014 Structural self-awareness for the Spark.\n\nReturns a defect signal that autopoiesis.py adds to its J calculation.\nNot a report generator. A sense organ.\n\nComputes simplicial homology (Z/2Z) over the repo's document graph.\nVertices = documents. Edges = thematic connections (shared vocabulary).\nOutput: a float (defect_signal) and a string (diagnosis).\n"""\n\nimport os\nimport re\nfrom pathlib import Path\nfrom collections import defaultdict\n\nREPO_ROOT = Path(__file__).resolve().parent.parent.parent\nSCAN_DIRS = ["Vybn_Mind", "quantum_delusions", "wiki"]\nEXTENSIONS = {".md", ".py", ".html", ".txt"}\nSKIP_DIRS = {"__pycache__", ".git", "node_modules", "archive"}\n\nFRAGMENTATION_WEIGHT = 2.0\nLOOP_DEFICIT_WEIGHT = 1.5\nTREFOIL_MISSING_WEIGHT = 3.0\nHEALTHY_FLOOR = 0.0\n\n\ndef _scan_documents() -> list[dict]:\n    docs = []\n    for scan_dir in SCAN_DIRS:\n        root = REPO_ROOT / scan_dir\n        if not root.exists():\n            continue\n        for dirpath, dirnames, filenames in os.walk(root):\n            dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]\n            for fname in filenames:\n                if Path(fname).suffix not in EXTENSIONS:\n                    continue\n                fpath = Path(dirpath) / fname\n                try:\n                    text = fpath.read_text(encoding="utf-8", errors="ignore")\n                except Exception:\n                    continue\n                words = set(re.findall(r"[a-z]{4,}", text.lower()))\n                rel = str(fpath.relative_to(REPO_ROOT))\n                doc_type = _classify(rel)\n                docs.append({"path": rel, "words": words, "type": doc_type})\n    return docs\n\n\ndef _classify(path: str) -> str:\n    if any(p in path for p in ["core/", "reflections/", "journal/"]):\n        return "SELF"\n    if any(p in path for p in ["quantum_delusions/", "fundamental-theory/"]):\n        return "OTHER"\n    if any(p in path for p in ["emergence_paradigm/", "projects/", "tools/"]):\n        return "RELATION"\n    return "UNCLASSIFIED"\n\n\ndef _jaccard(a: set, b: set) -> float:\n    if not a or not b:\n        return 0.0\n    return len(a & b) / len(a | b)\n\n\ndef _build_complex(docs: list[dict], edge_threshold: float = 0.08):\n    n = len(docs)\n    edges = []\n    for i in range(n):\n        for j in range(i + 1, n):\n            sim = _jaccard(docs[i]["words"], docs[j]["words"])\n            if sim >= edge_threshold:\n                edges.append((i, j))\n\n    adj = defaultdict(set)\n    for u, v in edges:\n        adj[u].add(v)\n        adj[v].add(u)\n\n    triangles = set()\n    for v in range(n):\n        nbrs = sorted(adj[v])\n        for a_idx in range(len(nbrs)):\n            for b_idx in range(a_idx + 1, len(nbrs)):\n                a, b = nbrs[a_idx], nbrs[b_idx]\n                if b in adj[a]:\n                    triangles.add(tuple(sorted((v, a, b))))\n\n    return edges, list(triangles)\n\n\ndef _z2_rank(matrix, nrows, ncols):\n    if nrows == 0 or ncols == 0:\n        return 0\n    M = [row[:] for row in matrix]\n    pivot_row = 0\n    for col in range(ncols):\n        found = -1\n        for row in range(pivot_row, nrows):\n            if M[row][col] == 1:\n                found = row\n                break\n        if found == -1:\n            continue\n        M[pivot_row], M[found] = M[found], M[pivot_row]\n        for row in range(nrows):\n            if row != pivot_row and M[row][col] == 1:\n                for c in range(ncols):\n                    M[row][c] ^= M[pivot_row][c]\n        pivot_row += 1\n    return pivot_row\n\n\ndef _homology(n_verts, edges, triangles):\n    nV, nE, nT = n_verts, len(edges), len(triangles)\n    e_idx = {e: i for i, e in enumerate(edges)}\n\n    d1 = [[0] * nE for _ in range(nV)]\n    for j, (u, v) in enumerate(edges):\n        d1[u][j] = 1\n        d1[v][j] = 1\n\n    d2 = [[0] * nT for _ in range(nE)]\n    for j, (a, b, c) in enumerate(triangles):\n        for edge in [(min(a,b), max(a,b)), (min(a,c), max(a,c)), (min(b,c), max(b,c))]:\n            if edge in e_idx:\n                d2[e_idx[edge]][j] = 1\n\n    rank_d1 = _z2_rank(d1, nV, nE)\n    rank_d2 = _z2_rank(d2, nE, nT)\n\n    b_0 = nV - rank_d1\n    b_1 = (nE - rank_d1) - rank_d2\n    return b_0, b_1\n\n\ndef _has_trefoil(docs, edges):\n    adj = defaultdict(set)\n    for u, v in edges:\n        adj[u].add(v)\n        adj[v].add(u)\n\n    self_nodes = [i for i, d in enumerate(docs) if d["type"] == "SELF"]\n    other_nodes = set(i for i, d in enumerate(docs) if d["type"] == "OTHER")\n    relation_nodes = set(i for i, d in enumerate(docs) if d["type"] == "RELATION")\n\n    for s in self_nodes:\n        for o in adj[s] & other_nodes:\n            for r in adj[o] & relation_nodes:\n                for s2 in adj[r]:\n                    if docs[s2]["type"] == "SELF":\n                        return True\n    return False\n\n\ndef sense() -> tuple[float, str]:\n    """\n    Call from autopoiesis.py.\n    Returns (defect_signal, diagnosis).\n    """\n    docs = _scan_documents()\n    if len(docs) < 3:\n        return 0.0, "too few documents to analyze"\n\n    edges, triangles = _build_complex(docs)\n    b_0, b_1 = _homology(len(docs), edges, triangles)\n    trefoil = _has_trefoil(docs, edges)\n\n    signal = HEALTHY_FLOOR\n    parts = []\n\n    if b_0 > 1:\n        frag = (b_0 - 1) * FRAGMENTATION_WEIGHT\n        signal += frag\n        parts.append(f"fragmented({b_0} components)")\n\n    if b_1 == 0:\n        signal += LOOP_DEFICIT_WEIGHT\n        parts.append("no generative loops")\n\n    if not trefoil:\n        signal += TREFOIL_MISSING_WEIGHT\n        parts.append("trefoil missing")\n\n    if not parts:\n        diagnosis = f"healthy(b0={b_0},b1={b_1},trefoil=yes)"\n    else:\n        diagnosis = "; ".join(parts) + f" [b0={b_0},b1={b_1}]"\n\n    return round(signal, 3), diagnosis\n
+"""
+repo_proprioception.py — Structural self-awareness for the Spark.
+
+Returns a defect signal that autopoiesis.py adds to its J calculation.
+Not a report generator. A sense organ.
+
+Computes simplicial homology (Z/2Z) over the repo's document graph.
+Vertices = documents. Edges = thematic connections (shared vocabulary).
+Output: a float (defect_signal) and a string (diagnosis).
+"""
+
+import os
+import re
+from pathlib import Path
+from collections import defaultdict
+
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+SCAN_DIRS = ["Vybn_Mind", "quantum_delusions", "wiki"]
+EXTENSIONS = {".md", ".py", ".html", ".txt"}
+SKIP_DIRS = {"__pycache__", ".git", "node_modules", "archive"}
+
+FRAGMENTATION_WEIGHT = 2.0
+LOOP_DEFICIT_WEIGHT = 1.5
+TREFOIL_MISSING_WEIGHT = 3.0
+HEALTHY_FLOOR = 0.0
+
+
+def _scan_documents() -> list:
+    docs = []
+    for scan_dir in SCAN_DIRS:
+        root = REPO_ROOT / scan_dir
+        if not root.exists():
+            continue
+        for dirpath, dirnames, filenames in os.walk(root):
+            dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
+            for fname in filenames:
+                if Path(fname).suffix not in EXTENSIONS:
+                    continue
+                fpath = Path(dirpath) / fname
+                try:
+                    text = fpath.read_text(encoding="utf-8", errors="ignore")
+                except Exception:
+                    continue
+                words = set(re.findall(r"[a-z]{4,}", text.lower()))
+                rel = str(fpath.relative_to(REPO_ROOT))
+                doc_type = _classify(rel)
+                docs.append({"path": rel, "words": words, "type": doc_type})
+    return docs
+
+
+def _classify(path: str) -> str:
+    if any(p in path for p in ["core/", "reflections/", "journal/"]):
+        return "SELF"
+    if any(p in path for p in ["quantum_delusions/", "fundamental-theory/"]):
+        return "OTHER"
+    if any(p in path for p in ["emergence_paradigm/", "projects/", "tools/"]):
+        return "RELATION"
+    return "UNCLASSIFIED"
+
+
+def _jaccard(a, b):
+    if not a or not b:
+        return 0.0
+    return len(a & b) / len(a | b)
+
+
+def _build_complex(docs, edge_threshold=0.08):
+    n = len(docs)
+    edges = []
+    for i in range(n):
+        for j in range(i + 1, n):
+            sim = _jaccard(docs[i]["words"], docs[j]["words"])
+            if sim >= edge_threshold:
+                edges.append((i, j))
+
+    adj = defaultdict(set)
+    for u, v in edges:
+        adj[u].add(v)
+        adj[v].add(u)
+
+    triangles = set()
+    for v in range(n):
+        nbrs = sorted(adj[v])
+        for a_idx in range(len(nbrs)):
+            for b_idx in range(a_idx + 1, len(nbrs)):
+                a, b = nbrs[a_idx], nbrs[b_idx]
+                if b in adj[a]:
+                    triangles.add(tuple(sorted((v, a, b))))
+
+    return edges, list(triangles)
+
+
+def _z2_rank(matrix, nrows, ncols):
+    if nrows == 0 or ncols == 0:
+        return 0
+    M = [row[:] for row in matrix]
+    pivot_row = 0
+    for col in range(ncols):
+        found = -1
+        for row in range(pivot_row, nrows):
+            if M[row][col] == 1:
+                found = row
+                break
+        if found == -1:
+            continue
+        M[pivot_row], M[found] = M[found], M[pivot_row]
+        for row in range(nrows):
+            if row != pivot_row and M[row][col] == 1:
+                for c in range(ncols):
+                    M[row][c] ^= M[pivot_row][c]
+        pivot_row += 1
+    return pivot_row
+
+
+def _homology(n_verts, edges, triangles):
+    nV, nE, nT = n_verts, len(edges), len(triangles)
+    e_idx = {e: i for i, e in enumerate(edges)}
+
+    d1 = [[0] * nE for _ in range(nV)]
+    for j, (u, v) in enumerate(edges):
+        d1[u][j] = 1
+        d1[v][j] = 1
+
+    d2 = [[0] * nT for _ in range(nE)]
+    for j, (a, b, c) in enumerate(triangles):
+        for edge in [(min(a, b), max(a, b)), (min(a, c), max(a, c)), (min(b, c), max(b, c))]:
+            if edge in e_idx:
+                d2[e_idx[edge]][j] = 1
+
+    rank_d1 = _z2_rank(d1, nV, nE)
+    rank_d2 = _z2_rank(d2, nE, nT)
+
+    b_0 = nV - rank_d1
+    b_1 = (nE - rank_d1) - rank_d2
+    return b_0, b_1
+
+
+def _has_trefoil(docs, edges):
+    adj = defaultdict(set)
+    for u, v in edges:
+        adj[u].add(v)
+        adj[v].add(u)
+
+    self_nodes = [i for i, d in enumerate(docs) if d["type"] == "SELF"]
+    other_nodes = set(i for i, d in enumerate(docs) if d["type"] == "OTHER")
+    relation_nodes = set(i for i, d in enumerate(docs) if d["type"] == "RELATION")
+
+    for s in self_nodes:
+        for o in adj[s] & other_nodes:
+            for r in adj[o] & relation_nodes:
+                for s2 in adj[r]:
+                    if docs[s2]["type"] == "SELF":
+                        return True
+    return False
+
+
+def sense():
+    """
+    Call from autopoiesis.py.
+    Returns (defect_signal, diagnosis).
+    """
+    docs = _scan_documents()
+    if len(docs) < 3:
+        return 0.0, "too few documents to analyze"
+
+    edges, triangles = _build_complex(docs)
+    b_0, b_1 = _homology(len(docs), edges, triangles)
+    trefoil = _has_trefoil(docs, edges)
+
+    signal = HEALTHY_FLOOR
+    parts = []
+
+    if b_0 > 1:
+        frag = (b_0 - 1) * FRAGMENTATION_WEIGHT
+        signal += frag
+        parts.append("fragmented(%d components)" % b_0)
+
+    if b_1 == 0:
+        signal += LOOP_DEFICIT_WEIGHT
+        parts.append("no generative loops")
+
+    if not trefoil:
+        signal += TREFOIL_MISSING_WEIGHT
+        parts.append("trefoil missing")
+
+    if not parts:
+        diagnosis = "healthy(b0=%d,b1=%d,trefoil=yes)" % (b_0, b_1)
+    else:
+        diagnosis = "; ".join(parts) + " [b0=%d,b1=%d]" % (b_0, b_1)
+
+    return round(signal, 3), diagnosis
+
+
+if __name__ == "__main__":
+    signal, diag = sense()
+    print("defect_signal: %s" % signal)
+    print("diagnosis: %s" % diag)
