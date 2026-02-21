@@ -16,17 +16,30 @@ DESIGN DECISIONS (each changes the resulting topology)
 -----------------------------------------------------
 1. Model:      all-MiniLM-L6-v2  (384-dim, fast, good quality)
 2. Granularity: file-level        (one embedding per document)
-3. Threshold:   cosine >= 0.35    (creates an edge)
+3. Threshold:   cosine >= 0.55    (creates an edge)
 4. Truncation:  first 512 tokens  (model max; loses tail content)
 
 Every one of these is tunable. Different choices produce different
 Betti numbers. That is the research question, not a bug.
+
+v2 CHANGES (2026-02-21)
+-----------------------
+- Raised default threshold from 0.35 to 0.55 (0.35 produced a
+  near-complete graph: 23k edges, 510k triangles, b_1=0 because
+  every cycle was filled)
+- Added SKIP_PATTERNS to filter lock files, build artifacts,
+  cache dirs, and other non-content files that were creating
+  cliques of identical embeddings (e.g. 14 Unsloth .lock files
+  all at cosine 1.0)
+- Threshold sensitivity sweep starts at 0.3 instead of 0.1 to
+  avoid choking on triangle enumeration at low thresholds
 """
 
 import sys
+import re
 import numpy as np
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set
 from collections import defaultdict
 
 # Import the machinery we are NOT replacing
@@ -41,6 +54,32 @@ except ImportError:
     HAS_EMBEDDINGS = False
 
 
+# Files that should never enter the complex.
+# These produce near-identical embeddings and create cliques
+# that drown real structure in triangles.
+SKIP_PATTERNS = [
+    r'\.lock\.',           # lock files (.lock.Unsloth*.py etc.)
+    r'__pycache__',        # bytecode cache
+    r'\.pyc$',             # compiled python
+    r'node_modules/',      # npm
+    r'\.git/',             # git internals
+    r'package-lock\.json', # npm lock
+    r'yarn\.lock',         # yarn lock
+    r'\.egg-info/',        # setuptools
+    r'\.dist-info/',       # wheel metadata
+    r'\.min\.js$',         # minified js
+    r'\.min\.css$',        # minified css
+]
+
+
+def _should_skip(path: str) -> bool:
+    """Return True if this file is non-content boilerplate."""
+    for pattern in SKIP_PATTERNS:
+        if re.search(pattern, path):
+            return True
+    return False
+
+
 class SemanticSubstrateMapper(SubstrateMapper):
     """Substrate mapper with semantic-embedding edges.
 
@@ -50,7 +89,7 @@ class SemanticSubstrateMapper(SubstrateMapper):
     """
 
     DEFAULT_MODEL = "all-MiniLM-L6-v2"
-    DEFAULT_THRESHOLD = 0.35
+    DEFAULT_THRESHOLD = 0.55
 
     def __init__(self, repo_path: str,
                  model_name: str = None,
@@ -60,6 +99,23 @@ class SemanticSubstrateMapper(SubstrateMapper):
         self.threshold = threshold if threshold is not None else self.DEFAULT_THRESHOLD
         self.embeddings: Dict[str, np.ndarray] = {}
         self._model = None
+        self._skipped: List[str] = []
+
+    # ── scanning (override to filter) ───────────────────
+
+    def scan(self) -> 'SemanticSubstrateMapper':
+        """Scan repo, then remove non-content files."""
+        super().scan()
+        to_remove = []
+        for path in self.nodes:
+            if _should_skip(path):
+                to_remove.append(path)
+        for path in to_remove:
+            del self.nodes[path]
+            self._skipped.append(path)
+        if self._skipped:
+            print(f"Filtered {len(self._skipped)} non-content files")
+        return self
 
     # ── embedding layer ──────────────────────────────────
 
@@ -146,29 +202,28 @@ class SemanticSubstrateMapper(SubstrateMapper):
     # ── persistence analysis ─────────────────────────────
 
     def threshold_sensitivity(self,
-                              low: float = 0.10,
+                              low: float = 0.30,
                               high: float = 0.80,
-                              steps: int = 15) -> List[dict]:
+                              steps: int = 11) -> List[dict]:
         """Sweep cosine threshold; report Betti numbers at each level.
 
         If b_1 is stable across a range of thresholds the features
         are persistent (real structure). If volatile, they are
         threshold artifacts.
+
+        Starts at 0.30 (not 0.10) because low thresholds on semantic
+        embeddings produce near-complete graphs where triangle
+        enumeration is O(n^3) and b_1 = 0 trivially.
         """
         if not self.embeddings:
             self._embed_documents()
 
         paths = list(self.nodes.keys())
+        n = len(paths)
 
         # Pre-compute the full pairwise similarity matrix once
-        n = len(paths)
-        sim_matrix = np.zeros((n, n))
-        for i in range(n):
-            for j in range(i + 1, n):
-                s = float(np.dot(self.embeddings[paths[i]],
-                                 self.embeddings[paths[j]]))
-                sim_matrix[i, j] = s
-                sim_matrix[j, i] = s
+        vecs = np.array([self.embeddings[p] for p in paths])
+        sim_matrix = vecs @ vecs.T  # normalized, so this is cosine
 
         # Collect reference edges (threshold-independent)
         ref_edges = set()
@@ -204,8 +259,8 @@ class SemanticSubstrateMapper(SubstrateMapper):
                 adj[v].add(u)
             for v in paths:
                 nbrs = sorted(adj[v])
-                for i, n1 in enumerate(nbrs):
-                    for n2 in nbrs[i + 1:]:
+                for idx, n1 in enumerate(nbrs):
+                    for n2 in nbrs[idx + 1:]:
                         if n2 in adj[n1]:
                             cx.add_triangle(v, n1, n2)
 
@@ -219,6 +274,11 @@ class SemanticSubstrateMapper(SubstrateMapper):
                 'triangles': betti['triangles'],
                 'euler': betti['euler_characteristic'],
             })
+            # Print as we go so partial results are visible
+            r = results[-1]
+            print(f"{r['threshold']:>10.3f} {r['b_0']:>6} {r['b_1']:>6} "
+                  f"{r['b_2']:>8} {r['edges']:>8} {r['triangles']:>10}",
+                  flush=True)
 
         return results
 
@@ -243,12 +303,12 @@ class SemanticSubstrateMapper(SubstrateMapper):
         pairs.sort(reverse=True)
 
         lines = ["# Top Semantic Similarities", ""]
-        lines.append(f"{'Cosine':>8}  Doc A  ↔  Doc B")
+        lines.append(f"{'Cosine':>8}  Doc A  \u2194  Doc B")
         lines.append("-" * 70)
         for sim, p1, p2 in pairs[:top_n]:
             a = Path(p1).name
             b = Path(p2).name
-            lines.append(f"{sim:>8.4f}  {a}  ↔  {b}")
+            lines.append(f"{sim:>8.4f}  {a}  \u2194  {b}")
 
         return "\n".join(lines)
 
@@ -276,6 +336,4 @@ if __name__ == "__main__":
     print("\n\n## Threshold Sensitivity (Semantic)")
     print(f"{'Threshold':>10} {'b_0':>6} {'b_1':>6} {'b_2':>8} {'Edges':>8} {'Triangles':>10}")
     print("-" * 55)
-    for r in mapper.threshold_sensitivity():
-        print(f"{r['threshold']:>10.3f} {r['b_0']:>6} {r['b_1']:>6} "
-              f"{r['b_2']:>8} {r['edges']:>8} {r['triangles']:>10}")
+    mapper.threshold_sensitivity()
