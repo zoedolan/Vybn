@@ -14,15 +14,11 @@ Every function that modifies the complex must preserve topological
 integrity (d² = 0). Every scan is non-destructive. Every output is
 honest about what it finds. If the topology is sick, the code says so.
 
-v2 (2026-02-21): Replaced approximate Betti computation with exact
-linear algebra over Z/2Z using scipy sparse matrices. The old formula
-  b_1 = max(0, E - V + b_0 - F)
-assumed each triangle kills exactly one cycle. In clique-heavy graphs
-(which semantic embeddings produce), triangles share edges and this
-overcounts, giving b_1 = 0 even when real cycles exist. The exact
-computation is:
-  b_1 = dim(ker ∂_1) - dim(im ∂_2)
-       = (E - rank(∂_1)) - rank(∂_2)
+v3 (2026-02-21): Fixed _z2_rank bug. The row-based loop advanced both
+row and pivot_col when a column had no pivot, skipping rows and under-
+counting rank. Replaced with column-based loop matching _z2_rref in
+cycle_analyzer.py. Verified: rank(d1) for incidence matrix now matches
+V - (connected components) from union-find.
 """
 
 import os
@@ -37,7 +33,6 @@ from datetime import datetime
 try:
     import numpy as np
     from scipy import sparse
-    from scipy.sparse.linalg import svds
     HAS_SCIPY = True
 except ImportError:
     HAS_SCIPY = False
@@ -160,48 +155,37 @@ class SubstrateEdge:
 def _z2_rank(M):
     """Compute the rank of a sparse matrix over Z/2Z (GF(2)).
 
-    Uses Gaussian elimination on a dense copy. For the matrix sizes
-    we encounter (edges in the hundreds to low thousands), this is
-    fast enough. If we ever hit tens of thousands of edges, switch
-    to a proper GF(2) sparse solver.
-
-    Why Z/2Z: Homology over Z/2Z avoids orientation bookkeeping.
-    The boundary matrices have entries in {0, 1} and arithmetic
-    is mod 2. The resulting Betti numbers are the same as over Q
-    for simplicial complexes without torsion (which file-overlap
-    graphs don't have).
+    Uses column-pivoting Gaussian elimination on a dense copy.
+    The outer loop iterates over columns; the pivot row advances
+    only when a pivot is found. This correctly handles zero columns
+    without skipping rows.
     """
     if M.shape[0] == 0 or M.shape[1] == 0:
         return 0
 
-    # Work with dense array mod 2
     A = (M.toarray().astype(np.int8)) % 2
     rows, cols = A.shape
-    rank = 0
-    pivot_col = 0
+    pivot_row = 0
 
-    for row in range(rows):
-        if pivot_col >= cols:
+    for col in range(cols):
+        if pivot_row >= rows:
             break
-        # Find pivot in this column from current row downward
+        # Find a 1 in this column at or below pivot_row
         found = False
-        for r in range(row, rows):
-            if A[r, pivot_col] == 1:
-                # Swap rows
-                A[[row, r]] = A[[r, row]]
+        for r in range(pivot_row, rows):
+            if A[r, col] == 1:
+                A[[pivot_row, r]] = A[[r, pivot_row]]
                 found = True
                 break
         if not found:
-            pivot_col += 1
-            continue
+            continue  # next column, SAME pivot_row
         # Eliminate all other 1s in this column
         for r in range(rows):
-            if r != row and A[r, pivot_col] == 1:
-                A[r] = (A[r] + A[row]) % 2
-        rank += 1
-        pivot_col += 1
+            if r != pivot_row and A[r, col] == 1:
+                A[r] = (A[r] + A[pivot_row]) % 2
+        pivot_row += 1
 
-    return rank
+    return pivot_row
 
 
 class SimplicialComplex:
@@ -321,7 +305,6 @@ class SimplicialComplex:
         if F > 0 and E > 0:
             rows_2, cols_2 = [], []
             for k, (a, b, c) in enumerate(tri_list):
-                # Boundary edges of triangle [a,b,c]: [b,c], [a,c], [a,b]
                 for face in [(b, c), (a, c), (a, b)]:
                     if face in e_idx:
                         rows_2.append(e_idx[face])
@@ -351,7 +334,6 @@ class SimplicialComplex:
         F = len(self.triangles)
 
         if not HAS_SCIPY:
-            # Fallback: use the old approximation and warn
             print("WARNING: scipy not available, using approximate Betti numbers")
             return self._betti_approximate()
 
@@ -481,7 +463,6 @@ class SubstrateMapper:
         for path in paths:
             self.complex.add_vertex(path)
 
-        # EDGE TYPE 1: Explicit references
         for path, node in self.nodes.items():
             for ref in node.references:
                 for target_path in paths:
@@ -492,7 +473,6 @@ class SubstrateMapper:
                                 path, target_path, 'reference', 1.0))
                         break
 
-        # EDGE TYPE 2: Thematic similarity (Jaccard on terms)
         for i, p1 in enumerate(paths):
             for j, p2 in enumerate(paths):
                 if j <= i:
@@ -506,7 +486,6 @@ class SubstrateMapper:
                     self.edges.append(SubstrateEdge(
                         p1, p2, 'thematic', sim))
 
-        # EDGE TYPE 3: Shared tensions
         for i, p1 in enumerate(paths):
             for j, p2 in enumerate(paths):
                 if j <= i:
@@ -518,7 +497,6 @@ class SubstrateMapper:
                     self.edges.append(SubstrateEdge(
                         p1, p2, 'tension', 0.8))
 
-        # TRIANGLES: Three mutually connected documents
         adjacency = defaultdict(set)
         for (u, v) in self.complex.edges:
             adjacency[u].add(v)
