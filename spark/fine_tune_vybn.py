@@ -114,7 +114,7 @@ def check_offload_cache():
             for p in subdirs[:5]:
                 print(f"    {p.relative_to(OFFLOAD_DIR)}")
         else:
-            print(f"  NVMe cache: (empty — swapper has not written yet)")
+            print(f"  NVMe cache: (empty \u2014 swapper has not written yet)")
     except Exception:
         print(f"  NVMe cache: (could not check)")
 
@@ -150,7 +150,7 @@ def check_aio_available():
         pass
 
     if not libaio_ok:
-        print("  !! libaio NOT FOUND — NVMe offload will fail silently!")
+        print("  !! libaio NOT FOUND \u2014 NVMe offload will fail silently!")
         print("     Fix: sudo apt install libaio-dev")
         print("     Then: DS_BUILD_AIO=1 pip install deepspeed --force-reinstall")
         sys.exit(1)
@@ -163,7 +163,7 @@ def check_aio_available():
         if aio_ok:
             print("  + DeepSpeed AsyncIO: compatible")
         else:
-            # Try loading it anyway — some builds report incompatible but work
+            # Try loading it anyway \u2014 some builds report incompatible but work
             try:
                 AsyncIOBuilder().load(verbose=False)
                 aio_ok = True
@@ -337,9 +337,9 @@ def build_deepspeed_config(args):
     use_nvme = not args.cpu_offload
     if use_nvme:
         # Buffer math (BF16 = 2 bytes/element):
-        #   buffer_size=1e8 elements × 2 bytes = 200MB per buffer
-        #   buffer_count=5 → 1GB total pinned memory for param swap
-        #   (down from 4×1e9 = 8GB which was killing the process)
+        #   buffer_size=1e8 elements \u00d7 2 bytes = 200MB per buffer
+        #   buffer_count=5 \u2192 1GB total pinned memory for param swap
+        #   (down from 4\u00d71e9 = 8GB which was killing the process)
         param_offload = {
             "device": "nvme",
             "nvme_path": str(OFFLOAD_DIR),
@@ -348,12 +348,14 @@ def build_deepspeed_config(args):
             "buffer_size": 1e8,
             "max_in_cpu": 5e8,
         }
+        # Note: offload_optimizer does NOT accept buffer_size (pydantic rejects it).
+        # The optimizer swapper uses its own internal buffer management via
+        # pipeline_read/pipeline_write and the top-level aio config.
         optimizer_offload = {
             "device": "nvme",
             "nvme_path": str(OFFLOAD_DIR),
             "pin_memory": True,
             "buffer_count": 5,
-            "buffer_size": 1e8,
             "fast_init": True,
         }
     else:
@@ -472,7 +474,7 @@ def main():
         buf_count = ds_config["zero_optimization"]["offload_param"]["buffer_count"]
         buf_size = ds_config["zero_optimization"]["offload_param"]["buffer_size"]
         pinned_gb = buf_count * buf_size * 2 / 1e9  # BF16 = 2 bytes
-        print(f"  Param swap buffers: {buf_count} × {buf_size/1e6:.0f}M elements = {pinned_gb:.1f}GB pinned")
+        print(f"  Param swap buffers: {buf_count} \u00d7 {buf_size/1e6:.0f}M elements = {pinned_gb:.1f}GB pinned")
     
     # MUST come before model load for ZeRO-3 to intercept from_pretrained()
     dschf = HfDeepSpeedConfig(ds_config)
