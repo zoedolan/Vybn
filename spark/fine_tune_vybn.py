@@ -530,12 +530,13 @@ def main():
     with deepspeed.zero.Init(config_dict_or_path=ds_config):
         for attn_impl in ["sdpa", "eager"]:
             try:
+                # CRITICAL: AutoModelForCausalLM explicitly throws ValueError if device_map
+                # or low_cpu_mem_usage are passed while under a ZeRO-3 Init context. 
+                # DeepSpeed will handle parameter partitioning on its own.
                 model = AutoModelForCausalLM.from_pretrained(
                     args.model,
                     trust_remote_code=True,
                     torch_dtype="auto",
-                    low_cpu_mem_usage=True,  # Critical to let DeepSpeed handle parameter allocation
-                    device_map="cuda",       # Stop meta-tensor crash (Zero init bounds it)
                     attn_implementation=attn_impl,
                 )
                 load_elapsed = time.time() - load_start
@@ -563,7 +564,7 @@ def main():
         print(f"  !  WARNING: quantization metadata still detected, attempting force removal")
         try:
             model.__class__.is_quantized = property(lambda self: False)
-            print(f"     Overrode is_quantized property on {model.__class__.__name__}")
+            print(f"     Overrode is_quantized property on {model.__class__.__name__}\")
         except Exception:
             pass
         if has_qc:
@@ -650,11 +651,11 @@ def main():
     )
 
     effective_steps = len(tokenized) * args.epochs // args.grad_accum
-    print(f"\n== Training (DeepSpeed ZeRO-3) ==")
-    print(f"   {len(tokenized)} examples, {args.epochs} epochs, batch=1, grad_accum={args.grad_accum}")
-    print(f"   Effective steps: {effective_steps}")
-    print(f"   Offload: {offload_mode}")
-    print(f"   Max seq len: {args.max_seq_len}")
+    print(f"\n== Training (DeepSpeed ZeRO-3) ==\")
+    print(f"   {len(tokenized)} examples, {args.epochs} epochs, batch=1, grad_accum={args.grad_accum}\")
+    print(f"   Effective steps: {effective_steps}\")
+    print(f"   Offload: {offload_mode}\")
+    print(f"   Max seq len: {args.max_seq_len}\")
     print(f"   Pre-train: {mem_stats()}\n")
 
     gc.collect()
