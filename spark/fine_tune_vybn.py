@@ -564,7 +564,7 @@ def main():
         print(f"  !  WARNING: quantization metadata still detected, attempting force removal")
         try:
             model.__class__.is_quantized = property(lambda self: False)
-            print(f"     Overrode is_quantized property on {model.__class__.__name__}\")
+            print(f"     Overrode is_quantized property on {model.__class__.__name__}")
         except Exception:
             pass
         if has_qc:
@@ -651,11 +651,11 @@ def main():
     )
 
     effective_steps = len(tokenized) * args.epochs // args.grad_accum
-    print(f"\n== Training (DeepSpeed ZeRO-3) ==\")
-    print(f"   {len(tokenized)} examples, {args.epochs} epochs, batch=1, grad_accum={args.grad_accum}\")
-    print(f"   Effective steps: {effective_steps}\")
-    print(f"   Offload: {offload_mode}\")
-    print(f"   Max seq len: {args.max_seq_len}\")
+    print(f"\n== Training (DeepSpeed ZeRO-3) ==")
+    print(f"   {len(tokenized)} examples, {args.epochs} epochs, batch=1, grad_accum={args.grad_accum}")
+    print(f"   Effective steps: {effective_steps}")
+    print(f"   Offload: {offload_mode}")
+    print(f"   Max seq len: {args.max_seq_len}")
     print(f"   Pre-train: {mem_stats()}\n")
 
     gc.collect()
