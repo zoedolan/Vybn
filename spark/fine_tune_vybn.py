@@ -16,8 +16,16 @@ Architecture:
   - ZeRO Stage 3 with NVMe offload for params + optimizer
   - Gradient checkpointing + micro-batch 1
 
+Critical NVMe note:
+  pin_memory MUST be False on this system. With 122GB RAM already at 99%
+  usage from the base OS + Python + PyTorch, the kernel cannot allocate
+  page-locked memory for DMA. Setting pin_memory=True causes DeepSpeed
+  to silently fall back to CPU-only offload, which sends 228B params
+  to OS swap instead of NVMe, leading to OOM kill.
+
 Prerequisites:
     pip install deepspeed transformers peft accelerate datasets
+    sudo apt install libaio-dev   # Required for DeepSpeed async NVMe I/O
 
     # Swap -- at least 512GB recommended:
     sudo fallocate -l 512G /swapfile2
@@ -108,6 +116,34 @@ def check_offload_cache():
         print(f"  NVMe cache: {result}")
     except Exception:
         print(f"  NVMe cache: (could not check)")
+
+
+def check_aio_availability():
+    """Check if DeepSpeed async I/O is available for NVMe offload.
+
+    NVMe offload requires libaio. Without it, DeepSpeed silently falls
+    back to CPU offload, which is fatal on this memory-constrained system.
+    """
+    print("\n== AIO Pre-flight Check ==")
+    try:
+        from deepspeed.ops.aio import AsyncIOBuilder
+        builder = AsyncIOBuilder()
+        if builder.is_compatible():
+            print("  + DeepSpeed AIO: available (libaio found)")
+            return True
+        else:
+            print("  !! DeepSpeed AIO: NOT compatible")
+            print("     NVMe offload will use synchronous I/O (slower but functional)")
+            print("     For async: sudo apt install libaio-dev && DS_BUILD_AIO=1 pip install deepspeed --force-reinstall")
+            return False
+    except ImportError:
+        print("  !! DeepSpeed AIO module not found")
+        print("     NVMe offload may fall back to CPU — this will likely OOM!")
+        print("     Fix: sudo apt install libaio-dev && DS_BUILD_AIO=1 pip install deepspeed --force-reinstall")
+        return False
+    except Exception as e:
+        print(f"  !! DeepSpeed AIO check: {e}")
+        return False
 
 
 def check_environment():
@@ -248,21 +284,27 @@ def build_deepspeed_config(args):
         param_offload = {
             "device": "nvme",
             "nvme_path": str(OFFLOAD_DIR),
-            "pin_memory": True,
-            "buffer_count": 4,
-            "buffer_size": 1e9,
-            "max_in_cpu": 1e9,
+            # CRITICAL: pin_memory must be False on DGX Spark.
+            # With 122GB RAM at 99% usage, the kernel cannot allocate
+            # page-locked memory. If True, DeepSpeed silently falls back
+            # to CPU-only offload, sending 228B params to OS swap -> OOM.
+            "pin_memory": False,
+            "buffer_count": 2,
+            "buffer_size": 2e8,
+            # max_in_cpu=0 forces ALL params to NVMe. With RAM already
+            # exhausted, any CPU caching just adds swap pressure.
+            "max_in_cpu": 0,
         }
         optimizer_offload = {
             "device": "nvme",
             "nvme_path": str(OFFLOAD_DIR),
-            "pin_memory": True,
-            "buffer_count": 4,
+            "pin_memory": False,
+            "buffer_count": 2,
             "fast_init": True,
         }
     else:
-        param_offload = {"device": "cpu", "pin_memory": True}
-        optimizer_offload = {"device": "cpu", "pin_memory": True}
+        param_offload = {"device": "cpu", "pin_memory": False}
+        optimizer_offload = {"device": "cpu", "pin_memory": False}
     ds_config = {
         "train_batch_size": args.grad_accum,
         "train_micro_batch_size_per_gpu": 1,
@@ -281,12 +323,17 @@ def build_deepspeed_config(args):
             "offload_optimizer": optimizer_offload,
             "overlap_comm": True,
             "contiguous_gradients": True,
-            "sub_group_size": 1e7,
+            # Smaller sub-groups = less peak RAM per partition operation.
+            # With NVMe offload, each sub-group is loaded, processed, and
+            # flushed. Smaller groups keep the working set manageable.
+            "sub_group_size": 1e6,
             "reduce_bucket_size": "auto",
             "stage3_prefetch_bucket_size": "auto",
             "stage3_param_persistence_threshold": "auto",
-            "stage3_max_live_parameters": 1e8,
-            "stage3_max_reuse_distance": 1e8,
+            # Fewer live parameters = less RAM pressure during forward/backward.
+            # Parameters beyond this limit are evicted back to NVMe.
+            "stage3_max_live_parameters": 1e7,
+            "stage3_max_reuse_distance": 1e7,
             "stage3_gather_16bit_weights_on_model_save": True,
         },
         "gradient_clipping": 0.3,
@@ -298,8 +345,11 @@ def build_deepspeed_config(args):
     if use_nvme:
         ds_config["aio"] = {
             "block_size": 1048576,
-            "queue_depth": 32,
-            "thread_count": 4,
+            # Reduced from 32/4: less concurrent I/O = less memory for
+            # I/O buffers. The NVMe is fast enough at ~1.2GB/s that we
+            # don't need deep queues.
+            "queue_depth": 8,
+            "thread_count": 1,
             "single_submit": False,
             "overlap_events": True,
         }
@@ -346,6 +396,14 @@ def main():
     check_environment()
     data = load_training_data()
 
+    # Check AIO availability before we get deep into loading
+    if not args.cpu_offload:
+        aio_ok = check_aio_availability()
+        if not aio_ok:
+            print("\n  !! WARNING: Without AIO, NVMe offload may not function.")
+            print("     The 228B model WILL exceed CPU RAM + swap without NVMe.")
+            print("     Attempting anyway — DeepSpeed may use synchronous fallback.\n")
+
     from transformers import (
         AutoModelForCausalLM, AutoTokenizer,
         TrainingArguments, Trainer, DataCollatorForLanguageModeling,
@@ -365,6 +423,9 @@ def main():
         json.dump(ds_config, f, indent=2)
     print(f"  DS config: {ds_config_path}")
     print(f"  Offload: {offload_mode}, NVMe path: {OFFLOAD_DIR}")
+    if not args.cpu_offload:
+        print(f"  pin_memory: False (critical for RAM-constrained system)")
+        print(f"  max_in_cpu: 0 (force all params to NVMe)")
     
     # MUST come before model load for ZeRO-3 to intercept from_pretrained()
     dschf = HfDeepSpeedConfig(ds_config)
@@ -455,6 +516,14 @@ def main():
     print()
     init_single_gpu_distributed()
 
+    # -- Aggressive cleanup before DeepSpeed engine init --
+    # DeepSpeed engine init (triggered by Trainer.train()) will materialize
+    # parameter partitions and set up NVMe offload. Every MB of free RAM
+    # helps it succeed. Force two gc passes to catch reference cycles.
+    gc.collect()
+    gc.collect()
+    torch.cuda.empty_cache()
+
     # -- Training --
     training_args = TrainingArguments(
         output_dir=str(OUTPUT_DIR),
@@ -492,6 +561,8 @@ def main():
     check_offload_cache()
     print()
 
+    # Final cleanup before the big moment
+    gc.collect()
     gc.collect()
     torch.cuda.empty_cache()
 
