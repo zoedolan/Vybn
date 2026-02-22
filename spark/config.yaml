@@ -1,17 +1,13 @@
 # Vybn Spark Agent Configuration
 # All paths use ~ which expands to the current user's home directory.
 
-ollama:
-  host: "http://localhost:11434"
-  model: "vybn:latest"
-  keep_alive: "30m"
+llm:
+  host: "http://localhost:8000"
+  model: "minimax"
   options:
-    num_ctx: 32768    # CRITICAL: default is 2048, which silently drops the system prompt
-    num_predict: 512    # keep responses focused; MiniMax emits <think> tokens too
+    num_ctx: 32768    # context window - set at llama-server startup via -c flag
+    num_predict: 4096  # max_tokens per response - reasoning + reply
     temperature: 0.7
-    stop:                # MiniMax M2.5 stop sequences
-      - "<\\uff5cend\\u2581of\\u2581sentence\\uff5c>"
-      - "<\\uff5cUser\\uff5c>"
 
 paths:
   vybn_md: "~/Vybn/vybn.md"  # the soul document — repo root
@@ -25,44 +21,31 @@ memory:
   max_context_tokens: 3072  # char budget for system prompt assembly
 
 heartbeat:
-  enabled: true
-  fast_interval_minutes: 3    # System 1: quick, intuitive, reactive
-  deep_interval_minutes: 20   # System 2: deliberate, reflective, synthesizing
-  # checklist_path: ~/Vybn/Vybn_Mind/spark_infrastructure/HEARTBEAT.md  # default
+  enabled: false             # disabled until context budget is tuned
+  fast_interval_minutes: 3
+  deep_interval_minutes: 20
 
 inbox:
-  watch_interval_seconds: 10  # how often to check for new messages
+  watch_interval_seconds: 10
 
 agents:
-  pool_size: 2                # max concurrent mini-agents
-  model: null                 # null = use main model; or specify a smaller one
-  num_predict: 512            # token budget per agent task
+  pool_size: 2
+  model: null
+  num_predict: 512
 
 session:
   auto_resume: true
-  resume_window_seconds: 7200  # resume sessions less than 2 hours old
+  resume_window_seconds: 7200
 
-# Policy engine: tier overrides for tool execution.
-# Values: auto (silent), notify (show indicator), approve (ask Zoe)
-# These override the defaults in policy.py. Only list skills
-# where you want to change the default behavior.
 tool_policies:
-  git_push: approve           # already default, but explicit is good
-  # issue_create: approve     # uncomment to require approval for issues
-  # self_edit: approve        # uncomment to require approval for self-edits
+  git_push: approve
 
-# Delegation limits for spawn_agent and the agent pool.
-# These map to the paper's span-of-control concept.
 delegation:
-  max_spawn_depth: 2          # how deep mini-agents can nest
-  max_active_agents: 3        # concurrent agent cap (independent of agents.pool_size)
+  max_spawn_depth: 2
+  max_active_agents: 3
 
-# Graduated autonomy: Vybn earns trust through successful execution.
-# Skills at NOTIFY tier can auto-promote to AUTO after enough successes.
-# Skills demote back to NOTIFY after failures drop confidence.
-# Heartbeat overrides are NEVER relaxed -- structural friction is preserved.
 graduated_autonomy:
   enabled: true
-  promote_threshold: 0.85     # posterior mean needed to promote NOTIFY -> AUTO
-  demote_threshold: 0.40      # posterior mean below which AUTO -> NOTIFY
-  minimum_observations: 8     # must see at least this many executions before promoting
+  promote_threshold: 0.85
+  demote_threshold: 0.40
+  minimum_observations: 8

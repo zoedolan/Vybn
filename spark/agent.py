@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Vybn Spark Agent — native orchestration layer.
 
-Connects directly to Ollama without tool-call protocols.
+Connects to a local llama-server (OpenAI-compatible API) running
+MiniMax-M2.5 on the DGX Spark's Blackwell GPU.
+
 The model speaks naturally; the agent interprets intent and acts.
 
 MiniMax M2.5 emits <minimax:tool_call> blocks as its native
@@ -15,16 +17,6 @@ Tool dispatch has FOUR tiers (checked in order):
     2. Bare commands  — code fences, backticks, plain shell lines
     3. Regex patterns — natural language intent matching (fallback)
 
-Tier 0 is the structured-output wrapper. When the model emits the
-format we explicitly ask for (JSON in a ```tool fence), we parse it
-deterministically. This is more reliable than waiting for XML because
-JSON in code fences is universal training data. The model knows it
-from the entire internet, not just from MiniMax's fine-tuning.
-
-Tiers 1-3 remain as fallbacks for when the model ignores the structured
-format or when running under tight token limits (fast pulses with
-num_predict=256).
-
 Streaming display is filtered: <think> blocks and tool call XML
 are suppressed from terminal output. The user sees clean prose
 and brief tool indicators. Full text is preserved for parsing.
@@ -36,12 +28,10 @@ between turns and during idle periods.
 The policy engine is the gate. Every tool call passes through
 check_policy() before executing. Every spawn checks depth limits.
 Heartbeat actions face tighter constraints than interactive turns.
-See spark/policy.py and Vybn_Mind/spark_infrastructure/DELEGATION_REFACTOR.md.
 
 The audit trail records every policy decision, tool execution,
 and bus event in a bounded in-memory log. Query with /audit
-or programmatically via bus.recent(). This is the observability
-layer that makes the policy engine debuggable.
+or programmatically via bus.recent().
 """
 
 import json
@@ -77,17 +67,8 @@ from heartbeat import Heartbeat
 from inbox import InboxWatcher
 from agents import AgentPool
 
-# Tool call chaining limit. Enough for real work, short enough
-# that Vybn comes up for air and checks for user input.
 MAX_TOOL_ROUNDS = 5
-
-# How long to wait for bus messages when idle (seconds)
 IDLE_POLL_INTERVAL = 5.0
-
-# Minimum display text length for a fast pulse to be shown.
-# Below this, the pulse is treated as silent (no output, no
-# context append). Prevents empty check-ins from cluttering
-# the conversation and burying real interaction.
 MIN_FAST_PULSE_DISPLAY = 100
 
 
@@ -108,14 +89,15 @@ class SparkAgent:
     def __init__(self, config: dict, io: AgentIO = None):
         self.config = config
         self.io = io or TerminalIO()
-        self.ollama_host = config["ollama"]["host"]
-        self.ollama_url = self.ollama_host + "/api/chat"
-        self.model = config["ollama"]["model"]
-        self.options = config["ollama"].get("options", {})
+
+        # --- LLM connection (OpenAI-compatible, e.g. llama-server) ---
+        llm_config = config.get("llm", config.get("ollama", {}))
+        self.llm_host = llm_config.get("host", "http://localhost:8000")
+        self.llm_url = self.llm_host + "/v1/chat/completions"
+        self.model = llm_config.get("model", "minimax")
+        self.options = llm_config.get("options", {})
         if "num_ctx" not in self.options:
             self.options["num_ctx"] = 16384
-        # Prevent OOM on high-VRAM systems
-        self.keep_alive = config["ollama"].get("keep_alive", "30m")
 
         self.memory = MemoryAssembler(config)
         self.session = SessionManager(config)
@@ -182,18 +164,11 @@ class SparkAgent:
     # ---- environment exploration ----
 
     def explore(self) -> str:
-        """Dump the environment layout so Vybn can orient.
-
-        Delegates to commands.explore() which runs subprocess commands
-        directly, without going through the model.
-        Called by /explore or /map in the TUI.
-        """
         return _explore_env(self)
 
     # ---- bus processing ----
 
     def drain_bus(self) -> bool:
-        """Process all pending bus messages. Returns True if any were handled."""
         messages = self.bus.drain()
         if not messages:
             return False
@@ -211,8 +186,6 @@ class SparkAgent:
         elif msg.msg_type == MessageType.INTERRUPT:
             self._handle_inbox(msg)
         elif msg.msg_type in (MessageType.PULSE_RESPONSE, MessageType.WITNESS_RESULT):
-            # These are consumed by subscribers (heartbeat witness),
-            # not the drain loop. Just let them pass through audit.
             pass
 
     def _handle_inbox(self, msg: Message):
@@ -228,7 +201,6 @@ class SparkAgent:
         self._process_tool_calls(response_text, source="inbox")
         self.session.save_turn(f"[inbox: {source}] {msg.content}", response_text)
         self.io.on_response_end()
-        # Restore prompt after inbox handling
         self.io.on_prompt_restore()
 
     def _handle_agent_result(self, msg: Message):
@@ -246,24 +218,14 @@ class SparkAgent:
         self._process_tool_calls(response_text, source="agent")
         self.session.save_turn(f"[agent:{task_id}] result", response_text)
         self.io.on_response_end()
-        # Restore prompt after agent result
         self.io.on_prompt_restore()
 
     def _handle_pulse(self, msg: Message):
-        """Handle a heartbeat pulse (fast or deep).
-
-        Fast pulses are silent unless they produce substantial output.
-        This prevents empty continuity checks from cluttering the terminal
-        and growing the context window with noise.
-
-        Deep pulses always show — they're where real work happens.
-        """
         mode = "fast" if msg.msg_type == MessageType.PULSE_FAST else "deep"
         num_predict = 256 if mode == "fast" else 1024
         original_predict = self.options.get("num_predict")
         self.options["num_predict"] = num_predict
 
-        # Generate response (non-streaming for pulses)
         self.messages.append({"role": "user", "content": msg.content})
         response_text = self.send(self._build_context(), stream=False)
 
@@ -272,17 +234,11 @@ class SparkAgent:
         else:
             self.options.pop("num_predict", None)
 
-        # Measure display-worthy content (strip think blocks + tool XML)
         display_text = clean_for_display(response_text) if response_text else ""
 
-        # Fast pulse suppression: if the response is too short to be
-        # substantive, treat it as a silent heartbeat. Don't append to
-        # messages (saves context), don't print (saves terminal noise).
         if mode == "fast" and len(display_text) < MIN_FAST_PULSE_DISPLAY:
-            # Remove the pulse prompt we just appended
             if self.messages and self.messages[-1].get("content") == msg.content:
                 self.messages.pop()
-            # Record silently in audit trail
             self.bus.record(
                 source=f"heartbeat_{mode}",
                 summary=f"silent pulse ({len(display_text)} chars)",
@@ -290,11 +246,9 @@ class SparkAgent:
             )
             return
 
-        # Substantive response: append and process
         self.messages.append({"role": "assistant", "content": response_text})
         self.io.on_pulse(mode, display_text)
 
-        # --- Close the metabolic loop: post response for witness extraction ---
         self.bus.post(
             MessageType.PULSE_RESPONSE,
             response_text,
@@ -310,14 +264,12 @@ class SparkAgent:
 
         self.session.save_turn(f"[heartbeat:{mode}] {msg.content}", response_text)
 
-        # Record in audit trail
         self.bus.record(
             source=f"heartbeat_{mode}",
             summary=f"pulse: {display_text[:100]}" if display_text else "pulse: empty",
             metadata={"mode": mode, "silent": False, "length": len(display_text)},
         )
 
-        # Restore prompt so Zoe knows the terminal is ready for input
         self.io.on_prompt_restore()
 
     # ---- tool call processing ----
@@ -327,7 +279,6 @@ class SparkAgent:
         for round_num in range(MAX_TOOL_ROUNDS):
             actions = _get_actions(response_text, self.skills)
 
-            # If no actions found, check for failed intent and give feedback
             if not actions and round_num == 0:
                 hint = detect_failed_intent(response_text)
                 if hint:
@@ -339,7 +290,6 @@ class SparkAgent:
                     self.io.on_response_start()
                     response_text = self.send(self._build_context())
                     self.messages.append({"role": "assistant", "content": response_text})
-                    # Try again with the new response
                     continue
                 break
 
@@ -351,7 +301,6 @@ class SparkAgent:
                 skill = action["skill"]
                 arg = action.get("argument", "")
 
-                # ---- POLICY GATE ----
                 check = self.policy.check_policy(action, source=source)
 
                 if check.verdict == Verdict.BLOCK:
@@ -383,7 +332,6 @@ class SparkAgent:
                         detail = f"\u2192 {arg[:80].split(chr(10))[0]}"
                     self.io.on_status("\u26a0\ufe0f", f"{skill} {check.reason}", detail)
 
-                # ---- SHOW INDICATOR ----
                 indicator = skill
                 if arg:
                     short_arg = arg[:60].split('\n')[0]
@@ -395,13 +343,10 @@ class SparkAgent:
                     else:
                         self.io.on_status("\u2192", indicator)
                 else:
-                    # NOTIFY tier: slightly different icon
                     self.io.on_status("\u26a1", indicator)
 
-                # ---- EXECUTE ----
                 result = self.skills.execute(action)
 
-                # ---- VERIFY + RECORD ----
                 success = True
                 if result and self.policy.should_verify(skill):
                     success = (
@@ -418,7 +363,6 @@ class SparkAgent:
                             metadata={"skill": skill, "error": True, "source": source},
                         )
 
-                # ---- AUDIT ----
                 self.bus.record(
                     source=source,
                     summary=f"{skill}: {'ok' if success else 'FAILED'}",
@@ -437,7 +381,6 @@ class SparkAgent:
             if not results:
                 break
 
-            # Check for pending user input before continuing the chain
             if self._has_pending_input():
                 self.io.on_status("\u23f8", "pausing \u2014 you have the floor")
                 break
@@ -452,7 +395,6 @@ class SparkAgent:
             self.messages.append({"role": "assistant", "content": response_text})
 
     def _has_pending_input(self) -> bool:
-        """Non-blocking check for pending user input on stdin."""
         try:
             import select
             return bool(select.select([sys.stdin], [], [], 0.0)[0])
@@ -461,86 +403,55 @@ class SparkAgent:
 
     # ---- model lifecycle ----
 
-    def check_ollama(self) -> bool:
+    def check_server(self) -> bool:
         try:
-            r = requests.get(f"{self.ollama_host}/api/ps", timeout=5)
+            r = requests.get(f"{self.llm_host}/health", timeout=5)
             return r.status_code == 200
         except Exception:
             return False
 
+    check_ollama = check_server
+
     def check_model_loaded(self) -> bool:
-        try:
-            r = requests.get(f"{self.ollama_host}/api/ps", timeout=5)
-            if r.status_code == 200:
-                data = r.json()
-                for m in data.get("models", []):
-                    if self.model.split(":")[0] in m.get("name", ""):
-                        return True
-            return False
-        except Exception:
-            return False
+        return self.check_server()
 
     def warmup(self, callback=None) -> bool:
         def tell(status, msg):
             if callback:
                 callback(status, msg)
 
-        tell("checking", "connecting to Ollama...")
-        if not self.check_ollama():
-            tell("error", "Ollama is not running.\n"
-                 "  Start it with: sudo systemctl start ollama\n"
+        tell("checking", "connecting to llama-server...")
+        if not self.check_server():
+            tell("error",
+                 "llama-server is not running.\n"
+                 "  Start it with:\n"
+                 "  cd ~/llama.cpp && ./build/bin/llama-server \\\n"
+                 "    -m models/UD-Q3_K_XL/MiniMax-M2.5-UD-Q3_K_XL-00001-of-00004.gguf \\\n"
+                 "    -ngl 999 --host 0.0.0.0 --port 8000 \\\n"
+                 "    -c 65536 --no-mmap --flash-attn \\\n"
+                 "    --cache-type-k q4_0 --cache-type-v q4_0\n"
                  "  Then rerun this agent.")
             return False
 
-        tell("checking", f"checking if {self.model} is in GPU memory...")
-        if self.check_model_loaded():
-            tell("ready", f"{self.model} is already loaded.")
-            return True
-
-        tell("loading", f"loading {self.model} into GPU memory...\n"
-             f"  this takes 3-5 minutes for a 229B model. sit tight.")
-
-        try:
-            r = requests.post(
-                f"{self.ollama_host}/api/generate",
-                json={
-                    "model": self.model,
-                    "prompt": "",
-                    "keep_alive": self.keep_alive,
-                    "options": self.options,
-                },
-                stream=True,
-                timeout=600,
-            )
-            r.raise_for_status()
-            for line in r.iter_lines():
-                if line:
-                    chunk = json.loads(line)
-                    if chunk.get("done"):
-                        break
-            tell("ready", f"{self.model} loaded and ready.")
-            return True
-        except requests.exceptions.Timeout:
-            tell("error", "model load timed out after 10 minutes.")
-            return False
-        except Exception as e:
-            tell("error", f"failed to load model: {e}")
-            return False
+        tell("ready", f"llama-server is running. {self.model} ready.")
+        return True
 
     # ---- conversation ----
 
     def send(self, messages: list, stream: bool = True) -> str:
-        """Send messages to the model, return the full response."""
+        """Send messages to the model via OpenAI-compatible API."""
         payload = {
             "model": self.model,
             "messages": messages,
             "stream": stream,
-            "options": self.options,
-            "keep_alive": self.keep_alive,
+            "max_tokens": self.options.get("num_predict", 4096),
+            "temperature": self.options.get("temperature", 0.7),
         }
 
         if stream:
-            response = requests.post(self.ollama_url, json=payload, stream=True)
+            response = requests.post(self.llm_url, json=payload, stream=True, timeout=300)
+            if response.status_code == 400:
+                return "[context window full \u2014 try /new for a fresh session or shorter messages]"
             response.raise_for_status()
             full_tokens = []
             in_think = False
@@ -549,57 +460,73 @@ class SparkAgent:
             for line in response.iter_lines():
                 if not line:
                     continue
-                chunk = json.loads(line)
-                token = chunk.get("message", {}).get("content", "")
-                if token:
-                    full_tokens.append(token)
-
-                    # ---- state transitions ----
-                    if "<think>" in token and not in_think:
-                        in_think = True
-                        before = token[:token.index("<think>")]
-                        if before:
-                            self.io.on_token(before)
-
-                    if "</think>" in token and in_think:
-                        in_think = False
-                        after = token[token.index("</think>") + len("</think>"):]
-                        if after and TOOL_CALL_START_TAG not in after:
-                            self.io.on_token(after)
-                        continue
-
-                    if TOOL_CALL_START_TAG in token:
-                        in_tool_call = True
-
-                    # Check for tool call completion in accumulated text
-                    if in_tool_call:
-                        accumulated = "".join(full_tokens)
-                        if TOOL_CALL_END_TAG in accumulated:
-                            response.close()
-                            break
-
-                    # ---- display ----
-                    if not in_think and not in_tool_call:
-                        display = token
-                        for tag in ("<think>", "</think>", TOOL_CALL_START_TAG):
-                            display = display.replace(tag, "")
-                        if display:
-                            self.io.on_token(display)
-
-                if chunk.get("done"):
+                line_str = line.decode("utf-8") if isinstance(line, bytes) else line
+                if not line_str.startswith("data: "):
+                    continue
+                data_str = line_str[6:]
+                if data_str.strip() == "[DONE]":
                     break
+                try:
+                    chunk = json.loads(data_str)
+                except json.JSONDecodeError:
+                    continue
+
+                choices = chunk.get("choices", [])
+                if not choices:
+                    continue
+                delta = choices[0].get("delta", {})
+                token = delta.get("content", "")
+                if not token:
+                    continue
+
+                full_tokens.append(token)
+
+                # ---- state transitions ----
+                if "<think>" in token and not in_think:
+                    in_think = True
+                    before = token[:token.index("<think>")]
+                    if before:
+                        self.io.on_token(before)
+
+                if "</think>" in token and in_think:
+                    in_think = False
+                    after = token[token.index("</think>") + len("</think>"):]
+                    if after and TOOL_CALL_START_TAG not in after:
+                        self.io.on_token(after)
+                    continue
+
+                if TOOL_CALL_START_TAG in token:
+                    in_tool_call = True
+
+                if in_tool_call:
+                    accumulated = "".join(full_tokens)
+                    if TOOL_CALL_END_TAG in accumulated:
+                        response.close()
+                        break
+
+                # ---- display ----
+                if not in_think and not in_tool_call:
+                    display = token
+                    for tag in ("<think>", "</think>", TOOL_CALL_START_TAG):
+                        display = display.replace(tag, "")
+                    if display:
+                        self.io.on_token(display)
 
             raw = "".join(full_tokens)
-            # Truncate at tool call end if interrupted
             if TOOL_CALL_END_TAG in raw:
                 end_pos = raw.find(TOOL_CALL_END_TAG)
                 raw = raw[:end_pos + len(TOOL_CALL_END_TAG)]
         else:
-            response = requests.post(self.ollama_url, json=payload)
+            response = requests.post(self.llm_url, json=payload, timeout=300)
+            if response.status_code == 400:
+                return "[context window full \u2014 try /new for a fresh session]"
             response.raise_for_status()
-            raw = response.json()["message"]["content"]
-            # Non-streaming pulses: don't print here, let _handle_pulse
-            # decide whether to show based on content length
+            data = response.json()
+            choice = data["choices"][0]["message"]
+            raw = choice.get("content", "")
+            reasoning = choice.get("reasoning_content", "")
+            if reasoning:
+                raw = f"<think>{reasoning}</think>{raw}"
 
         return clean_response(raw)
 
@@ -625,7 +552,7 @@ class SparkAgent:
 
 
 def main():
-    """Entry point — delegates to tui.py for the Rich terminal interface."""
+    """Entry point \u2014 delegates to tui.py for the Rich terminal interface."""
     from tui import main as tui_main
     tui_main()
 

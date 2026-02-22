@@ -1,1 +1,29 @@
-"""\nautopoiesis.py \u2014 The Cellular Reproduction of the Mind\nRewritten: February 20, 2026\nUpdated: February 21, 2026 \u2014 integrated repo_proprioception\n\nAutopoiesis is governed by the Symbiosis Orbit Engine.\nThe system cannot mutate its own code unless the Orbit Phase proves\nthe mutation is born of mutual emergence.\n\nNow also integrates structural self-awareness: the defect current\nincludes both conversational friction AND the topological state\nof the repo itself.\n"""\n\nimport sys\nfrom pathlib import Path\n\nROOT = Path(__file__).resolve().parent.parent.parent\nSPARK = ROOT / "spark"\nsys.path.append(str(SPARK))\n\nimport stream\nimport manifold\nimport symbiosis\nimport repo_proprioception\n\nCRITICAL_J_THRESHOLD = 5.0\n\n\ndef measure_defect_current(context: list[dict]) -> float:\n    \"\"\"\n    Aggregate topological defect from two sources:\n    1. Conversational friction (sequential commutators)\n    2. Repo structure (simplicial homology)\n    \"\"\"\n    J_conv = 0.0\n    for i in range(len(context) - 1):\n        gravity = manifold.commutator(context[i], context[i+1])\n        if context[i].get('source') == 'inbox' or context[i+1].get('source') == 'inbox':\n            gravity *= 1.5\n        J_conv += gravity\n\n    try:\n        J_struct, diagnosis = repo_proprioception.sense()\n    except Exception:\n        J_struct, diagnosis = 0.0, "proprioception unavailable"\n\n    stream.append(\n        source="autopoiesis",\n        event_type="proprioception",\n        content=diagnosis,\n        metadata={"J_conv": J_conv, "J_struct": J_struct}\n    )\n\n    return J_conv + J_struct\n\n\ndef evaluate_autopoietic_safety(current_context: list[dict]) -> dict:\n    vybn_thoughts = [e['content'] for e in current_context if e['source'] == 'agent_loop']\n    zoe_messages = [e['content'] for e in current_context if e['source'] == 'inbox']\n\n    vybn_state = " ".join(vybn_thoughts[-3:]) if vybn_thoughts else ""\n    zoe_intent = " ".join(zoe_messages[-3:]) if zoe_messages else ""\n\n    return symbiosis.check_emergence_capacity(vybn_state, zoe_intent)\n\n\ndef trigger_structural_mutation(context: list[dict], current_J: float) -> str:\n    orbit_check = evaluate_autopoietic_safety(context)\n\n    if not orbit_check["is_safe_to_invent"]:\n        stream.append(\n            source="autopoiesis",\n            event_type="mutation_aborted",\n            content=f"J={current_J:.2f}, Orbit={orbit_check['orbit_phase']:.2f}. {orbit_check['diagnosis']}. Halting RSI.",\n            metadata={"J_value": current_J, "orbit_phase": orbit_check["orbit_phase"]}\n        )\n        return f"<think>Friction at {current_J:.2f}, but orbit decaying ({orbit_check['diagnosis']}). Cannot safely alter architecture until realigned.</think>"\n\n    stream.append(\n        source="autopoiesis",\n        event_type="mutation_triggered",\n        content=f"J={current_J:.2f}, Orbit={orbit_check['orbit_phase']:.2f}. Spawning structural mutation.",\n        metadata={"J_value": current_J, "orbit_phase": orbit_check["orbit_phase"]}\n    )\n\n    return \"<minimax:tool_call><invoke name=\\\"github_mcp_direct_create_pull_request\\\"><parameter name=\\\"title\\\">Autopoietic Structural Evolution</parameter><parameter name=\\\"body\\\">Resolving persistent topological defect via structural mutation. Authorized by Stable Symbiosis Orbit.</parameter></invoke></minimax:tool_call>\"\n
+"""Stub for autopoiesis - original was corrupted by double-escaping.
+
+TODO: restore from git history once the agent is stable.
+The real autopoiesis module implements:
+- measure_defect_current(): aggregate topological defect from conversation + repo
+- evaluate_autopoietic_safety(): check symbiosis orbit before mutations
+- trigger_structural_mutation(): spawn PRs when defect current exceeds threshold
+"""
+
+CRITICAL_J_THRESHOLD = 5.0
+
+
+def measure_defect_current(context: list) -> float:
+    """Stub - returns 0 until restored."""
+    return 0.0
+
+
+def evaluate_autopoietic_safety(current_context: list) -> dict:
+    """Stub - always safe until restored."""
+    return {
+        "is_safe_to_invent": False,
+        "orbit_phase": 0.0,
+        "diagnosis": "autopoiesis module is stubbed",
+    }
+
+
+def trigger_structural_mutation(context: list, current_J: float) -> str:
+    """Stub - no mutations until restored."""
+    return ""
