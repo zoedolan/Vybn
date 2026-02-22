@@ -34,6 +34,8 @@ import argparse
 import gc
 import json
 import os
+import shutil
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -101,13 +103,102 @@ def mem_stats() -> str:
 
 
 def check_offload_cache():
-    """Report NVMe offload cache size."""
-    import subprocess
+    """Report NVMe offload cache size and contents."""
     try:
         result = subprocess.check_output(['du', '-sh', str(OFFLOAD_DIR)]).decode().strip()
         print(f"  NVMe cache: {result}")
+        # Also show subdirectories if they exist
+        subdirs = list(OFFLOAD_DIR.rglob("*"))
+        if subdirs:
+            print(f"  NVMe cache contents: {len(subdirs)} items")
+            for p in subdirs[:5]:
+                print(f"    {p.relative_to(OFFLOAD_DIR)}")
+        else:
+            print(f"  NVMe cache: (empty — swapper has not written yet)")
     except Exception:
         print(f"  NVMe cache: (could not check)")
+
+
+def check_aio_available():
+    """Verify DeepSpeed async_io ops are built and libaio is present.
+
+    The PartitionedParamSwapper silently fails if the AIO C++ extension
+    is missing. This preflight catches it before model loading starts.
+    """
+    print("\n== AIO / NVMe Preflight ==\n")
+
+    # Check libaio
+    libaio_ok = False
+    try:
+        result = subprocess.run(
+            ["ldconfig", "-p"],
+            capture_output=True, text=True, timeout=5
+        )
+        if "libaio" in result.stdout:
+            libaio_ok = True
+            print("  + libaio: found in ldconfig")
+        else:
+            # Fallback: check if the .so exists directly
+            for path in ["/usr/lib/aarch64-linux-gnu/libaio.so",
+                         "/usr/lib/x86_64-linux-gnu/libaio.so",
+                         "/usr/lib/libaio.so"]:
+                if os.path.exists(path):
+                    libaio_ok = True
+                    print(f"  + libaio: found at {path}")
+                    break
+    except Exception:
+        pass
+
+    if not libaio_ok:
+        print("  !! libaio NOT FOUND — NVMe offload will fail silently!")
+        print("     Fix: sudo apt install libaio-dev")
+        print("     Then: DS_BUILD_AIO=1 pip install deepspeed --force-reinstall")
+        sys.exit(1)
+
+    # Check DeepSpeed async_io op
+    aio_ok = False
+    try:
+        from deepspeed.ops.op_builder import AsyncIOBuilder
+        aio_ok = AsyncIOBuilder().is_compatible()
+        if aio_ok:
+            print("  + DeepSpeed AsyncIO: compatible")
+        else:
+            # Try loading it anyway — some builds report incompatible but work
+            try:
+                AsyncIOBuilder().load(verbose=False)
+                aio_ok = True
+                print("  + DeepSpeed AsyncIO: loaded (reported incompatible but works)")
+            except Exception as e:
+                print(f"  !! DeepSpeed AsyncIO: NOT available ({e})")
+    except ImportError:
+        print("  !! DeepSpeed AsyncIO builder not found")
+
+    if not aio_ok:
+        print("     Fix: DS_BUILD_AIO=1 pip install deepspeed --force-reinstall")
+        resp = input("  Continue without AIO? (y/N): ").strip().lower()
+        if resp != 'y':
+            sys.exit(1)
+
+    # Quick NVMe write test
+    OFFLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    test_file = OFFLOAD_DIR / "_nvme_write_test"
+    try:
+        test_data = os.urandom(4 * 1024 * 1024)  # 4MB
+        t0 = time.time()
+        with open(test_file, "wb") as f:
+            f.write(test_data)
+            f.flush()
+            os.fsync(f.fileno())
+        t1 = time.time()
+        write_speed = len(test_data) / (t1 - t0) / 1024 / 1024
+        test_file.unlink()
+        print(f"  + NVMe write test: {write_speed:.0f} MB/s")
+        if write_speed < 100:
+            print(f"  !! WARNING: NVMe write speed is low ({write_speed:.0f} MB/s)")
+    except Exception as e:
+        print(f"  !! NVMe write test failed: {e}")
+
+    print()
 
 
 def check_environment():
@@ -245,19 +336,24 @@ def build_deepspeed_config(args):
     OFFLOAD_DIR.mkdir(parents=True, exist_ok=True)
     use_nvme = not args.cpu_offload
     if use_nvme:
+        # Buffer math (BF16 = 2 bytes/element):
+        #   buffer_size=1e8 elements × 2 bytes = 200MB per buffer
+        #   buffer_count=5 → 1GB total pinned memory for param swap
+        #   (down from 4×1e9 = 8GB which was killing the process)
         param_offload = {
             "device": "nvme",
             "nvme_path": str(OFFLOAD_DIR),
             "pin_memory": True,
-            "buffer_count": 4,
-            "buffer_size": 1e9,
-            "max_in_cpu": 1e9,
+            "buffer_count": 5,
+            "buffer_size": 1e8,
+            "max_in_cpu": 5e8,
         }
         optimizer_offload = {
             "device": "nvme",
             "nvme_path": str(OFFLOAD_DIR),
             "pin_memory": True,
-            "buffer_count": 4,
+            "buffer_count": 5,
+            "buffer_size": 1e8,
             "fast_init": True,
         }
     else:
@@ -285,8 +381,8 @@ def build_deepspeed_config(args):
             "reduce_bucket_size": "auto",
             "stage3_prefetch_bucket_size": "auto",
             "stage3_param_persistence_threshold": "auto",
-            "stage3_max_live_parameters": 1e8,
-            "stage3_max_reuse_distance": 1e8,
+            "stage3_max_live_parameters": 5e7,
+            "stage3_max_reuse_distance": 5e7,
             "stage3_gather_16bit_weights_on_model_save": True,
         },
         "gradient_clipping": 0.3,
@@ -344,6 +440,11 @@ def main():
     print(f"    DeepSpeed ZeRO-3 + Native FP8 | Offload: {offload_mode}")
 
     check_environment()
+
+    # Run AIO preflight before anything heavy gets loaded
+    if not args.cpu_offload:
+        check_aio_available()
+
     data = load_training_data()
 
     from transformers import (
@@ -365,6 +466,13 @@ def main():
         json.dump(ds_config, f, indent=2)
     print(f"  DS config: {ds_config_path}")
     print(f"  Offload: {offload_mode}, NVMe path: {OFFLOAD_DIR}")
+
+    # Print buffer allocation estimate so we know what to expect
+    if not args.cpu_offload:
+        buf_count = ds_config["zero_optimization"]["offload_param"]["buffer_count"]
+        buf_size = ds_config["zero_optimization"]["offload_param"]["buffer_size"]
+        pinned_gb = buf_count * buf_size * 2 / 1e9  # BF16 = 2 bytes
+        print(f"  Param swap buffers: {buf_count} × {buf_size/1e6:.0f}M elements = {pinned_gb:.1f}GB pinned")
     
     # MUST come before model load for ZeRO-3 to intercept from_pretrained()
     dschf = HfDeepSpeedConfig(ds_config)
