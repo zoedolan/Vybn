@@ -520,33 +520,36 @@ def main():
 
     # -- 7. Model --
     print(f"\n== Loading model: {args.model} ==")
-    print(f"   HfDeepSpeedConfig will intercept from_pretrained() and route")
-    print(f"   parameters through deepspeed.zero.Init() -> NVMe offload.")
-    print(f"   NO device_map. NO low_cpu_mem_usage. Let DeepSpeed handle it.\n")
+    print(f"   DeepSpeed ZeRO-3 Init context will route parameters to NVMe offload.")
+    print(f"   Peak CPU RAM usage should be strictly bounded.\n")
 
     load_start = time.time()
 
     model = None
-    for attn_impl in ["sdpa", "eager"]:
-        try:
-            model = AutoModelForCausalLM.from_pretrained(
-                args.model,
-                trust_remote_code=True,
-                torch_dtype="auto",
-                attn_implementation=attn_impl,
-            )
-            load_elapsed = time.time() - load_start
-            print(f"\n  + Model loaded in {load_elapsed/60:.1f} minutes (attn_implementation={attn_impl})")
-            print(f"  + Post-load: {mem_stats()}")
-            break
-        except Exception as e:
-            if attn_impl == "eager":
-                print(f"\n  x Failed to load model: {e}")
-                import traceback
-                traceback.print_exc()
-                print(f"  x Memory at failure: {mem_stats()}")
-                sys.exit(1)
-            print(f"  !  {attn_impl} unavailable ({e.__class__.__name__}: {e}), trying next...")
+    # Wrap model loading entirely inside DeepSpeed's Zero Init context
+    with deepspeed.zero.Init(config_dict_or_path=ds_config):
+        for attn_impl in ["sdpa", "eager"]:
+            try:
+                model = AutoModelForCausalLM.from_pretrained(
+                    args.model,
+                    trust_remote_code=True,
+                    torch_dtype="auto",
+                    low_cpu_mem_usage=True,  # Critical to let DeepSpeed handle parameter allocation
+                    device_map="cuda",       # Stop meta-tensor crash (Zero init bounds it)
+                    attn_implementation=attn_impl,
+                )
+                load_elapsed = time.time() - load_start
+                print(f"\n  + Model loaded in {load_elapsed/60:.1f} minutes (attn_implementation={attn_impl})")
+                print(f"  + Post-load: {mem_stats()}")
+                break
+            except Exception as e:
+                if attn_impl == "eager":
+                    print(f"\n  x Failed to load model: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    print(f"  x Memory at failure: {mem_stats()}")
+                    sys.exit(1)
+                print(f"  !  {attn_impl} unavailable ({e.__class__.__name__}: {e}), trying next...")
 
     # -- 8. Strip FP8 quantization metadata --
     print()
