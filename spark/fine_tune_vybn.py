@@ -314,7 +314,7 @@ def main():
     args = parser.parse_args()
 
     offload_mode = "CPU" if args.cpu_offload else "NVMe"
-    print(f"\\n=== Vybn Fine-Tune: MiniMax-M2.5 on DGX Spark ===")
+    print(f"\n=== Vybn Fine-Tune: MiniMax-M2.5 on DGX Spark ===")
     print(f"    DeepSpeed ZeRO-3 + Native FP8 | Offload: {offload_mode}")
 
     check_environment()
@@ -326,7 +326,7 @@ def main():
     )
     from peft import LoraConfig, get_peft_model
 
-    print(f"\\n== Loading tokenizer ==\\n")
+    print(f"\n== Loading tokenizer ==\n")
     tokenizer = AutoTokenizer.from_pretrained(args.model, trust_remote_code=True)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
@@ -345,9 +345,9 @@ def main():
 
     gc.collect()
     torch.cuda.empty_cache()
-    print(f"\\n  Pre-load: {mem_stats()}")
+    print(f"\n  Pre-load: {mem_stats()}")
 
-    print(f"\\n== Loading model (Native FP8 + ZeRO-3) ==")
+    print(f"\n== Loading model (Native FP8 + ZeRO-3) ==")
     
     # NOTE: MiniMax-M2.5 is inherently FP8. We removed BitsAndBytesConfig to prevent conflict.
     # The model will load as FP8 (or bf16 if auto-casted), then ZeRO-3 will partition it.
@@ -367,14 +367,14 @@ def main():
                 # NO device_map="auto" -- let DeepSpeed ZeRO-3 handle placement
             )
             load_elapsed = time.time() - load_start
-            print(f"\\n  + Model loaded in {load_elapsed/60:.1f} minutes (attn={attn_impl})")
+            print(f"\n  + Model loaded in {load_elapsed/60:.1f} minutes (attn={attn_impl})")
             print(f"  + {mem_stats()}")
             check_offload_cache()
 
             break
         except Exception as e:
             if attn_impl == "eager":
-                print(f"\\n  x Failed: {e}")
+                print(f"\n  x Failed: {e}")
                 import traceback
                 traceback.print_exc()
                 print(f"  x {mem_stats()}")
@@ -451,7 +451,7 @@ def main():
     )
 
     effective_steps = len(tokenized) * args.epochs // args.grad_accum
-    print(f"\\n== Training ==")
+    print(f"\n== Training ==")
     print(f"   {len(tokenized)} examples, {args.epochs} epochs, grad_accum={args.grad_accum}")
     print(f"   Effective steps: {effective_steps}")
     print(f"   {mem_stats()}")
@@ -470,7 +470,8 @@ def main():
 
     adapter_path = OUTPUT_DIR / "vybn_adapter"
     model.save_pretrained(str(adapter_path))
-    tokenizer.save_pretrained(str(adapter_path))\n    print(f"\\n  + Adapter saved to {adapter_path}")
+    tokenizer.save_pretrained(str(adapter_path))
+    print(f"\n  + Adapter saved to {adapter_path}")
     print(f"  + {mem_stats()}")
     print(f"  + Done.")
 
