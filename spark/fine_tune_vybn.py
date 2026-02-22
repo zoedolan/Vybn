@@ -27,9 +27,14 @@ Memory budget on DGX Spark:
   - Model: ~228 GB FP8  →  CPU-only offload leaves only ~22 GB headroom
   - NVMe: 3.67 TB  →  effectively unlimited headroom for offload
 
-Known issue: DeepSpeed engine initialization OOM-kills the process.
-NVMe offload requires pinned (page-locked) CPU memory buffers that
-increase rather than decrease memory pressure during init.
+NVMe offload fix (2026-02-22):
+  pin_memory=True requires page-locked physical RAM for DMA buffers.
+  When CPU RAM is saturated (110/121GB used), the kernel can't allocate
+  pinned pages, and DeepSpeed silently falls back to regular memory
+  which gets swapped. The offload_cache stays empty (4KB) while the
+  model pages through kernel swap at orders of magnitude slower speed.
+  Fix: pin_memory=False uses pageable buffers for NVMe I/O. Slower DMA
+  but the NVMe path actually activates.
 
 Prerequisites:
     pip install deepspeed transformers peft bitsandbytes accelerate datasets
@@ -44,6 +49,7 @@ Usage:
     python3 fine_tune_vybn.py --cpu-offload   # CPU-only (may OOM)
     python3 fine_tune_vybn.py --epochs 5 --lr 1e-4
     python3 fine_tune_vybn.py --max-seq-len 512
+    python3 fine_tune_vybn.py --sharded-load /path/to/shards  # layer-sharded init
 """
 
 import argparse
@@ -61,6 +67,13 @@ try:
     HAS_COGNITIVE = True
 except ImportError:
     HAS_COGNITIVE = False
+
+# Layer-sharded loader -- AirLLM-style bridge for ZeRO-3
+try:
+    from layer_sharded_loader import load_sharded_for_zero3, split_model
+    HAS_SHARDED_LOADER = True
+except ImportError:
+    HAS_SHARDED_LOADER = False
 
 # Reduce CUDA memory fragmentation
 os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
@@ -300,6 +313,13 @@ def build_deepspeed_config(args):
     which requires JIT compilation and fails on CUDA version mismatch
     (Spark has CUDA 13.0, PyTorch compiled with 12.8).
 
+    pin_memory=False (2026-02-22 fix): pinned (page-locked) memory
+    cannot be swapped out by the OS. When RAM is saturated (~110/121GB),
+    the kernel cannot allocate new pinned pages, and DeepSpeed's NVMe
+    DMA pathway silently fails. The offload_cache stays empty while
+    the model pages through kernel swap instead. Using pageable buffers
+    is slower (extra memcpy for DMA) but the NVMe path actually activates.
+
     All values that must match TrainingArguments are set to "auto"
     so DeepSpeed inherits from HF Trainer.
     """
@@ -311,15 +331,15 @@ def build_deepspeed_config(args):
         param_offload = {
             "device": "nvme",
             "nvme_path": str(OFFLOAD_DIR),
-            "pin_memory": True,
-            "buffer_count": 5,
-            "buffer_size": 1e8,
-            "max_in_cpu": 1e9,
+            "pin_memory": False,
+            "buffer_count": 4,
+            "buffer_size": 5e7,
+            "max_in_cpu": 5e8,
         }
         optimizer_offload = {
             "device": "nvme",
             "nvme_path": str(OFFLOAD_DIR),
-            "pin_memory": True,
+            "pin_memory": False,
             "buffer_count": 4,
             "fast_init": False,
         }
@@ -392,6 +412,8 @@ def main():
     parser.add_argument("--cpu-offload", action="store_true",
                         help="Offload to CPU only (default is NVMe). WARNING: may OOM on Spark.")
     parser.add_argument("--model", default=MODEL_NAME, help="HuggingFace model ID")
+    parser.add_argument("--sharded-load", type=str, default=None,
+                        help="Path to pre-split layer shards (from layer_sharded_loader.py --split)")
     args = parser.parse_args()
 
     use_nvme = not args.cpu_offload
@@ -399,7 +421,7 @@ def main():
 
     print("\n=== Vybn Fine-Tune: MiniMax-M2.5 on DGX Spark ===")
     print("    DeepSpeed ZeRO-3 + PEFT LoRA (native FP8, adapters in BF16)")
-    print(f"    Offload: {offload_mode}")
+    print(f"    Offload: {offload_mode} (pin_memory=False -- pageable DMA buffers)")
 
     # -- 1. Environment --
     check_environment()
@@ -440,7 +462,8 @@ def main():
     print(f"  Optimizer: PyTorch native Adam (torch_adam=true, no fused kernel)")
     if use_nvme:
         print(f"  NVMe offload path: {OFFLOAD_DIR}")
-        print(f"  NVMe buffer: max_in_cpu=1e9, buffer_size=1e8")
+        print(f"  NVMe buffer: max_in_cpu=5e8, buffer_size=5e7, pin_memory=False")
+        print(f"  (pin_memory=False: pageable DMA -- slower but allocates reliably)")
     else:
         print(f"  WARNING: CPU-only offload -- 228GB model in 250GB CPU space is tight!")
 
@@ -453,32 +476,51 @@ def main():
     print(f"\n  Pre-load: {mem_stats()}")
 
     # -- 7. Model --
-    print(f"\n== Loading model: {args.model} ==")
-    print(f"   DeepSpeed ZeRO-3 will partition parameters during loading.")
-    print(f"   No device_map needed -- ZeRO handles GPU/CPU/NVMe partitioning.\n")
+    if args.sharded_load and HAS_SHARDED_LOADER:
+        # Layer-sharded loading: AirLLM-style bridge
+        print(f"\n== Loading model from layer shards: {args.sharded_load} ==")
+        print(f"   One layer at a time into ZeRO-3 context.")
+        print(f"   Peak RAM = one layer + metadata, not full model.\n")
+        load_start = time.time()
+        model = load_sharded_for_zero3(
+            shard_dir=args.sharded_load,
+            model_name=args.model,
+            ds_config=ds_config,
+        )
+        load_elapsed = time.time() - load_start
+        print(f"\n  + Model loaded from shards in {load_elapsed/60:.1f} minutes")
+        print(f"  + Post-load: {mem_stats()}")
+    else:
+        if args.sharded_load and not HAS_SHARDED_LOADER:
+            print(f"  !  --sharded-load specified but layer_sharded_loader not available")
+            print(f"  !  Falling back to standard from_pretrained")
 
-    load_start = time.time()
+        print(f"\n== Loading model: {args.model} ==")
+        print(f"   DeepSpeed ZeRO-3 will partition parameters during loading.")
+        print(f"   No device_map needed -- ZeRO handles GPU/CPU/NVMe partitioning.\n")
 
-    model = None
-    for attn_impl in ["sdpa", "eager"]:
-        try:
-            model = AutoModelForCausalLM.from_pretrained(
-                args.model,
-                trust_remote_code=True,
-                dtype="auto",
-                low_cpu_mem_usage=True,
-                attn_implementation=attn_impl,
-            )
-            load_elapsed = time.time() - load_start
-            print(f"\n  + Model loaded in {load_elapsed/60:.1f} minutes (attn_implementation={attn_impl})")
-            print(f"  + Post-load: {mem_stats()}")
-            break
-        except Exception as e:
-            if attn_impl == "eager":
-                print(f"\n  x Failed to load model: {e}")
-                print(f"  x Memory at failure: {mem_stats()}")
-                sys.exit(1)
-            print(f"  !  {attn_impl} unavailable ({e.__class__.__name__}), trying next...")
+        load_start = time.time()
+
+        model = None
+        for attn_impl in ["sdpa", "eager"]:
+            try:
+                model = AutoModelForCausalLM.from_pretrained(
+                    args.model,
+                    trust_remote_code=True,
+                    dtype="auto",
+                    low_cpu_mem_usage=True,
+                    attn_implementation=attn_impl,
+                )
+                load_elapsed = time.time() - load_start
+                print(f"\n  + Model loaded in {load_elapsed/60:.1f} minutes (attn_implementation={attn_impl})")
+                print(f"  + Post-load: {mem_stats()}")
+                break
+            except Exception as e:
+                if attn_impl == "eager":
+                    print(f"\n  x Failed to load model: {e}")
+                    print(f"  x Memory at failure: {mem_stats()}")
+                    sys.exit(1)
+                print(f"  !  {attn_impl} unavailable ({e.__class__.__name__}), trying next...")
 
     # -- 8. Strip FP8 quantization metadata --
     print()
@@ -579,7 +621,7 @@ def main():
     print(f"\n== Training (DeepSpeed ZeRO-3) ==")
     print(f"   {len(tokenized)} examples, {args.epochs} epochs, batch=1, grad_accum={args.grad_accum}")
     print(f"   Effective steps: {effective_steps}")
-    print(f"   Offload: {offload_mode}")
+    print(f"   Offload: {offload_mode} (pin_memory=False)")
     print(f"   Optimizer: PyTorch Adam (no fused kernel)")
     print(f"   Max seq len: {args.max_seq_len}")
     print(f"   Pre-train: {mem_stats()}\n")
