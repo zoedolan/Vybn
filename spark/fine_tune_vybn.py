@@ -487,6 +487,7 @@ def main():
     )
     from transformers.integrations import HfDeepSpeedConfig
     from peft import LoraConfig, get_peft_model
+    import deepspeed.utils.zero_to_fp32  # Force deepspeed tools load
 
     # -- 4. Tokenizer --
     print(f"\n== Loading tokenizer: {args.model} ==\n")
@@ -519,7 +520,11 @@ def main():
     else:
         print(f"  WARNING: CPU-only offload -- 228GB model in 250GB CPU space is tight!")
 
-    dschf = HfDeepSpeedConfig(ds_config)  # noqa: F841
+    # IMPORTANT: We MUST use the `deepspeed.zero.Init` context to ensure parameters are
+    # properly instrumented for offload *as they are created/loaded*. If we just call
+    # `from_pretrained` without it, HF will load all 228GB into CPU RAM and ZeRO-3's
+    # NVMe offloader will never touch the base model parameters!
+    dschf = HfDeepSpeedConfig(ds_config)  # Tells HF we are using DeepSpeed
     print(f"  ZeRO-3 Init context activated (incremental parameter partitioning)")
 
     # -- 6. Clear memory --
@@ -528,39 +533,22 @@ def main():
     print(f"\n  Pre-load: {mem_stats()}")
 
     # -- 7. Model --
-    if args.sharded_load and HAS_SHARDED_LOADER:
-        # Layer-sharded loading: AirLLM-style bridge
-        print(f"\n== Loading model from layer shards: {args.sharded_load} ==")
-        print(f"   One layer at a time into ZeRO-3 context.")
-        print(f"   Peak RAM = one layer + metadata, not full model.\n")
-        load_start = time.time()
-        model = load_sharded_for_zero3(
-            shard_dir=args.sharded_load,
-            model_name=args.model,
-            ds_config=ds_config,
-        )
-        load_elapsed = time.time() - load_start
-        print(f"\n  + Model loaded from shards in {load_elapsed/60:.1f} minutes")
-        print(f"  + Post-load: {mem_stats()}")
-    else:
-        if args.sharded_load and not HAS_SHARDED_LOADER:
-            print(f"  !  --sharded-load specified but layer_sharded_loader not available")
-            print(f"  !  Falling back to standard from_pretrained")
+    print(f"\n== Loading model: {args.model} ==")
+    print(f"   DeepSpeed ZeRO-3 Init context will route parameters to NVMe offload.")
+    print(f"   Peak CPU RAM usage should be strictly bounded.\n")
 
-        print(f"\n== Loading model: {args.model} ==")
-        print(f"   DeepSpeed ZeRO-3 will partition parameters during loading.")
-        print(f"   No device_map needed -- ZeRO handles GPU/CPU/NVMe partitioning.\n")
+    load_start = time.time()
 
-        load_start = time.time()
-
-        model = None
+    model = None
+    # Wrap the model loading entirely inside DeepSpeed's Zero Init context
+    with deepspeed.zero.Init(config_dict_or_path=ds_config):
         for attn_impl in ["sdpa", "eager"]:
             try:
                 model = AutoModelForCausalLM.from_pretrained(
                     args.model,
                     trust_remote_code=True,
                     dtype="auto",
-                    low_cpu_mem_usage=True,
+                    low_cpu_mem_usage=True,  # Critical to let DeepSpeed handle parameter allocation
                     attn_implementation=attn_impl,
                 )
                 load_elapsed = time.time() - load_start
