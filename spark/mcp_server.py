@@ -362,6 +362,89 @@ async def issue_create(title: str, body: str = "") -> str:
 # OLLAMA GENERATION TOOLS
 # ============================================================================
 
+
+
+# ============================================================================
+# RLM + KNOWLEDGE GRAPH TOOLS (Issue #2275)
+# ============================================================================
+
+@mcp.tool()
+async def rlm_agent(query: str, node_id: str = "", depth: int = 2,
+                    max_tokens: int = 2048, system: str = "") -> str:
+    """Invoke Vybn recursively on a sub-problem with scoped KG context.
+
+    The model calls itself on sub-problems. Each invocation gets a
+    slice of the knowledge graph relevant to the query.
+
+    Args:
+        query: The sub-problem to solve
+        node_id: Optional KG node to center context on
+        depth: KG traversal depth (default 2)
+        max_tokens: Token budget for this invocation
+        system: Optional system prompt override
+
+    Returns:
+        Result from the recursive sub-invocation
+    """
+    allowed, err, action = _policy_gate(
+        "rlm_agent", argument=query,
+        params={"node_id": node_id, "depth": depth,
+                "max_tokens": max_tokens, "system": system}
+    )
+    if not allowed:
+        return err
+    try:
+        result = skills.execute(action)
+        _record("rlm_agent", success=True)
+        return result or "rlm_agent returned no result"
+    except Exception as e:
+        logger.error(f"rlm_agent error: {e}")
+        _record("rlm_agent", success=False)
+        return f"Error: {e}"
+
+
+@mcp.tool()
+async def kg_traverse(command: str = "stats", node_id: str = "",
+                      source: str = "", target: str = "",
+                      node_type: str = "", depth: int = 2) -> str:
+    """Query Vybn's knowledge graph.
+
+    Subcommands:
+        neighborhood <node_id>  - BFS traversal around a node
+        path <source> <target>  - find paths between nodes
+        type <node_type>        - list all nodes of a type
+        stats                   - graph statistics
+        entity <node_id>        - single node details
+        edges <node_id>         - all edges from/to a node
+
+    Args:
+        command: Subcommand (neighborhood, path, type, stats, entity, edges)
+        node_id: Target node for neighborhood/entity/edges
+        source: Source node for path queries
+        target: Target node for path queries
+        node_type: Node type for type queries
+        depth: Traversal depth for neighborhood (default 2)
+
+    Returns:
+        Query results formatted as text
+    """
+    allowed, err, action = _policy_gate(
+        "kg_traverse", argument=f"{command} {node_id or source or node_type}".strip(),
+        params={"command": command, "node_id": node_id,
+                "source": source, "target": target,
+                "node_type": node_type, "depth": depth}
+    )
+    if not allowed:
+        return err
+    try:
+        result = skills.execute(action)
+        _record("kg_traverse", success=True)
+        return result or "kg_traverse returned no result"
+    except Exception as e:
+        logger.error(f"kg_traverse error: {e}")
+        _record("kg_traverse", success=False)
+        return f"Error: {e}"
+
 @mcp.tool()
 async def ollama_generate(prompt: str, system: str = "") -> str:
     """Generate text using Ollama's Vybn model.

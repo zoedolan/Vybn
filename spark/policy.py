@@ -137,6 +137,9 @@ DEFAULT_TIERS = {
     "git_push": Tier.APPROVE,
     "issue_create": Tier.NOTIFY,
     "spawn_agent": Tier.NOTIFY,
+        # RLM and knowledge graph (read-only graph queries, agent loops)
+    "kg_traverse": Tier.AUTO,
+    "rlm_agent": Tier.NOTIFY,
 }
 
 # Heartbeat overrides: the paper's 'dynamic cognitive friction' (§2.2)
