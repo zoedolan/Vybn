@@ -41,6 +41,12 @@ NVMe offload strategy (2026-02-22):
   IMPORTANT: Always use --sharded-load for NVMe offload on the Spark.
   Run layer_sharded_loader.py --split first to prepare the shards.
 
+  NVMe buffer sizing (2026-02-22):
+  buffer_size must be >= the largest single parameter in the model.
+  MiniMax-M2.5's embed_tokens is vocab_size * hidden_size = ~615M
+  elements. buffer_size=1e9 provides headroom. buffer_count=4 at
+  BF16 = 8GB pinned RAM, well within the Spark's 122GB.
+
 Prerequisites:
     pip install deepspeed transformers peft bitsandbytes accelerate datasets
 
@@ -324,6 +330,13 @@ def build_deepspeed_config(args):
     writes parameters to NVMe. Without sharded loading, RAM saturates
     and pinned allocation fails silently.
 
+    buffer_size=1e9 (2026-02-22 fix): DeepSpeed's NVMe param swapper
+    asserts that each parameter fits within a single swap buffer.
+    MiniMax-M2.5's embed_tokens = vocab_size * hidden_size = ~615M
+    elements. Previous buffer_size of 5e7 was 12x too small.
+    1e9 gives comfortable headroom. 4 buffers × 1e9 × 2 bytes (BF16)
+    = 8GB pinned RAM -- safe within the Spark's 122GB.
+
     Batch-related values are set to concrete numbers (not "auto")
     because --sharded-load triggers ZeRO-3 Init via from_config
     before HF Trainer gets a chance to resolve "auto" strings.
@@ -339,8 +352,8 @@ def build_deepspeed_config(args):
             "nvme_path": str(OFFLOAD_DIR),
             "pin_memory": True,
             "buffer_count": 4,
-            "buffer_size": 5e7,
-            "max_in_cpu": 5e8,
+            "buffer_size": 1e9,
+            "max_in_cpu": 2e9,
         }
         optimizer_offload = {
             "device": "nvme",
@@ -468,7 +481,8 @@ def main():
     print(f"  Optimizer: PyTorch native Adam (torch_adam=true, no fused kernel)")
     if use_nvme:
         print(f"  NVMe offload path: {OFFLOAD_DIR}")
-        print(f"  NVMe buffer: max_in_cpu=5e8, buffer_size=5e7, pin_memory=True")
+        print(f"  NVMe buffer: max_in_cpu=2e9, buffer_size=1e9, pin_memory=True")
+        print(f"  (buffer_size=1e9: must exceed largest param, embed_tokens is ~615M)")
         print(f"  (pin_memory=True: page-locked DMA buffers for proper libaio writes)")
     else:
         print(f"  WARNING: CPU-only offload -- 228GB model in 250GB CPU space is tight!")
