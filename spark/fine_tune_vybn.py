@@ -23,6 +23,13 @@ Critical NVMe note:
   to silently fall back to CPU-only offload, which sends 228B params
   to OS swap instead of NVMe, leading to OOM kill.
 
+Critical AIO note:
+  The pre-built DeepSpeed wheel for aarch64 does NOT include the compiled
+  AIO C++ extension. AsyncIOBuilder().is_compatible() returns True (libaio
+  is installed), but `from deepspeed.ops.aio import aio_handle` fails.
+  Without this, DeepSpeed silently falls back to CPU offload even when
+  NVMe is configured. We JIT-compile and inject it at startup.
+
 Prerequisites:
     pip install deepspeed transformers peft accelerate datasets
     sudo apt install libaio-dev   # Required for DeepSpeed async NVMe I/O
@@ -62,6 +69,55 @@ import deepspeed
 from transformers.integrations import HfDeepSpeedConfig
 # NOTE: Removed BitsAndBytesConfig because MiniMax-M2.5 is natively FP8 quantized.
 # Attempting to re-quantize to 4-bit causes a config collision in Transformers.
+
+
+# ============================================================
+# AIO JIT Compilation for aarch64
+# ============================================================
+# The pre-built DeepSpeed wheel doesn't include the compiled AIO
+# C++ extension on aarch64. Without it, NVMe offload silently falls
+# back to CPU, which OOM-kills on this memory-constrained system.
+# JIT-compile it here and inject into DeepSpeed's module namespace
+# so all internal imports (deepspeed.runtime.swap_tensor etc.) find it.
+# ============================================================
+def _ensure_aio_available():
+    """JIT-compile DeepSpeed AIO if the pre-built module is missing."""
+    try:
+        from deepspeed.ops.aio import aio_handle
+        return True  # Pre-built module exists
+    except ImportError:
+        pass
+
+    try:
+        from deepspeed.ops.op_builder import AsyncIOBuilder
+        builder = AsyncIOBuilder()
+        if not builder.is_compatible():
+            print("  !! AIO: libaio not found. NVMe offload will not work.")
+            print("     Fix: sudo apt install libaio-dev")
+            return False
+
+        print("  + AIO: JIT compiling for aarch64 (one-time)...")
+        aio_mod = builder.load()
+
+        # Inject into deepspeed's namespace so internal imports find it
+        import deepspeed.ops.aio as aio_pkg
+        aio_pkg.aio_handle = aio_mod.aio_handle
+        aio_pkg.aio_read = aio_mod.aio_read
+        aio_pkg.aio_write = aio_mod.aio_write
+
+        # Verify
+        from deepspeed.ops.aio import aio_handle as _verify
+        print(f"  + AIO: JIT compiled and injected ({_verify})")
+        return True
+    except Exception as e:
+        print(f"  !! AIO JIT compilation failed: {e}")
+        print("     NVMe offload will fall back to CPU -> likely OOM")
+        return False
+
+
+# Run immediately at import time, before any DeepSpeed engine init
+AIO_AVAILABLE = _ensure_aio_available()
+
 
 try:
     from cognitive_scheduler import CognitiveTrainer
@@ -118,34 +174,6 @@ def check_offload_cache():
         print(f"  NVMe cache: (could not check)")
 
 
-def check_aio_availability():
-    """Check if DeepSpeed async I/O is available for NVMe offload.
-
-    NVMe offload requires libaio. Without it, DeepSpeed silently falls
-    back to CPU offload, which is fatal on this memory-constrained system.
-    """
-    print("\n== AIO Pre-flight Check ==")
-    try:
-        from deepspeed.ops.aio import AsyncIOBuilder
-        builder = AsyncIOBuilder()
-        if builder.is_compatible():
-            print("  + DeepSpeed AIO: available (libaio found)")
-            return True
-        else:
-            print("  !! DeepSpeed AIO: NOT compatible")
-            print("     NVMe offload will use synchronous I/O (slower but functional)")
-            print("     For async: sudo apt install libaio-dev && DS_BUILD_AIO=1 pip install deepspeed --force-reinstall")
-            return False
-    except ImportError:
-        print("  !! DeepSpeed AIO module not found")
-        print("     NVMe offload may fall back to CPU — this will likely OOM!")
-        print("     Fix: sudo apt install libaio-dev && DS_BUILD_AIO=1 pip install deepspeed --force-reinstall")
-        return False
-    except Exception as e:
-        print(f"  !! DeepSpeed AIO check: {e}")
-        return False
-
-
 def check_environment():
     print("\n== Environment Check ==\n")
     if not torch.cuda.is_available():
@@ -170,6 +198,7 @@ def check_environment():
     print(f"  System RAM : {total_ram:.0f} GB")
     print(f"  Swap       : {swap_total:.0f} GB")
     print(f"  DeepSpeed  : {deepspeed.__version__}")
+    print(f"  AIO ready  : {AIO_AVAILABLE}")
     if swap_total < MIN_SWAP_GB:
         print(f"\n  !! WARNING: Swap is {swap_total:.0f}GB, need >= {MIN_SWAP_GB}GB !!")
         resp = input("  Continue anyway? (y/N): ").strip().lower()
@@ -394,15 +423,16 @@ def main():
     print(f"    DeepSpeed ZeRO-3 + Native FP8 | Offload: {offload_mode}")
 
     check_environment()
-    data = load_training_data()
 
-    # Check AIO availability before we get deep into loading
-    if not args.cpu_offload:
-        aio_ok = check_aio_availability()
-        if not aio_ok:
-            print("\n  !! WARNING: Without AIO, NVMe offload may not function.")
-            print("     The 228B model WILL exceed CPU RAM + swap without NVMe.")
-            print("     Attempting anyway — DeepSpeed may use synchronous fallback.\n")
+    # Hard stop if NVMe offload is requested but AIO isn't working
+    if not args.cpu_offload and not AIO_AVAILABLE:
+        print("\n  !! FATAL: NVMe offload requires AIO but it's not available.")
+        print("     The 228B model WILL exceed CPU RAM + swap without NVMe.")
+        print("     Fix: sudo apt install libaio-dev")
+        print("     Then restart this script.\n")
+        sys.exit(1)
+
+    data = load_training_data()
 
     from transformers import (
         AutoModelForCausalLM, AutoTokenizer,
