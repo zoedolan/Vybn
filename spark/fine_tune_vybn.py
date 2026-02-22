@@ -10,22 +10,8 @@ DeepSpeed ZeRO-3 is purpose-built for this problem:
   - Handles gradient computation through offloaded parameters
   - Can overflow to NVMe for models that exceed GPU+CPU
 
-CRITICAL DISCOVERY (2026-02-22):
-  With trust_remote_code=True FP8 models like MiniMax-M2.5, using ANY form 
-  of deepspeed.zero.Init() (either via HfDeepSpeedConfig or explicit wrapper) 
-  during from_pretrained() causes a catastrophic silent failure. The code will 
-  intercept parameter creation, register the shapes as empty meta tensors, and 
-  throw away the 220GB of actual safetensor weight data.
-
-  THE FIX: We have a 640GB swap/RAM runway. We must load the model the ugly, 
-  brute-force way entirely outside of ZeRO-3. It will take ~15 minutes and fill 
-  up the swap file, but the real weights will be materialized in CPU memory. 
-  Only AFTER from_pretrained() completes do we hand the massive model over 
-  to the Trainer, which will initialize the DeepSpeed engine, partition the 
-  weights, and flush them to the NVMe offload cache.
-
 Architecture:
-  - FP8 weights loaded to CPU/Swap, then partitioned by ZeRO-3 via Trainer
+  - 4-bit QLoRA weights loaded with bnb_4bit_quant_storage=torch.bfloat16
   - LoRA rank 8 on attention projections (BF16 adapters)
   - ZeRO Stage 3 with NVMe offload for params + optimizer
   - Gradient checkpointing + micro-batch 1
@@ -62,31 +48,8 @@ os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
 
 import torch
 import deepspeed
-
-# ============================================================================
-# MONKEY-PATCH: Prevent DeepSpeedEngine from calling .bfloat16() on the model.
-# With 228B params this materializes all ZeRO-3 partitioned parameters back
-# into CPU RAM simultaneously, causing OOM. Since the engine init handles
-# dtype internally, the bulk cast is unnecessary.
-# ============================================================================
-import deepspeed.runtime.engine as _ds_engine
-_orig_configure_distributed = _ds_engine.DeepSpeedEngine._configure_distributed_model
-def _patched_configure_distributed(self_ds, model_ds):
-    _saved_bf16 = getattr(model_ds, "bfloat16", None)
-    _saved_half = getattr(model_ds, "half", None)
-    if _saved_bf16 is not None:
-        model_ds.bfloat16 = lambda: model_ds
-    if _saved_half is not None:
-        model_ds.half = lambda: model_ds
-    try:
-        _orig_configure_distributed(self_ds, model_ds)
-    finally:
-        if _saved_bf16 is not None:
-            model_ds.bfloat16 = _saved_bf16
-        if _saved_half is not None:
-            model_ds.half = _saved_half
-_ds_engine.DeepSpeedEngine._configure_distributed_model = _patched_configure_distributed
-print("[PATCH] DeepSpeedEngine._configure_distributed_model: .bfloat16()/.half() no-ops")
+from transformers.integrations import HfDeepSpeedConfig
+from transformers import BitsAndBytesConfig
 
 try:
     from cognitive_scheduler import CognitiveTrainer
@@ -221,7 +184,7 @@ def find_attention_targets(model):
     attn_keywords = ["q_proj", "k_proj", "v_proj", "o_proj", "q_a_proj", "q_b_proj", "kv_a_proj", "kv_b_proj"]
     found = set()
     for name, module in model.named_modules():
-        if isinstance(module, torch.nn.Linear):
+        if isinstance(module, torch.nn.Linear) or "Linear" in str(type(module)):
             short = name.split(".")[-1]
             if any(k in short.lower() for k in attn_keywords):
                 found.add(short)
@@ -314,9 +277,9 @@ def build_deepspeed_config(args):
             "overlap_comm": True,
             "contiguous_gradients": True,
             "sub_group_size": 1e7,
-            "reduce_bucket_size": 5e7,
-            "stage3_prefetch_bucket_size": 5e7,
-            "stage3_param_persistence_threshold": 0,
+            "reduce_bucket_size": "auto",
+            "stage3_prefetch_bucket_size": "auto",
+            "stage3_param_persistence_threshold": "auto",
             "stage3_max_live_parameters": 1e8,
             "stage3_max_reuse_distance": 1e8,
             "stage3_gather_16bit_weights_on_model_save": True,
@@ -350,7 +313,7 @@ def main():
 
     offload_mode = "CPU" if args.cpu_offload else "NVMe"
     print(f"\n=== Vybn Fine-Tune: MiniMax-M2.5 on DGX Spark ===")
-    print(f"    DeepSpeed ZeRO-3 + PEFT LoRA | Offload: {offload_mode}")
+    print(f"    DeepSpeed ZeRO-3 + QLoRA | Offload: {offload_mode}")
 
     check_environment()
     data = load_training_data()
@@ -374,23 +337,24 @@ def main():
         json.dump(ds_config, f, indent=2)
     print(f"  DS config: {ds_config_path}")
     print(f"  Offload: {offload_mode}, NVMe path: {OFFLOAD_DIR}")
+    
+    # MUST come before model load for ZeRO-3 to intercept from_pretrained()
+    dschf = HfDeepSpeedConfig(ds_config)
 
     gc.collect()
     torch.cuda.empty_cache()
     print(f"\n  Pre-load: {mem_stats()}")
 
-    # ========================================================================
-    # MODEL LOADING: BRUTE-FORCE NATIVE LOAD INTO SWAP
-    #
-    # We DO NOT register HfDeepSpeedConfig here. We DO NOT use deepspeed.zero.Init().
-    # We intentionally force HuggingFace to load all 228GB of data natively
-    # into CPU memory and our 640GB swap file. Only then will we hand the fully 
-    # materialized model to Trainer to partition it.
-    # ========================================================================
-    print(f"\n== Loading model (Brute Force Native) ==")
-    print(f"   NO zero.Init() context. NO HfDeepSpeedConfig.")
-    print(f"   The model will load entirely into CPU/Swap.")
-    print(f"   Expect this to take much longer than before (minutes, not seconds).\\n")
+    print(f"\n== Loading model (QLoRA + ZeRO-3) ==")
+    
+    quant_storage_dtype = torch.bfloat16
+    bnb_config = BitsAndBytesConfig(
+        load_in_4bit=True,
+        bnb_4bit_compute_dtype=torch.bfloat16,
+        bnb_4bit_quant_type="nf4",
+        bnb_4bit_use_double_quant=True,
+        bnb_4bit_quant_storage=quant_storage_dtype,
+    )
 
     load_start = time.time()
     model = None
@@ -400,9 +364,10 @@ def main():
             model = AutoModelForCausalLM.from_pretrained(
                 args.model,
                 trust_remote_code=True,
-                torch_dtype=torch.bfloat16,
+                torch_dtype=quant_storage_dtype,
+                quantization_config=bnb_config,
                 attn_implementation=attn_impl,
-                device_map="cpu", # explicitly force to CPU/Swap instead of random spreading
+                # NO device_map="auto" -- let DeepSpeed ZeRO-3 handle placement
             )
             load_elapsed = time.time() - load_start
             print(f"\n  + Model loaded in {load_elapsed/60:.1f} minutes (attn={attn_impl})")
@@ -481,10 +446,6 @@ def main():
         local_rank=int(os.environ.get("LOCAL_RANK", 0)),
     )
 
-    # Note: Because the model is already instantiated in full CPU/swap memory, 
-    # Trainer's DeepSpeed engine initialization will partition the weights 
-    # directly out of system memory and flush them to the NVMe offload cache 
-    # before training steps begin.
     trainer = Trainer(
         model=model,
         args=training_args,
