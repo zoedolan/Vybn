@@ -60,8 +60,27 @@ import json
 import os
 import sys
 import time
-import torch
 from pathlib import Path
+
+# Skip CUDA version check in DeepSpeed JIT compilation.
+# MUST BE SET BEFORE DEEPSPEED IS IMPORTED.
+# The Spark has CUDA 13.0 but PyTorch was compiled with 12.8.
+# When NVMe offload initializes, it tries to JIT compile the AIO extension.
+# Without this, it hits a CUDAMismatchException and dies.
+os.environ["DS_SKIP_CUDA_CHECK"] = "1"
+
+# Single-GPU distributed setup for DeepSpeed.
+# Without these, DeepSpeed's init_distributed() falls through to
+# mpi_discovery() which requires mpi4py. Setting MASTER_ADDR, RANK,
+# and WORLD_SIZE tells DeepSpeed to init via NCCL with a single process.
+os.environ.setdefault("MASTER_ADDR", "localhost")
+os.environ.setdefault("MASTER_PORT", "29500")
+os.environ.setdefault("RANK", "0")
+os.environ.setdefault("LOCAL_RANK", "0")
+os.environ.setdefault("WORLD_SIZE", "1")
+
+import torch
+import deepspeed
 
 # Cognitive scheduler -- the training loop that observes itself
 try:
@@ -79,23 +98,6 @@ except ImportError:
 
 # Reduce CUDA memory fragmentation
 os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
-
-# Skip CUDA version check in DeepSpeed JIT compilation.
-# The Spark has CUDA 13.0 but PyTorch was compiled with 12.8.
-# We use torch_adam=true to avoid fused kernels, but this env var
-# prevents any other DeepSpeed ops from choking on the mismatch.
-os.environ["DS_SKIP_CUDA_CHECK"] = "1"
-
-# Single-GPU distributed setup for DeepSpeed.
-# Without these, DeepSpeed's init_distributed() falls through to
-# mpi_discovery() which requires mpi4py (not installed). Setting
-# MASTER_ADDR, RANK, and WORLD_SIZE tells DeepSpeed to init via
-# NCCL with a single process -- no MPI needed.
-os.environ.setdefault("MASTER_ADDR", "localhost")
-os.environ.setdefault("MASTER_PORT", "29500")
-os.environ.setdefault("RANK", "0")
-os.environ.setdefault("LOCAL_RANK", "0")
-os.environ.setdefault("WORLD_SIZE", "1")
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 TRAINING_DATA = REPO_ROOT / "spark" / "training_data" / "training_data.json"
@@ -205,9 +207,8 @@ def check_environment():
         print(f"    pip install {' '.join(missing)}")
         sys.exit(1)
 
-    import deepspeed
     print(f"  DeepSpeed  : {deepspeed.__version__}")
-    print(f"  DS_SKIP_CUDA_CHECK=1 (CUDA 13.0 vs PyTorch 12.8 workaround)")
+    print(f"  DS_SKIP_CUDA_CHECK=1 (CUDA 13.0 vs PyTorch 12.8 workaround applied before import)")
 
     print()
     return dev
