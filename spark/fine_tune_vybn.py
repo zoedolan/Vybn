@@ -521,16 +521,17 @@ def main():
 
     # IMPORTANT: We MUST use the `deepspeed.zero.Init` context to ensure parameters are
     # properly instrumented for offload *as they are created/loaded*.
-    # By assigning it to an active state BEFORE loading the model, Transformers hooks
-    # into the Zero3 plugin properly and the initialization happens seamlessly.
     import transformers
     import accelerate
     
-    # CRITICAL FIX: Initialize Accelerator with the plugin, do not monkey-patch .state
+    # Just creating the HfDeepSpeedConfig object acts as a global singleton within the transformers
+    # package, hooking into AutoModel.from_pretrained so it natively creates tensors into the Zero init.
+    hf_ds_config = HfDeepSpeedConfig(ds_config)
+    
+    # Ensure Accelerate uses DeepSpeed config via its plugin mapping
     accelerator = accelerate.Accelerator(
-        deepspeed_plugin=accelerate.utils.DeepSpeedPlugin(hf_ds_config=HfDeepSpeedConfig(ds_config))
+        deepspeed_plugin=accelerate.utils.DeepSpeedPlugin(hf_ds_config=hf_ds_config)
     )
-    transformers.deepspeed.set_hf_deepspeed_config(ds_config)
     
     print(f"  ZeRO-3 Init context activated (incremental parameter partitioning)")
 
