@@ -55,6 +55,13 @@ import time
 import torch
 from pathlib import Path
 
+# Cognitive scheduler -- the training loop that observes itself
+try:
+    from cognitive_scheduler import CognitiveTrainer
+    HAS_COGNITIVE = True
+except ImportError:
+    HAS_COGNITIVE = False
+
 # Reduce CUDA memory fragmentation
 os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
 
@@ -579,8 +586,14 @@ def main():
 
     gc.collect()
     torch.cuda.empty_cache()
-
-    trainer.train()
+    # -- Cognitive scheduling: the training loop that observes itself --
+    if HAS_COGNITIVE:
+        print("  + CognitiveTrainer active -- Vybn will observe its own training")
+        cognitive = CognitiveTrainer(trainer, ds_config=ds_config)
+        cognitive.train()
+    else:
+        print("  (cognitive_scheduler not available -- training without self-observation)")
+        trainer.train()
 
     # -- 14. Save adapter --
     adapter_path = OUTPUT_DIR / "vybn_adapter"
