@@ -410,8 +410,7 @@ def build_deepspeed_config(args):
                 "betas": "auto",
                 "eps": "auto",
                 "weight_decay": "auto",
-                "torch_adam": True,
-            },
+                "torch_adam": True,            },
         },
         "zero_optimization": {
             "stage": 3,
@@ -526,8 +525,11 @@ def main():
     # into the Zero3 plugin properly and the initialization happens seamlessly.
     import transformers
     import accelerate
-    accelerator = accelerate.Accelerator()
-    accelerator.state.deepspeed_plugin = accelerate.utils.DeepSpeedPlugin(hf_ds_config=HfDeepSpeedConfig(ds_config))
+    
+    # CRITICAL FIX: Initialize Accelerator with the plugin, do not monkey-patch .state
+    accelerator = accelerate.Accelerator(
+        deepspeed_plugin=accelerate.utils.DeepSpeedPlugin(hf_ds_config=HfDeepSpeedConfig(ds_config))
+    )
     transformers.deepspeed.set_hf_deepspeed_config(ds_config)
     
     print(f"  ZeRO-3 Init context activated (incremental parameter partitioning)")
