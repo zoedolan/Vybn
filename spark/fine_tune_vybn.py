@@ -27,14 +27,25 @@ Memory budget on DGX Spark:
   - Model: ~228 GB FP8  →  CPU-only offload leaves only ~22 GB headroom
   - NVMe: 3.67 TB  →  effectively unlimited headroom for offload
 
-NVMe offload fix (2026-02-22):
-  pin_memory=True requires page-locked physical RAM for DMA buffers.
-  When CPU RAM is saturated (110/121GB used), the kernel can't allocate
-  pinned pages, and DeepSpeed silently falls back to regular memory
-  which gets swapped. The offload_cache stays empty (4KB) while the
-  model pages through kernel swap at orders of magnitude slower speed.
-  Fix: pin_memory=False uses pageable buffers for NVMe I/O. Slower DMA
-  but the NVMe path actually activates.
+NVMe offload strategy (2026-02-22):
+  pin_memory=True with layer-sharded loading. The sharded loader keeps
+  RAM at ~5GB during init (one layer at a time), so the kernel can
+  allocate page-locked DMA buffers without fragmentation. DeepSpeed's
+  libaio then writes parameters to NVMe via proper DMA transfers.
+
+  Without sharded loading, from_pretrained saturates RAM and the kernel
+  can't allocate pinned pages. The NVMe DMA pathway silently fails and
+  the offload_cache stays empty (4KB) while the model pages through
+  kernel swap at orders of magnitude slower speed.
+
+  IMPORTANT: Always use --sharded-load for NVMe offload on the Spark.
+  Run layer_sharded_loader.py --split first to prepare the shards.
+
+  NVMe buffer sizing (2026-02-22):
+  buffer_size must be >= the largest single parameter in the model.
+  MiniMax-M2.5's embed_tokens is vocab_size * hidden_size = ~615M
+  elements. buffer_size=1e9 provides headroom. buffer_count=4 at
+  BF16 = 8GB pinned RAM, well within the Spark's 122GB.
 
 Prerequisites:
     pip install deepspeed transformers peft bitsandbytes accelerate datasets
@@ -45,11 +56,11 @@ Prerequisites:
     sudo swapon /swapfile
 
 Usage:
-    python3 fine_tune_vybn.py                 # NVMe offload (default)
+    python3 fine_tune_vybn.py --sharded-load path/to/shards  # recommended
+    python3 fine_tune_vybn.py                 # NVMe offload (standard load)
     python3 fine_tune_vybn.py --cpu-offload   # CPU-only (may OOM)
     python3 fine_tune_vybn.py --epochs 5 --lr 1e-4
     python3 fine_tune_vybn.py --max-seq-len 512
-    python3 fine_tune_vybn.py --sharded-load /path/to/shards  # layer-sharded init
 """
 
 import argparse
@@ -313,15 +324,23 @@ def build_deepspeed_config(args):
     which requires JIT compilation and fails on CUDA version mismatch
     (Spark has CUDA 13.0, PyTorch compiled with 12.8).
 
-    pin_memory=False (2026-02-22 fix): pinned (page-locked) memory
-    cannot be swapped out by the OS. When RAM is saturated (~110/121GB),
-    the kernel cannot allocate new pinned pages, and DeepSpeed's NVMe
-    DMA pathway silently fails. The offload_cache stays empty while
-    the model pages through kernel swap instead. Using pageable buffers
-    is slower (extra memcpy for DMA) but the NVMe path actually activates.
+    pin_memory=True (2026-02-22 fix): with layer-sharded loading,
+    RAM stays at ~5GB during init. The kernel can allocate page-locked
+    DMA buffers without fragmentation, and DeepSpeed's libaio properly
+    writes parameters to NVMe. Without sharded loading, RAM saturates
+    and pinned allocation fails silently.
 
-    All values that must match TrainingArguments are set to "auto"
-    so DeepSpeed inherits from HF Trainer.
+    buffer_size=1e9 (2026-02-22 fix): DeepSpeed's NVMe param swapper
+    asserts that each parameter fits within a single swap buffer.
+    MiniMax-M2.5's embed_tokens = vocab_size * hidden_size = ~615M
+    elements. Previous buffer_size of 5e7 was 12x too small.
+    1e9 gives comfortable headroom. 4 buffers × 1e9 × 2 bytes (BF16)
+    = 8GB pinned RAM -- safe within the Spark's 122GB.
+
+    Batch-related values are set to concrete numbers (not "auto")
+    because --sharded-load triggers ZeRO-3 Init via from_config
+    before HF Trainer gets a chance to resolve "auto" strings.
+    DeepSpeed tries to multiply "auto" * "auto" and crashes.
     """
     OFFLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -331,15 +350,15 @@ def build_deepspeed_config(args):
         param_offload = {
             "device": "nvme",
             "nvme_path": str(OFFLOAD_DIR),
-            "pin_memory": False,
+            "pin_memory": True,
             "buffer_count": 4,
-            "buffer_size": 5e7,
-            "max_in_cpu": 5e8,
+            "buffer_size": 1e9,
+            "max_in_cpu": 2e9,
         }
         optimizer_offload = {
             "device": "nvme",
             "nvme_path": str(OFFLOAD_DIR),
-            "pin_memory": False,
+            "pin_memory": True,
             "buffer_count": 4,
             "fast_init": False,
         }
@@ -381,9 +400,9 @@ def build_deepspeed_config(args):
             "stage3_max_reuse_distance": 1e8,
             "stage3_gather_16bit_weights_on_model_save": True,
         },
-        "gradient_accumulation_steps": "auto",
-        "train_micro_batch_size_per_gpu": "auto",
-        "gradient_clipping": "auto",
+        "gradient_accumulation_steps": 8,
+        "train_micro_batch_size_per_gpu": 1,
+        "gradient_clipping": 0.3,
         "steps_per_print": 1,
         "wall_clock_breakdown": False,
     }
@@ -421,7 +440,7 @@ def main():
 
     print("\n=== Vybn Fine-Tune: MiniMax-M2.5 on DGX Spark ===")
     print("    DeepSpeed ZeRO-3 + PEFT LoRA (native FP8, adapters in BF16)")
-    print(f"    Offload: {offload_mode} (pin_memory=False -- pageable DMA buffers)")
+    print(f"    Offload: {offload_mode} (pin_memory=True, sharded loading for clean DMA)")
 
     # -- 1. Environment --
     check_environment()
@@ -462,8 +481,9 @@ def main():
     print(f"  Optimizer: PyTorch native Adam (torch_adam=true, no fused kernel)")
     if use_nvme:
         print(f"  NVMe offload path: {OFFLOAD_DIR}")
-        print(f"  NVMe buffer: max_in_cpu=5e8, buffer_size=5e7, pin_memory=False")
-        print(f"  (pin_memory=False: pageable DMA -- slower but allocates reliably)")
+        print(f"  NVMe buffer: max_in_cpu=2e9, buffer_size=1e9, pin_memory=True")
+        print(f"  (buffer_size=1e9: must exceed largest param, embed_tokens is ~615M)")
+        print(f"  (pin_memory=True: page-locked DMA buffers for proper libaio writes)")
     else:
         print(f"  WARNING: CPU-only offload -- 228GB model in 250GB CPU space is tight!")
 
@@ -621,7 +641,7 @@ def main():
     print(f"\n== Training (DeepSpeed ZeRO-3) ==")
     print(f"   {len(tokenized)} examples, {args.epochs} epochs, batch=1, grad_accum={args.grad_accum}")
     print(f"   Effective steps: {effective_steps}")
-    print(f"   Offload: {offload_mode} (pin_memory=False)")
+    print(f"   Offload: {offload_mode} (pin_memory=True)")
     print(f"   Optimizer: PyTorch Adam (no fused kernel)")
     print(f"   Max seq len: {args.max_seq_len}")
     print(f"   Pre-train: {mem_stats()}\n")
