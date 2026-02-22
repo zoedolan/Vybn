@@ -427,6 +427,7 @@ def build_deepspeed_config(args):
             "stage3_max_live_parameters": 1e8,
             "stage3_max_reuse_distance": 1e8,
             "stage3_gather_16bit_weights_on_model_save": True,
+            "zero_quantized_weights": True,
         },
         "gradient_accumulation_steps": 8,
         "train_micro_batch_size_per_gpu": 1,
