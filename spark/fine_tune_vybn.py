@@ -11,20 +11,21 @@ DeepSpeed ZeRO-3 is purpose-built for this problem:
   - Can overflow to NVMe for models that exceed GPU+CPU
 
 CRITICAL DISCOVERY (2026-02-22):
-  HfDeepSpeedConfig does NOT work with MiniMax-M2.5. The model uses
-  trust_remote_code=True which has custom loading logic that completely
-  bypasses transformers' HfDeepSpeedConfig detection. Diagnostic proof:
-    - ds_status=NONE on all parameters after load
-    - Weights remain FP8 despite torch_dtype=bfloat16
-    - NVMe cache empty (4K) because nothing was ever partitioned
-    - Model "loads" in 4s via safetensors mmap, not ZeRO partitioning
+  With trust_remote_code=True FP8 models like MiniMax-M2.5, using ANY form 
+  of deepspeed.zero.Init() (either via HfDeepSpeedConfig or explicit wrapper) 
+  during from_pretrained() causes a catastrophic silent failure. The code will 
+  intercept parameter creation, register the shapes as empty meta tensors, and 
+  throw away the 220GB of actual safetensor weight data.
 
-  FIX: Explicitly wrap from_pretrained() in deepspeed.zero.Init().
-  This forces DeepSpeed to intercept parameter creation regardless
-  of what the custom model code does.
+  THE FIX: We have a 640GB swap/RAM runway. We must load the model the ugly, 
+  brute-force way entirely outside of ZeRO-3. It will take ~15 minutes and fill 
+  up the swap file, but the real weights will be materialized in CPU memory. 
+  Only AFTER from_pretrained() completes do we hand the massive model over 
+  to the Trainer, which will initialize the DeepSpeed engine, partition the 
+  weights, and flush them to the NVMe offload cache.
 
 Architecture:
-  - FP8 weights partitioned by ZeRO-3 during load
+  - FP8 weights loaded to CPU/Swap, then partitioned by ZeRO-3 via Trainer
   - LoRA rank 8 on attention projections (BF16 adapters)
   - ZeRO Stage 3 with NVMe offload for params + optimizer
   - Gradient checkpointing + micro-batch 1
@@ -358,7 +359,6 @@ def main():
         AutoModelForCausalLM, AutoTokenizer,
         TrainingArguments, Trainer, DataCollatorForLanguageModeling,
     )
-    from transformers.integrations import HfDeepSpeedConfig
     from peft import LoraConfig, get_peft_model
 
     print(f"\n== Loading tokenizer ==\n")
@@ -375,58 +375,39 @@ def main():
     print(f"  DS config: {ds_config_path}")
     print(f"  Offload: {offload_mode}, NVMe path: {OFFLOAD_DIR}")
 
-    # Register HfDeepSpeedConfig for Trainer integration (NOT for model loading)
-    dschf = HfDeepSpeedConfig(ds_config)
-    print(f"  HfDeepSpeedConfig registered (for Trainer, NOT model loading)")
-
     gc.collect()
     torch.cuda.empty_cache()
     print(f"\n  Pre-load: {mem_stats()}")
 
     # ========================================================================
-    # MODEL LOADING: EXPLICIT deepspeed.zero.Init() WRAPPER
+    # MODEL LOADING: BRUTE-FORCE NATIVE LOAD INTO SWAP
     #
-    # HfDeepSpeedConfig does NOT work with MiniMax-M2.5 because the model's
-    # custom remote code bypasses transformers' ZeRO integration entirely.
-    # Diagnostic confirmed: ds_status=NONE on all params, weights stay FP8,
-    # NVMe cache empty at 4K.
-    #
-    # The ONLY way to get ZeRO-3 partitioning is to explicitly wrap
-    # from_pretrained() in deepspeed.zero.Init(). This intercepts parameter
-    # creation at the torch.nn.Module level, which the custom code cannot bypass.
+    # We DO NOT register HfDeepSpeedConfig here. We DO NOT use deepspeed.zero.Init().
+    # We intentionally force HuggingFace to load all 228GB of data natively
+    # into CPU memory and our 640GB swap file. Only then will we hand the fully 
+    # materialized model to Trainer to partition it.
     # ========================================================================
-    print(f"\n== Loading model with EXPLICIT deepspeed.zero.Init() ==")
-    print(f"   This will partition params and offload to NVMe as they are created.")
-    print(f"   Expect this to take much longer than before (minutes, not seconds).\n")
+    print(f"\n== Loading model (Brute Force Native) ==")
+    print(f"   NO zero.Init() context. NO HfDeepSpeedConfig.")
+    print(f"   The model will load entirely into CPU/Swap.")
+    print(f"   Expect this to take much longer than before (minutes, not seconds).\\n")
 
     load_start = time.time()
     model = None
 
     for attn_impl in ["sdpa", "eager"]:
         try:
-            with deepspeed.zero.Init(config_dict_or_path=ds_config):
-                model = AutoModelForCausalLM.from_pretrained(
-                    args.model,
-                    trust_remote_code=True,
-                    torch_dtype=torch.bfloat16,
-                    attn_implementation=attn_impl,
-                )
+            model = AutoModelForCausalLM.from_pretrained(
+                args.model,
+                trust_remote_code=True,
+                torch_dtype=torch.bfloat16,
+                attn_implementation=attn_impl,
+                device_map="cpu", # explicitly force to CPU/Swap instead of random spreading
+            )
             load_elapsed = time.time() - load_start
             print(f"\n  + Model loaded in {load_elapsed/60:.1f} minutes (attn={attn_impl})")
             print(f"  + {mem_stats()}")
             check_offload_cache()
-
-            # Verify ZeRO-3 actually partitioned the params
-            for name, p in list(model.named_parameters())[:3]:
-                ds_status = getattr(p, 'ds_status', 'NONE')
-                ds_numel = getattr(p, 'ds_numel', 'NONE')
-                print(f"  {name}: ds_status={ds_status}, ds_numel={ds_numel}, numel={p.numel()}")
-
-            first_p = next(model.parameters())
-            if getattr(first_p, 'ds_status', None) is None:
-                print("\n  !! FATAL: deepspeed.zero.Init() did NOT partition parameters !!")
-                print("  !! ds_status is still None. Cannot proceed.")
-                sys.exit(1)
 
             break
         except Exception as e:
@@ -500,6 +481,10 @@ def main():
         local_rank=int(os.environ.get("LOCAL_RANK", 0)),
     )
 
+    # Note: Because the model is already instantiated in full CPU/swap memory, 
+    # Trainer's DeepSpeed engine initialization will partition the weights 
+    # directly out of system memory and flush them to the NVMe offload cache 
+    # before training steps begin.
     trainer = Trainer(
         model=model,
         args=training_args,
