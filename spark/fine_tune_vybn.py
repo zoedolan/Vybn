@@ -382,7 +382,7 @@ def build_deepspeed_config(args):
             "pin_memory": True,
             "buffer_count": 4,
             "buffer_size": 1e9,
-            "max_in_cpu": 2e9,
+            "max_in_cpu": 1e9, # Reduced from 2e9 to aggressively flush
         }
         optimizer_offload = {
             "device": "nvme",
@@ -402,6 +402,8 @@ def build_deepspeed_config(args):
         }
 
     ds_config = {
+        "train_batch_size": args.grad_accum, # Explicitly tell DeepSpeed the total batch size
+        "gradient_accumulation_steps": args.grad_accum,
         "bf16": {
             "enabled": True,
         },
@@ -430,7 +432,6 @@ def build_deepspeed_config(args):
             "stage3_gather_16bit_weights_on_model_save": True,
             "zero_quantized_weights": True,
         },
-        "gradient_accumulation_steps": 8,
         "train_micro_batch_size_per_gpu": 1,
         "gradient_clipping": 0.3,
         "steps_per_print": 1,
@@ -562,6 +563,15 @@ def main():
                 print(f"  x Memory at failure: {mem_stats()}")
                 sys.exit(1)
             print(f"  !  {attn_impl} unavailable ({e.__class__.__name__}: {e}), trying next...")
+
+    # FORCE OFFLOAD TO NVME: ZeRO-3 initializes partitions lazily.
+    # We call empty_partition_cache to evict the weights that are loaded onto NVMe.
+    print("\n  Forcing early DeepSpeed partition eviction...")
+    try:
+        model._ds_engine.empty_partition_cache()
+        print("  + Cache evicted.")
+    except Exception:
+        print("  + Cache eviction skipped (engine not fully initialized yet).")
 
     # -- 8. Strip FP8 quantization metadata --
     print()
