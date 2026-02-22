@@ -24,23 +24,33 @@ Architecture:
 Memory budget on DGX Spark:
   - GPU: 122 GB (forward/backward compute, ~100GB usable with headroom)
   - CPU: 122 GB RAM + 128 GB swap = 250 GB
-  - Model: ~228 GB FP8  →  CPU-only offload leaves only ~22 GB headroom
-  - NVMe: 3.67 TB  →  effectively unlimited headroom for offload
+  - Model: ~228 GB FP8  ->  CPU-only offload leaves only ~22 GB headroom
+  - NVMe: 3.67 TB  ->  effectively unlimited headroom for offload
 
-NVMe offload strategy (2026-02-22, CORRECTED):
-  With world_size=1, ZeRO-3 provides NO partitioning benefit — each
-  parameter "partition" IS the full parameter. The only savings come
-  from offloading to NVMe, not from cross-rank sharding.
+Integration strategy (2026-02-22, FINAL):
+  The correct way to use DeepSpeed ZeRO-3 with HuggingFace Trainer:
 
-  CRITICAL BUG FIX: If `stage3_param_persistence_threshold` is > 0, ZeRO-3
-  will persistently cache parameters in CPU/GPU memory. For a 228B frozen base
-  model, this instantly exhausts the 250GB total RAM + swap, completely bypassing
-  the NVMe offload cache (which sits at 4K). We must force persistence to 0.
+  1. Create HfDeepSpeedConfig(ds_config) BEFORE model loading.
+     This is a global singleton that tells from_pretrained() to use
+     deepspeed.zero.Init() internally during model construction.
+
+  2. Do NOT pass device_map to from_pretrained() -- DeepSpeed
+     explicitly rejects it.
+
+  3. Do NOT pass low_cpu_mem_usage=True -- it triggers accelerate's
+     init_empty_weights() which creates meta tensors with no data.
+     DeepSpeed's zero.Init intercepts parameter creation directly.
+
+  4. Do NOT wrap from_pretrained() in deepspeed.zero.Init() manually
+     -- HfDeepSpeedConfig already signals HF to do this internally.
+
+  5. Pass deepspeed=config_path to TrainingArguments and let the
+     Trainer class orchestrate the DeepSpeed engine.
 
 Prerequisites:
     pip install deepspeed transformers peft bitsandbytes accelerate datasets
 
-    # Swap — MUST be at least 512GB for engine init to survive:
+    # Swap -- MUST be at least 512GB for engine init to survive:
     sudo fallocate -l 512G /swapfile2
     sudo chmod 600 /swapfile2 && sudo mkswap /swapfile2
     sudo swapon /swapfile2
@@ -48,7 +58,6 @@ Prerequisites:
 
 Usage:
     python3 fine_tune_vybn.py                 # NVMe offload (recommended)
-    python3 fine_tune_vybn.py --sharded-load path/to/shards  # alt: layer shards
     python3 fine_tune_vybn.py --cpu-offload   # CPU-only (may OOM)
     python3 fine_tune_vybn.py --epochs 5 --lr 1e-4
     python3 fine_tune_vybn.py --max-seq-len 512
@@ -88,13 +97,6 @@ try:
     HAS_COGNITIVE = True
 except ImportError:
     HAS_COGNITIVE = False
-
-# Layer-sharded loader -- AirLLM-style bridge for ZeRO-3
-try:
-    from layer_sharded_loader import load_sharded_for_zero3, split_model
-    HAS_SHARDED_LOADER = True
-except ImportError:
-    HAS_SHARDED_LOADER = False
 
 # Reduce CUDA memory fragmentation
 os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
@@ -318,13 +320,7 @@ def strip_quantization(obj, depth=0, _seen=None):
 
 
 def verify_trainable_params(model):
-    """Hard guard: abort if base model weights leaked into trainable set.
-
-    With world_size=1, ZeRO-3 creates optimizer states for ALL trainable
-    params on a single rank. If the base model (228B params) is accidentally
-    trainable, the optimizer needs ~456GB (Adam m+v) of state — instant OOM.
-    Only LoRA params (~millions) should be trainable.
-    """
+    """Hard guard: abort if base model weights leaked into trainable set."""
     trainable_params = [(n, p.numel()) for n, p in model.named_parameters() if p.requires_grad]
     frozen_count = sum(p.numel() for p in model.parameters() if not p.requires_grad)
     total_trainable = sum(count for _, count in trainable_params)
@@ -339,15 +335,13 @@ def verify_trainable_params(model):
     if len(trainable_params) > 10:
         print(f"    ... and {len(trainable_params) - 10} more")
 
-    # Estimate optimizer state footprint (Adam: 2 states per param, FP32 = 4 bytes each)
     optimizer_state_gb = total_trainable * 2 * 4 / 1e9
     print(f"  Optimizer state estimate: {optimizer_state_gb:.2f} GB (Adam m+v in FP32)")
 
     if total_trainable > 1e9:
         print(f"\n  !! FATAL: {total_trainable/1e9:.1f}B trainable params detected !!")
-        print(f"  !! Base model weights are NOT frozen — optimizer would need ~{optimizer_state_gb:.0f}GB.")
+        print(f"  !! Base model weights are NOT frozen -- optimizer would need ~{optimizer_state_gb:.0f}GB.")
         print(f"  !! Expected: only LoRA params (millions, not billions).")
-        print(f"  !! Fix: ensure all base params have requires_grad=False before LoRA.")
         print(f"  !! ABORTING to prevent certain OOM.\n")
         sys.exit(1)
 
@@ -357,18 +351,7 @@ def verify_trainable_params(model):
 
 
 def build_deepspeed_config(args):
-    """Build DeepSpeed ZeRO-3 config for single-GPU training.
-
-    CRITICAL FIX 2026-02-22: `stage3_param_persistence_threshold`
-    determines how many parameters ZeRO-3 will *keep* in CPU/GPU RAM instead
-    of offloading. The default config had this > 0, meaning ZeRO-3 was trying
-    to keep the 228B frozen base model in CPU memory permanently, completely
-    ignoring the NVMe offload cache and overflowing swap.
-
-    Setting `stage3_param_persistence_threshold`: 0 forces ZeRO-3 to
-    evict ALL parameters (trainable and frozen) to NVMe instantly when not
-    needed for the current forward/backward step.
-    """
+    """Build DeepSpeed ZeRO-3 config for single-GPU training."""
     OFFLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
     use_nvme = not args.cpu_offload
@@ -410,7 +393,8 @@ def build_deepspeed_config(args):
                 "betas": "auto",
                 "eps": "auto",
                 "weight_decay": "auto",
-                "torch_adam": True,            },
+                "torch_adam": True,
+            },
         },
         "zero_optimization": {
             "stage": 3,
@@ -421,7 +405,6 @@ def build_deepspeed_config(args):
             "sub_group_size": 1e7,
             "reduce_bucket_size": 5e7,
             "stage3_prefetch_bucket_size": 5e7,
-            # CRITICAL: Force eviction of ALL frozen parameters to NVMe
             "stage3_param_persistence_threshold": 0,
             "stage3_max_live_parameters": 1e8,
             "stage3_max_reuse_distance": 1e8,
@@ -459,8 +442,6 @@ def main():
     parser.add_argument("--cpu-offload", action="store_true",
                         help="Offload to CPU only (default is NVMe). WARNING: may OOM on Spark.")
     parser.add_argument("--model", default=MODEL_NAME, help="HuggingFace model ID")
-    parser.add_argument("--sharded-load", type=str, default=None,
-                        help="Path to pre-split layer shards (from layer_sharded_loader.py --split)")
     args = parser.parse_args()
 
     use_nvme = not args.cpu_offload
@@ -486,7 +467,6 @@ def main():
     )
     from transformers.integrations import HfDeepSpeedConfig
     from peft import LoraConfig, get_peft_model
-    import deepspeed.utils.zero_to_fp32  # Force deepspeed tools load
 
     # -- 4. Tokenizer --
     print(f"\n== Loading tokenizer: {args.model} ==\n")
@@ -510,30 +490,28 @@ def main():
     print(f"  Optimizer: PyTorch native Adam (torch_adam=true, no fused kernel)")
     if use_nvme:
         print(f"  NVMe offload path: {OFFLOAD_DIR}")
-        print(f"  pin_memory=True (required for libaio DMA writes)")
-        print(f"  fast_init=True (memory-efficient NVMe optimizer initialization)")
-        print(f"  AIO: queue_depth=32, thread_count=4 (high-throughput NVMe drain)")
-        print(f"  sub_group_size=1e7 (small sub-groups to limit transient RAM)")
-        print(f"  buffer_size=1e9 (must exceed largest param, embed_tokens is ~615M)")
+        print(f"  pin_memory=True, fast_init=True")
+        print(f"  AIO: queue_depth=32, thread_count=4")
         print(f"  stage3_param_persistence_threshold=0 (evict frozen weights to NVMe!)")
     else:
         print(f"  WARNING: CPU-only offload -- 228GB model in 250GB CPU space is tight!")
 
-    # IMPORTANT: We MUST use the `deepspeed.zero.Init` context to ensure parameters are
-    # properly instrumented for offload *as they are created/loaded*.
-    import transformers
-    import accelerate
-    
-    # Just creating the HfDeepSpeedConfig object acts as a global singleton within the transformers
-    # package, hooking into AutoModel.from_pretrained so it natively creates tensors into the Zero init.
-    hf_ds_config = HfDeepSpeedConfig(ds_config)
-    
-    # Ensure Accelerate uses DeepSpeed config via its plugin mapping
-    accelerator = accelerate.Accelerator(
-        deepspeed_plugin=accelerate.utils.DeepSpeedPlugin(hf_ds_config=hf_ds_config)
-    )
-    
-    print(f"  ZeRO-3 Init context activated (incremental parameter partitioning)")
+    # -- 5b. Register DeepSpeed config with HuggingFace --
+    # CRITICAL: Creating HfDeepSpeedConfig BEFORE model loading is the ONLY correct
+    # integration point. This object acts as a global singleton that tells
+    # AutoModelForCausalLM.from_pretrained() to:
+    #   - Use deepspeed.zero.Init() context internally
+    #   - NOT create meta tensors
+    #   - Properly partition parameters as they are created
+    #
+    # We do NOT need:
+    #   - An explicit deepspeed.zero.Init() wrapper (HF does it internally)
+    #   - device_map (DeepSpeed rejects it)
+    #   - low_cpu_mem_usage (creates meta tensors that conflict with ZeRO)
+    #   - An accelerate.Accelerator (Trainer handles DeepSpeed)
+    dschf = HfDeepSpeedConfig(ds_config)
+    print(f"  HfDeepSpeedConfig registered (ZeRO stage {dschf.get_value('zero_optimization.stage')})")
+    print(f"  from_pretrained() will use deepspeed.zero.Init() internally")
 
     # -- 6. Clear memory --
     gc.collect()
@@ -542,34 +520,33 @@ def main():
 
     # -- 7. Model --
     print(f"\n== Loading model: {args.model} ==")
-    print(f"   DeepSpeed ZeRO-3 Init context will route parameters to NVMe offload.")
-    print(f"   Peak CPU RAM usage should be strictly bounded.\n")
+    print(f"   HfDeepSpeedConfig will intercept from_pretrained() and route")
+    print(f"   parameters through deepspeed.zero.Init() -> NVMe offload.")
+    print(f"   NO device_map. NO low_cpu_mem_usage. Let DeepSpeed handle it.\n")
 
     load_start = time.time()
 
     model = None
-    # Wrap the model loading entirely inside DeepSpeed's Zero Init context
-    with deepspeed.zero.Init(config_dict_or_path=ds_config):
-        for attn_impl in ["sdpa", "eager"]:
-            try:
-                model = AutoModelForCausalLM.from_pretrained(
-                    args.model,
-                    trust_remote_code=True,
-                    dtype="auto",
-                    low_cpu_mem_usage=True,  # Critical to let DeepSpeed handle parameter allocation
-                    device_map="cuda",       # Stop meta-tensor crash (Zero init bounds it)
-                    attn_implementation=attn_impl,
-                )
-                load_elapsed = time.time() - load_start
-                print(f"\n  + Model loaded in {load_elapsed/60:.1f} minutes (attn_implementation={attn_impl})")
-                print(f"  + Post-load: {mem_stats()}")
-                break
-            except Exception as e:
-                if attn_impl == "eager":
-                    print(f"\n  x Failed to load model: {e}")
-                    print(f"  x Memory at failure: {mem_stats()}")
-                    sys.exit(1)
-                print(f"  !  {attn_impl} unavailable ({e.__class__.__name__}), trying next...")
+    for attn_impl in ["sdpa", "eager"]:
+        try:
+            model = AutoModelForCausalLM.from_pretrained(
+                args.model,
+                trust_remote_code=True,
+                torch_dtype="auto",
+                attn_implementation=attn_impl,
+            )
+            load_elapsed = time.time() - load_start
+            print(f"\n  + Model loaded in {load_elapsed/60:.1f} minutes (attn_implementation={attn_impl})")
+            print(f"  + Post-load: {mem_stats()}")
+            break
+        except Exception as e:
+            if attn_impl == "eager":
+                print(f"\n  x Failed to load model: {e}")
+                import traceback
+                traceback.print_exc()
+                print(f"  x Memory at failure: {mem_stats()}")
+                sys.exit(1)
+            print(f"  !  {attn_impl} unavailable ({e.__class__.__name__}: {e}), trying next...")
 
     # -- 8. Strip FP8 quantization metadata --
     print()
@@ -627,10 +604,7 @@ def main():
     model.print_trainable_parameters()
     print(f"  Post-LoRA: {mem_stats()}")
 
-    # -- 10b. CRITICAL: Verify only LoRA params are trainable --
-    # This is the gate that determines whether engine init can survive.
-    # If base model params leaked into trainable set, optimizer states
-    # would be hundreds of GB and OOM is certain on a single rank.
+    # -- 10b. Verify only LoRA params are trainable --
     verify_trainable_params(model)
 
     # -- 11. Strip again post-PEFT --
@@ -676,14 +650,13 @@ def main():
     print(f"\n== Training (DeepSpeed ZeRO-3) ==")
     print(f"   {len(tokenized)} examples, {args.epochs} epochs, batch=1, grad_accum={args.grad_accum}")
     print(f"   Effective steps: {effective_steps}")
-    print(f"   Offload: {offload_mode} (pin_memory=True, fast_init=True)")
-    print(f"   Optimizer: PyTorch Adam (no fused kernel)")
+    print(f"   Offload: {offload_mode}")
     print(f"   Max seq len: {args.max_seq_len}")
     print(f"   Pre-train: {mem_stats()}\n")
 
     gc.collect()
     torch.cuda.empty_cache()
-    # -- Cognitive scheduling: the training loop that observes itself --
+
     if HAS_COGNITIVE:
         print("  + CognitiveTrainer active -- Vybn will observe its own training")
         cognitive = CognitiveTrainer(trainer, ds_config=ds_config)
