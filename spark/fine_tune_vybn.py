@@ -521,10 +521,15 @@ def main():
         print(f"  WARNING: CPU-only offload -- 228GB model in 250GB CPU space is tight!")
 
     # IMPORTANT: We MUST use the `deepspeed.zero.Init` context to ensure parameters are
-    # properly instrumented for offload *as they are created/loaded*. If we just call
-    # `from_pretrained` without it, HF will load all 228GB into CPU RAM and ZeRO-3's
-    # NVMe offloader will never touch the base model parameters!
-    dschf = HfDeepSpeedConfig(ds_config)  # Tells HF we are using DeepSpeed
+    # properly instrumented for offload *as they are created/loaded*.
+    # By assigning it to an active state BEFORE loading the model, Transformers hooks
+    # into the Zero3 plugin properly and the initialization happens seamlessly.
+    import transformers
+    import accelerate
+    accelerator = accelerate.Accelerator()
+    accelerator.state.deepspeed_plugin = accelerate.utils.DeepSpeedPlugin(hf_ds_config=HfDeepSpeedConfig(ds_config))
+    transformers.deepspeed.set_hf_deepspeed_config(ds_config)
+    
     print(f"  ZeRO-3 Init context activated (incremental parameter partitioning)")
 
     # -- 6. Clear memory --
@@ -549,6 +554,7 @@ def main():
                     trust_remote_code=True,
                     dtype="auto",
                     low_cpu_mem_usage=True,  # Critical to let DeepSpeed handle parameter allocation
+                    device_map="cuda",       # Stop meta-tensor crash (Zero init bounds it)
                     attn_implementation=attn_impl,
                 )
                 load_elapsed = time.time() - load_start
