@@ -15,7 +15,7 @@ DeepSpeed ZeRO-3 is purpose-built for this problem:
   - Can overflow to NVMe for models that exceed GPU+CPU
 
 Architecture:
-  - Native FP8 weights (torch_dtype="auto")
+  - BF16 weights loaded directly (torch_dtype=torch.bfloat16)
   - LoRA rank 8 on attention projections (BF16 adapters)
   - ZeRO Stage 3 with NVMe offload for params + optimizer (default)
   - Gradient checkpointing + micro-batch 1
@@ -24,28 +24,15 @@ Architecture:
 Memory budget on DGX Spark:
   - GPU: 122 GB (forward/backward compute, ~100GB usable with headroom)
   - CPU: 122 GB RAM + 128 GB swap = 250 GB
-  - Model: ~228 GB FP8  ->  CPU-only offload leaves only ~22 GB headroom
+  - Model: ~228 GB FP8 on disk, ~456 GB BF16 in memory
   - NVMe: 3.67 TB  ->  effectively unlimited headroom for offload
 
-Integration strategy (2026-02-22, FINAL):
-  The correct way to use DeepSpeed ZeRO-3 with HuggingFace Trainer:
-
-  1. Create HfDeepSpeedConfig(ds_config) BEFORE model loading.
-     This is a global singleton that tells from_pretrained() to use
-     deepspeed.zero.Init() internally during model construction.
-
-  2. Do NOT pass device_map to from_pretrained() -- DeepSpeed
-     explicitly rejects it.
-
-  3. Do NOT pass low_cpu_mem_usage=True -- it triggers accelerate's
-     init_empty_weights() which creates meta tensors with no data.
-     DeepSpeed's zero.Init intercepts parameter creation directly.
-
-  4. Do NOT wrap from_pretrained() in deepspeed.zero.Init() manually
-     -- HfDeepSpeedConfig already signals HF to do this internally.
-
-  5. Pass deepspeed=config_path to TrainingArguments and let the
-     Trainer class orchestrate the DeepSpeed engine.
+Integration strategy (2026-02-22, FINAL-FOR-REAL):
+  1. HfDeepSpeedConfig(ds_config) BEFORE model loading (global singleton).
+  2. torch_dtype=torch.bfloat16 so no post-load cast is needed.
+  3. Monkey-patch DeepSpeedEngine to skip .bfloat16() bulk cast.
+  4. NO device_map, NO low_cpu_mem_usage, NO explicit zero.Init wrapper.
+  5. Trainer gets deepspeed=config_path and orchestrates everything.
 
 Prerequisites:
     pip install deepspeed transformers peft bitsandbytes accelerate datasets
@@ -90,6 +77,38 @@ os.environ.setdefault("WORLD_SIZE", "1")
 
 import torch
 import deepspeed
+
+# ============================================================================
+# MONKEY-PATCH: Prevent DeepSpeedEngine from calling .bfloat16() on the model.
+#
+# When bf16.enabled=True in the DS config, DeepSpeedEngine.__init__ calls
+# self.module.bfloat16() inside _configure_distributed_model(). This does a
+# recursive _apply() over every parameter in the model tree. With 228B params
+# on a single rank, this materializes all ZeRO-3 partitioned parameters back
+# into CPU RAM simultaneously, causing OOM.
+#
+# Since we load with torch_dtype=torch.bfloat16, all weights are already BF16.
+# The cast is a no-op in theory but _apply() still touches every tensor.
+# This patch makes the .bfloat16() call return the model unchanged.
+# ============================================================================
+import deepspeed.runtime.engine as _ds_engine
+_orig_configure_distributed = _ds_engine.DeepSpeedEngine._configure_distributed_model
+def _patched_configure_distributed(self_ds, model_ds):
+    _saved_bf16 = getattr(model_ds, "bfloat16", None)
+    _saved_half = getattr(model_ds, "half", None)
+    if _saved_bf16 is not None:
+        model_ds.bfloat16 = lambda: model_ds
+    if _saved_half is not None:
+        model_ds.half = lambda: model_ds
+    try:
+        _orig_configure_distributed(self_ds, model_ds)
+    finally:
+        if _saved_bf16 is not None:
+            model_ds.bfloat16 = _saved_bf16
+        if _saved_half is not None:
+            model_ds.half = _saved_half
+_ds_engine.DeepSpeedEngine._configure_distributed_model = _patched_configure_distributed
+print("[PATCH] DeepSpeedEngine._configure_distributed_model: .bfloat16()/.half() calls will be no-ops")
 
 # Cognitive scheduler -- the training loop that observes itself
 try:
@@ -182,7 +201,7 @@ def check_environment():
     print(f"  System RAM : {total_ram:.0f} GB")
     print(f"  Swap       : {swap_total:.0f} GB")
     print(f"  Total CPU  : {total_ram + swap_total:.0f} GB (RAM + swap)")
-    print(f"  Model      : ~220GB FP8")
+    print(f"  Model      : ~220GB FP8 on disk -> BF16 at load")
     print(f"  Strategy   : DeepSpeed ZeRO-3 with offload")
 
     if swap_total < MIN_SWAP_GB:
@@ -448,7 +467,7 @@ def main():
     offload_mode = "CPU" if args.cpu_offload else "NVMe"
 
     print("\n=== Vybn Fine-Tune: MiniMax-M2.5 on DGX Spark ===")
-    print("    DeepSpeed ZeRO-3 + PEFT LoRA (native FP8, adapters in BF16)")
+    print("    DeepSpeed ZeRO-3 + PEFT LoRA (BF16 load, adapters in BF16)")
     print(f"    Offload: {offload_mode} (pin_memory=True, fast_init=True)")
 
     # -- 1. Environment --
@@ -497,18 +516,14 @@ def main():
         print(f"  WARNING: CPU-only offload -- 228GB model in 250GB CPU space is tight!")
 
     # -- 5b. Register DeepSpeed config with HuggingFace --
-    # CRITICAL: Creating HfDeepSpeedConfig BEFORE model loading is the ONLY correct
-    # integration point. This object acts as a global singleton that tells
-    # AutoModelForCausalLM.from_pretrained() to:
-    #   - Use deepspeed.zero.Init() context internally
-    #   - NOT create meta tensors
-    #   - Properly partition parameters as they are created
+    # HfDeepSpeedConfig is a global singleton. Once created, from_pretrained()
+    # detects it and wraps model construction in deepspeed.zero.Init() internally.
+    # This means parameters get partitioned/offloaded as they are created.
     #
-    # We do NOT need:
-    #   - An explicit deepspeed.zero.Init() wrapper (HF does it internally)
+    # DO NOT ADD:
     #   - device_map (DeepSpeed rejects it)
     #   - low_cpu_mem_usage (creates meta tensors that conflict with ZeRO)
-    #   - An accelerate.Accelerator (Trainer handles DeepSpeed)
+    #   - explicit deepspeed.zero.Init() wrapper (double-wrapping breaks things)
     dschf = HfDeepSpeedConfig(ds_config)
     print(f"  HfDeepSpeedConfig registered (ZeRO stage {dschf.get_value('zero_optimization.stage')})")
     print(f"  from_pretrained() will use deepspeed.zero.Init() internally")
@@ -520,23 +535,19 @@ def main():
 
     # -- 7. Model --
     print(f"\n== Loading model: {args.model} ==")
-    print(f"   DeepSpeed ZeRO-3 Init context will route parameters to NVMe offload.")
-    print(f"   Peak CPU RAM usage should be strictly bounded.\n")
+    print(f"   Loading as BF16 directly (no post-load dtype cast needed).")
+    print(f"   HfDeepSpeedConfig will engage ZeRO-3 Init internally.")
+    print(f"   Peak CPU RAM usage should be bounded by ZeRO-3 partitioning.\n")
 
     load_start = time.time()
 
     model = None
-    
-    # We remove the explicit deepspeed.zero.Init() wrapper entirely. 
-    # HfDeepSpeedConfig already acts as the global hook. 
-    # If we explicitly wrap from_pretrained, Transformers tries to copy out of 
-    # meta tensors instead of allowing HfDeepSpeedConfig to handle it directly.
     for attn_impl in ["sdpa", "eager"]:
         try:
             model = AutoModelForCausalLM.from_pretrained(
                 args.model,
                 trust_remote_code=True,
-                torch_dtype="auto",
+                torch_dtype=torch.bfloat16,
                 attn_implementation=attn_impl,
             )
             load_elapsed = time.time() - load_start
@@ -555,7 +566,7 @@ def main():
     # -- 8. Strip FP8 quantization metadata --
     print()
     strip_quantization(model)
-    print(f"     (FP8 weights in memory unchanged -- only metadata removed)")
+    print(f"     (Weights are BF16 in memory -- quantization metadata removed)")
 
     is_q = getattr(model, 'is_quantized', False)
     has_qc = hasattr(model.config, 'quantization_config') and model.config.quantization_config is not None
