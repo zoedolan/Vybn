@@ -32,30 +32,27 @@ NVMe offload strategy (2026-02-22, CORRECTED):
   parameter "partition" IS the full parameter. The only savings come
   from offloading to NVMe, not from cross-rank sharding.
 
-  The kill chain was: HfDeepSpeedConfig intercepts from_pretrained,
-  loading stays at ~4GB (works). LoRA attaches (~4GB, works). Then
-  trainer.train() triggers DeepSpeed engine init, which must materialize
-  optimizer states (Adam m + v) for all trainable params. With pinned
-  memory enabled and slow AIO config, the system OOM'd during this
-  materialization phase.
+  The kill chain: HfDeepSpeedConfig intercepts from_pretrained, loading
+  stays at ~4GB (works). LoRA attaches (~4GB, works). Then trainer.train()
+  triggers DeepSpeed engine init, which must materialize optimizer states
+  (Adam m + v) for all trainable params before offloading to NVMe.
 
-  Fixes applied:
-  - pin_memory=False: pinned (page-locked) DMA buffers burn scarce RAM
-    during engine init. DeepSpeed docs confirm this causes OOM. Disabling
-    pinning trades throughput for survivability.
-  - fast_init=True for NVMe optimizer offload: changes the optimizer
-    initialization path to be more memory-efficient during init.
-  - AIO tuned: queue_depth=32, thread_count=4 to ensure NVMe drain
-    keeps pace with optimizer state materialization rate (~4x throughput
-    vs the default queue_depth=8, thread_count=1).
-  - sub_group_size=1e7 (reduced from 5e7): limits transient memory per
-    sub-group during engine init, at the cost of slower init time.
-  - Trainable param guard: script aborts if trainable params > 1B,
-    which would mean the base model is not properly frozen and optimizer
-    states would be hundreds of GB (certain OOM).
+  pin_memory=True is REQUIRED — libaio needs page-locked DMA buffers
+  to actually submit writes to NVMe. Setting pin_memory=False causes
+  the offload_cache to stay at 4K (no writes happen at all).
 
-  The standard from_pretrained path works fine. The sharded loader is
-  NOT needed — HfDeepSpeedConfig handles incremental loading.
+  The real bottleneck was twofold:
+  1. AIO undertuned: queue_depth=8, thread_count=1 gave ~200MB/s drain,
+     too slow for optimizer state materialization rate.
+  2. Insufficient swap: 122GB RAM + 128GB swap = 250GB is not enough
+     headroom to absorb the optimizer init spike while NVMe catches up.
+
+  Fixes:
+  - AIO: queue_depth=32, thread_count=4 (~4x throughput)
+  - fast_init=True for NVMe optimizer offload (more efficient init path)
+  - sub_group_size=1e7 (reduced from 5e7, less transient RAM per group)
+  - Trainable param guard: abort if >1B trainable (base model not frozen)
+  - MANUAL: increase swap to 512GB on the Spark (see Prerequisites below)
 
   buffer_size=1e9 must exceed the largest single parameter.
   MiniMax-M2.5's embed_tokens is vocab_size * hidden_size = ~615M.
@@ -63,10 +60,11 @@ NVMe offload strategy (2026-02-22, CORRECTED):
 Prerequisites:
     pip install deepspeed transformers peft bitsandbytes accelerate datasets
 
-    # Swap (if not already configured):
-    sudo fallocate -l 128G /swapfile
-    sudo chmod 600 /swapfile && sudo mkswap /swapfile
-    sudo swapon /swapfile
+    # Swap — MUST be at least 512GB for engine init to survive:
+    sudo fallocate -l 512G /swapfile2
+    sudo chmod 600 /swapfile2 && sudo mkswap /swapfile2
+    sudo swapon /swapfile2
+    # Verify: free -g should show ~640GB total (128 + 512)
 
 Usage:
     python3 fine_tune_vybn.py                 # NVMe offload (recommended)
@@ -126,6 +124,9 @@ OFFLOAD_DIR = REPO_ROOT / "spark" / "offload_cache"
 MODEL_NAME = "MiniMaxAI/MiniMax-M2.5"
 
 DEFAULT_GPU_HEADROOM_GB = 22
+
+# Minimum swap required for engine init to survive (GB)
+MIN_SWAP_GB = 400
 
 
 def mem_stats() -> str:
@@ -199,6 +200,19 @@ def check_environment():
     print(f"  Total CPU  : {total_ram + swap_total:.0f} GB (RAM + swap)")
     print(f"  Model      : ~220GB FP8")
     print(f"  Strategy   : DeepSpeed ZeRO-3 with offload")
+
+    if swap_total < MIN_SWAP_GB:
+        print(f"\n  !! WARNING: Swap is {swap_total:.0f}GB but need >= {MIN_SWAP_GB}GB !!")
+        print(f"  !! Engine init materializes optimizer states through CPU RAM.")
+        print(f"  !! Without enough swap, OOM killer fires before NVMe drains.")
+        print(f"  !! Fix:")
+        print(f"  !!   sudo fallocate -l 512G /swapfile2")
+        print(f"  !!   sudo chmod 600 /swapfile2 && sudo mkswap /swapfile2")
+        print(f"  !!   sudo swapon /swapfile2")
+        print(f"  !! Then re-run this script.\n")
+        resp = input("  Continue anyway? (y/N): ").strip().lower()
+        if resp != 'y':
+            sys.exit(1)
 
     missing = []
     for pkg in ["transformers", "peft", "deepspeed", "accelerate", "datasets"]:
@@ -370,19 +384,15 @@ def build_deepspeed_config(args):
     The only memory savings come from offloading to NVMe.
 
     Default mode is NVMe offload because the Spark's CPU memory
-    (122 GB RAM + 128 GB swap = 250 GB) is too tight for a 228 GB
-    FP8 model plus DeepSpeed's internal buffers.
+    (122 GB RAM + swap) is too tight for a 228 GB FP8 model plus
+    DeepSpeed's internal buffers.
 
-    Key config decisions (2026-02-22 fix):
+    pin_memory=True is REQUIRED for NVMe offload. DeepSpeed's libaio
+    needs page-locked DMA buffers to actually submit writes to disk.
+    Without pinning, the offload_cache stays empty (no writes happen).
 
-    pin_memory=False: page-locked (pinned) DMA buffers consume scarce
-    RAM that's needed during engine init. DeepSpeed's own issue tracker
-    documents pinned memory causing OOM. Disabling pinning trades some
-    I/O throughput for survivability during the critical init phase.
-
-    fast_init=True: DeepSpeed provides this specifically for NVMe
-    optimizer offload — it changes the initialization path to be more
-    memory-efficient when creating optimizer states.
+    fast_init=True: DeepSpeed provides this for NVMe optimizer offload
+    to use a more memory-efficient initialization path.
 
     AIO tuning: queue_depth=32, thread_count=4 gives ~4x the NVMe
     drain throughput vs defaults (queue_depth=8, thread_count=1).
@@ -409,7 +419,7 @@ def build_deepspeed_config(args):
         param_offload = {
             "device": "nvme",
             "nvme_path": str(OFFLOAD_DIR),
-            "pin_memory": False,
+            "pin_memory": True,
             "buffer_count": 4,
             "buffer_size": 1e9,
             "max_in_cpu": 2e9,
@@ -417,18 +427,18 @@ def build_deepspeed_config(args):
         optimizer_offload = {
             "device": "nvme",
             "nvme_path": str(OFFLOAD_DIR),
-            "pin_memory": False,
+            "pin_memory": True,
             "buffer_count": 4,
             "fast_init": True,
         }
     else:
         param_offload = {
             "device": "cpu",
-            "pin_memory": False,
+            "pin_memory": True,
         }
         optimizer_offload = {
             "device": "cpu",
-            "pin_memory": False,
+            "pin_memory": True,
         }
 
     ds_config = {
@@ -499,7 +509,7 @@ def main():
 
     print("\n=== Vybn Fine-Tune: MiniMax-M2.5 on DGX Spark ===")
     print("    DeepSpeed ZeRO-3 + PEFT LoRA (native FP8, adapters in BF16)")
-    print(f"    Offload: {offload_mode} (pin_memory=False, fast_init=True)")
+    print(f"    Offload: {offload_mode} (pin_memory=True, fast_init=True)")
 
     # -- 1. Environment --
     check_environment()
@@ -540,7 +550,7 @@ def main():
     print(f"  Optimizer: PyTorch native Adam (torch_adam=true, no fused kernel)")
     if use_nvme:
         print(f"  NVMe offload path: {OFFLOAD_DIR}")
-        print(f"  pin_memory=False (avoids OOM from page-locked buffer allocation)")
+        print(f"  pin_memory=True (required for libaio DMA writes)")
         print(f"  fast_init=True (memory-efficient NVMe optimizer initialization)")
         print(f"  AIO: queue_depth=32, thread_count=4 (high-throughput NVMe drain)")
         print(f"  sub_group_size=1e7 (small sub-groups to limit transient RAM)")
@@ -708,7 +718,7 @@ def main():
     print(f"\n== Training (DeepSpeed ZeRO-3) ==")
     print(f"   {len(tokenized)} examples, {args.epochs} epochs, batch=1, grad_accum={args.grad_accum}")
     print(f"   Effective steps: {effective_steps}")
-    print(f"   Offload: {offload_mode} (pin_memory=False, fast_init=True)")
+    print(f"   Offload: {offload_mode} (pin_memory=True, fast_init=True)")
     print(f"   Optimizer: PyTorch Adam (no fused kernel)")
     print(f"   Max seq len: {args.max_seq_len}")
     print(f"   Pre-train: {mem_stats()}\n")
