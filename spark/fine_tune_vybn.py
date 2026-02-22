@@ -45,6 +45,9 @@ os.environ.setdefault("RANK", "0")
 os.environ.setdefault("LOCAL_RANK", "0")
 os.environ.setdefault("WORLD_SIZE", "1")
 os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+# Prevent any fallback to NCCL (Blackwell CUDA 12.1 unsupported by current PyTorch)
+os.environ.setdefault("NCCL_P2P_DISABLE", "1")
+os.environ.setdefault("NCCL_IB_DISABLE", "1")
 
 import torch
 import deepspeed
@@ -289,6 +292,8 @@ def build_deepspeed_config(args):
         "gradient_clipping": 0.3,
         "steps_per_print": 1,
         "wall_clock_breakdown": False,
+        # Force gloo for single-GPU Blackwell (NCCL fails on CUDA 12.1)
+        "communication_data_type": "fp32",
     }
     if use_nvme:
         ds_config["aio"] = {
@@ -299,6 +304,27 @@ def build_deepspeed_config(args):
             "overlap_events": True,
         }
     return ds_config
+
+
+def init_single_gpu_distributed():
+    """Pre-initialize torch.distributed with gloo backend for single-GPU.
+
+    The DGX Spark's Blackwell GB10 reports CUDA capability 12.1, but the
+    installed PyTorch (compiled for up to 12.0) cannot initialize NCCL on
+    this architecture. Since world_size=1, all collective operations
+    (all_gather, reduce_scatter) are no-ops regardless of backend. Using
+    gloo lets DeepSpeed ZeRO-3 function without ever touching NCCL.
+    """
+    if torch.distributed.is_initialized():
+        return
+
+    print("  + Pre-init distributed: gloo backend (single-GPU, NCCL bypass)")
+    torch.distributed.init_process_group(
+        backend="gloo",
+        rank=0,
+        world_size=1,
+    )
+    print(f"  + Distributed initialized: backend=gloo, rank=0, world_size=1")
 
 
 def main():
@@ -420,6 +446,14 @@ def main():
     # -- Tokenize --
     print()
     tokenized = sharegpt_to_dataset(data, tokenizer, args.max_seq_len)
+
+    # -- Initialize distributed before TrainingArguments --
+    # This MUST happen before TrainingArguments is created, because its __init__
+    # triggers PartialState -> DeepSpeed dist init, which defaults to NCCL.
+    # NCCL fails on Blackwell CUDA 12.1 (PyTorch compiled for <= 12.0).
+    # Pre-initializing with gloo makes DeepSpeed skip its own init.
+    print()
+    init_single_gpu_distributed()
 
     # -- Training --
     training_args = TrainingArguments(
