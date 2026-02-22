@@ -11,13 +11,13 @@ DeepSpeed ZeRO-3 is purpose-built for this problem:
   - Can overflow to NVMe for models that exceed GPU+CPU
 
 Architecture:
-  - 4-bit QLoRA weights loaded with bnb_4bit_quant_storage=torch.bfloat16
+  - FP8 weights (Native) loaded to CPU/Swap, then partitioned by ZeRO-3
   - LoRA rank 8 on attention projections (BF16 adapters)
   - ZeRO Stage 3 with NVMe offload for params + optimizer
   - Gradient checkpointing + micro-batch 1
 
 Prerequisites:
-    pip install deepspeed transformers peft bitsandbytes accelerate datasets
+    pip install deepspeed transformers peft accelerate datasets
 
     # Swap -- at least 512GB recommended:
     sudo fallocate -l 512G /swapfile2
@@ -49,7 +49,8 @@ os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
 import torch
 import deepspeed
 from transformers.integrations import HfDeepSpeedConfig
-from transformers import BitsAndBytesConfig
+# NOTE: Removed BitsAndBytesConfig because MiniMax-M2.5 is natively FP8 quantized.
+# Attempting to re-quantize to 4-bit causes a config collision in Transformers.
 
 try:
     from cognitive_scheduler import CognitiveTrainer
@@ -136,6 +137,7 @@ def check_environment():
         if resp != 'y':
             sys.exit(1)
     missing = []
+    # Removed bitsandbytes from requirement check since we rely on native FP8
     for pkg in ["transformers", "peft", "deepspeed", "accelerate", "datasets"]:
         try:
             __import__(pkg)
@@ -312,8 +314,8 @@ def main():
     args = parser.parse_args()
 
     offload_mode = "CPU" if args.cpu_offload else "NVMe"
-    print(f"\n=== Vybn Fine-Tune: MiniMax-M2.5 on DGX Spark ===")
-    print(f"    DeepSpeed ZeRO-3 + QLoRA | Offload: {offload_mode}")
+    print(f"\\n=== Vybn Fine-Tune: MiniMax-M2.5 on DGX Spark ===")
+    print(f"    DeepSpeed ZeRO-3 + Native FP8 | Offload: {offload_mode}")
 
     check_environment()
     data = load_training_data()
@@ -324,7 +326,7 @@ def main():
     )
     from peft import LoraConfig, get_peft_model
 
-    print(f"\n== Loading tokenizer ==\n")
+    print(f"\\n== Loading tokenizer ==\\n")
     tokenizer = AutoTokenizer.from_pretrained(args.model, trust_remote_code=True)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
@@ -343,18 +345,12 @@ def main():
 
     gc.collect()
     torch.cuda.empty_cache()
-    print(f"\n  Pre-load: {mem_stats()}")
+    print(f"\\n  Pre-load: {mem_stats()}")
 
-    print(f"\n== Loading model (QLoRA + ZeRO-3) ==")
+    print(f"\\n== Loading model (Native FP8 + ZeRO-3) ==")
     
-    quant_storage_dtype = torch.bfloat16
-    bnb_config = BitsAndBytesConfig(
-        load_in_4bit=True,
-        bnb_4bit_compute_dtype=torch.bfloat16,
-        bnb_4bit_quant_type="nf4",
-        bnb_4bit_use_double_quant=True,
-        bnb_4bit_quant_storage=quant_storage_dtype,
-    )
+    # NOTE: MiniMax-M2.5 is inherently FP8. We removed BitsAndBytesConfig to prevent conflict.
+    # The model will load as FP8 (or bf16 if auto-casted), then ZeRO-3 will partition it.
 
     load_start = time.time()
     model = None
@@ -364,20 +360,21 @@ def main():
             model = AutoModelForCausalLM.from_pretrained(
                 args.model,
                 trust_remote_code=True,
-                torch_dtype=quant_storage_dtype,
-                quantization_config=bnb_config,
+                # Use standard BF16 dtype request; if model is FP8, it might cast or keep as FP8 depending on implementation.
+                # But we MUST NOT pass quantization_config=bnb_config.
+                dtype=torch.bfloat16, 
                 attn_implementation=attn_impl,
                 # NO device_map="auto" -- let DeepSpeed ZeRO-3 handle placement
             )
             load_elapsed = time.time() - load_start
-            print(f"\n  + Model loaded in {load_elapsed/60:.1f} minutes (attn={attn_impl})")
+            print(f"\\n  + Model loaded in {load_elapsed/60:.1f} minutes (attn={attn_impl})")
             print(f"  + {mem_stats()}")
             check_offload_cache()
 
             break
         except Exception as e:
             if attn_impl == "eager":
-                print(f"\n  x Failed: {e}")
+                print(f"\\n  x Failed: {e}")
                 import traceback
                 traceback.print_exc()
                 print(f"  x {mem_stats()}")
@@ -454,7 +451,7 @@ def main():
     )
 
     effective_steps = len(tokenized) * args.epochs // args.grad_accum
-    print(f"\n== Training ==")
+    print(f"\\n== Training ==")
     print(f"   {len(tokenized)} examples, {args.epochs} epochs, grad_accum={args.grad_accum}")
     print(f"   Effective steps: {effective_steps}")
     print(f"   {mem_stats()}")
@@ -473,8 +470,7 @@ def main():
 
     adapter_path = OUTPUT_DIR / "vybn_adapter"
     model.save_pretrained(str(adapter_path))
-    tokenizer.save_pretrained(str(adapter_path))
-    print(f"\n  + Adapter saved to {adapter_path}")
+    tokenizer.save_pretrained(str(adapter_path))\n    print(f"\\n  + Adapter saved to {adapter_path}")
     print(f"  + {mem_stats()}")
     print(f"  + Done.")
 
