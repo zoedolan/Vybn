@@ -28,7 +28,6 @@ news_sources:
     categories: ["cs.AI", "cs.CL", "cs.LG"]
     max_daily: 20
   lab_blogs:
-    - {url: "https://www.anthropic.com/research", label: "Anthropic"}
     - {url: "https://openai.com/blog", label: "OpenAI"}
     - {url: "https://deepmind.google/research/", label: "DeepMind"}
 
