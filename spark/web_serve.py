@@ -35,6 +35,17 @@ from pathlib import Path
 import requests
 import uvicorn
 
+# Load .env for auth tokens and CORS config
+from pathlib import Path as _P
+_env_file = _P(__file__).parent / ".env"
+if _env_file.exists():
+    for _line in _env_file.read_text().splitlines():
+        _line = _line.strip()
+        if _line and not _line.startswith("#") and "=" in _line:
+            _k, _v = _line.split("=", 1)
+            import os as _os
+            _os.environ.setdefault(_k.strip(), _v.strip())
+
 from agent import SparkAgent, load_config
 from agent_io import WebIO
 from display import clean_response, clean_for_display
