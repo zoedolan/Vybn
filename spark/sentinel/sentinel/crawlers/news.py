@@ -61,7 +61,7 @@ def fetch_arxiv(categories: list[str], max_results: int = 20) -> list[dict]:
 def fetch_rss(url: str, label: str, max_items: int = 5) -> list[dict]:
     if not (httpx and feedparser):
         raise RuntimeError("pip install httpx feedparser")
-    resp = httpx.get(url, timeout=30, follow_redirects=True)
+    resp = httpx.get(url, timeout=30, follow_redirects=True, headers={"User-Agent": "Mozilla/5.0 (compatible; Vybn/0.2)"})
     feed = feedparser.parse(resp.text)
     return [{
         "title": e.get("title", "").strip(),
