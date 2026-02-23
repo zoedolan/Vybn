@@ -1,6 +1,10 @@
 """Claim extraction via local M2.5.
 
 Decomposes raw news into: (factual_kernel, interpretive_frame, excitement_level)
+
+Temperance: excitement is MULTIPLIED by the temperance_factor.
+A factor of 0.6 means "keep 60% of the original excitement" --
+i.e., discount interpretive framing by 40%.
 """
 import json
 import re
@@ -9,9 +13,9 @@ from typing import Any
 
 EXTRACTION_PROMPT = """Extract each distinct claim as a JSON array. Per claim:
 {{"kernel": "<bare fact, no editorializing>",
- "frame": "<author's interpretive spin, if any>",
- "excitement": <0.0-1.0 how hyperbolic>,
- "category": "<ai|politics|crypto|geopolitics|science|other>"}}
+  "frame": "<author's interpretive spin, if any>",
+  "excitement": <0.0-1.0 how hyperbolic>,
+  "category": "<ai|politics|crypto|geopolitics|science|other>"}}
 
 JSON array only. No commentary.
 
@@ -28,10 +32,13 @@ def extract_claims(text: str, source_label: str,
     except json.JSONDecodeError:
         match = re.search(r"\[.*\]", raw, re.DOTALL)
         claims = json.loads(match.group()) if match else []
+
     for c in claims:
         c["source"] = source_label
+        # FIX: multiply by temperance_factor, not divide.
+        # temperance_factor=0.6 means keep 60% of excitement.
         c["effective_excitement"] = min(1.0,
-            c.get("excitement", 0.5) / max(temperance_factor, 0.1))
+            c.get("excitement", 0.5) * temperance_factor)
     return claims
 
 
@@ -43,6 +50,7 @@ def process_news_bundle(bundle_path: str | Path, config: dict,
         temperance_map[tw.get("label", tw["handle"])] = tw.get("temperance_factor", 1.0)
     for sub in config.get("news_sources", {}).get("substacks", []):
         temperance_map[sub.get("label", "")] = sub.get("temperance_factor", 1.0)
+
     all_claims: list[dict] = []
     for item in bundle:
         text = f"{item.get('title', '')}\n{item.get('summary', '')}"
