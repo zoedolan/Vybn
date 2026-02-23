@@ -113,7 +113,8 @@ def run_cycle(config: dict, local_only: bool = False):
 
     if not local_only:
         state = synthesize(claims, config["output"]["belief_state"],
-                           make_frontier_fn(config))
+                           make_frontier_fn(config),
+                           config=config)
         log.info(f"Belief state updated: {state.get('last_updated')}")
     else:
         log.info("Local-only mode: skipping frontier synthesis")
