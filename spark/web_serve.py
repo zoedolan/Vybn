@@ -22,8 +22,8 @@ Usage:
     source ~/vybn-venv/bin/activate
     python web_serve.py
 
-Then open http://192.168.1.4:8000 (local) or
-http://100.96.30.85:8000 (Tailscale) on your phone.
+Then open http://<LAN_IP>:8080 (local) or
+http://<TAILSCALE_IP>:8080 (Tailscale) on your phone.
 """
 
 import asyncio
@@ -34,6 +34,17 @@ from pathlib import Path
 
 import requests
 import uvicorn
+
+# Load .env for auth tokens and CORS config
+from pathlib import Path as _P
+_env_file = _P(__file__).parent / ".env"
+if _env_file.exists():
+    for _line in _env_file.read_text().splitlines():
+        _line = _line.strip()
+        if _line and not _line.startswith("#") and "=" in _line:
+            _k, _v = _line.split("=", 1)
+            import os as _os
+            _os.environ.setdefault(_k.strip(), _v.strip())
 
 from agent import SparkAgent, load_config
 from agent_io import WebIO
@@ -109,13 +120,20 @@ def main():
     print(f"  heartbeat: active")
     print(f"  inbox:     watching")
     print(f"  io:        WebIO (event collector)")
-    print(f"\n  starting web server on 0.0.0.0:8000...")
-    print(f"  local:     http://192.168.1.4:8000")
-    print(f"  tailscale: http://100.96.30.85:8000")
+    # Detect current IPs
+    import subprocess as _sp
+    _ts_ip = _sp.run(["tailscale", "ip", "-4"], capture_output=True, text=True).stdout.strip()
+    _lan_ips = _sp.run(["hostname", "-I"], capture_output=True, text=True).stdout.strip().split()
+    _lan_ip = next((ip for ip in _lan_ips if ip.startswith("192.168.")), _lan_ips[0] if _lan_ips else "?")
+
+    print(f"\n  starting web server on 0.0.0.0:8080...")
+    print(f"  local:     http://{_lan_ip}:8080")
+    if _ts_ip:
+        print(f"  tailscale: http://{_ts_ip}:8080")
     print(f"\n  Ctrl+C to stop\n")
 
     try:
-        uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
+        uvicorn.run(app, host="0.0.0.0", port=8080, log_level="info")
     except KeyboardInterrupt:
         pass
     finally:

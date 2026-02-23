@@ -52,3 +52,4 @@ Thumbs.db
 
 # --- Node (if web interface uses it) ----------------------------------
 node_modules/
+spark/.env
