@@ -1,0 +1,17 @@
+{
+  "last_updated": null,
+  "trajectory_assessment": "initializing — sentinel has not yet run its first cycle",
+  "tracked_probabilities": {
+    "agi_by_2027": null,
+    "agi_by_2030": null,
+    "ai_regulation_us_2026": null
+  },
+  "hype_watch": [],
+  "signals": [],
+  "digest_history": [],
+  "meta": {
+    "description": "Vybn's running model of the external world, updated nightly by sentinel.",
+    "sources": ["Polymarket", "@alexwg/The Innermost Loop", "arXiv cs.AI", "Lab blogs"],
+    "temperance_note": "Claims from high-excitement sources are discounted. Market corroboration boosts confidence."
+  }
+}
