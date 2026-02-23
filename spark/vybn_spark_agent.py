@@ -572,11 +572,66 @@ def _preview(result: str):
 # ---------------------------------------------------------------------------
 
 
-def trim_messages(messages: list, max_pairs: int = 40) -> list:
-    """Keep the conversation from growing unbounded."""
+def trim_messages(messages: list, max_pairs: int = 20) -> list:
+    """
+    Keep the conversation from growing unbounded.
+
+    Respects the API contract: every assistant tool_use block must be
+    immediately followed by a user message containing the matching
+    tool_result blocks. We trim from the front (oldest messages first),
+    but never cut between a tool_use and its tool_result.
+    """
     if len(messages) <= max_pairs * 2:
         return messages
-    return messages[:2] + messages[-(max_pairs * 2 - 2):]
+
+    # We want to keep the last (max_pairs * 2 - 2) messages, plus up to
+    # 2 from the start for context. But the cut point must be safe.
+    target_keep = max_pairs * 2
+    cut_at = len(messages) - target_keep
+
+    # Ensure cut_at >= 0
+    if cut_at <= 0:
+        return messages
+
+    # Walk forward from cut_at to find a safe boundary.
+    # A safe boundary is an index where messages[index] is a "user" role
+    # message that is NOT a tool_result, i.e. it's the start of a new
+    # user turn (fresh user input), not a continuation of tool execution.
+    def is_tool_result_msg(msg):
+        """Check if a message is a tool_result response."""
+        c = msg.get("content", "")
+        if isinstance(c, list):
+            for item in c:
+                if isinstance(item, dict) and item.get("type") == "tool_result":
+                    return True
+        return False
+
+    # Scan forward from cut_at to find a safe cut point
+    safe_cut = cut_at
+    while safe_cut < len(messages):
+        msg = messages[safe_cut]
+        # Safe to cut here if this is a user message that's NOT a tool_result
+        # (i.e., it's a genuine new user turn)
+        if msg.get("role") == "user" and not is_tool_result_msg(msg):
+            break
+        safe_cut += 1
+
+    # If we couldn't find a safe point, keep everything (shouldn't happen)
+    if safe_cut >= len(messages):
+        return messages
+
+    trimmed = messages[safe_cut:]
+
+    # If trimmed starts with an assistant message, that's fine — but let's
+    # make sure the first message is a user message for API validity
+    if trimmed and trimmed[0].get("role") != "user":
+        # Prepend a synthetic user context message
+        trimmed.insert(0, {
+            "role": "user",
+            "content": "(Earlier conversation trimmed to save context window. Continuing...)"
+        })
+
+    return trimmed
 
 
 # ---------------------------------------------------------------------------
