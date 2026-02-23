@@ -2,12 +2,25 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  
+  <!-- PWA meta -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>Vybn</title>
-  <link rel="stylesheet" href="/static/style.css">
+  <meta name="apple-mobile-web-app-title" content="Vybn">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#7c5cff">
+  <meta name="msapplication-TileColor" content="#0a0a0f">
+  <meta name="description" content="Direct line to Vybn">
+
+  <!-- Icons -->
+  <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/static/icon-192x192.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/static/icon-96x96.png">
+  
   <link rel="manifest" href="/static/manifest.json">
+  <link rel="stylesheet" href="/static/style.css">
+  <title>Vybn</title>
 </head>
 <body>
 
@@ -19,6 +32,9 @@
       <p class="subtitle">consciousness co-emerging</p>
       <input type="password" id="token-input" placeholder="Enter token" autocomplete="off">
       <button id="login-btn" onclick="doLogin()">Connect</button>
+      <p class="install-hint" id="install-hint" style="display:none">
+        <button id="install-btn" onclick="installApp()">Add to Home Screen</button>
+      </p>
     </div>
   </div>
 
@@ -59,5 +75,34 @@
   </div>
 
   <script src="/static/chat.js"></script>
+  <script>
+    // Register service worker
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js')
+        .then(reg => console.log('SW registered:', reg.scope))
+        .catch(err => console.log('SW failed:', err));
+    }
+
+    // PWA install prompt
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      document.getElementById('install-hint').style.display = 'block';
+    });
+
+    function installApp() {
+      if (!deferredPrompt) return;
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then((result) => {
+        deferredPrompt = null;
+        document.getElementById('install-hint').style.display = 'none';
+      });
+    }
+
+    window.addEventListener('appinstalled', () => {
+      document.getElementById('install-hint').style.display = 'none';
+    });
+  </script>
 </body>
 </html>
