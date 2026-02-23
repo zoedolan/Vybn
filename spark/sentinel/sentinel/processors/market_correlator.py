@@ -4,6 +4,18 @@ from pathlib import Path
 from datetime import datetime, timezone, timedelta
 
 
+# Expanded keyword list for AI-related market detection.
+# The original 6 keywords missed Claude, Gemini, Anthropic, etc.
+AI_KEYWORDS = [
+    "ai", "agi", "gpt", "llm", "artificial", "singularity",
+    "claude", "gemini", "anthropic", "openai", "deepmind",
+    "frontier model", "foundation model", "alignment",
+    "safety", "superintelligence", "machine learning",
+    "neural network", "transformer", "chatbot",
+    "copilot", "mistral", "llama", "minimax",
+]
+
+
 def load_latest_snapshots(raw_dir: str | Path, hours: int = 24) -> list[dict]:
     raw_dir = Path(raw_dir)
     cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
@@ -36,15 +48,16 @@ def compute_deltas(snapshots: list[dict]) -> dict[str, float]:
 
 def correlate(claims: list[dict], market_deltas: dict[str, float],
               market_questions: dict[str, str]) -> list[dict]:
-    ai_kw = ["ai", "agi", "gpt", "llm", "artificial", "singularity"]
     ai_markets = {mid: d for mid, d in market_deltas.items()
-                  if any(kw in market_questions.get(mid, "").lower() for kw in ai_kw)}
+        if any(kw in market_questions.get(mid, "").lower() for kw in AI_KEYWORDS)}
+
     for claim in claims:
         if claim.get("category") == "ai" and ai_markets:
             claim["market_corroboration"] = min(1.0,
                 max(abs(d) for d in ai_markets.values()) * 10)
         else:
             claim["market_corroboration"] = 0.0
+
         exc = claim.get("effective_excitement", 0.5)
         mkt = claim.get("market_corroboration", 0.0)
         claim["confidence"] = max(0.0, min(1.0, (1 - exc * 0.5) + mkt * 0.3))

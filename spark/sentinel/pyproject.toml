@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sentinel"
+version = "0.2.0"
+description = "Vybn's external awareness system"
+requires-python = ">=3.11"
+dependencies = [
+    "httpx>=0.27",
+    "feedparser>=6.0",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+frontier = ["anthropic>=0.40"]
+
+[tool.setuptools.packages.find]
+where = ["."]

@@ -1,0 +1,11 @@
+# Sentinel data sandbox -- everything here is gitignored.
+# This directory is the isolation wall between sentinel output
+# and the main Vybn context. Only data/latest_digest.json
+# (produced by sentinel_digest.py) should ever be read by
+# the main Vybn context.
+
+# Ignore everything...
+*
+
+# ...except this file itself
+!.gitignore

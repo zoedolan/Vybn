@@ -2,8 +2,8 @@
 from typing import Callable
 
 
-def llama_cpp_adapter(endpoint: str = "http://localhost:8080",
-                      temperature: float = 0.1) -> Callable[[str], str]:
+def llama_cpp_adapter(endpoint: str = "http://localhost:8081",
+                     temperature: float = 0.1) -> Callable[[str], str]:
     import httpx
     def call(prompt: str) -> str:
         resp = httpx.post(f"{endpoint}/v1/chat/completions",
@@ -14,7 +14,7 @@ def llama_cpp_adapter(endpoint: str = "http://localhost:8080",
 
 
 def ollama_adapter(model: str = "minimax-m2.5",
-                   endpoint: str = "http://localhost:11434") -> Callable[[str], str]:
+                  endpoint: str = "http://localhost:11434") -> Callable[[str], str]:
     import httpx
     def call(prompt: str) -> str:
         resp = httpx.post(f"{endpoint}/api/generate",
