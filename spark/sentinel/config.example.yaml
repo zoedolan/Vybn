@@ -1,0 +1,52 @@
+# Sentinel Configuration
+# Copy to config.yaml and fill in your keys.
+
+polymarket:
+  gamma_api: "https://gamma-api.polymarket.com"
+  clob_api: "https://clob.polymarket.com"
+  ws_endpoint: "wss://ws-subscriptions-clob.polymarket.com/ws/market"
+  poll_interval_minutes: 15
+  tracked_categories:
+    - ai
+    - politics
+    - crypto
+    - geopolitics
+
+news_sources:
+  twitter:
+    - handle: "alexwg"
+      temperance_factor: 0.6  # discount interpretive framing by 40%
+      label: "The Innermost Loop"
+  substacks:
+    - url: "https://theinnermostloop.substack.com"
+      label: "Wissner-Gross daily"
+  arxiv:
+    categories: ["cs.AI", "cs.CL", "cs.LG"]
+    max_daily: 20
+  lab_blogs:
+    - {url: "https://www.anthropic.com/research", label: "Anthropic"}
+    - {url: "https://openai.com/blog", label: "OpenAI"}
+    - {url: "https://deepmind.google/research/", label: "DeepMind"}
+
+local_model:
+  backend: "llama.cpp"  # or "vllm", "ollama"
+  model_path: "~/.models/MiniMax-M2.5-Q3_K_M.gguf"
+  endpoint: "http://localhost:8080"
+  context_window: 200000
+  temperature: 0.1  # low creativity for extraction tasks
+
+frontier_model:
+  provider: "anthropic"
+  model: "claude-sonnet-4-20250514"
+  api_key_env: "ANTHROPIC_API_KEY"
+  max_daily_tokens: 10000
+
+output:
+  structured_dir: "data/structured"
+  raw_dir: "data/raw"
+  belief_state: "data/sentinel_state.json"
+
+schedule:
+  polymarket_poll: "*/15 * * * *"   # every 15 min
+  news_crawl: "0 8,20 * * *"        # twice daily
+  synthesis: "0 21 * * *"            # nightly
