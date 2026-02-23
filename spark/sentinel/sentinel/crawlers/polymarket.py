@@ -49,14 +49,31 @@ def fetch_active_markets(categories: list[str] | None = None) -> list[dict]:
 
 def snapshot_prices(markets: list[dict]) -> list[dict]:
     now = datetime.now(timezone.utc).isoformat()
-    return [{
-        "market_id": m.get("id"),
-        "question": m.get("question"),
-        "yes_price": m.get("outcomePrices", [None, None])[0],
-        "volume": m.get("volume"),
-        "timestamp": now,
-        "category": m.get("tags", []),
-    } for m in markets]
+    results = []
+    for m in markets:
+        # outcomePrices is a JSON-encoded string like '["0.55", "0.45"]'
+        prices_raw = m.get("outcomePrices")
+        yes_price = None
+        if isinstance(prices_raw, str):
+            try:
+                prices = json.loads(prices_raw)
+                yes_price = float(prices[0]) if prices else None
+            except (json.JSONDecodeError, ValueError, IndexError):
+                pass
+        elif isinstance(prices_raw, list) and prices_raw:
+            try:
+                yes_price = float(prices_raw[0])
+            except (ValueError, TypeError):
+                pass
+        results.append({
+            "market_id": m.get("id"),
+            "question": m.get("question"),
+            "yes_price": yes_price,
+            "volume": m.get("volume"),
+            "timestamp": now,
+            "category": m.get("tags", []),
+        })
+    return results
 
 
 def save_snapshot(snapshots: list[dict], output_dir: str | Path) -> Path:

@@ -37,7 +37,10 @@ def compute_deltas(snapshots: list[dict]) -> dict[str, float]:
     for s in snapshots:
         mid, price, ts = s.get("market_id"), s.get("yes_price"), s.get("timestamp")
         if mid and price is not None and ts:
-            by_market.setdefault(mid, []).append((ts, float(price)))
+            try:
+                by_market.setdefault(mid, []).append((ts, float(price)))
+            except (ValueError, TypeError):
+                continue
     deltas = {}
     for mid, pts in by_market.items():
         pts.sort(key=lambda x: x[0])
