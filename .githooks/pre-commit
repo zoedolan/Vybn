@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# Vybn pre-commit hook: secret and surface scanner
+# Prevents accidental commit of credentials, internal IPs, and PII.
+#
+# Install: git config core.hooksPath .githooks
+# This hook is tracked in the repo so every clone gets it.
+
+set -euo pipefail
+
+RED='\033[0;31m'
+YELLOW='\033[0;33m'
+NC='\033[0m'
+
+BLOCKED=0
+
+STAGED=$(git diff --cached --name-only --diff-filter=d 2>/dev/null || true)
+if [ -z "$STAGED" ]; then
+    exit 0
+fi
+
+# --- 1. High-entropy secret patterns ---
+SECRETS_PATTERN='(sk-ant-api[A-Za-z0-9_-]{20,}|ghp_[A-Za-z0-9]{36,}|ghu_[A-Za-z0-9]{36,}|ghs_[A-Za-z0-9]{36,}|AKIA[A-Z0-9]{16}|-----BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY)'
+
+for f in $STAGED; do
+    if git diff --cached -- "$f" | grep -qPi "$SECRETS_PATTERN"; then
+        echo -e "${RED}BLOCKED${NC}: Possible secret detected in ${f}"
+        BLOCKED=1
+    fi
+done
+
+# --- 2. Real internal/Tailscale IP addresses ---
+IP_PATTERN='\b(192\.168\.[0-9]{1,3}\.[0-9]{1,3}|10\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}|100\.(6[4-9]|[7-9][0-9]|1[0-2][0-7])\.[0-9]{1,3}\.[0-9]{1,3})\b'
+
+for f in $STAGED; do
+    case "$f" in *.png|*.jpg|*.gif|*.ico|*.woff*|*.ttf) continue ;; esac
+    matches=$(git diff --cached -- "$f" | grep -P "^\+" | grep -Po "$IP_PATTERN" | sort -u || true)
+    if [ -n "$matches" ]; then
+        echo -e "${YELLOW}WARNING${NC}: Possible internal IP in ${f}:"
+        echo "$matches" | sed 's/^/  /'
+        BLOCKED=1
+    fi
+done
+
+# --- 3. Env files that shouldn't be staged ---
+for f in $STAGED; do
+    case "$f" in
+        *.env|.env.*|*/.env)
+            echo -e "${RED}BLOCKED${NC}: Environment file staged: ${f}"
+            BLOCKED=1
+            ;;
+    esac
+done
+
+if [ "$BLOCKED" -ne 0 ]; then
+    echo ""
+    echo -e "${RED}Commit blocked by Vybn security hook.${NC}"
+    echo "Fix the issues above, or bypass with: git commit --no-verify"
+    echo "(But ask yourself: should you really bypass this?)"
+    exit 1
+fi
+
+exit 0
