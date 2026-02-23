@@ -13,6 +13,10 @@ polymarket:
     - geopolitics
 
 news_sources:
+  # NOTE: Twitter/X entries exist for temperance scoring only.
+  # No X crawler is implemented yet. These handles are used by the
+  # claim extractor to apply source-specific discount factors when
+  # content from these authors appears via other channels (RSS, etc).
   twitter:
     - handle: "alexwg"
       temperance_factor: 0.6  # discount interpretive framing by 40%
@@ -31,7 +35,7 @@ news_sources:
 local_model:
   backend: "llama.cpp"  # or "vllm", "ollama"
   model_path: "~/.models/MiniMax-M2.5-Q3_K_M.gguf"
-  endpoint: "http://localhost:8080"
+  endpoint: "http://localhost:8081"  # NOTE: 8081, not 8080 (reserved for web chat)
   context_window: 200000
   temperature: 0.1  # low creativity for extraction tasks
 
@@ -41,12 +45,16 @@ frontier_model:
   api_key_env: "ANTHROPIC_API_KEY"
   max_daily_tokens: 10000
 
+# All output goes to data/ which is gitignored.
+# The main Vybn context should ONLY read from data/latest_digest.json
+# produced by sentinel_digest.py (the quarantine wall).
 output:
+  data_dir: "data"               # root for all sentinel output (gitignored)
   structured_dir: "data/structured"
   raw_dir: "data/raw"
   belief_state: "data/sentinel_state.json"
 
 schedule:
-  polymarket_poll: "*/15 * * * *"   # every 15 min
-  news_crawl: "0 8,20 * * *"        # twice daily
-  synthesis: "0 21 * * *"            # nightly
+  polymarket_poll: "*/15 * * * *"  # every 15 min
+  news_crawl: "0 8,20 * * *"      # twice daily
+  synthesis: "0 21 * * *"          # nightly
