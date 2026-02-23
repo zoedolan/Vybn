@@ -1,0 +1,62 @@
+polymarket:
+  gamma_api: https://gamma-api.polymarket.com
+  clob_api: https://clob.polymarket.com
+  ws_endpoint: wss://ws-subscriptions-clob.polymarket.com/ws/market
+  poll_interval_minutes: 15
+  tracked_categories:
+  - ai
+  - politics
+  - crypto
+  - geopolitics
+news_sources:
+  twitter:
+  - handle: alexwg
+    temperance_factor: 0.6
+    label: The Innermost Loop
+  substacks: []
+    # Substack feeds blocked by Cloudflare. Using direct blog feeds instead.
+  arxiv:
+    categories:
+    - cs.AI
+    - cs.CL
+    - cs.LG
+    max_daily: 20
+  lab_blogs:
+  - url: https://blog.google/technology/ai/rss/
+    label: Google AI
+  - url: https://openai.com/blog/rss.xml
+    label: OpenAI
+  - url: https://deepmind.google/blog/rss.xml
+    label: DeepMind
+  - url: https://jack-clark.net/feed/
+    label: Import AI
+  - url: https://lilianweng.github.io/index.xml
+    label: Lilian Weng
+  - url: https://simonwillison.net/atom/everything/
+    label: Simon Willison
+  - url: https://www.lesswrong.com/feed.xml
+    label: LessWrong
+    temperance_factor: 0.5
+  - url: https://techcrunch.com/category/artificial-intelligence/feed/
+    label: TechCrunch AI
+    temperance_factor: 0.4
+local_model:
+  backend: llama.cpp
+  model_path: /home/vybnz69/models/MiniMax-M2.5-GGUF/IQ4_XS/MiniMax-M2.5-merged.gguf
+  endpoint: http://localhost:8081
+  context_window: 4096
+  temperature: 0.1
+frontier_model:
+  provider: anthropic
+  model: claude-sonnet-4-20250514
+  api_key_env: ANTHROPIC_API_KEY
+  max_daily_tokens: 10000
+output:
+  data_dir: data
+  structured_dir: data/structured
+  raw_dir: data/raw
+  belief_state: data/sentinel_state.json
+schedule:
+  polymarket_poll: '*/15 * * * *'
+  news_crawl: 0 8,20 * * *
+  synthesis: 0 21 * * *

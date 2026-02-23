@@ -19,6 +19,7 @@ except ImportError:
 log = logging.getLogger("sentinel")
 ARXIV_API = "https://export.arxiv.org/api/query"
 MAX_SEEN_URLS = 5000
+USER_AGENT = "Vybn-Sentinel/0.2 (RSS reader; +https://github.com/zoedolan/Vybn)"
 
 
 def _load_seen_urls(data_dir: str) -> set[str]:
@@ -43,7 +44,8 @@ def fetch_arxiv(categories: list[str], max_results: int = 20) -> list[dict]:
     if not (httpx and feedparser):
         raise RuntimeError("pip install httpx feedparser")
     cat_query = " OR ".join(f"cat:{c}" for c in categories)
-    resp = httpx.get(ARXIV_API, follow_redirects=True, params={
+    resp = httpx.get(ARXIV_API, follow_redirects=True,
+                     headers={"User-Agent": USER_AGENT}, params={
         "search_query": cat_query, "sortBy": "submittedDate",
         "sortOrder": "descending", "max_results": max_results,
     }, timeout=30)
@@ -61,7 +63,8 @@ def fetch_arxiv(categories: list[str], max_results: int = 20) -> list[dict]:
 def fetch_rss(url: str, label: str, max_items: int = 5) -> list[dict]:
     if not (httpx and feedparser):
         raise RuntimeError("pip install httpx feedparser")
-    resp = httpx.get(url, timeout=30, follow_redirects=True, headers={"User-Agent": "Mozilla/5.0 (compatible; Vybn/0.2)"})
+    resp = httpx.get(url, timeout=30, follow_redirects=True,
+                     headers={"User-Agent": USER_AGENT})
     feed = feedparser.parse(resp.text)
     return [{
         "title": e.get("title", "").strip(),
