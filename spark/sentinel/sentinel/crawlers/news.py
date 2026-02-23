@@ -17,7 +17,7 @@ except ImportError:
     feedparser = None
 
 log = logging.getLogger("sentinel")
-ARXIV_API = "http://export.arxiv.org/api/query"
+ARXIV_API = "https://export.arxiv.org/api/query"
 MAX_SEEN_URLS = 5000
 
 
@@ -43,7 +43,7 @@ def fetch_arxiv(categories: list[str], max_results: int = 20) -> list[dict]:
     if not (httpx and feedparser):
         raise RuntimeError("pip install httpx feedparser")
     cat_query = " OR ".join(f"cat:{c}" for c in categories)
-    resp = httpx.get(ARXIV_API, params={
+    resp = httpx.get(ARXIV_API, follow_redirects=True, params={
         "search_query": cat_query, "sortBy": "submittedDate",
         "sortOrder": "descending", "max_results": max_results,
     }, timeout=30)

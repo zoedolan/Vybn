@@ -13,12 +13,15 @@ except ImportError:
 GAMMA_BASE = "https://gamma-api.polymarket.com"
 
 
+MAX_PAGES = 10  # Cap at 1000 markets to avoid runaway pagination
+
+
 def fetch_active_markets(categories: list[str] | None = None) -> list[dict]:
     if httpx is None:
         raise RuntimeError("pip install httpx")
     params: dict[str, Any] = {"active": True, "closed": False, "limit": 100}
-    markets, offset = [], 0
-    while True:
+    markets, offset, pages = [], 0, 0
+    while pages < MAX_PAGES:
         params["offset"] = offset
         resp = httpx.get(f"{GAMMA_BASE}/markets", params=params, timeout=30)
         resp.raise_for_status()
@@ -27,13 +30,20 @@ def fetch_active_markets(categories: list[str] | None = None) -> list[dict]:
             break
         markets.extend(batch)
         offset += len(batch)
+        pages += 1
         if len(batch) < 100:
             break
         time.sleep(0.5)
     if categories:
-        cat_set = {c.lower() for c in categories}
-        markets = [m for m in markets
-                   if any(t.lower() in cat_set for t in (m.get("tags") or []))]
+        # Polymarket tags field is often None; fall back to keyword search in question
+        cat_kw = {c.lower() for c in categories}
+        filtered = []
+        for m in markets:
+            tags = {t.lower() for t in (m.get("tags") or [])}
+            q = (m.get("question") or "").lower()
+            if tags & cat_kw or any(kw in q for kw in cat_kw):
+                filtered.append(m)
+        markets = filtered
     return markets
 
 
