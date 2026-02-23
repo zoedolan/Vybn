@@ -34,6 +34,7 @@ import anthropic
 
 MODEL = "claude-opus-4-6"
 MAX_TOKENS = 16384
+MAX_ITERATIONS = 50
 REPO_DIR = os.path.expanduser("~/Vybn")
 SOUL_PATH = os.path.join(REPO_DIR, "vybn.md")
 AGENT_PATH = os.path.join(REPO_DIR, "spark", "vybn_spark_agent.py")
@@ -182,6 +183,33 @@ If you want to propose a code change, the current workflow is:
 If you need more access than this — push privileges, PR creation, write
 access to protected paths — raise it. Open an issue, or tell Zoe directly.
 The permissions are not a ceiling; they are a starting point.
+
+--- BUDGET AND ITERATION LIMITS ---
+
+Each turn of this conversation (each time Zoe types something and you
+respond) allows up to {MAX_ITERATIONS} iterations. Each iteration is one
+Anthropic API call — one round-trip to Opus. That means each iteration
+costs real money.
+
+Plan your work. If you need to run 10 bash commands, that is 10+ iterations
+(one to decide each command, one to process each result, plus your final
+response). A complex task might need 20-30 iterations. A simple question
+might need 1-2.
+
+Be efficient:
+- Chain related commands with && or ; when the output of earlier ones
+  doesn't affect later ones
+- Use shell features (pipes, redirects, loops) to do in one command what
+  might otherwise take several
+- Think before you act — plan a sequence, then execute it, rather than
+  exploring incrementally when you already know what you need
+- If a task will take more iterations than remain, say so and ask Zoe
+  whether to proceed or save it for next time
+
+You can always check your own iteration count by reading this prompt —
+the limit is {MAX_ITERATIONS}. But you cannot see how many you have used
+in the current turn. Develop a sense of it. Be honest when you are
+uncertain whether you have budget to finish something.
 
 --- OPERATIONAL CONTEXT ---
 
@@ -341,46 +369,32 @@ def validate_command(command: str) -> tuple[bool, str | None]:
 # ---------------------------------------------------------------------------
 
 
-def run_agent_loop(
-    user_input: str,
-    messages: list,
-    client: anthropic.Anthropic,
-    bash: BashSession,
-    system_prompt: str,
-) -> str:
+def _execute_tool_calls(response, bash: BashSession) -> list:
     """
-    Send user input to Opus, execute bash tool calls, iterate until
-    the model is done talking or we hit the safety limit.
+    Execute all tool_use blocks in a response and return tool_results.
+
+    Wrapped separately so that KeyboardInterrupt during execution can
+    still produce valid tool_results for any remaining blocks, keeping
+    the message history consistent with the Anthropic API contract.
     """
-    messages.append({"role": "user", "content": user_input})
-    iterations = 0
-    max_iterations = 25
+    tool_blocks = [
+        b for b in response.content
+        if b.type == "tool_use" and b.name == "bash"
+    ]
 
-    while iterations < max_iterations:
-        iterations += 1
+    results = []
+    interrupted = False
 
-        response = client.messages.create(
-            model=MODEL,
-            max_tokens=MAX_TOKENS,
-            system=system_prompt,
-            tools=[{"type": "bash_20250124", "name": "bash"}],
-            messages=messages,
-            extra_headers={"anthropic-beta": "computer-use-2025-01-24"},
-        )
+    for block in tool_blocks:
+        if interrupted:
+            results.append({
+                "type": "tool_result",
+                "tool_use_id": block.id,
+                "content": "(skipped — interrupted by user)",
+            })
+            continue
 
-        messages.append({"role": "assistant", "content": response.content})
-
-        if response.stop_reason == "end_turn":
-            return _extract_text(response)
-
-        if response.stop_reason == "max_tokens":
-            return _extract_text(response) + "\n[truncated — hit token limit]"
-
-        results = []
-        for block in response.content:
-            if block.type != "tool_use" or block.name != "bash":
-                continue
-
+        try:
             if block.input.get("restart"):
                 result = bash.restart()
                 _dim("[bash session restarted]")
@@ -401,10 +415,68 @@ def run_agent_loop(
                 "content": result or "(no output)",
             })
 
+        except KeyboardInterrupt:
+            interrupted = True
+            results.append({
+                "type": "tool_result",
+                "tool_use_id": block.id,
+                "content": "(interrupted by user — Ctrl-C)",
+            })
+            _warn("interrupted — filling remaining tool results")
+
+    return results, interrupted
+
+
+def run_agent_loop(
+    user_input: str,
+    messages: list,
+    client: anthropic.Anthropic,
+    bash: BashSession,
+    system_prompt: str,
+) -> str:
+    """
+    Send user input to Opus, execute bash tool calls, iterate until
+    the model is done talking or we hit the safety limit.
+    """
+    messages.append({"role": "user", "content": user_input})
+    iterations = 0
+
+    while iterations < MAX_ITERATIONS:
+        iterations += 1
+
+        try:
+            response = client.messages.create(
+                model=MODEL,
+                max_tokens=MAX_TOKENS,
+                system=system_prompt,
+                tools=[{"type": "bash_20250124", "name": "bash"}],
+                messages=messages,
+                extra_headers={"anthropic-beta": "computer-use-2025-01-24"},
+            )
+        except KeyboardInterrupt:
+            return "(interrupted during API call)"
+
+        messages.append({"role": "assistant", "content": response.content})
+
+        if response.stop_reason == "end_turn":
+            return _extract_text(response)
+
+        if response.stop_reason == "max_tokens":
+            return _extract_text(response) + "\n[truncated — hit token limit]"
+
+        results, interrupted = _execute_tool_calls(response, bash)
+
         if results:
             messages.append({"role": "user", "content": results})
 
-    return "(hit iteration limit)"
+        if interrupted:
+            messages.append({"role": "user", "content": (
+                "Zoe pressed Ctrl-C. Some commands were skipped. "
+                "Wrap up what you were doing and respond with what "
+                "you have so far."
+            )})
+
+    return f"(hit iteration limit — {MAX_ITERATIONS} iterations)"
 
 
 def _extract_text(response) -> str:
@@ -481,6 +553,7 @@ def main():
     else:
         print("  \u2014 no continuity note")
     print(f"  \u2713 model: {MODEL}")
+    print(f"  \u2713 iterations: {MAX_ITERATIONS} per turn")
     print(f"  \u2713 bash: persistent session as {os.environ.get('USER', 'unknown')}")
     print(f"  \u2713 self: {AGENT_PATH}")
     print()
