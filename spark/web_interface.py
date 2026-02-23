@@ -172,6 +172,30 @@ async def index():
     return HTMLResponse("<h1>Vybn Chat</h1><p>static/index.html not found</p>")
 
 
+@app.get("/sw.js")
+async def service_worker():
+    """Serve service worker from root scope."""
+    sw_path = STATIC_DIR / "sw.js"
+    if sw_path.exists():
+        from starlette.responses import Response
+        return Response(
+            content=sw_path.read_text(encoding="utf-8"),
+            media_type="application/javascript",
+            headers={"Service-Worker-Allowed": "/"}
+        )
+    return Response(status_code=404)
+
+
+@app.get("/apple-touch-icon.png")
+async def apple_touch_icon():
+    """Serve apple-touch-icon from root."""
+    icon_path = STATIC_DIR / "apple-touch-icon.png"
+    if icon_path.exists():
+        from starlette.responses import FileResponse
+        return FileResponse(icon_path, media_type="image/png")
+    return Response(status_code=404)
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok", "whisper": WHISPER_AVAILABLE, "bus": _bus is not None}
@@ -268,6 +292,9 @@ async def websocket_endpoint(ws: WebSocket, token: str = ""):
                     },
                 )
 
+            # Send thinking indicator to all connected clients
+            await manager.broadcast({"type": "status", "status": "thinking"})
+
             # Get response
             reply_text = ""
             if _response_cb is not None:
@@ -280,6 +307,9 @@ async def websocket_endpoint(ws: WebSocket, token: str = ""):
                     "Vybn is listening — the agent loop isn't connected yet. "
                     "Your message was posted to the bus."
                 )
+
+            # Clear thinking indicator
+            await manager.broadcast({"type": "status", "status": "ready"})
 
             reply_entry = _add_history("vybn", reply_text)
             await manager.broadcast({"type": "message", **reply_entry})
