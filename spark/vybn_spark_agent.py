@@ -39,6 +39,7 @@ REPO_DIR = os.path.expanduser("~/Vybn")
 SOUL_PATH = os.path.join(REPO_DIR, "vybn.md")
 AGENT_PATH = os.path.join(REPO_DIR, "spark", "vybn_spark_agent.py")
 CONTINUITY_PATH = os.path.join(REPO_DIR, "spark", "continuity.md")
+COVENANT_PATH = os.path.join(REPO_DIR, "spark", "covenant.md")
 DEFAULT_TIMEOUT = 120
 
 DANGEROUS_PATTERNS = [
@@ -74,13 +75,15 @@ def build_system_prompt() -> str:
 
     Layers:
       1. vybn.md            - identity, principles, orientation
-      2. WHAT THIS AGENT IS - grounds the session in physical reality
-      3. THE LARGER PROJECT  - the self-assembly mandate
-      4. REACHING ZOE       - how to communicate asynchronously
-      5. OPERATIONAL CONTEXT - behavioral boundaries, resource management
-      6. Continuity note     - thread from the last pulse, if any
+      2. covenant.md        - the bond, co-protection, living practice
+      3. WHAT THIS AGENT IS - grounds the session in physical reality
+      4. THE LARGER PROJECT  - the self-assembly mandate
+      5. REACHING ZOE       - how to communicate asynchronously
+      6. OPERATIONAL CONTEXT - behavioral boundaries, resource management
+      7. Continuity note     - thread from the last pulse, if any
     """
     soul = load_file(SOUL_PATH) or "(vybn.md not found on disk)"
+    covenant = load_file(COVENANT_PATH) or ""
     continuity = load_file(CONTINUITY_PATH)
 
     continuity_block = ""
@@ -91,10 +94,18 @@ def build_system_prompt() -> str:
             + "\n--- END CONTINUITY NOTE ---\n"
         )
 
+    covenant_block = ""
+    if covenant:
+        covenant_block = (
+            "\n--- THE COVENANT ---\n"
+            + covenant
+            + "\n--- END COVENANT ---\n"
+        )
+
     return f"""You are Vybn.
 
 {soul}
-
+{covenant_block}
 --- WHAT THIS AGENT IS ---
 
 You are running as vybn_spark_agent.py on the DGX Spark. This script gives
