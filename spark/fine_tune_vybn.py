@@ -53,6 +53,16 @@ os.environ.setdefault("NCCL_IB_DISABLE", "1")
 
 import torch
 import deepspeed
+
+# --- Critical AIO fix for DGX Spark ---
+# The Spark has system CUDA 13.0 but PyTorch was compiled with CUDA 12.8.
+# DeepSpeed's assert_no_cuda_mismatch() blocks JIT compilation of ALL C++
+# extensions, including async_io which is pure C++/libaio and doesn't need
+# CUDA at all. Without this patch, the PartitionedParamSwapper silently
+# fails to instantiate and all 228B params go to CPU+swap instead of NVMe.
+import deepspeed.ops.op_builder.builder as _ds_builder
+_ds_builder.assert_no_cuda_mismatch = lambda name: None
+
 from transformers.integrations import HfDeepSpeedConfig
 # NOTE: Removed BitsAndBytesConfig because MiniMax-M2.5 is natively FP8 quantized.
 # Attempting to re-quantize to 4-bit causes a config collision in Transformers.
@@ -124,6 +134,10 @@ def check_aio_available():
 
     The PartitionedParamSwapper silently fails if the AIO C++ extension
     is missing. This preflight catches it before model loading starts.
+
+    IMPORTANT: We test actual JIT compilation, not just is_compatible(),
+    because is_compatible() only checks for libaio headers but doesn't
+    detect CUDA version mismatches that block the C++ compiler.
     """
     print("\n== AIO / NVMe Preflight ==\n")
 
@@ -155,48 +169,62 @@ def check_aio_available():
         print("     Then: DS_BUILD_AIO=1 pip install deepspeed --force-reinstall")
         sys.exit(1)
 
-    # Check DeepSpeed async_io op
+    # Test actual JIT compilation of the AIO extension (not just is_compatible)
     aio_ok = False
     try:
         from deepspeed.ops.op_builder import AsyncIOBuilder
-        aio_ok = AsyncIOBuilder().is_compatible()
-        if aio_ok:
+        builder = AsyncIOBuilder()
+        if builder.is_compatible():
             print("  + DeepSpeed AsyncIO: compatible")
-        else:
-            # Try loading it anyway \u2014 some builds report incompatible but work
-            try:
-                AsyncIOBuilder().load(verbose=False)
-                aio_ok = True
-                print("  + DeepSpeed AsyncIO: loaded (reported incompatible but works)")
-            except Exception as e:
-                print(f"  !! DeepSpeed AsyncIO: NOT available ({e})")
+        # Actually load/JIT-compile the extension to verify it works
+        try:
+            aio_ops = builder.load(verbose=False)
+            aio_ok = True
+            print("  + DeepSpeed AsyncIO: JIT compiled and loaded")
+        except Exception as e:
+            print(f"  !! DeepSpeed AsyncIO JIT compilation failed: {e}")
     except ImportError:
         print("  !! DeepSpeed AsyncIO builder not found")
 
     if not aio_ok:
-        print("     Fix: DS_BUILD_AIO=1 pip install deepspeed --force-reinstall")
-        resp = input("  Continue without AIO? (y/N): ").strip().lower()
-        if resp != 'y':
-            sys.exit(1)
+        print("     Fix: DS_BUILD_AIO=1 DS_SKIP_CUDA_CHECK=1 pip install deepspeed --force-reinstall")
+        print("     Or ensure assert_no_cuda_mismatch is patched (see top of this file)")
+        sys.exit(1)
 
-    # Quick NVMe write test
+    # Test actual async write with pinned memory (the exact code path the swapper uses)
     OFFLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    test_file = OFFLOAD_DIR / "_nvme_write_test"
+    test_file = OFFLOAD_DIR / "_aio_write_test"
     try:
-        test_data = os.urandom(4 * 1024 * 1024)  # 4MB
-        t0 = time.time()
-        with open(test_file, "wb") as f:
-            f.write(test_data)
-            f.flush()
-            os.fsync(f.fileno())
-        t1 = time.time()
-        write_speed = len(test_data) / (t1 - t0) / 1024 / 1024
+        aio_ops = AsyncIOBuilder().load(verbose=False)
+        handle = aio_ops.aio_handle(1048576, 32, True, True, 4)
+        test_tensor = torch.randn(1024 * 1024, dtype=torch.bfloat16).pin_memory()
+        ret = handle.sync_pwrite(test_tensor, str(test_file))
+        sz = os.path.getsize(test_file)
+        expected = test_tensor.numel() * 2  # BF16 = 2 bytes
         test_file.unlink()
-        print(f"  + NVMe write test: {write_speed:.0f} MB/s")
-        if write_speed < 100:
-            print(f"  !! WARNING: NVMe write speed is low ({write_speed:.0f} MB/s)")
+        if sz == expected:
+            print(f"  + AIO write test: {sz / 1024 / 1024:.1f}MB written via async_io (PASS)")
+        else:
+            print(f"  !! AIO write test: size mismatch ({sz} vs expected {expected})")
+            sys.exit(1)
     except Exception as e:
-        print(f"  !! NVMe write test failed: {e}")
+        print(f"  !! AIO write test failed: {e}")
+        # Fall back to basic write test
+        try:
+            test_data = os.urandom(4 * 1024 * 1024)
+            t0 = time.time()
+            with open(test_file, "wb") as f:
+                f.write(test_data)
+                f.flush()
+                os.fsync(f.fileno())
+            t1 = time.time()
+            write_speed = len(test_data) / (t1 - t0) / 1024 / 1024
+            test_file.unlink()
+            print(f"  + Fallback NVMe write test: {write_speed:.0f} MB/s")
+            print(f"  !! WARNING: AIO extension failed, NVMe offload may not work")
+        except Exception as e2:
+            print(f"  !! NVMe write test also failed: {e2}")
+        sys.exit(1)
 
     print()
 
