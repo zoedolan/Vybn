@@ -247,11 +247,12 @@ async def websocket_endpoint(ws: WebSocket, token: str = ""):
             if not user_text:
                 continue
 
+            # SECURITY: Reject oversized messages
+            if len(json.dumps(data)) > MAX_WS_MESSAGE_SIZE:
+                await ws.send_json({"type": "error", "content": "Message too large"})
+                continue
+
             # Record user message
-                            # SECURITY: Reject oversized messages (cf. openclaw ACP bounds)
-                if len(json.dumps(data)) > MAX_WS_MESSAGE_SIZE:
-                    await ws.send_json({"type": "error", "content": "Message too large"})
-                    continue
             user_entry = _add_history("user", user_text)
             await manager.broadcast({"type": "message", **user_entry})
 
