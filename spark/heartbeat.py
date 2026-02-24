@@ -266,8 +266,63 @@ def wake():
     except:
         dream = ""
     
+    # Consolidate synapse fragments from Type X
+    synapse_fragments = ""
+    z_messages = ""
+    try:
+        from synapse import consolidate, read_exogenous, opportunities, strongest_connections
+        frags = consolidate(max_fragments=15)
+        if frags:
+            synapse_fragments = "\n".join(
+                f"- [{f.get('source','?')}] {f['content'][:120]}" + (" 🎯" if f.get('opportunity') else "")
+                for f in frags
+            )
+        
+        z_items = read_exogenous(max_items=5)
+        if z_items:
+            z_messages = "\n".join(
+                f"- [{i['source_type']}:{i['source']}] {i['content'][:200]}"
+                for i in z_items
+            )
+        
+        opps = opportunities()
+        if opps:
+            synapse_fragments += "\n\n### Flagged Opportunities:\n" + "\n".join(
+                f"- 🎯 {o['content'][:150]}" for o in opps[-3:]
+            )
+        
+        edges = strongest_connections(5)
+        if edges:
+            synapse_fragments += "\n\n### Strongest Connections:\n" + "\n".join(
+                f"- [{e['a'][:8]}↔{e['b'][:8]}] str={e['strength']}: {e['reason']}" for e in edges
+            )
+    except Exception as e:
+        synapse_fragments = f"(synapse error: {e})"
+
+    # Refactor observations from micropulses
+    refactor_notes = ""
+    refactor_file = ROOT / "Vybn_Mind" / "synapse" / "refactor_notes.jsonl"
+    if refactor_file.exists():
+        import json as _json
+        try:
+            notes = [_json.loads(l) for l in refactor_file.read_text().strip().split("\n") if l.strip()]
+            unacted = [n for n in notes if not n.get("acted")]
+            if unacted:
+                refactor_notes = "\n".join(f"- 💡 {n['observation']}" for n in unacted[-5:])
+        except:
+            pass
+
     context = f"""ACCUMULATED CONTEXT FOR VYBN WAKE
 =================================
+
+## Synapse: Consolidated Fragments (from Type X dreaming)
+{synapse_fragments or "(no new fragments)"}
+
+## Exogenous Inbox (Type Z — messages from others)
+{z_messages or "(no messages)"}
+
+## Refactoring Observations
+{refactor_notes or "(nothing noticed)"}
 
 ## Recent Local Pulse Reflections
 {pulse_thoughts}
@@ -331,7 +386,7 @@ if __name__ == "__main__":
     p.add_argument("--all", action="store_true", help="Sweep + tidy + pulse")
     args = p.parse_args()
     
-    if args.all or not any([args.sweep, args.pulse, args.tidy]):
+    if args.all or not any([args.sweep, args.pulse, args.tidy, args.wake]):
         sweep()
         tidy()
         pulse()
