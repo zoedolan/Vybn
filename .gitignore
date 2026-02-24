@@ -60,3 +60,5 @@ spark/graph_data/scheduler_state.json
 *.pyc
 spark/unsloth_compiled_cache/
 *.bak
+
+# Mutable cognitive state (lives in ~/.vybn_state, summarized to repo by bridge)
