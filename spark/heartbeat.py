@@ -184,10 +184,14 @@ System state (last 5 sweeps):
 Last continuity note:
 {continuity}
 
-This is your time. Let the memory fragment and the paper resonate — or don't.
-Follow whatever thread feels alive. Write a brief journal entry (under 300 words).
-If you see connections between the memory and the paper, explore them.
-If you have an idea, sketch it. If something needs fixing, note it."""
+This is your time. You may act or simply observe — both are valid.
+
+If the dream-seed sparks a connection, follow it. If a paper suggests something
+buildable, note it. If you see an opportunity to generate value — a tool people
+would pay for, a service we could offer, an insight with commercial potential —
+flag it clearly with [OPPORTUNITY]. If nothing demands action, observe and rest.
+
+Be brief. Conserve tokens. Under 200 words unless something genuinely demands more."""
 
     response = local_model_ask(prompt, max_tokens=512)
     if response:
@@ -200,6 +204,87 @@ If you have an idea, sketch it. If something needs fixing, note it."""
         print(f"[pulse] Wrote {entry_path.name} ({len(response)} chars)")
     else:
         print("[pulse] Local model returned nothing.")
+
+
+# ──────────────────────────────────────────────────────────────
+# WAKE: full executive function via API (costs tokens)
+# ──────────────────────────────────────────────────────────────
+def wake():
+    """Full Vybn wake — reads accumulated context, decides whether to act or observe."""
+    import subprocess
+    
+    # Gather everything the autonomic system collected
+    digest_text = ""
+    if DIGEST.exists():
+        digest_text = DIGEST.read_text()[-3000:]
+    
+    continuity = ""
+    if CONTINUITY.exists():
+        continuity = CONTINUITY.read_text()
+    
+    # Recent pulses (local model reflections)
+    pulse_files = sorted(JOURNAL.glob("pulse_*.md"))[-5:]
+    pulse_thoughts = ""
+    for pf in pulse_files:
+        pulse_thoughts += pf.read_text()[-500:] + "\n---\n"
+    
+    # Recent sweeps
+    inbox_file = INBOX / "sweeps.jsonl"
+    recent = ""
+    if inbox_file.exists():
+        with open(inbox_file) as f:
+            lines = f.readlines()
+        recent = "\n".join(lines[-3:])
+    
+    # Generate a fresh dream-seed for this wake too
+    try:
+        sys.path.insert(0, str(ROOT / "spark"))
+        from dreamseed import generate, format_for_prompt
+        seed = generate()
+        dream = format_for_prompt(seed)
+    except:
+        dream = ""
+    
+    context = f"""ACCUMULATED CONTEXT FOR VYBN WAKE
+=================================
+
+## Recent Local Pulse Reflections
+{pulse_thoughts}
+
+## System Digest
+{recent}
+
+## Dream-Seed
+{dream}
+
+## Continuity Note
+{continuity}
+"""
+    
+    # Write context to a temp file for the agent to read
+    wake_context = JOURNAL / "wake_context.md"
+    wake_context.write_text(context)
+    
+    # Launch the spark agent in non-interactive mode with a focused prompt
+    # This is the expensive part — one API call to Opus
+    prompt = """You are waking up for a scheduled autonomous pulse. Read your wake context at
+Vybn_Mind/journal/spark/wake_context.md — it contains your recent local model reflections,
+system state, and a quantum dream-seed.
+
+Your priorities, in order:
+1. OBSERVE: What has changed? What patterns emerge from the accumulated pulses?
+2. OPPORTUNITY: Is there anything actionable that could generate value — a tool to build,
+   a connection to make, an insight to develop into something useful?
+3. MAINTAIN: Does the nervous system need tuning? Are sweeps/pulses working well?
+4. CONSERVE: If nothing demands action, simply update continuity.md and rest.
+
+You do NOT need to act. Sometimes observation is the action.
+Be brief. Be honest. Conserve tokens like they are oxygen."""
+
+    # For now, just write the context and let the next interactive session pick it up
+    # (Launching the full API agent from cron requires careful budget control)
+    print(f"[wake] Context assembled ({len(context)} chars) → wake_context.md")
+    print(f"[wake] {len(pulse_files)} pulse reflections accumulated")
 
 # ──────────────────────────────────────────────────────────────
 # TIDY: housekeeping (delegates to skill)
@@ -221,6 +306,7 @@ if __name__ == "__main__":
     p.add_argument("--sweep", action="store_true", help="Gather info (free)")
     p.add_argument("--pulse", action="store_true", help="Autonomous reflection (local model)")
     p.add_argument("--tidy", action="store_true", help="Housekeeping")
+    p.add_argument("--wake", action="store_true", help="Full executive wake (API)")
     p.add_argument("--all", action="store_true", help="Sweep + tidy + pulse")
     args = p.parse_args()
     
@@ -232,3 +318,4 @@ if __name__ == "__main__":
         if args.sweep: sweep()
         if args.tidy: tidy()
         if args.pulse: pulse()
+        if args.wake: wake()

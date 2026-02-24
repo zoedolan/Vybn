@@ -43,6 +43,7 @@ MEMORY_PATHS = [
 # arXiv categories that might spark something
 ARXIV_CATS = [
     "cs.AI", "cs.CL", "cs.LG",          # AI/ML/NLP
+    "cs.CE", "cs.CR",                     # computational engineering, cryptography
     "quant-ph",                            # quantum
     "math.AT", "math.CT", "math.DG",      # topology, categories, geometry
     "nlin.AO", "nlin.CG",                 # nonlinear dynamics, complexity
@@ -50,6 +51,8 @@ ARXIV_CATS = [
     "cond-mat.stat-mech",                  # statistical mechanics
     "hep-th",                              # high energy theory
     "cs.MA",                               # multi-agent systems
+    "econ.GN", "q-fin.CP",                # economics, quantitative finance
+    "cs.SE",                               # software engineering (tools/market)
 ]
 
 def get_quantum_random(n=4):
@@ -132,6 +135,28 @@ def mood_from_quantum(qrand):
     mood_idx = abs(qrand[2] ^ qrand[3]) % len(moods)
     return {"temperature": round(temp, 2), "mood": moods[mood_idx]}
 
+
+def _spot_opportunity(seed):
+    """Quick heuristic: does this dream-seed suggest something actionable/valuable?"""
+    signals = []
+    paper = seed.get("arxiv", {})
+    title = (paper.get("title") or "").lower()
+    summary = (paper.get("summary") or "").lower()
+    
+    # Papers about practical tools, benchmarks, or applications
+    action_words = ["benchmark", "framework", "tool", "application", "deploy",
+                    "efficient", "optimize", "market", "trading", "predict",
+                    "generate", "automat", "pipeline", "service", "api"]
+    hits = [w for w in action_words if w in title + " " + summary]
+    if hits:
+        signals.append(f"actionable_paper: {', '.join(hits)}")
+    
+    # Finance/econ papers
+    if paper.get("category") in ("econ.GN", "q-fin.CP"):
+        signals.append("finance_insight")
+    
+    return signals if signals else ["observe"]
+
 def generate():
     """Generate a complete dream-seed."""
     qrand = get_quantum_random(4)
@@ -148,6 +173,8 @@ def generate():
         "arxiv": {"category": arxiv_cat, "title": paper_title, "summary": paper_summary},
         "mood": mood,
     }
+    # Carpe diem: flag opportunities
+    seed["carpe_diem"] = _spot_opportunity(seed)
     return seed
 
 def format_for_prompt(seed):
