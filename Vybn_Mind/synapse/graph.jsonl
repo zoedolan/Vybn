@@ -1,1 +1,9 @@
 {"ts": "2026-02-24T12:13:31.047965+00:00", "a": "a79b0981e21b", "b": "7e1853b321cf", "strength": 0.8, "reason": "mesh topology \u2194 agent self-organization"}
+{"ts": "2026-02-24T12:36:02.149572+00:00", "a": "9f271d26fd08", "b": "13fe231a5f31", "strength": 0.5, "reason": "temporal adjacency in wake cycle"}
+{"ts": "2026-02-24T12:37:39.209915+00:00", "a": "628479b41d25", "b": "7d81300a0d19", "strength": 0.5, "reason": "temporal adjacency in wake cycle"}
+{"ts": "2026-02-24T12:37:39.209942+00:00", "a": "7d81300a0d19", "b": "d77845a9c420", "strength": 0.5, "reason": "temporal adjacency in wake cycle"}
+{"ts": "2026-02-24T12:37:39.209953+00:00", "a": "d77845a9c420", "b": "0a7d26e15130", "strength": 0.5, "reason": "temporal adjacency in wake cycle"}
+{"ts": "2026-02-24T12:37:39.209962+00:00", "a": "0a7d26e15130", "b": "59e4dd3721b1", "strength": 0.5, "reason": "temporal adjacency in wake cycle"}
+{"ts": "2026-02-24T12:37:39.209971+00:00", "a": "59e4dd3721b1", "b": "13fe4452d7bf", "strength": 0.5, "reason": "temporal adjacency in wake cycle"}
+{"ts": "2026-02-24T12:37:39.209980+00:00", "a": "13fe4452d7bf", "b": "c5a619684c32", "strength": 0.5, "reason": "temporal adjacency in wake cycle"}
+{"ts": "2026-02-24T12:37:39.209988+00:00", "a": "c5a619684c32", "b": "97850ab0b1c5", "strength": 0.5, "reason": "temporal adjacency in wake cycle"}
