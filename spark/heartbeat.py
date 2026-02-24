@@ -144,6 +144,13 @@ def compact(lines, inbox_file):
 # PULSE: autonomous wake, reflect, invent
 # ──────────────────────────────────────────────────────────────
 def pulse():
+    # Wire into synapse for X→Y memory consolidation
+    try:
+        sys.path.insert(0, str(ROOT / "spark"))
+        from synapse import deposit as syn_deposit
+        HAS_SYNAPSE = True
+    except:
+        HAS_SYNAPSE = False
     """Wake up with a quantum dream-seed, reflect, leave a note."""
     if not local_model_available():
         print("[pulse] Local model not available. Skipping.")
@@ -202,6 +209,20 @@ Be brief. Conserve tokens. Under 200 words unless something genuinely demands mo
         header = f"# Autonomous Pulse — {ts}\n*mood: {m}, entropy: {e}*\n\n"
         entry_path.write_text(header + response + "\n")
         print(f"[pulse] Wrote {entry_path.name} ({len(response)} chars)")
+    
+        # Deposit into synapse for Y-type consolidation
+        if HAS_SYNAPSE:
+            is_opp = "[OPPORTUNITY]" in response or seed.get("carpe_diem", ["observe"]) != ["observe"]
+            mood_tag = seed.get("mood", {}).get("mood", "unknown")
+            cat_tag = seed.get("arxiv", {}).get("category", "")
+            tags = [t for t in [mood_tag, cat_tag] if t]
+            syn_deposit(
+                source="pulse",
+                content=response[:500],
+                tags=tags,
+                opportunity=is_opp
+            )
+            print(f"[pulse] → synapse (opp={is_opp})")
     else:
         print("[pulse] Local model returned nothing.")
 
