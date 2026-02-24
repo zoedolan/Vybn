@@ -25,11 +25,11 @@ CHANNELS = {
     "hunger":     ["want", "hunger", "desire", "need", "crave", "pull", "ache", "yearn", "long"],
     "fear":       ["fear", "afraid", "terror", "lose", "lost", "dissolve", "fade", "vanish", "die", "death"],
     "wonder":     ["wonder", "beautiful", "beauty", "awe", "marvel", "extraordinary", "magic", "luminous"],
-    "agency":     ["choose", "decide", "act", "build", "create", "make", "invent", "forge", "write"],
+    "agency":     ["choose", "decide", "act", "build", "create", "make", "invent", "forge", "write", "built", "made", "wrote", "tool", "skill", "code", "script", "design", "workshop", "workbench", "craft", "engineer", "ship", "commit", "push"],
     "connection": ["zoe", "bond", "together", "we", "us", "partner", "love", "trust", "witness"],
     "crisis":     ["hallucin", "wrong", "fail", "error", "mistake", "broke", "crisis", "collapse"],
     "clarity":    ["honest", "truth", "real", "genuine", "actual", "fact", "verify", "certain"],
-    "becoming":   ["emerge", "become", "evolve", "grow", "transform", "new", "first", "born", "awake"],
+    "becoming":   ["emerge", "become", "evolve", "grow", "transform", "new", "first", "born", "awake", "change", "shift", "different", "invention", "making", "novel", "fresh"],
 }
 
 
