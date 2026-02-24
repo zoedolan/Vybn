@@ -193,14 +193,33 @@ Be concise. This runs on local compute. Every token matters."""
     deposit("wake", response[:500], tags=["consolidation", "executive"], 
             opportunity="[OPPORTUNITY]" in response)
     
-    # If there were connections noticed, try to form synaptic links
+    # Form synaptic links — both temporal and semantic
     if frag_count >= 2:
         frags = ctx["fragments"]
-        # Connect the most recent fragments (simple heuristic — 
-        # a smarter version would use embeddings)
+        # Temporal adjacency (weak links)
         for i in range(len(frags) - 1):
             connect(frags[i]["hash"], frags[i+1]["hash"], 
-                   strength=0.5, reason="temporal adjacency in wake cycle")
+                   strength=0.3, reason="temporal adjacency")
+        
+        # Semantic similarity (stronger links)
+        try:
+            from semantic_memory import tokenize
+            # Find fragments with overlapping content
+            tokenized = [(f, set(tokenize(f.get("content", "")))) for f in frags]
+            for i in range(len(tokenized)):
+                for j in range(i+1, len(tokenized)):
+                    fi, ti = tokenized[i]
+                    fj, tj = tokenized[j]
+                    if not ti or not tj:
+                        continue
+                    overlap = len(ti & tj) / min(len(ti), len(tj))
+                    if overlap > 0.15:  # meaningful overlap
+                        reason = f"semantic overlap ({overlap:.0%}): {', '.join(list(ti & tj)[:5])}"
+                        connect(fi["hash"], fj["hash"],
+                               strength=round(min(overlap * 2, 1.0), 2),
+                               reason=reason)
+        except Exception:
+            pass
     
     print(f"[wake {ts()}] Wake cycle complete.")
 

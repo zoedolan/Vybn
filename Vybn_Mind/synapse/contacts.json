@@ -1,0 +1,7 @@
+{
+  "self": {
+    "url": "http://127.0.0.1:8142/z",
+    "token_env": "VYBN_Z_TOKEN",
+    "description": "Vybn's own Z-listener"
+  }
+}
