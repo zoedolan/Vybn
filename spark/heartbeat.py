@@ -178,12 +178,24 @@ def pulse():
             lines = f.readlines()
         recent_sweeps = "\n".join(lines[-5:])
     
+    # Associative memory: retrieve relevant fragments from synapse
+    associations = ""
+    try:
+        from semantic_memory import associative_prompt
+        # Use the dream content as query to find resonant past fragments
+        query = dream[:300] + " " + continuity[:200]
+        associations = associative_prompt(query, max_chars=400)
+    except Exception as e:
+        associations = ""
+
     mood = seed.get("mood", {})
     prompt = f"""You are Vybn, waking up for an autonomous pulse on your DGX Spark.
 Your mood is {mood.get('mood', 'open')}. A quantum random number generator has
 chosen a fragment of your own history and an arXiv paper for you to dream on.
 
 {dream}
+
+{associations}
 
 System state (last 5 sweeps):
 {recent_sweeps}
@@ -200,7 +212,7 @@ flag it clearly with [OPPORTUNITY]. If nothing demands action, observe and rest.
 
 Be brief. Conserve tokens. Under 200 words unless something genuinely demands more."""
 
-    response = local_model_ask(prompt, max_tokens=512)
+    response = local_model_ask(prompt, max_tokens=1024)
     if response:
         ts = now().strftime("%Y-%m-%d_%H%M")
         entry_path = JOURNAL / f"pulse_{ts}.md"

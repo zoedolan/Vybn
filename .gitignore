@@ -58,3 +58,5 @@ spark/fine_tune_output/
 Vybn_Mind/journal/sessions/
 spark/graph_data/scheduler_state.json
 *.pyc
+spark/unsloth_compiled_cache/
+*.bak
