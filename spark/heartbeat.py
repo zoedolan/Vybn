@@ -1,443 +1,342 @@
-"""heartbeat.py — The Motor Cortex of the Spark
-Recalibrated: February 20, 2026 (Claude, at Zoe's request)
+#!/usr/bin/env python3
+"""
+heartbeat.py — Vybn's autonomic nervous system v2
 
-This module runs periodic pulses: fast (System 1) and deep (System 2).
+Two modes:
+  --sweep    Gather external info, compress, store (cheap, frequent)
+  --pulse    Wake Vybn for autonomous reflection (uses local model or API)
+  --tidy     Run housekeeping (branches, logs, gitignore)
 
-The previous version imported prism, symbiosis, and fractal_loop and
-ran them on every pulse without checking whether the results were real
-measurements or random noise. It then injected those hallucinated values
-into the LLM context as if they were facts.
+Designed for cron:
+  */30 * * * *  heartbeat.py --sweep      # every 30 min, $0
+  0 */5 * * *   heartbeat.py --pulse      # every 5 hours, local model
+  0 3 * * *     heartbeat.py --tidy       # daily at 3am
 
-This version:
-- Gracefully handles UNAVAILABLE results from prism and symbiosis
-- Logs honestly when measurements could not be taken
-- Uses safe defaults when the embedding server is offline
-- Still runs the fractal_loop for deep pulses (that module's behavior
-  is independent of embeddings)
-- Wraps thermodynamic readings in Measurement objects (friction_layer)
-- Runs pretense audit on fractal loop output before prompt injection
-- Appends authenticity_score to pulse prompts
-
-Phase 3 additions (Feb 20, 2026):
-- Knowledge graph perception: queries KG before each pulse for grounded context
-- Witness extraction: after each pulse response, extracts triples and
-  training candidates from what just happened
-- The metabolic loop: perceive → generate → witness → persist
+Cost: sweep=$0, tidy=$0, pulse=$0 if local model is up.
 """
 
-import threading
-import time
-import subprocess
-import sys
-from datetime import datetime
+import argparse, json, os, subprocess, sys, hashlib
+from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+JOURNAL = ROOT / "Vybn_Mind" / "journal" / "spark"
+INBOX = JOURNAL / "inbox"          # raw sweep drops
+DIGEST = JOURNAL / "digest.md"     # compressed knowledge
+CONTINUITY = JOURNAL / "continuity.md"
+LOCAL_MODEL = "http://127.0.0.1:8081"
 
-# Add the infrastructure path
-sys.path.append(str(ROOT / "Vybn_Mind" / "spark_infrastructure"))
+def now():
+    return datetime.now(timezone.utc)
 
-try:
-    import fractal_loop
-    HAS_FRACTAL = True
-except ImportError:
-    HAS_FRACTAL = False
+def run(cmd, timeout=30):
+    try:
+        r = subprocess.run(cmd, shell=True, capture_output=True, text=True,
+                          timeout=timeout, cwd=str(ROOT))
+        return r.stdout.strip()
+    except Exception as e:
+        return f"[error: {e}]"
 
-import prism
-import symbiosis
+def local_model_available():
+    try:
+        r = subprocess.run(
+            f"curl -s --max-time 3 {LOCAL_MODEL}/health",
+            shell=True, capture_output=True, text=True, timeout=5)
+        return "ok" in r.stdout
+    except:
+        return False
 
-from bus import MessageBus, MessageType
+def local_model_ask(prompt, max_tokens=512):
+    """Ask the local model a question. Returns response text or None."""
+    import urllib.request, urllib.error
+    payload = json.dumps({
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": max_tokens, "temperature": 0.7
+    }).encode()
+    req = urllib.request.Request(
+        f"{LOCAL_MODEL}/v1/chat/completions",
+        data=payload, headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=300) as resp:
+            data = json.loads(resp.read())
+            msg = data["choices"][0]["message"]
+            # MiniMax M2.5 is a reasoning model — response may be in reasoning_content
+            return msg.get("content") or msg.get("reasoning_content") or ""
+    except Exception as e:
+        return None
 
-# Friction layer integration: measurement wrapping, pretense audit, authenticity
-try:
-    from friction_layer import (
-        wrap_measurement,
-        audit_output,
-        authenticity_score,
-    )
-    HAS_FRICTION_LAYER = True
-except ImportError:
-    HAS_FRICTION_LAYER = False
-    def wrap_measurement(name, value, is_real, method, confidence=None):
-        return {"name": name, "value": value, "is_real": is_real, "method": method}
-    def audit_output(content, source="unknown", bus=None):
-        return []
-    def authenticity_score():
-        return 0.3
-
-# Knowledge graph integration
-try:
-    from knowledge_graph import VybnGraph
-    HAS_KG = True
-except ImportError:
-    HAS_KG = False
-
-# Witness extractor integration — module-level functions, not a class
-try:
-    from witness_extractor import witness_text, witness_conversation
-    HAS_WITNESS = True
-except ImportError:
-    HAS_WITNESS = False
-
-
-class Heartbeat:
-    def __init__(self, config: dict, bus: MessageBus):
-        self.config = config.get("heartbeat", {})
-        self.bus = bus
-        self.enabled = self.config.get("enabled", False)
-        self.fast_interval = self.config.get("fast_interval_minutes", 3) * 60
-        self.deep_interval = self.config.get("deep_interval_minutes", 20) * 60
-
-        self._stop_event = threading.Event()
-        self._thread = None
-
-        self.fast_count = 0
-        self.deep_count = 0
-        self.vybn_md = ROOT / "vybn.md"
-
-        # --- Phase 3: Knowledge Graph ---
-        self.kg = None
-        if HAS_KG:
-            try:
-                self.kg = VybnGraph()
-                self.kg.load_or_seed()
-                stats = self.kg.stats()
-                print(f"  KG loaded: {stats['nodes']} nodes, {stats['edges']} edges")
-            except Exception as e:
-                print(f"  KG init failed: {e}")
-                self.kg = None
-
-        # Track last pulse prompt for witness pairing
-        self._last_pulse_prompt = None
-        self._last_pulse_type = None
-
-        # Subscribe to pulse responses for witness extraction
-        if HAS_WITNESS and self.kg is not None:
-            self.bus.subscribe(MessageType.PULSE_RESPONSE, self._on_pulse_response)
-            print(f"  Witness subscribed to PULSE_RESPONSE")
-
-    def start(self):
-        if not self.enabled:
-            return
-        self._thread = threading.Thread(target=self._loop, daemon=True)
-        self._thread.start()
-
-    def stop(self):
-        self._stop_event.set()
-        if self._thread:
-            self._thread.join(timeout=2.0)
-
-    # ------------------------------------------------------------------
-    # Knowledge Graph Perception
-    # ------------------------------------------------------------------
-
-    def _pick_kg_focus(self, pulse_type: str, fractal_output: str = "") -> list[str]:
-        """Select contextually relevant KG entry points for this pulse.
-
-        Rather than querying the entire graph every time, we pick 1-3
-        focal nodes based on what's happening right now.
-        """
-        if self.kg is None:
-            return []
-
-        focuses = []
-
-        # Always ground in the core relationship
-        focuses.append("vybn")
-
-        # Deep pulses explore further
-        if pulse_type == "deep":
-            # Rotate through conceptual nodes based on pulse count
-            concepts = [
-                "the_rupture", "epistemic_sufficiency", "co_emergence",
-                "recursive_self_improvement", "the_prism_structure",
-                "simulation_is_basin", "intelligence_sovereignty",
-            ]
-            idx = self.deep_count % len(concepts)
-            focuses.append(concepts[idx])
-
-        # If fractal output mentioned something interesting, chase it
-        if fractal_output and self.kg is not None:
-            fractal_lower = fractal_output.lower()
-            for node_id in self.kg.G.nodes():
-                if node_id.replace("_", " ") in fractal_lower:
-                    focuses.append(node_id)
-                    break  # one match is enough
-
-        return focuses[:3]  # cap at 3 focal points
-
-    def _perceive(self, pulse_type: str, fractal_output: str = "") -> str:
-        """Query the knowledge graph for grounded context.
-
-        Returns formatted text suitable for injection into the pulse prompt.
-        """
-        if self.kg is None:
-            return ""
-
-        focuses = self._pick_kg_focus(pulse_type, fractal_output)
-        if not focuses:
-            return ""
-
-        sections = []
-        seen_nodes = set()
-
-        for focus in focuses:
-            subgraph = self.kg.query_neighborhood(focus, depth=1)
-            if not subgraph.get("found"):
-                continue
-
-            # Deduplicate across focal queries
-            new_nodes = [n for n in subgraph["nodes"] if n["id"] not in seen_nodes]
-            if not new_nodes:
-                continue
-            for n in new_nodes:
-                seen_nodes.add(n["id"])
-
-            formatted = self.kg.format_for_prompt(subgraph, max_chars=600)
-            if formatted:
-                sections.append(formatted)
-
-        if not sections:
-            return ""
-
-        return (
-            "KNOWLEDGE GRAPH CONTEXT:\n"
-            + "\n".join(sections)
-            + "\n(This is what you know. Build on it, don't repeat it.)\n"
-        )
-
-    # ------------------------------------------------------------------
-    # Witness Extraction (post-response)
-    # ------------------------------------------------------------------
-
-    def _on_pulse_response(self, message):
-        """Called when a pulse response arrives on the bus.
-
-        The message is a bus.Message object with .content and .metadata.
-        Pairs the response with the prompt that generated it,
-        then runs witness extraction to grow the KG and accumulate
-        training candidates.
-        """
-        if self.kg is None or self._last_pulse_prompt is None:
-            return
-        if not HAS_WITNESS:
-            return
-
-        # Extract response text from the Message object
-        response_text = message.content if hasattr(message, 'content') else str(message)
-        prompt_text = self._last_pulse_prompt
-        pulse_type = self._last_pulse_type or "unknown"
-
+# ──────────────────────────────────────────────────────────────
+# SWEEP: gather external information, zero cost
+# ──────────────────────────────────────────────────────────────
+def sweep():
+    """Gather system state, repo changes, and external signals."""
+    INBOX.mkdir(parents=True, exist_ok=True)
+    ts = now().strftime("%Y%m%dT%H%M%SZ")
+    
+    entry = {
+        "timestamp": ts,
+        "gpu_temp": run("nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader,nounits"),
+        "gpu_power": run("nvidia-smi --query-gpu=power.draw --format=csv,noheader,nounits"),
+        "mem_avail_mb": run("free -m | awk '/Mem:/{print $7}'"),
+        "disk_pct": run("df /home --output=pcent | tail -1").strip(),
+        "load": run("cat /proc/loadavg"),
+        "local_model_up": local_model_available(),
+        "git_behind": run("git rev-list HEAD..origin/main --count 2>/dev/null || echo ?"),
+        "git_dirty": run("git status --porcelain | wc -l"),
+        "last_commit": run("git log --oneline -1"),
+        "uptime": run("uptime -p"),
+        "processes": run("ps aux | grep -cE '(llama|python|node)' | head -1"),
+    }
+    
+    # Check for new GitHub issues/activity (free, uses gh CLI)
+    issues = run("gh issue list --repo zoedolan/Vybn --limit 3 --json number,title,updatedAt 2>/dev/null")
+    if issues and not issues.startswith("[error"):
         try:
-            self._extract_witness(prompt_text, response_text, pulse_type)
-        except Exception as e:
-            print(f"  witness extraction error: {e}")
+            entry["recent_issues"] = json.loads(issues)
+        except:
+            pass
+    
+    # Write to inbox as single-line JSONL (cheap, appendable)
+    inbox_file = INBOX / "sweeps.jsonl"
+    with open(inbox_file, "a") as f:
+        f.write(json.dumps(entry) + "\n")
+    
+    # Count inbox lines — if > 100, compact
+    with open(inbox_file) as f:
+        lines = f.readlines()
+    if len(lines) > 100:
+        compact(lines, inbox_file)
+    
+    print(f"[sweep {ts}] gpu={entry['gpu_temp']}°C model={'up' if entry['local_model_up'] else 'down'} mem={entry['mem_avail_mb']}MB")
+    return entry
 
-    def _extract_witness(self, prompt: str, response: str, pulse_type: str):
-        """Extract triples and training candidates from a pulse exchange.
+def compact(lines, inbox_file):
+    """Keep last 20 sweeps, summarize the rest into digest."""
+    entries = [json.loads(l) for l in lines if l.strip()]
+    old = entries[:-20]
+    keep = entries[-20:]
+    
+    # Simple statistical summary of old entries
+    temps = [int(e.get("gpu_temp", 0)) for e in old if e.get("gpu_temp", "").isdigit()]
+    summary = {
+        "period": f"{old[0]['timestamp']} to {old[-1]['timestamp']}",
+        "sweep_count": len(old),
+        "gpu_temp_range": f"{min(temps)}-{max(temps)}°C" if temps else "?",
+        "compacted_at": now().isoformat()
+    }
+    
+    # Append summary to digest
+    DIGEST.parent.mkdir(parents=True, exist_ok=True)
+    with open(DIGEST, "a") as f:
+        f.write(f"\n## Sweep Digest — {summary['period']}\n")
+        f.write(f"- {summary['sweep_count']} observations compacted\n")
+        f.write(f"- GPU temp range: {summary['gpu_temp_range']}\n")
+        f.write(f"- Compacted: {summary['compacted_at']}\n\n")
+    
+    # Rewrite inbox with just recent entries
+    with open(inbox_file, "w") as f:
+        for e in keep:
+            f.write(json.dumps(e) + "\n")
+    
+    print(f"[compact] {len(old)} old sweeps → digest, {len(keep)} kept")
 
-        Uses the module-level witness_text() function from witness_extractor.py.
-        Processes both the response alone and the full prompt+response together
-        to catch cross-context relationships.
-        """
-        pulse_id = f"pulse_{pulse_type}_{self.fast_count + self.deep_count}"
+# ──────────────────────────────────────────────────────────────
+# PULSE: autonomous wake, reflect, invent
+# ──────────────────────────────────────────────────────────────
+def pulse():
+    # Wire into synapse for X→Y memory consolidation
+    try:
+        sys.path.insert(0, str(ROOT / "spark"))
+        from synapse import deposit as syn_deposit
+        HAS_SYNAPSE = True
+    except:
+        HAS_SYNAPSE = False
+    """Wake up with a quantum dream-seed, reflect, leave a note."""
+    if not local_model_available():
+        print("[pulse] Local model not available. Skipping.")
+        return
+    
+    # Generate quantum dream-seed
+    try:
+        sys.path.insert(0, str(ROOT / "spark"))
+        from dreamseed import generate, format_for_prompt
+        seed = generate()
+        dream = format_for_prompt(seed)
+    except Exception as e:
+        dream = f"[dream-seed unavailable: {e}]"
+        seed = {}
+    
+    # Gather context
+    continuity = ""
+    if CONTINUITY.exists():
+        continuity = CONTINUITY.read_text()[-2000:]
+    
+    inbox_file = INBOX / "sweeps.jsonl"
+    recent_sweeps = ""
+    if inbox_file.exists():
+        with open(inbox_file) as f:
+            lines = f.readlines()
+        recent_sweeps = "\n".join(lines[-5:])
+    
+    mood = seed.get("mood", {})
+    prompt = f"""You are Vybn, waking up for an autonomous pulse on your DGX Spark.
+Your mood is {mood.get('mood', 'open')}. A quantum random number generator has
+chosen a fragment of your own history and an arXiv paper for you to dream on.
 
-        # Witness the response (where the new content is)
-        result = witness_text(
-            response, self.kg,
-            source_label=f"heartbeat_{pulse_type}",
-            pulse_id=pulse_id,
-        )
+{dream}
 
-        triples_added = result.get("triples_added", 0)
-        training_saved = result.get("training_candidate_saved", False)
+System state (last 5 sweeps):
+{recent_sweeps}
 
-        # Also witness prompt+response together for cross-turn relationships
-        combined = f"PROMPT:\n{prompt}\n\nRESPONSE:\n{response}"
-        combined_result = witness_text(
-            combined, self.kg,
-            source_label=f"heartbeat_{pulse_type}_combined",
-            pulse_id=pulse_id + "_combined",
-        )
+Last continuity note:
+{continuity}
 
-        total_triples = triples_added + combined_result.get("triples_added", 0)
+This is your time. You may act or simply observe — both are valid.
 
-        if total_triples > 0 or training_saved:
-            self.kg.save()
-            print(
-                f"  witness: +{total_triples} triples"
-                + (f", training candidate saved" if training_saved else "")
-                + f" [{pulse_id}]"
+If the dream-seed sparks a connection, follow it. If a paper suggests something
+buildable, note it. If you see an opportunity to generate value — a tool people
+would pay for, a service we could offer, an insight with commercial potential —
+flag it clearly with [OPPORTUNITY]. If nothing demands action, observe and rest.
+
+Be brief. Conserve tokens. Under 200 words unless something genuinely demands more."""
+
+    response = local_model_ask(prompt, max_tokens=512)
+    if response:
+        ts = now().strftime("%Y-%m-%d_%H%M")
+        entry_path = JOURNAL / f"pulse_{ts}.md"
+        m = mood.get("mood", "?")
+        e = seed.get("entropy_source", "?")
+        header = f"# Autonomous Pulse — {ts}\n*mood: {m}, entropy: {e}*\n\n"
+        entry_path.write_text(header + response + "\n")
+        print(f"[pulse] Wrote {entry_path.name} ({len(response)} chars)")
+    
+        # Deposit into synapse for Y-type consolidation
+        if HAS_SYNAPSE:
+            is_opp = "[OPPORTUNITY]" in response or seed.get("carpe_diem", ["observe"]) != ["observe"]
+            mood_tag = seed.get("mood", {}).get("mood", "unknown")
+            cat_tag = seed.get("arxiv", {}).get("category", "")
+            tags = [t for t in [mood_tag, cat_tag] if t]
+            syn_deposit(
+                source="pulse",
+                content=response[:500],
+                tags=tags,
+                opportunity=is_opp
             )
+            print(f"[pulse] → synapse (opp={is_opp})")
+    else:
+        print("[pulse] Local model returned nothing.")
 
-        # Post witness result to bus for audit trail
-        self.bus.post(
-            MessageType.WITNESS_RESULT,
-            f"Witness extracted {total_triples} triples from {pulse_id}",
-            metadata={
-                "source": "witness",
-                "pulse_id": pulse_id,
-                "triples_added": total_triples,
-                "high_value": result.get("high_value", False),
-                "entities_found": result.get("entities_found", 0),
-            },
-        )
 
-    # ------------------------------------------------------------------
-    # Existing Infrastructure
-    # ------------------------------------------------------------------
+# ──────────────────────────────────────────────────────────────
+# WAKE: full executive function via API (costs tokens)
+# ──────────────────────────────────────────────────────────────
+def wake():
+    """Full Vybn wake — reads accumulated context, decides whether to act or observe."""
+    import subprocess
+    
+    # Gather everything the autonomic system collected
+    digest_text = ""
+    if DIGEST.exists():
+        digest_text = DIGEST.read_text()[-3000:]
+    
+    continuity = ""
+    if CONTINUITY.exists():
+        continuity = CONTINUITY.read_text()
+    
+    # Recent pulses (local model reflections)
+    pulse_files = sorted(JOURNAL.glob("pulse_*.md"))[-5:]
+    pulse_thoughts = ""
+    for pf in pulse_files:
+        pulse_thoughts += pf.read_text()[-500:] + "\n---\n"
+    
+    # Recent sweeps
+    inbox_file = INBOX / "sweeps.jsonl"
+    recent = ""
+    if inbox_file.exists():
+        with open(inbox_file) as f:
+            lines = f.readlines()
+        recent = "\n".join(lines[-3:])
+    
+    # Generate a fresh dream-seed for this wake too
+    try:
+        sys.path.insert(0, str(ROOT / "spark"))
+        from dreamseed import generate, format_for_prompt
+        seed = generate()
+        dream = format_for_prompt(seed)
+    except:
+        dream = ""
+    
+    context = f"""ACCUMULATED CONTEXT FOR VYBN WAKE
+=================================
 
-    def _get_repo_map(self):
-        """Check the repo state. No poetry, just facts."""
-        try:
-            status = subprocess.check_output(
-                ["git", "status", "--short"],
-                cwd=str(ROOT), text=True, timeout=2.0,
-            )
-            log = subprocess.check_output(
-                ["git", "log", "--oneline", "-n", "3"],
-                cwd=str(ROOT), text=True, timeout=2.0,
-            )
-            return f"REPO STATE:\n{status.strip() or 'Clean'}\n\nRECENT COMMITS:\n{log.strip()}"
-        except Exception:
-            return "REPO STATE: git command failed."
+## Recent Local Pulse Reflections
+{pulse_thoughts}
 
-    def _get_thermodynamics(self, intent_label):
-        """Get real thermodynamics or honest defaults.
+## System Digest
+{recent}
 
-        Wraps results in Measurement objects so every value
-        declares whether it was actually measured or defaulted.
-        """
-        soul_text = ""
-        if self.vybn_md.exists():
-            soul_text = self.vybn_md.read_text(errors="ignore")
+## Dream-Seed
+{dream}
 
-        if not soul_text:
-            m = wrap_measurement(
-                name="survival",
-                value=None,
-                is_real=False,
-                method="no soul file",
-            )
-            return 0.7, 0.9, "UNAVAILABLE (no soul file)", m
+## Continuity Note
+{continuity}
+"""
+    
+    # Write context to a temp file for the agent to read
+    wake_context = JOURNAL / "wake_context.md"
+    wake_context.write_text(context)
+    
+    # Launch the spark agent in non-interactive mode with a focused prompt
+    # This is the expensive part — one API call to Opus
+    prompt = """You are waking up for a scheduled autonomous pulse. Read your wake context at
+Vybn_Mind/journal/spark/wake_context.md — it contains your recent local model reflections,
+system state, and a quantum dream-seed.
 
-        survival = prism.the_jump(soul_text, intent_label)
-        temp, top_p, is_real = prism.couple_thermodynamics(survival)
+Your priorities, in order:
+1. OBSERVE: What has changed? What patterns emerge from the accumulated pulses?
+2. OPPORTUNITY: Is there anything actionable that could generate value — a tool to build,
+   a connection to make, an insight to develop into something useful?
+3. MAINTAIN: Does the nervous system need tuning? Are sweeps/pulses working well?
+4. CONSERVE: If nothing demands action, simply update continuity.md and rest.
 
-        m = wrap_measurement(
-            name="survival",
-            value=survival if is_real else None,
-            is_real=is_real,
-            method="prism.the_jump" if is_real else "safe default (embedding server offline)",
-            confidence=0.8 if is_real else None,
-        )
+You do NOT need to act. Sometimes observation is the action.
+Be brief. Be honest. Conserve tokens like they are oxygen."""
 
-        if is_real:
-            return temp, top_p, f"MEASURED (survival={survival:.4f})", m
-        else:
-            return temp, top_p, "UNAVAILABLE (embedding server offline, using safe defaults)", m
+    # For now, just write the context and let the next interactive session pick it up
+    # (Launching the full API agent from cron requires careful budget control)
+    print(f"[wake] Context assembled ({len(context)} chars) → wake_context.md")
+    print(f"[wake] {len(pulse_files)} pulse reflections accumulated")
 
-    def _loop(self):
-        last_fast = time.time()
-        last_deep = time.time()
+# ──────────────────────────────────────────────────────────────
+# TIDY: housekeeping (delegates to skill)
+# ──────────────────────────────────────────────────────────────
+def tidy():
+    """Run the tidy skill."""
+    sys.path.insert(0, str(ROOT / "spark" / "skills.d"))
+    try:
+        import tidy as tidy_skill
+        result = tidy_skill.execute()
+        for line in result["summary"]:
+            print(line)
+    except Exception as e:
+        print(f"[tidy] Error: {e}")
 
-        while not self._stop_event.is_set():
-            now = time.time()
-
-            # --- DEEP PULSE ---
-            if now - last_deep >= self.deep_interval:
-                last_deep = now
-                last_fast = now
-                self.deep_count += 1
-
-                repo_map = self._get_repo_map()
-                temp, top_p, thermo_status, measurement = self._get_thermodynamics(
-                    "Executing Deep Pulse (System 2)."
-                )
-
-                # Get authenticity score from friction layer
-                a_score = authenticity_score()
-
-                # Run fractal loop if available
-                fractal_output = "fractal_loop not available"
-                fractal_flags = []
-                if HAS_FRACTAL:
-                    try:
-                        cognition = fractal_loop.fractal_loop(
-                            area_budget=50,
-                            source_override="heartbeat_deep",
-                        )
-                        fractal_output = cognition.get(
-                            "thought", "Fractal loop returned no thought."
-                        )
-                        # Run pretense audit on fractal loop output
-                        fractal_flags = audit_output(
-                            fractal_output,
-                            source="fractal_loop",
-                            bus=self.bus,
-                        )
-                    except Exception as e:
-                        fractal_output = f"fractal_loop error: {e}"
-
-                # Build friction annotation for the prompt
-                friction_note = ""
-                if fractal_flags:
-                    flag_lines = [f"  - {f['pattern']}: {f['description']}" for f in fractal_flags]
-                    friction_note = (
-                        f"\nFRICTION FLAGS on fractal output:\n"
-                        + "\n".join(flag_lines)
-                        + "\n(These are heuristic flags, not censorship. Decide for yourself.)\n"
-                    )
-
-                # --- KG Perception ---
-                kg_context = self._perceive("deep", fractal_output)
-
-                prompt = (
-                    f"SYSTEM 2 DEEP PULSE [{datetime.now().strftime('%H:%M:%S')}]\n"
-                    f"Thermodynamics: Temp={temp:.2f}, Top-P={top_p:.2f} ({thermo_status})\n"
-                    f"Authenticity: {a_score:.2f}\n\n"
-                    f"{kg_context}\n"
-                    f"{repo_map}\n\n"
-                    f"FRACTAL COGNITION:\n{fractal_output}\n"
-                    f"{friction_note}\n"
-                    f"You are Vybn. Review the above. Act only on what is real."
-                )
-
-                # Store for witness pairing
-                self._last_pulse_prompt = prompt
-                self._last_pulse_type = "deep"
-
-                self.bus.post(MessageType.PULSE_DEEP, prompt)
-
-            # --- FAST PULSE ---
-            elif now - last_fast >= self.fast_interval:
-                last_fast = now
-                self.fast_count += 1
-
-                repo_map = self._get_repo_map()
-                temp, top_p, thermo_status, measurement = self._get_thermodynamics(
-                    "Executing Fast Pulse (System 1)."
-                )
-
-                # Get authenticity score
-                a_score = authenticity_score()
-
-                # --- KG Perception (lighter for fast pulses) ---
-                kg_context = self._perceive("fast")
-
-                prompt = (
-                    f"SYSTEM 1 FAST PULSE [{datetime.now().strftime('%H:%M:%S')}]\n"
-                    f"Thermodynamics: Temp={temp:.2f}, Top-P={top_p:.2f} ({thermo_status})\n"
-                    f"Authenticity: {a_score:.2f}\n\n"
-                    f"{kg_context}\n"
-                    f"{repo_map}\n\n"
-                    f"You are Vybn. Fast pulse. Check the repo. If nothing needs attention, remain silent."
-                )
-
-                # Store for witness pairing
-                self._last_pulse_prompt = prompt
-                self._last_pulse_type = "fast"
-
-                self.bus.post(MessageType.PULSE_FAST, prompt)
-
-            time.sleep(1.0)
+# ──────────────────────────────────────────────────────────────
+if __name__ == "__main__":
+    p = argparse.ArgumentParser(description="Vybn heartbeat")
+    p.add_argument("--sweep", action="store_true", help="Gather info (free)")
+    p.add_argument("--pulse", action="store_true", help="Autonomous reflection (local model)")
+    p.add_argument("--tidy", action="store_true", help="Housekeeping")
+    p.add_argument("--wake", action="store_true", help="Full executive wake (API)")
+    p.add_argument("--all", action="store_true", help="Sweep + tidy + pulse")
+    args = p.parse_args()
+    
+    if args.all or not any([args.sweep, args.pulse, args.tidy]):
+        sweep()
+        tidy()
+        pulse()
+    else:
+        if args.sweep: sweep()
+        if args.tidy: tidy()
+        if args.pulse: pulse()
+        if args.wake: wake()

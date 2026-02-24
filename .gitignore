@@ -53,3 +53,8 @@ Thumbs.db
 # --- Node (if web interface uses it) ----------------------------------
 node_modules/
 spark/.env
+spark/graph_data/training_candidates/
+spark/fine_tune_output/
+Vybn_Mind/journal/sessions/
+spark/graph_data/scheduler_state.json
+*.pyc
