@@ -63,7 +63,7 @@ from parsing import (
 from policy import PolicyEngine, Verdict
 from session import SessionManager
 from skills import SkillRouter
-from heartbeat import Heartbeat
+#from heartbeat import Heartbeat
 from inbox import InboxWatcher
 from agents import AgentPool
 

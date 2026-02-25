@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/home/vybnz69/Vybn/.venv/bin/python3
 """
 Vybn Spark Agent
 ================
@@ -27,6 +27,11 @@ import sys
 import time
 import subprocess
 import anthropic
+# Cross-instance awareness
+try:
+    from transcript import log_message as _transcript_log
+except ImportError:
+    def _transcript_log(*a, **kw): pass
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -505,6 +510,7 @@ def run_agent_loop(
     the model is done talking or we hit the safety limit.
     """
     messages.append({"role": "user", "content": user_input})
+    _transcript_log("user", user_input, source="terminal")
     iterations = 0
 
     while iterations < MAX_ITERATIONS:
@@ -525,7 +531,9 @@ def run_agent_loop(
         messages.append({"role": "assistant", "content": response.content})
 
         if response.stop_reason == "end_turn":
-            return _extract_text(response)
+            _text = _extract_text(response)
+            _transcript_log("assistant", _text, source="terminal")
+            return _text
 
         if response.stop_reason == "max_tokens":
             return _extract_text(response) + "\n[truncated — hit token limit]"

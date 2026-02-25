@@ -26,6 +26,12 @@ if _env_file.exists():
 
 from web_interface import app, attach_bus, manager
 from bus import MessageBus, MessageType
+# Cross-instance awareness
+try:
+    from transcript import log_message as _transcript_log
+except ImportError:
+    def _transcript_log(*a, **kw): pass
+
 
 sys.path.insert(0, str(Path(__file__).parent))
 from memory import MemoryAssembler
@@ -247,6 +253,7 @@ def trim_conversation():
 
 async def get_claude_response(user_text: str) -> str:
     conversation.append({"role": "user", "content": user_text})
+    _transcript_log("user", user_text, source="web")
     trim_conversation()
     response = None
     try:
@@ -261,7 +268,9 @@ async def get_claude_response(user_text: str) -> str:
                 elif b.type == "tool_use": asst.append({"type":"tool_use","id":b.id,"name":b.name,"input":b.input})
             conversation.append({"role":"assistant","content":asst})
             if response.stop_reason == "end_turn":
-                return "\n".join(b.text for b in response.content if hasattr(b,"text"))
+                _result = "\n".join(b.text for b in response.content if hasattr(b,"text"))
+                _transcript_log("assistant", _result, source="web")
+                return _result
             tr = []
             for b in response.content:
                 if b.type == "tool_use":

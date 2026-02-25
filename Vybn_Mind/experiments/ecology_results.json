@@ -1,0 +1,7064 @@
+{
+  "timestamp": "2026-02-24T20:17:02.688149",
+  "experiment": "015b_ecology",
+  "config": {
+    "epochs": 120,
+    "batch_size": 16,
+    "lr": 0.001,
+    "geo_weight": 0.1,
+    "initial_alive_fraction": 0.7
+  },
+  "history": [
+    {
+      "epoch": 1,
+      "train_loss": 0.0170255901136746,
+      "val_loss": 0.0026669835206121206,
+      "geo_loss": 1.0456570148468018,
+      "temperature": 2.0,
+      "avg_commutator": 0.13486868515610695,
+      "unique_primitives": 47,
+      "census": {
+        "alive": 41,
+        "dead": 15,
+        "total_compute": 56,
+        "oldest": 30,
+        "youngest": 0,
+        "most_active": 1693,
+        "least_active_alive": 0
+      }
+    },
+    {
+      "epoch": 10,
+      "train_loss": 0.00010849058477712485,
+      "val_loss": 0.0002900573017541319,
+      "geo_loss": 1.0142354528109232,
+      "temperature": 1.85,
+      "avg_commutator": 0.04375575762242079,
+      "unique_primitives": 1,
+      "census": {
+        "alive": 49,
+        "dead": 7,
+        "total_compute": 56,
+        "oldest": 301,
+        "youngest": 0,
+        "most_active": 26954,
+        "least_active_alive": 0
+      }
+    },
+    {
+      "epoch": 20,
+      "train_loss": 0.0003148095915094018,
+      "val_loss": 0.001322990283370018,
+      "geo_loss": 0.9926797449588776,
+      "temperature": 1.6833333333333333,
+      "avg_commutator": 0.08669192716479301,
+      "unique_primitives": 1,
+      "census": {
+        "alive": 56,
+        "dead": 0,
+        "total_compute": 56,
+        "oldest": 602,
+        "youngest": 0,
+        "most_active": 30520,
+        "least_active_alive": 0
+      }
+    },
+    {
+      "epoch": 30,
+      "train_loss": 0.00016090453767295305,
+      "val_loss": 0.0006765296566300094,
+      "geo_loss": 0.9538303295771281,
+      "temperature": 1.5166666666666666,
+      "avg_commutator": 0.07104844227433205,
+      "unique_primitives": 1,
+      "census": {
+        "alive": 56,
+        "dead": 0,
+        "total_compute": 56,
+        "oldest": 903,
+        "youngest": 0,
+        "most_active": 30899,
+        "least_active_alive": 0
+      }
+    },
+    {
+      "epoch": 40,
+      "train_loss": 0.00013306010041560511,
+      "val_loss": 0.0006344815483316779,
+      "geo_loss": 0.8845881978670757,
+      "temperature": 1.35,
+      "avg_commutator": 0.10822256468236446,
+      "unique_primitives": 1,
+      "census": {
+        "alive": 56,
+        "dead": 0,
+        "total_compute": 56,
+        "oldest": 1204,
+        "youngest": 0,
+        "most_active": 30931,
+        "least_active_alive": 0
+      }
+    },
+    {
+      "epoch": 50,
+      "train_loss": 0.00011914606972519929,
+      "val_loss": 0.0005307177780196071,
+      "geo_loss": 0.8068107108275095,
+      "temperature": 1.1833333333333333,
+      "avg_commutator": 0.09455123543739319,
+      "unique_primitives": 2,
+      "census": {
+        "alive": 56,
+        "dead": 0,
+        "total_compute": 56,
+        "oldest": 1505,
+        "youngest": 0,
+        "most_active": 30931,
+        "least_active_alive": 0
+      }
+    },
+    {
+      "epoch": 60,
+      "train_loss": 8.051782527521331e-05,
+      "val_loss": 0.0004115620395168662,
+      "geo_loss": 0.6947574257850647,
+      "temperature": 1.0166666666666666,
+      "avg_commutator": 0.13482747972011566,
+      "unique_primitives": 1,
+      "census": {
+        "alive": 56,
+        "dead": 0,
+        "total_compute": 56,
+        "oldest": 1806,
+        "youngest": 0,
+        "most_active": 30941,
+        "least_active_alive": 0
+      }
+    },
+    {
+      "epoch": 70,
+      "train_loss": 5.501809415970153e-05,
+      "val_loss": 0.00041702637099660933,
+      "geo_loss": 0.5930103480815887,
+      "temperature": 0.8500000000000001,
+      "avg_commutator": 0.15058228000998497,
+      "unique_primitives": 1,
+      "census": {
+        "alive": 56,
+        "dead": 0,
+        "total_compute": 56,
+        "oldest": 2107,
+        "youngest": 0,
+        "most_active": 30947,
+        "least_active_alive": 0
+      }
+    },
+    {
+      "epoch": 80,
+      "train_loss": 4.353998644243499e-05,
+      "val_loss": 0.00033639895264059305,
+      "geo_loss": 0.4873476246992747,
+      "temperature": 0.6833333333333333,
+      "avg_commutator": 0.14491881988942623,
+      "unique_primitives": 1,
+      "census": {
+        "alive": 56,
+        "dead": 0,
+        "total_compute": 56,
+        "oldest": 2408,
+        "youngest": 0,
+        "most_active": 30948,
+        "least_active_alive": 0
+      }
+    },
+    {
+      "epoch": 90,
+      "train_loss": 5.432973412098363e-05,
+      "val_loss": 0.00033445152803324163,
+      "geo_loss": 0.39068158666292824,
+      "temperature": 0.5166666666666666,
+      "avg_commutator": 0.16180527582764626,
+      "unique_primitives": 1,
+      "census": {
+        "alive": 56,
+        "dead": 0,
+        "total_compute": 56,
+        "oldest": 2709,
+        "youngest": 0,
+        "most_active": 30948,
+        "least_active_alive": 0
+      }
+    },
+    {
+      "epoch": 100,
+      "train_loss": 3.4067062915710264e-05,
+      "val_loss": 0.0003891663218382746,
+      "geo_loss": 0.3109612504641215,
+      "temperature": 0.3500000000000001,
+      "avg_commutator": 0.17350849509239197,
+      "unique_primitives": 1,
+      "census": {
+        "alive": 56,
+        "dead": 0,
+        "total_compute": 56,
+        "oldest": 3010,
+        "youngest": 0,
+        "most_active": 30949,
+        "least_active_alive": 0
+      }
+    },
+    {
+      "epoch": 110,
+      "train_loss": 3.009721249327413e-05,
+      "val_loss": 0.00029874188476242125,
+      "geo_loss": 0.2554384211699168,
+      "temperature": 0.3,
+      "avg_commutator": 0.16262659803032875,
+      "unique_primitives": 1,
+      "census": {
+        "alive": 56,
+        "dead": 0,
+        "total_compute": 56,
+        "oldest": 3311,
+        "youngest": 0,
+        "most_active": 30949,
+        "least_active_alive": 0
+      }
+    },
+    {
+      "epoch": 120,
+      "train_loss": 2.5298874152213103e-05,
+      "val_loss": 0.00026047328719869256,
+      "geo_loss": 0.20370049625635148,
+      "temperature": 0.3,
+      "avg_commutator": 0.1967676319181919,
+      "unique_primitives": 1,
+      "census": {
+        "alive": 56,
+        "dead": 0,
+        "total_compute": 56,
+        "oldest": 3612,
+        "youngest": 0,
+        "most_active": 30949,
+        "least_active_alive": 0
+      }
+    }
+  ],
+  "population_timeline": [
+    {
+      "epoch": 0,
+      "alive": 41,
+      "dead": 15,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 1,
+      "alive": 41,
+      "dead": 15,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 3
+    },
+    {
+      "epoch": 2,
+      "alive": 42,
+      "dead": 14,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 3,
+      "alive": 43,
+      "dead": 13,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 4,
+      "alive": 44,
+      "dead": 12,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 5,
+      "alive": 45,
+      "dead": 11,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 6,
+      "alive": 46,
+      "dead": 10,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 7,
+      "alive": 47,
+      "dead": 9,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 8,
+      "alive": 48,
+      "dead": 8,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 9,
+      "alive": 49,
+      "dead": 7,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 10,
+      "alive": 50,
+      "dead": 6,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 11,
+      "alive": 51,
+      "dead": 5,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 12,
+      "alive": 52,
+      "dead": 4,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 13,
+      "alive": 53,
+      "dead": 3,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 14,
+      "alive": 54,
+      "dead": 2,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 15,
+      "alive": 55,
+      "dead": 1,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 16,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 17,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 18,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 19,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 20,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 21,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 22,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 23,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 24,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 25,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 26,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 27,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 28,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 29,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 30,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 31,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 32,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 33,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 34,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 35,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 36,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 37,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 38,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 39,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 40,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 41,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 42,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 43,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 44,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 45,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 46,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 47,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 48,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 49,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 50,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 51,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 52,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 53,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 54,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 55,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 56,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 57,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 58,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 59,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 60,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 61,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 62,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 63,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 64,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 65,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 66,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 67,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 68,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 69,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 70,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 71,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 72,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 73,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 74,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 75,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 76,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 77,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 78,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 79,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 80,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 81,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 82,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 83,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 84,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 85,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 86,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 87,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 88,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 89,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 90,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 91,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 92,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 93,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 94,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 95,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 96,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 97,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 98,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 99,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 100,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 101,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 102,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 103,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 104,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 105,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 106,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 107,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 108,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 109,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 110,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 111,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 112,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 113,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 114,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 115,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 116,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 117,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 118,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    },
+    {
+      "epoch": 119,
+      "alive": 56,
+      "dead": 0,
+      "deaths_this_epoch": 3,
+      "ops_this_epoch": 6
+    }
+  ],
+  "ecology_log": [
+    {
+      "epoch": 0,
+      "deaths": [
+        6,
+        3,
+        0
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 3,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 6,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            40
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.403387343059563,
+        "meta_op_rate": 0.0,
+        "diversity": 1.0
+      }
+    },
+    {
+      "epoch": 1,
+      "deaths": [
+        3,
+        40,
+        0
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 3,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 40,
+          "reason": "replacement"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5119398733074587,
+        "meta_op_rate": 0.0,
+        "diversity": 0.68
+      }
+    },
+    {
+      "epoch": 2,
+      "deaths": [
+        0,
+        3,
+        40
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 3,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 40,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            41
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.581948155617725,
+        "meta_op_rate": 0.0,
+        "diversity": 0.14
+      }
+    },
+    {
+      "epoch": 3,
+      "deaths": [
+        0,
+        3,
+        6
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 3,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 6,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            42
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999452242915013,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 4,
+      "deaths": [
+        0,
+        3,
+        6
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 3,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 6,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            43
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.599942228684549,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 5,
+      "deaths": [
+        0,
+        3,
+        6
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 3,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 6,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            44
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.599939190214122,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 6,
+      "deaths": [
+        0,
+        3,
+        6
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 3,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 6,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            45
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.599938651309704,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 7,
+      "deaths": [
+        0,
+        3,
+        6
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 3,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 6,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            46
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999328414490144,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 8,
+      "deaths": [
+        0,
+        3,
+        6
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 3,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 6,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            47
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999405475774005,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 9,
+      "deaths": [
+        0,
+        3,
+        6
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 3,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 6,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            48
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.599942243557814,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 10,
+      "deaths": [
+        0,
+        3,
+        6
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 3,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 6,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            49
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999370472991488,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 11,
+      "deaths": [
+        0,
+        3,
+        6
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 3,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 6,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            50
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.59994480661611,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 12,
+      "deaths": [
+        0,
+        3,
+        4
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 3,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 4,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            51
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.599936376730806,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 13,
+      "deaths": [
+        0,
+        3,
+        4
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 3,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 4,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            52
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999409176255686,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 14,
+      "deaths": [
+        0,
+        1,
+        3
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 3,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            53
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999321120758676,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 15,
+      "deaths": [
+        0,
+        1,
+        3
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 3,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            54
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999319178133025,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 16,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            55
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999378281674783,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 17,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999438053181807,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 18,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999434314974237,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 19,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.599935318895345,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 20,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999342948466726,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 21,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.599935020534123,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 22,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999365832170542,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 23,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.59993755689003,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 24,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999353386444897,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 25,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999398320176925,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 26,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.599946837033846,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 27,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.599942094985583,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 28,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999412711734293,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 29,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999452778950065,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 30,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999375743754056,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 31,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.599940432207448,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 32,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.599944083479897,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 33,
+      "deaths": [
+        0,
+        1,
+        3
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 3,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999384627475983,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 34,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999352212224904,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 35,
+      "deaths": [
+        0,
+        1,
+        3
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 3,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5997216433405623,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 36,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.599551947187116,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 37,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5995492786325265,
+        "meta_op_rate": 0.0,
+        "diversity": 0.04
+      }
+    },
+    {
+      "epoch": 38,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5995507945526732,
+        "meta_op_rate": 0.0,
+        "diversity": 0.04
+      }
+    },
+    {
+      "epoch": 39,
+      "deaths": [
+        0,
+        2,
+        3
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 3,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.599573927318951,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 40,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5998099586086254,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 41,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999375653324557,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 42,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999410569643358,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 43,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5959416875559054,
+        "meta_op_rate": 0.0,
+        "diversity": 0.04
+      }
+    },
+    {
+      "epoch": 44,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.595939106033804,
+        "meta_op_rate": 0.0,
+        "diversity": 0.04
+      }
+    },
+    {
+      "epoch": 45,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.599940410920183,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 46,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.599937291414074,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 47,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.59992699228391,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 48,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.599928541685605,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 49,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999283475214257,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 50,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.599932701336062,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 51,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5959373139969504,
+        "meta_op_rate": 0.0,
+        "diversity": 0.04
+      }
+    },
+    {
+      "epoch": 52,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999322396955007,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 53,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999360453149016,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 54,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999378401231827,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 55,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999335176661735,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 56,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999368241736893,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 57,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999398361640744,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 58,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999358069504046,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 59,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999394506809925,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 60,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999332269280204,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 61,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.599928926293473,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 62,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999389688314887,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 63,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.599940354237402,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 64,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.599940739598616,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 65,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.599940735318034,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 66,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.599942806443059,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 67,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.59993863140731,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 68,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.599939875414874,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 69,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999375919674708,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 70,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.599941190637972,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 71,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999392459145674,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 72,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999366778291835,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 73,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999383507203135,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 74,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.599935503952717,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 75,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999354151942256,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 76,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999381711574814,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 77,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999360541986833,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 78,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999411583280043,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 79,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999418701005372,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 80,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.599944914852585,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 81,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999453460981012,
+        "meta_op_rate": 0.0,
+        "diversity": 0.04
+      }
+    },
+    {
+      "epoch": 82,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.599936218538328,
+        "meta_op_rate": 0.0,
+        "diversity": 0.04
+      }
+    },
+    {
+      "epoch": 83,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999279138584006,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 84,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.599937624141995,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 85,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999432970556313,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 86,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.599919153292744,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 87,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.599916158795187,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 88,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.599937080640109,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 89,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.59993442355129,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 90,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999361882455885,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 91,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.599936140137338,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 92,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999401724592848,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 93,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999386837520735,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 94,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999405530662085,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 95,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.599944594490257,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 96,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.599948894638982,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 97,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999419273264444,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 98,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999347993189925,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 99,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.599934044774904,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 100,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999340333437244,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 101,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999382257380175,
+        "meta_op_rate": 0.0,
+        "diversity": 0.04
+      }
+    },
+    {
+      "epoch": 102,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999379298798577,
+        "meta_op_rate": 0.0,
+        "diversity": 0.04
+      }
+    },
+    {
+      "epoch": 103,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.599937517149543,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 104,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999320245759776,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 105,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999326943350747,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 106,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999434798079966,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 107,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999412089367957,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 108,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999366159808335,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 109,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.599932378186817,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 110,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999324187382724,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 111,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999367634225434,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 112,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.59993206275825,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 113,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.59993760120897,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 114,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999435192726708,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 115,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999338242432253,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 116,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999356989749107,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 117,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999366571231395,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 118,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.5999371859688356,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    },
+    {
+      "epoch": 119,
+      "deaths": [
+        0,
+        1,
+        2
+      ],
+      "ops": [
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 1,
+          "reason": "replacement"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 2,
+          "reason": "replacement"
+        },
+        {
+          "op": "SPLIT",
+          "target": 26,
+          "children": [
+            26,
+            26
+          ]
+        },
+        {
+          "op": "FORGET",
+          "target": 0,
+          "reason": "low_activation"
+        },
+        {
+          "op": "BIRTH",
+          "born_at": 0,
+          "reason": "diversity"
+        }
+      ],
+      "pressure": {
+        "mean_commutator": 2.599936677272333,
+        "meta_op_rate": 0.0,
+        "diversity": 0.02
+      }
+    }
+  ],
+  "final_introspection": {
+    "cycle": 3613,
+    "census": {
+      "alive": 56,
+      "dead": 0,
+      "total_compute": 56,
+      "oldest": 3613,
+      "youngest": 1,
+      "most_active": 32869,
+      "least_active_alive": 0
+    },
+    "metabolic": {
+      "mean_commutator": 2.5999362539538122,
+      "meta_op_rate": 0.0,
+      "diversity": 0.02
+    },
+    "thriving_primitives": [
+      {
+        "idx": 26,
+        "age": 3613,
+        "activations": 32869,
+        "norm": 12.621471405029297
+      }
+    ],
+    "endangered_primitives": [
+      {
+        "idx": 3,
+        "age": 2409,
+        "activations": 0,
+        "norm": 5.9760541915893555
+      },
+      {
+        "idx": 4,
+        "age": 3191,
+        "activations": 0,
+        "norm": 5.34400749206543
+      },
+      {
+        "idx": 5,
+        "age": 3613,
+        "activations": 0,
+        "norm": 3.795856237411499
+      },
+      {
+        "idx": 6,
+        "age": 3251,
+        "activations": 0,
+        "norm": 6.518904209136963
+      },
+      {
+        "idx": 7,
+        "age": 3613,
+        "activations": 0,
+        "norm": 3.8311493396759033
+      },
+      {
+        "idx": 8,
+        "age": 3613,
+        "activations": 0,
+        "norm": 3.9033374786376953
+      },
+      {
+        "idx": 9,
+        "age": 3613,
+        "activations": 0,
+        "norm": 3.684631824493408
+      },
+      {
+        "idx": 10,
+        "age": 3613,
+        "activations": 0,
+        "norm": 3.615332841873169
+      },
+      {
+        "idx": 11,
+        "age": 3613,
+        "activations": 0,
+        "norm": 3.6449456214904785
+      },
+      {
+        "idx": 12,
+        "age": 3613,
+        "activations": 0,
+        "norm": 3.717682361602783
+      }
+    ],
+    "commutator_samples": [
+      {
+        "pair": [
+          30,
+          26
+        ],
+        "magnitude": 0.45207488536834717
+      },
+      {
+        "pair": [
+          8,
+          23
+        ],
+        "magnitude": 0.33266884088516235
+      },
+      {
+        "pair": [
+          18,
+          37
+        ],
+        "magnitude": 0.6380124688148499
+      },
+      {
+        "pair": [
+          30,
+          46
+        ],
+        "magnitude": 0.20808535814285278
+      },
+      {
+        "pair": [
+          53,
+          33
+        ],
+        "magnitude": 0.2893884479999542
+      }
+    ],
+    "lineage_entries": 22,
+    "total_meta_ops": 0
+  },
+  "lineage": {
+    "6": {
+      "born_from": "birth",
+      "cycle": 0
+    },
+    "3": {
+      "born_from": "birth",
+      "cycle": 0
+    },
+    "0": {
+      "born_from": "birth",
+      "cycle": 0
+    },
+    "40": {
+      "born_from": "birth",
+      "cycle": 0
+    },
+    "41": {
+      "born_from": "split",
+      "parent": 26,
+      "cycle": 91
+    },
+    "42": {
+      "born_from": "split",
+      "parent": 26,
+      "cycle": 121
+    },
+    "43": {
+      "born_from": "split",
+      "parent": 26,
+      "cycle": 151
+    },
+    "44": {
+      "born_from": "split",
+      "parent": 26,
+      "cycle": 181
+    },
+    "45": {
+      "born_from": "split",
+      "parent": 26,
+      "cycle": 211
+    },
+    "46": {
+      "born_from": "split",
+      "parent": 26,
+      "cycle": 241
+    },
+    "47": {
+      "born_from": "split",
+      "parent": 26,
+      "cycle": 271
+    },
+    "48": {
+      "born_from": "split",
+      "parent": 26,
+      "cycle": 301
+    },
+    "49": {
+      "born_from": "split",
+      "parent": 26,
+      "cycle": 332
+    },
+    "50": {
+      "born_from": "split",
+      "parent": 26,
+      "cycle": 362
+    },
+    "4": {
+      "born_from": "birth",
+      "cycle": 0
+    },
+    "51": {
+      "born_from": "split",
+      "parent": 26,
+      "cycle": 392
+    },
+    "52": {
+      "born_from": "split",
+      "parent": 26,
+      "cycle": 422
+    },
+    "1": {
+      "born_from": "birth",
+      "cycle": 0
+    },
+    "53": {
+      "born_from": "split",
+      "parent": 26,
+      "cycle": 452
+    },
+    "54": {
+      "born_from": "split",
+      "parent": 26,
+      "cycle": 482
+    },
+    "2": {
+      "born_from": "birth",
+      "cycle": 0
+    },
+    "55": {
+      "born_from": "split",
+      "parent": 26,
+      "cycle": 512
+    }
+  }
+}
