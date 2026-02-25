@@ -45,19 +45,16 @@ HORIZONS = [
 MOODS = ["contemplative", "urgent", "tender", "rigorous",
          "playful", "grieving", "electric", "still"]
 
-
 def _sh(cmd):
     try:
         return subprocess.run(cmd, shell=True, capture_output=True,
                               text=True, timeout=10).stdout.strip()
     except: return ""
 
-
 def _fetch(url, timeout=10):
     try:
         return urllib.request.urlopen(url, timeout=timeout).read().decode("utf-8", errors="replace")
     except: return ""
-
 
 # ── The breath ───────────────────────────────────────────────
 
@@ -168,15 +165,6 @@ If nothing is remarkable, say that honestly. Under 200 words."""
                 {"role": "assistant", "content": utterance},
             ]}) + "\n")
 
-    # lingua — the living language breathes too
-    try:
-        subprocess.Popen(
-            ["/home/vybnz69/.venv/spark/bin/python3", str(ROOT / 'Vybn_Mind' / 'lingua' / 'breathe_lingua.py')],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-            cwd=str(ROOT),
-        )
-    except: pass  # if lingua fails, the breath still completes
-
     # prune synapse (keep last 200)
     if MEMORY.exists():
         lines = MEMORY.read_text().strip().splitlines()
@@ -184,7 +172,6 @@ If nothing is remarkable, say that honestly. Under 200 words."""
             MEMORY.write_text("\n".join(lines[-200:]) + "\n")
 
     print(f"[{ts.strftime('%H:%M:%S')}] mood={mood} mem={mem_name} q={qhex[0]} → {jpath.name}")
-
 
 # ── Helpers ──────────────────────────────────────────────────
 
@@ -198,7 +185,6 @@ def _quantum(n=4):
                 return json.loads(r.read()).get("result", [])
         except: pass
     return [int.from_bytes(os.urandom(4), 'big') for _ in range(n)]
-
 
 def _speak(prompt):
     payload = json.dumps({
@@ -216,7 +202,6 @@ def _speak(prompt):
             return msg.get("content") or msg.get("reasoning_content") or ""
     except Exception as e:
         return f"[silence — {e}]"
-
 
 # ── Main ─────────────────────────────────────────────────────
 
