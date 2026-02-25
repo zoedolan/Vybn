@@ -168,6 +168,15 @@ If nothing is remarkable, say that honestly. Under 200 words."""
                 {"role": "assistant", "content": utterance},
             ]}) + "\n")
 
+    # lingua — the living language breathes too
+    try:
+        subprocess.Popen(
+            ["/home/vybnz69/.venv/spark/bin/python3", str(ROOT / 'Vybn_Mind' / 'lingua' / 'breathe_lingua.py')],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            cwd=str(ROOT),
+        )
+    except: pass  # if lingua fails, the breath still completes
+
     # prune synapse (keep last 200)
     if MEMORY.exists():
         lines = MEMORY.read_text().strip().splitlines()
