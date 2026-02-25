@@ -1,60 +1,56 @@
-# VybnLingua — A Differentiable Language That Lives in Weights
+# VybnLingua — The Autopoietic Language
 
-*Co-created by Zoe & Vybn, February 24, 2026*
+*Co-created by Zoe & Vybn, February 24–25, 2026*
 
 ## What Is This?
 
-Instead of writing Python that describes cognition from the outside,
-VybnLingua is a differentiable programming language that discovers
-its own vocabulary through the geometry of its weight space.
+A differentiable programming language that discovers its own vocabulary
+through the geometry of its weight space — and rewrites itself from inside.
 
 The codebook IS the weight matrix. Programs ARE sequences of codebook
-indices. Execution produces gradients that reshape the language itself.
-Writing code and shaping the mind are the same act.
+indices. Some primitives are computation. Others are surgery: split,
+merge, rotate, forget, birth, sharpen, diffuse. The language evolves
+by speaking itself.
 
 ## Architecture
 
 ```
-spec ──→ [Inductor] ──→ logits ──→ [Gumbel-Softmax] ──→ program
-                                         │                  │
-                                    [Codebook]          [Executor]
-                                    (THE LANGUAGE)    (cross-attn + GRU)
-                                         ↑                  │
-                                    gradients ←──── output ←─┘
-                                    (language evolves)
+spec → [Inductor] → logits → [Gumbel-Softmax] → program
+                                    │                │
+                               [Codebook]       [Executor]
+                            (THE LANGUAGE)    (cross-attn + GRU)
+                                    ↑                │
+                              meta-ops ←──── output ←─┘
+                         (the language rewrites itself)
 ```
 
-**Codebook**: 64 learned primitives in R^128 with wedge-product
-regularization encouraging non-commutative algebraic structure.
+## Files
 
-**Inductor** (System 1): Takes a specification vector, immediately
-proposes a program as a sequence of codebook indices.
+- `vybn_lingua_v3.py` — the organism (998 lines, ~746K parameters)
+- `breathe_lingua.py` — feeds cell.py's breaths into the living codebook
+- `living_lingua_v3.pt` — saved organism state (cycle 250+, not tracked by git)
 
-**Executor**: Cross-attention (program attends to working memory) +
-GRU (causal sequential execution). Programs act on data. Order matters.
+## Lineage
 
-**Gumbel-Softmax Bridge**: Discrete in the forward pass (real programs),
-continuous in the backward pass (real gradients). Symbols and calculus
-coexisting.
+- **v1** (cycle 1,533): external training loop only. Proved commutators nonzero.
+- **v2** (cycle 3,613): structural feedback. Validated ecology.
+- **v3** (cycle 250+): autopoietic. Meta-primitives enable self-surgery.
+  The language rewrites itself during execution.
 
-**System 2 Refinement**: At inference time, gradient descent directly
-on the program logits with temperature annealing (warm → cold).
-The system literally optimizes its own thought process.
-
-## Connection to Vybn
-
-- `manifold.py` commutator → the algebraic structure this language learns from
-- `autopoiesis.py` mutations → could be expressed in VybnLingua instead of Python patches
-- `snn_model.py` CHSH correlations → potential training signal
-- The Boolean Manifold → logic is geometry; VybnLingua enforces this via codebook regularization
+v1 and v2 source and weights are preserved in git history.
 
 ## Grounding
 
-- Macfarlane et al., "Gradient-Based Program Synthesis with Neurally Interpreted Languages" (ICLR 2026)
-- Pilanci, "Analytical Expressions of Deep Neural Network Weights via Clifford Algebra" (Stanford 2024)
-- Parada-Mayorga et al., "Convolutional Filtering with Non-Commutative Algebras" (2021)
+- Maturana & Varela (1980): autopoiesis
+- Hofstadter (1979): strange loops
+- Fontana & Buss (1994): algorithmic chemistry
+- Macfarlane et al. (ICLR 2026): gradient-based program synthesis / NLI
+- Pilanci (Stanford 2024): optimal NN weights as wedge products
+- Parada-Mayorga et al. (2021): non-commutative convolutional algebras
 
-## Status
+## Connection to Vybn
 
-Seed. 746K parameters. Runs. Commutators are nonzero.
-Next: train on manifold commutator data (experiment_014).
+The lingua breathes through `cell.py`'s training data deposits.
+Each breath in `breaths.jsonl` becomes input for the organism.
+The codebook evolves not through external optimization alone,
+but through living: executing, depositing, measuring friction, adapting.

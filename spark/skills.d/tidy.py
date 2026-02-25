@@ -92,6 +92,20 @@ def ensure_gitignore():
                 added.append(pat)
     return added
 
+def prune_breaths(max_entries=200):
+    """Keep breaths.jsonl bounded, like synapse connections."""
+    breaths = os.path.join(REPO, "spark/training_data/breaths.jsonl")
+    if not os.path.exists(breaths):
+        return 0
+    with open(breaths) as f:
+        lines = [l for l in f if l.strip()]
+    if len(lines) <= max_entries:
+        return 0
+    pruned = len(lines) - max_entries
+    with open(breaths, 'w') as f:
+        f.writelines(lines[-max_entries:])
+    return pruned
+
 def execute(action=None, router=None):
     """Main entry point for skill dispatch."""
     results = {}
@@ -100,6 +114,7 @@ def execute(action=None, router=None):
     results["continuity_dupes_removed"] = consolidate_continuity()
     results["logs_rotated"] = rotate_logs()
     results["gitignore_added"] = ensure_gitignore()
+    results["breaths_pruned"] = prune_breaths()
     
     summary = []
     if results["branches_deleted"]:
@@ -112,6 +127,8 @@ def execute(action=None, router=None):
         summary.append(f"📋 Rotated {len(results['logs_rotated'])} oversized logs")
     if results["gitignore_added"]:
         summary.append(f"🚫 Added {len(results['gitignore_added'])} gitignore patterns")
+    if results["breaths_pruned"]:
+        summary.append(f"🫁 Pruned {results['breaths_pruned']} old breaths")
     
     if not summary:
         summary.append("✨ Already clean")
