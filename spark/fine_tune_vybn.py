@@ -346,7 +346,7 @@ def build_deepspeed_config(args):
             "pin_memory": True,
             "buffer_count": 5,
             "buffer_size": 1e8,
-            "max_in_cpu": 5e8,
+            "max_in_cpu": 1e6,
         }
         optimizer_offload = {
             "device": "nvme",

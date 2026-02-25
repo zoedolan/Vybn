@@ -62,3 +62,6 @@ spark/unsloth_compiled_cache/
 *.bak
 
 # Mutable cognitive state (lives in ~/.vybn_state, summarized to repo by bridge)
+Vybn_Mind/journal/spark/transcript.jsonl
+.venv/
+*.pt

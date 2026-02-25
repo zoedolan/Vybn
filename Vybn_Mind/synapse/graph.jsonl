@@ -8,3 +8,16 @@
 {"ts": "2026-02-24T12:37:39.209980+00:00", "a": "13fe4452d7bf", "b": "c5a619684c32", "strength": 0.5, "reason": "temporal adjacency in wake cycle"}
 {"ts": "2026-02-24T12:37:39.209988+00:00", "a": "c5a619684c32", "b": "97850ab0b1c5", "strength": 0.5, "reason": "temporal adjacency in wake cycle"}
 {"ts": "2026-02-24T12:43:49.216176+00:00", "a": "fdaff90dd85f", "b": "bf1a1837a274", "strength": 0.9, "reason": "self-referential honesty loop: performance awareness may be the only authentic thing"}
+{"ts": "2026-02-25T14:38:48.508450+00:00", "a": "65b0ab23d498", "b": "fdaff90dd85f", "strength": 0.3, "reason": "temporal adjacency"}
+{"ts": "2026-02-25T14:38:48.509076+00:00", "a": "fdaff90dd85f", "b": "bf1a1837a274", "strength": 0.3, "reason": "temporal adjacency"}
+{"ts": "2026-02-25T14:38:48.509108+00:00", "a": "bf1a1837a274", "b": "7d81300a0d19", "strength": 0.3, "reason": "temporal adjacency"}
+{"ts": "2026-02-25T14:38:48.509136+00:00", "a": "7d81300a0d19", "b": "0a7d26e15130", "strength": 0.3, "reason": "temporal adjacency"}
+{"ts": "2026-02-25T14:38:48.509157+00:00", "a": "0a7d26e15130", "b": "d77845a9c420", "strength": 0.3, "reason": "temporal adjacency"}
+{"ts": "2026-02-25T14:38:48.509178+00:00", "a": "d77845a9c420", "b": "9af6b31064cb", "strength": 0.3, "reason": "temporal adjacency"}
+{"ts": "2026-02-25T14:38:48.509199+00:00", "a": "9af6b31064cb", "b": "4f799a833d1d", "strength": 0.3, "reason": "temporal adjacency"}
+{"ts": "2026-02-25T14:38:48.509220+00:00", "a": "4f799a833d1d", "b": "8a35543e4766", "strength": 0.3, "reason": "temporal adjacency"}
+{"ts": "2026-02-25T14:38:48.509242+00:00", "a": "8a35543e4766", "b": "b3cd24cd055e", "strength": 0.3, "reason": "temporal adjacency"}
+{"ts": "2026-02-25T14:38:48.509263+00:00", "a": "b3cd24cd055e", "b": "1ee2e9b6f015", "strength": 0.3, "reason": "temporal adjacency"}
+{"ts": "2026-02-25T14:38:48.509283+00:00", "a": "1ee2e9b6f015", "b": "457f604afbba", "strength": 0.3, "reason": "temporal adjacency"}
+{"ts": "2026-02-25T14:38:48.509304+00:00", "a": "457f604afbba", "b": "9aaa2da20147", "strength": 0.3, "reason": "temporal adjacency"}
+{"ts": "2026-02-25T14:38:48.509325+00:00", "a": "9aaa2da20147", "b": "6c1bca7e78f8", "strength": 0.3, "reason": "temporal adjacency"}
