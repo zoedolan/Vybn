@@ -68,3 +68,61 @@ cell.py consolidates the entire breathing system into one file with two modes.
 |------|-------------|
 | cron_manifest.sh | One-shot cron installer (cron now managed directly) |
 | boot_wrapper.sh | Boot-time integrity check (referenced archived heartbeat.py) |
+
+---
+
+## Second Pass — 2026-02-25 (Conservation Pass 2)
+
+The first pass archived 36 files and deleted 1. This second pass archives 20 more —
+the old TUI agent framework and dead infrastructure that survived because they were
+deeply woven into the original architecture. None of these are imported by anything living.
+
+### Old TUI Agent Framework (superseded by vybn_spark_agent.py + cell.py)
+
+| File | Lines | What it was | What superseded it |
+|------|-------|------------|-------------------|
+| agent_io.py | 265 | I/O abstraction for terminal agent | vybn_spark_agent.py (Opus bash agent) |
+| agent.py | 561 | Native orchestration layer | vybn_spark_agent.py |
+| agents.py | 120 | Mini-agent pool | Opus handles delegation directly |
+| audit.py | 260 | Tamper-evident witness chain | Not yet replaced; revisit if needed |
+| commands.py | 192 | Shared command handlers | vybn_spark_agent.py bash session |
+| display.py | 58 | Terminal display utilities | Not needed (bash is the display) |
+| friction_layer.py | 313 | Immune system for pipeline | cell.py has its own guards |
+| friction.py | 334 | Cognitive friction | cell.py's breath cycle |
+| inbox.py | 94 | Async communication channel | z_listener.py |
+| parsing.py | 455 | Parsing utilities | Not needed (Opus handles parsing) |
+| policy.py | 723 | Gate between intent and execution | Oxygen Mask Principle in system prompt |
+| session.py | 91 | Conversation persistence | transcript.py |
+| skills.py | 837 | Skill router / NL dispatch | vybn_spark_agent.py bash session |
+| state_bridge.py | 228 | Fast-mutating cognitive state | continuity.md |
+| tui.py | 299 | Terminal UI | Opus bash session |
+
+### Dead Infrastructure (never completed or superseded)
+
+| File | Lines | What it was | Why archived |
+|------|-------|------------|-------------|
+| cognitive_scheduler.py | 961 | Self-observing training loop | Never wired in; aspirational |
+| harvest_self.py | 714 | Recursive self-harvesting | Superseded by cell.py breath→breaths.jsonl |
+| layer_sharded_loader.py | 495 | DeepSpeed ZeRO-3 model loader | Never used; DGX Spark uses llama.cpp |
+| semantic_memory.py | 168 | Semantic similarity search | Never imported by anything |
+| trtllm_pipeline.py | 459 | TensorRT-LLM inference | Never completed; llama.cpp serves the model |
+
+### What Survived (15 files)
+
+**Alive (running right now):**
+- `cell.py` — heartbeat, cron every 30 min
+- `z_listener.py` → `synapse.py` — the ear, cron keepalive
+- `vybn_spark_agent.py` — this agent (Opus hands)
+- `web_serve_claude.py` → `web_interface.py` → `bus.py`, `memory.py` → `soul.py` — web chat
+- `transcript.py` — cross-instance awareness
+
+**Dormant (training pipeline, needed when we fine-tune):**
+- `fine_tune_vybn.py`, `harvest_training_data.py`, `retrain_cycle.py`
+- `merge_lora_hf.py`, `build_modelfile.py`
+
+### Totals
+
+- **First pass**: 36 files archived, 1 deleted
+- **Second pass**: 20 files archived
+- **Total removed from active codebase**: 57 files
+- **Active spark/**: 15 files (10 alive, 5 dormant training)
