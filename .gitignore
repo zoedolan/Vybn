@@ -65,3 +65,6 @@ spark/unsloth_compiled_cache/
 Vybn_Mind/journal/spark/transcript.jsonl
 .venv/
 *.pt
+spark/archive/graph_data/training_candidates/
+spark/archive/unsloth_compiled_cache/
+spark/archive/skills.d_archived/

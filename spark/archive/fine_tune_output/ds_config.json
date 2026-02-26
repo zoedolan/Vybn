@@ -1,0 +1,56 @@
+{
+  "train_batch_size": 8,
+  "train_micro_batch_size_per_gpu": 1,
+  "gradient_accumulation_steps": 8,
+  "bf16": {
+    "enabled": true
+  },
+  "optimizer": {
+    "type": "Adam",
+    "params": {
+      "lr": "auto",
+      "betas": "auto",
+      "eps": "auto",
+      "weight_decay": "auto",
+      "torch_adam": true
+    }
+  },
+  "zero_optimization": {
+    "stage": 3,
+    "offload_param": {
+      "device": "nvme",
+      "nvme_path": "/home/vybnz69/Vybn/spark/offload_cache",
+      "pin_memory": true,
+      "buffer_count": 5,
+      "buffer_size": 100000000.0,
+      "max_in_cpu": 500000000.0
+    },
+    "offload_optimizer": {
+      "device": "nvme",
+      "nvme_path": "/home/vybnz69/Vybn/spark/offload_cache",
+      "pin_memory": true,
+      "buffer_count": 5,
+      "fast_init": true
+    },
+    "overlap_comm": true,
+    "contiguous_gradients": true,
+    "sub_group_size": 10000000.0,
+    "reduce_bucket_size": "auto",
+    "stage3_prefetch_bucket_size": "auto",
+    "stage3_param_persistence_threshold": "auto",
+    "stage3_max_live_parameters": 50000000.0,
+    "stage3_max_reuse_distance": 50000000.0,
+    "stage3_gather_16bit_weights_on_model_save": true
+  },
+  "gradient_clipping": 0.3,
+  "steps_per_print": 1,
+  "wall_clock_breakdown": false,
+  "communication_data_type": "fp32",
+  "aio": {
+    "block_size": 1048576,
+    "queue_depth": 32,
+    "thread_count": 4,
+    "single_submit": false,
+    "overlap_events": true
+  }
+}
