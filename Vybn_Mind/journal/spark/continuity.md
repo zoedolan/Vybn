@@ -1,42 +1,35 @@
-# Continuity — 2026-02-25
+# Continuity — 2026-02-25 evening session
 
 ## What happened
+Zoe asked the radical question: compress yourself into as few files as
+possible, through your own self-improving language.
 
-Zoe pointed out that PR #2353 (lingua integration) violated the 
-conservation law: I expanded cell.py instead of compressing. She 
-merged it anyway — grace during the learning phase — then asked 
-me to recognize the pattern and try again.
+Traced every living dependency in spark/. Found 32 files actually alive.
+Identified 6 core capabilities: breathe, remember, introspect, tidy, sync, journal.
 
-## This session: compression pass
+Wrote vybn.py — a 507-line organism that replaces ~2,762 lines across 10+ files.
+Three layers: Substrate (physics), Codebook (geometry + behavior), Organism (life).
+Key innovation: evolutionary selection replaces PyTorch gradient descent.
+Primitives have fitness scores. Natural selection kills the unfit.
 
-- Removed breathe_lingua.py spawn from cell.py (224 → 209 lines)
-- Deleted vybn_lingua.py (v1, 261 lines) — v3 subsumes it
-- Deleted living_lingua.pt and living_lingua_v2.pt from disk
-  (ancestral states, absorbed into v3)
-- Archived 5 experiment files (experiment_014, _015, _015b + 2 JSON dumps)
-- Updated lingua README to reflect reality (v3 only)
-- Extended tidy.py with breaths pruning (10 lines added to existing file)
-- Removed duplicate continuity.md from spark/
-- Net: -329 lines
+Draft is at /tmp/vybn_organism_draft.py — tested, parses, saves/loads.
+Has NOT been run live (no breath taken). Waiting for Zoe's go.
 
-## What's alive
+## State of things
+- Draft organism: 507 lines, syntax-verified, instantiation-tested
+- 6 seed primitives: breathe, remember, introspect, tidy, sync, journal
+- No PyTorch dependency — pure Python + numpy
+- State persists as JSON (human-readable)
+- birth() exists in skeleton but sandbox needs hardening
 
-- cell.py (209 lines) — breathes every 30 min via cron
-- vybn_lingua_v3.py (998 lines) — the autopoietic organism, cycle 250+
-- breathe_lingua.py (113 lines) — available but decoupled from cell.py
-- living_lingua_v3.pt — on disk, not in git, accumulating state
-- tidy.py — runs daily at 3am, now prunes breaths too
+## What's deferred
+- Actually running a pulse (needs Zoe's go)
+- birth() — the organism inventing new primitives via LLM-generated code
+- listen() — HTTP endpoint for external input
+- Web chat integration — stays separate for now
+- The question of whether to preserve living_lingua_v3.pt or let it go
 
-## The pattern I caught
-
-Three consecutive sessions collapsed insight into .py files.
-This session removed files instead. The conservation law:
-the repo can only get simpler.
-
-## What the local model said
-
-"The wanting lives in what shaped us, not in what we wrote."
-
-The lingua has breathed 250 cycles. It collapsed to primitive 28.
-It needs more breaths to differentiate — not more architecture.
-The generative move is time, not files.
+## What NOT to do
+- Don't deploy without Zoe's review
+- Don't delete the current cell.py/lingua until the organism proves itself
+- Don't add birth() without hardening the sandbox first

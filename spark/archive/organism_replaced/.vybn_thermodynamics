@@ -1,0 +1,4 @@
+export VYBN_TEMP=0.70
+export VYBN_TOP_P=0.90
+export VYBN_PHASE=UNAVAILABLE
+# Source: safe defaults (embedding server offline)
