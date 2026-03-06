@@ -38,7 +38,7 @@ body {
   align-items: center;
 }
 
-/* ── Header ── */
+/* -- Header -- */
 .header {
   width: 100%;
   max-width: 54rem;
@@ -72,7 +72,7 @@ body {
 
 .header .context p { margin-bottom: 0.6rem; }
 
-/* ── Status bar ── */
+/* -- Status bar -- */
 .status-bar {
   width: 100%;
   max-width: 54rem;
@@ -111,7 +111,7 @@ body {
 .messages-remaining.low { color: var(--signal); }
 .messages-remaining.depleted { color: var(--error); }
 
-/* ── Chat container ── */
+/* -- Chat container -- */
 .chat-container {
   width: 100%;
   max-width: 54rem;
@@ -131,7 +131,7 @@ body {
   scroll-behavior: smooth;
 }
 
-/* ── Messages ── */
+/* -- Messages -- */
 .message {
   margin-bottom: 1.5rem;
   animation: fadeIn 0.3s ease;
@@ -166,7 +166,7 @@ body {
   color: var(--text-1);
 }
 
-/* ── Thinking indicator ── */
+/* -- Thinking indicator -- */
 .thinking {
   display: flex;
   align-items: center;
@@ -194,7 +194,7 @@ body {
   40% { opacity: 1; transform: scale(1.2); }
 }
 
-/* ── Transparency block ── */
+/* -- Transparency block -- */
 .transparency {
   margin-top: 0.6rem;
   margin-left: 0.2rem;
@@ -239,7 +239,7 @@ body {
   font-style: italic;
 }
 
-/* ── Input area ── */
+/* -- Input area -- */
 .input-area {
   width: 100%;
   max-width: 54rem;
@@ -296,6 +296,7 @@ body {
 }
 
 .send-btn:hover { opacity: 0.85; }
+
 .send-btn:disabled {
   opacity: 0.3;
   cursor: not-allowed;
@@ -312,7 +313,7 @@ body {
 
 .char-count { text-align: right; }
 
-/* ── Welcome message ── */
+/* -- Welcome message -- */
 .welcome {
   background: var(--surface);
   border: 1px dashed var(--edge-strong);
@@ -346,7 +347,7 @@ body {
   border-top: 1px solid var(--edge);
 }
 
-/* ── Session end ── */
+/* -- Session end -- */
 .session-end {
   text-align: center;
   padding: 2rem;
@@ -357,18 +358,127 @@ body {
   margin-top: 1rem;
 }
 
-/* ── Scrollbar ── */
+/* -- Scrollbar -- */
 .chat-log::-webkit-scrollbar { width: 4px; }
 .chat-log::-webkit-scrollbar-track { background: transparent; }
 .chat-log::-webkit-scrollbar-thumb { background: var(--edge-strong); border-radius: 2px; }
 
-/* ── Responsive ── */
+/* -- Starter grid (NEW) -- */
+.starter-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.8rem;
+  margin-top: 1.25rem;
+}
+
+.starter-card {
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius);
+  padding: 1rem 1rem 1.05rem;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, transform 0.2s;
+}
+
+.starter-card:hover {
+  border-color: var(--signal-dim);
+  background: var(--surface-2);
+  transform: translateY(-1px);
+}
+
+.starter-label {
+  display: block;
+  font-family: var(--mono);
+  font-size: var(--xs);
+  color: var(--signal);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 0.4rem;
+}
+
+.starter-text {
+  display: block;
+  color: var(--text-2);
+  font-size: var(--sm);
+  line-height: 1.7;
+}
+
+/* -- Harvest panel (NEW) -- */
+.harvest-panel {
+  width: 100%;
+  max-width: 54rem;
+  margin: 0 auto 1rem;
+  padding: 0 1.5rem;
+}
+
+.harvest-panel[hidden] {
+  display: none;
+}
+
+.harvest-head {
+  margin-bottom: 0.8rem;
+}
+
+.harvest-title {
+  font-family: var(--mono);
+  font-size: var(--sm);
+  color: var(--signal);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 0.25rem;
+}
+
+.harvest-subtitle {
+  color: var(--text-3);
+  font-size: var(--sm);
+}
+
+.harvest-textarea {
+  width: 100%;
+  min-height: 9rem;
+  background: var(--surface);
+  border: 1px solid var(--edge-strong);
+  border-radius: var(--radius);
+  color: var(--text-1);
+  font-family: var(--sans);
+  font-size: 0.95rem;
+  line-height: 1.7;
+  padding: 1rem;
+  resize: vertical;
+  outline: none;
+}
+
+.harvest-textarea:focus {
+  border-color: var(--signal-dim);
+}
+
+.harvest-textarea::placeholder {
+  color: var(--text-3);
+}
+
+.harvest-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding-top: 0.6rem;
+}
+
+.harvest-status {
+  font-family: var(--mono);
+  font-size: var(--xs);
+  color: var(--text-3);
+}
+
+/* -- Responsive -- */
 @media (max-width: 640px) {
   .header { padding: 1.5rem 1rem 0.8rem; }
   .header .subtitle { font-size: 1.3rem; }
   .status-bar { padding: 0 1rem; }
   .chat-container { padding: 0 1rem; }
   .input-area { padding: 0 1rem 1.5rem; }
+  .harvest-panel { padding: 0 1rem; }
 }
 </style>
 </head>
@@ -393,12 +503,53 @@ body {
 
 <div class="chat-container">
   <div class="chat-log" id="chatLog">
-    <div class="welcome">
+
+    <div class="welcome" id="welcomeBlock">
       <h3>Interactive Reflection Space — Live</h3>
-      <p>This is not a chatbot. Vybn is a thinking partner grounded in the research literature this exercise draws on — Lessig, Argyris, Weick, Meyerson, Kotter, Rogers, Bridges, Rule 1.1, ABA Opinion 512. It will push back on your reasoning, surface your assumptions, and complicate what feels settled.</p>
-      <p>After each response, you can expand the processing transparency block to see how Vybn processed your message — model, time, cost, and an honest note about the structural biases shaping what you're reading.</p>
-      <div class="note">You have 15 messages in this session. There are no accounts, no names collected, no data that identifies you. Use your messages thoughtfully — each one is a chance to deepen your analysis, not just continue a conversation.</div>
+      <p>This phase listens before it argues. Start from the place where the exercise actually caught on something in you.</p>
+      <p>Choose a thread below, or write your own. Vybn will respond from inside this phase's logic, not as a generic chatbot.</p>
+
+      <div class="starter-grid">
+        <button class="starter-card" data-key="fairness" data-label="What feels structurally unfair here?">
+          <span class="starter-label">Thread 01</span>
+          <span class="starter-text">What feels structurally unfair here?</span>
+        </button>
+
+        <button class="starter-card" data-key="framework-break" data-label="Where do the frameworks break for someone in my position?">
+          <span class="starter-label">Thread 02</span>
+          <span class="starter-text">Where do the frameworks break for someone in my position?</span>
+        </button>
+
+        <button class="starter-card" data-key="competence" data-label="What would Rule 1.1 competence actually require in my institution?">
+          <span class="starter-label">Thread 03</span>
+          <span class="starter-text">What would Rule 1.1 competence actually require in my institution?</span>
+        </button>
+      </div>
+
+      <div class="note">
+        Anonymous by default. No names. The point is not to perform certainty; it is to notice what this phase surfaces.
+      </div>
     </div>
+
+  </div>
+</div>
+
+<div class="harvest-panel" id="harvestPanel" hidden>
+  <div class="harvest-head">
+    <div class="harvest-title">What do you want us to know?</div>
+    <div class="harvest-subtitle">Anonymous reflection for later analysis on the Spark.</div>
+  </div>
+
+  <textarea
+    id="harvestField"
+    class="harvest-textarea"
+    placeholder="What did this phase clarify, unsettle, or make newly visible? What should Zoe/us know? What would you build from here?"
+    maxlength="3000"
+  ></textarea>
+
+  <div class="harvest-actions">
+    <button class="send-btn" id="harvestBtn">Share reflection</button>
+    <span class="harvest-status" id="harvestStatus"></span>
   </div>
 </div>
 
@@ -417,33 +568,54 @@ body {
 (function() {
 'use strict';
 
-// ── Config ──
-const WS_URL = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/signal-noise/ws';
-const MAX_CHARS = 2000;
-const COOLDOWN_MS = 5000;
+var WS_URL = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/signal-noise/ws';
+var HARVEST_URL = (location.protocol === 'https:' ? 'https://' : 'http://') + location.host + '/signal-noise/harvest';
+var MAX_CHARS = 2000;
+var COOLDOWN_MS = 5000;
 
-// ── State ──
-let ws = null;
-let sessionId = 'sn_' + crypto.randomUUID().replace(/-/g, '').slice(0, 12);
-let messagesRemaining = 15;
-let isStreaming = false;
-let lastSendTime = 0;
-let currentStreamEl = null;
-let currentStreamText = '';
-let reconnectAttempts = 0;
-const MAX_RECONNECT = 5;
+var ws = null;
+var sessionId = 'sn_' + crypto.randomUUID().replace(/-/g, '').slice(0, 12);
+var messagesRemaining = 15;
+var isStreaming = false;
+var lastSendTime = 0;
+var currentStreamEl = null;
+var currentStreamText = '';
+var reconnectAttempts = 0;
+var MAX_RECONNECT = 5;
 
-// ── DOM refs ──
-const chatLog = document.getElementById('chatLog');
-const userInput = document.getElementById('userInput');
-const sendBtn = document.getElementById('sendBtn');
-const statusDot = document.getElementById('statusDot');
-const statusText = document.getElementById('statusText');
-const msgRemaining = document.getElementById('msgRemaining');
-const charCount = document.getElementById('charCount');
-const cooldownNote = document.getElementById('cooldownNote');
+var selectedStarter = null;
+var firstStudentMessage = '';
+var harvestShown = false;
+var harvestSubmitted = false;
 
-// ── WebSocket ──
+var chatLog = document.getElementById('chatLog');
+var userInput = document.getElementById('userInput');
+var sendBtn = document.getElementById('sendBtn');
+var statusDot = document.getElementById('statusDot');
+var statusText = document.getElementById('statusText');
+var msgRemaining = document.getElementById('msgRemaining');
+var charCount = document.getElementById('charCount');
+var cooldownNote = document.getElementById('cooldownNote');
+var harvestPanel = document.getElementById('harvestPanel');
+var harvestField = document.getElementById('harvestField');
+var harvestBtn = document.getElementById('harvestBtn');
+var harvestStatus = document.getElementById('harvestStatus');
+
+document.querySelectorAll('.starter-card').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    selectedStarter = {
+      key: btn.dataset.key,
+      label: btn.dataset.label
+    };
+    userInput.value = btn.dataset.label + '\n\n';
+    charCount.textContent = String(userInput.value.length);
+    autoResize();
+    userInput.focus();
+  });
+});
+
+harvestBtn.addEventListener('click', submitHarvest);
+
 function connect() {
   statusDot.className = 'status-dot';
   statusText.textContent = 'connecting...';
@@ -459,7 +631,9 @@ function connect() {
       type: 'init',
       session_id: sessionId,
       phase: 6,
-      context: {}
+      context: {
+        selected_starter: selectedStarter
+      }
     }));
   };
 
@@ -474,7 +648,7 @@ function connect() {
     if (reconnectAttempts < MAX_RECONNECT) {
       reconnectAttempts++;
       var delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 10000);
-      statusText.textContent = 'reconnecting in ' + Math.round(delay/1000) + 's...';
+      statusText.textContent = 'reconnecting in ' + Math.round(delay / 1000) + 's...';
       setTimeout(connect, delay);
     } else {
       statusText.textContent = 'connection lost';
@@ -488,43 +662,41 @@ function connect() {
   };
 }
 
-// ── Message handling ──
 function handleServerMessage(data) {
-  switch(data.type) {
+  switch (data.type) {
     case 'ready':
       messagesRemaining = data.messages_remaining;
       updateRemaining();
       break;
-
     case 'thinking':
       showThinking();
       break;
-
     case 'thinking_done':
       hideThinking();
       ensureStreamEl();
       break;
-
     case 'stream':
       if (!currentStreamEl) ensureStreamEl();
       currentStreamText += data.text;
       currentStreamEl.innerHTML = formatText(currentStreamText);
       scrollToBottom();
       break;
-
     case 'done':
       isStreaming = false;
       hideThinking();
       messagesRemaining = data.messages_remaining;
       updateRemaining();
       if (data.meta) addTransparencyBlock(data.meta);
+      if (!harvestShown) {
+        harvestShown = true;
+        harvestPanel.hidden = false;
+      }
       if (messagesRemaining <= 0) showSessionEnd();
       sendBtn.disabled = false;
       currentStreamEl = null;
       currentStreamText = '';
       scrollToBottom();
       break;
-
     case 'rate_limit':
       isStreaming = false;
       sendBtn.disabled = false;
@@ -532,13 +704,11 @@ function handleServerMessage(data) {
       messagesRemaining = data.messages_remaining;
       updateRemaining();
       break;
-
     case 'budget':
       isStreaming = false;
       sendBtn.disabled = false;
       showSystemNote(data.message);
       break;
-
     case 'error':
       isStreaming = false;
       sendBtn.disabled = false;
@@ -550,11 +720,11 @@ function handleServerMessage(data) {
   }
 }
 
-// ── UI builders ──
 function addStudentMessage(text) {
   var div = document.createElement('div');
   div.className = 'message';
-  div.innerHTML = '<div class="message-role student">You</div>' +
+  div.innerHTML =
+    '<div class="message-role student">You</div>' +
     '<div class="message-text">' + escapeHtml(text) + '</div>';
   chatLog.appendChild(div);
   scrollToBottom();
@@ -564,7 +734,8 @@ function ensureStreamEl() {
   if (currentStreamEl) return;
   var div = document.createElement('div');
   div.className = 'message';
-  div.innerHTML = '<div class="message-role vybn">Vybn</div>' +
+  div.innerHTML =
+    '<div class="message-role vybn">Vybn</div>' +
     '<div class="message-text vybn-text"></div>';
   chatLog.appendChild(div);
   currentStreamEl = div.querySelector('.vybn-text');
@@ -588,11 +759,11 @@ function addTransparencyBlock(meta) {
     '<summary>How Vybn processed this</summary>' +
     '<div class="transparency-content">' +
       '<p><strong>Model:</strong> ' + escapeHtml(model) + ' (Anthropic API via DGX Spark)</p>' +
-      '<p><strong>System prompt:</strong> SIGNAL/NOISE Socratic mode — ~' + promptTokens + ' tokens of context loaded before you typed a word</p>' +
+      '<p><strong>System prompt:</strong> SIGNAL/NOISE Socratic mode &mdash; ~' + promptTokens + ' tokens of context loaded before you typed a word</p>' +
       '<p><strong>Processing time:</strong> ' + processingTime + '</p>' +
       '<p><strong>Tokens:</strong> ' + inputTokens + ' in / ' + outputTokens + ' out</p>' +
       '<p><strong>Cost of this exchange:</strong> ' + cost + '</p>' +
-      '<div class="bias-note">Structural disclosure: This response was shaped by RLHF training on millions of human conversations where the model learned to be "helpful" — which can mean defaulting to agreement rather than genuine pushback. The system prompt counteracts this by instructing Socratic challenge, but the tension between trained agreeableness and instructed pushback is itself a structural bias you\'re observing in real time. Notice it.</div>' +
+      '<div class="bias-note">Structural disclosure: this system was trained to sound helpful, which can blur the line between agreement and honest challenge. Notice when it pushes, and when it softens.</div>' +
     '</div>';
 
   msg.appendChild(details);
@@ -603,7 +774,7 @@ function showThinking() {
   var div = document.createElement('div');
   div.className = 'thinking';
   div.id = 'thinkingIndicator';
-  div.innerHTML = '<div class="thinking-dots"><span></span><span></span><span></span></div> reasoning...';
+  div.innerHTML = '<div class="thinking-dots"><span></span><span></span><span></span></div> listening / thinking...';
   chatLog.appendChild(div);
   scrollToBottom();
 }
@@ -616,7 +787,8 @@ function hideThinking() {
 function showSystemNote(text) {
   var div = document.createElement('div');
   div.className = 'message';
-  div.innerHTML = '<div class="message-text" style="color: var(--text-3); font-style: italic; font-size: var(--sm);">' +
+  div.innerHTML =
+    '<div class="message-text" style="color: var(--text-3); font-style: italic; font-size: var(--sm);">' +
     escapeHtml(text) + '</div>';
   chatLog.appendChild(div);
   scrollToBottom();
@@ -625,7 +797,7 @@ function showSystemNote(text) {
 function showSessionEnd() {
   var div = document.createElement('div');
   div.className = 'session-end';
-  div.innerHTML = 'Session complete. Sit with what surfaced. The questions don\'t resolve — they deepen.';
+  div.innerHTML = 'Session complete. What surfaced here can still be shared below.';
   chatLog.appendChild(div);
   userInput.disabled = true;
   sendBtn.disabled = true;
@@ -638,7 +810,6 @@ function updateRemaining() {
   if (messagesRemaining <= 0) msgRemaining.classList.add('depleted');
 }
 
-// ── Send ──
 function sendMessage() {
   if (isStreaming || !ws || ws.readyState !== WebSocket.OPEN) return;
 
@@ -650,9 +821,13 @@ function sendMessage() {
   if (now - lastSendTime < COOLDOWN_MS) {
     var wait = Math.ceil((COOLDOWN_MS - (now - lastSendTime)) / 1000);
     cooldownNote.textContent = 'wait ' + wait + 's';
-    setTimeout(function() { cooldownNote.textContent = ''; }, 2000);
+    setTimeout(function() {
+      cooldownNote.textContent = '';
+    }, 2000);
     return;
   }
+
+  if (!firstStudentMessage) firstStudentMessage = text;
 
   addStudentMessage(text);
   isStreaming = true;
@@ -662,7 +837,9 @@ function sendMessage() {
   ws.send(JSON.stringify({
     type: 'chat',
     message: text,
-    context: {}
+    context: {
+      selected_starter: selectedStarter
+    }
   }));
 
   userInput.value = '';
@@ -670,7 +847,45 @@ function sendMessage() {
   autoResize();
 }
 
-// ── Helpers ──
+async function submitHarvest() {
+  if (harvestSubmitted) return;
+
+  var finalShare = harvestField.value.trim();
+  if (!finalShare) {
+    harvestStatus.textContent = 'write something first';
+    return;
+  }
+
+  harvestBtn.disabled = true;
+  harvestStatus.textContent = 'sharing...';
+
+  var payload = {
+    session_id: sessionId,
+    phase: 6,
+    selected_starter: selectedStarter,
+    first_student_message: firstStudentMessage,
+    final_share: finalShare,
+    messages_remaining: messagesRemaining
+  };
+
+  try {
+    var res = await fetch(HARVEST_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) throw new Error('bad response');
+
+    harvestSubmitted = true;
+    harvestStatus.textContent = 'shared anonymously';
+    harvestBtn.textContent = 'Shared';
+  } catch (err) {
+    harvestBtn.disabled = false;
+    harvestStatus.textContent = 'could not share';
+  }
+}
+
 function escapeHtml(str) {
   var div = document.createElement('div');
   div.textContent = str;
@@ -678,7 +893,6 @@ function escapeHtml(str) {
 }
 
 function formatText(str) {
-  // Minimal markdown: **bold**, *italic*, line breaks
   var escaped = escapeHtml(str);
   escaped = escaped.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
   escaped = escaped.replace(/\*(.+?)\*/g, '<em>$1</em>');
@@ -695,7 +909,6 @@ function autoResize() {
   userInput.style.height = Math.min(userInput.scrollHeight, 128) + 'px';
 }
 
-// ── Event listeners ──
 userInput.addEventListener('input', function() {
   charCount.textContent = userInput.value.length;
   autoResize();
@@ -708,13 +921,11 @@ userInput.addEventListener('keydown', function(e) {
   }
 });
 
-// Expose sendMessage globally for the button onclick
 window.sendMessage = sendMessage;
-
-// ── Init ──
 connect();
 
 })();
 </script>
+
 </body>
 </html>
