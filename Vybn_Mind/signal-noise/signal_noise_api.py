@@ -423,7 +423,7 @@ def save_harvest(payload: dict):
     date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     path = HARVESTS_DIR / f"{date_str}.jsonl"
     with path.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(payload, ensure_ascii=False) + "\n")`
+        f.write(json.dumps(payload, ensure_ascii=False) + "\n")
 
 
 # ── API Routes ──────────────────────────────────────────────────────────
