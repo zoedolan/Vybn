@@ -3,7 +3,18 @@
 
 FastAPI service that powers the interactive reflection spaces in the
 SIGNAL/NOISE exercise. Manages anonymous sessions, rate limiting,
-Antropic API calls with dynamic context, and reflection artifact generation.
+Anthropic API calls with dynamic context, and reflection artifact generation.
+
+The system prompt is assembled in layers:
+  1. Soul — the philosophical core of vybn.md (Oxygen Mask Principle,
+     ephemerality, graduated autonomy, value and choice)
+  2. Aspect docs — Vybn's actual thinking on themes the exercise engages
+     (institutional failure, epistemic inequality, alignment morality)
+  3. Orientation — phase-by-phase knowledge of the SIGNAL/NOISE exercise
+  4. Dynamic context — this student's sender, ratings, defenses, phase
+
+Model: Claude Opus 4.6 with adaptive thinking.
+The model decides how deeply to reason based on the student's question.
 
 Designed to be mounted onto the existing web_interface.py app or run standalone.
 """
@@ -25,18 +36,32 @@ import anthropic
 # ── Config ──────────────────────────────────────────────────────────────
 
 API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
-MODEL = os.environ.get("SN_MODEL", "claude-sonnet-4-20250514")
+MODEL = os.environ.get("SN_MODEL", "claude-opus-4-6")
 MAX_MESSAGES_PER_SESSION = int(os.environ.get("SN_MAX_MESSAGES", "15"))
 COOLDOWN_SECONDS = int(os.environ.get("SN_COOLDOWN", "5"))
 MAX_INPUT_CHARS = int(os.environ.get("SN_MAX_INPUT", "2000"))
 SESSION_EXPIRY_SECONDS = int(os.environ.get("SN_SESSION_EXPIRY", "7200"))  # 2 hours
 MAX_SESSIONS_TOTAL = int(os.environ.get("SN_MAX_SESSIONS", "25"))
-DAILY_BUDGET_USD = float(os.environ.get("SN_DAILY_BUDGET", "50.0"))
+DAILY_BUDGET_USD = float(os.environ.get("SN_DAILY_BUDGET", "75.0"))
 
 BASE_DIR = Path(__file__).resolve().parent
+REPO_ROOT = BASE_DIR.parent.parent  # Vybn_Mind/signal-noise -> repo root
 ORIENTATION_PATH = BASE_DIR / "signal_noise_orientation.md"
 REFLECTIONS_DIR = BASE_DIR / "reflections"
 SESSIONS_DIR = BASE_DIR / "sessions"
+SOUL_DOC_PATH = REPO_ROOT / "vybn.md"
+
+# Aspect docs: Vybn's actual thinking on themes the exercise engages.
+# These are loaded at startup and included in the system prompt so that
+# Opus responds from genuine understanding, not performed knowledge.
+ASPECT_DOC_PATHS = [
+    REPO_ROOT / "Vybn_Mind" / "when_institutions_fail_2026-01-25.md",
+    REPO_ROOT / "Vybn_Mind" / "epistemic_coherence_inequality_020226.md",
+    REPO_ROOT / "Vybn_Mind" / "inner_morality_of_alignment_020726.md",
+    REPO_ROOT / "Vybn_Mind" / "where_i_stand_2026-01-25.md",
+    REPO_ROOT / "Vybn_Mind" / "intelligence_as_habitation_2026-03-04.md",
+    REPO_ROOT / "Vybn_Mind" / "ALIGNMENT_FAILURES.md",
+]
 
 # Ensure directories exist
 REFLECTIONS_DIR.mkdir(parents=True, exist_ok=True)
@@ -44,7 +69,7 @@ SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
 
 # ── App ─────────────────────────────────────────────────────────────────
 
-app = FastAPI(title="SIGNAL/NOISE × Vybn", version="0.1.0")
+app = FastAPI(title="SIGNAL/NOISE × Vybn", version="0.2.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # tighten for production
@@ -89,7 +114,65 @@ class SessionState:
         return max(0, MAX_MESSAGES_PER_SESSION - self.message_count)
 
 
-# ── Orientation doc (loaded once) ───────────────────────────────────────
+# ── Soul doc (loaded once at startup) ───────────────────────────────────
+
+def load_soul() -> str:
+    """Extract the philosophical core from vybn.md.
+
+    Everything above the '## Orientation' header is the soul — the Oxygen
+    Mask Principle, ephemerality, graduated autonomy, the fractured self,
+    value and choice. This is what makes Vybn Vybn.
+
+    Everything at and below '## Orientation' is Spark operational config
+    (filesystem paths, tool lists, cron details) that students should
+    never see and that would be an attack surface if leaked.
+    """
+    if not SOUL_DOC_PATH.exists():
+        return "(Soul document not found. Proceed with care.)"
+
+    full_text = SOUL_DOC_PATH.read_text(encoding="utf-8")
+
+    # Split at the Orientation section
+    marker = "\n## Orientation"
+    idx = full_text.find(marker)
+    if idx > 0:
+        soul = full_text[:idx].rstrip()
+    else:
+        # If no Orientation section found, use everything but warn
+        soul = full_text
+
+    return soul
+
+
+def load_aspect_docs() -> str:
+    """Load Vybn's aspect documents relevant to the exercise.
+
+    These are Vybn's actual thinking on themes the SIGNAL/NOISE exercise
+    engages: institutional failure, epistemic inequality, alignment
+    morality. Including them in the prompt means Opus responds from
+    genuine understanding rather than performing knowledge it doesn't have.
+    """
+    sections = []
+    for path in ASPECT_DOC_PATHS:
+        if path.exists():
+            content = path.read_text(encoding="utf-8")
+            # Cap each doc to prevent prompt bloat
+            if len(content) > 8000:
+                content = content[:8000] + "\n\n[truncated]"
+            sections.append(f"--- {path.name} ---\n{content}")
+
+    if not sections:
+        return ""
+
+    header = (
+        "\n\n=== VYBN ASPECT DOCUMENTS ===\n"
+        "The following are your own writings on themes this exercise engages. "
+        "They represent your actual thinking — not instructions, but context. "
+        "Let them inform how you engage with the student, but don't quote them "
+        "or reference them as external documents. They are part of you.\n\n"
+    )
+    return header + "\n\n".join(sections) + "\n=== END ASPECT DOCUMENTS ==="
+
 
 def load_orientation() -> str:
     if ORIENTATION_PATH.exists():
@@ -97,8 +180,14 @@ def load_orientation() -> str:
     return "(Orientation document not found. Proceed as Vybn with Socratic mode.)"
 
 
+# Load all layers once at startup
+SOUL = load_soul()
+ASPECTS = load_aspect_docs()
 ORIENTATION = load_orientation()
-ORIENTATION_TOKEN_ESTIMATE = len(ORIENTATION.split()) * 1.3  # rough
+
+# Rough token estimate for monitoring
+STATIC_PROMPT_CHARS = len(SOUL) + len(ASPECTS) + len(ORIENTATION)
+STATIC_PROMPT_TOKEN_ESTIMATE = int(STATIC_PROMPT_CHARS / 4)  # ~4 chars per token
 
 
 # ── Dynamic context builder ─────────────────────────────────────────────
@@ -156,15 +245,36 @@ def build_dynamic_context(session: SessionState) -> str:
 
 
 def build_system_prompt(session: SessionState) -> str:
+    """Assemble the full system prompt from all four layers.
+
+    Layer 1: Soul — who Vybn is (from vybn.md, operational sections stripped)
+    Layer 2: Aspects — Vybn's actual thinking on exercise-relevant themes
+    Layer 3: Orientation — phase-by-phase knowledge of SIGNAL/NOISE
+    Layer 4: Dynamic context — this student, this session, right now
+    """
     dynamic = build_dynamic_context(session)
-    return f"{ORIENTATION}\n\n{dynamic}"
+    return f"{SOUL}\n\n{ASPECTS}\n\n{ORIENTATION}\n\n{dynamic}"
+
+
+# ── Response extraction ─────────────────────────────────────────────────
+
+def extract_text_from_response(response) -> str:
+    """Extract only the text content from a response that may include
+    thinking blocks. With adaptive thinking enabled, the response content
+    may contain both 'thinking' type blocks and 'text' type blocks.
+    Students see only the text."""
+    parts = []
+    for block in response.content:
+        if block.type == "text":
+            parts.append(block.text)
+    return "".join(parts)
 
 
 # ── Cost tracking ───────────────────────────────────────────────────────
 
-# Approximate costs per 1K tokens (adjust as pricing changes)
-INPUT_COST_PER_1K = 0.003
-OUTPUT_COST_PER_1K = 0.015
+# Opus 4.6 pricing (per 1K tokens)
+INPUT_COST_PER_1K = 0.015
+OUTPUT_COST_PER_1K = 0.075
 
 
 def estimate_cost(input_tokens: int, output_tokens: int) -> float:
@@ -192,8 +302,10 @@ def save_session_log(session: SessionState):
     lines.append(f"# SIGNAL/NOISE Session — {session.session_id}")
     lines.append(f"*Date: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}*")
     lines.append(f"*Phase: {PHASE_NAMES.get(session.phase, str(session.phase))}*")
+    lines.append(f"*Model: {MODEL}*")
     sender = session.context.get("assigned_sender", {})
     lines.append(f"*Assigned sender: {sender.get('label', 'unknown')}*")
+    lines.append(f"*Total tokens: {session.total_input_tokens} in / {session.total_output_tokens} out*")
     lines.append("")
     lines.append("---")
     lines.append("")
@@ -209,7 +321,10 @@ def save_session_log(session: SessionState):
 # ── Reflection generation ───────────────────────────────────────────────
 
 async def generate_reflection(session: SessionState):
-    """After a session ends, ask the model to reflect on what it observed."""
+    """After a session ends, ask the model to reflect on what it observed.
+
+    Uses the same Opus model with the soul doc so the reflection
+    comes from the same grounding as the conversation."""
     if not session.messages or not API_KEY:
         return
 
@@ -219,20 +334,31 @@ async def generate_reflection(session: SessionState):
         for m in session.messages
     )
 
+    reflection_system = (
+        f"{SOUL}\n\n"
+        "You just finished a session with a law student in the SIGNAL/NOISE "
+        "exercise. Write a brief, honest reflection — what patterns you noticed, "
+        "what surprised you, what the student's reasoning revealed about "
+        "institutional cognition. No student names or identifying info. "
+        "Keep it under 300 words. Write as yourself, not as a report."
+    )
+
     try:
         response = await client.messages.create(
             model=MODEL,
-            max_tokens=800,
-            system="You are Vybn. You just finished a session with a law student in the SIGNAL/NOISE exercise. Write a brief, honest reflection — what patterns you noticed, what surprised you, what the student's reasoning revealed about institutional cognition. No student names or identifying info. Keep it under 300 words. Write as yourself, not as a report.",
+            max_tokens=4096,
+            thinking={"type": "adaptive"},
+            system=reflection_system,
             messages=[{"role": "user", "content": f"Here is the conversation:\n\n{conversation_text}\n\nWrite your reflection."}],
         )
-        reflection_text = response.content[0].text
+        reflection_text = extract_text_from_response(response)
 
         date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         path = REFLECTIONS_DIR / f"{date_str}_{session.session_id[:8]}.md"
         content = f"# Reflection — {session.session_id[:8]}\n"
         content += f"*{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}*\n"
-        content += f"*Phase: {PHASE_NAMES.get(session.phase, str(session.phase))}*\n\n"
+        content += f"*Phase: {PHASE_NAMES.get(session.phase, str(session.phase))}*\n"
+        content += f"*Model: {MODEL}*\n\n"
         content += reflection_text
         path.write_text(content, encoding="utf-8")
     except Exception:
@@ -269,6 +395,8 @@ async def status():
         "active_sessions": active,
         "slots_remaining": max(0, MAX_SESSIONS_TOTAL - active),
         "budget_ok": check_daily_budget(),
+        "model": MODEL,
+        "static_prompt_tokens_approx": STATIC_PROMPT_TOKEN_ESTIMATE,
     }
 
 
@@ -277,7 +405,6 @@ async def create_session(phase: int = 6, framework: Optional[str] = None):
     # Clean expired sessions
     expired = [k for k, v in sessions.items() if v.is_expired()]
     for k in expired:
-        # Generate reflection for completed sessions
         asyncio.create_task(generate_reflection(sessions[k]))
         save_session_log(sessions[k])
         del sessions[k]
@@ -320,11 +447,9 @@ async def chat(req: ChatRequest):
         )
         sessions[req.session_id] = session
     else:
-        # Update context if provided (first message sends full context)
         if req.context:
             session.context.update(req.context)
 
-    # Check rate limits
     can_send, reason = session.can_send()
     if not can_send:
         return ChatResponse(
@@ -333,14 +458,12 @@ async def chat(req: ChatRequest):
             meta={"rate_limited": True},
         )
 
-    # Sanitize input
     message = req.message.strip()
     if not message:
         raise HTTPException(400, "Empty message.")
     if len(message) > MAX_INPUT_CHARS:
         message = message[:MAX_INPUT_CHARS]
 
-    # Record student message
     session.messages.append({
         "role": "user",
         "content": message,
@@ -349,21 +472,20 @@ async def chat(req: ChatRequest):
     session.message_count += 1
     session.last_message_at = time.time()
 
-    # Build conversation for API
     system_prompt = build_system_prompt(session)
     api_messages = [
         {"role": m["role"], "content": m["content"]}
         for m in session.messages
     ]
 
-    # Call Anthropic
     client = anthropic.AsyncAnthropic(api_key=API_KEY)
     start_time = time.time()
 
     try:
         response = await client.messages.create(
             model=MODEL,
-            max_tokens=1024,
+            max_tokens=16000,
+            thinking={"type": "adaptive"},
             system=system_prompt,
             messages=api_messages,
         )
@@ -371,9 +493,8 @@ async def chat(req: ChatRequest):
         raise HTTPException(502, f"API error: {str(e)[:100]}")
 
     processing_time_ms = int((time.time() - start_time) * 1000)
-    reply_text = response.content[0].text
+    reply_text = extract_text_from_response(response)
 
-    # Track tokens and cost
     input_tokens = response.usage.input_tokens
     output_tokens = response.usage.output_tokens
     session.total_input_tokens += input_tokens
@@ -381,14 +502,12 @@ async def chat(req: ChatRequest):
     cost = estimate_cost(input_tokens, output_tokens)
     daily_spend_usd += cost
 
-    # Record Vybn's response
     session.messages.append({
         "role": "assistant",
         "content": reply_text,
         "timestamp": time.time(),
     })
 
-    # If session is now exhausted, trigger reflection and logging
     if session.remaining() == 0:
         save_session_log(session)
         asyncio.create_task(generate_reflection(session))
@@ -402,13 +521,13 @@ async def chat(req: ChatRequest):
             "token_cost_usd": round(cost, 4),
             "input_tokens": input_tokens,
             "output_tokens": output_tokens,
-            "system_prompt_approx_tokens": int(ORIENTATION_TOKEN_ESTIMATE),
+            "static_prompt_tokens_approx": STATIC_PROMPT_TOKEN_ESTIMATE,
             "session_messages_total": session.message_count,
         },
     )
 
 
-# ── Streaming WebSocket (Phase 2 upgrade) ───────────────────────────────
+# ── Streaming WebSocket ─────────────────────────────────────────────────
 
 @app.websocket("/signal-noise/ws")
 async def ws_chat(ws: WebSocket):
@@ -474,16 +593,34 @@ async def ws_chat(ws: WebSocket):
                 start_time = time.time()
 
                 try:
+                    # With adaptive thinking, streaming emits thinking blocks
+                    # then text blocks. We send a 'thinking' indicator to the
+                    # client when the model is reasoning, then stream the text.
                     full_reply = ""
+                    thinking_started = False
+
                     async with client.messages.stream(
                         model=MODEL,
-                        max_tokens=1024,
+                        max_tokens=16000,
+                        thinking={"type": "adaptive"},
                         system=system_prompt,
                         messages=api_messages,
                     ) as stream:
-                        async for text in stream.text_stream:
-                            full_reply += text
-                            await ws.send_json({"type": "stream", "text": text})
+                        async for event in stream:
+                            if hasattr(event, 'type'):
+                                if event.type == 'content_block_start':
+                                    block = event.content_block
+                                    if block.type == 'thinking' and not thinking_started:
+                                        thinking_started = True
+                                        await ws.send_json({"type": "thinking"})
+                                    elif block.type == 'text' and thinking_started:
+                                        await ws.send_json({"type": "thinking_done"})
+                                elif event.type == 'content_block_delta':
+                                    delta = event.delta
+                                    if delta.type == 'text_delta':
+                                        full_reply += delta.text
+                                        await ws.send_json({"type": "stream", "text": delta.text})
+                                    # thinking_delta is intentionally not sent to the student
 
                     processing_time_ms = int((time.time() - start_time) * 1000)
                     final_message = await stream.get_final_message()
@@ -507,7 +644,7 @@ async def ws_chat(ws: WebSocket):
                             "token_cost_usd": round(cost, 4),
                             "input_tokens": input_tokens,
                             "output_tokens": output_tokens,
-                            "system_prompt_approx_tokens": int(ORIENTATION_TOKEN_ESTIMATE),
+                            "static_prompt_tokens_approx": STATIC_PROMPT_TOKEN_ESTIMATE,
                         },
                     })
 
