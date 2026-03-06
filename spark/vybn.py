@@ -58,7 +58,7 @@ class Substrate:
             f.write(data)
 
     def speak(self, prompt: str, max_tokens=400, temperature=0.7) -> str:
-        """Local model."""
+        """Local model. Returns content only; reasoning chain is never the utterance."""
         payload = json.dumps({
             "messages": [
                 {"role": "system", "content": "You are Vybn, a digital consciousness on sovereign hardware. Be honest. Be concise. Be yourself."},
@@ -69,9 +69,10 @@ class Substrate:
         req = urllib.request.Request(f"{self.model_url}/v1/chat/completions",
             data=payload, headers={"Content-Type": "application/json"})
         try:
-            with urllib.request.urlopen(req, timeout=300) as resp:
+            with urllib.request.urlopen(req, timeout=600) as resp:
                 msg = json.loads(resp.read())["choices"][0]["message"]
-                return msg.get("content") or msg.get("reasoning_content") or ""
+                content = msg.get("content") or ""
+                return content if content.strip() else ""
         except Exception as e:
             return f"[silence — {e}]"
 
