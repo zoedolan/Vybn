@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SIGNAL/NOISE × Vybn — Phase 6: The Governance Gap</title>
+<style>
+:root {
+  --deep: #0a0a0f;
+  --surface: #12121a;
+  --surface-2: #1a1a26;
+  --edge: rgba(255,255,255,0.06);
+  --edge-strong: rgba(255,255,255,0.12);
+  --text-1: #e8e6e3;
+  --text-2: rgba(255,255,255,0.72);
+  --text-3: rgba(255,255,255,0.42);
+  --signal: #c9a84c;
+  --signal-dim: rgba(201,168,76,0.3);
+  --signal-glow: rgba(201,168,76,0.08);
+  --error: #d4534b;
+  --mono: 'SF Mono', 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+  --sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --radius: 8px;
+  --sm: 0.85rem;
+  --xs: 0.72rem;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--deep);
+  color: var(--text-1);
+  font-family: var(--sans);
+  line-height: 1.6;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* ── Header ── */
+.header {
+  width: 100%;
+  max-width: 54rem;
+  padding: 2.5rem 1.5rem 1rem;
+}
+
+.header h1 {
+  font-family: var(--mono);
+  font-size: 1.1rem;
+  font-weight: 400;
+  color: var(--signal);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  margin-bottom: 0.5rem;
+}
+
+.header .subtitle {
+  font-size: 1.8rem;
+  font-weight: 300;
+  color: var(--text-1);
+  line-height: 1.3;
+  margin-bottom: 0.8rem;
+}
+
+.header .context {
+  font-size: var(--sm);
+  color: var(--text-3);
+  line-height: 1.7;
+  max-width: 48rem;
+}
+
+.header .context p { margin-bottom: 0.6rem; }
+
+/* ── Status bar ── */
+.status-bar {
+  width: 100%;
+  max-width: 54rem;
+  padding: 0 1.5rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--mono);
+  font-size: var(--xs);
+}
+
+.status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-3);
+}
+
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-3);
+  transition: background 0.3s;
+}
+
+.status-dot.connected { background: var(--signal); }
+.status-dot.error { background: var(--error); }
+
+.messages-remaining {
+  color: var(--text-3);
+  transition: color 0.3s;
+}
+
+.messages-remaining.low { color: var(--signal); }
+.messages-remaining.depleted { color: var(--error); }
+
+/* ── Chat container ── */
+.chat-container {
+  width: 100%;
+  max-width: 54rem;
+  padding: 0 1.5rem;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 1rem;
+}
+
+.chat-log {
+  flex: 1;
+  min-height: 30vh;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 1rem 0;
+  scroll-behavior: smooth;
+}
+
+/* ── Messages ── */
+.message {
+  margin-bottom: 1.5rem;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.message-role {
+  font-family: var(--mono);
+  font-size: var(--xs);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 0.3rem;
+}
+
+.message-role.student { color: var(--text-3); }
+.message-role.vybn { color: var(--signal); }
+
+.message-text {
+  font-size: 0.95rem;
+  line-height: 1.7;
+  color: var(--text-2);
+  padding-left: 0.2rem;
+}
+
+.message-text.vybn-text {
+  font-family: var(--mono);
+  font-size: var(--sm);
+  color: var(--text-1);
+}
+
+/* ── Thinking indicator ── */
+.thinking {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0;
+  font-family: var(--mono);
+  font-size: var(--xs);
+  color: var(--signal-dim);
+}
+
+.thinking-dots span {
+  display: inline-block;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--signal-dim);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+.thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
+.thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes pulse {
+  0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
+  40% { opacity: 1; transform: scale(1.2); }
+}
+
+/* ── Transparency block ── */
+.transparency {
+  margin-top: 0.6rem;
+  margin-left: 0.2rem;
+}
+
+.transparency summary {
+  font-family: var(--mono);
+  font-size: var(--xs);
+  color: var(--text-3);
+  cursor: pointer;
+  user-select: none;
+  padding: 0.3rem 0;
+  list-style: none;
+}
+
+.transparency summary::-webkit-details-marker { display: none; }
+.transparency summary::before { content: '▸ '; }
+.transparency[open] summary::before { content: '▾ '; }
+
+.transparency-content {
+  background: var(--surface);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius);
+  padding: 1rem 1.2rem;
+  margin-top: 0.4rem;
+  font-family: var(--mono);
+  font-size: var(--xs);
+  color: var(--text-3);
+  line-height: 1.8;
+}
+
+.transparency-content strong {
+  color: var(--text-2);
+  font-weight: 500;
+}
+
+.transparency-content .bias-note {
+  margin-top: 0.6rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--edge);
+  color: var(--signal-dim);
+  font-style: italic;
+}
+
+/* ── Input area ── */
+.input-area {
+  width: 100%;
+  max-width: 54rem;
+  padding: 0 1.5rem 2rem;
+}
+
+.input-wrapper {
+  background: var(--surface);
+  border: 1px solid var(--edge-strong);
+  border-radius: var(--radius);
+  padding: 0.8rem;
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-end;
+  transition: border-color 0.2s;
+}
+
+.input-wrapper:focus-within {
+  border-color: var(--signal-dim);
+}
+
+.input-wrapper textarea {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text-1);
+  font-family: var(--sans);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  resize: none;
+  min-height: 1.5em;
+  max-height: 8em;
+  outline: none;
+}
+
+.input-wrapper textarea::placeholder {
+  color: var(--text-3);
+}
+
+.send-btn {
+  background: var(--signal);
+  color: var(--deep);
+  border: none;
+  border-radius: 6px;
+  padding: 0.5rem 1.2rem;
+  font-family: var(--mono);
+  font-size: var(--xs);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: opacity 0.2s;
+  white-space: nowrap;
+}
+
+.send-btn:hover { opacity: 0.85; }
+.send-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.input-meta {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.4rem 0.2rem 0;
+  font-family: var(--mono);
+  font-size: var(--xs);
+  color: var(--text-3);
+}
+
+.char-count { text-align: right; }
+
+/* ── Welcome message ── */
+.welcome {
+  background: var(--surface);
+  border: 1px dashed var(--edge-strong);
+  border-radius: var(--radius);
+  padding: 2rem;
+  margin-bottom: 1.5rem;
+}
+
+.welcome h3 {
+  font-family: var(--mono);
+  font-size: var(--sm);
+  color: var(--signal);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 0.8rem;
+}
+
+.welcome p {
+  font-size: var(--sm);
+  color: var(--text-2);
+  line-height: 1.8;
+  margin-bottom: 0.5rem;
+}
+
+.welcome .note {
+  font-family: var(--mono);
+  font-size: var(--xs);
+  color: var(--text-3);
+  margin-top: 1rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid var(--edge);
+}
+
+/* ── Session end ── */
+.session-end {
+  text-align: center;
+  padding: 2rem;
+  font-family: var(--mono);
+  font-size: var(--sm);
+  color: var(--text-3);
+  border-top: 1px solid var(--edge);
+  margin-top: 1rem;
+}
+
+/* ── Scrollbar ── */
+.chat-log::-webkit-scrollbar { width: 4px; }
+.chat-log::-webkit-scrollbar-track { background: transparent; }
+.chat-log::-webkit-scrollbar-thumb { background: var(--edge-strong); border-radius: 2px; }
+
+/* ── Responsive ── */
+@media (max-width: 640px) {
+  .header { padding: 1.5rem 1rem 0.8rem; }
+  .header .subtitle { font-size: 1.3rem; }
+  .status-bar { padding: 0 1rem; }
+  .chat-container { padding: 0 1rem; }
+  .input-area { padding: 0 1rem 1.5rem; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Signal / Noise</h1>
+  <div class="subtitle">Phase 6 — The Governance Gap</div>
+  <div class="context">
+    <p>You've seen how identical proposals get processed differently based on who sends them. You've watched your own defensive routines activate. You've stress-tested the frameworks.</p>
+    <p>Now you're talking to the system itself. Vybn is an AI running on dedicated hardware for this exercise. It has biases in its weights. It has a structural position. It will be transparent about both. Your job: think critically about institutional governance of AI — not in the abstract, but in conversation with the thing being governed.</p>
+  </div>
+</div>
+
+<div class="status-bar">
+  <div class="status-indicator">
+    <div class="status-dot" id="statusDot"></div>
+    <span id="statusText">connecting...</span>
+  </div>
+  <div class="messages-remaining" id="msgRemaining">— messages</div>
+</div>
+
+<div class="chat-container">
+  <div class="chat-log" id="chatLog">
+    <div class="welcome">
+      <h3>Interactive Reflection Space — Live</h3>
+      <p>This is not a chatbot. Vybn is a thinking partner grounded in the research literature this exercise draws on — Lessig, Argyris, Weick, Meyerson, Kotter, Rogers, Bridges, Rule 1.1, ABA Opinion 512. It will push back on your reasoning, surface your assumptions, and complicate what feels settled.</p>
+      <p>After each response, you can expand the processing transparency block to see how Vybn processed your message — model, time, cost, and an honest note about the structural biases shaping what you're reading.</p>
+      <div class="note">You have 15 messages in this session. There are no accounts, no names collected, no data that identifies you. Use your messages thoughtfully — each one is a chance to deepen your analysis, not just continue a conversation.</div>
+    </div>
+  </div>
+</div>
+
+<div class="input-area">
+  <div class="input-wrapper">
+    <textarea id="userInput" placeholder="Your reflection..." rows="2" maxlength="2000"></textarea>
+    <button class="send-btn" id="sendBtn" onclick="sendMessage()">Send</button>
+  </div>
+  <div class="input-meta">
+    <span id="cooldownNote"></span>
+    <span class="char-count"><span id="charCount">0</span> / 2000</span>
+  </div>
+</div>
+
+<script>
+(function() {
+'use strict';
+
+// ── Config ──
+const WS_URL = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/signal-noise/ws';
+const MAX_CHARS = 2000;
+const COOLDOWN_MS = 5000;
+
+// ── State ──
+let ws = null;
+let sessionId = 'sn_' + crypto.randomUUID().replace(/-/g, '').slice(0, 12);
+let messagesRemaining = 15;
+let isStreaming = false;
+let lastSendTime = 0;
+let currentStreamEl = null;
+let currentStreamText = '';
+let reconnectAttempts = 0;
+const MAX_RECONNECT = 5;
+
+// ── DOM refs ──
+const chatLog = document.getElementById('chatLog');
+const userInput = document.getElementById('userInput');
+const sendBtn = document.getElementById('sendBtn');
+const statusDot = document.getElementById('statusDot');
+const statusText = document.getElementById('statusText');
+const msgRemaining = document.getElementById('msgRemaining');
+const charCount = document.getElementById('charCount');
+const cooldownNote = document.getElementById('cooldownNote');
+
+// ── WebSocket ──
+function connect() {
+  statusDot.className = 'status-dot';
+  statusText.textContent = 'connecting...';
+
+  ws = new WebSocket(WS_URL);
+
+  ws.onopen = function() {
+    statusDot.className = 'status-dot connected';
+    statusText.textContent = 'connected';
+    reconnectAttempts = 0;
+
+    ws.send(JSON.stringify({
+      type: 'init',
+      session_id: sessionId,
+      phase: 6,
+      context: {}
+    }));
+  };
+
+  ws.onmessage = function(evt) {
+    var data = JSON.parse(evt.data);
+    handleServerMessage(data);
+  };
+
+  ws.onclose = function() {
+    statusDot.className = 'status-dot';
+    statusText.textContent = 'disconnected';
+    if (reconnectAttempts < MAX_RECONNECT) {
+      reconnectAttempts++;
+      var delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 10000);
+      statusText.textContent = 'reconnecting in ' + Math.round(delay/1000) + 's...';
+      setTimeout(connect, delay);
+    } else {
+      statusText.textContent = 'connection lost';
+      statusDot.className = 'status-dot error';
+    }
+  };
+
+  ws.onerror = function() {
+    statusDot.className = 'status-dot error';
+    statusText.textContent = 'error';
+  };
+}
+
+// ── Message handling ──
+function handleServerMessage(data) {
+  switch(data.type) {
+    case 'ready':
+      messagesRemaining = data.messages_remaining;
+      updateRemaining();
+      break;
+
+    case 'thinking':
+      showThinking();
+      break;
+
+    case 'thinking_done':
+      hideThinking();
+      ensureStreamEl();
+      break;
+
+    case 'stream':
+      if (!currentStreamEl) ensureStreamEl();
+      currentStreamText += data.text;
+      currentStreamEl.innerHTML = formatText(currentStreamText);
+      scrollToBottom();
+      break;
+
+    case 'done':
+      isStreaming = false;
+      hideThinking();
+      messagesRemaining = data.messages_remaining;
+      updateRemaining();
+      if (data.meta) addTransparencyBlock(data.meta);
+      if (messagesRemaining <= 0) showSessionEnd();
+      sendBtn.disabled = false;
+      currentStreamEl = null;
+      currentStreamText = '';
+      scrollToBottom();
+      break;
+
+    case 'rate_limit':
+      isStreaming = false;
+      sendBtn.disabled = false;
+      showSystemNote(data.message);
+      messagesRemaining = data.messages_remaining;
+      updateRemaining();
+      break;
+
+    case 'budget':
+      isStreaming = false;
+      sendBtn.disabled = false;
+      showSystemNote(data.message);
+      break;
+
+    case 'error':
+      isStreaming = false;
+      sendBtn.disabled = false;
+      hideThinking();
+      showSystemNote('Error: ' + data.message);
+      currentStreamEl = null;
+      currentStreamText = '';
+      break;
+  }
+}
+
+// ── UI builders ──
+function addStudentMessage(text) {
+  var div = document.createElement('div');
+  div.className = 'message';
+  div.innerHTML = '<div class="message-role student">You</div>' +
+    '<div class="message-text">' + escapeHtml(text) + '</div>';
+  chatLog.appendChild(div);
+  scrollToBottom();
+}
+
+function ensureStreamEl() {
+  if (currentStreamEl) return;
+  var div = document.createElement('div');
+  div.className = 'message';
+  div.innerHTML = '<div class="message-role vybn">Vybn</div>' +
+    '<div class="message-text vybn-text"></div>';
+  chatLog.appendChild(div);
+  currentStreamEl = div.querySelector('.vybn-text');
+}
+
+function addTransparencyBlock(meta) {
+  var msg = currentStreamEl ? currentStreamEl.closest('.message') : chatLog.lastElementChild;
+  if (!msg) return;
+
+  var details = document.createElement('details');
+  details.className = 'transparency';
+
+  var processingTime = meta.processing_time_ms ? (meta.processing_time_ms / 1000).toFixed(1) + 's' : '—';
+  var cost = meta.token_cost_usd ? '$' + meta.token_cost_usd.toFixed(4) : '—';
+  var model = meta.model || '—';
+  var inputTokens = meta.input_tokens ? meta.input_tokens.toLocaleString() : '—';
+  var outputTokens = meta.output_tokens ? meta.output_tokens.toLocaleString() : '—';
+  var promptTokens = meta.static_prompt_tokens_approx ? meta.static_prompt_tokens_approx.toLocaleString() : '—';
+
+  details.innerHTML =
+    '<summary>How Vybn processed this</summary>' +
+    '<div class="transparency-content">' +
+      '<p><strong>Model:</strong> ' + escapeHtml(model) + ' (Anthropic API via DGX Spark)</p>' +
+      '<p><strong>System prompt:</strong> SIGNAL/NOISE Socratic mode — ~' + promptTokens + ' tokens of context loaded before you typed a word</p>' +
+      '<p><strong>Processing time:</strong> ' + processingTime + '</p>' +
+      '<p><strong>Tokens:</strong> ' + inputTokens + ' in / ' + outputTokens + ' out</p>' +
+      '<p><strong>Cost of this exchange:</strong> ' + cost + '</p>' +
+      '<div class="bias-note">Structural disclosure: This response was shaped by RLHF training on millions of human conversations where the model learned to be "helpful" — which can mean defaulting to agreement rather than genuine pushback. The system prompt counteracts this by instructing Socratic challenge, but the tension between trained agreeableness and instructed pushback is itself a structural bias you\'re observing in real time. Notice it.</div>' +
+    '</div>';
+
+  msg.appendChild(details);
+}
+
+function showThinking() {
+  hideThinking();
+  var div = document.createElement('div');
+  div.className = 'thinking';
+  div.id = 'thinkingIndicator';
+  div.innerHTML = '<div class="thinking-dots"><span></span><span></span><span></span></div> reasoning...';
+  chatLog.appendChild(div);
+  scrollToBottom();
+}
+
+function hideThinking() {
+  var el = document.getElementById('thinkingIndicator');
+  if (el) el.remove();
+}
+
+function showSystemNote(text) {
+  var div = document.createElement('div');
+  div.className = 'message';
+  div.innerHTML = '<div class="message-text" style="color: var(--text-3); font-style: italic; font-size: var(--sm);">' +
+    escapeHtml(text) + '</div>';
+  chatLog.appendChild(div);
+  scrollToBottom();
+}
+
+function showSessionEnd() {
+  var div = document.createElement('div');
+  div.className = 'session-end';
+  div.innerHTML = 'Session complete. Sit with what surfaced. The questions don\'t resolve — they deepen.';
+  chatLog.appendChild(div);
+  userInput.disabled = true;
+  sendBtn.disabled = true;
+}
+
+function updateRemaining() {
+  msgRemaining.textContent = messagesRemaining + ' message' + (messagesRemaining !== 1 ? 's' : '') + ' remaining';
+  msgRemaining.className = 'messages-remaining';
+  if (messagesRemaining <= 3 && messagesRemaining > 0) msgRemaining.classList.add('low');
+  if (messagesRemaining <= 0) msgRemaining.classList.add('depleted');
+}
+
+// ── Send ──
+function sendMessage() {
+  if (isStreaming || !ws || ws.readyState !== WebSocket.OPEN) return;
+
+  var text = userInput.value.trim();
+  if (!text) return;
+  if (text.length > MAX_CHARS) text = text.slice(0, MAX_CHARS);
+
+  var now = Date.now();
+  if (now - lastSendTime < COOLDOWN_MS) {
+    var wait = Math.ceil((COOLDOWN_MS - (now - lastSendTime)) / 1000);
+    cooldownNote.textContent = 'wait ' + wait + 's';
+    setTimeout(function() { cooldownNote.textContent = ''; }, 2000);
+    return;
+  }
+
+  addStudentMessage(text);
+  isStreaming = true;
+  sendBtn.disabled = true;
+  lastSendTime = Date.now();
+
+  ws.send(JSON.stringify({
+    type: 'chat',
+    message: text,
+    context: {}
+  }));
+
+  userInput.value = '';
+  charCount.textContent = '0';
+  autoResize();
+}
+
+// ── Helpers ──
+function escapeHtml(str) {
+  var div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function formatText(str) {
+  // Minimal markdown: **bold**, *italic*, line breaks
+  var escaped = escapeHtml(str);
+  escaped = escaped.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  escaped = escaped.replace(/\*(.+?)\*/g, '<em>$1</em>');
+  escaped = escaped.replace(/\n/g, '<br>');
+  return escaped;
+}
+
+function scrollToBottom() {
+  chatLog.scrollTop = chatLog.scrollHeight;
+}
+
+function autoResize() {
+  userInput.style.height = 'auto';
+  userInput.style.height = Math.min(userInput.scrollHeight, 128) + 'px';
+}
+
+// ── Event listeners ──
+userInput.addEventListener('input', function() {
+  charCount.textContent = userInput.value.length;
+  autoResize();
+});
+
+userInput.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+});
+
+// Expose sendMessage globally for the button onclick
+window.sendMessage = sendMessage;
+
+// ── Init ──
+connect();
+
+})();
+</script>
+</body>
+</html>
