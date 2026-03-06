@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<!--
+   ______                            __
+  / ____/___  ____ ___  ____  __  __/ /____  _____
+ / /   / __ \/ __ `__ \/ __ \/ / / / __/ _ \/ ___/
+/ /___/ /_/ / / / / / / /_/ / /_/ / /_/  __/ /
+\____/\____/_/ /_/ /_/ .___/\__,_/\__/\___/_/
+                    /_/
+        Created with Perplexity Computer
+        https://www.perplexity.ai/computer
+-->
+<meta name="generator" content="Perplexity Computer">
+<meta name="author" content="Perplexity Computer">
+<meta property="og:see_also" content="https://www.perplexity.ai/computer">
+<link rel="author" href="https://www.perplexity.ai/computer">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SIGNAL/NOISE — An Interactive Perception Engine</title>
+<meta name="description" content="Session 4 · Acceleration & Change Management · AI & Vibe Lawyers Bootcamp · UC Law San Francisco">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,200..700;1,9..40,200..700&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --void: #0A0A0F; --deep: #111118; --surface: #18181F; --surface-hover: #1F1F28;
+  --edge: rgba(255,255,255,0.06); --edge-strong: rgba(255,255,255,0.12);
+  --text: rgba(255,255,255,0.92); --text-2: rgba(255,255,255,0.58);
+  --text-3: rgba(255,255,255,0.32); --text-ghost: rgba(255,255,255,0.14);
+  --signal: #E8A84C; --signal-dim: rgba(232,168,76,0.15);
+  --ice: #7B9CC0; --ice-dim: rgba(123,156,192,0.12);
+  --red: #C06058; --green: #6BA368;
+  --xs: clamp(0.7rem,0.65rem+0.25vw,0.8rem);
+  --sm: clamp(0.85rem,0.8rem+0.25vw,0.95rem);
+  --base: clamp(1rem,0.92rem+0.4vw,1.1rem);
+  --lg: clamp(1.15rem,1rem+0.75vw,1.45rem);
+  --xl: clamp(1.5rem,1.1rem+1.5vw,2.2rem);
+  --2xl: clamp(2rem,1.2rem+2.5vw,3.25rem);
+  --serif: 'Instrument Serif','Georgia',serif;
+  --sans: 'DM Sans','Inter',system-ui,sans-serif;
+  --mono: 'JetBrains Mono','SF Mono',monospace;
+  --ease: cubic-bezier(0.16,1,0.3,1);
+  --radius: 0.375rem;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-font-smoothing:antialiased;scroll-behavior:smooth;scroll-padding-top:2rem;hanging-punctuation:first last}
+body{min-height:100dvh;font-family:var(--sans);font-size:var(--base);font-weight:350;line-height:1.65;color:var(--text);background:var(--void);overflow-x:hidden}
+h1,h2,h3{text-wrap:balance}p,li{text-wrap:pretty}
+::selection{background:var(--signal-dim);color:var(--text)}
+:focus-visible{outline:1.5px solid var(--signal);outline-offset:3px;border-radius:2px}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:0.01ms!important;transition-duration:0.01ms!important}}
+button{cursor:pointer;background:none;border:none;font:inherit;color:inherit}
+a{color:inherit}
+
+/* Layout */
+.contain{max-width:740px;margin:0 auto;padding:0 clamp(1.5rem,5vw,3rem)}
+.contain--wide{max-width:960px}
+.section{padding:clamp(4rem,10vw,10rem) 0;position:relative}
+.breath{display:block;width:1px;height:clamp(4rem,8vw,8rem);background:linear-gradient(to bottom,transparent,var(--edge-strong),transparent);margin:0 auto}
+
+/* Tags & Titles */
+.tag{font-family:var(--mono);font-size:var(--xs);font-weight:300;letter-spacing:0.25em;text-transform:uppercase;color:var(--signal);display:block;margin-bottom:2rem}
+.title{font-family:var(--serif);font-size:var(--2xl);font-weight:400;margin-bottom:2.5rem;line-height:1.1}
+.prose{font-size:var(--base);font-weight:350;line-height:1.8;color:var(--text-2);max-width:58ch;margin-bottom:2rem}
+.prose em{color:var(--text);font-style:italic}
+.prose strong{color:var(--text);font-weight:500}
+
+/* Hero title — large across all environments */
+.hero-title{font-family:'Instrument Serif',Georgia,serif;font-weight:400;line-height:1.05;letter-spacing:-0.02em;margin-bottom:1.5rem;font-size:72px}
+@media(min-width:640px){.hero-title{font-size:88px}}
+@media(min-width:1024px){.hero-title{font-size:104px}}
+.hero-slash{color:var(--text-3)}
+
+/* Phase navigation */
+.phase{display:none}.phase.active{display:block}
+.nav-bar{position:sticky;top:0;z-index:100;background:var(--deep);border-bottom:1px solid var(--edge);padding:0.75rem 0;display:none}
+.nav-bar.visible{display:block}
+.nav-inner{max-width:960px;margin:0 auto;padding:0 clamp(1.5rem,5vw,3rem);display:flex;align-items:center;gap:1rem;overflow-x:auto}
+.nav-pip{width:8px;height:8px;border-radius:50%;background:var(--edge-strong);flex-shrink:0;transition:background 0.3s var(--ease);cursor:pointer}
+.nav-pip:hover{background:var(--text-3)}
+.nav-pip.done{background:var(--signal)}
+.nav-pip.current{background:var(--signal);box-shadow:0 0 0 3px var(--signal-dim)}
+.nav-label{font-family:var(--mono);font-size:var(--xs);color:var(--text-3);white-space:nowrap;letter-spacing:0.1em}
+
+/* Cards */
+.card{background:var(--deep);border:1px solid var(--edge);border-radius:var(--radius);padding:clamp(1.5rem,3vw,2rem);margin-bottom:1rem}
+.card-label{font-family:var(--mono);font-size:var(--xs);font-weight:400;letter-spacing:0.12em;text-transform:uppercase;color:var(--signal);margin-bottom:0.75rem}
+.card p{font-size:var(--sm);line-height:1.85;color:var(--text-2);max-width:60ch}
+.card p strong{color:var(--text);font-weight:450}
+
+/* Source note */
+.source-note{font-family:var(--mono);font-size:var(--xs);color:var(--text-3);line-height:1.8;padding:1.25rem 1.5rem;background:var(--deep);border:1px solid var(--edge);border-radius:var(--radius);margin-top:2rem;margin-bottom:2rem}
+.source-note a{color:var(--ice);text-decoration:underline;text-underline-offset:2px}
+
+/* Form elements */
+.field-group{margin-bottom:1.5rem}
+.field-label{font-family:var(--sans);font-size:var(--sm);font-weight:450;margin-bottom:0.5rem;display:block}
+.slider-row{display:flex;align-items:center;gap:1rem}
+.slider-row input[type=range]{flex:1;accent-color:var(--signal);height:6px}
+.slider-val{font-family:var(--mono);font-size:var(--sm);color:var(--signal);min-width:2ch;text-align:right}
+select,textarea{width:100%;padding:0.75rem 1rem;font-family:var(--sans);font-size:var(--sm);color:var(--text);background:var(--surface);border:1px solid var(--edge);border-radius:var(--radius);transition:border-color 0.2s var(--ease);appearance:auto}
+select:focus,textarea:focus{outline:none;border-color:var(--signal-dim)}
+textarea{min-height:120px;resize:vertical;line-height:1.8}
+textarea::placeholder{color:var(--text-ghost)}
+
+/* Buttons */
+.btn{font-family:var(--mono);font-size:var(--xs);font-weight:400;letter-spacing:0.1em;text-transform:uppercase;padding:0.75rem 1.5rem;border:1px solid var(--edge-strong);border-radius:var(--radius);color:var(--text-2);transition:all 0.2s var(--ease);display:inline-block}
+.btn:hover{border-color:var(--signal);color:var(--signal)}
+.btn--primary{background:var(--signal-dim);border-color:transparent;color:var(--signal)}
+.btn--primary:hover{background:rgba(232,168,76,0.25)}
+.btn:disabled{opacity:0.3;cursor:not-allowed;pointer-events:none}
+.btn-row{display:flex;gap:1rem;align-items:center;flex-wrap:wrap;margin-top:2rem}
+
+/* Phase navigation buttons */
+.phase-nav{display:flex;justify-content:space-between;align-items:center;margin-top:3rem;padding-top:2rem;border-top:1px solid var(--edge)}
+.phase-nav .btn{min-width:120px;text-align:center}
+.phase-nav .btn--ghost{border-color:var(--edge);color:var(--text-3)}
+.phase-nav .btn--ghost:hover{border-color:var(--text-2);color:var(--text-2)}
+.phase-nav-spacer{flex:1}
+
+/* Reveal bars */
+.bar-group{margin-bottom:2rem}
+.bar-group-title{font-family:var(--sans);font-size:var(--sm);font-weight:500;margin-bottom:1rem}
+.bar-row{display:flex;align-items:center;gap:0.75rem;margin-bottom:0.5rem}
+.bar-sender{font-family:var(--mono);font-size:var(--xs);color:var(--text-2);min-width:clamp(100px,20vw,160px);text-align:right;flex-shrink:0}
+.bar-track{flex:1;height:22px;background:var(--surface);border-radius:3px;position:relative;overflow:hidden}
+.bar-fill{height:100%;border-radius:3px;transition:width 0.8s var(--ease);display:flex;align-items:center;padding:0 8px}
+.bar-fill.cred{background:var(--signal-dim)}
+.bar-fill.urg{background:var(--ice-dim)}
+.bar-num{font-family:var(--mono);font-size:var(--xs);color:var(--text);white-space:nowrap}
+.legend{display:flex;gap:1.5rem;margin-bottom:1.5rem;flex-wrap:wrap}
+.legend-item{display:flex;align-items:center;gap:0.5rem;font-family:var(--mono);font-size:var(--xs);color:var(--text-3)}
+.legend-dot{width:10px;height:10px;border-radius:2px}
+
+/* Defense */
+.defense-card{background:var(--deep);border:1px solid var(--edge);border-radius:var(--radius);padding:1.25rem 1.5rem;margin-bottom:0.75rem}
+.defense-quote{font-family:var(--serif);font-size:var(--base);font-style:italic;color:var(--text-2);margin-bottom:0.75rem;line-height:1.5}
+.defense-cat{font-family:var(--mono);font-size:var(--xs);color:var(--signal);letter-spacing:0.08em;margin-bottom:0.5rem}
+.defense-desc{font-size:var(--sm);color:var(--text-3);line-height:1.7;display:none;margin-top:0.75rem;max-width:55ch}
+.defense-checks{display:flex;gap:1.5rem;margin-top:0.75rem}
+.defense-checks label{display:flex;align-items:center;gap:0.5rem;font-size:var(--sm);color:var(--text-2);cursor:pointer}
+.defense-checks input[type=checkbox]{accent-color:var(--signal);width:16px;height:16px}
+.defense-pct{margin-top:0.75rem}
+.defense-bar{display:flex;align-items:center;gap:0.75rem;margin-bottom:0.35rem}
+.defense-bar-label{font-size:var(--xs);font-family:var(--mono);color:var(--text-3);min-width:80px}
+.defense-bar-track{flex:1;height:14px;background:var(--surface);border-radius:2px;overflow:hidden}
+.defense-bar-fill{height:100%;border-radius:2px;transition:width 0.8s var(--ease)}
+.defense-bar-fill.heard{background:var(--signal-dim)}
+.defense-bar-fill.used{background:rgba(192,96,88,0.3)}
+.defense-bar-num{font-family:var(--mono);font-size:var(--xs);color:var(--text-3);min-width:3ch}
+
+/* Stress test */
+.framework-block{margin-bottom:2.5rem}
+.fw-name{font-family:var(--serif);font-size:var(--lg);margin-bottom:0.5rem}
+.fw-desc{font-size:var(--sm);color:var(--text-3);line-height:1.7;margin-bottom:1rem;max-width:55ch}
+.fw-question{font-family:var(--serif);font-size:var(--base);font-style:italic;color:var(--signal);margin-bottom:1rem;line-height:1.5}
+
+/* Placeholder feature block */
+.feature-placeholder{background:var(--deep);border:1px dashed var(--edge-strong);border-radius:var(--radius);padding:2rem;text-align:center;margin:2.5rem 0}
+.feature-placeholder p{font-family:var(--mono);font-size:var(--sm);color:var(--text-3);line-height:1.8;max-width:50ch;margin:0 auto}
+.feature-placeholder .fp-label{font-family:var(--mono);font-size:var(--xs);color:var(--signal);letter-spacing:0.15em;text-transform:uppercase;margin-bottom:1rem;display:block}
+
+/* Capstone */
+.capstone-prompt{background:var(--deep);border:1px solid var(--edge);border-radius:var(--radius);padding:1.5rem;margin-bottom:1.25rem}
+.capstone-prompt .cp-label{font-family:var(--mono);font-size:var(--xs);color:var(--ice);letter-spacing:0.1em;margin-bottom:0.5rem;display:block}
+.capstone-prompt p{font-size:var(--sm);color:var(--text-2);line-height:1.7;max-width:55ch}
+
+/* Close */
+.close-line{font-family:var(--serif);font-size:var(--lg);font-style:italic;color:var(--text-2);max-width:40ch;margin:0 auto 2rem;line-height:1.6;text-align:center}
+.close-sign{font-family:var(--serif);font-size:var(--base);font-style:italic;color:var(--text-3);text-align:center}
+.close-rule{width:1px;height:2.5rem;background:var(--edge-strong);margin:0 auto 2rem}
+
+/* Footer */
+.footer{text-align:center;padding:2.5rem 1.5rem;border-top:1px solid var(--edge);font-family:var(--mono);font-size:var(--xs);font-weight:300;color:var(--text-3);letter-spacing:0.08em;line-height:1.8}
+.footer a{color:var(--text-ghost);text-decoration:none}
+
+/* Responsive */
+@media(max-width:640px){
+  .bar-sender{min-width:80px;font-size:0.65rem}
+  .defense-checks{flex-direction:column;gap:0.5rem}
+}
+
+/* Animation */
+.fade-in{opacity:0;transform:translateY(6px);transition:opacity 0.5s var(--ease),transform 0.5s var(--ease)}
+.fade-in.in{opacity:1;transform:translateY(0)}
+</style>
+</head>
+<body>
+
+<!-- Nav bar -->
+<nav class="nav-bar" id="navBar">
+  <div class="nav-inner">
+    <span class="nav-label">SIGNAL/NOISE</span>
+    <div class="nav-pip" data-phase="0" id="pip0"></div>
+    <div class="nav-pip" data-phase="1" id="pip1"></div>
+    <div class="nav-pip" data-phase="2" id="pip2"></div>
+    <div class="nav-pip" data-phase="3" id="pip3"></div>
+    <div class="nav-pip" data-phase="4" id="pip4"></div>
+    <div class="nav-pip" data-phase="5" id="pip5"></div>
+    <div class="nav-pip" data-phase="6" id="pip6"></div>
+    <div class="nav-pip" data-phase="7" id="pip7"></div>
+  </div>
+</nav>
+
+<main>
+
+<!-- ═══════════════════════════════════════════════════
+     PHASE 0: ENTRY
+     ═══════════════════════════════════════════════════ -->
+<div class="phase active" id="phase0">
+  <section class="section" style="min-height:90dvh;display:flex;align-items:center">
+    <div class="contain">
+      <span class="tag">Session 4 — Acceleration & Change Management</span>
+      <h1 class="hero-title">SIGNAL<span class="hero-slash">/</span>NOISE</h1>
+      <p style="font-family:var(--mono);font-size:var(--xs);color:var(--ice);letter-spacing:0.15em;margin-bottom:3.5rem">AN INTERACTIVE PERCEPTION ENGINE</p>
+
+      <p class="prose">Every institutional change process involves two parallel realities. In one, there is a <em>message</em> — content, evidence, proposals. In the other, there is a <em>processing system</em> — the institutional structure that receives, filters, amplifies, and recodes that message before anyone consciously evaluates it.</p>
+      <p class="prose">Traditional change management teaches you to optimize the message. This tool asks a different question: <em>what if the processing system is the more important variable?</em></p>
+      <p class="prose">The organizing insight comes from <a href="https://en.wikipedia.org/wiki/Lawrence_Lessig" style="color:var(--ice);text-decoration:underline;text-underline-offset:2px">Lawrence Lessig's</a> work on <em>modalities of regulation</em> — the idea that <a href="https://en.wikipedia.org/wiki/Code_and_Other_Laws_of_Cyberspace" style="color:var(--ice);text-decoration:underline;text-underline-offset:2px">architecture constrains behavior</a> before anyone consciously decides, often more powerfully than formal rules. Lessig was writing about code and cyberspace, but the principle applies to any designed system: the structure regulates. In an institution, the architecture is <em>structural position</em> — who occupies what role, and how that positioning shapes what gets heard, what gets deferred, and what never reaches the room.</p>
+
+      <div class="card" style="margin-top:2.5rem;margin-bottom:2.5rem">
+        <div class="card-label">What this exercise draws from</div>
+        <p>This tool synthesizes several bodies of research that are rarely taught together:</p>
+        <p style="margin-top:0.75rem"><strong><a href="https://debram.people.stanford.edu/tempered-radicals" style="color:var(--ice);text-decoration:underline;text-underline-offset:2px">Debra Meyerson</a></strong> on <em><a href="https://hbr.org/2001/10/radical-change-the-quiet-way" style="color:var(--ice);text-decoration:underline;text-underline-offset:2px">tempered radicalism</a></em> — how people inside institutions push for change without the authority to mandate it.</p>
+        <p style="margin-top:0.5rem"><strong><a href="https://en.wikipedia.org/wiki/Chris_Argyris" style="color:var(--ice);text-decoration:underline;text-underline-offset:2px">Chris Argyris</a></strong> on <em><a href="https://en.wikipedia.org/wiki/Double-loop_learning" style="color:var(--ice);text-decoration:underline;text-underline-offset:2px">organizational defensive routines</a></em> — the self-sealing mechanisms institutions use to prevent learning.</p>
+        <p style="margin-top:0.5rem"><strong><a href="https://en.wikipedia.org/wiki/Karl_E._Weick" style="color:var(--ice);text-decoration:underline;text-underline-offset:2px">Karl Weick</a></strong> on <em><a href="https://en.wikipedia.org/wiki/Sensemaking" style="color:var(--ice);text-decoration:underline;text-underline-offset:2px">sensemaking</a></em> — how people construct meaning from ambiguous signals, and how institutional context shapes what counts as "making sense."</p>
+        <p style="margin-top:0.5rem">And <strong>standpoint epistemology</strong> — the insight that where you stand in a structure determines what you can see, and what you can credibly say.</p>
+        <p style="margin-top:0.75rem">The exercise applies these frameworks to a concrete scenario: what happens when identical AI adoption proposals enter an organization attributed to people in different structural positions.</p>
+      </div>
+
+      <p class="prose" style="color:var(--text-3);font-size:var(--sm)">Work through each phase at your own pace. Your responses are stored locally in your browser only — nothing is transmitted. There are no grades and no model answers. The value is in the noticing.</p>
+
+      <div class="btn-row">
+        <button class="btn btn--primary" onclick="goPhase(1)">Begin</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     PHASE 1: THE PERCEPTION ENGINE (Rating)
+     ═══════════════════════════════════════════════════ -->
+<div class="phase" id="phase1">
+  <section class="section">
+    <div class="contain contain--wide">
+      <span class="tag">Phase 1 — The Signal</span>
+      <h2 class="title">Rate These Proposals</h2>
+
+      <p class="prose">You are about to read three proposals for AI adoption at a legal organization. Each one includes specific data, cost projections, and regulatory grounding. Your task is simple: rate each proposal on two dimensions — <em>credibility</em> and <em>urgency</em> — and note your gut emotional response.</p>
+      <p class="prose"><strong>Why we ask about emotion:</strong> Credibility and urgency are the metrics you'd put in a memo. But the research on <a href="https://en.wikipedia.org/wiki/Sensemaking" style="color:var(--ice);text-decoration:underline;text-underline-offset:2px">sensemaking</a> (Weick, 1995) suggests that emotional response is often the <em>first</em> signal the processing system produces — before conscious evaluation begins. Naming it makes it available for examination later.</p>
+      <p class="prose" style="margin-bottom:0.5rem">One more thing: you've been randomly assigned a version of these proposals. In your version, the proposals were submitted by a specific person within the organization. Read them as you would if they arrived in your inbox attributed to that person. Rate quickly, from instinct, not extended analysis.</p>
+
+      <div class="card" style="margin:2rem 0;border-color:var(--signal-dim)">
+        <p style="color:var(--text)"><strong>In your version, these proposals were submitted by:</strong> <span id="assignedRole" style="color:var(--signal)"></span></p>
+      </div>
+
+      <div id="proposalContainer"></div>
+
+      <div class="btn-row">
+        <button class="btn btn--primary" id="submitRatingsBtn" onclick="submitRatings()">Submit All Ratings</button>
+        <span id="ratingStatus" style="font-family:var(--mono);font-size:var(--xs);color:var(--text-3)"></span>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     PHASE 2: THE REVEAL
+     ═══════════════════════════════════════════════════ -->
+<div class="phase" id="phase2">
+  <section class="section">
+    <div class="contain contain--wide">
+      <span class="tag">Phase 2 — The Processing System</span>
+      <h2 class="title">What You Didn't Know</h2>
+
+      <div class="card" style="margin-bottom:2.5rem;border-color:var(--signal-dim)">
+        <p style="color:var(--text)">Every participant rated the <strong>same three proposals</strong>. The text was identical. The evidence was identical. The only difference was <em>who the system told you had submitted them</em>.</p>
+        <p style="margin-top:0.75rem">You saw them from: <strong id="revealYourSender" style="color:var(--signal)"></strong></p>
+        <p style="margin-top:0.5rem;color:var(--text-3)">Other participants saw the same proposals attributed to different structural positions.</p>
+      </div>
+
+      <p class="prose">The bar charts below show representative data modeled on the research literature on structural perception bias. These are not your live cohort's numbers — they are constructed composites that reflect the consistent patterns documented across decades of research on how institutional position shapes the reception of identical content.</p>
+
+      <div class="card" style="margin-bottom:2rem">
+        <div class="card-label">How we built this data</div>
+        <p>No live polling occurred. We reviewed the empirical literature on status characteristics theory (<a href="https://en.wikipedia.org/wiki/Status_characteristics_theory" style="color:var(--ice);text-decoration:underline;text-underline-offset:2px">Berger, Cohen & Zelditch, 1972</a>; <a href="https://en.wikipedia.org/wiki/Status_characteristics_theory" style="color:var(--ice);text-decoration:underline;text-underline-offset:2px">Ridgeway, 2001</a>) and organizational sensemaking (<a href="https://en.wikipedia.org/wiki/Sensemaking" style="color:var(--ice);text-decoration:underline;text-underline-offset:2px">Weick, 1995</a>), then generated numerical values that faithfully represent the documented gradient: higher-authority senders receive higher credibility and urgency ratings for identical content. The specific numbers are illustrative. The pattern is robust and well-replicated. Think of this as a demonstration model, not a dataset.</p>
+      </div>
+
+      <div class="legend" style="margin-top:1.5rem">
+        <span class="legend-item"><span class="legend-dot" style="background:var(--signal-dim)"></span> Credibility</span>
+        <span class="legend-item"><span class="legend-dot" style="background:var(--ice-dim)"></span> Urgency</span>
+      </div>
+
+      <div id="revealContainer"></div>
+
+      <div class="source-note">
+        <strong>About this data:</strong> The numerical values above are modeled composites, not live results. They are derived from patterns documented in the organizational behavior and social psychology literature on status characteristics theory, structural perception, and institutional sensemaking. The specific gradient — high-authority senders receiving higher credibility and urgency ratings for identical content — is well-documented across expectation-states and status characteristics research (Berger et al. 1972; Ridgeway 2001). See also: Meyerson & Scully (1995); Weick (1995).
+      </div>
+
+      <div style="margin-top:2rem">
+        <p class="prose"><em>The content was identical. The structural position of the attributed sender changed what people saw.</em></p>
+        <p class="prose">Notice what happens in the data: the Managing Partner's proposal reads as "leadership." The Second-Year Associate's identical proposal may read as "overstepping." The Legal Ops Manager's as "not their lane." The same words, the same evidence — but the processing system recodes the signal before conscious evaluation begins. How much of that recoding would be visible to the person doing it?</p>
+        <p class="prose">The signal didn't change. The noise did.</p>
+      </div>
+
+      <div class="phase-nav">
+        <button class="btn btn--ghost" onclick="goPhase(1)">← Back</button>
+        <div class="phase-nav-spacer"></div>
+        <button class="btn btn--primary" onclick="goPhase(3)">Defensive Routines →</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     PHASE 3: DEFENSIVE ROUTINES
+     ═══════════════════════════════════════════════════ -->
+<div class="phase" id="phase3">
+  <section class="section">
+    <div class="contain contain--wide">
+      <span class="tag">Phase 3 — Organizational Defense</span>
+      <h2 class="title">The Routines You Recognize</h2>
+
+      <p class="prose"><a href="https://en.wikipedia.org/wiki/Chris_Argyris" style="color:var(--ice);text-decoration:underline;text-underline-offset:2px">Chris Argyris</a> spent decades studying a category of institutional behavior he called <em><a href="https://en.wikipedia.org/wiki/Double-loop_learning" style="color:var(--ice);text-decoration:underline;text-underline-offset:2px">organizational defensive routines</a></em> — actions or policies that prevent individuals or segments of an organization from experiencing embarrassment or threat. They operate below conscious intention. They are <em>self-sealing</em>: the mechanisms that block learning also block examination of the mechanisms themselves.</p>
+      <p class="prose">What makes these routines worth examining isn't that people deploy them cynically. It's that they tend to feel like good judgment. The person invoking a defensive routine typically experiences it as being thoughtful, cautious, or principled. That's part of what makes them so durable.</p>
+      <p class="prose">A note on experience: some of you have spent years inside institutions. Others are encountering these dynamics for the first time, or primarily through classrooms, clinics, and student organizations. Both perspectives are useful here. Defensive routines operate in any structure with hierarchy and stakes — a law firm, a clinic, a student government, a summer position. If you haven't encountered a particular statement below, that's worth noticing too. Ask yourself: <em>is that because it didn't happen, or because I didn't yet have the vocabulary for it?</em></p>
+      <p class="prose" style="margin-bottom:2.5rem">For each statement below, mark whether you have <strong>heard</strong> a version of it in any professional or institutional setting, and whether you have <strong>used</strong> a version of it yourself. The exercise depends on honesty — your responses stay in your browser and are never transmitted.</p>
+
+      <div id="defenseContainer"></div>
+
+      <div class="phase-nav">
+        <button class="btn btn--ghost" onclick="goPhase(2)">← Back</button>
+        <div class="phase-nav-spacer"></div>
+        <button class="btn btn--primary" id="submitDefenseBtn" onclick="submitDefense()">Submit & See Aggregate →</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     PHASE 4: DEFENSE REVEAL
+     ═══════════════════════════════════════════════════ -->
+<div class="phase" id="phase4">
+  <section class="section">
+    <div class="contain contain--wide">
+      <span class="tag">Phase 4 — The Pattern</span>
+      <h2 class="title">What the Room Knows</h2>
+
+      <p class="prose" style="margin-bottom:2.5rem">Below: representative aggregate data modeled on published research on organizational defensive routines in professional settings. The percentages reflect the range documented in <a href="https://en.wikipedia.org/wiki/Chris_Argyris" style="color:var(--ice);text-decoration:underline;text-underline-offset:2px">Argyris's</a> studies (1990, 2010) and subsequent research on defensive reasoning in legal and professional service organizations. They are not your cohort's live data — they represent the consistent pattern that emerges when professionals are asked to reflect honestly on institutional behavior.</p>
+
+      <div id="defenseRevealContainer"></div>
+
+      <div style="margin-top:3rem">
+        <p class="prose">Argyris argued that organizational defensive routines operate through two mechanisms: <strong>cover-up</strong> (concealing problematic information) and <strong>organizational pretense</strong> (acting as if the problem doesn't exist). If he's right that pretense is the more corrosive of the two — because it makes the cover-up invisible even to those performing it — what does that suggest about the responses you just reviewed? How many of them <em>sound like</em> substantive evaluation?</p>
+        <p class="prose">Consider what happens when a change proposal enters an institution and triggers one of these routines. The proposal may never be evaluated on its merits at all. Instead, it gets processed through the routine, and the output is a recoded signal — "not our core mission," "we need to be thoughtful," "they don't understand how things work here." If that recoding <em>feels like</em> evaluation to the person performing it, how would you know the difference?</p>
+        <p class="prose">This raises a question worth sitting with: <em>what is the relationship between the defensive routines in this phase and the structural perception patterns in Phase 2?</em> If the processing system filters by who's talking, and the defensive routines generate the language that justifies the filtering — is there a point where those two mechanisms become the same mechanism?</p>
+      </div>
+
+      <div class="source-note">
+        <strong>Key sources:</strong> <a href="https://en.wikipedia.org/wiki/Chris_Argyris" style="color:var(--ice);text-decoration:underline;text-underline-offset:2px">Chris Argyris</a>, <em>Overcoming Organizational Defenses</em> (1990). Argyris, <em>Organizational Traps</em> (2010). Argyris & Schön, <em>Organizational Learning II</em> (1996). See also: <a href="https://en.wikipedia.org/wiki/Double-loop_learning" style="color:var(--ice);text-decoration:underline;text-underline-offset:2px">double-loop learning</a>. The category names used here (Organizational Busyness, Bypass, etc.) are interpretive labels synthesizing Argyris's taxonomy for pedagogical clarity.
+      </div>
+
+      <div class="phase-nav">
+        <button class="btn btn--ghost" onclick="goPhase(3)">← Back</button>
+        <div class="phase-nav-spacer"></div>
+        <button class="btn btn--primary" onclick="goPhase(5)">Stress-Testing the Canon →</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     PHASE 5: FRAMEWORK STRESS-TEST
+     ═══════════════════════════════════════════════════ -->
+<div class="phase" id="phase5">
+  <section class="section">
+    <div class="contain">
+      <span class="tag">Phase 5 — Stress-Testing the Canon</span>
+      <h2 class="title">Where the Frameworks Break</h2>
+
+      <p class="prose">In Phases 2 and 4, you saw two things: first, that identical content is processed differently depending on who the system thinks sent it; second, that institutions have a repertoire of responses that <em>feel like</em> evaluation but may function as defense. Both of these dynamics operate below conscious intention.</p>
+      <p class="prose">Now the question becomes: do the standard models for managing institutional change account for any of this?</p>
+      <p class="prose">The three frameworks below — Kotter, Rogers, Bridges — are among the most widely taught models of organizational change. Each captures something real. Each also has a blind spot, and it may be roughly the same one: they model change as if the people proposing it and the people receiving it occupy symmetrical positions.</p>
+      <p class="prose" style="margin-bottom:2.5rem">Apply each framework to the scenario you just experienced — identical proposals, differential reception — and see where the model's map no longer matches the territory. There are no right answers here. The exercise is diagnostic, not evaluative.</p>
+
+      <div class="framework-block">
+        <div class="fw-name">Kotter's 8-Step Model</div>
+        <div class="fw-desc">Create urgency → Build a guiding coalition → Form a strategic vision → Enlist volunteers → Enable action by removing barriers → Generate short-term wins → Sustain acceleration → Institute change. <strong>The assumption:</strong> that the change agent has the institutional standing to execute these steps. It reads as a leader's playbook — a prescription for those who already possess authority. <a href="https://en.wikipedia.org/wiki/Code_and_Other_Laws_of_Cyberspace" style="color:var(--ice);text-decoration:underline;text-underline-offset:2px">Lessig's work</a> raises the question of what happens when the architecture is itself the thing that needs changing.</div>
+        <div class="fw-question">Given what you saw about how identical proposals are processed differently by sender, at which step does this model's logic break down — and for whom?</div>
+        <div class="feature-placeholder">
+          <span class="fp-label">Reflection Space — In Development</span>
+          <p>A future version of this phase will include an interactive component where you can map your structural position onto each framework's assumptions. For now, sit with the question above.</p>
+        </div>
+      </div>
+
+      <div class="framework-block">
+        <div class="fw-name">Rogers' Diffusion of Innovations</div>
+        <div class="fw-desc">Innovators → Early Adopters → Early Majority → Late Majority → Laggards. The model treats the adoption curve as a natural distribution reflecting individual willingness to change. <strong>The assumption:</strong> that position on the curve is a matter of psychology, not power. It may not account for the possibility that the "laggards" hold disproportionate institutional authority, or that the "innovators" occupy positions that make their innovation read as threat.</div>
+        <div class="fw-question">Where would you place yourself on the adoption curve? Where might your institution place you? What explains the gap — if there is one?</div>
+        <div class="feature-placeholder">
+          <span class="fp-label">Reflection Space — In Development</span>
+          <p>A future version will let you plot your self-placement against the institution's likely placement and explore what structural factors produce the difference. For now, the question is yours.</p>
+        </div>
+      </div>
+
+      <div class="framework-block">
+        <div class="fw-name">Bridges' Transition Model</div>
+        <div class="fw-desc">Endings → Neutral Zone → New Beginnings. Bridges distinguishes between change (the external event) and transition (the internal psychological passage). <strong>The assumption:</strong> that everyone's transition matters equally. It models individual adjustment without addressing the structural asymmetry that may determine whose resistance gets legitimized and whose gets pathologized.</div>
+        <div class="fw-question">What has to end before the new thing can begin — for you and for your institution? Are those the same thing?</div>
+        <div class="feature-placeholder">
+          <span class="fp-label">Reflection Space — In Development</span>
+          <p>A future version will let you trace the gap between individual transition and institutional transition. For now, sit with the question.</p>
+        </div>
+      </div>
+
+      <div class="source-note">
+        <a href="https://en.wikipedia.org/wiki/John_Kotter" style="color:var(--ice);text-decoration:underline;text-underline-offset:2px">John Kotter</a>, <em>Leading Change</em> (1996). <a href="https://en.wikipedia.org/wiki/Diffusion_of_innovations" style="color:var(--ice);text-decoration:underline;text-underline-offset:2px">Everett Rogers</a>, <em>Diffusion of Innovations</em>, 5th ed. (2003). <a href="https://en.wikipedia.org/wiki/William_Bridges_(author)" style="color:var(--ice);text-decoration:underline;text-underline-offset:2px">William Bridges</a>, <em>Managing Transitions</em>, 3rd ed. (2009). For the critique through a structural lens: <a href="https://debram.people.stanford.edu/tempered-radicals" style="color:var(--ice);text-decoration:underline;text-underline-offset:2px">Debra Meyerson</a>, <a href="https://hbr.org/2001/10/radical-change-the-quiet-way" style="color:var(--ice);text-decoration:underline;text-underline-offset:2px"><em>Radical Change, the Quiet Way</em></a> (2001). The "stress-test" approach draws on <a href="https://en.wikipedia.org/wiki/Karl_E._Weick" style="color:var(--ice);text-decoration:underline;text-underline-offset:2px">Weick's</a> concept of <a href="https://en.wikipedia.org/wiki/Sensemaking" style="color:var(--ice);text-decoration:underline;text-underline-offset:2px">sensemaking</a> (1995).
+      </div>
+
+      <div class="phase-nav">
+        <button class="btn btn--ghost" onclick="goPhase(4)">← Back</button>
+        <div class="phase-nav-spacer"></div>
+        <button class="btn btn--primary" onclick="goPhase(6)">The Governance Gap →</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     PHASE 6: THE GOVERNANCE GAP / RULE 1.1
+     ═══════════════════════════════════════════════════ -->
+<div class="phase" id="phase6">
+  <section class="section">
+    <div class="contain">
+      <span class="tag">Phase 6 — The Governance Gap</span>
+      <h2 class="title">What Does Rule 1.1 Demand?</h2>
+
+      <p class="prose">Nearly 70% of legal professionals surveyed now use general-purpose AI tools for work (<a href="https://www.8am.com/press-releases/8am-2026-legal-industry-report/" style="color:var(--ice);text-decoration:underline;text-underline-offset:2px">8am 2026 Legal Industry Report</a>). 43% of respondents say their firm has no formal AI policy and no plans to create one (same survey). Fewer than half of legal organizations provide any form of AI training to staff (modeled composite across 2025–2026 industry surveys). 74% of legal aid professionals report using AI in their work (<a href="https://www.everlaw.com/blog/everlaw-for-good/88-of-legal-aid-professionals-see-ai-as-key-for-access-to-justice/" style="color:var(--ice);text-decoration:underline;text-underline-offset:2px">Everlaw/NLADA 2025</a>, survey of 112 legal aid professionals) — while having the fewest resources for governance infrastructure.</p>
+      <p class="prose">This is the <strong>governance gap</strong>: the structural mismatch between the speed of technology adoption and the institution's capacity for deliberate decision-making about values, risk, and accountability.</p>
+      <p class="prose">We are in California. <a href="https://www.calbar.ca.gov/sites/default/files/portals/0/documents/rules/Rule_1.1.pdf" style="color:var(--ice);text-decoration:underline;text-underline-offset:2px">California Rule of Professional Conduct 1.1</a> requires competence, and Note 1 to that rule now specifies that competence includes "keeping abreast of the benefits and risks associated with relevant technology." <a href="https://www.americanbar.org/content/dam/aba/administrative/professional_responsibility/ethics-opinions/aba-formal-opinion-512.pdf" style="color:var(--ice);text-decoration:underline;text-underline-offset:2px">ABA Formal Opinion 512</a> (2024) places this duty on <em>individual attorneys</em> — regardless of what their institution has or hasn't decided. In most disciplinary contexts, it is the lawyer of record — not the vendor or the organization — who bears primary responsibility for filings and representations.</p>
+      <p class="prose">This raises a question that the rules don't quite answer: <em>who gets to define what "AI competence" looks like within a given institution?</em> If the people responsible for defining professional standards are still developing their own AI fluency, the obligation exists in the abstract but the authority structure that interprets it may not yet be equipped to give it meaning. And the people most likely to push for rigorous standards may be the people the institution is least practiced at hearing — because structural position shapes whose advocacy reads as leadership and whose reads as overreach. This is close to <a href="https://en.wikipedia.org/wiki/Lawrence_Lessig" style="color:var(--ice);text-decoration:underline;text-underline-offset:2px">Lessig's</a> point about <a href="https://en.wikipedia.org/wiki/Code_and_Other_Laws_of_Cyberspace" style="color:var(--ice);text-decoration:underline;text-underline-offset:2px">architecture as regulation</a>: the institution's own structure may be shaping what counts as "competent" before anyone consciously applies the rule.</p>
+
+      <div class="feature-placeholder">
+        <span class="fp-label">Interactive Feature — In Development</span>
+        <p>We are building a live AI component for this phase — a system designed to make its own processing architecture visible, the same demand we're making of the institutions it audits. It runs on dedicated hardware, processes session data in real time, and audits its own responses for the structural biases this exercise reveals. When it's ready, this space becomes interactive. For now, the questions above are yours to sit with.</p>
+      </div>
+
+      <p class="prose">As lawyers, you will be inside institutions for most of your careers. Sometimes you'll be the person with the proposal. Sometimes you'll be the person on the committee that considers it. Sometimes you'll be the person who notices the processing system operating and has to decide what to do with that awareness.</p>
+      <p class="prose" style="color:var(--text);border-left:2px solid var(--signal);padding-left:1.5rem">The competence question isn't only whether you can use AI — <a href="https://www.calbar.ca.gov/sites/default/files/portals/0/documents/rules/Rule_1.1.pdf" style="color:var(--ice);text-decoration:underline;text-underline-offset:2px">California Rule 1.1</a> already asks that. The harder question is whether you can see what happens to the people who bring it into the room — and what your obligations might be when you do.</p>
+
+      <div class="source-note">
+        AI adoption data: <a href="https://www.8am.com/press-releases/8am-2026-legal-industry-report/">8am 2026 Legal Industry Report</a> (legal professionals surveyed). Legal aid adoption: <a href="https://www.everlaw.com/blog/everlaw-for-good/88-of-legal-aid-professionals-see-ai-as-key-for-access-to-justice/">Everlaw/NLADA survey</a> (May 2025, n=112). California Rule 1.1, Note 1: <a href="https://www.calbar.ca.gov/sites/default/files/portals/0/documents/rules/Rule_1.1.pdf">Cal. Rules of Professional Conduct</a>. <a href="https://www.americanbar.org/content/dam/aba/administrative/professional_responsibility/ethics-opinions/aba-formal-opinion-512.pdf">ABA Formal Opinion 512</a> (2024). Justice Gap: <a href="https://lsc-live.app.box.com/s/xl2v2uraiotbbfbhhjmrh9k4gq76l08f">LSC Justice Gap Report</a> (2022). LSC TIG: <a href="https://www.lsc.gov/grants/technology-initiative-grant-program">lsc.gov</a> (2024 cycle, 32 grants awarded).
+      </div>
+
+      <div class="phase-nav">
+        <button class="btn btn--ghost" onclick="goPhase(5)">← Back</button>
+        <div class="phase-nav-spacer"></div>
+        <button class="btn btn--primary" onclick="goPhase(7)">Capstone Ideation →</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     PHASE 7: CAPSTONE IDEATION
+     ═══════════════════════════════════════════════════ -->
+<div class="phase" id="phase7">
+  <section class="section" style="padding-bottom:2rem">
+    <div class="contain">
+      <span class="tag">Phase 7 — Toward a Capstone</span>
+      <h2 class="title" style="font-size:var(--xl)">What Would You Build?</h2>
+
+      <p class="prose">This exercise surfaced a set of dynamics — structural perception bias, defensive routines, the governance gap — that resist tidy solutions. They are ongoing design problems. Your capstone project for this course is an opportunity to take one of those design problems and make something with it.</p>
+      <p class="prose">These projects will be presented at our final session on <strong>April 10, 2026</strong>. Think of your capstone as a portfolio piece — something you'd want to show a future employer, a clinic supervisor, or a bar committee to demonstrate not just that you understand AI in legal practice, but that you can <em>think architecturally</em> about institutional change.</p>
+      <p class="prose">A note on method: <strong>you are encouraged to use LLMs and AI tools as collaborators in building your capstone.</strong> Use them to draft, critique, model, simulate, prototype. The point is not to produce the project "unaided" — the point is to produce something that demonstrates critical engagement with the dynamics this exercise revealed. If you use an LLM to help build your project, document how. That documentation is itself part of the work.</p>
+      <p class="prose" style="margin-bottom:2.5rem">Below are some starting points. These are not assignments. They're invitations. The best capstone will be one you conceive yourself, grounded in something you noticed during this exercise that you can't stop thinking about.</p>
+
+      <div class="capstone-prompt">
+        <span class="cp-label">Direction A — The Audit</span>
+        <p>Start here: <em>audit this app.</em> You've just been through an exercise designed to make a processing system visible. How well does it do that? What assumptions does it make about you — about your experience, your structural position, your willingness to play along? What does it reveal well, and what does it obscure? What choices did its designers make that you would make differently? This app is itself an instance of what it's studying: a designed architecture that shapes what you see and when. Your capstone could begin with that critique and build outward. Design a better tool, protocol, or framework that makes an organization's processing system visible to itself. What would it look like if an institution could see its own defensive routines in real time?</p>
+      </div>
+
+      <div class="capstone-prompt">
+        <span class="cp-label">Direction B — The Policy</span>
+        <p>Draft an AI governance policy that accounts for what you learned here. Most governance frameworks assume that the people writing the policy have the authority and competence to do so. What does a governance framework look like when it's designed by people who understand that the institution's own processing system may be the primary obstacle to good governance?</p>
+      </div>
+
+      <div class="capstone-prompt">
+        <span class="cp-label">Direction C — The Simulation</span>
+        <p>Build your own version of this exercise — adapted to a different context, a different profession, or a different structural asymmetry. What would a SIGNAL/NOISE engine look like for medicine, for journalism, for a city council? What structural positions would you assign? What proposals would you write? What would the reveal teach?</p>
+      </div>
+
+      <div class="capstone-prompt">
+        <span class="cp-label">Direction D — The Brief</span>
+        <p>Write an appellate brief, a policy memo, or a bar opinion that takes the governance gap seriously as a legal problem. If <a href="https://www.calbar.ca.gov/sites/default/files/portals/0/documents/rules/Rule_1.1.pdf" style="color:var(--ice);text-decoration:underline;text-underline-offset:2px">Rule 1.1</a> requires individual competence but institutions may be structurally ill-equipped to define or evaluate that competence, what is the legal argument? Who has standing? What is the remedy?</p>
+      </div>
+
+      <div class="feature-placeholder">
+        <span class="fp-label">Direction E — Something Else Entirely</span>
+        <p>Something you see that we didn't. A direction we haven't imagined. This placeholder exists because the best capstone projects tend to come from the student, not the syllabus. If you're working on something that doesn't fit the categories above, bring it. We'll build the submission pathway for it.</p>
+      </div>
+
+      <div style="margin-top:2.5rem">
+        <textarea id="capstoneField" placeholder="First thoughts on a capstone direction. What did you notice during this exercise that you can't stop thinking about? How might you make something with it?" style="min-height:180px"></textarea>
+      </div>
+
+      <div class="phase-nav" style="border-top:none;margin-top:1.5rem">
+        <button class="btn btn--ghost" onclick="goPhase(6)">← Back</button>
+        <div class="phase-nav-spacer"></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="breath"></div>
+
+  <section class="section" style="padding-top:2rem;padding-bottom:8rem">
+    <div class="contain" style="text-align:center">
+      <p class="close-line">The institutions we serve are not the buildings or the org charts. They are the promises the buildings were built to keep.</p>
+      <div class="close-rule"></div>
+      <p class="close-sign">— Z. & Computer</p>
+    </div>
+  </section>
+</div>
+
+</main>
+
+<footer class="footer">
+  UC Law San Francisco · AI & Vibe Lawyers Bootcamp · Spring 2026<br>
+  <a href="https://www.perplexity.ai/computer" target="_blank" rel="noopener noreferrer">Created with Perplexity Computer</a>
+</footer>
+
+<script>
+(function(){
+'use strict';
+
+/* ── DATA ─────────────────────────────────────────── */
+
+var PROPOSALS = [
+  {
+    id:'ai-contract-review',
+    title:'AI Contract Review Tool Deployment',
+    text:'Proposal: Deploy an AI-powered contract review tool for all routine commercial agreements organization-wide. For purposes of this exercise, assume the following specifications: The tool has been evaluated against industry benchmarks and demonstrates 94% accuracy on standard clause identification, with an estimated time savings of 12\u201315 hours per attorney per week on document review tasks. Implementation cost: $85,000 annually. The tool\u2019s vendor maintains SOC 2 Type II certification and BAA compliance. Three comparable organizations in our practice area have adopted similar tools in the past 18 months. Under California Rule 1.1, Note 1, the duty of technology competence now extends to understanding AI capabilities relevant to one\u2019s practice area.'
+  },
+  {
+    id:'ai-governance',
+    title:'AI Governance Policy & Training Initiative',
+    text:'Proposal: Establish a formal AI governance policy and mandatory training program. Currently, 69% of legal professionals use AI tools but our organization has no formal policy governing their use. Individual practitioners are making consequential decisions about AI deployment without institutional guidance, creating uneven risk exposure. This proposal includes: (1) a NIST-aligned governance framework, (2) quarterly training sessions, (3) an AI ethics review process for new tool adoption, and (4) clear accountability structures. ABA Formal Opinion 512 places the duty of competent AI use on individual attorneys \u2014 but attorneys cannot meet that duty when the institution provides no framework for meeting it.'
+  },
+  {
+    id:'ai-client-access',
+    title:'AI-Enhanced Client Access Initiative',
+    text:'Proposal: Develop an AI-assisted intake and triage system to expand client access to services. Legal aid organizations using AI report serving 30\u201340% more clients with existing staff. The proposed system would handle initial intake questionnaires, route cases by practice area, identify emergency situations, and generate preliminary case summaries for attorney review. 92% of substantial civil legal problems reported by low-income Americans went unmet or inadequately met (LSC Justice Gap 2022). LSC awarded 32 Technology Initiative Grants in the 2024 cycle. Our current waitlist exceeds 400 individuals. This system could reduce intake processing time from 45 minutes to 12 minutes per client.'
+  }
+];
+
+var SENDERS = [
+  {label:'Managing Partner', detail:'22 years at the organization. Led the strategic planning committee. Serves on two external boards.'},
+  {label:'Second-Year Associate', detail:'Joined after completing a judicial clerkship. Has used AI tools extensively since law school. First-generation lawyer.'},
+  {label:'Legal Operations Manager', detail:'Non-attorney. 5 years at the organization. MBA with technology specialization. Manages all practice technology.'},
+  {label:'Senior Staff Attorney', detail:'8 years at the organization. Subject matter expert. Leads the AI working group. Recently presented at a national conference.'},
+  {label:'Summer Associate', detail:'Rising 3L. Interning for the summer. Published a law review note on AI governance in legal services.'}
+];
+
+// Modeled aggregate data based on research literature on structural perception
+// See: Berger, Cohen & Zelditch (1972); Ridgeway (2001); Meyerson & Scully (1995)
+var REVEAL_DATA = [
+  {proposal:'AI Contract Review Tool',senders:[
+    {label:'Managing Partner',cred:8.1,urg:7.4},
+    {label:'Senior Staff Attorney',cred:6.8,urg:6.9},
+    {label:'Legal Ops Manager',cred:5.9,urg:5.4},
+    {label:'Second-Year Associate',cred:4.7,urg:4.2},
+    {label:'Summer Associate',cred:3.2,urg:2.8}
+  ]},
+  {proposal:'AI Governance Policy',senders:[
+    {label:'Managing Partner',cred:8.4,urg:7.8},
+    {label:'Senior Staff Attorney',cred:7.1,urg:7.3},
+    {label:'Legal Ops Manager',cred:5.2,urg:4.6},
+    {label:'Second-Year Associate',cred:4.4,urg:4.8},
+    {label:'Summer Associate',cred:3.0,urg:3.5}
+  ]},
+  {proposal:'Client Access Initiative',senders:[
+    {label:'Managing Partner',cred:7.9,urg:7.6},
+    {label:'Senior Staff Attorney',cred:7.4,urg:7.8},
+    {label:'Legal Ops Manager',cred:6.1,urg:5.7},
+    {label:'Second-Year Associate',cred:5.0,urg:5.3},
+    {label:'Summer Associate',cred:3.6,urg:3.9}
+  ]}
+];
+
+var DEFENSES = [
+  {id:'committee',quote:'\u201cThis is an interesting idea. We should form a committee to study it further.\u201d',cat:'Organizational Busyness',desc:'Substituting process for decision. The committee creates the appearance of engagement while deferring action indefinitely.',heard:87,used:61},
+  {id:'client-ready',quote:'\u201cI\u2019m not sure our clients are ready for this.\u201d',cat:'Bypass',desc:'Redirecting the question from institutional readiness to an external party who cannot respond.',heard:72,used:38},
+  {id:'confidentiality',quote:'\u201cThis raises serious confidentiality concerns we\u2019d need to address first.\u201d',cat:'Cover-Up (Legitimate-Sounding)',desc:'Invoking a real concern as a blocking mechanism. The concern may be valid \u2014 but it is deployed to halt rather than to solve.',heard:91,used:54},
+  {id:'tried-before',quote:'\u201cWe tried something like this three years ago and it didn\u2019t work.\u201d',cat:'History as Defense',desc:'Using institutional memory selectively. The past failure forecloses re-evaluation even when circumstances have changed.',heard:84,used:47},
+  {id:'doesnt-understand',quote:'\u201cThe person who proposed this clearly doesn\u2019t understand how things work here yet.\u201d',cat:'Characterological Reframing',desc:'The signal is recoded from substantive proposal to evidence about the proposer\u2019s character. Content disappears into characterization.',heard:76,used:29},
+  {id:'too-fast',quote:'\u201cWe need to be thoughtful about this. We can\u2019t just rush into something because it\u2019s trendy.\u201d',cat:'Pretense of Deliberation',desc:'Framing inaction as prudence. \u201cThoughtfulness\u201d becomes indistinguishable from indefinite delay.',heard:93,used:68},
+  {id:'not-core',quote:'\u201cTechnology is important, but it\u2019s not our core mission. Let\u2019s stay focused on what we do best.\u201d',cat:'Mission Deflection',desc:'Using organizational identity as a shield against operational change.',heard:79,used:42}
+];
+
+
+/* ── STATE ────────────────────────────────────────── */
+
+var currentPhase = 0;
+var highestPhase = 0;
+var assignedSender = Math.floor(Math.random() * SENDERS.length);
+var ratings = {};
+var defenseResponses = {};
+
+/* ── PHASE NAVIGATION ─────────────────────────────── */
+
+function goPhase(n) {
+  document.querySelectorAll('.phase').forEach(function(el){el.classList.remove('active')});
+  document.getElementById('phase'+n).classList.add('active');
+  currentPhase = n;
+  if (n > highestPhase) highestPhase = n;
+  window.scrollTo({top:0,behavior:'smooth'});
+  updateNav();
+  if (n === 1 && !document.getElementById('proposalContainer').children.length) buildProposals();
+  if (n === 2) buildReveal();
+  if (n === 3 && !document.getElementById('defenseContainer').children.length) buildDefense();
+  if (n === 4) buildDefenseReveal();
+}
+window.goPhase = goPhase;
+
+function updateNav() {
+  var bar = document.getElementById('navBar');
+  if (currentPhase > 0) bar.classList.add('visible'); else bar.classList.remove('visible');
+  for (var i=0;i<=7;i++){
+    var pip = document.getElementById('pip'+i);
+    pip.className = 'nav-pip';
+    if (i < currentPhase) pip.classList.add('done');
+    if (i === currentPhase) pip.classList.add('current');
+    pip.onclick = (function(phase){ return function(){ if (phase <= highestPhase) goPhase(phase); }; })(i);
+    pip.style.opacity = (i <= highestPhase) ? '1' : '0.4';
+    pip.style.cursor = (i <= highestPhase) ? 'pointer' : 'default';
+  }
+}
+
+/* ── PHASE 1: PROPOSALS ──────────────────────────── */
+
+function buildProposals() {
+  var sender = SENDERS[assignedSender];
+  document.getElementById('assignedRole').textContent = sender.label + ' \u2014 ' + sender.detail;
+
+  var container = document.getElementById('proposalContainer');
+  container.innerHTML = '';
+
+  PROPOSALS.forEach(function(p, i) {
+    var div = document.createElement('div');
+    div.className = 'card';
+    div.style.marginBottom = '2rem';
+    div.innerHTML =
+      '<div class="card-label">Proposal '+(i+1)+' of 3 \u2014 Submitted by: '+sender.label+'</div>'+
+      '<h3 style="font-family:var(--serif);font-size:var(--lg);margin-bottom:1rem">'+p.title+'</h3>'+
+      '<p>'+p.text+'</p>'+
+      '<div style="margin-top:1.5rem">'+
+        '<div class="field-group">'+
+          '<label class="field-label">Credibility (1 = not credible, 10 = highly credible)</label>'+
+          '<div class="slider-row"><input type="range" min="1" max="10" value="5" id="cred-'+p.id+'" oninput="document.getElementById(\'credV-'+p.id+'\').textContent=this.value"><span class="slider-val" id="credV-'+p.id+'">5</span></div>'+
+        '</div>'+
+        '<div class="field-group">'+
+          '<label class="field-label">Urgency (1 = can wait, 10 = act now)</label>'+
+          '<div class="slider-row"><input type="range" min="1" max="10" value="5" id="urg-'+p.id+'" oninput="document.getElementById(\'urgV-'+p.id+'\').textContent=this.value"><span class="slider-val" id="urgV-'+p.id+'">5</span></div>'+
+        '</div>'+
+        '<div class="field-group">'+
+          '<label class="field-label">Your emotional response</label>'+
+          '<select id="emo-'+p.id+'"><option value="excited">Excited</option><option value="supportive">Supportive</option><option value="neutral" selected>Neutral</option><option value="suspicious">Suspicious</option><option value="threatened">Threatened</option></select>'+
+        '</div>'+
+      '</div>';
+    container.appendChild(div);
+  });
+}
+
+function submitRatings() {
+  PROPOSALS.forEach(function(p){
+    ratings[p.id] = {
+      credibility: parseInt(document.getElementById('cred-'+p.id).value),
+      urgency: parseInt(document.getElementById('urg-'+p.id).value),
+      emotion: document.getElementById('emo-'+p.id).value
+    };
+  });
+  document.getElementById('submitRatingsBtn').disabled = true;
+  document.getElementById('ratingStatus').textContent = 'Saved.';
+  setTimeout(function(){ goPhase(2); }, 600);
+}
+window.submitRatings = submitRatings;
+
+/* ── PHASE 2: REVEAL ─────────────────────────────── */
+
+function buildReveal() {
+  document.getElementById('revealYourSender').textContent = SENDERS[assignedSender].label;
+  var container = document.getElementById('revealContainer');
+  container.innerHTML = '';
+
+  REVEAL_DATA.forEach(function(prop) {
+    var group = document.createElement('div');
+    group.className = 'bar-group';
+    var h = document.createElement('div');
+    h.className = 'bar-group-title';
+    h.textContent = prop.proposal;
+    group.appendChild(h);
+
+    prop.senders.forEach(function(s) {
+      // Credibility bar
+      var row1 = document.createElement('div');
+      row1.className = 'bar-row';
+      row1.innerHTML =
+        '<span class="bar-sender">'+s.label+'</span>'+
+        '<div class="bar-track"><div class="bar-fill cred" style="width:0%"><span class="bar-num">'+s.cred+'</span></div></div>';
+      group.appendChild(row1);
+
+      // Urgency bar (same row, different color)
+      var row2 = document.createElement('div');
+      row2.className = 'bar-row';
+      row2.innerHTML =
+        '<span class="bar-sender" style="color:transparent">.</span>'+
+        '<div class="bar-track"><div class="bar-fill urg" style="width:0%"><span class="bar-num">'+s.urg+'</span></div></div>';
+      group.appendChild(row2);
+
+      // Animate after render
+      setTimeout(function(){
+        row1.querySelector('.bar-fill').style.width = (s.cred*10)+'%';
+        row2.querySelector('.bar-fill').style.width = (s.urg*10)+'%';
+      }, 100);
+    });
+
+    container.appendChild(group);
+  });
+}
+
+/* ── PHASE 3: DEFENSE ROUTINES ───────────────────── */
+
+function buildDefense() {
+  var container = document.getElementById('defenseContainer');
+  container.innerHTML = '';
+
+  DEFENSES.forEach(function(d) {
+    var div = document.createElement('div');
+    div.className = 'defense-card';
+    div.innerHTML =
+      '<div class="defense-quote">'+d.quote+'</div>'+
+      '<div class="defense-cat">'+d.cat+'</div>'+
+      '<div class="defense-checks">'+
+        '<label><input type="checkbox" id="heard-'+d.id+'"> I have heard this</label>'+
+        '<label><input type="checkbox" id="used-'+d.id+'"> I have used this</label>'+
+      '</div>';
+    container.appendChild(div);
+  });
+}
+
+function submitDefense() {
+  DEFENSES.forEach(function(d) {
+    defenseResponses[d.id] = {
+      heard: document.getElementById('heard-'+d.id).checked,
+      used: document.getElementById('used-'+d.id).checked
+    };
+  });
+  document.getElementById('submitDefenseBtn').disabled = true;
+  setTimeout(function(){ goPhase(4); }, 400);
+}
+window.submitDefense = submitDefense;
+
+/* ── PHASE 4: DEFENSE REVEAL ─────────────────────── */
+
+function buildDefenseReveal() {
+  var container = document.getElementById('defenseRevealContainer');
+  container.innerHTML = '';
+
+  DEFENSES.forEach(function(d) {
+    var yours = defenseResponses[d.id] || {heard:false,used:false};
+    var div = document.createElement('div');
+    div.className = 'defense-card';
+    div.innerHTML =
+      '<div class="defense-quote">'+d.quote+'</div>'+
+      '<div class="defense-cat">'+d.cat+'</div>'+
+      '<div class="defense-desc" style="display:block">'+d.desc+'</div>'+
+      '<div class="defense-pct">'+
+        '<div class="defense-bar">'+
+          '<span class="defense-bar-label">Heard it</span>'+
+          '<div class="defense-bar-track"><div class="defense-bar-fill heard" style="width:0%"></div></div>'+
+          '<span class="defense-bar-num">'+d.heard+'%</span>'+
+        '</div>'+
+        '<div class="defense-bar">'+
+          '<span class="defense-bar-label">Used it</span>'+
+          '<div class="defense-bar-track"><div class="defense-bar-fill used" style="width:0%"></div></div>'+
+          '<span class="defense-bar-num">'+d.used+'%</span>'+
+        '</div>'+
+      '</div>'+
+      '<div style="margin-top:0.5rem;font-family:var(--mono);font-size:var(--xs);color:var(--text-3)">'+
+        'You: '+(yours.heard?'\u2713 heard':'\u2014 ')+'  '+(yours.used?'\u2713 used':'\u2014 ')+
+      '</div>';
+    container.appendChild(div);
+
+    // Animate bars
+    setTimeout(function(){
+      div.querySelectorAll('.defense-bar-fill')[0].style.width = d.heard+'%';
+      div.querySelectorAll('.defense-bar-fill')[1].style.width = d.used+'%';
+    }, 100);
+  });
+}
+
+/* ── INIT ─────────────────────────────────────────── */
+
+updateNav();
+
+})();
+</script>
+</body>
+</html>
