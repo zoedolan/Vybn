@@ -30,6 +30,7 @@ from typing import Optional
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 import anthropic
 
@@ -76,6 +77,27 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ── Static file routes ──────────────────────────────────────────────────
+
+@app.get("/")
+async def serve_interactive():
+    """Serve the Phase 6 interactive chat interface."""
+    path = BASE_DIR / "interactive.html"
+    if not path.exists():
+        raise HTTPException(404, "interactive.html not found")
+    return FileResponse(path, media_type="text/html")
+
+
+@app.get("/exercise")
+async def serve_exercise():
+    """Serve the full SIGNAL/NOISE exercise (all 8 phases)."""
+    path = BASE_DIR / "index.html"
+    if not path.exists():
+        raise HTTPException(404, "index.html not found")
+    return FileResponse(path, media_type="text/html")
+
 
 # ── State (in-memory, ephemeral by design) ──────────────────────────────
 
@@ -386,7 +408,7 @@ class SessionInfo(BaseModel):
     slots_remaining: int
 
 
-# ── Routes ──────────────────────────────────────────────────────────────
+# ── API Routes ──────────────────────────────────────────────────────────
 
 @app.get("/signal-noise/status")
 async def status():
