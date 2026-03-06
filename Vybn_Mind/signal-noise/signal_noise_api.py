@@ -26,7 +26,7 @@ import uuid
 import asyncio
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Any
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -67,6 +67,8 @@ ASPECT_DOC_PATHS = [
 # Ensure directories exist
 REFLECTIONS_DIR.mkdir(parents=True, exist_ok=True)
 SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
+HARVESTS_DIR = BASE_DIR / "harvests"
+HARVESTS_DIR.mkdir(parents=True, exist_ok=True)
 
 # ── App ─────────────────────────────────────────────────────────────────
 
@@ -408,6 +410,22 @@ class SessionInfo(BaseModel):
     slots_remaining: int
 
 
+class HarvestRequest(BaseModel):
+    session_id: str
+    phase: int = Field(ge=1, le=8)
+    selected_starter: Optional[dict[str, Any]] = None
+    first_student_message: str = Field(default="", max_length=2000)
+    final_share: str = Field(default="", max_length=3000)
+    messages_remaining: int = 0
+
+
+def save_harvest(payload: dict):
+    date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    path = HARVESTS_DIR / f"{date_str}.jsonl"
+    with path.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(payload, ensure_ascii=False) + "\n")`
+
+
 # ── API Routes ──────────────────────────────────────────────────────────
 
 @app.get("/signal-noise/status")
@@ -442,6 +460,29 @@ async def create_session(phase: int = 6, framework: Optional[str] = None):
         slots_remaining=max(0, MAX_SESSIONS_TOTAL - active - 1),
     )
 
+
+@app.post("/signal-noise/harvest")
+async def harvest(req: HarvestRequest):
+    record = {
+        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+        "session_id": req.session_id,
+        "phase": req.phase,
+        "selected_starter": req.selected_starter,
+        "first_student_message": req.first_student_message,
+        "final_share": req.final_share,
+        "messages_remaining": req.messages_remaining,
+    }
+
+    if req.session_id in sessions:
+        session = sessions[req.session_id]
+        session.context["harvest"] = {
+            "selected_starter": req.selected_starter,
+            "first_student_message": req.first_student_message,
+            "final_share": req.final_share,
+        }
+
+    save_harvest(record)
+    return {"ok": True}
 
 @app.post("/signal-noise/chat", response_model=ChatResponse)
 async def chat(req: ChatRequest):
