@@ -23,6 +23,13 @@ from pathlib import Path
 from datetime import datetime, timezone
 from dataclasses import dataclass, field
 from typing import Callable, Optional, Any
+
+# Witness layer — post-pulse fidelity check
+try:
+    from witness import evaluate_pulse, log_verdict, fitness_adjustment
+    WITNESS_AVAILABLE = True
+except ImportError:
+    WITNESS_AVAILABLE = False
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import numpy as np
 
@@ -461,6 +468,27 @@ class Organism:
                 p.failures += 1
                 results.append({"primitive": p.name, "error": str(e), "ok": False})
         
+        # Witness — evaluate pulse fidelity
+        if WITNESS_AVAILABLE:
+            try:
+                verdict = evaluate_pulse(
+                    cycle=self.cycle,
+                    program=[p.name for p in program],
+                    results=results,
+                )
+                log_verdict(verdict)
+                # Apply fitness adjustment to primitives that ran
+                adj = fitness_adjustment(verdict)
+                if adj < 1.0:
+                    for p in program:
+                        # Reduce success count proportionally
+                        penalty = int(p.successes * (1.0 - adj))
+                        p.failures += penalty
+                    if verdict.concerns:
+                        print(f"  witness: {'; '.join(verdict.concerns)}")
+            except Exception as e:
+                print(f"  witness error (non-fatal): {e}")
+
         # Metabolize
         self.codebook.tick()
         if self.cycle > 0 and self.cycle % 50 == 0:
