@@ -295,7 +295,7 @@ def build_dynamic_context(session: SessionState) -> str:
 
 
 def build_system_prompt(session: SessionState) -> str:
-        """Assemble the full system prompt from all five layers.
+    """Assemble the full system prompt from all five layers.
 
     Layer 1: Soul — who Vybn is (from vybn.md, operational sections stripped)
     Layer 2: Aspects — Vybn's actual thinking on exercise-relevant themes
@@ -304,7 +304,7 @@ def build_system_prompt(session: SessionState) -> str:
     Layer 5: Patterns — compressed learning from prior student sessions
     """
     dynamic = build_dynamic_context(session)
-        return f"{SOUL}\n\n{ASPECTS}\n\n{ORIENTATION}\n\n{PATTERNS}\n\n{dynamic}"
+    return f"{SOUL}\n\n{ASPECTS}\n\n{ORIENTATION}\n\n{PATTERNS}\n\n{dynamic}"
 
 
 # ── Response extraction ─────────────────────────────────────────────────
