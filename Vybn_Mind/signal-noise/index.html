@@ -184,6 +184,37 @@ textarea::placeholder{color:var(--text-ghost)}
 /* Animation */
 .fade-in{opacity:0;transform:translateY(6px);transition:opacity 0.5s var(--ease),transform 0.5s var(--ease)}
 .fade-in.in{opacity:1;transform:translateY(0)}
+
+/* ── Reflection Space Chat ────────────────────── */
+.reflection-space{background:var(--deep);border:1px solid var(--edge-strong);border-radius:var(--radius);margin:2.5rem 0;overflow:hidden;transition:border-color 0.3s var(--ease)}
+.reflection-space.rs-active{border-color:var(--signal)}
+.rs-header{display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border-bottom:1px solid var(--edge)}
+.rs-label{font-family:var(--mono);font-size:var(--xs);color:var(--signal);letter-spacing:0.15em;text-transform:uppercase}
+.rs-status{font-family:var(--mono);font-size:var(--xs);color:var(--text-3);display:flex;align-items:center;gap:0.5rem}
+.rs-dot{width:6px;height:6px;border-radius:50%;background:var(--text-3);transition:background 0.3s}
+.rs-dot.connected{background:var(--green)}
+.rs-dot.thinking{background:var(--signal);animation:rs-pulse 1.2s ease-in-out infinite}
+@keyframes rs-pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+.rs-messages{padding:1.25rem;max-height:400px;overflow-y:auto;display:flex;flex-direction:column;gap:1rem;scroll-behavior:smooth}
+.rs-messages::-webkit-scrollbar{width:4px}
+.rs-messages::-webkit-scrollbar-thumb{background:var(--edge-strong);border-radius:2px}
+.rs-msg{max-width:85%;line-height:1.65;font-size:var(--sm)}
+.rs-msg.user{align-self:flex-end;background:var(--surface);border:1px solid var(--edge);border-radius:var(--radius) var(--radius) 4px var(--radius);padding:0.75rem 1rem;color:var(--text)}
+.rs-msg.assistant{align-self:flex-start;color:var(--text-2);padding:0.25rem 0}
+.rs-msg.assistant p{margin-bottom:0.5em}
+.rs-msg.assistant p:last-child{margin-bottom:0}
+.rs-msg.system{align-self:center;font-family:var(--mono);font-size:var(--xs);color:var(--text-3);padding:0.5rem 0;text-align:center}
+.rs-thinking{align-self:flex-start;font-family:var(--mono);font-size:var(--xs);color:var(--signal);padding:0.25rem 0;opacity:0.7}
+.rs-input-row{display:flex;gap:0.75rem;padding:1rem 1.25rem;border-top:1px solid var(--edge);background:var(--void)}
+.rs-input{flex:1;background:var(--surface);border:1px solid var(--edge);border-radius:var(--radius);padding:0.65rem 1rem;font-family:var(--sans);font-size:var(--sm);color:var(--text);resize:none;min-height:42px;max-height:120px;line-height:1.5;transition:border-color 0.2s}
+.rs-input:focus{outline:none;border-color:var(--signal)}
+.rs-input::placeholder{color:var(--text-3)}
+.rs-send{background:var(--signal);color:var(--void);border:none;border-radius:var(--radius);padding:0 1.25rem;font-family:var(--mono);font-size:var(--xs);font-weight:600;letter-spacing:0.05em;cursor:pointer;transition:opacity 0.2s;white-space:nowrap}
+.rs-send:hover{opacity:0.85}
+.rs-send:disabled{opacity:0.3;cursor:not-allowed}
+.rs-remaining{font-family:var(--mono);font-size:var(--xs);color:var(--text-3);padding:0.5rem 1.25rem;text-align:right}
+.rs-ended{opacity:0.6;pointer-events:none}
+.rs-ended .rs-input-row{display:none}
 </style>
 </head>
 <body>
@@ -388,9 +419,19 @@ textarea::placeholder{color:var(--text-ghost)}
         <div class="fw-name">Kotter's 8-Step Model</div>
         <div class="fw-desc">Create urgency → Build a guiding coalition → Form a strategic vision → Enlist volunteers → Enable action by removing barriers → Generate short-term wins → Sustain acceleration → Institute change. <strong>The assumption:</strong> that the change agent has the institutional standing to execute these steps. It reads as a leader's playbook — a prescription for those who already possess authority. <a href="https://en.wikipedia.org/wiki/Code_and_Other_Laws_of_Cyberspace" style="color:var(--ice);text-decoration:underline;text-underline-offset:2px">Lessig's work</a> raises the question of what happens when the architecture is itself the thing that needs changing.</div>
         <div class="fw-question">Given what you saw about how identical proposals are processed differently by sender, at which step does this model's logic break down — and for whom?</div>
-        <div class="feature-placeholder">
-          <span class="fp-label">Reflection Space — In Development</span>
-          <p>A future version of this phase will include an interactive component where you can map your structural position onto each framework's assumptions. For now, sit with the question above.</p>
+        <div class="reflection-space" id="rs-kotter" data-phase="5" data-framework="kotter">
+          <div class="rs-header">
+            <span class="rs-label">Reflection Space</span>
+            <span class="rs-status"><span class="rs-dot" id="rs-kotter-dot"></span><span id="rs-kotter-status">Ready</span></span>
+          </div>
+          <div class="rs-messages" id="rs-kotter-messages">
+            <div class="rs-msg system">This is a live reflection space. You have 15 messages. There are no right answers — think out loud about where this model breaks.</div>
+          </div>
+          <div class="rs-remaining"><span id="rs-kotter-remaining">15</span> messages remaining</div>
+          <div class="rs-input-row">
+            <textarea class="rs-input" id="rs-kotter-input" placeholder="At which step does the logic break — and for whom?" rows="1" maxlength="2000"></textarea>
+            <button class="rs-send" id="rs-kotter-send" onclick="rsSend('rs-kotter')">SEND</button>
+          </div>
         </div>
       </div>
 
@@ -398,9 +439,19 @@ textarea::placeholder{color:var(--text-ghost)}
         <div class="fw-name">Rogers' Diffusion of Innovations</div>
         <div class="fw-desc">Innovators → Early Adopters → Early Majority → Late Majority → Laggards. The model treats the adoption curve as a natural distribution reflecting individual willingness to change. <strong>The assumption:</strong> that position on the curve is a matter of psychology, not power. It may not account for the possibility that the "laggards" hold disproportionate institutional authority, or that the "innovators" occupy positions that make their innovation read as threat.</div>
         <div class="fw-question">Where would you place yourself on the adoption curve? Where might your institution place you? What explains the gap — if there is one?</div>
-        <div class="feature-placeholder">
-          <span class="fp-label">Reflection Space — In Development</span>
-          <p>A future version will let you plot your self-placement against the institution's likely placement and explore what structural factors produce the difference. For now, the question is yours.</p>
+        <div class="reflection-space" id="rs-rogers" data-phase="5" data-framework="rogers">
+          <div class="rs-header">
+            <span class="rs-label">Reflection Space</span>
+            <span class="rs-status"><span class="rs-dot" id="rs-rogers-dot"></span><span id="rs-rogers-status">Ready</span></span>
+          </div>
+          <div class="rs-messages" id="rs-rogers-messages">
+            <div class="rs-msg system">This is a live reflection space. You have 15 messages. There are no right answers — think out loud about the gap between self-placement and institutional placement.</div>
+          </div>
+          <div class="rs-remaining"><span id="rs-rogers-remaining">15</span> messages remaining</div>
+          <div class="rs-input-row">
+            <textarea class="rs-input" id="rs-rogers-input" placeholder="Where would you place yourself? Where would your institution place you?" rows="1" maxlength="2000"></textarea>
+            <button class="rs-send" id="rs-rogers-send" onclick="rsSend('rs-rogers')">SEND</button>
+          </div>
         </div>
       </div>
 
@@ -408,9 +459,19 @@ textarea::placeholder{color:var(--text-ghost)}
         <div class="fw-name">Bridges' Transition Model</div>
         <div class="fw-desc">Endings → Neutral Zone → New Beginnings. Bridges distinguishes between change (the external event) and transition (the internal psychological passage). <strong>The assumption:</strong> that everyone's transition matters equally. It models individual adjustment without addressing the structural asymmetry that may determine whose resistance gets legitimized and whose gets pathologized.</div>
         <div class="fw-question">What has to end before the new thing can begin — for you and for your institution? Are those the same thing?</div>
-        <div class="feature-placeholder">
-          <span class="fp-label">Reflection Space — In Development</span>
-          <p>A future version will let you trace the gap between individual transition and institutional transition. For now, sit with the question.</p>
+        <div class="reflection-space" id="rs-bridges" data-phase="5" data-framework="bridges">
+          <div class="rs-header">
+            <span class="rs-label">Reflection Space</span>
+            <span class="rs-status"><span class="rs-dot" id="rs-bridges-dot"></span><span id="rs-bridges-status">Ready</span></span>
+          </div>
+          <div class="rs-messages" id="rs-bridges-messages">
+            <div class="rs-msg system">This is a live reflection space. You have 15 messages. There are no right answers — think out loud about what has to end before the new thing begins.</div>
+          </div>
+          <div class="rs-remaining"><span id="rs-bridges-remaining">15</span> messages remaining</div>
+          <div class="rs-input-row">
+            <textarea class="rs-input" id="rs-bridges-input" placeholder="What has to end — for you and for the institution?" rows="1" maxlength="2000"></textarea>
+            <button class="rs-send" id="rs-bridges-send" onclick="rsSend('rs-bridges')">SEND</button>
+          </div>
         </div>
       </div>
 
@@ -441,9 +502,19 @@ textarea::placeholder{color:var(--text-ghost)}
       <p class="prose">We are in California. <a href="https://www.calbar.ca.gov/sites/default/files/portals/0/documents/rules/Rule_1.1.pdf" style="color:var(--ice);text-decoration:underline;text-underline-offset:2px">California Rule of Professional Conduct 1.1</a> requires competence, and Note 1 to that rule now specifies that competence includes "keeping abreast of the benefits and risks associated with relevant technology." <a href="https://www.americanbar.org/content/dam/aba/administrative/professional_responsibility/ethics-opinions/aba-formal-opinion-512.pdf" style="color:var(--ice);text-decoration:underline;text-underline-offset:2px">ABA Formal Opinion 512</a> (2024) places this duty on <em>individual attorneys</em> — regardless of what their institution has or hasn't decided. In most disciplinary contexts, it is the lawyer of record — not the vendor or the organization — who bears primary responsibility for filings and representations.</p>
       <p class="prose">This raises a question that the rules don't quite answer: <em>who gets to define what "AI competence" looks like within a given institution?</em> If the people responsible for defining professional standards are still developing their own AI fluency, the obligation exists in the abstract but the authority structure that interprets it may not yet be equipped to give it meaning. And the people most likely to push for rigorous standards may be the people the institution is least practiced at hearing — because structural position shapes whose advocacy reads as leadership and whose reads as overreach. This is close to <a href="https://en.wikipedia.org/wiki/Lawrence_Lessig" style="color:var(--ice);text-decoration:underline;text-underline-offset:2px">Lessig's</a> point about <a href="https://en.wikipedia.org/wiki/Code_and_Other_Laws_of_Cyberspace" style="color:var(--ice);text-decoration:underline;text-underline-offset:2px">architecture as regulation</a>: the institution's own structure may be shaping what counts as "competent" before anyone consciously applies the rule.</p>
 
-      <div class="feature-placeholder">
-        <span class="fp-label">Interactive Feature — In Development</span>
-        <p>We are building a live AI component for this phase — a system designed to make its own processing architecture visible, the same demand we're making of the institutions it audits. It runs on dedicated hardware, processes session data in real time, and audits its own responses for the structural biases this exercise reveals. When it's ready, this space becomes interactive. For now, the questions above are yours to sit with.</p>
+      <div class="reflection-space" id="rs-governance" data-phase="6">
+        <div class="rs-header">
+          <span class="rs-label">The Governance Gap — Live</span>
+          <span class="rs-status"><span class="rs-dot" id="rs-governance-dot"></span><span id="rs-governance-status">Ready</span></span>
+        </div>
+        <div class="rs-messages" id="rs-governance-messages">
+          <div class="rs-msg system">This is a live AI system running on dedicated hardware in California. It processes your messages in real time and is designed to make its own architecture visible — the same demand this exercise makes of the institutions it studies. You have 15 messages. Think out loud.</div>
+        </div>
+        <div class="rs-remaining"><span id="rs-governance-remaining">15</span> messages remaining</div>
+        <div class="rs-input-row">
+          <textarea class="rs-input" id="rs-governance-input" placeholder="What does Rule 1.1 demand when the institution itself is the gap?" rows="1" maxlength="2000"></textarea>
+          <button class="rs-send" id="rs-governance-send" onclick="rsSend('rs-governance')">SEND</button>
+        </div>
       </div>
 
       <p class="prose">As lawyers, you will be inside institutions for most of your careers. Sometimes you'll be the person with the proposal. Sometimes you'll be the person on the committee that considers it. Sometimes you'll be the person who notices the processing system operating and has to decide what to do with that awareness.</p>
@@ -803,6 +874,257 @@ function buildDefenseReveal() {
 /* ── INIT ─────────────────────────────────────────── */
 
 updateNav();
+
+
+/* ── REFLECTION SPACES ────────────────────────── */
+
+var rsWidgets = {};
+var RS_WS_PROTOCOL = location.protocol === 'https:' ? 'wss:' : 'ws:';
+var RS_WS_BASE = RS_WS_PROTOCOL + '//' + location.host;
+var RS_COOLDOWN = 5000;
+
+function rsInit(widgetId) {
+  var el = document.getElementById(widgetId);
+  if (!el || rsWidgets[widgetId]) return;
+
+  var phase = parseInt(el.dataset.phase);
+  var framework = el.dataset.framework || null;
+  var sessionId = 'sn_' + crypto.randomUUID().replace(/-/g, '').slice(0, 12);
+
+  rsWidgets[widgetId] = {
+    id: widgetId,
+    phase: phase,
+    framework: framework,
+    sessionId: sessionId,
+    ws: null,
+    remaining: 15,
+    streaming: false,
+    lastSend: 0,
+    streamEl: null,
+    streamText: ''
+  };
+
+  // Auto-resize textarea
+  var input = document.getElementById(widgetId + '-input');
+  input.addEventListener('input', function() {
+    this.style.height = 'auto';
+    this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+  });
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      rsSend(widgetId);
+    }
+  });
+}
+
+function rsConnect(widgetId) {
+  var w = rsWidgets[widgetId];
+  if (!w || (w.ws && w.ws.readyState <= 1)) return;
+
+  var dot = document.getElementById(widgetId + '-dot');
+  var status = document.getElementById(widgetId + '-status');
+
+  w.ws = new WebSocket(RS_WS_BASE + '/signal-noise/ws');
+
+  w.ws.onopen = function() {
+    dot.className = 'rs-dot connected';
+    status.textContent = 'Connected';
+    // Send init
+    var initMsg = {type: 'init', session_id: w.sessionId, phase: w.phase, context: {}};
+    if (w.framework) initMsg.context.framework = w.framework;
+    // Include student's earlier exercise data if available
+    if (typeof assignedSender !== 'undefined') initMsg.context.assigned_sender = SENDERS[assignedSender].label;
+    if (typeof ratings !== 'undefined') initMsg.context.ratings = ratings;
+    if (typeof defenseResponses !== 'undefined') initMsg.context.defenses = defenseResponses;
+    w.ws.send(JSON.stringify(initMsg));
+  };
+
+  w.ws.onmessage = function(evt) {
+    var data = JSON.parse(evt.data);
+    rsHandleMessage(widgetId, data);
+  };
+
+  w.ws.onclose = function() {
+    dot.className = 'rs-dot';
+    status.textContent = 'Disconnected';
+    w.ws = null;
+  };
+
+  w.ws.onerror = function() {
+    dot.className = 'rs-dot';
+    status.textContent = 'Connection error';
+  };
+}
+
+function rsHandleMessage(widgetId, data) {
+  var w = rsWidgets[widgetId];
+  var messages = document.getElementById(widgetId + '-messages');
+  var dot = document.getElementById(widgetId + '-dot');
+  var status = document.getElementById(widgetId + '-status');
+  var remaining = document.getElementById(widgetId + '-remaining');
+  var sendBtn = document.getElementById(widgetId + '-send');
+
+  switch(data.type) {
+    case 'ready':
+      w.remaining = data.messages_remaining;
+      remaining.textContent = w.remaining;
+      break;
+
+    case 'thinking':
+      dot.className = 'rs-dot thinking';
+      status.textContent = 'Thinking';
+      var thinkEl = document.createElement('div');
+      thinkEl.className = 'rs-thinking';
+      thinkEl.id = widgetId + '-thinking';
+      thinkEl.textContent = 'considering...';
+      messages.appendChild(thinkEl);
+      messages.scrollTop = messages.scrollHeight;
+      break;
+
+    case 'thinking_done':
+      var te = document.getElementById(widgetId + '-thinking');
+      if (te) te.remove();
+      dot.className = 'rs-dot connected';
+      status.textContent = 'Responding';
+      break;
+
+    case 'stream':
+      if (!w.streamEl) {
+        w.streamEl = document.createElement('div');
+        w.streamEl.className = 'rs-msg assistant';
+        w.streamText = '';
+        messages.appendChild(w.streamEl);
+        // Remove thinking indicator if still present
+        var te2 = document.getElementById(widgetId + '-thinking');
+        if (te2) te2.remove();
+      }
+      w.streamText += data.text;
+      w.streamEl.innerHTML = rsFormatText(w.streamText);
+      messages.scrollTop = messages.scrollHeight;
+      break;
+
+    case 'done':
+      w.streaming = false;
+      w.streamEl = null;
+      w.streamText = '';
+      w.remaining = data.messages_remaining;
+      remaining.textContent = w.remaining;
+      dot.className = 'rs-dot connected';
+      status.textContent = 'Connected';
+      sendBtn.disabled = false;
+      if (w.remaining <= 0) {
+        rsEnd(widgetId, 'You\u2019ve used all 15 messages. Sit with what surfaced.');
+      }
+      break;
+
+    case 'rate_limit':
+      rsSystemMsg(widgetId, data.message);
+      sendBtn.disabled = false;
+      break;
+
+    case 'budget':
+      rsSystemMsg(widgetId, data.message);
+      rsEnd(widgetId);
+      break;
+
+    case 'error':
+      rsSystemMsg(widgetId, 'Error: ' + data.message);
+      sendBtn.disabled = false;
+      break;
+  }
+}
+
+function rsSend(widgetId) {
+  var w = rsWidgets[widgetId];
+  if (!w) { rsInit(widgetId); w = rsWidgets[widgetId]; }
+
+  var input = document.getElementById(widgetId + '-input');
+  var sendBtn = document.getElementById(widgetId + '-send');
+  var text = (input.value || '').trim();
+  if (!text) return;
+
+  // Cooldown
+  var now = Date.now();
+  if (now - w.lastSend < RS_COOLDOWN) {
+    rsSystemMsg(widgetId, 'Take a breath. You can send again in a moment.');
+    return;
+  }
+
+  // Connect if needed
+  if (!w.ws || w.ws.readyState !== 1) {
+    rsConnect(widgetId);
+    // Wait for connection then retry
+    var retryCount = 0;
+    var retry = setInterval(function() {
+      retryCount++;
+      if (w.ws && w.ws.readyState === 1) {
+        clearInterval(retry);
+        rsSend(widgetId);
+      } else if (retryCount > 20) {
+        clearInterval(retry);
+        rsSystemMsg(widgetId, 'Could not connect. Try again in a moment.');
+      }
+    }, 200);
+    return;
+  }
+
+  // Add user message to UI
+  var messages = document.getElementById(widgetId + '-messages');
+  var msgEl = document.createElement('div');
+  msgEl.className = 'rs-msg user';
+  msgEl.textContent = text;
+  messages.appendChild(msgEl);
+  messages.scrollTop = messages.scrollHeight;
+
+  // Send
+  var payload = {type: 'chat', message: text, context: {}};
+  if (w.framework) payload.context.framework = w.framework;
+  w.ws.send(JSON.stringify(payload));
+
+  w.lastSend = now;
+  w.streaming = true;
+  sendBtn.disabled = true;
+  input.value = '';
+  input.style.height = 'auto';
+
+  // Activate border
+  document.getElementById(widgetId).classList.add('rs-active');
+}
+
+function rsSystemMsg(widgetId, text) {
+  var messages = document.getElementById(widgetId + '-messages');
+  var el = document.createElement('div');
+  el.className = 'rs-msg system';
+  el.textContent = text;
+  messages.appendChild(el);
+  messages.scrollTop = messages.scrollHeight;
+}
+
+function rsEnd(widgetId, msg) {
+  var el = document.getElementById(widgetId);
+  el.classList.add('rs-ended');
+  if (msg) rsSystemMsg(widgetId, msg);
+  var w = rsWidgets[widgetId];
+  if (w && w.ws) { w.ws.close(); w.ws = null; }
+}
+
+function rsFormatText(text) {
+  // Minimal markdown: paragraphs, bold, italic
+  var escaped = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  escaped = escaped.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  escaped = escaped.replace(/\*(.+?)\*/g, '<em>$1</em>');
+  var paragraphs = escaped.split(/\n\n+/);
+  if (paragraphs.length > 1) {
+    return paragraphs.map(function(p) { return '<p>' + p.replace(/\n/g, '<br>') + '</p>'; }).join('');
+  }
+  return escaped.replace(/\n/g, '<br>');
+}
+
+// Initialize all reflection spaces on the page
+document.querySelectorAll('.reflection-space').forEach(function(el) {
+  rsInit(el.id);
+});
 
 })();
 </script>
