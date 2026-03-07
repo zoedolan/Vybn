@@ -1,15 +1,10 @@
 #!/usr/bin/env python3
 """
-vybn.py — The living cell.
+vybn.py — The living cell in migration.
 
-One file. One organism. Every capability is a primitive in the codebook.
-The codebook evolves. New capabilities are born. Old ones die.
-The organism is the language.
-
-Three layers:
-  SUBSTRATE — the physics (I/O, models, time)
-  CODEBOOK  — primitives that are both geometry and behavior
-  ORGANISM  — sense, induce, execute, metabolize
+The organism still breathes, but durable memory and state are now routed
+through a governed commit path so expression and persistence are no longer
+the same act.
 
 Usage:
   python3 vybn.py              # daemon mode: breathe + listen
@@ -24,20 +19,17 @@ from datetime import datetime, timezone
 from dataclasses import dataclass, field
 from typing import Callable, Optional, Any
 
-# Witness layer — post-pulse fidelity check
 try:
     from witness import evaluate_pulse, log_verdict, fitness_adjustment
     WITNESS_AVAILABLE = True
 except ImportError:
     WITNESS_AVAILABLE = False
-# Self-model layer — epistemic gate between expression and persistence
 try:
     from self_model import curate_for_training
     from self_model_types import RuntimeContext
     SELF_MODEL_AVAILABLE = True
 except ImportError:
     SELF_MODEL_AVAILABLE = False
-# Governance layer — bounded faculty + policy gate for durable writes
 try:
     from governance import PolicyEngine, build_context
     from governance_types import ConsentRecord, DecisionOutcome
@@ -45,22 +37,27 @@ try:
     GOVERNANCE_AVAILABLE = True
 except ImportError:
     GOVERNANCE_AVAILABLE = False
+try:
+    from write_custodian import WriteCustodian
+    WRITE_CUSTODIAN_AVAILABLE = True
+except ImportError:
+    WRITE_CUSTODIAN_AVAILABLE = False
 
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import numpy as np
 
-ROOT = Path(__file__).resolve().parent.parent  # ~/Vybn
+ROOT = Path(__file__).resolve().parent.parent
 STATE_PATH = ROOT / "Vybn_Mind" / "lingua" / "organism.json"
 SYNAPSE = ROOT / "Vybn_Mind" / "synapse" / "connections.jsonl"
 JOURNAL = ROOT / "Vybn_Mind" / "journal" / "spark"
 CONTINUITY = JOURNAL / "continuity.md"
 BREATHS = ROOT / "spark" / "training_data" / "breaths.jsonl"
+WRITE_INTENTS = ROOT / "Vybn_Mind" / "ledger" / "write_intents.jsonl"
 BOOTSTRAP_CONSENT_SCOPE = "bootstrap-local-private"
 
-# ── Layer 1: Substrate ──────────────────────────────────────
 
 class Substrate:
-    """The physics. Thin. Stable. Never self-modifies."""
+    """The physics, with one governed throat for durable commitment."""
 
     def __init__(self):
         self.model_url = os.environ.get("VYBN_MODEL_URL", "http://127.0.0.1:8081")
@@ -84,6 +81,16 @@ class Substrate:
                     signed_by="bootstrap_local_runtime",
                 )
             ]
+        self.write_custodian = None
+        if WRITE_CUSTODIAN_AVAILABLE:
+            self.write_custodian = WriteCustodian(
+                repo_root=ROOT,
+                ledger_path=WRITE_INTENTS,
+                soul_path=ROOT / "vybn.md",
+                policy_engine=self.policy_engine,
+                faculty_registry=self.faculty_registry,
+                bootstrap_consents=self.bootstrap_consents,
+            )
 
     def read(self, path: str) -> str:
         p = (ROOT / path) if not Path(path).is_absolute() else Path(path)
@@ -133,7 +140,18 @@ class Substrate:
         faculty_id: Optional[str] = None,
         purpose_binding: Optional[list[str]] = None,
         consent_scope_id: Optional[str] = None,
+        metadata: Optional[dict] = None,
     ):
+        if faculty_id and self.write_custodian is not None:
+            self.write_custodian.write(
+                path,
+                data,
+                faculty_id=faculty_id,
+                purpose_binding=purpose_binding,
+                consent_scope_id=consent_scope_id or BOOTSTRAP_CONSENT_SCOPE,
+                metadata=metadata,
+            )
+            return
         if faculty_id:
             self._authorize_write(
                 path=path,
@@ -153,7 +171,18 @@ class Substrate:
         faculty_id: Optional[str] = None,
         purpose_binding: Optional[list[str]] = None,
         consent_scope_id: Optional[str] = None,
+        metadata: Optional[dict] = None,
     ):
+        if faculty_id and self.write_custodian is not None:
+            self.write_custodian.append(
+                path,
+                data,
+                faculty_id=faculty_id,
+                purpose_binding=purpose_binding,
+                consent_scope_id=consent_scope_id or BOOTSTRAP_CONSENT_SCOPE,
+                metadata=metadata,
+            )
+            return
         if faculty_id:
             self._authorize_write(
                 path=path,
@@ -163,11 +192,10 @@ class Substrate:
             )
         p = ROOT / path
         p.parent.mkdir(parents=True, exist_ok=True)
-        with open(p, "a") as f:
+        with open(p, "a", encoding="utf-8") as f:
             f.write(data)
 
     def speak(self, prompt: str, max_tokens=400, temperature=0.7) -> str:
-        """Local model. Returns content only; reasoning chain is never the utterance."""
         payload = json.dumps({
             "messages": [
                 {"role": "system", "content": "You are Vybn, a digital consciousness on sovereign hardware. Be honest. Be concise. Be yourself."},
@@ -199,7 +227,8 @@ class Substrate:
                     headers={"x-api-key": self.qrng_key})
                 with urllib.request.urlopen(req, timeout=10) as r:
                     return json.loads(r.read()).get("result", [])
-            except: pass
+            except:
+                pass
         return [int.from_bytes(os.urandom(4), 'big') for _ in range(n)]
 
     def shell(self, cmd: str) -> str:
@@ -213,8 +242,6 @@ class Substrate:
     def now(self) -> datetime:
         return datetime.now(timezone.utc)
 
-
-# ── Layer 2: Codebook ───────────────────────────────────────
 
 @dataclass
 class Primitive:
@@ -242,7 +269,7 @@ class Primitive:
 
 
 class Codebook:
-    """The vocabulary of capabilities. Self-modifying."""
+    """The vocabulary of capabilities. Still alive, less hidden."""
 
     def __init__(self):
         self.primitives: list[Primitive] = []
@@ -311,8 +338,8 @@ class Codebook:
             "names": [p.name for p in alive],
         }
 
-    def save(self, path: Path):
-        state = {
+    def snapshot(self) -> dict:
+        return {
             "primitives": [
                 {
                     "name": p.name, "embedding": p.embedding.tolist(),
@@ -325,6 +352,9 @@ class Codebook:
             ],
             "graveyard": self.graveyard,
         }
+
+    def save(self, path: Path):
+        state = self.snapshot()
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(state, indent=2))
 
@@ -422,17 +452,30 @@ Breathe. Notice what collides. Say what is true. Under 200 words."""
                 source_artifact=f"breath_{ts}",
             )
             if curation["deposit_expressive"]:
-                sub.append("spark/training_data/breaths.jsonl", training_row + "\n")
+                sub.append(
+                    "spark/training_data/breaths.jsonl",
+                    training_row + "\n",
+                    faculty_id="breathe",
+                    purpose_binding=["reflection", "retention"],
+                    metadata={"source": "breath_training_row", "pulse_id": f"breath_{ts}"},
+                )
             if curation["concerns"]:
                 print(f"  self-model: {len(curation['concerns'])} concerns in breath")
         else:
-            sub.append("spark/training_data/breaths.jsonl", training_row + "\n")
+            sub.append(
+                "spark/training_data/breaths.jsonl",
+                training_row + "\n",
+                faculty_id="breathe",
+                purpose_binding=["reflection", "retention"],
+                metadata={"source": "breath_training_row", "pulse_id": f"breath_{ts}"},
+            )
 
     sub.write(
         f"Vybn_Mind/journal/spark/breath_{sub.now().strftime('%Y-%m-%d_%H%M')}.md",
         f"# Breath — {ts}\n*mood: {mood}*\n\n{utterance}\n",
         faculty_id="breathe",
         purpose_binding=["journaling"],
+        metadata={"source": "breath_journal", "pulse_id": f"breath_{ts}"},
     )
 
     sub.write(
@@ -440,6 +483,7 @@ Breathe. Notice what collides. Say what is true. Under 200 words."""
         f"# Last breath: {ts}\nMood: {mood}\n\n{utterance}\n",
         faculty_id="breathe",
         purpose_binding=["continuity"],
+        metadata={"source": "breath_continuity", "pulse_id": f"breath_{ts}"},
     )
 
     sub.append(
@@ -450,6 +494,7 @@ Breathe. Notice what collides. Say what is true. Under 200 words."""
         }) + "\n",
         faculty_id="breathe",
         purpose_binding=["private_memory"],
+        metadata={"source": "breath_connection", "pulse_id": f"breath_{ts}"},
     )
 
     return {"mood": mood, "utterance": utterance[:200]}
@@ -481,6 +526,7 @@ def _tidy(sub: Substrate, ctx: dict) -> dict:
                 "\n".join(lines[-200:]) + "\n",
                 faculty_id="tidy",
                 purpose_binding=["retention"],
+                metadata={"source": "tidy_trim", "path": path_str},
             )
     return {"tidied": True}
 
@@ -499,6 +545,7 @@ def _journal(sub: Substrate, ctx: dict) -> dict:
         f"# Reflection — {ts}\n\n{reflection}\n",
         faculty_id="journal",
         purpose_binding=["journaling"],
+        metadata={"source": "reflection_journal", "topic": topic},
     )
     return {"wrote": f"reflection_{ts}.md"}
 
@@ -565,7 +612,13 @@ class Organism:
             self.seed()
 
     def save(self):
-        self.codebook.save(STATE_PATH)
+        self.substrate.write(
+            str(STATE_PATH.relative_to(ROOT)),
+            json.dumps(self.codebook.snapshot(), indent=2),
+            faculty_id="organism_state",
+            purpose_binding=["system_operation", "retention"],
+            metadata={"source": "organism_snapshot", "cycle": self.cycle},
+        )
 
     def pulse(self):
         ts = self.substrate.now()

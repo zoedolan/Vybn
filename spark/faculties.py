@@ -199,6 +199,15 @@ class FacultyRegistry:
                 may_trigger_routing=False,
                 required_policy_checks=["consent_scope_valid"],
             ),
+            FacultyCard(
+                faculty_id="organism_state",
+                purpose="Persist bounded organism state snapshots through the governed commit path.",
+                allowed_scopes=["memory_write", "ledger_write"],
+                prohibited_acts=["memory_promote", "route_select", "response_generate"],
+                may_write_memory=True,
+                may_trigger_routing=False,
+                required_policy_checks=["consent_scope_valid"],
+            ),
         ]
 
 
