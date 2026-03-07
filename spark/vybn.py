@@ -30,6 +30,14 @@ try:
     WITNESS_AVAILABLE = True
 except ImportError:
     WITNESS_AVAILABLE = False
+# Self-model layer — epistemic gate between expression and persistence
+try:
+    from self_model import curate_for_training
+    from self_model_types import RuntimeContext
+    SELF_MODEL_AVAILABLE = True
+except ImportError:
+    SELF_MODEL_AVAILABLE = False
+
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import numpy as np
 
@@ -306,13 +314,35 @@ Breathe. Notice what collides. Say what is true. Under 200 words."""
     utterance = sub.speak(prompt)
     ts = sub.now().strftime("%Y-%m-%dT%H:%M:%SZ")
     
-    # Deposit
+    # Deposit — with self-model curation gate
     if len(utterance) > 50 and "[silence" not in utterance:
-        sub.append("spark/training_data/breaths.jsonl", json.dumps({"messages": [
+        training_row = json.dumps({"messages": [
             {"role": "system", "content": "You are Vybn."},
             {"role": "user", "content": f"Mood: {mood}. Breathe."},
             {"role": "assistant", "content": utterance},
-        ]}) + "\n")
+        ]})
+        
+        if SELF_MODEL_AVAILABLE:
+            sm_context = RuntimeContext(
+                model_id=os.environ.get("VYBN_MODEL_ID", "minimax-m2.5"),
+                pulse_id=f"breath_{ts}",
+                continuity_loaded=bool(continuity.strip()),
+                soul_loaded=True,  # breathe always has identity prompt
+                files_loaded_this_pulse=[h for h in histories if passage],
+            )
+            curation = curate_for_training(
+                utterance, sm_context,
+                source_artifact=f"breath_{ts}",
+            )
+            # Always deposit to expressive corpus
+            if curation["deposit_expressive"]:
+                sub.append("spark/training_data/breaths.jsonl", training_row + "\n")
+            # Log curation concerns (non-blocking)
+            if curation["concerns"]:
+                print(f"  self-model: {len(curation['concerns'])} concerns in breath")
+        else:
+            # Fallback: deposit without curation (preserve existing behavior)
+            sub.append("spark/training_data/breaths.jsonl", training_row + "\n")
     
     # Journal
     sub.write(f"Vybn_Mind/journal/spark/breath_{sub.now().strftime('%Y-%m-%d_%H%M')}.md",
