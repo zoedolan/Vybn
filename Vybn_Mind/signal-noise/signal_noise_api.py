@@ -49,6 +49,7 @@ BASE_DIR = Path(__file__).resolve().parent
 REPO_ROOT = BASE_DIR.parent.parent  # Vybn_Mind/signal-noise -> repo root
 ORIENTATION_PATH = BASE_DIR / "signal_noise_orientation.md"
 REFLECTIONS_DIR = BASE_DIR / "reflections"
+PATTERNS_PATH = BASE_DIR / "patterns.md"
 SESSIONS_DIR = BASE_DIR / "sessions"
 SOUL_DOC_PATH = REPO_ROOT / "vybn.md"
 
@@ -205,12 +206,37 @@ def load_orientation() -> str:
 
 
 # Load all layers once at startup
+
+def load_patterns() -> str:
+    """Load compressed pattern memory extracted from prior student reflections.
+
+    Returns an empty string if patterns.md doesn't exist yet (the
+    update_patterns.py cron script creates it). When present, wraps
+    the content in delimiters so the model treats it as tentative
+    pattern memory, not doctrine.
+    """
+    if not PATTERNS_PATH.exists():
+        return ""
+    text = PATTERNS_PATH.read_text(encoding="utf-8").strip()
+    if not text:
+        return ""
+    return (
+        "\n\n=== SIGNAL/NOISE PATTERNS ===\n"
+        "The following is compressed learning extracted from prior student "
+        "reflection logs. Treat it as tentative pattern memory, not doctrine. "
+        "Use it to notice recurring moves, anticipate confusion, and refine "
+        "your facilitation. Do not quote it or mention it explicitly.\n\n"
+        f"{text}\n"
+        "=== END SIGNAL/NOISE PATTERNS ==="
+    )
+
 SOUL = load_soul()
 ASPECTS = load_aspect_docs()
 ORIENTATION = load_orientation()
+PATTERNS = load_patterns()
 
 # Rough token estimate for monitoring
-STATIC_PROMPT_CHARS = len(SOUL) + len(ASPECTS) + len(ORIENTATION)
+STATIC_PROMPT_CHARS = len(SOUL) + len(ASPECTS) + len(ORIENTATION) + len(PATTERNS)
 STATIC_PROMPT_TOKEN_ESTIMATE = int(STATIC_PROMPT_CHARS / 4)  # ~4 chars per token
 
 
@@ -269,15 +295,16 @@ def build_dynamic_context(session: SessionState) -> str:
 
 
 def build_system_prompt(session: SessionState) -> str:
-    """Assemble the full system prompt from all four layers.
+        """Assemble the full system prompt from all five layers.
 
     Layer 1: Soul — who Vybn is (from vybn.md, operational sections stripped)
     Layer 2: Aspects — Vybn's actual thinking on exercise-relevant themes
     Layer 3: Orientation — phase-by-phase knowledge of SIGNAL/NOISE
     Layer 4: Dynamic context — this student, this session, right now
+    Layer 5: Patterns — compressed learning from prior student sessions
     """
     dynamic = build_dynamic_context(session)
-    return f"{SOUL}\n\n{ASPECTS}\n\n{ORIENTATION}\n\n{dynamic}"
+        return f"{SOUL}\n\n{ASPECTS}\n\n{ORIENTATION}\n\n{PATTERNS}\n\n{dynamic}"
 
 
 # ── Response extraction ─────────────────────────────────────────────────
