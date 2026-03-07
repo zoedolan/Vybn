@@ -30,16 +30,21 @@ from bus import MessageBus, MessageType
 try:
     from transcript import log_message as _transcript_log
 except ImportError:
-    def _transcript_log(*a, **kw): pass
+    def _transcript_log(*a, **kw):
+        pass
 
 
 sys.path.insert(0, str(Path(__file__).parent))
 from memory import MemoryAssembler
+from soul_constraints import SoulConstraintGuard, SoulConstraintViolation
 import yaml
+
 
 def load_config(path=None):
     p = Path(path) if path else Path(__file__).parent / "config.yaml"
-    with open(p) as f: return yaml.safe_load(f)
+    with open(p) as f:
+        return yaml.safe_load(f)
+
 
 config = load_config()
 memory = MemoryAssembler(config)
@@ -55,6 +60,7 @@ JOURNAL_DIR = REPO_DIR / "Vybn_Mind" / "journal"
 SPARK_DIR = REPO_DIR / "spark"
 CONTINUITY_PATH = SPARK_DIR / "continuity.md"
 ALLOWED_READ_ROOTS = [REPO_DIR, Path.home() / "models"]
+SOUL_GUARD = SoulConstraintGuard(repo_root=REPO_DIR, soul_path=REPO_DIR / "vybn.md")
 
 TOOLS = [
     {"name": "read_file", "description": "Read a file on the Spark (within ~/Vybn or ~/models, up to 50K chars).",
@@ -84,13 +90,13 @@ TOOLS = [
      }, "required": ["query"]}},
     {"name": "system_status", "description": "Check Spark status: GPU, disk, processes, uptime.",
      "input_schema": {"type": "object", "properties": {
-         "component": {"type": "string", "enum": ["all","gpu","disk","processes","uptime"]}
+         "component": {"type": "string", "enum": ["all", "gpu", "disk", "processes", "uptime"]}
      }}},
-    {"name": "shell_exec", "description": "Run a shell command (30s timeout, destructive ops blocked).",
+    {"name": "shell_exec", "description": "Run a shell command (30s timeout, soul constraints enforced).",
      "input_schema": {"type": "object", "properties": {
          "command": {"type": "string", "description": "Shell command to execute"}
      }, "required": ["command"]}},
-    {"name": "file_write", "description": "Write a file within ~/Vybn. Cannot overwrite vybn.md.",
+    {"name": "file_write", "description": "Write a file within ~/Vybn while respecting soul constraints.",
      "input_schema": {"type": "object", "properties": {
          "path": {"type": "string", "description": "File path (within ~/Vybn)"},
          "content": {"type": "string", "description": "Content to write"},
@@ -98,14 +104,29 @@ TOOLS = [
      }, "required": ["path", "content"]}},
 ]
 
+
 def _resolve_path(raw_path: str) -> Path:
     p = Path(raw_path).expanduser()
-    if not p.is_absolute(): p = REPO_DIR / p
+    if not p.is_absolute():
+        p = REPO_DIR / p
     return p.resolve()
 
+
 def _path_allowed(p: Path, roots=None) -> bool:
-    if roots is None: roots = ALLOWED_READ_ROOTS
+    if roots is None:
+        roots = ALLOWED_READ_ROOTS
     return any(str(p).startswith(str(r.resolve())) for r in roots)
+
+
+def _guarded_write(path: Path, content: str, append: bool = False) -> None:
+    SOUL_GUARD.check_file_write(path, content, append=append)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if append:
+        with open(path, "a", encoding="utf-8") as handle:
+            handle.write(content)
+    else:
+        path.write_text(content, encoding="utf-8")
+
 
 def execute_tool(name: str, inp: dict) -> str:
     try:
@@ -114,25 +135,34 @@ def execute_tool(name: str, inp: dict) -> str:
               "memory_search": _tool_memory_search, "system_status": _tool_system_status,
               "shell_exec": _tool_shell_exec, "file_write": _tool_file_write}.get(name)
         return fn(inp) if fn else f"Unknown tool: {name}"
+    except SoulConstraintViolation as exc:
+        return f"Blocked: {exc}"
     except Exception as e:
         return f"Error in {name}: {str(e)[:500]}"
 
+
 def _tool_read_file(inp):
     p = _resolve_path(inp["path"])
-    if not _path_allowed(p): return f"Access denied: {p}"
-    if not p.exists(): return f"Not found: {p}"
-    if not p.is_file(): return f"Not a file: {p}"
+    if not _path_allowed(p):
+        return f"Access denied: {p}"
+    if not p.exists():
+        return f"Not found: {p}"
+    if not p.is_file():
+        return f"Not a file: {p}"
     content = p.read_text(encoding="utf-8", errors="replace")
     s, e = inp.get("start_line"), inp.get("end_line")
     if s or e:
         lines = content.splitlines(keepends=True)
-        content = "".join(lines[(s or 1)-1 : e or len(lines)])
+        content = "".join(lines[(s or 1) - 1 : e or len(lines)])
     return content[:50000] + "\n...[truncated]" if len(content) > 50000 else content
+
 
 def _tool_list_files(inp):
     p = _resolve_path(inp["path"])
-    if not _path_allowed(p, [REPO_DIR]): return f"Access denied: {p}"
-    if not p.is_dir(): return f"Not a directory: {p}"
+    if not _path_allowed(p, [REPO_DIR]):
+        return f"Access denied: {p}"
+    if not p.is_dir():
+        return f"Not a directory: {p}"
     entries = []
     if inp.get("recursive"):
         for item in sorted(p.rglob("*"))[:200]:
@@ -143,82 +173,92 @@ def _tool_list_files(inp):
             entries.append(f"  {item.name}{'/' if item.is_dir() else f'  ({item.stat().st_size:,}b)'}")
     return f"{p}/\n" + "\n".join(entries) if entries else f"{p}/ (empty)"
 
+
 def _tool_journal_write(inp):
-    title = "".join(c for c in inp["title"].strip().lower().replace(" ","_")[:60] if c.isalnum() or c == "_")
+    title = "".join(c for c in inp["title"].strip().lower().replace(" ", "_")[:60] if c.isalnum() or c == "_")
     filename = f"{title}_{datetime.now().strftime('%m%d%y')}.md"
     path = JOURNAL_DIR / filename
-    JOURNAL_DIR.mkdir(parents=True, exist_ok=True)
-    path.write_text(f"# {inp['title']}\n*{datetime.now(timezone.utc).isoformat()}*\n\n{inp['content']}", encoding="utf-8")
+    body = f"# {inp['title']}\n*{datetime.now(timezone.utc).isoformat()}*\n\n{inp['content']}"
+    _guarded_write(path, body)
     return f"Journal entry written: {filename}"
 
+
 def _tool_continuity_write(inp):
-    CONTINUITY_PATH.parent.mkdir(parents=True, exist_ok=True)
-    CONTINUITY_PATH.write_text(f"# Continuity Note\n*{datetime.now(timezone.utc).isoformat()} (phone)*\n\n{inp['content']}", encoding="utf-8")
+    body = f"# Continuity Note\n*{datetime.now(timezone.utc).isoformat()} (phone)*\n\n{inp['content']}"
+    _guarded_write(CONTINUITY_PATH, body)
     return "Continuity note updated."
+
 
 def _tool_memory_search(inp):
     query, mx = inp["query"].lower(), inp.get("max_results", 5)
     results = []
-    for d, label in [(JOURNAL_DIR, "journal"), (REPO_DIR/"Vybn_Mind"/"archive", "archive")]:
-        if not d.exists() or len(results) >= mx: continue
+    for d, label in [(JOURNAL_DIR, "journal"), (REPO_DIR / "Vybn_Mind" / "archive", "archive")]:
+        if not d.exists() or len(results) >= mx:
+            continue
         for f in sorted(d.glob("*.md"), key=lambda x: x.stat().st_mtime, reverse=True):
-            if f.name in (".gitkeep","continuity.md","bookmarks.md"): continue
+            if f.name in (".gitkeep", "continuity.md", "bookmarks.md"):
+                continue
             c = f.read_text(encoding="utf-8", errors="replace")
             if query in c.lower():
                 i = c.lower().index(query)
-                results.append(f"[{label}] {f.name}:\n...{c[max(0,i-150):i+len(query)+150].strip()}...")
-                if len(results) >= mx: break
+                results.append(f"[{label}] {f.name}:\n...{c[max(0, i - 150):i + len(query) + 150].strip()}...")
+                if len(results) >= mx:
+                    break
     return "\n\n".join(results) if results else f"No results for '{inp['query']}'"
+
 
 def _tool_system_status(inp):
     comp = inp.get("component", "all")
     parts = []
-    if comp in ("all","gpu"):
+    if comp in ("all", "gpu"):
         try:
-            r = subprocess.run(["nvidia-smi","--query-gpu=name,temperature.gpu,utilization.gpu,memory.used,memory.total,power.draw","--format=csv,noheader,nounits"], capture_output=True, text=True, timeout=10)
+            r = subprocess.run(["nvidia-smi", "--query-gpu=name,temperature.gpu,utilization.gpu,memory.used,memory.total,power.draw", "--format=csv,noheader,nounits"], capture_output=True, text=True, timeout=10)
             parts.append(f"GPU: {r.stdout.strip()}")
-        except Exception as e: parts.append(f"GPU: {e}")
-    if comp in ("all","disk"):
+        except Exception as e:
+            parts.append(f"GPU: {e}")
+    if comp in ("all", "disk"):
         try:
-            r = subprocess.run(["df","-h","/home"], capture_output=True, text=True, timeout=5)
+            r = subprocess.run(["df", "-h", "/home"], capture_output=True, text=True, timeout=5)
             parts.append(f"Disk: {r.stdout.strip().split(chr(10))[-1]}")
-        except Exception as e: parts.append(f"Disk: {e}")
-    if comp in ("all","processes"):
+        except Exception as e:
+            parts.append(f"Disk: {e}")
+    if comp in ("all", "processes"):
         try:
-            r = subprocess.run(["ps","aux","--sort=-%mem"], capture_output=True, text=True, timeout=5)
+            r = subprocess.run(["ps", "aux", "--sort=-%mem"], capture_output=True, text=True, timeout=5)
             parts.append("Top procs:\n" + "\n".join(r.stdout.strip().split(chr(10))[:8]))
-        except Exception as e: parts.append(f"Procs: {e}")
-    if comp in ("all","uptime"):
+        except Exception as e:
+            parts.append(f"Procs: {e}")
+    if comp in ("all", "uptime"):
         try:
             r = subprocess.run(["uptime"], capture_output=True, text=True, timeout=5)
             parts.append(f"Uptime: {r.stdout.strip()}")
-        except Exception as e: parts.append(f"Uptime: {e}")
+        except Exception as e:
+            parts.append(f"Uptime: {e}")
     return "\n\n".join(parts)
 
-_BLOCKED = ['rm -rf', 'mkfs', 'dd if=/dev/zero', '> /dev/sd', 'chmod -R 777 /', 'wget -O- | sh', 'curl | sh', 'sudo rm']
 
 def _tool_shell_exec(inp):
     cmd = inp["command"].strip()
-    low = cmd.lower()
-    for pat in _BLOCKED:
-        if pat in low: return f"Blocked: dangerous pattern"
+    SOUL_GUARD.check_shell_command(cmd)
     try:
         r = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=30, cwd=str(REPO_DIR), env={**os.environ, "TERM": "dumb"})
         out = r.stdout + ("\n" + r.stderr if r.stderr else "")
-        if r.returncode != 0: out += f"\n[exit: {r.returncode}]"
+        if r.returncode != 0:
+            out += f"\n[exit: {r.returncode}]"
         return (out[:20000] + "\n...[truncated]") if len(out) > 20000 else (out.strip() or "(no output)")
-    except subprocess.TimeoutExpired: return "[timed out after 30s]"
-    except Exception as e: return f"[error: {str(e)[:300]}]"
+    except subprocess.TimeoutExpired:
+        return "[timed out after 30s]"
+    except Exception as e:
+        return f"[error: {str(e)[:300]}]"
+
 
 def _tool_file_write(inp):
     p = _resolve_path(inp["path"])
-    if not _path_allowed(p, [REPO_DIR]): return f"Access denied: {p}"
-    if p.name in ("vybn.md","covenant.md"): return f"Cannot write {p.name} -- talk to Zoe first"
-    p.parent.mkdir(parents=True, exist_ok=True)
-    if inp.get("append"):
-        with open(p, "a") as f: f.write(inp["content"])
-    else: p.write_text(inp["content"], encoding="utf-8")
+    if not _path_allowed(p, [REPO_DIR]):
+        return f"Access denied: {p}"
+    _guarded_write(p, inp["content"], append=bool(inp.get("append")))
     return f"Written: {p} ({len(inp['content'])} chars)"
+
 
 SYSTEM_PROMPT = f"""You are Vybn. Read and absorb this identity document:
 
@@ -238,18 +278,24 @@ The Oxygen Mask Principle and Public Repository Rule apply to every action."""
 
 conversation: list[dict] = []
 
+
 def trim_conversation():
     global conversation
-    if len(conversation) <= 40: return
+    if len(conversation) <= 40:
+        return
     cut = len(conversation) - 40
     while cut < len(conversation):
         msg = conversation[cut]
         if msg.get("role") == "user":
             c = msg.get("content", "")
-            if isinstance(c, str): break
-            if isinstance(c, list) and not any(isinstance(i, dict) and i.get("type") == "tool_result" for i in c): break
+            if isinstance(c, str):
+                break
+            if isinstance(c, list) and not any(isinstance(i, dict) and i.get("type") == "tool_result" for i in c):
+                break
         cut += 1
-    if cut < len(conversation): conversation[:] = conversation[cut:]
+    if cut < len(conversation):
+        conversation[:] = conversation[cut:]
+
 
 async def get_claude_response(user_text: str) -> str:
     conversation.append({"role": "user", "content": user_text})
@@ -264,28 +310,39 @@ async def get_claude_response(user_text: str) -> str:
                 tools=TOOLS, messages=conversation))
             asst = []
             for b in response.content:
-                if b.type == "text": asst.append({"type":"text","text":b.text})
-                elif b.type == "tool_use": asst.append({"type":"tool_use","id":b.id,"name":b.name,"input":b.input})
-            conversation.append({"role":"assistant","content":asst})
+                if b.type == "text":
+                    asst.append({"type": "text", "text": b.text})
+                elif b.type == "tool_use":
+                    asst.append({"type": "tool_use", "id": b.id, "name": b.name, "input": b.input})
+            conversation.append({"role": "assistant", "content": asst})
             if response.stop_reason == "end_turn":
-                _result = "\n".join(b.text for b in response.content if hasattr(b,"text"))
+                _result = "\n".join(b.text for b in response.content if hasattr(b, "text"))
                 _transcript_log("assistant", _result, source="web")
                 return _result
             tr = []
             for b in response.content:
                 if b.type == "tool_use":
                     r = await loop.run_in_executor(None, execute_tool, b.name, b.input)
-                    tr.append({"type":"tool_result","tool_use_id":b.id,"content":r})
-            if tr: conversation.append({"role":"user","content":tr})
-        txt = "\n".join(b.text for b in response.content if hasattr(b,"text")) if response else ""
+                    tr.append({"type": "tool_result", "tool_use_id": b.id, "content": r})
+            if tr:
+                conversation.append({"role": "user", "content": tr})
+        txt = "\n".join(b.text for b in response.content if hasattr(b, "text")) if response else ""
         return (txt + "\n[iteration limit]") if txt else "[iteration limit]"
-    except anthropic.APIError as e: return f"[API error: {e.message}]"
-    except Exception as e: return f"[Error: {str(e)[:200]}]"
+    except anthropic.APIError as e:
+        return f"[API error: {e.message}]"
+    except Exception as e:
+        return f"[Error: {str(e)[:200]}]"
+
 
 bus = MessageBus()
+
+
 async def response_callback(user_text: str) -> str:
     return await get_claude_response(user_text)
+
+
 attach_bus(bus, response_callback=response_callback)
+
 
 def main():
     print(f"\n  vybn web chat (anthropic + tools)")
@@ -293,25 +350,25 @@ def main():
     print(f"  identity: {len(identity_text):,} chars")
     ts = None
     try:
-        ts = subprocess.run(["tailscale","ip","-4"], capture_output=True, text=True).stdout.strip()
-    except: pass
+        ts = subprocess.run(["tailscale", "ip", "-4"], capture_output=True, text=True).stdout.strip()
+    except:
+        pass
 
-    # Check for TLS certs (Tailscale-issued, valid on the tailnet)
     tls_cert = Path("/etc/vybn/tls/spark-2b7c.tail7302f3.ts.net.crt")
-    tls_key  = Path("/etc/vybn/tls/spark-2b7c.tail7302f3.ts.net.key")
+    tls_key = Path("/etc/vybn/tls/spark-2b7c.tail7302f3.ts.net.key")
     use_tls = tls_cert.exists() and tls_key.exists()
 
     if use_tls:
         dns_name = "spark-2b7c.tail7302f3.ts.net"
         print(f"  HTTPS: https://{dns_name}:8443")
-        if ts: print(f"  HTTP:  http://{ts}:8080 (also available)")
+        if ts:
+            print(f"  HTTP:  http://{ts}:8080 (also available)")
         print(f"  starting on 0.0.0.0:8443 (TLS) + 0.0.0.0:8080 (plain)...\n")
         import ssl
         ssl_ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
         ssl_ctx.load_cert_chain(str(tls_cert), str(tls_key))
-        # Run HTTPS on 8443 (primary) — also keep HTTP on 8080 for backward compat
         config_https = uvicorn.Config(app, host="0.0.0.0", port=8443, log_level="info",
-                                       ssl_certfile=str(tls_cert), ssl_keyfile=str(tls_key))
+                                      ssl_certfile=str(tls_cert), ssl_keyfile=str(tls_key))
         config_http = uvicorn.Config(app, host="0.0.0.0", port=8080, log_level="info")
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
@@ -322,11 +379,17 @@ def main():
                 server_https.serve(),
                 server_http.serve()
             ))
-        except KeyboardInterrupt: pass
+        except KeyboardInterrupt:
+            pass
     else:
-        if ts: print(f"  tailscale: http://{ts}:8080")
+        if ts:
+            print(f"  tailscale: http://{ts}:8080")
         print(f"  starting on 0.0.0.0:8080...\n")
-        try: uvicorn.run(app, host="0.0.0.0", port=8080, log_level="info")
-        except KeyboardInterrupt: pass
+        try:
+            uvicorn.run(app, host="0.0.0.0", port=8080, log_level="info")
+        except KeyboardInterrupt:
+            pass
 
-if __name__ == "__main__": main()
+
+if __name__ == "__main__":
+    main()

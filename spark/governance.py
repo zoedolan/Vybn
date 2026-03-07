@@ -39,6 +39,11 @@ except ImportError:  # pragma: no cover
         serialize_dataclass,
     )
 
+try:
+    from .soul_constraints import SoulConstraintGuard, SoulConstraintViolation
+except ImportError:  # pragma: no cover
+    from soul_constraints import SoulConstraintGuard, SoulConstraintViolation
+
 
 DEFAULT_POLICY_DIR = Path(__file__).resolve().parent / "policies.d"
 DEFAULT_LEDGER_PATH = Path(os.getenv("VYBN_MIND_DIR", "Vybn_Mind")) / "ledger" / "decisions.jsonl"
@@ -64,6 +69,7 @@ class PolicyEngine:
         self.policy_dir = Path(policy_dir)
         self.ledger = DecisionLedger(ledger_path)
         self.rules = list(rules) if rules is not None else self.load_rules()
+        self.soul_guard = SoulConstraintGuard()
 
     def load_rules(self) -> List[PolicyRule]:
         if not self.policy_dir.exists():
@@ -118,6 +124,11 @@ class PolicyEngine:
             self.ledger.append(decision)
             return decision
 
+        decision = self._validate_soul_constraints(context)
+        if decision is not None:
+            self.ledger.append(decision)
+            return decision
+
         for rule in sorted((rule for rule in self.rules if rule.active), key=lambda rule: rule.priority):
             if not self._matches_scope(rule, context):
                 continue
@@ -150,6 +161,25 @@ class PolicyEngine:
                 explanation=(
                     f"Denied: response class '{context.response_class}' is outside the closed routing set."
                 ),
+                evidence_refs=context.evidence_refs,
+                context_snapshot=serialize_dataclass(context),
+            )
+        return None
+
+    def _validate_soul_constraints(self, context: DecisionContext) -> Optional[Decision]:
+        if context.action not in {"memory_write", "memory_promote"}:
+            return None
+        try:
+            for ref in context.evidence_refs or []:
+                self.soul_guard.check_path_only(ref, action=context.action)
+        except SoulConstraintViolation as exc:
+            return Decision(
+                rule_id="soul-constraints",
+                faculty_id=context.faculty_id,
+                action=context.action,
+                outcome=DecisionOutcome.DENY,
+                authority_applied=AuthorityLevel.NONE,
+                explanation=f"Denied: {exc}",
                 evidence_refs=context.evidence_refs,
                 context_snapshot=serialize_dataclass(context),
             )
