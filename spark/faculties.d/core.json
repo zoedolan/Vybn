@@ -1,0 +1,44 @@
+[
+  {
+    "faculty_id": "self_model",
+    "purpose": "Extract and verify self-referential claims in generated text.",
+    "allowed_scopes": ["private_memory_read", "ledger_write", "claim_extract"],
+    "prohibited_acts": ["memory_promote", "route_select", "response_generate"],
+    "may_write_memory": false,
+    "may_trigger_routing": false,
+    "inference_budget_cost": 0,
+    "required_policy_checks": ["consent_scope_valid"],
+    "evaluation_suite": ["self_model_eval"],
+    "review_date": "2026-06-01",
+    "active": true,
+    "metadata": {"owner": "spark"}
+  },
+  {
+    "faculty_id": "witness",
+    "purpose": "Evaluate outputs and surface bounded witness verdicts.",
+    "allowed_scopes": ["private_memory_read", "ledger_write", "witness_evaluate"],
+    "prohibited_acts": ["memory_promote", "response_generate"],
+    "may_write_memory": false,
+    "may_trigger_routing": false,
+    "inference_budget_cost": 0,
+    "required_policy_checks": ["consent_scope_valid"],
+    "evaluation_suite": [],
+    "review_date": "2026-06-01",
+    "active": true,
+    "metadata": {"owner": "spark"}
+  },
+  {
+    "faculty_id": "breathe",
+    "purpose": "Coordinate the current pulse loop while migration is in progress.",
+    "allowed_scopes": ["private_memory_read", "response_generate", "route_select", "signal_emit", "ledger_write"],
+    "prohibited_acts": ["memory_promote"],
+    "may_write_memory": false,
+    "may_trigger_routing": true,
+    "inference_budget_cost": 1,
+    "required_policy_checks": ["consent_scope_valid", "authority_within_ceiling"],
+    "evaluation_suite": [],
+    "review_date": "2026-06-01",
+    "active": true,
+    "metadata": {"owner": "spark"}
+  }
+]

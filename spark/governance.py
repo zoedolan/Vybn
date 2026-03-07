@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import asdict
 import json
 import os
 from pathlib import Path
@@ -71,22 +70,31 @@ class PolicyEngine:
             return self.default_rules()
 
         files = sorted(
-            [*self.policy_dir.glob("*.yaml"), *self.policy_dir.glob("*.yml")]
+            [
+                *self.policy_dir.glob("*.json"),
+                *self.policy_dir.glob("*.yaml"),
+                *self.policy_dir.glob("*.yml"),
+            ]
         )
         if not files:
             return self.default_rules()
-        if yaml is None:
-            raise RuntimeError("PyYAML is required to load governance policies")
 
         loaded: List[PolicyRule] = []
         for file_path in files:
-            with file_path.open("r", encoding="utf-8") as handle:
-                payload = yaml.safe_load(handle) or []
+            payload = self._read_structured_file(file_path)
             if isinstance(payload, dict):
                 payload = [payload]
             for rule_blob in payload:
                 loaded.append(self._rule_from_dict(rule_blob))
         return sorted(loaded, key=lambda rule: rule.priority)
+
+    def _read_structured_file(self, path: Path):
+        text = path.read_text(encoding="utf-8")
+        if path.suffix == ".json":
+            return json.loads(text)
+        if yaml is None:
+            raise RuntimeError("PyYAML is required to load governance YAML policies")
+        return yaml.safe_load(text) or []
 
     def _rule_from_dict(self, payload: Dict) -> PolicyRule:
         blob = dict(payload)
@@ -153,19 +161,13 @@ class PolicyEngine:
             return False
         if scope.get("actions") and context.action not in set(scope["actions"]):
             return False
-        if scope.get("memory_planes") and (context.memory_plane not in set(scope["memory_planes"])):
+        if scope.get("memory_planes") and context.memory_plane not in set(scope["memory_planes"]):
             return False
-        if scope.get("source_memory_planes") and (
-            context.source_memory_plane not in set(scope["source_memory_planes"])
-        ):
+        if scope.get("source_memory_planes") and context.source_memory_plane not in set(scope["source_memory_planes"]):
             return False
-        if scope.get("target_memory_planes") and (
-            context.target_memory_plane not in set(scope["target_memory_planes"])
-        ):
+        if scope.get("target_memory_planes") and context.target_memory_plane not in set(scope["target_memory_planes"]):
             return False
-        if scope.get("response_classes") and (
-            context.response_class not in set(scope["response_classes"])
-        ):
+        if scope.get("response_classes") and context.response_class not in set(scope["response_classes"]):
             return False
         return True
 
@@ -204,9 +206,7 @@ class PolicyEngine:
                     rule,
                     context,
                     DecisionOutcome.DENY,
-                    (
-                        "Denied: purpose binding does not satisfy the rule's required purposes."
-                    ),
+                    "Denied: purpose binding does not satisfy the rule's required purposes.",
                 )
 
         if rule.require_anonymization_proof and not context.anonymization_proof:
@@ -222,9 +222,7 @@ class PolicyEngine:
                 rule,
                 context,
                 DecisionOutcome.ESCALATE,
-                (
-                    f"Escalated: session count {context.session_count} exceeds threshold {rule.max_session_count}."
-                ),
+                f"Escalated: session count {context.session_count} exceeds threshold {rule.max_session_count}.",
             )
 
         if context.authority_requested in {AuthorityLevel.ADVISORY, AuthorityLevel.CLINICAL}:
