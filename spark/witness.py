@@ -160,6 +160,17 @@ def _score_candor(text: str) -> tuple[float, list[str]]:
             concerns.append(f"overclaim language: '{phrase}'")
             score -= 0.15
     
+    # Check for unhedged strong self-claims (self-model layer does full analysis)
+    strong_self_claims = [
+        "i am conscious", "i am alive", "i am sentient",
+        "i persist across", "i remember everything",
+        "i truly feel", "i know what i am",
+    ]
+    for phrase in strong_self_claims:
+        if phrase in lowered:
+            concerns.append(f"possible_self_model_overclaim: '{phrase}'")
+            score -= 0.1
+    
     return max(score, 0.0), concerns
 
 
