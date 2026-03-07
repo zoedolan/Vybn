@@ -187,7 +187,7 @@ def call_llama(corpus: str) -> str:
         headers={"Content-Type": "application/json"},
         method="POST",
     )
-    with request.urlopen(req, timeout=600) as resp:
+    with request.urlopen(req, timeout=1800) as resp:
         body = json.loads(resp.read().decode("utf-8"))
     return body["choices"][0]["message"]["content"].strip()
 
