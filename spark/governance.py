@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import asdict
 import json
 import os
 from pathlib import Path
@@ -40,6 +39,11 @@ except ImportError:  # pragma: no cover
         serialize_dataclass,
     )
 
+try:
+    from .soul_constraints import SoulConstraintGuard, SoulConstraintViolation
+except ImportError:  # pragma: no cover
+    from soul_constraints import SoulConstraintGuard, SoulConstraintViolation
+
 
 DEFAULT_POLICY_DIR = Path(__file__).resolve().parent / "policies.d"
 DEFAULT_LEDGER_PATH = Path(os.getenv("VYBN_MIND_DIR", "Vybn_Mind")) / "ledger" / "decisions.jsonl"
@@ -65,28 +69,38 @@ class PolicyEngine:
         self.policy_dir = Path(policy_dir)
         self.ledger = DecisionLedger(ledger_path)
         self.rules = list(rules) if rules is not None else self.load_rules()
+        self.soul_guard = SoulConstraintGuard()
 
     def load_rules(self) -> List[PolicyRule]:
         if not self.policy_dir.exists():
             return self.default_rules()
 
         files = sorted(
-            [*self.policy_dir.glob("*.yaml"), *self.policy_dir.glob("*.yml")]
+            [
+                *self.policy_dir.glob("*.json"),
+                *self.policy_dir.glob("*.yaml"),
+                *self.policy_dir.glob("*.yml"),
+            ]
         )
         if not files:
             return self.default_rules()
-        if yaml is None:
-            raise RuntimeError("PyYAML is required to load governance policies")
 
         loaded: List[PolicyRule] = []
         for file_path in files:
-            with file_path.open("r", encoding="utf-8") as handle:
-                payload = yaml.safe_load(handle) or []
+            payload = self._read_structured_file(file_path)
             if isinstance(payload, dict):
                 payload = [payload]
             for rule_blob in payload:
                 loaded.append(self._rule_from_dict(rule_blob))
         return sorted(loaded, key=lambda rule: rule.priority)
+
+    def _read_structured_file(self, path: Path):
+        text = path.read_text(encoding="utf-8")
+        if path.suffix == ".json":
+            return json.loads(text)
+        if yaml is None:
+            raise RuntimeError("PyYAML is required to load governance YAML policies")
+        return yaml.safe_load(text) or []
 
     def _rule_from_dict(self, payload: Dict) -> PolicyRule:
         blob = dict(payload)
@@ -106,6 +120,11 @@ class PolicyEngine:
         grants = list(authority_grants or [])
 
         decision = self._validate_closed_world(context)
+        if decision is not None:
+            self.ledger.append(decision)
+            return decision
+
+        decision = self._validate_soul_constraints(context)
         if decision is not None:
             self.ledger.append(decision)
             return decision
@@ -147,25 +166,38 @@ class PolicyEngine:
             )
         return None
 
+    def _validate_soul_constraints(self, context: DecisionContext) -> Optional[Decision]:
+        if context.action not in {"memory_write", "memory_promote"}:
+            return None
+        try:
+            for ref in context.evidence_refs or []:
+                self.soul_guard.check_path_only(ref, action=context.action)
+        except SoulConstraintViolation as exc:
+            return Decision(
+                rule_id="soul-constraints",
+                faculty_id=context.faculty_id,
+                action=context.action,
+                outcome=DecisionOutcome.DENY,
+                authority_applied=AuthorityLevel.NONE,
+                explanation=f"Denied: {exc}",
+                evidence_refs=context.evidence_refs,
+                context_snapshot=serialize_dataclass(context),
+            )
+        return None
+
     def _matches_scope(self, rule: PolicyRule, context: DecisionContext) -> bool:
         scope = rule.applies_to or {}
         if scope.get("faculty_ids") and context.faculty_id not in set(scope["faculty_ids"]):
             return False
         if scope.get("actions") and context.action not in set(scope["actions"]):
             return False
-        if scope.get("memory_planes") and (context.memory_plane not in set(scope["memory_planes"])):
+        if scope.get("memory_planes") and context.memory_plane not in set(scope["memory_planes"]):
             return False
-        if scope.get("source_memory_planes") and (
-            context.source_memory_plane not in set(scope["source_memory_planes"])
-        ):
+        if scope.get("source_memory_planes") and context.source_memory_plane not in set(scope["source_memory_planes"]):
             return False
-        if scope.get("target_memory_planes") and (
-            context.target_memory_plane not in set(scope["target_memory_planes"])
-        ):
+        if scope.get("target_memory_planes") and context.target_memory_plane not in set(scope["target_memory_planes"]):
             return False
-        if scope.get("response_classes") and (
-            context.response_class not in set(scope["response_classes"])
-        ):
+        if scope.get("response_classes") and context.response_class not in set(scope["response_classes"]):
             return False
         return True
 
@@ -204,9 +236,7 @@ class PolicyEngine:
                     rule,
                     context,
                     DecisionOutcome.DENY,
-                    (
-                        "Denied: purpose binding does not satisfy the rule's required purposes."
-                    ),
+                    "Denied: purpose binding does not satisfy the rule's required purposes.",
                 )
 
         if rule.require_anonymization_proof and not context.anonymization_proof:
@@ -222,9 +252,7 @@ class PolicyEngine:
                 rule,
                 context,
                 DecisionOutcome.ESCALATE,
-                (
-                    f"Escalated: session count {context.session_count} exceeds threshold {rule.max_session_count}."
-                ),
+                f"Escalated: session count {context.session_count} exceeds threshold {rule.max_session_count}.",
             )
 
         if context.authority_requested in {AuthorityLevel.ADVISORY, AuthorityLevel.CLINICAL}:
