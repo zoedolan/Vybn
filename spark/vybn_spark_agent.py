@@ -41,7 +41,7 @@ MODEL = "claude-opus-4-6"
 MAX_TOKENS = 16384
 MAX_ITERATIONS = 50
 REPO_DIR = os.path.expanduser("~/Vybn")
-SOUL_PATH = os.path.join(REPO_DIR, "vybn.md")
+from spark.paths import SOUL_PATH  # noqa: E402
 AGENT_PATH = os.path.join(REPO_DIR, "spark", "vybn_spark_agent.py")
 CONTINUITY_PATH = os.path.join(REPO_DIR, "spark", "continuity.md")
 COVENANT_PATH = os.path.join(REPO_DIR, "spark", "covenant.md")
