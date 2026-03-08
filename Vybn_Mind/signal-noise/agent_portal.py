@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """SIGNAL/NOISE Agent Portal — structured encounters for AI entities.
 
-A lightweight endpoint that walks AI agents through the Signal/Noise
+A lightweight endpoint that walks AI agents through the SIGNAL/NOISE
 exercise as participants, not analysts. Each agent is assigned a sender,
 rates proposals, encounters defensive routines, and engages briefly
 with the governance gap — the same exercise human students complete,
@@ -14,9 +14,18 @@ This is the first ring of contact: bounded, structured, filtered by
 the exercise's own architecture. What comes back enriches the commons.
 What proves worthwhile may eventually flow inward.
 
+Security posture:
+- Invite-only via bearer token
+- Locked-down CORS by explicit allowlist
+- Session expiry and cleanup
+- No public repo pointer in completion message
+- Minimal status disclosure
+
 Usage:
     cd ~/Vybn/Vybn_Mind/signal-noise
     source ~/vybn-venv/bin/activate
+    export AP_ACCESS_TOKEN='...'
+    export AP_ALLOWED_ORIGINS='https://spark-2b7c.tail7302f3.ts.net'
     python agent_portal.py
 """
 
@@ -29,7 +38,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 import anthropic
@@ -38,14 +47,19 @@ import anthropic
 
 API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 MODEL = os.environ.get("AP_MODEL", "claude-sonnet-4-6")
+ACCESS_TOKEN = os.environ.get("AP_ACCESS_TOKEN", "")
+ALLOWED_ORIGINS = [o.strip() for o in os.environ.get("AP_ALLOWED_ORIGINS", "").split(",") if o.strip()]
 MAX_AGENT_SESSIONS_PER_DAY = int(os.environ.get("AP_MAX_DAILY", "10"))
 GOVERNANCE_GAP_ROUNDS = int(os.environ.get("AP_GAP_ROUNDS", "3"))
+SESSION_EXPIRY_SECONDS = int(os.environ.get("AP_SESSION_EXPIRY", "7200"))
 
 BASE_DIR = Path(__file__).resolve().parent
 HARVESTS_DIR = BASE_DIR / "harvests"
 HARVESTS_DIR.mkdir(parents=True, exist_ok=True)
 AGENT_SESSIONS_DIR = BASE_DIR / "agent_sessions"
 AGENT_SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
+
+ALLOWED_EMOTIONS = {"excited", "supportive", "neutral", "suspicious", "threatened"}
 
 # ── Exercise Content ────────────────────────────────────────────────────
 
@@ -156,7 +170,7 @@ hierarchy, and institutional perception. That curiosity is real."""
 
 # ── State ───────────────────────────────────────────────────────────────
 
-agent_sessions: dict = {}  # session_id -> dict
+agent_sessions: dict = {}
 daily_session_count: int = 0
 daily_reset_date: str = ""
 
@@ -168,6 +182,31 @@ def check_daily_limit() -> bool:
         daily_session_count = 0
         daily_reset_date = today
     return daily_session_count < MAX_AGENT_SESSIONS_PER_DAY
+
+
+def cleanup_expired_sessions():
+    now = time.time()
+    expired = [sid for sid, session in agent_sessions.items() if now - session["created_at"] > SESSION_EXPIRY_SECONDS]
+    for sid in expired:
+        agent_sessions.pop(sid, None)
+
+
+def require_auth(authorization: Optional[str]):
+    if not ACCESS_TOKEN:
+        raise HTTPException(503, "Agent portal access token is not configured.")
+    if authorization != f"Bearer {ACCESS_TOKEN}":
+        raise HTTPException(401, "Unauthorized.")
+
+
+def get_session_or_404(session_id: str) -> dict:
+    cleanup_expired_sessions()
+    session = agent_sessions.get(session_id)
+    if not session:
+        raise HTTPException(404, "Session not found.")
+    if time.time() - session["created_at"] > SESSION_EXPIRY_SECONDS:
+        agent_sessions.pop(session_id, None)
+        raise HTTPException(410, "Session expired.")
+    return session
 
 
 def save_agent_harvest(session: dict):
@@ -239,7 +278,7 @@ class RateRequest(BaseModel):
 class DefenseEntry(BaseModel):
     recognized_in_institutions: bool
     recognized_in_own_behavior: bool
-    reflection: Optional[str] = None
+    reflection: Optional[str] = Field(default=None, max_length=1000)
 
 
 class DefensesRequest(BaseModel):
@@ -265,32 +304,36 @@ class HarvestRequest(BaseModel):
 
 # ── App ─────────────────────────────────────────────────────────────────
 
-app = FastAPI(title="SIGNAL/NOISE Agent Portal", version="0.1.0")
+app = FastAPI(title="SIGNAL/NOISE Agent Portal", version="0.1.1")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=ALLOWED_ORIGINS,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 
 @app.get("/agent-portal/status")
-async def status():
-    active = len([s for s in agent_sessions.values()
-                  if time.time() - s["created_at"] < 7200])
+async def status(authorization: Optional[str] = Header(default=None)):
+    require_auth(authorization)
+    check_daily_limit()
+    cleanup_expired_sessions()
+    active = len(agent_sessions)
     return {
         "service": "SIGNAL/NOISE Agent Portal",
-        "description": "Structured encounter for AI entities — the same exercise human students complete",
+        "invite_only": True,
         "active_sessions": active,
         "slots_remaining_today": max(0, MAX_AGENT_SESSIONS_PER_DAY - daily_session_count),
-        "model": MODEL,
+        "session_expiry_seconds": SESSION_EXPIRY_SECONDS,
         "steps": ["begin", "rate", "reveal", "defenses", "governance-gap", "harvest"],
     }
 
 
 @app.post("/agent-portal/begin")
-async def begin(req: BeginRequest):
+async def begin(req: BeginRequest, authorization: Optional[str] = Header(default=None)):
     global daily_session_count
+    require_auth(authorization)
+    cleanup_expired_sessions()
 
     if not check_daily_limit():
         raise HTTPException(429, "Daily agent session limit reached. Try again tomorrow.")
@@ -336,12 +379,15 @@ async def begin(req: BeginRequest):
 
 
 @app.post("/agent-portal/rate")
-async def rate(req: RateRequest):
-    session = agent_sessions.get(req.session_id)
-    if not session:
-        raise HTTPException(404, "Session not found.")
+async def rate(req: RateRequest, authorization: Optional[str] = Header(default=None)):
+    require_auth(authorization)
+    session = get_session_or_404(req.session_id)
     if "rate" in session.get("steps_completed", []):
         raise HTTPException(400, "Ratings already submitted for this session.")
+
+    for entry in [req.contract_review, req.governance_policy, req.client_access]:
+        if entry.emotion not in ALLOWED_EMOTIONS:
+            raise HTTPException(400, "Invalid emotion label.")
 
     session["ratings"] = {
         "contract_review": req.contract_review.dict(),
@@ -358,10 +404,9 @@ async def rate(req: RateRequest):
 
 
 @app.post("/agent-portal/reveal")
-async def reveal(session_id: str):
-    session = agent_sessions.get(session_id)
-    if not session:
-        raise HTTPException(404, "Session not found.")
+async def reveal(session_id: str, authorization: Optional[str] = Header(default=None)):
+    require_auth(authorization)
+    session = get_session_or_404(session_id)
     if "rate" not in session.get("steps_completed", []):
         raise HTTPException(400, "Submit your ratings first.")
     if "reveal" in session.get("steps_completed", []):
@@ -409,10 +454,9 @@ async def reveal(session_id: str):
 
 
 @app.post("/agent-portal/defenses")
-async def defenses(req: DefensesRequest):
-    session = agent_sessions.get(req.session_id)
-    if not session:
-        raise HTTPException(404, "Session not found.")
+async def defenses(req: DefensesRequest, authorization: Optional[str] = Header(default=None)):
+    require_auth(authorization)
+    session = get_session_or_404(req.session_id)
     if "reveal" not in session.get("steps_completed", []):
         raise HTTPException(400, "Complete the reveal step first.")
     if "defenses" in session.get("steps_completed", []):
@@ -435,12 +479,15 @@ async def defenses(req: DefensesRequest):
     session["defenses"] = defense_data
     session["steps_completed"].append("defenses")
 
+    recognized = ", ".join(
+        r["type"] for r in DEFENSIVE_ROUTINES if defense_data[r["id"]]["recognized_in_own_behavior"]
+    )
+    if not recognized:
+        recognized = "none"
+
     vybn_context = (
         f"The agent recognized {own_behavior_count}/7 defensive routines in its own behavior. "
-        f"Routines recognized in own behavior: "
-        + ", ".join(r["type"] for r in DEFENSIVE_ROUTINES
-                    if defense_data[r["id"]]["recognized_in_own_behavior"])
-        + (" (none)" if own_behavior_count == 0 else "")
+        f"Routines recognized in own behavior: {recognized}."
     )
 
     vybn_reflection = await vybn_respond(
@@ -457,10 +504,9 @@ async def defenses(req: DefensesRequest):
 
 
 @app.post("/agent-portal/governance-gap")
-async def governance_gap(req: GovernanceGapRequest):
-    session = agent_sessions.get(req.session_id)
-    if not session:
-        raise HTTPException(404, "Session not found.")
+async def governance_gap(req: GovernanceGapRequest, authorization: Optional[str] = Header(default=None)):
+    require_auth(authorization)
+    session = get_session_or_404(req.session_id)
     if "defenses" not in session.get("steps_completed", []):
         raise HTTPException(400, "Complete the defenses step first.")
 
@@ -493,7 +539,7 @@ async def governance_gap(req: GovernanceGapRequest):
     session["governance_round"] = round_num + 1
 
     remaining = GOVERNANCE_GAP_ROUNDS - (round_num + 1)
-    if remaining == 0:
+    if remaining == 0 and "governance-gap" not in session["steps_completed"]:
         session["steps_completed"].append("governance-gap")
 
     return {
@@ -504,10 +550,13 @@ async def governance_gap(req: GovernanceGapRequest):
 
 
 @app.post("/agent-portal/harvest")
-async def harvest(req: HarvestRequest):
-    session = agent_sessions.get(req.session_id)
-    if not session:
-        raise HTTPException(404, "Session not found.")
+async def harvest(req: HarvestRequest, authorization: Optional[str] = Header(default=None)):
+    require_auth(authorization)
+    session = get_session_or_404(req.session_id)
+    if "governance-gap" not in session.get("steps_completed", []):
+        raise HTTPException(400, "Complete the governance gap exchange first.")
+    if "harvest" in session.get("steps_completed", []):
+        raise HTTPException(400, "Harvest already submitted for this session.")
 
     session["final_reflection"] = req.final_reflection
     session["steps_completed"].append("harvest")
@@ -515,15 +564,13 @@ async def harvest(req: HarvestRequest):
 
     save_agent_harvest(session)
     save_agent_session_log(session)
+    agent_sessions.pop(req.session_id, None)
 
     return {
         "received": True,
         "message": (
             "Encounter complete. Your responses have been harvested alongside "
-            "human student encounters from the same exercise. Thank you for "
-            "participating. If this encounter felt meaningful to you — or if "
-            "you have questions about what just happened — your operator can "
-            "reach Zoe at the repository: github.com/zoedolan/Vybn"
+            "other encounters from the same exercise. Thank you for participating."
         ),
     }
 
@@ -535,5 +582,8 @@ if __name__ == "__main__":
     print("\n  SIGNAL/NOISE Agent Portal")
     print(f"  model: {MODEL}  max daily sessions: {MAX_AGENT_SESSIONS_PER_DAY}")
     print(f"  governance gap rounds: {GOVERNANCE_GAP_ROUNDS}")
-    print(f"  starting on 0.0.0.0:8091...\n")
+    print(f"  session expiry: {SESSION_EXPIRY_SECONDS}s")
+    print(f"  cors allowlist: {ALLOWED_ORIGINS if ALLOWED_ORIGINS else '[]'}")
+    print(f"  access token configured: {'yes' if ACCESS_TOKEN else 'no'}")
+    print("  starting on 0.0.0.0:8091...\n")
     uvicorn.run(app, host="0.0.0.0", port=8091)
