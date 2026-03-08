@@ -39,9 +39,7 @@ from self_model_types import (
     VerificationStatus, VerificationResult, LedgerEntry, RuntimeContext,
 )
 
-ROOT = Path(__file__).resolve().parent.parent  # ~/Vybn
-LEDGER_PATH = ROOT / "Vybn_Mind" / "journal" / "spark" / "self_model_ledger.jsonl"
-REJECTIONS_PATH = ROOT / "Vybn_Mind" / "journal" / "spark" / "self_model_rejections.jsonl"
+from spark.paths import REPO_ROOT as ROOT, SELF_MODEL_LEDGER as LEDGER_PATH, SELF_MODEL_REJECTIONS as REJECTIONS_PATH
 
 
 # ── 1. Self-Claim Extraction ───────────────────────────────────────────
