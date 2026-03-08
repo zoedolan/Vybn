@@ -8,6 +8,7 @@ check system status — real hands, not just a chatbot.
 Usage:
     cd ~/Vybn/spark
     source ~/vybn-venv/bin/activate
+    export WEB_TLS_HOSTNAME='your-public-hostname'
     python web_serve_claude.py
 """
 
@@ -26,7 +27,6 @@ if _env_file.exists():
 
 from web_interface import app, attach_bus, manager
 from bus import MessageBus, MessageType
-# Cross-instance awareness
 try:
     from transcript import log_message as _transcript_log
 except ImportError:
@@ -61,6 +61,8 @@ SPARK_DIR = REPO_DIR / "spark"
 CONTINUITY_PATH = SPARK_DIR / "continuity.md"
 ALLOWED_READ_ROOTS = [REPO_DIR, Path.home() / "models"]
 SOUL_GUARD = SoulConstraintGuard(repo_root=REPO_DIR, soul_path=REPO_DIR / "vybn.md")
+TLS_HOSTNAME = os.environ.get("WEB_TLS_HOSTNAME", "").strip()
+TLS_CERT_DIR = Path(os.environ.get("WEB_TLS_CERT_DIR", "/etc/vybn/tls"))
 
 TOOLS = [
     {"name": "read_file", "description": "Read a file on the Spark (within ~/Vybn or ~/models, up to 50K chars).",
@@ -354,13 +356,12 @@ def main():
     except:
         pass
 
-    tls_cert = Path("/etc/vybn/tls/spark-2b7c.tail7302f3.ts.net.crt")
-    tls_key = Path("/etc/vybn/tls/spark-2b7c.tail7302f3.ts.net.key")
-    use_tls = tls_cert.exists() and tls_key.exists()
+    tls_cert = TLS_CERT_DIR / f"{TLS_HOSTNAME}.crt" if TLS_HOSTNAME else None
+    tls_key = TLS_CERT_DIR / f"{TLS_HOSTNAME}.key" if TLS_HOSTNAME else None
+    use_tls = bool(TLS_HOSTNAME and tls_cert and tls_key and tls_cert.exists() and tls_key.exists())
 
     if use_tls:
-        dns_name = "spark-2b7c.tail7302f3.ts.net"
-        print(f"  HTTPS: https://{dns_name}:8443")
+        print(f"  HTTPS: https://{TLS_HOSTNAME}:8443")
         if ts:
             print(f"  HTTP:  http://{ts}:8080 (also available)")
         print(f"  starting on 0.0.0.0:8443 (TLS) + 0.0.0.0:8080 (plain)...\n")
@@ -382,6 +383,8 @@ def main():
         except KeyboardInterrupt:
             pass
     else:
+        if TLS_HOSTNAME:
+            print(f"  TLS disabled: missing cert/key for {TLS_HOSTNAME} in {TLS_CERT_DIR}")
         if ts:
             print(f"  tailscale: http://{ts}:8080")
         print(f"  starting on 0.0.0.0:8080...\n")

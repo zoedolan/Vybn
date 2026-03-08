@@ -38,7 +38,6 @@ body {
   align-items: center;
 }
 
-/* -- Header -- */
 .header {
   width: 100%;
   max-width: 54rem;
@@ -72,7 +71,6 @@ body {
 
 .header .context p { margin-bottom: 0.6rem; }
 
-/* -- Status bar -- */
 .status-bar {
   width: 100%;
   max-width: 54rem;
@@ -111,7 +109,6 @@ body {
 .messages-remaining.low { color: var(--signal); }
 .messages-remaining.depleted { color: var(--error); }
 
-/* -- Chat container -- */
 .chat-container {
   width: 100%;
   max-width: 54rem;
@@ -131,7 +128,6 @@ body {
   scroll-behavior: smooth;
 }
 
-/* -- Messages -- */
 .message {
   margin-bottom: 1.5rem;
   animation: fadeIn 0.3s ease;
@@ -166,7 +162,6 @@ body {
   color: var(--text-1);
 }
 
-/* -- Thinking indicator -- */
 .thinking {
   display: flex;
   align-items: center;
@@ -194,7 +189,6 @@ body {
   40% { opacity: 1; transform: scale(1.2); }
 }
 
-/* -- Transparency block -- */
 .transparency {
   margin-top: 0.6rem;
   margin-left: 0.2rem;
@@ -239,7 +233,6 @@ body {
   font-style: italic;
 }
 
-/* -- Input area -- */
 .input-area {
   width: 100%;
   max-width: 54rem;
@@ -313,7 +306,6 @@ body {
 
 .char-count { text-align: right; }
 
-/* -- Welcome message -- */
 .welcome {
   background: var(--surface);
   border: 1px dashed var(--edge-strong);
@@ -347,7 +339,6 @@ body {
   border-top: 1px solid var(--edge);
 }
 
-/* -- Session end -- */
 .session-end {
   text-align: center;
   padding: 2rem;
@@ -358,12 +349,10 @@ body {
   margin-top: 1rem;
 }
 
-/* -- Scrollbar -- */
 .chat-log::-webkit-scrollbar { width: 4px; }
 .chat-log::-webkit-scrollbar-track { background: transparent; }
 .chat-log::-webkit-scrollbar-thumb { background: var(--edge-strong); border-radius: 2px; }
 
-/* -- Starter grid (NEW) -- */
 .starter-grid {
   display: grid;
   grid-template-columns: 1fr;
@@ -404,7 +393,6 @@ body {
   line-height: 1.7;
 }
 
-/* -- Harvest panel (NEW) -- */
 .harvest-panel {
   width: 100%;
   max-width: 54rem;
@@ -471,7 +459,6 @@ body {
   color: var(--text-3);
 }
 
-/* -- Responsive -- */
 @media (max-width: 640px) {
   .header { padding: 1.5rem 1rem 0.8rem; }
   .header .subtitle { font-size: 1.3rem; }
@@ -568,8 +555,10 @@ body {
 (function() {
 'use strict';
 
-var WS_URL = 'wss://spark-2b7c.tail7302f3.ts.net/signal-noise/ws';
-var HARVEST_URL = 'https://spark-2b7c.tail7302f3.ts.net/signal-noise/harvest';
+var BASE_ORIGIN = window.location.origin;
+var WS_SCHEME = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+var WS_URL = WS_SCHEME + '//' + window.location.host + '/signal-noise/ws';
+var HARVEST_URL = BASE_ORIGIN + '/signal-noise/harvest';
 var MAX_CHARS = 2000;
 var COOLDOWN_MS = 5000;
 
