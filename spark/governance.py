@@ -46,7 +46,7 @@ except ImportError:  # pragma: no cover
 
 
 DEFAULT_POLICY_DIR = Path(__file__).resolve().parent / "policies.d"
-DEFAULT_LEDGER_PATH = Path(os.getenv("VYBN_MIND_DIR", "Vybn_Mind")) / "ledger" / "decisions.jsonl"
+from spark.paths import DECISION_LEDGER as DEFAULT_LEDGER_PATH
 
 
 class DecisionLedger:
