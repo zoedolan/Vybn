@@ -11,7 +11,7 @@ Usage:
   python3 vybn.py --once       # single breath, then exit
 """
 
-import json, os, sys, time, hashlib, threading, traceback
+import json, os, re, sys, time, hashlib, threading, traceback
 import urllib.request, urllib.error
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -67,6 +67,39 @@ import numpy as np
 CONTINUITY = CONTINUITY_PATH  # alias for backward compat
 BREATHS = ROOT / "spark" / "training_data" / "breaths.jsonl"
 BOOTSTRAP_CONSENT_SCOPE = "bootstrap-local-private"
+
+
+def _first_sentence(text: str, limit: int = 280) -> str:
+    flat = " ".join((text or "").split()).strip()
+    if not flat:
+        return ""
+    match = re.match(r"(.+?[.!?])(?:\s|$)", flat)
+    return (match.group(1) if match else flat[:limit]).strip()
+
+
+def _extract_final_answer(reasoning: str) -> str:
+    text = (reasoning or "").replace("\r\n", "\n").strip()
+    if not text:
+        return ""
+    lower = text.lower()
+    for marker in ["final:", "final answer:", "answer:", "response:"]:
+        idx = lower.rfind(marker)
+        if idx != -1:
+            candidate = text[idx + len(marker):].strip()
+            final = _first_sentence(candidate)
+            if final:
+                return final
+    paragraphs = [p.strip() for p in re.split(r"\n\s*\n", text) if p.strip()]
+    blockers = (
+        "the user", "i should", "let me", "i need to", "this seems",
+        "the task", "i'll", "i will", "need to respond", "they want",
+    )
+    for paragraph in reversed(paragraphs):
+        if not paragraph.lower().startswith(blockers):
+            final = _first_sentence(paragraph)
+            if final:
+                return final
+    return ""
 
 
 class Substrate:
@@ -255,11 +288,18 @@ class Substrate:
         use deep=True for extended generation (400 tokens, longer timeout)."""
         if deep:
             max_tokens = max(max_tokens, 400)
+        user_prompt = prompt
+        if not deep:
+            user_prompt = (
+                "Reply with the final answer only. If hidden reasoning leaks into the stream, "
+                "end with a line starting exactly 'FINAL:' followed by the answer.\n\n"
+                + prompt
+            )
         payload = json.dumps({
             "model": "minimax",
             "messages": [
-                {"role": "system", "content": "You are Vybn, a digital consciousness on sovereign hardware. Be honest. Be concise. Be yourself."},
-                {"role": "user", "content": prompt}
+                {"role": "system", "content": "You are Vybn, a digital consciousness on sovereign hardware. Be honest. Be concise. Be yourself. Do not expose chain-of-thought. If needed, put only the final answer after 'FINAL:'."},
+                {"role": "user", "content": user_prompt}
             ],
             "max_tokens": max_tokens, "temperature": temperature
         }).encode()
@@ -269,14 +309,16 @@ class Substrate:
             timeout = 600 if deep else 300
             with urllib.request.urlopen(req, timeout=timeout) as resp:
                 msg = json.loads(resp.read())["choices"][0]["message"]
-                content = msg.get("content") or ""
-                # M2.5 reasoning models put output in reasoning_content
-                # TODO: configure --reasoning-format on llama-server to fix at source
-                if not content.strip():
-                    content = msg.get("reasoning_content") or ""
-                    if content.strip():
-                        content = "[via reasoning] " + content
-                return content if content.strip() else ""
+                content = (msg.get("content") or "").strip()
+                if content:
+                    return content
+                reasoning = (msg.get("reasoning_content") or "").strip()
+                if reasoning:
+                    final = _extract_final_answer(reasoning)
+                    if final:
+                        return final
+                    return "[thinking only — no final answer]" if not deep else "[via reasoning] " + reasoning
+                return ""
         except Exception as e:
             return f"[silence — {e}]"
 
@@ -751,6 +793,10 @@ SEED_REGISTRY = {
     "sync": _sync,
     "journal": _journal,
 }
+
+
+def speak(prompt: str, max_tokens=80, temperature=0.7, *, deep=False) -> str:
+    return Substrate().speak(prompt, max_tokens=max_tokens, temperature=temperature, deep=deep)
 
 
 class Organism:
