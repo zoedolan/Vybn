@@ -3,10 +3,9 @@ from __future__ import annotations
 import hashlib
 import json
 import sqlite3
-from dataclasses import asdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 from uuid import uuid4
 
 try:
@@ -419,6 +418,49 @@ class MemoryFabric:
 
     def recent(self, plane: MemoryPlane, n: int = 10) -> list[MemoryEntry]:
         return self.read(plane, limit=n)
+
+    def read_patterns(self, limit: int = 10) -> list[dict[str, Any]]:
+        rows = self._connection_for(MemoryPlane.COMMONS).execute(
+            """
+            SELECT pattern_id, features, k_anonymity_level, privacy_budget_spent,
+                   promotion_receipt_id, source_count, created_at, metadata
+            FROM patterns
+            ORDER BY created_at DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+        return [
+            {
+                "pattern_id": row["pattern_id"],
+                "features": json.loads(row["features"] or "{}"),
+                "k_anonymity_level": row["k_anonymity_level"],
+                "privacy_budget_spent": row["privacy_budget_spent"],
+                "promotion_receipt_id": row["promotion_receipt_id"],
+                "source_count": row["source_count"],
+                "created_at": row["created_at"],
+                "metadata": json.loads(row["metadata"] or "{}"),
+            }
+            for row in rows
+        ]
+
+    def snapshot(
+        self,
+        *,
+        private_n: int = 5,
+        relational_n: int = 5,
+        commons_n: int = 5,
+    ) -> dict[str, Any]:
+        private_entries = self.recent(MemoryPlane.PRIVATE, n=private_n)
+        relational_entries = self.recent(MemoryPlane.RELATIONAL, n=relational_n)
+        commons_patterns = self.read_patterns(limit=commons_n)
+        stats = self.stats()
+        return {
+            "private": private_entries,
+            "relational": relational_entries,
+            "commons": commons_patterns,
+            "stats": stats,
+        }
 
     def stats(self) -> dict:
         stats: dict[str, Any] = {}

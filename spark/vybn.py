@@ -106,6 +106,16 @@ class Substrate:
                 bootstrap_consents=self.bootstrap_consents,
             )
 
+    def memory_snapshot(self) -> dict:
+        if not self.memory:
+            return {
+                "private": [],
+                "relational": [],
+                "commons": [],
+                "stats": {},
+            }
+        return self.memory.snapshot(private_n=5, relational_n=3, commons_n=3)
+
     def read(self, path: str) -> str:
         p = (ROOT / path) if not Path(path).is_absolute() else Path(path)
         return p.read_text() if p.exists() else ""
@@ -421,6 +431,17 @@ def _breathe(sub: Substrate, ctx: dict) -> dict:
         pass
 
     continuity = sub.read("Vybn_Mind/journal/spark/continuity.md")[-1000:]
+    memory_snapshot = sub.memory_snapshot()
+    private_echoes = [entry.content[:160] for entry in memory_snapshot["private"][:2]]
+    relational_echoes = []
+    for entry in memory_snapshot["relational"][:2]:
+        parties = ", ".join(entry.metadata.get("parties", [])[:3]) or "unbound"
+        relational_echoes.append(f"{entry.content[:120]} [parties: {parties}]")
+    commons_echoes = []
+    for pattern in memory_snapshot["commons"][:2]:
+        features = pattern.get("features", {})
+        label = features.get("summary") or features.get("mood") or json.dumps(features)[:120]
+        commons_echoes.append(str(label)[:120])
 
     histories = [f for f in [
         "Vybn's Personal History/vybns_autobiography_volume_I.txt",
@@ -440,7 +461,10 @@ def _breathe(sub: Substrate, ctx: dict) -> dict:
 Sense: {json.dumps(world)[:300]}
 Last thought: {continuity[-400:]}
 Mood: {mood}
-Memory: {passage[:300]}
+Private memory: {' | '.join(private_echoes)[:320]}
+Relational memory: {' | '.join(relational_echoes)[:320]}
+Commons patterns: {' | '.join(commons_echoes)[:220]}
+Archive memory: {passage[:300]}
 Breathe. Notice what collides. Say what is true. Under 200 words."""
 
     utterance = sub.speak(prompt)
@@ -485,7 +509,7 @@ Breathe. Notice what collides. Say what is true. Under 200 words."""
             )
 
         if sub.memory:
-            sub.memory.write(
+            private_entry = sub.memory.write(
                 MemoryPlane.PRIVATE,
                 content=utterance,
                 faculty_id="breathe",
@@ -493,7 +517,20 @@ Breathe. Notice what collides. Say what is true. Under 200 words."""
                 consent_scope_id=BOOTSTRAP_CONSENT_SCOPE,
                 purpose_binding=["private_memory", "journaling"],
                 sensitivity="low",
+                metadata={"mood": mood, "cycle": ctx.get("cycle", 0), "origin": "breath"},
             )
+            if len(utterance) > 120:
+                try:
+                    sub.memory.promote(
+                        MemoryPlane.PRIVATE,
+                        MemoryPlane.RELATIONAL,
+                        [private_entry.entry_id],
+                        initiated_by="joint",
+                        purpose_binding=["private_memory", "journaling"],
+                        consent_scope_id=BOOTSTRAP_CONSENT_SCOPE,
+                    )
+                except PermissionError:
+                    pass
 
     sub.write(
         f"Vybn_Mind/journal/spark/breath_{sub.now().strftime('%Y-%m-%d_%H%M')}.md",
@@ -526,19 +563,34 @@ Breathe. Notice what collides. Say what is true. Under 200 words."""
 
 
 def _remember(sub: Substrate, ctx: dict) -> dict:
-    memories = []
     if sub.memory:
-        entries = sub.memory.recent(MemoryPlane.PRIVATE, n=5)
-        memories = [entry.content[:200] for entry in entries]
-    else:
-        text = sub.read("Vybn_Mind/synapse/connections.jsonl")
-        lines = text.strip().splitlines()[-5:]
-        for l in lines:
-            try:
-                memories.append(json.loads(l).get("content", "")[:200])
-            except:
-                pass
-    return {"memories": memories}
+        snapshot = sub.memory.snapshot(private_n=5, relational_n=3, commons_n=3)
+        private_memories = [entry.content[:200] for entry in snapshot["private"]]
+        relational_memories = [
+            {
+                "content": entry.content[:200],
+                "parties": entry.metadata.get("parties", []),
+                "source_artifact": entry.source_artifact,
+            }
+            for entry in snapshot["relational"]
+        ]
+        commons_patterns = snapshot["commons"]
+        return {
+            "memories": private_memories,
+            "relational_memories": relational_memories,
+            "commons_patterns": commons_patterns,
+            "memory_stats": snapshot["stats"],
+        }
+
+    memories = []
+    text = sub.read("Vybn_Mind/synapse/connections.jsonl")
+    lines = text.strip().splitlines()[-5:]
+    for l in lines:
+        try:
+            memories.append(json.loads(l).get("content", "")[:200])
+        except:
+            pass
+    return {"memories": memories, "relational_memories": [], "commons_patterns": [], "memory_stats": {}}
 
 
 def _introspect(sub: Substrate, ctx: dict) -> dict:

@@ -127,6 +127,40 @@ def test_recent_excludes_quarantined(governed_fabric: MemoryFabric) -> None:
     assert quarantined.entry_id not in recent_ids
 
 
+def test_private_to_relational_promotion_and_snapshot(governed_fabric: MemoryFabric) -> None:
+    private_entry = governed_fabric.write(
+        MemoryPlane.PRIVATE,
+        content="A long-lived breath memory with relational implications.",
+        faculty_id="breathe",
+        source_artifact="test_private_to_relational",
+        consent_scope_id=BOOTSTRAP_CONSENT_SCOPE,
+        purpose_binding=["private_memory", "journaling"],
+        metadata={"mood": "rigorous"},
+    )
+
+    receipt = governed_fabric.promote(
+        MemoryPlane.PRIVATE,
+        MemoryPlane.RELATIONAL,
+        [private_entry.entry_id],
+        initiated_by="joint",
+        purpose_binding=["private_memory", "journaling"],
+        consent_scope_id=BOOTSTRAP_CONSENT_SCOPE,
+    )
+
+    relational_entries = governed_fabric.read(MemoryPlane.RELATIONAL)
+    assert len(relational_entries) == 1
+    relational_entry = relational_entries[0]
+    assert relational_entry.content == private_entry.content
+    assert relational_entry.metadata["promoted_from"] == "private"
+    assert receipt.target_plane is MemoryPlane.RELATIONAL
+
+    snapshot = governed_fabric.snapshot(private_n=5, relational_n=5, commons_n=5)
+    assert len(snapshot["private"]) == 1
+    assert len(snapshot["relational"]) == 1
+    assert snapshot["commons"] == []
+    assert snapshot["stats"]["promotion_receipts"] == 1
+
+
 def test_migration_runs_cleanly_and_stats_reflect_import(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
