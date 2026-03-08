@@ -601,6 +601,7 @@ textarea::placeholder{color:var(--text-ghost)}
   <a href="https://www.perplexity.ai/computer" target="_blank" rel="noopener noreferrer">Created with Perplexity Computer</a>
 </footer>
 
+<script src="backend.js"></script>
 <script>
 (function(){
 'use strict';
@@ -879,8 +880,7 @@ updateNav();
 /* ── REFLECTION SPACES ────────────────────────── */
 
 var rsWidgets = {};
-var RS_WS_PROTOCOL = location.protocol === 'https:' ? 'wss:' : 'ws:';
-var RS_WS_BASE = RS_WS_PROTOCOL + '//' + location.host;
+var RS_WS_BASE = VYBN_BACKEND.wsUrl('');
 var RS_COOLDOWN = 5000;
 
 function rsInit(widgetId) {
