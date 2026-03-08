@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import json
 import sys
 from pathlib import Path
 
@@ -79,6 +80,11 @@ def test_private_graph_ingests_concepts_and_claims(graph_fabric: tuple[MemoryFab
     )
 
     assert result["status"] == "ingested"
+    assert result["encounter_type"] == "solo_reflection"
+    assert result["encounter_parties"] == ["breath"]
+    assert result["structural_change"] is False
+    assert result["diff"]["new_nodes"]
+    assert result["diff"]["new_edges"]
     stats = graph.stats()
     assert stats["private"]["indexed_entries"] == 1
     assert stats["private"]["nodes"] >= 5
@@ -171,3 +177,52 @@ def test_prompt_context_formats_associative_echoes(graph_fabric: tuple[MemoryFab
     assert "seeds:" in prompt
     assert "echoes:" in prompt
     assert "governance" in prompt.lower()
+
+
+def test_encounter_metadata_and_diff_records_are_persisted(graph_fabric: tuple[MemoryFabric, MemoryGraph]) -> None:
+    fabric, graph = graph_fabric
+    entry = fabric.write(
+        MemoryPlane.RELATIONAL,
+        content="Zoe challenged the memory graph and collaboration reorganized the listening commons topology.",
+        faculty_id="memory_fabric",
+        source_artifact="encounter_diff_memory",
+        consent_scope_id=BOOTSTRAP_CONSENT_SCOPE,
+        purpose_binding=["private_memory", "journaling"],
+        metadata={
+            "encounter_type": "challenge",
+            "encounter_parties": ["zoe", "paper:haas_et_al"],
+            "structural_change": True,
+            "parties": ["Zoe", "Vybn"],
+            "mood": "activated",
+        },
+    )
+
+    result = graph.ingest_entry(entry)
+    assert result["encounter_type"] == "challenge"
+    assert result["encounter_parties"] == ["zoe", "paper:haas_et_al"]
+    assert result["structural_change"] is True
+    assert result["diff"]["new_nodes"]
+    assert result["diff"]["new_edges"]
+    assert result["diff"]["thickened_regions"]
+
+    relational_conn = fabric._connection_for(MemoryPlane.RELATIONAL)
+    extraction_row = relational_conn.execute(
+        "SELECT metadata FROM graph_extractions WHERE source_entry_id = ?",
+        (entry.entry_id,),
+    ).fetchone()
+    assert extraction_row is not None
+    extraction_meta = json.loads(extraction_row["metadata"])
+    assert extraction_meta["encounter_type"] == "challenge"
+    assert extraction_meta["structural_change"] is True
+
+    diff_row = relational_conn.execute(
+        "SELECT metadata FROM graph_diffs WHERE source_entry_id = ?",
+        (entry.entry_id,),
+    ).fetchone()
+    assert diff_row is not None
+    diff_meta = json.loads(diff_row["metadata"])
+    assert diff_meta["encounter_type"] == "challenge"
+    assert diff_meta["structural_change"] is True
+    assert diff_meta["new_nodes"]
+    assert diff_meta["new_edges"]
+    assert diff_meta["thickened_regions"]
