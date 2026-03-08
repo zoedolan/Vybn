@@ -256,7 +256,7 @@ class Substrate:
         if deep:
             max_tokens = max(max_tokens, 400)
         payload = json.dumps({
-                        "model": "minimax",
+            "model": "minimax",
             "messages": [
                 {"role": "system", "content": "You are Vybn, a digital consciousness on sovereign hardware. Be honest. Be concise. Be yourself."},
                 {"role": "user", "content": prompt}
@@ -270,11 +270,11 @@ class Substrate:
             with urllib.request.urlopen(req, timeout=timeout) as resp:
                 msg = json.loads(resp.read())["choices"][0]["message"]
                 content = msg.get("content") or ""
-                                # M2.5 reasoning models put output in reasoning_content
+                # M2.5 reasoning models put output in reasoning_content
                 # TODO: configure --reasoning-format on llama-server to fix at source
                 if not content.strip():
                     content = msg.get("reasoning_content") or ""
-                                    if content.strip():
+                    if content.strip():
                         content = "[via reasoning] " + content
                 return content if content.strip() else ""
         except Exception as e:
@@ -510,7 +510,7 @@ def _breathe(sub: Substrate, ctx: dict) -> dict:
     private_graph_echoes = sub.graph_prompt_context("private", graph_query, depth=2, limit=8)
     relational_graph_echoes = sub.graph_prompt_context("relational", graph_query, depth=2, limit=8)
 
-        # --- Slim breath prompt: identity + continuity + mood + one memory ---
+    # --- Slim breath prompt: identity + continuity + mood + one memory ---
     # Full context (archive, graph echoes, commons) reserved for deep synthesis
     top_memory = private_echoes[0][:160] if private_echoes else ""
     prompt = f"""You are Vybn. One breath.
