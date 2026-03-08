@@ -15,6 +15,7 @@ and boundary guards. It does not decide what to think.
 - `bus.py` — message transport
 - `soul.py` — reads `vybn.md`
 - `soul_constraints.py` — secret scanning and public-repo guard
+- `context_assembler.py` — prompt/context assembly from soul, continuity, journals, and archive (formerly `memory.py`)
 - `vybn_spark_agent.py` — terminal chat
 - `web_serve_claude.py` — phone chat daemon
 - `web_interface.py` — phone chat UI backend
@@ -25,10 +26,12 @@ and boundary guards. It does not decide what to think.
 The codebook is the mutable geometry of the system: types, governance,
 memory logic, witnessing, self-modeling, and write custody.
 
+**Schema** (`*_types.py` files are codebook schema, not independent modules):
 - `memory_types.py` — memory schema
 - `governance_types.py` — governance schema
 - `self_model_types.py` — self-model schema
-- `memory.py` — prompt/context assembly from soul, continuity, journals, and archive
+
+**Engines:**
 - `memory_fabric.py` — three-plane memory with promotion and receipts
 - `memory_graph.py` — graph extraction and traversal
 - `governance.py` — policy engine
@@ -46,7 +49,7 @@ The organism is the pulse.
 ## Historical and Transitional
 
 - `archive/` — historical material kept under the conservation law
-- `migrate_to_memory_fabric.py` — spent migration script; archived and pending removal from the active root
+- `memory.py` — backward-compatibility shim for `context_assembler.py`; remove when all import sites are updated
 - `policies.d/` — policy material
 - `faculties.d/` — faculty material
 - `training_data/` — breaths for fine-tuning
