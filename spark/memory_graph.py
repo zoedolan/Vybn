@@ -150,6 +150,18 @@ CREATE TABLE IF NOT EXISTS graph_extractions (
 CREATE INDEX IF NOT EXISTS idx_graph_extractions_artifact ON graph_extractions(source_artifact);
 """
 
+GRAPH_DIFFS_SCHEMA = """
+CREATE TABLE IF NOT EXISTS graph_diffs (
+    diff_id TEXT PRIMARY KEY,
+    source_entry_id TEXT NOT NULL,
+    plane TEXT NOT NULL,
+    diffed_at TEXT NOT NULL,
+    metadata TEXT DEFAULT '{}'
+);
+CREATE INDEX IF NOT EXISTS idx_graph_diffs_entry ON graph_diffs(source_entry_id);
+CREATE INDEX IF NOT EXISTS idx_graph_diffs_plane ON graph_diffs(plane);
+"""
+
 
 class MemoryGraph:
     """Associative graph layer that sits above the governed memory fabric."""
@@ -183,10 +195,12 @@ class MemoryGraph:
         conn = self.fabric._connection_for(entry.plane)
         ts = self.fabric._utc_now()
         entry_node_id = self._entry_node_id(entry.entry_id)
-        created_nodes = 0
-        created_edges = 0
+        encounter_type = self._encounter_type(entry)
+        encounter_parties = self._encounter_parties(entry)
+        structural_change = self._structural_change(entry)
+        diff_tracker = self._new_diff_tracker(entry, ts)
 
-        created_nodes += self._upsert_node(
+        self._upsert_node(
             conn,
             node_id=entry_node_id,
             label=self._entry_label(entry),
@@ -203,12 +217,16 @@ class MemoryGraph:
                 "sensitivity": entry.sensitivity,
                 "mood": entry.metadata.get("mood"),
                 "content_preview": entry.content[:280],
+                "encounter_type": encounter_type,
+                "encounter_parties": encounter_parties,
+                "structural_change": structural_change,
             },
+            diff_tracker=diff_tracker,
         )
 
         if entry.source_artifact:
             artifact_node_id = f"artifact:{self._slug(entry.source_artifact)}"
-            created_nodes += self._upsert_node(
+            self._upsert_node(
                 conn,
                 node_id=artifact_node_id,
                 label=entry.source_artifact,
@@ -216,9 +234,14 @@ class MemoryGraph:
                 description=f"Source artifact for {entry.entry_id}",
                 salience=0.75,
                 now=ts,
-                metadata={"source_artifact": entry.source_artifact},
+                metadata={
+                    "source_artifact": entry.source_artifact,
+                    "encounter_type": encounter_type,
+                    "encounter_parties": encounter_parties,
+                },
+                diff_tracker=diff_tracker,
             )
-            created_edges += self._upsert_edge(
+            self._upsert_edge(
                 conn,
                 source_node_id=entry_node_id,
                 target_node_id=artifact_node_id,
@@ -227,12 +250,18 @@ class MemoryGraph:
                 provenance_entry_id=entry.entry_id,
                 provenance_artifact=entry.source_artifact,
                 now=ts,
-                metadata={"plane": entry.plane.value},
+                metadata={
+                    "plane": entry.plane.value,
+                    "encounter_type": encounter_type,
+                    "encounter_parties": encounter_parties,
+                    "structural_change": structural_change,
+                },
+                diff_tracker=diff_tracker,
             )
 
         if entry.source_signal_id:
             signal_node_id = f"signal:{self._slug(entry.source_signal_id)}"
-            created_nodes += self._upsert_node(
+            self._upsert_node(
                 conn,
                 node_id=signal_node_id,
                 label=entry.source_signal_id,
@@ -240,9 +269,13 @@ class MemoryGraph:
                 description="Source signal that contributed to this memory.",
                 salience=0.7,
                 now=ts,
-                metadata={"source_signal_id": entry.source_signal_id},
+                metadata={
+                    "source_signal_id": entry.source_signal_id,
+                    "encounter_type": encounter_type,
+                },
+                diff_tracker=diff_tracker,
             )
-            created_edges += self._upsert_edge(
+            self._upsert_edge(
                 conn,
                 source_node_id=entry_node_id,
                 target_node_id=signal_node_id,
@@ -251,13 +284,79 @@ class MemoryGraph:
                 provenance_entry_id=entry.entry_id,
                 provenance_artifact=entry.source_artifact,
                 now=ts,
-                metadata={"plane": entry.plane.value},
+                metadata={
+                    "plane": entry.plane.value,
+                    "encounter_type": encounter_type,
+                    "encounter_parties": encounter_parties,
+                    "structural_change": structural_change,
+                },
+                diff_tracker=diff_tracker,
             )
+
+        encounter_type_node_id = f"encounter_type:{self._slug(encounter_type)}"
+        self._upsert_node(
+            conn,
+            node_id=encounter_type_node_id,
+            label=encounter_type,
+            node_type="encounter_type",
+            description="Encounter type attached to a memory entry.",
+            salience=0.74,
+            now=ts,
+            metadata={"encounter_type": encounter_type},
+            diff_tracker=diff_tracker,
+        )
+        self._upsert_edge(
+            conn,
+            source_node_id=entry_node_id,
+            target_node_id=encounter_type_node_id,
+            relation_type="HAS_ENCOUNTER_TYPE",
+            weight=0.88,
+            provenance_entry_id=entry.entry_id,
+            provenance_artifact=entry.source_artifact,
+            now=ts,
+            metadata={
+                "plane": entry.plane.value,
+                "encounter_type": encounter_type,
+                "encounter_parties": encounter_parties,
+                "structural_change": structural_change,
+            },
+            diff_tracker=diff_tracker,
+        )
+
+        structural_node_id = f"structural_change:{'true' if structural_change else 'false'}"
+        self._upsert_node(
+            conn,
+            node_id=structural_node_id,
+            label="structural_change" if structural_change else "incremental_change",
+            node_type="structural_change",
+            description="Whether the encounter reorganized existing graph structure.",
+            salience=0.72,
+            now=ts,
+            metadata={"structural_change": structural_change},
+            diff_tracker=diff_tracker,
+        )
+        self._upsert_edge(
+            conn,
+            source_node_id=entry_node_id,
+            target_node_id=structural_node_id,
+            relation_type="MARKED_AS_STRUCTURAL_CHANGE",
+            weight=0.86,
+            provenance_entry_id=entry.entry_id,
+            provenance_artifact=entry.source_artifact,
+            now=ts,
+            metadata={
+                "plane": entry.plane.value,
+                "encounter_type": encounter_type,
+                "encounter_parties": encounter_parties,
+                "structural_change": structural_change,
+            },
+            diff_tracker=diff_tracker,
+        )
 
         mood = str(entry.metadata.get("mood") or "").strip()
         if mood:
             mood_node_id = f"mood:{self._slug(mood)}"
-            created_nodes += self._upsert_node(
+            self._upsert_node(
                 conn,
                 node_id=mood_node_id,
                 label=mood,
@@ -265,9 +364,10 @@ class MemoryGraph:
                 description="Affective coloring attached to a memory entry.",
                 salience=0.65,
                 now=ts,
-                metadata={"mood": mood},
+                metadata={"mood": mood, "encounter_type": encounter_type},
+                diff_tracker=diff_tracker,
             )
-            created_edges += self._upsert_edge(
+            self._upsert_edge(
                 conn,
                 source_node_id=entry_node_id,
                 target_node_id=mood_node_id,
@@ -276,13 +376,18 @@ class MemoryGraph:
                 provenance_entry_id=entry.entry_id,
                 provenance_artifact=entry.source_artifact,
                 now=ts,
-                metadata={"plane": entry.plane.value},
+                metadata={
+                    "plane": entry.plane.value,
+                    "encounter_type": encounter_type,
+                    "encounter_parties": encounter_parties,
+                },
+                diff_tracker=diff_tracker,
             )
 
         parties = [str(p).strip() for p in entry.metadata.get("parties", []) if str(p).strip()]
         for party in parties[:6]:
             party_node_id = f"party:{self._slug(party)}"
-            created_nodes += self._upsert_node(
+            self._upsert_node(
                 conn,
                 node_id=party_node_id,
                 label=party,
@@ -290,9 +395,10 @@ class MemoryGraph:
                 description="A relational participant carried in the memory plane.",
                 salience=0.85,
                 now=ts,
-                metadata={"party": party},
+                metadata={"party": party, "encounter_type": encounter_type},
+                diff_tracker=diff_tracker,
             )
-            created_edges += self._upsert_edge(
+            self._upsert_edge(
                 conn,
                 source_node_id=entry_node_id,
                 target_node_id=party_node_id,
@@ -301,13 +407,50 @@ class MemoryGraph:
                 provenance_entry_id=entry.entry_id,
                 provenance_artifact=entry.source_artifact,
                 now=ts,
-                metadata={"plane": entry.plane.value},
+                metadata={
+                    "plane": entry.plane.value,
+                    "encounter_type": encounter_type,
+                    "encounter_parties": encounter_parties,
+                    "structural_change": structural_change,
+                },
+                diff_tracker=diff_tracker,
+            )
+
+        for encounter_party in encounter_parties[:8]:
+            party_node_id = f"encounter_party:{self._slug(encounter_party)}"
+            self._upsert_node(
+                conn,
+                node_id=party_node_id,
+                label=encounter_party,
+                node_type="encounter_party",
+                description="Named participant or stimulus in an encounter.",
+                salience=0.82,
+                now=ts,
+                metadata={"encounter_party": encounter_party},
+                diff_tracker=diff_tracker,
+            )
+            self._upsert_edge(
+                conn,
+                source_node_id=entry_node_id,
+                target_node_id=party_node_id,
+                relation_type="HAS_ENCOUNTER_PARTY",
+                weight=0.9,
+                provenance_entry_id=entry.entry_id,
+                provenance_artifact=entry.source_artifact,
+                now=ts,
+                metadata={
+                    "plane": entry.plane.value,
+                    "encounter_type": encounter_type,
+                    "encounter_parties": encounter_parties,
+                    "structural_change": structural_change,
+                },
+                diff_tracker=diff_tracker,
             )
 
         concepts = self._extract_concepts(entry.content)
         for concept in concepts:
             concept_node_id = f"concept:{concept['slug']}"
-            created_nodes += self._upsert_node(
+            self._upsert_node(
                 conn,
                 node_id=concept_node_id,
                 label=concept["label"],
@@ -315,9 +458,14 @@ class MemoryGraph:
                 description=f"Concept extracted from {entry.entry_id}",
                 salience=concept["score"],
                 now=ts,
-                metadata={"normalized": concept["normalized"], "plane": entry.plane.value},
+                metadata={
+                    "normalized": concept["normalized"],
+                    "plane": entry.plane.value,
+                    "encounter_type": encounter_type,
+                },
+                diff_tracker=diff_tracker,
             )
-            created_edges += self._upsert_edge(
+            self._upsert_edge(
                 conn,
                 source_node_id=entry_node_id,
                 target_node_id=concept_node_id,
@@ -326,13 +474,20 @@ class MemoryGraph:
                 provenance_entry_id=entry.entry_id,
                 provenance_artifact=entry.source_artifact,
                 now=ts,
-                metadata={"token_count": concept["count"], "plane": entry.plane.value},
+                metadata={
+                    "token_count": concept["count"],
+                    "plane": entry.plane.value,
+                    "encounter_type": encounter_type,
+                    "encounter_parties": encounter_parties,
+                    "structural_change": structural_change,
+                },
+                diff_tracker=diff_tracker,
             )
 
         for index, source in enumerate(concepts):
             for target in concepts[index + 1 :]:
                 ordered = sorted([source["slug"], target["slug"]])
-                created_edges += self._upsert_edge(
+                self._upsert_edge(
                     conn,
                     source_node_id=f"concept:{ordered[0]}",
                     target_node_id=f"concept:{ordered[1]}",
@@ -341,7 +496,13 @@ class MemoryGraph:
                     provenance_entry_id=entry.entry_id,
                     provenance_artifact=entry.source_artifact,
                     now=ts,
-                    metadata={"plane": entry.plane.value},
+                    metadata={
+                        "plane": entry.plane.value,
+                        "encounter_type": encounter_type,
+                        "encounter_parties": encounter_parties,
+                        "structural_change": structural_change,
+                    },
+                    diff_tracker=diff_tracker,
                 )
 
         normalized_claims = [self._normalize_claim_entry(item) for item in (claim_entries or [])]
@@ -355,7 +516,7 @@ class MemoryGraph:
             verification_status = str(claim.get("verification_status") or "unknown")
             claim_node_id = self._claim_node_id(entry.entry_id, claim_type, claim_text)
 
-            created_nodes += self._upsert_node(
+            self._upsert_node(
                 conn,
                 node_id=claim_node_id,
                 label=claim_text[:120],
@@ -369,9 +530,13 @@ class MemoryGraph:
                     "verification_status": verification_status,
                     "source_artifact": claim.get("source_artifact") or entry.source_artifact,
                     "perturbation_required": bool(claim.get("perturbation_required", False)),
+                    "encounter_type": encounter_type,
+                    "encounter_parties": encounter_parties,
+                    "structural_change": structural_change,
                 },
+                diff_tracker=diff_tracker,
             )
-            created_edges += self._upsert_edge(
+            self._upsert_edge(
                 conn,
                 source_node_id=entry_node_id,
                 target_node_id=claim_node_id,
@@ -380,11 +545,17 @@ class MemoryGraph:
                 provenance_entry_id=entry.entry_id,
                 provenance_artifact=entry.source_artifact,
                 now=ts,
-                metadata={"plane": entry.plane.value},
+                metadata={
+                    "plane": entry.plane.value,
+                    "encounter_type": encounter_type,
+                    "encounter_parties": encounter_parties,
+                    "structural_change": structural_change,
+                },
+                diff_tracker=diff_tracker,
             )
 
             claim_type_node_id = f"claim_type:{self._slug(claim_type)}"
-            created_nodes += self._upsert_node(
+            self._upsert_node(
                 conn,
                 node_id=claim_type_node_id,
                 label=claim_type,
@@ -393,8 +564,9 @@ class MemoryGraph:
                 salience=0.7,
                 now=ts,
                 metadata={"claim_type": claim_type},
+                diff_tracker=diff_tracker,
             )
-            created_edges += self._upsert_edge(
+            self._upsert_edge(
                 conn,
                 source_node_id=claim_node_id,
                 target_node_id=claim_type_node_id,
@@ -403,11 +575,12 @@ class MemoryGraph:
                 provenance_entry_id=entry.entry_id,
                 provenance_artifact=entry.source_artifact,
                 now=ts,
-                metadata={"plane": entry.plane.value},
+                metadata={"plane": entry.plane.value, "encounter_type": encounter_type},
+                diff_tracker=diff_tracker,
             )
 
             provenance_node_id = f"provenance:{self._slug(provenance_class)}"
-            created_nodes += self._upsert_node(
+            self._upsert_node(
                 conn,
                 node_id=provenance_node_id,
                 label=provenance_class,
@@ -416,8 +589,9 @@ class MemoryGraph:
                 salience=0.68,
                 now=ts,
                 metadata={"provenance_class": provenance_class},
+                diff_tracker=diff_tracker,
             )
-            created_edges += self._upsert_edge(
+            self._upsert_edge(
                 conn,
                 source_node_id=claim_node_id,
                 target_node_id=provenance_node_id,
@@ -426,11 +600,12 @@ class MemoryGraph:
                 provenance_entry_id=entry.entry_id,
                 provenance_artifact=entry.source_artifact,
                 now=ts,
-                metadata={"plane": entry.plane.value},
+                metadata={"plane": entry.plane.value, "encounter_type": encounter_type},
+                diff_tracker=diff_tracker,
             )
 
             status_node_id = f"verification:{self._slug(verification_status)}"
-            created_nodes += self._upsert_node(
+            self._upsert_node(
                 conn,
                 node_id=status_node_id,
                 label=verification_status,
@@ -439,8 +614,9 @@ class MemoryGraph:
                 salience=0.66,
                 now=ts,
                 metadata={"verification_status": verification_status},
+                diff_tracker=diff_tracker,
             )
-            created_edges += self._upsert_edge(
+            self._upsert_edge(
                 conn,
                 source_node_id=claim_node_id,
                 target_node_id=status_node_id,
@@ -449,19 +625,26 @@ class MemoryGraph:
                 provenance_entry_id=entry.entry_id,
                 provenance_artifact=entry.source_artifact,
                 now=ts,
-                metadata={"plane": entry.plane.value},
+                metadata={"plane": entry.plane.value, "encounter_type": encounter_type},
+                diff_tracker=diff_tracker,
             )
 
         self._record_extraction(conn, entry, ts)
+        self._record_diff(conn, diff_tracker)
         conn.commit()
+        diff_summary = self._finalize_diff_tracker(diff_tracker)
         return {
             "status": "ingested",
             "entry_id": entry.entry_id,
             "plane": entry.plane.value,
+            "encounter_type": encounter_type,
+            "encounter_parties": encounter_parties,
+            "structural_change": structural_change,
             "concept_count": len(concepts),
             "claim_count": len(normalized_claims),
-            "nodes_touched": created_nodes,
-            "edges_touched": created_edges,
+            "nodes_touched": len(diff_summary["new_nodes"]),
+            "edges_touched": len(diff_summary["new_edges"]),
+            "diff": diff_summary,
         }
 
     def associative_recall(
@@ -552,6 +735,7 @@ class MemoryGraph:
             conn.executescript(GRAPH_NODES_SCHEMA)
             conn.executescript(GRAPH_EDGES_SCHEMA)
             conn.executescript(GRAPH_EXTRACTIONS_SCHEMA)
+            conn.executescript(GRAPH_DIFFS_SCHEMA)
             conn.commit()
 
     def _is_fresh(self, entry: MemoryEntry) -> bool:
@@ -582,7 +766,36 @@ class MemoryGraph:
                 entry.source_artifact,
                 now,
                 self.extractor_version,
-                json.dumps({"source_signal_id": entry.source_signal_id}),
+                json.dumps(
+                    {
+                        "source_signal_id": entry.source_signal_id,
+                        "encounter_type": self._encounter_type(entry),
+                        "encounter_parties": self._encounter_parties(entry),
+                        "structural_change": self._structural_change(entry),
+                    },
+                    ensure_ascii=False,
+                ),
+            ),
+        )
+
+    def _record_diff(self, conn: sqlite3.Connection, diff_tracker: dict[str, Any]) -> None:
+        diff_summary = self._finalize_diff_tracker(diff_tracker)
+        conn.execute(
+            """
+            INSERT INTO graph_diffs (diff_id, source_entry_id, plane, diffed_at, metadata)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(diff_id) DO UPDATE SET
+                source_entry_id = excluded.source_entry_id,
+                plane = excluded.plane,
+                diffed_at = excluded.diffed_at,
+                metadata = excluded.metadata
+            """,
+            (
+                diff_tracker["diff_id"],
+                diff_tracker["source_entry_id"],
+                diff_tracker["plane"],
+                diff_tracker["diffed_at"],
+                json.dumps(diff_summary, ensure_ascii=False),
             ),
         )
 
@@ -597,8 +810,13 @@ class MemoryGraph:
         salience: float,
         now: str,
         metadata: dict[str, Any],
+        diff_tracker: dict[str, Any] | None = None,
     ) -> int:
-        row = conn.execute("SELECT node_id FROM graph_nodes WHERE node_id = ?", (node_id,)).fetchone()
+        row = conn.execute(
+            "SELECT node_id, metadata FROM graph_nodes WHERE node_id = ?",
+            (node_id,),
+        ).fetchone()
+        previous_metadata = json.loads(row["metadata"] or "{}") if row and row["metadata"] else {}
         conn.execute(
             """
             INSERT INTO graph_nodes (
@@ -625,6 +843,21 @@ class MemoryGraph:
                 json.dumps(metadata, ensure_ascii=False),
             ),
         )
+        if diff_tracker is not None and row is None:
+            diff_tracker["new_nodes"][node_id] = {
+                "node_id": node_id,
+                "label": label,
+                "node_type": node_type,
+                "metadata": metadata,
+            }
+        elif diff_tracker is not None and previous_metadata != metadata:
+            diff_tracker["updated_nodes"][node_id] = {
+                "node_id": node_id,
+                "label": label,
+                "node_type": node_type,
+                "previous_metadata": previous_metadata,
+                "metadata": metadata,
+            }
         return 0 if row else 1
 
     def _upsert_edge(
@@ -639,9 +872,16 @@ class MemoryGraph:
         provenance_artifact: str | None,
         now: str,
         metadata: dict[str, Any],
+        diff_tracker: dict[str, Any] | None = None,
     ) -> int:
         edge_id = self._stable_id(source_node_id, target_node_id, relation_type, provenance_entry_id or "")
-        row = conn.execute("SELECT edge_id FROM graph_edges WHERE edge_id = ?", (edge_id,)).fetchone()
+        row = conn.execute(
+            "SELECT edge_id, weight, metadata FROM graph_edges WHERE edge_id = ?",
+            (edge_id,),
+        ).fetchone()
+        previous_weight = float(row["weight"]) if row and row["weight"] is not None else None
+        previous_metadata = json.loads(row["metadata"] or "{}") if row and row["metadata"] else {}
+        rounded_weight = round(float(weight), 3)
         conn.execute(
             """
             INSERT INTO graph_edges (
@@ -659,7 +899,7 @@ class MemoryGraph:
                 source_node_id,
                 target_node_id,
                 relation_type,
-                round(float(weight), 3),
+                rounded_weight,
                 provenance_entry_id,
                 provenance_artifact,
                 now,
@@ -667,6 +907,39 @@ class MemoryGraph:
                 json.dumps(metadata, ensure_ascii=False),
             ),
         )
+        if diff_tracker is not None and row is None:
+            diff_tracker["new_edges"][edge_id] = {
+                "edge_id": edge_id,
+                "source_node_id": source_node_id,
+                "target_node_id": target_node_id,
+                "relation_type": relation_type,
+                "weight": rounded_weight,
+                "metadata": metadata,
+            }
+        elif diff_tracker is not None and previous_weight is not None:
+            if rounded_weight > previous_weight:
+                diff_tracker["strengthened_edges"][edge_id] = {
+                    "edge_id": edge_id,
+                    "source_node_id": source_node_id,
+                    "target_node_id": target_node_id,
+                    "relation_type": relation_type,
+                    "previous_weight": previous_weight,
+                    "weight": rounded_weight,
+                    "metadata": metadata,
+                }
+            elif previous_metadata != metadata:
+                diff_tracker["updated_edges"][edge_id] = {
+                    "edge_id": edge_id,
+                    "source_node_id": source_node_id,
+                    "target_node_id": target_node_id,
+                    "relation_type": relation_type,
+                    "weight": rounded_weight,
+                    "previous_metadata": previous_metadata,
+                    "metadata": metadata,
+                }
+        if diff_tracker is not None:
+            cluster_key = self._cluster_key(source_node_id, target_node_id)
+            diff_tracker["cluster_edge_counts"][cluster_key] = diff_tracker["cluster_edge_counts"].get(cluster_key, 0) + 1
         return 0 if row else 1
 
     def _rank_seed_nodes(self, conn: sqlite3.Connection, query_text: str, limit: int) -> list[dict[str, Any]]:
@@ -843,6 +1116,92 @@ class MemoryGraph:
             or self._edge_is_active(conn, {"provenance_entry_id": row["provenance_entry_id"]})
             for row in rows
         )
+
+    def _new_diff_tracker(self, entry: MemoryEntry, now: str) -> dict[str, Any]:
+        return {
+            "diff_id": self._stable_id(entry.entry_id, entry.content_hash, now),
+            "source_entry_id": entry.entry_id,
+            "plane": entry.plane.value,
+            "diffed_at": now,
+            "encounter_type": self._encounter_type(entry),
+            "encounter_parties": self._encounter_parties(entry),
+            "structural_change": self._structural_change(entry),
+            "new_nodes": {},
+            "updated_nodes": {},
+            "new_edges": {},
+            "updated_edges": {},
+            "strengthened_edges": {},
+            "cluster_edge_counts": {},
+        }
+
+    def _finalize_diff_tracker(self, diff_tracker: dict[str, Any]) -> dict[str, Any]:
+        thickened_regions = [
+            {"cluster": cluster, "new_internal_edges": count}
+            for cluster, count in sorted(
+                diff_tracker["cluster_edge_counts"].items(),
+                key=lambda item: (-item[1], item[0]),
+            )
+            if count >= 2
+        ]
+        return {
+            "diff_id": diff_tracker["diff_id"],
+            "source_entry_id": diff_tracker["source_entry_id"],
+            "plane": diff_tracker["plane"],
+            "diffed_at": diff_tracker["diffed_at"],
+            "encounter_type": diff_tracker["encounter_type"],
+            "encounter_parties": diff_tracker["encounter_parties"],
+            "structural_change": diff_tracker["structural_change"],
+            "new_nodes": list(diff_tracker["new_nodes"].values()),
+            "updated_nodes": list(diff_tracker["updated_nodes"].values()),
+            "new_edges": list(diff_tracker["new_edges"].values()),
+            "updated_edges": list(diff_tracker["updated_edges"].values()),
+            "strengthened_edges": list(diff_tracker["strengthened_edges"].values()),
+            "thickened_regions": thickened_regions,
+        }
+
+    @staticmethod
+    def _cluster_key(source_node_id: str, target_node_id: str) -> str:
+        def prefix(node_id: str) -> str:
+            if node_id.startswith("concept:"):
+                return "concept"
+            if node_id.startswith("entry:"):
+                return "entry"
+            return node_id.split(":", 1)[0]
+
+        ordered = sorted([prefix(source_node_id), prefix(target_node_id)])
+        return "::".join(ordered)
+
+    @staticmethod
+    def _encounter_type(entry: MemoryEntry) -> str:
+        encounter_type = str(entry.metadata.get("encounter_type") or "").strip().lower()
+        return encounter_type or "solo_reflection"
+
+    @staticmethod
+    def _encounter_parties(entry: MemoryEntry) -> list[str]:
+        raw = entry.metadata.get("encounter_parties") or entry.metadata.get("parties") or []
+        if isinstance(raw, str):
+            raw = [raw]
+        seen: set[str] = set()
+        parties: list[str] = []
+        for item in raw:
+            value = str(item).strip()
+            if not value:
+                continue
+            lowered = value.lower()
+            if lowered in seen:
+                continue
+            seen.add(lowered)
+            parties.append(value)
+        if parties:
+            return parties
+        fallback = str(entry.metadata.get("origin") or "").strip()
+        return [fallback] if fallback else []
+
+    @classmethod
+    def _structural_change(cls, entry: MemoryEntry) -> bool:
+        if "structural_change" in entry.metadata:
+            return bool(entry.metadata.get("structural_change"))
+        return cls._encounter_type(entry) in {"correction", "challenge", "collaboration", "composting"}
 
     def _extract_concepts(self, text: str, limit: int = 8) -> list[dict[str, Any]]:
         counts = Counter()
