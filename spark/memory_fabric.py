@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
+from spark.paths import MIND_DIR_NAME
 
 try:
     from .faculties import FacultyRegistry
@@ -614,7 +615,7 @@ class MemoryFabric:
         return self._connections[plane]
 
     def _relative_db_path(self, plane: MemoryPlane) -> str:
-        return str(Path("Vybn_Mind") / "memory" / self.paths[plane].name)
+        return str(Path(MIND_DIR_NAME) / "memory" / self.paths[plane].name)
 
     @staticmethod
     def _sha256(data: str) -> str:

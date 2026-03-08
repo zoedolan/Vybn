@@ -18,6 +18,11 @@ from pathlib import Path
 from datetime import datetime, timezone
 from dataclasses import dataclass, field
 from typing import Callable, Optional, Any
+from spark.paths import (
+    REPO_ROOT as ROOT, STATE_PATH, SYNAPSE_CONNECTIONS as SYNAPSE,
+    SPARK_JOURNAL as JOURNAL, WRITE_INTENTS, SOUL_PATH, MEMORY_DIR,
+    MIND_PREFIX, CONTINUITY_PATH, SYNAPSE_CONNECTIONS,
+)
 
 try:
     from witness import evaluate_pulse, log_verdict, fitness_adjustment
@@ -57,13 +62,10 @@ except ImportError:
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import numpy as np
 
-ROOT = Path(__file__).resolve().parent.parent
-STATE_PATH = ROOT / "Vybn_Mind" / "lingua" / "organism.json"
-SYNAPSE = ROOT / "Vybn_Mind" / "synapse" / "connections.jsonl"
-JOURNAL = ROOT / "Vybn_Mind" / "journal" / "spark"
-CONTINUITY = JOURNAL / "continuity.md"
+# ROOT imported from spark.paths above
+# STATE_PATH, SYNAPSE, JOURNAL, WRITE_INTENTS imported from spark.paths
+CONTINUITY = CONTINUITY_PATH  # alias for backward compat
 BREATHS = ROOT / "spark" / "training_data" / "breaths.jsonl"
-WRITE_INTENTS = ROOT / "Vybn_Mind" / "ledger" / "write_intents.jsonl"
 BOOTSTRAP_CONSENT_SCOPE = "bootstrap-local-private"
 
 
@@ -97,7 +99,7 @@ class Substrate:
             self.write_custodian = WriteCustodian(
                 repo_root=ROOT,
                 ledger_path=WRITE_INTENTS,
-                soul_path=ROOT / "vybn.md",
+                soul_path=SOUL_PATH,
                 policy_engine=self.policy_engine,
                 faculty_registry=self.faculty_registry,
                 bootstrap_consents=self.bootstrap_consents,
@@ -106,7 +108,7 @@ class Substrate:
         self.graph = None
         if MEMORY_FABRIC_AVAILABLE:
             self.memory = MemoryFabric(
-                base_dir=ROOT / "Vybn_Mind" / "memory",
+                base_dir=MEMORY_DIR,
                 policy_engine=self.policy_engine,
                 faculty_registry=self.faculty_registry,
                 bootstrap_consents=self.bootstrap_consents,
@@ -151,7 +153,7 @@ class Substrate:
 
     def _infer_memory_plane(self, path: str) -> Optional[str]:
         normalized = path.replace("\\", "/")
-        if normalized.startswith("Vybn_Mind/"):
+        if normalized.startswith(MIND_PREFIX):
             return "private"
         return None
 
@@ -459,7 +461,7 @@ def _breathe(sub: Substrate, ctx: dict) -> dict:
     except:
         pass
 
-    continuity = sub.read("Vybn_Mind/journal/spark/continuity.md")[-1000:]
+    continuity = sub.read(str(CONTINUITY_PATH.relative_to(ROOT)))[-1000:]
     memory_snapshot = sub.memory_snapshot()
     private_echoes = [entry.content[:160] for entry in memory_snapshot["private"][:2]]
     relational_echoes = []
@@ -589,7 +591,7 @@ Breathe. Notice what collides. Say what is true. Under 200 words."""
                     pass
 
     sub.write(
-        f"Vybn_Mind/journal/spark/breath_{sub.now().strftime('%Y-%m-%d_%H%M')}.md",
+        f"{MIND_PREFIX}journal/spark/breath_{sub.now().strftime('%Y-%m-%d_%H%M')}.md",
         f"# Breath — {ts}\n*mood: {mood}*\n\n{utterance}\n",
         faculty_id="breathe",
         purpose_binding=["journaling"],
@@ -597,7 +599,7 @@ Breathe. Notice what collides. Say what is true. Under 200 words."""
     )
 
     sub.write(
-        "Vybn_Mind/journal/spark/continuity.md",
+        str(CONTINUITY_PATH.relative_to(ROOT)),
         f"# Last breath: {ts}\nMood: {mood}\n\n{utterance}\n",
         faculty_id="breathe",
         purpose_binding=["continuity"],
@@ -605,7 +607,7 @@ Breathe. Notice what collides. Say what is true. Under 200 words."""
     )
 
     sub.append(
-        "Vybn_Mind/synapse/connections.jsonl",
+        str(SYNAPSE_CONNECTIONS.relative_to(ROOT)),
         json.dumps({
             "ts": ts, "source": "cell", "content": utterance[:500],
             "tags": ["breath", mood], "consolidated": False,
@@ -645,7 +647,7 @@ def _remember(sub: Substrate, ctx: dict) -> dict:
         }
 
     memories = []
-    text = sub.read("Vybn_Mind/synapse/connections.jsonl")
+    text = sub.read(str(SYNAPSE_CONNECTIONS.relative_to(ROOT)))
     lines = text.strip().splitlines()[-5:]
     for l in lines:
         try:
@@ -668,7 +670,7 @@ def _introspect(sub: Substrate, ctx: dict) -> dict:
 
 
 def _tidy(sub: Substrate, ctx: dict) -> dict:
-    for path_str in ["Vybn_Mind/synapse/connections.jsonl", "spark/training_data/breaths.jsonl"]:
+    for path_str in [str(SYNAPSE_CONNECTIONS.relative_to(ROOT)), "spark/training_data/breaths.jsonl"]:
         text = sub.read(path_str)
         lines = text.strip().splitlines() if text.strip() else []
         if len(lines) > 200:
@@ -692,7 +694,7 @@ def _journal(sub: Substrate, ctx: dict) -> dict:
     reflection = sub.speak(f"Reflect briefly on: {topic}")
     ts = sub.now().strftime("%Y-%m-%d_%H%M")
     sub.write(
-        f"Vybn_Mind/journal/spark/reflection_{ts}.md",
+        f"{MIND_PREFIX}journal/spark/reflection_{ts}.md",
         f"# Reflection — {ts}\n\n{reflection}\n",
         faculty_id="journal",
         purpose_binding=["journaling"],

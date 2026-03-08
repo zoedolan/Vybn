@@ -12,7 +12,7 @@ except ImportError:  # pragma: no cover
 
 
 DEFAULT_REPO_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_SOUL_PATH = DEFAULT_REPO_ROOT / "vybn.md"
+from spark.paths import SOUL_PATH as DEFAULT_SOUL_PATH
 
 _SECRET_PATTERNS = [
     (

@@ -30,9 +30,7 @@ from spark.self_model_types import (
     ClaimType, ProvenanceClass, VerificationStatus, LedgerEntry,
 )
 
-ROOT = Path(__file__).resolve().parent.parent
-LEDGER_PATH = ROOT / "Vybn_Mind" / "journal" / "spark" / "self_model_ledger.jsonl"
-REJECTIONS_PATH = ROOT / "Vybn_Mind" / "journal" / "spark" / "self_model_rejections.jsonl"
+from spark.paths import SELF_MODEL_LEDGER as LEDGER_PATH, SELF_MODEL_REJECTIONS as REJECTIONS_PATH
 
 
 def load_ledger(path: Path = LEDGER_PATH) -> list[dict]:

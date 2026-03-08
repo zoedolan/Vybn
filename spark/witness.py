@@ -34,8 +34,7 @@ from datetime import datetime, timezone
 import json
 from typing import Any
 
-ROOT = Path(__file__).resolve().parent.parent
-WITNESS_LOG = ROOT / "Vybn_Mind" / "journal" / "spark" / "witness.jsonl"
+from spark.paths import REPO_ROOT as ROOT, WITNESS_LOG
 
 
 @dataclass

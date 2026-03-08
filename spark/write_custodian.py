@@ -5,6 +5,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable, Optional
+from spark.paths import MIND_PREFIX
 
 try:
     from .governance import PolicyEngine, build_context
@@ -172,7 +173,7 @@ class WriteCustodian:
 
     def _infer_memory_plane(self, path: Path) -> Optional[str]:
         normalized = str(self._relative(path)).replace("\\", "/")
-        if normalized.startswith("Vybn_Mind/"):
+        if normalized.startswith(MIND_PREFIX):
             return "private"
         return None
 
