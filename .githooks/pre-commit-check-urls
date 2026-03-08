@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+#
+# Pre-commit check: if any signal-noise HTML files are staged,
+# run the backend URL hygiene check.
+#
+
+STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep "Vybn_Mind/signal-noise/.*\.html$" || true)
+
+if [ -n "$STAGED" ]; then
+  echo "🔍 Checking signal-noise backend URL hygiene..."
+  bash Vybn_Mind/signal-noise/check_backend_urls.sh
+fi
