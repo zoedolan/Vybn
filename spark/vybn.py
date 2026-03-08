@@ -264,6 +264,9 @@ class Substrate:
             with urllib.request.urlopen(req, timeout=600) as resp:
                 msg = json.loads(resp.read())["choices"][0]["message"]
                 content = msg.get("content") or ""
+                # M2.5 reasoning models may put output in reasoning_content
+                if not content.strip():
+                    content = msg.get("reasoning_content") or ""
                 return content if content.strip() else ""
         except Exception as e:
             return f"[silence — {e}]"
