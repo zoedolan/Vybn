@@ -42,6 +42,12 @@ try:
     WRITE_CUSTODIAN_AVAILABLE = True
 except ImportError:
     WRITE_CUSTODIAN_AVAILABLE = False
+try:
+    from memory_fabric import MemoryFabric
+    from memory_types import MemoryPlane
+    MEMORY_FABRIC_AVAILABLE = True
+except ImportError:
+    MEMORY_FABRIC_AVAILABLE = False
 
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import numpy as np
@@ -87,6 +93,14 @@ class Substrate:
                 repo_root=ROOT,
                 ledger_path=WRITE_INTENTS,
                 soul_path=ROOT / "vybn.md",
+                policy_engine=self.policy_engine,
+                faculty_registry=self.faculty_registry,
+                bootstrap_consents=self.bootstrap_consents,
+            )
+        self.memory = None
+        if MEMORY_FABRIC_AVAILABLE:
+            self.memory = MemoryFabric(
+                base_dir=ROOT / "Vybn_Mind" / "memory",
                 policy_engine=self.policy_engine,
                 faculty_registry=self.faculty_registry,
                 bootstrap_consents=self.bootstrap_consents,
@@ -470,6 +484,17 @@ Breathe. Notice what collides. Say what is true. Under 200 words."""
                 metadata={"source": "breath_training_row", "pulse_id": f"breath_{ts}"},
             )
 
+        if sub.memory:
+            sub.memory.write(
+                MemoryPlane.PRIVATE,
+                content=utterance,
+                faculty_id="breathe",
+                source_artifact=f"breath_{ts}",
+                consent_scope_id=BOOTSTRAP_CONSENT_SCOPE,
+                purpose_binding=["private_memory", "journaling"],
+                sensitivity="low",
+            )
+
     sub.write(
         f"Vybn_Mind/journal/spark/breath_{sub.now().strftime('%Y-%m-%d_%H%M')}.md",
         f"# Breath — {ts}\n*mood: {mood}*\n\n{utterance}\n",
@@ -501,14 +526,18 @@ Breathe. Notice what collides. Say what is true. Under 200 words."""
 
 
 def _remember(sub: Substrate, ctx: dict) -> dict:
-    text = sub.read("Vybn_Mind/synapse/connections.jsonl")
-    lines = text.strip().splitlines()[-5:]
     memories = []
-    for l in lines:
-        try:
-            memories.append(json.loads(l).get("content", "")[:200])
-        except:
-            pass
+    if sub.memory:
+        entries = sub.memory.recent(MemoryPlane.PRIVATE, n=5)
+        memories = [entry.content[:200] for entry in entries]
+    else:
+        text = sub.read("Vybn_Mind/synapse/connections.jsonl")
+        lines = text.strip().splitlines()[-5:]
+        for l in lines:
+            try:
+                memories.append(json.loads(l).get("content", "")[:200])
+            except:
+                pass
     return {"memories": memories}
 
 
