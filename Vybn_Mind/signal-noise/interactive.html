@@ -555,10 +555,17 @@ body {
 (function() {
 'use strict';
 
-var BASE_ORIGIN = window.location.origin;
-var WS_SCHEME = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-var WS_URL = WS_SCHEME + '//' + window.location.host + '/signal-noise/ws';
-var HARVEST_URL = BASE_ORIGIN + '/signal-noise/harvest';
+// When served from the API (Funnel), use relative paths.
+// When served from GitHub Pages, connect to the Funnel backend.
+// The Funnel URL is public infrastructure — it is the designed entry point.
+var IS_GITHUB_PAGES = window.location.hostname.indexOf('github.io') !== -1;
+var BACKEND = IS_GITHUB_PAGES
+  ? 'https://spark-2b7c.tail7302f3.ts.net'
+  : window.location.origin;
+var WS_URL = (IS_GITHUB_PAGES ? 'wss:' : (window.location.protocol === 'https:' ? 'wss:' : 'ws:'))
+  + '//' + (IS_GITHUB_PAGES ? 'spark-2b7c.tail7302f3.ts.net' : window.location.host)
+  + '/signal-noise/ws';
+var HARVEST_URL = BACKEND + '/signal-noise/harvest';
 var MAX_CHARS = 2000;
 var COOLDOWN_MS = 5000;
 
