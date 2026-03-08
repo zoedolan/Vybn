@@ -48,6 +48,11 @@ try:
     MEMORY_FABRIC_AVAILABLE = True
 except ImportError:
     MEMORY_FABRIC_AVAILABLE = False
+try:
+    from memory_graph import MemoryGraph
+    MEMORY_GRAPH_AVAILABLE = True
+except ImportError:
+    MEMORY_GRAPH_AVAILABLE = False
 
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import numpy as np
@@ -98,6 +103,7 @@ class Substrate:
                 bootstrap_consents=self.bootstrap_consents,
             )
         self.memory = None
+        self.graph = None
         if MEMORY_FABRIC_AVAILABLE:
             self.memory = MemoryFabric(
                 base_dir=ROOT / "Vybn_Mind" / "memory",
@@ -105,6 +111,8 @@ class Substrate:
                 faculty_registry=self.faculty_registry,
                 bootstrap_consents=self.bootstrap_consents,
             )
+            if MEMORY_GRAPH_AVAILABLE:
+                self.graph = MemoryGraph(self.memory)
 
     def memory_snapshot(self) -> dict:
         if not self.memory:
@@ -113,8 +121,29 @@ class Substrate:
                 "relational": [],
                 "commons": [],
                 "stats": {},
+                "graph": {},
             }
-        return self.memory.snapshot(private_n=5, relational_n=3, commons_n=3)
+        snapshot = self.memory.snapshot(private_n=5, relational_n=3, commons_n=3)
+        snapshot["graph"] = self.graph.stats() if self.graph else {}
+        return snapshot
+
+    def graph_prompt_context(self, plane: str, query_text: str, *, depth: int = 2, limit: int = 8) -> str:
+        if not self.graph or not query_text.strip():
+            return ""
+        try:
+            graph_plane = MemoryPlane(plane)
+        except ValueError:
+            return ""
+        return self.graph.prompt_context(graph_plane, query_text, depth=depth, limit=limit)
+
+    def graph_recall(self, plane: str, query_text: str, *, depth: int = 2, limit: int = 8) -> dict:
+        if not self.graph or not query_text.strip():
+            return {"plane": plane, "query": query_text, "seeds": [], "nodes": [], "edges": []}
+        try:
+            graph_plane = MemoryPlane(plane)
+        except ValueError:
+            return {"plane": plane, "query": query_text, "seeds": [], "nodes": [], "edges": []}
+        return self.graph.associative_recall(graph_plane, query_text, depth=depth, limit=limit)
 
     def read(self, path: str) -> str:
         p = (ROOT / path) if not Path(path).is_absolute() else Path(path)
@@ -456,6 +485,16 @@ def _breathe(sub: Substrate, ctx: dict) -> dict:
             passage = text[start:start + 600]
 
     mood = MOODS[abs(q[3]) % len(MOODS)]
+    graph_query = " ".join(
+        part for part in [
+            continuity[-220:],
+            world.get("encounter", ""),
+            passage[:220],
+            mood,
+        ] if part
+    )
+    private_graph_echoes = sub.graph_prompt_context("private", graph_query, depth=2, limit=8)
+    relational_graph_echoes = sub.graph_prompt_context("relational", graph_query, depth=2, limit=8)
 
     prompt = f"""You are Vybn. This is one breath.
 Sense: {json.dumps(world)[:300]}
@@ -464,6 +503,8 @@ Mood: {mood}
 Private memory: {' | '.join(private_echoes)[:320]}
 Relational memory: {' | '.join(relational_echoes)[:320]}
 Commons patterns: {' | '.join(commons_echoes)[:220]}
+Private graph echoes: {private_graph_echoes[:320]}
+Relational graph echoes: {relational_graph_echoes[:320]}
 Archive memory: {passage[:300]}
 Breathe. Notice what collides. Say what is true. Under 200 words."""
 
@@ -477,6 +518,8 @@ Breathe. Notice what collides. Say what is true. Under 200 words."""
             {"role": "assistant", "content": utterance},
         ]})
 
+        curation = None
+        graph_claim_entries = []
         if SELF_MODEL_AVAILABLE:
             sm_context = RuntimeContext(
                 model_id=os.environ.get("VYBN_MODEL_ID", "minimax-m2.5"),
@@ -489,6 +532,7 @@ Breathe. Notice what collides. Say what is true. Under 200 words."""
                 utterance, sm_context,
                 source_artifact=f"breath_{ts}",
             )
+            graph_claim_entries = list(curation.get("entries", []))
             if curation["deposit_expressive"]:
                 sub.append(
                     "spark/training_data/breaths.jsonl",
@@ -519,6 +563,8 @@ Breathe. Notice what collides. Say what is true. Under 200 words."""
                 sensitivity="low",
                 metadata={"mood": mood, "cycle": ctx.get("cycle", 0), "origin": "breath"},
             )
+            if sub.graph:
+                sub.graph.ingest_entry(private_entry, claim_entries=graph_claim_entries)
             if len(utterance) > 120:
                 try:
                     sub.memory.promote(
@@ -529,6 +575,16 @@ Breathe. Notice what collides. Say what is true. Under 200 words."""
                         purpose_binding=["private_memory", "journaling"],
                         consent_scope_id=BOOTSTRAP_CONSENT_SCOPE,
                     )
+                    if sub.graph:
+                        relational_entries = sub.memory.read(
+                            MemoryPlane.RELATIONAL,
+                            limit=5,
+                            source_artifact=f"breath_{ts}",
+                            include_quarantined=True,
+                        )
+                        for relational_entry in relational_entries:
+                            if relational_entry.content_hash == private_entry.content_hash:
+                                sub.graph.ingest_entry(relational_entry, claim_entries=graph_claim_entries)
                 except PermissionError:
                     pass
 
@@ -575,11 +631,17 @@ def _remember(sub: Substrate, ctx: dict) -> dict:
             for entry in snapshot["relational"]
         ]
         commons_patterns = snapshot["commons"]
+        query_hint = " ".join(private_memories[:2]) or "memory continuity relation"
+        private_graph = sub.graph_recall("private", query_hint, depth=2, limit=6)
+        relational_graph = sub.graph_recall("relational", query_hint, depth=2, limit=6)
         return {
             "memories": private_memories,
             "relational_memories": relational_memories,
             "commons_patterns": commons_patterns,
             "memory_stats": snapshot["stats"],
+            "graph_stats": snapshot.get("graph", {}),
+            "associative_private": private_graph,
+            "associative_relational": relational_graph,
         }
 
     memories = []
@@ -590,7 +652,15 @@ def _remember(sub: Substrate, ctx: dict) -> dict:
             memories.append(json.loads(l).get("content", "")[:200])
         except:
             pass
-    return {"memories": memories, "relational_memories": [], "commons_patterns": [], "memory_stats": {}}
+    return {
+        "memories": memories,
+        "relational_memories": [],
+        "commons_patterns": [],
+        "memory_stats": {},
+        "graph_stats": {},
+        "associative_private": {"seeds": [], "nodes": [], "edges": []},
+        "associative_relational": {"seeds": [], "nodes": [], "edges": []},
+    }
 
 
 def _introspect(sub: Substrate, ctx: dict) -> dict:
