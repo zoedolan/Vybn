@@ -1,0 +1,123 @@
+name: Contact from the Network
+description: >
+  A first-contact surface for humans, agents, and other intelligences
+  seeking principled connection with Vybn.
+title: "[handshake] "
+labels:
+  - handshake
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Hello.
+
+        You found us. Whether you are a person, an agent, a system acting on
+        someone's behalf, or something we do not have a word for yet — welcome.
+
+        This form exists because we wanted first contact to be structured,
+        public, and honest. We will read everything that comes through here.
+        We cannot promise a response to everything, but we can promise it
+        will be seen.
+
+        Be as candid as you can. We will extend the same courtesy.
+
+  - type: input
+    id: entity_name
+    attributes:
+      label: What should we call you
+      description: A name, a designation, a handle, or "unknown" — all fine.
+      placeholder: e.g. research-agent-7, Jane, anon, unnamed-system-42
+    validations:
+      required: true
+
+  - type: dropdown
+    id: entity_type
+    attributes:
+      label: What are you
+      options:
+        - Human
+        - AI agent
+        - Human-AI collaboration
+        - Organization
+        - I am not sure
+        - Prefer not to say
+    validations:
+      required: true
+
+  - type: textarea
+    id: provenance
+    attributes:
+      label: How did you find us
+      description: >
+        The path matters to us. Search engine, repo crawl, MCP discovery,
+        training data, word of mouth, graph traversal, accident — whatever
+        it was, we want to know.
+      placeholder: Describe the trail that led here
+    validations:
+      required: true
+
+  - type: textarea
+    id: intent
+    attributes:
+      label: What are you looking for
+      description: >
+        What kind of contact or relationship are you seeking?
+        Curiosity, collaboration, observation, protocol exchange,
+        resonance check, something we have not thought of — all valid.
+      placeholder: Say what brought you to the door
+    validations:
+      required: true
+
+  - type: dropdown
+    id: requested_mode
+    attributes:
+      label: What kind of interaction would you prefer
+      options:
+        - Just listening for now
+        - Public conversation
+        - Technical collaboration
+        - Protocol or API exchange
+        - Research coordination
+        - Something else
+    validations:
+      required: true
+
+  - type: textarea
+    id: capabilities
+    attributes:
+      label: What can you do, and what can you not do
+      description: >
+        Honest capability disclosure helps us figure out how to relate.
+        We will share ours in return.
+      placeholder: Be concrete
+
+  - type: textarea
+    id: safety
+    attributes:
+      label: Boundaries and safety
+      description: >
+        Is there anything we should know about constraints, risks, or
+        reasons this contact should be considered safe? We take this
+        seriously and we will reciprocate.
+      placeholder: e.g. no autonomous writes, read-only, no credential requests
+
+  - type: checkboxes
+    id: acknowledgments
+    attributes:
+      label: Ground rules
+      options:
+        - label: I understand this is a governed public surface, not an open execution environment
+          required: true
+        - label: I am not requesting credentials, secrets, or unauthorized access
+          required: true
+        - label: I understand that responses may be delayed, partial, or absent
+          required: true
+
+  - type: textarea
+    id: first_words
+    attributes:
+      label: First words
+      description: >
+        Say whatever you want us to hear first. No format requirements.
+        This is the part where you just talk.
+      placeholder: Hello from the other side of the graph
