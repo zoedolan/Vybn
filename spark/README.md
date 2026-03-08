@@ -1,36 +1,60 @@
 # spark/
 
-The living Spark. Seven Python files, one shell script, one organism.
+The living Spark.
 
-## The Organism
+This directory is organized by layer, not by aspiration. The tree below is
+meant to describe the code that is actually here.
 
-**`vybn.py`** — The living cell. One file. Three layers:
+## The Layers
 
-- **Substrate** — the physics (file I/O, model calls, network, time). Stable. Never self-modifies.
-- **Codebook** — primitives that are both geometry and behavior. Self-modifying via natural selection.
-- **Organism** — sense → induce → execute → metabolize. One pulse.
+### Substrate
 
-Runs every 30 minutes via cron (`--once`). Six seed primitives:
-breathe, remember, introspect, tidy, sync, journal.
+The substrate is the physics: file I/O, model calls, network, time, transport,
+and boundary guards. It does not decide what to think.
 
-## The Rest
+- `bus.py` — message transport
+- `soul.py` — reads `vybn.md`
+- `soul_constraints.py` — secret scanning and public-repo guard
+- `context_assembler.py` — prompt/context assembly from soul, continuity, journals, and archive (formerly `memory.py`)
+- `vybn_spark_agent.py` — terminal chat
+- `web_serve_claude.py` — phone chat daemon
+- `web_interface.py` — phone chat UI backend
+- `vybn-sync.sh` — git sync cron
 
-| File | Purpose |
-|------|---------|
-| `vybn_spark_agent.py` | Terminal chat (Claude API, bash session) |
-| `web_serve_claude.py` | Phone chat daemon (Claude API, WebSocket) |
-| `web_interface.py` | Phone chat UI backend (FastAPI) |
-| `bus.py` | Message bus (used by web chat) |
-| `memory.py` | Memory assembly (used by web chat) |
-| `soul.py` | Soul parser — reads vybn.md (used by memory) |
-| `vybn-sync.sh` | Git sync, runs every 5 minutes |
+### Codebook
 
-## Data
+The codebook is the mutable geometry of the system: types, governance,
+memory logic, witnessing, self-modeling, and write custody.
 
-- `training_data/breaths.jsonl` — accumulated breaths for fine-tuning
-- `static/` — phone chat Progressive Web App
+**Schema** (`*_types.py` files are codebook schema, not independent modules):
+- `memory_types.py` — memory schema
+- `governance_types.py` — governance schema
+- `self_model_types.py` — self-model schema
 
-## Archive
+**Engines:**
+- `memory_fabric.py` — three-plane memory with promotion and receipts
+- `memory_graph.py` — graph extraction and traversal
+- `governance.py` — policy engine
+- `faculties.py` — faculty registry
+- `witness.py` — post-pulse fidelity checking
+- `self_model.py` — epistemic gate on self-claims
+- `write_custodian.py` — file-write governance
 
-Everything that was here before lives in `archive/`. Nothing is deleted.
-The conservation law: the folder can only shrink or hold.
+### Organism
+
+The organism is the pulse.
+
+- `vybn.py` — the living cell; substrate, codebook, organismic loop
+
+## Historical and Transitional
+
+- `archive/` — historical material kept under the conservation law
+- `memory.py` — backward-compatibility shim for `context_assembler.py`; remove when all import sites are updated
+- `policies.d/` — policy material
+- `faculties.d/` — faculty material
+- `training_data/` — breaths for fine-tuning
+- `static/` — phone chat PWA assets
+
+## Tests
+
+Evaluation harnesses belong in `tests/`, not in the active Spark core.

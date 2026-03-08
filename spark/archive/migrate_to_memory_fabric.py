@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
-"""Migrate connections.jsonl entries into the private memory plane."""
+"""Archived migration script for connections.jsonl -> private memory plane."""
 
 import json
+import sys
 from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(ROOT / "spark"))
 
 from memory_fabric import MemoryFabric
 from memory_types import MemoryPlane
 
-ROOT = Path(__file__).resolve().parent.parent
 SYNAPSE = ROOT / "Vybn_Mind" / "synapse" / "connections.jsonl"
 
 
