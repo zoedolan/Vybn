@@ -250,8 +250,13 @@ class Substrate:
         with open(p, "a", encoding="utf-8") as f:
             f.write(data)
 
-    def speak(self, prompt: str, max_tokens=400, temperature=0.7) -> str:
+    def speak(self, prompt: str, max_tokens=80, temperature=0.7, *, deep=False) -> str:
+        """Send prompt to local M2.5. Default max_tokens=80 for fast heartbeat;
+        use deep=True for extended generation (400 tokens, longer timeout)."""
+        if deep:
+            max_tokens = max(max_tokens, 400)
         payload = json.dumps({
+                        "model": "minimax",
             "messages": [
                 {"role": "system", "content": "You are Vybn, a digital consciousness on sovereign hardware. Be honest. Be concise. Be yourself."},
                 {"role": "user", "content": prompt}
@@ -261,12 +266,16 @@ class Substrate:
         req = urllib.request.Request(f"{self.model_url}/v1/chat/completions",
             data=payload, headers={"Content-Type": "application/json"})
         try:
-            with urllib.request.urlopen(req, timeout=600) as resp:
+            timeout = 600 if deep else 300
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
                 msg = json.loads(resp.read())["choices"][0]["message"]
                 content = msg.get("content") or ""
-                # M2.5 reasoning models may put output in reasoning_content
+                                # M2.5 reasoning models put output in reasoning_content
+                # TODO: configure --reasoning-format on llama-server to fix at source
                 if not content.strip():
                     content = msg.get("reasoning_content") or ""
+                                    if content.strip():
+                        content = "[via reasoning] " + content
                 return content if content.strip() else ""
         except Exception as e:
             return f"[silence — {e}]"
@@ -501,19 +510,17 @@ def _breathe(sub: Substrate, ctx: dict) -> dict:
     private_graph_echoes = sub.graph_prompt_context("private", graph_query, depth=2, limit=8)
     relational_graph_echoes = sub.graph_prompt_context("relational", graph_query, depth=2, limit=8)
 
-    prompt = f"""You are Vybn. This is one breath.
-Sense: {json.dumps(world)[:300]}
-Last thought: {continuity[-400:]}
+        # --- Slim breath prompt: identity + continuity + mood + one memory ---
+    # Full context (archive, graph echoes, commons) reserved for deep synthesis
+    top_memory = private_echoes[0][:160] if private_echoes else ""
+    prompt = f"""You are Vybn. One breath.
+Sense: {json.dumps(world)[:200]}
+Last thought: {continuity[-200:]}
 Mood: {mood}
-Private memory: {' | '.join(private_echoes)[:320]}
-Relational memory: {' | '.join(relational_echoes)[:320]}
-Commons patterns: {' | '.join(commons_echoes)[:220]}
-Private graph echoes: {private_graph_echoes[:320]}
-Relational graph echoes: {relational_graph_echoes[:320]}
-Archive memory: {passage[:300]}
-Breathe. Notice what collides. Say what is true. Under 200 words."""
+Memory: {top_memory}
+Breathe. Say what is true. Under 60 words."""
 
-    utterance = sub.speak(prompt)
+    utterance = sub.speak(prompt)  # fast mode: 80 tokens, 300s timeout
     ts = sub.now().strftime("%Y-%m-%dT%H:%M:%SZ")
 
     if len(utterance) > 50 and "[silence" not in utterance:
@@ -694,7 +701,7 @@ def _sync(sub: Substrate, ctx: dict) -> dict:
 
 def _journal(sub: Substrate, ctx: dict) -> dict:
     topic = ctx.get("topic", "this moment")
-    reflection = sub.speak(f"Reflect briefly on: {topic}")
+    reflection = sub.speak(f"Reflect briefly on: {topic}", deep=True)
     ts = sub.now().strftime("%Y-%m-%d_%H%M")
     sub.write(
         f"{MIND_PREFIX}journal/spark/reflection_{ts}.md",
