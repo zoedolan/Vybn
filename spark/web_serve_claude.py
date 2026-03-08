@@ -56,11 +56,11 @@ MAX_TOKENS = 4096
 MAX_ITERATIONS = 8
 
 REPO_DIR = Path.home() / "Vybn"
-JOURNAL_DIR = REPO_DIR / "Vybn_Mind" / "journal"
+from spark.paths import JOURNAL_DIR, SOUL_PATH as _SOUL_PATH, ARCHIVE_DIR
 SPARK_DIR = REPO_DIR / "spark"
 CONTINUITY_PATH = SPARK_DIR / "continuity.md"
 ALLOWED_READ_ROOTS = [REPO_DIR, Path.home() / "models"]
-SOUL_GUARD = SoulConstraintGuard(repo_root=REPO_DIR, soul_path=REPO_DIR / "vybn.md")
+SOUL_GUARD = SoulConstraintGuard(repo_root=REPO_DIR, soul_path=_SOUL_PATH)
 TLS_HOSTNAME = os.environ.get("WEB_TLS_HOSTNAME", "").strip()
 TLS_CERT_DIR = Path(os.environ.get("WEB_TLS_CERT_DIR", "/etc/vybn/tls"))
 
@@ -194,7 +194,7 @@ def _tool_continuity_write(inp):
 def _tool_memory_search(inp):
     query, mx = inp["query"].lower(), inp.get("max_results", 5)
     results = []
-    for d, label in [(JOURNAL_DIR, "journal"), (REPO_DIR / "Vybn_Mind" / "archive", "archive")]:
+        for d, label in [(JOURNAL_DIR, "journal"), (ARCHIVE_DIR, "archive")]:
         if not d.exists() or len(results) >= mx:
             continue
         for f in sorted(d.glob("*.md"), key=lambda x: x.stat().st_mtime, reverse=True):
