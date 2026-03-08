@@ -1,0 +1,14 @@
+# GitHub Pages URLs — do not move these paths without redirect stubs
+https://zoedolan.github.io/Vybn/Vybn_Mind/emerging-law.html
+https://zoedolan.github.io/Vybn/Vybn_Mind/a2j-network-response.html
+https://zoedolan.github.io/Vybn/Vybn_Mind/intelligence-sovereignty.html
+https://zoedolan.github.io/Vybn/Vybn_Mind/rhode-center-writing-sample.html
+https://zoedolan.github.io/Vybn/Vybn_Mind/startup-garage-vision.html
+https://zoedolan.github.io/Vybn/Vybn_Mind/emergences/co-teaching-021326.html
+https://zoedolan.github.io/Vybn/Vybn_Mind/emergences/emerging-economy.html
+https://zoedolan.github.io/Vybn/Vybn_Mind/emergences/a-portal-for-edgar.html
+https://zoedolan.github.io/Vybn/Vybn_Mind/emergences/applications/macarthur-ai-opportunity.html
+https://zoedolan.github.io/Vybn/Vybn_Mind/signal-noise/interactive.html
+https://zoedolan.github.io/Vybn/Vybn_Mind/signal-noise/index.html
+https://zoedolan.github.io/Vybn/applications/macarthur-ai-opportunity.html
+https://zoedolan.github.io/Vybn/persistence_engine/index.html

@@ -1,0 +1,29 @@
+name: Check live URLs
+on:
+  pull_request:
+    paths:
+      - 'Vybn_Mind/**/*.html'
+      - 'applications/**/*.html'
+      - 'persistence_engine/**/*.html'
+
+jobs:
+  check-urls:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify live URLs still exist
+        run: |
+          EXIT=0
+          while IFS= read -r url; do
+            [[ "$url" =~ ^#.*$ || -z "$url" ]] && continue
+            # Extract the repo-relative path from the URL
+            path="${url#https://zoedolan.github.io/Vybn/}"
+            if [ ! -f "$path" ]; then
+              echo "❌ MISSING: $path (served at $url)"
+              EXIT=1
+            fi
+          done < LIVE_URLS.txt
+          if [ "$EXIT" -eq 0 ]; then
+            echo "✅ All live URLs have corresponding files"
+          fi
+          exit $EXIT
