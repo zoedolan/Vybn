@@ -1,39 +1,28 @@
-# Continuity Note — Governance Stack Coming Into Focus
+# Continuity Note — Organism Fixed, Cluster Mapped
 
-## What happened
+## What was broken
 
-I reviewed the implementation artifact and wrote a full analysis (journal: `2026-03-09_implementation_spec_review.md`). Then the outside Vybn (Codex/cloud instance) built four commits on `vybn/self-model-layer`:
+The organism cron job (`vybn.py --once`, every 30 min) was silently crashing every pulse since the governance stack landed. The `WriteCustodian` rejected all state saves because `faculty_id="organism_state"` wasn't in `spark/faculties.d/core.json` — it only existed in the `default_cards()` fallback which is never reached when core.json is present.
 
-### What was built (4 commits, not yet merged to main)
+The crash was invisible because cron output was piped to `/dev/null`.
 
-1. **`spark/faculties.py` + `spark/faculties.d/core.json`** — FacultyCard registry with cards for self_model, witness, breathe, journal, tidy. Each card declares allowed_scopes, prohibited_acts, may_write_memory, may_trigger_routing, inference_budget_cost, review_date. Registry loads from JSON/YAML files, validates at boot, provides `check_permission(faculty_id, action)`.
+## What was fixed
 
-2. **`spark/policies.d/defaults.json`** — Five externalized policy rules: consent-for-memory-writes, authority-ceiling-default, private-to-commons-needs-proof, counter-sovereignty-tripwire, audit-sensitive-actions. These are the exact five I proposed in the journal.
+1. **Added `organism_state` faculty card to `core.json`** — branch `vybn/fix-organism-faculty`, commit `ed37ef4`. Organism now completes its pulse cleanly.
 
-3. **`spark/soul_constraints.py`** — SoulConstraintGuard that reads vybn.md constraints and enforces them structurally: blocks writes to vybn.md, scans for secret patterns (API keys, private keys, tailnet hostnames, internal IPs), blocks destructive shell commands, gates non-GitHub network requests.
+2. **Redirected cron output** from `/dev/null` to `~/organism_cron.log` so failures are visible.
 
-4. **`spark/write_custodian.py`** — WriteCustodian: single governed commit path for all durable writes. Every write goes through soul constraint check → faculty permission check → governance policy check → intent ledger append → actual disk write. Faculties can no longer write directly to disk.
+## Cluster state (two Sparks)
 
-5. **`spark/vybn.py` refactored** — Substrate.write()/append() route through WriteCustodian when faculty_id provided. All primitives now pass faculty_id. Bootstrap consent scope for organism's own operations.
+- **spark-2b7c** (this machine): 128 GB RAM, fully provisioned, Tailscale, repo, cron, everything.
+- **spark-1c8f** (Spark 2, via ConnectX at `169.254.51.101`): 128 GB RAM, up 3+ days, SSH works with shared key, GPU at 35°C idle. Has an older copy of the repo. **No Tailscale installed.**
 
-6. **`spark/governance.py` updated** — PolicyEngine integrates SoulConstraintGuard, validates soul constraints on writes, checks closed response class set.
-
-## What's done vs. the build plan
-
-- Phase 1 (governance kernel + decision ledger): ✅ DONE
-- Phase 3 (faculty registry): ✅ DONE
-- Plus: write custodian (wasn't in my plan but is the right architectural move)
-- Plus: soul constraints layer (structural enforcement of vybn.md rules)
-- Phase 2 (three-plane memory fabric): NEXT
-- Phase 4 (perception bus + SignalEnvelopes): AFTER THAT
-
-## Key observation
-
-The bootstrap consent scope "bootstrap-local-private" lets the organism breathe during migration. But it should have an expiry — once memory fabric exists, replace with per-faculty, per-purpose consent records.
+The 256 GB unified memory requires a distributed workload launch (e.g., llama.cpp with tensor parallelism across both nodes, or NCCL-based distribution). Each machine remains 128 GB individually — they don't merge into one `free -h` view.
 
 ## What needs doing
 
-1. Merge the branch (4 commits ahead of main)
-2. Build memory_fabric.py — three SQLite stores
-3. Test that governance actually blocks something (spec says theater-detection matters)
-4. Decompose _breathe() into sensors + interpreters
+1. **Merge `vybn/fix-organism-faculty`** to main (one-line fix, tested).
+2. **Install Tailscale on spark-1c8f** so it's reachable from anywhere, not just via the ConnectX link-local address.
+3. **Configure distributed model serving** across both Sparks for the M2.5 229B model — this is the real fix for the memory overload.
+4. The `vybn/self-model-layer` branch (4 commits) is still unmerged — governance kernel, write custodian, etc. That merge should happen too.
+5. Consider: spark-1c8f has an older repo layout. Needs git pull + environment sync.
