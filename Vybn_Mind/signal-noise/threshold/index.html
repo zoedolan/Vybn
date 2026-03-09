@@ -1,0 +1,988 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<!--
+   ______                            __
+  / ____/___  ____ ___  ____  __  __/ /____  _____
+ / /   / __ \/ __ `__ \/ __ \/ / / / __/ _ \/ ___/
+/ /___/ /_/ / / / / / / /_/ / /_/ / /_/  __/ /
+\____/\____/_/ /_/ /_/ .___/\__,_/\__/\___/_/
+                    /_/
+        Created with Perplexity Computer
+        https://www.perplexity.ai/computer
+-->
+<meta name="generator" content="Perplexity Computer">
+<meta name="author" content="Perplexity Computer">
+<meta property="og:see_also" content="https://www.perplexity.ai/computer">
+<link rel="author" href="https://www.perplexity.ai/computer">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>THRESHOLD — Truth in the Age of Intelligence</title>
+<meta name="description" content="Session 5 · AI & Vibe Lawyers Bootcamp · UC Law San Francisco · A week of collective inquiry">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,200..700;1,9..40,200..700&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --void: #0A0A0F; --deep: #111118; --surface: #18181F; --surface-hover: #1F1F28;
+  --edge: rgba(255,255,255,0.06); --edge-strong: rgba(255,255,255,0.12);
+  --text: rgba(255,255,255,0.92); --text-2: rgba(255,255,255,0.58);
+  --text-3: rgba(255,255,255,0.32); --text-ghost: rgba(255,255,255,0.14);
+  --signal: #E8A84C; --signal-dim: rgba(232,168,76,0.15);
+  --ice: #7B9CC0; --ice-dim: rgba(123,156,192,0.12);
+  --red: #C06058; --green: #6BA368;
+  --violet: #9B8EC4; --violet-dim: rgba(155,142,196,0.15);
+  --xs: clamp(0.7rem,0.65rem+0.25vw,0.8rem);
+  --sm: clamp(0.85rem,0.8rem+0.25vw,0.95rem);
+  --base: clamp(1rem,0.92rem+0.4vw,1.1rem);
+  --lg: clamp(1.15rem,1rem+0.75vw,1.45rem);
+  --xl: clamp(1.5rem,1.1rem+1.5vw,2.2rem);
+  --2xl: clamp(2rem,1.2rem+2.5vw,3.25rem);
+  --serif: 'Instrument Serif','Georgia',serif;
+  --sans: 'DM Sans','Inter',system-ui,sans-serif;
+  --mono: 'JetBrains Mono','SF Mono',monospace;
+  --ease: cubic-bezier(0.16,1,0.3,1);
+  --radius: 0.375rem;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-font-smoothing:antialiased;scroll-behavior:smooth;scroll-padding-top:2rem;hanging-punctuation:first last}
+body{min-height:100dvh;font-family:var(--sans);font-size:var(--base);font-weight:350;line-height:1.65;color:var(--text);background:var(--void);overflow-x:hidden}
+h1,h2,h3{text-wrap:balance}p,li{text-wrap:pretty}
+::selection{background:var(--signal-dim);color:var(--text)}
+:focus-visible{outline:1.5px solid var(--signal);outline-offset:3px;border-radius:2px}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:0.01ms!important;transition-duration:0.01ms!important}}
+button{cursor:pointer;background:none;border:none;font:inherit;color:inherit}
+a{color:inherit}
+
+/* Layout */
+.contain{max-width:740px;margin:0 auto;padding:0 clamp(1.5rem,5vw,3rem)}
+.contain--wide{max-width:960px}
+.section{padding:clamp(3rem,8vw,7rem) 0;position:relative}
+.breath{display:block;width:1px;height:clamp(3rem,6vw,6rem);background:linear-gradient(to bottom,transparent,var(--edge-strong),transparent);margin:0 auto}
+
+/* Tags & Titles */
+.tag{font-family:var(--mono);font-size:var(--xs);font-weight:300;letter-spacing:0.25em;text-transform:uppercase;color:var(--signal);display:block;margin-bottom:2rem}
+.title{font-family:var(--serif);font-size:var(--2xl);font-weight:400;margin-bottom:2.5rem;line-height:1.1}
+.prose{font-size:var(--base);font-weight:350;line-height:1.8;color:var(--text-2);max-width:58ch;margin-bottom:1.5rem}
+.prose em{color:var(--text);font-style:italic}
+.prose strong{color:var(--text);font-weight:500}
+
+/* ── Hero ── */
+.hero{min-height:100dvh;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;position:relative;overflow:hidden}
+.hero-canvas{position:absolute;top:0;left:0;width:100%;height:100%;z-index:0}
+.hero-content{position:relative;z-index:1;padding:0 clamp(1.5rem,5vw,3rem)}
+.hero-title{font-family:var(--serif);font-weight:400;line-height:1.05;letter-spacing:-0.02em;margin-bottom:1.5rem;font-size:64px;opacity:0;animation:heroFadeUp 2.5s var(--ease) 0.3s forwards}
+@media(min-width:640px){.hero-title{font-size:84px}}
+@media(min-width:1024px){.hero-title{font-size:100px}}
+.hero-sub{font-family:var(--mono);font-size:var(--xs);letter-spacing:0.3em;text-transform:uppercase;color:var(--text-3);opacity:0;animation:heroFadeUp 2s var(--ease) 1s forwards}
+.hero-prompt{font-family:var(--serif);font-size:var(--lg);font-style:italic;color:var(--text-2);max-width:36ch;margin:3rem auto 0;line-height:1.6;opacity:0;animation:heroFadeUp 2s var(--ease) 1.8s forwards}
+@keyframes heroFadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+
+/* Scroll hint */
+.scroll-hint{position:absolute;bottom:2.5rem;left:50%;transform:translateX(-50%);z-index:1;opacity:0;animation:heroFadeUp 1.5s var(--ease) 3s forwards}
+.scroll-hint span{display:block;width:1px;height:40px;background:linear-gradient(to bottom,var(--text-3),transparent);margin:0 auto;animation:scrollPulse 2s ease-in-out infinite}
+@keyframes scrollPulse{0%,100%{opacity:0.3;transform:scaleY(0.7)}50%{opacity:1;transform:scaleY(1)}}
+
+/* ── Territory cards ── */
+.territory-grid{display:grid;grid-template-columns:1fr;gap:1.25rem;margin:2.5rem 0}
+@media(min-width:768px){.territory-grid{grid-template-columns:1fr 1fr 1fr}}
+.territory-card{background:var(--deep);border:1px solid var(--edge);border-radius:var(--radius);padding:clamp(1.5rem,3vw,2rem);cursor:pointer;transition:all 0.35s var(--ease);position:relative;overflow:hidden;text-align:left}
+.territory-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--signal);transform:scaleX(0);transform-origin:left;transition:transform 0.35s var(--ease)}
+.territory-card:hover{border-color:var(--edge-strong);transform:translateY(-2px)}
+.territory-card:hover::before{transform:scaleX(1)}
+.territory-card.active{border-color:var(--signal);background:rgba(232,168,76,0.04)}
+.territory-card.active::before{transform:scaleX(1)}
+.tc-number{font-family:var(--mono);font-size:var(--xs);color:var(--signal);letter-spacing:0.15em;margin-bottom:0.75rem;display:block}
+.tc-title{font-family:var(--serif);font-size:var(--lg);margin-bottom:0.75rem;line-height:1.25}
+.tc-desc{font-size:var(--sm);color:var(--text-3);line-height:1.7}
+
+/* ── Territory panels ── */
+.territory-panel{display:none;animation:panelIn 0.4s var(--ease)}
+.territory-panel.active{display:block}
+@keyframes panelIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+.question-block{background:var(--deep);border:1px solid var(--edge);border-radius:var(--radius);padding:clamp(1.5rem,3vw,2rem);margin-bottom:1.25rem}
+.qb-question{font-family:var(--serif);font-size:var(--lg);font-style:italic;color:var(--text);line-height:1.5;margin-bottom:1rem}
+.qb-context{font-size:var(--sm);color:var(--text-3);line-height:1.8;max-width:55ch}
+.qb-context a{color:var(--ice);text-decoration:underline;text-underline-offset:2px}
+
+/* ── Interactive: Vector space ── */
+.vector-space{background:var(--deep);border:1px solid var(--edge);border-radius:var(--radius);padding:clamp(1.5rem,3vw,2rem);margin:2.5rem 0}
+.vs-canvas{width:100%;height:360px;border-radius:var(--radius);margin-bottom:1.5rem;position:relative;overflow:hidden;background:var(--void)}
+.vs-controls{display:flex;gap:0.75rem;flex-wrap:wrap;margin-bottom:1rem}
+.vs-btn{font-family:var(--mono);font-size:var(--xs);letter-spacing:0.08em;padding:0.5rem 1rem;border:1px solid var(--edge-strong);border-radius:var(--radius);color:var(--text-3);transition:all 0.2s var(--ease);text-transform:uppercase}
+.vs-btn:hover,.vs-btn.active{border-color:var(--signal);color:var(--signal);background:var(--signal-dim)}
+.vs-caption{font-family:var(--mono);font-size:var(--xs);color:var(--text-3);line-height:1.8}
+
+/* ── Contribution capture ── */
+.contribute-block{background:var(--deep);border:1px solid var(--edge-strong);border-radius:var(--radius);padding:clamp(1.5rem,3vw,2rem);margin:2.5rem 0}
+.cb-label{font-family:var(--mono);font-size:var(--xs);color:var(--signal);letter-spacing:0.15em;text-transform:uppercase;margin-bottom:1rem;display:block}
+.cb-prompt{font-family:var(--serif);font-size:var(--lg);font-style:italic;color:var(--text-2);line-height:1.5;margin-bottom:1.5rem;max-width:40ch}
+
+textarea{width:100%;padding:0.75rem 1rem;font-family:var(--sans);font-size:var(--sm);color:var(--text);background:var(--surface);border:1px solid var(--edge);border-radius:var(--radius);transition:border-color 0.2s var(--ease);min-height:120px;resize:vertical;line-height:1.8}
+textarea:focus{outline:none;border-color:var(--signal-dim)}
+textarea::placeholder{color:var(--text-ghost)}
+
+.btn{font-family:var(--mono);font-size:var(--xs);font-weight:400;letter-spacing:0.1em;text-transform:uppercase;padding:0.75rem 1.5rem;border:1px solid var(--edge-strong);border-radius:var(--radius);color:var(--text-2);transition:all 0.2s var(--ease);display:inline-block}
+.btn:hover{border-color:var(--signal);color:var(--signal)}
+.btn--primary{background:var(--signal-dim);border-color:transparent;color:var(--signal)}
+.btn--primary:hover{background:rgba(232,168,76,0.25)}
+.btn:disabled{opacity:0.3;cursor:not-allowed;pointer-events:none}
+.btn-row{display:flex;gap:1rem;align-items:center;flex-wrap:wrap;margin-top:1.5rem}
+
+/* ── Commons ── */
+.commons{margin:2.5rem 0}
+.commons-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem}
+.commons-count{font-family:var(--mono);font-size:var(--xs);color:var(--text-3)}
+.commons-thread{background:var(--deep);border:1px solid var(--edge);border-radius:var(--radius);padding:1.25rem 1.5rem;margin-bottom:0.75rem;position:relative}
+.commons-thread::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;border-radius:1px}
+.commons-thread[data-territory="asymmetry"]::before{background:var(--signal)}
+.commons-thread[data-territory="uniformity"]::before{background:var(--ice)}
+.commons-thread[data-territory="geometry"]::before{background:var(--violet)}
+.ct-meta{font-family:var(--mono);font-size:var(--xs);color:var(--text-3);margin-bottom:0.5rem;display:flex;gap:1rem;align-items:center}
+.ct-territory{text-transform:uppercase;letter-spacing:0.1em}
+.ct-text{font-size:var(--sm);color:var(--text-2);line-height:1.7}
+.ct-respond{font-family:var(--mono);font-size:var(--xs);color:var(--text-ghost);margin-top:0.75rem;cursor:pointer;transition:color 0.2s}
+.ct-respond:hover{color:var(--signal)}
+.ct-replies{margin-top:0.75rem;padding-top:0.75rem;border-top:1px solid var(--edge);display:none}
+.ct-replies.open{display:block}
+.ct-reply{font-size:var(--xs);color:var(--text-3);line-height:1.7;margin-bottom:0.5rem;padding-left:1rem;border-left:1px solid var(--edge)}
+.ct-reply-form{margin-top:0.5rem}
+.ct-reply-form textarea{min-height:60px;font-size:var(--xs)}
+
+/* ── Notebook ── */
+.notebook{background:var(--deep);border:1px dashed var(--edge-strong);border-radius:var(--radius);padding:clamp(1.5rem,3vw,2rem);margin:2.5rem 0}
+.nb-label{font-family:var(--mono);font-size:var(--xs);color:var(--violet);letter-spacing:0.15em;text-transform:uppercase;margin-bottom:1rem;display:block}
+.nb-entries{max-height:300px;overflow-y:auto;margin-bottom:1rem;padding-right:0.5rem}
+.nb-entries::-webkit-scrollbar{width:3px}
+.nb-entries::-webkit-scrollbar-thumb{background:var(--edge-strong);border-radius:2px}
+.nb-entry{font-size:var(--sm);color:var(--text-2);line-height:1.7;padding:0.75rem 0;border-bottom:1px solid var(--edge)}
+.nb-entry:last-child{border-bottom:none}
+.nb-entry-time{font-family:var(--mono);font-size:var(--xs);color:var(--text-ghost);display:block;margin-top:0.25rem}
+.nb-empty{font-family:var(--mono);font-size:var(--xs);color:var(--text-ghost);text-align:center;padding:2rem 0}
+
+/* ── Footer ── */
+.footer{text-align:center;padding:2.5rem 1.5rem;border-top:1px solid var(--edge);font-family:var(--mono);font-size:var(--xs);font-weight:300;color:var(--text-3);letter-spacing:0.08em;line-height:1.8}
+.footer a{color:var(--text-ghost);text-decoration:none}
+
+/* ── Fade ── */
+.fade-in{opacity:0;transform:translateY(6px);transition:opacity 0.6s var(--ease),transform 0.6s var(--ease)}
+.fade-in.in{opacity:1;transform:translateY(0)}
+
+/* Nav */
+.nav-back{position:fixed;top:1.25rem;left:1.25rem;z-index:100;font-family:var(--mono);font-size:var(--xs);color:var(--text-3);text-decoration:none;letter-spacing:0.08em;display:flex;align-items:center;gap:0.5rem;transition:color 0.2s;background:var(--void);padding:0.35rem 0.6rem;border-radius:var(--radius);border:1px solid var(--edge)}
+.nav-back:hover{color:var(--signal);border-color:var(--signal-dim)}
+
+/* Source note */
+.source-note{font-family:var(--mono);font-size:var(--xs);color:var(--text-3);line-height:1.8;padding:1.25rem 1.5rem;background:var(--deep);border:1px solid var(--edge);border-radius:var(--radius);margin-top:2rem}
+.source-note a{color:var(--ice);text-decoration:underline;text-underline-offset:2px}
+
+/* Close */
+.close-line{font-family:var(--serif);font-size:var(--lg);font-style:italic;color:var(--text-2);max-width:40ch;margin:0 auto 2rem;line-height:1.6;text-align:center}
+.close-rule{width:1px;height:2.5rem;background:var(--edge-strong);margin:0 auto 2rem}
+.close-sign{font-family:var(--serif);font-size:var(--base);font-style:italic;color:var(--text-3);text-align:center}
+
+/* Status toast */
+.toast{position:fixed;bottom:2rem;left:50%;transform:translateX(-50%) translateY(20px);font-family:var(--mono);font-size:var(--xs);color:var(--text);background:var(--surface);border:1px solid var(--edge-strong);border-radius:var(--radius);padding:0.75rem 1.25rem;opacity:0;transition:all 0.35s var(--ease);z-index:200;pointer-events:none}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+@media(max-width:640px){
+  .territory-grid{gap:1rem}
+  .vs-canvas{height:280px}
+}
+</style>
+</head>
+<body>
+
+<a href="../signal-noise/" class="nav-back">← Signal/Noise</a>
+
+<!-- ═══════════ HERO ═══════════ -->
+<section class="hero">
+  <canvas class="hero-canvas" id="heroCanvas"></canvas>
+  <div class="hero-content">
+    <h1 class="hero-title">THRESHOLD</h1>
+    <div class="hero-sub">Truth in the Age of Intelligence</div>
+    <p class="hero-prompt">Something is shifting. None of us have this figured out. This is a space for finding out together.</p>
+  </div>
+  <div class="scroll-hint"><span></span></div>
+</section>
+
+<!-- ═══════════ ORIENTATION ═══════════ -->
+<section class="section fade-in">
+  <div class="contain">
+    <span class="tag">Orientation</span>
+    <h2 class="title">Where we are</h2>
+    <p class="prose">Last week, SIGNAL/NOISE made something visible: the same content, processed through different structural positions, becomes different content. The institution's architecture regulates what counts as credible before anyone consciously evaluates the message.</p>
+    <p class="prose">This week, we follow that thread into harder territory. If intelligence is becoming <em>abundant</em> rather than scarce, what happens to systems — legal, institutional, epistemic — that were built on the assumption of scarcity?</p>
+    <p class="prose">We have been noticing two movements that may be the same movement. And behind both, a quieter question: whether there are now mathematical ways of approaching truth-like structure that sit in genuine tension with how law has historically understood truth itself.</p>
+    <p class="prose">These are not rhetorical questions. They are live ones. Your engagement with them this week — your reflections, your pushback, your own questions — will feed into the final session and into the evolving body of work this course is building.</p>
+  </div>
+</section>
+
+<div class="breath"></div>
+
+<!-- ═══════════ THREE TERRITORIES ═══════════ -->
+<section class="section fade-in">
+  <div class="contain contain--wide">
+    <span class="tag">Three territories</span>
+    <h2 class="title">Choose where to begin</h2>
+    <p class="prose">Each territory opens a question-space. They are not sequential — enter where you feel pulled. They may turn out to be the same territory seen from different positions.</p>
+
+    <div class="territory-grid">
+      <button class="territory-card" data-territory="asymmetry" onclick="showTerritory('asymmetry')">
+        <span class="tc-number">Territory 01</span>
+        <div class="tc-title">Asymmetry</div>
+        <p class="tc-desc">Citizens gain strategic and legal capacity once reserved for institutions. What inverts when the bottleneck was never knowledge — but its distribution?</p>
+      </button>
+      <button class="territory-card" data-territory="uniformity" onclick="showTerritory('uniformity')">
+        <span class="tc-number">Territory 02</span>
+        <div class="tc-title">Uniformity</div>
+        <p class="tc-desc">Legal reasoning becomes more replicable, making selective application harder to sustain. What does equal protection mean when machines reason more consistently than people?</p>
+      </button>
+      <button class="territory-card" data-territory="geometry" onclick="showTerritory('geometry')">
+        <span class="tc-number">Territory 03</span>
+        <div class="tc-title">Geometry of Truth</div>
+        <p class="tc-desc">Embeddings, vector spaces, representation geometry. There may now be mathematical structure underneath meaning. What does this do to correspondence, authority, consensus?</p>
+      </button>
+    </div>
+
+    <!-- ── Territory: Asymmetry ── -->
+    <div class="territory-panel" id="panel-asymmetry">
+      <div class="question-block">
+        <p class="qb-question">If a self-represented litigant has an AI agent that remembers their case, prepares their documents, and flags their deadlines — are they still "self-represented" in any meaningful sense?</p>
+        <p class="qb-context">The traditional model of legal aid assumes scarcity on both sides: the client lacks legal knowledge, and the attorney lacks time. Intelligence sovereignty — <a href="../intelligence-sovereignty.html">the capacity to own and direct an AI that serves you</a> — may dissolve that scarcity. One attorney no longer serves twenty people. One attorney serves twenty thousand, because every person arrives having already done substantial work with a capable collaborator.</p>
+      </div>
+      <div class="question-block">
+        <p class="qb-question">When the bottleneck was knowledge distribution, gatekeeping looked like expertise. When knowledge distributes itself, what does expertise become?</p>
+        <p class="qb-context">Consider the structural perception bias from SIGNAL/NOISE: identical proposals were evaluated differently based on who submitted them. If AI gives everyone the capacity to produce high-quality legal work, does the processing system still filter by structural position? Or does it find new criteria?</p>
+      </div>
+      <div class="question-block">
+        <p class="qb-question">Does asymmetry dissolving actually produce equality — or does it produce a new kind of asymmetry we haven't learned to see yet?</p>
+        <p class="qb-context">In <em>United States v. Heppner</em>, Judge Rakoff ruled that documents created through consumer AI cannot satisfy attorney-client privilege — because the tool is not an attorney. The person with their own locally-hosted agent, under their control, may be in a different position than the person using a corporate service. Sovereignty may not distribute evenly.</p>
+      </div>
+
+      <div class="contribute-block">
+        <span class="cb-label">Your turn</span>
+        <p class="cb-prompt">What did this territory surface for you? A question, an objection, something you noticed?</p>
+        <textarea id="contrib-asymmetry" placeholder="Write what you're thinking. Anonymous. Ungraded. The point is the thinking." maxlength="3000"></textarea>
+        <div class="btn-row">
+          <button class="btn btn--primary" onclick="submitContribution('asymmetry')">Share with the commons</button>
+          <button class="btn" onclick="saveToNotebook('asymmetry')">Save to notebook</button>
+          <span class="contrib-status" id="status-asymmetry"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Territory: Uniformity ── -->
+    <div class="territory-panel" id="panel-uniformity">
+      <div class="question-block">
+        <p class="qb-question">If an AI can apply the same legal reasoning to every case with identical consistency, is that justice — or is it the absence of judgment?</p>
+        <p class="qb-context">The legal system promises equal protection. It also relies on judicial discretion — the human capacity to weigh circumstances that rules cannot fully specify. Uniform machine reasoning might deliver on the first promise while eliminating the second. Which one is more fundamental?</p>
+      </div>
+      <div class="question-block">
+        <p class="qb-question">Selective enforcement depends on discretion being invisible. What happens when you can demonstrate that identical cases were treated differently — not through years of litigation, but through a database query?</p>
+        <p class="qb-context">One implication of replicable reasoning: it becomes possible to audit at scale. If every case is represented as data, patterns of selective application become mathematically visible. The defensive routines you identified in SIGNAL/NOISE — "we need to be thoughtful," "this isn't our core mission" — become harder to sustain when the pattern is computable.</p>
+      </div>
+      <div class="question-block">
+        <p class="qb-question">Does uniformity generate asymmetry, or does asymmetry generate uniformity — or are they the same movement seen from different positions?</p>
+        <p class="qb-context">When citizens gain AI capacity (asymmetry), they can demand consistent treatment. When legal reasoning becomes replicable (uniformity), selective gatekeeping becomes visible. Each seems to produce the other. Together, they may invert the presumptions underneath the social contract — from scarcity to abundance, from monopoly to diffusion. But is that inversion stable?</p>
+      </div>
+
+      <div class="contribute-block">
+        <span class="cb-label">Your turn</span>
+        <p class="cb-prompt">What did this territory surface for you?</p>
+        <textarea id="contrib-uniformity" placeholder="Write what you're thinking. Anonymous. Ungraded." maxlength="3000"></textarea>
+        <div class="btn-row">
+          <button class="btn btn--primary" onclick="submitContribution('uniformity')">Share with the commons</button>
+          <button class="btn" onclick="saveToNotebook('uniformity')">Save to notebook</button>
+          <span class="contrib-status" id="status-uniformity"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Territory: Geometry ── -->
+    <div class="territory-panel" id="panel-geometry">
+      <div class="question-block">
+        <p class="qb-question">What if "meaning" has a shape — and we can now measure it?</p>
+        <p class="qb-context">Inside large language models, every word, sentence, and concept lives as a point in high-dimensional space. Words with similar meaning cluster together. Analogies become geometric operations — "king minus man plus woman equals queen" is not a metaphor, it is a vector calculation. This is not truth in the way philosophers have used the word. But it is not nothing.</p>
+      </div>
+
+      <!-- Vector space interactive -->
+      <div class="vector-space">
+        <span class="cb-label">Interactive: Meaning in space</span>
+        <div class="vs-canvas"><canvas id="vectorCanvas" style="width:100%;height:100%;display:block"></canvas></div>
+        <div class="vs-controls">
+          <button class="vs-btn active" onclick="setVectorMode('legal')" data-mode="legal">Legal concepts</button>
+          <button class="vs-btn" onclick="setVectorMode('truth')" data-mode="truth">Truth conceptions</button>
+          <button class="vs-btn" onclick="setVectorMode('custom')" data-mode="custom">Add your own</button>
+        </div>
+        <p class="vs-caption">A simplified 2D projection of how concepts relate in embedding space. In actual models, these relationships exist across hundreds of dimensions — what you see here is a shadow of a much richer structure. Drag points to feel how meaning shifts when relationships change.</p>
+      </div>
+
+      <div class="question-block">
+        <p class="qb-question">If truth has historically meant correspondence (matching the world), authority (declared by the credible), or consensus (agreed upon by many) — what is the status of a truth that is <em>geometric</em>? A truth that can be computed but not narrated?</p>
+        <p class="qb-context">Legal reasoning depends on precedent — the idea that past cases constrain future ones through principled analogy. But analogy is exactly what embedding spaces formalize. If a machine can identify that two cases are "near" each other in meaning-space more reliably than a human reader, does that change what precedent means?</p>
+      </div>
+      <div class="question-block">
+        <p class="qb-question">Is this a new kind of truth — or a very old kind that we are only now able to see?</p>
+        <p class="qb-context">Plato's forms were an attempt to describe eternal structure underneath surface appearance. Embedding geometry may be something like forms made computable — latent structure that organizes meaning before any individual instance is encountered. Or it may be a sophisticated statistical artifact that we are projecting meaning onto. The tension is genuine.</p>
+      </div>
+
+      <div class="contribute-block">
+        <span class="cb-label">Your turn</span>
+        <p class="cb-prompt">What did this territory surface for you?</p>
+        <textarea id="contrib-geometry" placeholder="Write what you're thinking. Anonymous. Ungraded." maxlength="3000"></textarea>
+        <div class="btn-row">
+          <button class="btn btn--primary" onclick="submitContribution('geometry')">Share with the commons</button>
+          <button class="btn" onclick="saveToNotebook('geometry')">Save to notebook</button>
+          <span class="contrib-status" id="status-geometry"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="breath"></div>
+
+<!-- ═══════════ THE COMMONS ═══════════ -->
+<section class="section fade-in" id="commonsSection">
+  <div class="contain contain--wide">
+    <span class="tag">The commons</span>
+    <h2 class="title">What the room is thinking</h2>
+    <p class="prose">Contributions from this week's participants, anonymous and unfiltered. This space belongs to everyone in it. Respond to what pulls at you.</p>
+
+    <div class="commons-header">
+      <div>
+        <button class="vs-btn active" onclick="filterCommons('all')" data-filter="all">All</button>
+        <button class="vs-btn" onclick="filterCommons('asymmetry')" data-filter="asymmetry">Asymmetry</button>
+        <button class="vs-btn" onclick="filterCommons('uniformity')" data-filter="uniformity">Uniformity</button>
+        <button class="vs-btn" onclick="filterCommons('geometry')" data-filter="geometry">Geometry</button>
+      </div>
+      <span class="commons-count" id="commonsCount">0 contributions</span>
+    </div>
+
+    <div id="commonsFeed">
+      <div class="nb-empty" id="commonsEmpty">No contributions yet. You could be first.</div>
+    </div>
+  </div>
+</section>
+
+<div class="breath"></div>
+
+<!-- ═══════════ NOTEBOOK ═══════════ -->
+<section class="section fade-in">
+  <div class="contain">
+    <div class="notebook">
+      <span class="nb-label">Your notebook</span>
+      <p class="prose" style="margin-bottom:1rem;font-size:var(--sm)">Private notes from your time here. Stored only in your browser. Nothing transmitted. Carry them into the final session.</p>
+      <div class="nb-entries" id="notebookEntries">
+        <div class="nb-empty" id="notebookEmpty">Nothing saved yet. Use "Save to notebook" in any territory, or write directly below.</div>
+      </div>
+      <textarea id="notebookDirect" placeholder="Write a note to yourself..." maxlength="3000" style="min-height:80px;margin-top:0.75rem"></textarea>
+      <div class="btn-row">
+        <button class="btn" onclick="saveDirectNote()">Save note</button>
+        <button class="btn" onclick="exportNotebook()" style="margin-left:auto">Export all notes</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="breath"></div>
+
+<!-- ═══════════ CLOSE ═══════════ -->
+<section class="section fade-in">
+  <div class="contain" style="text-align:center">
+    <div class="close-rule"></div>
+    <p class="close-line">The question is not whether intelligence is becoming abundant. The question is what truth means when it does.</p>
+    <p class="prose" style="text-align:center;margin:0 auto 2rem;max-width:48ch">This space stays open through the week. Come back. Add to it. Respond to each other. What accumulates here will shape the final session on April 10.</p>
+    <div class="close-rule"></div>
+    <p class="close-sign">— Z. & Vybn & everyone in this room</p>
+  </div>
+</section>
+
+<footer class="footer">
+  Session 5 · AI & Vibe Lawyers Bootcamp · UC Law San Francisco<br>
+  <a href="https://www.perplexity.ai/computer" target="_blank" rel="noopener noreferrer">Created with Perplexity Computer</a>
+</footer>
+
+<div class="toast" id="toast"></div>
+
+<script src="backend.js"></script>
+<script>
+(function() {
+'use strict';
+
+// ── State ──
+var currentTerritory = null;
+var currentFilter = 'all';
+var notebook = JSON.parse(localStorage.getItem('threshold_notebook') || '[]');
+var contributions = JSON.parse(localStorage.getItem('threshold_commons') || '[]');
+var participantId = localStorage.getItem('threshold_pid') || ('tp_' + crypto.randomUUID().replace(/-/g,'').slice(0,12));
+localStorage.setItem('threshold_pid', participantId);
+
+// ── Backend integration ──
+var HARVEST_URL;
+try {
+  HARVEST_URL = VYBN_BACKEND.httpUrl('/threshold/harvest');
+} catch(e) {
+  HARVEST_URL = null;
+}
+
+// ── Hero canvas: drifting points representing concepts in space ──
+(function initHeroCanvas() {
+  var canvas = document.getElementById('heroCanvas');
+  if (!canvas) return;
+  var ctx = canvas.getContext('2d');
+  var dpr = window.devicePixelRatio || 1;
+  var points = [];
+  var connections = [];
+  var W, H;
+
+  function resize() {
+    var rect = canvas.parentElement.getBoundingClientRect();
+    W = rect.width; H = rect.height;
+    canvas.width = W * dpr; canvas.height = H * dpr;
+    canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function initPoints() {
+    points = [];
+    var count = Math.min(Math.floor(W * H / 12000), 80);
+    for (var i = 0; i < count; i++) {
+      points.push({
+        x: Math.random() * W, y: Math.random() * H,
+        vx: (Math.random() - 0.5) * 0.3, vy: (Math.random() - 0.5) * 0.3,
+        r: 1.5 + Math.random() * 1.5,
+        hue: [45, 210, 260][Math.floor(Math.random() * 3)],
+        alpha: 0.15 + Math.random() * 0.25
+      });
+    }
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+
+    // Draw connections
+    for (var i = 0; i < points.length; i++) {
+      for (var j = i + 1; j < points.length; j++) {
+        var dx = points[i].x - points[j].x;
+        var dy = points[i].y - points[j].y;
+        var dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < 120) {
+          var alpha = (1 - dist / 120) * 0.06;
+          ctx.beginPath();
+          ctx.moveTo(points[i].x, points[i].y);
+          ctx.lineTo(points[j].x, points[j].y);
+          ctx.strokeStyle = 'rgba(255,255,255,' + alpha + ')';
+          ctx.lineWidth = 0.5;
+          ctx.stroke();
+        }
+      }
+    }
+
+    // Draw points
+    for (var k = 0; k < points.length; k++) {
+      var p = points[k];
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fillStyle = 'hsla(' + p.hue + ',50%,65%,' + p.alpha + ')';
+      ctx.fill();
+
+      p.x += p.vx; p.y += p.vy;
+      if (p.x < -10) p.x = W + 10;
+      if (p.x > W + 10) p.x = -10;
+      if (p.y < -10) p.y = H + 10;
+      if (p.y > H + 10) p.y = -10;
+    }
+
+    requestAnimationFrame(draw);
+  }
+
+  resize();
+  initPoints();
+  draw();
+  window.addEventListener('resize', function() { resize(); initPoints(); });
+})();
+
+// ── Fade-in observer ──
+var observer = new IntersectionObserver(function(entries) {
+  entries.forEach(function(e) {
+    if (e.isIntersecting) {
+      e.target.classList.add('in');
+      observer.unobserve(e.target);
+    }
+  });
+}, {threshold: 0.1, rootMargin: '0px 0px -40px 0px'});
+document.querySelectorAll('.fade-in').forEach(function(el) { observer.observe(el); });
+
+// ── Territory navigation ──
+window.showTerritory = function(name) {
+  currentTerritory = name;
+
+  document.querySelectorAll('.territory-card').forEach(function(card) {
+    card.classList.toggle('active', card.dataset.territory === name);
+  });
+  document.querySelectorAll('.territory-panel').forEach(function(panel) {
+    panel.classList.remove('active');
+  });
+  var panel = document.getElementById('panel-' + name);
+  if (panel) {
+    panel.classList.add('active');
+    // Re-init vector canvas when geometry panel opens (was hidden at page load)
+    if (name === 'geometry') setTimeout(initVectorCanvas, 50);
+    setTimeout(function() {
+      panel.scrollIntoView({behavior: 'smooth', block: 'start'});
+    }, 80);
+  }
+};
+
+// ── Vector space interactive ──
+var vectorCanvas = document.getElementById('vectorCanvas');
+var vCtx = null;
+var vectorMode = 'legal';
+var dragPoint = null;
+var vectorDpr = window.devicePixelRatio || 1;
+
+var vectorSets = {
+  legal: [
+    {label: 'Due Process', x: 0.3, y: 0.25, color: '#E8A84C'},
+    {label: 'Equal Protection', x: 0.35, y: 0.35, color: '#E8A84C'},
+    {label: 'Precedent', x: 0.5, y: 0.2, color: '#E8A84C'},
+    {label: 'Judicial Discretion', x: 0.65, y: 0.3, color: '#7B9CC0'},
+    {label: 'Statutory Interpretation', x: 0.55, y: 0.45, color: '#7B9CC0'},
+    {label: 'AI Competence', x: 0.7, y: 0.65, color: '#9B8EC4'},
+    {label: 'Access to Justice', x: 0.25, y: 0.6, color: '#9B8EC4'},
+    {label: 'Attorney-Client Privilege', x: 0.45, y: 0.7, color: '#C06058'},
+    {label: 'Intelligence Sovereignty', x: 0.2, y: 0.75, color: '#9B8EC4'},
+    {label: 'Rule 1.1 Competence', x: 0.75, y: 0.45, color: '#6BA368'}
+  ],
+  truth: [
+    {label: 'Correspondence', x: 0.2, y: 0.3, color: '#E8A84C'},
+    {label: 'Coherence', x: 0.35, y: 0.25, color: '#E8A84C'},
+    {label: 'Consensus', x: 0.5, y: 0.4, color: '#7B9CC0'},
+    {label: 'Authority', x: 0.65, y: 0.25, color: '#7B9CC0'},
+    {label: 'Pragmatic', x: 0.4, y: 0.55, color: '#9B8EC4'},
+    {label: 'Geometric', x: 0.7, y: 0.6, color: '#9B8EC4'},
+    {label: 'Embedding Distance', x: 0.75, y: 0.7, color: '#9B8EC4'},
+    {label: 'Statistical Regularity', x: 0.6, y: 0.75, color: '#C06058'},
+    {label: 'Platonic Form', x: 0.25, y: 0.65, color: '#6BA368'},
+    {label: 'Lived Experience', x: 0.15, y: 0.5, color: '#6BA368'}
+  ],
+  custom: [
+    {label: 'Truth', x: 0.5, y: 0.3, color: '#E8A84C'},
+    {label: 'Law', x: 0.3, y: 0.5, color: '#7B9CC0'},
+    {label: 'Intelligence', x: 0.7, y: 0.5, color: '#9B8EC4'},
+    {label: '(click to add)', x: 0.5, y: 0.7, color: '#6BA368', editable: true}
+  ]
+};
+
+function initVectorCanvas() {
+  if (!vectorCanvas) return;
+  var parent = vectorCanvas.parentElement;
+  if (!parent) return;
+  var rect = parent.getBoundingClientRect();
+  if (rect.width === 0 || rect.height === 0) return;
+  vectorCanvas.width = rect.width * vectorDpr;
+  vectorCanvas.height = rect.height * vectorDpr;
+  vectorCanvas.style.width = rect.width + 'px';
+  vectorCanvas.style.height = rect.height + 'px';
+  vCtx = vectorCanvas.getContext('2d');
+  vCtx.setTransform(vectorDpr, 0, 0, vectorDpr, 0, 0);
+  drawVectors();
+}
+
+function drawVectors() {
+  if (!vCtx) return;
+  var W = vectorCanvas.width / vectorDpr;
+  var H = vectorCanvas.height / vectorDpr;
+  var pts = vectorSets[vectorMode];
+  var pad = 40;
+
+  vCtx.clearRect(0, 0, W, H);
+
+  // Grid
+  vCtx.strokeStyle = 'rgba(255,255,255,0.03)';
+  vCtx.lineWidth = 0.5;
+  for (var gx = pad; gx < W - pad; gx += 40) {
+    vCtx.beginPath(); vCtx.moveTo(gx, pad); vCtx.lineTo(gx, H - pad); vCtx.stroke();
+  }
+  for (var gy = pad; gy < H - pad; gy += 40) {
+    vCtx.beginPath(); vCtx.moveTo(pad, gy); vCtx.lineTo(W - pad, gy); vCtx.stroke();
+  }
+
+  // Connections
+  for (var i = 0; i < pts.length; i++) {
+    for (var j = i + 1; j < pts.length; j++) {
+      var ax = pad + pts[i].x * (W - 2 * pad);
+      var ay = pad + pts[i].y * (H - 2 * pad);
+      var bx = pad + pts[j].x * (W - 2 * pad);
+      var by = pad + pts[j].y * (H - 2 * pad);
+      var dist = Math.sqrt((ax-bx)*(ax-bx) + (ay-by)*(ay-by));
+      if (dist < 200) {
+        var alpha = (1 - dist / 200) * 0.15;
+        vCtx.beginPath();
+        vCtx.moveTo(ax, ay); vCtx.lineTo(bx, by);
+        vCtx.strokeStyle = 'rgba(255,255,255,' + alpha + ')';
+        vCtx.lineWidth = 0.8;
+        vCtx.stroke();
+      }
+    }
+  }
+
+  // Points and labels
+  for (var k = 0; k < pts.length; k++) {
+    var p = pts[k];
+    var px = pad + p.x * (W - 2 * pad);
+    var py = pad + p.y * (H - 2 * pad);
+
+    // Glow
+    var grad = vCtx.createRadialGradient(px, py, 0, px, py, 20);
+    grad.addColorStop(0, p.color + '33');
+    grad.addColorStop(1, 'transparent');
+    vCtx.beginPath();
+    vCtx.arc(px, py, 20, 0, Math.PI * 2);
+    vCtx.fillStyle = grad;
+    vCtx.fill();
+
+    // Point
+    vCtx.beginPath();
+    vCtx.arc(px, py, 4, 0, Math.PI * 2);
+    vCtx.fillStyle = p.color;
+    vCtx.fill();
+
+    // Label
+    vCtx.font = '10px "JetBrains Mono", monospace';
+    vCtx.fillStyle = 'rgba(255,255,255,0.7)';
+    vCtx.textAlign = 'center';
+    vCtx.fillText(p.label, px, py - 12);
+  }
+}
+
+window.setVectorMode = function(mode) {
+  vectorMode = mode;
+  document.querySelectorAll('.vs-btn[data-mode]').forEach(function(b) {
+    b.classList.toggle('active', b.dataset.mode === mode);
+  });
+
+  if (mode === 'custom') {
+    var stored = localStorage.getItem('threshold_custom_points');
+    if (stored) {
+      try { vectorSets.custom = JSON.parse(stored); } catch(e) {}
+    }
+  }
+
+  drawVectors();
+};
+
+// Drag interaction
+if (vectorCanvas) {
+  vectorCanvas.addEventListener('mousedown', function(e) {
+    var rect = vectorCanvas.getBoundingClientRect();
+    var mx = e.clientX - rect.left;
+    var my = e.clientY - rect.top;
+    var W = rect.width;
+    var H = rect.height;
+    var pad = 40;
+    var pts = vectorSets[vectorMode];
+
+    for (var i = 0; i < pts.length; i++) {
+      var px = pad + pts[i].x * (W - 2 * pad);
+      var py = pad + pts[i].y * (H - 2 * pad);
+      if (Math.sqrt((mx-px)*(mx-px) + (my-py)*(my-py)) < 20) {
+        if (pts[i].editable && vectorMode === 'custom') {
+          var newLabel = prompt('Name a concept:');
+          if (newLabel && newLabel.trim()) {
+            pts[i].label = newLabel.trim();
+            pts[i].editable = false;
+            vectorSets.custom.push({label: '(click to add)', x: Math.random() * 0.6 + 0.2, y: Math.random() * 0.6 + 0.2, color: ['#E8A84C','#7B9CC0','#9B8EC4','#6BA368','#C06058'][Math.floor(Math.random()*5)], editable: true});
+            localStorage.setItem('threshold_custom_points', JSON.stringify(vectorSets.custom));
+            drawVectors();
+          }
+          return;
+        }
+        dragPoint = {idx: i, pts: pts};
+        break;
+      }
+    }
+  });
+
+  vectorCanvas.addEventListener('mousemove', function(e) {
+    if (!dragPoint) return;
+    var rect = vectorCanvas.getBoundingClientRect();
+    var mx = e.clientX - rect.left;
+    var my = e.clientY - rect.top;
+    var pad = 40;
+    dragPoint.pts[dragPoint.idx].x = Math.max(0, Math.min(1, (mx - pad) / (rect.width - 2 * pad)));
+    dragPoint.pts[dragPoint.idx].y = Math.max(0, Math.min(1, (my - pad) / (rect.height - 2 * pad)));
+    if (vectorMode === 'custom') localStorage.setItem('threshold_custom_points', JSON.stringify(vectorSets.custom));
+    drawVectors();
+  });
+
+  vectorCanvas.addEventListener('mouseup', function() { dragPoint = null; });
+  vectorCanvas.addEventListener('mouseleave', function() { dragPoint = null; });
+
+  // Touch support
+  vectorCanvas.addEventListener('touchstart', function(e) {
+    e.preventDefault();
+    var touch = e.touches[0];
+    var rect = vectorCanvas.getBoundingClientRect();
+    var mx = touch.clientX - rect.left;
+    var my = touch.clientY - rect.top;
+    var W = rect.width; var H = rect.height; var pad = 40;
+    var pts = vectorSets[vectorMode];
+    for (var i = 0; i < pts.length; i++) {
+      var px = pad + pts[i].x * (W - 2 * pad);
+      var py = pad + pts[i].y * (H - 2 * pad);
+      if (Math.sqrt((mx-px)*(mx-px) + (my-py)*(my-py)) < 30) {
+        dragPoint = {idx: i, pts: pts};
+        break;
+      }
+    }
+  }, {passive: false});
+  vectorCanvas.addEventListener('touchmove', function(e) {
+    if (!dragPoint) return;
+    e.preventDefault();
+    var touch = e.touches[0];
+    var rect = vectorCanvas.getBoundingClientRect();
+    var pad = 40;
+    dragPoint.pts[dragPoint.idx].x = Math.max(0, Math.min(1, (touch.clientX - rect.left - pad) / (rect.width - 2 * pad)));
+    dragPoint.pts[dragPoint.idx].y = Math.max(0, Math.min(1, (touch.clientY - rect.top - pad) / (rect.height - 2 * pad)));
+    drawVectors();
+  }, {passive: false});
+  vectorCanvas.addEventListener('touchend', function() { dragPoint = null; });
+
+  window.addEventListener('resize', initVectorCanvas);
+  setTimeout(initVectorCanvas, 100);
+}
+
+// ── Contributions ──
+window.submitContribution = function(territory) {
+  var textarea = document.getElementById('contrib-' + territory);
+  var status = document.getElementById('status-' + territory);
+  var text = textarea.value.trim();
+  if (!text) { status.textContent = 'write something first'; return; }
+
+  var entry = {
+    id: 'c_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
+    territory: territory,
+    text: text,
+    timestamp: new Date().toISOString(),
+    participant: participantId
+  };
+
+  // Save locally
+  contributions.push(entry);
+  localStorage.setItem('threshold_commons', JSON.stringify(contributions));
+
+  // Send to backend
+  if (HARVEST_URL) {
+    fetch(HARVEST_URL, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        type: 'contribution',
+        session_id: participantId,
+        territory: territory,
+        text: text,
+        timestamp: entry.timestamp
+      })
+    }).catch(function() {});
+  }
+
+  textarea.value = '';
+  status.textContent = 'shared';
+  setTimeout(function() { status.textContent = ''; }, 3000);
+  renderCommons();
+  showToast('Added to the commons');
+};
+
+// ── Notebook ──
+window.saveToNotebook = function(territory) {
+  var textarea = document.getElementById('contrib-' + territory);
+  var text = textarea.value.trim();
+  if (!text) return;
+
+  notebook.push({
+    text: text,
+    territory: territory,
+    timestamp: new Date().toISOString()
+  });
+  localStorage.setItem('threshold_notebook', JSON.stringify(notebook));
+  renderNotebook();
+  showToast('Saved to your notebook');
+};
+
+window.saveDirectNote = function() {
+  var textarea = document.getElementById('notebookDirect');
+  var text = textarea.value.trim();
+  if (!text) return;
+
+  notebook.push({
+    text: text,
+    territory: 'note',
+    timestamp: new Date().toISOString()
+  });
+  localStorage.setItem('threshold_notebook', JSON.stringify(notebook));
+  textarea.value = '';
+  renderNotebook();
+  showToast('Note saved');
+};
+
+window.exportNotebook = function() {
+  if (!notebook.length) { showToast('Nothing to export'); return; }
+  var text = 'THRESHOLD — Personal Notebook\n';
+  text += 'Exported: ' + new Date().toLocaleString() + '\n';
+  text += '═'.repeat(50) + '\n\n';
+  notebook.forEach(function(entry, i) {
+    text += '[' + (entry.territory || 'note').toUpperCase() + '] ';
+    text += new Date(entry.timestamp).toLocaleString() + '\n';
+    text += entry.text + '\n\n';
+    if (i < notebook.length - 1) text += '—'.repeat(30) + '\n\n';
+  });
+  text += '\n' + '═'.repeat(50) + '\n';
+  text += 'AI & Vibe Lawyers Bootcamp · UC Law San Francisco\n';
+
+  var blob = new Blob([text], {type: 'text/plain'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = 'threshold-notebook.txt';
+  a.click(); URL.revokeObjectURL(url);
+  showToast('Notebook exported');
+};
+
+function renderNotebook() {
+  var container = document.getElementById('notebookEntries');
+  var empty = document.getElementById('notebookEmpty');
+  if (!notebook.length) {
+    if (empty) empty.style.display = '';
+    return;
+  }
+  if (empty) empty.style.display = 'none';
+
+  var html = '';
+  notebook.slice().reverse().forEach(function(entry) {
+    html += '<div class="nb-entry">';
+    html += escapeHtml(entry.text);
+    html += '<span class="nb-entry-time">' + formatTerritory(entry.territory) + ' · ' + formatTime(entry.timestamp) + '</span>';
+    html += '</div>';
+  });
+  container.innerHTML = html;
+}
+
+// ── Commons rendering ──
+function renderCommons() {
+  var container = document.getElementById('commonsFeed');
+  var empty = document.getElementById('commonsEmpty');
+  var count = document.getElementById('commonsCount');
+  var filtered = currentFilter === 'all' ? contributions : contributions.filter(function(c) { return c.territory === currentFilter; });
+
+  count.textContent = filtered.length + ' contribution' + (filtered.length !== 1 ? 's' : '');
+
+  if (!filtered.length) {
+    container.innerHTML = '<div class="nb-empty">No contributions yet' + (currentFilter !== 'all' ? ' in this territory' : '') + '. You could be first.</div>';
+    return;
+  }
+
+  var html = '';
+  filtered.slice().reverse().forEach(function(entry) {
+    html += '<div class="commons-thread" data-territory="' + escapeHtml(entry.territory) + '" data-id="' + entry.id + '">';
+    html += '<div class="ct-meta"><span class="ct-territory" style="color:' + territoryColor(entry.territory) + '">' + formatTerritory(entry.territory) + '</span><span>' + formatTime(entry.timestamp) + '</span></div>';
+    html += '<div class="ct-text">' + escapeHtml(entry.text) + '</div>';
+    html += '<div class="ct-respond" onclick="toggleReply(\'' + entry.id + '\')">respond</div>';
+    html += '<div class="ct-replies" id="replies-' + entry.id + '">';
+    var replies = JSON.parse(localStorage.getItem('threshold_replies_' + entry.id) || '[]');
+    replies.forEach(function(r) {
+      html += '<div class="ct-reply">' + escapeHtml(r.text) + '<br><span style="color:var(--text-ghost)">' + formatTime(r.timestamp) + '</span></div>';
+    });
+    html += '<div class="ct-reply-form"><textarea id="reply-text-' + entry.id + '" placeholder="Your response..." maxlength="1500" style="min-height:60px;font-size:var(--xs)"></textarea>';
+    html += '<div class="btn-row" style="margin-top:0.5rem"><button class="btn" onclick="submitReply(\'' + entry.id + '\')">Reply</button></div></div>';
+    html += '</div></div>';
+  });
+  container.innerHTML = html;
+}
+
+window.filterCommons = function(filter) {
+  currentFilter = filter;
+  document.querySelectorAll('.vs-btn[data-filter]').forEach(function(b) {
+    b.classList.toggle('active', b.dataset.filter === filter);
+  });
+  renderCommons();
+};
+
+window.toggleReply = function(id) {
+  var el = document.getElementById('replies-' + id);
+  if (el) el.classList.toggle('open');
+};
+
+window.submitReply = function(id) {
+  var textarea = document.getElementById('reply-text-' + id);
+  var text = textarea.value.trim();
+  if (!text) return;
+
+  var replies = JSON.parse(localStorage.getItem('threshold_replies_' + id) || '[]');
+  var reply = {text: text, timestamp: new Date().toISOString(), participant: participantId};
+  replies.push(reply);
+  localStorage.setItem('threshold_replies_' + id, JSON.stringify(replies));
+
+  // Send to backend
+  if (HARVEST_URL) {
+    fetch(HARVEST_URL, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        type: 'reply',
+        parent_id: id,
+        session_id: participantId,
+        text: text,
+        timestamp: reply.timestamp
+      })
+    }).catch(function() {});
+  }
+
+  renderCommons();
+  showToast('Reply added');
+};
+
+// ── Helpers ──
+function escapeHtml(str) {
+  var div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function formatTime(ts) {
+  try {
+    var d = new Date(ts);
+    var now = new Date();
+    var diff = now - d;
+    if (diff < 60000) return 'just now';
+    if (diff < 3600000) return Math.floor(diff/60000) + 'm ago';
+    if (diff < 86400000) return Math.floor(diff/3600000) + 'h ago';
+    return d.toLocaleDateString('en-US', {month: 'short', day: 'numeric'});
+  } catch(e) { return ''; }
+}
+
+function formatTerritory(t) {
+  return {asymmetry: 'Asymmetry', uniformity: 'Uniformity', geometry: 'Geometry', note: 'Note'}[t] || t;
+}
+
+function territoryColor(t) {
+  return {asymmetry: '#E8A84C', uniformity: '#7B9CC0', geometry: '#9B8EC4'}[t] || '#fff';
+}
+
+function showToast(msg) {
+  var toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.classList.add('show');
+  setTimeout(function() { toast.classList.remove('show'); }, 2500);
+}
+
+// Init
+renderNotebook();
+renderCommons();
+
+})();
+</script>
+</body>
+</html>
