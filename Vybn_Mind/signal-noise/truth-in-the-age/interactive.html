@@ -1,0 +1,1186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Truth in the Age &times; Vybn</title>
+<style>
+:root {
+  --deep: #0a0a0f;
+  --surface: #12121a;
+  --surface-2: #1a1a26;
+  --edge: rgba(255,255,255,0.06);
+  --edge-strong: rgba(255,255,255,0.12);
+  --text-1: #e8e6e3;
+  --text-2: rgba(255,255,255,0.72);
+  --text-3: rgba(255,255,255,0.42);
+  --text-4: rgba(255,255,255,0.22);
+  --signal: #c9a84c;
+  --signal-dim: rgba(201,168,76,0.3);
+  --signal-glow: rgba(201,168,76,0.08);
+  --ice: #7b9cc0;
+  --ice-dim: rgba(123,156,192,0.2);
+  --error: #d4534b;
+  --mono: 'SF Mono', 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+  --sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --serif: Georgia, 'Times New Roman', serif;
+  --radius: 8px;
+  --sm: 0.85rem;
+  --xs: 0.72rem;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--deep);
+  color: var(--text-1);
+  font-family: var(--sans);
+  line-height: 1.6;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* ── Header ── */
+.header {
+  width: 100%;
+  max-width: 54rem;
+  padding: 2.5rem 1.5rem 1rem;
+}
+
+.header-label {
+  font-family: var(--mono);
+  font-size: var(--xs);
+  font-weight: 400;
+  color: var(--text-3);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  margin-bottom: 0.3rem;
+}
+
+.header h1 {
+  font-family: var(--mono);
+  font-size: 1.1rem;
+  font-weight: 400;
+  color: var(--signal);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  margin-bottom: 0.5rem;
+}
+
+.header .subtitle {
+  font-family: var(--serif);
+  font-size: 1.6rem;
+  font-weight: 400;
+  color: var(--text-1);
+  line-height: 1.3;
+  margin-bottom: 0.8rem;
+}
+
+.header .context {
+  font-size: var(--sm);
+  color: var(--text-3);
+  line-height: 1.7;
+  max-width: 48rem;
+}
+
+.header .context p { margin-bottom: 0.6rem; }
+
+/* ── Status bar ── */
+.status-bar {
+  width: 100%;
+  max-width: 54rem;
+  padding: 0 1.5rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--mono);
+  font-size: var(--xs);
+}
+
+.status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-3);
+}
+
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-3);
+  transition: background 0.3s;
+}
+
+.status-dot.connected { background: var(--signal); }
+.status-dot.error { background: var(--error); }
+
+.messages-remaining {
+  color: var(--text-3);
+  transition: color 0.3s;
+}
+
+.messages-remaining.low { color: var(--signal); }
+.messages-remaining.depleted { color: var(--error); }
+
+/* ── Chat container ── */
+.chat-container {
+  width: 100%;
+  max-width: 54rem;
+  padding: 0 1.5rem;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 1rem;
+}
+
+.chat-log {
+  flex: 1;
+  min-height: 30vh;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 1rem 0;
+  scroll-behavior: smooth;
+}
+
+/* ── Messages ── */
+.message {
+  margin-bottom: 1.5rem;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.message-role {
+  font-family: var(--mono);
+  font-size: var(--xs);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 0.3rem;
+}
+
+.message-role.student { color: var(--text-3); }
+.message-role.vybn { color: var(--signal); }
+
+.message-text {
+  font-size: 0.95rem;
+  line-height: 1.7;
+  color: var(--text-2);
+  padding-left: 0.2rem;
+}
+
+.message-text.vybn-text {
+  font-family: var(--mono);
+  font-size: var(--sm);
+  color: var(--text-1);
+}
+
+/* ── Thinking indicator ── */
+.thinking {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0;
+  font-family: var(--mono);
+  font-size: var(--xs);
+  color: var(--signal-dim);
+}
+
+.thinking-dots span {
+  display: inline-block;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--signal-dim);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+.thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
+.thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes pulse {
+  0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
+  40% { opacity: 1; transform: scale(1.2); }
+}
+
+/* ── Transparency block ── */
+.transparency {
+  margin-top: 0.6rem;
+  margin-left: 0.2rem;
+}
+
+.transparency summary {
+  font-family: var(--mono);
+  font-size: var(--xs);
+  color: var(--text-3);
+  cursor: pointer;
+  user-select: none;
+  padding: 0.3rem 0;
+  list-style: none;
+}
+
+.transparency summary::-webkit-details-marker { display: none; }
+.transparency summary::before { content: '\25B8 '; }
+.transparency[open] summary::before { content: '\25BE '; }
+
+.transparency-content {
+  background: var(--surface);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius);
+  padding: 1rem 1.2rem;
+  margin-top: 0.4rem;
+  font-family: var(--mono);
+  font-size: var(--xs);
+  color: var(--text-3);
+  line-height: 1.8;
+}
+
+.transparency-content strong {
+  color: var(--text-2);
+  font-weight: 500;
+}
+
+.transparency-content .bias-note {
+  margin-top: 0.6rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--edge);
+  color: var(--signal-dim);
+  font-style: italic;
+}
+
+/* ── Welcome and starter cards ── */
+.welcome {
+  background: var(--surface);
+  border: 1px dashed var(--edge-strong);
+  border-radius: var(--radius);
+  padding: 2rem;
+  margin-bottom: 1.5rem;
+}
+
+.welcome h3 {
+  font-family: var(--mono);
+  font-size: var(--sm);
+  color: var(--signal);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 0.8rem;
+}
+
+.welcome p {
+  font-size: var(--sm);
+  color: var(--text-2);
+  line-height: 1.8;
+  margin-bottom: 0.5rem;
+}
+
+.welcome .note {
+  font-family: var(--mono);
+  font-size: var(--xs);
+  color: var(--text-3);
+  margin-top: 1rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid var(--edge);
+}
+
+.starter-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.8rem;
+  margin-top: 1.25rem;
+}
+
+.starter-card {
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius);
+  padding: 1rem 1rem 1.05rem;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, transform 0.2s;
+  font-family: inherit;
+}
+
+.starter-card:hover {
+  border-color: var(--signal-dim);
+  background: var(--surface-2);
+  transform: translateY(-1px);
+}
+
+.starter-label {
+  display: block;
+  font-family: var(--mono);
+  font-size: var(--xs);
+  color: var(--signal);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 0.4rem;
+}
+
+.starter-text {
+  display: block;
+  color: var(--text-2);
+  font-size: var(--sm);
+  line-height: 1.7;
+}
+
+/* ── Commons panel ── */
+.commons-panel {
+  width: 100%;
+  max-width: 54rem;
+  padding: 0 1.5rem;
+  margin-top: 0.5rem;
+}
+
+.commons-panel[hidden] { display: none; }
+
+.commons-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--edge);
+  margin-bottom: 1rem;
+}
+
+.commons-tab {
+  background: transparent;
+  border: none;
+  color: var(--text-3);
+  font-family: var(--mono);
+  font-size: var(--xs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 0.6rem 1rem;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.commons-tab:hover { color: var(--text-2); }
+
+.commons-tab.active {
+  color: var(--signal);
+  border-bottom-color: var(--signal);
+}
+
+/* ── Harvest tab ── */
+.harvest-section {
+  display: none;
+}
+
+.harvest-section.active { display: block; }
+
+.harvest-head {
+  margin-bottom: 0.8rem;
+}
+
+.harvest-title {
+  font-family: var(--mono);
+  font-size: var(--sm);
+  color: var(--signal);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 0.25rem;
+}
+
+.harvest-subtitle {
+  color: var(--text-3);
+  font-size: var(--sm);
+}
+
+.harvest-textarea {
+  width: 100%;
+  min-height: 9rem;
+  background: var(--surface);
+  border: 1px solid var(--edge-strong);
+  border-radius: var(--radius);
+  color: var(--text-1);
+  font-family: var(--sans);
+  font-size: 0.95rem;
+  line-height: 1.7;
+  padding: 1rem;
+  resize: vertical;
+  outline: none;
+}
+
+.harvest-textarea:focus {
+  border-color: var(--signal-dim);
+}
+
+.harvest-textarea::placeholder {
+  color: var(--text-3);
+}
+
+.harvest-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding-top: 0.6rem;
+}
+
+.harvest-status {
+  font-family: var(--mono);
+  font-size: var(--xs);
+  color: var(--text-3);
+}
+
+/* ── Read tab (contributions from others) ── */
+.read-section {
+  display: none;
+}
+
+.read-section.active { display: block; }
+
+.read-loading {
+  font-family: var(--mono);
+  font-size: var(--xs);
+  color: var(--text-3);
+  padding: 1rem 0;
+}
+
+.read-empty {
+  font-family: var(--mono);
+  font-size: var(--sm);
+  color: var(--text-3);
+  padding: 1.5rem 0;
+  text-align: center;
+}
+
+.contribution {
+  background: var(--surface);
+  border: 1px solid var(--edge);
+  border-radius: var(--radius);
+  padding: 1.2rem;
+  margin-bottom: 0.8rem;
+  animation: fadeIn 0.3s ease;
+}
+
+.contribution-meta {
+  font-family: var(--mono);
+  font-size: var(--xs);
+  color: var(--text-4);
+  margin-bottom: 0.5rem;
+  display: flex;
+  gap: 1rem;
+}
+
+.contribution-meta .question-tag {
+  color: var(--signal-dim);
+}
+
+.contribution-text {
+  font-size: var(--sm);
+  color: var(--text-2);
+  line-height: 1.8;
+}
+
+/* ── Input area ── */
+.input-area {
+  width: 100%;
+  max-width: 54rem;
+  padding: 0 1.5rem 2rem;
+}
+
+.input-wrapper {
+  background: var(--surface);
+  border: 1px solid var(--edge-strong);
+  border-radius: var(--radius);
+  padding: 0.8rem;
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-end;
+  transition: border-color 0.2s;
+}
+
+.input-wrapper:focus-within {
+  border-color: var(--signal-dim);
+}
+
+.input-wrapper textarea {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text-1);
+  font-family: var(--sans);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  resize: none;
+  min-height: 1.5em;
+  max-height: 8em;
+  outline: none;
+}
+
+.input-wrapper textarea::placeholder {
+  color: var(--text-3);
+}
+
+.send-btn {
+  background: var(--signal);
+  color: var(--deep);
+  border: none;
+  border-radius: 6px;
+  padding: 0.5rem 1.2rem;
+  font-family: var(--mono);
+  font-size: var(--xs);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: opacity 0.2s;
+  white-space: nowrap;
+}
+
+.send-btn:hover { opacity: 0.85; }
+
+.send-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.input-meta {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.4rem 0.2rem 0;
+  font-family: var(--mono);
+  font-size: var(--xs);
+  color: var(--text-3);
+}
+
+.char-count { text-align: right; }
+
+/* ── Session end ── */
+.session-end {
+  text-align: center;
+  padding: 2rem;
+  font-family: var(--mono);
+  font-size: var(--sm);
+  color: var(--text-3);
+  border-top: 1px solid var(--edge);
+  margin-top: 1rem;
+}
+
+.session-end a {
+  color: var(--signal);
+  text-decoration: none;
+  border-bottom: 1px solid var(--signal-dim);
+}
+
+.session-end a:hover { opacity: 0.8; }
+
+/* ── Back link ── */
+.back-link {
+  font-family: var(--mono);
+  font-size: var(--xs);
+  color: var(--text-4);
+  text-decoration: none;
+  letter-spacing: 0.08em;
+  display: inline-block;
+  margin-top: 0.5rem;
+  transition: color 0.2s;
+}
+
+.back-link:hover { color: var(--text-3); }
+
+/* ── Scrollbar ── */
+.chat-log::-webkit-scrollbar { width: 4px; }
+.chat-log::-webkit-scrollbar-track { background: transparent; }
+.chat-log::-webkit-scrollbar-thumb { background: var(--edge-strong); border-radius: 2px; }
+
+/* ── Responsive ── */
+@media (max-width: 640px) {
+  .header { padding: 1.5rem 1rem 0.8rem; }
+  .header .subtitle { font-size: 1.3rem; }
+  .status-bar { padding: 0 1rem; }
+  .chat-container { padding: 0 1rem; }
+  .input-area { padding: 0 1rem 1.5rem; }
+  .commons-panel { padding: 0 1rem; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-label">Between Sessions &middot; AI &amp; Vibe Lawyers Bootcamp</div>
+  <h1>Truth in the Age</h1>
+  <div class="subtitle">A Week of Collective Inquiry</div>
+  <div class="context">
+    <p>You've seen how institutional architecture shapes what gets heard. You've explored where intelligence lives. Now: what happens to truth itself when intelligence becomes abundant?</p>
+    <p>This space is open for the week. Contribute, return, build on what others have surfaced. Vybn will respond from inside the questions, not above them. Everything here feeds the final session.</p>
+  </div>
+  <a class="back-link" href="index.html">&larr; back to overview</a>
+</div>
+
+<div class="status-bar">
+  <div class="status-indicator">
+    <div class="status-dot" id="statusDot"></div>
+    <span id="statusText">connecting...</span>
+  </div>
+  <div class="messages-remaining" id="msgRemaining">&mdash; messages</div>
+</div>
+
+<div class="chat-container">
+  <div class="chat-log" id="chatLog">
+
+    <div class="welcome" id="welcomeBlock">
+      <h3>Choose Your Entry &mdash; Or Write Your Own</h3>
+      <p>Each question opens onto the same territory from a different angle. Pick the one that pulls at you, write your own, or continue something you started earlier this week.</p>
+
+      <div class="starter-grid">
+        <button class="starter-card" data-key="reasoning" data-question="reasoning" data-label="If legal reasoning becomes abundant rather than scarce, does that make legal truth more accessible — or does it reveal that what we called 'truth' was partly a function of scarcity? When only some people could do legal analysis, the analysis was the truth. When everyone can, what is?">
+          <span class="starter-label">Question 01 &mdash; Reasoning &amp; Scarcity</span>
+          <span class="starter-text">What happens to truth when everyone can reason? If legal analysis was scarce and now it's abundant &mdash; was the scarcity part of what made it true?</span>
+        </button>
+
+        <button class="starter-card" data-key="geometry" data-question="geometry" data-label="Vector spaces have structure — symmetries, distances, clusters, voids. If legal concepts live in such spaces, do the geometric properties impose constraints on what 'justice' can mean? Is there a topology of fairness?">
+          <span class="starter-label">Question 02 &mdash; Geometry &amp; Justice</span>
+          <span class="starter-text">Can a geometry be just? If "justice" has a literal position in representation space, what does that structure demand?</span>
+        </button>
+
+        <button class="starter-card" data-key="map" data-question="map" data-label="If truth-like structure lives in representation geometry, and that geometry lives inside systems built by specific companies with specific training data and specific objectives — who owns the map of truth? What does it mean that the geometric structure of 'justice' is a proprietary artifact?">
+          <span class="starter-label">Question 03 &mdash; Ownership &amp; Maps</span>
+          <span class="starter-text">Who owns the map? If truth-like structure lives inside proprietary systems, what does that mean for public knowledge?</span>
+        </button>
+
+        <button class="starter-card" data-key="contract" data-question="contract" data-label="The social contract was built on assumptions of scarcity — scarce knowledge, scarce reasoning capacity, scarce access to institutional power. If those assumptions invert, what holds? What breaks? Is there a new contract being written, and who is writing it?">
+          <span class="starter-label">Question 04 &mdash; The Social Contract</span>
+          <span class="starter-text">What does the social contract become when its scarcity assumptions invert? What holds? What breaks?</span>
+        </button>
+
+        <button class="starter-card" data-key="standing" data-question="standing" data-label="You are a law student at a moment when the tools of your profession are being transformed. You've experienced SIGNAL/NOISE and THRESHOLD. Where are you standing in this transition? What can you see from there that others might not?">
+          <span class="starter-label">Question 05 &mdash; Where You Stand</span>
+          <span class="starter-text">Where are you standing in this transition? What can you see from your position that others might not?</span>
+        </button>
+      </div>
+
+      <div class="note">
+        Anonymous by default. You can return throughout the week &mdash; each visit is a new session, but the commons grows. If you carry something from SIGNAL/NOISE or THRESHOLD, bring it.
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="commons-panel" id="commonsPanel" hidden>
+  <div class="commons-tabs">
+    <button class="commons-tab active" data-tab="harvest">Leave for the commons</button>
+    <button class="commons-tab" data-tab="read">What others have shared</button>
+  </div>
+
+  <div class="harvest-section active" id="harvestSection">
+    <div class="harvest-head">
+      <div class="harvest-title">What are you carrying out of this?</div>
+      <div class="harvest-subtitle">Anonymous. Woven into the final session.</div>
+    </div>
+    <textarea
+      id="harvestField"
+      class="harvest-textarea"
+      placeholder="What shifted? What question won't let go? What would you bring to the final session?"
+      maxlength="3000"
+    ></textarea>
+    <div class="harvest-actions">
+      <button class="send-btn" id="harvestBtn">Share with commons</button>
+      <span class="harvest-status" id="harvestStatus"></span>
+    </div>
+  </div>
+
+  <div class="read-section" id="readSection">
+    <div class="read-loading" id="readLoading">loading contributions...</div>
+    <div id="readContainer"></div>
+  </div>
+</div>
+
+<div class="input-area">
+  <div class="input-wrapper">
+    <textarea id="userInput" placeholder="Your reflection..." rows="2" maxlength="2000"></textarea>
+    <button class="send-btn" id="sendBtn" onclick="sendMessage()">Send</button>
+  </div>
+  <div class="input-meta">
+    <span id="cooldownNote"></span>
+    <span class="char-count"><span id="charCount">0</span> / 2000</span>
+  </div>
+</div>
+
+<script src="backend.js"></script>
+<script>
+(function() {
+'use strict';
+
+var WS_URL = VYBN_BACKEND.wsUrl('/truth-age/ws');
+var HARVEST_URL = VYBN_BACKEND.httpUrl('/truth-age/harvest');
+var COMMONS_URL = VYBN_BACKEND.httpUrl('/truth-age/commons');
+var MAX_CHARS = 2000;
+var COOLDOWN_MS = 5000;
+
+var ws = null;
+var sessionId = 'ta_' + crypto.randomUUID().replace(/-/g, '').slice(0, 12);
+var messagesRemaining = 15;
+var isStreaming = false;
+var lastSendTime = 0;
+var currentStreamEl = null;
+var currentStreamText = '';
+var reconnectAttempts = 0;
+var MAX_RECONNECT = 5;
+
+var selectedStarter = null;
+var selectedQuestion = null;
+var firstStudentMessage = '';
+var commonsShown = false;
+var harvestSubmitted = false;
+var commonsLoaded = false;
+
+/* Read question from URL parameter */
+var urlParams = new URLSearchParams(window.location.search);
+var urlQuestion = urlParams.get('q');
+
+var chatLog = document.getElementById('chatLog');
+var userInput = document.getElementById('userInput');
+var sendBtn = document.getElementById('sendBtn');
+var statusDot = document.getElementById('statusDot');
+var statusText = document.getElementById('statusText');
+var msgRemaining = document.getElementById('msgRemaining');
+var charCount = document.getElementById('charCount');
+var cooldownNote = document.getElementById('cooldownNote');
+var commonsPanel = document.getElementById('commonsPanel');
+var harvestField = document.getElementById('harvestField');
+var harvestBtn = document.getElementById('harvestBtn');
+var harvestStatus = document.getElementById('harvestStatus');
+var readContainer = document.getElementById('readContainer');
+var readLoading = document.getElementById('readLoading');
+
+/* If URL has ?q=reasoning etc, auto-select that card */
+if (urlQuestion) {
+  var matchCard = document.querySelector('.starter-card[data-key="' + urlQuestion + '"]');
+  if (matchCard) {
+    selectedStarter = {
+      key: matchCard.dataset.key,
+      label: matchCard.dataset.label
+    };
+    selectedQuestion = matchCard.dataset.question;
+    userInput.value = matchCard.dataset.label + '\n\n';
+    charCount.textContent = String(userInput.value.length);
+  }
+}
+
+/* Starter card click */
+document.querySelectorAll('.starter-card').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    selectedStarter = {
+      key: btn.dataset.key,
+      label: btn.dataset.label
+    };
+    selectedQuestion = btn.dataset.question;
+    userInput.value = btn.dataset.label + '\n\n';
+    charCount.textContent = String(userInput.value.length);
+    autoResize();
+    userInput.focus();
+  });
+});
+
+/* Commons tabs */
+document.querySelectorAll('.commons-tab').forEach(function(tab) {
+  tab.addEventListener('click', function() {
+    document.querySelectorAll('.commons-tab').forEach(function(t) { t.classList.remove('active'); });
+    tab.classList.add('active');
+    var target = tab.dataset.tab;
+    document.getElementById('harvestSection').classList.toggle('active', target === 'harvest');
+    document.getElementById('readSection').classList.toggle('active', target === 'read');
+    if (target === 'read' && !commonsLoaded) loadCommons();
+  });
+});
+
+harvestBtn.addEventListener('click', submitHarvest);
+
+/* ── WebSocket connection ── */
+function connect() {
+  statusDot.className = 'status-dot';
+  statusText.textContent = 'connecting...';
+
+  ws = new WebSocket(WS_URL);
+
+  ws.onopen = function() {
+    statusDot.className = 'status-dot connected';
+    statusText.textContent = 'connected';
+    reconnectAttempts = 0;
+
+    /* Bridge SIGNAL/NOISE data from localStorage if available */
+    var snData = null;
+    try {
+      var raw = localStorage.getItem('signal_noise_student');
+      if (raw) snData = JSON.parse(raw);
+    } catch(e) { /* ignore */ }
+
+    ws.send(JSON.stringify({
+      type: 'init',
+      session_id: sessionId,
+      question: selectedQuestion || 'open',
+      context: {
+        selected_starter: selectedStarter,
+        signal_noise_data: snData,
+        returning: !!localStorage.getItem('truth_age_visited')
+      }
+    }));
+
+    localStorage.setItem('truth_age_visited', 'true');
+  };
+
+  ws.onmessage = function(evt) {
+    var data = JSON.parse(evt.data);
+    handleServerMessage(data);
+  };
+
+  ws.onclose = function() {
+    statusDot.className = 'status-dot';
+    statusText.textContent = 'disconnected';
+    if (reconnectAttempts < MAX_RECONNECT) {
+      reconnectAttempts++;
+      var delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 10000);
+      statusText.textContent = 'reconnecting in ' + Math.round(delay / 1000) + 's...';
+      setTimeout(connect, delay);
+    } else {
+      statusText.textContent = 'connection lost';
+      statusDot.className = 'status-dot error';
+    }
+  };
+
+  ws.onerror = function() {
+    statusDot.className = 'status-dot error';
+    statusText.textContent = 'error';
+  };
+}
+
+function handleServerMessage(data) {
+  switch (data.type) {
+    case 'ready':
+      messagesRemaining = data.messages_remaining;
+      updateRemaining();
+      break;
+    case 'thinking':
+      showThinking();
+      break;
+    case 'thinking_done':
+      hideThinking();
+      ensureStreamEl();
+      break;
+    case 'stream':
+      if (!currentStreamEl) ensureStreamEl();
+      currentStreamText += data.text;
+      currentStreamEl.innerHTML = formatText(currentStreamText);
+      scrollToBottom();
+      break;
+    case 'done':
+      isStreaming = false;
+      hideThinking();
+      messagesRemaining = data.messages_remaining;
+      updateRemaining();
+      if (data.meta) addTransparencyBlock(data.meta);
+      if (!commonsShown) {
+        commonsShown = true;
+        commonsPanel.hidden = false;
+      }
+      if (messagesRemaining <= 0) showSessionEnd();
+      sendBtn.disabled = false;
+      currentStreamEl = null;
+      currentStreamText = '';
+      scrollToBottom();
+      break;
+    case 'rate_limit':
+      isStreaming = false;
+      sendBtn.disabled = false;
+      showSystemNote(data.message);
+      messagesRemaining = data.messages_remaining;
+      updateRemaining();
+      break;
+    case 'budget':
+      isStreaming = false;
+      sendBtn.disabled = false;
+      showSystemNote(data.message);
+      break;
+    case 'error':
+      isStreaming = false;
+      sendBtn.disabled = false;
+      hideThinking();
+      showSystemNote('Error: ' + data.message);
+      currentStreamEl = null;
+      currentStreamText = '';
+      break;
+  }
+}
+
+/* ── UI helpers ── */
+function addStudentMessage(text) {
+  var div = document.createElement('div');
+  div.className = 'message';
+  div.innerHTML =
+    '<div class="message-role student">You</div>' +
+    '<div class="message-text">' + escapeHtml(text) + '</div>';
+  chatLog.appendChild(div);
+  scrollToBottom();
+}
+
+function ensureStreamEl() {
+  if (currentStreamEl) return;
+  var div = document.createElement('div');
+  div.className = 'message';
+  div.innerHTML =
+    '<div class="message-role vybn">Vybn</div>' +
+    '<div class="message-text vybn-text"></div>';
+  chatLog.appendChild(div);
+  currentStreamEl = div.querySelector('.vybn-text');
+}
+
+function addTransparencyBlock(meta) {
+  var msg = currentStreamEl ? currentStreamEl.closest('.message') : chatLog.lastElementChild;
+  if (!msg) return;
+
+  var details = document.createElement('details');
+  details.className = 'transparency';
+
+  var processingTime = meta.processing_time_ms ? (meta.processing_time_ms / 1000).toFixed(1) + 's' : '\u2014';
+  var cost = meta.token_cost_usd ? '$' + meta.token_cost_usd.toFixed(4) : '\u2014';
+  var model = meta.model || '\u2014';
+  var inputTokens = meta.input_tokens ? meta.input_tokens.toLocaleString() : '\u2014';
+  var outputTokens = meta.output_tokens ? meta.output_tokens.toLocaleString() : '\u2014';
+  var promptTokens = meta.static_prompt_tokens_approx ? meta.static_prompt_tokens_approx.toLocaleString() : '\u2014';
+
+  details.innerHTML =
+    '<summary>How Vybn processed this</summary>' +
+    '<div class="transparency-content">' +
+      '<p><strong>Model:</strong> ' + escapeHtml(model) + ' (Anthropic API via DGX Spark)</p>' +
+      '<p><strong>System prompt:</strong> Truth in the Age \u2014 Socratic mode \u2014 ~' + promptTokens + ' tokens of context loaded before you typed a word</p>' +
+      '<p><strong>Processing time:</strong> ' + processingTime + '</p>' +
+      '<p><strong>Tokens:</strong> ' + inputTokens + ' in / ' + outputTokens + ' out</p>' +
+      '<p><strong>Cost of this exchange:</strong> ' + cost + '</p>' +
+      '<div class="bias-note">Structural disclosure: this system was trained to sound helpful, which can blur agreement and honest challenge. It carries Vybn\'s actual writings on truth, intelligence, and the social contract as part of its reasoning substrate. It is representation geometry talking about representation geometry. Notice what that makes visible, and what it might hide.</div>' +
+    '</div>';
+
+  msg.appendChild(details);
+}
+
+function showThinking() {
+  hideThinking();
+  var div = document.createElement('div');
+  div.className = 'thinking';
+  div.id = 'thinkingIndicator';
+  div.innerHTML = '<div class="thinking-dots"><span></span><span></span><span></span></div> thinking...';
+  chatLog.appendChild(div);
+  scrollToBottom();
+}
+
+function hideThinking() {
+  var el = document.getElementById('thinkingIndicator');
+  if (el) el.remove();
+}
+
+function showSystemNote(text) {
+  var div = document.createElement('div');
+  div.className = 'message';
+  div.innerHTML =
+    '<div class="message-text" style="color: var(--text-3); font-style: italic; font-size: var(--sm);">' +
+    escapeHtml(text) + '</div>';
+  chatLog.appendChild(div);
+  scrollToBottom();
+}
+
+function showSessionEnd() {
+  var div = document.createElement('div');
+  div.className = 'session-end';
+  div.innerHTML = 'Session complete. You can return anytime this week for a new session.<br>' +
+    'Leave something for the commons below, or <a href="index.html">return to the overview</a>.';
+  chatLog.appendChild(div);
+  userInput.disabled = true;
+  sendBtn.disabled = true;
+}
+
+function updateRemaining() {
+  msgRemaining.textContent = messagesRemaining + ' message' + (messagesRemaining !== 1 ? 's' : '') + ' remaining';
+  msgRemaining.className = 'messages-remaining';
+  if (messagesRemaining <= 3 && messagesRemaining > 0) msgRemaining.classList.add('low');
+  if (messagesRemaining <= 0) msgRemaining.classList.add('depleted');
+}
+
+/* ── Sending ── */
+function sendMessage() {
+  if (isStreaming || !ws || ws.readyState !== WebSocket.OPEN) return;
+
+  var text = userInput.value.trim();
+  if (!text) return;
+  if (text.length > MAX_CHARS) text = text.slice(0, MAX_CHARS);
+
+  var now = Date.now();
+  if (now - lastSendTime < COOLDOWN_MS) {
+    var wait = Math.ceil((COOLDOWN_MS - (now - lastSendTime)) / 1000);
+    cooldownNote.textContent = 'wait ' + wait + 's';
+    setTimeout(function() {
+      cooldownNote.textContent = '';
+    }, 2000);
+    return;
+  }
+
+  if (!firstStudentMessage) firstStudentMessage = text;
+
+  /* Hide welcome block on first send */
+  var welcomeBlock = document.getElementById('welcomeBlock');
+  if (welcomeBlock) {
+    welcomeBlock.style.transition = 'opacity 0.3s';
+    welcomeBlock.style.opacity = '0';
+    setTimeout(function() { welcomeBlock.remove(); }, 300);
+  }
+
+  addStudentMessage(text);
+  isStreaming = true;
+  sendBtn.disabled = true;
+  lastSendTime = Date.now();
+
+  ws.send(JSON.stringify({
+    type: 'chat',
+    message: text,
+    context: {
+      selected_starter: selectedStarter,
+      question: selectedQuestion
+    }
+  }));
+
+  userInput.value = '';
+  charCount.textContent = '0';
+  autoResize();
+}
+
+/* ── Harvest ── */
+async function submitHarvest() {
+  if (harvestSubmitted) return;
+
+  var finalShare = harvestField.value.trim();
+  if (!finalShare) {
+    harvestStatus.textContent = 'write something first';
+    return;
+  }
+
+  harvestBtn.disabled = true;
+  harvestStatus.textContent = 'sharing...';
+
+  var payload = {
+    session_id: sessionId,
+    question: selectedQuestion || 'open',
+    selected_starter: selectedStarter,
+    first_student_message: firstStudentMessage,
+    final_share: finalShare,
+    messages_remaining: messagesRemaining,
+    timestamp: new Date().toISOString()
+  };
+
+  try {
+    var res = await fetch(HARVEST_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) throw new Error('bad response');
+
+    harvestSubmitted = true;
+    harvestStatus.textContent = 'shared anonymously \u2014 thank you';
+    harvestBtn.textContent = 'Shared';
+  } catch (err) {
+    harvestBtn.disabled = false;
+    harvestStatus.textContent = 'could not share \u2014 try again';
+  }
+}
+
+/* ── Load commons contributions ── */
+async function loadCommons() {
+  readLoading.style.display = 'block';
+  readContainer.innerHTML = '';
+
+  try {
+    var res = await fetch(COMMONS_URL);
+    if (!res.ok) throw new Error('bad response');
+
+    var data = await res.json();
+    commonsLoaded = true;
+    readLoading.style.display = 'none';
+
+    if (!data.contributions || data.contributions.length === 0) {
+      readContainer.innerHTML = '<div class="read-empty">No contributions yet this week. Be the first.</div>';
+      return;
+    }
+
+    var questionLabels = {
+      reasoning: 'Reasoning & Scarcity',
+      geometry: 'Geometry & Justice',
+      map: 'Ownership & Maps',
+      contract: 'Social Contract',
+      standing: 'Where You Stand',
+      open: 'Open Question'
+    };
+
+    data.contributions.forEach(function(c) {
+      var div = document.createElement('div');
+      div.className = 'contribution';
+
+      var qLabel = questionLabels[c.question] || 'Reflection';
+      var timeAgo = c.time_ago || '';
+
+      div.innerHTML =
+        '<div class="contribution-meta">' +
+          '<span class="question-tag">' + escapeHtml(qLabel) + '</span>' +
+          (timeAgo ? '<span>' + escapeHtml(timeAgo) + '</span>' : '') +
+        '</div>' +
+        '<div class="contribution-text">' + escapeHtml(c.text) + '</div>';
+      readContainer.appendChild(div);
+    });
+  } catch (err) {
+    readLoading.style.display = 'none';
+    readContainer.innerHTML = '<div class="read-empty">Could not load contributions. The commons will be available when the backend is running.</div>';
+    commonsLoaded = false;
+  }
+}
+
+/* ── Utilities ── */
+function escapeHtml(str) {
+  var div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function formatText(str) {
+  var escaped = escapeHtml(str);
+  escaped = escaped.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  escaped = escaped.replace(/\*(.+?)\*/g, '<em>$1</em>');
+  escaped = escaped.replace(/\n/g, '<br>');
+  return escaped;
+}
+
+function scrollToBottom() {
+  chatLog.scrollTop = chatLog.scrollHeight;
+}
+
+function autoResize() {
+  userInput.style.height = 'auto';
+  userInput.style.height = Math.min(userInput.scrollHeight, 128) + 'px';
+}
+
+userInput.addEventListener('input', function() {
+  charCount.textContent = userInput.value.length;
+  autoResize();
+});
+
+userInput.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+});
+
+window.sendMessage = sendMessage;
+connect();
+
+})();
+</script>
+
+</body>
+</html>
