@@ -1,0 +1,6 @@
+sessions/
+harvest/
+commons/
+reflections/
+__pycache__/
+*.pyc
