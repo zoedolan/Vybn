@@ -158,11 +158,11 @@ def load_commons_digest() -> str:
 
 
 QUESTION_LABELS = {
-    "reasoning": "What happens to truth when everyone can reason?",
-    "geometry": "Can a geometry be just?",
-    "map": "Who owns the map of truth?",
-    "contract": "What does the social contract become?",
-    "standing": "Where are you standing?",
+    "memo": "THE MEMO: You just used AI to draft a legal memo. Your supervising attorney can't tell. Is that memo yours? Not ethically. Ontologically. What did you make?",
+    "motion": "THE MOTION: A self-represented litigant walks into court with an AI-drafted motion better than opposing counsel's. The judge can't tell the difference. Should she be able to? What breaks if she can't?",
+    "price": "THE PRICE: Legal research used to cost $500 an hour. Now it costs five cents. The reasoning is the same. Is the truth the same? What was the $499.95 paying for?",
+    "contract": "THE CONTRACT: The social contract was written when knowledge was scarce and reasoning was expensive. Neither is true anymore. You can feel something shifting. What's being renegotiated? And who gets a seat at the table?",
+    "mirror": "THE MIRROR: You're talking to an AI right now. I process your words as coordinates in thousands of dimensions. In that space, 'justice' is a location. 'Mercy' is farther away. I don't know if that's true. Do you?",
     "open": "Student's own question",
 }
 
@@ -236,7 +236,7 @@ about representation geometry. None of us have this figured out.
 Everyone is learning. Hold the space for that.
 
 When messages are running low, say so: "We have N left. What's the
-question you most want to push on?" Make the scarcity productive.
+question you most want to push on? What's the question that might become your capstone?" Make the scarcity productive.
 """
     return prompt
 
