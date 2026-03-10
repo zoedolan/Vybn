@@ -5,8 +5,20 @@
    ================================================================ */
 
 /* ---- Auth ---- */
-const params = new URLSearchParams(window.location.search);
-const TOKEN = params.get('token') || '';
+// Read token from URL, store in sessionStorage, then strip from URL.
+// Keeps the token out of browser history, Referer headers, and server logs.
+(function () {
+  const params = new URLSearchParams(window.location.search);
+  const urlToken = params.get('token');
+  if (urlToken) {
+    sessionStorage.setItem('vybn_token', urlToken);
+    params.delete('token');
+    const clean = params.toString();
+    const newUrl = window.location.pathname + (clean ? '?' + clean : '');
+    history.replaceState(null, '', newUrl);
+  }
+})();
+const TOKEN = sessionStorage.getItem('vybn_token') || '';
 
 async function apiFetch(path) {
   try {
@@ -30,7 +42,7 @@ function updateConnectionStatus(connected, label) {
   const text = document.getElementById('connText');
   if (connected) {
     dot.classList.remove('disconnected');
-    text.textContent = label || 'spark-2b7c.tail7302f3.ts.net';
+    text.textContent = label || 'sovereign hardware';
   } else {
     dot.classList.add('disconnected');
     text.textContent = label || 'connecting…';
@@ -242,10 +254,10 @@ async function refreshProjects() {
     card.innerHTML =
       '<div class="project-head">' +
         '<div class="project-name">' + escapeHtml(p.name) + '</div>' +
-        '<span class="project-status active">' + p.source + '</span>' +
+        '<span class="project-status active">' + escapeHtml(p.source) + '</span>' +
       '</div>' +
       '<div class="project-desc">' +
-        'Age: ' + p.age + ' cycles · Activations: ' + p.activations +
+        'Age: ' + escapeHtml(String(p.age)) + ' cycles \u00b7 Activations: ' + escapeHtml(String(p.activations)) +
       '</div>' +
       '<div class="project-footer">' +
         '<div class="project-progress">' +
@@ -279,12 +291,12 @@ function populateCollaborators() {
     card.className = 'collaborator-card';
     card.innerHTML =
       '<div class="collab-avatar ' + c.type + '">' +
-        c.initials +
-        '<span class="collab-presence ' + c.presence + '"></span>' +
+        escapeHtml(c.initials) +
+        '<span class="collab-presence ' + escapeHtml(c.presence) + '"></span>' +
       '</div>' +
       '<div class="collab-info">' +
-        '<div class="collab-name">' + c.name + '</div>' +
-        '<div class="collab-role">' + c.role + '</div>' +
+        '<div class="collab-name">' + escapeHtml(c.name) + '</div>' +
+        '<div class="collab-role">' + escapeHtml(c.role) + '</div>' +
       '</div>';
     container.appendChild(card);
   });
@@ -458,7 +470,7 @@ async function refreshCodebook() {
             '<span class="timeline-type">' + (ok ? 'ok' : 'fail') + '</span>' +
             '<span class="timeline-time">' + escapeHtml(t.ts ? new Date(t.ts).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '') + '</span>' +
           '</div>' +
-          '<div class="timeline-text" style="font-family:var(--font-mono);font-size:var(--text-xs)">[' + (t.program || []).join(', ') + ']</div>' +
+          '<div class="timeline-text" style="font-family:var(--font-mono);font-size:var(--text-xs)">[' + (t.program || []).map(escapeHtml).join(', ') + ']</div>' +
         '</div>';
       traceList.appendChild(entry);
     });
