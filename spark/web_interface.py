@@ -319,6 +319,51 @@ async def websocket_endpoint(ws: WebSocket, token: str = ""):
 
 
 # ---------------------------------------------------------------------------
+# Portal — read-only organism dashboard
+# ---------------------------------------------------------------------------
+try:
+    from portal_api import (
+        router as _portal_router,
+        attach_organism as _portal_attach_organism,
+        attach_portal_bus as _portal_attach_bus,
+    )
+
+    app.include_router(_portal_router)
+
+    PORTAL_DIR = Path(__file__).parent / "static" / "portal"
+    if PORTAL_DIR.exists():
+        app.mount(
+            "/portal-static",
+            StaticFiles(directory=str(PORTAL_DIR)),
+            name="portal-static",
+        )
+
+    @app.get("/portal", response_class=HTMLResponse)
+    async def portal_index():
+        """Serve the Portal dashboard."""
+        portal_path = PORTAL_DIR / "index.html"
+        if portal_path.exists():
+            return HTMLResponse(portal_path.read_text(encoding="utf-8"))
+        return HTMLResponse("<h1>Portal</h1><p>Not yet deployed.</p>")
+
+    # Expose helpers for the Spark agent to wire organism/bus into the Portal.
+    def attach_organism(organism):
+        """Give the Portal read access to the running Organism."""
+        _portal_attach_organism(organism)
+
+    # Wrap the original attach_bus so the Portal also gets bus access.
+    _orig_attach_bus = attach_bus
+
+    def attach_bus(bus, response_callback=None):       # noqa: F811
+        _orig_attach_bus(bus, response_callback)
+        _portal_attach_bus(bus)
+
+    _PORTAL_LOADED = True
+except ImportError:
+    _PORTAL_LOADED = False
+
+
+# ---------------------------------------------------------------------------
 # Standalone runner
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
