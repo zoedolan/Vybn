@@ -18,6 +18,13 @@ from pathlib import Path
 from datetime import datetime, timezone
 from dataclasses import dataclass, field
 from typing import Callable, Optional, Any
+
+# Ensure the repo root is on sys.path regardless of how this script is invoked
+# (e.g., from cron where PYTHONPATH is not set). Mirrors vybn_spark_agent.py:44.
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
 from spark.paths import (
     REPO_ROOT as ROOT, STATE_PATH, SYNAPSE_CONNECTIONS as SYNAPSE,
     SPARK_JOURNAL as JOURNAL, WRITE_INTENTS, SOUL_PATH, MEMORY_DIR,
