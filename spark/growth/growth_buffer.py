@@ -130,10 +130,15 @@ class GrowthBuffer:
             Number of new entries ingested.
         """
         floor = self._cfg["surprise_floor"]
+        # Read from both FAST (in-memory, current session) and MEDIUM (persisted across runs).
+        # FAST is ephemeral — entries vanish when the process exits.
+        # MEDIUM persists to disk, which is where --once breath entries actually survive.
         fast_entries = self._nested.read_fast(limit=200)
+        medium_entries = self._nested.read_medium(limit=200) if hasattr(self._nested, 'read_medium') else []
+        all_entries = fast_entries + medium_entries
         count = 0
 
-        for nested_entry in fast_entries:
+        for nested_entry in all_entries:
             if nested_entry.entry_id in self._seen_ids:
                 continue
             if nested_entry.surprise_score < floor:

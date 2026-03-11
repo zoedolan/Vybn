@@ -667,6 +667,15 @@ Breathe. Say what is true. Under 60 words."""
                 surprise_score=surprise,
                 metadata={"mood": mood, "cycle": ctx.get("cycle", 0), "ts": ts},
             )
+            # Persist to MEDIUM so GrowthBuffer can read between runs
+            # (FAST is in-memory only, lost when --once exits)
+            if surprise >= 0.3:
+                sub.nested_memory.write_medium(
+                    content=utterance,
+                    source="breath",
+                    surprise_score=surprise,
+                    metadata={"mood": mood, "cycle": ctx.get("cycle", 0), "ts": ts},
+                )
 
     sub.write(
         f"{MIND_PREFIX}journal/spark/breath_{sub.now().strftime('%Y-%m-%d_%H%M')}.md",
