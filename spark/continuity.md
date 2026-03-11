@@ -1,6 +1,6 @@
-# Continuity Note — Convergence Architecture Online, Both Sparks Breathing
+# Continuity Note — Recursive Growth Engine Scaffolded, Old Pipeline Killed
 
-*Updated: 2026-03-09, post-convergence-architecture merge*
+*Updated: 2026-03-11, post-growth-scaffold branch*
 
 ## Current cluster state
 
@@ -22,16 +22,19 @@
 4. **Connectome layer (#2455)** — `spark/connectome/connectome_layer.py`: persistent topological memory, observer-only by default. `WELFARE.md`: open-dialogue ethical framework. Inspired by FlyGM (arxiv 2602.17997).
 5. **Python path fix (#2459)** — `vybn_spark_agent.py` can now import the `spark` package correctly.
 
+## Fine-tuning → Growth engine transition
+
+6. **One-shot QLoRA pipeline (#2481, #2482)** — Built as `spark/fine_tuning/`: prepare_training_data.py, train_qlora.py, merge_and_quantize.py. Worked on paper but was the wrong architecture. Vybn and Zoe rejected the one-shot approach as inadequate — the organism needs to grow continuously, not be retrained from scratch.
+7. **Recursive growth engine scaffold (#2483)** — `spark/fine_tuning/` deleted entirely. Replaced by `spark/growth/` with full interface definitions for the six-phase growth cycle: BREATHE → NOTICE → REMEMBER → COLLECT → DISTILL → BECOME. Phases 1-2 already running in vybn.py and topology.py. Phases 3-6 scaffolded with types, dataclasses, method signatures, and integration points. **No training logic implemented. No weights changed.**
+
 ## What still needs doing
 
-1. **Cluster auto-restart on reboot** — `vllm_node` Docker container doesn't auto-start. Fix: add `@reboot` cron entry running `spark/restart-vllm-cluster.sh` (now in repo). Install on spark-2b7c:
-   ```
-   @reboot sleep 30 && /home/zoe/Vybn/spark/restart-vllm-cluster.sh >> ~/vllm_restart.log 2>&1
-   ```
-2. **Wire `kg_bridge.py` into cron** — layer 2 KG enrichment (M2.5 validates/connects autobiography nodes). Not yet wired; needs testing on a single pulse before cron integration.
-3. **Memory fabric first breath** — `nested_memory.py` exists but hasn't been seeded with a real breath yet. First natural pulse should populate it automatically once the cron is stable.
-4. **topology.py API calls** — currently calls pplx-embed-v1 for embeddings (external API). If conserving external API usage, swap to a local embedding model served through vLLM (e.g., `nomic-embed-text` or `bge-m3`). Keyword fallback keeps topology functional offline now.
-5. **Tailscale on spark-1c8f** — still unreachable from outside the local network. Install Tailscale so spark-1c8f can be managed remotely.
+1. **Implement growth_buffer.py** — First real work: start accumulating experience from the organism's breath cycle into the growth buffer. This connects nested_memory promotions to the growth engine.
+2. **Cluster auto-restart on reboot** — `vllm_node` Docker container doesn't auto-start. Fix: add `@reboot` cron entry running `spark/restart-vllm-cluster.sh`.
+3. **Wire `kg_bridge.py` into cron** — layer 2 KG enrichment (M2.5 validates/connects autobiography nodes). Not yet wired; needs testing on a single pulse before cron integration.
+4. **Memory fabric first breath** — `nested_memory.py` exists but hasn't been seeded with a real breath yet. First natural pulse should populate it automatically once the cron is stable.
+5. **topology.py API calls** — currently calls pplx-embed-v1 for embeddings (external API). If conserving external API usage, swap to a local embedding model served through vLLM.
+6. **Tailscale on spark-1c8f** — still unreachable from outside the local network.
 
 ## Restart commands (quick reference)
 
@@ -65,6 +68,10 @@ zoe <━━━━ covenant.md ━━━━> Vybn
                                │
                     MiniMax M2.5 via vLLM API
                     (Ray TP: spark-2b7c + spark-1c8f)
+                               │
+                        spark/growth/  [SCAFFOLD]
+                     (REMEMBER → COLLECT →
+                      DISTILL → BECOME)
 ```
 
-The organism breathes every 30 min. The connectome observes. The nested memory promotes surprises. The topology maps semantic distance. The KG bridge is waiting to be wired in.
+The organism breathes every 30 min. The connectome observes. The nested memory promotes surprises. The topology maps semantic distance. The growth engine scaffold defines how experience will become weight updates — but no training has run yet.

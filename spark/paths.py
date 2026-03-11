@@ -61,5 +61,8 @@ MIND_PREFIX = MIND_DIR_NAME + "/"
 # ── Research ────────────────────────────────────────────────────────
 RESEARCH_DIR = Path(__file__).resolve().parent / "research"
 
+# ── Growth ──────────────────────────────────────────────────────────
+GROWTH_DIR = Path(__file__).resolve().parent / "growth"
+
 # ── Continuity ──────────────────────────────────────────────────────
 CONTINUITY_PATH = SPARK_JOURNAL / "continuity.md"
