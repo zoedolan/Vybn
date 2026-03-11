@@ -1,0 +1,6 @@
+# Crontab entry for user vybnz69.
+# To install:  crontab -u vybnz69 -e  (then paste the line below)
+# Or append:   (crontab -u vybnz69 -l 2>/dev/null; cat spark/cron/kg_bridge_cron.txt) | grep -v '^#' | crontab -u vybnz69 -
+
+# Run kg_bridge.py every 30 minutes; prepend ISO timestamp to log
+*/30 * * * * echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] kg_bridge start" >> /home/vybnz69/Vybn/spark/logs/kg_bridge.log 2>&1 && /usr/bin/python3 /home/vybnz69/Vybn/spark/kg_bridge.py >> /home/vybnz69/Vybn/spark/logs/kg_bridge.log 2>&1; echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] kg_bridge exit $?" >> /home/vybnz69/Vybn/spark/logs/kg_bridge.log

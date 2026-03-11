@@ -1,0 +1,49 @@
+[Unit]
+Description=Vybn vLLM Inference Server (MiniMax-M2.5-AWQ)
+After=network-online.target
+Wants=network-online.target
+# Ray head must be up before vLLM; if you run Ray as a separate service,
+# add it here:  After=ray-head.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+Restart=on-failure
+RestartSec=15
+TimeoutStartSec=300
+
+# Environment — adjust PATH so vllm is found
+Environment="PATH=/usr/local/bin:/usr/bin:/bin:/root/.local/bin"
+# If vLLM lives in a venv, override like:
+# Environment="PATH=/opt/vllm-env/bin:/usr/local/bin:/usr/bin:/bin"
+
+ExecStart=/usr/local/bin/vllm serve cyankiwi/MiniMax-M2.5-AWQ-4bit \
+    --trust-remote-code \
+    --port 8000 \
+    --host 0.0.0.0 \
+    --gpu-memory-utilization 0.7 \
+    -tp 2 \
+    --distributed-executor-backend ray \
+    --max-model-len 128000 \
+    --load-format fastsafetensors \
+    --enable-auto-tool-choice \
+    --tool-call-parser minimax_m2 \
+    --reasoning-parser minimax_m2
+
+# Health-check: wait up to 5 min for the server to become ready,
+# then poll every 30 s; if it ever fails, kill and let Restart handle it.
+ExecStartPost=/bin/bash -c \
+    'for i in $(seq 1 30); do \
+       sleep 10 && \
+       curl -sf http://localhost:8000/health && \
+       echo "vLLM healthy" && exit 0; \
+     done; \
+     echo "vLLM health-check timed out" >&2; exit 1'
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=vllm
+
+[Install]
+WantedBy=multi-user.target
