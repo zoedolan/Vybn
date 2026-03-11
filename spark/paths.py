@@ -58,5 +58,8 @@ ARCHIVE_DIR = MIND_DIR / "archive"
 # ── Relative path prefix (for string-based path checks) ────────────
 MIND_PREFIX = MIND_DIR_NAME + "/"
 
+# ── Research ────────────────────────────────────────────────────────
+RESEARCH_DIR = Path(__file__).resolve().parent / "research"
+
 # ── Continuity ──────────────────────────────────────────────────────
 CONTINUITY_PATH = SPARK_JOURNAL / "continuity.md"

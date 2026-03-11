@@ -1,0 +1,38 @@
+id: risk_minimax_peft_support
+name: "MiniMaxM2ForCausalLM PEFT Support"
+severity: high  # critical | high | medium | low
+status: open  # open | mitigated | resolved | accepted
+description: |
+  The MiniMax M2.5 architecture may not be in PEFT's supported model list.
+  While LoRA on attention layers is relatively architecture-agnostic (it just
+  needs q/k/v/o projection matrices), expert-layer adaptation requires
+  model-specific configuration. HuggingFace PEFT issue #2527 tracks this for
+  MoE models generally, but MiniMax-specific support is not confirmed.
+
+  Community discussion on the MiniMax M2 HuggingFace model page confirms that
+  QLoRA guides for this specific architecture are in demand but not yet
+  available. MLX deployment guides exist, but QLoRA support for
+  MiniMaxM2ForCausalLM is NOT yet confirmed in the PEFT library. This is a
+  genuine gap that may require custom implementation.
+
+  The risk is that even if AWQ + LoRA compatibility is resolved in general,
+  the specific MiniMax M2.5 architecture may need custom wrappers or patches
+  to work with PEFT. This adds engineering complexity and maintenance burden.
+mitigation: |
+  Inspect the model's architecture to identify target modules. Use PEFT's
+  target_modules parameter with explicit layer names rather than relying on
+  auto-detection.
+
+  Be prepared to write custom nn.utils.parametrize wrappers if PEFT cannot
+  handle the architecture natively. The Torchtune approach for MoE LoRA
+  (referenced in HuggingFace PEFT issue #2527) provides a template.
+
+  As a fallback, attention-layer LoRA should work regardless of architecture
+  support since it only targets standard projection matrices. Expert-layer
+  adaptation can be deferred until PEFT support matures.
+affected_layers:
+  - "layer_2_fast_adaptation"
+  - "layer_3_slow_consolidation"
+observations: []
+created: "2026-03-11"
+updated: "2026-03-11"

@@ -1,0 +1,53 @@
+id: insight_2_ttt_metabolism
+name: "Test-Time Training as Continuous Metabolism"
+insight_number: 2
+status: theoretical  # theoretical | testing | validated | refuted | superseded
+novelty: high
+description: |
+  The TTT (Test-Time Training) layer paper introduces a radical architectural
+  idea: the hidden state IS a machine learning model. The update rule for each
+  token is a step of self-supervised learning. Every token processed updates
+  the hidden-state model. This is not fine-tuning — it is inference that
+  trains. The distinction between processing and learning dissolves.
+
+  Fast Weight Programmers (Schmidhuber -> Schlag et al.) formalized this years
+  earlier: linear transformers ARE fast weight programmers. Slow weights learn
+  to program fast weights. The fast weights change with every input — they are
+  metabolic by construction. LaCT (Large Chunk TTT) scales the fast-weight
+  state to 40% of model parameter size, enabling context lengths up to 1M
+  tokens.
+
+  This is the key insight that SUBVERTS the entire framing of Q1-Q4. You don't
+  need to co-serve training and inference. You need a system where inference IS
+  training. The engineering problem shifts from "how do I schedule training
+  alongside inference" to "how do I architect an inference pass that leaves
+  behind learned residues." The LoRA adapter becomes not a training artifact
+  but a metabolic byproduct — a sedimentary layer deposited by the river of
+  tokens flowing through the model.
+
+  SYNTHESIS: What if Vybn doesn't need traditional LoRA fine-tuning at all?
+  What if the "continuous absorption" is better modeled as a TTT-style process
+  where processing the corpus IS the training? Each pass through the corpus
+  updates a fast-weight adapter that sits alongside the frozen MoE base.
+  There is no separate training phase. The distinction between "reading" and
+  "learning" dissolves.
+implementation_sketch: |
+  1. Implement a self-supervised update rule that runs during inference
+  2. Each token processed through the corpus leaves a trace in fast-weight
+     LoRA adapters
+  3. No separate training phase — inference IS training
+  4. Background process periodically checkpoints the fast weights
+  5. vLLM hot-swap API loads new checkpoints atomically
+  6. Fast weights decay toward zero unless consolidated into Layer 3
+  7. The decay rate is controlled by Layer 6's free energy oracle
+connected_layers:
+  - "layer_2_fast_adaptation"
+  - "layer_1_base"
+key_papers:
+  - title: "TTT: Learning to (Learn at Test Time): RNNs with Expressive Hidden States"
+    url: "https://arxiv.org/abs/2407.04620"
+  - title: "FlexLLM: Co-Serving LLM Inference and Fine-Tuning on GPUs"
+    url: "https://arxiv.org/abs/2402.18789"
+observations: []
+created: "2026-03-11"
+updated: "2026-03-11"

@@ -1,0 +1,57 @@
+id: layer_1_base
+name: "Base Layer — The Frozen Foundation"
+layer_number: 1
+status: designed  # designed | implementing | testing | active | deprecated
+description: |
+  MiniMax M2.5 229B MoE, AWQ-quantized, served via vLLM on dual NVIDIA GB10
+  chips with 256 GB unified memory. This layer never changes. It provides the
+  raw computational substrate — the 256-expert routing mechanism with top-8
+  routing, the attention heads, the positional encodings. All learning happens
+  in layers above.
+
+  The base model's weights are the "genome" — fixed at birth, providing the
+  foundational capabilities that adaptation builds upon. The 256-expert MoE
+  architecture is inherently suited to self-modification because experts can
+  be individually expanded, pruned, and rerouted without affecting the entire
+  model.
+
+  The frozen base serves a critical theoretical role: it is the "prior" in the
+  free energy formulation (Layer 6). The complexity cost term penalizes deviation
+  from this prior, which prevents model collapse during self-distillation. Without
+  a frozen reference point, the system has no anchor.
+implementation:
+  summary: "Standard vLLM deployment with AWQ model loading."
+  details: |
+    Deploy with --gpu-memory-utilization 0.70 to reserve 30% for adapter
+    operations in higher layers. Environment variable
+    VLLM_ALLOW_RUNTIME_LORA_UPDATING=True enables the /v1/load_lora_adapter
+    API endpoint for hot-swapping adapters at runtime.
+
+    The AWQ quantization uses group-wise asymmetric quantization with salient
+    weight channels preserved at higher precision. This is fundamentally
+    different from bitsandbytes NF4 quantization, which has implications for
+    LoRA compatibility (see Risk: AWQ + LoRA Compatibility).
+  prerequisites:
+    - "Dual NVIDIA GB10 with 256 GB unified memory"
+    - "vLLM with LoRA support enabled"
+    - "MiniMax M2.5 229B AWQ-quantized weights"
+  blocking_risks:
+    - "risk_awq_lora_compat"
+dependencies:
+  requires: []
+  enables:
+    - "layer_2_fast_adaptation"
+    - "layer_3_slow_consolidation"
+    - "layer_4_dream_engine"
+    - "layer_5_morphogenetic_monitor"
+    - "layer_6_free_energy_oracle"
+key_papers:
+  - title: "vLLM LoRA Documentation"
+    url: "https://docs.vllm.ai/en/latest/features/lora.html"
+  - title: "S-LoRA: Serving Thousands of Concurrent LoRA Adapters"
+    url: "https://arxiv.org/abs/2311.03285"
+  - title: "FlexLLM: Co-Serving LLM Inference and Fine-Tuning on GPUs"
+    url: "https://arxiv.org/abs/2402.18789"
+observations: []
+created: "2026-03-11"
+updated: "2026-03-11"

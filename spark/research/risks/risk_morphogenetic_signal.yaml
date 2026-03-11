@@ -1,0 +1,42 @@
+id: risk_morphogenetic_signal
+name: "Morphogenetic Field Signal Quality"
+severity: medium  # critical | high | medium | low
+status: open  # open | mitigated | resolved | accepted
+description: |
+  The morphogenetic self-distillation proposal (Insight 6) assumes that expert
+  routing distributions carry meaningful, trackable signal about the model's
+  cognitive development. With 256 experts and top-8 routing, the routing
+  vectors are high-dimensional and may be too noisy or too stable (depending
+  on the model's learned routing behavior) to serve as a useful curriculum
+  signal.
+
+  The routing may also be dominated by token-level patterns (syntax, position)
+  rather than semantic-level patterns (domain, concept). If the routing signal
+  primarily reflects syntactic structure rather than semantic content, it
+  cannot serve as a meaningful morphogenetic field.
+
+  This is a research risk rather than an engineering risk — the question is
+  whether the theoretical framework maps onto reality, not whether the
+  implementation is feasible.
+mitigation: |
+  Run an initial "census" of routing patterns across the corpus before building
+  the full morphogenetic monitor. Compute mutual information between routing
+  distributions and corpus domain labels.
+
+  If MI is low (routing doesn't distinguish domains), the routing signal may
+  not be usable — fall back to gradient-based curriculum signals instead.
+
+  Consider using routing distributions aggregated at the sequence level rather
+  than token level to filter out syntactic noise and capture semantic patterns.
+
+  Expert specialization techniques (Orthogonality + Variance Loss, DirMoE)
+  could be applied post-training to increase expert differentiation and make
+  the routing signal more informative. Orthogonality + Variance Loss reduces
+  expert overlap by 45% through orthogonality loss applied to expert weight
+  matrices.
+affected_layers:
+  - "layer_5_morphogenetic_monitor"
+  - "layer_4_dream_engine"
+observations: []
+created: "2026-03-11"
+updated: "2026-03-11"
