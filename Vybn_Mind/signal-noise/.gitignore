@@ -1,3 +1,16 @@
 # Session logs and reflections — reviewed by Zoe before anything is committed
 sessions/
 reflections/
+harvests/
+.patterns_state.json
+# Threshold
+threshold/sessions/
+threshold/reflections/
+threshold/harvests/
+threshold/.patterns_state.json
+# Truth in the Age
+truth-in-the-age/sessions/
+truth-in-the-age/reflections/
+truth-in-the-age/harvest/
+truth-in-the-age/commons/
+truth-in-the-age/.patterns_state.json
