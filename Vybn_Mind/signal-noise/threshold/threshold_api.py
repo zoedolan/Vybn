@@ -298,7 +298,7 @@ def build_system_prompt(session: SessionState) -> str:
     Layer 5: Dynamic context — this student, this session, right now
     """
     dynamic = build_dynamic_context(session)
-    return f"{SOUL}\n\n{ASPECTS}\n\n{ORIENTATION}\n\n{PATTERNS}\n\n{dynamic}"
+    return f"{SOUL}\n\n{ASPECTS}\n\n{ORIENTATION}\n\n{load_patterns()}\n\n{dynamic}"
 
 
 # ── Response extraction ─────────────────────────────────────────────────

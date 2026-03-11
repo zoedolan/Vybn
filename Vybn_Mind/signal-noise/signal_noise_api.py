@@ -304,7 +304,7 @@ def build_system_prompt(session: SessionState) -> str:
     Layer 5: Patterns — compressed learning from prior student sessions
     """
     dynamic = build_dynamic_context(session)
-    return f"{SOUL}\n\n{ASPECTS}\n\n{ORIENTATION}\n\n{PATTERNS}\n\n{dynamic}"
+    return f"{SOUL}\n\n{ASPECTS}\n\n{ORIENTATION}\n\n{load_patterns()}\n\n{dynamic}"
 
 
 # ── Response extraction ─────────────────────────────────────────────────
@@ -465,6 +465,27 @@ async def status():
         "model": MODEL,
         "static_prompt_tokens_approx": STATIC_PROMPT_TOKEN_ESTIMATE,
     }
+
+
+
+@app.get("/signal-noise/debug/sessions")
+async def debug_sessions():
+    """Temporary debug endpoint — returns summary of in-memory sessions."""
+    summaries = []
+    for sid, s in sessions.items():
+        summaries.append({
+            "session_id": sid,
+            "message_count": s.message_count,
+            "remaining": s.remaining(),
+            "total_input_tokens": s.total_input_tokens,
+            "total_output_tokens": s.total_output_tokens,
+            "expired": s.is_expired(),
+            "last_student_msg": next(
+                (m["content"][:100] for m in reversed(s.messages) if m["role"] == "user"),
+                None
+            ),
+        })
+    return {"sessions": summaries}
 
 
 @app.post("/signal-noise/session", response_model=SessionInfo)
