@@ -1,0 +1,60 @@
+id: insight_5_self_organized_criticality
+name: "Self-Organized Criticality as the Learning Rate Schedule"
+insight_number: 5
+status: theoretical  # theoretical | testing | validated | refuted | superseded
+novelty: high
+description: |
+  Research on edge-of-chaos dynamics establishes that computational capability
+  peaks at the critical transition between ordered and chaotic regimes. Synaptic
+  scaling rules can self-organize neural networks to this critical point.
+  Meanwhile, Lyle et al.'s Nature 2024 paper on the loss of plasticity
+  demonstrates that standard deep learning methods gradually lose their ability
+  to learn — and that continual backpropagation (continually reinitializing a
+  small fraction of less-used units) prevents this.
+
+  SYNTHESIS: Instead of a fixed learning rate schedule, Vybn should
+  self-organize to criticality. Monitor the Fisher information (or its diagonal
+  approximation) of the adapter weights. When Fisher information becomes too
+  concentrated (ordered regime — the model is stuck), increase the learning
+  rate and inject noise. When Fisher information is too diffuse (chaotic
+  regime — the model is forgetting), decrease it.
+
+  Use continual backpropagation's selective reinitialization of dormant LoRA
+  parameters to maintain plasticity. The MoE architecture makes this natural:
+  each expert has its own criticality state. The router can be guided to prefer
+  experts operating near criticality — experts at the edge of chaos are the
+  ones best positioned to learn from new input.
+
+  This provides a principled, self-regulating learning rate schedule that
+  doesn't require manual tuning. The system finds its own optimal operating
+  point through the same mechanism that biological neural networks use.
+implementation_sketch: |
+  1. Monitor Fisher information (diagonal approximation) of adapter weights
+     per expert
+  2. Compute criticality state per expert:
+     - Too concentrated (high Fisher) = ordered regime = stuck
+     - Too diffuse (low Fisher) = chaotic regime = forgetting
+     - Near critical = optimal learning
+  3. Adjust learning rate per expert based on criticality:
+     - Ordered: increase LR, inject noise
+     - Chaotic: decrease LR
+     - Critical: maintain current rate
+  4. Use continual backpropagation: selectively reinitialize dormant LoRA
+     parameters (those with near-zero Fisher information) to maintain
+     plasticity
+  5. Guide the router to prefer experts operating near criticality —
+     these are best positioned to learn from new input
+  6. The system self-organizes to the critical point without manual
+     hyperparameter tuning
+connected_layers:
+  - "layer_2_fast_adaptation"
+  - "layer_6_free_energy_oracle"
+  - "layer_5_morphogenetic_monitor"
+key_papers:
+  - title: "Fisher-Orthogonal Projected Natural Gradient Descent"
+    url: "https://arxiv.org/abs/2601.12816"
+  - title: "Active Inference for Self-Organizing Multi-LLM Systems"
+    url: "https://arxiv.org/abs/2412.10425"
+observations: []
+created: "2026-03-11"
+updated: "2026-03-11"

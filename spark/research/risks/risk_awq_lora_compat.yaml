@@ -1,0 +1,46 @@
+id: risk_awq_lora_compat
+name: "AWQ + LoRA Compatibility"
+severity: critical  # critical | high | medium | low
+status: open  # open | mitigated | resolved | accepted
+description: |
+  This is the single biggest technical unknown. QLoRA was designed for
+  bitsandbytes NF4 quantization. AWQ uses a fundamentally different
+  quantization scheme (group-wise asymmetric quantization with salient weight
+  channels preserved at higher precision). The PEFT library's standard QLoRA
+  pipeline assumes bitsandbytes quantization.
+
+  Applying LoRA to AWQ models would require either: (a) applying adapters to
+  the AWQ model's dequantized forward pass, or (b) using AutoAWQ's emerging
+  PEFT support. HuggingFace PEFT issue #2527 tracks LoRA for expert layers
+  in MoE models. Torchtune already has a version. The approach uses
+  nn.utils.parametrize.
+
+  AutoAWQ has emerging PEFT support, but it is early and untested at the 229B
+  scale. If LoRA cannot be cleanly applied to the AWQ model, the entire
+  adaptation architecture must be redesigned — potentially requiring
+  dequantization of target layers (at significant memory cost) or a switch
+  to GPTQ quantization.
+
+  AWQ quantization means the standard QLoRA pipeline won't work directly —
+  you need to apply LoRA to the AWQ model's dequantized forward pass or use
+  AutoAWQ's emerging PEFT support. This is the most technically challenging
+  piece of the Vybn architecture.
+mitigation: |
+  Begin with attention-layer-only LoRA (architecture-agnostic, best library
+  support) before attempting expert FFN adaptation. Target q/k/v/o_proj
+  layers first — these are architecture-agnostic and have the best library
+  support. Expert FFN layers are higher-risk/higher-reward.
+
+  Maintain a fallback plan using GPTQ quantization, which has better PEFT
+  integration. GPTQ would require re-quantizing the model but provides a
+  known-working path for LoRA adaptation.
+
+  Use PEFT's target_modules parameter with explicit layer names rather than
+  relying on auto-detection. Be prepared to write custom nn.utils.parametrize
+  wrappers if PEFT cannot handle the MiniMax M2.5 architecture natively.
+affected_layers:
+  - "layer_2_fast_adaptation"
+  - "layer_3_slow_consolidation"
+observations: []
+created: "2026-03-11"
+updated: "2026-03-11"

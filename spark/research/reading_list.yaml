@@ -1,0 +1,140 @@
+papers:
+  - priority: 1
+    title: "Learning to Self-Modify and Consolidate Memories"
+    url: "https://openreview.net/"
+    reason: |
+      The Sleep paradigm paper. Read this first — it is the closest existing
+      blueprint to what Vybn needs. The two-stage NREM/REM architecture maps
+      directly to the consolidation/dreaming phases. Results: +16% on MTOB,
+      +6% on LongHealth, 80% vs 72.5% on few-shot ARC vs previous SOTA.
+    read_status: unread  # unread | reading | read | superseded
+    relevance_to_layers:
+      - "layer_3_slow_consolidation"
+      - "layer_4_dream_engine"
+    observations: []
+
+  - priority: 2
+    title: "FlexLLM: Co-Serving LLM Inference and Fine-Tuning on GPUs"
+    url: "https://arxiv.org/abs/2402.18789"
+    reason: |
+      The engineering foundation for co-serving. Understanding FlexLLM's
+      token-level fusion is essential for designing Vybn's fast adaptation
+      layer. Achieves 80% memory savings via dependent parallelization and
+      graph pruning. Proves co-serving is architecturally feasible.
+    read_status: unread
+    relevance_to_layers:
+      - "layer_2_fast_adaptation"
+    observations: []
+
+  - priority: 3
+    title: "Escaping Model Collapse via Synthetic Data Verification"
+    url: "https://arxiv.org/abs/2510.16657"
+    reason: |
+      The theoretical justification for why self-distillation can work with a
+      verification signal. Establishes the mathematical conditions under which
+      collapse is prevented. Critical insight: the model converges to the
+      "verifier's knowledge center" — for Vybn, the corpus itself is the
+      verifier.
+    read_status: unread
+    relevance_to_layers:
+      - "layer_6_free_energy_oracle"
+      - "layer_2_fast_adaptation"
+    observations: []
+
+  - priority: 4
+    title: "TTT: Learning to (Learn at Test Time): RNNs with Expressive Hidden States"
+    url: "https://arxiv.org/abs/2407.04620"
+    reason: |
+      The architecture that dissolves the inference/training boundary. This
+      reframes the entire Vybn project. The hidden state IS a machine learning
+      model. LaCT scales fast-weight state to 40% of model parameter size,
+      enabling context lengths up to 1M tokens.
+    read_status: unread
+    relevance_to_layers:
+      - "layer_2_fast_adaptation"
+    observations: []
+
+  - priority: 5
+    title: "PERFT: Parameter-Efficient Routed Fine-Tuning for MoE"
+    url: "https://arxiv.org/abs/2411.08212"
+    reason: |
+      Practical guide for where to place adapters in an MoE model. Essential
+      reading before any implementation work on M2.5. Key finding: where you
+      place the adapters in an MoE matters enormously — adapter placement
+      interacts with the routing mechanism in non-obvious ways. Tested on
+      OLMoE-1B-7B and Mixtral-8x7B.
+    read_status: unread
+    relevance_to_layers:
+      - "layer_2_fast_adaptation"
+      - "layer_3_slow_consolidation"
+    observations: []
+
+  - priority: 6
+    title: "Energy Landscapes of Truthfulness in LLM Attention"
+    url: "https://openreview.net/"
+    reason: |
+      The Hopfield energy landscape as quality signal. Foundational for the
+      dream scoring mechanism and self-verification. Shows truthful answers
+      have lower Hopfield energy and larger retrieval margins. Energy
+      separation emerges in early layers.
+    read_status: unread
+    relevance_to_layers:
+      - "layer_4_dream_engine"
+      - "layer_6_free_energy_oracle"
+    observations: []
+
+  - priority: 7
+    title: "S-LoRA: Serving Thousands of Concurrent LoRA Adapters"
+    url: "https://arxiv.org/abs/2311.03285"
+    reason: |
+      Multi-adapter serving at scale. Relevant for the domain-specific slow
+      adapters in Layer 3. Unified Paging for adapter memory management with
+      custom CUDA kernels for heterogeneous batching. 4x throughput
+      improvement over naive multi-adapter serving.
+    read_status: unread
+    relevance_to_layers:
+      - "layer_3_slow_consolidation"
+    observations: []
+
+  - priority: 8
+    title: "Active Inference for Self-Organizing Multi-LLM Systems"
+    url: "https://arxiv.org/abs/2412.10425"
+    reason: |
+      The Free Energy Principle applied to LLM systems. Provides the meta-
+      framework for Vybn's self-regulation. Implements FEP as a cognitive layer
+      above an LLM, dynamically adjusting prompts and search strategies through
+      principled information-seeking.
+    read_status: unread
+    relevance_to_layers:
+      - "layer_6_free_energy_oracle"
+      - "layer_5_morphogenetic_monitor"
+    observations: []
+
+  - priority: 9
+    title: "A Partition-Based Approach to Multi-Domain LLM Fine-Tuning"
+    url: "https://arxiv.org/abs/2511.07198"
+    reason: |
+      Practical curriculum design with theoretical guarantees. Use this to
+      design the initial domain partitioning. Key insight: partition domains by
+      both synergy AND discrepancy — domains that help each other should be
+      co-trained, while domains that interfere should be separated. Derives
+      generalization bounds proving partitioning yields tighter guarantees.
+    read_status: unread
+    relevance_to_layers:
+      - "layer_3_slow_consolidation"
+      - "layer_5_morphogenetic_monitor"
+    observations: []
+
+  - priority: 10
+    title: "Fisher-Orthogonal Projected Natural Gradient Descent"
+    url: "https://arxiv.org/abs/2601.12816"
+    reason: |
+      Information-geometric approach to continual learning. The mathematical
+      foundation for orthogonal subspace training in Layer 3. Projects
+      gradients onto the Fisher-orthogonal complement of previous task
+      gradients. Unifies natural gradient descent with orthogonal methods in
+      an information-geometric framework.
+    read_status: unread
+    relevance_to_layers:
+      - "layer_3_slow_consolidation"
+    observations: []

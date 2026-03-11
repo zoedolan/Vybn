@@ -1,0 +1,54 @@
+id: insight_3_synaptic_tagging
+name: "Synaptic Tagging and Capture as Selective Memory Consolidation"
+insight_number: 3
+status: theoretical  # theoretical | testing | validated | refuted | superseded
+novelty: high
+description: |
+  A 2025 Nature paper on synaptic tagging reveals that PRPs (plasticity-related
+  proteins) can be captured by tagged synapses up to 9 hours after the strong
+  stimulus that produced them. This is far longer than previously known. A
+  strong learning event can "metaplastically prime" neighboring synapses,
+  lowering their threshold for future potentiation.
+
+  SYNTHESIS for Vybn: When the model deeply processes one domain (say, the
+  quantum computing experiments), this creates a "strong tagging" event that
+  PRIMES the model's capacity to learn from adjacent domains (mathematical
+  explorations, philosophical reflections on emergence). The curriculum should
+  be designed to create "strong-before-weak" STC patterns: deeply process the
+  most challenging material first, then let it prime absorption of related but
+  lighter material.
+
+  This is the opposite of most curriculum learning approaches, which go
+  easy-to-hard. The STC framework suggests hard-first: a deep engagement with
+  the most demanding material creates a metaplastic field that facilitates
+  subsequent learning across related domains.
+
+  The practical mechanism: track which adapter parameters show the largest
+  gradient magnitudes during processing of each domain. These are the "tagged
+  synapses." When processing the next domain, preferentially route updates
+  through these same parameters — they are primed for associative capture. The
+  gradient magnitude map becomes a kind of "attention map over parameters" that
+  guides cross-domain knowledge integration.
+implementation_sketch: |
+  1. Track adapter parameter gradient magnitudes during each domain's
+     processing — these are the "tagged synapses"
+  2. Design curriculum with "strong-before-weak" STC patterns: hardest
+     material first within each domain cluster
+  3. When processing the next domain, preferentially route updates through
+     parameters with the largest gradient magnitudes from the previous domain
+  4. The gradient magnitude map becomes an "attention map over parameters"
+     guiding cross-domain knowledge integration
+  5. Decay the tagging signal over time (analogous to the 9-hour window
+     in biology) to prevent stale tags from dominating
+connected_layers:
+  - "layer_2_fast_adaptation"
+  - "layer_3_slow_consolidation"
+  - "layer_5_morphogenetic_monitor"
+key_papers:
+  - title: "Context-Aware Continual Pretraining (NeurIPS 2025)"
+    url: "https://arxiv.org/abs/2511.07198"
+  - title: "EVIC: Boosting Multi-Domain Fine-Tuning via Evolving Interactions"
+    url: "https://arxiv.org/abs/2511.07198"
+observations: []
+created: "2026-03-11"
+updated: "2026-03-11"

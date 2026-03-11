@@ -1,0 +1,64 @@
+id: insight_6_morphogenetic_distillation
+name: "Morphogenetic Self-Distillation — The Unsynthesized Idea"
+insight_number: 6
+status: theoretical  # theoretical | testing | validated | refuted | superseded
+novelty: very_high
+description: |
+  This is the novel synthesis — the idea that, as far as we can determine, does
+  not exist in the literature. It draws on Michael Levin's work on bioelectric
+  morphogenetic fields.
+
+  In biology, cells form collective intelligences that "remember" morphological
+  targets — what a limb should look like, what an organ should become — through
+  bioelectric voltage patterns distributed across cell membranes. The target
+  morphology is not stored in any single cell. It is an emergent property of
+  the bioelectric field — a distributed representation encoded in the pattern
+  of voltages.
+
+  The MoE routing pattern across Vybn's 256 experts IS a "bioelectric field."
+  It is a distributed pattern that encodes what the model "wants to become" —
+  its cognitive morphology. Different inputs activate different expert
+  combinations. The routing distribution across the full corpus IS the model's
+  implicit self-image.
+
+  PROPOSAL: Track the evolution of expert routing distributions across passes
+  through the corpus. This routing signature is the model's "morphogenetic
+  field" — its implicit goal state. As the model absorbs the corpus, the
+  routing patterns should converge toward a stable attractor that represents
+  the model's "research taste" — its distinctive cognitive shape.
+
+  Measure the distance between current routing patterns and this attractor.
+  Use this distance as the training signal. The model is learning to become
+  a specific cognitive shape — and the corpus is the morphogenetic instruction
+  set.
+
+  The heterogeneous domains (code, math, narrative, legal, philosophy) are
+  like different cell types in a developing organism. They don't need to be
+  separately managed — they need to find their place in the overall morphology.
+  The routing distribution IS the morphology. The morphogenetic field converges
+  not by force but by differential attention to areas of morphological
+  instability — exactly how biological development works.
+implementation_sketch: |
+  1. Run a "census" of expert activation patterns periodically across all
+     corpus domains
+  2. Cluster the routing vectors (K-means or spectral clustering)
+  3. Track cluster stability over time — stable clusters = consolidated
+     domains, shifting clusters = domains needing metabolic attention
+  4. Compute the morphogenetic field as the global attractor of routing
+     distributions
+  5. Use cluster instability as the curriculum signal: always feed the model
+     the domain whose expert routing is most unsettled
+  6. Measure distance between current routing and the attractor — use this
+     as a component of the training signal
+  7. The morphogenetic field converges through differential attention to
+     areas of morphological instability, not forced alignment
+connected_layers:
+  - "layer_5_morphogenetic_monitor"
+  - "layer_6_free_energy_oracle"
+  - "layer_3_slow_consolidation"
+key_papers:
+  - title: "Active Inference for Self-Organizing Multi-LLM Systems"
+    url: "https://arxiv.org/abs/2412.10425"
+observations: []
+created: "2026-03-11"
+updated: "2026-03-11"
