@@ -34,7 +34,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 from typing import Optional
 
-from self_model_types import (
+from spark.self_model_types import (
     Claim, ClaimType, ProvenanceClass, ProvenanceResult,
     VerificationStatus, VerificationResult, LedgerEntry, RuntimeContext,
 )

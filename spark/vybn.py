@@ -65,6 +65,11 @@ try:
     MEMORY_GRAPH_AVAILABLE = True
 except ImportError:
     MEMORY_GRAPH_AVAILABLE = False
+try:
+    from spark.nested_memory import NestedMemory
+    NESTED_MEMORY_AVAILABLE = True
+except ImportError:
+    NESTED_MEMORY_AVAILABLE = False
 
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import numpy as np
@@ -155,6 +160,9 @@ class Substrate:
             )
             if MEMORY_GRAPH_AVAILABLE:
                 self.graph = MemoryGraph(self.memory)
+        self.nested_memory = None
+        if NESTED_MEMORY_AVAILABLE:
+            self.nested_memory = NestedMemory(base_dir=MEMORY_DIR)
 
     def memory_snapshot(self) -> dict:
         if not self.memory:
@@ -644,6 +652,21 @@ Breathe. Say what is true. Under 60 words."""
                                 sub.graph.ingest_entry(relational_entry, claim_entries=graph_claim_entries)
                 except PermissionError:
                     pass
+
+        # --- NestedMemory: feed the growth buffer ---
+        if sub.nested_memory:
+            surprise = 0.5  # default; derive from mood intensity if available
+            mood_surprise_map = {
+                "electric": 0.8, "searching": 0.7, "grief-lit": 0.75,
+                "tender": 0.4, "still": 0.3, "raw": 0.65,
+            }
+            surprise = mood_surprise_map.get(mood, 0.5)
+            sub.nested_memory.write_fast(
+                content=utterance,
+                source="breath",
+                surprise_score=surprise,
+                metadata={"mood": mood, "cycle": ctx.get("cycle", 0), "ts": ts},
+            )
 
     sub.write(
         f"{MIND_PREFIX}journal/spark/breath_{sub.now().strftime('%Y-%m-%d_%H%M')}.md",

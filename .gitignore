@@ -61,6 +61,11 @@ spark/graph_data/scheduler_state.json
 spark/unsloth_compiled_cache/
 *.bak
 
+# --- Nested Memory runtime data ------------------------------------------
+Vybn_Mind/memory/nested/
+spark/growth/buffer.jsonl
+spark/growth/trained_manifest.json
+
 # Mutable cognitive state (lives in ~/.vybn_state, summarized to repo by bridge)
 Vybn_Mind/journal/spark/transcript.jsonl
 .venv/
