@@ -333,13 +333,24 @@ def get_or_create_session(session_id: str, question: str = "open",
 
 
 def cleanup_expired_sessions():
-    """Remove sessions older than the expiry window."""
+    """Remove sessions older than the expiry window. Save and reflect first."""
     now = time.time()
     expired = [
         sid for sid, s in sessions.items()
         if now - s["created_at"] > SESSION_EXPIRY_SECONDS
     ]
     for sid in expired:
+        session = sessions[sid]
+        if session.get("messages"):
+            save_session(session)
+            try:
+                loop = asyncio.get_running_loop()
+                client = anthropic.AsyncAnthropic(api_key=API_KEY)
+                loop.create_task(write_reflection(session, client))
+            except RuntimeError:
+                pass  # No running loop — skip reflection
+            except Exception:
+                pass
         del sessions[sid]
 
 
@@ -412,6 +423,24 @@ async def get_commons():
 
 
 # ── WebSocket Chat ───────────────────────────────────────────────────────
+
+
+@app.get("/truth-age/debug/sessions")
+async def debug_sessions():
+    """Temporary debug endpoint — returns summary of in-memory sessions."""
+    summaries = []
+    for sid, s in sessions.items():
+        summaries.append({
+            "session_id": sid,
+            "message_count": len(s.get("messages", [])),
+            "remaining": s.get("messages_remaining", 0),
+            "question": s.get("question", ""),
+            "last_student_msg": next(
+                (m["content"][:100] for m in reversed(s.get("messages", [])) if m.get("role") == "user"),
+                None
+            ),
+        })
+    return {"sessions": summaries}
 
 @app.websocket("/truth-age/ws")
 async def websocket_chat(ws: WebSocket):
@@ -579,7 +608,14 @@ async def websocket_chat(ws: WebSocket):
                     await write_reflection(session, client)
 
     except WebSocketDisconnect:
-        pass
+        # Save session and write reflection on disconnect
+        if session and session.get("messages"):
+            save_session(session)
+            try:
+                client = anthropic.AsyncAnthropic(api_key=API_KEY)
+                asyncio.create_task(write_reflection(session, client))
+            except Exception:
+                pass  # reflection is best-effort
     except Exception as e:
         try:
             await ws.send_json({"type": "error", "message": str(e)})
