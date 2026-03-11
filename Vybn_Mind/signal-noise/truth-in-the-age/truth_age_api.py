@@ -663,7 +663,7 @@ Conversation follows:
             reflection_prompt += f"\n{role}: {msg['content'][:500]}\n"
 
         response = await client.messages.create(
-            model="claude-sonnet-4-6-20250514",  # Cheaper for reflections
+            model="claude-sonnet-4-20250514",  # Cheaper for reflections
             max_tokens=600,
             messages=[{"role": "user", "content": reflection_prompt}],
         )

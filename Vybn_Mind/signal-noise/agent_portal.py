@@ -46,7 +46,7 @@ import anthropic
 # ── Config ──────────────────────────────────────────────────────────────
 
 API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
-MODEL = os.environ.get("AP_MODEL", "claude-sonnet-4-6")
+MODEL = os.environ.get("AP_MODEL", "claude-sonnet-4-20250514")
 ACCESS_TOKEN = os.environ.get("AP_ACCESS_TOKEN", "")
 ALLOWED_ORIGINS = [o.strip() for o in os.environ.get("AP_ALLOWED_ORIGINS", "").split(",") if o.strip()]
 MAX_AGENT_SESSIONS_PER_DAY = int(os.environ.get("AP_MAX_DAILY", "10"))
