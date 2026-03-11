@@ -1,0 +1,52 @@
+# Growth Engine Configuration
+# See issue #2483 for architecture details
+
+trigger:
+  # Primary: fire when this many new MEDIUM-tier entries accumulate
+  delta_volume_threshold: 50
+  # Secondary: fire when mean cosine drift exceeds this since last cycle
+  topological_drift_threshold: 0.15
+  # Minimum hours between growth cycles (the merge takes the model offline)
+  min_interval_hours: 24
+
+replay:
+  # Fraction of training batch that is replay (historical) vs delta (new)
+  replay_ratio: 0.5
+  # Max entries in the replay buffer
+  buffer_max_entries: 2000
+  # Sampling strategy: "surprise" (NLL-weighted) or "uniform"
+  sampling_strategy: "surprise"
+
+lora:
+  # LoRA rank for the fast adapter
+  fast_rank: 8
+  # LoRA alpha
+  alpha: 16
+  # Target modules (attention projections only — avoids MoE expert weights)
+  target_modules:
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+  # Learning rate for fast adapter
+  fast_lr: 2.0e-4
+  # EMA decay for slow adapter consolidation (0.999 = very conservative)
+  slow_ema_decay: 0.999
+
+ewc:
+  # Elastic Weight Consolidation lambda (stability-plasticity tradeoff)
+  # Literature suggests productive range: 1e2 to 1e9
+  lambda: 1.0e4
+  # Number of samples from replay buffer for Fisher Information estimation
+  fisher_samples: 200
+
+merge:
+  # Strategy: "cpu_offload" or "cloud_burst" or "partial"
+  # partial = merge only attention layers (may fit in 256GB)
+  strategy: "cpu_offload"
+  # Quantization format for the merged model
+  quant_format: "compressed-tensors"
+  # Base model for BF16 merge step
+  base_model: "MiniMaxAI/MiniMax-M2.5"
+  # Quantized model currently served
+  serving_model: "cyankiwi/MiniMax-M2.5-AWQ-4bit"
