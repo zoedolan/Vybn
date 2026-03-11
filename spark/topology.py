@@ -60,47 +60,35 @@ DOT_OUT = SPARK_DIR / "graph_data" / "topology.dot"
 # Directories to scan (relative to repo root)
 SCAN_DIRS = ["spark", "Vybn_Mind", "applications", "tests"]
 
-
 # ---------------------------------------------------------------------------
-# Embedding backend — pplx-embed-v1-0.6B via sentence-transformers
+# ---------------------------------------------------------------------------
+# Embedding backend — all-MiniLM-L6-v2 on CPU via local_embedder.py
 # Falls back to keyword mode if not installed.
 # ---------------------------------------------------------------------------
 
-_EMBED_MODEL = None
 _EMBED_AVAILABLE = None
 
 
 def _load_embedder() -> bool:
-    """Lazy-load the embedding model. Returns True if available."""
-    global _EMBED_MODEL, _EMBED_AVAILABLE
+    """Check if local_embedder is importable."""
+    global _EMBED_AVAILABLE
     if _EMBED_AVAILABLE is not None:
         return _EMBED_AVAILABLE
     try:
-        from sentence_transformers import SentenceTransformer
-        _EMBED_MODEL = SentenceTransformer(
-            "perplexity-ai/pplx-embed-v1-0.6B",
-            trust_remote_code=True,
-        )
+        from local_embedder import embed as _test  # noqa: F401
         _EMBED_AVAILABLE = True
     except Exception as exc:
-        print(f"  ⚠ embedding model unavailable ({exc}); falling back to keywords")
+        print(f'  ⚠ local_embedder unavailable ({exc}); falling back to keywords')
         _EMBED_AVAILABLE = False
     return _EMBED_AVAILABLE
 
 
 def embed_texts(texts: list[str]) -> np.ndarray:
-    """Embed a list of texts. Returns (N, D) float32 array.
-
-    Uses pplx-embed-v1 if available, otherwise returns None so callers
-    can fall back to keyword mode.
-    """
+    """Embed a list of texts. Returns (N, D) float32 array, L2-normalised."""
     if not _load_embedder():
-        raise RuntimeError("Embedding model not available")
-    embeddings = _EMBED_MODEL.encode(texts)
-    # Normalize for cosine similarity
-    norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
-    norms = np.where(norms == 0, 1, norms)
-    return (embeddings / norms).astype(np.float32)
+        raise RuntimeError('Embedding model not available')
+    from local_embedder import embed
+    return embed(texts)
 
 
 # ---------------------------------------------------------------------------
