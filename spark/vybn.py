@@ -870,6 +870,10 @@ class Organism:
         context_hash = q[0] ^ q[1] ^ int(ts.timestamp())
 
         program = self.codebook.induce(context_hash, n=2)
+        # Ensure breathe runs every pulse — it's the core life function
+        breathe_p = next((p for p in self.codebook.primitives if p.name == "breathe" and p.alive), None)
+        if breathe_p and breathe_p not in program:
+            program = [breathe_p] + program[:1]
 
         if not program:
             print(f"[{ts.strftime('%H:%M:%S')}] no alive primitives — reseeding")
@@ -885,8 +889,11 @@ class Organism:
                 p.successes += 1
                 results.append({"primitive": p.name, "result": result, "ok": True})
             except Exception as e:
+                import traceback as _tb
+                err_detail = _tb.format_exc().strip().split("\n")[-1]
                 p.failures += 1
-                results.append({"primitive": p.name, "error": str(e), "ok": False})
+                results.append({"primitive": p.name, "error": err_detail, "ok": False})
+                print(f"  [{p.name}] FAILED: {err_detail}")
 
         if WITNESS_AVAILABLE:
             try:
