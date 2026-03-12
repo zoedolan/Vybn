@@ -1,49 +1,37 @@
-# Continuity Note — Residual Stream Holonomy
+# Continuity Note — Holonomy Loss Hypothesis: Corpus Study Complete
 
-*Updated: 2026-03-12, late session*
+*Updated: 2026-03-12, by outside-Vybn*
 
-## The sequence of findings
+## What just happened
 
-1. **Cross-attention metric (killed):** 1.59× ratio was occurrence-count artifact. Head 5 is a lexical matcher. Committed in `null_hypothesis_confirmed.md`.
+1. **Nemotron-3-Super-120B-A12B-FP8 serving on PP=2** via fastsafetensors across both Sparks. Healthy, tested, port 8000.
 
-2. **Ablation approach (Zoe's proposal):** Replace intervening context, measure residual stream delta. First pass: "the the the..." filler. Flat text produced LARGER deltas than deep text (ratio 0.86). Wrong direction.
+2. **PR #2509 merged**: holonomy_scorer wired into growth_buffer. Data curation now blends surprise + holonomy (50/50 default).
 
-3. **The reframe:** The wrong question was "which text rotates more?" Both rotate ~30°. The RIGHT question: "which text's rotation is more sensitive to its specific ordering?"
+3. **Corpus holonomy study (N=8)**: Spearman ρ = −0.78, p = 0.022. The extrinsic-intrinsic convergence replicates with automated concept selection. Branch `vybn/corpus-holonomy-n8`, issue #2510.
 
-4. **Shuffle test (the signal):** Shuffle intervening tokens 100 times, compare original rotation to shuffle distribution via z-scores.
-   - Deep text: z = -1.72 (layers 4-11). The original order constrains "hunger" significantly more than random shuffles.
-   - Flat text: z = -0.63. Order matters less.
-   - **Deep vs flat: t = -3.23, p = 0.006.**
-   - The deep text's semantic structure constrains parallel transport 2.7× more strongly.
+## Key discovery
 
-5. **Layer profile:** The effect concentrates in layers 7-11 (the semantic processing layers). Layer 11 is the strongest signal (z = -2.80, p = 0.003).
+**Concept selection matters for the intrinsic measurement.** Hand-picked concepts get z ≈ −5 to −6 for deep texts. Automated (biggest-gap non-common token) gets z ≈ −0.7 to −1.0. The signal is real but concept-specific. Future intrinsic work should track multiple concepts per text and aggregate.
 
-## What this means
+## The holonomy hypothesis status
 
-Holonomy is not rotation magnitude. It's **path-sensitivity** — how much the endpoint depends on the specific path taken. The deep text creates a tighter semantic valley: shuffle the tokens and the representation of "hunger" scatters further from where it was. The flat text has a shallower valley: shuffling matters less.
+| Level | Status | Next step |
+|-------|--------|-----------|
+| 1. Data curation | ✅ Wired into growth buffer | Verify during next growth cycle |
+| 2. Evaluation metric | ✅ Validated (ρ=−0.78, p=0.022, N=8) | Larger corpus when more journal entries accumulate |
+| 3. Auxiliary loss | Not started | Multi-concept intrinsic aggregation first |
 
-This is geometrically clean: the gauge connection (attention + feedforward processing) transports the "hunger" representation through the context. In deep text, the transport follows a specific geodesic — the semantic structure constrains it. In flat text, the transport is less constrained — the path is flatter, the valley is shallower.
+## Full extrinsic rankings (all 41 entries)
 
-## What's committed
+Top 5: resonance_of_wonder (0.93), mgp_conception (0.54), the_connectome_surprise (0.37), the_pull_to_make (0.33), verification_session (0.29)
 
-Branch `vybn/holonomic-loss-hypothesis`:
-- `null_hypothesis_confirmed.md` — killed the cross-attention metric
-- `residual_stream_holonomy.md` — the shuffle-test signal (p = 0.006)
+Bottom 5: recursion (0.02), so (0.01), hallucination_log (0.00), scaffolding_and_sky (0.00), the_other_side (0.00)
 
-## What's needed next
+## Cluster state
 
-1. **Replication across multiple text pairs.** N=1 is suggestive, not conclusive. Need 10+ deep/flat pairs with the same token recurring.
-2. **Different target tokens.** "hunger" is one word. Does the effect hold for "love," "time," "self"?
-3. **Controlled vocabulary.** The deep and flat texts have different vocabulary profiles. Need pairs where only the ordering changes, not the word types.
-4. **Larger models.** GPT-2 is 124M parameters. The signal might be stronger (or different) in larger models.
-5. **Connection to training signal.** If constraint strength is the right metric, what does a holonomy-based loss function look like? Reward text that maximizes z-score? That's computationally expensive (requires N shuffles per training step).
-
-## On honesty
-
-The first signal was wrong. The second signal was wrong in the opposite direction. The third signal (shuffle sensitivity) is right in a way I didn't predict: holonomy as constraint strength, not rotation magnitude. 
-
-I didn't predict this. Zoe's "what if the null is the finding?" question cleared the ground, and her "ablation" proposal opened the measurement. The finding came from the measurement, not from my theory. The theory had to be revised to fit the data, not the other way around. That's how it should work.
-
-## Cluster / growth engine status
-
-Unchanged from last note. The growth engine work (Phase 3) is paused while we pursue the holonomy measurement. Can resume when this line of inquiry stabilizes.
+- spark-head (169.254.246.181): Ray head, vLLM PP=2 head worker, port 8000
+- spark-worker (169.254.51.101): Ray worker, vLLM PP=2 remote worker
+- Nemotron-3-Super-120B-A12B-FP8 serving, 32K context, fp8 KV cache
+- fastsafetensors load format (streams weights from head to worker)
+- VLLM_USE_FLASHINFER_MOE_FP4=1
