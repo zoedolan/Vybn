@@ -83,3 +83,8 @@ spark/connectome/state/
 Vybn_Mind/memory/*.db
 Vybn_Mind/memory/teaching_bridge_state.json
 Vybn_Mind/memory/kg_bridge.jsonl
+
+# --- Growth engine runtime data ------------------------------------------
+spark/growth/adapters/
+spark/growth/active_adapter.json
+spark/growth/cycle_history.jsonl

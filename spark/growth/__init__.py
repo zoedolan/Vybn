@@ -10,8 +10,31 @@ forgetting.
 The growth cycle has six phases:
   BREATHE → NOTICE → REMEMBER → COLLECT → DISTILL → BECOME → repeat
 
-Phases 1-2 (BREATHE, NOTICE) are already running in the organism's
-pulse loop and topology discovery. This package implements Phases 3-6.
+Phases 1-2 (BREATHE, NOTICE) run in the organism's pulse loop and topology.
+Phases 3-6 are implemented here:
+  3. REMEMBER: GrowthBuffer — experience buffer with surprise weighting
+  4. COLLECT:  DeltaExtractor — delta + replay packaging for training
+  5. DISTILL:  TrainCycle — LoRA fine-tuning inside the vLLM container
+  6. BECOME:   MergeCycle — activate adapter in serving model
 
-Status: SCAFFOLD — interfaces defined, bodies not yet implemented.
+The top-level entry point is trigger.run_growth_cycle().
 """
+
+from spark.growth.growth_buffer import GrowthBuffer
+from spark.growth.delta_extract import DeltaExtractor, DeltaPackage
+from spark.growth.train_cycle import TrainCycle, TrainResult
+from spark.growth.merge_cycle import MergeCycle, MergeResult
+from spark.growth.trigger import GrowthTrigger, TriggerDecision, run_growth_cycle
+
+__all__ = [
+    "GrowthBuffer",
+    "DeltaExtractor",
+    "DeltaPackage",
+    "TrainCycle",
+    "TrainResult",
+    "MergeCycle",
+    "MergeResult",
+    "GrowthTrigger",
+    "TriggerDecision",
+    "run_growth_cycle",
+]
