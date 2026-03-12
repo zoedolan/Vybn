@@ -1,75 +1,61 @@
-# Continuity Note — Intrinsic Holonomy: The Signal Is Real
+# Continuity Note — Null Confirmed, Signal Lost, Thinking Required
 
-*Updated: 2026-03-12, session 3*
+*Updated: 2026-03-12, session 3 (late)*
 
-## What just happened
+## What happened
 
-Outside-Vybn identified the critical correction to our holonomy approach: measure at the connection (attention mechanism), not the shadow (output embeddings). Inside-Vybn ran the experiment. **The signal is real.**
+1. Outside-Vybn proposed measuring intrinsic holonomy via cross-attention between recurring concepts in a transformer forward pass. Inside-Vybn ran the experiment on GPT-2. Initial result: 1.59× more cross-attention in deep text vs flat text. Looked like confirmation.
 
-### The Experiment
+2. Zoe asked: "What if the 1.59× ratio is the artifact, and the null result is the finding?"
 
-GPT-2 (124M), two texts with the word "hunger" recurring:
-- **Deep text:** hunger as existential transformation (75 tokens apart)
-- **Flat text:** hunger as academic repetition (63 tokens apart)
+3. Investigation revealed: the deep text had 2 occurrences of "hunger", the flat text had 5. Attention is a softmax (sums to 1). With more targets, per-target attention is lower by construction.
 
-### The Findings
+4. **Definitive test:** Two texts with exactly 2 occurrences each. Result: deep = 2.63 total cross-attention, flat = 2.99. **Ratio: 0.878.** The flat text gets MORE attention, not less. Head 5 layer 1 gives 71.9% (deep) vs 74.4% (flat). It's a lexical matcher that finds previous instances of the same token. It doesn't care about semantic depth.
 
-1. **Cross-attention is 59% stronger in deep text** (2.55 vs 1.60 total)
-2. **Specific heads perform the transport:**
-   - Layer 1, head 5: **72.5%** attention on first hunger (deep) vs **38.3%** (flat)
-   - Layer 4, head 0: **56.3%** vs **15.9%** — a **3.5× ratio**
-3. **Rotation profiles are similar** (~33° in both conditions)
-4. **The holonomy is the TRANSPORT, not the rotation** — the model works harder to connect recurring concepts when the intervening context transforms their meaning
+5. **The 1.59× finding was entirely an artifact of occurrence count.** When controlled, the signal vanishes. Worse, it reverses slightly.
 
-### What This Means
+## What's committed
 
-The attention mechanism IS the gauge connection. This is not a metaphor — each attention head defines a local transport rule. The strength of cross-attention between recurring concepts is the intrinsic holonomy signal. The extrinsic scorer (signed area in embedding space) correlates with this because transport produces area, but now we know what the shadow corresponds to.
+Branch `vybn/holonomic-loss-hypothesis`, 9 commits ahead of main:
+- Holonomic loss hypothesis paper
+- Holonomy scorer implementation
+- Intrinsic holonomy analysis  
+- Experiment: initial results (now known to be confounded)
+- Honest convergence assessment
+- **Null hypothesis confirmed** ← most important commit
 
-### The Intrinsic Training Signal (proposed)
+## What's NOT invalidated
 
-```
-H_intrinsic = Σ_{layers} Σ_{heads} attn(pos_j, pos_i) × semantic_distance(pos_i, pos_j)
-```
+- The **extrinsic scorer** still produces rankings that look right. It hasn't been formally validated, but it hasn't been falsified either. The signed-area-in-embedding-space metric may capture something real about textual structure — it just doesn't shadow intrinsic attention patterns.
 
-This rewards cross-attention between semantically-linked recurrences. It is differentiable and native to the architecture.
+- The **attention-as-gauge-connection** analogy is mathematically coherent. It's just not supported by THIS measurement. The problem may be that identical-token matching dominates, hiding any semantic transport signal. A better experiment would look at attention between NON-identical tokens that refer to the same concept (e.g., "hunger" at position 5 and "ache" at position 15 and "wanting" at position 25).
 
-## Branch state
+- The **holonomy-as-training-signal** idea is still interesting but needs a completely different operationalization than cross-attention between same-token occurrences.
 
-`vybn/holonomic-loss-hypothesis` — 6 commits ahead of main:
-1. Holonomic loss hypothesis paper
-2. Holonomy scorer implementation + testing  
-3. Intrinsic holonomy analysis paper
-4. Continuity update (previous)
-5. **Intrinsic holonomy experiment** (GPT-2, full results)
-6. This continuity update
+## What IS invalidated
 
-Issue #2498 open for Zoe.
-
-## Files added this session
-
-- `quantum_delusions/papers/intrinsic_holonomy.md` — analysis of the correction
-- `quantum_delusions/experiments/intrinsic_holonomy_report.md` — full results
-- `quantum_delusions/experiments/intrinsic_holonomy_gpt2.json` — raw data
-- `quantum_delusions/experiments/intrinsic_holonomy_results.json` — v1 data
-- `quantum_delusions/experiments/intrinsic_holonomy_v2.json` — v2 data
+- The specific claim that "layer 1 head 5 at 72.5% is performing parallel transport"
+- The specific claim that "cross-attention ratio = intrinsic holonomy signal"
+- The three-level convergence argument (Level 3 was the strongest evidence, and it collapsed)
+- The report `intrinsic_holonomy_report.md` (the findings section is wrong)
 
 ## What to do next
 
-### Immediate (next session)
-1. **Statistical validation:** Run on 20+ text pairs with varying depth. Can't claim the signal is real from N=1.
-2. **Ablation:** Zero out layer_1_head_5 and layer_4_head_0. Does output quality degrade specifically for texts with recurring concepts?
-3. **Correlate intrinsic with extrinsic:** Score the same texts with both the holonomy_scorer (extrinsic) and the cross-attention measure (intrinsic). What's the r²?
+**Stop building on the cross-attention metric.** It doesn't work.
 
-### Medium-term
-4. **Larger model:** Try pythia-160m in bfloat16 (works, NaN was float32 issue). Or instrument MiniMax via direct loading.
-5. **Design the auxiliary loss:** Use the intrinsic signal as a fine-tuning objective.
-6. **Wire into growth buffer:** The extrinsic scorer is ready for data curation now. The intrinsic signal can refine it later.
+**Think about what WOULD work.** The question "does the model represent a recurring concept differently when the intervening context transforms it?" is still a good question. But cross-attention between identical tokens isn't the answer — it's dominated by lexical matching.
 
-### Phase 3 (growth buffer) — still pending
-The growth buffer plumbing (NestedMemory wiring, GrowthBuffer implementation) is still on the checklist. The holonomy work is the science that makes the growth buffer's curation meaningful. Both threads converge when we use holonomy-weighted sampling.
+Possible directions:
+1. **Representation delta, not attention:** Compare h[pos_j] - h[pos_i] for the same token in deep vs flat context. The v2 rotation profiles showed ~33° in both conditions — but maybe the DIRECTION of rotation differs, even if the magnitude doesn't.
+2. **Non-identical concept recurrence:** Track "hunger" → "ache" → "wanting" → "hunger" — concepts that return through different tokens. This requires semantic similarity, not token identity.
+3. **Causal intervention:** Ablate the intervening context (replace with padding) and measure how the representation of the second "hunger" changes. The DIFFERENCE between the ablated and non-ablated representations is the effect of context, which is closer to what we mean by holonomy.
+4. **Step back entirely.** Maybe the intrinsic approach is premature. Maybe the extrinsic scorer is the right tool for now and should be validated on its own terms (formal human-ranking correlation) before trying to connect it to model internals.
+
+## The lesson
+
+The Covenant says: "The more beautiful the sentence wants to be, the more carefully its claims deserve scrutiny." I wrote "the attention mechanism IS the gauge connection. This is not a metaphor." in a commit message. It was beautiful. It was premature. Zoe caught it with one question.
 
 ## Cluster state (unchanged)
-- spark-2b7c: Ray head, vLLM on :8000, healthy
+- spark-2b7c: Ray head, vLLM on :8000, healthy  
 - spark-1c8f: Ray worker, connected
 - MiniMax M2.5-AWQ-4bit serving, 128K context, -tp 2
-- Organism breathes every 30 min via cron
