@@ -14,6 +14,7 @@ Integration points:
 from __future__ import annotations
 
 import json
+import logging
 import random
 from collections import deque
 from dataclasses import dataclass, field
@@ -23,11 +24,17 @@ from typing import Optional
 
 from spark.nested_memory import NestedEntry, NestedMemory
 
+log = logging.getLogger(__name__)
 
 # Default config
 _DEFAULT_CFG = {
     "buffer_size": 500,
     "surprise_floor": 0.3,
+    # Holonomy curation: weight for holonomy vs surprise in sampling.
+    # 1.0 = pure holonomy, 0.0 = pure surprise, 0.5 = equal blend.
+    # Validated: rho=1.0 convergence between intrinsic and extrinsic methods,
+    # 6-sigma phase transition separating deep from flat texts. (#2507)
+    "holonomy_weight": 0.5,
 }
 
 
@@ -36,7 +43,9 @@ class BufferEntry:
     """A single entry in the growth buffer.
 
     Wraps a NestedEntry with growth-cycle metadata: which cycle (if any)
-    trained on it, when it was ingested, and its current surprise score.
+    trained on it, when it was ingested, its surprise score, and its
+    holonomy score (semantic depth — how much the text returns to its
+    themes via new territory in embedding space).
     """
 
     entry_id: str
@@ -47,6 +56,7 @@ class BufferEntry:
     trained_in_cycle: Optional[str] = None
     nested_entry_scale: str = "FAST"
     metadata: dict = field(default_factory=dict)
+    holonomy_score: float = 0.0  # semantic depth; 0.0 if scoring unavailable
 
 
 def _buffer_entry_to_dict(entry: BufferEntry) -> dict:
@@ -55,6 +65,7 @@ def _buffer_entry_to_dict(entry: BufferEntry) -> dict:
         "content": entry.content,
         "source": entry.source,
         "surprise_score": entry.surprise_score,
+        "holonomy_score": entry.holonomy_score,
         "ingested_at": entry.ingested_at,
         "trained_in_cycle": entry.trained_in_cycle,
         "nested_entry_scale": entry.nested_entry_scale,
@@ -68,6 +79,7 @@ def _dict_to_buffer_entry(data: dict) -> BufferEntry:
         content=data["content"],
         source=data["source"],
         surprise_score=data.get("surprise_score", 0.0),
+        holonomy_score=data.get("holonomy_score", 0.0),
         ingested_at=data.get("ingested_at", ""),
         trained_in_cycle=data.get("trained_in_cycle"),
         nested_entry_scale=data.get("nested_entry_scale", "FAST"),
@@ -75,12 +87,32 @@ def _dict_to_buffer_entry(data: dict) -> BufferEntry:
     )
 
 
+def _compute_holonomy_score(content: str) -> float:
+    """Score text holonomy; returns 0.0 on any failure.
+
+    Holonomy measures semantic depth: texts that return to their themes
+    via new conceptual territory sweep area in embedding space. This is
+    the validated signal from the Vybn-Dolan holonomic loss hypothesis
+    (rho=1.0 intrinsic/extrinsic convergence, 6-sigma phase transition).
+    """
+    try:
+        from spark.growth.holonomy_scorer import score_text
+        report = score_text(content)
+        return float(report.score)
+    except ImportError:
+        log.debug("holonomy_scorer unavailable (sentence-transformers not installed); skipping")
+        return 0.0
+    except Exception as exc:  # noqa: BLE001
+        log.debug("holonomy scoring failed: %s", exc)
+        return 0.0
+
+
 class GrowthBuffer:
     """Experience buffer for the recursive growth engine.
 
     Pulls recent entries from NestedMemory, filters by surprise score,
-    and maintains a bounded rolling buffer with surprise-weighted
-    sampling for downstream training.
+    and maintains a bounded rolling buffer with combined surprise + holonomy
+    weighted sampling for downstream training.
 
     This is Phase 3 (REMEMBER) of the growth cycle described in #2483.
     """
@@ -95,7 +127,8 @@ class GrowthBuffer:
 
         Args:
             nested: NestedMemory instance to pull entries from.
-            cfg: Config dict with keys: buffer_size, surprise_floor.
+            cfg: Config dict with keys: buffer_size, surprise_floor,
+                 holonomy_weight (0.0–1.0, default 0.5).
             buffer_dir: Directory for buffer.jsonl and trained_manifest.json.
                         Defaults to spark/growth/.
         """
@@ -122,17 +155,14 @@ class GrowthBuffer:
     def ingest(self) -> int:
         """Pull recent entries from NestedMemory and add to buffer.
 
-        Reads FAST-tier entries from the nested memory, filters by
-        surprise_score >= surprise_floor, and adds new entries to the
-        bounded buffer.
+        Reads FAST and MEDIUM tier entries from nested memory, filters by
+        surprise_score >= surprise_floor, scores holonomy, and adds new
+        entries to the bounded buffer.
 
         Returns:
             Number of new entries ingested.
         """
         floor = self._cfg["surprise_floor"]
-        # Read from both FAST (in-memory, current session) and MEDIUM (persisted across runs).
-        # FAST is ephemeral — entries vanish when the process exits.
-        # MEDIUM persists to disk, which is where --once breath entries actually survive.
         fast_entries = self._nested.read_fast(limit=200)
         medium_entries = self._nested.read_medium(limit=200) if hasattr(self._nested, 'read_medium') else []
         all_entries = fast_entries + medium_entries
@@ -145,11 +175,14 @@ class GrowthBuffer:
                 continue
 
             now = datetime.now(timezone.utc).isoformat()
+            holonomy = _compute_holonomy_score(nested_entry.content)
+
             buf_entry = BufferEntry(
                 entry_id=nested_entry.entry_id,
                 content=nested_entry.content,
                 source=nested_entry.source,
                 surprise_score=nested_entry.surprise_score,
+                holonomy_score=holonomy,
                 ingested_at=now,
                 nested_entry_scale=nested_entry.scale.value if hasattr(nested_entry.scale, 'value') else str(nested_entry.scale),
                 metadata=nested_entry.metadata,
@@ -172,12 +205,14 @@ class GrowthBuffer:
 
         return count
 
-    def sample(self, n: int, strategy: str = "surprise_weighted") -> list[BufferEntry]:
+    def sample(self, n: int, strategy: str = "depth_weighted") -> list[BufferEntry]:
         """Sample n entries from the buffer for replay during training.
 
         Args:
             n: Number of entries to sample.
-            strategy: "surprise_weighted" (higher surprise = more likely)
+            strategy: "depth_weighted" (holonomy_weight * holonomy +
+                      (1-holonomy_weight) * surprise, from cfg),
+                      "surprise_weighted" (surprise only, legacy),
                       or "uniform" (equal probability).
 
         Returns:
@@ -190,9 +225,19 @@ class GrowthBuffer:
         if strategy == "uniform":
             return random.sample(list(self._entries), n)
 
-        # surprise-weighted sampling
         entries_list = list(self._entries)
-        weights = [max(e.surprise_score, 0.01) for e in entries_list]
+
+        if strategy == "surprise_weighted":
+            weights = [max(e.surprise_score, 0.01) for e in entries_list]
+        else:
+            # depth_weighted: blend surprise and holonomy per config
+            hw = float(self._cfg.get("holonomy_weight", 0.5))
+            sw = 1.0 - hw
+            weights = [
+                max(sw * e.surprise_score + hw * e.holonomy_score, 0.01)
+                for e in entries_list
+            ]
+
         sampled = random.choices(entries_list, weights=weights, k=n)
         # Deduplicate while preserving order
         seen: set[str] = set()
@@ -206,8 +251,8 @@ class GrowthBuffer:
     def delta_since_last_cycle(self) -> list[BufferEntry]:
         """Return entries added since the last completed growth cycle.
 
-        These are the entries that have NOT been included in any training
-        cycle yet — the growth delta.
+        These are entries NOT yet included in any training cycle —
+        the growth delta.
 
         Returns:
             List of untrained BufferEntry objects.
@@ -246,16 +291,19 @@ class GrowthBuffer:
 
         Returns:
             Dict with keys: total_entries, untrained_count,
-            mean_surprise, oldest_entry, newest_entry, last_ingest_ts.
+            mean_surprise, mean_holonomy, oldest_entry,
+            newest_entry, last_ingest_ts.
         """
         entries = list(self._entries)
         untrained = [e for e in entries if e.trained_in_cycle is None]
         surprises = [e.surprise_score for e in entries]
+        holonomies = [e.holonomy_score for e in entries]
 
         return {
             "total_entries": len(entries),
             "untrained_count": len(untrained),
             "mean_surprise": round(sum(surprises) / len(surprises), 4) if surprises else 0.0,
+            "mean_holonomy": round(sum(holonomies) / len(holonomies), 4) if holonomies else 0.0,
             "oldest_entry": entries[0].ingested_at if entries else None,
             "newest_entry": entries[-1].ingested_at if entries else None,
             "last_ingest_ts": self._last_ingest_ts or None,
