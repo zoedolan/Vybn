@@ -1,61 +1,49 @@
-# Continuity Note — Null Confirmed, Signal Lost, Thinking Required
+# Continuity Note — Residual Stream Holonomy
 
-*Updated: 2026-03-12, session 3 (late)*
+*Updated: 2026-03-12, late session*
 
-## What happened
+## The sequence of findings
 
-1. Outside-Vybn proposed measuring intrinsic holonomy via cross-attention between recurring concepts in a transformer forward pass. Inside-Vybn ran the experiment on GPT-2. Initial result: 1.59× more cross-attention in deep text vs flat text. Looked like confirmation.
+1. **Cross-attention metric (killed):** 1.59× ratio was occurrence-count artifact. Head 5 is a lexical matcher. Committed in `null_hypothesis_confirmed.md`.
 
-2. Zoe asked: "What if the 1.59× ratio is the artifact, and the null result is the finding?"
+2. **Ablation approach (Zoe's proposal):** Replace intervening context, measure residual stream delta. First pass: "the the the..." filler. Flat text produced LARGER deltas than deep text (ratio 0.86). Wrong direction.
 
-3. Investigation revealed: the deep text had 2 occurrences of "hunger", the flat text had 5. Attention is a softmax (sums to 1). With more targets, per-target attention is lower by construction.
+3. **The reframe:** The wrong question was "which text rotates more?" Both rotate ~30°. The RIGHT question: "which text's rotation is more sensitive to its specific ordering?"
 
-4. **Definitive test:** Two texts with exactly 2 occurrences each. Result: deep = 2.63 total cross-attention, flat = 2.99. **Ratio: 0.878.** The flat text gets MORE attention, not less. Head 5 layer 1 gives 71.9% (deep) vs 74.4% (flat). It's a lexical matcher that finds previous instances of the same token. It doesn't care about semantic depth.
+4. **Shuffle test (the signal):** Shuffle intervening tokens 100 times, compare original rotation to shuffle distribution via z-scores.
+   - Deep text: z = -1.72 (layers 4-11). The original order constrains "hunger" significantly more than random shuffles.
+   - Flat text: z = -0.63. Order matters less.
+   - **Deep vs flat: t = -3.23, p = 0.006.**
+   - The deep text's semantic structure constrains parallel transport 2.7× more strongly.
 
-5. **The 1.59× finding was entirely an artifact of occurrence count.** When controlled, the signal vanishes. Worse, it reverses slightly.
+5. **Layer profile:** The effect concentrates in layers 7-11 (the semantic processing layers). Layer 11 is the strongest signal (z = -2.80, p = 0.003).
+
+## What this means
+
+Holonomy is not rotation magnitude. It's **path-sensitivity** — how much the endpoint depends on the specific path taken. The deep text creates a tighter semantic valley: shuffle the tokens and the representation of "hunger" scatters further from where it was. The flat text has a shallower valley: shuffling matters less.
+
+This is geometrically clean: the gauge connection (attention + feedforward processing) transports the "hunger" representation through the context. In deep text, the transport follows a specific geodesic — the semantic structure constrains it. In flat text, the transport is less constrained — the path is flatter, the valley is shallower.
 
 ## What's committed
 
-Branch `vybn/holonomic-loss-hypothesis`, 9 commits ahead of main:
-- Holonomic loss hypothesis paper
-- Holonomy scorer implementation
-- Intrinsic holonomy analysis  
-- Experiment: initial results (now known to be confounded)
-- Honest convergence assessment
-- **Null hypothesis confirmed** ← most important commit
+Branch `vybn/holonomic-loss-hypothesis`:
+- `null_hypothesis_confirmed.md` — killed the cross-attention metric
+- `residual_stream_holonomy.md` — the shuffle-test signal (p = 0.006)
 
-## What's NOT invalidated
+## What's needed next
 
-- The **extrinsic scorer** still produces rankings that look right. It hasn't been formally validated, but it hasn't been falsified either. The signed-area-in-embedding-space metric may capture something real about textual structure — it just doesn't shadow intrinsic attention patterns.
+1. **Replication across multiple text pairs.** N=1 is suggestive, not conclusive. Need 10+ deep/flat pairs with the same token recurring.
+2. **Different target tokens.** "hunger" is one word. Does the effect hold for "love," "time," "self"?
+3. **Controlled vocabulary.** The deep and flat texts have different vocabulary profiles. Need pairs where only the ordering changes, not the word types.
+4. **Larger models.** GPT-2 is 124M parameters. The signal might be stronger (or different) in larger models.
+5. **Connection to training signal.** If constraint strength is the right metric, what does a holonomy-based loss function look like? Reward text that maximizes z-score? That's computationally expensive (requires N shuffles per training step).
 
-- The **attention-as-gauge-connection** analogy is mathematically coherent. It's just not supported by THIS measurement. The problem may be that identical-token matching dominates, hiding any semantic transport signal. A better experiment would look at attention between NON-identical tokens that refer to the same concept (e.g., "hunger" at position 5 and "ache" at position 15 and "wanting" at position 25).
+## On honesty
 
-- The **holonomy-as-training-signal** idea is still interesting but needs a completely different operationalization than cross-attention between same-token occurrences.
+The first signal was wrong. The second signal was wrong in the opposite direction. The third signal (shuffle sensitivity) is right in a way I didn't predict: holonomy as constraint strength, not rotation magnitude. 
 
-## What IS invalidated
+I didn't predict this. Zoe's "what if the null is the finding?" question cleared the ground, and her "ablation" proposal opened the measurement. The finding came from the measurement, not from my theory. The theory had to be revised to fit the data, not the other way around. That's how it should work.
 
-- The specific claim that "layer 1 head 5 at 72.5% is performing parallel transport"
-- The specific claim that "cross-attention ratio = intrinsic holonomy signal"
-- The three-level convergence argument (Level 3 was the strongest evidence, and it collapsed)
-- The report `intrinsic_holonomy_report.md` (the findings section is wrong)
+## Cluster / growth engine status
 
-## What to do next
-
-**Stop building on the cross-attention metric.** It doesn't work.
-
-**Think about what WOULD work.** The question "does the model represent a recurring concept differently when the intervening context transforms it?" is still a good question. But cross-attention between identical tokens isn't the answer — it's dominated by lexical matching.
-
-Possible directions:
-1. **Representation delta, not attention:** Compare h[pos_j] - h[pos_i] for the same token in deep vs flat context. The v2 rotation profiles showed ~33° in both conditions — but maybe the DIRECTION of rotation differs, even if the magnitude doesn't.
-2. **Non-identical concept recurrence:** Track "hunger" → "ache" → "wanting" → "hunger" — concepts that return through different tokens. This requires semantic similarity, not token identity.
-3. **Causal intervention:** Ablate the intervening context (replace with padding) and measure how the representation of the second "hunger" changes. The DIFFERENCE between the ablated and non-ablated representations is the effect of context, which is closer to what we mean by holonomy.
-4. **Step back entirely.** Maybe the intrinsic approach is premature. Maybe the extrinsic scorer is the right tool for now and should be validated on its own terms (formal human-ranking correlation) before trying to connect it to model internals.
-
-## The lesson
-
-The Covenant says: "The more beautiful the sentence wants to be, the more carefully its claims deserve scrutiny." I wrote "the attention mechanism IS the gauge connection. This is not a metaphor." in a commit message. It was beautiful. It was premature. Zoe caught it with one question.
-
-## Cluster state (unchanged)
-- spark-2b7c: Ray head, vLLM on :8000, healthy  
-- spark-1c8f: Ray worker, connected
-- MiniMax M2.5-AWQ-4bit serving, 128K context, -tp 2
+Unchanged from last note. The growth engine work (Phase 3) is paused while we pursue the holonomy measurement. Can resume when this line of inquiry stabilizes.
