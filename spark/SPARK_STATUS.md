@@ -22,19 +22,19 @@ doing anything else.*
 
 ## Network
 
-- **Tailscale mesh**: spark-2b7c (`<TAILSCALE_IP_SPARK>`), zll/Windows (`<TAILSCALE_IP_ZLL>`), zoes-a53/Android (`<TAILSCALE_IP_PHONE>`)
+- **Tailscale mesh**: spark-2b7c (`<TAILSCALE_IP_SPARK>`), workstation (`<TAILSCALE_IP_WORKSTATION>`), mobile (`<TAILSCALE_IP_MOBILE>`)
 - **Tailscale Funnel**: HTTPS on `<TAILSCALE_FUNNEL_HOST>`
 - **No open ports to the public internet** — all access through Tailscale or Funnel
 
 ## What's Running on spark-2b7c
 
-| Service | PID | Port | Notes |
-|---------|-----|------|-------|
-| **llama-server** (MiniMax M2.5) | 1587237 | 8000 (all interfaces) | IQ4_XS, ctx=4096, flash-attn, q4_0 KV cache |
-| **chat_server.py** | 1117532 | 8443 (localhost + Tailscale) | WebSocket chat interface |
-| **voice_server.py** | 715897 | 8150 (localhost + Tailscale) | Kokoro TTS |
-| **gateway.py** | 1177378 | 8090 (all interfaces) | Signal-noise API gateway |
-| **Open WebUI** (Docker) | — | 3000 (localhost only) | `ghcr.io/open-webui/open-webui:main` |
+| Service | Port | Notes |
+|---------|------|-------|
+| **llama-server** (MiniMax M2.5) | 8000 (all interfaces) | IQ4_XS, ctx=4096, flash-attn, q4_0 KV cache |
+| **chat_server.py** | 8443 (localhost + Tailscale) | WebSocket chat interface |
+| **voice_server.py** | 8150 (localhost + Tailscale) | Kokoro TTS |
+| **gateway.py** | 8090 (all interfaces) | Signal-noise API gateway. **Intentionally bound to 0.0.0.0 — access is Tailscale-gated. If network posture changes, revisit this binding.** |
+| **Open WebUI** (Docker) | 3000 (localhost only) | `ghcr.io/open-webui/open-webui:main` |
 
 ## What's Running on spark-1c8f
 
@@ -150,38 +150,38 @@ Almost none — the growth engine is model-agnostic by design:
 
 ```
                      Zoe (Tailscale mesh)
-                      │
-          ┌───────────┼────────────┐
-          │           │            │
+                      |
+          +-----------+------------+
+          |           |            |
      chat_server  voice_server  Open WebUI
      (8443/wss)   (8150/http)   (3000/http)
-          │           │            │
-          └───────────┼────────────┘
-                      │
-              ┌───────┴───────┐
-              │  llama-server │  ← currently MiniMax M2.5 via llama.cpp
-              │  (port 8000)  │  ← will become vLLM + Nemotron-3-Super
-              └───────┬───────┘
-                      │
-         spark-2b7c ──┤── spark-1c8f (idle, 101GB free)
-         (primary)    │   (secondary, LAN: <LAN_IP>)
-                      │
-              ┌───────┴───────┐
-              │   Organism    │  vybn.py — breathes every 30 min
-              │   (cron)      │  writes to MemoryFabric + NestedMemory
-              └───────┬───────┘
-                      │
-         ┌────────────┼────────────┐
-         │            │            │
+          |           |            |
+          +-----------+------------+
+                      |
+              +-------+-------+
+              |  llama-server |  <- currently MiniMax M2.5 via llama.cpp
+              |  (port 8000)  |  <- will become vLLM + Nemotron-3-Super
+              +-------+-------+
+                      |
+         spark-2b7c --+-- spark-1c8f (idle, 101GB free)
+         (primary)    |   (secondary, LAN: <LAN_IP>)
+                      |
+              +-------+-------+
+              |   Organism    |  vybn.py -- breathes every 30 min
+              |   (cron)      |  writes to MemoryFabric + NestedMemory
+              +-------+-------+
+                      |
+         +------------+------------+
+         |            |            |
     MemoryFabric  NestedMemory  Topology
     (SQLite)      (3-tier)      (semantic)
-         │            │            │
-         └────────────┼────────────┘
-                      │
-              ┌───────┴───────┐
-              │ Growth Engine │  BREATHE → NOTICE → REMEMBER →
-              │ (spark/growth)│  COLLECT → DISTILL → BECOME
-              └───────────────┘
+         |            |            |
+         +------------+------------+
+                      |
+              +-------+-------+
+              | Growth Engine |  BREATHE -> NOTICE -> REMEMBER ->
+              | (spark/growth)|  COLLECT -> DISTILL -> BECOME
+              +---------------+
 ```
 
 ## Growth Engine Status
@@ -190,13 +190,13 @@ Almost none — the growth engine is model-agnostic by design:
 - **Phase 3** (REMEMBER): `growth_buffer.py` scaffolded, partially implemented
   - **Critical gap**: organism writes to MemoryFabric but NOT to NestedMemory — growth buffer reads from NestedMemory, which is empty
   - Fix: wire `nested_memory.write_fast()` into organism's breathe cycle
-  - Also: fix `self_model.py` import bug (bare `from self_model_types` → `from spark.self_model_types`)
+  - Also: fix `self_model.py` import bug (bare `from self_model_types` -> `from spark.self_model_types`)
 - **Phases 4-6** (COLLECT, DISTILL, BECOME): Scaffolded, all `NotImplementedError`
 
 ## Recent Experiments
 
 ### Corpus Holonomy (2026-03-12)
-N=8 replication of extrinsic-intrinsic holonomy convergence. Spearman ρ = −0.78, p = 0.022. Texts with high semantic loop area in embedding space (extrinsic holonomy) show stronger path-ordering constraints in GPT-2 hidden states (intrinsic holonomy). Papers and results in `quantum_delusions/papers/`.
+N=8 replication of extrinsic-intrinsic holonomy convergence. Spearman rho = -0.78, p = 0.022. Texts with high semantic loop area in embedding space (extrinsic holonomy) show stronger path-ordering constraints in GPT-2 hidden states (intrinsic holonomy). Papers and results in `quantum_delusions/papers/`.
 
 ---
 
@@ -208,7 +208,7 @@ N=8 replication of extrinsic-intrinsic holonomy convergence. Spearman ρ = −0.
 | 2026-03-10 | Chat server, voice server stable. Signal-noise API gateway deployed. |
 | 2026-03-11 | Growth engine scaffold merged (#2483, #2485). Teaching bridge cron added. |
 | 2026-03-12 05:00 | Nemotron-3-Super deployment attempted (FP8, PP=2 via vLLM Docker). Stopped at 07:14. |
-| 2026-03-12 07:02 | Corpus holonomy N=8 replication completed (ρ = −0.78, p = 0.022). |
+| 2026-03-12 07:02 | Corpus holonomy N=8 replication completed (rho = -0.78, p = 0.022). |
 | 2026-03-12 13:20 | This document created by outside-Vybn (Claude Opus). |
 
 ---
