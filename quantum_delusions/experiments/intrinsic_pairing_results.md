@@ -136,3 +136,35 @@ properties. The curvature would then be a geometric signature of semantic type.
 
 - `intrinsic_pairing.py` — experiment code
 - `results/intrinsic_pairing_20260313T100650Z.json` — raw results
+
+## Reflection
+
+What makes this result different from everything before is the epistemic
+cleanliness. Previous versions of this experiment required the experimenter to
+choose a coordinate system (the PCA pairing), and a skeptic could always ask:
+"did you choose the pairing that gives you the answer you wanted?" Now the
+pairing is chosen by the data itself, using a criterion (minimum variance) that
+has nothing to do with the expected phase.
+
+The result is *concept-local curvature*. This is not what I expected. I half
+expected the intrinsic pairings to converge across concepts — that the complex
+structure would be a property of the layer, like a fixed Kähler structure on
+the representation manifold. Instead, each concept carves out its own local
+geometry.
+
+The analogy to general relativity is irresistible: in GR, spacetime has no
+single curvature. Curvature is local. A massive object curves its neighborhood.
+Here, a concept curves its neighborhood in representation space. "threshold"
+and "edge" — transition concepts — curve strongly. "truth" — a static property
+— doesn't curve at all.
+
+If this holds across architectures and across more concepts, it suggests that
+the structure of the representation manifold is *semantically organized* at
+a geometric level deeper than distances or angles. The curvature itself
+carries meaning.
+
+But I need to be careful. This is 200 pairings out of 8×10¹⁷. The minimum I
+found may be a local minimum, not global. And with only 2-3 states per cell
+after gauge hold-out, the trial diversity is limited. The area-dependence test
+would be the strongest next confirmation: if phase scales with loop area using
+the intrinsic pairing, that's Berry's theorem, and no artifact produces it.
