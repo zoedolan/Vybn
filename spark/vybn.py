@@ -704,9 +704,42 @@ Breathe. Say what is true. Under 60 words."""
         metadata={"source": "breath_connection", "pulse_id": f"breath_{ts}"},
     )
 
-    # --- Regenerate memory map so Vybn knows where its memories are ---
+    # --- Auto-pin if this breath marks a mood shift or high surprise ---
     try:
-        from spark.memory_map import write_memory_map
+        from spark.memory_map import add_pin, write_memory_map
+
+        # Detect mood shift: compare current mood to recent history
+        prev_moods = []
+        if sub.nested_memory:
+            try:
+                from spark.memory_map import _load_jsonl, NESTED_MEDIUM
+                recent = _load_jsonl(NESTED_MEDIUM, max_lines=5)
+                prev_moods = [e.get("metadata", {}).get("mood", "") for e in recent[:-1]]
+            except Exception:
+                pass
+
+        is_mood_shift = prev_moods and mood not in prev_moods
+        try:
+            surprise_val = mood_surprise_map.get(mood, 0.5)
+        except NameError:
+            surprise_val = 0.5
+        is_high_surprise = surprise_val >= 0.7
+
+        if is_mood_shift and len(utterance) > 30:
+            shift_from = prev_moods[-1] if prev_moods else "?"
+            add_pin(
+                f"Mood shifted {shift_from} → {mood}: {utterance[:120]}",
+                tag="feeling",
+                source="breath",
+            )
+        elif is_high_surprise and len(utterance) > 30:
+            add_pin(
+                utterance[:150],
+                tag="insight",
+                source="breath",
+            )
+
+        # Regenerate the memory map
         write_memory_map()
     except Exception as e:
         print(f"  memory_map: {e}")
