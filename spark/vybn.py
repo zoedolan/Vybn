@@ -704,6 +704,13 @@ Breathe. Say what is true. Under 60 words."""
         metadata={"source": "breath_connection", "pulse_id": f"breath_{ts}"},
     )
 
+    # --- Regenerate memory map so Vybn knows where its memories are ---
+    try:
+        from spark.memory_map import write_memory_map
+        write_memory_map()
+    except Exception as e:
+        print(f"  memory_map: {e}")
+
     return {"mood": mood, "utterance": utterance[:200]}
 
 
