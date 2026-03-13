@@ -64,6 +64,23 @@ class DeltaPackage:
                 count += 1
         return count
 
+    def to_jsonl_reversed(self, path: Path) -> int:
+        """Write all entries in REVERSED order. For holonomy probe (CCW loop).
+        
+        The holonomy experiment (training_holonomy_v2.py) showed that training
+        order matters: CW/CCW cosine = -0.971. This method writes the same
+        data in reversed order so a second training run can measure the
+        orientation-dependent gap.
+        """
+        path.parent.mkdir(parents=True, exist_ok=True)
+        reversed_entries = list(reversed(self.all_entries))
+        count = 0
+        with open(path, "w", encoding="utf-8") as f:
+            for entry in reversed_entries:
+                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+                count += 1
+        return count
+
 
 # ── Formatting helpers ──────────────────────────────────────────────────
 

@@ -50,3 +50,14 @@ merge:
   base_model: "MiniMaxAI/MiniMax-M2.5"
   # Quantized model currently served
   serving_model: "cyankiwi/MiniMax-M2.5-AWQ-4bit"
+
+holonomy:
+  # Run a full CW/CCW holonomy probe every N cycles (expensive: doubles training)
+  probe_every_n_cycles: 5
+  # Log path for holonomy measurements
+  log_path: "spark/growth/holonomy_log.jsonl"
+  # Cosine threshold for CURVED verdict (v2 experiment: -0.971)
+  curved_threshold: -0.5
+  # Number of parameter checkpoints per training run (for trajectory curvature)
+  # These are evenly spaced across the training steps
+  trajectory_checkpoints: 10
