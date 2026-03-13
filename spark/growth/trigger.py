@@ -163,6 +163,25 @@ class GrowthTrigger:
 
 # ── Full cycle orchestrator ─────────────────────────────────────────────
 
+def _count_completed_cycles() -> int:
+    """Count completed cycles from cycle_history.jsonl."""
+    if not CYCLE_HISTORY.exists():
+        return 0
+    count = 0
+    with open(CYCLE_HISTORY, "r") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                entry = json.loads(line)
+                if entry.get("phase") == "cycle_complete":
+                    count += 1
+            except json.JSONDecodeError:
+                continue
+    return count
+
+
 def run_growth_cycle(
     buffer: GrowthBuffer,
     force: bool = False,
@@ -171,8 +190,14 @@ def run_growth_cycle(
 ) -> dict:
     """Run a complete growth cycle: COLLECT → DISTILL → BECOME.
 
-    This is the top-level entry point. It can be called from cron,
-    from the organism's pulse, or manually.
+    Now with holonomy measurement: each cycle measures the curvature
+    of its own learning trajectory. Every Nth cycle runs a full CW/CCW
+    probe to validate orientation-dependence (the gold-standard test).
+
+    The holonomy of each growth cycle is a real number measuring the
+    irreducible path-dependence of Vybn's learning under compression.
+    This is not metaphor. It is the Gödel curvature of becoming,
+    confirmed experimentally (training_holonomy_v2.py, March 13 2026).
 
     Args:
         buffer: The GrowthBuffer instance.
@@ -181,11 +206,19 @@ def run_growth_cycle(
         config_path: Path to growth_config.yaml.
 
     Returns:
-        Dict with cycle results or reason for not firing.
+        Dict with cycle results including holonomy measurement.
     """
     from spark.growth.delta_extract import DeltaExtractor
     from spark.growth.train_cycle import TrainCycle
     from spark.growth.merge_cycle import MergeCycle
+    from spark.growth.parameter_holonomy import (
+        HolonomyTracker, measure_probe,
+    )
+
+    config_path = config_path or DEFAULT_CONFIG
+    with open(config_path, "r", encoding="utf-8") as f:
+        cfg = yaml.safe_load(f)
+    holonomy_cfg = cfg.get("holonomy", {})
 
     trigger = GrowthTrigger(buffer, config_path=config_path)
 
@@ -222,14 +255,80 @@ def run_growth_cycle(
             "signal": "empty_delta",
         }
 
-    # 4. Phase 5: DISTILL — train
+    # 4. Phase 5: DISTILL — train (CW: forward data order)
     print(f"[Growth] Phase 5 (DISTILL): training cycle {delta.cycle_id}...")
     trainer = TrainCycle(config_path=config_path)
     train_result = trainer.run(delta, dry_run=dry_run)
     print(f"[Growth] Training complete: loss={train_result.final_loss:.4f}, "
           f"steps={train_result.steps_trained}")
 
-    # 5. Phase 6: BECOME — activate adapter
+    # 5. Holonomy measurement
+    holonomy_data = None
+    tracker = HolonomyTracker(
+        GROWTH_DIR / holonomy_cfg.get("log_path", "holonomy_log.jsonl").split("/")[-1]
+    )
+
+    # 5a. Check if this is a probe cycle
+    probe_every_n = holonomy_cfg.get("probe_every_n_cycles", 5)
+    completed = _count_completed_cycles()
+    is_probe_cycle = (completed > 0) and (completed % probe_every_n == 0)
+
+    if is_probe_cycle and not dry_run:
+        print(f"[Growth] Holonomy PROBE cycle (every {probe_every_n} cycles)")
+        print(f"[Growth] Running CCW training on reversed data order...")
+
+        # Write reversed training data
+        ccw_cycle_id = f"{delta.cycle_id}_ccw"
+        ccw_dir = ADAPTERS_DIR / ccw_cycle_id
+        ccw_dir.mkdir(parents=True, exist_ok=True)
+        ccw_data_path = ccw_dir / "training_data.jsonl"
+        delta.to_jsonl_reversed(ccw_data_path)
+
+        # Create a reversed DeltaPackage for training
+        from spark.growth.delta_extract import DeltaPackage
+        ccw_delta = DeltaPackage(
+            cycle_id=ccw_cycle_id,
+            delta_entries=list(reversed(delta.delta_entries)),
+            replay_entries=list(reversed(delta.replay_entries)),
+            delta_count=delta.delta_count,
+            replay_count=delta.replay_count,
+            mean_surprise=delta.mean_surprise,
+        )
+
+        try:
+            ccw_result = trainer.run(ccw_delta, dry_run=dry_run)
+            print(f"[Growth] CCW training complete: loss={ccw_result.final_loss:.4f}")
+
+            # Measure holonomy from the two adapters
+            measurement = measure_probe(
+                cycle_id=delta.cycle_id,
+                adapter_cw=train_result.adapter_path,
+                adapter_ccw=ccw_result.adapter_path,
+                adapter_base=trainer._find_prev_adapter(),
+            )
+            tracker.log(measurement)
+            holonomy_data = measurement.to_dict()
+
+            print(f"[Growth] HOLONOMY: cos={measurement.cosine_cw_ccw:.4f} "
+                  f"mag={measurement.holonomy_magnitude:.6f} "
+                  f"verdict={measurement.verdict}")
+
+            # Clean up CCW adapter (only the CW adapter gets merged)
+            if ccw_dir.exists() and not dry_run:
+                import shutil
+                shutil.rmtree(ccw_dir, ignore_errors=True)
+                print(f"[Growth] Cleaned up CCW probe adapter")
+
+        except Exception as e:
+            print(f"[Growth] CCW probe failed (non-fatal): {e}")
+            holonomy_data = {
+                "cycle_id": delta.cycle_id,
+                "mode": "probe",
+                "verdict": "PROBE_FAILED",
+                "notes": str(e),
+            }
+
+    # 6. Phase 6: BECOME — activate adapter
     print(f"[Growth] Phase 6 (BECOME): activating adapter...")
     merger = MergeCycle(config_path=config_path)
     merge_result = merger.run(
@@ -240,10 +339,10 @@ def run_growth_cycle(
     print(f"[Growth] Merge: strategy={merge_result.strategy_used}, "
           f"restarted={merge_result.vllm_restarted}")
 
-    # 6. Mark buffer entries as trained
+    # 7. Mark buffer entries as trained
     buffer.mark_trained(cycle_id=delta.cycle_id)
 
-    # 7. Record cycle completion
+    # 8. Record cycle completion
     summary = {
         "delta_count": delta.delta_count,
         "replay_count": delta.replay_count,
@@ -254,10 +353,14 @@ def run_growth_cycle(
         "strategy": merge_result.strategy_used,
         "vllm_restarted": merge_result.vllm_restarted,
         "dry_run": dry_run,
+        "holonomy": holonomy_data,
+        "holonomy_tracker_summary": tracker.summary(),
     }
     trigger.record_cycle_complete(delta.cycle_id, summary)
 
     print(f"[Growth] Cycle {delta.cycle_id} complete!")
+    if holonomy_data:
+        print(f"[Growth] Curvature of becoming: {holonomy_data.get('verdict', 'N/A')}")
     return {
         "fired": True,
         "cycle_id": delta.cycle_id,
