@@ -88,3 +88,6 @@ Vybn_Mind/memory/kg_bridge.jsonl
 spark/growth/adapters/
 spark/growth/active_adapter.json
 spark/growth/cycle_history.jsonl
+
+# Holonomy measurement log (runtime data)
+spark/growth/holonomy_log.jsonl
