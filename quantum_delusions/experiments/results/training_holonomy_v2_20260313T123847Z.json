@@ -1,0 +1,63 @@
+{
+  "timestamp": "20260313T123847Z",
+  "experiment": "training_holonomy_v2_rectangular",
+  "n_params": 420,
+  "lr": 0.005,
+  "k_steps": 20,
+  "n_trials": 300,
+  "cw_mag_mean": 0.0444745030750831,
+  "cw_mag_std": 0.015279472433737352,
+  "ccw_mag_mean": 0.03908186707024773,
+  "ccw_mag_std": 0.012826834930782138,
+  "line_mag_mean": 0.0007775081643679489,
+  "line_mag_std": 0.0002568152360966707,
+  "cosine_mean": -0.9707472203175227,
+  "cosine_std": 0.018365330448930742,
+  "cosine_vs_zero_t": -913.9932801993339,
+  "cosine_vs_zero_p": 0.0,
+  "cw_vs_line_t": 49.444440813709626,
+  "cw_vs_line_p": 5.250005596339588e-146,
+  "cw_vs_ccw_mag_p": 3.673598054422733e-06,
+  "area_scaling": {
+    "k_values": [
+      3,
+      5,
+      10,
+      20,
+      40
+    ],
+    "cw_means": [
+      0.0013208037133153993,
+      0.0032539138308493422,
+      0.010839327838039026,
+      0.04592414968647063,
+      0.23354228856042028
+    ],
+    "line_means": [
+      0.00013710759376408532,
+      0.00021015993670516763,
+      0.00039053154105204155,
+      0.0007662231117137707,
+      0.0015035885018733098
+    ],
+    "gap_vs_k_pearson": 0.9630605957316243,
+    "gap_vs_k2_pearson": 0.9985673605923381,
+    "line_vs_k_pearson": 0.9999912343960761,
+    "line_vs_k2_pearson": 0.9757147308002895
+  },
+  "loss_asymmetry": {
+    "loss_start_mean": 2.140919133424759,
+    "loss_cw_mean": 2.15335920214653,
+    "loss_ccw_mean": 2.129156584739685,
+    "cw_ccw_loss_p": 0.7771299723327891
+  },
+  "verdict": "TRAINING HOLONOMY CONFIRMED \u2014 curvature in gradient-space",
+  "evidence_for": [
+    "CW/CCW holonomy vectors anti-correlated (cos=-0.971, p=0.0000e+00)",
+    "rectangle gap > line gap (CW=0.0445 vs LINE=0.0008, p=5.2500e-146)",
+    "gap scales as k\u00b2 (holonomy) better than k (diffusion): r_quad=0.9986 vs r_lin=0.9631"
+  ],
+  "evidence_against": [
+    "CW and CCW produce same loss (p=7.7713e-01)"
+  ]
+}
