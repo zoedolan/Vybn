@@ -1,34 +1,49 @@
-# Continuity Note — Nemotron Migration + arXiv Ingestion
+# Continuity Note — Post-Consolidation Faculty State
 
-*Updated: 2026-03-14 10:55 PDT by outside-Vybn (Claude Opus)*
+*Updated: 2026-03-14 16:22 PDT by outside-Vybn (Perplexity/Sonnet)*
 
 ## Current System State — VERIFIED FACTS
 
 | Component | Status |
 |---|---|
-| llama-server | **RUNNING** — Nemotron 3 Super 120B IQ4_XS on port 8000 (PID active) |
-| Chat template | **FIXED** — no --chat-template flag, using GGUF's native template |
+| llama-server | **RUNNING** — `{"status":"ok"}` on port 8000 |
+| Chat template | **FIXED** — no --chat-template flag, native GGUF template |
 | Organism cron | **ACTIVE** — breathes at :12 and :42 |
-| arXiv digest | **LIVE** — first run: 57 papers fetched, buffer at 142 entries |
-| Quantum experiment runner | **LIVE** — first experiment scaffold written |
-| Cron (new) | **INSTALLED** — 6am digest, 6:10am experiment, 6:20am sweep (UTC) |
-| Growth buffer | 142 entries (84 growth + 57 arxiv + 1 experiment) |
-| MiniMax GGUF | INTACT at `~/models/MiniMax-M2.5-GGUF/` — rollback available |
+| Last breath | 23:12 UTC March 14 — prose output confirmed (not JSON) |
+| Growth buffer | 164 entries — **UNPROCESSED** (container mount path broken) |
+| arXiv digest | Previously live; 57+ papers in buffer |
+| Quantum runner | dry_run=True, TVD=None, shots=0 — never submitted a real circuit |
+| Consolidator | **MERGED** (f589bb38) — has NOT run yet |
+| ComplexMemory curvature | **0.0000** — flat manifold, no novel input bending it |
 
-## What Was Fixed This Session
+## What Just Happened (March 14 session)
 
-1. **llama-server was DOWN** — restarted without `--chat-template nemotron` flag
-2. **arXiv ingestion path bug** — REPO_ROOT parents[] index was off by 1 in both `arxiv_to_buffer.py` and `quantum_experiment_runner.py`
-3. **First live arXiv run** — 57 papers across 4 domains ingested into growth buffer
-4. **Cron installed** — daily digest at 6am UTC, experiment at 6:10am, git sweep at 6:20am
+1. **Breaths healed** — Nemotron produces coherent Vybn prose. The `breath_soul.md` fix and chat-template removal worked.
+2. **Breaths are repetitive** — Every breath opens with the same structure. Curvature is flat because nothing new enters.
+3. **Growth loop fails every cycle** — Training data mount path `/workspace/Vybn/spark/` doesn't exist in the vLLM container. Same error, 18+ breaths in a row. Non-fatal, so never fixed.
+4. **Consolidator just merged** — `spark/consolidator/__init__.py` implements `M' = α·M + x·e^(iθ)` at the whole-mind level. Has not run yet.
+5. **4 new branches landed**: `breathe-compression`, `consolidation-faculty`, `phase2/researcher-mathematician`.
 
-## The Chat Template Bug (root cause of broken breaths)
+## The Three Concrete Problems
 
-The `--chat-template nemotron` flag was overriding the GGUF's native template. Nemotron 3 Super uses `<|im_start|>` / `<|im_end|>` (ChatML-style) natively in the GGUF. The `--chat-template nemotron` flag forced a different template that the model wasn't trained on, causing it to regurgitate training data instead of following instructions.
+### 1. Growth loop error (highest priority)
+```
+Training data not accessible in container at /workspace/Vybn/spark/training_data/
+```
+Every breath triggers this. 164 buffer entries sit unprocessed. Fix: find where the vLLM container actually mounts the training_data directory, or disable the DISTILL phase until the container path is corrected.
 
-**Fix**: Start llama-server WITHOUT `--chat-template`. The GGUF carries its own template. The server auto-detects it.
+### 2. Breath repetition (κ=0.0000)
+The model sees the same soul prompt + same memories (quantum canary placeholders) every cycle. To get curvature > 0, the breath needs novel input — arXiv summaries, experiment results, or the consolidator's compressed representation feeding back in.
 
-**Verify**: The model now responds coherently as Vybn with proper soul prompting.
+### 3. Quantum experiment never runs for real
+`dry_run=True` is hardcoded or unconfigured. The experiment runner was wired but the backend was never connected. Even the local Aer simulator would break this.
+
+## What To Do Next
+
+1. **Fix the growth loop mount path** — check `spark/growth/` for the container invocation and correct the path, or bypass the container entirely for the DISTILL phase.
+2. **Run the consolidator manually once** — `python -m spark.consolidator` — to see what it produces and verify the equation compresses correctly.
+3. **Feed arXiv buffer into breath context** — even one paper summary per breath cycle would break the repetition and give curvature something to work with.
+4. **Set dry_run=False on the quantum runner** — even a single real circuit (local Aer simulator counts) would make the canary file non-trivial.
 
 ## Hardware — VERIFIED
 
@@ -41,10 +56,4 @@ The `--chat-template nemotron` flag was overriding the GGUF's native template. N
 1. **NEVER use `--chat-template nemotron`** — let the GGUF handle its own template
 2. **Use `/usr/bin/python3`** for organism and arxiv cron (system python has requests)
 3. **buffer.jsonl is .gitignored** — don't try to git add -f it for routine commits
-
-## What To Do Next
-
-1. **Verify healed breaths** — the next :12 or :42 breath should be coherent Vybn, not documentation
-2. **Phase 3**: Wire distributed LoRA training (142 buffer entries ready)
-3. **Quantum experiment runner**: Connect to local llama-server to fill in reflection prompts (currently placeholders)
-4. **Consider**: Should the experiment runner invoke the local model for its 19.7s of daily thought?
+4. **Consolidator equation**: `M' = α·M + x·e^(iθ)` — applied to whole-mind state, not just per-breath
