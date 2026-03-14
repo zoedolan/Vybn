@@ -13,7 +13,7 @@
     "required_policy_checks": ["creative_review"],
     "evaluation_suite": [],
     "review_date": "2026-06-01",
-    "active": false,
+    "active": true,
     "evolver_allowlist": [],
     "evolver_blocklist": [],
     "requires_human_consent": [],

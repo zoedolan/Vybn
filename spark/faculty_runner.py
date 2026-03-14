@@ -33,6 +33,12 @@ def _load_faculty(fid: str):
         elif fid == 'mathematician':
             from spark.mathematician import MathFaculty
             _FACULTY_MODULES[fid] = MathFaculty()
+        elif fid == 'creator':
+            from spark.creator import CreatorFaculty
+            _FACULTY_MODULES[fid] = CreatorFaculty()
+        elif fid == 'synthesizer':
+            from spark.synthesizer import SynthesizerFaculty
+            _FACULTY_MODULES[fid] = SynthesizerFaculty()
         # witness and self_model are handled by vybn.py directly
         else:
             return None

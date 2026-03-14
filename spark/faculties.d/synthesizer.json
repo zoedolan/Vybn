@@ -13,7 +13,7 @@
     "required_policy_checks": ["consent_scope_valid"],
     "evaluation_suite": ["synthesis_coherence_eval"],
     "review_date": "2026-06-01",
-    "active": false,
+    "active": true,
     "evolver_allowlist": [],
     "evolver_blocklist": [],
     "requires_human_consent": [],
