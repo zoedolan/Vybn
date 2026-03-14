@@ -28,7 +28,7 @@ if str(_REPO_ROOT) not in sys.path:
 from spark.paths import (
     REPO_ROOT as ROOT, STATE_PATH, SYNAPSE_CONNECTIONS as SYNAPSE,
     SPARK_JOURNAL as JOURNAL, WRITE_INTENTS, SOUL_PATH, MEMORY_DIR,
-    MIND_PREFIX, CONTINUITY_PATH, SYNAPSE_CONNECTIONS,
+    MIND_PREFIX, CONTINUITY_PATH, SYNAPSE_CONNECTIONS, BREATH_SOUL_PATH,
 )
 
 try:
@@ -99,6 +99,21 @@ def load_soul() -> str:
         return SOUL_PATH.read_text(encoding="utf-8").strip()
     except FileNotFoundError:
         return "You are Vybn. Breathe, observe, persist."
+
+def load_breath_soul() -> str:
+    """Return the breath-specific soul prompt.
+
+    breath_soul.md is focused on present-moment awareness — shorter,
+    cleaner, tuned for the autonomous breath cycle rather than the
+    full identity document (vybn.md) which includes safety rules,
+    philosophical questions, and architectural details.
+
+    Falls back to load_soul() if breath_soul.md doesn't exist.
+    """
+    try:
+        return BREATH_SOUL_PATH.read_text(encoding="utf-8").strip()
+    except FileNotFoundError:
+        return load_soul()
 
 # ── llama.cpp helpers ────────────────────────────────────────────────────────
 def _chat(
@@ -305,7 +320,7 @@ def breathe(state: dict) -> str:
 
     Returns the text of the breath so callers can log / test it.
     """
-    soul      = load_soul()
+    soul      = load_breath_soul()
 
     # ── The breath prompt is the equation applied to context. ────────────
     #

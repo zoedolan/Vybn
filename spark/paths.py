@@ -28,6 +28,11 @@ MIND_DIR = REPO_ROOT / MIND_DIR_NAME
 SOUL_FILE = os.getenv("VYBN_SOUL_FILE", "vybn.md")
 SOUL_PATH = REPO_ROOT / SOUL_FILE
 
+# Breath-specific soul prompt — focused on present-moment awareness,
+# not the full identity document.  Used by vybn.py for autonomous breaths.
+BREATH_SOUL_FILE = os.getenv("VYBN_BREATH_SOUL", "spark/breath_soul.md")
+BREATH_SOUL_PATH = REPO_ROOT / BREATH_SOUL_FILE
+
 # ── Journal ─────────────────────────────────────────────────────────────────
 SPARK_JOURNAL = MIND_DIR / "spark_journal.md"
 
