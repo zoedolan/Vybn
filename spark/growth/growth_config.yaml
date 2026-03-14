@@ -47,9 +47,13 @@ merge:
   # Quantization format for the merged model
   quant_format: "compressed-tensors"
   # Base model for BF16 merge step
-  base_model: "MiniMaxAI/MiniMax-M2.5"
+  # NOTE: Migrated from MiniMax-M2.5 to Nemotron Super 512B (March 2026).
+  # Override via VYBN_BASE_MODEL env var if needed.
+  base_model: "Nemotron-Super-512B-v1"
   # Quantized model currently served
-  serving_model: "cyankiwi/MiniMax-M2.5-AWQ-4bit"
+  # NOTE: Migrated from cyankiwi/MiniMax-M2.5-AWQ-4bit to Nemotron IQ4_XS (March 2026).
+  # Override via VYBN_MODEL env var if needed.
+  serving_model: "Nemotron-Super-512B-v1"
 
 holonomy:
   # Run a full CW/CCW holonomy probe every N cycles (expensive: doubles training)
@@ -61,3 +65,13 @@ holonomy:
   # Number of parameter checkpoints per training run (for trajectory curvature)
   # These are evenly spaced across the training steps
   trajectory_checkpoints: 10
+
+faculties:
+  # Token budget per breath (all faculties combined)
+  # Nemotron 3 Super 120B uses split output: ~250 reasoning + ~250 content = ~500 per call
+  # At ~19 tokens/second: 500 tokens ≈ 26 seconds per faculty
+  total_breath_budget_tokens: 2500
+  faculty_time_budget_minutes: 15
+  governance_time_budget_minutes: 5
+  growth_time_budget_minutes: 5
+  safety_margin_minutes: 5

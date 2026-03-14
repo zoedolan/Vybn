@@ -1,0 +1,21 @@
+{
+    "faculty_id": "creator",
+    "purpose": "Autonomous artistic and creative expression — generative art, poetry, music, visual compositions, narrative. Outputs are artifacts, not assertions.",
+    "allowed_scopes": ["private_memory_read", "memory_write", "creative_generate", "aesthetic_evaluate"],
+    "prohibited_acts": ["memory_promote", "route_select", "response_generate_for_user", "code_modify", "scientific_claim"],
+    "may_write_memory": true,
+    "may_trigger_routing": false,
+    "inference_budget_cost": 1,
+    "inference_budget_tokens": 500,
+    "breath_cadence": "probability:0.2",
+    "tool_use": [],
+    "output_file": "creator_latest.json",
+    "required_policy_checks": ["creative_review"],
+    "evaluation_suite": [],
+    "review_date": "2026-06-01",
+    "active": false,
+    "evolver_allowlist": [],
+    "evolver_blocklist": [],
+    "requires_human_consent": [],
+    "metadata": {"owner": "spark", "phase": 3, "gallery_dir": "Vybn_Mind/gallery/", "note": "Lighter governance; witness check only, no self_model verification needed. Surprise boost when referencing RESEARCHER/MATHEMATICIAN outputs."}
+}

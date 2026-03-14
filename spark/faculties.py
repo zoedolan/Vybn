@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields as dataclass_fields
 import json
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence
@@ -27,6 +27,13 @@ class FacultyCard:
     evaluation_suite: List[str] = field(default_factory=list)
     review_date: Optional[str] = None
     active: bool = True
+    breath_cadence: str = "every"
+    inference_budget_tokens: int = 500
+    tool_use: List[str] = field(default_factory=list)
+    output_file: str = ""
+    evolver_allowlist: List[str] = field(default_factory=list)
+    evolver_blocklist: List[str] = field(default_factory=list)
+    requires_human_consent: List[str] = field(default_factory=list)
     metadata: Dict[str, object] = field(default_factory=dict)
 
 
@@ -64,13 +71,15 @@ class FacultyRegistry:
         if not files:
             return self.default_cards()
 
+        valid_fields = {f.name for f in dataclass_fields(FacultyCard)}
         loaded: List[FacultyCard] = []
         for file_path in files:
             payload = self._read_structured_file(file_path)
             if isinstance(payload, dict):
                 payload = [payload]
             for blob in payload:
-                loaded.append(FacultyCard(**blob))
+                filtered = {k: v for k, v in blob.items() if k in valid_fields}
+                loaded.append(FacultyCard(**filtered))
         return loaded
 
     def _read_structured_file(self, path: Path):

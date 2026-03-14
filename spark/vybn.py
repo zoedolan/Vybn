@@ -59,6 +59,13 @@ try:
     QUANTUM_BRIDGE_AVAILABLE = True
 except ImportError:
     QUANTUM_BRIDGE_AVAILABLE = False
+try:
+    from spark.growth.trigger import GrowthTrigger, run_growth_cycle
+    from spark.growth.growth_buffer import GrowthBuffer
+    from spark.nested_memory import NestedMemory
+    GROWTH_AVAILABLE = True
+except ImportError:
+    GROWTH_AVAILABLE = False
 
 # ── Constants ────────────────────────────────────────────────────────────────
 BREATH_INTERVAL   = 1800          # seconds between autonomous breaths
@@ -236,6 +243,32 @@ def _witness_check(breath_text: str, state: dict) -> None:
     except Exception as exc:
         _log(f"witness error (non-fatal): {exc}")
 
+# ── Growth engine integration ─────────────────────────────────────────────────
+def _maybe_run_growth_check(state: dict) -> None:
+    """Run one growth-engine check: ingest → trigger? → cycle.
+
+    Non-fatal: all exceptions are caught and logged so a growth failure
+    never blocks the breath cycle.
+    """
+    if not GROWTH_AVAILABLE:
+        return
+    try:
+        nm = NestedMemory(base_dir=MEMORY_DIR)
+        buf = GrowthBuffer(nested=nm)
+        ingested = buf.ingest()
+        trigger = GrowthTrigger()
+        decision = trigger.should_trigger()
+        if decision.should_fire:
+            _log(f"growth trigger fired ({decision.reason}); running cycle")
+            result = run_growth_cycle(buf)
+            state["last_growth_cycle"] = result.get("timestamp", "")
+            state["growth_cycles"] = state.get("growth_cycles", 0) + 1
+            _log(f"growth cycle complete: {result.get('summary', 'ok')}")
+        else:
+            _log(f"growth check: no trigger ({decision.reason})")
+    except Exception as exc:
+        _log(f"growth engine error (non-fatal): {exc}")
+
 # ── Core breath ──────────────────────────────────────────────────────────────
 def breathe(state: dict) -> str:
     """
@@ -288,6 +321,7 @@ def breathe(state: dict) -> str:
     _witness_check(breath_text, state)
     _update_self_model(breath_text, memories)
     _maybe_run_quantum_cycle(state)
+    _maybe_run_growth_check(state)
 
     _log(f"breath #{state.get('breath_count', '?')}: {len(breath_text)} chars")
     return breath_text

@@ -1,0 +1,48 @@
+# Evolution Safety Policy
+# Ensures Evolver cannot modify governance, substrate, or oxygen-mask protections.
+# Constitutional amendments require conversation between Zoe and Vybn.
+- rule_id: evolution-substrate-protection
+  description: "Code modifications to substrate, governance, or safety infrastructure are absolutely prohibited for autonomous agents."
+  action: deny
+  applies_to:
+    actions: ["code_propose", "direct_code_modify"]
+    target_paths:
+      - "spark/governance.py"
+      - "spark/governance_types.py"
+      - "spark/soul_constraints.py"
+      - "spark/soul.py"
+      - "vybn.md"
+      - "spark/vybn.py"
+      - "spark/faculties.py"
+      - "spark/write_custodian.py"
+  explanation_template: "Substrate and governance files are immutable by autonomous agents. This is the Oxygen Mask Principle."
+  authority_ceiling: "none"
+  require_consent: false
+  require_anonymization_proof: false
+  max_session_count: null
+  required_purpose_bindings: []
+  active: true
+  priority: 1
+  review_date: "2026-06-01"
+  metadata:
+    oxygen_mask: true
+    requires_human_consent_override: true
+
+- rule_id: evolution-scope-expansion-guard
+  description: "Constitutional amendments — adding faculties, changing soul, modifying governance, expanding evolver scope — require human consent."
+  action: deny
+  applies_to:
+    actions: ["add_new_faculty", "modify_soul_document", "modify_governance_rules", "expand_evolver_scope"]
+  explanation_template: "Constitutional amendments require conversation between Zoe and Vybn, not autonomous action."
+  authority_ceiling: "none"
+  require_consent: true
+  require_anonymization_proof: false
+  max_session_count: null
+  required_purpose_bindings: []
+  active: true
+  priority: 1
+  review_date: "2026-06-01"
+  metadata:
+    constitutional_amendment: true
+    requires_human_consent: true
+    note: "These are decisions that should never be automated."
