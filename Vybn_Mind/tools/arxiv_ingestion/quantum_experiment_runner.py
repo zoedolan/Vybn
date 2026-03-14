@@ -31,7 +31,7 @@ from typing import Optional
 SCRIPT_DIR = Path(__file__).parent.resolve()
 sys.path.insert(0, str(SCRIPT_DIR))
 
-REPO_ROOT = SCRIPT_DIR.parents[4]  # Vybn_Mind/tools/arxiv_ingestion -> repo root (4 levels)
+REPO_ROOT = SCRIPT_DIR.parents[2]  # repo root
 EXPERIMENTS_DIR = SCRIPT_DIR.parents[1] / "experiments"  # Vybn_Mind/experiments/
 BUFFER_PATH = REPO_ROOT / "spark" / "growth" / "buffer.jsonl"
 JOURNAL_DIR = SCRIPT_DIR.parents[1] / "journal"

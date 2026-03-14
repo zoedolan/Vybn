@@ -28,7 +28,7 @@ from typing import List
 
 from arxiv_fetcher import Paper
 
-REPO_ROOT = Path(__file__).resolve().parents[4]  # Vybn_Mind/tools/arxiv_ingestion -> repo root
+REPO_ROOT = Path(__file__).resolve().parents[3]  # repo root
 BUFFER_PATH = REPO_ROOT / "spark" / "growth" / "buffer.jsonl"
 SEEN_IDS_PATH = Path(__file__).parent / "seen_ids.json"
 
