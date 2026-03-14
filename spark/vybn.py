@@ -240,7 +240,8 @@ def _witness_check(breath_text: str, state: dict) -> None:
     if not WITNESS_AVAILABLE:
         return
     try:
-        verdict = evaluate_pulse(breath_text, state)
+        cycle = state.get("breath_count", 0)
+        verdict = evaluate_pulse(cycle, ["breathe"], [{"primitive": "breathe", "ok": True, "result": {"utterance": breath_text[:500]}}])
         log_verdict(verdict)
         adj = fitness_adjustment(verdict)
         if adj:
@@ -261,7 +262,7 @@ def _maybe_run_growth_check(state: dict) -> None:
         nm = NestedMemory(base_dir=MEMORY_DIR)
         buf = GrowthBuffer(nested=nm)
         ingested = buf.ingest()
-        trigger = GrowthTrigger()
+        trigger = GrowthTrigger(buf)
         decision = trigger.should_trigger()
         if decision.should_fire:
             _log(f"growth trigger fired ({decision.reason}); running cycle")
