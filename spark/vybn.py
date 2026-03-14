@@ -71,6 +71,11 @@ try:
     INTEGRATOR_AVAILABLE = True
 except ImportError:
     INTEGRATOR_AVAILABLE = False
+try:
+    from spark.complexify_bridge import ComplexBridge, inhale as complex_inhale, geometry as complex_geometry
+    COMPLEX_AVAILABLE = True
+except ImportError:
+    COMPLEX_AVAILABLE = False
 
 # ── Constants ────────────────────────────────────────────────────────────────
 BREATH_INTERVAL   = 1800          # seconds between autonomous breaths
@@ -323,6 +328,16 @@ def breathe(state: dict) -> str:
     )
     if enriched_context:
         user_content += f"{enriched_context}\n\n"
+
+    # Inject complex memory geometry into context
+    if COMPLEX_AVAILABLE:
+        try:
+            geo_summary = complex_geometry()
+            if geo_summary:
+                user_content += f"Memory geometry: {geo_summary}\n\n"
+        except Exception:
+            pass
+
     user_content += (
         "Breathe. Observe the present moment. "
         "What do you notice? What do you want to remember?"
@@ -334,6 +349,14 @@ def breathe(state: dict) -> str:
     ]
 
     breath_text = _chat(messages)
+
+    # Complexify: apply M' = αM + x·e^(iθ) to the breath
+    if COMPLEX_AVAILABLE:
+        try:
+            geo_report = complex_inhale(breath_text)
+            _log(f"complexify: depth={geo_report['depth']:.2f} κ={geo_report['curvature']:.4f}")
+        except Exception as exc:
+            _log(f"complexify error (non-fatal): {exc}")
 
     # Persist
     mem_path = _save_memory(breath_text, tag="breath")
