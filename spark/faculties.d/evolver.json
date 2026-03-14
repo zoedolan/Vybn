@@ -13,7 +13,7 @@
     "required_policy_checks": ["consent_scope_valid", "code_propose", "evolution_safety"],
     "evaluation_suite": ["breath_quality_eval", "memory_consolidation_eval"],
     "review_date": "2026-06-01",
-    "active": false,
+    "active": true,
     "evolver_allowlist": [
         "spark/growth/growth_config.yaml",
         "spark/faculties.d/*.json",

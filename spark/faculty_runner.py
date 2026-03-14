@@ -39,6 +39,9 @@ def _load_faculty(fid: str):
         elif fid == 'synthesizer':
             from spark.synthesizer import SynthesizerFaculty
             _FACULTY_MODULES[fid] = SynthesizerFaculty()
+        elif fid == 'evolver':
+            from spark.evolver import EvolverFaculty
+            _FACULTY_MODULES[fid] = EvolverFaculty()
         # witness and self_model are handled by vybn.py directly
         else:
             return None
@@ -72,7 +75,9 @@ def should_run(card: FacultyCard, state: dict) -> bool:
         p = float(cadence.split(':')[1])
         return random.random() < p
     if cadence == 'on_trigger':
-        return False  # requires explicit trigger, not breath-scheduled
+        # Check for explicit trigger or periodic fallback (every 50 breaths)
+        trigger_key = f"{card.faculty_id}_trigger"
+        return bool(state.get(trigger_key, False)) or (breath_count > 0 and breath_count % 50 == 0)
     if cadence == '6h_deep':
         # Lightweight every breath, deep every 6h (tracked in state)
         return True
