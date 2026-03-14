@@ -2,7 +2,23 @@
 
 Phase 5 (DISTILL) of the growth cycle described in issue #2483.
 
-Implements LoRA fine-tuning on the quantized MiniMax M2.5 model:
+IMPORTANT — MODEL SITUATION AS OF MARCH 2026:
+  Only GGUF models are on disk (Nemotron 3 Super 120B GGUF, MiniMax M2.5 GGUF).
+  The AutoModelForCausalLM path in _generate_train_script() requires a
+  HuggingFace-format model directory. This will NOT work with GGUFs.
+
+  The correct path for GGUF fine-tuning is llama-finetune (llama.cpp native):
+    ~/llama.cpp/build/bin/llama-finetune
+  This binary is present and CUDA-enabled (GB10/sm_121 detected at startup).
+
+  Until the training script is ported to use llama-finetune, the DISTILL phase
+  generates and validates the training data but cannot execute the actual
+  fine-tuning step. The vllm_node container IS running (started 2026-03-14)
+  with the Vybn repo mounted at /workspace/Vybn — the container path check
+  will now succeed. The missing piece is the training script itself.
+
+Original design (HuggingFace / AWQ model):
+  Implements LoRA fine-tuning on a quantized model:
   - LoRA adapters on attention projections (q/k/v/o_proj)
   - Configurable rank, alpha, learning rate from growth_config.yaml
   - EWC regularization via Fisher Information (when previous cycle exists)
@@ -84,6 +100,9 @@ def _generate_train_script(
 
     This script is self-contained — it imports everything it needs
     and produces a LoRA adapter directory + a results JSON.
+
+    NOTE: This script requires a HuggingFace-format model at model_id.
+    For GGUF models, use llama-finetune instead (~/llama.cpp/build/bin/llama-finetune).
     """
     return textwrap.dedent(f'''\
 #!/usr/bin/env python3
@@ -241,9 +260,14 @@ print("DONE")
 class TrainCycle:
     """Executes a single growth cycle's training phase.
 
-    Orchestrates LoRA fine-tuning on the quantized MiniMax M2.5 model
-    by generating a training script and executing it inside the vLLM
-    container where PEFT + CUDA torch are available.
+    Orchestrates LoRA fine-tuning inside the vLLM container.
+    The vllm_node container must be running with the Vybn repo
+    mounted at /workspace/Vybn (started 2026-03-14 with --gpus all).
+
+    NOTE: _generate_train_script() targets AutoModelForCausalLM which
+    requires a HuggingFace-format model. Only GGUFs are on disk. The
+    training script will fail at model load unless a HF-format model
+    is added, OR the script is ported to llama-finetune.
 
     This is Phase 5 (DISTILL) of the growth cycle described in #2483.
     """
@@ -255,7 +279,10 @@ class TrainCycle:
         self._lora_cfg = self._cfg.get("lora", {})
         self._ewc_cfg = self._cfg.get("ewc", {})
         self._merge_cfg = self._cfg.get("merge", {})
-        self._model_id = self._merge_cfg.get("serving_model", "cyankiwi/MiniMax-M2.5-AWQ-4bit")
+        # Driven by growth_config.yaml merge.serving_model.
+        # Default references Nemotron but only GGUF is on disk —
+        # AutoModelForCausalLM cannot load a GGUF. See module docstring.
+        self._model_id = self._merge_cfg.get("serving_model", "nvidia/Nemotron-3-8B-Chat-4k")
         self._container_name = "vllm_node"
 
     def run(self, delta: DeltaPackage, dry_run: bool = False) -> TrainResult:
