@@ -43,6 +43,16 @@ MIND_PREFIX = str(MIND_DIR) + "/"
 # ── Write intents ────────────────────────────────────────────────────────────
 WRITE_INTENTS = MIND_DIR / "write_intents.jsonl"
 
+# ── Research ─────────────────────────────────────────────────────────────────
+RESEARCH_DIR    = REPO_ROOT / "spark" / "research"
+FRONTIER_PATH   = RESEARCH_DIR / "research_frontier.yaml"
+CONJECTURE_PATH = RESEARCH_DIR / "conjecture_registry.yaml"
+
+# ── Ledgers ──────────────────────────────────────────────────────────────────
+DECISION_LEDGER    = MIND_DIR / "decision_ledger.jsonl"
+SELF_MODEL_LEDGER  = MIND_DIR / "self_model_ledger.jsonl"
+WITNESS_LOG        = MIND_DIR / "witness.jsonl"
+
 # ── Quantum ──────────────────────────────────────────────────────────────────
 QUANTUM_BUDGET_LEDGER = MIND_DIR / "quantum_budget.jsonl"
 QUANTUM_EXPERIMENT_LOG = MIND_DIR / "quantum_experiments.jsonl"

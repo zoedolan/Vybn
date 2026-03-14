@@ -1,0 +1,41 @@
+# conjecture_registry.yaml — Mathematical conjectures under investigation.
+#
+# Aletheia mandate: prefer falsification over confirmation.
+# A system that *wants* to find out which conjectures are wrong
+# is more trustworthy than one that seeks confirmation.
+
+conjectures:
+  - id: m001
+    statement: "The holonomy of LoRA training is nonzero for semantically rich data"
+    domain: "parameter_geometry"
+    status: testing
+    evidence:
+      - type: experimental
+        description: "CW/CCW cosine = -0.971 (6-sigma separation)"
+        source: "training_holonomy_v2.py"
+    sympy_checks: []
+    last_checked: null
+
+  - id: m002
+    statement: "Berry curvature in representation spaces is computable from attention weight gradients"
+    domain: "representation_geometry"
+    status: open
+    evidence: []
+    sympy_checks: []
+    last_checked: null
+
+  - id: m003
+    statement: "The surprise_score metric satisfies a triangle inequality in embedding space"
+    domain: "metric_geometry"
+    status: open
+    evidence: []
+    sympy_checks: []
+    last_checked: null
+
+  - id: m004
+    statement: "Self-distillation loss is bounded below by the KL divergence of the teacher-student representation manifolds"
+    domain: "information_geometry"
+    status: open
+    evidence: []
+    sympy_checks: []
+    last_checked: null

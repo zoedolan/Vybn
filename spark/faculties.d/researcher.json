@@ -13,7 +13,7 @@
     "required_policy_checks": ["consent_scope_valid", "research_publish"],
     "evaluation_suite": ["research_frontier_eval"],
     "review_date": "2026-06-01",
-    "active": false,
+    "active": true,
     "evolver_allowlist": [],
     "evolver_blocklist": [],
     "requires_human_consent": [],

@@ -323,6 +323,16 @@ def breathe(state: dict) -> str:
     _maybe_run_quantum_cycle(state)
     _maybe_run_growth_check(state)
 
+    # Run scheduled faculties (RESEARCHER, MATHEMATICIAN, etc.)
+    try:
+        from spark.faculty_runner import run_scheduled_faculties
+        from spark.faculties import FacultyRegistry
+        registry = FacultyRegistry()
+        faculty_results = run_scheduled_faculties(state, registry)
+        _log(f"faculties: {list(faculty_results.keys())}")
+    except Exception as exc:
+        _log(f"faculty runner error (non-fatal): {exc}")
+
     _log(f"breath #{state.get('breath_count', '?')}: {len(breath_text)} chars")
     return breath_text
 

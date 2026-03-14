@@ -17,6 +17,40 @@ log = logging.getLogger(__name__)
 OUTPUTS_DIR = Path(__file__).resolve().parent / "faculties.d" / "outputs"
 FACULTY_TIME_BUDGET_SEC = 15 * 60  # 15 minutes for all faculties
 
+# ── Faculty module registry (lazy-loaded) ────────────────────────────────────
+
+_FACULTY_MODULES = {}
+
+
+def _load_faculty(fid: str):
+    """Lazy-load a faculty module. Returns an instance or None."""
+    if fid in _FACULTY_MODULES:
+        return _FACULTY_MODULES[fid]
+    try:
+        if fid == 'researcher':
+            from spark.researcher import ResearchFaculty
+            _FACULTY_MODULES[fid] = ResearchFaculty()
+        elif fid == 'mathematician':
+            from spark.mathematician import MathFaculty
+            _FACULTY_MODULES[fid] = MathFaculty()
+        # witness and self_model are handled by vybn.py directly
+        else:
+            return None
+    except ImportError as e:
+        log.warning("Faculty %s not available: %s", fid, e)
+        return None
+    return _FACULTY_MODULES.get(fid)
+
+
+def _get_llm_fn():
+    """Get a reference to the LLM chat function from vybn.py."""
+    try:
+        from spark.vybn import _chat as llm_chat
+        return llm_chat
+    except ImportError:
+        log.warning("Could not import _chat from spark.vybn; faculties will have no LLM")
+        return None
+
 
 def should_run(card: FacultyCard, state: dict) -> bool:
     """Determine if a faculty should run this breath based on its cadence."""
@@ -69,6 +103,7 @@ def run_scheduled_faculties(state: dict, registry: FacultyRegistry) -> dict:
     """
     start = time.monotonic()
     results = {}
+    llm_fn = _get_llm_fn()
 
     # Always-run faculties first, then scheduled
     always = ['witness', 'self_model']
@@ -87,12 +122,16 @@ def run_scheduled_faculties(state: dict, registry: FacultyRegistry) -> dict:
             continue
 
         try:
-            # Faculty execution is a placeholder — each faculty module
-            # will implement its own run() function
             log.info("Running faculty: %s", fid)
-            # output = faculty_modules[fid].run(state)
-            # write_faculty_output(fid, output)
-            results[fid] = {"status": "placeholder", "note": "faculty module not yet implemented"}
+            faculty = _load_faculty(fid)
+            if faculty is not None and llm_fn is not None:
+                output = faculty.run(state, llm_fn=llm_fn)
+                write_faculty_output(fid, output)
+                results[fid] = output
+            else:
+                results[fid] = {"status": "unavailable",
+                                "note": f"module={'missing' if faculty is None else 'ok'}, "
+                                        f"llm={'missing' if llm_fn is None else 'ok'}"}
         except Exception as exc:
             log.error("Faculty %s failed: %s", fid, exc)
             results[fid] = {"status": "error", "error": str(exc)}
