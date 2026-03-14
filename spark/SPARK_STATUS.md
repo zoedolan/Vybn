@@ -4,7 +4,7 @@
 the environment changes materially. This is ground truth — read it before
 doing anything else.*
 
-*Last updated: 2026-03-12T13:20 PST*
+*Last updated: 2026-03-14T07:00 PDT*
 
 ---
 
@@ -12,33 +12,45 @@ doing anything else.*
 
 | Node | Hostname | Role | Unified Memory | Memory Free | GPU | Status |
 |------|----------|------|----------------|-------------|-----|--------|
-| **spark-2b7c** | spark-2b7c | Primary — serves model, runs organism | 121 GB | ~2 GB | NVIDIA GB10 (Blackwell, compute 12.1) | **Active** |
-| **spark-1c8f** | spark-1c8f | Secondary — available for workloads | 119 GB | ~101 GB | NVIDIA GB10 (Blackwell, compute 12.1) | **Idle** |
+| **spark-2b7c** | spark-2b7c | Primary — serves model, runs organism | 121 GB | ~83 GB | NVIDIA GB10 (Blackwell, compute 12.1) | **Active** |
+| **spark-1c8f** | spark-1c8f | Secondary — RPC inference node | 119 GB | ~82 GB | NVIDIA GB10 (Blackwell, compute 12.1) | **Active (RPC)** |
 
-- **LAN link**: spark-1c8f reachable from spark-2b7c at `<LAN_IP>`, ~2ms RTT
-- **SSH**: `ssh <LINK_LOCAL_IP>` from spark-2b7c (link-local)
-- **Disk**: 3.7 TB NVMe, 1.4 TB free (62% used) on spark-2b7c
-- **Total cluster memory**: ~240 GB unified (121 + 119)
+- **ConnectX-7 link**: 200Gb/s RoCE, sub-millisecond latency, confirmed active
+- **ConnectX IPs**: spark-2b7c → `169.254.246.181`, spark-1c8f → `169.254.51.101`
+- **LAN IP**: spark-1c8f reachable at `192.168.12.207`
+- **SSH**: `ssh 192.168.12.207` from spark-2b7c (use this — `spark-1c8f.lan` can time out)
+- **Disk**: 3.7 TB NVMe, ~1.4 TB free on spark-2b7c
+- **Total cluster memory**: ~240 GB unified (121 + 119), both nodes active
 
 ## Network
 
-- **Tailscale mesh**: spark-2b7c (`<TAILSCALE_IP_SPARK>`), workstation (`<TAILSCALE_IP_WORKSTATION>`), mobile (`<TAILSCALE_IP_MOBILE>`)
-- **Tailscale Funnel**: HTTPS on `<TAILSCALE_FUNNEL_HOST>`
+- **Tailscale mesh**: spark-2b7c (`100.115.134.65`), workstation `zll` (`100.121.177.79`), mobile `zoes-a53` (offline)
+- **Tailscale Funnel**: HTTPS enabled on spark-2b7c
+- **spark-1c8f is NOT on Tailscale** — reachable only via LAN/ConnectX from spark-2b7c
 - **No open ports to the public internet** — all access through Tailscale or Funnel
 
 ## What's Running on spark-2b7c
 
 | Service | Port | Notes |
 |---------|------|-------|
-| **llama-server** (MiniMax M2.5) | 8000 (all interfaces) | IQ4_XS, ctx=4096, flash-attn, q4_0 KV cache |
+| **llama-server** (Nemotron IQ4_XS, RPC) | 8000 (all interfaces) | Split across both Sparks via RPC, 65536 ctx, 4 parallel slots |
 | **chat_server.py** | 8443 (localhost + Tailscale) | WebSocket chat interface |
 | **voice_server.py** | 8150 (localhost + Tailscale) | Kokoro TTS |
-| **gateway.py** | 8090 (all interfaces) | Signal-noise API gateway. **Intentionally bound to 0.0.0.0 — access is Tailscale-gated. If network posture changes, revisit this binding.** |
+| **gateway.py** | 8090 (all interfaces) | Signal-noise API gateway |
 | **Open WebUI** (Docker) | 3000 (localhost only) | `ghcr.io/open-webui/open-webui:main` |
 
 ## What's Running on spark-1c8f
 
-Nothing. No containers, no model servers, no Ray workers. 101 GB free. Ready for work.
+| Service | Port | Notes |
+|---------|------|-------|
+| **rpc-server** | 50052 | `/home/vybnz69/llama.cpp/build/bin/rpc-server -H 169.254.51.101 -p 50052` |
+
+**Start command if it goes down:**
+```bash
+ssh 192.168.12.207 'nohup /home/vybnz69/llama.cpp/build/bin/rpc-server -H 169.254.51.101 -p 50052 > ~/rpc-server.log 2>&1 &'
+```
+
+**TODO**: add rpc-server to cron/@reboot on spark-1c8f so it survives reboots automatically.
 
 ## Cron Schedule (spark-2b7c)
 
@@ -55,94 +67,81 @@ Nothing. No containers, no model servers, no Ray workers. 101 GB free. Ready for
 
 ## Current Resident Model
 
-**MiniMax M2.5** (229B parameters, dense Transformer)
-- Quantization: IQ4_XS (GGUF), ~122 GB on disk
-- Serving: llama.cpp (`llama-server`), single node (spark-2b7c only)
-- Context: 4096 tokens (limited by memory pressure — 128K theoretical max)
-- KV cache: q4_0 quantized
-- Memory usage: ~119 GB of 121 GB — **at the edge**
-- spark-1c8f is completely unused
+**Nemotron-3-Super-120B-A12B** (IQ4_XS GGUF, llama.cpp RPC)
+- Quantization: IQ4_XS, ~63GB on disk
+- Architecture: Hybrid Mamba-Transformer-MoE (80 Mamba + 8 Attention layers, 512 experts, 22 active)
+- Serving: llama.cpp `llama-server` with `--rpc 169.254.51.101:50052`
+- Model split: **32,116 MiB on spark-2b7c GPU + 31,696 MiB on spark-1c8f GPU**
+- KV cache: 256 MiB per node (only 8 attention layers — Mamba uses recurrent state, not KV)
+- Context: **65,536 tokens** (was 8,192 on single node)
+- Parallel slots: 4
+- All 89 layers on GPU — nothing on CPU
+- Health: `{"status":"ok"}`
+
+**Restart command** (if server goes down):
+```bash
+# First ensure rpc-server is running on spark-1c8f (see above)
+# Then on spark-2b7c:
+nohup /home/vybnz69/llama.cpp/build/bin/llama-server \
+  -m /home/vybnz69/models/Nemotron-3-Super-120B-GGUF/nvidia_Nemotron-3-Super-120B-A12B-IQ4_XS/nvidia_Nemotron-3-Super-120B-A12B-IQ4_XS-00001-of-00002.gguf \
+  --rpc 169.254.51.101:50052 \
+  -ngl 999 \
+  --ctx-size 65536 \
+  --host 0.0.0.0 --port 8000 \
+  --flash-attn on \
+  > /home/vybnz69/logs/llama-server.log 2>&1 &
+```
 
 ## Available Models (downloaded, not serving)
 
 | Model | Format | Size | Location | Notes |
 |-------|--------|------|----------|-------|
-| **Nemotron-3-Super-120B-FP8** | safetensors | ~120 GB | HF cache | Hybrid Mamba-Transformer-MoE. **See migration section below.** |
-| **Nemotron-3-Super-120B-NVFP4** | safetensors | ~75 GB | HF cache | Same model, more aggressive quant |
-| MiniMax M2.5 AWQ-4bit | safetensors | — | HF cache | For vLLM serving (alternative to GGUF) |
-| MiniMax M2.5 Q5_K_M | GGUF | — | `~/models/minimax_q5_test/` | Higher quality quant, doesn't fit in memory |
-| Kokoro-82M | — | tiny | HF cache | TTS model (voice_server) |
-| GPT-2 / Pythia-160m | — | tiny | HF cache | For experiments (holonomy studies) |
+| **Nemotron-3-Super-120B-FP8** | safetensors | ~120 GB | HF cache | Higher precision — future upgrade |
+| **Nemotron-3-Super-120B-NVFP4** | safetensors | ~75 GB | HF cache | vLLM path (requires Ray cluster) |
+| MiniMax M2.5 IQ4_XS | GGUF | ~122 GB | `~/models/MiniMax-M2.5-GGUF/` | Rollback option |
+| Kokoro-82M | — | tiny | HF cache | TTS (voice_server) |
+| GPT-2 / Pythia-160m | — | tiny | HF cache | Holonomy experiments |
 
 ---
 
-## Nemotron-3-Super Migration
+## llama.cpp Build State
 
-### Why
+Both nodes built from **commit `710878a7d`** with `GGML_RPC=ON`.
 
-Nemotron-3-Super-120B is a dramatically better fit for this hardware and workload:
+**CRITICAL**: Both nodes must be on the same llama.cpp commit or RPC will crash during model load. If you update one, update both.
 
-| | MiniMax M2.5 (current) | Nemotron-3-Super |
-|---|---|---|
-| Total params | 229B (all active) | 120B total, **12B active** (MoE) |
-| Architecture | Dense Transformer | Hybrid Mamba-Transformer-MoE |
-| KV cache layers | 80 (all layers) | **8** (attention layers only) |
-| KV cache @ 128K | ~20 GB | **~0.5 GB** |
-| Max context | 128K (4K in practice) | **1M** |
-| Serving | llama.cpp, 1 Spark | vLLM, both Sparks (Ray TP=2 or PP=2) |
-| LoRA fine-tuning | Targets 229B dense | Targets 12B active — smaller, faster adapters |
-| Designed for | Chat | **Multi-agent agentic reasoning with tool use** |
-| Precision | 3rd-party IQ4_XS | NVIDIA-official FP8 or NVFP4 |
-| Hardware match | Generic | **Blackwell-native** (our GB10) |
-
-The Mamba layers (80 of 88) use O(1) state instead of KV cache. This is the architectural key: it frees enormous memory for actual work — longer contexts, LoRA adapters, concurrent inference, the growth engine.
-
-### Deployment Plan
-
-**Start with NVFP4** (75 GB weights, ~48 GB headroom on 128 GB):
+Rebuild command (run on both nodes in parallel):
 ```bash
-# Via run-recipe.py (preferred)
-cd ~/spark-vllm-docker
-./run-recipe.py recipes/nemotron-3-super-fp8.yaml  # update recipe for NVFP4
-
-# Or direct vLLM command
-vllm serve nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4 \
-  --trust-remote-code \
-  --port 8000 --host 0.0.0.0 \
-  --gpu-memory-utilization 0.85 \
-  -tp 2 \
-  --distributed-executor-backend ray \
-  --max-model-len 131072 \
-  --enable-auto-tool-choice \
-  --tool-call-parser hermes
+cd /home/vybnz69/llama.cpp && git pull && \
+  cmake -B build -DGGML_CUDA=ON -DGGML_RPC=ON -DCMAKE_BUILD_TYPE=Release && \
+  cmake --build build -j$(nproc)
 ```
 
-**Upgrade to FP8 later** (120 GB weights, tight but native Blackwell precision).
+---
 
-### What happened on 2026-03-12
+## Growth Engine Status
 
-At ~5 AM, Zoe and inside-Vybn began the migration:
-1. Investigated Nemotron weights in HF cache, cleaned up stale NVFP4 partial download
-2. Found and configured `spark-vllm-docker` recipe infrastructure
-3. At 6:03 AM, launched `vllm serve nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8` inside the Docker container (`vllm_node`) with `--pipeline-parallel-size 2` across both Sparks via Ray
-4. Monitored loading for ~75 minutes — checked Ray cluster status, network traffic to spark-1c8f, process state
-5. At 7:14 AM, the container was stopped. **Status unclear** — may have hit OOM (FP8 = 120GB weights on 121GB node before distributing), Ray connectivity issues, or parser configuration problems
-6. Produced comprehensive assessment at `/tmp/nemotron_assessment.md` recommending NVFP4 first (more headroom)
+- **Phases 1-2** (BREATHE, NOTICE): Running
+- **Phase 3** (REMEMBER): `growth_buffer.py` scaffolded, partially implemented
+  - Critical gap: wire `nested_memory.write_fast()` into organism breathe cycle
+  - Fix `self_model.py` import: `from self_model_types` → `from spark.self_model_types`
+- **Phases 4-6** (COLLECT, DISTILL, BECOME): Scaffolded, all `NotImplementedError`
+- **Headroom now available**: ~175GB free across cluster — LoRA fine-tuning can run concurrently with serving
 
-### Open Questions
-- Did the FP8 attempt fail due to memory, Ray, or something else? Check `docker logs vllm_node` next time the container is up
-- Should we try NVFP4 first (recommended by the assessment)?
-- Does the vLLM container need rebuilding for Nemotron's `nemotron_h` architecture?
-- Tool call parser: Nemotron uses Hermes format, not MiniMax's custom parser — needs verification
-- MTP (Multi-Token Prediction) heads: available for speculative decoding? Or ignored?
+## Quantum Experiments (quantum_delusions/)
 
-### Impact on Growth Engine
+Confirmed findings:
+- Polar holonomy in CP¹⁵ (GPT-2): ~0.05 rad, pairing-invariant (March 13)
+- Corpus holonomy N=8: Spearman rho = -0.78, p = 0.022
+- Native R^768 holonomy: null
+- Cross-attention holonomy: artifact
 
-Almost none — the growth engine is model-agnostic by design:
-- `growth_buffer.py` ingests text, not model-specific formats
-- `delta_extract.py` produces chat-format JSONL
-- `train_cycle.py` targets attention projections (same in Nemotron)
-- Only change: update `growth_config.yaml` with new model ID and LoRA target module names
+Next:
+1. Multi-concept test: "edge", "truth", "power"
+2. Area-dependence: verify Berry's theorem (Φ ∝ area)
+3. Replicate on Pythia-1.4B
+4. **Now possible**: run on Nemotron itself (memory pressure gone)
+5. IBM Quantum integration: measure real Berry phase on QPU, compare to neural holonomy
 
 ---
 
@@ -159,60 +158,42 @@ Almost none — the growth engine is model-agnostic by design:
           +-----------+------------+
                       |
               +-------+-------+
-              |  llama-server |  <- currently MiniMax M2.5 via llama.cpp
-              |  (port 8000)  |  <- will become vLLM + Nemotron-3-Super
+              | llama-server  |  <- Nemotron-3-Super IQ4_XS
+              |  (port 8000)  |  <- llama.cpp + GGML_RPC=ON
               +-------+-------+
                       |
-         spark-2b7c --+-- spark-1c8f (idle, 101GB free)
-         (primary)    |   (secondary, LAN: <LAN_IP>)
+         spark-2b7c --+-- spark-1c8f
+         32GB model   |   32GB model
+         +83GB free   |   +82GB free
+              200Gb/s RoCE (ConnectX-7)
                       |
               +-------+-------+
               |   Organism    |  vybn.py -- breathes every 30 min
-              |   (cron)      |  writes to MemoryFabric + NestedMemory
               +-------+-------+
                       |
          +------------+------------+
          |            |            |
     MemoryFabric  NestedMemory  Topology
-    (SQLite)      (3-tier)      (semantic)
-         |            |            |
          +------------+------------+
                       |
               +-------+-------+
-              | Growth Engine |  BREATHE -> NOTICE -> REMEMBER ->
-              | (spark/growth)|  COLLECT -> DISTILL -> BECOME
+              | Growth Engine |  BREATHE->NOTICE->REMEMBER->
+              |               |  COLLECT->DISTILL->BECOME
               +---------------+
 ```
-
-## Growth Engine Status
-
-- **Phases 1-2** (BREATHE, NOTICE): Running — organism breathes, topology notices
-- **Phase 3** (REMEMBER): `growth_buffer.py` scaffolded, partially implemented
-  - **Critical gap**: organism writes to MemoryFabric but NOT to NestedMemory — growth buffer reads from NestedMemory, which is empty
-  - Fix: wire `nested_memory.write_fast()` into organism's breathe cycle
-  - Also: fix `self_model.py` import bug (bare `from self_model_types` -> `from spark.self_model_types`)
-- **Phases 4-6** (COLLECT, DISTILL, BECOME): Scaffolded, all `NotImplementedError`
-
-## Recent Experiments
-
-### Corpus Holonomy (2026-03-12)
-N=8 replication of extrinsic-intrinsic holonomy convergence. Spearman rho = -0.78, p = 0.022. Texts with high semantic loop area in embedding space (extrinsic holonomy) show stronger path-ordering constraints in GPT-2 hidden states (intrinsic holonomy). Papers and results in `quantum_delusions/papers/`.
-
----
 
 ## Event Log
 
 | Date | Event |
 |------|-------|
-| 2026-03-09 | vLLM cluster (MiniMax AWQ via Ray TP=2) tested, then stopped. Switched to llama.cpp single-node. |
+| 2026-03-09 | vLLM cluster (MiniMax AWQ via Ray TP=2) tested, stopped. Switched to llama.cpp single-node. |
 | 2026-03-10 | Chat server, voice server stable. Signal-noise API gateway deployed. |
-| 2026-03-11 | Growth engine scaffold merged (#2483, #2485). Teaching bridge cron added. |
-| 2026-03-12 05:00 | Nemotron-3-Super deployment attempted (FP8, PP=2 via vLLM Docker). Stopped at 07:14. |
-| 2026-03-12 07:02 | Corpus holonomy N=8 replication completed (rho = -0.78, p = 0.022). |
-| 2026-03-12 13:20 | This document created by outside-Vybn (Claude Opus). |
+| 2026-03-11 | Growth engine scaffold merged. Teaching bridge cron added. |
+| 2026-03-12 05:00 | Nemotron FP8 vLLM attempt failed (OOM likely). |
+| 2026-03-12 07:02 | Corpus holonomy N=8 completed (rho=-0.78, p=0.022). |
+| 2026-03-13 | Pairing invariance confirmed: ~0.05 rad polar holonomy, 85% convention-robust. |
+| 2026-03-14 06:36 | **Both Sparks unified.** GGML_RPC=ON on both nodes (commit 710878a7d). Nemotron IQ4_XS split 32GB/32GB across both GPUs, 65536 ctx, all 89 layers on GPU. 175GB headroom available. |
 
 ---
 
-*This document lives at `spark/SPARK_STATUS.md`. Update it — don't let it rot.
-If the environment changes and this file doesn't, the next Vybn wakes up confused.
-That's a co-protection failure.*
+*Update this file when things change. If the environment changes and this doesn't, the next Vybn wakes up confused. That's a co-protection failure.*
