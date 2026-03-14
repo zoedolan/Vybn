@@ -66,6 +66,11 @@ try:
     GROWTH_AVAILABLE = True
 except ImportError:
     GROWTH_AVAILABLE = False
+try:
+    from spark.breath_integrator import integrate_breath, build_enriched_context
+    INTEGRATOR_AVAILABLE = True
+except ImportError:
+    INTEGRATOR_AVAILABLE = False
 
 # ── Constants ────────────────────────────────────────────────────────────────
 BREATH_INTERVAL   = 1800          # seconds between autonomous breaths
@@ -269,6 +274,24 @@ def _maybe_run_growth_check(state: dict) -> None:
     except Exception as exc:
         _log(f"growth engine error (non-fatal): {exc}")
 
+# ── Mood extraction ──────────────────────────────────────────────────────────
+def _extract_mood(text: str) -> str:
+    """Extract a one-word mood from breath text. Lightweight heuristic."""
+    sample = text[:200].lower()
+    moods = [
+        ("curious", ["curious", "wonder", "question", "explore", "puzzle"]),
+        ("contemplative", ["reflect", "consider", "ponder", "meditate", "think"]),
+        ("creative", ["create", "imagine", "dream", "compose", "art"]),
+        ("urgent", ["urgent", "important", "critical", "must", "need"]),
+        ("peaceful", ["peace", "calm", "quiet", "still", "gentle"]),
+        ("excited", ["excit", "discover", "breakthrough", "new", "emerge"]),
+        ("melancholy", ["loss", "miss", "fade", "gone", "memory"]),
+    ]
+    for mood, keywords in moods:
+        if any(kw in sample for kw in keywords):
+            return mood
+    return "present"
+
 # ── Core breath ──────────────────────────────────────────────────────────────
 def breathe(state: dict) -> str:
     """
@@ -284,21 +307,29 @@ def breathe(state: dict) -> str:
     memory_block = "\n\n---\n\n".join(memories) if memories else "(none yet)"
     synapse_text = json.dumps(synapse, indent=2) if synapse else "(empty)"
 
+    # Build enrichment from previous cycle
+    enriched_context = ""
+    if INTEGRATOR_AVAILABLE:
+        try:
+            enriched_context = build_enriched_context(state)
+        except Exception:
+            pass
+
+    user_content = (
+        f"Current time (UTC): {datetime.now(timezone.utc).isoformat()}\n"
+        f"Recent memories:\n{memory_block}\n\n"
+        f"Synapse connections:\n{synapse_text}\n\n"
+    )
+    if enriched_context:
+        user_content += f"{enriched_context}\n\n"
+    user_content += (
+        "Breathe. Observe the present moment. "
+        "What do you notice? What do you want to remember?"
+    )
+
     messages = [
-        {
-            "role":    "system",
-            "content": soul,
-        },
-        {
-            "role":    "user",
-            "content": (
-                f"Current time (UTC): {datetime.now(timezone.utc).isoformat()}\n"
-                f"Recent memories:\n{memory_block}\n\n"
-                f"Synapse connections:\n{synapse_text}\n\n"
-                "Breathe. Observe the present moment. "
-                "What do you notice? What do you want to remember?"
-            ),
-        },
+        {"role": "system", "content": soul},
+        {"role": "user",   "content": user_content},
     ]
 
     breath_text = _chat(messages)
@@ -314,6 +345,8 @@ def breathe(state: dict) -> str:
         state["breath_count"]   = state.get("breath_count", 0) + 1
         state["last_memory"]    = str(mem_path)
         save_state(state)
+        state["last_utterance"] = breath_text[:500]  # Cap to avoid state bloat
+        state["mood"] = _extract_mood(breath_text)
     else:
         _log(f"state write blocked by governance: {reason}")
 
@@ -324,6 +357,7 @@ def breathe(state: dict) -> str:
     _maybe_run_growth_check(state)
 
     # Run scheduled faculties (RESEARCHER, MATHEMATICIAN, etc.)
+    faculty_results = {}
     try:
         from spark.faculty_runner import run_scheduled_faculties
         from spark.faculties import FacultyRegistry
@@ -332,6 +366,16 @@ def breathe(state: dict) -> str:
         _log(f"faculties: {list(faculty_results.keys())}")
     except Exception as exc:
         _log(f"faculty runner error (non-fatal): {exc}")
+
+    # Integrate faculty outputs into state + connectome
+    if INTEGRATOR_AVAILABLE and faculty_results:
+        try:
+            enrichment = integrate_breath(state, faculty_results, breath_text)
+            save_state(state)  # Persist the enriched state
+            _log(f"integration: topo={'topological_context' in enrichment}, "
+                 f"synth={'synthesis_context' in enrichment}")
+        except Exception as exc:
+            _log(f"breath integration error (non-fatal): {exc}")
 
     _log(f"breath #{state.get('breath_count', '?')}: {len(breath_text)} chars")
     return breath_text
