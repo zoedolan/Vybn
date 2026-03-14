@@ -56,3 +56,7 @@ WITNESS_LOG        = MIND_DIR / "witness.jsonl"
 # ── Quantum ──────────────────────────────────────────────────────────────────
 QUANTUM_BUDGET_LEDGER = MIND_DIR / "quantum_budget.jsonl"
 QUANTUM_EXPERIMENT_LOG = MIND_DIR / "quantum_experiments.jsonl"
+
+# ── Synthesis ────────────────────────────────────────────────────────────────
+SYNTHESIS_DIR       = MIND_DIR / "synthesis"
+BREATH_SUMMARY_DIR  = MIND_DIR / "breath_summaries"
