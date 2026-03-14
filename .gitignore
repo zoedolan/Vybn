@@ -93,3 +93,6 @@ spark/growth/cycle_history.jsonl
 spark/growth/holonomy_log.jsonl
 Vybn_Mind/memory/memory_map.md
 Vybn_Mind/memory/pins.jsonl
+
+# Complex memory state (runtime, not code)
+Vybn_Mind/memory/complex_memory.json
