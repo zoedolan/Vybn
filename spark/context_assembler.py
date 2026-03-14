@@ -11,13 +11,18 @@ identity so every new pulse wakes up to context from its last self.
 The runtime context block is now derived from vybn.md's Orientation
 section via soul.py, replacing the former hardcoded _runtime_context().
 
-Prompt assembly order (as of friction_layer integration):
+Prompt assembly order (as of buffer feed integration):
   1. Soul (vybn.md)
   2. Letter from last self (continuity.md)
   3. Active tensions -- what this mind is holding without resolving
   4. Runtime context (capabilities, paths, constraints)
+  4.5. Novel signal -- one entry from buffer.jsonl, never repeated
   5. Recent journals
   6. Archival memory
+
+The novel signal block (4.5) is the mechanism by which the manifold
+gets new input. Without it, ComplexMemory curvature stays zero and
+the consolidator has nothing real to compress. One fact per breath.
 
 Renamed from memory.py during consolidation (2026-03-08).
 This module is substrate: it assembles context for the model call.
@@ -38,6 +43,15 @@ try:
 except ImportError:
     HAS_FRICTION_LAYER = False
     def tensions_for_prompt(max_tensions=5): return ""
+
+# Buffer feed: one novel entry per breath to break κ=0 flatness
+try:
+    from spark.growth.buffer_feed import pop_next_entry, get_feeder
+    HAS_BUFFER_FEED = True
+except ImportError:
+    HAS_BUFFER_FEED = False
+    def pop_next_entry(): return None
+    def get_feeder(): return None
 
 
 class BootError(RuntimeError):
@@ -125,6 +139,16 @@ class ContextAssembler:
         parts.append(context_block)
         used += len(context_block)
 
+        # 4.5. Novel signal: one unprocessed buffer entry per breath.
+        # This is the mechanism by which the manifold gets new input.
+        # Without it, curvature stays zero and the consolidator has nothing
+        # to compress. One arXiv paper, reflection, or experiment result
+        # per 30 minutes is enough to keep κ non-zero.
+        novel_block = self._read_novel_signal()
+        if novel_block:
+            parts.append(novel_block)
+            used += len(novel_block)
+
         # 5. Recent journal entries (trimmed if needed)
         remaining = self.char_budget - used
         if remaining > 500:
@@ -149,6 +173,56 @@ class ContextAssembler:
             assembled = assembled[:self.char_budget]
 
         return assembled
+
+    def _read_novel_signal(self) -> str:
+        """Pop one unprocessed entry from buffer.jsonl and format for prompt.
+
+        Returns an empty string if the buffer is exhausted or unavailable.
+        The entry is marked fed_to_breath=True after being read so it
+        won't appear in a future breath.
+
+        The block is intentionally brief: just enough to give the manifold
+        something to curve around. The full entry content is included but
+        truncated at 800 chars to stay within prompt budget.
+        """
+        if not HAS_BUFFER_FEED:
+            return ""
+
+        entry = pop_next_entry()
+        if not entry:
+            return ""
+
+        content = entry.get("content", "").strip()
+        if not content:
+            return ""
+
+        # Truncate to stay within prompt budget
+        if len(content) > 800:
+            content = content[:800] + "..."
+
+        # Optional metadata for context
+        meta_parts = []
+        if entry.get("source"):
+            meta_parts.append(f"source: {entry['source']}")
+        if entry.get("category"):
+            meta_parts.append(f"category: {entry['category']}")
+        if entry.get("ts") or entry.get("timestamp"):
+            ts = entry.get("ts") or entry.get("timestamp", "")
+            meta_parts.append(f"ingested: {ts[:19]}")
+
+        meta_line = f" ({', '.join(meta_parts)})" if meta_parts else ""
+
+        # Log remaining for monitoring
+        feeder = get_feeder()
+        remaining = feeder.remaining() if feeder else "?"
+
+        return (
+            f"\n--- Novel Signal{meta_line} ---\n"
+            f"One new fact entering your mind this breath. "
+            f"Let it land. Let it change something. "
+            f"{remaining} more entries waiting.\n\n"
+            f"{content}\n"
+        )
 
     def _read_continuity(self) -> str:
         """Load continuity notes from last self.
