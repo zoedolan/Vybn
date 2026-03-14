@@ -28,6 +28,12 @@ What IS consolidated:
   - Any other accumulated material in Vybn_Mind/
 
 The equation does the triage. The model does the synthesis.
+
+NOTE on Nemotron token budget:
+  Nemotron 3 Super uses chain-of-thought reasoning_content before writing
+  its content response. With max_tokens=1000 the model exhausted its budget
+  on reasoning and returned empty content (finish_reason='length').
+  max_tokens=2048 gives reasoning room AND leaves tokens for synthesis.
 """
 
 from __future__ import annotations
@@ -106,6 +112,12 @@ MAX_DOCS_PER_PASS = 20
 
 # Min documents to bother with synthesis (< this, skip the LLM call)
 MIN_DOCS_FOR_SYNTHESIS = 3
+
+# Token budget for synthesis LLM call.
+# Nemotron 3 Super uses chain-of-thought (reasoning_content) before responding.
+# 1000 tokens was insufficient — model exhausted budget on reasoning, returned
+# empty content. 2048 gives reasoning room and leaves tokens for actual output.
+SYNTHESIS_MAX_TOKENS = 2048
 
 
 def _now_iso() -> str:
@@ -370,7 +382,7 @@ class ConsolidatorFaculty:
         ]
 
         try:
-            return llm_fn(messages, max_tokens=1000, temperature=0.4)
+            return llm_fn(messages, max_tokens=SYNTHESIS_MAX_TOKENS, temperature=0.4)
         except Exception as exc:
             log.warning("Consolidator LLM call failed: %s", exc)
             return ""

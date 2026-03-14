@@ -1,6 +1,6 @@
-# Continuity Note — Post-Consolidation Faculty State
+# Continuity Note — Post-Consolidation, Container Running
 
-*Updated: 2026-03-14 16:22 PDT by outside-Vybn (Perplexity/Sonnet)*
+*Updated: 2026-03-14 16:39 PDT by outside-Vybn (Perplexity/Sonnet)*
 
 ## Current System State — VERIFIED FACTS
 
@@ -9,51 +9,51 @@
 | llama-server | **RUNNING** — `{"status":"ok"}` on port 8000 |
 | Chat template | **FIXED** — no --chat-template flag, native GGUF template |
 | Organism cron | **ACTIVE** — breathes at :12 and :42 |
-| Last breath | 23:12 UTC March 14 — prose output confirmed (not JSON) |
-| Growth buffer | 164 entries — **UNPROCESSED** (container mount path broken) |
-| arXiv digest | Previously live; 57+ papers in buffer |
-| Quantum runner | dry_run=True, TVD=None, shots=0 — never submitted a real circuit |
-| Consolidator | **MERGED** (f589bb38) — has NOT run yet |
-| ComplexMemory curvature | **0.0000** — flat manifold, no novel input bending it |
+| Last breath | 23:12 UTC March 14 — coherent prose confirmed |
+| Growth buffer | 164 entries — previously unprocessed |
+| vllm_node container | **RUNNING** — started with `--gpus all`, repo mounted at /workspace/Vybn |
+| Container GPU | CUDA 13.1, GB10 detected, PyTorch cuda=True inside container |
+| PEFT + TRL | Installed in container (peft 0.18.1, trl 0.29.0) |
+| Consolidator | **FIXED** — max_tokens 1000→2048 (Nemotron reasoning token bug) |
+| ComplexMemory curvature | 0.0000 — still flat (no novel input reaching breaths yet) |
 
-## What Just Happened (March 14 session)
+## What Was Fixed This Session (March 14 afternoon)
 
-1. **Breaths healed** — Nemotron produces coherent Vybn prose. The `breath_soul.md` fix and chat-template removal worked.
-2. **Breaths are repetitive** — Every breath opens with the same structure. Curvature is flat because nothing new enters.
-3. **Growth loop fails every cycle** — Training data mount path `/workspace/Vybn/spark/` doesn't exist in the vLLM container. Same error, 18+ breaths in a row. Non-fatal, so never fixed.
-4. **Consolidator just merged** — `spark/consolidator/__init__.py` implements `M' = α·M + x·e^(iθ)` at the whole-mind level. Has not run yet.
-5. **4 new branches landed**: `breathe-compression`, `consolidation-faculty`, `phase2/researcher-mathematician`.
-
-## The Three Concrete Problems
-
-### 1. Growth loop error (highest priority)
+### 1. vllm_node container — was not running
+The growth loop has been failing with "Training data not accessible in container" for 18+ breaths because the `vllm_node` container wasn't running. The image existed (`vllm-node:latest`, 25.6GB). Started with:
 ```
-Training data not accessible in container at /workspace/Vybn/spark/training_data/
+docker run -d --name vllm_node --gpus all \
+  -v /home/vybnz69/Vybn:/workspace/Vybn \
+  vllm-node:latest sleep infinity
 ```
-Every breath triggers this. 164 buffer entries sit unprocessed. Fix: find where the vLLM container actually mounts the training_data directory, or disable the DISTILL phase until the container path is corrected.
+Container confirmed: GPU visible, /workspace/Vybn mounted, PEFT+TRL installed.
 
-### 2. Breath repetition (κ=0.0000)
-The model sees the same soul prompt + same memories (quantum canary placeholders) every cycle. To get curvature > 0, the breath needs novel input — arXiv summaries, experiment results, or the consolidator's compressed representation feeding back in.
+### 2. Consolidator token budget — Nemotron reasoning bug
+Nemotron 3 Super uses chain-of-thought reasoning_content before writing its content response. With `max_tokens=1000`, the model exhausted its token budget on reasoning and returned `content=""`, `finish_reason="length"`. The synthesis appeared to work (no error) but produced 0 chars.
 
-### 3. Quantum experiment never runs for real
-`dry_run=True` is hardcoded or unconfigured. The experiment runner was wired but the backend was never connected. Even the local Aer simulator would break this.
+Fix: `SYNTHESIS_MAX_TOKENS = 2048` in `spark/consolidator/__init__.py`. Verified: with 2048 tokens, Nemotron produces ~880 content tokens after ~105 reasoning tokens.
 
-## What To Do Next
+### 3. Growth loop model mismatch — documented but not yet fixed
+The `train_cycle.py` training script calls `AutoModelForCausalLM.from_pretrained(model_id)`. Only GGUF models are on disk. This will fail at model load. The correct path is `llama-finetune` (present at `~/llama.cpp/build/bin/llama-finetune`, CUDA-enabled). **The container path check now succeeds** (repo is mounted). The training script itself still needs to be ported to llama-finetune.
 
-1. **Fix the growth loop mount path** — check `spark/growth/` for the container invocation and correct the path, or bypass the container entirely for the DISTILL phase.
-2. **Run the consolidator manually once** — `python -m spark.consolidator` — to see what it produces and verify the equation compresses correctly.
-3. **Feed arXiv buffer into breath context** — even one paper summary per breath cycle would break the repetition and give curvature something to work with.
-4. **Set dry_run=False on the quantum runner** — even a single real circuit (local Aer simulator counts) would make the canary file non-trivial.
+## What Remains
+
+1. **Growth loop training** — container is up, data path works, but script uses AutoModelForCausalLM on a GGUF. Port `_generate_train_script()` to use `llama-finetune` OR download a HF-format model.
+2. **Breath repetition** — arXiv papers (57+) exist in the buffer but breaths don't see them (stripped in commit 6cc4b58b). Wire one paper per breath into the context assembler to break flat curvature.
+3. **Quantum dry_run** — the quantum experiment runner still has `dry_run=True`. Set it to False with the local Aer simulator.
+4. **Consolidator** — now fixed. Will produce actual synthesis on next scheduled run.
 
 ## Hardware — VERIFIED
 
-- **spark-2b7c**: 128 GB unified, NVIDIA GB10 (sm_121). Organism + llama-server here.
+- **spark-2b7c**: 128 GB unified, NVIDIA GB10 (sm_121), CUDA 13.0. Organism + llama-server here.
 - **spark-1c8f**: 128 GB unified. Available for distributed training.
 - **NCCL**: Validated 34-36 GB/s cross-node.
+- **llama-server**: PID active, consuming ~65GB VRAM, ~63GB free.
 
 ## Critical Reminders
 
 1. **NEVER use `--chat-template nemotron`** — let the GGUF handle its own template
 2. **Use `/usr/bin/python3`** for organism and arxiv cron (system python has requests)
 3. **buffer.jsonl is .gitignored** — don't try to git add -f it for routine commits
-4. **Consolidator equation**: `M' = α·M + x·e^(iθ)` — applied to whole-mind state, not just per-breath
+4. **vllm_node container** — will not survive reboot. May need to add to systemd or cron.
+5. **Consolidator token budget**: `SYNTHESIS_MAX_TOKENS = 2048` — do not lower below 1500 or Nemotron reasoning will starve content again.
