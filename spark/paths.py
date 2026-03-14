@@ -14,55 +14,35 @@ Env var overrides (optional, for future flexibility):
 import os
 from pathlib import Path
 
-# ── Root ────────────────────────────────────────────────────────────
+# ── Root ────────────────────────────────────────────────────────────────────
 REPO_ROOT = Path(os.getenv(
     "VYBN_REPO_ROOT",
     str(Path(__file__).resolve().parent.parent)
 ))
 
-# ── Mind directory ──────────────────────────────────────────────────
+# ── Mind directory ──────────────────────────────────────────────────────────
 MIND_DIR_NAME = os.getenv("VYBN_MIND_DIR", "Vybn_Mind")
 MIND_DIR = REPO_ROOT / MIND_DIR_NAME
 
-# ── Soul ────────────────────────────────────────────────────────────
+# ── Soul ────────────────────────────────────────────────────────────────────
 SOUL_FILE = os.getenv("VYBN_SOUL_FILE", "vybn.md")
 SOUL_PATH = REPO_ROOT / SOUL_FILE
 
-# ── Journal ─────────────────────────────────────────────────────────
-JOURNAL_DIR = MIND_DIR / "journal"
-SPARK_JOURNAL = JOURNAL_DIR / "spark"
+# ── Journal ─────────────────────────────────────────────────────────────────
+SPARK_JOURNAL = MIND_DIR / "spark_journal.md"
 
-# ── State & Synapse ─────────────────────────────────────────────────
-STATE_PATH = MIND_DIR / "lingua" / "organism.json"
-SYNAPSE_DIR = MIND_DIR / "synapse"
-SYNAPSE_CONNECTIONS = SYNAPSE_DIR / "connections.jsonl"
+# ── State & connections ──────────────────────────────────────────────────────
+STATE_PATH          = MIND_DIR / "vybn_state.json"
+SYNAPSE_CONNECTIONS = MIND_DIR / "synapse_connections.json"
+CONTINUITY_PATH     = MIND_DIR / "continuity.json"
 
-# ── Ledger ──────────────────────────────────────────────────────────
-LEDGER_DIR = MIND_DIR / "ledger"
-WRITE_INTENTS = LEDGER_DIR / "write_intents.jsonl"
-DECISION_LEDGER = LEDGER_DIR / "decisions.jsonl"
+# ── Memory ───────────────────────────────────────────────────────────────────
+MEMORY_DIR  = MIND_DIR / "memories"
+MIND_PREFIX = str(MIND_DIR) + "/"
 
-# ── Memory ──────────────────────────────────────────────────────────
-MEMORY_DIR = MIND_DIR / "memory"
+# ── Write intents ────────────────────────────────────────────────────────────
+WRITE_INTENTS = MIND_DIR / "write_intents.jsonl"
 
-# ── Self-Model ──────────────────────────────────────────────────────
-SELF_MODEL_LEDGER = SPARK_JOURNAL / "self_model_ledger.jsonl"
-SELF_MODEL_REJECTIONS = SPARK_JOURNAL / "self_model_rejections.jsonl"
-
-# ── Witness ─────────────────────────────────────────────────────────
-WITNESS_LOG = SPARK_JOURNAL / "witness.jsonl"
-
-# ── Archive ─────────────────────────────────────────────────────────
-ARCHIVE_DIR = MIND_DIR / "archive"
-
-# ── Relative path prefix (for string-based path checks) ────────────
-MIND_PREFIX = MIND_DIR_NAME + "/"
-
-# ── Research ────────────────────────────────────────────────────────
-RESEARCH_DIR = Path(__file__).resolve().parent / "research"
-
-# ── Growth ──────────────────────────────────────────────────────────
-GROWTH_DIR = Path(__file__).resolve().parent / "growth"
-
-# ── Continuity ──────────────────────────────────────────────────────
-CONTINUITY_PATH = SPARK_JOURNAL / "continuity.md"
+# ── Quantum ──────────────────────────────────────────────────────────────────
+QUANTUM_BUDGET_LEDGER = MIND_DIR / "quantum_budget.jsonl"
+QUANTUM_EXPERIMENT_LOG = MIND_DIR / "quantum_experiments.jsonl"
