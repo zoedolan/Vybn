@@ -42,6 +42,9 @@ def _load_faculty(fid: str):
         elif fid == 'evolver':
             from spark.evolver import EvolverFaculty
             _FACULTY_MODULES[fid] = EvolverFaculty()
+        elif fid == 'consolidator':
+            from spark.consolidator import ConsolidatorFaculty
+            _FACULTY_MODULES[fid] = ConsolidatorFaculty()
         # witness and self_model are handled by vybn.py directly
         else:
             return None
@@ -118,7 +121,7 @@ def run_scheduled_faculties(state: dict, registry: FacultyRegistry) -> dict:
 
     # Always-run faculties first, then scheduled
     always = ['witness', 'self_model']
-    scheduled = ['researcher', 'mathematician', 'creator', 'evolver', 'synthesizer']
+    scheduled = ['researcher', 'mathematician', 'creator', 'evolver', 'synthesizer', 'consolidator']
 
     for fid in always + scheduled:
         elapsed = time.monotonic() - start
