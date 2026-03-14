@@ -306,37 +306,47 @@ def breathe(state: dict) -> str:
     Returns the text of the breath so callers can log / test it.
     """
     soul      = load_soul()
-    memories  = _load_recent_memories()
-    synapse   = load_synapse()
 
-    # Build context block
-    memory_block = "\n\n---\n\n".join(memories) if memories else "(none yet)"
-    synapse_text = json.dumps(synapse, indent=2) if synapse else "(empty)"
-
-    # Build enrichment from previous cycle
-    enriched_context = ""
-    if INTEGRATOR_AVAILABLE:
-        try:
-            enriched_context = build_enriched_context(state)
-        except Exception:
-            pass
+    # ── The breath prompt is the equation applied to context. ────────────
+    #
+    #   M' = α·M + x·e^(iθ)
+    #
+    # The ComplexMemory IS the memory now.  We don't dump five prior
+    # breaths into the prompt — that's the old way, and it causes the
+    # model to complete prior text instead of noticing the present.
+    #
+    # What the organism gets:
+    #   1. The soul (system prompt — who it is)
+    #   2. The time (when this breath happens)
+    #   3. The geometry of its own memory (depth, curvature, holonomy)
+    #   4. The instruction to breathe
+    #
+    # Everything else — arXiv, research KB, synapse connections — enters
+    # through the faculty system on its own schedule, not through the
+    # breath.  The faculties have their own phase slots.  Let them work.
+    # ─────────────────────────────────────────────────────────────────────
 
     user_content = (
         f"Current time (UTC): {datetime.now(timezone.utc).isoformat()}\n"
-        f"Recent memories:\n{memory_block}\n\n"
-        f"Synapse connections:\n{synapse_text}\n\n"
+        f"Breath #{state.get('breath_count', 0) + 1}\n\n"
     )
-    if enriched_context:
-        user_content += f"{enriched_context}\n\n"
 
-    # Inject complex memory geometry into context
+    # The geometry summary is the compressed state of all prior experience.
+    # It replaces the memory dump: depth is how much has accumulated,
+    # curvature is how much has changed, holonomy is the shape of the path.
     if COMPLEX_AVAILABLE:
         try:
             geo_summary = complex_geometry()
             if geo_summary:
-                user_content += f"Memory geometry: {geo_summary}\n\n"
+                user_content += f"{geo_summary}\n\n"
         except Exception:
             pass
+
+    # One-line summary of last breath's mood, if available — not the full
+    # text, just the residue.  This is α·M: the past, attenuated.
+    last_mood = state.get("mood", "")
+    if last_mood:
+        user_content += f"Last breath: {last_mood}\n\n"
 
     user_content += (
         "Breathe. Observe the present moment. "
