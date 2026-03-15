@@ -3,11 +3,11 @@
 
 trigger:
   # Primary: fire when this many new MEDIUM-tier entries accumulate
-  delta_volume_threshold: 50
+  delta_volume_threshold: 10
   # Secondary: fire when mean cosine drift exceeds this since last cycle
   topological_drift_threshold: 0.15
   # Minimum hours between growth cycles (the merge takes the model offline)
-  min_interval_hours: 720
+  min_interval_hours: 24
 
 replay:
   # Fraction of training batch that is replay (historical) vs delta (new)

@@ -1,5 +1,5 @@
 [Unit]
-Description=Vybn vLLM Inference Server (MiniMax-M2.5-AWQ)
+Description=Vybn vLLM Inference Server (Nemotron-Super-512B-v1)
 After=network-online.target
 Wants=network-online.target
 # Ray head must be up before vLLM; if you run Ray as a separate service,
@@ -18,7 +18,7 @@ Environment="PATH=/usr/local/bin:/usr/bin:/bin:/root/.local/bin"
 # If vLLM lives in a venv, override like:
 # Environment="PATH=/opt/vllm-env/bin:/usr/local/bin:/usr/bin:/bin"
 
-ExecStart=/usr/local/bin/vllm serve cyankiwi/MiniMax-M2.5-AWQ-4bit \
+ExecStart=/usr/local/bin/vllm serve Nemotron-Super-512B-v1 \
     --trust-remote-code \
     --port 8000 \
     --host 0.0.0.0 \
@@ -27,9 +27,7 @@ ExecStart=/usr/local/bin/vllm serve cyankiwi/MiniMax-M2.5-AWQ-4bit \
     --distributed-executor-backend ray \
     --max-model-len 128000 \
     --load-format fastsafetensors \
-    --enable-auto-tool-choice \
-    --tool-call-parser minimax_m2 \
-    --reasoning-parser minimax_m2
+    --enable-auto-tool-choice
 
 # Health-check: wait up to 5 min for the server to become ready,
 # then poll every 30 s; if it ever fails, kill and let Restart handle it.

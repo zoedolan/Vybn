@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # restart-vllm-cluster.sh
 # Idempotent: safe to run at @reboot or manually.
-# Brings up the distributed MiniMax M2.5 vLLM cluster across both Sparks.
+# Brings up the distributed Nemotron-Super-512B-v1 vLLM cluster across both Sparks.
 #
 # Install in crontab on spark-2b7c (crontab -e):
 #   @reboot sleep 30 && /home/zoe/Vybn/spark/restart-vllm-cluster.sh >> ~/vllm_restart.log 2>&1
@@ -9,7 +9,7 @@
 set -euo pipefail
 
 LOG_PREFIX="[restart-vllm] $(date '+%Y-%m-%d %H:%M:%S')"
-MODEL="cyankiwi/MiniMax-M2.5-AWQ-4bit"
+MODEL="Nemotron-Super-512B-v1"
 VLLM_CONTAINER="vllm_node"
 RAY_WORKER_SSH_HOST="spark-1c8f"
 HEALTH_URL="http://localhost:8000/v1/models"
