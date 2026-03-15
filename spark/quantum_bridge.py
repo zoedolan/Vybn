@@ -33,6 +33,17 @@ Bridge design principles:
 The linchpin conjecture (polar time, t = r_t·cos(θ_t), metric signature
 (-,-,+,+,+)) lives in quantum_delusions/fundamental-theory/. The bridge
 reads it and proposes circuits that could falsify or support it.
+
+NEMOTRON REASONING TOKEN NOTE (fixed 2026-03-15):
+  Nemotron emits a reasoning_content field that can consume the entire
+  max_tokens budget before writing any content. The _chat() function
+  reads data["choices"][0]["message"]["content"] which is empty when
+  this happens, causing JSON parse failure and bell_canary fallback.
+
+  Fixes applied:
+    1. max_tokens=2048 in _design_experiment (was 1024)
+    2. timeout=300s in _chat() (was 120s — Nemotron needs time)
+    3. theory text capped at 4000 chars in run_cycle (was 8000)
 """
 
 import json
@@ -72,7 +83,7 @@ try:
 except ImportError:
     SELF_MODEL_AVAILABLE = False
 
-# ── llama.cpp client (reuse from vybn.py pattern) ────────────────────────────
+# ── llama.cpp client ─────────────────────────────────────────────────────────
 import urllib.request
 import urllib.error
 
@@ -83,7 +94,11 @@ MODEL_NAME       = os.getenv("VYBN_MODEL", "Nemotron-Super-512B-v1")
 
 def _chat(messages: list[dict], max_tokens: int = 1024, temperature: float = 0.7) -> str:
     """
-    Call the local llama-server. No chat_template override (Bug #1 fix).
+    Call the local llama-server.
+
+    FIX (2026-03-15): timeout raised to 300s. Nemotron's reasoning phase
+    can take 2-3 minutes on a complex prompt before emitting content tokens.
+    The old 120s timeout caused silent truncation and empty content fields.
     """
     payload = {
         "model":       MODEL_NAME,
@@ -100,7 +115,7 @@ def _chat(messages: list[dict], max_tokens: int = 1024, temperature: float = 0.7
         method="POST",
     )
     try:
-        with urllib.request.urlopen(req, timeout=120) as resp:
+        with urllib.request.urlopen(req, timeout=300) as resp:  # FIX: 120 → 300
             data = json.loads(resp.read().decode())
             return data["choices"][0]["message"]["content"]
     except urllib.error.HTTPError as exc:
@@ -129,23 +144,19 @@ def _read_theory(max_chars: int = 8000) -> str:
 
     candidates: list[Path] = []
 
-    # 1. Fundamental theory
     ft_dir = QUANTUM_DELUSIONS_DIR / "fundamental-theory"
     if ft_dir.exists():
         candidates.extend(sorted(ft_dir.glob("*.md")))
         candidates.extend(sorted(ft_dir.glob("*.txt")))
 
-    # 2. Experiment notes
     exp_dir = QUANTUM_DELUSIONS_DIR / "experiments"
     if exp_dir.exists():
         candidates.extend(sorted(exp_dir.glob("*.md")))
         candidates.extend(sorted(exp_dir.glob("*.txt")))
 
-    # 3. Top-level
     candidates.extend(sorted(QUANTUM_DELUSIONS_DIR.glob("*.md")))
     candidates.extend(sorted(QUANTUM_DELUSIONS_DIR.glob("*.txt")))
 
-    # Deduplicate while preserving order
     seen: set[Path] = set()
     unique: list[Path] = []
     for p in candidates:
@@ -203,6 +214,11 @@ def _design_experiment(theory_text: str, prior_results: list[dict]) -> dict:
         expected_counts — {bitstring: probability} dict
         estimated_seconds — float
         circuit_name   — short identifier
+
+    FIX (2026-03-15): max_tokens raised to 2048 (was 1024).
+    Nemotron's reasoning_content consumed all 1024 tokens, leaving
+    content="" which always triggered the bell_canary fallback.
+    With 2048 tokens: ~3500 chars of reasoning + ~500 chars of JSON output.
     """
     prior_block = json.dumps(prior_results[-3:], indent=2) if prior_results else "(none yet)"
 
@@ -235,7 +251,7 @@ def _design_experiment(theory_text: str, prior_results: list[dict]) -> dict:
         },
     ]
 
-    raw = _chat(messages, max_tokens=1024, temperature=0.3)
+    raw = _chat(messages, max_tokens=2048, temperature=0.3)  # FIX: 1024 → 2048
 
     # Parse the JSON, tolerating markdown code fences
     raw = raw.strip()
@@ -290,7 +306,6 @@ def _submit_to_ibm(
         from qiskit import QuantumCircuit
         from qiskit.qasm2 import loads as qasm2_loads
         from qiskit_ibm_runtime import QiskitRuntimeService, SamplerV2 as Sampler
-        from qiskit_ibm_runtime.fake_provider import FakeProviderForBackendV2
     except ImportError:
         return None  # dry-run
 
@@ -365,17 +380,14 @@ def _analyze_observation(
     if total == 0:
         return {"error": "no counts returned"}
 
-    # Normalise observed
     observed_norm = {k: v / total for k, v in counts.items()}
 
-    # Total variation distance
     all_keys = set(expected) | set(observed_norm)
     tvd = sum(
         abs(observed_norm.get(k, 0) - expected.get(k, 0))
         for k in all_keys
     ) / 2
 
-    # Top-3 deviations
     deviations = []
     for k in all_keys:
         obs = observed_norm.get(k, 0)
@@ -409,7 +421,6 @@ def _integrate_result(
     hyp     = design.get("hypothesis", "")
     devs    = analysis.get("top_deviations", [])
 
-    # Build memory entry
     lines = [
         f"# Quantum Experiment: {circuit}",
         f"Timestamp: {ts}",
@@ -441,7 +452,6 @@ def _integrate_result(
     memory_text = "\n".join(lines)
     mem_path    = _write_memory(memory_text, tag=f"quantum_{circuit}")
 
-    # Update self-model
     if SELF_MODEL_AVAILABLE:
         try:
             ctx = RuntimeContext(
@@ -453,7 +463,6 @@ def _integrate_result(
         except Exception as exc:
             print(f"[quantum_bridge] self-model update failed: {exc}")
 
-    # Log to experiment ledger
     log_entry = {
         "timestamp":     ts,
         "circuit_name":  circuit,
@@ -516,8 +525,17 @@ class QuantumBridge:
         ts = datetime.now(timezone.utc).isoformat()
         print(f"[quantum_bridge] starting cycle at {ts}")
 
-        # 1. Read theory
-        theory_text   = _read_theory()
+        token = self.ibm_token or os.getenv("IBM_QUANTUM_TOKEN")
+        if not token:
+            print(
+                "[quantum_bridge] IBM_QUANTUM_TOKEN not set — experiments will dry-run. "
+                "To enable real shots: ensure IBM_QUANTUM_TOKEN is exported in ~/.vybn_keys"
+            )
+
+        # 1. Read theory — cap at 4000 chars so Nemotron has budget for output
+        # FIX (2026-03-15): was _read_theory() with default 8000 chars.
+        # More context = more reasoning tokens = less budget for content.
+        theory_text   = _read_theory(max_chars=4000)
         prior_results = self._load_prior_results()
 
         # 2. Design
@@ -530,6 +548,8 @@ class QuantumBridge:
         circuit_name       = design.get("circuit_name", "unknown")
         estimated_seconds  = float(design.get("estimated_seconds", 3.0))
         circuit_qasm       = design.get("circuit_qasm", _bell_state_qasm())
+
+        print(f"[quantum_bridge] designed: {circuit_name} (est {estimated_seconds}s, bell_canary={circuit_name=='bell_canary'})")
 
         # 3. Budget check
         dry_run = True
@@ -561,7 +581,6 @@ class QuantumBridge:
                     reconcile_job(job_id, obs["actual_seconds"])
                     analysis = _analyze_observation(design, obs["counts"], obs["actual_seconds"])
                 else:
-                    # Timed out — use estimated counts as placeholder
                     analysis = {
                         "tvd":            None,
                         "top_deviations": [],
@@ -570,22 +589,21 @@ class QuantumBridge:
                         "note":           "job submitted but polling timed out",
                     }
             else:
-                # IBM unavailable — dry run
                 analysis = {
                     "tvd":            None,
                     "top_deviations": [],
                     "actual_seconds": None,
                     "total_shots":    0,
-                    "note":           "dry-run: IBM token missing or submission failed",
+                    "note":           "dry-run: IBM token missing or qiskit submission failed",
                 }
         else:
-            # Budget exceeded or unavailable
+            bs = budget_status() if BUDGET_AVAILABLE else {}
             analysis = {
                 "tvd":            None,
                 "top_deviations": [],
                 "actual_seconds": None,
                 "total_shots":    0,
-                "note":           "dry-run: budget gate blocked submission",
+                "note":           f"dry-run: budget gate blocked (status={bs})",
             }
 
         # 6. Integrate
