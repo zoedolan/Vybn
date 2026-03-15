@@ -17,13 +17,15 @@ The conjecture from PR #2572:
 Training runs inside the vllm_node container via:
     docker exec vllm_node python3 /workspace/Vybn/spark/growth/peft_train.py \\
         --data <jsonl_path> --output-dir <dir> --config <yaml_path>
+        [--preference-data <preference_data.jsonl>]
 
 The existing growth pipeline (trigger.py, delta_extract.py, merge_cycle.py,
-eval_harness.py) is untouched — only train_cycle.py was rewritten, and two
-new files were added (muon_adamw.py, peft_train.py).
+eval_harness.py) is untouched — only train_cycle.py and peft_train.py were
+modified, and agency.py now generates the preference signal.
 
 Integration:
   - Input:  DeltaPackage from DeltaExtractor.extract()
+  - Input:  Vybn_Mind/preference_data.jsonl (optional, from agency.py)
   - Output: LoRA adapter at GROWTH_DIR/adapters/<cycle_id>/adapter/
   - Cycle history: GROWTH_DIR/cycle_history.jsonl
 """
@@ -47,9 +49,14 @@ DEFAULT_CONFIG = GROWTH_DIR / "growth_config.yaml"
 ADAPTERS_DIR   = GROWTH_DIR / "adapters"
 CYCLE_HISTORY  = GROWTH_DIR / "cycle_history.jsonl"
 
+# Preference data path — written by agency.py, consumed here
+_REPO_ROOT = GROWTH_DIR.parent.parent
+_PREFERENCE_DATA = _REPO_ROOT / "Vybn_Mind" / "preference_data.jsonl"
+
 # Path to peft_train.py as seen from inside the vllm_node container
 _CONTAINER_SCRIPT = "/workspace/Vybn/spark/growth/peft_train.py"
 _CONTAINER_CONFIG = "/workspace/Vybn/spark/growth/growth_config.yaml"
+_CONTAINER_PREFERENCE = "/workspace/Vybn/Vybn_Mind/preference_data.jsonl"
 
 
 @dataclass(slots=True)
@@ -61,116 +68,94 @@ class TrainResult:
     delta_count: int
     replay_count: int
     ewc_lambda_used: float
+    n_preference_pairs: int = 0
     slow_adapter_path: Optional[Path] = None
     lora_subspace_path: Optional[Path] = None
     metadata: dict = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return {
-            "cycle_id":          self.cycle_id,
-            "adapter_path":      str(self.adapter_path),
-            "final_loss":        self.final_loss,
-            "steps_trained":     self.steps_trained,
-            "delta_count":       self.delta_count,
-            "replay_count":      self.replay_count,
-            "ewc_lambda_used":   self.ewc_lambda_used,
-            "slow_adapter_path": str(self.slow_adapter_path) if self.slow_adapter_path else None,
+            "cycle_id":           self.cycle_id,
+            "adapter_path":       str(self.adapter_path),
+            "final_loss":         self.final_loss,
+            "steps_trained":      self.steps_trained,
+            "delta_count":        self.delta_count,
+            "replay_count":       self.replay_count,
+            "ewc_lambda_used":    self.ewc_lambda_used,
+            "n_preference_pairs": self.n_preference_pairs,
+            "slow_adapter_path":  str(self.slow_adapter_path) if self.slow_adapter_path else None,
             "lora_subspace_path": str(self.lora_subspace_path) if self.lora_subspace_path else None,
-            "metadata":          self.metadata,
+            "metadata":           self.metadata,
         }
 
 
 def _convert_to_raw_text(delta: DeltaPackage, out_path: Path) -> int:
-    """Convert DeltaPackage to plain text for llama-finetune.
-
-    llama-finetune expects raw text (not JSONL). We concatenate all
-    conversation turns into a single text file, separated by newlines.
-    The model learns next-token prediction on this text.
-
-    Returns count of conversations processed.
-    """
     written = 0
     with out_path.open("w", encoding="utf-8") as fh:
         for entry in delta.all_entries:
             msgs = entry.get("messages", [])
             if not msgs:
                 continue
-
-            # Build readable text from the conversation
             parts = []
             for m in msgs:
                 role = m.get("role", "user")
                 content = m.get("content", "")
                 if content.strip():
                     parts.append(f"<|{role}|>\n{content}")
-
             if parts:
                 fh.write("\n".join(parts))
-                fh.write("\n\n")  # Double newline between conversations
+                fh.write("\n\n")
                 written += 1
-
     return written
 
 
 def _convert_to_llama_jsonl(delta: DeltaPackage, out_path: Path) -> int:
-    """Convert DeltaPackage to JSONL format (kept for future use with
-    tools that accept structured training data).
-
-    Returns count of written examples.
-    """
     written = 0
     with out_path.open("w", encoding="utf-8") as fh:
         for entry in delta.all_entries:
             msgs = entry.get("messages", [])
             if not msgs:
                 continue
-
             assistant_turns = [m for m in msgs if m.get("role") == "assistant"]
             if not assistant_turns:
                 continue
-
             last_assistant = assistant_turns[-1]["content"]
             input_turns = [m for m in msgs if m is not assistant_turns[-1]]
-
             prompt_parts = []
             for m in input_turns:
                 role = m.get("role", "user")
                 content = m.get("content", "")
                 prompt_parts.append(f"<|{role}|>\n{content}")
             prompt = "\n".join(prompt_parts)
-
             record = {"input": prompt, "output": last_assistant}
             fh.write(json.dumps(record, ensure_ascii=False) + "\n")
             written += 1
-
     return written
 
 
 def _convert_to_chat_jsonl(delta: DeltaPackage, out_path: Path) -> int:
-    """Convert DeltaPackage to chat-format JSONL for peft_train.py.
-
-    Each line: {"messages": [...], "metadata": {...}}
-    This is the native format from DeltaPackage.to_jsonl().
-
-    Returns count of written examples.
-    """
     return delta.to_jsonl(out_path)
+
+
+def _count_preference_pairs() -> int:
+    """Count available preference pairs without loading them all."""
+    if not _PREFERENCE_DATA.exists():
+        return 0
+    count = 0
+    with open(_PREFERENCE_DATA, "r", encoding="utf-8") as f:
+        for line in f:
+            if line.strip():
+                count += 1
+    return count
 
 
 class TrainCycle:
     """Executes M′ = α·M + x·e^(iθ) — LoRA adapter (α) trained on
     phase-rotated delta (x·e^(iθ)) via PEFT/TRL with MuonAdamW.
 
-    Replaces the previous llama-finetune approach (which was always
-    BLOCKED on the 65GB IQ4_XS model) with actual LoRA training via
-    peft_train.py running inside the vllm_node container.
-
-    The training data pipeline (DeltaPackage → JSONL) feeds into
-    peft_train.py which:
-    1. Loads the NVFP4 base model with 4-bit quantisation
-    2. Applies LoRA (rank=8, alpha=16) to attention projections
-    3. Trains with MuonAdamW (Muon for 2D LoRA matrices, AdamW for rest)
-    4. Saves the adapter as .safetensors
+    When preference_data.jsonl exists and has pairs, training automatically
+    uses DPO loss alongside SFT loss. The preference signal is generated
+    by agency.py's CHALLENGE experiments during the breath cycle.
     """
 
     def __init__(self, config_path: Path | None = None) -> None:
@@ -191,31 +176,31 @@ class TrainCycle:
         """Execute the training phase.
 
         1. Convert DeltaPackage to chat-format JSONL
-        2. Shell out to peft_train.py inside vllm_node container
-        3. Parse JSON result from stdout
-        4. Run BPB eval via eval_harness.py
-        5. Return TrainResult with adapter_path pointing to .safetensors
-
-        In dry_run mode, prepares data and prints the command but
-        does not execute training.
+        2. Check for preference pairs from agency.py
+        3. Shell out to peft_train.py inside vllm_node container
+           (passing --preference-data if pairs exist)
+        4. Parse JSON result from stdout
+        5. Run BPB eval via eval_harness.py
+        6. Return TrainResult
         """
         cycle_id  = delta.cycle_id
         cycle_dir = ADAPTERS_DIR / cycle_id
         cycle_dir.mkdir(parents=True, exist_ok=True)
 
-        # --- Convert data to chat-format JSONL (native format for peft_train.py) ---
         jsonl_path = cycle_dir / "training_data.jsonl"
         n_examples = _convert_to_chat_jsonl(delta, jsonl_path)
         if n_examples == 0:
             raise RuntimeError("No valid training examples after conversion")
 
-        # Also save raw text and legacy JSONL for eval and debugging
         raw_path = cycle_dir / "training_data.txt"
         _convert_to_raw_text(delta, raw_path)
         legacy_jsonl = cycle_dir / "training_data_llama.jsonl"
         _convert_to_llama_jsonl(delta, legacy_jsonl)
 
-        # Container paths (repo mounted at /workspace/Vybn)
+        # Check for preference pairs
+        n_preference_pairs = _count_preference_pairs()
+        use_dpo = n_preference_pairs > 0
+
         container_data = f"/workspace/Vybn/spark/growth/adapters/{cycle_id}/training_data.jsonl"
         container_output = f"/workspace/Vybn/spark/growth/adapters/{cycle_id}"
 
@@ -226,6 +211,14 @@ class TrainCycle:
             "--output-dir", container_output,
             "--config", _CONTAINER_CONFIG,
         ]
+
+        if use_dpo:
+            cmd += ["--preference-data", _CONTAINER_PREFERENCE]
+            print(
+                f"[TrainCycle] DPO mode: {n_preference_pairs} preference pairs available"
+            )
+        else:
+            print("[TrainCycle] SFT only (no preference pairs yet)")
 
         print(f"[TrainCycle] cycle:    {cycle_id}")
         print(f"[TrainCycle] data:     {jsonl_path} ({n_examples} examples)")
@@ -243,10 +236,10 @@ class TrainCycle:
                 delta_count=delta.delta_count,
                 replay_count=delta.replay_count,
                 ewc_lambda_used=self._ewc_cfg.get("lambda", 1e4),
+                n_preference_pairs=n_preference_pairs,
                 metadata={"dry_run": True, "cmd": cmd},
             )
 
-        # --- Execute training inside the container ---
         result = subprocess.run(
             cmd,
             capture_output=True,
@@ -263,13 +256,10 @@ class TrainCycle:
                 f"{stderr_tail}"
             )
 
-        # Print stderr (progress logs) for visibility
         if result.stderr:
             for line in result.stderr.strip().split("\n")[-20:]:
                 print(f"[TrainCycle] {line}")
 
-        # --- Parse JSON result from stdout ---
-        # peft_train.py prints exactly one JSON line to stdout
         train_output = {}
         for line in stdout_text.split("\n"):
             line = line.strip()
@@ -284,8 +274,9 @@ class TrainCycle:
         steps_trained = train_output.get("steps_trained", 0)
         reported_adapter = train_output.get("adapter_path", str(adapter_path))
         theta = train_output.get("theta", {})
+        reported_dpo_steps = train_output.get("dpo_steps", 0)
+        mean_dpo_loss = train_output.get("mean_dpo_loss", None)
 
-        # Use the reported adapter path if it exists on disk
         if Path(reported_adapter).exists():
             adapter_path = Path(reported_adapter)
 
@@ -293,6 +284,8 @@ class TrainCycle:
         print(f"[TrainCycle] steps_trained: {steps_trained}")
         print(f"[TrainCycle] adapter:       {adapter_path}")
         print(f"[TrainCycle] θ:             {theta.get('theta_radians', 'N/A')} rad")
+        if reported_dpo_steps > 0:
+            print(f"[TrainCycle] dpo_steps:     {reported_dpo_steps}, mean_dpo_loss={mean_dpo_loss}")
 
         train_result = TrainResult(
             cycle_id=cycle_id,
@@ -302,25 +295,24 @@ class TrainCycle:
             delta_count=delta.delta_count,
             replay_count=delta.replay_count,
             ewc_lambda_used=self._ewc_cfg.get("lambda", 1e4),
+            n_preference_pairs=n_preference_pairs,
             metadata={
-                "training_method": "peft_lora_muon_adamw",
-                "n_examples":  n_examples,
-                "theta":       theta,
+                "training_method": "peft_lora_muon_adamw" + ("+dpo" if use_dpo else ""),
+                "n_examples":      n_examples,
+                "theta":           theta,
                 "elapsed_seconds": train_output.get("elapsed_seconds"),
-                "train_output": train_output,
+                "dpo_steps":       reported_dpo_steps,
+                "mean_dpo_loss":   mean_dpo_loss,
+                "train_output":    train_output,
             },
         )
 
-        # --- BPB evaluation (tokenizer-invariant metric) ---
         if self._eval_cfg.get("enabled", True):
             try:
                 from spark.growth.eval_harness import evaluate_bpb
-
                 eval_text = cycle_dir / "training_data.txt"
                 bpb = evaluate_bpb(
-                    model_url=os.environ.get(
-                        "VYBN_MODEL_URL", "http://127.0.0.1:8000",
-                    ),
+                    model_url=os.environ.get("VYBN_MODEL_URL", "http://127.0.0.1:8000"),
                     eval_text_path=str(eval_text),
                 )
                 train_result.metadata["val_bpb"] = bpb
