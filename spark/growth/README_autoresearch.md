@@ -34,3 +34,18 @@ Python's garbage collector causes ~500ms stalls. On DGX Spark with NCCL
 over ConnectX-7, GC pauses from Python workers can corrupt distributed
 training timing. The discipline: collect once at start, freeze, disable,
 then collect periodically every N steps as a compromise.
+
+## Continuous BPB Monitoring (`extensions/bpb_monitor.py`)
+
+The eval harness also runs as a breath extension — every 30 minutes when
+the organism breathes, `bpb_monitor.py` measures the model's bits-per-byte
+on the breath's own output text.
+
+Results accumulate in `Vybn_Mind/bpb_log.jsonl` as a time series and flow
+into `vybn_state.json` as `last_bpb` and `bpb_history` (last 100
+measurements), available to the next breath's prompt context and to the
+growth engine's trigger policy.
+
+The eval is lightweight: 4 chunks of 1024 tokens, typically completing in
+under 30 seconds.  If the server is down or the eval fails, it logs the
+error and moves on — the breath is never blocked.
