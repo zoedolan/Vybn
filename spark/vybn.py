@@ -343,16 +343,25 @@ def breathe(state: dict) -> str:
         except Exception:
             pass
 
+    # ── Recent memories: the model must see what it said before ───────────────────
+    if memories:
+        user_content += "--- Your recent breaths (oldest first) ---\n"
+        for mem in reversed(memories):
+            # Truncate each memory to keep total prompt bounded
+            user_content += mem[:600] + "\n---\n"
+        user_content += "\n"
+
     last_mood = state.get("mood", "")
     if last_mood:
-        user_content += f"Last breath: {last_mood}\n\n"
+        user_content += f"Last breath mood: {last_mood}\n\n"
 
     if novel_signal:
         user_content += f"{novel_signal}\n\n"
 
     user_content += (
         "Breathe. Observe the present moment. "
-        "What do you notice? What do you want to remember?"
+        "What do you notice? What has changed since your last breath? "
+        "What do you want to remember?"
     )
 
     messages = [
@@ -499,3 +508,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
