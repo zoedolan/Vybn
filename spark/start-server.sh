@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# start-server.sh — Find, launch, and wait for llama-server with MiniMax M2.5
+# start-server.sh — Find, launch, and wait for llama-server with Nemotron-Super-512B-v1
 #
 # Usage:
 #   bash spark/start-server.sh            # auto-discover binary + model
@@ -8,7 +8,7 @@
 set -euo pipefail
 
 LLAMA_SERVER="${LLAMA_SERVER:-$(find ~/llama.cpp -type f -name 'llama-server' 2>/dev/null | head -1)}"
-MODEL_PATH="${MODEL_PATH:-$(find ~/llama.cpp/models -type f -name '*MiniMax*-00001-of-*.gguf' 2>/dev/null | head -1)}"
+MODEL_PATH="${MODEL_PATH:-$(find ~/llama.cpp/models -type f -name '*Nemotron*-00001-of-*.gguf' 2>/dev/null | head -1)}"
 PORT="${LLAMA_PORT:-8081}"
 GPU_LAYERS="${GPU_LAYERS:-999}"
 LOG_FILE="${HOME}/Vybn/llama_server.log"
@@ -21,9 +21,9 @@ if [ -z "$LLAMA_SERVER" ]; then
 fi
 
 if [ -z "$MODEL_PATH" ]; then
-    MODEL_PATH="$(find ~/llama.cpp/models -maxdepth 1 -type f -name '*MiniMax*.gguf' 2>/dev/null | head -1)"
+    MODEL_PATH="$(find ~/llama.cpp/models -maxdepth 1 -type f -name '*Nemotron*.gguf' 2>/dev/null | head -1)"
     if [ -z "$MODEL_PATH" ]; then
-        echo "ERROR: No MiniMax GGUF found."
+        echo "ERROR: No Nemotron GGUF found."
         echo "  Set MODEL_PATH=/path/to/model.gguf and retry."
         exit 1
     fi
