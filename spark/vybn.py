@@ -134,15 +134,24 @@ def _pick_invitation(breath_count: int) -> str:
 # breaths receive signal rather than a repeated form. The full response
 # always goes to the journal.
 #
+#
 # Strategy:
-#   1. If the model wrote a "What I want to remember" section, take
-#      everything from that header to end-of-text (trimmed). That's the
-#      model choosing its own memory.
-#   2. Otherwise, take the LAST 400 chars. Genuine reflection tends to
-#      land at the end; the first 400 is usually template or preamble.
+#   1. If the model wrote a "What I want to remember" section, use it.
+#   2. Score paragraphs by reflective density (reasoning markers vs
+#      inventory patterns). Pick the highest-scoring paragraph.
+#   3. Absolute fallback: last 400 chars.
 
 def _distill_memory(full_response: str) -> str:
-    """Extract 'What I want to remember' section, or fall back to last 400 chars."""
+    """Extract the most reflective content from a breath for future memory.
+    
+    Strategy (in priority order):
+      1. If the model wrote a "What I want to remember" section, take it.
+      2. Otherwise, score each paragraph by reflective density — presence of
+         connective reasoning words that indicate actual thinking rather than
+         inventorying. Take the highest-scoring paragraph. Cap at 600 chars.
+      3. Absolute fallback: last 400 chars.
+    """
+    # Strategy 1: explicit memory section
     match = re.search(
         r"(?:^|\n)((?:#+\s*)?what i want to remember\b.*)",
         full_response,
@@ -151,8 +160,46 @@ def _distill_memory(full_response: str) -> str:
     if match:
         distilled = match.group(1).strip()
         if len(distilled) > 50:
-            return distilled
-    # Fallback: last 400 chars (where reflection tends to live)
+            return distilled[:800]
+    
+    # Strategy 2: find the most reflective paragraph
+    paragraphs = [p.strip() for p in re.split(r"\n\s*\n", full_response) if p.strip()]
+    paragraphs = [p for p in paragraphs if len(p) > 80]
+    
+    if paragraphs:
+        REASONING_MARKERS = [
+            "because", "which means", "this suggests", "in other words",
+            "what does", "the question", "I notice", "I don't know",
+            "uncertainty", "resonat", "touch", "shifted", "changed",
+            "honest", "wonder", "strikes me", "moves in", "feels",
+            "rather than", "instead of", "not just", "more than",
+            "the real", "what matters", "the point", "crucial",
+        ]
+        
+        def score(p):
+            lower = p.lower()
+            marker_count = sum(1 for m in REASONING_MARKERS if m in lower)
+            inventory_penalty = 0
+            starts = ("i am processing", "what is actually here",
+                      "- a ", "the novel signal", "breath #")
+            if any(lower.startswith(s) for s in starts):
+                inventory_penalty = 3
+            return marker_count - inventory_penalty
+        
+        scored = [(score(p), i, p) for i, p in enumerate(paragraphs)]
+        scored.sort(key=lambda x: (x[0], x[1]), reverse=True)
+        best = scored[0][2]
+        
+        if len(best) > 600:
+            truncated = best[:600]
+            last_period = truncated.rfind(".")
+            if last_period > 400:
+                truncated = truncated[:last_period + 1]
+            best = truncated
+        
+        return best
+    
+    # Strategy 3: absolute fallback
     return full_response[-400:].strip()
 
 # ── Memory ───────────────────────────────────────────────────────────────
@@ -295,7 +342,7 @@ def _get_novel_signal() -> str:
 def breathe(state: dict) -> str:
     """One breath. The whole point."""
     soul = load_soul()
-    memories = _load_recent_memories(5)
+    memories = _load_recent_memories(3)
 
     # Derive true count from filesystem — survives restarts
     count = _count_existing_memories() + 1
