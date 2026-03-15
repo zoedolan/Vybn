@@ -85,6 +85,11 @@ try:
     BUFFER_FEED_AVAILABLE = True
 except ImportError:
     BUFFER_FEED_AVAILABLE = False
+try:
+    from spark.tension import measure_tension, compute_theta, log_tension
+    TENSION_AVAILABLE = True
+except ImportError:
+    TENSION_AVAILABLE = False
 
 # ── Constants ───────────────────────────────────────────────────────────────
 BREATH_INTERVAL  = 1800
@@ -329,6 +334,19 @@ def breathe(state: dict) -> str:
         except Exception as exc:
             _log(f"buffer feed error (non-fatal): {exc}")
 
+    # ── Tension measurement ─────────────────────────────────────────────────────
+    tension = None
+    tension_theta = None
+    if TENSION_AVAILABLE:
+        try:
+            tension = measure_tension(memories, novel_signal)
+            breath_step = state.get("breath_count", 0)
+            tension_theta = compute_theta(tension, step=breath_step)
+            if tension:
+                _log(f"tension: angle={tension['tension_angle_deg']}° θ={tension_theta:.4f}")
+        except Exception as exc:
+            _log(f"tension error (non-fatal): {exc}")
+
     # ── Build prompt ────────────────────────────────────────────────────────────────
     user_content = (
         f"Current time (UTC): {datetime.now(timezone.utc).isoformat()}\n"
@@ -342,6 +360,12 @@ def breathe(state: dict) -> str:
                 user_content += f"{geo_summary}\n\n"
         except Exception:
             pass
+
+    if tension:
+        user_content += (
+            f"Tension: {tension['tension_angle_deg']}° between memory and novelty "
+            f"(cosine={tension['cosine_sim']:.2f})\n\n"
+        )
 
     # ── Recent memories: the model must see what it said before ───────────────────
     if memories:
@@ -371,13 +395,22 @@ def breathe(state: dict) -> str:
 
     breath_text = _chat(messages)
 
-    # Complexify the breath
+    # Complexify the breath (pass tension-informed θ when available)
+    geo_report = None
     if COMPLEX_AVAILABLE:
         try:
-            geo_report = complex_inhale(breath_text)
+            geo_report = complex_inhale(breath_text, theta=tension_theta)
             _log(f"complexify breath: depth={geo_report['depth']:.2f} κ={geo_report['curvature']:.4f}")
         except Exception as exc:
             _log(f"complexify error (non-fatal): {exc}")
+
+    # Log tension metrics
+    if TENSION_AVAILABLE:
+        try:
+            kappa = geo_report["curvature"] if geo_report else None
+            log_tension(state.get("breath_count", 0) + 1, tension, tension_theta or 0.0, kappa)
+        except Exception as exc:
+            _log(f"tension log error (non-fatal): {exc}")
 
     # Ingest broader corpus into M
     if INGESTER_AVAILABLE:
