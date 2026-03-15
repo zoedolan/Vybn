@@ -314,7 +314,7 @@ def breathe(state: dict) -> str:
             if refill.get("refilled"):
                 _log(f"buffer refilled: {refill['new_papers']} new papers")
             feeder = BufferFeeder()
-            entry  = feeder.pop_one()
+            entry  = feeder.pop_next()
             if entry:
                 content = entry.get("content", "")[:800]
                 source  = entry.get("source", "unknown")

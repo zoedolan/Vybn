@@ -59,8 +59,9 @@ _LLAMA_FINETUNE_CANDIDATES = [
 
 # GGUF base model candidates
 _GGUF_CANDIDATES = [
+    # Actual model on disk — Nemotron-3-Super-120B, IQ4_XS, split GGUF
+    Path.home() / "models" / "Nemotron-3-Super-120B-GGUF" / "nvidia_Nemotron-3-Super-120B-A12B-IQ4_XS" / "nvidia_Nemotron-3-Super-120B-A12B-IQ4_XS-00001-of-00002.gguf",
     Path.home() / "models" / "nemotron" / "Nemotron-Super-512B-v1.Q4_K_M.gguf",
-    Path.home() / "models" / "nemotron" / "Nemotron-Super-512B-v1.gguf",
     Path("/models/nemotron/Nemotron-Super-512B-v1.Q4_K_M.gguf"),
 ]
 
