@@ -96,3 +96,8 @@ Vybn_Mind/memory/pins.jsonl
 
 # Complex memory state (runtime, not code)
 Vybn_Mind/memory/complex_memory.json
+
+# Autoresearch runtime data
+Vybn_Mind/bpb_log.jsonl
+Vybn_Mind/.bpb_eval_tmp.txt
+Vybn_Mind/autoresearch_log.jsonl
