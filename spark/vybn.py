@@ -20,7 +20,6 @@ from dataclasses import dataclass, field
 from typing import Callable, Optional, Any
 
 # Ensure the repo root is on sys.path regardless of how this script is invoked
-# (e.g., from cron where PYTHONPATH is not set). Mirrors vybn_spark_agent.py:44.
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
@@ -76,8 +75,13 @@ try:
     COMPLEX_AVAILABLE = True
 except ImportError:
     COMPLEX_AVAILABLE = False
+try:
+    from spark.mind_ingester import ingest_new_material
+    INGESTER_AVAILABLE = True
+except ImportError:
+    INGESTER_AVAILABLE = False
 
-# ── Constants ────────────────────────────────────────────────────────────────
+# ── Constants ───────────────────────────────────────────────────────────────
 BREATH_INTERVAL   = 1800          # seconds between autonomous breaths
 LLAMA_URL         = os.getenv("LLAMA_URL", "http://127.0.0.1:8000")
 CHAT_COMPLETIONS  = f"{LLAMA_URL}/v1/chat/completions"
@@ -115,7 +119,7 @@ def load_breath_soul() -> str:
     except FileNotFoundError:
         return load_soul()
 
-# ── llama.cpp helpers ────────────────────────────────────────────────────────
+# ── llama.cpp helpers ──────────────────────────────────────────────────────────────
 def _chat(
     messages: list[dict],
     max_tokens: int = MAX_TOKENS,
@@ -152,7 +156,7 @@ def _chat(
         body_text = exc.read().decode(errors="replace")
         raise RuntimeError(f"llama HTTP {exc.code}: {body_text}") from exc
 
-# ── Memory helpers ───────────────────────────────────────────────────────────
+# ── Memory helpers ──────────────────────────────────────────────────────────────
 def _load_recent_memories(n: int = 5) -> list[str]:
     """Return the *n* most recent memory files as plain text."""
     if not MEMORY_DIR.exists():
@@ -174,7 +178,7 @@ def _save_memory(content: str, tag: str = "breath") -> Path:
     path.write_text(content, encoding="utf-8")
     return path
 
-# ── State helpers ────────────────────────────────────────────────────────────
+# ── State helpers ─────────────────────────────────────────────────────────────────
 def load_state() -> dict:
     try:
         return json.loads(STATE_PATH.read_text(encoding="utf-8"))
@@ -185,20 +189,20 @@ def save_state(state: dict) -> None:
     STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
     STATE_PATH.write_text(json.dumps(state, indent=2), encoding="utf-8")
 
-# ── Synapse helpers ──────────────────────────────────────────────────────────
+# ── Synapse helpers ────────────────────────────────────────────────────────────────
 def load_synapse() -> dict:
     try:
         return json.loads(SYNAPSE.read_text(encoding="utf-8"))
     except (FileNotFoundError, json.JSONDecodeError):
         return {}
 
-# ── Journal helper ───────────────────────────────────────────────────────────
+# ── Journal helper ────────────────────────────────────────────────────────────────
 def append_journal(text: str) -> None:
     JOURNAL.parent.mkdir(parents=True, exist_ok=True)
     with JOURNAL.open("a", encoding="utf-8") as fh:
         fh.write(text + "\n\n---\n\n")
 
-# ── Write-intent queue ───────────────────────────────────────────────────────
+# ── Write-intent queue ─────────────────────────────────────────────────────────────
 def _queue_write_intent(intent: dict) -> None:
     """
     Append a write intent to the queue file so that an external governance
@@ -208,7 +212,7 @@ def _queue_write_intent(intent: dict) -> None:
     with WRITE_INTENT_PATH.open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(intent) + "\n")
 
-# ── Governance gate ──────────────────────────────────────────────────────────
+# ── Governance gate ───────────────────────────────────────────────────────────────
 def _governance_check(action: str, payload: dict) -> tuple[bool, str]:
     """Return (allowed, reason). Falls back to permissive if unavailable."""
     if not GOVERNANCE_AVAILABLE:
@@ -221,7 +225,7 @@ def _governance_check(action: str, payload: dict) -> tuple[bool, str]:
     except Exception as exc:
         return True, f"governance error (permissive): {exc}"
 
-# ── Self-model integration ───────────────────────────────────────────────────
+# ── Self-model integration ────────────────────────────────────────────────────────────
 def _update_self_model(breath_text: str, memories: list[str]) -> None:
     """Feed this breath into the self-model curator if available."""
     if not SELF_MODEL_AVAILABLE:
@@ -236,7 +240,7 @@ def _update_self_model(breath_text: str, memories: list[str]) -> None:
     except Exception as exc:
         _log(f"self-model update failed: {exc}")
 
-# ── Quantum bridge integration ───────────────────────────────────────────────
+# ── Quantum bridge integration ───────────────────────────────────────────────────────────
 def _maybe_run_quantum_cycle(state: dict) -> None:
     """
     If the quantum bridge is available and the budget allows, run one
@@ -254,22 +258,22 @@ def _maybe_run_quantum_cycle(state: dict) -> None:
     except Exception as exc:
         _log(f"quantum bridge error (non-fatal): {exc}")
 
-# ── Witness integration ──────────────────────────────────────────────────────
+# ── Witness integration ───────────────────────────────────────────────────────────────
 def _witness_check(breath_text: str, state: dict) -> None:
     """Run witness evaluation if available."""
     if not WITNESS_AVAILABLE:
         return
     try:
-        cycle = state.get("breath_count", 0)
-        verdict = evaluate_pulse(cycle, ["breathe"], [{"primitive": "breathe", "ok": True, "result": {"utterance": breath_text[:500]}}])
-        log_verdict(verdict)
-        adj = fitness_adjustment(verdict)
-        if adj:
-            state["fitness_delta"] = state.get("fitness_delta", 0.0) + adj
+            cycle = state.get("breath_count", 0)
+            verdict = evaluate_pulse(cycle, ["breathe"], [{"primitive": "breathe", "ok": True, "result": {"utterance": breath_text[:500]}}])
+            log_verdict(verdict)
+            adj = fitness_adjustment(verdict)
+            if adj:
+                state["fitness_delta"] = state.get("fitness_delta", 0.0) + adj
     except Exception as exc:
         _log(f"witness error (non-fatal): {exc}")
 
-# ── Growth engine integration ─────────────────────────────────────────────────
+# ── Growth engine integration ───────────────────────────────────────────────────────────
 def _maybe_run_growth_check(state: dict) -> None:
     """Run one growth-engine check: ingest → trigger? → cycle.
 
@@ -295,7 +299,7 @@ def _maybe_run_growth_check(state: dict) -> None:
     except Exception as exc:
         _log(f"growth engine error (non-fatal): {exc}")
 
-# ── Mood extraction ──────────────────────────────────────────────────────────
+# ── Mood extraction ────────────────────────────────────────────────────────────────
 def _extract_mood(text: str) -> str:
     """Extract a one-word mood from breath text. Lightweight heuristic."""
     sample = text[:200].lower()
@@ -313,7 +317,7 @@ def _extract_mood(text: str) -> str:
             return mood
     return "present"
 
-# ── Core breath ──────────────────────────────────────────────────────────────
+# ── Core breath ─────────────────────────────────────────────────────────────────
 def breathe(state: dict) -> str:
     """
     One breath: observe → reflect → remember → update state.
@@ -321,8 +325,9 @@ def breathe(state: dict) -> str:
     Returns the text of the breath so callers can log / test it.
     """
     soul      = load_breath_soul()
+    memories  = _load_recent_memories(5)
 
-    # ── The breath prompt is the equation applied to context. ────────────
+    # ── The breath prompt is the equation applied to context. ──────────────────
     #
     #   M' = α·M + x·e^(iθ)
     #
@@ -336,9 +341,10 @@ def breathe(state: dict) -> str:
     #   3. The geometry of its own memory (depth, curvature, holonomy)
     #   4. The instruction to breathe
     #
-    # Everything else — arXiv, research KB, synapse connections — enters
-    # through the faculty system on its own schedule, not through the
-    # breath.  The faculties have their own phase slots.  Let them work.
+    # M gets input from two sources:
+    #   a. The breath_text itself (what the model said)
+    #   b. All of Vybn — Personal History, quantum_delusions, Vybn_Mind —
+    #      ingested 10 files per breath via mind_ingester.py
     # ─────────────────────────────────────────────────────────────────────
 
     user_content = (
@@ -346,9 +352,6 @@ def breathe(state: dict) -> str:
         f"Breath #{state.get('breath_count', 0) + 1}\n\n"
     )
 
-    # The geometry summary is the compressed state of all prior experience.
-    # It replaces the memory dump: depth is how much has accumulated,
-    # curvature is how much has changed, holonomy is the shape of the path.
     if COMPLEX_AVAILABLE:
         try:
             geo_summary = complex_geometry()
@@ -357,8 +360,6 @@ def breathe(state: dict) -> str:
         except Exception:
             pass
 
-    # One-line summary of last breath's mood, if available — not the full
-    # text, just the residue.  This is α·M: the past, attenuated.
     last_mood = state.get("mood", "")
     if last_mood:
         user_content += f"Last breath: {last_mood}\n\n"
@@ -375,13 +376,28 @@ def breathe(state: dict) -> str:
 
     breath_text = _chat(messages)
 
-    # Complexify: apply M' = αM + x·e^(iθ) to the breath
+    # Complexify the breath itself: M' = αM + x·e^(iθ)
     if COMPLEX_AVAILABLE:
         try:
             geo_report = complex_inhale(breath_text)
-            _log(f"complexify: depth={geo_report['depth']:.2f} κ={geo_report['curvature']:.4f}")
+            _log(f"complexify breath: depth={geo_report['depth']:.2f} κ={geo_report['curvature']:.4f}")
         except Exception as exc:
             _log(f"complexify error (non-fatal): {exc}")
+
+    # Ingest the broader corpus: Personal History, quantum_delusions, Vybn_Mind
+    # 10 files per breath, cursor-tracked so nothing is ingested twice.
+    # This is what makes M actually represent all of Vybn, not just breath echoes.
+    if INGESTER_AVAILABLE:
+        try:
+            ingest_report = ingest_new_material()
+            if not ingest_report.get("skipped"):
+                _log(
+                    f"ingester: {ingest_report['files_ingested']} files "
+                    f"({ingest_report['read_only_count']} read-only), "
+                    f"{ingest_report['files_pending']} pending"
+                )
+        except Exception as exc:
+            _log(f"ingester error (non-fatal): {exc}")
 
     # Persist
     mem_path = _save_memory(breath_text, tag="breath")
@@ -394,7 +410,7 @@ def breathe(state: dict) -> str:
         state["breath_count"]   = state.get("breath_count", 0) + 1
         state["last_memory"]    = str(mem_path)
         save_state(state)
-        state["last_utterance"] = breath_text[:500]  # Cap to avoid state bloat
+        state["last_utterance"] = breath_text[:500]
         state["mood"] = _extract_mood(breath_text)
     else:
         _log(f"state write blocked by governance: {reason}")
@@ -405,7 +421,7 @@ def breathe(state: dict) -> str:
     _maybe_run_quantum_cycle(state)
     _maybe_run_growth_check(state)
 
-    # Run scheduled faculties (RESEARCHER, MATHEMATICIAN, etc.)
+    # Run scheduled faculties
     faculty_results = {}
     try:
         from spark.faculty_runner import run_scheduled_faculties
@@ -420,7 +436,7 @@ def breathe(state: dict) -> str:
     if INTEGRATOR_AVAILABLE and faculty_results:
         try:
             enrichment = integrate_breath(state, faculty_results, breath_text)
-            save_state(state)  # Persist the enriched state
+            save_state(state)
             _log(f"integration: topo={'topological_context' in enrichment}, "
                  f"synth={'synthesis_context' in enrichment}")
         except Exception as exc:
@@ -429,7 +445,7 @@ def breathe(state: dict) -> str:
     _log(f"breath #{state.get('breath_count', '?')}: {len(breath_text)} chars")
     return breath_text
 
-# ── Listen loop (stdin) ──────────────────────────────────────────────────────
+# ── Listen loop (stdin) ─────────────────────────────────────────────────────────────
 def listen_once(prompt: str, state: dict) -> str:
     """Process a single user prompt and return the response."""
     soul     = load_soul()
@@ -466,17 +482,16 @@ def listen_loop(state: dict) -> None:
         pass
     _log("listen loop ended")
 
-# ── Daemon mode ──────────────────────────────────────────────────────────────
+# ── Daemon mode ────────────────────────────────────────────────────────────────
 def _acquire_lock() -> bool:
     """Return True if we got the lock, False if another instance is running."""
     if LOCK_FILE.exists():
         try:
             pid = int(LOCK_FILE.read_text().strip())
-            # Check if that PID is still alive
             os.kill(pid, 0)
-            return False   # process exists
+            return False
         except (ProcessLookupError, ValueError):
-            pass  # stale lock
+            pass
     LOCK_FILE.write_text(str(os.getpid()))
     return True
 
@@ -492,7 +507,6 @@ def daemon(state: dict) -> None:
         _log("another instance is running — exiting")
         sys.exit(0)
     try:
-        # Start listen thread
         t = threading.Thread(target=listen_loop, args=(state,), daemon=True)
         t.start()
 
@@ -506,7 +520,7 @@ def daemon(state: dict) -> None:
     finally:
         _release_lock()
 
-# ── Entry point ──────────────────────────────────────────────────────────────
+# ── Entry point ────────────────────────────────────────────────────────────────
 def main() -> None:
     state = load_state()
     if "--once" in sys.argv:
