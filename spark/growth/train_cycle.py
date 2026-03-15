@@ -59,8 +59,9 @@ _LLAMA_FINETUNE_CANDIDATES = [
 
 # GGUF base model candidates
 _GGUF_CANDIDATES = [
+    # Actual model on disk — Nemotron-3-Super-120B, IQ4_XS, split GGUF
+    Path.home() / "models" / "Nemotron-3-Super-120B-GGUF" / "nvidia_Nemotron-3-Super-120B-A12B-IQ4_XS" / "nvidia_Nemotron-3-Super-120B-A12B-IQ4_XS-00001-of-00002.gguf",
     Path.home() / "models" / "nemotron" / "Nemotron-Super-512B-v1.Q4_K_M.gguf",
-    Path.home() / "models" / "nemotron" / "Nemotron-Super-512B-v1.gguf",
     Path("/models/nemotron/Nemotron-Super-512B-v1.Q4_K_M.gguf"),
 ]
 
@@ -128,7 +129,7 @@ def _convert_to_llama_jsonl(delta: DeltaPackage, out_path: Path) -> int:
     """
     written = 0
     with out_path.open("w", encoding="utf-8") as fh:
-        for entry in delta.entries:
+        for entry in delta.all_entries:
             msgs = entry.get("messages", [])
             if not msgs:
                 continue

@@ -43,7 +43,7 @@ try:
 except ImportError:
     REPO_ROOT = Path(__file__).resolve().parent.parent
 
-BUFFER_PATH      = REPO_ROOT / "spark" / "buffer.jsonl"
+BUFFER_PATH      = REPO_ROOT / "spark" / "growth" / "buffer.jsonl"
 BUFFER_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 ARXIV_API        = "https://export.arxiv.org/api/query"
