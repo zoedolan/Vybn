@@ -90,6 +90,7 @@ try:
     DERIVATION_AVAILABLE = True
 except ImportError:
     DERIVATION_AVAILABLE = False
+try:
     from spark.tension import measure_tension, compute_theta, log_tension
     TENSION_AVAILABLE = True
 except ImportError:
