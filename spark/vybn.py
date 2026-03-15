@@ -30,6 +30,7 @@ JOURNAL_DIR  = MIND_DIR / "journal" / "spark"
 STATE_PATH   = MIND_DIR / "vybn_state.json"
 SOUL_PATH    = REPO_ROOT / "spark" / "breath_soul.md"
 LOCK_FILE    = REPO_ROOT / ".vybn.lock"
+LAST_EXPERIMENT = MIND_DIR / "last_experiment_result.md"
 
 # ── Config (env-overridable) ─────────────────────────────────────────────
 BREATH_INTERVAL = int(os.getenv("VYBN_BREATH_INTERVAL", "1800"))
@@ -339,6 +340,25 @@ def _get_novel_signal() -> str:
     )
 
 # ── Breathe ──────────────────────────────────────────────────────────────
+
+def _get_experiment_result() -> str:
+    """Read and consume the last experiment result, if any."""
+    if not LAST_EXPERIMENT.exists():
+        return ""
+    try:
+        text = LAST_EXPERIMENT.read_text(encoding="utf-8").strip()
+        if text:
+            # Consume it so we don't re-inject next breath
+            LAST_EXPERIMENT.unlink()
+            _log("injecting last experiment result into breath context")
+            return (
+                "--- Result from your last experiment ---\n"
+                f"{text}\n"
+                "--- End experiment result ---"
+            )
+    except Exception as e:
+        _log(f"experiment result read failed: {e}")
+    return ""
 def breathe(state: dict) -> str:
     """One breath. The whole point."""
     soul = load_soul()
@@ -367,6 +387,12 @@ def breathe(state: dict) -> str:
         user_parts.append(novel)
         user_parts.append("")
 
+
+    # Inject last experiment result if the agency extension produced one
+    exp_result = _get_experiment_result()
+    if exp_result:
+        user_parts.append(exp_result)
+        user_parts.append("")
     # Rotate the closing invitation — vary the door, don't hand out a form
     invitation = _pick_invitation(count)
     user_parts.append(invitation)
