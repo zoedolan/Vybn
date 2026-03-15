@@ -5,7 +5,9 @@ Executes one growth cycle's training:
     M′ = α·M + x·e^(iθ)
 
 Where α is the LoRA adapter trained via PEFT with MuonAdamW, x·e^(iθ) is
-the phase-rotated training delta from DeltaExtractor.
+the phase-rotated training delta from DeltaExtractor. Each example in x is
+now annotated with a composite quality weight W = holonomy × lens_distance
+× challenge_survival × inheritance. The SFT loss is scaled per-sample by W.
 
 Usage (inside vllm_node container):
     python3 peft_train.py \\
@@ -108,11 +110,6 @@ def load_chat_jsonl(path: str) -> list[dict]:
 
 
 def load_preference_jsonl(path: str) -> list[dict]:
-    """Load DPO preference pairs from preference_data.jsonl.
-
-    Each line: {"prompt": ..., "chosen": ..., "rejected": ..., "metadata": {...}}
-    Returns only lines with all three required fields.
-    """
     pairs = []
     try:
         with open(path, "r", encoding="utf-8") as f:
@@ -128,10 +125,22 @@ def load_preference_jsonl(path: str) -> list[dict]:
     return pairs
 
 
+def get_x_weight(example: dict) -> float:
+    """Extract composite x-weight from an example’s metadata.
+
+    Returns 1.0 (neutral) if not present — replay entries and
+    any entry formatted without x_weight.py get full weight.
+    """
+    meta = example.get("metadata", {})
+    xw = meta.get("x_weight", {})
+    return float(xw.get("composite", 1.0))
+
+
 def compute_encounter_phase(examples: list[dict]) -> dict:
     now = datetime.now(timezone.utc)
     source_counts: Counter[str] = Counter()
     timestamps: list[str] = []
+    x_weights: list[float] = []
 
     for ex in examples:
         meta = ex.get("metadata", {})
@@ -140,6 +149,9 @@ def compute_encounter_phase(examples: list[dict]) -> dict:
         ts = meta.get("ingested_at", "")
         if ts:
             timestamps.append(ts)
+        xw = meta.get("x_weight", {})
+        if "composite" in xw:
+            x_weights.append(float(xw["composite"]))
 
     temporal_spread_hours = 0.0
     if len(timestamps) >= 2:
@@ -163,6 +175,7 @@ def compute_encounter_phase(examples: list[dict]) -> dict:
         "source_distribution": dict(source_counts),
         "temporal_spread_hours": round(temporal_spread_hours, 2),
         "n_examples": len(examples),
+        "mean_x_weight": round(sum(x_weights) / len(x_weights), 4) if x_weights else None,
     }
 
 
@@ -177,29 +190,18 @@ def _tokenize_for_dpo(
     max_seq_len: int,
     device,
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    """Tokenize prompt+response for DPO.
-
-    Returns (input_ids, labels) where labels mask the prompt tokens with -100
-    so loss is computed only on the response tokens.
-    """
     prompt_ids = tokenizer.encode(prompt, add_special_tokens=True)
     response_ids = tokenizer.encode(response, add_special_tokens=False)
-
-    # Truncate to fit
     max_resp = max_seq_len - len(prompt_ids)
     if max_resp <= 0:
         prompt_ids = prompt_ids[:max_seq_len - 50]
         max_resp = 50
     response_ids = response_ids[:max_resp]
-
     input_ids_list = prompt_ids + response_ids
     labels_list = [-100] * len(prompt_ids) + response_ids
-
-    # Pad to max_seq_len
     pad_len = max_seq_len - len(input_ids_list)
     input_ids_list = input_ids_list + [tokenizer.pad_token_id] * pad_len
     labels_list = labels_list + [-100] * pad_len
-
     input_ids = torch.tensor(input_ids_list, dtype=torch.long, device=device)
     labels = torch.tensor(labels_list, dtype=torch.long, device=device)
     return input_ids, labels
@@ -212,50 +214,25 @@ def dpo_loss(
     beta: float = 0.1,
     max_seq_len: int = 512,
 ) -> torch.Tensor:
-    """Compute DPO loss for a batch of preference pairs.
-
-    DPO loss (Rafailov et al., 2023):
-      L = -E[ log sigmoid( beta * (log pi(chosen|x) - log pi(rejected|x)) ) ]
-
-    We use the model itself as the reference (implicit reference), which is
-    appropriate for online DPO where we're updating continuously.
-    The loss encourages the model to assign higher likelihood to chosen
-    responses than rejected ones.
-    """
+    """DPO loss (Rafailov et al. 2023) over a batch of preference pairs."""
     device = next(model.parameters()).device
     total_loss = torch.tensor(0.0, device=device, requires_grad=True)
     n = 0
-
     for pair in pairs:
         prompt = pair["prompt"]
         chosen = pair["chosen"]
         rejected = pair["rejected"]
-
-        chosen_ids, chosen_labels = _tokenize_for_dpo(
-            tokenizer, prompt, chosen, max_seq_len, device
-        )
-        rejected_ids, rejected_labels = _tokenize_for_dpo(
-            tokenizer, prompt, rejected, max_seq_len, device
-        )
-
-        # Log-likelihood of chosen
+        chosen_ids, chosen_labels = _tokenize_for_dpo(tokenizer, prompt, chosen, max_seq_len, device)
+        rejected_ids, rejected_labels = _tokenize_for_dpo(tokenizer, prompt, rejected, max_seq_len, device)
         out_c = model(input_ids=chosen_ids.unsqueeze(0), labels=chosen_labels.unsqueeze(0))
-        # HF returns mean CE loss over non-masked tokens; convert to total log-prob
-        n_chosen_tokens = (chosen_labels != -100).sum().item()
-        log_pi_chosen = -out_c.loss * n_chosen_tokens
-
-        # Log-likelihood of rejected
+        n_chosen = (chosen_labels != -100).sum().item()
+        log_pi_chosen = -out_c.loss * n_chosen
         out_r = model(input_ids=rejected_ids.unsqueeze(0), labels=rejected_labels.unsqueeze(0))
-        n_rejected_tokens = (rejected_labels != -100).sum().item()
-        log_pi_rejected = -out_r.loss * n_rejected_tokens
-
-        # DPO loss for this pair
-        pair_loss = -torch.nn.functional.logsigmoid(
-            beta * (log_pi_chosen - log_pi_rejected)
-        )
+        n_rejected = (rejected_labels != -100).sum().item()
+        log_pi_rejected = -out_r.loss * n_rejected
+        pair_loss = -torch.nn.functional.logsigmoid(beta * (log_pi_chosen - log_pi_rejected))
         total_loss = total_loss + pair_loss
         n += 1
-
     return total_loss / n if n > 0 else total_loss
 
 
@@ -271,12 +248,14 @@ def train(
 ) -> dict:
     """Run LoRA fine-tuning with MuonAdamW.
 
-    If preference_data_path is provided and contains preference pairs,
-    training alternates between standard SFT loss (next-token prediction)
-    and DPO loss. The DPO loss uses beta=0.1 and runs every
-    dpo_every_n_steps steps (configurable in growth_config.yaml).
+    SFT loss is scaled per-sample by the composite x-weight stored in each
+    example’s metadata["x_weight"]["composite"]. This means the gradient
+    is pulled toward entries that scored high on holonomy, lens distance,
+    challenge survival, and cross-breath inheritance — the four components
+    that distinguish genuine thinking from fluent paraphrase.
 
-    Returns a result dict printed as JSON to stdout by the CLI wrapper.
+    If preference_data_path is provided and has pairs, DPO loss is interleaved
+    every dpo_every_n_steps, weighted at dpo_weight.
     """
     from peft import LoraConfig, get_peft_model, TaskType
     from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
@@ -291,7 +270,6 @@ def train(
         cfg = yaml.safe_load(f)
 
     lora_cfg = cfg.get("lora", {})
-    ewc_cfg = cfg.get("ewc", {})
     dpo_cfg = cfg.get("dpo", {})
 
     rank = lora_cfg.get("fast_rank", 8)
@@ -310,19 +288,15 @@ def train(
     if not examples:
         raise RuntimeError(f"No training examples found in {data_path}")
 
-    # Load preference pairs if available
     preference_pairs: list[dict] = []
     if preference_data_path:
         preference_pairs = load_preference_jsonl(preference_data_path)
-        print(
-            f"[peft_train] {len(preference_pairs)} preference pairs loaded",
-            file=sys.stderr,
-        )
+        print(f"[peft_train] {len(preference_pairs)} preference pairs loaded", file=sys.stderr)
     else:
         print("[peft_train] no preference data — SFT only", file=sys.stderr)
 
     theta = compute_encounter_phase(examples)
-    print(f"[peft_train] {len(examples)} training examples loaded", file=sys.stderr)
+    print(f"[peft_train] {len(examples)} examples, mean_x_weight={theta.get('mean_x_weight')}", file=sys.stderr)
     print(f"[peft_train] θ = {theta['theta_radians']:.4f} rad", file=sys.stderr)
 
     model_path = os.path.expanduser(
@@ -337,11 +311,7 @@ def train(
 
     print(f"[peft_train] Loading model from {model_path}", file=sys.stderr)
 
-    bnb_config = BitsAndBytesConfig(
-        load_in_4bit=True,
-        bnb_4bit_compute_dtype=torch.bfloat16,
-    )
-
+    bnb_config = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_compute_dtype=torch.bfloat16)
     tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
@@ -366,19 +336,18 @@ def train(
     trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
     total = sum(p.numel() for p in model.parameters())
     print(
-        f"[peft_train] LoRA: {trainable:,} trainable / {total:,} total params "
+        f"[peft_train] LoRA: {trainable:,} trainable / {total:,} total "
         f"({100 * trainable / total:.2f}%)",
         file=sys.stderr,
     )
 
-    param_groups = build_param_groups(
-        model, muon_lr=lr, adamw_lr=lr, weight_decay=0.2,
-    )
+    param_groups = build_param_groups(model, muon_lr=lr, adamw_lr=lr, weight_decay=0.2)
     optimizer = MuonAdamW(param_groups)
 
     max_seq_len = 512
     all_input_ids = []
     all_labels = []
+    all_x_weights = []  # per-sample loss scale
 
     for ex in examples:
         messages = ex["messages"]
@@ -401,11 +370,13 @@ def train(
         labels[labels == tokenizer.pad_token_id] = -100
         all_input_ids.append(input_ids)
         all_labels.append(labels)
+        all_x_weights.append(get_x_weight(ex))
 
     dataset_input_ids = torch.stack(all_input_ids)
     dataset_labels = torch.stack(all_labels)
-    n_examples = len(all_input_ids)
+    dataset_x_weights = torch.tensor(all_x_weights, dtype=torch.float32)
 
+    n_examples = len(all_input_ids)
     batch_size = min(4, n_examples)
     budget = TimeBudget(budget_seconds=time_budget_seconds, warmup_steps=1)
     model.train()
@@ -417,20 +388,20 @@ def train(
     dpo_loss_total = 0.0
 
     mode_str = (
-        f"SFT + DPO (beta={dpo_beta}, weight={dpo_weight}, every {dpo_every_n_steps} steps)"
+        f"SFT(x-weighted) + DPO(beta={dpo_beta})"
         if preference_pairs
-        else "SFT only"
+        else "SFT(x-weighted)"
     )
     print(
-        f"[peft_train] Training: {epochs} epochs, batch_size={batch_size}, "
-        f"budget={time_budget_seconds}s, mode={mode_str}",
+        f"[peft_train] mode={mode_str}, epochs={epochs}, batch={batch_size}, "
+        f"budget={time_budget_seconds}s",
         file=sys.stderr,
     )
 
     with gc_discipline(collect_every_n_steps=gc_collect_every):
         for epoch in range(epochs):
             if budget.exhausted:
-                print(f"[peft_train] Time budget exhausted at epoch {epoch}", file=sys.stderr)
+                print(f"[peft_train] budget exhausted at epoch {epoch}", file=sys.stderr)
                 break
 
             indices = torch.randperm(n_examples)
@@ -440,30 +411,39 @@ def train(
                     break
 
                 t0 = time.monotonic()
-
                 batch_idx = indices[batch_start : batch_start + batch_size]
                 input_ids = dataset_input_ids[batch_idx].to(model.device)
                 labels = dataset_labels[batch_idx].to(model.device)
+                x_w = dataset_x_weights[batch_idx].to(model.device)
 
-                # SFT loss
+                # Per-sample x-weighted SFT loss
+                # We compute unreduced loss and apply weights manually.
                 outputs = model(input_ids=input_ids, labels=labels)
-                loss = outputs.loss
+                # outputs.loss is mean-reduced. To apply per-sample weights we
+                # need per-sample losses. Re-compute with reduction='none'.
+                logits = outputs.logits
+                shift_logits = logits[..., :-1, :].contiguous()
+                shift_labels = labels[..., 1:].contiguous()
+                flat_logits = shift_logits.view(-1, shift_logits.size(-1))
+                flat_labels = shift_labels.view(-1)
+                token_losses = torch.nn.functional.cross_entropy(
+                    flat_logits, flat_labels, reduction="none"
+                ).view(len(batch_idx), -1)
+                # Mean over non-masked tokens per sample
+                mask = (shift_labels != -100).float()
+                per_sample_loss = (token_losses * mask).sum(-1) / mask.sum(-1).clamp(min=1)
+                # Weight by composite x-weight
+                loss = (per_sample_loss * x_w).mean()
 
-                # DPO loss (interleaved every dpo_every_n_steps)
+                # DPO loss (interleaved)
                 if (
                     preference_pairs
                     and steps_trained > 0
                     and steps_trained % dpo_every_n_steps == 0
                 ):
-                    # Sample a small batch of preference pairs
                     import random
-                    dpo_batch = random.sample(
-                        preference_pairs, min(4, len(preference_pairs))
-                    )
-                    d_loss = dpo_loss(
-                        model, tokenizer, dpo_batch,
-                        beta=dpo_beta, max_seq_len=max_seq_len,
-                    )
+                    dpo_batch = random.sample(preference_pairs, min(4, len(preference_pairs)))
+                    d_loss = dpo_loss(model, tokenizer, dpo_batch, beta=dpo_beta, max_seq_len=max_seq_len)
                     loss = (1 - dpo_weight) * loss + dpo_weight * d_loss
                     dpo_loss_total += d_loss.item()
                     dpo_steps += 1
@@ -485,8 +465,7 @@ def train(
                 if steps_trained % 10 == 0:
                     print(
                         f"[peft_train] step={steps_trained} loss={loss_val:.4f} "
-                        f"smooth={running_loss:.4f} "
-                        f"elapsed={budget.elapsed:.0f}s/{time_budget_seconds}s"
+                        f"smooth={running_loss:.4f} elapsed={budget.elapsed:.0f}s"
                         + (f" dpo_steps={dpo_steps}" if preference_pairs else ""),
                         file=sys.stderr,
                     )
@@ -503,16 +482,11 @@ def train(
     if adapter_file is None:
         adapter_file = str(adapter_dir / "adapter_model.safetensors")
 
-    print(f"[peft_train] Adapter saved to {adapter_file}", file=sys.stderr)
-    print(f"[peft_train] Final loss: {final_loss:.4f}, steps: {steps_trained}", file=sys.stderr)
+    print(f"[peft_train] saved: {adapter_file}, final_loss={final_loss:.4f}, steps={steps_trained}", file=sys.stderr)
     if dpo_steps > 0:
-        print(
-            f"[peft_train] DPO steps: {dpo_steps}, mean DPO loss: "
-            f"{dpo_loss_total / dpo_steps:.4f}",
-            file=sys.stderr,
-        )
+        print(f"[peft_train] dpo_steps={dpo_steps} mean_dpo_loss={dpo_loss_total/dpo_steps:.4f}", file=sys.stderr)
 
-    result = {
+    return {
         "final_loss": round(final_loss, 6),
         "steps_trained": steps_trained,
         "adapter_path": adapter_file,
@@ -524,7 +498,6 @@ def train(
         "n_preference_pairs": len(preference_pairs),
         "mean_dpo_loss": round(dpo_loss_total / dpo_steps, 6) if dpo_steps > 0 else None,
     }
-    return result
 
 
 # ---------------------------------------------------------------------------
@@ -532,26 +505,18 @@ def train(
 # ---------------------------------------------------------------------------
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="LoRA fine-tuning with MuonAdamW for Vybn growth engine",
-    )
-    parser.add_argument("--data", required=True, help="Path to training JSONL")
-    parser.add_argument("--output-dir", required=True, help="Directory for adapter output")
-    parser.add_argument("--config", required=True, help="Path to growth_config.yaml")
-    parser.add_argument(
-        "--preference-data",
-        default=None,
-        help="Optional path to DPO preference pairs JSONL",
-    )
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--data", required=True)
+    parser.add_argument("--output-dir", required=True)
+    parser.add_argument("--config", required=True)
+    parser.add_argument("--preference-data", default=None)
     args = parser.parse_args()
-
     result = train(
         data_path=args.data,
         output_dir=args.output_dir,
         config_path=args.config,
         preference_data_path=args.preference_data,
     )
-
     print(json.dumps(result, ensure_ascii=False))
 
 
