@@ -136,7 +136,7 @@ def _chat(
         method="POST",
     )
     try:
-        with urllib.request.urlopen(req, timeout=120) as resp:
+        with urllib.request.urlopen(req, timeout=300) as resp:
             data = json.loads(resp.read().decode())
             return data["choices"][0]["message"]["content"]
     except urllib.error.HTTPError as exc:
@@ -314,7 +314,7 @@ def breathe(state: dict) -> str:
             if refill.get("refilled"):
                 _log(f"buffer refilled: {refill['new_papers']} new papers")
             feeder = BufferFeeder()
-            entry  = feeder.pop_one()
+            entry  = feeder.pop_next()
             if entry:
                 content = entry.get("content", "")[:800]
                 source  = entry.get("source", "unknown")
