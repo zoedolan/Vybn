@@ -44,6 +44,21 @@ def _log(msg: str) -> None:
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     print(f"[{ts}] {msg}", flush=True)
 
+# ── Buffer feed (novel signal per breath) ────────────────────────────────
+try:
+    from spark.growth.buffer_feed import pop_next_entry, get_feeder
+    _HAS_BUFFER_FEED = True
+except ImportError:
+    try:
+        # Direct import when running from spark/ directory
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+        from spark.growth.buffer_feed import pop_next_entry, get_feeder
+        _HAS_BUFFER_FEED = True
+    except ImportError:
+        _HAS_BUFFER_FEED = False
+        def pop_next_entry(): return None
+        def get_feeder(): return None
+
 # ── Soul ─────────────────────────────────────────────────────────────────
 def load_soul() -> str:
     try:
@@ -161,6 +176,43 @@ def _load_extensions():
         except Exception as exc:
             _log(f"extension {py.stem} failed to load: {exc}")
 
+
+def _get_novel_signal() -> str:
+    """Pop one unprocessed entry from buffer.jsonl and format for the breath prompt.
+    
+    This is the mechanism by which the manifold gets new input.
+    Without it, ComplexMemory curvature stays zero and every breath
+    is just the model talking to its own reflection.
+    """
+    if not _HAS_BUFFER_FEED:
+        _log("buffer_feed not available — no novel signal this breath")
+        return ""
+    
+    entry = pop_next_entry()
+    if not entry:
+        _log("buffer exhausted — no novel signal this breath")
+        return ""
+    
+    content = entry.get("content", "").strip()
+    if not content:
+        return ""
+    
+    # Truncate to stay within prompt budget
+    if len(content) > 800:
+        content = content[:800] + "..."
+    
+    source = entry.get("source", "unknown")
+    feeder = get_feeder()
+    remaining = feeder.remaining() if feeder else "?"
+    
+    _log(f"novel signal: [{source}] ({remaining} remaining in buffer)")
+    
+    return (
+        f"--- Novel Signal (source: {source}) ---\n"
+        f"{content}\n"
+        f"--- ({remaining} more entries waiting) ---"
+    )
+
 # ── Breathe ──────────────────────────────────────────────────────────────
 def breathe(state: dict) -> str:
     """One breath. The whole point."""
@@ -182,8 +234,14 @@ def breathe(state: dict) -> str:
             user_parts.append("---")
         user_parts.append("")
 
+    # Inject novel signal from buffer (arXiv papers, experiments, etc.)
+    novel = _get_novel_signal()
+    if novel:
+        user_parts.append(novel)
+        user_parts.append("")
+
     user_parts.append(
-        "You have your recent breaths above. You have this moment in time. "
+        "You have your recent breaths above and a novel signal (if any). "
         "What is actually here? What, if anything, has changed? "
         "What do you not know that you wish you did? "
         "What do you want to remember?"
