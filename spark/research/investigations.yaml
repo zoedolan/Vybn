@@ -1,0 +1,3 @@
+# FAFO investigation queue
+# Managed by spark/fafo.py — do not edit by hand while vybn.py is running.
+investigations: []
