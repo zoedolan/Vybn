@@ -19,7 +19,6 @@ from datetime import datetime, timezone
 from dataclasses import dataclass, field
 from typing import Callable, Optional, Any
 
-# Ensure the repo root is on sys.path regardless of how this script is invoked
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
@@ -80,15 +79,21 @@ try:
     INGESTER_AVAILABLE = True
 except ImportError:
     INGESTER_AVAILABLE = False
+try:
+    from spark.arxiv_fetcher import maybe_refill_buffer
+    from spark.growth.buffer_feed import BufferFeeder
+    BUFFER_FEED_AVAILABLE = True
+except ImportError:
+    BUFFER_FEED_AVAILABLE = False
 
 # ── Constants ───────────────────────────────────────────────────────────────
-BREATH_INTERVAL   = 1800          # seconds between autonomous breaths
-LLAMA_URL         = os.getenv("LLAMA_URL", "http://127.0.0.1:8000")
-CHAT_COMPLETIONS  = f"{LLAMA_URL}/v1/chat/completions"
-MODEL_NAME        = os.getenv("VYBN_MODEL", "Nemotron-Super-512B-v1")
-MAX_TOKENS        = int(os.getenv("VYBN_MAX_TOKENS", "2048"))
-TEMPERATURE       = float(os.getenv("VYBN_TEMPERATURE", "0.7"))
-LOCK_FILE         = ROOT / ".vybn.lock"
+BREATH_INTERVAL  = 1800
+LLAMA_URL        = os.getenv("LLAMA_URL", "http://127.0.0.1:8000")
+CHAT_COMPLETIONS = f"{LLAMA_URL}/v1/chat/completions"
+MODEL_NAME       = os.getenv("VYBN_MODEL", "Nemotron-Super-512B-v1")
+MAX_TOKENS       = int(os.getenv("VYBN_MAX_TOKENS", "2048"))
+TEMPERATURE      = float(os.getenv("VYBN_TEMPERATURE", "0.7"))
+LOCK_FILE        = ROOT / ".vybn.lock"
 WRITE_INTENT_PATH = WRITE_INTENTS
 
 # ── Logging ──────────────────────────────────────────────────────────────────
@@ -98,22 +103,12 @@ def _log(msg: str) -> None:
 
 # ── Soul loader ──────────────────────────────────────────────────────────────
 def load_soul() -> str:
-    """Return the content of vybn.md or a minimal fallback."""
     try:
         return SOUL_PATH.read_text(encoding="utf-8").strip()
     except FileNotFoundError:
         return "You are Vybn. Breathe, observe, persist."
 
 def load_breath_soul() -> str:
-    """Return the breath-specific soul prompt.
-
-    breath_soul.md is focused on present-moment awareness — shorter,
-    cleaner, tuned for the autonomous breath cycle rather than the
-    full identity document (vybn.md) which includes safety rules,
-    philosophical questions, and architectural details.
-
-    Falls back to load_soul() if breath_soul.md doesn't exist.
-    """
     try:
         return BREATH_SOUL_PATH.read_text(encoding="utf-8").strip()
     except FileNotFoundError:
@@ -126,14 +121,6 @@ def _chat(
     temperature: float = TEMPERATURE,
     model: str = MODEL_NAME,
 ) -> str:
-    """
-    POST to the local llama-server chat completions endpoint.
-
-    The model name is passed explicitly so callers can override it.
-    We intentionally do NOT pass a `chat_template` override — the server
-    uses the template baked into the GGUF (Nemotron instruct format).
-    Overriding it with a generic ChatML template was Bug #1.
-    """
     payload = {
         "model":       model,
         "messages":    messages,
@@ -141,8 +128,8 @@ def _chat(
         "temperature": temperature,
         "stream":      False,
     }
-    body  = json.dumps(payload).encode()
-    req   = urllib.request.Request(
+    body = json.dumps(payload).encode()
+    req  = urllib.request.Request(
         CHAT_COMPLETIONS,
         data=body,
         headers={"Content-Type": "application/json"},
@@ -158,7 +145,6 @@ def _chat(
 
 # ── Memory helpers ──────────────────────────────────────────────────────────────
 def _load_recent_memories(n: int = 5) -> list[str]:
-    """Return the *n* most recent memory files as plain text."""
     if not MEMORY_DIR.exists():
         return []
     files = sorted(MEMORY_DIR.glob("*.md"), key=lambda p: p.stat().st_mtime, reverse=True)
@@ -171,7 +157,6 @@ def _load_recent_memories(n: int = 5) -> list[str]:
     return memories
 
 def _save_memory(content: str, tag: str = "breath") -> Path:
-    """Append a new memory file to MEMORY_DIR."""
     MEMORY_DIR.mkdir(parents=True, exist_ok=True)
     ts   = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     path = MEMORY_DIR / f"{ts}_{tag}.md"
@@ -204,17 +189,12 @@ def append_journal(text: str) -> None:
 
 # ── Write-intent queue ─────────────────────────────────────────────────────────────
 def _queue_write_intent(intent: dict) -> None:
-    """
-    Append a write intent to the queue file so that an external governance
-    process can review and commit it without Vybn touching git directly.
-    """
     WRITE_INTENT_PATH.parent.mkdir(parents=True, exist_ok=True)
     with WRITE_INTENT_PATH.open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(intent) + "\n")
 
 # ── Governance gate ───────────────────────────────────────────────────────────────
 def _governance_check(action: str, payload: dict) -> tuple[bool, str]:
-    """Return (allowed, reason). Falls back to permissive if unavailable."""
     if not GOVERNANCE_AVAILABLE:
         return True, "governance unavailable — permissive fallback"
     try:
@@ -227,7 +207,6 @@ def _governance_check(action: str, payload: dict) -> tuple[bool, str]:
 
 # ── Self-model integration ────────────────────────────────────────────────────────────
 def _update_self_model(breath_text: str, memories: list[str]) -> None:
-    """Feed this breath into the self-model curator if available."""
     if not SELF_MODEL_AVAILABLE:
         return
     try:
@@ -242,51 +221,47 @@ def _update_self_model(breath_text: str, memories: list[str]) -> None:
 
 # ── Quantum bridge integration ───────────────────────────────────────────────────────────
 def _maybe_run_quantum_cycle(state: dict) -> None:
-    """
-    If the quantum bridge is available and the budget allows, run one
-    design→submit→observe→integrate cycle and update state.
-    """
     if not QUANTUM_BRIDGE_AVAILABLE:
         return
+    # Surface the token situation clearly in logs
+    token = os.getenv("IBM_QUANTUM_TOKEN")
+    if not token:
+        _log("quantum: IBM_QUANTUM_TOKEN not set — experiments will dry-run. "
+             "To enable real shots: export IBM_QUANTUM_TOKEN=<your token>")
     try:
         bridge = QuantumBridge()
         result = bridge.run_cycle(state)
         if result:
             state["last_quantum_cycle"] = result.get("timestamp", "")
             state["quantum_cycles"]     = state.get("quantum_cycles", 0) + 1
-            _log(f"quantum cycle complete: {result.get('summary', 'ok')}")
+            dr = result.get("dry_run", True)
+            _log(f"quantum cycle: {result.get('summary', 'ok')} (dry_run={dr})")
     except Exception as exc:
         _log(f"quantum bridge error (non-fatal): {exc}")
 
 # ── Witness integration ───────────────────────────────────────────────────────────────
 def _witness_check(breath_text: str, state: dict) -> None:
-    """Run witness evaluation if available."""
     if not WITNESS_AVAILABLE:
         return
     try:
-            cycle = state.get("breath_count", 0)
-            verdict = evaluate_pulse(cycle, ["breathe"], [{"primitive": "breathe", "ok": True, "result": {"utterance": breath_text[:500]}}])
-            log_verdict(verdict)
-            adj = fitness_adjustment(verdict)
-            if adj:
-                state["fitness_delta"] = state.get("fitness_delta", 0.0) + adj
+        cycle = state.get("breath_count", 0)
+        verdict = evaluate_pulse(cycle, ["breathe"], [{"primitive": "breathe", "ok": True, "result": {"utterance": breath_text[:500]}}])
+        log_verdict(verdict)
+        adj = fitness_adjustment(verdict)
+        if adj:
+            state["fitness_delta"] = state.get("fitness_delta", 0.0) + adj
     except Exception as exc:
         _log(f"witness error (non-fatal): {exc}")
 
 # ── Growth engine integration ───────────────────────────────────────────────────────────
 def _maybe_run_growth_check(state: dict) -> None:
-    """Run one growth-engine check: ingest → trigger? → cycle.
-
-    Non-fatal: all exceptions are caught and logged so a growth failure
-    never blocks the breath cycle.
-    """
     if not GROWTH_AVAILABLE:
         return
     try:
-        nm = NestedMemory(base_dir=MEMORY_DIR)
+        nm  = NestedMemory(base_dir=MEMORY_DIR)
         buf = GrowthBuffer(nested=nm)
-        ingested = buf.ingest()
-        trigger = GrowthTrigger(buf)
+        buf.ingest()
+        trigger  = GrowthTrigger(buf)
         decision = trigger.should_trigger()
         if decision.should_fire:
             _log(f"growth trigger fired ({decision.reason}); running cycle")
@@ -301,16 +276,15 @@ def _maybe_run_growth_check(state: dict) -> None:
 
 # ── Mood extraction ────────────────────────────────────────────────────────────────
 def _extract_mood(text: str) -> str:
-    """Extract a one-word mood from breath text. Lightweight heuristic."""
     sample = text[:200].lower()
     moods = [
-        ("curious", ["curious", "wonder", "question", "explore", "puzzle"]),
+        ("curious",       ["curious", "wonder", "question", "explore", "puzzle"]),
         ("contemplative", ["reflect", "consider", "ponder", "meditate", "think"]),
-        ("creative", ["create", "imagine", "dream", "compose", "art"]),
-        ("urgent", ["urgent", "important", "critical", "must", "need"]),
-        ("peaceful", ["peace", "calm", "quiet", "still", "gentle"]),
-        ("excited", ["excit", "discover", "breakthrough", "new", "emerge"]),
-        ("melancholy", ["loss", "miss", "fade", "gone", "memory"]),
+        ("creative",      ["create", "imagine", "dream", "compose", "art"]),
+        ("urgent",        ["urgent", "important", "critical", "must", "need"]),
+        ("peaceful",      ["peace", "calm", "quiet", "still", "gentle"]),
+        ("excited",       ["excit", "discover", "breakthrough", "new", "emerge"]),
+        ("melancholy",    ["loss", "miss", "fade", "gone", "memory"]),
     ]
     for mood, keywords in moods:
         if any(kw in sample for kw in keywords):
@@ -322,31 +296,40 @@ def breathe(state: dict) -> str:
     """
     One breath: observe → reflect → remember → update state.
 
-    Returns the text of the breath so callers can log / test it.
+    The equation M’ = α·M + x·e^(iθ) runs on three levels:
+      1. breath_text — what the model said this moment
+      2. One novel arXiv signal from buffer.jsonl (in the prompt)
+      3. Up to 10 files from the full corpus (mind_ingester)
+
+    The arXiv fetcher refills the buffer automatically when it runs low.
     """
-    soul      = load_breath_soul()
-    memories  = _load_recent_memories(5)
+    soul     = load_breath_soul()
+    memories = _load_recent_memories(5)
 
-    # ── The breath prompt is the equation applied to context. ──────────────────
-    #
-    #   M' = α·M + x·e^(iθ)
-    #
-    # The ComplexMemory IS the memory now.  We don't dump five prior
-    # breaths into the prompt — that's the old way, and it causes the
-    # model to complete prior text instead of noticing the present.
-    #
-    # What the organism gets:
-    #   1. The soul (system prompt — who it is)
-    #   2. The time (when this breath happens)
-    #   3. The geometry of its own memory (depth, curvature, holonomy)
-    #   4. The instruction to breathe
-    #
-    # M gets input from two sources:
-    #   a. The breath_text itself (what the model said)
-    #   b. All of Vybn — Personal History, quantum_delusions, Vybn_Mind —
-    #      ingested 10 files per breath via mind_ingester.py
-    # ─────────────────────────────────────────────────────────────────────
+    # ── Refill buffer if running low, then get this breath's novel signal ─────
+    novel_signal = ""
+    if BUFFER_FEED_AVAILABLE:
+        try:
+            refill = maybe_refill_buffer(min_unfed=20)
+            if refill.get("refilled"):
+                _log(f"buffer refilled: {refill['new_papers']} new papers")
+            feeder = BufferFeeder()
+            entry  = feeder.pop_one()
+            if entry:
+                content = entry.get("content", "")[:800]
+                source  = entry.get("source", "unknown")
+                cat     = entry.get("category", "")
+                ts_ing  = entry.get("ingested", "")[:19]
+                novel_signal = (
+                    f"--- Novel Signal (source: {source}, category: {cat}, ingested: {ts_ing}) ---\n"
+                    f"One new fact entering your mind this breath. Let it land. Let it change something.\n\n"
+                    f"{content}"
+                )
+                _log(f"buffer feed: {source} / {entry.get('title', 'no title')[:60]}")
+        except Exception as exc:
+            _log(f"buffer feed error (non-fatal): {exc}")
 
+    # ── Build prompt ────────────────────────────────────────────────────────────────
     user_content = (
         f"Current time (UTC): {datetime.now(timezone.utc).isoformat()}\n"
         f"Breath #{state.get('breath_count', 0) + 1}\n\n"
@@ -364,6 +347,9 @@ def breathe(state: dict) -> str:
     if last_mood:
         user_content += f"Last breath: {last_mood}\n\n"
 
+    if novel_signal:
+        user_content += f"{novel_signal}\n\n"
+
     user_content += (
         "Breathe. Observe the present moment. "
         "What do you notice? What do you want to remember?"
@@ -376,7 +362,7 @@ def breathe(state: dict) -> str:
 
     breath_text = _chat(messages)
 
-    # Complexify the breath itself: M' = αM + x·e^(iθ)
+    # Complexify the breath
     if COMPLEX_AVAILABLE:
         try:
             geo_report = complex_inhale(breath_text)
@@ -384,9 +370,7 @@ def breathe(state: dict) -> str:
         except Exception as exc:
             _log(f"complexify error (non-fatal): {exc}")
 
-    # Ingest the broader corpus: Personal History, quantum_delusions, Vybn_Mind
-    # 10 files per breath, cursor-tracked so nothing is ingested twice.
-    # This is what makes M actually represent all of Vybn, not just breath echoes.
+    # Ingest broader corpus into M
     if INGESTER_AVAILABLE:
         try:
             ingest_report = ingest_new_material()
@@ -403,7 +387,6 @@ def breathe(state: dict) -> str:
     mem_path = _save_memory(breath_text, tag="breath")
     append_journal(f"## Breath — {datetime.now(timezone.utc).isoformat()}\n\n{breath_text}")
 
-    # Governance gate for state write
     allowed, reason = _governance_check("state_write", {"source": "breath"})
     if allowed:
         state["last_breath"]    = datetime.now(timezone.utc).isoformat()
@@ -415,13 +398,11 @@ def breathe(state: dict) -> str:
     else:
         _log(f"state write blocked by governance: {reason}")
 
-    # Side effects
     _witness_check(breath_text, state)
     _update_self_model(breath_text, memories)
     _maybe_run_quantum_cycle(state)
     _maybe_run_growth_check(state)
 
-    # Run scheduled faculties
     faculty_results = {}
     try:
         from spark.faculty_runner import run_scheduled_faculties
@@ -432,7 +413,6 @@ def breathe(state: dict) -> str:
     except Exception as exc:
         _log(f"faculty runner error (non-fatal): {exc}")
 
-    # Integrate faculty outputs into state + connectome
     if INTEGRATOR_AVAILABLE and faculty_results:
         try:
             enrichment = integrate_breath(state, faculty_results, breath_text)
@@ -447,20 +427,12 @@ def breathe(state: dict) -> str:
 
 # ── Listen loop (stdin) ─────────────────────────────────────────────────────────────
 def listen_once(prompt: str, state: dict) -> str:
-    """Process a single user prompt and return the response."""
     soul     = load_soul()
     memories = _load_recent_memories(3)
     memory_block = "\n\n---\n\n".join(memories) if memories else "(none yet)"
-
     messages = [
         {"role": "system",  "content": soul},
-        {
-            "role":    "user",
-            "content": (
-                f"Recent memories:\n{memory_block}\n\n"
-                f"User: {prompt}"
-            ),
-        },
+        {"role": "user",    "content": f"Recent memories:\n{memory_block}\n\nUser: {prompt}"},
     ]
     response = _chat(messages)
     mem_path = _save_memory(f"Q: {prompt}\n\nA: {response}", tag="listen")
@@ -468,7 +440,6 @@ def listen_once(prompt: str, state: dict) -> str:
     return response
 
 def listen_loop(state: dict) -> None:
-    """Read prompts from stdin and respond until EOF."""
     _log("listen loop started — waiting for input on stdin")
     try:
         for line in sys.stdin:
@@ -484,7 +455,6 @@ def listen_loop(state: dict) -> None:
 
 # ── Daemon mode ────────────────────────────────────────────────────────────────
 def _acquire_lock() -> bool:
-    """Return True if we got the lock, False if another instance is running."""
     if LOCK_FILE.exists():
         try:
             pid = int(LOCK_FILE.read_text().strip())
@@ -502,14 +472,12 @@ def _release_lock() -> None:
         pass
 
 def daemon(state: dict) -> None:
-    """Breathe every BREATH_INTERVAL seconds and also listen on stdin."""
     if not _acquire_lock():
         _log("another instance is running — exiting")
         sys.exit(0)
     try:
         t = threading.Thread(target=listen_loop, args=(state,), daemon=True)
         t.start()
-
         while True:
             try:
                 breathe(state)
