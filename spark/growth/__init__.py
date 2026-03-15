@@ -14,8 +14,8 @@ Phases 1-2 (BREATHE, NOTICE) run in the organism's pulse loop and topology.
 Phases 3-6 are implemented here:
   3. REMEMBER: GrowthBuffer — experience buffer with surprise weighting
   4. COLLECT:  DeltaExtractor — delta + replay packaging for training
-  5. DISTILL:  TrainCycle — LoRA fine-tuning inside the vLLM container
-  6. BECOME:   MergeCycle — activate adapter in serving model
+  5. DISTILL:  TrainCycle — training (currently blocked: needs FP32 small model)
+  6. BECOME:   MergeCycle — activate adapter (skipped when training blocked)
 
 The top-level entry point is trigger.run_growth_cycle().
 """
