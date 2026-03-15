@@ -262,6 +262,35 @@ def run_growth_cycle(
     print(f"[Growth] Training complete: loss={train_result.final_loss:.4f}, "
           f"steps={train_result.steps_trained}")
 
+    # Check if training was blocked (e.g., model too large / wrong quantization)
+    training_blocked = train_result.metadata.get("blocked", False)
+    if training_blocked:
+        reason = train_result.metadata.get("reason", "unknown")
+        print(f"[Growth] Training BLOCKED: {reason}")
+        print(f"[Growth] Data prepared and saved. Skipping holonomy and merge.")
+        buffer.mark_trained(cycle_id=delta.cycle_id)
+        trigger.record_cycle_complete(delta.cycle_id, {
+            "delta_count": delta.delta_count,
+            "replay_count": delta.replay_count,
+            "mean_surprise": delta.mean_surprise,
+            "final_loss": -1.0,
+            "steps_trained": 0,
+            "adapter_path": str(train_result.adapter_path),
+            "strategy": "blocked",
+            "vllm_restarted": False,
+            "dry_run": dry_run,
+            "holonomy": None,
+            "training_blocked": True,
+            "blocked_reason": reason,
+        })
+        return {
+            "fired": True,
+            "cycle_id": delta.cycle_id,
+            "training_blocked": True,
+            "blocked_reason": reason,
+            "data_ready": True,
+        }
+
     # 5. Holonomy measurement
     holonomy_data = None
     tracker = HolonomyTracker(
