@@ -136,7 +136,7 @@ def _chat(
         method="POST",
     )
     try:
-        with urllib.request.urlopen(req, timeout=120) as resp:
+        with urllib.request.urlopen(req, timeout=300) as resp:
             data = json.loads(resp.read().decode())
             return data["choices"][0]["message"]["content"]
     except urllib.error.HTTPError as exc:

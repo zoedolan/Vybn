@@ -129,7 +129,7 @@ def _convert_to_llama_jsonl(delta: DeltaPackage, out_path: Path) -> int:
     """
     written = 0
     with out_path.open("w", encoding="utf-8") as fh:
-        for entry in delta.entries:
+        for entry in delta.all_entries:
             msgs = entry.get("messages", [])
             if not msgs:
                 continue
