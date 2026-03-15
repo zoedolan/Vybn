@@ -85,6 +85,11 @@ try:
     BUFFER_FEED_AVAILABLE = True
 except ImportError:
     BUFFER_FEED_AVAILABLE = False
+try:
+    from spark.derivation import record_derivation
+    DERIVATION_AVAILABLE = True
+except ImportError:
+    DERIVATION_AVAILABLE = False
 
 # ── Constants ───────────────────────────────────────────────────────────────
 BREATH_INTERVAL  = 1800
@@ -430,6 +435,13 @@ def breathe(state: dict) -> str:
                  f"synth={'synthesis_context' in enrichment}")
         except Exception as exc:
             _log(f"breath integration error (non-fatal): {exc}")
+
+    # Record breath as architecture-scale derivation event
+    if DERIVATION_AVAILABLE:
+        try:
+            record_derivation(breath_text[:300], source="breath")
+        except Exception as exc:
+            _log(f"derivation error (non-fatal): {exc}")
 
     _log(f"breath #{state.get('breath_count', '?')}: {len(breath_text)} chars")
     return breath_text
