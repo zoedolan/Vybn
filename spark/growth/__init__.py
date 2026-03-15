@@ -25,6 +25,12 @@ from spark.growth.delta_extract import DeltaExtractor, DeltaPackage
 from spark.growth.train_cycle import TrainCycle, TrainResult
 from spark.growth.merge_cycle import MergeCycle, MergeResult
 from spark.growth.trigger import GrowthTrigger, TriggerDecision, run_growth_cycle
+from spark.growth.eval_harness import (
+    evaluate_bpb,
+    TimeBudget,
+    gc_discipline,
+    gc_checkpoint,
+)
 
 __all__ = [
     "GrowthBuffer",
@@ -37,4 +43,8 @@ __all__ = [
     "GrowthTrigger",
     "TriggerDecision",
     "run_growth_cycle",
+    "evaluate_bpb",
+    "TimeBudget",
+    "gc_discipline",
+    "gc_checkpoint",
 ]

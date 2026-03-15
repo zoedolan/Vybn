@@ -262,6 +262,10 @@ class TrainCycle:
             cfg = {}
         self._lora_cfg = cfg.get("lora", {})
         self._ewc_cfg  = cfg.get("ewc", {})
+        self._eval_cfg = cfg.get("eval", {})
+        self._time_budget_seconds: int = self._lora_cfg.get(
+            "time_budget_seconds", 7200,
+        )
 
     def run(self, delta: DeltaPackage, dry_run: bool = False) -> TrainResult:
         """Execute the training phase.
@@ -387,7 +391,7 @@ class TrainCycle:
             cmd,
             capture_output=True,
             text=True,
-            timeout=7200,  # 2 hour max
+            timeout=self._time_budget_seconds,
         )
 
         stdout_tail = result.stdout[-2000:] if result.stdout else ""
@@ -422,6 +426,25 @@ class TrainCycle:
                 "lr":         lr,
             },
         )
+
+        # --- BPB evaluation (tokenizer-invariant metric) ---
+        if self._eval_cfg.get("enabled", True):
+            try:
+                from spark.growth.eval_harness import evaluate_bpb
+
+                eval_text = cycle_dir / "training_data.txt"
+                bpb = evaluate_bpb(
+                    model_url=os.environ.get(
+                        "VYBN_MODEL_URL", "http://127.0.0.1:8000",
+                    ),
+                    eval_text_path=str(eval_text),
+                )
+                train_result.metadata["val_bpb"] = bpb
+                print(f"[TrainCycle] val_bpb: {bpb:.6f}")
+            except Exception as e:
+                print(f"[TrainCycle] BPB eval skipped: {e}")
+                train_result.metadata["val_bpb"] = None
+                train_result.metadata["bpb_error"] = str(e)
 
         self._record_cycle(train_result)
         return train_result

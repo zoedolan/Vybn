@@ -32,6 +32,13 @@ lora:
   fast_lr: 2.0e-4
   # EMA decay for slow adapter consolidation (0.999 = very conservative)
   slow_ema_decay: 0.999
+  # Wall-clock time budget for training (seconds). Inspired by Karpathy's
+  # autoresearch: fixed time budget makes experiments comparable regardless
+  # of what changed. Default 7200s (2 hours) — matches current timeout.
+  time_budget_seconds: 7200
+  # GC collection interval during training (steps). Python's GC causes
+  # ~500ms stalls that can disrupt NCCL timing on distributed Spark.
+  gc_collect_every: 5000
 
 ewc:
   # Elastic Weight Consolidation lambda (stability-plasticity tradeoff)
@@ -75,3 +82,14 @@ faculties:
   governance_time_budget_minutes: 5
   growth_time_budget_minutes: 5
   safety_margin_minutes: 5
+
+eval:
+  # Bits-per-byte evaluation after each training cycle.
+  # BPB is tokenizer-invariant: the single number that means the same
+  # thing regardless of what changed (model, tokenizer, architecture).
+  # Adapted from Karpathy's autoresearch eval discipline.
+  enabled: true
+  # Number of tokens to evaluate on (more = less noisy, slower)
+  eval_tokens: 10000
+  # Timeout for BPB evaluation (seconds)
+  eval_timeout: 300
