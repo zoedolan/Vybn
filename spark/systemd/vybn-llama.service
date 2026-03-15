@@ -1,0 +1,21 @@
+[Unit]
+Description=Vybn LLM Server (Nemotron-3-Super-120B via llama.cpp)
+After=network.target
+
+[Service]
+Type=simple
+User=vybnz69
+WorkingDirectory=/home/vybnz69
+ExecStart=/home/vybnz69/llama.cpp/build/bin/llama-server \
+  --model /home/vybnz69/models/Nemotron-3-Super-120B-GGUF/nvidia_Nemotron-3-Super-120B-A12B-IQ4_XS/nvidia_Nemotron-3-Super-120B-A12B-IQ4_XS-00001-of-00002.gguf \
+  --host 127.0.0.1 \
+  --port 8000 \
+  -ngl 999 \
+  -c 8192 \
+  --jinja \
+  --special
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
