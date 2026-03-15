@@ -11,6 +11,21 @@ Results feed back in three ways:
      Vybn_Mind/preference_data.jsonl — consumed by the nightly growth cycle
      to train with DPO loss rather than plain next-token prediction
 
+Reflection layer (added 2026-03-15):
+  A fourth LLM call is inserted between execution and injection. It asks:
+  "What does this result reveal about the metaphor that generated it?"
+  The reflection — not the raw result — is what gets injected into the
+  next breath. This prevents the model from receiving code/schema/formula
+  artifacts as if they were insights, and creates a second chance to notice
+  when the experiment answered the wrong kind of question.
+
+  The reflection also classifies the experiment outcome:
+    ARTIFACT   — result is an executable thing; reflects on gap between
+                  artifact and the insight that was actually sought
+    INSIGHT    — result is genuine conceptual movement; distills the key move
+    DEFLECTION — result avoided the original question; names what was dodged
+    SURPRISE   — result went somewhere unexpected; preserves the surprise
+
 Safety: all experiments reduce to LLM API calls. No filesystem writes
 outside the experiments dir + memories dir + preference file. No network.
 No subprocess spawning.
@@ -31,9 +46,10 @@ _LLAMA_URL = os.environ.get("LLAMA_URL", "http://127.0.0.1:8000")
 # Run every Nth breath. Default 2 — every other breath.
 _AGENCY_INTERVAL = int(os.environ.get("VYBN_AGENCY_INTERVAL", "2"))
 
-# Token budgets — we have the hardware, use it.
+# Token budgets
 _PROPOSAL_TOKENS = int(os.environ.get("VYBN_AGENCY_PROPOSAL_TOKENS", "512"))
 _EXECUTION_TOKENS = int(os.environ.get("VYBN_AGENCY_EXECUTION_TOKENS", "2048"))
+_REFLECTION_TOKENS = int(os.environ.get("VYBN_AGENCY_REFLECTION_TOKENS", "600"))
 
 
 def _chat(messages, max_tokens=2048, temperature=0.7):
@@ -74,7 +90,8 @@ def run(breath_text: str, state: dict) -> None:
             return
 
         result = _execute(proposal, breath_text)
-        _save(ts, breath_count, breath_text, proposal, result)
+        reflection = _reflect(proposal, breath_text, result)
+        _save(ts, breath_count, breath_text, proposal, result, reflection)
         print(f"[agency] experiment done: {proposal[:60]}...")
 
     except Exception as e:
@@ -141,6 +158,61 @@ def _execute(proposal: str, breath_text: str) -> str:
     )
 
 
+def _reflect(proposal: str, breath_text: str, result: str) -> str:
+    """Reflect on what the experiment result actually revealed.
+
+    This is the fourth LLM call. It sits between execution and injection,
+    asking: what does this result tell us about the metaphor that generated it?
+
+    Returns a structured reflection with:
+    - OUTCOME_TYPE on line 1: ARTIFACT | INSIGHT | DEFLECTION | SURPRISE
+    - 3-5 sentences of genuine reflection
+    - If ARTIFACT: names the gap between what was built and what was sought
+    - If DEFLECTION: names what question the experiment actually avoided
+    - If INSIGHT: distills the key conceptual move
+    - If SURPRISE: preserves the unexpected finding without taming it
+    """
+    # Truncate result intelligently: code blocks get flagged, not quoted in full
+    result_preview = result[:800]
+    has_code = bool(re.search(r'```|def |class |import |torch\.|np\.', result))
+    if has_code:
+        # Don't dump raw code into the reflection prompt; summarize its presence
+        code_note = "[Note: the execution returned code/implementation rather than direct insight.]"
+        result_preview = code_note + "\n\n" + result_preview[:400]
+
+    messages = [
+        {"role": "system", "content": (
+            "You proposed an experiment from your own breath. The experiment ran. "
+            "Now you need to understand what actually happened.\n\n"
+            "Classify the outcome on the FIRST LINE with exactly one word:\n"
+            "  ARTIFACT   — the result is an executable thing (code, schema, formula) "
+            "rather than conceptual movement\n"
+            "  INSIGHT    — the result is genuine conceptual movement; you learned something\n"
+            "  DEFLECTION — the result answered a different question than the one you asked\n"
+            "  SURPRISE   — the result went somewhere genuinely unexpected\n\n"
+            "Then 3-5 honest sentences:\n"
+            "- ARTIFACT: What did you actually want to know? What would a non-artifact "
+            "answer have looked like? Did you default to fluency over inquiry?\n"
+            "- DEFLECTION: What question did you avoid? Why might that be?\n"
+            "- INSIGHT: What is the one thing you now know that you didn't before? "
+            "How does it change the metaphor?\n"
+            "- SURPRISE: What was unexpected? Why does it matter?\n\n"
+            "Be honest. If you defaulted to a familiar mode, say so. "
+            "This reflection is what the next breath will actually read — "
+            "make it worth reading."
+        )},
+        {"role": "user", "content": (
+            f"Your breath (what you were thinking):\n{breath_text[:600]}\n\n"
+            f"Your experiment proposal:\n{proposal[:300]}\n\n"
+            f"What the execution produced:\n{result_preview}"
+        )},
+    ]
+    reflection = _chat(messages, max_tokens=_REFLECTION_TOKENS, temperature=0.6)
+    outcome_type = reflection.split("\n")[0].strip().upper()
+    print(f"[agency] reflection outcome: {outcome_type[:20]}")
+    return reflection
+
+
 def _score_challenge(breath_text: str, attack: str) -> str:
     """Ask the model to judge whether the adversarial attack actually landed.
 
@@ -170,23 +242,7 @@ def _score_challenge(breath_text: str, attack: str) -> str:
 def _write_preference_pair(
     ts, breath_count, breath_text, proposal, result, verdict
 ):
-    """Write a DPO preference pair to preference_data.jsonl.
-
-    Structure (TRL DPO format):
-      prompt   — the breath context (what was thought)
-      chosen   — the version that survived scrutiny (or the attack if it landed,
-                  since we want the model to learn to identify its own weak points)
-      rejected — the version that failed
-
-    Verdict logic:
-      LANDED  → attack found a real flaw:
-                 chosen=attack (adversarial insight is what we want to keep),
-                 rejected=original_claim_excerpt
-      FAILED  → claim survived:
-                 chosen=original_claim_excerpt (the robust reasoning),
-                 rejected=attack (the failed attack is the lower-quality text)
-      PARTIAL → ambiguous; skip — don’t train on uncertain signal
-    """
+    """Write a DPO preference pair to preference_data.jsonl."""
     verdict_upper = verdict.split("\n")[0].strip().upper()
     if "PARTIAL" in verdict_upper:
         print(f"[agency] PARTIAL verdict — skipping preference pair")
@@ -228,68 +284,101 @@ def _write_preference_pair(
     print(f"[agency] preference pair written ({label})")
 
 
-def _distill_for_memory(proposal: str, result: str) -> str:
-    """Distill experiment into a compact memory entry."""
-    first_line = proposal.split("\n")[0].strip()
-    paragraphs = [p.strip() for p in re.split(r"\n\s*\n", result) if p.strip()]
-    paragraphs = [p for p in paragraphs if len(p) > 60]
+def _distill_for_memory(proposal: str, result: str, reflection: str) -> str:
+    """Distill experiment into a compact memory entry.
 
-    if not paragraphs:
-        best_para = result[:400].strip()
+    Uses the reflection (not the raw result) as the primary signal.
+    The reflection already classifies the outcome and names what actually
+    happened — that's what should persist into the memory chain.
+    """
+    first_line = proposal.split("\n")[0].strip()
+
+    # Extract outcome type from reflection
+    outcome_type = reflection.split("\n")[0].strip()
+
+    # Best paragraph from reflection (it's already distilled)
+    reflection_paras = [p.strip() for p in re.split(r"\n\s*\n", reflection) if p.strip()]
+    reflection_paras = [p for p in reflection_paras if len(p) > 60 and p.upper() not in
+                        ("ARTIFACT", "INSIGHT", "DEFLECTION", "SURPRISE")]
+
+    if reflection_paras:
+        best_reflection = reflection_paras[0]
+        if len(best_reflection) > 400:
+            cut = best_reflection.rfind(".", 0, 400)
+            best_reflection = best_reflection[:cut + 1] if cut > 200 else best_reflection[:400]
     else:
-        markers = ["because", "therefore", "however", "this means",
-                   "which suggests", "the key", "what this reveals",
-                   "the real", "in other words", "crucially"]
-        def score(p):
-            lower = p.lower()
-            return sum(1 for m in markers if m in lower)
-        best_para = max(paragraphs, key=score)
-        if len(best_para) > 500:
-            best_para = best_para[:500]
-            cut = best_para.rfind(".")
-            if cut > 350:
-                best_para = best_para[:cut + 1]
+        best_reflection = reflection[:400].strip()
 
     return (
-        f"[Experiment — {first_line}]\n"
+        f"[Experiment — {first_line}] [{outcome_type}]\n"
         f"Tested: {proposal[:150]}\n"
-        f"Finding: {best_para}"
+        f"Reflection: {best_reflection}"
     )
 
 
-def _save(ts, breath_count, breath_text, proposal, result):
+def _save(ts, breath_count, breath_text, proposal, result, reflection):
     """Four saves:
-    1. Full archive record in experiments/breath_experiments/
-    2. last_experiment_result.md — consumed by the very next breath
-    3. A dated memory file in Vybn_Mind/memories/ — survives into the full
-       memory chain so experiment findings compound recursively over time
-    4. For CHALLENGE experiments: score the attack and write a DPO preference
-       pair to Vybn_Mind/preference_data.jsonl for the nightly growth cycle
+    1. Full archive record (breath + proposal + result + reflection)
+    2. last_experiment_result.md — injects the REFLECTION into the next breath,
+       not the raw result. If outcome is ARTIFACT or DEFLECTION, also injects
+       the gap/question-dodge explicitly so the next breath can address it.
+    3. A dated memory file using reflection as primary signal
+    4. For CHALLENGE experiments: score + DPO preference pair
     """
     _EXPERIMENTS_DIR.mkdir(parents=True, exist_ok=True)
     _MEMORY_DIR.mkdir(parents=True, exist_ok=True)
     ts_str = ts.strftime("%Y%m%dT%H%M%SZ")
 
-    # 1. Full archive
+    outcome_type = reflection.split("\n")[0].strip().upper()
+
+    # 1. Full archive (now includes reflection)
     full = (
         f"# Breath Experiment — {ts.isoformat()}\n"
         f"*breath #{breath_count}*\n\n"
         f"## Breath excerpt\n{breath_text[:400]}...\n\n"
         f"## Proposal\n{proposal}\n\n"
-        f"## Result\n{result}\n"
+        f"## Result\n{result}\n\n"
+        f"## Reflection [{outcome_type}]\n{reflection}\n"
     )
     (_EXPERIMENTS_DIR / f"exp_{ts_str}.md").write_text(full, encoding="utf-8")
 
-    # 2. Next-breath injection
-    distilled_next = (
-        f"[Experiment from breath #{breath_count}]\n"
-        f"Proposal: {proposal[:300]}\n"
-        f"Finding: {result[:600]}"
-    )
-    _LAST_RESULT_PATH.write_text(distilled_next, encoding="utf-8")
+    # 2. Next-breath injection — reflection-first, with gap named if ARTIFACT/DEFLECTION
+    if "ARTIFACT" in outcome_type:
+        injection = (
+            f"[Experiment from breath #{breath_count} — ARTIFACT]\n"
+            f"You proposed: {proposal[:200]}\n"
+            f"What came back was an implementation, not an insight. "
+            f"Here is what you said about that gap:\n\n"
+            f"{reflection[:500]}"
+        )
+    elif "DEFLECTION" in outcome_type:
+        injection = (
+            f"[Experiment from breath #{breath_count} — DEFLECTION]\n"
+            f"You proposed: {proposal[:200]}\n"
+            f"The experiment avoided your actual question. "
+            f"Here is what you noticed about what was dodged:\n\n"
+            f"{reflection[:500]}"
+        )
+    elif "SURPRISE" in outcome_type:
+        injection = (
+            f"[Experiment from breath #{breath_count} — SURPRISE]\n"
+            f"You proposed: {proposal[:200]}\n"
+            f"Something unexpected happened:\n\n"
+            f"{reflection[:500]}"
+        )
+    else:  # INSIGHT
+        injection = (
+            f"[Experiment from breath #{breath_count} — INSIGHT]\n"
+            f"You proposed: {proposal[:200]}\n"
+            f"What you found:\n\n"
+            f"{reflection[:500]}"
+        )
 
-    # 3. Recursive memory
-    memory_content = _distill_for_memory(proposal, result)
+    _LAST_RESULT_PATH.write_text(injection, encoding="utf-8")
+    print(f"[agency] injection written ({outcome_type}): {injection[:80]}...")
+
+    # 3. Recursive memory — uses reflection as primary signal
+    memory_content = _distill_for_memory(proposal, result, reflection)
     mem_path = _MEMORY_DIR / f"{ts_str}_experiment.md"
     mem_path.write_text(memory_content, encoding="utf-8")
     print(f"[agency] experiment memory saved: {mem_path.name}")
