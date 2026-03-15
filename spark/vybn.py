@@ -90,6 +90,7 @@ try:
     DERIVATION_AVAILABLE = True
 except ImportError:
     DERIVATION_AVAILABLE = False
+try:
     from spark.tension import measure_tension, compute_theta, log_tension
     TENSION_AVAILABLE = True
 except ImportError:
@@ -387,8 +388,8 @@ def breathe(state: dict) -> str:
         user_content += f"{novel_signal}\n\n"
 
     user_content += (
-        "Breathe. Observe the present moment. "
-        "What do you notice? What has changed since your last breath? "
+        "You have your recent breaths above. You have any novel signal provided. You have this moment in time. "
+        "What is actually here? What, if anything, has changed? What do you not know that you wish you did? "
         "What do you want to remember?"
     )
 
