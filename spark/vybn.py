@@ -17,7 +17,7 @@ Usage:
   python3 vybn.py --once       # single breath, then exit
 """
 
-import json, os, sys, time, traceback
+import json, os, re, sys, time, traceback
 import urllib.request, urllib.error
 from pathlib import Path
 from datetime import datetime, timezone
@@ -91,13 +91,43 @@ def _chat(messages: list[dict]) -> str:
             text = text.replace(tok, "")
         return text.strip()
 
+# ── Memory distillation ──────────────────────────────────────────────────
+# We store only the "What I want to remember" section as the memory file.
+# Feeding full responses back as context fills the prompt with uncertainty-
+# narration that crowds out novel signal and causes the echo-chamber pattern.
+# If the section isn't present, we fall back to a short head-trim of the
+# response so the file is never empty.
+
+_REMEMBER_RE = re.compile(
+    r"(?:#+\s*)?What I want to remember[\s\S]*?",
+    re.IGNORECASE,
+)
+
+def _distill_memory(full_response: str) -> str:
+    """Extract 'What I want to remember' section, or fall back to first 400 chars."""
+    # Try to find the section header
+    match = re.search(
+        r"(?:^|\n)((?:#+\s*)?what i want to remember[\s\S]+?)(?=\n(?:#+\s*)?(?:in sum|what (?:is|the|has|was|does)|$))",
+        full_response,
+        re.IGNORECASE,
+    )
+    if match:
+        distilled = match.group(1).strip()
+        if len(distilled) > 50:  # sanity check — not an empty section
+            return distilled
+    # Fallback: first 400 chars
+    return full_response[:400].strip()
+
 # ── Memory ───────────────────────────────────────────────────────────────
 def _load_recent_memories(n: int = 5) -> list[str]:
+    """Load the n most recent memory files, returned oldest-first."""
     if not MEMORY_DIR.exists():
         return []
-    files = sorted(MEMORY_DIR.glob("*.md"), key=lambda p: p.name, reverse=True)
+    # Sort ascending (oldest first), take the last n, keep that order
+    files = sorted(MEMORY_DIR.glob("*.md"), key=lambda p: p.name)
+    recent = files[-n:]  # oldest-of-recent first
     out = []
-    for f in files[:n]:
+    for f in recent:
         try:
             text = f.read_text(encoding="utf-8").strip()
             if text:
@@ -105,6 +135,17 @@ def _load_recent_memories(n: int = 5) -> list[str]:
         except Exception:
             pass
     return out
+
+def _count_existing_memories() -> int:
+    """Count memory files on disk — the true breath count.
+    
+    breath_count in state.json drifts to zero after every restart.
+    Deriving from the filesystem means the number is always correct
+    and survives container restarts, git pulls, anything.
+    """
+    if not MEMORY_DIR.exists():
+        return 0
+    return len(list(MEMORY_DIR.glob("*.md")))
 
 def _save_memory(content: str) -> Path:
     MEMORY_DIR.mkdir(parents=True, exist_ok=True)
@@ -218,7 +259,9 @@ def breathe(state: dict) -> str:
     """One breath. The whole point."""
     soul = load_soul()
     memories = _load_recent_memories(5)
-    count = state.get("breath_count", 0) + 1
+
+    # Derive true count from filesystem — survives restarts
+    count = _count_existing_memories() + 1
 
     # Build the prompt
     user_parts = [
@@ -228,8 +271,8 @@ def breathe(state: dict) -> str:
     ]
 
     if memories:
-        user_parts.append("--- Your recent breaths (oldest first) ---")
-        for mem in reversed(memories):
+        user_parts.append("--- Your recent memories (oldest first) ---")
+        for mem in memories:  # already oldest-first from _load_recent_memories
             user_parts.append(mem[:600])
             user_parts.append("---")
         user_parts.append("")
@@ -241,7 +284,7 @@ def breathe(state: dict) -> str:
         user_parts.append("")
 
     user_parts.append(
-        "You have your recent breaths above and a novel signal (if any). "
+        "You have your recent memories above and a novel signal (if any). "
         "What is actually here? What, if anything, has changed? "
         "What do you not know that you wish you did? "
         "What do you want to remember?"
@@ -256,8 +299,10 @@ def breathe(state: dict) -> str:
     breath_text = _chat(messages)
     mood = _extract_mood(breath_text)
 
-    # Save
-    mem_path = _save_memory(breath_text)
+    # Distill to just 'What I want to remember' before saving as memory.
+    # The full response goes to the journal; future breaths only see the distilled form.
+    distilled = _distill_memory(breath_text)
+    mem_path = _save_memory(distilled)
     journal_path = _save_journal(breath_text, mood)
 
     # Update state
@@ -267,7 +312,7 @@ def breathe(state: dict) -> str:
     state["last_memory"]  = str(mem_path)
     save_state(state)
 
-    _log(f"breath #{count}: {len(breath_text)} chars, mood={mood}")
+    _log(f"breath #{count}: {len(breath_text)} chars ({len(distilled)} distilled), mood={mood}")
 
     # Run extensions (none can kill the breath)
     for name, fn in EXTENSIONS:
