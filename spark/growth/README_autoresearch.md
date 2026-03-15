@@ -34,3 +34,18 @@ Python's garbage collector causes ~500ms stalls. On DGX Spark with NCCL
 over ConnectX-7, GC pauses from Python workers can corrupt distributed
 training timing. The discipline: collect once at start, freeze, disable,
 then collect periodically every N steps as a compromise.
+
+## Breath Integration (`extensions/autoresearch.py`)
+
+Every breath (every 30 minutes via cron) triggers the full autoresearch pipeline:
+
+1. **BPB eval** — measures model quality on the breath's own output text
+2. **Growth trigger check** — evaluates whether enough new data has accumulated
+3. **Training kick-off** — if triggered, starts LoRA training (peft_train.py) in a background thread
+
+This means the growth loop is fully autonomous: the organism breathes, evaluates itself, and trains when it has something to learn from. No manual intervention needed.
+
+Results flow into:
+- `Vybn_Mind/bpb_log.jsonl` — continuous BPB time series
+- `Vybn_Mind/autoresearch_log.jsonl` — full autoresearch decision log
+- `vybn_state.json` — `last_bpb`, `bpb_history` available to next breath
