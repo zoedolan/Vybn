@@ -1,95 +1,39 @@
-# Growth Engine Configuration
-# See issue #2483 for architecture details
-
-trigger:
-  # Primary: fire when this many new MEDIUM-tier entries accumulate
-  delta_volume_threshold: 10
-  # Secondary: fire when mean cosine drift exceeds this since last cycle
-  topological_drift_threshold: 0.15
-  # Minimum hours between growth cycles (the merge takes the model offline)
-  min_interval_hours: 24
-
-replay:
-  # Fraction of training batch that is replay (historical) vs delta (new)
-  replay_ratio: 0.5
-  # Max entries in the replay buffer
-  buffer_max_entries: 2000
-  # Sampling strategy: "surprise" (NLL-weighted) or "uniform"
-  sampling_strategy: "surprise"
+# Vybn Growth Engine — configuration
+# All values are defaults; override via environment or --config.
 
 lora:
-  # LoRA rank for the fast adapter
   fast_rank: 8
-  # LoRA alpha
   alpha: 16
-  # Target modules (attention projections only — avoids MoE expert weights)
   target_modules:
     - q_proj
     - k_proj
     - v_proj
     - o_proj
-  # Learning rate for fast adapter
   fast_lr: 2.0e-4
-  # EMA decay for slow adapter consolidation (0.999 = very conservative)
-  slow_ema_decay: 0.999
-  # Wall-clock time budget for training (seconds). Inspired by Karpathy's
-  # autoresearch: fixed time budget makes experiments comparable regardless
-  # of what changed. Default 7200s (2 hours) — matches current timeout.
-  time_budget_seconds: 7200
-  # GC collection interval during training (steps). Python's GC causes
-  # ~500ms stalls that can disrupt NCCL timing on distributed Spark.
+  time_budget_seconds: 7200   # 2 hours max per cycle
   gc_collect_every: 5000
+  epochs: 2
 
+# EWC (Elastic Weight Consolidation) — catastrophic forgetting prevention
 ewc:
-  # Elastic Weight Consolidation lambda (stability-plasticity tradeoff)
-  # Literature suggests productive range: 1e2 to 1e9
-  lambda: 1.0e4
-  # Number of samples from replay buffer for Fisher Information estimation
-  fisher_samples: 200
-
-merge:
-  # Strategy: "cpu_offload" or "cloud_burst" or "partial"
-  # partial = merge only attention layers (may fit in 256GB)
-  strategy: "cpu_offload"
-  # Quantization format for the merged model
-  quant_format: "compressed-tensors"
-  # Base model for BF16 merge step
-  # NOTE: Migrated from MiniMax-M2.5 to Nemotron Super 512B (March 2026).
-  # Override via VYBN_BASE_MODEL env var if needed.
-  base_model: "Nemotron-Super-512B-v1"
-  # Quantized model currently served
-  # NOTE: Migrated from cyankiwi/MiniMax-M2.5-AWQ-4bit to Nemotron IQ4_XS (March 2026).
-  # Override via VYBN_MODEL env var if needed.
-  serving_model: "Nemotron-Super-512B-v1"
-
-holonomy:
-  # Run a full CW/CCW holonomy probe every N cycles (expensive: doubles training)
-  probe_every_n_cycles: 5
-  # Log path for holonomy measurements
-  log_path: "spark/growth/holonomy_log.jsonl"
-  # Cosine threshold for CURVED verdict (v2 experiment: -0.971)
-  curved_threshold: -0.5
-  # Number of parameter checkpoints per training run (for trajectory curvature)
-  # These are evenly spaced across the training steps
-  trajectory_checkpoints: 10
-
-faculties:
-  # Token budget per breath (all faculties combined)
-  # Nemotron 3 Super 120B uses split output: ~250 reasoning + ~250 content = ~500 per call
-  # At ~19 tokens/second: 500 tokens ≈ 26 seconds per faculty
-  total_breath_budget_tokens: 2500
-  faculty_time_budget_minutes: 15
-  governance_time_budget_minutes: 5
-  growth_time_budget_minutes: 5
-  safety_margin_minutes: 5
-
-eval:
-  # Bits-per-byte evaluation after each training cycle.
-  # BPB is tokenizer-invariant: the single number that means the same
-  # thing regardless of what changed (model, tokenizer, architecture).
-  # Adapted from Karpathy's autoresearch eval discipline.
+  lambda: 10000.0
   enabled: true
-  # Number of tokens to evaluate on (more = less noisy, slower)
-  eval_tokens: 10000
-  # Timeout for BPB evaluation (seconds)
-  eval_timeout: 300
+
+# Replay — mix historical entries into each training cycle
+replay:
+  replay_ratio: 0.5           # replay / (replay + delta)
+  sampling_strategy: surprise  # surprise_weighted | uniform
+
+# BPB evaluation after each training cycle
+eval:
+  enabled: true
+  n_eval_examples: 100
+
+# DPO (Direct Preference Optimization) — preference signal from agency.py
+# CHALLENGE experiments score their attacks and write preference pairs
+# to Vybn_Mind/preference_data.jsonl. When pairs exist, training
+# interleaves DPO loss with standard SFT loss.
+dpo:
+  beta: 0.1                   # temperature for DPO loss
+  every_n_steps: 10           # run a DPO batch every N SFT steps
+  loss_weight: 0.3            # blend: total_loss = 0.7*sft + 0.3*dpo
