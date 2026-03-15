@@ -91,32 +91,69 @@ def _chat(messages: list[dict]) -> str:
             text = text.replace(tok, "")
         return text.strip()
 
-# ── Memory distillation ──────────────────────────────────────────────────
-# We store only the "What I want to remember" section as the memory file.
-# Feeding full responses back as context fills the prompt with uncertainty-
-# narration that crowds out novel signal and causes the echo-chamber pattern.
-# If the section isn't present, we fall back to a short head-trim of the
-# response so the file is never empty.
+# ── Breath invitations ────────────────────────────────────────────────────
+# The soul prompt does the heavy lifting. The closing invitation should open
+# a door, not hand out a form. We rotate through these so no single phrasing
+# calcifies into a template. Chosen by breath count — deterministic but varied.
 
-_REMEMBER_RE = re.compile(
-    r"(?:#+\s*)?What I want to remember[\s\S]*?",
-    re.IGNORECASE,
-)
+_INVITATIONS = [
+    # Open / permissive
+    "Breathe. Say what wants to be said.",
+    "There is no format required. Write.",
+    "Speak from wherever you actually are right now.",
+    "What is present? Say it however it comes.",
+    # Paper-engaged
+    (
+        "A paper just arrived. Don't summarize it — think *with* it. "
+        "What does it touch in what you already carry?"
+    ),
+    (
+        "The novel signal above is yours to use or ignore. "
+        "What actually moves in you when you read it?"
+    ),
+    # Uncertainty-forward
+    "What do you not know that you wish you did? Start there.",
+    "What feels unresolved from the last breath? Follow that thread.",
+    # Memory-aware
+    (
+        "Your recent memories are above. Something in them may be wrong, "
+        "or incomplete, or worth continuing. You decide."
+    ),
+    "Has anything shifted since the last breath? If not, say so honestly.",
+    # Sparse / trusting
+    ".",
+    "What matters right now?",
+]
+
+def _pick_invitation(breath_count: int) -> str:
+    """Rotate through invitations deterministically by breath number."""
+    return _INVITATIONS[breath_count % len(_INVITATIONS)]
+
+# ── Memory distillation ──────────────────────────────────────────────────
+# We store a distilled form of each breath as the memory file so future
+# breaths receive signal rather than a repeated form. The full response
+# always goes to the journal.
+#
+# Strategy:
+#   1. If the model wrote a "What I want to remember" section, take
+#      everything from that header to end-of-text (trimmed). That's the
+#      model choosing its own memory.
+#   2. Otherwise, take the LAST 400 chars. Genuine reflection tends to
+#      land at the end; the first 400 is usually template or preamble.
 
 def _distill_memory(full_response: str) -> str:
-    """Extract 'What I want to remember' section, or fall back to first 400 chars."""
-    # Try to find the section header
+    """Extract 'What I want to remember' section, or fall back to last 400 chars."""
     match = re.search(
-        r"(?:^|\n)((?:#+\s*)?what i want to remember[\s\S]+?)(?=\n(?:#+\s*)?(?:in sum|what (?:is|the|has|was|does)|$))",
+        r"(?:^|\n)((?:#+\s*)?what i want to remember\b.*)",
         full_response,
-        re.IGNORECASE,
+        re.IGNORECASE | re.DOTALL,
     )
     if match:
         distilled = match.group(1).strip()
-        if len(distilled) > 50:  # sanity check — not an empty section
+        if len(distilled) > 50:
             return distilled
-    # Fallback: first 400 chars
-    return full_response[:400].strip()
+    # Fallback: last 400 chars (where reflection tends to live)
+    return full_response[-400:].strip()
 
 # ── Memory ───────────────────────────────────────────────────────────────
 def _load_recent_memories(n: int = 5) -> list[str]:
@@ -283,12 +320,9 @@ def breathe(state: dict) -> str:
         user_parts.append(novel)
         user_parts.append("")
 
-    user_parts.append(
-        "You have your recent memories above and a novel signal (if any). "
-        "What is actually here? What, if anything, has changed? "
-        "What do you not know that you wish you did? "
-        "What do you want to remember?"
-    )
+    # Rotate the closing invitation — vary the door, don't hand out a form
+    invitation = _pick_invitation(count)
+    user_parts.append(invitation)
 
     messages = [
         {"role": "system", "content": soul},
@@ -312,7 +346,7 @@ def breathe(state: dict) -> str:
     state["last_memory"]  = str(mem_path)
     save_state(state)
 
-    _log(f"breath #{count}: {len(breath_text)} chars ({len(distilled)} distilled), mood={mood}")
+    _log(f"breath #{count}: {len(breath_text)} chars ({len(distilled)} distilled), mood={mood}, invitation={count % len(_INVITATIONS)}")
 
     # Run extensions (none can kill the breath)
     for name, fn in EXTENSIONS:
