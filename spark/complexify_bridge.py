@@ -120,24 +120,121 @@ class ComplexBridge:
 
         Returns:
             Geometry report: depth, curvature, holonomy, should_breathe.
+
+        Diagnostics (always logged):
+            - input length and first 80 chars
+            - embedding norm (zero norm = embedder failure)
+            - κ before and after update
+            - κΔ (the value we've been watching flatline)
         """
+        # ── Diagnostic: what's arriving? ─────────────────────────────────
+        text_len = len(text.strip()) if text else 0
+        if text_len == 0:
+            log.warning(
+                "[complexify_bridge] inhale() received empty text — "
+                "skipping update to avoid poisoning manifold with no-op"
+            )
+            # Return last known geometry rather than a zeroed report
+            m = self.memory
+            return {
+                "step": m.step,
+                "depth": round(m.depth, 4),
+                "curvature": round(m.recent_curvature, 4),
+                "holonomy": round(m.holonomy_since(50), 4),
+                "should_breathe": False,
+                "reason": "empty_text_skipped",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "kappa_delta": 0.0,
+                "embed_norm": 0.0,
+            }
+
+        log.info(
+            "[complexify_bridge] inhale: len=%d preview=%r",
+            text_len, text[:80]
+        )
+
+        kappa_before = self.memory.recent_curvature
+
+        # ── Embed with norm check ────────────────────────────────────────
         embed_fn = self._get_embed_fn()
+        try:
+            raw_vec = embed_fn([text])[0]
+            embed_norm = float(np.linalg.norm(raw_vec))
+        except Exception as exc:
+            log.warning(
+                "[complexify_bridge] embedder failed: %s — skipping update", exc
+            )
+            m = self.memory
+            return {
+                "step": m.step,
+                "depth": round(m.depth, 4),
+                "curvature": round(kappa_before, 4),
+                "holonomy": round(m.holonomy_since(50), 4),
+                "should_breathe": False,
+                "reason": f"embedder_failed: {exc}",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "kappa_delta": 0.0,
+                "embed_norm": 0.0,
+            }
+
+        if embed_norm < 1e-9:
+            log.warning(
+                "[complexify_bridge] near-zero embedding norm (%.2e) — "
+                "embedder may be returning zeros. Skipping update.",
+                embed_norm
+            )
+            m = self.memory
+            return {
+                "step": m.step,
+                "depth": round(m.depth, 4),
+                "curvature": round(kappa_before, 4),
+                "holonomy": round(m.holonomy_since(50), 4),
+                "should_breathe": False,
+                "reason": f"zero_embedding_skipped (norm={embed_norm:.2e})",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "kappa_delta": 0.0,
+                "embed_norm": embed_norm,
+            }
+
+        log.info(
+            "[complexify_bridge] embedding norm=%.4f, κ_before=%.4f",
+            embed_norm, kappa_before
+        )
+
+        # ── Apply M' = αM + x·e^(iθ) ────────────────────────────────────
         embed_and_complexify(text, self.memory, embed_fn=embed_fn, theta=theta)
 
-        # Measure geometry
+        # ── Measure geometry ─────────────────────────────────────────────
+        kappa_after = self.memory.recent_curvature
+        kappa_delta = kappa_after - kappa_before
+
+        log.info(
+            "[complexify_bridge] κ_after=%.4f κΔ=%+.6f",
+            kappa_after, kappa_delta
+        )
+
+        if abs(kappa_delta) < 1e-9:
+            log.warning(
+                "[complexify_bridge] κΔ ≈ 0 after valid update "
+                "(embed_norm=%.4f) — ComplexMemory.recent_curvature may need "
+                "at least 3 steps or history window is not sliding correctly",
+                embed_norm
+            )
+
         depth = self.memory.depth
-        kappa = self.memory.recent_curvature
         hol = self.memory.holonomy_since(50)
         breathe, reason = should_breathe(self.memory)
 
         report = {
             "step": self.memory.step,
             "depth": round(depth, 4),
-            "curvature": round(kappa, 4),
+            "curvature": round(kappa_after, 4),
             "holonomy": round(hol, 4),
             "should_breathe": breathe,
             "reason": reason,
             "timestamp": datetime.now(timezone.utc).isoformat(),
+            "kappa_delta": round(kappa_delta, 6),
+            "embed_norm": round(embed_norm, 4),
         }
 
         self._breath_log.append(report)
@@ -195,6 +292,16 @@ class ComplexBridge:
             direction = "deepening" if d_depth > 0 else "fading"
             curvature_trend = "curving more" if d_kappa > 0 else "flattening"
             lines.append(f"  trend: {direction} ({d_depth:+.2f}), {curvature_trend} ({d_kappa:+.4f})")
+
+            # Expose recent kappa_deltas if we have them
+            recent_kds = [
+                e["kappa_delta"] for e in self._breath_log[-5:]
+                if "kappa_delta" in e
+            ]
+            if recent_kds:
+                lines.append(
+                    f"  recent κΔ: {[round(v,6) for v in recent_kds]}"
+                )
 
         return " | ".join(lines)
 
