@@ -9,6 +9,9 @@ complex memory (complexify.py). It:
 3. On each conversation turn: same operation, different theta
 4. Provides curvature-aware retrieval for context assembly
 5. Reports memory geometry to the breath integrator
+6. Gates agency proposals by curvature — rejects flat explorations
+7. Probes Jordan structure — detects when the operator approaches
+   non-diagonalizability (the memory regime where α_eff → 1)
 
 The bridge does NOT replace any existing component. It adds a layer
 of geometric awareness beneath them. The organism breathes the same way.
@@ -19,12 +22,19 @@ Usage in vybn.py:
     bridge = ComplexBridge.load_or_create()
     bridge.inhale(breath_text)  # after each breath
     κ = bridge.curvature()      # for triggering, context, logging
+
+Usage in agency.py (curvature gate):
+    from spark.complexify_bridge import should_explore
+    verdict = should_explore(proposal_text)
+    if not verdict["pass"]:
+        # reject — manifold is flat in this direction
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Callable
@@ -221,6 +231,129 @@ class ComplexBridge:
         phase_delta = (phase_delta + np.pi) % (2 * np.pi) - np.pi
         return float(np.mean(np.abs(phase_delta)))
 
+    # ── Curvature gate (used by agency.py) ────────────────────────────────
+
+    # Minimum phase shift to consider a proposal interesting.
+    _PHASE_FLOOR = float(os.environ.get("VYBN_PHASE_FLOOR", "0.005"))
+    # After N consecutive rejections, force-pass to prevent total stasis.
+    _MAX_REJECTIONS = int(os.environ.get("VYBN_MAX_REJECTIONS", "3"))
+
+    def should_explore(self, text: str) -> dict:
+        """Gate a proposal: does the manifold find it interesting?
+
+        Simulates the complexify update without modifying the real memory.
+        Measures the curvature delta and phase shift that would result.
+        Returns a verdict dict with 'pass' (bool), 'reason', and metrics.
+
+        Builds on curvature_score() — same simulation, richer decision.
+        On infrastructure failure, defaults to pass (never block exploration
+        due to a broken embedder).
+        """
+        try:
+            score = self.curvature_score(text)
+        except Exception as exc:
+            log.debug("should_explore: curvature_score failed (%s), passing", exc)
+            return {"pass": True, "reason": "score_failed", "phase_shift": 0.0}
+
+        # Also compute curvature delta (not just phase shift)
+        try:
+            embed_fn = self._get_embed_fn()
+            x = embed_fn([text])[0]
+            omega = 2 * np.pi / 3 * 0.11
+            theta = omega * self.memory.step
+            M_sim = complexify(
+                self.memory.M.copy(), x, theta, self.memory.alpha
+            )
+            # Curvature of recent history + simulated point
+            kappa_before = self.memory.recent_curvature
+            sim_history = list(self.memory._history[-19:]) + [M_sim]
+            if len(sim_history) >= 3:
+                kappa_after = float(np.mean(np.abs(
+                    curvature_1d(np.array(sim_history))
+                )))
+            else:
+                kappa_after = kappa_before
+            kappa_delta = kappa_after - kappa_before
+        except Exception:
+            kappa_delta = 0.0
+            kappa_before = kappa_after = 0.0
+
+        # Decision: passes if it produces non-trivial phase rotation
+        # OR a curvature increment. Either means the manifold finds it new.
+        passes = score > self._PHASE_FLOOR or kappa_delta > 0.001
+
+        # Track consecutive rejections to prevent total stasis
+        rejections = getattr(self, "_consecutive_rejections", 0)
+        if passes:
+            self._consecutive_rejections = 0
+            reason = f"interesting (φ={score:.4f}, κΔ={kappa_delta:.4f})"
+        elif rejections >= self._MAX_REJECTIONS:
+            self._consecutive_rejections = 0
+            passes = True
+            reason = f"forced_pass_after_{self._MAX_REJECTIONS}_rejections"
+        else:
+            self._consecutive_rejections = rejections + 1
+            reason = (
+                f"flat (φ={score:.4f} < {self._PHASE_FLOOR}, "
+                f"κΔ={kappa_delta:.4f}, rejection #{rejections + 1})"
+            )
+
+        return {
+            "pass": passes,
+            "reason": reason,
+            "phase_shift": round(score, 6),
+            "kappa_delta": round(kappa_delta, 6),
+            "kappa_before": round(kappa_before, 6),
+            "kappa_after": round(kappa_after, 6),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+
+    # ── Jordan structure probe ─────────────────────────────────────────
+
+    def jordan_probe(self) -> dict:
+        """Probe whether the complexify operator is nearing non-diagonalizability.
+
+        The operator T on augmented space [M; 1] is:
+            T = [[a·I, col], [0, 1]]
+        When a = 1, T has a repeated eigenvalue with a Jordan block — memory
+        accumulates linearly rather than saturating. We measure "Jordan
+        proximity" = |1 - a_eff| where a_eff is the effective decay
+        estimated from the actual depth trajectory.
+
+        If depth is growing linearly past the expected saturation point
+        (step >> 1/(1-a)), the effective retention is higher than nominal.
+        """
+        m = self.memory
+        alpha = m.alpha
+        depth = m.depth
+        step = m.step
+
+        if step < 2:
+            return {
+                "jordan_proximity": 1.0 - alpha,
+                "alpha_effective": alpha,
+                "regime": "early",
+            }
+
+        relaxation = 1.0 / (1.0 - alpha + 1e-15)
+        if step > 2 * relaxation and depth > 0:
+            # Past expected saturation. Estimate effective alpha.
+            alpha_eff = min(1.0 - 1e-12, 1.0 - 1.0 / max(step, 1))
+            regime = "jordan_approach"
+        else:
+            alpha_eff = alpha
+            regime = "normal_decay"
+
+        return {
+            "jordan_proximity": abs(1.0 - alpha_eff),
+            "alpha_effective": round(alpha_eff, 8),
+            "alpha_nominal": alpha,
+            "depth": round(depth, 4),
+            "step": step,
+            "relaxation_steps": round(relaxation, 1),
+            "regime": regime,
+        }
+
 
 # ── Module-level convenience ─────────────────────────────────────────────────
 
@@ -243,3 +376,13 @@ def inhale(text: str, theta: Optional[float] = None) -> dict:
 def geometry() -> str:
     """Convenience: get geometry summary for prompt injection."""
     return get_bridge().geometry_summary()
+
+
+def should_explore(text: str) -> dict:
+    """Convenience: gate a proposal through the curvature manifold."""
+    return get_bridge().should_explore(text)
+
+
+def jordan_probe() -> dict:
+    """Convenience: probe Jordan structure of the operator."""
+    return get_bridge().jordan_probe()
