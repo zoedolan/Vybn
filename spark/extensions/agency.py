@@ -56,6 +56,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 import urllib.request
 
+# Curvature gate: the equation governs its own exploration.
+# should_explore() simulates a complexify update without mutating the
+# real manifold. If the proposal would leave the phase landscape flat,
+# we re-propose rather than execute dead-weight.
+try:
+    from spark.complexify_bridge import should_explore as _curvature_gate
+except ImportError:
+    _curvature_gate = None
+
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 _EXPERIMENTS_DIR = _REPO_ROOT / "Vybn_Mind" / "experiments" / "breath_experiments"
 _LAST_RESULT_PATH = _REPO_ROOT / "Vybn_Mind" / "last_experiment_result.md"
@@ -129,6 +138,32 @@ def run(breath_text: str, state: dict) -> None:
         if not _covenant_check(proposal, "proposal"):
             return
 
+        # ── Curvature gate: would this proposal bend the manifold? ──
+        if _curvature_gate is not None:
+            verdict = _curvature_gate(proposal)
+            if not verdict["pass"]:
+                print(f"[agency] curvature gate rejected: {verdict['reason']}")
+                # Re-propose once with a hint to try something structurally different
+                proposal = _get_proposal(
+                    breath_text,
+                    hint=(
+                        "Your previous proposal was geometrically flat — it "
+                        "would not bend the memory manifold. Try something that "
+                        "challenges your assumptions or explores a genuinely "
+                        "different direction. Phase shift was only "
+                        f"{verdict.get('phase_shift', 0):.4f}."
+                    ),
+                )
+                if not proposal or len(proposal) < 20:
+                    print("[agency] re-proposal also empty — skipping")
+                    return
+                if not _covenant_check(proposal, "re-proposal"):
+                    return
+                # Don't gate the re-proposal — let it through regardless
+                print(f"[agency] re-proposal accepted after curvature rejection")
+            else:
+                print(f"[agency] curvature gate passed: {verdict['reason']}")
+
         result = _execute(proposal, breath_text)
 
         if not _covenant_check(result, "result"):
@@ -149,7 +184,7 @@ def run(breath_text: str, state: dict) -> None:
         traceback.print_exc()
 
 
-def _get_proposal(breath_text: str) -> str:
+def _get_proposal(breath_text: str, hint: str = "") -> str:
     # Read the last experiment result if it exists, to provide continuity
     last_result = ""
     if _LAST_RESULT_PATH.exists():
@@ -161,6 +196,11 @@ def _get_proposal(breath_text: str) -> str:
     last_result_block = (
         f"\n\nYour last experiment (from a prior breath):\n{last_result}\n"
         if last_result else ""
+    )
+
+    hint_block = (
+        f"\n\n[Curvature feedback: {hint}]\n"
+        if hint else ""
     )
 
     messages = [
@@ -195,6 +235,7 @@ def _get_proposal(breath_text: str) -> str:
         {"role": "user", "content": (
             f"Your breath:\n\n{breath_text[:2000]}"
             f"{last_result_block}"
+            f"{hint_block}"
             f"\n\nWhat do you want to test?"
         )}
     ]

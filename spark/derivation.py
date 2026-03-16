@@ -82,6 +82,18 @@ def record_derivation(
         "curvature": round(mem.recent_curvature, 6),
         "holonomy": round(mem.holonomy_since(50), 6),
     }
+    # Jordan structure metrics from the bridge (if available).
+    # This detects when the architecture-level operator approaches
+    # non-diagonalizability — the regime where α_eff → 1 and
+    # memory accumulates linearly rather than saturating.
+    try:
+        from spark.complexify_bridge import jordan_probe
+        jordan = jordan_probe()
+        entry["jordan_proximity"] = jordan.get("jordan_proximity")
+        entry["alpha_effective"] = jordan.get("alpha_effective")
+        entry["jordan_regime"] = jordan.get("regime")
+    except Exception:
+        pass  # bridge not loaded or not available — that's fine
     try:
         with _LOG_PATH.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(entry) + "\n")

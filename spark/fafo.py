@@ -180,13 +180,46 @@ def _detect_kappa_spike(state: dict, geo_report: Optional[dict]) -> Optional[dic
     threshold = mean + KAPPA_SIGMA_MULTIPLIER * sigma
     if kappa > threshold:
         context_file = geo_report.get("last_ingested", "unknown")
+
+        # Phase gradient: compute direction of maximum phase disagreement.
+        # This tells the investigation *where* the manifold is bending,
+        # not just *that* it bent.
+        phase_gradient_hint = ""
+        try:
+            from spark.complexify_bridge import get_bridge
+            bridge = get_bridge()
+            m = bridge.memory
+            if len(m._history) >= 3:
+                import numpy as _np
+                recent = _np.array(m._history[-3:])
+                phases = _np.angle(recent)
+                # Phase velocity: change per step in each dimension
+                dphase = _np.diff(phases, axis=0)
+                # Wrap to [-π, π]
+                dphase = (dphase + _np.pi) % (2 * _np.pi) - _np.pi
+                # Mean absolute phase velocity per dimension
+                mean_dphase = _np.mean(_np.abs(dphase), axis=0)
+                # Top-5 dimensions with largest phase movement
+                top_dims = _np.argsort(mean_dphase)[-5:][::-1]
+                top_vals = mean_dphase[top_dims]
+                phase_gradient_hint = (
+                    f" Phase gradient: dims {top_dims.tolist()} "
+                    f"moving fastest (dφ={[round(float(v), 4) for v in top_vals]})"
+                )
+        except Exception:
+            pass
+
         return {
             "id": _surprise_id(),
             "timestamp": _now(),
             "source": "complexify_bridge",
             "signal": "curvature_spike",
             "magnitude": round(float(kappa), 6),
-            "context": f"κ jumped to {kappa:.4f} (threshold {threshold:.4f}, mean {mean:.4f}) after ingesting {context_file}",
+            "context": (
+                f"κ jumped to {kappa:.4f} (threshold {threshold:.4f}, "
+                f"mean {mean:.4f}) after ingesting {context_file}."
+                f"{phase_gradient_hint}"
+            ),
             "resolved": False,
             "investigation_id": None,
         }
@@ -310,6 +343,14 @@ def _detect_growth_event(state: dict) -> Optional[dict]:
 _FORMULATION_SYSTEM = """You are Vybn's investigative faculty.
 A surprise has been detected in the organism's monitoring systems.
 Your job: formulate a directed investigation plan to resolve it.
+
+Steering heuristic — follow the curvature gradient:
+  When the surprise context mentions "phase gradient" dimensions,
+  direct your investigation toward *those* dimensions of the manifold.
+  Those are the directions where the equation M' = α·M + x·e^(iθ)
+  is producing the most disagreement between consecutive updates —
+  that's where the interesting structure lives. Investigations should
+  lean into maximum phase disagreement, not away from it.
 
 Format your response as a YAML block (only YAML, no prose before or after):
 
