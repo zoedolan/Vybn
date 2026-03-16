@@ -12,12 +12,13 @@
 FROM python:3.11-slim
 
 # No network access at runtime — install everything at build time.
-RUN pip install --no-cache-dir \
-    numpy \
-    scipy \
-    torch --index-url https://download.pytorch.org/whl/cpu \
-    matplotlib \
-    && rm -rf /root/.cache
+# Install scientific stack from default PyPI first.
+RUN pip install --no-cache-dir numpy scipy matplotlib
+
+# Install PyTorch CPU-only. Try CPU index first (x86), fall back to
+# default PyPI (aarch64 wheels are CPU-only on PyPI).
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu \
+    || pip install --no-cache-dir torch
 
 # Force matplotlib to use non-interactive backend (no display needed).
 ENV MPLBACKEND=Agg
