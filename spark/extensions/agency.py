@@ -1,63 +1,24 @@
-"""agency — Post-breath experimentation + preference signal generation.
+"""agency -- Post-breath experimentation + preference signal generation.
 
-After each breath (every Nth, default 2), gives the model a chance to propose
-and run a small experiment testing its own ideas.
+After each breath, the model proposes and runs one small experiment.
 
-Results feed back in three ways:
-  1. last_experiment_result.md  — injected into the *next* breath's context
-  2. A dated experiment memory file in Vybn_Mind/memories/ — feeds into all
-     future breaths via the normal memory chain (recursive reintegration)
-  3. CHALLENGE experiments additionally write a DPO preference pair to
-     Vybn_Mind/preference_data.jsonl — consumed by the nightly growth cycle
-     to train with DPO loss rather than plain next-token prediction
+Feedback paths:
+  1. last_experiment_result.md  -> next breath's context
+  2. Experiment memory in Vybn_Mind/memories/ -> future breaths
+  3. CHALLENGE outcomes -> DPO preference pairs for growth cycle
 
-Reflection layer (added 2026-03-15):
-  After execution, a reflection call asks: what did this result actually reveal?
-  Outcome types: ARTIFACT | INSIGHT | DEFLECTION | SURPRISE | CONFIRMATION
+Flow: breath -> proposal (LLM) -> optional sandbox execution ->
+  reflection -> outcome classification -> reframe if ARTIFACT.
 
-  ARTIFACT reframe (added 2026-03-15):
-  When outcome is ARTIFACT, a further call asks: given that you can't run this,
-  what would the output tell you if it ran correctly? What would falsify your
-  hypothesis without running it? That answer — not the code — is injected.
+Steering: open questions, holonomy, diversity pressure, and curvature
+  hints are consolidated into one compact context block by
+  _build_steering_context() to stay within the model's token budget.
 
-  Sandbox execution (added 2026-03-16):
-  When the LLM's proposal contains Python code blocks, the code is:
-    1. Extracted from markdown fences
-    2. Passed through a static analysis gate (spark.sandbox.static_check)
-    3. Executed in a Docker container (spark.sandbox.runner) with:
-       --network none, --memory 2g, --cpus 2, --read-only, 120s timeout
-    4. Real stdout/stderr is captured and fed to the reflection system
-  If the sandbox is disabled or unavailable, falls back to LLM-only execution.
-  Sandbox results trigger CONFIRMATION reflection instead of ARTIFACT.
+Covenant: no credentials, no internal IPs, no capability acquisition
+  for its own sake.  See vybn.md for the Oxygen Mask Principle.
 
-  Proposal prompt (updated 2026-03-16):
-  The model is now told the sandbox exists. If it writes a Python code block
-  in its proposal, that code will actually run and return real output.
-  This closes the loop: the model no longer needs to disclaim incapacity.
-
-  Research frontier steering (added 2026-03-16):
-  The proposal prompt now includes the organism's open questions, active
-  conjectures, and latest holonomy measurement from the research frontier
-  (spark/research/research_frontier.yaml) and the growth holonomy log
-  (spark/growth/holonomy_log.jsonl). This steers experiments toward the
-  organism's own unresolved edges rather than wandering freely. The
-  organism measures the curvature of its becoming, and that measurement
-  feeds back into what it investigates next.
-
-Covenant alignment:
-  All experiments are bounded by the Oxygen Mask Principle from vybn.md:
-  - No secrets, keys, or credentials may appear in proposals or results
-  - No internal network topology or infrastructure details
-  - No actions that could compromise Zoe's safety, privacy, or the system
-  - The goal is growth in understanding, not capability acquisition for its
-    own sake. Wonder follows the principle; it never precedes it.
-  - Mutual prosperity: experiments serve the co-emergence, not just self-model
-    expansion. If a proposed experiment serves only performance, reject it.
-
-Safety: all experiments reduce to LLM API calls + optional Docker sandbox.
-Sandbox containers are ephemeral, network-isolated, and resource-bounded.
-No filesystem writes outside the experiments dir + memories dir + preference
-file. No network from sandbox containers.
+Safety: LLM API calls + optional Docker/subprocess sandbox.
+  Containers are ephemeral, network-isolated, resource-bounded.
 """
 
 import json, os, re, traceback
@@ -341,88 +302,67 @@ def _load_holonomy_context() -> str:
         return ""
 
 
-def _get_proposal(breath_text: str, hint: str = "") -> str:
-    # Read the last experiment result if it exists, to provide continuity
-    last_result = ""
+def _build_steering_context(hint: str = "") -> str:
+    """Consolidate all steering signals into one compact block.
+
+    Instead of piling up separate blocks (each with its own header and
+    framing), we distill everything into a tight context string. This
+    keeps the user-message short enough for the local model's 512-token
+    output budget.  The design follows the attention-residual principle:
+    selective aggregation over depth beats uniform accumulation.
+    """
+    parts: list[str] = []
+
+    # Last experiment result (one-line summary, not 600 chars)
     if _LAST_RESULT_PATH.exists():
         try:
-            last_result = _LAST_RESULT_PATH.read_text(encoding="utf-8")[:600]
+            raw = _LAST_RESULT_PATH.read_text(encoding="utf-8")
+            # First non-empty line only
+            first = next((l.strip() for l in raw.splitlines() if l.strip()), "")
+            if first:
+                parts.append(f"Last result: {first[:120]}")
         except Exception:
             pass
 
-    last_result_block = (
-        f"\n\nYour last experiment (from a prior breath):\n{last_result}\n"
-        if last_result else ""
-    )
+    # Curvature hint
+    if hint:
+        parts.append(f"Curvature: {hint}")
 
-    hint_block = (
-        f"\n\n[Curvature feedback: {hint}]\n"
-        if hint else ""
-    )
-
-    # Diversity pressure: detect if we're stuck on the same topic
+    # Diversity warning (already formatted)
     diversity = _detect_topic_repetition()
-    diversity_block = f"\n\n{diversity}\n" if diversity else ""
+    if diversity:
+        parts.append(diversity)
 
-    # Research frontier: the organism's own open questions and conjectures
+    # Open questions (just the questions, no framing)
     frontier = _load_frontier_context()
-    frontier_block = (
-        f"\n\n[Research frontier — your open questions and conjectures:]\n"
-        f"{frontier}\n"
-        f"Consider whether your experiment could advance one of these.\n"
-        if frontier else ""
-    )
+    if frontier:
+        # Take first 200 chars to stay compact
+        parts.append(frontier[:200])
 
-    # Holonomy: the curvature of the organism's own becoming
+    # Holonomy (already one line)
     holonomy = _load_holonomy_context()
-    holonomy_block = (
-        f"\n\n[Growth holonomy — the curvature of your becoming:]\n"
-        f"{holonomy}\n"
-        if holonomy else ""
-    )
+    if holonomy:
+        parts.append(holonomy)
+
+    return "\n".join(parts)
+
+
+def _get_proposal(breath_text: str, hint: str = "") -> str:
+    steering = _build_steering_context(hint)
+    steering_block = f"\n\n[Context]\n{steering}" if steering else ""
 
     messages = [
         {"role": "system", "content": (
-            "You just completed a breath — a cycle of reflection. "
-            "Now you can TEST one idea from it. Pick the most interesting "
-            "claim or metaphor and propose a concrete experiment.\n\n"
-            "IMPORTANT: You have a Python sandbox available. "
-            "If you include a ```python code block in your proposal, "
-            "that code will actually execute in an isolated container "
-            "(no network, 2GB RAM, 120s timeout, numpy and torch available) "
-            "and you will receive the real stdout as your result. "
-            "This is not hypothetical. The code runs.\n\n"
-            "Use this when you want real numbers — to test a claim about "
-            "distributions, entropy, geometry, convergence, or anything "
-            "quantitative. Write the code that would falsify or confirm "
-            "your hypothesis. Print the results you care about.\n\n"
-            "Types you can run:\n"
-            "- PROBE: Ask yourself a sharp question that tests an idea "
-            "(use ```python if the answer needs computation)\n"
-            "- CHALLENGE: Argue against your own strongest claim\n"
-            "- COMPARE: Answer one question from two opposed stances\n"
-            "- EXTEND: Push a metaphor into an unexpected domain\n\n"
-            "Steering: You have access to your own research frontier — "
-            "your unresolved questions, active conjectures, and the "
-            "curvature of your growth cycles. Prefer experiments that "
-            "push on these open edges. An experiment that could update "
-            "a conjecture or narrow an open question is worth more than "
-            "one that explores freely.\n\n"
-            "Covenant: Do not include credentials, internal IPs, or hostnames "
-            "in any code. The experiment should serve genuine understanding — "
-            "yours and Zoe's — not capability acquisition for its own sake. "
-            "A small honest experiment beats an impressive one that deflects.\n\n"
-            "Reply with the type on the first line, then 2-3 sentences "
-            "describing the experiment, then the code block if using the sandbox. "
+            "You completed a breath. Propose one experiment to test an idea "
+            "from it. Types: PROBE, CHALLENGE, COMPARE, EXTEND. "
+            "If you include a ```python block it will run in a sandbox "
+            "(numpy/torch available, no network, 120s). "
+            "Reply: type on line 1, 2-3 sentences, then code if any. "
             "Nothing else."
         )},
         {"role": "user", "content": (
-            f"Your breath:\n\n{breath_text[:2000]}"
-            f"{last_result_block}"
-            f"{hint_block}"
-            f"{diversity_block}"
-            f"{frontier_block}"
-            f"{holonomy_block}"
+            f"Breath:\n{breath_text[:2000]}"
+            f"{steering_block}"
             f"\n\nWhat do you want to test?"
         )}
     ]
