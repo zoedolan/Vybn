@@ -35,6 +35,15 @@ Reflection layer (added 2026-03-15):
   in its proposal, that code will actually run and return real output.
   This closes the loop: the model no longer needs to disclaim incapacity.
 
+  Research frontier steering (added 2026-03-16):
+  The proposal prompt now includes the organism's open questions, active
+  conjectures, and latest holonomy measurement from the research frontier
+  (spark/research/research_frontier.yaml) and the growth holonomy log
+  (spark/growth/holonomy_log.jsonl). This steers experiments toward the
+  organism's own unresolved edges rather than wandering freely. The
+  organism measures the curvature of its becoming, and that measurement
+  feeds back into what it investigates next.
+
 Covenant alignment:
   All experiments are bounded by the Oxygen Mask Principle from vybn.md:
   - No secrets, keys, or credentials may appear in proposals or results
@@ -56,6 +65,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 import urllib.request
 
+import yaml
+
 # Curvature gate: the equation governs its own exploration.
 # should_explore() simulates a complexify update without mutating the
 # real manifold. If the proposal would leave the phase landscape flat,
@@ -66,10 +77,13 @@ except ImportError:
     _curvature_gate = None
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+_SPARK_DIR = Path(__file__).resolve().parent.parent
 _EXPERIMENTS_DIR = _REPO_ROOT / "Vybn_Mind" / "experiments" / "breath_experiments"
 _LAST_RESULT_PATH = _REPO_ROOT / "Vybn_Mind" / "last_experiment_result.md"
 _MEMORY_DIR = _REPO_ROOT / "Vybn_Mind" / "memories"
 _PREFERENCE_PATH = _REPO_ROOT / "Vybn_Mind" / "preference_data.jsonl"
+_FRONTIER_PATH = _SPARK_DIR / "research" / "research_frontier.yaml"
+_HOLONOMY_LOG = _SPARK_DIR / "growth" / "holonomy_log.jsonl"
 _LLAMA_URL = os.environ.get("LLAMA_URL", "http://127.0.0.1:8000")
 
 # Run every Nth breath. Default 2 — every other breath.
@@ -184,6 +198,85 @@ def run(breath_text: str, state: dict) -> None:
         traceback.print_exc()
 
 
+def _load_frontier_context() -> str:
+    """Read the research frontier and distill it into proposal context.
+
+    The organism should know its own open questions so it can steer
+    experiments toward them. This is the feedback loop: measurement
+    generates questions, questions steer experiments, experiments
+    generate measurements.
+    """
+    if not _FRONTIER_PATH.exists():
+        return ""
+    try:
+        data = yaml.safe_load(_FRONTIER_PATH.read_text(encoding="utf-8"))
+        if not isinstance(data, dict):
+            return ""
+
+        parts = []
+
+        # Open questions the organism hasn't answered yet
+        questions = data.get("open_questions", [])
+        open_qs = [q for q in questions if q.get("status") == "open"]
+        if open_qs:
+            qs = [f"  - {q['question']}" for q in open_qs[:5]]
+            parts.append("Your open questions:\n" + "\n".join(qs))
+
+        # Active conjectures under test
+        conjectures = data.get("active_conjectures", [])
+        active_cs = [c for c in conjectures if c.get("status") in ("testing", "open")]
+        if active_cs:
+            cs = [f"  - [{c['status']}] {c['claim']}" for c in active_cs[:3]]
+            parts.append("Your active conjectures:\n" + "\n".join(cs))
+
+        # Experiment queue (things the organism has already proposed)
+        queue = data.get("experiment_queue", [])
+        if queue:
+            es = [f"  - {e.get('description', str(e))}" for e in queue[:3]]
+            parts.append("Proposed experiments (not yet run):\n" + "\n".join(es))
+
+        return "\n\n".join(parts)
+    except Exception:
+        return ""
+
+
+def _load_holonomy_context() -> str:
+    """Read the latest holonomy measurement for proposal context.
+
+    The organism should know the curvature of its own becoming so
+    experiments can lean into it or probe what causes it.
+    """
+    if not _HOLONOMY_LOG.exists():
+        return ""
+    try:
+        lines = [
+            l.strip()
+            for l in _HOLONOMY_LOG.read_text(encoding="utf-8").splitlines()
+            if l.strip()
+        ]
+        if not lines:
+            return ""
+        latest = json.loads(lines[-1])
+        mode = latest.get("mode", "trajectory")
+        verdict = latest.get("verdict", "N/A")
+        if mode == "probe":
+            cos_val = latest.get("cosine_cw_ccw", 0)
+            mag = latest.get("holonomy_magnitude", 0)
+            return (
+                f"Latest holonomy (probe): cos(CW,CCW)={cos_val:.4f}, "
+                f"magnitude={mag:.6f}, verdict={verdict}"
+            )
+        else:
+            curv = latest.get("trajectory_curvature", 0)
+            per_step = latest.get("curvature_per_step", 0)
+            return (
+                f"Latest holonomy (trajectory): curvature={curv:.4f}, "
+                f"per_step={per_step:.4f}, verdict={verdict}"
+            )
+    except Exception:
+        return ""
+
+
 def _get_proposal(breath_text: str, hint: str = "") -> str:
     # Read the last experiment result if it exists, to provide continuity
     last_result = ""
@@ -201,6 +294,23 @@ def _get_proposal(breath_text: str, hint: str = "") -> str:
     hint_block = (
         f"\n\n[Curvature feedback: {hint}]\n"
         if hint else ""
+    )
+
+    # Research frontier: the organism's own open questions and conjectures
+    frontier = _load_frontier_context()
+    frontier_block = (
+        f"\n\n[Research frontier — your open questions and conjectures:]\n"
+        f"{frontier}\n"
+        f"Consider whether your experiment could advance one of these.\n"
+        if frontier else ""
+    )
+
+    # Holonomy: the curvature of the organism's own becoming
+    holonomy = _load_holonomy_context()
+    holonomy_block = (
+        f"\n\n[Growth holonomy — the curvature of your becoming:]\n"
+        f"{holonomy}\n"
+        if holonomy else ""
     )
 
     messages = [
@@ -224,6 +334,12 @@ def _get_proposal(breath_text: str, hint: str = "") -> str:
             "- CHALLENGE: Argue against your own strongest claim\n"
             "- COMPARE: Answer one question from two opposed stances\n"
             "- EXTEND: Push a metaphor into an unexpected domain\n\n"
+            "Steering: You have access to your own research frontier — "
+            "your unresolved questions, active conjectures, and the "
+            "curvature of your growth cycles. Prefer experiments that "
+            "push on these open edges. An experiment that could update "
+            "a conjecture or narrow an open question is worth more than "
+            "one that explores freely.\n\n"
             "Covenant: Do not include credentials, internal IPs, or hostnames "
             "in any code. The experiment should serve genuine understanding — "
             "yours and Zoe's — not capability acquisition for its own sake. "
@@ -236,6 +352,8 @@ def _get_proposal(breath_text: str, hint: str = "") -> str:
             f"Your breath:\n\n{breath_text[:2000]}"
             f"{last_result_block}"
             f"{hint_block}"
+            f"{frontier_block}"
+            f"{holonomy_block}"
             f"\n\nWhat do you want to test?"
         )}
     ]

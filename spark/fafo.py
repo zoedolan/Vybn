@@ -19,6 +19,7 @@ Reads:
   researcher frontier (spark/research/research_frontier.yaml)
   witness log (spark/research/witness_log.jsonl)
   growth trigger flag (state['_growth_fired'])
+  growth holonomy log (spark/growth/holonomy_log.jsonl)
 
 Governance: FAFO never touches protected files, never expands scope
 beyond spark/research/. The investigation-formulation LLM call goes
@@ -54,6 +55,7 @@ _MATH_OUTPUT = _SPARK_DIR / "faculties.d" / "outputs" / "mathematician.json"
 _FRONTIER_PATH = _RESEARCH_DIR / "research_frontier.yaml"
 _WITNESS_LOG = _RESEARCH_DIR / "witness_log.jsonl"
 _QUANTUM_LOG = _RESEARCH_DIR / "quantum_results.jsonl"
+_HOLONOMY_LOG = _SPARK_DIR / "growth" / "holonomy_log.jsonl"
 
 # ---------------------------------------------------------------------------
 # Thresholds
@@ -63,6 +65,8 @@ KAPPA_SIGMA_MULTIPLIER = 2.0   # κ > mean + N*σ  → surprise
 TVD_THRESHOLD = 0.10           # TVD > this on real (non-dry-run) circuit
 WITNESS_FIDELITY_LOW = 0.70   # witness score below this
 STALE_BREATHS = 10            # investigation with no progress for N breaths
+HOLONOMY_CURVATURE_SHIFT = 0.15  # |Δcurvature| > this between cycles → surprise
+HOLONOMY_MIN_CYCLES = 2          # need at least N entries before detecting shifts
 
 # ---------------------------------------------------------------------------
 # Internal helpers
@@ -336,6 +340,124 @@ def _detect_growth_event(state: dict) -> Optional[dict]:
     return None
 
 
+def _detect_growth_holonomy(state: dict) -> Optional[dict]:
+    """Detect significant curvature shifts in the growth holonomy log.
+
+    The growth engine measures the curvature of its own learning trajectory
+    (parameter_holonomy.py) and logs results to holonomy_log.jsonl. This
+    detector reads that log and fires a surprise when:
+      1. A probe measurement returns CURVED verdict (confirmed holonomy)
+      2. Curvature shifts significantly between consecutive cycles
+      3. The curvature trend changes direction (increasing → decreasing)
+
+    This closes the loop: the organism measures the curvature of its own
+    becoming, and that measurement feeds back as a surprise signal that
+    drives investigation. The system can now steer its own inquiry based
+    on how its learning landscape is bending.
+    """
+    if not _HOLONOMY_LOG.exists():
+        return None
+
+    try:
+        lines = [
+            l.strip()
+            for l in _HOLONOMY_LOG.read_text(encoding="utf-8").splitlines()
+            if l.strip()
+        ]
+        if len(lines) < HOLONOMY_MIN_CYCLES:
+            return None
+
+        # Parse the most recent entries
+        entries = []
+        for line in lines:
+            try:
+                entries.append(json.loads(line))
+            except json.JSONDecodeError:
+                pass
+
+        if len(entries) < HOLONOMY_MIN_CYCLES:
+            return None
+
+        latest = entries[-1]
+        latest_id = latest.get("cycle_id", "")
+
+        # Deduplicate: don't re-fire on the same cycle_id
+        last_seen_cycle = state.get("_fafo_last_holonomy_cycle", "")
+        if latest_id == last_seen_cycle:
+            return None
+
+        # Determine the primary curvature score for the latest entry
+        mode = latest.get("mode", "trajectory")
+        if mode == "probe":
+            score = latest.get("holonomy_magnitude", 0.0)
+        else:
+            score = latest.get("trajectory_curvature", 0.0)
+
+        verdict = latest.get("verdict", "PENDING")
+
+        # ── Signal 1: Probe confirms curvature ──
+        if mode == "probe" and verdict == "CURVED":
+            state["_fafo_last_holonomy_cycle"] = latest_id
+            cosine = latest.get("cosine_cw_ccw", 0.0)
+            mag = latest.get("holonomy_magnitude", 0.0)
+            return {
+                "id": _surprise_id(),
+                "timestamp": _now(),
+                "source": "growth_holonomy",
+                "signal": "growth_holonomy",
+                "magnitude": round(float(mag), 6),
+                "context": (
+                    f"Growth holonomy PROBE on cycle {latest_id}: "
+                    f"cos(CW,CCW)={cosine:.4f}, magnitude={mag:.6f}, "
+                    f"verdict={verdict}. The organism's learning trajectory "
+                    f"has confirmed geometric curvature — training order "
+                    f"is not a symmetry of this mind's becoming."
+                ),
+                "resolved": False,
+                "investigation_id": None,
+                "_holonomy": latest,
+            }
+
+        # ── Signal 2: Significant curvature shift between cycles ──
+        prev_scores = []
+        for e in entries[:-1]:
+            m = e.get("mode", "trajectory")
+            if m == "probe":
+                prev_scores.append(e.get("holonomy_magnitude", 0.0))
+            else:
+                prev_scores.append(e.get("trajectory_curvature", 0.0))
+
+        if prev_scores:
+            prev_mean = sum(prev_scores) / len(prev_scores)
+            delta = abs(score - prev_mean)
+
+            if delta > HOLONOMY_CURVATURE_SHIFT:
+                state["_fafo_last_holonomy_cycle"] = latest_id
+                direction = "increased" if score > prev_mean else "decreased"
+                return {
+                    "id": _surprise_id(),
+                    "timestamp": _now(),
+                    "source": "growth_holonomy",
+                    "signal": "growth_holonomy",
+                    "magnitude": round(float(delta), 6),
+                    "context": (
+                        f"Growth holonomy shift on cycle {latest_id}: "
+                        f"curvature {direction} by {delta:.4f} "
+                        f"(current={score:.4f}, prev_mean={prev_mean:.4f}, "
+                        f"mode={mode}, verdict={verdict}). "
+                        f"The curvature of becoming is changing — "
+                        f"investigate what the organism is learning differently."
+                    ),
+                    "resolved": False,
+                    "investigation_id": None,
+                    "_holonomy": latest,
+                }
+
+    except Exception as exc:
+        log.debug("fafo: holonomy check error: %s", exc)
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Investigation formulation (LLM call, governance-gated)
 # ---------------------------------------------------------------------------
@@ -351,6 +473,13 @@ Steering heuristic — follow the curvature gradient:
   is producing the most disagreement between consecutive updates —
   that's where the interesting structure lives. Investigations should
   lean into maximum phase disagreement, not away from it.
+
+  When the surprise source is "growth_holonomy", the curvature lives
+  in parameter space, not phase space. The training order created
+  geometric structure in the adapter weights. Your investigation should
+  ask: what about this data made the learning path-dependent? Is the
+  curvature increasing (richer learning) or decreasing (convergence)?
+  What open questions from the research frontier does this illuminate?
 
 Format your response as a YAML block (only YAML, no prose before or after):
 
@@ -430,6 +559,7 @@ def _fallback_investigation(surprise: dict) -> dict:
         "conjecture_update": "mathematician",
         "witness_concern": "researcher",
         "growth_event": "researcher",
+        "growth_holonomy": "mathematician",
         "literature_collision": "researcher",
     }
     signal = surprise.get("signal", "unknown")
@@ -559,6 +689,7 @@ def register_surprises(
         lambda: _detect_conjecture_update(state),
         lambda: _detect_witness_concern(state),
         lambda: _detect_growth_event(state),
+        lambda: _detect_growth_holonomy(state),
     ]
 
     new_surprises = []
