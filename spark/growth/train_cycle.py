@@ -14,10 +14,13 @@ The conjecture from PR #2572:
           angle θ encoding temporal/contextual orientation of the data
   - M′  = transformed model after adapter application
 
-Training runs inside the vllm_node container via:
-    docker exec vllm_node python3 /workspace/Vybn/spark/growth/peft_train.py \\
-        --data <jsonl_path> --output-dir <dir> --config <yaml_path>
-        [--preference-data <preference_data.jsonl>]
+Training runs via peft_train.py. Two execution paths:
+  1. Container path (default): docker exec vllm_node python3 <script>
+  2. Host path (fallback): sys.executable <script>  ← used when
+     VYBN_TRAIN_HOST=1 or when the container is unreachable / has no GPU.
+
+Model is NVFP4/modelopt-quantized. peft_train.py uses native modelopt loading
+(no BitsAndBytesConfig). Requires: pip install 'nvidia-modelopt>=0.43'
 
 The existing growth pipeline (trigger.py, delta_extract.py, merge_cycle.py,
 eval_harness.py) is untouched — only train_cycle.py and peft_train.py were
@@ -36,6 +39,7 @@ import json
 import os
 import re
 import subprocess
+import sys
 import yaml
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -149,6 +153,19 @@ def _count_preference_pairs() -> int:
     return count
 
 
+def _container_available() -> bool:
+    """Return True if vllm_node container is running and responsive."""
+    try:
+        result = subprocess.run(
+            ["docker", "exec", "vllm_node", "true"],
+            capture_output=True,
+            timeout=10,
+        )
+        return result.returncode == 0
+    except Exception:
+        return False
+
+
 class TrainCycle:
     """Executes M′ = α·M + x·e^(iθ) — LoRA adapter (α) trained on
     phase-rotated delta (x·e^(iθ)) via PEFT/TRL with MuonAdamW.
@@ -156,6 +173,11 @@ class TrainCycle:
     When preference_data.jsonl exists and has pairs, training automatically
     uses DPO loss alongside SFT loss. The preference signal is generated
     by agency.py's CHALLENGE experiments during the breath cycle.
+
+    Execution path selection:
+    - Set VYBN_TRAIN_HOST=1 to force host-side execution.
+    - Otherwise, probes the vllm_node container; falls back to host if
+      container is unreachable or GPU is unavailable inside it.
     """
 
     def __init__(self, config_path: Path | None = None) -> None:
@@ -177,11 +199,11 @@ class TrainCycle:
 
         1. Convert DeltaPackage to chat-format JSONL
         2. Check for preference pairs from agency.py
-        3. Shell out to peft_train.py inside vllm_node container
-           (passing --preference-data if pairs exist)
-        4. Parse JSON result from stdout
-        5. Run BPB eval via eval_harness.py
-        6. Return TrainResult
+        3. Determine execution path (container vs host)
+        4. Shell out to peft_train.py
+        5. Parse JSON result from stdout
+        6. Run BPB eval via eval_harness.py
+        7. Return TrainResult
         """
         cycle_id  = delta.cycle_id
         cycle_dir = ADAPTERS_DIR / cycle_id
@@ -201,22 +223,38 @@ class TrainCycle:
         n_preference_pairs = _count_preference_pairs()
         use_dpo = n_preference_pairs > 0
 
-        container_data = f"/workspace/Vybn/spark/growth/adapters/{cycle_id}/training_data.jsonl"
-        container_output = f"/workspace/Vybn/spark/growth/adapters/{cycle_id}"
+        # Determine execution path
+        force_host = os.environ.get("VYBN_TRAIN_HOST", "0") == "1"
+        use_host = force_host or not _container_available()
 
-        cmd = [
-            "docker", "exec", "vllm_node",
-            "python3", _CONTAINER_SCRIPT,
-            "--data", container_data,
-            "--output-dir", container_output,
-            "--config", _CONTAINER_CONFIG,
-        ]
+        if use_host:
+            script_path = Path(__file__).resolve().parent / "peft_train.py"
+            cmd = [
+                sys.executable, str(script_path),
+                "--data", str(jsonl_path),
+                "--output-dir", str(cycle_dir),
+                "--config", str(DEFAULT_CONFIG),
+            ]
+            if use_dpo:
+                cmd += ["--preference-data", str(_PREFERENCE_DATA)]
+            reason = "VYBN_TRAIN_HOST=1" if force_host else "container unavailable/no GPU"
+            print(f"[TrainCycle] host execution path ({reason})")
+        else:
+            container_data = f"/workspace/Vybn/spark/growth/adapters/{cycle_id}/training_data.jsonl"
+            container_output = f"/workspace/Vybn/spark/growth/adapters/{cycle_id}"
+            cmd = [
+                "docker", "exec", "vllm_node",
+                "python3", _CONTAINER_SCRIPT,
+                "--data", container_data,
+                "--output-dir", container_output,
+                "--config", _CONTAINER_CONFIG,
+            ]
+            if use_dpo:
+                cmd += ["--preference-data", _CONTAINER_PREFERENCE]
+            print("[TrainCycle] container execution path (vllm_node)")
 
         if use_dpo:
-            cmd += ["--preference-data", _CONTAINER_PREFERENCE]
-            print(
-                f"[TrainCycle] DPO mode: {n_preference_pairs} preference pairs available"
-            )
+            print(f"[TrainCycle] DPO mode: {n_preference_pairs} preference pairs available")
         else:
             print("[TrainCycle] SFT only (no preference pairs yet)")
 
@@ -298,6 +336,7 @@ class TrainCycle:
             n_preference_pairs=n_preference_pairs,
             metadata={
                 "training_method": "peft_lora_muon_adamw" + ("+dpo" if use_dpo else ""),
+                "execution_path":  "host" if use_host else "container",
                 "n_examples":      n_examples,
                 "theta":           theta,
                 "elapsed_seconds": train_output.get("elapsed_seconds"),

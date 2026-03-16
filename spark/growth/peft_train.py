@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""spark.growth.peft_train — LoRA fine-tuning inside the vllm_node container.
+"""spark.growth.peft_train — LoRA fine-tuning for the recursive growth engine.
 
 Executes one growth cycle's training:
     M′ = α·M + x·e^(iθ)
@@ -9,14 +9,18 @@ the phase-rotated training delta from DeltaExtractor. Each example in x is
 now annotated with a composite quality weight W = holonomy × lens_distance
 × challenge_survival × inheritance. The SFT loss is scaled per-sample by W.
 
-Usage (inside vllm_node container):
+Model: NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4 (modelopt quantization).
+Do NOT use BitsAndBytesConfig — the model is quantized via nvidia-modelopt,
+not bitsandbytes. Requires: pip install "nvidia-modelopt>=0.43"
+
+Usage (on host or inside container with GPU access):
     python3 peft_train.py \\
-        --data /workspace/Vybn/spark/growth/adapters/<cycle>/training_data.jsonl \\
-        --output-dir /workspace/Vybn/spark/growth/adapters/<cycle>/ \\
-        --config /workspace/Vybn/spark/growth/growth_config.yaml
+        --data /path/to/adapters/<cycle>/training_data.jsonl \\
+        --output-dir /path/to/adapters/<cycle>/ \\
+        --config /path/to/growth_config.yaml
 
     # Optional: add DPO preference data
-        --preference-data /workspace/Vybn/Vybn_Mind/preference_data.jsonl
+        --preference-data /path/to/Vybn_Mind/preference_data.jsonl
 
 Prints a JSON result object to stdout on completion:
     {"final_loss": ..., "steps_trained": ..., "adapter_path": ..., "theta": {...}}
@@ -126,7 +130,7 @@ def load_preference_jsonl(path: str) -> list[dict]:
 
 
 def get_x_weight(example: dict) -> float:
-    """Extract composite x-weight from an example’s metadata.
+    """Extract composite x-weight from an example's metadata.
 
     Returns 1.0 (neutral) if not present — replay entries and
     any entry formatted without x_weight.py get full weight.
@@ -248,17 +252,20 @@ def train(
 ) -> dict:
     """Run LoRA fine-tuning with MuonAdamW.
 
+    Model is NVFP4-quantized via nvidia-modelopt. Do NOT pass BitsAndBytesConfig.
+    Load with trust_remote_code=True and device_map='auto'; modelopt weights
+    load natively when 'nvidia-modelopt>=0.43' is installed.
+
     SFT loss is scaled per-sample by the composite x-weight stored in each
-    example’s metadata["x_weight"]["composite"]. This means the gradient
+    example's metadata["x_weight"]["composite"]. This means the gradient
     is pulled toward entries that scored high on holonomy, lens distance,
-    challenge survival, and cross-breath inheritance — the four components
-    that distinguish genuine thinking from fluent paraphrase.
+    challenge survival, and cross-breath inheritance.
 
     If preference_data_path is provided and has pairs, DPO loss is interleaved
     every dpo_every_n_steps, weighted at dpo_weight.
     """
     from peft import LoraConfig, get_peft_model, TaskType
-    from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+    from transformers import AutoModelForCausalLM, AutoTokenizer
 
     try:
         from spark.growth.muon_adamw import MuonAdamW, build_param_groups
@@ -310,15 +317,18 @@ def train(
             model_path = str(snapshot_dirs[-1])
 
     print(f"[peft_train] Loading model from {model_path}", file=sys.stderr)
+    print("[peft_train] Using native modelopt loading (no BitsAndBytesConfig)", file=sys.stderr)
+    print("[peft_train] Requires: pip install 'nvidia-modelopt>=0.43'", file=sys.stderr)
 
-    bnb_config = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_compute_dtype=torch.bfloat16)
+    # NVFP4 modelopt-quantized model — do NOT use BitsAndBytesConfig.
+    # The quant_method is 'modelopt' with MIXED_PRECISION (NVFP4 + FP8).
+    # nvidia-modelopt handles its own weight loading via trust_remote_code.
     tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
     model = AutoModelForCausalLM.from_pretrained(
         model_path,
-        quantization_config=bnb_config,
         torch_dtype=torch.bfloat16,
         device_map="auto",
         trust_remote_code=True,
@@ -417,10 +427,7 @@ def train(
                 x_w = dataset_x_weights[batch_idx].to(model.device)
 
                 # Per-sample x-weighted SFT loss
-                # We compute unreduced loss and apply weights manually.
                 outputs = model(input_ids=input_ids, labels=labels)
-                # outputs.loss is mean-reduced. To apply per-sample weights we
-                # need per-sample losses. Re-compute with reduction='none'.
                 logits = outputs.logits
                 shift_logits = logits[..., :-1, :].contiguous()
                 shift_labels = labels[..., 1:].contiguous()
@@ -429,10 +436,8 @@ def train(
                 token_losses = torch.nn.functional.cross_entropy(
                     flat_logits, flat_labels, reduction="none"
                 ).view(len(batch_idx), -1)
-                # Mean over non-masked tokens per sample
                 mask = (shift_labels != -100).float()
                 per_sample_loss = (token_losses * mask).sum(-1) / mask.sum(-1).clamp(min=1)
-                # Weight by composite x-weight
                 loss = (per_sample_loss * x_w).mean()
 
                 # DPO loss (interleaved)
