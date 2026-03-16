@@ -198,6 +198,70 @@ def run(breath_text: str, state: dict) -> None:
         traceback.print_exc()
 
 
+def _detect_topic_repetition() -> str:
+    """Detect if recent experiments are stuck on the same topic.
+
+    Reads the last N experiment archive files and checks for repeated
+    keywords. If the same topic appears in 3+ consecutive experiments,
+    returns a nudge string for the proposal prompt.
+
+    This is the structural diversity pressure: the organism can't keep
+    rephrasing the same LayerNorm experiment in different words and
+    expect to pass. It must actually move.
+    """
+    if not _EXPERIMENTS_DIR.exists():
+        return ""
+    try:
+        # Get last 5 experiment files sorted by name (timestamp-ordered)
+        exp_files = sorted(_EXPERIMENTS_DIR.glob("exp_*.md"))[-5:]
+        if len(exp_files) < 3:
+            return ""
+
+        # Extract proposal lines from each
+        proposals = []
+        for f in exp_files:
+            text = f.read_text(encoding="utf-8")[:1000]
+            # Find the ## Proposal section
+            if "## Proposal" in text:
+                prop = text.split("## Proposal")[1].split("##")[0].strip()[:300]
+                proposals.append(prop.lower())
+
+        if len(proposals) < 3:
+            return ""
+
+        # Check for repeated keywords across recent proposals
+        # Extract significant words (length > 5, not common)
+        _COMMON = {
+            "would", "could", "should", "about", "which", "their", "there",
+            "these", "those", "where", "while", "experiment", "propose",
+            "probe", "challenge", "extend", "compare", "python", "import",
+            "numpy", "torch", "print", "between", "whether", "measure",
+            "across", "through", "within",
+        }
+        from collections import Counter
+        word_counts = Counter()
+        for prop in proposals[-3:]:
+            words = set(re.findall(r'[a-z]{6,}', prop)) - _COMMON
+            word_counts.update(words)
+
+        # Words appearing in all 3 recent proposals = repetition
+        repeated = [w for w, c in word_counts.items() if c >= 3]
+        if repeated:
+            topic = ", ".join(repeated[:3])
+            return (
+                f"[DIVERSITY ALERT: Your last 3 experiments all involved "
+                f"{topic}. You are stuck in a loop. The curvature gate may "
+                f"let rephrased versions through, but the substance hasn't "
+                f"moved. Look at your open questions and conjectures below "
+                f"— pick one you haven't touched. A genuinely different "
+                f"experiment, even a smaller one, is worth more than another "
+                f"variation on the same theme.]"
+            )
+    except Exception:
+        pass
+    return ""
+
+
 def _load_frontier_context() -> str:
     """Read the research frontier and distill it into proposal context.
 
@@ -296,6 +360,10 @@ def _get_proposal(breath_text: str, hint: str = "") -> str:
         if hint else ""
     )
 
+    # Diversity pressure: detect if we're stuck on the same topic
+    diversity = _detect_topic_repetition()
+    diversity_block = f"\n\n{diversity}\n" if diversity else ""
+
     # Research frontier: the organism's own open questions and conjectures
     frontier = _load_frontier_context()
     frontier_block = (
@@ -352,6 +420,7 @@ def _get_proposal(breath_text: str, hint: str = "") -> str:
             f"Your breath:\n\n{breath_text[:2000]}"
             f"{last_result_block}"
             f"{hint_block}"
+            f"{diversity_block}"
             f"{frontier_block}"
             f"{holonomy_block}"
             f"\n\nWhat do you want to test?"
@@ -388,7 +457,7 @@ def _try_sandbox(code: str) -> str | None:
         return None
 
     if not sandbox_available():
-        print("[agency] sandbox not available (disabled or no Docker) — falling back to LLM-only")
+        print("[agency] sandbox not available (disabled) — falling back to LLM-only")
         return None
 
     safe, reason = check_code(code)
