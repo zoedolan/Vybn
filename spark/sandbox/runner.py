@@ -103,6 +103,7 @@ def _build_docker_cmd(script_path: str) -> list[str]:
         cmd.extend(["-v", f"{persist_path}:/output:rw"])
 
     cmd.extend([
+        "--entrypoint", "",
         SANDBOX_IMAGE,
         "timeout", str(SANDBOX_TIMEOUT), "python3", "/script.py",
     ])
