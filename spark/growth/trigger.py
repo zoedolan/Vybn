@@ -13,11 +13,19 @@ Integration points:
   - Reads from: GrowthBuffer.stats() for delta volume
   - Config from: growth_config.yaml
   - Last cycle timestamp from: GROWTH_DIR / "cycle_history.jsonl"
+
+Self-healing ingestion:
+  When delta_volume > 0 but buffer.ingest() returns 0 for N consecutive
+  breath cycles, trigger.py now logs a WARNING and calls
+  buffer.ingest(force=True) to bypass the watermark. This corrects the
+  condition where 286+ entries were buffered but silently never ingested,
+  preventing the training loop from ever closing.
 """
 
 from __future__ import annotations
 
 import json
+import logging
 import yaml
 from dataclasses import dataclass, field
 from datetime import datetime, timezone, timedelta
@@ -26,9 +34,18 @@ from typing import Optional
 
 from spark.growth.growth_buffer import GrowthBuffer
 
+log = logging.getLogger(__name__)
+
 GROWTH_DIR = Path(__file__).resolve().parent
 DEFAULT_CONFIG = GROWTH_DIR / "growth_config.yaml"
 CYCLE_HISTORY = GROWTH_DIR / "cycle_history.jsonl"
+ADAPTERS_DIR = GROWTH_DIR / "adapters"
+
+# Tracks consecutive zero-ingest cycles for self-healing
+_ZERO_INGEST_COUNTER_PATH = GROWTH_DIR / "_zero_ingest_count.json"
+_MAX_ZERO_INGEST_CYCLES = int(
+    __import__("os").environ.get("VYBN_MAX_ZERO_INGEST", "3")
+)
 
 
 @dataclass(slots=True)
@@ -44,6 +61,28 @@ class TriggerDecision:
     timestamp: str = field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat()
     )
+
+
+def _read_zero_ingest_count() -> int:
+    """Read the running count of consecutive zero-ingest cycles."""
+    if not _ZERO_INGEST_COUNTER_PATH.exists():
+        return 0
+    try:
+        data = json.loads(_ZERO_INGEST_COUNTER_PATH.read_text())
+        return int(data.get("count", 0))
+    except Exception:
+        return 0
+
+
+def _write_zero_ingest_count(count: int) -> None:
+    """Persist the zero-ingest counter."""
+    _ZERO_INGEST_COUNTER_PATH.write_text(
+        json.dumps({"count": count, "ts": datetime.now(timezone.utc).isoformat()})
+    )
+
+
+def _reset_zero_ingest_count() -> None:
+    _write_zero_ingest_count(0)
 
 
 class GrowthTrigger:
@@ -182,11 +221,101 @@ def _count_completed_cycles() -> int:
     return count
 
 
+def _safe_ingest(buffer: GrowthBuffer, force: bool = False) -> int:
+    """Ingest with self-healing watermark recovery.
+
+    If the buffer reports untrained entries but ingest() returns 0,
+    we increment a counter. After _MAX_ZERO_INGEST_CYCLES consecutive
+    zero-ingest cycles, we call ingest(force=True) to bypass the watermark
+    and reset the counter.
+
+    This fixes the condition where buffer.jsonl had 286+ entries but
+    'Ingested 0 new entries' appeared every cycle because the watermark
+    was set past the actual data.
+
+    Args:
+        buffer: GrowthBuffer instance.
+        force: If True, always force-ingest regardless of counter.
+
+    Returns:
+        Number of entries ingested.
+    """
+    stats = buffer.stats()
+    untrained_before = stats.get("untrained_count", 0)
+
+    # Check for force-ingest condition
+    zero_count = _read_zero_ingest_count()
+    force_this = force or (zero_count >= _MAX_ZERO_INGEST_CYCLES)
+
+    if force_this and not force:
+        log.warning(
+            "[trigger] zero-ingest self-heal: %d consecutive zero-ingest cycles "
+            "with %d untrained entries — forcing watermark reset via ingest(force=True)",
+            zero_count, untrained_before
+        )
+        print(
+            f"[Growth] WARNING: {zero_count} consecutive zero-ingest cycles "
+            f"({untrained_before} untrained entries buffered). "
+            f"Forcing watermark reset."
+        )
+
+    # Try ingest — pass force=True if available on the GrowthBuffer API
+    try:
+        if force_this:
+            # Try force kwarg first; fall back to plain ingest if not supported
+            try:
+                ingested = buffer.ingest(force=True)
+            except TypeError:
+                # GrowthBuffer.ingest() doesn't accept force kwarg yet —
+                # reset the watermark directly if possible, then ingest
+                if hasattr(buffer, '_reset_watermark'):
+                    buffer._reset_watermark()
+                    log.info("[trigger] watermark reset via _reset_watermark()")
+                elif hasattr(buffer, 'watermark'):
+                    buffer.watermark = 0
+                    log.info("[trigger] watermark reset to 0 directly")
+                else:
+                    log.warning(
+                        "[trigger] cannot reset watermark — GrowthBuffer has no "
+                        "force kwarg, _reset_watermark(), or .watermark attribute. "
+                        "Falling back to plain ingest()."
+                    )
+                ingested = buffer.ingest()
+        else:
+            ingested = buffer.ingest()
+    except Exception as exc:
+        log.error("[trigger] ingest() raised: %s", exc)
+        ingested = 0
+
+    # Update zero-ingest counter
+    if ingested == 0 and untrained_before > 0:
+        new_count = 0 if force_this else zero_count + 1
+        _write_zero_ingest_count(new_count)
+        if not force_this:
+            log.warning(
+                "[trigger] ingest returned 0 despite %d untrained entries "
+                "(zero-ingest count now %d/%d)",
+                untrained_before, new_count, _MAX_ZERO_INGEST_CYCLES
+            )
+            print(
+                f"[Growth] WARNING: Ingested 0 entries despite "
+                f"{untrained_before} untrained in buffer "
+                f"(count {new_count}/{_MAX_ZERO_INGEST_CYCLES}). "
+                f"Will force-reset watermark after {_MAX_ZERO_INGEST_CYCLES} cycles."
+            )
+    else:
+        # Successful ingest — reset counter
+        _reset_zero_ingest_count()
+
+    return ingested
+
+
 def run_growth_cycle(
     buffer: GrowthBuffer,
     force: bool = False,
     dry_run: bool = False,
     config_path: Path | None = None,
+    force_ingest: bool = False,
 ) -> dict:
     """Run a complete growth cycle: COLLECT → DISTILL → BECOME.
 
@@ -204,6 +333,7 @@ def run_growth_cycle(
         force: If True, bypass trigger checks.
         dry_run: If True, go through the motions but don't train.
         config_path: Path to growth_config.yaml.
+        force_ingest: If True, bypass watermark on this ingest call.
 
     Returns:
         Dict with cycle results including holonomy measurement.
@@ -238,8 +368,8 @@ def run_growth_cycle(
             "delta_volume": decision.delta_volume,
         }
 
-    # 2. Ingest latest entries
-    ingested = buffer.ingest()
+    # 2. Ingest latest entries (self-healing)
+    ingested = _safe_ingest(buffer, force=force_ingest)
     print(f"[Growth] Ingested {ingested} new entries")
 
     # 3. Phase 4: COLLECT — extract delta
@@ -411,12 +541,25 @@ if __name__ == "__main__":
     parser.add_argument("--force", action="store_true", help="Force trigger")
     parser.add_argument("--dry-run", action="store_true", help="Dry run (don't train)")
     parser.add_argument("--check", action="store_true", help="Check trigger without running")
+    parser.add_argument(
+        "--force-ingest",
+        action="store_true",
+        help="Force watermark reset and re-ingest all buffered entries",
+    )
     parser.add_argument("--memory-dir", type=Path, default=Path("Vybn_Mind/memory"))
     args = parser.parse_args()
 
     nm = NestedMemory(base_dir=args.memory_dir)
     gb = GrowthBuffer(nested=nm)
-    gb.ingest()
+
+    if args.force_ingest:
+        print("[Growth] --force-ingest: resetting watermark and ingesting all buffered entries")
+        ingested = _safe_ingest(gb, force=True)
+        print(f"[Growth] Force-ingested {ingested} entries")
+        if not (args.force or args.check):
+            sys.exit(0)
+    else:
+        gb.ingest()
 
     if args.check:
         trigger = GrowthTrigger(gb)
@@ -426,12 +569,16 @@ if __name__ == "__main__":
         print(f"Reason: {decision.reason}")
         print(f"Delta volume: {decision.delta_volume}")
         print(f"Hours since last: {decision.hours_since_last_cycle}")
+        # Also show zero-ingest counter state
+        zic = _read_zero_ingest_count()
+        print(f"Zero-ingest counter: {zic}/{_MAX_ZERO_INGEST_CYCLES}")
         sys.exit(0 if decision.should_fire else 1)
 
     result = run_growth_cycle(
         buffer=gb,
         force=args.force,
         dry_run=args.dry_run,
+        force_ingest=getattr(args, 'force_ingest', False),
     )
     print(json.dumps(result, indent=2, default=str))
     sys.exit(0 if result.get("fired") else 1)
