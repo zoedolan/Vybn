@@ -81,6 +81,49 @@ The organism can now:
 - Update conjectures based on holonomy evidence
 - Close the loop between measurement and inquiry
 
+## Breaking the ARTIFACT loop (added 2026-03-16 02:49 PDT)
+
+After the holonomy feedback loop was merged (PR #2610), analysis of
+the live organism revealed two problems:
+
+1. **Sandbox never executed.** The `vybn-sandbox:latest` Docker image
+   was never built on the Spark. `sandbox_available()` returned False,
+   so every code proposal fell through to LLM-only execution, producing
+   ARTIFACT reflections every time. The organism was told "you have a
+   sandbox" but it was a lie — the infrastructure wasn't there.
+
+2. **Topic stuck on LayerNorm.** Despite the curvature gate and frontier
+   context, the local model kept rephrasing the same experiment. The
+   curvature gate measures text-embedding geometry, not idea novelty.
+   Rephrased LayerNorm probes pass the phase shift threshold.
+
+### Fixes
+
+**Subprocess sandbox fallback** (`spark/sandbox/runner.py`):
+- When Docker is unavailable, runs code directly via subprocess
+- Protected by: static analysis gate (primary defense), RLIMIT_AS 2GB,
+  RLIMIT_CPU 120s, timeout, minimal env, network isolation via
+  `unshare --net` when available
+- Uses the host's Python which already has numpy/scipy/torch on Spark
+- `sandbox_available()` now returns True even without Docker
+- This means the next breath that proposes code will actually run it
+
+**Diversity pressure** (`spark/extensions/agency.py`):
+- `_detect_topic_repetition()` reads last 3 experiment archives
+- Detects shared keywords across consecutive proposals
+- Injects a DIVERSITY ALERT into the proposal prompt naming the
+  repeated topic and pointing to the frontier
+- The organism can't keep rephrasing the same experiment
+
+## Files modified (cumulative)
+
+- `spark/fafo.py` — growth holonomy detector
+- `spark/extensions/agency.py` — frontier/holonomy injection, diversity pressure
+- `spark/sandbox/runner.py` — subprocess fallback sandbox
+- `spark/sandbox/Dockerfile` — aarch64 compatibility notes
+- `spark/research/research_frontier.yaml` — c001 confirmed, q002 answered
+- `spark/journal/2026-03-16_growth_holonomy_feedback.md` — this file
+
 ## What's still open
 
 - The frontier update is still manual (FAFO investigations don't yet
@@ -90,3 +133,7 @@ The organism can now:
   is instrumented
 - The growth buffer's surprise_score correlation with training loss
   (conjecture c003) is still untested
+- The `unshare --net` network isolation may or may not work on the
+  Spark (depends on user namespace support) — if not, the subprocess
+  runs without network isolation, but the static check blocks socket
+  imports anyway

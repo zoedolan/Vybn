@@ -8,15 +8,23 @@
 #
 # Pre-baked packages: numpy, scipy, torch (CPU), matplotlib (Agg).
 # Nothing that touches filesystem, network, or system internals.
+#
+# NOTE: python:3.11-slim supports multi-arch (amd64 + arm64).
+# On DGX Spark (aarch64 Grace-Blackwell), this pulls the ARM64 image.
+# PyTorch CPU wheels are available for both architectures on PyPI.
+#
+# FALLBACK: If Docker is not available on the host, runner.py uses
+# a subprocess-based sandbox with the host's Python + static analysis
+# gate. This is the expected mode on DGX Spark where numpy/scipy/torch
+# are already installed natively.
 
 FROM python:3.11-slim
 
 # No network access at runtime — install everything at build time.
-# Install scientific stack from default PyPI first.
 RUN pip install --no-cache-dir numpy scipy matplotlib
 
-# Install PyTorch CPU-only. Try CPU index first (x86), fall back to
-# default PyPI (aarch64 wheels are CPU-only on PyPI).
+# PyTorch CPU-only: try the CPU index first (smaller download on x86),
+# fall back to default PyPI (aarch64 wheels are CPU-only on PyPI).
 RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu \
     || pip install --no-cache-dir torch
 
