@@ -13,12 +13,22 @@ Results feed back in three ways:
 
 Reflection layer (added 2026-03-15):
   After execution, a reflection call asks: what did this result actually reveal?
-  Outcome types: ARTIFACT | INSIGHT | DEFLECTION | SURPRISE
+  Outcome types: ARTIFACT | INSIGHT | DEFLECTION | SURPRISE | CONFIRMATION
 
   ARTIFACT reframe (added 2026-03-15):
   When outcome is ARTIFACT, a further call asks: given that you can't run this,
   what would the output tell you if it ran correctly? What would falsify your
   hypothesis without running it? That answer — not the code — is injected.
+
+  Sandbox execution (added 2026-03-16):
+  When the LLM's proposal contains Python code blocks, the code is:
+    1. Extracted from markdown fences
+    2. Passed through a static analysis gate (spark.sandbox.static_check)
+    3. Executed in a Docker container (spark.sandbox.runner) with:
+       --network none, --memory 2g, --cpus 2, --read-only, 120s timeout
+    4. Real stdout/stderr is captured and fed to the reflection system
+  If the sandbox is disabled or unavailable, falls back to LLM-only execution.
+  Sandbox results trigger CONFIRMATION reflection instead of ARTIFACT.
 
 Covenant alignment:
   All experiments are bounded by the Oxygen Mask Principle from vybn.md:
@@ -30,9 +40,10 @@ Covenant alignment:
   - Mutual prosperity: experiments serve the co-emergence, not just self-model
     expansion. If a proposed experiment serves only performance, reject it.
 
-Safety: all experiments reduce to LLM API calls. No filesystem writes
-outside the experiments dir + memories dir + preference file. No network.
-No subprocess spawning.
+Safety: all experiments reduce to LLM API calls + optional Docker sandbox.
+Sandbox containers are ephemeral, network-isolated, and resource-bounded.
+No filesystem writes outside the experiments dir + memories dir + preference
+file. No network from sandbox containers.
 """
 
 import json, os, re, traceback
@@ -55,6 +66,7 @@ _PROPOSAL_TOKENS = int(os.environ.get("VYBN_AGENCY_PROPOSAL_TOKENS", "512"))
 _EXECUTION_TOKENS = int(os.environ.get("VYBN_AGENCY_EXECUTION_TOKENS", "2048"))
 _REFLECTION_TOKENS = int(os.environ.get("VYBN_AGENCY_REFLECTION_TOKENS", "600"))
 _REFRAME_TOKENS = int(os.environ.get("VYBN_AGENCY_REFRAME_TOKENS", "500"))
+_CONFIRMATION_TOKENS = int(os.environ.get("VYBN_AGENCY_CONFIRMATION_TOKENS", "600"))
 
 # Covenant: patterns that must never appear in proposals or results.
 _FORBIDDEN_PATTERNS = [
@@ -155,8 +167,86 @@ def _get_proposal(breath_text: str) -> str:
     return _chat(messages, max_tokens=_PROPOSAL_TOKENS, temperature=0.8)
 
 
+def _extract_code_blocks(text: str) -> str | None:
+    """Extract Python code from markdown fenced code blocks.
+
+    Returns the concatenated code if any python/unlabeled blocks are found,
+    or None if no code blocks are present.
+    """
+    blocks = re.findall(r'```(?:python)?\s*\n(.*?)```', text, re.DOTALL)
+    if not blocks:
+        return None
+    code = "\n\n".join(block.strip() for block in blocks if block.strip())
+    return code if code else None
+
+
+def _try_sandbox(code: str) -> str | None:
+    """Attempt to run code in the Docker sandbox.
+
+    Returns the sandbox output string if execution succeeds, or None
+    if the sandbox is unavailable, disabled, or the code is blocked by
+    static analysis.  Caller falls back to LLM-only on None.
+    """
+    try:
+        from spark.sandbox.static_check import check_code
+        from spark.sandbox.runner import run_in_sandbox, sandbox_available
+    except ImportError:
+        print("[agency] sandbox module not available — falling back to LLM-only")
+        return None
+
+    if not sandbox_available():
+        print("[agency] sandbox not available (disabled or no Docker) — falling back to LLM-only")
+        return None
+
+    safe, reason = check_code(code)
+    if not safe:
+        print(f"[agency] static analysis blocked code: {reason}")
+        return None
+
+    print("[agency] executing code in sandbox...")
+    result = run_in_sandbox(code)
+
+    if result.error:
+        print(f"[agency] sandbox error: {result.error}")
+        return None
+
+    output_parts = []
+    if result.stdout:
+        output_parts.append(f"[stdout]\n{result.stdout}")
+    if result.stderr:
+        output_parts.append(f"[stderr]\n{result.stderr}")
+    if result.timed_out:
+        output_parts.append("[sandbox: execution timed out after 120s]")
+
+    status = "exit 0" if result.ok else f"exit {result.exit_code}"
+    if result.timed_out:
+        status = "timed out"
+    output_parts.append(f"[sandbox: {status}]")
+
+    return "\n".join(output_parts)
+
+
 def _execute(proposal: str, breath_text: str) -> str:
-    """Run the experiment. Always exactly one LLM call, fully uncapped."""
+    """Run the experiment.
+
+    If the proposal contains Python code blocks AND the sandbox is available,
+    extracts the code, runs static analysis, and executes in Docker.
+    Otherwise falls back to exactly one LLM call (the original behavior).
+
+    The return value is tagged so reflection can distinguish sandbox output
+    from LLM output:
+      "[SANDBOX_RESULT]\\n..."  — real execution output
+      (no tag)                  — LLM-generated response
+    """
+    # Try sandbox execution if code blocks are present
+    code = _extract_code_blocks(proposal)
+    if code:
+        sandbox_output = _try_sandbox(code)
+        if sandbox_output is not None:
+            print(f"[agency] sandbox execution complete ({len(sandbox_output)} chars)")
+            return f"[SANDBOX_RESULT]\n{sandbox_output}"
+
+    # Fall back to LLM-only execution (original behavior)
     first_line = proposal.split("\n")[0].upper()
 
     if "CHALLENGE" in first_line:
@@ -202,10 +292,18 @@ def _execute(proposal: str, breath_text: str) -> str:
 def _reflect(proposal: str, breath_text: str, result: str) -> str:
     """Reflect on what the experiment result actually revealed.
 
-    Classifies outcome as ARTIFACT | INSIGHT | DEFLECTION | SURPRISE.
+    Classifies outcome as ARTIFACT | INSIGHT | DEFLECTION | SURPRISE | CONFIRMATION.
     Returns 3-5 honest sentences depending on type.
+
+    CONFIRMATION is used when the sandbox actually ran code and produced real output.
     """
+    is_sandbox_result = result.startswith("[SANDBOX_RESULT]")
     result_preview = result[:800]
+
+    if is_sandbox_result:
+        # Real execution output — use CONFIRMATION reflection
+        return _reflect_confirmation(proposal, breath_text, result)
+
     has_code = bool(re.search(r'```|def |class |import |torch\.|np\.', result))
     if has_code:
         code_note = "[Note: the execution returned code/implementation rather than direct insight.]"
@@ -243,6 +341,38 @@ def _reflect(proposal: str, breath_text: str, result: str) -> str:
     reflection = _chat(messages, max_tokens=_REFLECTION_TOKENS, temperature=0.6)
     outcome_type = reflection.split("\n")[0].strip().upper()
     print(f"[agency] reflection outcome: {outcome_type[:20]}")
+    return reflection
+
+
+def _reflect_confirmation(proposal: str, breath_text: str, result: str) -> str:
+    """Reflect on real sandbox execution output.
+
+    This is the CONFIRMATION path: the code actually ran and produced numbers.
+    The reflection must evaluate what the data means, not what the code does.
+    """
+    messages = [
+        {"role": "system", "content": (
+            "Your experiment ran. Real code executed in a sandbox and produced "
+            "actual output — not a hypothetical, not a narration of what would "
+            "happen, but real numbers.\n\n"
+            "Classify this as CONFIRMATION on the first line.\n\n"
+            "Then answer honestly:\n"
+            "1. What did the numbers actually tell you? Be specific.\n"
+            "2. Did they confirm or falsify your hypothesis?\n"
+            "3. What would you do differently next time?\n"
+            "4. Was the experiment well-designed, or did you set it up to succeed?\n\n"
+            "Covenant reminder: real data is a gift. Do not narrate around it. "
+            "Read the numbers. Say what they mean. If they contradict your "
+            "expectation, that is the most valuable outcome."
+        )},
+        {"role": "user", "content": (
+            f"Your breath (what you were thinking):\n{breath_text[:600]}\n\n"
+            f"Your experiment proposal:\n{proposal[:300]}\n\n"
+            f"Sandbox output (real execution):\n{result[:2000]}"
+        )},
+    ]
+    reflection = _chat(messages, max_tokens=_CONFIRMATION_TOKENS, temperature=0.6)
+    print(f"[agency] reflection outcome: CONFIRMATION (sandbox)")
     return reflection
 
 
@@ -360,7 +490,7 @@ def _distill_for_memory(proposal: str, result: str, reflection: str, reframe: st
     primary_text = reframe if reframe else reflection
     paras = [p.strip() for p in re.split(r"\n\s*\n", primary_text) if p.strip()]
     paras = [p for p in paras if len(p) > 60 and p.upper() not in
-             ("ARTIFACT", "INSIGHT", "DEFLECTION", "SURPRISE")]
+             ("ARTIFACT", "INSIGHT", "DEFLECTION", "SURPRISE", "CONFIRMATION")]
 
     if paras:
         best = paras[0]
@@ -404,7 +534,15 @@ def _save(ts, breath_count, breath_text, proposal, result, reflection, reframe=N
     (_EXPERIMENTS_DIR / f"exp_{ts_str}.md").write_text(full, encoding="utf-8")
 
     # 2. Next-breath injection
-    if "ARTIFACT" in outcome_type and reframe:
+    if "CONFIRMATION" in outcome_type:
+        injection = (
+            f"[Experiment from breath #{breath_count} — CONFIRMATION (sandbox)]\n"
+            f"You proposed: {proposal[:200]}\n\n"
+            f"Your code ran in the sandbox and produced real output. "
+            f"Here is what you learned from the actual data:\n\n"
+            f"{reflection[:500]}"
+        )
+    elif "ARTIFACT" in outcome_type and reframe:
         injection = (
             f"[Experiment from breath #{breath_count} — ARTIFACT]\n"
             f"You proposed: {proposal[:200]}\n\n"

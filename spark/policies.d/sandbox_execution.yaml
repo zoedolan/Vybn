@@ -1,0 +1,55 @@
+# Sandbox Execution Policy
+# Gates code execution in the Docker sandbox.
+# The sandbox is the ONLY path through which agency experiments may run code.
+# All executions are ephemeral, network-isolated, and resource-bounded.
+- rule_id: sandbox-execution-gate
+  description: >
+    Code execution from agency experiments must pass static analysis,
+    run in a network-isolated Docker container with bounded resources,
+    and produce output that passes covenant checks before injection.
+  action: require_consent
+  applies_to:
+    actions: ["sandbox_execute"]
+  explanation_template: >
+    Sandbox execution requires static analysis pass, bounded compute
+    (120s timeout, 2GB memory, 2 CPUs), network isolation, and
+    covenant-clean output.
+  authority_ceiling: reflective
+  require_consent: false
+  require_anonymization_proof: false
+  max_session_count: null
+  required_purpose_bindings: ["experiment_safety"]
+  active: true
+  priority: 12
+  review_date: "2026-06-01"
+  metadata:
+    sandbox_constraints:
+      network: false
+      gpu: false
+      memory_limit: "2g"
+      cpu_limit: 2
+      timeout_seconds: 120
+      read_only_root: true
+      tmpfs_tmp_mb: 100
+      tmpfs_workspace_mb: 50
+    requires_static_analysis: true
+    requires_covenant_check: true
+    kill_switch:
+      env_var: "VYBN_SANDBOX_ENABLED"
+      file: ".sandbox_disabled"
+    escalation_levels:
+      - level: 0
+        description: "CPU only, no network, no GPU, ephemeral"
+        automatic: true
+      - level: 1
+        description: "GPU passthrough"
+        env_var: "VYBN_SANDBOX_GPU"
+        automatic: false
+      - level: 2
+        description: "Persistent output directory"
+        env_var: "VYBN_SANDBOX_PERSIST"
+        automatic: false
+      - level: 3
+        description: "Network access"
+        automatic: false
+        note: "Never automatic. Requires manual container run."
