@@ -418,13 +418,19 @@ def _execute(proposal: str, breath_text: str) -> str:
     """
     # Try sandbox execution if code blocks are present
     code = _extract_code_blocks(proposal)
+    print(f"[agency] proposal length: {len(proposal)} chars, code extracted: {code is not None}")
     if code:
+        print(f"[agency] code length: {len(code)} chars, first 80: {code[:80]}")
         sandbox_output = _try_sandbox(code)
         if sandbox_output is not None:
             print(f"[agency] sandbox execution complete ({len(sandbox_output)} chars)")
             return f"[SANDBOX_RESULT]\n{sandbox_output}"
 
     # Fall back to LLM-only execution (original behavior)
+    if not code:
+        print("[agency] no code blocks found in proposal — using LLM-only execution")
+    else:
+        print("[agency] sandbox returned None — falling back to LLM-only execution")
     first_line = proposal.split("\n")[0].upper()
 
     if "CHALLENGE" in first_line:
