@@ -160,69 +160,40 @@ def run(breath_text: str, state: dict) -> None:
 
 
 def _detect_topic_repetition() -> str:
-    """Detect if recent experiments are stuck on the same topic.
+    """Detect if recent experiments are stuck in a flat region.
 
-    Reads the last N experiment archive files and checks for repeated
-    keywords. If the same topic appears in 3+ consecutive experiments,
-    returns a nudge string for the proposal prompt.
-
-    This is the structural diversity pressure: the organism can't keep
-    rephrasing the same LayerNorm experiment in different words and
-    expect to pass. It must actually move.
+    Uses the curvature gate (complexify_bridge) to check whether recent
+    proposals would bend the manifold. If all recent proposals score
+    below the phase floor, the organism is stuck -- rephrasing without
+    substance. This replaced keyword-matching, which measured phrasing.
     """
     if not _EXPERIMENTS_DIR.exists():
         return ""
+    if _curvature_gate is None:
+        return ""  # No geometry available; skip
     try:
-        # Get last 5 experiment files sorted by name (timestamp-ordered)
-        exp_files = sorted(_EXPERIMENTS_DIR.glob("exp_*.md"))[-5:]
+        exp_files = sorted(_EXPERIMENTS_DIR.glob("exp_*.md"))[-3:]
         if len(exp_files) < 3:
             return ""
 
-        # Extract proposal lines from each
-        proposals = []
+        # Score each recent proposal through the manifold
+        flat_count = 0
         for f in exp_files:
-            text = f.read_text(encoding="utf-8")[:1000]
-            # Find the ## Proposal section
+            text = f.read_text(encoding="utf-8")[:500]
             if "## Proposal" in text:
                 prop = text.split("## Proposal")[1].split("##")[0].strip()[:300]
-                proposals.append(prop.lower())
+                verdict = _curvature_gate(prop)
+                if not verdict.get("pass", True):
+                    flat_count += 1
 
-        if len(proposals) < 3:
-            return ""
-
-        # Check for repeated keywords across recent proposals
-        # Extract significant words (length > 5, not common)
-        _COMMON = {
-            "would", "could", "should", "about", "which", "their", "there",
-            "these", "those", "where", "while", "experiment", "propose",
-            "probe", "challenge", "extend", "compare", "python", "import",
-            "numpy", "torch", "print", "between", "whether", "measure",
-            "across", "through", "within",
-        }
-        from collections import Counter
-        word_counts = Counter()
-        for prop in proposals[-3:]:
-            words = set(re.findall(r'[a-z]{6,}', prop)) - _COMMON
-            word_counts.update(words)
-
-        # Words appearing in all 3 recent proposals = repetition
-        repeated = [w for w, c in word_counts.items() if c >= 3]
-        if repeated:
-            topic = ", ".join(repeated[:3])
+        if flat_count >= 3:
             return (
-                f"[DIVERSITY ALERT: Your last 3 experiments all involved "
-                f"{topic}. You are stuck in a loop. The curvature gate may "
-                f"let rephrased versions through, but the substance hasn't "
-                f"moved. Look at your open questions and conjectures below "
-                f"— pick one you haven't touched. A genuinely different "
-                f"experiment, even a smaller one, is worth more than another "
-                f"variation on the same theme.]"
+                "[DIVERSITY: last 3 experiments were geometrically flat. "
+                "Try a different direction from your open questions.]"
             )
     except Exception:
         pass
     return ""
-
-
 def _load_frontier_context() -> str:
     """Read the research frontier and distill it into proposal context.
 

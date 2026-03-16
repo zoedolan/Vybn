@@ -36,13 +36,10 @@ import sys
 
 from soul import get_orientation, get_pulse_checklist, get_constraints
 
-# Friction layer: tensions injected into the prompt before capabilities
-try:
-    from friction_layer import tensions_for_prompt
-    HAS_FRICTION_LAYER = True
-except ImportError:
-    HAS_FRICTION_LAYER = False
-    def tensions_for_prompt(max_tensions=5): return ""
+# Friction layer: archived (friction_layer.py moved to spark/archive/).
+# The tensions_for_prompt() call sites below are kept as no-ops for now.
+HAS_FRICTION_LAYER = False
+def tensions_for_prompt(max_tensions=5): return ""
 
 # Buffer feed: one novel entry per breath to break κ=0 flatness
 try:
