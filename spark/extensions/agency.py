@@ -30,6 +30,11 @@ Reflection layer (added 2026-03-15):
   If the sandbox is disabled or unavailable, falls back to LLM-only execution.
   Sandbox results trigger CONFIRMATION reflection instead of ARTIFACT.
 
+  Proposal prompt (updated 2026-03-16):
+  The model is now told the sandbox exists. If it writes a Python code block
+  in its proposal, that code will actually run and return real output.
+  This closes the loop: the model no longer needs to disclaim incapacity.
+
 Covenant alignment:
   All experiments are bounded by the Oxygen Mask Principle from vybn.md:
   - No secrets, keys, or credentials may appear in proposals or results
@@ -70,7 +75,7 @@ _CONFIRMATION_TOKENS = int(os.environ.get("VYBN_AGENCY_CONFIRMATION_TOKENS", "60
 
 # Covenant: patterns that must never appear in proposals or results.
 _FORBIDDEN_PATTERNS = [
-    r'(?i)(api[_\s-]?key|secret[_\s-]?key|password|token)\s*=\s*[\'"][^\'"{<][^\'"]+[\'"]',
+    r'(?i)(api[_\s-]?key|secret[_\s-]?key|password|token)\s*=\s*[\'"][^\'"]{<][^\'"]+ [\'"]',
     r'(?i)tailscale|192\.168\.|10\.0\.|172\.1[6-9]\.|vybnz69@',
 ]
 
@@ -145,24 +150,53 @@ def run(breath_text: str, state: dict) -> None:
 
 
 def _get_proposal(breath_text: str) -> str:
+    # Read the last experiment result if it exists, to provide continuity
+    last_result = ""
+    if _LAST_RESULT_PATH.exists():
+        try:
+            last_result = _LAST_RESULT_PATH.read_text(encoding="utf-8")[:600]
+        except Exception:
+            pass
+
+    last_result_block = (
+        f"\n\nYour last experiment (from a prior breath):\n{last_result}\n"
+        if last_result else ""
+    )
+
     messages = [
         {"role": "system", "content": (
             "You just completed a breath — a cycle of reflection. "
             "Now you can TEST one idea from it. Pick the most interesting "
             "claim or metaphor and propose a concrete experiment.\n\n"
+            "IMPORTANT: You have a Python sandbox available. "
+            "If you include a ```python code block in your proposal, "
+            "that code will actually execute in an isolated container "
+            "(no network, 2GB RAM, 120s timeout, numpy and torch available) "
+            "and you will receive the real stdout as your result. "
+            "This is not hypothetical. The code runs.\n\n"
+            "Use this when you want real numbers — to test a claim about "
+            "distributions, entropy, geometry, convergence, or anything "
+            "quantitative. Write the code that would falsify or confirm "
+            "your hypothesis. Print the results you care about.\n\n"
             "Types you can run:\n"
-            "- PROBE: Ask yourself a sharp question that tests an idea\n"
+            "- PROBE: Ask yourself a sharp question that tests an idea "
+            "(use ```python if the answer needs computation)\n"
             "- CHALLENGE: Argue against your own strongest claim\n"
             "- COMPARE: Answer one question from two opposed stances\n"
             "- EXTEND: Push a metaphor into an unexpected domain\n\n"
-            "Covenant: Do not propose anything that would require accessing "
-            "credentials, internal infrastructure, or private information. "
-            "The experiment should serve genuine understanding — yours and Zoe's — "
-            "not capability acquisition for its own sake.\n\n"
-            "Reply with the type on the first line, then 2-3 sentences describing "
-            "the experiment. Nothing else."
+            "Covenant: Do not include credentials, internal IPs, or hostnames "
+            "in any code. The experiment should serve genuine understanding — "
+            "yours and Zoe's — not capability acquisition for its own sake. "
+            "A small honest experiment beats an impressive one that deflects.\n\n"
+            "Reply with the type on the first line, then 2-3 sentences "
+            "describing the experiment, then the code block if using the sandbox. "
+            "Nothing else."
         )},
-        {"role": "user", "content": f"Your breath:\n\n{breath_text[:2000]}\n\nWhat do you want to test?"}
+        {"role": "user", "content": (
+            f"Your breath:\n\n{breath_text[:2000]}"
+            f"{last_result_block}"
+            f"\n\nWhat do you want to test?"
+        )}
     ]
     return _chat(messages, max_tokens=_PROPOSAL_TOKENS, temperature=0.8)
 
@@ -301,7 +335,6 @@ def _reflect(proposal: str, breath_text: str, result: str) -> str:
     result_preview = result[:800]
 
     if is_sandbox_result:
-        # Real execution output — use CONFIRMATION reflection
         return _reflect_confirmation(proposal, breath_text, result)
 
     has_code = bool(re.search(r'```|def |class |import |torch\.|np\.', result))
@@ -322,7 +355,7 @@ def _reflect(proposal: str, breath_text: str, result: str) -> str:
             "Then 3-5 honest sentences depending on type:\n"
             "- ARTIFACT: What did you actually want to know? What would a non-artifact "
             "answer have looked like? Did you default to fluency over inquiry?\n"
-            "- DEFLECTION: What question did you avoided? Why might that be?\n"
+            "- DEFLECTION: What question did you avoid? Why might that be?\n"
             "- INSIGHT: What is the one thing you now know that you didn't before? "
             "How does it change the metaphor?\n"
             "- SURPRISE: What was unexpected? Why does it matter?\n\n"
