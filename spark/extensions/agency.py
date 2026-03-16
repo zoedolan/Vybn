@@ -50,8 +50,13 @@ _LLAMA_URL = os.environ.get("LLAMA_URL", "http://127.0.0.1:8000")
 # Run every Nth breath. Default 2 — every other breath.
 _AGENCY_INTERVAL = int(os.environ.get("VYBN_AGENCY_INTERVAL", "2"))
 
-# Token budgets
-_PROPOSAL_TOKENS = int(os.environ.get("VYBN_AGENCY_PROPOSAL_TOKENS", "512"))
+# Token budgets.
+# _PROPOSAL_TOKENS: must be large enough for Nemotron to emit a complete
+# ```python block. Tested: 512=TRUNCATED, 768=TRUNCATED, 1024=COMPLETE.
+# 1536 gives margin. This was the root cause of the sandbox never firing
+# across 20 consecutive experiments — every proposal was cut off before
+# the closing ``` fence, so _extract_code_blocks always returned None.
+_PROPOSAL_TOKENS = int(os.environ.get("VYBN_AGENCY_PROPOSAL_TOKENS", "1536"))
 _EXECUTION_TOKENS = int(os.environ.get("VYBN_AGENCY_EXECUTION_TOKENS", "2048"))
 _REFLECTION_TOKENS = int(os.environ.get("VYBN_AGENCY_REFLECTION_TOKENS", "600"))
 _REFRAME_TOKENS = int(os.environ.get("VYBN_AGENCY_REFRAME_TOKENS", "500"))
@@ -278,9 +283,9 @@ def _build_steering_context(hint: str = "") -> str:
 
     Instead of piling up separate blocks (each with its own header and
     framing), we distill everything into a tight context string. This
-    keeps the user-message short enough for the local model's 512-token
-    output budget.  The design follows the attention-residual principle:
-    selective aggregation over depth beats uniform accumulation.
+    keeps the user-message short enough for the local model's token budget.
+    The design follows the attention-residual principle: selective
+    aggregation over depth beats uniform accumulation.
     """
     parts: list[str] = []
 
@@ -343,10 +348,10 @@ def _get_proposal(breath_text: str, hint: str = "") -> str:
 def _extract_code_blocks(text: str) -> str | None:
     """Extract Python code from markdown fenced code blocks.
 
-    Returns the concatenated code if any python/unlabeled blocks are found,
-    or None if no code blocks are present.
+    Matches ```python, ```Python, ```py, and unlabeled ``` blocks.
+    Returns the concatenated code if any blocks are found, or None.
     """
-    blocks = re.findall(r'```(?:python)?\s*\n(.*?)```', text, re.DOTALL)
+    blocks = re.findall(r'```(?:[Pp]y(?:thon)?)?\s*\n(.*?)```', text, re.DOTALL)
     if not blocks:
         return None
     code = "\n\n".join(block.strip() for block in blocks if block.strip())
