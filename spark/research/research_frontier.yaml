@@ -41,6 +41,15 @@ open_questions:
     evidence: []
     raised_at: "2026-03-14"
 
+  - id: q006
+    question: "Can the three parallel curvature systems (complexify manifold, parameter holonomy, agency curvature gate) be unified into a single geometry layer, analogous to how AttnRes replaces uniform residual accumulation with selective depth-wise attention?"
+    status: open
+    evidence:
+      - "Kimi Team 'Attention Residuals' (2026): depth-wise uniform accumulation dilutes signal; selective aggregation via softmax attention recovers it"
+      - "The three systems currently compute 'did this bend the trajectory?' independently: complexify_bridge.curvature_score(), parameter_holonomy.measure_probe(), agency._detect_topic_repetition()"
+      - "PR #2612 applied the principle at the prompt level (40% reduction); the same principle likely applies at the architecture level"
+    raised_at: "2026-03-16"
+
 active_conjectures:
   - id: c001
     claim: "Training data order affects final adapter orientation (holonomy is nonzero)"
