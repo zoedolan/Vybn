@@ -9,11 +9,16 @@ the phase-rotated training delta from DeltaExtractor. Each example in x is
 now annotated with a composite quality weight W = holonomy × lens_distance
 × challenge_survival × inheritance. The SFT loss is scaled per-sample by W.
 
-Model: NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4 (modelopt quantization).
-Do NOT use BitsAndBytesConfig — the model is quantized via nvidia-modelopt,
-not bitsandbytes. Requires: pip install "nvidia-modelopt>=0.43"
+Model: NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4
+  - The NVFP4 safetensors are ALREADY quantized — no additional quantization
+    is needed. Do NOT use bitsandbytes or BitsAndBytesConfig.
+  - Load directly via AutoModelForCausalLM.from_pretrained() with
+    trust_remote_code=True and device_map="auto".
+  - PEFT wraps the frozen base with LoRA adapters on the attention projections.
 
-Usage (on host or inside container with GPU access):
+Requirements: peft>=0.18.1, trl>=0.29.0, transformers, torch
+
+Usage (on host — not inside a Docker container):
     python3 peft_train.py \\
         --data /path/to/adapters/<cycle>/training_data.jsonl \\
         --output-dir /path/to/adapters/<cycle>/ \\
@@ -241,6 +246,65 @@ def dpo_loss(
 
 
 # ---------------------------------------------------------------------------
+# Model loading — NVFP4 safetensors (already quantized, no bitsandbytes)
+# ---------------------------------------------------------------------------
+
+def _resolve_model_path() -> str:
+    """Locate the NVFP4 safetensors on disk.
+
+    Checks (in order):
+    1. VYBN_MODEL_PATH environment variable (explicit override)
+    2. HuggingFace cache default location for the NVFP4 model
+    """
+    explicit = os.environ.get("VYBN_MODEL_PATH")
+    if explicit and Path(explicit).exists():
+        return explicit
+
+    hf_cache = Path.home() / ".cache" / "huggingface" / "hub" / \
+        "models--nvidia--NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4"
+    snapshots_dir = hf_cache / "snapshots"
+    if snapshots_dir.exists():
+        snapshot_dirs = sorted(snapshots_dir.iterdir())
+        if snapshot_dirs:
+            return str(snapshot_dirs[-1])
+
+    return str(hf_cache)
+
+
+def load_model_and_tokenizer(model_path: str):
+    """Load the NVFP4 Nemotron model and tokenizer.
+
+    The model weights are NVFP4 safetensors — already quantized at the
+    tensor level. We load them directly into transformers with
+    device_map="auto" to shard across available GPUs/memory.
+
+    No bitsandbytes. No BitsAndBytesConfig. No additional quantization.
+    The NVFP4 format is the base — PEFT LoRA adapters train on top of it.
+    """
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+
+    print(f"[peft_train] Loading model from {model_path}", file=sys.stderr)
+    print("[peft_train] NVFP4 safetensors — already quantized, no bitsandbytes needed", file=sys.stderr)
+
+    tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+
+    # Load NVFP4 safetensors directly. The quantized weights are stored as
+    # standard safetensors with NVFP4 encoding — transformers loads them
+    # natively with trust_remote_code=True. device_map="auto" distributes
+    # across available memory (single node or FSDP sharded).
+    model = AutoModelForCausalLM.from_pretrained(
+        model_path,
+        torch_dtype=torch.bfloat16,
+        device_map="auto",
+        trust_remote_code=True,
+    )
+
+    return model, tokenizer
+
+
+# ---------------------------------------------------------------------------
 # Training
 # ---------------------------------------------------------------------------
 
@@ -250,11 +314,11 @@ def train(
     config_path: str,
     preference_data_path: str | None = None,
 ) -> dict:
-    """Run LoRA fine-tuning with MuonAdamW.
+    """Run LoRA fine-tuning with MuonAdamW on the NVFP4 base model.
 
-    Model is NVFP4-quantized via nvidia-modelopt. Do NOT pass BitsAndBytesConfig.
-    Load with trust_remote_code=True and device_map='auto'; modelopt weights
-    load natively when 'nvidia-modelopt>=0.43' is installed.
+    The NVFP4 safetensors are loaded directly — no bitsandbytes quantization.
+    PEFT wraps the frozen base with LoRA adapters on attention projections
+    (q_proj, k_proj, v_proj, o_proj). Only the LoRA weights are trained.
 
     SFT loss is scaled per-sample by the composite x-weight stored in each
     example's metadata["x_weight"]["composite"]. This means the gradient
@@ -265,7 +329,6 @@ def train(
     every dpo_every_n_steps, weighted at dpo_weight.
     """
     from peft import LoraConfig, get_peft_model, TaskType
-    from transformers import AutoModelForCausalLM, AutoTokenizer
 
     try:
         from spark.growth.muon_adamw import MuonAdamW, build_param_groups
@@ -291,6 +354,7 @@ def train(
     dpo_every_n_steps = dpo_cfg.get("every_n_steps", 10)
     dpo_weight = dpo_cfg.get("loss_weight", 0.3)
 
+    # Load training data
     examples = load_chat_jsonl(data_path)
     if not examples:
         raise RuntimeError(f"No training examples found in {data_path}")
@@ -306,34 +370,11 @@ def train(
     print(f"[peft_train] {len(examples)} examples, mean_x_weight={theta.get('mean_x_weight')}", file=sys.stderr)
     print(f"[peft_train] θ = {theta['theta_radians']:.4f} rad", file=sys.stderr)
 
-    model_path = os.path.expanduser(
-        "~/.cache/huggingface/hub/"
-        "models--nvidia--NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4"
-    )
-    snapshots_dir = Path(model_path) / "snapshots"
-    if snapshots_dir.exists():
-        snapshot_dirs = sorted(snapshots_dir.iterdir())
-        if snapshot_dirs:
-            model_path = str(snapshot_dirs[-1])
+    # Load model — NVFP4 safetensors, no bitsandbytes
+    model_path = _resolve_model_path()
+    model, tokenizer = load_model_and_tokenizer(model_path)
 
-    print(f"[peft_train] Loading model from {model_path}", file=sys.stderr)
-    print("[peft_train] Using native modelopt loading (no BitsAndBytesConfig)", file=sys.stderr)
-    print("[peft_train] Requires: pip install 'nvidia-modelopt>=0.43'", file=sys.stderr)
-
-    # NVFP4 modelopt-quantized model — do NOT use BitsAndBytesConfig.
-    # The quant_method is 'modelopt' with MIXED_PRECISION (NVFP4 + FP8).
-    # nvidia-modelopt handles its own weight loading via trust_remote_code.
-    tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
-    if tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.eos_token
-
-    model = AutoModelForCausalLM.from_pretrained(
-        model_path,
-        torch_dtype=torch.bfloat16,
-        device_map="auto",
-        trust_remote_code=True,
-    )
-
+    # Wrap with PEFT LoRA — only the adapter weights are trainable
     peft_config = LoraConfig(
         task_type=TaskType.CAUSAL_LM,
         r=rank,
@@ -351,13 +392,15 @@ def train(
         file=sys.stderr,
     )
 
+    # Optimizer — MuonAdamW (Muon for 2D LoRA matrices, AdamW for rest)
     param_groups = build_param_groups(model, muon_lr=lr, adamw_lr=lr, weight_decay=0.2)
     optimizer = MuonAdamW(param_groups)
 
+    # Tokenize all examples
     max_seq_len = 512
     all_input_ids = []
     all_labels = []
-    all_x_weights = []  # per-sample loss scale
+    all_x_weights = []
 
     for ex in examples:
         messages = ex["messages"]
@@ -408,6 +451,7 @@ def train(
         file=sys.stderr,
     )
 
+    # Training loop
     with gc_discipline(collect_every_n_steps=gc_collect_every):
         for epoch in range(epochs):
             if budget.exhausted:
@@ -475,6 +519,7 @@ def train(
                         file=sys.stderr,
                     )
 
+    # Save LoRA adapter as .safetensors
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
     adapter_dir = output_path / "adapter"
@@ -510,11 +555,13 @@ def train(
 # ---------------------------------------------------------------------------
 
 def main() -> None:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--data", required=True)
-    parser.add_argument("--output-dir", required=True)
-    parser.add_argument("--config", required=True)
-    parser.add_argument("--preference-data", default=None)
+    parser = argparse.ArgumentParser(
+        description="PEFT LoRA training on NVFP4 Nemotron (no bitsandbytes)"
+    )
+    parser.add_argument("--data", required=True, help="Path to training_data.jsonl")
+    parser.add_argument("--output-dir", required=True, help="Cycle output directory")
+    parser.add_argument("--config", required=True, help="Path to growth_config.yaml")
+    parser.add_argument("--preference-data", default=None, help="Path to preference_data.jsonl for DPO")
     args = parser.parse_args()
     result = train(
         data_path=args.data,
