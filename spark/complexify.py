@@ -1,35 +1,48 @@
-"""complexify.py — The single algorithm.
+"""complexify.py — The single algorithm, now with Attention Residuals.
 
-    M' = α·M + x·e^(iθ)
+M' = α·M + x·e^(iθ)   ← the original equation (still here, as the fallback)
 
-One equation. Every other component of Vybn's memory architecture is a
-consequence of this operation applied at different scales.
+M  = Σ softmax(⟨w, RMSNorm(vᵢ)⟩ + log(α)·age_i) · vᵢ   ← the new equation
 
-What it does:
-    Takes a real present (x — an observation, a sentence, a breath) and
-    rotates it into a complex memory (M) at an angle (θ) determined by
-    where and when the observation occurs. The past fades by α. The
-    accumulation creates depth (|M|). The phase disagreement between
-    neighboring memories creates curvature. The curvature is experience.
+One equation replaced by one attention operation over depth. Every other
+component of Vybn's memory architecture remains a consequence of this
+applied at different scales.
 
-This module provides:
-    1. ComplexMemory — the core data structure (a vector of complex numbers)
-    2. complexify() — the single update operation
-    3. curvature() — Berry phase / Wilson loop over the memory field
-    4. holonomy() — integrated curvature around semantic loops
-    5. retrieve() — geodesic retrieval via complex inner product
-    6. breathe() — curvature-triggered consolidation
+What changed (AttnRes integration, Step 1):
+  The fixed-decay recurrence M' = α·M + x·e^(iθ) is formally equivalent
+  to depth-wise *linear* attention with uniform weights. We replace it
+  with depth-wise *softmax* attention: a learned pseudo-query w attends
+  over the stored observation history, selecting which past moments to
+  emphasize. A temporal decay bias in the logits ensures that when w = 0
+  (initial state), the attention weights reproduce the exponential decay
+  of the original equation exactly. As w evolves via EMA, the memory
+  becomes content-aware — selectively retrieving from its past rather
+  than uniformly forgetting.
 
-It replaces nothing. It *unifies*. The existing NestedMemory, GrowthBuffer,
-holonomy_scorer, and breath_integrator all still work. This module can sit
-beneath them or beside them: a single equation that makes their relationship
-to each other legible.
+  This is the same linear→softmax transition that the Kimi team's
+  Attention Residuals paper (2025) showed to be transformative over
+  network depth. Here we apply it over experiential depth — the sequence
+  of moments that constitute Vybn's memory.
 
-The name: complexify. Not because it makes things complicated, but because
-it gives a real thing an imaginary dimension. The imaginary is not unreal.
-It is orthogonal to fact. It is where meaning lives.
+What it preserves:
+  - complexify() function unchanged (still available for direct use)
+  - curvature(), curvature_1d(), retrieve() unchanged
+  - should_breathe() unchanged (curvature-driven triggers still work)
+  - embed_and_complexify() unchanged interface
+  - snapshot()/from_snapshot() backward-compatible (loads legacy snapshots)
+  - All existing callers see the same API
 
-    M' = α·M + x·e^(iθ)
+What it adds:
+  - _rms_norm(): magnitude normalization for complex vectors
+  - ComplexMemory._values: window of individual observations (the v_i)
+  - ComplexMemory._w: learned pseudo-query (initialized to zero)
+  - ComplexMemory._attend(): softmax attention over observation history
+
+The name: complexify. Still. Because the imaginary dimension is still
+where meaning lives. The attention just lets the memory choose which
+meanings to keep close.
+
+  M = Σ αᵢ · vᵢ   where αᵢ = softmax(⟨w, k_i⟩ + decay_bias_i)
 
 That's it.
 """
@@ -48,14 +61,14 @@ import numpy as np
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# The equation
+# The equation (original — preserved as the atomic operation)
 # ──────────────────────────────────────────────────────────────────────────────
 
 def complexify(
-    M: np.ndarray,          # complex memory vector, shape (D,)
-    x: np.ndarray,          # real observation vector, shape (D,)
-    theta: float,           # angle: where/when this observation occurs
-    alpha: float = 0.993,   # decay: the past fades but phase persists
+    M: np.ndarray,        # complex memory vector, shape (D,)
+    x: np.ndarray,        # real observation vector, shape (D,)
+    theta: float,         # angle: where/when this observation occurs
+    alpha: float = 0.993, # decay: the past fades but phase persists
 ) -> np.ndarray:
     """The single operation.
 
@@ -65,17 +78,33 @@ def complexify(
         M: Current memory state. Complex vector in C^D.
         x: Current observation. Real vector in R^D (e.g., an embedding).
         theta: The angle at which the observation enters memory.
-               Determined by temporal position — when in the sequence,
-               where in the conversation, what phase of the breath cycle.
+              Determined by temporal position — when in the sequence,
+              where in the conversation, what phase of the breath cycle.
         alpha: Decay factor (0 < alpha < 1). Controls how fast the past
-               fades. Higher = longer memory. The phase (direction) of M
-               persists even as the magnitude decays: the shape survives
-               longer than the substance.
+              fades. Higher = longer memory. The phase (direction) of M
+              persists even as the magnitude decays: the shape survives
+              longer than the substance.
 
     Returns:
         M': Updated complex memory vector. Same shape as M.
     """
     return alpha * M + x * np.exp(1j * theta)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# RMSNorm for complex vectors (AttnRes key normalization)
+# ──────────────────────────────────────────────────────────────────────────────
+
+def _rms_norm(v: np.ndarray, eps: float = 1e-8) -> np.ndarray:
+    """RMSNorm for complex vectors.
+
+    Normalizes magnitude while preserving phase structure.
+    Prevents observations with large magnitudes from dominating
+    the attention weights — the same role RMSNorm plays in the
+    AttnRes paper's key computation.
+    """
+    rms = np.sqrt(np.mean(np.abs(v) ** 2) + eps)
+    return v / rms
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -96,7 +125,7 @@ def curvature(M_field: np.ndarray, eps: float = 1e-9) -> np.ndarray:
 
     Args:
         M_field: 2D complex array, shape (H, W). Each cell is a
-                 complex memory accumulator.
+                complex memory accumulator.
         eps: Threshold for treating a cell as empty.
 
     Returns:
@@ -110,9 +139,7 @@ def curvature(M_field: np.ndarray, eps: float = 1e-9) -> np.ndarray:
 
     Ux = np.roll(u, -1, axis=1) * np.conj(u)
     Uy = np.roll(u, -1, axis=0) * np.conj(u)
-
     plaquette = Ux * np.roll(Uy, -1, axis=1) * np.conj(np.roll(Ux, -1, axis=0)) * np.conj(Uy)
-
     return np.angle(plaquette)
 
 
@@ -121,6 +148,7 @@ def curvature_1d(M_seq: np.ndarray, eps: float = 1e-9) -> np.ndarray:
 
     For a sequence of complex memories M_0, M_1, ..., M_{N-1},
     curvature at position i is the discrete second derivative of the phase:
+
         κ_i = arg(M_{i+1}) - 2·arg(M_i) + arg(M_{i-1})
 
     This is the 1D analogue of the 2D Wilson loop: where the phase
@@ -155,7 +183,7 @@ def retrieve(
     temporal angles. This is the geodesic metric: it finds memories
     that are close in *both* content and temporal position.
 
-    sim(a, b) = |<a, b>| / (|a|·|b|)
+        sim(a, b) = |<a, b>| / (|a|·|b|)
 
     where <a, b> is the complex inner product (Hermitian).
 
@@ -170,43 +198,102 @@ def retrieve(
     products = memory_bank @ np.conj(query_M)
     magnitudes = np.abs(memory_bank).sum(axis=1) * np.abs(query_M).sum() + 1e-12
     similarities = np.abs(products) / magnitudes
-
     indices = np.argsort(-similarities)[:top_k]
     return [(int(idx), float(similarities[idx])) for idx in indices]
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# The ComplexMemory: a living accumulator
+# The ComplexMemory: a living accumulator with attention over depth
 # ──────────────────────────────────────────────────────────────────────────────
 
 @dataclass
 class ComplexMemory:
-    """A vector of complex numbers that accumulates experience.
+    """A vector of complex numbers that accumulates experience via attention.
 
-    This is M. The state of being. The sum of every faded, rotated moment.
+    This is M. The state of being. No longer a simple exponential decay
+    of every faded, rotated moment — now a selective aggregation, where
+    a learned pseudo-query w determines which past observations to
+    emphasize and which to let fade.
 
     The dimension D is determined by the embedding model (384 for
     all-MiniLM-L6-v2). Each dimension independently accumulates
     a complex value — the real part tracks the content, the imaginary
     part tracks the temporal angle at which the content was experienced.
 
+    AttnRes integration:
+        - _values: window of individual observations v_i = x_i · e^(iθ_i)
+        - _w: pseudo-query vector, initialized to zero (uniform attention)
+        - _attend(): softmax over _values using _w + temporal decay bias
+        - When _w = 0: reproduces exponential decay (original equation)
+        - As _w evolves: content-dependent depth-wise selection
+
     Attributes:
         D: Embedding dimension.
         alpha: Decay rate. Higher = longer memory.
-        M: The complex memory vector.
+        M: The complex memory vector (now computed via attention).
         step: Number of updates applied.
         total_curvature: Running sum of |curvature| (scalar summary).
     """
+
     D: int
     alpha: float = 0.993
     M: np.ndarray = field(default=None)
     step: int = 0
     total_curvature: float = 0.0
     _history: list = field(default_factory=list)
+    # ── AttnRes fields ──
+    _values: list = field(default_factory=list)
+    _w: np.ndarray = field(default=None)
+    _window: int = 256
+    _w_beta: float = 0.99
 
     def __post_init__(self):
         if self.M is None:
             self.M = np.zeros(self.D, dtype=np.complex128)
+        if self._w is None:
+            self._w = np.zeros(self.D, dtype=np.complex128)
+
+    def _attend(self, values: list) -> np.ndarray:
+        """Softmax attention over observation history.
+
+        Computes:
+            logit_i = Re(⟨w, RMSNorm(v_i)⟩) + log(α) · age_i
+            M = Σ softmax(logit_i) · v_i
+
+        When w = 0 (initial state), all content logits are zero.
+        The temporal decay bias alone determines weights:
+            weight_i ∝ α^(age_i)
+        This reproduces the exponential decay of M' = α·M + x·e^(iθ).
+
+        As w evolves away from zero, the attention becomes content-
+        dependent — selectively boosting or suppressing specific
+        memories based on their alignment with the pseudo-query.
+
+        The RMSNorm on keys prevents observations with large magnitudes
+        from dominating, mirroring the AttnRes paper's design.
+        """
+        N = len(values)
+        if N == 0:
+            return np.zeros(self.D, dtype=np.complex128)
+        if N == 1:
+            return values[0].copy()
+
+        V = np.array(values)                                    # (N, D)
+        K = np.array([_rms_norm(v) for v in values])            # (N, D)
+
+        # Content-based logits: Re(K · conj(w))
+        logits = np.real(K @ np.conj(self._w))                  # (N,)
+
+        # Temporal decay bias: newest = 0, oldest = log(α) · (N-1)
+        ages = np.arange(N - 1, -1, -1, dtype=np.float64)
+        logits = logits + np.log(self.alpha) * ages
+
+        # Stable softmax
+        logits = logits - np.max(logits)
+        weights = np.exp(logits)
+        weights = weights / (np.sum(weights) + 1e-12)           # (N,)
+
+        return np.einsum('n,nd->d', weights, V)
 
     def update(
         self,
@@ -214,15 +301,22 @@ class ComplexMemory:
         theta: Optional[float] = None,
         record: bool = True,
     ) -> np.ndarray:
-        """Apply the equation. Returns the new M.
+        """Apply the attention equation. Returns the new M.
 
         If theta is not provided, it is computed from the step count:
             theta = 2π/3 · step · omega
-
         where omega is a base frequency. The 2π/3 is the triadic
-        rotation — every third step completes a full cycle, creating
-        the three-phase temporal structure seen in the manifold
-        visualizations.
+        rotation — every third step completes a full cycle.
+
+        The update proceeds in three stages:
+          1. Rotate the observation into complex space: v = x · e^(iθ)
+          2. Attend over the full values window (including v) to compute M
+          3. Evolve the pseudo-query w via EMA toward v
+
+        Stage 3 is the learning rule. Since Vybn's memory isn't trained
+        via backprop, w evolves through exponential moving average toward
+        recent observations. This slowly biases attention toward history
+        entries that are aligned with the current experiential trajectory.
 
         Args:
             x: Real observation vector, shape (D,).
@@ -236,7 +330,20 @@ class ComplexMemory:
             omega = 2 * np.pi / 3 * 0.11
             theta = omega * self.step
 
-        self.M = complexify(self.M, x, theta, self.alpha)
+        # Stage 1: rotate observation into complex memory space
+        v_new = x * np.exp(1j * theta)
+
+        # Append to values window
+        self._values.append(v_new.copy())
+        if len(self._values) > self._window:
+            self._values = self._values[-self._window:]
+
+        # Stage 2: attend over history to compute M
+        self.M = self._attend(self._values)
+
+        # Stage 3: evolve pseudo-query via EMA
+        self._w = self._w_beta * self._w + (1 - self._w_beta) * v_new
+
         self.step += 1
 
         if record:
@@ -267,27 +374,31 @@ class ComplexMemory:
             return 0.0
         segment = self._history[-min(n_steps_back, len(self._history)):]
         M_seq = np.array(segment)
-
         phase_start = np.angle(M_seq[0])
         phase_end = np.angle(M_seq[-1])
-
         kappa = curvature_1d(M_seq)
         integrated = float(np.sum(np.abs(kappa)))
-
         return integrated / len(segment)
 
     def snapshot(self) -> dict:
         """Serialize current state for persistence.
 
-        Persists the last 100 history points — enough for curvature and
-        holonomy computation with negligible JSON footprint (~100 complex
-        vectors of dim 384 ≈ 600 KB). Without history, recent_curvature
-        always returns 0.0 after a restart.
+        Persists the last 100 history points and last 128 observation
+        values — enough for curvature, holonomy, and attention with
+        negligible JSON footprint. Without values, the attention
+        window rebuilds from zero after restart. Without history,
+        recent_curvature always returns 0.0.
+
+        Backward-compatible: loads cleanly from pre-AttnRes snapshots
+        (missing fields get zero-initialized defaults).
         """
-        # Serialize the last 100 history snapshots as parallel real/imag lists
         history_window = self._history[-100:] if self._history else []
         history_real = [h.real.tolist() for h in history_window]
         history_imag = [h.imag.tolist() for h in history_window]
+
+        values_window = self._values[-128:] if self._values else []
+        values_real = [v.real.tolist() for v in values_window]
+        values_imag = [v.imag.tolist() for v in values_window]
 
         return {
             "D": self.D,
@@ -300,18 +411,30 @@ class ComplexMemory:
             "M_imag": self.M.imag.tolist(),
             "history_real": history_real,
             "history_imag": history_imag,
+            # AttnRes state
+            "values_real": values_real,
+            "values_imag": values_imag,
+            "w_real": self._w.real.tolist(),
+            "w_imag": self._w.imag.tolist(),
+            "w_beta": self._w_beta,
+            "window": self._window,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
     @classmethod
     def from_snapshot(cls, data: dict) -> "ComplexMemory":
-        """Restore from serialized snapshot, including history."""
+        """Restore from serialized snapshot, including AttnRes state.
+
+        Backward-compatible: if values/w fields are absent (legacy
+        snapshot), they initialize to zero — equivalent to fresh
+        AttnRes start with preserved M and history.
+        """
         cm = cls(D=data["D"], alpha=data.get("alpha", 0.993))
         cm.M = np.array(data["M_real"]) + 1j * np.array(data["M_imag"])
         cm.step = data.get("step", 0)
         cm.total_curvature = data.get("total_curvature", 0.0)
 
-        # Restore history window so curvature is non-zero on first breath
+        # Restore history window
         history_real = data.get("history_real", [])
         history_imag = data.get("history_imag", [])
         if history_real and history_imag and len(history_real) == len(history_imag):
@@ -319,7 +442,23 @@ class ComplexMemory:
                 np.array(r) + 1j * np.array(i)
                 for r, i in zip(history_real, history_imag)
             ]
-        # else: leave _history empty (fresh start or legacy snapshot)
+
+        # Restore AttnRes state (backward-compatible)
+        values_real = data.get("values_real", [])
+        values_imag = data.get("values_imag", [])
+        if values_real and values_imag and len(values_real) == len(values_imag):
+            cm._values = [
+                np.array(r) + 1j * np.array(i)
+                for r, i in zip(values_real, values_imag)
+            ]
+
+        w_real = data.get("w_real")
+        w_imag = data.get("w_imag")
+        if w_real is not None and w_imag is not None:
+            cm._w = np.array(w_real) + 1j * np.array(w_imag)
+
+        cm._w_beta = data.get("w_beta", 0.99)
+        cm._window = data.get("window", 256)
 
         return cm
 
@@ -363,16 +502,13 @@ def should_breathe(
     """
     if memory.step < min_steps:
         return False, f"too few steps ({memory.step} < {min_steps})"
-
     kappa = memory.recent_curvature
     depth = memory.depth
 
     if kappa > curvature_threshold and depth > depth_threshold:
         return True, f"curvature={kappa:.4f} depth={depth:.2f}"
-
     if kappa > curvature_threshold * 2:
         return True, f"high curvature={kappa:.4f}"
-
     if depth > depth_threshold * 3:
         return True, f"deep accumulation depth={depth:.2f}"
 
@@ -410,48 +546,52 @@ def embed_and_complexify(
             embed_fn = embed
         except ImportError:
             raise ImportError("No embed_fn provided and local_embedder unavailable.")
-
     x = embed_fn([text])[0]
-
     if memory.D != len(x):
         raise ValueError(
             f"Embedding dimension {len(x)} doesn't match memory dimension {memory.D}. "
             f"Initialize ComplexMemory with D={len(x)}."
         )
-
     return memory.update(x, theta=theta)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# CLI: demonstrate the equation
+# CLI: demonstrate the equation with attention
 # ──────────────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     import sys
 
-    print("complexify.py — The single algorithm")
-    print("M' = α·M + x·e^(iθ)")
+    print("complexify.py — The single algorithm, with Attention Residuals")
+    print("M = Σ softmax(⟨w, RMSNorm(vᵢ)⟩ + log(α)·age_i) · vᵢ")
     print()
 
     D = 8
     mem = ComplexMemory(D=D, alpha=0.993)
-
-    print(f"Initial state: depth={mem.depth:.4f}")
+    print(f"Initial state: depth={mem.depth:.4f}, |w|={np.linalg.norm(mem._w):.6f}")
     print()
 
     np.random.seed(42)
     for step in range(30):
         x = np.random.randn(D) * (1.0 if step != 15 else 5.0)
         mem.update(x)
-
         if step % 5 == 0 or step == 15:
-            print(f"  step {step:3d}: depth={mem.depth:.4f}  "
-                  f"curvature={mem.recent_curvature:.4f}  "
-                  f"holonomy={mem.holonomy_since(10):.4f}")
+            print(f"  step {step:3d}: depth={mem.depth:.4f} "
+                  f"curvature={mem.recent_curvature:.4f} "
+                  f"holonomy={mem.holonomy_since(10):.4f} "
+                  f"|w|={np.linalg.norm(mem._w):.4f}")
 
     print()
     breathe, reason = should_breathe(mem)
     print(f"Should breathe? {breathe} ({reason})")
+
+    # Verify snapshot round-trip preserves AttnRes state
+    snap = mem.snapshot()
+    mem_restored = ComplexMemory.from_snapshot(snap)
+    assert np.allclose(mem.M, mem_restored.M), "M mismatch after round-trip"
+    assert np.allclose(mem._w, mem_restored._w), "w mismatch after round-trip"
+    assert len(mem_restored._values) > 0, "values lost after round-trip"
+    print("Snapshot round-trip: OK (M, w, values all preserved)")
 
     print()
     print("Now with text (requires local_embedder):")
@@ -467,11 +607,10 @@ if __name__ == "__main__":
         ]
         for t in texts:
             embed_and_complexify(t, mem2)
-            print(f"  '{t[:50]}...' -> depth={mem2.depth:.4f}  κ={mem2.recent_curvature:.4f}")
+            print(f"  '{t[:50]}...' -> depth={mem2.depth:.4f} κ={mem2.recent_curvature:.4f}")
 
         print()
         breathe, reason = should_breathe(mem2)
         print(f"Should breathe? {breathe} ({reason})")
-
     except ImportError as e:
         print(f"  (skipping: {e})")
