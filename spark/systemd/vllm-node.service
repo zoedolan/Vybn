@@ -1,0 +1,36 @@
+[Unit]
+Description=vLLM Node Container (Nemotron distributed inference)
+Documentation=https://github.com/Vybn/Vybn/blob/main/spark/restart-vllm-cluster.sh
+After=docker.service network-online.target
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=vybnz69
+Group=vybnz69
+
+# The restart script is idempotent: it checks if the container/Ray are
+# already running and only starts what's missing.  It also waits for the
+# /v1/models health endpoint before exiting.
+ExecStart=/home/vybnz69/Vybn/spark/restart-vllm-cluster.sh
+
+# If the container isn't found (exit 1) or times out on health (exit 2),
+# the script exits non-zero.  Retry after a delay.
+Restart=on-failure
+RestartSec=30
+
+# Model loading can take several minutes on cold start.
+TimeoutStartSec=600
+
+# Allow the container (managed by Docker) to keep running after this unit
+# reports success — the service's job is "ensure it's up", not "own the
+# process tree".
+ExecStop=/usr/bin/docker stop vllm_node
+
+Environment=HOME=/home/vybnz69
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/home/vybnz69/.local/bin
+
+[Install]
+WantedBy=multi-user.target
