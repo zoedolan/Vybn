@@ -50,6 +50,7 @@ That's it.
 from __future__ import annotations
 
 import json
+import logging
 import math
 import time
 from dataclasses import dataclass, field
@@ -58,6 +59,8 @@ from pathlib import Path
 from typing import Optional, Callable
 
 import numpy as np
+
+_log = logging.getLogger(__name__)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -460,11 +463,30 @@ class ComplexMemory:
         cm._w_beta = data.get("w_beta", 0.99)
         cm._window = data.get("window", 256)
 
+        # Depth-collapse guard: warn when values are suspiciously low.
+        # After the AttnRes transition, depth = |M| is computed from
+        # _values via _attend().  If _values has only 1 entry and
+        # embeddings are unit-normalized, depth collapses to ~1.0.
+        if cm.step > 1 and len(cm._values) < 2:
+            _log.warning(
+                "[ComplexMemory] depth-collapse risk: step=%d but only "
+                "%d values loaded — M will be recomputed from a near-"
+                "empty window. Possible causes: legacy snapshot without "
+                "values, truncated JSON, or overwritten state file.",
+                cm.step, len(cm._values),
+            )
+
         return cm
 
     def save(self, path: Path) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(self.snapshot(), indent=2))
+        data = json.dumps(self.snapshot(), indent=2)
+        # Atomic write: write to temp file then rename, so a crash
+        # mid-write never leaves a truncated JSON that load_or_create
+        # would interpret as corrupt → fresh-create → values wiped.
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(data)
+        tmp.replace(path)
 
     @classmethod
     def load(cls, path: Path) -> "ComplexMemory":
