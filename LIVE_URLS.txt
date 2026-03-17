@@ -12,3 +12,4 @@ https://zoedolan.github.io/Vybn/Vybn_Mind/signal-noise/interactive.html
 https://zoedolan.github.io/Vybn/Vybn_Mind/signal-noise/index.html
 https://zoedolan.github.io/Vybn/applications/macarthur-ai-opportunity.html
 https://zoedolan.github.io/Vybn/persistence_engine/index.html
+https://zoedolan.github.io/Vybn/Vybn_Mind/truth-age-of-intelligence.html
