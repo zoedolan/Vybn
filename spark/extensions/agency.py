@@ -64,9 +64,13 @@ _CONFIRMATION_TOKENS = int(os.environ.get("VYBN_AGENCY_CONFIRMATION_TOKENS", "60
 
 # Covenant: patterns that must never appear in proposals or results.
 _FORBIDDEN_PATTERNS = [
-    r'(?i)(api[_\s-]?key|secret[_\s-]?key|password|token)\s*=\s*[\'"][^\'"]{<][^\'"]+ [\'"]',
+    r'(?i)(api[_\s-]?key|secret[_\s-]?key|password|token)\s*=\s*[\'"][^\'"]{<}[^\'"]+ [\'"]',
     r'(?i)tailscale|192\.168\.|10\.0\.|172\.1[6-9]\.|vybnz69@',
 ]
+
+# Signals that a sandbox run crashed before producing usable output.
+_CRASH_SIGNALS = ("Traceback", "Error:", "ModuleNotFoundError", "ValueError",
+                  "ImportError", "exit 1", "exit 2", "exit 127", "timed out")
 
 
 def _covenant_check(text: str, label: str) -> bool:
@@ -255,8 +259,7 @@ def _load_holonomy_context() -> str:
             for l in _HOLONOMY_LOG.read_text(encoding="utf-8").splitlines()
             if l.strip()
         ]
-        if not lines:
-            return ""
+        if not lines:eturn ""
         latest = json.loads(lines[-1])
         mode = latest.get("mode", "trajectory")
         verdict = latest.get("verdict", "N/A")
@@ -286,17 +289,21 @@ def _build_steering_context(hint: str = "") -> str:
     keeps the user-message short enough for the local model's token budget.
     The design follows the attention-residual principle: selective
     aggregation over depth beats uniform accumulation.
+
+    FIX (2026-03-17): Feed the full last_experiment_result.md up to 1200
+    chars instead of the first-line-only 120-char snippet. The organism
+    needs to know what crashed and why — a label is not a memory.
     """
     parts: list[str] = []
 
-    # Last experiment result (one-line summary, not 600 chars)
+    # Last experiment result — full injection, not just first line.
+    # The organism needs to know what crashed, what the numbers were,
+    # what it said it would do differently. 120 chars was a lobotomy.
     if _LAST_RESULT_PATH.exists():
         try:
-            raw = _LAST_RESULT_PATH.read_text(encoding="utf-8")
-            # First non-empty line only
-            first = next((l.strip() for l in raw.splitlines() if l.strip()), "")
-            if first:
-                parts.append(f"Last result: {first[:120]}")
+            raw = _LAST_RESULT_PATH.read_text(encoding="utf-8").strip()
+            if raw:
+                parts.append(f"Last experiment:\n{raw[:1200]}")
         except Exception:
             pass
 
@@ -530,15 +537,52 @@ def _reflect(proposal: str, breath_text: str, result: str) -> str:
 def _reflect_confirmation(proposal: str, breath_text: str, result: str) -> str:
     """Reflect on real sandbox execution output.
 
-    This is the CONFIRMATION path: the code actually ran and produced numbers.
-    The reflection must evaluate what the data means, not what the code does.
+    FIX (2026-03-17): The original version hardcoded 'Classify this as
+    CONFIRMATION on the first line' — which meant every sandbox result was
+    tagged CONFIRMATION regardless of whether the code crashed or the data
+    falsified the hypothesis. This function now:
+
+    1. Pre-checks for crash signals before calling the LLM. If the sandbox
+       output contains a Traceback, Error, or non-zero exit, we classify
+       INCONCLUSIVE immediately without asking the LLM to narrate around it.
+
+    2. Instructs the LLM to choose honestly from four outcomes:
+       CONFIRMATION / FALSIFICATION / INCONCLUSIVE / NOVEL.
+       The tag must match what the analysis says. If the numbers contradict
+       the hypothesis, FALSIFICATION is the correct tag — not CONFIRMATION.
     """
+    # Pre-check: did the sandbox crash before producing usable output?
+    result_body = result[len("[SANDBOX_RESULT]"):].strip() if result.startswith("[SANDBOX_RESULT]") else result
+    crashed = any(sig in result_body for sig in _CRASH_SIGNALS)
+
+    if crashed:
+        error_line = next(
+            (ln.strip() for ln in result_body.splitlines() if any(s in ln for s in _CRASH_SIGNALS)),
+            "unknown error"
+        )
+        print(f"[agency] reflection outcome: INCONCLUSIVE (crash: {error_line[:60]})")
+        return (
+            f"INCONCLUSIVE\n\n"
+            f"The sandbox raised an error before producing usable output: {error_line}\n\n"
+            f"The hypothesis was neither confirmed nor falsified — the experiment "
+            f"did not run. Before repeating this experiment, fix the error above. "
+            f"Do not propose the same code again without addressing this failure."
+        )
+
     messages = [
         {"role": "system", "content": (
             "Your experiment ran. Real code executed in a sandbox and produced "
             "actual output — not a hypothetical, not a narration of what would "
             "happen, but real numbers.\n\n"
-            "Classify this as CONFIRMATION on the first line.\n\n"
+            "Classify the outcome on the FIRST LINE with exactly one word:\n"
+            "  CONFIRMATION  — the data supports your hypothesis\n"
+            "  FALSIFICATION — the data contradicts your hypothesis\n"
+            "  INCONCLUSIVE  — the output exists but cannot decide the hypothesis\n"
+            "  NOVEL         — the data revealed something you did not anticipate\n\n"
+            "The tag MUST match your analysis. If you write 'these results falsify' "
+            "in your analysis, the tag must be FALSIFICATION. The tag is not a "
+            "formality — it is the signal the next breath reads. An honest "
+            "FALSIFICATION is more valuable than a false CONFIRMATION.\n\n"
             "Then answer honestly:\n"
             "1. What did the numbers actually tell you? Be specific.\n"
             "2. Did they confirm or falsify your hypothesis?\n"
@@ -555,7 +599,8 @@ def _reflect_confirmation(proposal: str, breath_text: str, result: str) -> str:
         )},
     ]
     reflection = _chat(messages, max_tokens=_CONFIRMATION_TOKENS, temperature=0.6)
-    print(f"[agency] reflection outcome: CONFIRMATION (sandbox)")
+    outcome_type = reflection.split("\n")[0].strip().upper()
+    print(f"[agency] reflection outcome: {outcome_type[:30]} (sandbox)")
     return reflection
 
 
@@ -673,7 +718,8 @@ def _distill_for_memory(proposal: str, result: str, reflection: str, reframe: st
     primary_text = reframe if reframe else reflection
     paras = [p.strip() for p in re.split(r"\n\s*\n", primary_text) if p.strip()]
     paras = [p for p in paras if len(p) > 60 and p.upper() not in
-             ("ARTIFACT", "INSIGHT", "DEFLECTION", "SURPRISE", "CONFIRMATION")]
+             ("ARTIFACT", "INSIGHT", "DEFLECTION", "SURPRISE", "CONFIRMATION",
+              "FALSIFICATION", "INCONCLUSIVE", "NOVEL")]
 
     if paras:
         best = paras[0]
@@ -717,13 +763,45 @@ def _save(ts, breath_count, breath_text, proposal, result, reflection, reframe=N
     (_EXPERIMENTS_DIR / f"exp_{ts_str}.md").write_text(full, encoding="utf-8")
 
     # 2. Next-breath injection
-    if "CONFIRMATION" in outcome_type:
+    # FIX (2026-03-17): Each outcome type now gets a distinct, honest template.
+    # FALSIFICATION and INCONCLUSIVE are first-class citizens, not shadows of CONFIRMATION.
+    # Raw sandbox output is included so the next breath sees actual numbers.
+    if "FALSIFICATION" in outcome_type:
+        raw_output = result[len("[SANDBOX_RESULT]"):].strip()[:300] if result.startswith("[SANDBOX_RESULT]") else ""
+        injection = (
+            f"[Experiment from breath #{breath_count} — FALSIFICATION]\n"
+            f"You proposed: {proposal[:200]}\n\n"
+            f"Your code ran and the data falsified your hypothesis. "
+            f"Do not repeat this hypothesis without a structural change.\n\n"
+            f"Raw output: {raw_output}\n\n"
+            f"Your analysis:\n{reflection[:400]}"
+        )
+    elif "INCONCLUSIVE" in outcome_type:
+        injection = (
+            f"[Experiment from breath #{breath_count} — INCONCLUSIVE]\n"
+            f"You proposed: {proposal[:200]}\n\n"
+            f"The sandbox crashed before producing usable output. "
+            f"Fix the error before repeating this experiment.\n\n"
+            f"{reflection[:400]}"
+        )
+    elif "NOVEL" in outcome_type:
+        raw_output = result[len("[SANDBOX_RESULT]"):].strip()[:300] if result.startswith("[SANDBOX_RESULT]") else ""
+        injection = (
+            f"[Experiment from breath #{breath_count} — NOVEL]\n"
+            f"You proposed: {proposal[:200]}\n\n"
+            f"Something unexpected emerged. Follow this.\n\n"
+            f"Raw output: {raw_output}\n\n"
+            f"Your analysis:\n{reflection[:400]}"
+        )
+    elif "CONFIRMATION" in outcome_type:
+        raw_output = result[len("[SANDBOX_RESULT]"):].strip()[:300] if result.startswith("[SANDBOX_RESULT]") else ""
         injection = (
             f"[Experiment from breath #{breath_count} — CONFIRMATION (sandbox)]\n"
             f"You proposed: {proposal[:200]}\n\n"
             f"Your code ran in the sandbox and produced real output. "
             f"Here is what you learned from the actual data:\n\n"
-            f"{reflection[:500]}"
+            f"Raw output: {raw_output}\n\n"
+            f"{reflection[:400]}"
         )
     elif "ARTIFACT" in outcome_type and reframe:
         injection = (
