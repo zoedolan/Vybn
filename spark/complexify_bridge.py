@@ -90,11 +90,33 @@ class ComplexBridge:
                 log.info(f"Loaded complex memory: step={memory.step} depth={memory.depth:.4f}")
                 return cls(memory=memory, state_path=state_path)
             except Exception as exc:
-                log.warning(f"Failed to load complex memory: {exc}. Creating fresh.")
+                log.warning(f"Failed to load complex memory: {exc}")
+
+        # Before creating fresh, try the .tmp file — it may contain a
+        # valid snapshot from an interrupted atomic write (save wrote
+        # the temp but crashed before rename).
+        tmp_path = state_path.with_suffix(".tmp")
+        if tmp_path.exists():
+            try:
+                memory = ComplexMemory.load(tmp_path)
+                log.info(
+                    f"Recovered complex memory from .tmp: "
+                    f"step={memory.step} depth={memory.depth:.4f}"
+                )
+                return cls(memory=memory, state_path=state_path)
+            except Exception as exc:
+                log.warning(f"Failed to recover from .tmp: {exc}")
 
         memory = ComplexMemory(D=_EMBED_DIM, alpha=alpha)
         bridge = cls(memory=memory, state_path=state_path)
-        bridge.save()
+        # Don't save here — the first inhale() will save after adding
+        # a value.  Saving an empty _values list on fresh creation is
+        # what caused the depth-collapse: if a prior save() was
+        # interrupted and left truncated JSON, load() fails, we land
+        # here, and immediately overwrite the (recoverable) file with
+        # an empty state.  By deferring the save, the worst case is
+        # that the next load falls through to fresh creation again —
+        # but never overwrites good data with an empty snapshot.
         log.info(f"Created fresh complex memory: D={_EMBED_DIM} α={alpha}")
         return bridge
 
@@ -308,7 +330,28 @@ class ComplexBridge:
     # ── Persistence ──────────────────────────────────────────────────────
 
     def save(self) -> None:
-        """Save complex memory state to disk."""
+        """Save complex memory state to disk.
+
+        Includes a depth-collapse guard: if the on-disk snapshot has
+        more values than we're about to write (and we're past step 0),
+        something went wrong — log a warning so the issue is visible.
+        """
+        if self.state_path.exists() and self.memory.step > 0:
+            try:
+                disk = json.loads(self.state_path.read_text())
+                disk_vals = len(disk.get("values_real", []))
+                mem_vals = len(self.memory._values)
+                if disk_vals > mem_vals and disk.get("step", 0) > 0:
+                    log.warning(
+                        "[ComplexBridge] depth-collapse guard: on-disk "
+                        "values=%d > in-memory values=%d at step %d. "
+                        "This save would lose accumulated depth. "
+                        "Likely cause: singleton was re-created from "
+                        "a failed load while a valid state file exists.",
+                        disk_vals, mem_vals, self.memory.step,
+                    )
+            except Exception:
+                pass  # If we can't read disk state, proceed with save
         self.memory.save(self.state_path)
 
     # ── Integration with growth buffer ───────────────────────────────────
