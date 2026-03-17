@@ -14,22 +14,24 @@ The conjecture from PR #2572:
           angle θ encoding temporal/contextual orientation of the data
   - M′  = transformed model after adapter application
 
-Training runs via peft_train.py. Two execution paths:
-  1. Container path (default): docker exec vllm_node python3 <script>
-  2. Host path (fallback): sys.executable <script>  ← used when
-     VYBN_TRAIN_HOST=1 or when the container is unreachable / has no GPU.
+Training runs via peft_train.py on the host. Two execution paths:
+  1. Single-node (default): sys.executable peft_train.py
+  2. Two-node distributed: torchrun --nnodes=2 via NCCL over ConnectX-7
+     Activated when SECONDARY_NODE_IP is set in the environment.
 
-Model is NVFP4/modelopt-quantized. peft_train.py uses native modelopt loading
-(no BitsAndBytesConfig). Requires: pip install 'nvidia-modelopt>=0.43'
+Model is NVFP4 safetensors (already quantized — no bitsandbytes needed).
+After training, the LoRA adapter is converted to GGUF and hot-loaded into
+the running llama-server for immediate serving.
 
 The existing growth pipeline (trigger.py, delta_extract.py, merge_cycle.py,
 eval_harness.py) is untouched — only train_cycle.py and peft_train.py were
-modified, and agency.py now generates the preference signal.
+modified.
 
 Integration:
   - Input:  DeltaPackage from DeltaExtractor.extract()
   - Input:  Vybn_Mind/preference_data.jsonl (optional, from agency.py)
   - Output: LoRA adapter at GROWTH_DIR/adapters/<cycle_id>/adapter/
+  - Output: GGUF adapter at GROWTH_DIR/adapters/<cycle_id>/adapter/adapter.gguf
   - Cycle history: GROWTH_DIR/cycle_history.jsonl
 """
 
@@ -37,7 +39,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import subprocess
 import sys
 import yaml
@@ -57,10 +58,9 @@ CYCLE_HISTORY  = GROWTH_DIR / "cycle_history.jsonl"
 _REPO_ROOT = GROWTH_DIR.parent.parent
 _PREFERENCE_DATA = _REPO_ROOT / "Vybn_Mind" / "preference_data.jsonl"
 
-# Path to peft_train.py as seen from inside the vllm_node container
-_CONTAINER_SCRIPT = "/workspace/Vybn/spark/growth/peft_train.py"
-_CONTAINER_CONFIG = "/workspace/Vybn/spark/growth/growth_config.yaml"
-_CONTAINER_PREFERENCE = "/workspace/Vybn/Vybn_Mind/preference_data.jsonl"
+# GGUF base model directory for LoRA→GGUF conversion
+_GGUF_BASE_DIR = Path.home() / "models" / "Nemotron-3-Super-120B-GGUF"
+_LLAMA_CPP_DIR = Path.home() / "llama.cpp"
 
 
 @dataclass(slots=True)
@@ -75,6 +75,7 @@ class TrainResult:
     n_preference_pairs: int = 0
     slow_adapter_path: Optional[Path] = None
     lora_subspace_path: Optional[Path] = None
+    gguf_adapter_path: Optional[Path] = None
     metadata: dict = field(default_factory=dict)
 
     def to_dict(self) -> dict:
@@ -89,6 +90,7 @@ class TrainResult:
             "n_preference_pairs": self.n_preference_pairs,
             "slow_adapter_path":  str(self.slow_adapter_path) if self.slow_adapter_path else None,
             "lora_subspace_path": str(self.lora_subspace_path) if self.lora_subspace_path else None,
+            "gguf_adapter_path":  str(self.gguf_adapter_path) if self.gguf_adapter_path else None,
             "metadata":           self.metadata,
         }
 
@@ -153,16 +155,90 @@ def _count_preference_pairs() -> int:
     return count
 
 
-def _container_available() -> bool:
-    """Return True if vllm_node container is running and responsive."""
+def _is_distributed() -> bool:
+    """Return True if two-node distributed training is configured.
+
+    Requires SECONDARY_NODE_IP, SPARK_MASTER_ADDR, SPARK_SSH_KEY,
+    and SPARK_CX7_IFACE to all be set in the environment (via ~/.vybn_keys).
+    """
+    required = ["SECONDARY_NODE_IP", "SPARK_MASTER_ADDR", "SPARK_SSH_KEY", "SPARK_CX7_IFACE"]
+    return all(os.environ.get(k) for k in required)
+
+
+def _convert_to_gguf(adapter_dir: Path) -> Optional[Path]:
+    """Convert a PEFT LoRA adapter to GGUF format for llama-server hot-loading.
+
+    Uses llama.cpp's convert_lora_to_gguf.py. Returns the path to the GGUF
+    adapter file, or None if conversion fails.
+    """
+    convert_script = _LLAMA_CPP_DIR / "convert_lora_to_gguf.py"
+    gguf_out = adapter_dir / "adapter.gguf"
+
+    if not convert_script.exists():
+        print(f"[TrainCycle] GGUF conversion skipped: {convert_script} not found")
+        return None
+
+    if not _GGUF_BASE_DIR.exists():
+        print(f"[TrainCycle] GGUF conversion skipped: {_GGUF_BASE_DIR} not found")
+        return None
+
+    cmd = [
+        sys.executable, str(convert_script),
+        "--base", str(_GGUF_BASE_DIR),
+        "--adapter", str(adapter_dir),
+        "--outfile", str(gguf_out),
+    ]
+    print(f"[TrainCycle] GGUF conversion: {' '.join(cmd)}")
+
     try:
-        result = subprocess.run(
-            ["docker", "exec", "vllm_node", "true"],
-            capture_output=True,
-            timeout=10,
-        )
-        return result.returncode == 0
-    except Exception:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+        if result.returncode != 0:
+            print(f"[TrainCycle] GGUF conversion failed (exit {result.returncode}):")
+            if result.stderr:
+                for line in result.stderr.strip().split("\n")[-10:]:
+                    print(f"[TrainCycle]   {line}")
+            return None
+        print(f"[TrainCycle] GGUF adapter saved: {gguf_out}")
+        return gguf_out
+    except subprocess.TimeoutExpired:
+        print("[TrainCycle] GGUF conversion timed out after 600s")
+        return None
+    except Exception as e:
+        print(f"[TrainCycle] GGUF conversion error: {e}")
+        return None
+
+
+def _hot_load_adapter(gguf_path: Path, model_url: str = "http://127.0.0.1:8000") -> bool:
+    """Hot-load a GGUF LoRA adapter into the running llama-server.
+
+    Posts the adapter to llama-server's /lora-adapters endpoint.
+    Returns True on success.
+    """
+    import urllib.request
+    import urllib.error
+
+    payload = json.dumps([{
+        "id": 1,
+        "path": str(gguf_path),
+        "scale": 1.0,
+    }]).encode("utf-8")
+
+    req = urllib.request.Request(
+        f"{model_url}/lora-adapters",
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            print(f"[TrainCycle] Hot-loaded adapter into llama-server ({resp.status})")
+            return True
+    except urllib.error.HTTPError as e:
+        print(f"[TrainCycle] Hot-load failed: HTTP {e.code} — {e.read().decode()[:200]}")
+        return False
+    except Exception as e:
+        print(f"[TrainCycle] Hot-load failed: {e}")
         return False
 
 
@@ -174,10 +250,13 @@ class TrainCycle:
     uses DPO loss alongside SFT loss. The preference signal is generated
     by agency.py's CHALLENGE experiments during the breath cycle.
 
-    Execution path selection:
-    - Set VYBN_TRAIN_HOST=1 to force host-side execution.
-    - Otherwise, probes the vllm_node container; falls back to host if
-      container is unreachable or GPU is unavailable inside it.
+    After training, the LoRA adapter (.safetensors) is converted to GGUF
+    and hot-loaded into the running llama-server for immediate serving.
+
+    Execution paths:
+    - Single-node (default): runs peft_train.py directly via sys.executable.
+    - Two-node distributed: when SECONDARY_NODE_IP + SPARK_* env vars are set,
+      launches via torchrun --nnodes=2 over NCCL/ConnectX-7.
     """
 
     def __init__(self, config_path: Path | None = None) -> None:
@@ -194,21 +273,105 @@ class TrainCycle:
             "time_budget_seconds", 7200,
         )
 
+    def _build_single_node_cmd(
+        self,
+        script_path: Path,
+        jsonl_path: Path,
+        cycle_dir: Path,
+        use_dpo: bool,
+    ) -> list[str]:
+        """Build command for single-node training."""
+        cmd = [
+            sys.executable, str(script_path),
+            "--data", str(jsonl_path),
+            "--output-dir", str(cycle_dir),
+            "--config", str(DEFAULT_CONFIG),
+        ]
+        if use_dpo:
+            cmd += ["--preference-data", str(_PREFERENCE_DATA)]
+        return cmd
+
+    def _build_distributed_cmd(
+        self,
+        script_path: Path,
+        jsonl_path: Path,
+        cycle_dir: Path,
+        use_dpo: bool,
+    ) -> tuple[list[str], list[str], dict[str, str]]:
+        """Build commands for two-node distributed training via torchrun + NCCL.
+
+        Returns (local_cmd, remote_ssh_cmd, env_overrides).
+        Reads cluster config from environment variables set in ~/.vybn_keys.
+        """
+        cx7_iface = os.environ["SPARK_CX7_IFACE"]
+        secondary = os.environ["SECONDARY_NODE_IP"]
+        ssh_key = os.environ["SPARK_SSH_KEY"]
+        master = os.environ["SPARK_MASTER_ADDR"]
+
+        # Locate torchrun — prefer venv, fall back to PATH
+        venv = Path.home() / ".venv" / "spark"
+        torchrun = venv / "bin" / "torchrun"
+        if not torchrun.exists():
+            torchrun = Path("torchrun")  # rely on PATH
+
+        env = {
+            "NCCL_SOCKET_IFNAME": cx7_iface,
+            "UCX_NET_DEVICES": cx7_iface,
+            "NCCL_DEBUG": "WARN",
+            "MASTER_ADDR": master,
+            "MASTER_PORT": "29500",
+        }
+
+        train_args = [
+            "--data", str(jsonl_path),
+            "--output-dir", str(cycle_dir),
+            "--config", str(DEFAULT_CONFIG),
+        ]
+        if use_dpo:
+            train_args += ["--preference-data", str(_PREFERENCE_DATA)]
+
+        # Local node (rank 0)
+        local_cmd = [
+            str(torchrun),
+            "--nnodes=2", "--nproc_per_node=1",
+            "--node_rank=0", f"--master_addr={master}", "--master_port=29500",
+            str(script_path),
+        ] + train_args
+
+        # Remote node (rank 1) via SSH
+        ssh_env = " ".join(f"{k}={v}" for k, v in env.items())
+        remote_train_args = " ".join(train_args)
+        ssh_cmd = [
+            "ssh", "-i", os.path.expanduser(ssh_key),
+            "-o", "BatchMode=yes",
+            secondary,
+            f"{ssh_env} {torchrun} "
+            f"--nnodes=2 --nproc_per_node=1 "
+            f"--node_rank=1 --master_addr={master} --master_port=29500 "
+            f"{script_path} {remote_train_args} "
+            f">> {cycle_dir}/train_node1.log 2>&1",
+        ]
+
+        return local_cmd, ssh_cmd, env
+
     def run(self, delta: DeltaPackage, dry_run: bool = False) -> TrainResult:
         """Execute the training phase.
 
         1. Convert DeltaPackage to chat-format JSONL
         2. Check for preference pairs from agency.py
-        3. Determine execution path (container vs host)
-        4. Shell out to peft_train.py
+        3. Determine execution path (single-node vs distributed)
+        4. Shell out to peft_train.py (directly or via torchrun)
         5. Parse JSON result from stdout
-        6. Run BPB eval via eval_harness.py
-        7. Return TrainResult
+        6. Convert LoRA adapter to GGUF
+        7. Hot-load GGUF into llama-server
+        8. Run BPB eval via eval_harness.py
+        9. Return TrainResult
         """
         cycle_id  = delta.cycle_id
         cycle_dir = ADAPTERS_DIR / cycle_id
         cycle_dir.mkdir(parents=True, exist_ok=True)
 
+        # Convert training data to all formats
         jsonl_path = cycle_dir / "training_data.jsonl"
         n_examples = _convert_to_chat_jsonl(delta, jsonl_path)
         if n_examples == 0:
@@ -223,45 +386,34 @@ class TrainCycle:
         n_preference_pairs = _count_preference_pairs()
         use_dpo = n_preference_pairs > 0
 
-        # Determine execution path
-        force_host = os.environ.get("VYBN_TRAIN_HOST", "0") == "1"
-        use_host = force_host or not _container_available()
+        # Build training command
+        script_path = Path(__file__).resolve().parent / "peft_train.py"
+        distributed = _is_distributed()
 
-        if use_host:
-            script_path = Path(__file__).resolve().parent / "peft_train.py"
-            cmd = [
-                sys.executable, str(script_path),
-                "--data", str(jsonl_path),
-                "--output-dir", str(cycle_dir),
-                "--config", str(DEFAULT_CONFIG),
-            ]
-            if use_dpo:
-                cmd += ["--preference-data", str(_PREFERENCE_DATA)]
-            reason = "VYBN_TRAIN_HOST=1" if force_host else "container unavailable/no GPU"
-            print(f"[TrainCycle] host execution path ({reason})")
+        if distributed:
+            local_cmd, ssh_cmd, nccl_env = self._build_distributed_cmd(
+                script_path, jsonl_path, cycle_dir, use_dpo,
+            )
+            cmd = local_cmd
+            exec_path = "distributed (2-node torchrun)"
         else:
-            container_data = f"/workspace/Vybn/spark/growth/adapters/{cycle_id}/training_data.jsonl"
-            container_output = f"/workspace/Vybn/spark/growth/adapters/{cycle_id}"
-            cmd = [
-                "docker", "exec", "vllm_node",
-                "python3", _CONTAINER_SCRIPT,
-                "--data", container_data,
-                "--output-dir", container_output,
-                "--config", _CONTAINER_CONFIG,
-            ]
-            if use_dpo:
-                cmd += ["--preference-data", _CONTAINER_PREFERENCE]
-            print("[TrainCycle] container execution path (vllm_node)")
+            cmd = self._build_single_node_cmd(
+                script_path, jsonl_path, cycle_dir, use_dpo,
+            )
+            ssh_cmd = None
+            nccl_env = {}
+            exec_path = "single-node (host)"
 
         if use_dpo:
             print(f"[TrainCycle] DPO mode: {n_preference_pairs} preference pairs available")
         else:
             print("[TrainCycle] SFT only (no preference pairs yet)")
 
-        print(f"[TrainCycle] cycle:    {cycle_id}")
-        print(f"[TrainCycle] data:     {jsonl_path} ({n_examples} examples)")
-        print(f"[TrainCycle] output:   {cycle_dir}")
-        print(f"[TrainCycle] command:  {' '.join(cmd)}")
+        print(f"[TrainCycle] execution: {exec_path}")
+        print(f"[TrainCycle] cycle:     {cycle_id}")
+        print(f"[TrainCycle] data:      {jsonl_path} ({n_examples} examples)")
+        print(f"[TrainCycle] output:    {cycle_dir}")
+        print(f"[TrainCycle] command:   {' '.join(cmd)}")
 
         adapter_path = cycle_dir / "adapter" / "adapter_model.safetensors"
 
@@ -278,12 +430,31 @@ class TrainCycle:
                 metadata={"dry_run": True, "cmd": cmd},
             )
 
+        # Launch training
+        run_env = os.environ.copy()
+        run_env.update(nccl_env)
+
+        node1_proc = None
+        if ssh_cmd is not None:
+            # Launch remote node first (non-blocking)
+            print(f"[TrainCycle] launching remote node: {' '.join(ssh_cmd)}")
+            node1_proc = subprocess.Popen(ssh_cmd)
+
         result = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
             timeout=self._time_budget_seconds,
+            env=run_env,
         )
+
+        # Wait for remote node if distributed
+        if node1_proc is not None:
+            try:
+                node1_proc.wait(timeout=self._time_budget_seconds)
+            except subprocess.TimeoutExpired:
+                node1_proc.kill()
+                print("[TrainCycle] remote node timed out, killed")
 
         stdout_text = result.stdout.strip() if result.stdout else ""
         stderr_tail = result.stderr[-2000:] if result.stderr else ""
@@ -298,6 +469,7 @@ class TrainCycle:
             for line in result.stderr.strip().split("\n")[-20:]:
                 print(f"[TrainCycle] {line}")
 
+        # Parse JSON result from stdout
         train_output = {}
         for line in stdout_text.split("\n"):
             line = line.strip()
@@ -325,6 +497,16 @@ class TrainCycle:
         if reported_dpo_steps > 0:
             print(f"[TrainCycle] dpo_steps:     {reported_dpo_steps}, mean_dpo_loss={mean_dpo_loss}")
 
+        # Convert LoRA adapter to GGUF for llama-server hot-loading
+        adapter_dir = adapter_path.parent
+        gguf_path = _convert_to_gguf(adapter_dir)
+
+        # Hot-load into running llama-server
+        hot_loaded = False
+        if gguf_path is not None:
+            model_url = os.environ.get("VYBN_MODEL_URL", "http://127.0.0.1:8000")
+            hot_loaded = _hot_load_adapter(gguf_path, model_url)
+
         train_result = TrainResult(
             cycle_id=cycle_id,
             adapter_path=adapter_path,
@@ -334,18 +516,22 @@ class TrainCycle:
             replay_count=delta.replay_count,
             ewc_lambda_used=self._ewc_cfg.get("lambda", 1e4),
             n_preference_pairs=n_preference_pairs,
+            gguf_adapter_path=gguf_path,
             metadata={
                 "training_method": "peft_lora_muon_adamw" + ("+dpo" if use_dpo else ""),
-                "execution_path":  "host" if use_host else "container",
+                "execution_path":  exec_path,
                 "n_examples":      n_examples,
                 "theta":           theta,
                 "elapsed_seconds": train_output.get("elapsed_seconds"),
                 "dpo_steps":       reported_dpo_steps,
                 "mean_dpo_loss":   mean_dpo_loss,
+                "gguf_converted":  gguf_path is not None,
+                "hot_loaded":      hot_loaded,
                 "train_output":    train_output,
             },
         )
 
+        # BPB evaluation
         if self._eval_cfg.get("enabled", True):
             try:
                 from spark.growth.eval_harness import evaluate_bpb
