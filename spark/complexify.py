@@ -108,11 +108,9 @@ def curvature(M_field: np.ndarray, eps: float = 1e-9) -> np.ndarray:
     nz = mag > eps
     u[nz] = M_field[nz] / mag[nz]
 
-    # Link variables: phase difference between neighbors
-    Ux = np.roll(u, -1, axis=1) * np.conj(u)       # horizontal
-    Uy = np.roll(u, -1, axis=0) * np.conj(u)       # vertical
+    Ux = np.roll(u, -1, axis=1) * np.conj(u)
+    Uy = np.roll(u, -1, axis=0) * np.conj(u)
 
-    # Plaquette: product of links around a unit square
     plaquette = Ux * np.roll(Uy, -1, axis=1) * np.conj(np.roll(Ux, -1, axis=0)) * np.conj(Uy)
 
     return np.angle(plaquette)
@@ -136,7 +134,6 @@ def curvature_1d(M_seq: np.ndarray, eps: float = 1e-9) -> np.ndarray:
         Curvature array, shape (N,) or (N, D). Radians.
     """
     phase = np.angle(M_seq)
-    # Discrete second derivative of phase, wrapped to [-π, π]
     d2 = np.roll(phase, -1, axis=0) - 2 * phase + np.roll(phase, 1, axis=0)
     return (d2 + np.pi) % (2 * np.pi) - np.pi
 
@@ -170,7 +167,6 @@ def retrieve(
     Returns:
         List of (index, similarity) tuples, sorted by similarity desc.
     """
-    # Hermitian inner product
     products = memory_bank @ np.conj(query_M)
     magnitudes = np.abs(memory_bank).sum(axis=1) * np.abs(query_M).sum() + 1e-12
     similarities = np.abs(products) / magnitudes
@@ -237,7 +233,7 @@ class ComplexMemory:
             Updated M.
         """
         if theta is None:
-            omega = 2 * np.pi / 3 * 0.11  # triadic base frequency
+            omega = 2 * np.pi / 3 * 0.11
             theta = omega * self.step
 
         self.M = complexify(self.M, x, theta, self.alpha)
@@ -245,7 +241,6 @@ class ComplexMemory:
 
         if record:
             self._history.append(self.M.copy())
-            # Keep bounded history for curvature computation
             if len(self._history) > 1000:
                 self._history = self._history[-500:]
 
@@ -253,17 +248,14 @@ class ComplexMemory:
 
     @property
     def depth(self) -> float:
-        """Radial depth: how much accumulated memory. |M|."""
         return float(np.linalg.norm(self.M))
 
     @property
     def direction(self) -> np.ndarray:
-        """Angular direction: the resultant phase of accumulated experience."""
         return np.angle(self.M)
 
     @property
     def recent_curvature(self) -> float:
-        """Curvature of the most recent trajectory segment."""
         if len(self._history) < 3:
             return 0.0
         recent = np.array(self._history[-20:])
@@ -271,34 +263,32 @@ class ComplexMemory:
         return float(np.mean(np.abs(kappa)))
 
     def holonomy_since(self, n_steps_back: int = 50) -> float:
-        """Compute the holonomy (integrated curvature) over the recent path.
-
-        This is the accumulated phase rotation that the memory vector
-        underwent while traversing the last n_steps_back steps. It
-        measures how much the system changed by going around its own
-        trajectory — the signature of non-trivial experience.
-
-        Returns 0 for flat trajectories. Returns large values for
-        trajectories that explored and returned changed.
-        """
         if len(self._history) < 3:
             return 0.0
         segment = self._history[-min(n_steps_back, len(self._history)):]
         M_seq = np.array(segment)
 
-        # Phase of start and end
         phase_start = np.angle(M_seq[0])
         phase_end = np.angle(M_seq[-1])
 
-        # Integrated curvature along the path
         kappa = curvature_1d(M_seq)
         integrated = float(np.sum(np.abs(kappa)))
 
-        # The holonomy is the integrated curvature normalized by path length
         return integrated / len(segment)
 
     def snapshot(self) -> dict:
-        """Serialize current state for persistence."""
+        """Serialize current state for persistence.
+
+        Persists the last 100 history points — enough for curvature and
+        holonomy computation with negligible JSON footprint (~100 complex
+        vectors of dim 384 ≈ 600 KB). Without history, recent_curvature
+        always returns 0.0 after a restart.
+        """
+        # Serialize the last 100 history snapshots as parallel real/imag lists
+        history_window = self._history[-100:] if self._history else []
+        history_real = [h.real.tolist() for h in history_window]
+        history_imag = [h.imag.tolist() for h in history_window]
+
         return {
             "D": self.D,
             "alpha": self.alpha,
@@ -308,26 +298,37 @@ class ComplexMemory:
             "total_curvature": self.total_curvature,
             "M_real": self.M.real.tolist(),
             "M_imag": self.M.imag.tolist(),
+            "history_real": history_real,
+            "history_imag": history_imag,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
     @classmethod
     def from_snapshot(cls, data: dict) -> "ComplexMemory":
-        """Restore from serialized snapshot."""
+        """Restore from serialized snapshot, including history."""
         cm = cls(D=data["D"], alpha=data.get("alpha", 0.993))
         cm.M = np.array(data["M_real"]) + 1j * np.array(data["M_imag"])
         cm.step = data.get("step", 0)
         cm.total_curvature = data.get("total_curvature", 0.0)
+
+        # Restore history window so curvature is non-zero on first breath
+        history_real = data.get("history_real", [])
+        history_imag = data.get("history_imag", [])
+        if history_real and history_imag and len(history_real) == len(history_imag):
+            cm._history = [
+                np.array(r) + 1j * np.array(i)
+                for r, i in zip(history_real, history_imag)
+            ]
+        # else: leave _history empty (fresh start or legacy snapshot)
+
         return cm
 
     def save(self, path: Path) -> None:
-        """Persist to disk."""
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(self.snapshot(), indent=2))
 
     @classmethod
     def load(cls, path: Path) -> "ComplexMemory":
-        """Load from disk."""
         data = json.loads(path.read_text())
         return cls.from_snapshot(data)
 
@@ -410,10 +411,8 @@ def embed_and_complexify(
         except ImportError:
             raise ImportError("No embed_fn provided and local_embedder unavailable.")
 
-    # Embed the text to get a real observation vector
-    x = embed_fn([text])[0]  # shape (D,)
+    x = embed_fn([text])[0]
 
-    # Ensure memory dimensions match
     if memory.D != len(x):
         raise ValueError(
             f"Embedding dimension {len(x)} doesn't match memory dimension {memory.D}. "
@@ -434,17 +433,15 @@ if __name__ == "__main__":
     print("M' = α·M + x·e^(iθ)")
     print()
 
-    # Demo with synthetic data
     D = 8
     mem = ComplexMemory(D=D, alpha=0.993)
 
     print(f"Initial state: depth={mem.depth:.4f}")
     print()
 
-    # Simulate a sequence of observations
     np.random.seed(42)
     for step in range(30):
-        x = np.random.randn(D) * (1.0 if step != 15 else 5.0)  # spike at step 15
+        x = np.random.randn(D) * (1.0 if step != 15 else 5.0)
         mem.update(x)
 
         if step % 5 == 0 or step == 15:
