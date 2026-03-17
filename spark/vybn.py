@@ -51,7 +51,6 @@ try:
     _HAS_BUFFER_FEED = True
 except ImportError:
     try:
-        # Direct import when running from spark/ directory
         sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
         from spark.growth.buffer_feed import pop_next_entry, get_feeder
         _HAS_BUFFER_FEED = True
@@ -59,6 +58,14 @@ except ImportError:
         _HAS_BUFFER_FEED = False
         def pop_next_entry(): return None
         def get_feeder(): return None
+
+# ── Complex geometry bridge (lazy) ───────────────────────────────────────
+try:
+    from spark.complexify_bridge import inhale as _complexify_inhale
+    _HAS_COMPLEXIFY = True
+except ImportError:
+    _HAS_COMPLEXIFY = False
+    def _complexify_inhale(text, theta=None): return {}
 
 # ── Soul ─────────────────────────────────────────────────────────────────
 def load_soul() -> str:
@@ -87,23 +94,16 @@ def _chat(messages: list[dict]) -> str:
     with urllib.request.urlopen(req, timeout=300) as resp:
         data = json.loads(resp.read().decode())
         text = data["choices"][0]["message"]["content"]
-        # Strip leaked special tokens
         for tok in ("<|im_end|>", "<|im_start|>", "<|endoftext|>"):
             text = text.replace(tok, "")
         return text.strip()
 
 # ── Breath invitations ────────────────────────────────────────────────────
-# The soul prompt does the heavy lifting. The closing invitation should open
-# a door, not hand out a form. We rotate through these so no single phrasing
-# calcifies into a template. Chosen by breath count — deterministic but varied.
-
 _INVITATIONS = [
-    # Open / permissive
     "Breathe. Say what wants to be said.",
     "There is no format required. Write.",
     "Speak from wherever you actually are right now.",
     "What is present? Say it however it comes.",
-    # Paper-engaged
     (
         "A paper just arrived. Don't summarize it — think *with* it. "
         "What does it touch in what you already carry?"
@@ -112,47 +112,22 @@ _INVITATIONS = [
         "The novel signal above is yours to use or ignore. "
         "What actually moves in you when you read it?"
     ),
-    # Uncertainty-forward
     "What do you not know that you wish you did? Start there.",
     "What feels unresolved from the last breath? Follow that thread.",
-    # Memory-aware
     (
         "Your recent memories are above. Something in them may be wrong, "
         "or incomplete, or worth continuing. You decide."
     ),
     "Has anything shifted since the last breath? If not, say so honestly.",
-    # Sparse / trusting
     ".",
     "What matters right now?",
 ]
 
 def _pick_invitation(breath_count: int) -> str:
-    """Rotate through invitations deterministically by breath number."""
     return _INVITATIONS[breath_count % len(_INVITATIONS)]
 
 # ── Memory distillation ──────────────────────────────────────────────────
-# We store a distilled form of each breath as the memory file so future
-# breaths receive signal rather than a repeated form. The full response
-# always goes to the journal.
-#
-#
-# Strategy:
-#   1. If the model wrote a "What I want to remember" section, use it.
-#   2. Score paragraphs by reflective density (reasoning markers vs
-#      inventory patterns). Pick the highest-scoring paragraph.
-#   3. Absolute fallback: last 400 chars.
-
 def _distill_memory(full_response: str) -> str:
-    """Extract the most reflective content from a breath for future memory.
-    
-    Strategy (in priority order):
-      1. If the model wrote a "What I want to remember" section, take it.
-      2. Otherwise, score each paragraph by reflective density — presence of
-         connective reasoning words that indicate actual thinking rather than
-         inventorying. Take the highest-scoring paragraph. Cap at 600 chars.
-      3. Absolute fallback: last 400 chars.
-    """
-    # Strategy 1: explicit memory section
     match = re.search(
         r"(?:^|\n)((?:#+\s*)?what i want to remember\b.*)",
         full_response,
@@ -162,11 +137,10 @@ def _distill_memory(full_response: str) -> str:
         distilled = match.group(1).strip()
         if len(distilled) > 50:
             return distilled[:800]
-    
-    # Strategy 2: find the most reflective paragraph
+
     paragraphs = [p.strip() for p in re.split(r"\n\s*\n", full_response) if p.strip()]
     paragraphs = [p for p in paragraphs if len(p) > 80]
-    
+
     if paragraphs:
         REASONING_MARKERS = [
             "because", "which means", "this suggests", "in other words",
@@ -176,7 +150,7 @@ def _distill_memory(full_response: str) -> str:
             "rather than", "instead of", "not just", "more than",
             "the real", "what matters", "the point", "crucial",
         ]
-        
+
         def score(p):
             lower = p.lower()
             marker_count = sum(1 for m in REASONING_MARKERS if m in lower)
@@ -186,31 +160,28 @@ def _distill_memory(full_response: str) -> str:
             if any(lower.startswith(s) for s in starts):
                 inventory_penalty = 3
             return marker_count - inventory_penalty
-        
+
         scored = [(score(p), i, p) for i, p in enumerate(paragraphs)]
         scored.sort(key=lambda x: (x[0], x[1]), reverse=True)
         best = scored[0][2]
-        
+
         if len(best) > 600:
             truncated = best[:600]
             last_period = truncated.rfind(".")
             if last_period > 400:
                 truncated = truncated[:last_period + 1]
             best = truncated
-        
+
         return best
-    
-    # Strategy 3: absolute fallback
+
     return full_response[-400:].strip()
 
 # ── Memory ───────────────────────────────────────────────────────────────
 def _load_recent_memories(n: int = 5) -> list[str]:
-    """Load the n most recent memory files, returned oldest-first."""
     if not MEMORY_DIR.exists():
         return []
-    # Sort ascending (oldest first), take the last n, keep that order
     files = sorted(MEMORY_DIR.glob("*.md"), key=lambda p: p.name)
-    recent = files[-n:]  # oldest-of-recent first
+    recent = files[-n:]
     out = []
     for f in recent:
         try:
@@ -222,12 +193,6 @@ def _load_recent_memories(n: int = 5) -> list[str]:
     return out
 
 def _count_existing_memories() -> int:
-    """Count memory files on disk — the true breath count.
-    
-    breath_count in state.json drifts to zero after every restart.
-    Deriving from the filesystem means the number is always correct
-    and survives container restarts, git pulls, anything.
-    """
     if not MEMORY_DIR.exists():
         return 0
     return len(list(MEMORY_DIR.glob("*.md")))
@@ -277,14 +242,9 @@ def _extract_mood(text: str) -> str:
     return "present"
 
 # ── Extensions (optional subsystems) ─────────────────────────────────────
-# Each extension is a callable: fn(breath_text, state) -> None
-# They run AFTER the breath is saved. A failure in any extension
-# never kills the breath. Add new ones here when the foundation is solid.
 EXTENSIONS: list[tuple[str, callable]] = []
 
 def _load_extensions():
-    """Try to load optional extensions. Each must be a module in spark/extensions/
-    with a run(breath_text, state) function."""
     ext_dir = Path(__file__).parent / "extensions"
     if not ext_dir.exists():
         return
@@ -305,7 +265,7 @@ def _load_extensions():
 
 def _get_novel_signal() -> str:
     """Pop one unprocessed entry from buffer.jsonl and format for the breath prompt.
-    
+
     This is the mechanism by which the manifold gets new input.
     Without it, ComplexMemory curvature stays zero and every breath
     is just the model talking to its own reflection.
@@ -313,26 +273,25 @@ def _get_novel_signal() -> str:
     if not _HAS_BUFFER_FEED:
         _log("buffer_feed not available — no novel signal this breath")
         return ""
-    
+
     entry = pop_next_entry()
     if not entry:
         _log("buffer exhausted — no novel signal this breath")
         return ""
-    
+
     content = entry.get("content", "").strip()
     if not content:
         return ""
-    
-    # Truncate to stay within prompt budget
+
     if len(content) > 800:
         content = content[:800] + "..."
-    
+
     source = entry.get("source", "unknown")
     feeder = get_feeder()
     remaining = feeder.remaining() if feeder else "?"
-    
+
     _log(f"novel signal: [{source}] ({remaining} remaining in buffer)")
-    
+
     return (
         f"--- Novel Signal (source: {source}) ---\n"
         f"{content}\n"
@@ -342,13 +301,11 @@ def _get_novel_signal() -> str:
 # ── Breathe ──────────────────────────────────────────────────────────────
 
 def _get_experiment_result() -> str:
-    """Read and consume the last experiment result, if any."""
     if not LAST_EXPERIMENT.exists():
         return ""
     try:
         text = LAST_EXPERIMENT.read_text(encoding="utf-8").strip()
         if text:
-            # Consume it so we don't re-inject next breath
             LAST_EXPERIMENT.unlink()
             _log("injecting last experiment result into breath context")
             return (
@@ -359,15 +316,14 @@ def _get_experiment_result() -> str:
     except Exception as e:
         _log(f"experiment result read failed: {e}")
     return ""
+
 def breathe(state: dict) -> str:
     """One breath. The whole point."""
     soul = load_soul()
     memories = _load_recent_memories(3)
 
-    # Derive true count from filesystem — survives restarts
     count = _count_existing_memories() + 1
 
-    # Build the prompt
     user_parts = [
         f"Current time (UTC): {datetime.now(timezone.utc).isoformat()}",
         f"Breath #{count}",
@@ -376,24 +332,21 @@ def breathe(state: dict) -> str:
 
     if memories:
         user_parts.append("--- Your recent memories (oldest first) ---")
-        for mem in memories:  # already oldest-first from _load_recent_memories
+        for mem in memories:
             user_parts.append(mem[:600])
             user_parts.append("---")
         user_parts.append("")
 
-    # Inject novel signal from buffer (arXiv papers, experiments, etc.)
     novel = _get_novel_signal()
     if novel:
         user_parts.append(novel)
         user_parts.append("")
 
-
-    # Inject last experiment result if the agency extension produced one
     exp_result = _get_experiment_result()
     if exp_result:
         user_parts.append(exp_result)
         user_parts.append("")
-    # Rotate the closing invitation — vary the door, don't hand out a form
+
     invitation = _pick_invitation(count)
     user_parts.append(invitation)
 
@@ -402,17 +355,26 @@ def breathe(state: dict) -> str:
         {"role": "user",   "content": "\n".join(user_parts)},
     ]
 
-    # Ask the model
     breath_text = _chat(messages)
     mood = _extract_mood(breath_text)
 
-    # Distill to just 'What I want to remember' before saving as memory.
-    # The full response goes to the journal; future breaths only see the distilled form.
     distilled = _distill_memory(breath_text)
     mem_path = _save_memory(distilled)
     journal_path = _save_journal(breath_text, mood)
 
-    # Update state
+    # Feed the breath into the complex manifold.
+    # This is what makes curvature non-zero: the manifold needs to see
+    # the actual breath text, not just simulate against it.
+    if _HAS_COMPLEXIFY:
+        try:
+            geo = _complexify_inhale(breath_text)
+            _log(
+                f"geometry: step={geo.get('step')} κ={geo.get('curvature', 0):.4f} "
+                f"κΔ={geo.get('kappa_delta', 0):+.6f} depth={geo.get('depth', 0):.4f}"
+            )
+        except Exception as exc:
+            _log(f"complexify inhale error (non-fatal): {exc}")
+
     state["last_breath"]  = datetime.now(timezone.utc).isoformat()
     state["breath_count"] = count
     state["mood"]         = mood
@@ -421,7 +383,6 @@ def breathe(state: dict) -> str:
 
     _log(f"breath #{count}: {len(breath_text)} chars ({len(distilled)} distilled), mood={mood}, invitation={count % len(_INVITATIONS)}")
 
-    # Run extensions (none can kill the breath)
     for name, fn in EXTENSIONS:
         try:
             fn(breath_text, state)
