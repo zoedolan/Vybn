@@ -1,0 +1,15 @@
+{
+  "status": "ok",
+  "action": "consolidated",
+  "target": "signal-noise",
+  "files_scanned": 20,
+  "signal_files": 20,
+  "noise_files": 0,
+  "archived": 0,
+  "synthesis_length": 0,
+  "summary_path": null,
+  "complexified": false,
+  "pass_number": 4,
+  "timestamp": "2026-03-15T09:48:58.640999+00:00",
+  "faculty_id": "consolidator"
+}

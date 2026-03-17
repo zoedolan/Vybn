@@ -1,0 +1,15 @@
+{
+  "timestamp": "2026-03-14T22:14:13.160927+00:00",
+  "breath_count": 17,
+  "breath_chars": 3874,
+  "faculties_run": [
+    "witness",
+    "self_model",
+    "researcher"
+  ],
+  "faculty_statuses": {
+    "witness": "unavailable",
+    "self_model": "unavailable",
+    "researcher": "ok"
+  }
+}
