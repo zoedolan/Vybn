@@ -21,7 +21,7 @@
 FROM python:3.11-slim
 
 # No network access at runtime — install everything at build time.
-RUN pip install --no-cache-dir numpy scipy matplotlib
+RUN pip install --no-cache-dir numpy scipy matplotlib scikit-learn
 
 # PyTorch CPU-only: try the CPU index first (smaller download on x86),
 # fall back to default PyPI (aarch64 wheels are CPU-only on PyPI).

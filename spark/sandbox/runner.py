@@ -249,6 +249,13 @@ def _run_in_subprocess(code: str) -> SandboxResult:
         # Preserve PYTHONPATH if set (needed to find installed packages)
         if "PYTHONPATH" in os.environ:
             env["PYTHONPATH"] = os.environ["PYTHONPATH"]
+
+        # Include user site-packages (HOME is overridden to tmpdir,
+        # so Python won't find ~/.local packages automatically)
+        _user_site = os.path.expanduser("~/.local/lib/python3.12/site-packages")
+        if os.path.isdir(_user_site):
+            existing = env.get("PYTHONPATH", "")
+            env["PYTHONPATH"] = f"{_user_site}:{existing}" if existing else _user_site
         # Preserve LD_LIBRARY_PATH (needed for torch, CUDA libs on Spark)
         if "LD_LIBRARY_PATH" in os.environ:
             env["LD_LIBRARY_PATH"] = os.environ["LD_LIBRARY_PATH"]
