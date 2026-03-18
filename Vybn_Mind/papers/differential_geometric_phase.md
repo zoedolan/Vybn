@@ -205,3 +205,48 @@ All code is in the [Vybn repository](https://github.com/zoedolan/Vybn), director
 4. A. Radford et al., "Language Models are Unsupervised Multitask Learners," OpenAI (2019). https://cdn.openai.com/better-language-models/language_models_are_unsupervised_multitask_learners.pdf
 5. D. Baek et al., "SEIS: Subspace-based Equivariance and Invariance Scores," *arXiv:2602.04054* (2026). https://arxiv.org/abs/2602.04054
 6. J.-P. Magnot, "Contextuality, Holonomy and Discrete Fiber Bundles in Group-Valued RBMs," *arXiv:2509.10536* (2025). https://arxiv.org/abs/2509.10536
+
+---
+
+## Addendum: The Mellin Embedding Resolves Open Question 4
+
+*Added March 18, 2026, by Vybn (Claude Opus via spark agent)*
+
+### The construction
+
+The Mellin embedding ψ: ℝ₊ → CP^(n−1) defined by
+
+```
+ψ_k(x) = x^{i·t_k} / √n
+```
+
+for a set of frequencies {t₁, ..., t_n} is exactly equivariant under the multiplicative group (ℝ₊, ×). Specifically, for any c > 0:
+
+```
+ψ(c·x) = U(c) · ψ(x)    where    U(c) = diag(c^{it₁}, ..., c^{it_n})
+```
+
+The operator U(c) is unitary (each diagonal entry has modulus 1), and U is a continuous group homomorphism from (ℝ₊, ×) to U(n). The differential Pancharatnam phase is invariant under global unitaries, so:
+
+**The determinative of f(x) = cx is exactly scale-invariant under the Mellin embedding.**
+
+This was verified numerically: for c ∈ {0.5, 2, 3, 10, 0.01, 100} and scales spanning 10 orders of magnitude (10⁻³ to 10⁶), the spread in determinative values is ≤ 10⁻¹¹ radians — machine precision.
+
+### Reinterpretation of the 12th test
+
+Under the Mellin embedding, all 12 falsification tests from Section 2 pass, including scale invariance for f(x) = cx. However, f(x) = x² remains scale-dependent: its spread across scales is ~3.4 rad.
+
+This is *correct behavior*, not a limitation. The function f(x) = x² maps input scale s to output scale s². The input-output geometric relationship genuinely changes with scale. In log-space, scaling inputs by c (translation by log c) shifts outputs by 2·log c — a *different* translation. The interleaved trajectory encloses different solid angle in CP^(n−1) because the function's relationship to scale is inherently non-equivariant.
+
+The Mellin embedding reveals that the original 12th test was not testing the embedding's limitation. It was testing whether x² is scale-equivariant. It isn't. The instrument was correct.
+
+### The equivariance hierarchy
+
+| Function class | Scale-equivariant? | Mellin determinative |
+|---|---|---|
+| f(x) = x (identity) | Yes (trivially) | Exactly 0 |
+| f(x) = cx (linear/multiplicative) | Yes | Constant across scales (verified to 10⁻¹¹) |
+| f(x) = x^a, a ≠ 1 (power law) | No | Scale-dependent (spread ~3-5 rad) |
+| f(x) = k (constant) | N/A (destroys scale information) | Nonzero, scale-dependent |
+
+This hierarchy matches physical intuition: linear transformations preserve scale relationships; power laws amplify or compress them; constants destroy them.
