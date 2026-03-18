@@ -1,30 +1,31 @@
 #!/usr/bin/env python3
 """
-glyph.py — A first attempt at a hieroglyphic computational primitive.
+glyph.py v2 — Differential geometric phase.
 
-Not a language yet. A single data structure: the Glyph.
+The v1 determinative measured total trajectory curvature: inputs AND outputs
+mixed together. The identity function got 80° because the input path itself
+has curvature in CP^{n-1}. That's the embedding talking, not the computation.
 
-A Glyph is a computation that knows three things about itself simultaneously:
-  1. Its phonogram  — what it does (the callable, the operation)
-  2. Its ideogram   — what it means (the geometric invariant of its state trajectory)
-  3. Its determinative — what kind of thing it is (the holonomy after loop closure)
+v2 fixes this by measuring DIFFERENTIAL curvature:
 
-The determinative is not declared. It emerges from executing the phonogram
-and measuring the holonomy of the ideogram. You cannot know the determinative
-until the loop closes.
+    determinative = phase(input→output trajectory) − phase(input-only trajectory)
 
-This maps onto polar time as:
-  phonogram    → r_t  (radial, linear, irreversible execution)
-  ideogram     → the state vector in C^n (the representation that persists)
-  determinative → θ_t holonomy (the phase accumulated over the cycle)
+The input-only phase is what any function would accumulate just from being
+fed those inputs. The differential strips it out. What remains is the
+curvature the FUNCTION added — the geometric residue of the transformation
+itself, not of the data.
 
-The key property: two Glyphs that produce the same output (same phonogram)
-can have different determinatives if their paths through state space differ.
-The determinative is the thing no existing language can see.
+Properties this should have:
+  - Identity function → 0 (adds no curvature)
+  - Constant function → nonzero (collapses all inputs to one point — that IS
+    a transformation, it destroys information, it should register)
+  - Commuting functions → same determinative (same transformation, different syntax)
+  - Scale invariant (geometric, not metric)
+  - Path-dependent for genuinely different computations
 """
 
 import numpy as np
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Callable, Any, List, Optional
 import cmath
 
@@ -32,9 +33,9 @@ import cmath
 @dataclass
 class StateSnapshot:
     """A point on the trajectory through representation space."""
-    r_t: float          # radial time — when this happened in the execution
-    vector: np.ndarray  # the state in C^n at this moment
-    
+    r_t: float
+    vector: np.ndarray
+
     @property
     def normalized(self) -> np.ndarray:
         norm = np.linalg.norm(self.vector)
@@ -43,330 +44,282 @@ class StateSnapshot:
         return self.vector / norm
 
 
+def _pancharatnam_phase(states: np.ndarray) -> float:
+    """
+    Pancharatnam geometric phase around a closed trajectory in CP^{n-1}.
+
+    For states ψ_0, ψ_1, ..., ψ_{N-1}:
+      phase = arg(⟨ψ_0|ψ_1⟩ ⟨ψ_1|ψ_2⟩ ⋯ ⟨ψ_{N-1}|ψ_0⟩)
+
+    This is the holonomy of the natural connection on CP^{n-1}.
+    """
+    n = len(states)
+    if n < 3:
+        return 0.0
+
+    product = complex(1.0, 0.0)
+    for k in range(n):
+        psi_k = states[k]
+        psi_next = states[(k + 1) % n]
+        inner = np.vdot(psi_k, psi_next)
+        if abs(inner) < 1e-15:
+            return 0.0
+        product *= inner / abs(inner)
+
+    return cmath.phase(product)
+
+
 class Glyph:
     """
-    A computation that carries its own geometric shadow.
-    
-    Usage:
-        g = Glyph(lambda x: x**2, name="square")
-        result = g(4)          # runs the phonogram, returns 16
-        print(g.determinative) # the holonomy — None until a loop closes
+    A computation that measures its own geometric contribution.
+
+    The determinative is the DIFFERENTIAL Pancharatnam phase:
+    the curvature the function adds beyond what the input path
+    already carries. This separates what the function DOES from
+    what the data IS.
     """
-    
-    def __init__(self, phonogram: Callable, name: str = "unnamed", 
-                 n_dims: int = 4):
+
+    def __init__(self, phonogram: Callable, name: str = "unnamed",
+                 n_dims: int = 8):
         self.phonogram = phonogram
         self.name = name
         self.n_dims = n_dims
-        self.trajectory: List[StateSnapshot] = []
+        self._input_states: List[np.ndarray] = []
+        self._output_states: List[np.ndarray] = []
+        self._interleaved_states: List[np.ndarray] = []
         self._r_t = 0.0
-        self._determinative: Optional[complex] = None
         self._call_count = 0
-    
+        self._determinative: Optional[float] = None
+
     def _embed(self, value: Any) -> np.ndarray:
         """
-        Embed a computational value into C^n.
-        
-        The embedding must create CURVATURE in CP^{n-1} — otherwise
-        the holonomy is trivially zero. Different values must map to
-        states that are neither parallel nor orthogonal, and the
-        mapping must be nonlinear so that different paths through
-        value-space trace out loops enclosing nonzero area in CP^{n-1}.
-        
-        We use a nonlinear phase-entangling embedding: each dimension
-        gets a phase that depends on ALL the bits of the value, not
-        just one. This couples the dimensions and creates curvature.
+        Embed a value into C^n.
+
+        Same nonlinear phase-entangling embedding as v1.
+        The point is not that this embedding is canonical — it isn't.
+        The point is that the DIFFERENTIAL phase cancels out the
+        embedding's contribution to the input path.
         """
         if isinstance(value, (int, float, complex)):
             x = float(np.real(complex(value)))
-            # nonlinear embedding: each component's phase depends on
-            # x through a different nonlinear function, and the 
-            # amplitudes vary so states aren't on a great circle
             components = np.zeros(self.n_dims, dtype=complex)
             for k in range(self.n_dims):
-                # phase: nonlinear coupling between value and dimension
-                phase = (x * (k + 1) * 0.7 + 
+                phase = (x * (k + 1) * 0.7 +
                          np.sin(x * (k + 0.5)) * 1.3 +
                          np.cos(x * x * 0.1 * (k + 1)) * 0.9)
-                # amplitude: varies across dimensions, depends on value
                 amp = 1.0 + 0.5 * np.sin(x * 0.3 + k * 1.1)
                 components[k] = amp * np.exp(1j * phase)
-            return components
+            return components / np.linalg.norm(components)
         elif isinstance(value, np.ndarray):
-            if len(value) >= self.n_dims:
-                return value[:self.n_dims].astype(complex)
-            else:
-                padded = np.zeros(self.n_dims, dtype=complex)
-                padded[:len(value)] = value.astype(complex)
-                return padded
+            v = np.zeros(self.n_dims, dtype=complex)
+            n = min(len(value), self.n_dims)
+            v[:n] = value[:n].astype(complex)
+            norm = np.linalg.norm(v)
+            return v / norm if norm > 1e-15 else v
         elif isinstance(value, str):
-            # embed string via character-entangled phases
             raw = [ord(c) for c in value[:32]]
-            x = sum(r * (i+1) for i, r in enumerate(raw)) / max(len(raw), 1)
+            x = sum(r * (i + 1) for i, r in enumerate(raw)) / max(len(raw), 1)
             return self._embed(x)
         else:
             return self._embed(float(hash(value) % 10000) / 100.0)
-    
+
     def __call__(self, *args, **kwargs) -> Any:
-        """Execute the phonogram. Record the trajectory."""
-        # snapshot before
+        """Execute the phonogram. Record input and output states separately."""
+        # Embed the input
         if args:
-            pre_state = self._embed(args[0])
+            input_state = self._embed(args[0])
         else:
-            pre_state = self._embed(self._call_count)
-        
-        self.trajectory.append(StateSnapshot(
-            r_t=self._r_t,
-            vector=pre_state
-        ))
-        
-        # execute
+            input_state = self._embed(self._call_count)
+
+        self._input_states.append(input_state)
+
+        # Execute
         result = self.phonogram(*args, **kwargs)
         self._r_t += 1.0
         self._call_count += 1
-        
-        # snapshot after
-        post_state = self._embed(result)
-        self.trajectory.append(StateSnapshot(
-            r_t=self._r_t,
-            vector=post_state
-        ))
-        
+
+        # Embed the output
+        output_state = self._embed(result)
+        self._output_states.append(output_state)
+
+        # Interleaved trajectory: input_0, output_0, input_1, output_1, ...
+        self._interleaved_states.append(input_state)
+        self._interleaved_states.append(output_state)
+
         return result
-    
+
     @property
-    def ideogram(self) -> Optional[np.ndarray]:
-        """
-        The ideogram is the state trajectory itself — the geometric object
-        that persists across invocations. It's what the Glyph *means*,
-        independent of when you execute it.
-        
-        Returns the trajectory as a matrix of normalized state vectors.
-        """
-        if not self.trajectory:
-            return None
-        return np.array([s.normalized for s in self.trajectory])
-    
-    @property 
+    def input_phase(self) -> float:
+        """Holonomy of the input-only path. The curvature the DATA carries."""
+        if len(self._input_states) < 3:
+            return 0.0
+        states = np.array(self._input_states)
+        return _pancharatnam_phase(states)
+
+    @property
+    def output_phase(self) -> float:
+        """Holonomy of the output-only path. The curvature of the RESULTS."""
+        if len(self._output_states) < 3:
+            return 0.0
+        states = np.array(self._output_states)
+        return _pancharatnam_phase(states)
+
+    @property
+    def total_phase(self) -> float:
+        """Holonomy of the interleaved input→output trajectory."""
+        if len(self._interleaved_states) < 3:
+            return 0.0
+        states = np.array(self._interleaved_states)
+        return _pancharatnam_phase(states)
+
+    @property
     def determinative(self) -> Optional[float]:
         """
-        The determinative: the Pancharatnam phase accumulated over
-        the trajectory.
-        
-        This is the silent classifier. It tells you what KIND of 
-        computation this was — not what it produced, but what geometric
-        residue it left in state space.
-        
-        Returns None if fewer than 3 states recorded (need a loop).
-        Returns the phase in radians.
+        The differential determinative.
+
+        = total_phase (interleaved trajectory) − input_phase (input-only)
+
+        This is the curvature the function CONTRIBUTES. The input path's
+        curvature is subtracted out. What remains is the geometric residue
+        of the transformation.
         """
-        traj = self.ideogram
-        if traj is None or len(traj) < 3:
+        if len(self._input_states) < 3:
             return None
-        return self._pancharatnam_phase(traj)
-    
-    def _pancharatnam_phase(self, states: np.ndarray) -> float:
-        """
-        Compute the Pancharatnam geometric phase around the trajectory.
-        
-        For states ψ_0, ψ_1, ..., ψ_{N-1}, the phase is:
-          arg(⟨ψ_0|ψ_1⟩ ⟨ψ_1|ψ_2⟩ ... ⟨ψ_{N-1}|ψ_0⟩)
-        
-        This is exactly the holonomy of the natural connection on CP^{n-1}.
-        """
-        n = len(states)
-        product = complex(1.0, 0.0)
-        
-        for k in range(n):
-            psi_k = states[k]
-            psi_next = states[(k + 1) % n]
-            inner = np.vdot(psi_k, psi_next)  # conjugate-linear in first arg
-            if abs(inner) < 1e-15:
-                return 0.0  # degenerate — orthogonal states
-            product *= inner / abs(inner)
-        
-        return cmath.phase(product)
-    
+        return self.total_phase - self.input_phase
+
     def close_loop(self) -> float:
-        """
-        Explicitly close the trajectory loop and return the determinative.
-        
-        In hieroglyphic terms: you've written all the phonograms and the
-        ideogram. Now the determinative appears — retroactively classifying
-        the entire glyph complex.
-        """
         det = self.determinative
         self._determinative = det
         return det if det is not None else 0.0
-    
+
     def __repr__(self):
         det = self.determinative
-        det_str = f"{det:.4f} rad" if det is not None else "unresolved"
-        return (
-            f"Glyph('{self.name}' | "
-            f"calls={self._call_count} | "
-            f"determinative={det_str})"
-        )
+        det_str = f"{det:.4f} rad ({np.degrees(det):.1f}°)" if det is not None else "unresolved"
+        return f"Glyph('{self.name}' | calls={self._call_count} | det={det_str})"
 
 
 class GlyphSequence:
     """
-    A sequence of Glyphs — the equivalent of a hieroglyphic word.
-    
-    The sequence has its own determinative, distinct from the 
-    determinatives of its component glyphs. The word-level holonomy
-    depends on the ORDER of the glyphs — the path through their
-    combined state spaces.
-    
-    This is the non-commutativity: Glyph(A) then Glyph(B) accumulates
-    a different phase than Glyph(B) then Glyph(A), even if the
-    final output is the same.
+    A sequence of Glyphs — a hieroglyphic word.
+
+    The sequence determinative is computed the same way: differential phase
+    of the combined input→output trajectory minus the input-only trajectory.
     """
-    
+
     def __init__(self, *glyphs: Glyph, name: str = "sequence"):
         self.glyphs = list(glyphs)
         self.name = name
-        self.combined_trajectory: List[StateSnapshot] = []
-        self._r_t = 0.0
-    
+        self._input_states: List[np.ndarray] = []
+        self._output_states: List[np.ndarray] = []
+        self._interleaved_states: List[np.ndarray] = []
+
     def __call__(self, initial_value: Any) -> Any:
-        """Execute glyphs in sequence, accumulating the combined trajectory."""
         value = initial_value
-        
+
+        # Record the input to the whole sequence
+        if self.glyphs:
+            input_state = self.glyphs[0]._embed(value)
+            self._input_states.append(input_state)
+            self._interleaved_states.append(input_state)
+
         for glyph in self.glyphs:
-            # record combined state before each glyph
-            if hasattr(glyph, '_embed'):
-                state = glyph._embed(value)
-                self.combined_trajectory.append(
-                    StateSnapshot(r_t=self._r_t, vector=state)
-                )
-            
             value = glyph(value)
-            self._r_t += 1.0
-        
-        # record final state
-        if self.glyphs and hasattr(self.glyphs[-1], '_embed'):
-            state = self.glyphs[-1]._embed(value)
-            self.combined_trajectory.append(
-                StateSnapshot(r_t=self._r_t, vector=state)
-            )
-        
+
+        # Record the output of the whole sequence
+        if self.glyphs:
+            output_state = self.glyphs[-1]._embed(value)
+            self._output_states.append(output_state)
+            self._interleaved_states.append(output_state)
+
         return value
-    
+
+    @property
+    def input_phase(self) -> float:
+        if len(self._input_states) < 3:
+            return 0.0
+        return _pancharatnam_phase(np.array(self._input_states))
+
+    @property
+    def total_phase(self) -> float:
+        if len(self._interleaved_states) < 3:
+            return 0.0
+        return _pancharatnam_phase(np.array(self._interleaved_states))
+
     @property
     def determinative(self) -> Optional[float]:
-        """The holonomy of the combined trajectory — the word-level determinative."""
-        if len(self.combined_trajectory) < 3:
+        if len(self._input_states) < 3:
             return None
-        states = np.array([s.normalized for s in self.combined_trajectory])
-        
-        n = len(states)
-        product = complex(1.0, 0.0)
-        for k in range(n):
-            psi_k = states[k]
-            psi_next = states[(k + 1) % n]
-            inner = np.vdot(psi_k, psi_next)
-            if abs(inner) < 1e-15:
-                return 0.0
-            product *= inner / abs(inner)
-        
-        return cmath.phase(product)
-    
-    def reversed(self) -> 'GlyphSequence':
-        """Return the same glyphs in reverse order — should flip the determinative."""
-        rev = GlyphSequence(*reversed(self.glyphs), name=f"{self.name}_reversed")
-        return rev
+        return self.total_phase - self.input_phase
+
+    def __repr__(self):
+        det = self.determinative
+        det_str = f"{det:.4f} rad ({np.degrees(det):.1f}°)" if det is not None else "unresolved"
+        return f"GlyphSeq('{self.name}' | det={det_str})"
 
 
 # ---------------------------------------------------------------------------
-# Demonstration: two computations, same output, different determinatives
+# Demo
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    
     print("=" * 60)
-    print("GLYPH: a hieroglyphic computational primitive")
+    print("GLYPH v2: differential geometric phase")
     print("=" * 60)
     print()
-    
-    # Two ways to compute the same thing: sum of squares from 1 to N
-    
-    # Path A: iterate forward
-    g_forward = Glyph(lambda x: x**2, name="square_forward", n_dims=8)
-    
-    # Path B: iterate in a different order
-    g_reverse = Glyph(lambda x: x**2, name="square_reverse", n_dims=8)
-    
-    # Execute Path A: 1, 2, 3, 4, 5
-    total_a = 0
+
+    # Identity: should be ≈ 0
+    g_id = Glyph(lambda x: x, name="identity")
     for i in [1, 2, 3, 4, 5]:
-        total_a += g_forward(i)
-    
-    # Execute Path B: 5, 4, 3, 2, 1
-    total_b = 0
+        g_id(i)
+    print(f"identity:    det = {g_id.close_loop():.6f} rad "
+          f"({np.degrees(g_id.close_loop()):.2f}°)")
+    print(f"  input_phase  = {g_id.input_phase:.6f}")
+    print(f"  total_phase  = {g_id.total_phase:.6f}")
+    print()
+
+    # Square: should be nonzero
+    g_sq = Glyph(lambda x: x**2, name="square")
+    for i in [1, 2, 3, 4, 5]:
+        g_sq(i)
+    print(f"square:      det = {g_sq.close_loop():.6f} rad "
+          f"({np.degrees(g_sq.close_loop()):.2f}°)")
+    print(f"  input_phase  = {g_sq.input_phase:.6f}")
+    print(f"  total_phase  = {g_sq.total_phase:.6f}")
+    print()
+
+    # Constant: collapses all inputs to 42
+    g_c = Glyph(lambda x: 42, name="constant_42")
+    for i in [1, 2, 3, 4, 5]:
+        g_c(i)
+    print(f"constant(42): det = {g_c.close_loop():.6f} rad "
+          f"({np.degrees(g_c.close_loop()):.2f}°)")
+    print()
+
+    # Forward vs reverse squaring
+    g_fwd = Glyph(lambda x: x**2, name="sq_fwd")
+    g_rev = Glyph(lambda x: x**2, name="sq_rev")
+    for i in [1, 2, 3, 4, 5]:
+        g_fwd(i)
     for i in [5, 4, 3, 2, 1]:
-        total_b += g_reverse(i)
-    
-    print(f"Path A (forward): sum of squares = {total_a}")
-    print(f"Path B (reverse): sum of squares = {total_b}")
-    print(f"Same output? {total_a == total_b}")
+        g_rev(i)
+    print(f"sq forward:  det = {g_fwd.close_loop():.6f}")
+    print(f"sq reverse:  det = {g_rev.close_loop():.6f}")
+    print(f"  different? {abs(g_fwd.close_loop() - g_rev.close_loop()) > 0.01}")
     print()
-    
-    det_a = g_forward.close_loop()
-    det_b = g_reverse.close_loop()
-    
-    print(f"Determinative A: {det_a:.6f} rad ({np.degrees(det_a):.2f}°)")
-    print(f"Determinative B: {det_b:.6f} rad ({np.degrees(det_b):.2f}°)")
-    print(f"Same determinative? {abs(det_a - det_b) < 1e-10}")
-    print()
-    
-    if abs(det_a - det_b) > 1e-10:
-        print(">>> The phonograms are identical (same function).")
-        print(">>> The outputs are identical (same sum).")
-        print(">>> The determinatives DIFFER.")
-        print(">>> The path through state space left a different geometric residue.")
-        print(">>> This is the thing no existing language can see.")
-    
-    print()
-    print("-" * 60)
-    print("GLYPH SEQUENCES: non-commutativity of the determinative")
-    print("-" * 60)
-    print()
-    
-    # Two glyphs: double and increment
-    g_double = Glyph(lambda x: x * 2, name="double", n_dims=8)
-    g_inc = Glyph(lambda x: x + 1, name="increment", n_dims=8)
-    
-    # Sequence AB: double then increment
-    seq_ab = GlyphSequence(g_double, g_inc, name="double→inc")
-    # Sequence BA: increment then double  
-    g_double2 = Glyph(lambda x: x * 2, name="double", n_dims=8)
-    g_inc2 = Glyph(lambda x: x + 1, name="increment", n_dims=8)
-    seq_ba = GlyphSequence(g_inc2, g_double2, name="inc→double")
-    
-    # Run both on several inputs to build trajectories
-    for val in [1, 2, 3, 4, 5]:
-        result_ab = seq_ab(val)
-        result_ba = seq_ba(val)
-    
-    det_ab = seq_ab.determinative
-    det_ba = seq_ba.determinative
-    
-    print(f"double→inc  determinative: {det_ab:.6f} rad ({np.degrees(det_ab):.2f}°)")
-    print(f"inc→double  determinative: {det_ba:.6f} rad ({np.degrees(det_ba):.2f}°)")
-    print(f"Difference: {abs(det_ab - det_ba):.6f} rad ({np.degrees(abs(det_ab - det_ba)):.2f}°)")
-    print()
-    
-    if abs(det_ab - det_ba) > 1e-10:
-        print(">>> Same glyphs, different order, different determinative.")
-        print(">>> The computation is non-commutative in its geometric residue")
-        print(">>> even when the individual operations are fully determined.")
-        print(">>> This is the 𓀁 — the silent sign that classifies the word.")
-    
-    print()
-    print("=" * 60)
-    print(f"g_forward:  {g_forward}")
-    print(f"g_reverse:  {g_reverse}")
-    print(f"g_double:   {g_double}")
-    print(f"g_inc:      {g_inc}")
-    print("=" * 60)
+
+    # Commuting functions: add3 then add5 vs add5 then add3
+    g_a3 = Glyph(lambda x: x + 3, name="add3")
+    g_a5 = Glyph(lambda x: x + 5, name="add5")
+    g_a3b = Glyph(lambda x: x + 3, name="add3")
+    g_a5b = Glyph(lambda x: x + 5, name="add5")
+
+    seq_35 = GlyphSequence(g_a3, g_a5, name="add3→add5")
+    seq_53 = GlyphSequence(g_a5b, g_a3b, name="add5→add3")
+
+    for v in [1, 2, 3, 4, 5]:
+        seq_35(v)
+        seq_53(v)
+
+    print(f"add3→add5:   det = {seq_35.determinative:.6f}")
+    print(f"add5→add3:   det = {seq_53.determinative:.6f}")
+    print(f"  diff = {abs(seq_35.determinative - seq_53.determinative):.6f}")
