@@ -262,6 +262,11 @@ class GrowthBuffer:
     def mark_trained(self, entry_ids: list[str] | None = None, cycle_id: str | None = None) -> None:
         """Mark entries as included in a completed training cycle.
 
+        Should only be called after a TrainResult is successfully returned
+        from TrainCycle.run() — never on ingest or trigger. This ensures
+        trained_in_cycle reflects reality: entries are only marked trained
+        when training has actually completed.
+
         Args:
             entry_ids: IDs of entries that were trained on.
                        If None, marks all untrained entries.
@@ -278,6 +283,9 @@ class GrowthBuffer:
             if buf_entry:
                 buf_entry.trained_in_cycle = cycle_id
 
+        # Rewrite buffer.jsonl so trained_in_cycle persists across restarts
+        self._rewrite_buffer()
+
         # Update manifest
         self._trained_manifest.setdefault("cycles", []).append({
             "cycle_id": cycle_id,
@@ -285,6 +293,22 @@ class GrowthBuffer:
             "ts": datetime.now(timezone.utc).isoformat(),
         })
         self._save_manifest()
+
+    def reset_watermark(self) -> int:
+        """Clear trained_in_cycle for all entries, recovering orphaned data.
+
+        Useful when training failed silently and cycle_history.jsonl is
+        empty despite entries showing trained_in_cycle=<some cycle id>.
+        Returns the number of entries reset.
+        """
+        count = 0
+        for entry in self._entries:
+            if entry.trained_in_cycle is not None:
+                entry.trained_in_cycle = None
+                count += 1
+        if count:
+            self._rewrite_buffer()
+        return count
 
     def stats(self) -> dict:
         """Buffer statistics.
@@ -315,6 +339,14 @@ class GrowthBuffer:
         self._buffer_path.parent.mkdir(parents=True, exist_ok=True)
         with open(self._buffer_path, "a", encoding="utf-8") as f:
             f.write(json.dumps(_buffer_entry_to_dict(entry), ensure_ascii=False) + "\n")
+
+    def _rewrite_buffer(self) -> None:
+        """Rewrite buffer.jsonl atomically to persist in-memory state."""
+        tmp = self._buffer_path.with_suffix(".jsonl.tmp")
+        with open(tmp, "w", encoding="utf-8") as f:
+            for entry in self._entries:
+                f.write(json.dumps(_buffer_entry_to_dict(entry), ensure_ascii=False) + "\n")
+        tmp.replace(self._buffer_path)
 
     def _load_persisted(self) -> None:
         if not self._buffer_path.exists():
