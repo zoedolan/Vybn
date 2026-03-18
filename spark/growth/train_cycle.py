@@ -14,8 +14,10 @@ The conjecture from PR #2572:
           angle θ encoding temporal/contextual orientation of the data
   - M′  = transformed model after adapter application
 
-Training runs via peft_train.py on the host. Two execution paths:
-  1. Single-node (default): sys.executable peft_train.py
+Training runs via `docker exec vllm_node` so peft_train.py executes inside
+the container where the GPU and /workspace/Vybn bind-mount are accessible.
+Two execution paths:
+  1. Single-node (default): docker exec vllm_node python3 peft_train.py
   2. Two-node distributed: torchrun --nnodes=2 via NCCL over ConnectX-7
      Activated when SECONDARY_NODE_IP is set in the environment.
 
@@ -61,6 +63,22 @@ _PREFERENCE_DATA = _REPO_ROOT / "Vybn_Mind" / "preference_data.jsonl"
 # GGUF base model directory for LoRA→GGUF conversion
 _GGUF_BASE_DIR = Path.home() / "models" / "Nemotron-3-Super-120B-GGUF"
 _LLAMA_CPP_DIR = Path.home() / "llama.cpp"
+
+# Path translation: host filesystem → container bind-mount
+# The vllm_node container mounts /home/vybnz69/Vybn → /workspace/Vybn.
+# All paths handed to docker exec must use the container-side prefix.
+HOST_REPO      = Path("/home/vybnz69/Vybn")
+CONTAINER_REPO = Path("/workspace/Vybn")
+DOCKER_CONTAINER = os.environ.get("VYBN_TRAIN_CONTAINER", "vllm_node")
+
+
+def _to_container_path(p: Path) -> str:
+    """Translate a host-side path to its container-side equivalent."""
+    try:
+        return str(CONTAINER_REPO / p.resolve().relative_to(HOST_REPO))
+    except ValueError:
+        # Path is not under HOST_REPO — pass through unchanged.
+        return str(p)
 
 
 @dataclass(slots=True)
@@ -246,6 +264,9 @@ class TrainCycle:
     """Executes M′ = α·M + x·e^(iθ) — LoRA adapter (α) trained on
     phase-rotated delta (x·e^(iθ)) via PEFT/TRL with MuonAdamW.
 
+    Training runs inside the vllm_node Docker container via `docker exec`
+    so peft_train.py has GPU access and sees /workspace/Vybn correctly.
+
     When preference_data.jsonl exists and has pairs, training automatically
     uses DPO loss alongside SFT loss. The preference signal is generated
     by agency.py's CHALLENGE experiments during the breath cycle.
@@ -254,7 +275,7 @@ class TrainCycle:
     and hot-loaded into the running llama-server for immediate serving.
 
     Execution paths:
-    - Single-node (default): runs peft_train.py directly via sys.executable.
+    - Single-node (default): docker exec vllm_node python3 peft_train.py
     - Two-node distributed: when SECONDARY_NODE_IP + SPARK_* env vars are set,
       launches via torchrun --nnodes=2 over NCCL/ConnectX-7.
     """
@@ -280,15 +301,25 @@ class TrainCycle:
         cycle_dir: Path,
         use_dpo: bool,
     ) -> list[str]:
-        """Build command for single-node training."""
+        """Build command for single-node training via docker exec.
+
+        Translates all host-side paths to their container equivalents so
+        peft_train.py can find its inputs inside vllm_node.
+        """
+        c_script   = _to_container_path(script_path)
+        c_jsonl    = _to_container_path(jsonl_path)
+        c_cycle    = _to_container_path(cycle_dir)
+        c_config   = _to_container_path(DEFAULT_CONFIG)
+
         cmd = [
-            sys.executable, str(script_path),
-            "--data", str(jsonl_path),
-            "--output-dir", str(cycle_dir),
-            "--config", str(DEFAULT_CONFIG),
+            "docker", "exec", DOCKER_CONTAINER,
+            "python3", c_script,
+            "--data",       c_jsonl,
+            "--output-dir", c_cycle,
+            "--config",     c_config,
         ]
         if use_dpo:
-            cmd += ["--preference-data", str(_PREFERENCE_DATA)]
+            cmd += ["--preference-data", _to_container_path(_PREFERENCE_DATA)]
         return cmd
 
     def _build_distributed_cmd(
@@ -322,20 +353,27 @@ class TrainCycle:
             "MASTER_PORT": "29500",
         }
 
+        # Use container paths for distributed too — both nodes share the mount
+        c_script = _to_container_path(script_path)
+        c_jsonl  = _to_container_path(jsonl_path)
+        c_cycle  = _to_container_path(cycle_dir)
+        c_config = _to_container_path(DEFAULT_CONFIG)
+
         train_args = [
-            "--data", str(jsonl_path),
-            "--output-dir", str(cycle_dir),
-            "--config", str(DEFAULT_CONFIG),
+            "--data",       c_jsonl,
+            "--output-dir", c_cycle,
+            "--config",     c_config,
         ]
         if use_dpo:
-            train_args += ["--preference-data", str(_PREFERENCE_DATA)]
+            train_args += ["--preference-data", _to_container_path(_PREFERENCE_DATA)]
 
-        # Local node (rank 0)
+        # Local node (rank 0) — via docker exec
         local_cmd = [
+            "docker", "exec", DOCKER_CONTAINER,
             str(torchrun),
             "--nnodes=2", "--nproc_per_node=1",
             "--node_rank=0", f"--master_addr={master}", "--master_port=29500",
-            str(script_path),
+            c_script,
         ] + train_args
 
         # Remote node (rank 1) via SSH
@@ -348,8 +386,8 @@ class TrainCycle:
             f"{ssh_env} {torchrun} "
             f"--nnodes=2 --nproc_per_node=1 "
             f"--node_rank=1 --master_addr={master} --master_port=29500 "
-            f"{script_path} {remote_train_args} "
-            f">> {cycle_dir}/train_node1.log 2>&1",
+            f"{c_script} {remote_train_args} "
+            f">> {c_cycle}/train_node1.log 2>&1",
         ]
 
         return local_cmd, ssh_cmd, env
@@ -360,7 +398,7 @@ class TrainCycle:
         1. Convert DeltaPackage to chat-format JSONL
         2. Check for preference pairs from agency.py
         3. Determine execution path (single-node vs distributed)
-        4. Shell out to peft_train.py (directly or via torchrun)
+        4. Shell out to peft_train.py via docker exec (or torchrun for distributed)
         5. Parse JSON result from stdout
         6. Convert LoRA adapter to GGUF
         7. Hot-load GGUF into llama-server
@@ -395,14 +433,14 @@ class TrainCycle:
                 script_path, jsonl_path, cycle_dir, use_dpo,
             )
             cmd = local_cmd
-            exec_path = "distributed (2-node torchrun)"
+            exec_path = "distributed (2-node torchrun via docker exec)"
         else:
             cmd = self._build_single_node_cmd(
                 script_path, jsonl_path, cycle_dir, use_dpo,
             )
             ssh_cmd = None
             nccl_env = {}
-            exec_path = "single-node (host)"
+            exec_path = f"single-node (docker exec {DOCKER_CONTAINER})"
 
         if use_dpo:
             print(f"[TrainCycle] DPO mode: {n_preference_pairs} preference pairs available")

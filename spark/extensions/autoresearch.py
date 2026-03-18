@@ -17,6 +17,7 @@ from pathlib import Path
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 _BPB_LOG = _REPO_ROOT / "Vybn_Mind" / "bpb_log.jsonl"
 _AUTORESEARCH_LOG = _REPO_ROOT / "Vybn_Mind" / "autoresearch_log.jsonl"
+_ORGANISM_LOG = Path("/home/vybnz69/logs/organism.log")
 _MODEL_URL = os.environ.get("VYBN_MODEL_URL", "http://127.0.0.1:8000")
 
 
@@ -120,6 +121,17 @@ def _check_growth_trigger() -> dict | None:
         return None
 
 
+def _log_to_organism(msg: str) -> None:
+    """Write directly to organism.log so daemon-thread errors surface."""
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    line = f"[{ts}] {msg}\n"
+    try:
+        with open(_ORGANISM_LOG, "a", encoding="utf-8") as f:
+            f.write(line)
+    except OSError:
+        pass  # If we can't write the log, there's nothing we can do
+
+
 def _kick_off_growth_background():
     """Start a growth cycle in a background daemon thread."""
     def _run_growth():
@@ -143,10 +155,22 @@ def _kick_off_growth_background():
                 },
             }
             _append_log(_AUTORESEARCH_LOG, entry)
-            print(f"[autoresearch] growth cycle: {result.get('cycle_id', 'N/A')} fired={result.get('fired')}")
+            cycle_id = result.get('cycle_id', 'N/A')
+            fired = result.get('fired')
+            msg = f"[autoresearch] growth cycle complete: {cycle_id} fired={fired}"
+            print(msg)
+            _log_to_organism(msg)
         except Exception as e:
-            print(f"[autoresearch] growth cycle failed: {e}")
-            traceback.print_exc()
+            tb = traceback.format_exc()
+            msg = f"[autoresearch] GROWTH CYCLE FAILED: {e}\n{tb}"
+            print(msg)
+            _log_to_organism(msg)
+            _append_log(_AUTORESEARCH_LOG, {
+                "ts": datetime.now(timezone.utc).isoformat(),
+                "event": "growth_cycle_failed",
+                "error": str(e),
+                "traceback": tb,
+            })
 
     t = threading.Thread(target=_run_growth, daemon=True)
     t.start()
