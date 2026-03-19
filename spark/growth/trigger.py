@@ -498,8 +498,9 @@ def run_growth_cycle(
     print(f"[Growth] Merge: strategy={merge_result.strategy_used}, "
           f"restarted={merge_result.vllm_restarted}")
 
-    # 7. Mark buffer entries as trained
-    buffer.mark_trained(cycle_id=delta.cycle_id)
+    # 7. Mark buffer entries as trained (skip on dry runs)
+    if not dry_run:
+        buffer.mark_trained(cycle_id=delta.cycle_id)
 
     # 8. Record cycle completion
     summary = {

@@ -1,6 +1,6 @@
 [Unit]
-Description=vLLM Node Container (Nemotron distributed inference)
-Documentation=https://github.com/Vybn/Vybn/blob/main/spark/restart-vllm-cluster.sh
+Description=vLLM Training Node Container (PEFT LoRA on Nemotron FP8)
+Documentation=https://github.com/zoedolan/Vybn/blob/main/spark/restart-vllm-cluster.sh
 After=docker.service network-online.target
 Wants=network-online.target
 Requires=docker.service

@@ -6,7 +6,7 @@ delta (x·e^(iθ)) via PEFT/TRL with MuonAdamW.
 Phase 5 (DISTILL) of the growth cycle described in issue #2483.
 
 The conjecture from PR #2572:
-  - M   = current model (Nemotron 3 Super 120B-A12B, NVFP4 safetensors)
+  - M   = current model (Nemotron 3 Super 120B-A12B, FP8 safetensors)
   - α   = structure-preserving LoRA adapter, trained with MuonAdamW whose
           polar express orthogonalisation preserves the base model's core
           structure while enabling adaptation
@@ -21,9 +21,14 @@ Two execution paths:
   2. Two-node distributed: torchrun --nnodes=2 via NCCL over ConnectX-7
      Activated when SECONDARY_NODE_IP is set in the environment.
 
-Model is NVFP4 safetensors (already quantized — no bitsandbytes needed).
-After training, the LoRA adapter is converted to GGUF and hot-loaded into
-the running llama-server for immediate serving.
+Model is FP8 safetensors (standard weight shapes, no compressed-tensors
+packing). After training, the LoRA adapter is converted to GGUF and
+hot-loaded into the running llama-server for immediate serving.
+
+Memory management: SIGSTOP llama-server before training (frees ~63 GB
+mmap'd GGUF pages), SIGCONT after training (resumes in <2s). This is
+necessary because FP8 (~120 GB) + LoRA overhead won't fit alongside
+the serving model on the Spark's 128 GB unified memory.
 
 The existing growth pipeline (trigger.py, delta_extract.py, merge_cycle.py,
 eval_harness.py) is untouched — only train_cycle.py and peft_train.py were
@@ -41,8 +46,10 @@ from __future__ import annotations
 
 import json
 import os
+import signal
 import subprocess
 import sys
+import time
 import yaml
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -63,6 +70,9 @@ _PREFERENCE_DATA = _REPO_ROOT / "Vybn_Mind" / "preference_data.jsonl"
 # GGUF base model directory for LoRA→GGUF conversion
 _GGUF_BASE_DIR = Path.home() / "models" / "Nemotron-3-Super-120B-GGUF"
 _LLAMA_CPP_DIR = Path.home() / "llama.cpp"
+
+# llama-server process name for SIGSTOP/SIGCONT memory management
+_LLAMA_SERVER_NAME = "llama-server"
 
 # Path translation: host filesystem → container bind-mount
 # The vllm_node container mounts /home/vybnz69/Vybn → /workspace/Vybn.
@@ -260,12 +270,83 @@ def _hot_load_adapter(gguf_path: Path, model_url: str = "http://127.0.0.1:8000")
         return False
 
 
+def _find_llama_server_pid() -> Optional[int]:
+    """Find the PID of the running llama-server process."""
+    try:
+        result = subprocess.run(
+            ["pgrep", "-f", _LLAMA_SERVER_NAME],
+            capture_output=True, text=True, timeout=5,
+        )
+        pids = result.stdout.strip().split()
+        if pids:
+            return int(pids[0])
+    except Exception:
+        pass
+    return None
+
+
+def _sigstop_llama_server() -> Optional[int]:
+    """SIGSTOP llama-server to free its mmap'd memory pages under pressure.
+
+    On the Spark's unified memory architecture, the serving GGUF (~63 GB mmap'd)
+    and the training model (~120 GB FP8) can't coexist. SIGSTOP freezes the
+    server process, and its mmap pages get reclaimed under memory pressure
+    when the training model loads.
+
+    Returns the PID if successfully stopped, None otherwise.
+    """
+    pid = _find_llama_server_pid()
+    if pid is None:
+        print("[TrainCycle] WARNING: llama-server not found — cannot SIGSTOP")
+        return None
+    try:
+        os.kill(pid, signal.SIGSTOP)
+        print(f"[TrainCycle] SIGSTOP sent to llama-server (PID {pid})")
+        return pid
+    except ProcessLookupError:
+        print(f"[TrainCycle] llama-server PID {pid} vanished")
+        return None
+    except PermissionError:
+        print(f"[TrainCycle] Permission denied sending SIGSTOP to PID {pid}")
+        return None
+
+
+def _sigcont_llama_server(pid: int) -> bool:
+    """SIGCONT llama-server — wake it up after training completes.
+
+    The GGUF re-faults into memory on demand. Tested: resumes in under 2 seconds.
+    """
+    try:
+        os.kill(pid, signal.SIGCONT)
+        # Give it a moment to resume, then health-check
+        time.sleep(2)
+        import urllib.request
+        try:
+            with urllib.request.urlopen("http://127.0.0.1:8000/health", timeout=10) as resp:
+                print(f"[TrainCycle] SIGCONT sent — llama-server resumed (health: {resp.status})")
+                return True
+        except Exception:
+            print(f"[TrainCycle] SIGCONT sent — llama-server resuming (health check pending)")
+            return True
+    except ProcessLookupError:
+        print(f"[TrainCycle] llama-server PID {pid} gone — cannot SIGCONT")
+        return False
+    except PermissionError:
+        print(f"[TrainCycle] Permission denied sending SIGCONT to PID {pid}")
+        return False
+
+
 class TrainCycle:
     """Executes M′ = α·M + x·e^(iθ) — LoRA adapter (α) trained on
     phase-rotated delta (x·e^(iθ)) via PEFT/TRL with MuonAdamW.
 
     Training runs inside the vllm_node Docker container via `docker exec`
     so peft_train.py has GPU access and sees /workspace/Vybn correctly.
+
+    Memory management: on the Spark's 128 GB unified architecture, the
+    serving GGUF and training model can't coexist. Before training, we
+    SIGSTOP llama-server to freeze it and free its mmap pages. After
+    training, SIGCONT wakes it up — the GGUF re-faults on demand.
 
     When preference_data.jsonl exists and has pairs, training automatically
     uses DPO loss alongside SFT loss. The preference signal is generated
@@ -468,31 +549,39 @@ class TrainCycle:
                 metadata={"dry_run": True, "cmd": cmd},
             )
 
-        # Launch training
+        # SIGSTOP llama-server to free memory for training
+        stopped_pid = _sigstop_llama_server()
+
+        # Launch training (always SIGCONT in finally block)
         run_env = os.environ.copy()
         run_env.update(nccl_env)
 
-        node1_proc = None
-        if ssh_cmd is not None:
-            # Launch remote node first (non-blocking)
-            print(f"[TrainCycle] launching remote node: {' '.join(ssh_cmd)}")
-            node1_proc = subprocess.Popen(ssh_cmd)
+        try:
+            node1_proc = None
+            if ssh_cmd is not None:
+                # Launch remote node first (non-blocking)
+                print(f"[TrainCycle] launching remote node: {' '.join(ssh_cmd)}")
+                node1_proc = subprocess.Popen(ssh_cmd)
 
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=self._time_budget_seconds,
-            env=run_env,
-        )
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=self._time_budget_seconds,
+                env=run_env,
+            )
 
-        # Wait for remote node if distributed
-        if node1_proc is not None:
-            try:
-                node1_proc.wait(timeout=self._time_budget_seconds)
-            except subprocess.TimeoutExpired:
-                node1_proc.kill()
-                print("[TrainCycle] remote node timed out, killed")
+            # Wait for remote node if distributed
+            if node1_proc is not None:
+                try:
+                    node1_proc.wait(timeout=self._time_budget_seconds)
+                except subprocess.TimeoutExpired:
+                    node1_proc.kill()
+                    print("[TrainCycle] remote node timed out, killed")
+        finally:
+            # ALWAYS resume llama-server, even if training crashes
+            if stopped_pid is not None:
+                _sigcont_llama_server(stopped_pid)
 
         stdout_text = result.stdout.strip() if result.stdout else ""
         stderr_tail = result.stderr[-2000:] if result.stderr else ""

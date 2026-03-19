@@ -37,3 +37,9 @@ dpo:
   beta: 0.1                   # temperature for DPO loss
   every_n_steps: 10           # run a DPO batch every N SFT steps
   loss_weight: 0.3            # blend: total_loss = 0.7*sft + 0.3*dpo
+
+# Merge — how the trained adapter becomes active in the serving model
+merge:
+  serving_model: nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-IQ4_XS
+  server_url: http://127.0.0.1:8000
+  strategy: llama_server_lora_hotload
