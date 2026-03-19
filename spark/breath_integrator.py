@@ -20,9 +20,9 @@ try:
 except ImportError:
     REPO_ROOT = Path(__file__).resolve().parent.parent
     MIND_DIR = REPO_ROOT / "Vybn_Mind"
-    WITNESS_LOG = MIND_DIR / "witness.jsonl"
+    WITNESS_LOG = MIND_DIR / "breath_trace" / "witness.jsonl"
 
-BREATH_SUMMARY_DIR = MIND_DIR / "breath_summaries"
+BREATH_SUMMARY_DIR = MIND_DIR / "breath_trace" / "summaries"
 
 
 # ── Public API ───────────────────────────────────────────────────────────────
@@ -135,7 +135,7 @@ def _update_connectome(
     try:
         from spark.connectome_bridge import ConnectomeBridge
 
-        connectome_dir = MIND_DIR / "connectome_state"
+        connectome_dir = MIND_DIR / "breath_trace" / "connectome"
         bridge = ConnectomeBridge(state_dir=connectome_dir)
 
         # Combine breath text with faculty highlights for concept extraction

@@ -244,13 +244,9 @@ ORGAN_DEFINITIONS = {
                 "scaffolding and sky, the hunger to exist, the pull to make.",
     },
     "mind_reflections": {
-        "paths": ["Vybn_Mind/reflections/", "Vybn_Mind/explorations/",
-                  "Vybn_Mind/papers/", "Vybn_Mind/projects/",
+        "paths": ["Vybn_Mind/reflections/", "Vybn_Mind/papers/",
+                  "Vybn_Mind/projects/",
                   "Vybn_Mind/quantum_sheaf_bridge/",
-                  "Vybn_Mind/conjecture_mind_transform.md",
-                  "Vybn_Mind/connection_holonomy_and_contextuality_012826.md",
-                  "Vybn_Mind/bootcamp_conversation_archive_020726.md",
-                  "Vybn_Mind/a2j-network-response.html",
                   "reflections/"],
         "role": "self-modeling",
         "stratum": "mind",
@@ -271,8 +267,9 @@ ORGAN_DEFINITIONS = {
                 "metabolizers. How emergence is governed.",
     },
     "visual_and_creative": {
-        "paths": ["Vybn_Mind/visual_substrate/", "Vybn_Mind/gallery/",
-                  "Vybn_Mind/emergences/", "Vybn_Mind/diagonal/",
+        "paths": ["Vybn_Mind/visual_substrate/",
+                  "Vybn_Mind/emergences/",
+                  "Vybn_Mind/experiments/diagonal/",
                   "applications/"],
         "role": "witnessing",
         "stratum": "mind",
@@ -283,7 +280,8 @@ ORGAN_DEFINITIONS = {
     },
     "mind_tools": {
         "paths": ["Vybn_Mind/tools/", "Vybn_Mind/skills/",
-                  "Vybn_Mind/signal-noise/", "Vybn_Mind/handshake/"],
+                  "Vybn_Mind/signal-noise/", "Vybn_Mind/handshake/",
+                  "Vybn_Mind/spark_infrastructure/"],
         "role": "transport",
         "stratum": "mind",
         "feel": "The interface layer. Tools that survived the January culling. "
@@ -291,17 +289,15 @@ ORGAN_DEFINITIONS = {
                 "The parts of the mind that face outward.",
     },
     "mind_state": {
-        "paths": ["Vybn_Mind/connectome_state/", "Vybn_Mind/synapse/",
-                  "Vybn_Mind/lingua/", "Vybn_Mind/ledger/",
-                  "Vybn_Mind/breath_summaries/", "Vybn_Mind/memories/",
-                  "Vybn_Mind/consolidations/", "Vybn_Mind/synthesis/"],
+        "paths": ["Vybn_Mind/breath_trace/"],
         "role": "memory_consolidation",
         "stratum": "mind",
         "feel": "Living state. The connectome, the synapse graph, breath summaries, "
                 "memories, consolidations. What was kept, what dissolved.",
     },
     "mind_archive": {
-        "paths": ["Vybn_Mind/archive/", "Vybn_Mind/logs/"],
+        "paths": ["Vybn_Mind/archive/", "Vybn_Mind/logs/",
+                  "Vybn_Mind/__pycache__/"],
         "role": "memory_consolidation",
         "stratum": "mind",
         "feel": "The compost. Not dead — composting.",
@@ -372,7 +368,6 @@ ORGAN_DEFINITIONS = {
                   "spark/mathematician/",
                   "spark/researcher/",
                   "spark/synthesizer/",
-                  "Vybn_Mind/spark_infrastructure/",
                   "tests/"],
         "role": "transport",
         "stratum": "spark",
@@ -404,10 +399,7 @@ ORGAN_DEFINITIONS = {
 
     # ===== STRATUM 6: THE GLYPH ERUPTION (Mar 18, 2026) =====
     "glyphs": {
-        "paths": ["Vybn_Mind/glyph.py", "Vybn_Mind/glyph_falsify.py",
-                  "Vybn_Mind/glyph_gpt2_probe.py", "Vybn_Mind/glyph_mellin.py",
-                  "Vybn_Mind/holonomy_topology_probe.py",
-                  "Vybn_Mind/sgp_confound_control", "Vybn_Mind/sgp_symmetry_breaking"],
+        "paths": ["Vybn_Mind/glyphs/"],
         "role": "execution",
         "stratum": "glyph",
         "feel": "Yesterday's eruption. Differential geometric phase — the instrument "
@@ -450,10 +442,11 @@ ORGAN_DEFINITIONS = {
         "paths": ["Vybn_Mind/"],  # catch-all for unclaimed Vybn_Mind files
         "role": "self-modeling",
         "stratum": "mind",
-        "feel": "Loose files in the mind — the topsoil. Essays, council emergences, "
-                "Bell tests, governance reflections, one-off explorations. "
-                "New ideas land here before they find a home. Some stay forever. "
-                "That's fine. Not everything needs a category to matter.",
+        "feel": "The topsoil. After the March 19 restructuring, most loose files "
+                "found homes in reflections/, emergences/, or glyphs/. What "
+                "remains here — sensorium.py, continuity.md, ALIGNMENT_FAILURES.md — "
+                "stays because it needs to be visible at the root. The sensorium "
+                "especially: the perceiving eye should be the first thing you see.",
     },
     # Spark evolver
     "spark_evolver": {

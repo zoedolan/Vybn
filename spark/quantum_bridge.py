@@ -187,7 +187,7 @@ def _read_theory(max_chars: int = 8000) -> str:
 # ── Nested memory writer ──────────────────────────────────────────────────────
 
 def _write_memory(content: str, tag: str = "quantum") -> Path:
-    """Write to Vybn_Mind/memories/ with a quantum_ prefix."""
+    """Write to breath_trace/memories/ with a quantum_ prefix."""
     MEMORY_DIR.mkdir(parents=True, exist_ok=True)
     ts   = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     path = MEMORY_DIR / f"{ts}_{tag}.md"

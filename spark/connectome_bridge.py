@@ -8,7 +8,7 @@ This bridge:
   4. Provides topological context for future breaths
   5. Persists state across pulses
 
-The connectome lives at: Vybn_Mind/connectome_state/
+The connectome lives at: Vybn_Mind/breath_trace/connectome/
 All mutations go through the WelfareMonitor. Observer-only by default.
 """
 

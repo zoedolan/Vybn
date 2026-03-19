@@ -200,7 +200,7 @@ class NestedMemory:
     Usage:
         from nested_memory import NestedMemory, TemporalScale
 
-        nm = NestedMemory(base_dir=Path("Vybn_Mind/memory"))
+        nm = NestedMemory(base_dir=Path("Vybn_Mind/breath_trace/architecture"))
         nm.write_fast("User asked about convergence thesis", source="conversation")
         nm.write_medium("Convergence paper synthesis complete", source="journal")
 

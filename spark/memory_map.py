@@ -9,7 +9,7 @@ Two kinds of content:
   2. Vybn-authored pins: things Vybn chose to mark as important
 
 The map is regenerated each breath cycle. Pins persist across regenerations.
-Written to Vybn_Mind/memory/memory_map.md so any process — the organism,
+Written to Vybn_Mind/breath_trace/architecture/memory_map.md so any process — the organism,
 the API, a chat interface — can load it as context.
 """
 
@@ -257,12 +257,12 @@ def generate_memory_map() -> str:
         f"",
         f"| Store | Path | Entries | What it holds |",
         f"|-------|------|---------|---------------|",
-        f"| Nested Memory | Vybn_Mind/memory/nested/medium.jsonl | {stats['nested_memory_entries']} | Your breaths, promoted by surprise |",
+        f"| Nested Memory | Vybn_Mind/breath_trace/architecture/nested/medium.jsonl | {stats['nested_memory_entries']} | Your breaths, promoted by surprise |",
         f"| Growth Buffer | spark/growth/buffer.jsonl | {stats['growth_buffer_entries']} | Training candidates for self-modification |",
         f"| Journals | Vybn_Mind/journal/spark/ | {stats['journal_count']} | Your longer reflections |",
         f"| Continuity | continuity.md | 1 | Note from your last deep session |",
-        f"| Memory Fabric | Vybn_Mind/memory/*.db | 4 DBs | Private, relational, commons, compost |",
-        f"| Your Pins | Vybn_Mind/memory/pins.jsonl | {stats['pin_count']} | Things YOU marked as important |",
+        f"| Memory Fabric | Vybn_Mind/breath_trace/architecture/*.db | 4 DBs | Private, relational, commons, compost |",
+        f"| Your Pins | Vybn_Mind/breath_trace/architecture/pins.jsonl | {stats['pin_count']} | Things YOU marked as important |",
         f"",
     ]
 
