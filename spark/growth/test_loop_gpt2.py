@@ -73,33 +73,57 @@ def load_buffer(buffer_path: str, top_k: int = 50) -> list[dict]:
                 obj = json.loads(line)
             except json.JSONDecodeError:
                 continue
+
+            # buffer.jsonl may have either format:
+            #   a) "messages" list (chat format from peft_train.py)
+            #   b) raw "content" string (from GrowthBuffer)
+            # Wrap raw content into messages format so downstream
+            # tokenization works the same way.
             if "messages" in obj and obj["messages"]:
+                entries.append(obj)
+            elif obj.get("content"):
+                obj["messages"] = [{"role": "assistant", "content": obj["content"]}]
                 entries.append(obj)
 
     if not entries:
         raise RuntimeError(f"No valid entries in {buffer_path}")
 
-    # Sort by surprise score (descending) — highest surprise first
-    entries.sort(
-        key=lambda e: float(e.get("metadata", {}).get("surprise", 0.0)),
-        reverse=True,
-    )
+    # Sort by surprise score (descending) — highest surprise first.
+    # buffer.jsonl uses top-level "surprise_score"; metadata.surprise
+    # is the nested form from DeltaExtractor. Check both.
+    def _surprise(e: dict) -> float:
+        meta_s = float(e.get("metadata", {}).get("surprise", 0.0))
+        top_s = float(e.get("surprise_score", 0.0))
+        return max(meta_s, top_s)
+
+    entries.sort(key=_surprise, reverse=True)
 
     selected = entries[:top_k]
     print(f"[test_loop] loaded {len(entries)} entries, selected top {len(selected)} by surprise")
 
     if selected:
-        surprises = [float(e.get("metadata", {}).get("surprise", 0.0)) for e in selected]
+        surprises = [_surprise(e) for e in selected]
         print(f"[test_loop] surprise range: {min(surprises):.4f} — {max(surprises):.4f}")
 
     return selected
 
 
 def get_x_weight(example: dict) -> float:
-    """Extract composite x-weight (same as peft_train.py)."""
+    """Extract composite x-weight (same as peft_train.py).
+
+    Falls back to top-level holonomy_score if metadata.x_weight
+    isn't present (raw buffer entries use holonomy_score directly).
+    """
     meta = example.get("metadata", {})
     xw = meta.get("x_weight", {})
-    return float(xw.get("composite", 1.0))
+    composite = xw.get("composite")
+    if composite is not None:
+        return float(composite)
+    # Fallback: use holonomy_score as the weight
+    h = example.get("holonomy_score")
+    if h is not None:
+        return float(h)
+    return 1.0
 
 
 # ---------------------------------------------------------------------------
@@ -187,7 +211,7 @@ def train_gpt2(
 
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
-        torch_dtype=torch.float32,  # GPT-2 is small enough for fp32
+        dtype=torch.float32,  # GPT-2 is small enough for fp32
     )
 
     # Move to GPU if available
