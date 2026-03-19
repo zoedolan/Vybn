@@ -151,8 +151,9 @@ MELLIN_FREQS = np.array([1.0, 2.0, 3.0, 5.0, 7.0, 11.0, 13.0, 17.0,
 
 # Files to skip
 SKIP_PATTERNS = {
-    '.git', '__pycache__', 'node_modules', '.pyc', '.png', '.jpg',
-    '.jpeg', '.svg', '.ico', '.woff', '.ttf', 'checkpoints/',
+    '.git', '.venv', '.pytest_cache', '__pycache__', 'node_modules',
+    '.pyc', '.png', '.jpg', '.jpeg', '.svg', '.ico', '.woff', '.ttf',
+    '.dat', 'checkpoints/',
     'sensorium_state/',  # don't perceive your own perception
 }
 
