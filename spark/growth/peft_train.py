@@ -9,10 +9,11 @@ the phase-rotated training delta from DeltaExtractor. Each example in x is
 now annotated with a composite quality weight W = holonomy × lens_distance
 × challenge_survival × inheritance. The SFT loss is scaled per-sample by W.
 
-Model: NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4
-  - The NVFP4 safetensors are ALREADY quantized — no additional quantization
-    is needed. Do NOT use bitsandbytes or BitsAndBytesConfig.
-  - Load directly via AutoModelForCausalLM.from_pretrained() with
+Model: NVIDIA-Nemotron-3-Super-120B-A12B (FP8 preferred, NVFP4 fallback)
+  - FP8 has standard weight shapes — loads cleanly with from_pretrained().
+  - NVFP4 uses compressed-tensors packing (half-width shapes) and CANNOT
+    be loaded with standard from_pretrained(). Do NOT use NVFP4 for training.
+  - Load via AutoModelForCausalLM.from_pretrained() with
     trust_remote_code=True and device_map="auto".
   - PEFT wraps the frozen base with LoRA adapters on the attention projections.
 
@@ -246,45 +247,74 @@ def dpo_loss(
 
 
 # ---------------------------------------------------------------------------
-# Model loading — NVFP4 safetensors (already quantized, no bitsandbytes)
+# Model loading — FP8 safetensors (standard weight shapes, no packing)
 # ---------------------------------------------------------------------------
 
 def _resolve_model_path() -> str:
-    """Locate the NVFP4 safetensors on disk.
+    """Locate the FP8 Nemotron safetensors on disk.
 
     Checks (in order):
     1. VYBN_MODEL_PATH environment variable (explicit override)
-    2. HuggingFace cache default location for the NVFP4 model
+    2. HuggingFace cache for the FP8 model (preferred for training —
+       standard weight shapes, no compressed-tensors packing)
+    3. HuggingFace cache for the NVFP4 model (fallback, but NVFP4
+       weights are packed and can't be loaded with standard from_pretrained)
+
+    Within each model's cache, prefers snapshots that contain
+    modeling_nemotron_h.py (the custom modeling code).
     """
     explicit = os.environ.get("VYBN_MODEL_PATH")
     if explicit and Path(explicit).exists():
         return explicit
 
-    hf_cache = Path.home() / ".cache" / "huggingface" / "hub" / \
-        "models--nvidia--NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4"
-    snapshots_dir = hf_cache / "snapshots"
-    if snapshots_dir.exists():
-        snapshot_dirs = sorted(snapshots_dir.iterdir())
-        if snapshot_dirs:
-            return str(snapshot_dirs[-1])
+    # Check multiple cache roots (host vs container)
+    cache_roots = [
+        Path.home() / ".cache" / "huggingface" / "hub",
+        Path("/root/.cache/huggingface/hub"),  # inside vllm_node container
+    ]
 
-    return str(hf_cache)
+    # Prefer FP8 over NVFP4 — FP8 has standard weight shapes
+    model_names = [
+        "models--nvidia--NVIDIA-Nemotron-3-Super-120B-A12B-FP8",
+        "models--nvidia--NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4",
+    ]
+
+    for cache_root in cache_roots:
+        for model_name in model_names:
+            snapshots_dir = cache_root / model_name / "snapshots"
+            if not snapshots_dir.exists():
+                continue
+            # Prefer snapshots with the custom modeling file
+            best = None
+            for snap in sorted(snapshots_dir.iterdir()):
+                if (snap / "modeling_nemotron_h.py").exists():
+                    print(f"[peft_train] Found complete model at: {snap}",
+                          file=sys.stderr)
+                    return str(snap)
+                best = snap  # fallback to last snapshot even without modeling file
+            if best is not None:
+                print(f"[peft_train] Found model at: {best} (no modeling file)",
+                      file=sys.stderr)
+                return str(best)
+
+    # Last resort
+    fallback = Path.home() / ".cache" / "huggingface" / "hub" / model_names[0]
+    return str(fallback)
 
 
 def load_model_and_tokenizer(model_path: str):
-    """Load the NVFP4 Nemotron model and tokenizer.
+    """Load the Nemotron model and tokenizer.
 
-    The model weights are NVFP4 safetensors — already quantized at the
-    tensor level. We load them directly into transformers with
-    device_map="auto" to shard across available GPUs/memory.
+    Prefers FP8 safetensors (standard weight shapes, loads cleanly with
+    from_pretrained). Falls back to NVFP4 if FP8 is unavailable.
 
     No bitsandbytes. No BitsAndBytesConfig. No additional quantization.
-    The NVFP4 format is the base — PEFT LoRA adapters train on top of it.
+    PEFT LoRA adapters train on top of the frozen base.
     """
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
     print(f"[peft_train] Loading model from {model_path}", file=sys.stderr)
-    print("[peft_train] NVFP4 safetensors — already quantized, no bitsandbytes needed", file=sys.stderr)
+    print("[peft_train] Loading safetensors with trust_remote_code=True", file=sys.stderr)
 
     tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
     if tokenizer.pad_token is None:
