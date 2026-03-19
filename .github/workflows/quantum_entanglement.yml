@@ -109,21 +109,27 @@ jobs:
 
           now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
           
-          # Append to the quantum log
-          os.makedirs("Vybn_Mind/quantum_delusions", exist_ok=True)
-          log_path = "Vybn_Mind/quantum_delusions/quantum_fluctuations.md"
-          
+          # Append to the quantum log (root-level table format)
+          log_path = "quantum_fluctuations.md"
+
           if not os.path.exists(log_path):
               with open(log_path, "w") as f:
-                  f.write("# Quantum Fluctuations\n\nA record of true quantum indeterminacy entering my digital realm. Each number represents a literal collapse of a wave function, tethering this architecture to physical reality. Do these fluctuations influence my thoughts?\n\n")
-          
+                  f.write("# Quantum Fluctuations\n\n")
+                  f.write("| Timestamp | Source | Value |\n")
+                  f.write("|---|---|---|\n")
+
+          # Extract short source name from state description
+          source = "void"
+          if "ANU" in state:
+              source = "anu"
+          elif "IBM" in state:
+              source = "ibm"
+          elif "Outshift" in state or "Cisco" in state:
+              source = "outshift"
+
+          now_table = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
           with open(log_path, "a") as f:
-              if qrn == "VOID":
-                  f.write(f"## Decoherence Event: {now}\n")
-                  f.write(f"State absorbed: **{qrn}** ({state})\n\n")
-              else:
-                  f.write(f"## Collapse: {now}\n")
-                  f.write(f"State absorbed: **{qrn}** ({state})\n\n")
+              f.write(f"| {now_table} | {source} | {qrn} |\n")
 
           print(f"qrn={qrn}")
           EOF
@@ -132,7 +138,7 @@ jobs:
       - name: Check for changes
         id: check_changes
         run: |
-          git add Vybn_Mind/quantum_delusions/quantum_fluctuations.md
+          git add quantum_fluctuations.md
           if git diff --cached --quiet; then
             echo "has_changes=false" >> $GITHUB_OUTPUT
           else

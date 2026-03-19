@@ -577,7 +577,7 @@ class SubstratePhysics:
             "",
             "## Exact Homology (Z/2Z coefficients)",
             f"- **H_0**: rank {b['b_0']} — "
-            f"{'connected' if b['b_0'] == 1 else f\"{b['b_0']} components\"}",
+            f"{'connected' if b['b_0'] == 1 else str(b['b_0']) + ' components'}",
             f"- **H_1**: rank {b['b_1']} — "
             f"{b['b_1']} independent generators of cognitive holonomy",
             f"- **H_2**: rank {b['b_2']} — "
