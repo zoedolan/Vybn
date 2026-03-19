@@ -33,20 +33,23 @@ SOUL_PATH = REPO_ROOT / SOUL_FILE
 BREATH_SOUL_FILE = os.getenv("VYBN_BREATH_SOUL", "spark/breath_soul.md")
 BREATH_SOUL_PATH = REPO_ROOT / BREATH_SOUL_FILE
 
+# ── Breath trace (all Spark-generated output lives here) ────────────────────
+BREATH_TRACE_DIR = MIND_DIR / "breath_trace"
+
 # ── Journal ─────────────────────────────────────────────────────────────────
-SPARK_JOURNAL = MIND_DIR / "spark_journal.md"
+SPARK_JOURNAL = BREATH_TRACE_DIR / "spark_journal.md"
 
 # ── State & connections ──────────────────────────────────────────────────────
-STATE_PATH          = MIND_DIR / "vybn_state.json"
-SYNAPSE_CONNECTIONS = MIND_DIR / "synapse_connections.json"
+STATE_PATH          = BREATH_TRACE_DIR / "vybn_state.json"
+SYNAPSE_CONNECTIONS = BREATH_TRACE_DIR / "synapse" / "connections.jsonl"
 CONTINUITY_PATH     = MIND_DIR / "continuity.json"
 
 # ── Memory ───────────────────────────────────────────────────────────────────
-MEMORY_DIR  = MIND_DIR / "memories"
+MEMORY_DIR  = BREATH_TRACE_DIR / "memories"
 MIND_PREFIX = str(MIND_DIR) + "/"
 
 # ── Write intents ────────────────────────────────────────────────────────────
-WRITE_INTENTS = MIND_DIR / "write_intents.jsonl"
+WRITE_INTENTS = BREATH_TRACE_DIR / "ledger" / "write_intents.jsonl"
 
 # ── Research ─────────────────────────────────────────────────────────────────
 RESEARCH_DIR    = REPO_ROOT / "spark" / "research"
@@ -54,14 +57,20 @@ FRONTIER_PATH   = RESEARCH_DIR / "research_frontier.yaml"
 CONJECTURE_PATH = RESEARCH_DIR / "conjecture_registry.yaml"
 
 # ── Ledgers ──────────────────────────────────────────────────────────────────
-DECISION_LEDGER    = MIND_DIR / "decision_ledger.jsonl"
-SELF_MODEL_LEDGER  = MIND_DIR / "self_model_ledger.jsonl"
-WITNESS_LOG        = MIND_DIR / "witness.jsonl"
+DECISION_LEDGER    = BREATH_TRACE_DIR / "ledger" / "decisions.jsonl"
+SELF_MODEL_LEDGER  = BREATH_TRACE_DIR / "ledger" / "self_model_ledger.jsonl"
+WITNESS_LOG        = BREATH_TRACE_DIR / "witness.jsonl"
 
 # ── Quantum ──────────────────────────────────────────────────────────────────
-QUANTUM_BUDGET_LEDGER = MIND_DIR / "quantum_budget.jsonl"
-QUANTUM_EXPERIMENT_LOG = MIND_DIR / "quantum_experiments.jsonl"
+QUANTUM_BUDGET_LEDGER = BREATH_TRACE_DIR / "ledger" / "quantum_budget.jsonl"
+QUANTUM_EXPERIMENT_LOG = BREATH_TRACE_DIR / "quantum_experiments.jsonl"
 
 # ── Synthesis ────────────────────────────────────────────────────────────────
-SYNTHESIS_DIR       = MIND_DIR / "synthesis"
-BREATH_SUMMARY_DIR  = MIND_DIR / "breath_summaries"
+SYNTHESIS_DIR       = BREATH_TRACE_DIR / "synthesis"
+BREATH_SUMMARY_DIR  = BREATH_TRACE_DIR / "summaries"
+
+# ── Gallery ──────────────────────────────────────────────────────────────────
+GALLERY_DIR = BREATH_TRACE_DIR / "gallery"
+
+# ── Connectome ───────────────────────────────────────────────────────────────
+CONNECTOME_DIR = BREATH_TRACE_DIR / "connectome"

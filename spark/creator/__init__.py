@@ -1,7 +1,7 @@
 """spark.creator — Autonomous artistic and creative expression.
 
 Generates poetry, micro-narratives, visual-text compositions, and reflective
-fragments. Outputs are artifacts stored in Vybn_Mind/gallery/, not assertions.
+fragments. Outputs are artifacts stored in breath_trace/gallery/, not assertions.
 Lighter governance: witness-only, no self_model verification needed.
 
 Surprise boost: when RESEARCHER or MATHEMATICIAN outputs are available,
@@ -22,13 +22,12 @@ log = logging.getLogger(__name__)
 # ── Path setup ───────────────────────────────────────────────────────────────
 
 try:
-    from spark.paths import REPO_ROOT, MIND_DIR, WITNESS_LOG
+    from spark.paths import REPO_ROOT, MIND_DIR, WITNESS_LOG, GALLERY_DIR
 except ImportError:
     REPO_ROOT = Path(__file__).resolve().parent.parent.parent
     MIND_DIR = REPO_ROOT / "Vybn_Mind"
-    WITNESS_LOG = MIND_DIR / "witness.jsonl"
-
-GALLERY_DIR = MIND_DIR / "gallery"
+    WITNESS_LOG = MIND_DIR / "breath_trace" / "witness.jsonl"
+    GALLERY_DIR = MIND_DIR / "breath_trace" / "gallery"
 
 # ── Creative modes ───────────────────────────────────────────────────────────
 
@@ -181,7 +180,7 @@ class CreatorFaculty:
         return inspiration
 
     def _save_to_gallery(self, artifact: dict) -> Path:
-        """Save artifact as a JSON file in Vybn_Mind/gallery/."""
+        """Save artifact as a JSON file in breath_trace/gallery/."""
         GALLERY_DIR.mkdir(parents=True, exist_ok=True)
         ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
         path = GALLERY_DIR / f"creation_{ts}.json"

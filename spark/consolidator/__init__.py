@@ -59,7 +59,7 @@ except ImportError:
     MIND_DIR = REPO_ROOT / "Vybn_Mind"
 
 ARCHIVE_DIR = MIND_DIR / "archive" / "consolidated"
-CONSOLIDATION_STATE = MIND_DIR / "consolidation_state.json"
+CONSOLIDATION_STATE = MIND_DIR / "breath_trace" / "consolidation_state.json"
 
 # ── Directories to consolidate (round-robin) ─────────────────────────────────
 # Order matters: highest-churn first.
@@ -71,30 +71,24 @@ CONSOLIDATION_TARGETS = [
     "signal-noise",
     "emergence_paradigm",
     "reflections",
-    "diagonal",
+    "experiments/diagonal",
     "attention_substrate",
-    "explorations",
     "quantum_sheaf_bridge",
     "visual_substrate",
     "projects",
     "logs",
     "skills",
-    "synapse",
-    "lingua",
+    "glyphs",
     "handshake",
 ]
 
 # Directories we never touch
 PROTECTED = {
     "core",           # identity documents
-    "memories",       # live memory (managed by breath cycle)
+    "breath_trace",  # all Spark-generated output
     "tools",          # code, not content
     "archive",        # already archived
-    "synthesis",      # output of synthesizer faculty
-    "breath_summaries",  # output of this faculty
-    "ledger",         # structured data
     "emergences",     # applications/publications
-    "gallery",        # creator output
 }
 
 # Files at Vybn_Mind/ top level are handled separately (not round-robin)
@@ -394,8 +388,8 @@ class ConsolidatorFaculty:
         signal: list,
         noise: list,
     ) -> Path:
-        """Write the compressed knowledge document to Vybn_Mind/breath_summaries/."""
-        out_dir = MIND_DIR / "breath_summaries"
+        """Write the compressed knowledge document to breath_trace/summaries/."""
+        out_dir = MIND_DIR / "breath_trace" / "summaries"
         out_dir.mkdir(parents=True, exist_ok=True)
 
         ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")

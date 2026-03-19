@@ -546,7 +546,7 @@ if __name__ == "__main__":
         action="store_true",
         help="Force watermark reset and re-ingest all buffered entries",
     )
-    parser.add_argument("--memory-dir", type=Path, default=Path("Vybn_Mind/memory"))
+    parser.add_argument("--memory-dir", type=Path, default=Path("Vybn_Mind/breath_trace/architecture"))
     args = parser.parse_args()
 
     nm = NestedMemory(base_dir=args.memory_dir)

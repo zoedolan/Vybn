@@ -4,7 +4,7 @@ After each breath, the model proposes and runs one small experiment.
 
 Feedback paths:
   1. last_experiment_result.md  -> next breath's context
-  2. Experiment memory in Vybn_Mind/memories/ -> future breaths
+  2. Experiment memory in breath_trace/memories/ -> future breaths
   3. CHALLENGE outcomes -> DPO preference pairs for growth cycle
 
 Flow: breath -> proposal (LLM) -> optional sandbox execution ->

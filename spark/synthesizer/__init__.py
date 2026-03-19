@@ -26,10 +26,10 @@ try:
 except ImportError:
     REPO_ROOT = Path(__file__).resolve().parent.parent.parent
     MIND_DIR = REPO_ROOT / "Vybn_Mind"
-    WITNESS_LOG = MIND_DIR / "witness.jsonl"
+    WITNESS_LOG = MIND_DIR / "breath_trace" / "witness.jsonl"
 
-SYNTHESIS_DIR = MIND_DIR / "synthesis"
-CONNECTOME_STATE_DIR = MIND_DIR / "connectome_state"
+SYNTHESIS_DIR = MIND_DIR / "breath_trace" / "synthesis"
+CONNECTOME_STATE_DIR = MIND_DIR / "breath_trace" / "connectome"
 
 # ── Stop words for fallback concept extraction ───────────────────────────────
 
