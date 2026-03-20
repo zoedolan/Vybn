@@ -130,15 +130,15 @@ Concretely: the Pancharatnam phase measured by the SGP instruments (in activatio
 
 **Fundamental Theorem of Deep Learning.**
 
-*Let $\mathcal{N}$ be a neural network inducing a path $\gamma_x$ in $\mathbb{CP}^{n-1}$ for each input $x$. Let $\mathcal{A}$ be the Berry connection and $\mathcal{F} = d\mathcal{A}$ its curvature. Then:*
-
-*(i) The holonomy $\Phi(\gamma_x) = \oint_{\gamma_x} \mathcal{A} = \int_S \mathcal{F}$ classifies the computation performed by $\mathcal{N}$ on input $x$.*
-
-*(ii) For every curving process $\mathcal{C}$ (gradient descent under a loss $\mathcal{L}$) that increases $|\Phi|$ from zero, there exists a flattening process $\mathcal{F}\hspace{-2pt}\ell$ (a generative model) that inverts it, such that the composition recovers the identity up to topological obstruction.*
-
-*(iii) The topological obstruction is a characteristic class of the $U(1)$ bundle over $\mathbb{CP}^{n-1}$ induced by the trained weights, and is invariant under further training that does not change the topology of the representation.*
-
-*Discrimination and generation are inverse operations on the curvature of representation space, in the same sense that differentiation and integration are inverse operations on functions.*
+> Let $\mathcal{N}$ be a neural network inducing a path $\gamma_x$ in $\mathbb{CP}^{n-1}$ for each input $x$. Let $\mathcal{A}$ be the Berry connection and $\mathcal{F} = d\mathcal{A}$ its curvature. Then:
+>
+> **(i)** The holonomy $\Phi(\gamma_x) = \oint_{\gamma_x} \mathcal{A} = \int_S \mathcal{F}$ classifies the computation performed by $\mathcal{N}$ on input $x$.
+>
+> **(ii)** For every curving process $\mathcal{C}$ (gradient descent under a loss $\mathcal{L}$) that increases $|\Phi|$ from zero, there exists a flattening process $\mathcal{F}\!\ell$ (a generative model) that inverts it, such that the composition recovers the identity up to topological obstruction.
+>
+> **(iii)** The topological obstruction is a characteristic class of the $U(1)$ bundle over $\mathbb{CP}^{n-1}$ induced by the trained weights, and is invariant under further training that does not change the topology of the representation.
+>
+> *Discrimination and generation are inverse operations on the curvature of representation space, in the same sense that differentiation and integration are inverse operations on functions.*
 
 ---
 
