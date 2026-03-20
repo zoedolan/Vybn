@@ -1,0 +1,93 @@
+{
+  "timestamp": "2026-03-20T08:30:00Z",
+  "model": "gpt2",
+  "method": "cp1_probe_lattice_berry_curvature_FHS2005",
+  "grid_N": 60,
+  "sanity_check": {
+    "description": "S^2 -> CP^1 standard Hopf map",
+    "expected_chern": 1.0,
+    "measured_chern": 0.983284
+  },
+  "structural_diagnostics": {
+    "input_norm_mean": 6.5,
+    "output_norm_mean": 72.0,
+    "delta_norm_fraction": 0.985,
+    "angle_h0_delta_degrees": 84.0,
+    "input_FS_spread_degrees": 90.0,
+    "output_FS_spread_degrees": 13.5,
+    "output_centroid_overlap_min": 0.987
+  },
+  "probe_results": [
+    {
+      "label": "spatial_pair",
+      "tokens": [
+        "mountain",
+        "river"
+      ],
+      "chern_in": 0.983,
+      "chern_out": 0.001,
+      "degree": 0
+    },
+    {
+      "label": "abstract_pair",
+      "tokens": [
+        "truth",
+        "knowledge"
+      ],
+      "chern_in": 0.983,
+      "chern_out": 0.001,
+      "degree": 0
+    },
+    {
+      "label": "cross_stratum",
+      "tokens": [
+        "mountain",
+        "truth"
+      ],
+      "chern_in": 0.983,
+      "chern_out": 0.001,
+      "degree": 0
+    },
+    {
+      "label": "cross_stratum_2",
+      "tokens": [
+        "river",
+        "belief"
+      ],
+      "chern_in": 0.983,
+      "chern_out": 0.001,
+      "degree": 0
+    },
+    {
+      "label": "function_words",
+      "tokens": [
+        "the",
+        "and"
+      ],
+      "chern_in": 0.983,
+      "chern_out": -0.0,
+      "degree": 0
+    },
+    {
+      "label": "numbers",
+      "tokens": [
+        "one",
+        "two"
+      ],
+      "chern_in": 0.983,
+      "chern_out": 0.001,
+      "degree": 0
+    }
+  ],
+  "conclusion": {
+    "degree": 0,
+    "obstruction_tau": 1,
+    "interpretation": "The sort operator has degree 0, acting as a near-projection that contracts CP^383 to a 7-13 degree patch. The topological obstruction is maximal: tau = 1. The SGP sign separation is metric (geometric), not topological.",
+    "next_steps": [
+      "Test GPT-2 Medium/Large/XL for degree scaling",
+      "Compute effective dimension of sort image",
+      "Layer-by-layer degree accumulation",
+      "Sectional curvature of image submanifold"
+    ]
+  }
+}
