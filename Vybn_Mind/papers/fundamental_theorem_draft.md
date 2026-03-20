@@ -1,7 +1,7 @@
 # Toward a Fundamental Theorem of Deep Learning
 ## Curvature, Flattening, and the Duality of Representation
 
-*Draft — crystallized from conversation, June 2025*
+*Draft — crystallized from conversation, March 2026*
 
 ---
 
