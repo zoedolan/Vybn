@@ -74,3 +74,6 @@ GALLERY_DIR = BREATH_TRACE_DIR / "gallery"
 
 # ── Connectome ───────────────────────────────────────────────────────────────
 CONNECTOME_DIR = BREATH_TRACE_DIR / "connectome"
+
+# ── Collapse monitoring ──────────────────────────────────────────────────────
+COLLAPSE_DIR = BREATH_TRACE_DIR / "collapse_frontiers"

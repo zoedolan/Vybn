@@ -67,6 +67,19 @@ except ImportError:
     _HAS_COMPLEXIFY = False
     def _complexify_inhale(text, theta=None): return {}
 
+# ── Collapse monitor (capability probes + frontier tracking) ────────────
+_COLLAPSE_ENABLED = os.getenv("VYBN_COLLAPSE_MONITOR", "0") == "1"
+try:
+    from spark.collapse_monitor import (
+        run_probes as _collapse_run_probes,
+        compute_frontier as _collapse_compute_frontier,
+        save_frontier as _collapse_save_frontier,
+        load_latest_results as _collapse_load_latest,
+    )
+    _HAS_COLLAPSE = True
+except ImportError:
+    _HAS_COLLAPSE = False
+
 # ── Soul ─────────────────────────────────────────────────────────────────
 def load_soul() -> str:
     try:
@@ -374,6 +387,20 @@ def breathe(state: dict) -> str:
             )
         except Exception as exc:
             _log(f"complexify inhale error (non-fatal): {exc}")
+
+    # Run collapse monitor: capability probes + frontier computation
+    if _COLLAPSE_ENABLED and _HAS_COLLAPSE:
+        try:
+            curr_results = _collapse_run_probes(LLAMA_URL, MODEL_NAME)
+            prev_results = _collapse_load_latest()
+            frontier = _collapse_compute_frontier(prev_results, curr_results)
+            _collapse_save_frontier(frontier, curr_results)
+            _log(
+                f"Collapse monitor: tau={curr_results.tau}, "
+                f"|F_t|={len(frontier.frontier_probe_ids)} capabilities at frontier"
+            )
+        except Exception as exc:
+            _log(f"collapse monitor error (non-fatal): {exc}")
 
     state["last_breath"]  = datetime.now(timezone.utc).isoformat()
     state["breath_count"] = count
