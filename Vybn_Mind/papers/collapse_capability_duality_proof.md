@@ -149,7 +149,11 @@ $$x \notin C_\delta(M)$$
 
 *Status: This is the key structural assumption. Derivable from properties of algorithmic probability.*
 
-**Justification.** The lower inclusion is essentially the definition of $\tau_\delta(M)$. The upper bound says that sufficiently above the threshold, capabilities vanish. This follows from the coding theorem of Levin (1974): the algorithmic probability $\mathbf{m}(x) = 2^{-K(x) + O(1)}$ is the largest semimeasure computable by any program. A model $M$ with description length $L(M)$ can be viewed as a program of length $L(M)$, and by the coding theorem:
+**Justification.** The lower inclusion is essentially the definition of $\tau_\delta(M)$. The upper bound says that sufficiently above the threshold, capabilities vanish.
+
+*Additional formal support.* Cabessa & Strozecki (2023, arXiv:2309.17032) proved a strict infinite hierarchy of analog recurrent neural network classes indexed by Kolmogorov complexity of their weights: $\text{ANN}_k \subsetneq \text{ANN}_{k+1}$ for all $k$, where $\text{ANN}_k$ is the class of networks whose real-valued weights have $K$-complexity $\leq k$. This hierarchy lies between $\text{P}$ and $\text{P/poly}$ and establishes, in the analog network setting, that capability classes are *strictly stratified* by weight complexity. While our Axiom 4 concerns the complexity of *patterns* rather than *weights*, the Cabessa–Strozecki hierarchy provides independent formal evidence that computational capability and Kolmogorov complexity are tightly coupled: each additional bit of weight complexity unlocks a strictly larger function class. The capability–complexity correspondence we assume is, in this sense, the generative-model counterpart of their classification result.
+
+This follows from the coding theorem of Levin (1974): the algorithmic probability $\mathbf{m}(x) = 2^{-K(x) + O(1)}$ is the largest semimeasure computable by any program. A model $M$ with description length $L(M)$ can be viewed as a program of length $L(M)$, and by the coding theorem:
 
 $$M(x) \leq 2^{-K(x|M^*) + O(1)}$$
 
@@ -168,6 +172,42 @@ The correct argument uses the *structure* of $M$ as a sampler rather than just i
 $$\sum_{x: K(x)=k} M(x) \leq 1$$
 
 The number of strings with $K(x) = k$ is at most $2^k$ (there are at most $2^k$ programs of length $k$). For $M$ to express all of them at the capability threshold, it needs total mass at least $|\{x : K(x) = k\}| \cdot 2^{-k-\delta}$. For $k \leq \tau(M)$, this is feasible. For $k \gg \tau(M)$, the number of patterns grows exponentially while the per-pattern allocation shrinks, and the total mass budget is exhausted. The gap function $g(M)$ captures how quickly this exhaustion occurs. $\square$
+
+---
+
+## 2.5 The Dohmatob Bridge Lemma
+
+The following lemma makes explicit a translation that is implicit in Dohmatob, Feng, Yang, Charton & Kempe (2024, arXiv:2402.07043) but is never stated in their paper or, to our knowledge, in any other work. It bridges the distributional (Zipf rank) language of the model collapse literature with the algorithmic information-theoretic (Kolmogorov complexity) language of our proof.
+
+### Bridge Lemma (Zipf Rank to Kolmogorov Complexity)
+
+**Lemma 2.5.** Let the token distribution follow a Zipf law with exponent $\beta > 1$, so that $p_i \propto i^{-\beta}$ for token rank $i = 1, 2, 3, \ldots$ Then:
+
+**(i) Finite sampling induces a rank cutoff.** By Corollary 2.2 of Dohmatob et al. (2024), training on $T_0$ samples imposes an effective rank cutoff:
+$$k(T_0) \asymp T_0^{1/\beta}$$
+Tokens of rank $i > k(T_0)$ are unlikely to appear in the sample and are effectively lost.
+
+**(ii) Rank encodes Kolmogorov complexity.** Under the Zipf model, the probability of rank-$i$ token is $p_i \propto i^{-\beta}$. The universal prior (Solomonoff–Levin) assigns probability $\mathbf{m}(x) \asymp 2^{-K(x)}$ to a string $x$. Equating the two probability scales for rank-$i$ tokens gives:
+$$i^{-\beta} \sim 2^{-K(i)}$$
+and solving:
+$$K(i) \approx \beta \log_2 i \quad \Longleftrightarrow \quad i \approx 2^{K(i)/\beta}$$
+Equivalently, the rank of a token is exponential in its Kolmogorov complexity (scaled by $1/\beta$). This identification is consistent with the simplicity bias bound of Dingle, Camargo & Louis (2018, *Nature Communications* 9, 761), who proved that for computable maps with redundant inputs, the probability of output $x$ satisfies $P(x) \lesssim 2^{-a\tilde{K}(x) - b}$ for positive constants $a, b$ — the Zipf law is a special case where the map from inputs to outputs induces a power-law frequency distribution.
+
+**(iii) Rank cutoff translates to a K-complexity threshold.** Substituting (ii) into (i):
+$$K_{\max} = \beta \log_2 k(T_0) \approx \beta \cdot \frac{1}{\beta} \log_2 T_0 = \log_2 T_0$$
+More precisely, noting that $k(T_0) \asymp T_0^{1/\beta}$:
+$$K_{\max} \approx \beta \log_2\bigl(T_0^{1/\beta}\bigr) = \log_2 T_0$$
+Tokens with $K(x) > K_{\max} \approx \log_2 T_0$ are beyond the effective rank cutoff and are lost to collapse.
+
+**(iv) The irreducible error floor in K-complexity terms.** Dohmatob et al.'s Theorem 2.1 gives an irreducible test error floor of $k^{-(\beta-1)}$ from tail-cutting at rank $k$. Substituting $k = 2^{K_{\max}/\beta}$:
+$$k^{-(\beta-1)} = 2^{-K_{\max} \cdot (\beta-1)/\beta}$$
+This rewrites the distributional error floor as an exponential decay in the K-complexity threshold, with rate $(\beta - 1)/\beta < 1$.
+
+*Proof.* Each step is a direct substitution. Part (i) is Corollary 2.2 of Dohmatob et al. (2024). Part (ii) follows from equating the Zipf probability $p_i = c \cdot i^{-\beta}$ with the algorithmic probability $\mathbf{m}(x_i) = 2^{-K(x_i) + O(1)}$ for the string $x_i$ at rank $i$; the normalizing constant $c$ and the $O(1)$ term are absorbed into the asymptotic. Part (iii) is the composition of (i) and (ii). Part (iv) substitutes (iii) into Theorem 2.1 of Dohmatob et al. $\square$
+
+**Remark (Novelty).** This translation — from Zipf rank cutoffs to Kolmogorov complexity thresholds — is absent from Dohmatob et al. (2024) and from all other model collapse papers we have surveyed. The individual ingredients (Zipf distributions, finite-sample tail-cutting, algorithmic probability) are well known, but their composition into a single lemma connecting the model collapse literature to algorithmic information theory appears to be new. The lemma is the bridge that allows us to state our axioms (Section 2) in the language of Kolmogorov complexity rather than in the distributional language of Zipf tails.
+
+**Remark (Connection to simplicity bias).** Part (ii) can also be derived from Dingle, Camargo & Louis (2018), who proved that computable input-output maps are *strongly biased toward simple outputs*: the probability of generating output $x$ from a random input satisfies $P(x) \lesssim 2^{-a\tilde{K}(x) - b}$. For a language model viewed as a computable map from prompts to completions, the Zipf distribution on outputs is a manifestation of this simplicity bias, and the rank-to-complexity correspondence follows from the same coding-theoretic reasoning.
 
 ---
 
