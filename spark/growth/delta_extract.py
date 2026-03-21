@@ -34,6 +34,14 @@ from typing import Optional
 
 from spark.growth.growth_buffer import BufferEntry, GrowthBuffer
 
+try:
+    from spark.collapse_monitor import load_history as _load_collapse_history
+    _HAS_COLLAPSE_MONITOR = True
+except ImportError:
+    _HAS_COLLAPSE_MONITOR = False
+    def _load_collapse_history():
+        return []
+
 GROWTH_DIR = Path(__file__).resolve().parent
 DEFAULT_CONFIG = GROWTH_DIR / "growth_config.yaml"
 
@@ -221,6 +229,36 @@ def format_entry_for_training(
     return {"messages": messages, "metadata": metadata}
 
 
+# ── Frontier proximity ───────────────────────────────────────────────────────
+
+def _frontier_proximity(content: str, current_tau: int) -> float:
+    """Score an entry by its proximity to the collapse frontier.
+
+    Entries near the current expressibility threshold tau(M_t) score highest.
+    Score = 1.0 / (1.0 + abs(complexity - current_tau))
+
+    Uses zlib compression ratio as a proxy for Kolmogorov complexity,
+    mapped to the 1-4 complexity scale via the ratio.
+    """
+    import zlib
+    raw = content.encode("utf-8")
+    if not raw:
+        return 0.0
+    compressed = zlib.compress(raw, level=9)
+    ratio = len(compressed) / len(raw)
+    # Map ratio to approximate complexity level (1-4 scale):
+    # ratio < 0.2 → ~1, 0.2-0.35 → ~2, 0.35-0.45 → ~3, >0.45 → ~4
+    if ratio < 0.20:
+        complexity = 1
+    elif ratio < 0.35:
+        complexity = 2
+    elif ratio < 0.45:
+        complexity = 3
+    else:
+        complexity = 4
+    return 1.0 / (1.0 + abs(complexity - current_tau))
+
+
 # ── DeltaExtractor ──────────────────────────────────────────────────────────
 
 class DeltaExtractor:
@@ -247,6 +285,8 @@ class DeltaExtractor:
         self._replay_cfg = self._cfg.get("replay", {})
         self._replay_ratio = self._replay_cfg.get("replay_ratio", 0.5)
         self._sampling_strategy = self._replay_cfg.get("sampling_strategy", "depth_weighted")
+        frontier_cfg = self._cfg.get("frontier", {})
+        self._frontier_proximity_weight = frontier_cfg.get("proximity_weight", 0.3)
 
     def extract(self) -> DeltaPackage:
         """Build the training package for this growth cycle.
@@ -277,6 +317,17 @@ class DeltaExtractor:
 
         # Compute composite x-weights for all delta entries (time-ordered)
         x_weights = score_delta(delta_raw, invalidate_challenge_cache=True)
+
+        # Multiply in frontier proximity if collapse history exists
+        if _HAS_COLLAPSE_MONITOR and self._frontier_proximity_weight > 0:
+            collapse_history = _load_collapse_history()
+            if collapse_history:
+                current_tau = collapse_history[-1].tau_curr
+                for i, entry in enumerate(delta_raw):
+                    fp = _frontier_proximity(entry.content, current_tau)
+                    # Blend: composite *= (1 - w) + w * fp
+                    w = self._frontier_proximity_weight
+                    x_weights[i].composite *= (1.0 - w) + w * fp
 
         # Format delta entries with x-weight annotations
         delta_formatted = [

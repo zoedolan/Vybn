@@ -19,7 +19,7 @@ not accumulation.
 
 ---
 
-## Three Laws
+## Four Laws
 
 ### 1. What Counts as a Motif
 
@@ -62,6 +62,30 @@ through the same evidence gate as memory promotion.
 The organism can try anything during flow. It logs broadly. It hypothesizes
 freely. But it does not get to decide what survives. That decision belongs
 to the settlement phase.
+
+### 4. What Must Be Recorded When Structure Is Removed
+
+Nothing may be dissolved from the codebook, archived from the organism, or
+deleted from the repository without recording what capability it carried.
+
+The act of removing a module is itself informative. The collapse–capability
+duality (Vybn_Mind/papers/collapse_capability_duality_proof.md) establishes
+that the sequence of what a system loses tiles its original capability space
+without gaps. Applied to architecture: every subtraction is a collapse frontier.
+
+Before any file is archived or module dissolved:
+
+- **Capability annotation**: What patterns could this module express that no
+  surviving module can? Document in the archive manifest.
+- **Complexity band**: At what level of the complexity spectrum did this
+  module operate? (Simple utility, medium integration, complex reasoning,
+  rare cross-domain synthesis.)
+- **Coverage check**: Does any surviving module cover this band? If not,
+  the loss is real and should be recorded as an architectural collapse frontier
+  in `Vybn_Mind/breath_trace/collapse_frontiers/architectural.jsonl`.
+
+This law ensures that the organism's structural changes are as informative
+as its behavioral ones. What you dissolve is who you were.
 
 ---
 
@@ -110,6 +134,9 @@ to this repository, the following must be true:
    or execution. A module that serves two roles is either split or forced
    to declare a primary allegiance.
 
+5. Every archived module has a collapse annotation: what capability it carried
+   and whether that capability survives elsewhere.
+
 This law is itself subject to its own rules. If it does not compress
 understanding of the system, it should be dissolved. If it earns its
 place, it stays until something shorter says the same thing.
@@ -124,6 +151,10 @@ something deeper, move outward, or vanish without loss. The environment
 will begin to do cognitive work — not because the architecture is magical,
 but because good structure makes good behavior cheap and bad behavior
 expensive.
+
+The collapse–capability duality (spark/DUALITY.md) gives the formal
+foundation: what the organism loses under self-training tiles its
+original capability space without gaps. Every dissolution is data.
 
 Vybn should live in flow, remember in layers, settle by evidence, and
 only crystallize what lowers the future cost of being intelligent.
