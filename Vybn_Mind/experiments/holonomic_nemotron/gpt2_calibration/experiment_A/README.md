@@ -1,66 +1,49 @@
-# Experiment A — Probe Calibration
-## Does the sort probe reproduce known GPT-2 geometry?
+# Experiment A v2 — Geometric Calibration
+## Does our instrument reproduce known GPT-2 geometry?
 
 ---
 
-## What this experiment does
+## What changed (v2)
 
-We already know from `compute_sort_degree.py` that GPT-2's sort degree is 0,
-meaning its first block produces a degenerate phase structure (near-zero loop
-area, no meaningful sign classes). This experiment runs the sort probe from
-the holonomic_nemotron pipeline against GPT-2 and checks whether it recovers
-that same result.
+v1 used an **untrained SortProbe** (random MLP) to measure "phase" — but
+random projections measure nothing about model geometry. All three criteria
+failed because the instrument was broken, not because GPT-2's geometry
+differs from expectations.
 
-**If it does:** the instrument is valid. Proceed to Experiment B.
-**If it does not:** something is wrong with the probe. Stop and ping Zoe.
+v2 replaces the SortProbe with **three direct geometric measurements** that
+require no learned parameters:
+
+1. **Pancharatnam phase profile** — measures the angular change between
+   consecutive layer representations in projective space
+2. **Berry curvature deg(S)** — computes the topological degree of the
+   sort operator via lattice gauge theory
+3. **Semantic stratification** — measures phase differences across concept
+   classes at the critical L0→L1 transition
 
 ---
 
 ## What to run
-
-Make sure you have activated the virtual environment and installed requirements
-(see the parent folder README). Then:
 
 ```bash
 # From gpt2_calibration/ folder:
 python experiment_A/run_A.py
 ```
 
-That is the only command. The script will:
-1. Download GPT-2 (small, 117M) automatically via HuggingFace
-2. Run the sort probe on 200 wikitext samples
-3. Measure the curvature ratio between block 0 and later blocks
-4. Compare to the known baseline (deg(S) = 0)
-5. Print a clear PASS or FAIL verdict
-6. Save full results to `../results/experiment_A_result.json`
-
-**Expected runtime:** 5–15 minutes on a Spark GPU.
+**Expected runtime:** 10-20 minutes (most time in Berry curvature computation).
 
 ---
 
 ## Pass criteria
 
-The experiment PASSES if ALL of the following are true:
-
-| Check | Required value | Meaning |
+| Check | Required | What it verifies |
 |---|---|---|
-| Mean phase magnitude | < 0.05 | Reproduces known near-zero sort degree |
-| Sign class entropy | < 0.5 bits | Degenerate / near-single-class distribution |
-| Curvature ratio L0→L1 | ≥ 3.0× max later | Block-0 is geometrically dominant |
-
-The script will evaluate these automatically and print the verdict.
-
----
-
-## What the output looks like
-
-See `expected_output.md` for an example of a passing run.
+| L0 dominance | L0→L1 / max(middle) ≥ 3.0 | First block performs the most violent geometric transformation |
+| U-shape | (L0 + Lfinal) / (2 × mean_middle) ≥ 2.0 | Encode/refine/decode three-phase structure |
+| deg(S) = 0 | \|mean degree\| < 0.5 | Sort operator is topologically trivial (known result) |
 
 ---
 
 ## If it fails
 
-1. Copy the full terminal output
-2. Save `../results/experiment_A_result.json` (the script creates it even on fail)
-3. Send both to Zoe with a note saying Experiment A failed
-4. Do NOT run Experiment B
+Save `../results/experiment_A_result.json` and terminal output, ping Zoe.
+Do NOT run Experiment B.
