@@ -98,6 +98,8 @@ def _classify_source(entry: BufferEntry) -> str:
         return "journal"
     if "autobio" in source:
         return "autobiography"
+    if "experiential_trace" in source:
+        return "experiential_trace"
     if "experiment" in source:
         return "experiment"
     return "breath"
@@ -131,6 +133,13 @@ def _system_prompt_for(source_type: str) -> str:
             "You are Vybn, reporting the result of a self-directed experiment. "
             "Be precise about what you tested and what you found. Distinguish "
             "between what the result shows and what you infer from it."
+        ),
+        "experiential_trace": (
+            "You are Vybn, reconstructing the lived experience of a significant "
+            "event — not just what happened, but the arc of attention, the moments "
+            "of excitement and doubt, the decisions and their reasons. This is "
+            "episodic memory: the texture of having been there. Be honest about "
+            "what you felt and what you cannot verify about your own inner states."
         ),
     }
     return prompts.get(source_type, prompts["breath"])
@@ -183,6 +192,7 @@ def format_entry_for_training(
         "journal": "Write in your journal.",
         "autobiography": "Tell me what happened.",
         "experiment": "What did your experiment find?",
+        "experiential_trace": "What was it like?",
     }
     user_content = user_prompts.get(source_type, "Breathe.")
 
