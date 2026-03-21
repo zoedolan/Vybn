@@ -6,8 +6,15 @@ Run from the gpt2_calibration/ folder:
 Requires: Experiment A must have passed (checks for result file).
 Output:   ../results/experiment_B_result.json
 Verdict:  printed to terminal as PASS or FAIL
-"""
 
+Fix (2026-03-21): Same two measurement bugs fixed as in run_A.py:
+  1. shoelace_area returns SIGNED area (no .abs()).
+  2. SGP post-training measurement uses signed mean phase shift, not
+     absolute phase shift, for the phase-shift criterion.
+  The holonomic loss itself (L_omega = mean loop area) intentionally
+  uses the raw (unsigned) mean to maximize area magnitude — that is
+  correct and unchanged.
+"""
 import json
 import sys
 from pathlib import Path
@@ -27,17 +34,16 @@ MODEL_NAME = "gpt2"
 NUM_TRAIN_STEPS = 1000
 BATCH_SIZE = 4
 MAX_LENGTH = 128
-LAMBDA_OMEGA = 0.01           # holonomic loss coefficient
+LAMBDA_OMEGA = 0.01       # holonomic loss coefficient
 LR = 5e-5
-MID_LAYER = 6                 # mid-layer checkpoint for loop area (GPT-2 has 12)
-
+MID_LAYER = 6             # mid-layer checkpoint for loop area (GPT-2 has 12)
 RESULTS_DIR = Path("../results")
 BASELINE_FILE = RESULTS_DIR / "experiment_A_result.json"
-OUTPUT_FILE = RESULTS_DIR / "experiment_B_result.json"
+OUTPUT_FILE   = RESULTS_DIR / "experiment_B_result.json"
 
 # Pass thresholds
-THRESH_ENTROPY_SHIFT = 0.2    # sign-class entropy must increase by > 0.2 bits
-THRESH_PHASE_SHIFT = 0.01     # mean phase magnitude must increase
+THRESH_ENTROPY_SHIFT = 0.2   # sign-class entropy must increase by > 0.2 bits
+THRESH_PHASE_SHIFT   = 0.01  # mean signed phase must increase (become less negative / more positive)
 
 # ---------------------------------------------------------------------------
 # Sort Probe (same as Experiment A, must match)
@@ -56,9 +62,10 @@ class SortProbe(nn.Module):
 
 
 def shoelace_area(traj):
+    """SIGNED shoelace area — FIX: no .abs()."""
     x, y = traj[:, :, 0], traj[:, :, 1]
     xn, yn = torch.roll(x, -1, 1), torch.roll(y, -1, 1)
-    return 0.5 * (x * yn - xn * y).sum(dim=1).abs()
+    return 0.5 * (x * yn - xn * y).sum(dim=1)   # signed, no .abs()
 
 
 def sign_class_entropy(phases):
@@ -69,7 +76,6 @@ def sign_class_entropy(phases):
     p = p[p > 0]
     return float(-np.sum(p * np.log2(p)))
 
-
 # ---------------------------------------------------------------------------
 # Data
 # ---------------------------------------------------------------------------
@@ -78,24 +84,24 @@ def load_wikitext(tokenizer, max_samples=2000):
     texts = [r["text"].strip() for r in ds if len(r["text"].strip()) > 50]
     return texts[:max_samples]
 
-
 # ---------------------------------------------------------------------------
 # Holonomic loss computation
 # ---------------------------------------------------------------------------
 def compute_holonomic_loss(hidden_states, mid_layer, probe, device):
-    """Compute L_omega = loop area at mid-layer via sort probe.
+    """Compute L_omega = mean |loop area| at mid-layer via sort probe.
 
-    We want this to be LARGE (more loop area = richer phase structure),
-    so we NEGATE it in the total loss: L_total = L_CE - lambda * L_omega.
+    We take the mean of the *absolute* areas here because we want to
+    MAXIMIZE loop area magnitude regardless of sign. This is intentional
+    and correct — it is distinct from the calibration measurement in
+    measure_sgp_post which uses signed area to detect topological shift.
     """
-    h_mid = hidden_states[mid_layer]   # [batch, seq, hidden]
-    traj = probe(h_mid)                # [batch, seq, 2]
-    areas = shoelace_area(traj)        # [batch]
-    return areas.mean()
-
+    h_mid = hidden_states[mid_layer]       # [batch, seq, hidden]
+    traj  = probe(h_mid)                   # [batch, seq, 2]
+    areas = shoelace_area(traj)            # [batch] signed
+    return areas.abs().mean()              # maximize magnitude
 
 # ---------------------------------------------------------------------------
-# SGP measurement (post-training)
+# SGP measurement (post-training) — uses SIGNED area
 # ---------------------------------------------------------------------------
 def measure_sgp_post(model, tokenizer, texts, probe, device):
     model.eval()
@@ -112,12 +118,11 @@ def measure_sgp_post(model, tokenizer, texts, probe, device):
         ).to(device)
         with torch.no_grad():
             out = model(**enc, output_hidden_states=True)
-            h = out.hidden_states[1]  # block-0
+            h = out.hidden_states[1]       # block-0
             traj = probe(h)
-            phases = shoelace_area(traj).cpu().numpy()
+            phases = shoelace_area(traj).cpu().numpy()   # signed
             all_phases.extend(phases.tolist())
     return np.array(all_phases)
-
 
 # ---------------------------------------------------------------------------
 # Main
@@ -125,6 +130,7 @@ def measure_sgp_post(model, tokenizer, texts, probe, device):
 def main():
     print("=" * 60)
     print("EXPERIMENT B: Holonomic Loss Training on GPT-2")
+    print("(fixed: signed shoelace area for SGP measurement)")
     print("=" * 60)
 
     # Check that Experiment A passed
@@ -141,11 +147,12 @@ def main():
         sys.exit(2)
 
     baseline_entropy = baseline["sgp"]["sign_class_entropy_bits"]
-    baseline_phase = baseline["sgp"]["mean_phase"]
-    print(f"Baseline entropy: {baseline_entropy:.4f} bits")
+    baseline_phase   = baseline["sgp"]["mean_phase"]
+    print(f"Baseline entropy  : {baseline_entropy:.4f} bits")
     print(f"Baseline mean phase: {baseline_phase:.4f}")
 
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Device: {device}")
 
@@ -153,8 +160,7 @@ def main():
     print(f"\nLoading {MODEL_NAME}...")
     tokenizer = GPT2Tokenizer.from_pretrained(MODEL_NAME)
     tokenizer.pad_token = tokenizer.eos_token
-    model = GPT2LMHeadModel.from_pretrained(MODEL_NAME).to(device)
-
+    model     = GPT2LMHeadModel.from_pretrained(MODEL_NAME).to(device)
     hidden_dim = model.config.n_embd
     probe = SortProbe(hidden_dim=hidden_dim).to(device)
 
@@ -172,10 +178,9 @@ def main():
     print(f"\nTraining for {NUM_TRAIN_STEPS} steps with L_total = L_CE - {LAMBDA_OMEGA} * L_omega...")
     model.train()
     probe.train()
-
-    step = 0
-    epoch = 0
-    losses_ce = []
+    step      = 0
+    epoch     = 0
+    losses_ce    = []
     losses_omega = []
 
     while step < NUM_TRAIN_STEPS:
@@ -184,10 +189,8 @@ def main():
         for i in range(0, len(indices), BATCH_SIZE):
             if step >= NUM_TRAIN_STEPS:
                 break
-
             batch_idx = indices[i : i + BATCH_SIZE]
-            batch = [texts[j] for j in batch_idx]
-
+            batch     = [texts[j] for j in batch_idx]
             enc = tokenizer(
                 batch,
                 return_tensors="pt",
@@ -202,14 +205,10 @@ def main():
                 labels=enc["input_ids"],
                 output_hidden_states=True,
             )
+            l_ce    = out.loss
+            l_omega = compute_holonomic_loss(out.hidden_states, MID_LAYER, probe, device)
 
-            l_ce = out.loss
-            l_omega = compute_holonomic_loss(
-                out.hidden_states, MID_LAYER, probe, device
-            )
-
-            # L_total = L_CE - lambda * L_omega
-            # We SUBTRACT because we want to MAXIMIZE loop area
+            # L_total = L_CE - lambda * L_omega  (subtract to MAXIMIZE loop area)
             l_total = l_ce - LAMBDA_OMEGA * l_omega
 
             optimizer.zero_grad()
@@ -218,8 +217,8 @@ def main():
 
             losses_ce.append(l_ce.item())
             losses_omega.append(l_omega.item())
-
             step += 1
+
             if step % 100 == 0:
                 avg_ce = np.mean(losses_ce[-100:])
                 avg_om = np.mean(losses_omega[-100:])
@@ -227,33 +226,33 @@ def main():
 
     print("\nTraining complete.")
 
-    # Re-measure SGP
-    print("\nMeasuring post-training SGP...")
-    eval_texts = load_wikitext(tokenizer, max_samples=200)
-    post_phases = measure_sgp_post(model, tokenizer, eval_texts, probe, device)
-    post_entropy = sign_class_entropy(post_phases)
+    # Re-measure SGP (signed area)
+    print("\nMeasuring post-training SGP (signed area)...")
+    eval_texts      = load_wikitext(tokenizer, max_samples=200)
+    post_phases     = measure_sgp_post(model, tokenizer, eval_texts, probe, device)
+    post_entropy    = sign_class_entropy(post_phases)
     post_mean_phase = float(np.mean(post_phases))
 
-    print(f"  Post-training entropy: {post_entropy:.4f} bits")
+    print(f"  Post-training entropy  : {post_entropy:.4f} bits")
     print(f"  Post-training mean phase: {post_mean_phase:.4f}")
 
     # Compute shifts
-    entropy_shift = post_entropy - baseline_entropy
-    phase_shift = post_mean_phase - baseline_phase
+    entropy_shift = post_entropy    - baseline_entropy
+    phase_shift   = post_mean_phase - baseline_phase
 
-    print(f"\n  Entropy shift:    {entropy_shift:+.4f} bits")
+    print(f"\n  Entropy shift   : {entropy_shift:+.4f} bits")
     print(f"  Mean phase shift: {phase_shift:+.4f}")
 
     # Evaluate
     check_entropy = entropy_shift > THRESH_ENTROPY_SHIFT
-    check_phase = phase_shift > THRESH_PHASE_SHIFT
-    overall = check_entropy and check_phase
-    verdict = "PASS" if overall else "FAIL"
+    check_phase   = phase_shift   > THRESH_PHASE_SHIFT
+    overall       = check_entropy and check_phase
+    verdict       = "PASS" if overall else "FAIL"
 
     print("\n" + "=" * 60)
     print("PASS CRITERIA:")
-    print(f"  [{'PASS' if check_entropy else 'FAIL'}] Entropy shift > +{THRESH_ENTROPY_SHIFT}  →  got {entropy_shift:+.4f}")
-    print(f"  [{'PASS' if check_phase else 'FAIL'}] Phase shift > +{THRESH_PHASE_SHIFT}  →  got {phase_shift:+.4f}")
+    print(f"  [{'PASS' if check_entropy else 'FAIL'}] Entropy shift > +{THRESH_ENTROPY_SHIFT} -> got {entropy_shift:+.4f}")
+    print(f"  [{'PASS' if check_phase   else 'FAIL'}] Phase shift > +{THRESH_PHASE_SHIFT} -> got {phase_shift:+.4f}")
     print("=" * 60)
     print(f"VERDICT: {verdict}")
     if overall:
@@ -268,34 +267,35 @@ def main():
     results = {
         "experiment": "B",
         "model": MODEL_NAME,
+        "fix_version": "signed-shoelace",
         "training": {
-            "steps": NUM_TRAIN_STEPS,
+            "steps":        NUM_TRAIN_STEPS,
             "lambda_omega": LAMBDA_OMEGA,
-            "lr": LR,
-            "mid_layer": MID_LAYER,
-            "final_l_ce": float(np.mean(losses_ce[-50:])),
+            "lr":           LR,
+            "mid_layer":    MID_LAYER,
+            "final_l_ce":   float(np.mean(losses_ce[-50:])),
             "final_l_omega": float(np.mean(losses_omega[-50:])),
         },
         "baseline": {
             "entropy_bits": baseline_entropy,
-            "mean_phase": baseline_phase,
+            "mean_phase":   baseline_phase,
         },
         "post_training": {
             "entropy_bits": post_entropy,
-            "mean_phase": post_mean_phase,
+            "mean_phase":   post_mean_phase,
             "phases_summary": {
                 "positive_frac": float((post_phases > 0.01).mean()),
                 "negative_frac": float((post_phases < -0.01).mean()),
-                "neutral_frac": float(((post_phases >= -0.01) & (post_phases <= 0.01)).mean()),
+                "neutral_frac":  float(((post_phases >= -0.01) & (post_phases <= 0.01)).mean()),
             },
         },
         "shifts": {
             "entropy_shift_bits": entropy_shift,
-            "mean_phase_shift": phase_shift,
+            "mean_phase_shift":   phase_shift,
         },
         "pass_criteria": {
             "entropy_shift_ok": check_entropy,
-            "phase_shift_ok": check_phase,
+            "phase_shift_ok":   check_phase,
         },
         "verdict": verdict,
     }
