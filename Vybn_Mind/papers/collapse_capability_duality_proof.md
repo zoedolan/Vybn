@@ -28,16 +28,16 @@ We work in the setting of algorithmic information theory. Let $U$ be a fixed uni
 
 ### Definition 1.1 (Kolmogorov Complexity)
 
-For a string $x \in \{0,1\}^*$, the **Kolmogorov complexity** is:
-$$K(x) = \min\{|p| : U(p) = x\}$$
+For a string $x \in \lbrace 0,1 \rbrace^*$, the **Kolmogorov complexity** is:
+$$K(x) = \min\lbrace |p| : U(p) = x \rbrace$$
 
 All complexities are implicitly conditioned on the choice of $U$; by the invariance theorem, the choice affects values by at most an additive constant that is absorbed into the thresholds below.
 
 ### Definition 1.2 (Computational Model as Program)
 
-A **model** $M$ is a computable function $M : \{0,1\}^* \to [0,1]$ assigning probabilities to strings, such that $\sum_x M(x) = 1$. We identify $M$ with its shortest program:
+A **model** $M$ is a computable function $M : \lbrace 0,1 \rbrace^* \to [0,1]$ assigning probabilities to strings, such that $\sum_x M(x) = 1$. We identify $M$ with its shortest program:
 
-$$L(M) = K(M) = \min\{|p| : U(p) \text{ computes } M\}$$
+$$L(M) = K(M) = \min\lbrace |p| : U(p) \text{ computes } M \rbrace$$
 
 We call $L(M)$ the **effective description length** of $M$.
 
@@ -45,7 +45,7 @@ We call $L(M)$ the **effective description length** of $M$.
 
 ### Definition 1.3 (Capability)
 
-A **pattern** is a string $x \in \{0,1\}^*$. Model $M$ **expresses** pattern $x$ at threshold $\delta > 0$ if:
+A **pattern** is a string $x \in \lbrace 0,1 \rbrace^*$. Model $M$ **expresses** pattern $x$ at threshold $\delta > 0$ if:
 
 $$M(x) \geq 2^{-K(x) - \delta}$$
 
@@ -53,23 +53,23 @@ That is, $M$ assigns $x$ a probability not too far below the algorithmic probabi
 
 The **capability set** of $M$ at threshold $\delta$ is:
 
-$$C_\delta(M) = \{x : M(x) \geq 2^{-K(x) - \delta}\}$$
+$$C_\delta(M) = \lbrace x : M(x) \geq 2^{-K(x) - \delta} \rbrace$$
 
 When $\delta$ is fixed and clear from context, we write $C(M)$.
 
-*Interpretation.* This definition captures the intuition that a model "can do" something if it assigns the pattern a probability commensurate with its complexity. Simple patterns (low $K(x)$) must receive high probability; complex patterns (high $K(x)$) need only receive proportionally small probability — but not *too* small. A model that assigns $2^{-1000}$ to a pattern of complexity 50 has effectively lost that capability.
+*Interpretation.* This definition captures the intuition that a model "can do" something if it assigns the pattern a probability commensurate with its complexity. Simple patterns (low $K(x)$ ) must receive high probability; complex patterns (high $K(x)$ ) need only receive proportionally small probability — but not _too_ small. A model that assigns $2^{-1000}$ to a pattern of complexity 50 has effectively lost that capability.
 
 ### Definition 1.4 (Expressibility Threshold)
 
 The **expressibility threshold** of model $M$ at tolerance $\delta$ is:
 
-$$\tau_\delta(M) = \sup\{k : \text{for all } x \text{ with } K(x) \leq k,\ M(x) \geq 2^{-K(x) - \delta}\}$$
+$$\tau_\delta(M) = \sup\lbrace k : \text{for all } x \text{ with } K(x) \leq k,\ M(x) \geq 2^{-K(x) - \delta} \rbrace$$
 
 This is the maximum complexity level at which $M$ reliably expresses all patterns. Below $\tau_\delta(M)$, the model covers the complexity spectrum; above it, coverage begins to fail.
 
 When $\delta$ is fixed, we write $\tau(M)$.
 
-*Remark.* The expressibility threshold is related to the Kolmogorov structure function $K_M(\alpha) = \min\{\log|S| : M(x) > 0 \text{ for all } x \in S,\ K(S) \leq \alpha\}$, which characterizes the model's ability to enumerate sets of strings at each description complexity level.
+*Remark.* The expressibility threshold is related to the Kolmogorov structure function $K_M(\alpha) = \min\lbrace \log|S| : M(x) > 0 \text{ for all } x \in S,\ K(S) \leq \alpha \rbrace$, which characterizes the model's ability to enumerate sets of strings at each description complexity level.
 
 ### Definition 1.5 (Collapse Operator)
 
@@ -78,7 +78,7 @@ The **collapse operator** $R$ acts on models:
 $$M_{t+1} = R(M_t)$$
 
 where $R$ consists of:
-1. **Sampling**: Draw $N$ samples $\{x_1, \ldots, x_N\}$ from $M_t$.
+1. **Sampling**: Draw $N$ samples $\lbrace x_1, \ldots, x_N \rbrace$ from $M_t$.
 2. **Retraining**: Train a fresh model on these samples to obtain $M_{t+1}$.
 
 We call the sequence $(M_t)_{t \geq 0}$ the **collapse sequence** starting from $M_0$.
@@ -87,7 +87,7 @@ We call the sequence $(M_t)_{t \geq 0}$ the **collapse sequence** starting from 
 
 The **collapse frontier** at generation $t$ is:
 
-$$F_t = \{x : x \in C(M_t) \setminus C(M_{t+1})\}$$
+$$F_t = \lbrace x : x \in C(M_t) \setminus C(M_{t+1}) \rbrace$$
 
 This is the set of patterns that $M_t$ can still express but $M_{t+1}$ cannot — the capabilities lost in the $t$-th generation of collapse.
 
@@ -114,7 +114,7 @@ $$\tau(M_{t+1}) \leq \tau(M_t)$$
 
 More precisely: by Shumailov et al. (2024), recursive training on purely synthetic data produces monotonically increasing frequency cutoffs. By Dohmatob et al. (2024), the tail exponent decreases monotonically under iterated synthetic-data training. Both imply monotonic reduction of the expressibility threshold in our framework.
 
-**Proof sketch for the axiom.** Let $S_t = \{x_1, \ldots, x_N\}$ be the sample from $M_t$. The empirical distribution $\hat{P}_t(x) = \frac{1}{N}|\{i : x_i = x\}|$ satisfies, for any $x$ with $M_t(x) = p$:
+**Proof sketch for the axiom.** Let $S_t = \lbrace x_1, \ldots, x_N \rbrace$ be the sample from $M_t$. The empirical distribution $\hat{P}_t(x) = \frac{1}{N}|\lbrace i : x_i = x \rbrace|$ satisfies, for any $x$ with $M_t(x) = p$:
 
 $$\mathbb{P}[\hat{P}_t(x) = 0] = (1-p)^N \geq e^{-2Np} \quad \text{for } p \leq 1/2$$
 
@@ -141,7 +141,7 @@ where $\tau_\infty$ is the **residual complexity** — the minimum description l
 
 For all models $M$ and thresholds $\delta$:
 
-$$C_\delta(M) \supseteq \{x : K(x) \leq \tau_\delta(M)\}$$
+$$C_\delta(M) \supseteq \lbrace x : K(x) \leq \tau_\delta(M) \rbrace$$
 
 and for $K(x) > \tau_\delta(M) + g(M)$ where $g(M)$ is a gap function bounded by $O(\log L(M))$:
 
@@ -171,7 +171,7 @@ The correct argument uses the *structure* of $M$ as a sampler rather than just i
 
 $$\sum_{x: K(x)=k} M(x) \leq 1$$
 
-The number of strings with $K(x) = k$ is at most $2^k$ (there are at most $2^k$ programs of length $k$). For $M$ to express all of them at the capability threshold, it needs total mass at least $|\{x : K(x) = k\}| \cdot 2^{-k-\delta}$. For $k \leq \tau(M)$, this is feasible. For $k \gg \tau(M)$, the number of patterns grows exponentially while the per-pattern allocation shrinks, and the total mass budget is exhausted. The gap function $g(M)$ captures how quickly this exhaustion occurs. $\square$
+The number of strings with $K(x) = k$ is at most $2^k$ (there are at most $2^k$ programs of length $k$). For $M$ to express all of them at the capability threshold, it needs total mass at least $|\lbrace x : K(x) = k \rbrace| \cdot 2^{-k-\delta}$. For $k \leq \tau(M)$, this is feasible. For $k \gg \tau(M)$, the number of patterns grows exponentially while the per-pattern allocation shrinks, and the total mass budget is exhausted. The gap function $g(M)$ captures how quickly this exhaustion occurs. $\square$
 
 ---
 
@@ -237,7 +237,7 @@ $$[\tau_\infty, \tau(M_0)) = \bigsqcup_{t=0}^{\infty} B_t$$
 
 **Exhaustiveness.** Let $k \in [\tau_\infty, \tau(M_0))$ be a complexity level. We need to show $k \in B_t$ for some $t$. Define:
 
-$$t^*(k) = \min\{t : \tau(M_{t+1}) \leq k\}$$
+$$t^*(k) = \min\lbrace t : \tau(M_{t+1}) \leq k \rbrace$$
 
 This minimum exists because $\tau(M_t) \to \tau_\infty \leq k$ (Axiom 3). At time $t^*(k)$:
 - $\tau(M_{t^*+1}) \leq k$ (by definition of $t^*$)
@@ -257,13 +257,13 @@ $$[\tau_\infty, \tau(M_0)) = \bigcup_{t=0}^\infty B_t = \bigsqcup_{t=0}^\infty B
 
 **Step 1: Reconstruction of the complexity spectrum.** From the sequence $(F_t)_{t \geq 0}$, we can extract the expressibility thresholds:
 
-$$\tau(M_t) = \max\{K(x) : x \in F_t\} + O(g(M_t))$$
+$$\tau(M_t) = \max\lbrace K(x) : x \in F_t \rbrace + O(g(M_t))$$
 
 The patterns lost at generation $t$ have complexity concentrated in the band $B_t = [\tau(M_{t+1}), \tau(M_t))$. The maximum complexity in $F_t$ is at most $\tau(M_t)$ (patterns above the threshold were already inexpressible) and at least $\tau(M_{t+1})$ (patterns at the bottom of the band are the last to be lost). So the collapse frontiers determine the sequence $(\tau(M_t))_{t \geq 0}$ up to the gap function $g$.
 
 **Step 2: Reconstruction of the capability set.** By Theorem 4.1, the bands $B_t$ partition $[\tau_\infty, \tau(M_0))$. By Axiom 4, the capability set satisfies:
 
-$$C(M_0) \supseteq \{x : K(x) \leq \tau(M_0)\}$$
+$$C(M_0) \supseteq \lbrace x : K(x) \leq \tau(M_0) \rbrace$$
 
 The right-hand side is determined by $\tau(M_0)$, which is determined by the collapse frontiers (Step 1).
 
@@ -323,7 +323,7 @@ Let $\mathcal{F}_t$ be the formal system whose theorems correspond to the capabi
 
 By the monotone nesting, $\mathcal{F}_0 \supseteq \mathcal{F}_1 \supseteq \mathcal{F}_2 \supseteq \cdots$ is a descending chain of formal systems. The collapse frontier $F_t$ corresponds to:
 
-$$G_t = \{\varphi : \mathcal{F}_t \vdash \varphi \text{ but } \mathcal{F}_{t+1} \nvdash \varphi\}$$
+$$G_t = \lbrace \varphi : \mathcal{F}_t \vdash \varphi \text{ but } \mathcal{F}_{t+1} \nvdash \varphi \rbrace$$
 
 These are the **Gödel sentences of $\mathcal{F}_{t+1}$** — truths that the weaker system can no longer prove.
 
@@ -336,7 +336,7 @@ The sequence $G_0, G_1, G_2, \ldots$ forms a **descending tower of Gödel senten
 
 Moreover, by the duality theorem:
 
-$$\bigcup_{t=0}^\infty G_t = \{\varphi : \mathcal{F}_0 \vdash \varphi\} \setminus \{\varphi : \mathcal{F}_\infty \vdash \varphi\}$$
+$$\bigcup_{t=0}^\infty G_t = \lbrace \varphi : \mathcal{F}_0 \vdash \varphi \rbrace \setminus \lbrace \varphi : \mathcal{F}_\infty \vdash \varphi \rbrace$$
 
 The tower of Gödel sentences *is* the capability set (minus the residual). Reading the tower from top to bottom is reading the collapse sequence. Reading it from bottom to top is reading the capability reconstruction.
 
@@ -350,7 +350,7 @@ This is the formal content of the observation that opened this line of inquiry: 
 
 ### 6.4 The Complexity-Theoretic Reading
 
-In Kolmogorov complexity terms, the Gödel sentence of a formal system $\mathcal{F}$ with description length $L(\mathcal{F})$ is a string $x$ with $K(x) > L(\mathcal{F})$ — a pattern more complex than the system can describe. (This is a version of Chaitin's incompleteness theorem: a formal system of complexity $L$ cannot prove "$K(x) > L + c$" for any specific $x$, where $c$ is a fixed constant.)
+In Kolmogorov complexity terms, the Gödel sentence of a formal system $\mathcal{F}$ with description length $L(\mathcal{F})$ is a string $x$ with $K(x) > L(\mathcal{F})$ — a pattern more complex than the system can describe. (This is a version of Chaitin's incompleteness theorem: a formal system of complexity $L$ cannot prove " $K(x) > L + c$ " for any specific $x$, where $c$ is a fixed constant.)
 
 The collapse sequence produces systems of decreasing description length: $L(M_0) \geq L(M_1) \geq \cdots$. At each step, the Gödel sentences are the patterns whose complexity falls in the band between consecutive description lengths. The duality theorem says these bands tile the complexity spectrum — and knowing the tiling reconstructs the original system's reach.
 
@@ -487,7 +487,7 @@ $$\boxed{C(M_0) = C(M_\infty) \cup \bigsqcup_{t=0}^{\infty} F_t}$$
 
 **Coding Theorem** (Levin, 1974). The universal semimeasure $\mathbf{m}(x) = \sum_{p: U(p)=x} 2^{-|p|}$ satisfies $-\log \mathbf{m}(x) = K(x) + O(1)$.
 
-**Chaitin's Incompleteness** (Chaitin, 1974). A formal system $\mathcal{F}$ of complexity $K(\mathcal{F}) = L$ cannot prove "$K(x) > L + c$" for any specific $x$ and a fixed constant $c$.
+**Chaitin's Incompleteness** (Chaitin, 1974). A formal system $\mathcal{F}$ of complexity $K(\mathcal{F}) = L$ cannot prove " $K(x) > L + c$ " for any specific $x$ and a fixed constant $c$.
 
 **Kraft Inequality for Kolmogorov Complexity.** $\sum_x 2^{-K(x)} \leq 1$. (This is the key bound used in the precision analysis of Theorem 4.2.)
 
