@@ -1,15 +1,17 @@
-# GPT-2 Calibration Experiment
+# GPT-2 Calibration Experiments
 ## Holonomic Nemotron Pipeline — Stage 1 of 2
 
 ---
 
 ## Who this is for
 
-Hi Vaibhav. This folder contains two self-contained experiments that need to run
-on the Spark before we touch Nemotron-Super-120B. Please run them in order:
-Experiment A first, then Experiment B only if A passes. Each experiment has its
-own Python script with clear pass/fail output. You do not need to interpret the
-results — the scripts will print PASS or FAIL and tell you what to record.
+Hi Vaibhav. This folder contains three self-contained experiments that need to run
+on the Spark before we touch Nemotron-Super-120B. Run them in order:
+Experiment A first, then B only if A passes, then C only if A passes.
+(B and C are independent of each other — both depend on A.)
+Each experiment has its own Python script with clear output.
+You do not need to interpret the results — the scripts will print their
+verdict and tell you what to record.
 
 ---
 
@@ -43,11 +45,12 @@ gpt2_calibration/
   experiment_A/
     README.md            ← step-by-step instructions for Experiment A
     run_A.py             ← the script to execute
-    expected_output.md   ← what a passing run looks like
   experiment_B/
     README.md            ← step-by-step instructions for Experiment B
     run_B.py             ← the script to execute
-    expected_output.md   ← what a passing run looks like
+  experiment_C/
+    README.md            ← step-by-step instructions for Experiment C
+    run_C.py             ← the script to execute
   results/               ← output JSON files land here (git-ignored for large files)
 ```
 
@@ -102,16 +105,38 @@ python experiment_B/run_B.py
 ```
 
 **Decision gate:**
-- PASS → both results are the green light for Nemotron Phase 0
+- PASS → green light for Nemotron Phase 0
 - FAIL → null result, still valuable — save JSON, ping Zoe
+
+---
+
+## Experiment C — Exploit Cartography (run only if A passes)
+
+See `experiment_C/README.md` for full instructions.
+
+Experiment C is independent of B. It uses the model's own optimization pressure
+as a probe: three sequential geometric objectives, each closing the previous
+exploit, mapping the affordance structure of GPT-2's representational space.
+
+**One-liner:**
+```bash
+python experiment_C/run_C.py
+```
+
+**Verdict:**
+- INFORMATIVE → the model found distinct strategies as each loophole closed
+- FLAT → the geometry didn't differentiate across objectives (still a result)
+
+This experiment is cartographic, not pass/fail. The output is the map itself.
 
 ---
 
 ## What to send back
 
-When both experiments are done (or one fails), please send Zoe:
+When experiments are done (or one fails), please send Zoe:
 1. `results/experiment_A_result.json`
 2. `results/experiment_B_result.json` (if you got there)
-3. Any terminal errors or unexpected output, pasted into the message
+3. `results/experiment_C_result.json` (if you got there)
+4. Any terminal errors or unexpected output, pasted into the message
 
 That is everything needed to decide whether to proceed to Nemotron.
