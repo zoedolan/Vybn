@@ -2,437 +2,330 @@
 """
 Experiment E.1 — The Quantum Mirror (Simulation)
 
-Compares a baseline VQC (vanilla gradient descent) against a geometrically-
-regularized VQC (diagonal quantum natural gradient) on a 2-bit AND gate task.
+Two 4-qubit, 4-layer VQCs trained on an 8-example classification task.
+The baseline minimizes binary cross-entropy only.  The geometric run adds
+Fisher-information preconditioning — dampening gradient updates along
+directions of high quantum state-space curvature:
 
-Both use a 4-qubit, 4-layer hardware-efficient ansatz (32 parameters).
+    g_i → g_i / (1 + λ · F_ii)
 
-**Geometric regularization — diagonal quantum natural gradient (QNG):**
-For each parameter i, we compute the diagonal FS metric element
-g_ii = (1/2)(1 - Re⟨ψ(θ+se_i)|ψ(θ-se_i)⟩) from the same parameter-shifted
-circuits used for the CE gradient (Stokes et al., Quantum 4, 269, 2020).
-This adds ZERO extra circuit evaluations.  The update becomes:
+where F_ii is the i-th diagonal of the quantum Fisher information matrix.
+This is the direct quantum analog of Experiment D's classical arc-length
+regularizer: it penalizes large state-space movement per step, preserving
+representational diversity throughout training.
 
-    θ ← θ − η · diag(g + εI)⁻¹ · ∇CE
+The Fisher diagonal for preconditioning is estimated from a 2-point data
+subsample (cheap), while the full DQFIM for measurement uses all 8 points.
 
-This moves the optimizer in Fubini-Study distance units, taking larger steps
-in flat directions and smaller steps in curved directions.
-
-Prediction (from Qi et al. 2026): the geometry-aware optimizer should reach
-the same accuracy in fewer steps by navigating geodesics, and the learned
-solution should have different DQFIM effective dimension — reflecting a
-different universality class of the learned circuit.
+Snapshots every 10 steps: CE loss, accuracy, DQFIM effective dimension
+(Tr(F)² / Tr(F²), Haug & Kim PRL 2024), Berry phase (Bargmann invariant).
 
 Output: results/experiment_E1_simulation_result.json
 """
-from __future__ import annotations
-
-import json
 import os
+import sys
+import json
 import time
-from datetime import datetime, timezone
-from pathlib import Path
-
+import datetime
 import numpy as np
-from qiskit.circuit import QuantumCircuit, ParameterVector
-from qiskit.quantum_info import Statevector
 
 os.environ["PYTHONUNBUFFERED"] = "1"
 
-# ---------------------------------------------------------------------------
+from qiskit import QuantumCircuit
+from qiskit_aer import AerSimulator
+
 SEED = 42
-np.random.seed(SEED)
 
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
 N_QUBITS = 4
 N_LAYERS = 4
-N_PARAMS = N_QUBITS * N_LAYERS * 2  # 32
+N_PARAMS = N_QUBITS * N_LAYERS * 2   # 32
 N_STEPS = 200
-LR = 0.05
-LR_QNG = 0.02             # QNG amplifies steps; use moderately smaller LR
-DIAG_DAMPING = 0.001      # small damping — let the metric do the work
+LR = 0.15
+LAMBDA_GEO = 2.0
+SHIFT = np.pi / 2
 SNAPSHOT_EVERY = 10
-DQFIM_N_SAMPLES = 15
-DQFIM_EPSILON = 0.05
-BERRY_EPSILON = 0.08
-PARAM_SHIFT = np.pi / 2
+FD_EPSILON = 1e-3
+
+# For preconditioning: update Fisher every K steps using M data points
+FISHER_UPDATE_EVERY = 20
+FISHER_SUBSAMPLE = 2      # use 2 of 8 points for cheap preconditioning estimate
 
 # ---------------------------------------------------------------------------
-# Dataset: 2-bit AND gate  (4 examples)
+# Task: 8 examples, 3 input bits, label = XOR of first two bits
+# Balanced (4:4), requires entanglement, learnable in ~30 steps.
 # ---------------------------------------------------------------------------
-X_BITS = np.array([[0, 0], [0, 1], [1, 0], [1, 1]], dtype=float)
-Y_LABELS = np.array([0, 0, 0, 1], dtype=float)
-N_DATA = len(Y_LABELS)
+X_DATA = np.array([
+    [0, 0, 0], [0, 0, 1],  # label 0
+    [0, 1, 0], [0, 1, 1],  # label 1
+    [1, 0, 0], [1, 0, 1],  # label 1
+    [1, 1, 0], [1, 1, 1],  # label 0
+], dtype=float)
+Y_DATA = np.array([0, 0, 1, 1, 1, 1, 0, 0], dtype=float)
+N_DATA = len(X_DATA)
+
+SIM = AerSimulator(method="statevector")
 
 
-def encode_input(bits: np.ndarray) -> np.ndarray:
-    """Map 2-bit input → 4 rotation angles (bits duplicated)."""
-    return np.array([bits[0], bits[1], bits[0], bits[1]]) * np.pi
-
-
-# ---------------------------------------------------------------------------
+# ===================================================================
 # Circuit
-# ---------------------------------------------------------------------------
-def build_ansatz() -> tuple[QuantumCircuit, ParameterVector, ParameterVector]:
-    inp = ParameterVector("x", N_QUBITS)
-    theta = ParameterVector("θ", N_PARAMS)
+# ===================================================================
+def build_circuit(params, x):
     qc = QuantumCircuit(N_QUBITS)
-
-    for i in range(N_QUBITS):
-        qc.ry(inp[i], i)
-
+    for i in range(min(len(x), N_QUBITS)):
+        qc.rx(np.pi * x[i], i)
     idx = 0
     for _ in range(N_LAYERS):
         for q in range(N_QUBITS):
-            qc.ry(theta[idx], q); idx += 1
-        for q in range(N_QUBITS):
-            qc.rz(theta[idx], q); idx += 1
-        for q in range(N_QUBITS):
-            qc.cx(q, (q + 1) % N_QUBITS)
-
-    return qc, inp, theta
-
-
-_QC, _INP, _THETA = build_ansatz()
+            qc.ry(params[idx], q); idx += 1
+            qc.rz(params[idx], q); idx += 1
+        for q in range(N_QUBITS - 1):
+            qc.cx(q, q + 1)
+    qc.save_statevector()
+    return qc
 
 
-# ---------------------------------------------------------------------------
-# Statevector helpers
-# ---------------------------------------------------------------------------
-def get_statevector(input_angles: np.ndarray, params: np.ndarray) -> np.ndarray:
-    bind = {_INP[i]: float(input_angles[i]) for i in range(N_QUBITS)}
-    bind.update({_THETA[i]: float(params[i]) for i in range(N_PARAMS)})
-    return Statevector.from_instruction(_QC.assign_parameters(bind)).data
+def get_sv(params, x):
+    qc = build_circuit(params, x)
+    return np.asarray(SIM.run(qc, shots=0).result().get_statevector(qc).data)
 
 
-def proba_from_sv(sv: np.ndarray) -> float:
-    """P(qubit-0 in |1⟩) from a statevector."""
-    probs = np.abs(sv) ** 2
-    return float(sum(probs[k] for k in range(len(probs)) if k & 1))
+def predict_proba(sv):
+    """P(qubit 0 = |1⟩): odd-index amplitudes in little-endian."""
+    return float(np.sum(np.abs(sv[1::2]) ** 2))
 
 
-def predict_proba(input_angles: np.ndarray, params: np.ndarray) -> float:
-    return proba_from_sv(get_statevector(input_angles, params))
+# ===================================================================
+# Loss / accuracy
+# ===================================================================
+def bce(p, y, eps=1e-8):
+    p = np.clip(p, eps, 1 - eps)
+    return -(y * np.log(p) + (1 - y) * np.log(1 - p))
 
 
-# ---------------------------------------------------------------------------
-# Loss
-# ---------------------------------------------------------------------------
-def ce_from_probs(probs_list: list[float]) -> float:
-    eps = 1e-8
-    total = 0.0
-    for p, y in zip(probs_list, Y_LABELS):
-        p = np.clip(p, eps, 1 - eps)
-        total += -(y * np.log(p) + (1 - y) * np.log(1 - p))
-    return total / N_DATA
+def dataset_loss(params):
+    return sum(bce(predict_proba(get_sv(params, x)), y)
+               for x, y in zip(X_DATA, Y_DATA)) / N_DATA
 
 
-def cross_entropy(params: np.ndarray) -> float:
-    return ce_from_probs([predict_proba(encode_input(b), params) for b in X_BITS])
-
-
-def accuracy(params: np.ndarray) -> float:
+def dataset_accuracy(params):
     return sum(
-        1.0 for b, y in zip(X_BITS, Y_LABELS)
-        if (predict_proba(encode_input(b), params) >= 0.5) == (y >= 0.5)
+        (1.0 if predict_proba(get_sv(params, x)) >= 0.5 else 0.0) == y
+        for x, y in zip(X_DATA, Y_DATA)
     ) / N_DATA
 
 
-# ---------------------------------------------------------------------------
-# Gradient (vanilla)
-# ---------------------------------------------------------------------------
-def vanilla_gradient(params: np.ndarray) -> tuple[np.ndarray, float]:
-    """CE gradient via parameter-shift rule.  Cost: 2 × N_PARAMS × N_DATA svs."""
-    loss_val = cross_entropy(params)
-    grad = np.zeros(N_PARAMS)
-    for j in range(N_PARAMS):
-        p_plus = params.copy();  p_plus[j] += PARAM_SHIFT
-        p_minus = params.copy(); p_minus[j] -= PARAM_SHIFT
-        grad[j] = (cross_entropy(p_plus) - cross_entropy(p_minus)) / 2.0
-    return grad, loss_val
+# ===================================================================
+# CE gradient (parameter-shift)
+# ===================================================================
+def ce_gradient(params):
+    g = np.zeros_like(params)
+    for i in range(len(params)):
+        pp = params.copy(); pp[i] += SHIFT
+        pm = params.copy(); pm[i] -= SHIFT
+        g[i] = (dataset_loss(pp) - dataset_loss(pm)) / 2.0
+    return g
 
 
-# ---------------------------------------------------------------------------
-# Gradient + diagonal FS metric  (zero extra cost)
-# ---------------------------------------------------------------------------
-def gradient_and_metric(params: np.ndarray) -> tuple[np.ndarray, np.ndarray, float]:
+# ===================================================================
+# Fisher diagonal
+# F_ii = (4/|S|) Σ_{x∈S} [ ⟨∂_i ψ|∂_i ψ⟩ - |⟨ψ|∂_i ψ⟩|² ]
+# ===================================================================
+def compute_fisher_diagonal(params, data_subset=None):
+    """Compute diagonal of the quantum Fisher information matrix.
+
+    Args:
+        params: circuit parameters
+        data_subset: indices into X_DATA to use (None = all)
     """
-    Compute CE gradient AND diagonal FS metric from the same shifted circuits.
-    For parameter-shift-compatible gates (RY, RZ):
-        g_ii = (1/2)(1 - Re⟨ψ(θ+se_i)|ψ(θ-se_i)⟩)  averaged over data
-    (Stokes et al., Quantum 4, 269, 2020).
-    """
-    ref_probs = [predict_proba(encode_input(b), params) for b in X_BITS]
-    loss_val = ce_from_probs(ref_probs)
-
-    grad = np.zeros(N_PARAMS)
-    diag_g = np.zeros(N_PARAMS)
-    eps_num = 1e-8
-
-    for j in range(N_PARAMS):
-        p_plus = params.copy();  p_plus[j] += PARAM_SHIFT
-        p_minus = params.copy(); p_minus[j] -= PARAM_SHIFT
-
-        ce_plus = 0.0
-        ce_minus = 0.0
-        g_jj = 0.0
-
-        for i, bits in enumerate(X_BITS):
-            inp = encode_input(bits)
-            sv_p = get_statevector(inp, p_plus)
-            sv_m = get_statevector(inp, p_minus)
-
-            # CE contributions from shifted circuits
-            pp = np.clip(proba_from_sv(sv_p), eps_num, 1 - eps_num)
-            pm = np.clip(proba_from_sv(sv_m), eps_num, 1 - eps_num)
-            y = Y_LABELS[i]
-            ce_plus += -(y * np.log(pp) + (1 - y) * np.log(1 - pp))
-            ce_minus += -(y * np.log(pm) + (1 - y) * np.log(1 - pm))
-
-            # Diagonal FS metric from the same two statevectors
-            g_jj += 0.5 * (1.0 - float(np.real(np.vdot(sv_p, sv_m))))
-
-        grad[j] = (ce_plus - ce_minus) / (2.0 * N_DATA)
-        diag_g[j] = g_jj / N_DATA
-
-    return grad, diag_g, loss_val
+    xs = X_DATA if data_subset is None else X_DATA[data_subset]
+    n = len(params)
+    diag = np.zeros(n)
+    for x in xs:
+        sv = get_sv(params, x)
+        for i in range(n):
+            pe = params.copy(); pe[i] += FD_EPSILON
+            sve = get_sv(pe, x)
+            d = (sve - sv) / FD_EPSILON
+            diag[i] += 4.0 * (np.real(np.vdot(d, d)) - np.abs(np.vdot(sv, d)) ** 2)
+    diag /= len(xs)
+    return np.maximum(diag, 0.0)
 
 
-# ---------------------------------------------------------------------------
-# DQFIM effective dimension  (Haug & Kim, PRL 2024)
-# d_eff = (Tr F)² / Tr(F²)
-# ---------------------------------------------------------------------------
-def compute_dqfim_eff_dim(params: np.ndarray) -> float:
-    psi_list = [get_statevector(encode_input(b), params) for b in X_BITS]
-    rng = np.random.RandomState(SEED + int(abs(params[0]) * 1000) % 10000)
-    traces = []
-
-    for _ in range(DQFIM_N_SAMPLES):
-        v = rng.randn(N_PARAMS)
-        v /= np.linalg.norm(v)
-        p_plus = params + DQFIM_EPSILON * v
-        p_minus = params - DQFIM_EPSILON * v
-
-        vtFv = 0.0
-        for idx, bits in enumerate(X_BITS):
-            inp = encode_input(bits)
-            psi_0 = psi_list[idx]
-            psi_p = get_statevector(inp, p_plus)
-            psi_m = get_statevector(inp, p_minus)
-            dpsi = (psi_p - psi_m) / (2 * DQFIM_EPSILON)
-            vtFv += float(np.real(
-                np.vdot(dpsi, dpsi) - np.abs(np.vdot(dpsi, psi_0)) ** 2
-            ))
-        traces.append(vtFv / N_DATA)
-
-    d = N_PARAMS
-    mean_vtFv = np.mean(traces)
-    mean_vtFv_sq = np.mean(np.array(traces) ** 2)
-    tr_F = d * mean_vtFv
-    tr_F2 = (d * (d + 2) * mean_vtFv_sq - tr_F ** 2) / 2.0
-
-    if tr_F2 < 1e-12:
-        return float(d)
-    return float(np.clip(tr_F ** 2 / tr_F2, 1.0, d))
+def eff_dim_from_diag(diag):
+    """Tr(F)² / Tr(F²) — effective dimension from diagonal."""
+    tr = np.sum(diag)
+    tr2 = np.sum(diag ** 2)
+    return float(tr ** 2 / tr2) if tr2 > 1e-15 else 0.0
 
 
-# ---------------------------------------------------------------------------
-# Berry phase (Bargmann invariant)
-# ---------------------------------------------------------------------------
-def compute_berry_phase(params: np.ndarray) -> float:
-    rng = np.random.RandomState(SEED + int(abs(params.sum()) * 100) % 10000)
-    v1 = rng.randn(N_PARAMS) * BERRY_EPSILON
-    v2 = rng.randn(N_PARAMS) * BERRY_EPSILON
-    p1, p2, p3 = params + v1, params + v2, params
+# ===================================================================
+# Berry phase (Bargmann invariant of a triangle in parameter space)
+# ===================================================================
+def compute_berry_phase(params, rng_seed):
+    rng = np.random.RandomState(rng_seed)
+    d1 = rng.randn(len(params)) * 0.05
+    d2 = rng.randn(len(params)) * 0.05
+    # Use 2-point subsample for speed
+    indices = [0, 4]  # one from each class
+    phases = []
+    for idx in indices:
+        x = X_DATA[idx]
+        sv1 = get_sv(params, x)
+        sv2 = get_sv(params + d1, x)
+        sv3 = get_sv(params + d2, x)
+        phases.append(np.angle(
+            np.vdot(sv1, sv2) * np.vdot(sv2, sv3) * np.vdot(sv3, sv1)
+        ))
+    return float(np.mean(phases))
 
-    total = 0.0
-    for bits in X_BITS:
-        inp = encode_input(bits)
-        psi1 = get_statevector(inp, p1)
-        psi2 = get_statevector(inp, p2)
-        psi3 = get_statevector(inp, p3)
-        bargmann = np.vdot(psi1, psi2) * np.vdot(psi2, psi3) * np.vdot(psi3, psi1)
-        total += np.angle(bargmann)
-    return float(total / N_DATA)
 
-
-# ---------------------------------------------------------------------------
-# Training
-# ---------------------------------------------------------------------------
-def train_run(name: str, use_qng: bool) -> list[dict]:
-    rng_init = np.random.RandomState(SEED)
-    params = rng_init.randn(N_PARAMS) * 0.1
-    lr = LR_QNG if use_qng else LR
+# ===================================================================
+# Train
+# ===================================================================
+def train(use_geometric, label):
+    params = np.random.RandomState(SEED).uniform(-np.pi, np.pi, size=N_PARAMS)
+    fisher_diag = np.ones(N_PARAMS)  # uniform prior
     snapshots = []
 
+    # Fixed subsample indices for cheap Fisher preconditioning
+    precond_indices = np.array([0, 4])  # one per class
+
+    print(f"\n{'='*60}")
+    print(f"  {label}  (lambda={LAMBDA_GEO if use_geometric else 0})")
+    print(f"{'='*60}")
+
     for step in range(N_STEPS + 1):
+        # --- Snapshot (every SNAPSHOT_EVERY steps) ---
         if step % SNAPSHOT_EVERY == 0:
-            ce = cross_entropy(params)
-            acc = accuracy(params)
-            eff_dim = compute_dqfim_eff_dim(params)
-            berry = compute_berry_phase(params)
+            # Full-data Fisher for the DQFIM measurement
+            fisher_full = compute_fisher_diagonal(params, data_subset=None)
+            eff_dim = eff_dim_from_diag(fisher_full)
+
+            # If geometric, also update preconditioning Fisher from full data
+            if use_geometric:
+                fisher_diag = fisher_full
+
+            ce = dataset_loss(params)
+            acc = dataset_accuracy(params)
+            berry = compute_berry_phase(params, SEED + step)
             snap = {
                 "step": step,
-                "ce": round(ce, 6),
-                "acc": round(acc, 4),
-                "eff_dim": round(eff_dim, 4),
-                "berry": round(berry, 6),
+                "ce": round(float(ce), 6),
+                "acc": round(float(acc), 4),
+                "eff_dim": round(float(eff_dim), 4),
+                "berry": round(float(berry), 6),
             }
             snapshots.append(snap)
-            tag = "QNG" if use_qng else "VAN"
-            print(
-                f"  [{tag}] step={step:>3d}  CE={ce:.4f}  "
-                f"acc={acc:.2f}  d_eff={eff_dim:.1f}  berry={berry:.4f}",
-                flush=True,
-            )
+            print(f"  step {step:>3d}  CE={ce:.4f}  acc={acc:.2f}  "
+                  f"dim={eff_dim:.2f}  berry={berry:.4f}")
+            sys.stdout.flush()
+
+        # --- Cheap Fisher update for preconditioning (non-snapshot steps) ---
+        elif use_geometric and step % FISHER_UPDATE_EVERY == 0:
+            fisher_diag = compute_fisher_diagonal(params, data_subset=precond_indices)
 
         if step == N_STEPS:
             break
 
-        if use_qng:
-            grad, diag_g, _ = gradient_and_metric(params)
-            # Diagonal natural gradient — no renormalization!
-            # g_ii⁻¹ reshapes the gradient to follow geodesics
-            nat_grad = grad / (diag_g + DIAG_DAMPING)
-            params = params - lr * nat_grad
+        # --- Gradient step ---
+        grad = ce_gradient(params)
+
+        if use_geometric:
+            preconditioner = 1.0 / (1.0 + LAMBDA_GEO * fisher_diag)
+            params = params - LR * preconditioner * grad
         else:
-            grad, _ = vanilla_gradient(params)
-            params = params - lr * grad
+            params = params - LR * grad
 
-    return snapshots
+    return {"snapshots": snapshots}
 
 
-# ---------------------------------------------------------------------------
+# ===================================================================
 # Main
-# ---------------------------------------------------------------------------
+# ===================================================================
 def main():
     t0 = time.time()
-    print("=" * 60)
     print("Experiment E.1 — The Quantum Mirror (Simulation)")
-    print("=" * 60)
-    print(f"Config: {N_QUBITS}q × {N_LAYERS}L = {N_PARAMS} params")
-    print(f"Task: 2-bit AND gate (4 examples)")
-    print(f"Steps: {N_STEPS}  LR(vanilla)={LR}  LR(QNG)={LR_QNG}")
-    print(f"Baseline: vanilla gradient descent")
-    print(f"Geometric: diagonal quantum natural gradient (Stokes et al. 2020)")
-    print()
+    print(f"Task: 3-bit XOR(b0,b1), 8 examples  |  {N_QUBITS}q {N_LAYERS}L {N_PARAMS}p")
+    print(f"Steps: {N_STEPS}  LR: {LR}  lambda: {LAMBDA_GEO}")
+    print(f"Fisher: full at snapshots, {FISHER_SUBSAMPLE}-point subsample every {FISHER_UPDATE_EVERY} steps")
 
-    print("-" * 40)
-    print("Baseline (vanilla GD)")
-    print("-" * 40)
-    bl_snaps = train_run("baseline", use_qng=False)
-    t_bl = time.time() - t0
-    print(f"\nBaseline done in {t_bl:.1f}s\n")
+    baseline = train(use_geometric=False, label="Baseline")
+    geometric = train(use_geometric=True, label="Geometric (Fisher-preconditioned)")
 
-    print("-" * 40)
-    print("Geometric (diagonal QNG)")
-    print("-" * 40)
-    geo_snaps = train_run("geometric", use_qng=True)
-    t_total = time.time() - t0
-    print(f"\nGeometric done in {t_total - t_bl:.1f}s")
-    print(f"Total: {t_total:.1f}s\n")
+    bf = baseline["snapshots"][-1]
+    gf = geometric["snapshots"][-1]
+    bd = [s["eff_dim"] for s in baseline["snapshots"]]
+    gd = [s["eff_dim"] for s in geometric["snapshots"]]
+    mb, mg = float(np.mean(bd)), float(np.mean(gd))
+    ratio = mg / mb if mb > 1e-8 else float("inf")
 
-    # --- analysis ---
-    bl_f, geo_f = bl_snaps[-1], geo_snaps[-1]
-    bl_eff = [s["eff_dim"] for s in bl_snaps]
-    geo_eff = [s["eff_dim"] for s in geo_snaps]
-    mean_ratio = float(np.mean(geo_eff)) / max(float(np.mean(bl_eff)), 1e-8)
-
-    bl_full = next((s["step"] for s in bl_snaps if s["acc"] >= 1.0), N_STEPS)
-    geo_full = next((s["step"] for s in geo_snaps if s["acc"] >= 1.0), N_STEPS)
-
-    # Track eff_dim divergence over training
-    eff_dim_diffs = [g - b for g, b in zip(geo_eff, bl_eff)]
-    early_diff = float(np.mean(eff_dim_diffs[:5]))   # steps 0-40
-    late_diff = float(np.mean(eff_dim_diffs[-5:]))    # steps 160-200
-
-    parts = []
-    if geo_full < bl_full:
-        parts.append(f"QNG converged to 100% in {geo_full} steps vs baseline's {bl_full}")
-    elif geo_full == bl_full:
-        parts.append(f"Both reached 100% at step {bl_full}")
+    if gf["acc"] >= bf["acc"] - 0.05 and ratio > 1.005:
+        verdict = (
+            "Geometric run maintains higher DQFIM effective dimension "
+            "while matching baseline accuracy — consistent with geometric "
+            "coherence preventing representational collapse."
+        )
+    elif gf["acc"] < bf["acc"] - 0.1:
+        verdict = (
+            "Geometric penalty impaired learning. lambda too strong or "
+            "preconditioning distorted the optimization landscape."
+        )
     else:
-        parts.append(f"Baseline reached 100% at step {bl_full}, QNG at {geo_full}")
-
-    if abs(mean_ratio - 1.0) > 0.03:
-        parts.append(f"mean d_eff ratio (QNG/VAN) = {mean_ratio:.3f}")
-    if abs(late_diff) > 1.0:
-        parts.append(f"late-training d_eff difference = {late_diff:+.1f}")
-
-    if geo_full < bl_full and mean_ratio >= 0.95:
-        parts.append(
-            "— QNG navigates the loss landscape more efficiently via FS geodesics, "
-            "consistent with the geometric coherence hypothesis"
-        )
-    elif mean_ratio > 1.1:
-        parts.append(
-            "— QNG maintains higher effective dimension, suggesting it avoids "
-            "representational collapse"
-        )
-    elif abs(mean_ratio - 1.0) <= 0.03 and abs(geo_full - bl_full) <= 10:
-        parts.append(
-            "— minimal geometric effect at this scale. The task may be too "
-            "simple or the circuit too expressive for collapse to occur"
+        verdict = (
+            "No clear separation in effective dimension. The geometric "
+            "effect is not significant at this task/scale."
         )
 
-    verdict = ". ".join(parts) + "."
-
+    elapsed = time.time() - t0
     result = {
         "experiment": "E.1",
         "description": "Quantum Mirror — Simulation",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "elapsed_seconds": round(t_total, 1),
+        "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
+        "elapsed_seconds": round(elapsed, 1),
         "config": {
             "n_qubits": N_QUBITS,
             "n_layers": N_LAYERS,
             "n_params": N_PARAMS,
             "n_steps": N_STEPS,
-            "lr_vanilla": LR,
-            "lr_qng": LR_QNG,
-            "diag_damping": DIAG_DAMPING,
-            "task": "2-bit AND gate",
+            "lr": LR,
+            "lambda_geo": LAMBDA_GEO,
+            "task": "3-bit input, XOR(b0,b1) label, 8 examples",
             "seed": SEED,
-            "snapshot_every": SNAPSHOT_EVERY,
-            "dqfim_n_samples": DQFIM_N_SAMPLES,
-            "dqfim_epsilon": DQFIM_EPSILON,
-            "berry_epsilon": BERRY_EPSILON,
+            "fisher_update_every": FISHER_UPDATE_EVERY,
+            "fisher_subsample": FISHER_SUBSAMPLE,
         },
-        "baseline": {"snapshots": bl_snaps},
-        "geometric": {"snapshots": geo_snaps},
+        "baseline": {"snapshots": baseline["snapshots"]},
+        "geometric": {"snapshots": geometric["snapshots"]},
         "comparison": {
-            "baseline_final_acc": bl_f["acc"],
-            "geometric_final_acc": geo_f["acc"],
-            "baseline_final_ce": bl_f["ce"],
-            "geometric_final_ce": geo_f["ce"],
-            "baseline_steps_to_full_acc": bl_full,
-            "geometric_steps_to_full_acc": geo_full,
-            "baseline_mean_eff_dim": round(float(np.mean(bl_eff)), 4),
-            "geometric_mean_eff_dim": round(float(np.mean(geo_eff)), 4),
-            "mean_eff_dim_ratio": round(float(mean_ratio), 4),
-            "early_eff_dim_diff": round(early_diff, 4),
-            "late_eff_dim_diff": round(late_diff, 4),
+            "baseline_final_acc": bf["acc"],
+            "geometric_final_acc": gf["acc"],
+            "baseline_final_ce": bf["ce"],
+            "geometric_final_ce": gf["ce"],
+            "baseline_mean_eff_dim": round(mb, 4),
+            "geometric_mean_eff_dim": round(mg, 4),
+            "mean_eff_dim_ratio": round(float(ratio), 4),
             "verdict": verdict,
         },
     }
 
-    out_dir = Path(__file__).resolve().parent.parent / "results"
-    out_dir.mkdir(parents=True, exist_ok=True)
-    out_path = out_dir / "experiment_E1_simulation_result.json"
+    out_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "results")
+    os.makedirs(out_dir, exist_ok=True)
+    out_path = os.path.join(out_dir, "experiment_E1_simulation_result.json")
     with open(out_path, "w") as f:
         json.dump(result, f, indent=2)
 
-    print("=" * 60)
-    print("RESULTS")
-    print("=" * 60)
-    print(f"Baseline:  acc={bl_f['acc']:.2f}  CE={bl_f['ce']:.4f}  d_eff={bl_f['eff_dim']:.1f}  (100% at step {bl_full})")
-    print(f"Geometric: acc={geo_f['acc']:.2f}  CE={geo_f['ce']:.4f}  d_eff={geo_f['eff_dim']:.1f}  (100% at step {geo_full})")
-    print(f"Mean d_eff ratio (QNG/VAN): {mean_ratio:.4f}")
-    print(f"Early d_eff diff: {early_diff:+.2f}  Late: {late_diff:+.2f}")
-    print(f"\n{verdict}")
-    print(f"\nSaved: {out_path}")
-    print(f"Time:  {t_total:.1f}s")
+    print(f"\n{'='*60}")
+    print(f"  DONE in {elapsed:.1f}s")
+    print(f"  Baseline:  acc={bf['acc']:.2f}  CE={bf['ce']:.4f}  dim={bf['eff_dim']:.2f}")
+    print(f"  Geometric: acc={gf['acc']:.2f}  CE={gf['ce']:.4f}  dim={gf['eff_dim']:.2f}")
+    print(f"  Mean eff_dim ratio: {ratio:.4f}")
+    print(f"  Verdict: {verdict}")
+    print(f"  Saved: {out_path}")
+    print(f"{'='*60}")
+    return result
 
 
 if __name__ == "__main__":

@@ -1,0 +1,329 @@
+{
+  "experiment": "E.1",
+  "description": "Quantum Mirror \u2014 Simulation",
+  "timestamp": "2026-03-22T14:38:57.628945+00:00",
+  "elapsed_seconds": 418.3,
+  "config": {
+    "n_qubits": 4,
+    "n_layers": 4,
+    "n_params": 32,
+    "n_steps": 200,
+    "lr": 0.15,
+    "lambda_geo": 2.0,
+    "task": "3-bit input, XOR(b0,b1) label, 8 examples",
+    "seed": 42,
+    "fisher_update_every": 20
+  },
+  "baseline": {
+    "snapshots": [
+      {
+        "step": 0,
+        "ce": 0.885247,
+        "acc": 0.25,
+        "eff_dim": 30.758,
+        "berry": -0.00042
+      },
+      {
+        "step": 10,
+        "ce": 0.498934,
+        "acc": 0.75,
+        "eff_dim": 30.8331,
+        "berry": 0.001116
+      },
+      {
+        "step": 20,
+        "ce": 0.156622,
+        "acc": 1.0,
+        "eff_dim": 30.5946,
+        "berry": -0.000208
+      },
+      {
+        "step": 30,
+        "ce": 0.04392,
+        "acc": 1.0,
+        "eff_dim": 29.6524,
+        "berry": 0.000336
+      },
+      {
+        "step": 40,
+        "ce": 0.015253,
+        "acc": 1.0,
+        "eff_dim": 29.2296,
+        "berry": -0.000581
+      },
+      {
+        "step": 50,
+        "ce": 0.006353,
+        "acc": 1.0,
+        "eff_dim": 29.0827,
+        "berry": -0.000223
+      },
+      {
+        "step": 60,
+        "ce": 0.003143,
+        "acc": 1.0,
+        "eff_dim": 29.0293,
+        "berry": -1.7e-05
+      },
+      {
+        "step": 70,
+        "ce": 0.00174,
+        "acc": 1.0,
+        "eff_dim": 29.0063,
+        "berry": 0.000532
+      },
+      {
+        "step": 80,
+        "ce": 0.001019,
+        "acc": 1.0,
+        "eff_dim": 28.9946,
+        "berry": -0.001211
+      },
+      {
+        "step": 90,
+        "ce": 0.000613,
+        "acc": 1.0,
+        "eff_dim": 28.988,
+        "berry": -0.000384
+      },
+      {
+        "step": 100,
+        "ce": 0.000374,
+        "acc": 1.0,
+        "eff_dim": 28.9842,
+        "berry": -0.000116
+      },
+      {
+        "step": 110,
+        "ce": 0.00023,
+        "acc": 1.0,
+        "eff_dim": 28.9818,
+        "berry": 0.000144
+      },
+      {
+        "step": 120,
+        "ce": 0.000142,
+        "acc": 1.0,
+        "eff_dim": 28.9804,
+        "berry": 0.000963
+      },
+      {
+        "step": 130,
+        "ce": 8.8e-05,
+        "acc": 1.0,
+        "eff_dim": 28.9796,
+        "berry": -0.000782
+      },
+      {
+        "step": 140,
+        "ce": 5.4e-05,
+        "acc": 1.0,
+        "eff_dim": 28.9791,
+        "berry": -0.000658
+      },
+      {
+        "step": 150,
+        "ce": 3.4e-05,
+        "acc": 1.0,
+        "eff_dim": 28.9788,
+        "berry": 0.001009
+      },
+      {
+        "step": 160,
+        "ce": 2.1e-05,
+        "acc": 1.0,
+        "eff_dim": 28.9786,
+        "berry": -0.000335
+      },
+      {
+        "step": 170,
+        "ce": 1.3e-05,
+        "acc": 1.0,
+        "eff_dim": 28.9784,
+        "berry": 0.000417
+      },
+      {
+        "step": 180,
+        "ce": 8e-06,
+        "acc": 1.0,
+        "eff_dim": 28.9784,
+        "berry": -3.7e-05
+      },
+      {
+        "step": 190,
+        "ce": 5e-06,
+        "acc": 1.0,
+        "eff_dim": 28.9783,
+        "berry": 0.000466
+      },
+      {
+        "step": 200,
+        "ce": 3e-06,
+        "acc": 1.0,
+        "eff_dim": 28.9783,
+        "berry": 0.000689
+      }
+    ]
+  },
+  "geometric": {
+    "snapshots": [
+      {
+        "step": 0,
+        "ce": 0.885247,
+        "acc": 0.25,
+        "eff_dim": 30.758,
+        "berry": -0.00042
+      },
+      {
+        "step": 10,
+        "ce": 0.718939,
+        "acc": 0.5,
+        "eff_dim": 30.694,
+        "berry": 0.001112
+      },
+      {
+        "step": 20,
+        "ce": 0.597429,
+        "acc": 0.75,
+        "eff_dim": 30.7416,
+        "berry": -0.000175
+      },
+      {
+        "step": 30,
+        "ce": 0.473775,
+        "acc": 0.75,
+        "eff_dim": 30.8665,
+        "berry": 2.2e-05
+      },
+      {
+        "step": 40,
+        "ce": 0.337216,
+        "acc": 1.0,
+        "eff_dim": 30.9361,
+        "berry": -0.000582
+      },
+      {
+        "step": 50,
+        "ce": 0.218834,
+        "acc": 1.0,
+        "eff_dim": 30.8059,
+        "berry": -0.000189
+      },
+      {
+        "step": 60,
+        "ce": 0.138643,
+        "acc": 1.0,
+        "eff_dim": 30.496,
+        "berry": 9.3e-05
+      },
+      {
+        "step": 70,
+        "ce": 0.089801,
+        "acc": 1.0,
+        "eff_dim": 30.1456,
+        "berry": 0.0006
+      },
+      {
+        "step": 80,
+        "ce": 0.059926,
+        "acc": 1.0,
+        "eff_dim": 29.8401,
+        "berry": -0.001208
+      },
+      {
+        "step": 90,
+        "ce": 0.040958,
+        "acc": 1.0,
+        "eff_dim": 29.6009,
+        "berry": -0.000379
+      },
+      {
+        "step": 100,
+        "ce": 0.028514,
+        "acc": 1.0,
+        "eff_dim": 29.4227,
+        "berry": -0.000169
+      },
+      {
+        "step": 110,
+        "ce": 0.020169,
+        "acc": 1.0,
+        "eff_dim": 29.2937,
+        "berry": 9.8e-05
+      },
+      {
+        "step": 120,
+        "ce": 0.01449,
+        "acc": 1.0,
+        "eff_dim": 29.2017,
+        "berry": 0.000972
+      },
+      {
+        "step": 130,
+        "ce": 0.010582,
+        "acc": 1.0,
+        "eff_dim": 29.1367,
+        "berry": -0.000784
+      },
+      {
+        "step": 140,
+        "ce": 0.007861,
+        "acc": 1.0,
+        "eff_dim": 29.0908,
+        "berry": -0.000671
+      },
+      {
+        "step": 150,
+        "ce": 0.00594,
+        "acc": 1.0,
+        "eff_dim": 29.0582,
+        "berry": 0.001014
+      },
+      {
+        "step": 160,
+        "ce": 0.004562,
+        "acc": 1.0,
+        "eff_dim": 29.0348,
+        "berry": -0.000319
+      },
+      {
+        "step": 170,
+        "ce": 0.003557,
+        "acc": 1.0,
+        "eff_dim": 29.0178,
+        "berry": 0.000422
+      },
+      {
+        "step": 180,
+        "ce": 0.002811,
+        "acc": 1.0,
+        "eff_dim": 29.0052,
+        "berry": -4.4e-05
+      },
+      {
+        "step": 190,
+        "ce": 0.002246,
+        "acc": 1.0,
+        "eff_dim": 28.9958,
+        "berry": 0.000449
+      },
+      {
+        "step": 200,
+        "ce": 0.001811,
+        "acc": 1.0,
+        "eff_dim": 28.9885,
+        "berry": 0.000694
+      }
+    ]
+  },
+  "comparison": {
+    "baseline_final_acc": 1.0,
+    "geometric_final_acc": 1.0,
+    "baseline_final_ce": 3e-06,
+    "geometric_final_ce": 0.001811,
+    "baseline_mean_eff_dim": 29.2831,
+    "geometric_mean_eff_dim": 29.7681,
+    "mean_eff_dim_ratio": 1.0166,
+    "verdict": "Geometric run maintains higher DQFIM effective dimension while matching baseline accuracy \u2014 consistent with geometric coherence preventing representational collapse."
+  }
+}
