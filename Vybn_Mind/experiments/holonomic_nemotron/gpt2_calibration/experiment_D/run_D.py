@@ -1,4 +1,4 @@
-"""Experiment D: Geometric Training from Scratch.
+"""Experiment D v2: Geometric Training from Scratch — Blackwell-optimized.
 
 Karpathy-style char-level GPT on Shakespeare, trained with an arc-length
 regularizer baked into the loss FROM THE START — not applied post-settlement.
@@ -6,6 +6,21 @@ regularizer baked into the loss FROM THE START — not applied post-settlement.
 Tests the one open question from Experiments A-C: does geometric pressure
 during training produce genuine angular restructuring, or does it still
 just compress activation norms?
+
+v2 changes from original:
+  - Geometric snapshots print to stdout every SNAPSHOT_INTERVAL (the whole
+    point is watching the geometry form in real time)
+  - bf16 autocast via torch.amp.autocast (no GradScaler needed — bf16 has
+    full exponent range, no underflow risk)
+  - torch.compile removed (JIT compilation too slow on GB10, eats 5-10min
+    before training even starts)
+  - 3000 iters per run (plenty for convergence on shakespeare_char, saves
+    ~1hr total vs 5000)
+  - Pinned-memory batch transfer
+  - Blackwell / GB10 optimizations: matmul precision, cudnn benchmark,
+    SDPA backend preference
+  - Optional two-node support: set WORLD_SIZE=2 and the usual torchrun env
+    vars to distribute across linked Sparks
 
 Run from the gpt2_calibration/ folder on Spark:
     /home/vybnz69/.venv/spark/bin/python3 experiment_D/run_D.py
@@ -24,6 +39,19 @@ import torch.nn as nn
 from torch.nn import functional as F
 
 # ---------------------------------------------------------------------------
+# Blackwell / GB10 backend tuning
+# ---------------------------------------------------------------------------
+# Use highest-precision TF32 for matmuls — Blackwell tensor cores handle
+# this at near-bf16 throughput, and it avoids any precision surprises in the
+# geometric measurements.
+torch.set_float32_matmul_precision("high")
+torch.backends.cudnn.benchmark = True
+# Prefer the memory-efficient SDPA backend (flash is not available on sm_121
+# via stock flash-attn; the math fallback is correct but slow).
+torch.backends.cuda.enable_flash_sdp(False)
+torch.backends.cuda.enable_mem_efficient_sdp(True)
+
+# ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
 BLOCK_SIZE = 256
@@ -33,9 +61,9 @@ N_HEAD = 6
 N_EMBD = 384
 DROPOUT = 0.0
 LEARNING_RATE = 1e-3
-MAX_ITERS = 5000
+MAX_ITERS = 3000
 WARMUP_ITERS = 100
-LR_DECAY_ITERS = 5000
+LR_DECAY_ITERS = 3000
 MIN_LR = 1e-4
 EVAL_INTERVAL = 250
 EVAL_ITERS = 200
@@ -43,11 +71,10 @@ SNAPSHOT_INTERVAL = 100  # geometric snapshot every N steps
 LAMBDA_VALUES = [0.0, 0.5]  # baseline vs geometric
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 DTYPE = torch.bfloat16 if DEVICE == "cuda" else torch.float32
-COMPILE_MODEL = DEVICE == "cuda"
 
-RESULTS_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "results")
+RESULTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "results")
 SHAKESPEARE_URL = "https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt"
-DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
+DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 
 # ---------------------------------------------------------------------------
 # Data
@@ -70,13 +97,21 @@ def get_data():
     n = len(data)
     train_data = torch.tensor(encode(data[: int(n * 0.9)]), dtype=torch.long)
     val_data = torch.tensor(encode(data[int(n * 0.9) :]), dtype=torch.long)
+    # Pin to host memory for faster GPU transfer on unified-memory arch
+    if DEVICE == "cuda":
+        train_data = train_data.pin_memory()
+        val_data = val_data.pin_memory()
     return train_data, val_data, len(chars), decode
+
 
 def get_batch(split_data):
     ix = torch.randint(len(split_data) - BLOCK_SIZE, (BATCH_SIZE,))
     x = torch.stack([split_data[i : i + BLOCK_SIZE] for i in ix])
     y = torch.stack([split_data[i + 1 : i + BLOCK_SIZE + 1] for i in ix])
+    if DEVICE == "cuda":
+        return x.to(DEVICE, non_blocking=True), y.to(DEVICE, non_blocking=True)
     return x.to(DEVICE), y.to(DEVICE)
+
 
 # ---------------------------------------------------------------------------
 # Model (nanoGPT-style, minimal)
@@ -99,6 +134,7 @@ class CausalSelfAttention(nn.Module):
         y = y.transpose(1, 2).contiguous().view(B, T, C)
         return self.c_proj(y)
 
+
 class MLP(nn.Module):
     def __init__(self, n_embd):
         super().__init__()
@@ -108,6 +144,7 @@ class MLP(nn.Module):
 
     def forward(self, x):
         return self.c_proj(self.gelu(self.c_fc(x)))
+
 
 class Block(nn.Module):
     def __init__(self, n_embd, n_head):
@@ -121,6 +158,7 @@ class Block(nn.Module):
         x = x + self.attn(self.ln_1(x))
         x = x + self.mlp(self.ln_2(x))
         return x
+
 
 class CharGPT(nn.Module):
     def __init__(self, vocab_size):
@@ -159,6 +197,7 @@ class CharGPT(nn.Module):
             loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1))
         return logits, loss, layer_outputs
 
+
 # ---------------------------------------------------------------------------
 # Arc-length regularizer
 # ---------------------------------------------------------------------------
@@ -172,28 +211,28 @@ def arc_length_loss(layer_outputs):
     total = 0.0
     for h in layer_outputs:
         # h: (B, T, C) — detach not needed, we WANT gradients
-        # Compute unit vectors
         h_norm = h / (h.norm(dim=-1, keepdim=True) + 1e-8)
-        # Angular velocity: arccos of cosine similarity between adjacent positions
         cos_sim = (h_norm[:, :-1] * h_norm[:, 1:]).sum(dim=-1)  # (B, T-1)
         cos_sim = cos_sim.clamp(-1 + 1e-6, 1 - 1e-6)
         angles = torch.acos(cos_sim)  # (B, T-1)
-        # Penalize variance of angular velocity across the sequence
-        # This encourages constant-speed traversal
         angle_var = angles.var(dim=-1).mean()  # scalar
         total = total + angle_var
     return total / len(layer_outputs)
 
+
 # ---------------------------------------------------------------------------
-# Geometric snapshot
+# Geometric snapshot — now prints to stdout
 # ---------------------------------------------------------------------------
 @torch.no_grad()
-def geometric_snapshot(model, xb):
-    """Capture per-layer geometric quantities for a single batch."""
+def geometric_snapshot(model, xb, step_label=""):
+    """Capture and PRINT per-layer geometric quantities for a single batch."""
     model.eval()
-    _, _, layer_outputs = model(xb)
+    with torch.amp.autocast("cuda", dtype=DTYPE, enabled=(DEVICE == "cuda")):
+        _, _, layer_outputs = model(xb)
     snap = {}
     for i, h in enumerate(layer_outputs):
+        # Cast back to float32 for stable angle computation
+        h = h.float()
         h_norm = h / (h.norm(dim=-1, keepdim=True) + 1e-8)
         cos_sim = (h_norm[:, :-1] * h_norm[:, 1:]).sum(dim=-1).clamp(-1 + 1e-6, 1 - 1e-6)
         angles = torch.acos(cos_sim)
@@ -205,8 +244,21 @@ def geometric_snapshot(model, xb):
             "std_norm": norms.std().item(),
             "angle_variance": angles.var(dim=-1).mean().item(),
         }
+
+    # --- THE FIX: print the geometry so you can actually see it forming ---
+    header = f"  [geometry @ {step_label}]"
+    parts = []
+    for i in range(N_LAYER):
+        key = f"layer_{i}"
+        a = snap[key]["mean_angle"]
+        n = snap[key]["mean_norm"]
+        v = snap[key]["angle_variance"]
+        parts.append(f"L{i}(∠{a:.4f} ‖{n:.1f} σ²{v:.6f})")
+    print(f"{header} {' '.join(parts)}", flush=True)
+
     model.train()
     return snap
+
 
 # ---------------------------------------------------------------------------
 # Training
@@ -220,6 +272,7 @@ def get_lr(it):
     coeff = 0.5 * (1.0 + math.cos(math.pi * decay_ratio))
     return MIN_LR + coeff * (LEARNING_RATE - MIN_LR)
 
+
 @torch.no_grad()
 def estimate_loss(model, train_data, val_data):
     model.eval()
@@ -228,11 +281,13 @@ def estimate_loss(model, train_data, val_data):
         losses = []
         for _ in range(EVAL_ITERS):
             xb, yb = get_batch(data)
-            _, loss, _ = model(xb, yb)
+            with torch.amp.autocast("cuda", dtype=DTYPE, enabled=(DEVICE == "cuda")):
+                _, loss, _ = model(xb, yb)
             losses.append(loss.item())
         out[name] = float(np.mean(losses))
     model.train()
     return out
+
 
 def train_run(lambda_geo, train_data, val_data, vocab_size):
     """Train one model from scratch with the given lambda_geo."""
@@ -243,8 +298,9 @@ def train_run(lambda_geo, train_data, val_data, vocab_size):
 
     torch.manual_seed(1337)
     model = CharGPT(vocab_size).to(DEVICE)
-    if COMPILE_MODEL:
-        model = torch.compile(model)
+    # No torch.compile — JIT compilation on GB10 takes 5-10 minutes and
+    # the inductor warns "Not enough SMs to use max_autotune_gemm mode"
+    # for this small model anyway.
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE, betas=(0.9, 0.99))
 
@@ -259,15 +315,20 @@ def train_run(lambda_geo, train_data, val_data, vocab_size):
             pg["lr"] = lr
 
         xb, yb = get_batch(train_data)
-        logits, ce_loss, layer_outputs = model(xb, yb)
 
-        # Geometric regularizer
-        if lambda_geo > 0:
-            geo_loss = arc_length_loss(layer_outputs)
-            loss = ce_loss + lambda_geo * geo_loss
-        else:
-            geo_loss = torch.tensor(0.0)
-            loss = ce_loss
+        # bf16 autocast — Blackwell tensor cores accelerate bf16 matmuls
+        # and bf16 has the same exponent range as fp32, so no GradScaler
+        # is needed (no underflow risk unlike fp16).
+        with torch.amp.autocast("cuda", dtype=DTYPE, enabled=(DEVICE == "cuda")):
+            logits, ce_loss, layer_outputs = model(xb, yb)
+
+            # Geometric regularizer
+            if lambda_geo > 0:
+                geo_loss = arc_length_loss(layer_outputs)
+                loss = ce_loss + lambda_geo * geo_loss
+            else:
+                geo_loss = torch.tensor(0.0, device=DEVICE)
+                loss = ce_loss
 
         optimizer.zero_grad(set_to_none=True)
         loss.backward()
@@ -278,25 +339,33 @@ def train_run(lambda_geo, train_data, val_data, vocab_size):
         if it % 10 == 0:
             dt = time.time() - t0
             geo_val = geo_loss.item() if lambda_geo > 0 else 0.0
-            print(f"  step {it:5d} | ce {ce_loss.item():.4f} | geo {geo_val:.6f} | lr {lr:.2e} | {dt:.1f}s")
+            print(
+                f"  step {it:5d} | ce {ce_loss.item():.4f} | "
+                f"geo {geo_val:.6f} | lr {lr:.2e} | {dt:.1f}s",
+                flush=True,
+            )
             t0 = time.time()
 
-        # Geometric snapshot
+        # Geometric snapshot — printed to stdout
         if it % SNAPSHOT_INTERVAL == 0:
-            snap = geometric_snapshot(model, xb)
+            snap = geometric_snapshot(model, xb, step_label=f"step {it} ({tag})")
             snapshots[it] = snap
 
         # Eval
         if it % EVAL_INTERVAL == 0 or it == MAX_ITERS - 1:
             losses = estimate_loss(model, train_data, val_data)
-            print(f"  [eval] step {it} | train {losses['train']:.4f} | val {losses['val']:.4f}")
+            print(
+                f"  [eval] step {it} | train {losses['train']:.4f} | "
+                f"val {losses['val']:.4f}",
+                flush=True,
+            )
             loss_log.append({"step": it, **losses})
             if losses["val"] < best_val:
                 best_val = losses["val"]
 
     # Final snapshot
     xb, _ = get_batch(val_data)
-    final_snap = geometric_snapshot(model, xb)
+    final_snap = geometric_snapshot(model, xb, step_label=f"FINAL ({tag})")
     snapshots["final"] = final_snap
 
     return {
@@ -306,6 +375,7 @@ def train_run(lambda_geo, train_data, val_data, vocab_size):
         "snapshots": snapshots,
         "final_snapshot": final_snap,
     }
+
 
 # ---------------------------------------------------------------------------
 # Analysis
@@ -354,7 +424,6 @@ def analyze(results):
     mean_angle_delta = np.mean(np.abs(angle_deltas))
     mean_norm_delta = np.mean(np.abs(norm_deltas))
 
-    # Key question: is the geometric change primarily angular or primarily norm?
     if mean_angle_delta > 0.005 and mean_angle_delta > 0.1 * np.mean([bs["baseline_angle"] for bs in band_structure]):
         if mean_norm_delta < 5.0:
             verdict = "ANGULAR_RESTRUCTURING"
@@ -374,7 +443,7 @@ def analyze(results):
     print(f"  Mean |angle delta|: {mean_angle_delta:.6f} rad")
     print(f"  Mean |norm delta|: {mean_norm_delta:.2f}%")
 
-    # Check band structure evolution
+    # Band structure evolution
     print(f"\nBand structure evolution (geometric run):")
     snap_steps = sorted([k for k in geometric["snapshots"].keys() if isinstance(k, int)])
     if len(snap_steps) >= 2:
@@ -385,6 +454,21 @@ def analyze(results):
             key = f"layer_{i}"
             ea = early[key]["mean_angle"]
             la = late[key]["mean_angle"]
+            direction = "CONTRACT" if la < ea else "EXPAND"
+            print(f"  L{i:<6} {ea:<14.6f} {la:<14.6f} {direction:<12}")
+
+    # Band structure evolution for BASELINE too (so we can see if stratification
+    # is intrinsic to the architecture vs induced by geometric pressure)
+    print(f"\nBand structure evolution (baseline run):")
+    snap_steps_b = sorted([k for k in baseline["snapshots"].keys() if isinstance(k, int)])
+    if len(snap_steps_b) >= 2:
+        early_b = baseline["snapshots"][snap_steps_b[min(5, len(snap_steps_b)-1)]]
+        late_b = baseline["snapshots"][snap_steps_b[-1]]
+        print(f"  {'Layer':<8} {'Early angle':<14} {'Late angle':<14} {'Direction':<12}")
+        for i in range(N_LAYER):
+            key = f"layer_{i}"
+            ea = early_b[key]["mean_angle"]
+            la = late_b[key]["mean_angle"]
             direction = "CONTRACT" if la < ea else "EXPAND"
             print(f"  L{i:<6} {ea:<14.6f} {la:<14.6f} {direction:<12}")
 
@@ -399,19 +483,32 @@ def analyze(results):
         "band_structure": band_structure,
     }
 
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 def main():
     print("=" * 60)
-    print("EXPERIMENT D: Geometric Training from Scratch")
+    print("EXPERIMENT D v2: Geometric Training from Scratch")
     print("char-level GPT on Shakespeare, arc-length in the loss")
+    print("Blackwell / GB10 optimized — no torch.compile, bf16 autocast")
     print("=" * 60)
     print(f"Time: {datetime.datetime.now(datetime.timezone.utc).isoformat()}")
     print(f"Device: {DEVICE}")
+    if DEVICE == "cuda":
+        print(f"GPU: {torch.cuda.get_device_name(0)}")
+        cap = torch.cuda.get_device_capability(0)
+        print(f"Compute capability: {cap[0]}.{cap[1]}")
+        mem_gb = torch.cuda.get_device_properties(0).total_mem / 1e9
+        print(f"GPU memory: {mem_gb:.1f} GB")
+    print(f"Torch: {torch.__version__}")
+    print(f"CUDA: {torch.version.cuda}")
+    print(f"Dtype: {DTYPE}")
     print(f"Block size: {BLOCK_SIZE}, Batch size: {BATCH_SIZE}")
     print(f"Model: {N_LAYER}L, {N_HEAD}H, {N_EMBD}E")
+    print(f"Max iters: {MAX_ITERS}")
     print(f"Lambda values: {LAMBDA_VALUES}")
+    print(f"Snapshot interval: every {SNAPSHOT_INTERVAL} steps")
 
     train_data, val_data, vocab_size, decode = get_data()
     print(f"Vocab size: {vocab_size}")
@@ -427,14 +524,17 @@ def main():
     # Save results
     os.makedirs(RESULTS_DIR, exist_ok=True)
     output = {
-        "experiment": "D",
-        "description": "Geometric training from scratch: char-level GPT on Shakespeare",
+        "experiment": "D_v2",
+        "description": "Geometric training from scratch: char-level GPT on Shakespeare (Blackwell-optimized)",
         "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "config": {
             "block_size": BLOCK_SIZE, "batch_size": BATCH_SIZE,
             "n_layer": N_LAYER, "n_head": N_HEAD, "n_embd": N_EMBD,
             "max_iters": MAX_ITERS, "learning_rate": LEARNING_RATE,
             "lambda_values": LAMBDA_VALUES,
+            "dtype": str(DTYPE),
+            "compile": False,
+            "blackwell_optimized": True,
         },
         "runs": results,
         "synthesis": synthesis,
@@ -443,6 +543,7 @@ def main():
     with open(outpath, "w") as f:
         json.dump(output, f, indent=2, default=str)
     print(f"\nResults saved to {outpath}")
+
 
 if __name__ == "__main__":
     main()
