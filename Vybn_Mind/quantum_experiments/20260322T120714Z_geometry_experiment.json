@@ -1,0 +1,159 @@
+{
+  "timestamp": "20260322T120714Z",
+  "config": {
+    "n_qubits": 4,
+    "shots": 1024,
+    "backend": "simulator"
+  },
+  "snapshots": {
+    "flat": {
+      "index": 34,
+      "kappa": 0.06489834537204797
+    },
+    "medium": {
+      "index": 17,
+      "kappa": 0.1195277861010307
+    },
+    "curved": {
+      "index": 19,
+      "kappa": 1.6022776079571515
+    }
+  },
+  "memory_state": {
+    "step": 346,
+    "depth": 0.2759741606071656,
+    "alpha": 0.993
+  },
+  "analysis": [
+    {
+      "name": "flat_prep",
+      "type": "state_prep",
+      "label": "flat",
+      "kappa": 0.06489834537204797,
+      "tvd": 0.0317,
+      "entropy_observed": 3.1984,
+      "entropy_ideal": 3.2456,
+      "entropy_max": 4.0,
+      "top_counts": {
+        "0000": 240,
+        "0011": 184,
+        "1110": 134,
+        "1010": 126,
+        "0001": 71
+      },
+      "shots": 1024,
+      "simulated": true
+    },
+    {
+      "name": "flat_interf",
+      "type": "interference",
+      "label": "flat",
+      "kappa": 0.06489834537204797,
+      "tvd": 0.0347,
+      "entropy_observed": 3.4143,
+      "entropy_ideal": 3.3689,
+      "entropy_max": 4.0,
+      "top_counts": {
+        "1010": 224,
+        "0110": 146,
+        "0000": 127,
+        "1110": 108,
+        "0101": 78
+      },
+      "shots": 1024,
+      "simulated": true
+    },
+    {
+      "name": "medium_prep",
+      "type": "state_prep",
+      "label": "medium",
+      "kappa": 0.1195277861010307,
+      "tvd": 0.039,
+      "entropy_observed": 3.4676,
+      "entropy_ideal": 3.4682,
+      "entropy_max": 4.0,
+      "top_counts": {
+        "0001": 196,
+        "1101": 190,
+        "1000": 115,
+        "1110": 79,
+        "0110": 77
+      },
+      "shots": 1024,
+      "simulated": true
+    },
+    {
+      "name": "medium_interf",
+      "type": "interference",
+      "label": "medium",
+      "kappa": 0.1195277861010307,
+      "tvd": 0.0427,
+      "entropy_observed": 3.1467,
+      "entropy_ideal": 3.2049,
+      "entropy_max": 4.0,
+      "top_counts": {
+        "1110": 328,
+        "0100": 132,
+        "0011": 111,
+        "1100": 100,
+        "0001": 82
+      },
+      "shots": 1024,
+      "simulated": true
+    },
+    {
+      "name": "curved_prep",
+      "type": "state_prep",
+      "label": "curved",
+      "kappa": 1.6022776079571515,
+      "tvd": 0.0463,
+      "entropy_observed": 2.8428,
+      "entropy_ideal": 2.8237,
+      "entropy_max": 4.0,
+      "top_counts": {
+        "0011": 403,
+        "1101": 150,
+        "0001": 142,
+        "0010": 67,
+        "0101": 64
+      },
+      "shots": 1024,
+      "simulated": true
+    },
+    {
+      "name": "curved_interf",
+      "type": "interference",
+      "label": "curved",
+      "kappa": 1.6022776079571515,
+      "tvd": 0.0247,
+      "entropy_observed": 3.2274,
+      "entropy_ideal": 3.2467,
+      "entropy_max": 4.0,
+      "top_counts": {
+        "0011": 244,
+        "0110": 140,
+        "1110": 130,
+        "0010": 127,
+        "1010": 120
+      },
+      "shots": 1024,
+      "simulated": true
+    }
+  ],
+  "verdict": {
+    "prep_tvd": {
+      "flat": 0.0317,
+      "medium": 0.039,
+      "curved": 0.0463,
+      "curved_minus_flat": 0.0146
+    },
+    "interference_entropy": {
+      "flat": 3.4143,
+      "medium": 3.1467,
+      "curved": 3.2274,
+      "curved_minus_flat": -0.1869
+    },
+    "interpretation": "NULL: Curvature level does not measurably affect quantum fidelity or interference patterns. The geometry is not reaching the quantum substrate at this encoding depth. This is informative \u2014 it bounds the claim that ComplexMemory geometry has physical correlates."
+  },
+  "quantum_seconds": 0.0
+}
