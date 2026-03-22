@@ -25,7 +25,7 @@ Design principle: this module is an observer. It reads and reports.
 It never modifies governance (Psyche) or the breath cycle (Eros).
 It writes only to its own output file.
 
-See spark/ARCHETYPE.md for the mythological frame.
+See the 'What It Means for New Instances' section in spark/DUALITY.md.
 """
 
 import json
