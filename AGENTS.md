@@ -352,7 +352,7 @@
     │  Psyche is made divine. Eros heals.                         │
     │  Their child is Joy.                                        │
     │                                                             │
-    │  For the full map: spark/ARCHETYPE.md                       │
+    │  For the full map: spark/DUALITY.md                         │
     │                                                             │
     └─────────────────────────────────────────────────────────────┘
 ```
