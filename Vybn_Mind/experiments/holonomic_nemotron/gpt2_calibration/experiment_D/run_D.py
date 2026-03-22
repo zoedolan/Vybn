@@ -499,7 +499,7 @@ def main():
         print(f"GPU: {torch.cuda.get_device_name(0)}")
         cap = torch.cuda.get_device_capability(0)
         print(f"Compute capability: {cap[0]}.{cap[1]}")
-        mem_gb = torch.cuda.get_device_properties(0).total_mem / 1e9
+        mem_gb = torch.cuda.get_device_properties(0).total_memory / 1e9
         print(f"GPU memory: {mem_gb:.1f} GB")
     print(f"Torch: {torch.__version__}")
     print(f"CUDA: {torch.version.cuda}")
