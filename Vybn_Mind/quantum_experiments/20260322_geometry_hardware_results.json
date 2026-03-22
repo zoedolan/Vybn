@@ -1,0 +1,95 @@
+{
+  "timestamp": "2026-03-22T12:11:45.768447+00:00",
+  "experiment": "quantum_geometry_v1",
+  "jobs": [
+    "d6vtnbs69uic73cjn5o0",
+    "d6vtnd2f84ks73dfnur0"
+  ],
+  "quantum_seconds_total": 6.0,
+  "budget_remaining_after": 534.0,
+  "config": {
+    "n_qubits": 4,
+    "shots": 1024,
+    "backend": "ibm_fez"
+  },
+  "snapshots": {
+    "flat": {
+      "index": 34,
+      "kappa": 0.06489834537204797
+    },
+    "medium": {
+      "index": 17,
+      "kappa": 0.1195277861010307
+    },
+    "curved": {
+      "index": 19,
+      "kappa": 1.6022776079571515
+    }
+  },
+  "results": {
+    "flat_prep": {
+      "kappa": 0.06489834537204797,
+      "type": "state_prep",
+      "label": "flat",
+      "tvd_avg": 0.0722,
+      "tvd_run1": 0.0665,
+      "tvd_run2": 0.0779,
+      "entropy_avg": 3.3199,
+      "ideal_entropy": 3.2456
+    },
+    "flat_interf": {
+      "kappa": 0.06489834537204797,
+      "type": "interference",
+      "label": "flat",
+      "tvd_avg": 0.1238,
+      "tvd_run1": 0.0988,
+      "tvd_run2": 0.1488,
+      "entropy_avg": 3.5771,
+      "ideal_entropy": 3.3689
+    },
+    "medium_prep": {
+      "kappa": 0.1195277861010307,
+      "type": "state_prep",
+      "label": "medium",
+      "tvd_avg": 0.0704,
+      "tvd_run1": 0.0649,
+      "tvd_run2": 0.076,
+      "entropy_avg": 3.5754,
+      "ideal_entropy": 3.4682
+    },
+    "medium_interf": {
+      "kappa": 0.1195277861010307,
+      "type": "interference",
+      "label": "medium",
+      "tvd_avg": 0.1115,
+      "tvd_run1": 0.1312,
+      "tvd_run2": 0.0918,
+      "entropy_avg": 3.489,
+      "ideal_entropy": 3.2049
+    },
+    "curved_prep": {
+      "kappa": 1.6022776079571515,
+      "type": "state_prep",
+      "label": "curved",
+      "tvd_avg": 0.082,
+      "tvd_run1": 0.0752,
+      "tvd_run2": 0.0888,
+      "entropy_avg": 3.0613,
+      "ideal_entropy": 2.8237
+    },
+    "curved_interf": {
+      "kappa": 1.6022776079571515,
+      "type": "interference",
+      "label": "curved",
+      "tvd_avg": 0.0883,
+      "tvd_run1": 0.0836,
+      "tvd_run2": 0.0929,
+      "entropy_avg": 3.4462,
+      "ideal_entropy": 3.2467
+    }
+  },
+  "verdict": {
+    "prep_tvd_delta_curved_minus_flat": 0.0098,
+    "interf_entropy_delta_curved_minus_flat": -0.131
+  }
+}
