@@ -29,6 +29,11 @@ After IBM returns results, reconcile with actual execution time:
 
     from spark.quantum_budget import reconcile_job
     reconcile_job(job_id="abc123", actual_seconds=2.8)
+
+IBM QUANTUM API FIX (2026-07-14):
+  Uses _get_service() helper that auto-detects credentials from QISKIT_IBM_*
+  env vars (ibm_cloud channel) or falls back to IBM_QUANTUM_TOKEN (legacy
+  ibm_quantum channel). See quantum_bridge.py for details.
 """
 
 import json
@@ -198,22 +203,36 @@ def reconcile_job(job_id: str, actual_seconds: float) -> bool:
     return updated
 
 
-def get_ibm_job_duration(job_id: str, ibm_token: Optional[str] = None) -> Optional[float]:
+def _get_service():
+    """Create a QiskitRuntimeService using auto-detected credentials.
+
+    Shared logic with quantum_bridge.py — supports both QISKIT_IBM_TOKEN
+    (ibm_cloud channel, auto-detected) and IBM_QUANTUM_TOKEN (legacy).
+    """
+    from qiskit_ibm_runtime import QiskitRuntimeService
+
+    if os.getenv("QISKIT_IBM_TOKEN"):
+        return QiskitRuntimeService()
+
+    legacy_token = os.getenv("IBM_QUANTUM_TOKEN")
+    if legacy_token:
+        return QiskitRuntimeService(channel="ibm_quantum", token=legacy_token)
+
+    raise RuntimeError("No IBM Quantum credentials found in environment")
+
+
+def get_ibm_job_duration(job_id: str) -> Optional[float]:
     """
     Fetch the actual execution duration (in seconds) from IBM Quantum
     for a given job_id.
 
-    Requires the qiskit-ibm-runtime package and a valid IBM Quantum token
-    (from env var IBM_QUANTUM_TOKEN or passed directly).
+    FIX (2026-07-14): Uses _get_service() for auto-detected credentials
+    instead of hardcoding channel="ibm_quantum" with IBM_QUANTUM_TOKEN.
 
     Returns None if the job is not yet complete or the package is unavailable.
     """
-    token = ibm_token or os.getenv("IBM_QUANTUM_TOKEN")
-    if not token:
-        return None
     try:
-        from qiskit_ibm_runtime import QiskitRuntimeService
-        service = QiskitRuntimeService(channel="ibm_quantum", token=token)
+        service = _get_service()
         job     = service.job(job_id)
         metrics = job.metrics()
         # usage.seconds is the billed quantum time
@@ -222,14 +241,14 @@ def get_ibm_job_duration(job_id: str, ibm_token: Optional[str] = None) -> Option
         return None
 
 
-def auto_reconcile(ibm_token: Optional[str] = None) -> int:
+def auto_reconcile() -> int:
     """
     For every unreconciled ledger entry, try to fetch actual duration
     from IBM Quantum and update the ledger.
 
     Returns the number of entries successfully reconciled.
     """
-    entries   = _load_ledger()
+    entries    = _load_ledger()
     reconciled = 0
     for entry in entries:
         if entry.get("actual_seconds") is not None:
@@ -237,7 +256,7 @@ def auto_reconcile(ibm_token: Optional[str] = None) -> int:
         job_id = entry.get("job_id", "")
         if not job_id:
             continue
-        duration = get_ibm_job_duration(job_id, ibm_token)
+        duration = get_ibm_job_duration(job_id)
         if duration is not None:
             if reconcile_job(job_id, duration):
                 reconciled += 1

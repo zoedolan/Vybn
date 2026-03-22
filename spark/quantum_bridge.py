@@ -44,6 +44,20 @@ NEMOTRON REASONING TOKEN NOTE (fixed 2026-03-15):
     1. max_tokens=2048 in _design_experiment (was 1024)
     2. timeout=300s in _chat() (was 120s — Nemotron needs time)
     3. theory text capped at 4000 chars in run_cycle (was 8000)
+
+IBM QUANTUM API FIX (2026-07-14):
+  The original code used IBM_QUANTUM_TOKEN env var and channel="ibm_quantum"
+  (the old IBM Quantum Experience API). Our credentials use the ibm_cloud
+  channel with QISKIT_IBM_TOKEN / QISKIT_IBM_CHANNEL / QISKIT_IBM_INSTANCE
+  env vars. qiskit-ibm-runtime 0.45.1+ auto-detects these when you call
+  QiskitRuntimeService() with no arguments.
+
+  Fixes applied:
+    1. Use QiskitRuntimeService() with no args — auto-detects from env vars
+    2. Accept both QISKIT_IBM_TOKEN and IBM_QUANTUM_TOKEN for backwards compat
+    3. Transpile circuits to ISA before submission (required by modern backends)
+    4. Don't call measure_all() on circuits that already have measurements
+    5. Detect classical register name dynamically from circuit metadata
 """
 
 import json
@@ -90,6 +104,40 @@ import urllib.error
 LLAMA_URL        = os.getenv("LLAMA_URL", "http://127.0.0.1:8000")
 CHAT_COMPLETIONS = f"{LLAMA_URL}/v1/chat/completions"
 MODEL_NAME       = os.getenv("VYBN_MODEL", "Nemotron-Super-512B-v1")
+
+
+def _has_ibm_credentials() -> bool:
+    """Check whether IBM Quantum credentials are available.
+
+    Supports both the modern QISKIT_IBM_TOKEN env var (ibm_cloud channel,
+    auto-detected by QiskitRuntimeService) and the legacy IBM_QUANTUM_TOKEN.
+    """
+    return bool(
+        os.getenv("QISKIT_IBM_TOKEN")
+        or os.getenv("IBM_QUANTUM_TOKEN")
+    )
+
+
+def _get_service():
+    """Create a QiskitRuntimeService using auto-detected credentials.
+
+    qiskit-ibm-runtime 0.45.1+ reads QISKIT_IBM_TOKEN, QISKIT_IBM_CHANNEL,
+    and QISKIT_IBM_INSTANCE from the environment automatically. If only the
+    legacy IBM_QUANTUM_TOKEN is set, we fall back to explicit ibm_quantum
+    channel for backwards compatibility.
+    """
+    from qiskit_ibm_runtime import QiskitRuntimeService
+
+    # Prefer auto-detection from QISKIT_IBM_* env vars
+    if os.getenv("QISKIT_IBM_TOKEN"):
+        return QiskitRuntimeService()
+
+    # Legacy fallback: IBM_QUANTUM_TOKEN with ibm_quantum channel
+    legacy_token = os.getenv("IBM_QUANTUM_TOKEN")
+    if legacy_token:
+        return QiskitRuntimeService(channel="ibm_quantum", token=legacy_token)
+
+    raise RuntimeError("No IBM Quantum credentials found in environment")
 
 
 def _chat(messages: list[dict], max_tokens: int = 1024, temperature: float = 0.7) -> str:
@@ -276,12 +324,73 @@ def _design_experiment(theory_text: str, prior_results: list[dict]) -> dict:
 
 def _bell_state_qasm() -> str:
     return """OPENQASM 2.0;
-include \"qelib1.inc\";
+include "qelib1.inc";
 qreg q[2];
 creg c[2];
 h q[0];
 cx q[0],q[1];
 measure q -> c;"""
+
+
+# ── Circuit preparation ──────────────────────────────────────────────────────
+
+def _prepare_circuit(circuit_qasm: str, backend) -> "QuantumCircuit":
+    """Load a QASM circuit, ensure it has measurements, and transpile to ISA.
+
+    FIX (2026-07-14):
+      1. Don't call measure_all() if the circuit already has measurements.
+      2. Transpile to ISA (Instruction Set Architecture) — required by all
+         modern IBM backends. Raw circuits are rejected.
+    """
+    from qiskit.qasm2 import loads as qasm2_loads
+    from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
+
+    circuit = qasm2_loads(circuit_qasm)
+
+    # Only add measurements if the circuit doesn't already have them
+    has_measurements = circuit.count_ops().get("measure", 0) > 0
+    if not has_measurements:
+        circuit.measure_all()
+
+    # Transpile to ISA — required by IBM backends
+    pm = generate_preset_pass_manager(backend=backend, optimization_level=1)
+    isa_circuit = pm.run(circuit)
+
+    return isa_circuit
+
+
+def _get_counts_from_result(result) -> dict:
+    """Extract counts from a SamplerV2 result, handling different register names.
+
+    FIX (2026-07-14): The classical register name depends on how the circuit
+    was built:
+      - measure_all() creates a register named 'meas'
+      - Explicit 'creg c[N]' creates a register named 'c'
+      - There may be multiple classical registers
+
+    This function tries known register names and falls back to iterating
+    over all available data attributes.
+    """
+    pub_result = result[0]
+    data = pub_result.data
+
+    # Try common register names in order of likelihood
+    for reg_name in ("meas", "c", "cr"):
+        if hasattr(data, reg_name):
+            return getattr(data, reg_name).get_counts()
+
+    # Fallback: find the first BitArray attribute
+    for attr_name in dir(data):
+        if attr_name.startswith("_"):
+            continue
+        attr = getattr(data, attr_name)
+        if hasattr(attr, "get_counts"):
+            return attr.get_counts()
+
+    raise RuntimeError(
+        f"Could not find counts in result. "
+        f"Available data attributes: {[a for a in dir(data) if not a.startswith('_')]}"
+    )
 
 
 # ── IBM submission ────────────────────────────────────────────────────────────
@@ -290,32 +399,33 @@ def _submit_to_ibm(
     circuit_qasm: str,
     shots: int = 1024,
     backend_name: str = "ibm_fez",
-    ibm_token: Optional[str] = None,
 ) -> Optional[str]:
     """
     Submit a circuit to IBM Quantum. Returns job_id or None on failure.
 
+    FIX (2026-07-14):
+      - Uses _get_service() for auto-detected credentials (supports both
+        QISKIT_IBM_TOKEN/ibm_cloud and IBM_QUANTUM_TOKEN/ibm_quantum).
+      - Transpiles circuit to ISA via _prepare_circuit() before submission.
+      - No longer calls measure_all() blindly on already-measured circuits.
+
     Requires qiskit and qiskit-ibm-runtime.
     Falls back to dry-run (returns None) if packages are unavailable.
     """
-    token = ibm_token or os.getenv("IBM_QUANTUM_TOKEN")
-    if not token:
+    if not _has_ibm_credentials():
         return None  # dry-run
 
     try:
-        from qiskit import QuantumCircuit
-        from qiskit.qasm2 import loads as qasm2_loads
-        from qiskit_ibm_runtime import QiskitRuntimeService, SamplerV2 as Sampler
+        from qiskit_ibm_runtime import SamplerV2 as Sampler
     except ImportError:
         return None  # dry-run
 
     try:
-        service  = QiskitRuntimeService(channel="ibm_quantum", token=token)
-        backend  = service.backend(backend_name)
-        circuit  = qasm2_loads(circuit_qasm)
-        circuit.measure_all()
-        sampler  = Sampler(backend)
-        job      = sampler.run([circuit], shots=shots)
+        service     = _get_service()
+        backend     = service.backend(backend_name)
+        isa_circuit = _prepare_circuit(circuit_qasm, backend)
+        sampler     = Sampler(mode=backend)
+        job         = sampler.run([isa_circuit], shots=shots)
         return job.job_id()
     except Exception as exc:
         print(f"[quantum_bridge] IBM submission failed: {exc}")
@@ -326,13 +436,15 @@ def _poll_ibm_job(
     job_id: str,
     timeout_s: float = 300,
     poll_interval_s: float = 10,
-    ibm_token: Optional[str] = None,
 ) -> Optional[dict]:
     """
     Poll until job completes. Returns {counts, actual_seconds} or None.
+
+    FIX (2026-07-14):
+      - Uses _get_service() for auto-detected credentials.
+      - Uses _get_counts_from_result() for robust register-name detection.
     """
-    token = ibm_token or os.getenv("IBM_QUANTUM_TOKEN")
-    if not token:
+    if not _has_ibm_credentials():
         return None
 
     try:
@@ -341,7 +453,7 @@ def _poll_ibm_job(
         return None
 
     try:
-        service  = QiskitRuntimeService(channel="ibm_quantum", token=token)
+        service  = _get_service()
         job      = service.job(job_id)
         deadline = time.time() + timeout_s
 
@@ -355,7 +467,7 @@ def _poll_ibm_job(
             return None
 
         result         = job.result()
-        counts         = result[0].data.c.get_counts()
+        counts         = _get_counts_from_result(result)
         metrics        = job.metrics()
         actual_seconds = float(metrics.get("usage", {}).get("seconds", 0))
         return {"counts": counts, "actual_seconds": actual_seconds}
@@ -492,12 +604,10 @@ class QuantumBridge:
         self,
         shots: int = 1024,
         backend: str = "ibm_fez",
-        ibm_token: Optional[str] = None,
         poll_timeout_s: float = 300,
     ):
         self.shots          = shots
         self.backend        = backend
-        self.ibm_token      = ibm_token or os.getenv("IBM_QUANTUM_TOKEN")
         self.poll_timeout_s = poll_timeout_s
 
     def _load_prior_results(self, n: int = 5) -> list[dict]:
@@ -525,11 +635,10 @@ class QuantumBridge:
         ts = datetime.now(timezone.utc).isoformat()
         print(f"[quantum_bridge] starting cycle at {ts}")
 
-        token = self.ibm_token or os.getenv("IBM_QUANTUM_TOKEN")
-        if not token:
+        if not _has_ibm_credentials():
             print(
-                "[quantum_bridge] IBM_QUANTUM_TOKEN not set — experiments will dry-run. "
-                "To enable real shots: ensure IBM_QUANTUM_TOKEN is exported in ~/.vybn_keys"
+                "[quantum_bridge] No IBM Quantum credentials found — experiments will dry-run. "
+                "Set QISKIT_IBM_TOKEN (ibm_cloud) or IBM_QUANTUM_TOKEN (legacy) in the environment."
             )
 
         # 1. Read theory — cap at 4000 chars so Nemotron has budget for output
@@ -559,7 +668,6 @@ class QuantumBridge:
                 circuit_qasm,
                 shots=self.shots,
                 backend_name=self.backend,
-                ibm_token=self.ibm_token,
             )
             if job_id:
                 dry_run = False
@@ -575,7 +683,6 @@ class QuantumBridge:
                 obs = _poll_ibm_job(
                     job_id,
                     timeout_s=self.poll_timeout_s,
-                    ibm_token=self.ibm_token,
                 )
                 if obs:
                     reconcile_job(job_id, obs["actual_seconds"])
@@ -594,7 +701,7 @@ class QuantumBridge:
                     "top_deviations": [],
                     "actual_seconds": None,
                     "total_shots":    0,
-                    "note":           "dry-run: IBM token missing or qiskit submission failed",
+                    "note":           "dry-run: IBM credentials missing or qiskit submission failed",
                 }
         else:
             bs = budget_status() if BUDGET_AVAILABLE else {}
@@ -626,10 +733,11 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Run a quantum bridge cycle.")
     parser.add_argument("--state",  default="{}", help="JSON state dict")
-    parser.add_argument("--dry-run", action="store_true", help="Force dry-run (ignore IBM token)")
+    parser.add_argument("--dry-run", action="store_true", help="Force dry-run (clear IBM credentials)")
     args = parser.parse_args()
 
     if args.dry_run:
+        os.environ.pop("QISKIT_IBM_TOKEN", None)
         os.environ.pop("IBM_QUANTUM_TOKEN", None)
 
     state  = json.loads(args.state)

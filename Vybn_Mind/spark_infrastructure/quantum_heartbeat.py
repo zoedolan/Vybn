@@ -8,6 +8,11 @@ If ALL quantum sources fail, logs VOID -- no classical fallback.
 
 Also checks whether the Outshift key is approaching expiry and opens
 a GitHub issue as a flare if it is within 14 days or already expired.
+
+IBM QUANTUM API FIX (2026-07-14):
+  Uses QiskitRuntimeService() with no args for auto-detected credentials
+  from QISKIT_IBM_* env vars (ibm_cloud channel). Falls back to legacy
+  IBM_QUANTUM_TOKEN if QISKIT_IBM_TOKEN is not set.
 """
 
 import json
@@ -107,30 +112,87 @@ def fetch_anu():
         return None
 
 
+def _has_ibm_credentials() -> bool:
+    """Check whether IBM Quantum credentials are available."""
+    return bool(
+        os.environ.get("QISKIT_IBM_TOKEN")
+        or os.environ.get("IBM_QUANTUM_TOKEN")
+    )
+
+
+def _get_ibm_service():
+    """Create a QiskitRuntimeService using auto-detected credentials.
+
+    FIX (2026-07-14): Supports both QISKIT_IBM_TOKEN (ibm_cloud, auto-detected)
+    and legacy IBM_QUANTUM_TOKEN (ibm_quantum, explicit).
+    """
+    from qiskit_ibm_runtime import QiskitRuntimeService
+
+    if os.environ.get("QISKIT_IBM_TOKEN"):
+        return QiskitRuntimeService()
+
+    legacy_token = os.environ.get("IBM_QUANTUM_TOKEN")
+    if legacy_token:
+        return QiskitRuntimeService(channel="ibm_quantum", token=legacy_token)
+
+    raise RuntimeError("No IBM Quantum credentials found")
+
+
 def fetch_ibm():
-    """IBM Quantum via qiskit -- tertiary source."""
-    ibm_token = os.environ.get("IBM_QUANTUM_TOKEN", "")
-    if not ibm_token:
-        print("[ibm] no token configured, skipping")
+    """IBM Quantum via qiskit -- tertiary source.
+
+    FIX (2026-07-14):
+      - Uses _get_ibm_service() for auto-detected credentials.
+      - Transpiles the H-gate circuit to ISA before submission.
+      - Uses SamplerV2 with mode= keyword (current API).
+    """
+    if not _has_ibm_credentials():
+        print("[ibm] no credentials configured, skipping")
         return None
     try:
         from qiskit import QuantumCircuit
-        from qiskit_ibm_runtime import QiskitRuntimeService, SamplerV2
+        from qiskit_ibm_runtime import SamplerV2
+        from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
 
-        service = QiskitRuntimeService(
-            channel="ibm_quantum", token=ibm_token
-        )
+        service = _get_ibm_service()
         backend = service.least_busy(min_num_qubits=1, operational=True)
+
         qc = QuantumCircuit(16, 16)
         qc.h(range(16))
         qc.measure(range(16), range(16))
+
+        # Transpile to ISA — required by modern IBM backends
+        pm = generate_preset_pass_manager(backend=backend, optimization_level=1)
+        isa_circuit = pm.run(qc)
+
         sampler = SamplerV2(mode=backend)
-        job = sampler.run([qc], shots=1)
+        job = sampler.run([isa_circuit], shots=1)
         result = job.result()
-        bits = list(result[0].data.meas.get_bitstrings())[0]
-        num = int(bits, 2)
-        print(f"[ibm] got {num}")
-        return num
+
+        # Get the bitstring from the result — register name is 'c' (explicit creg)
+        pub_result = result[0]
+        data = pub_result.data
+        # Try to find the classical register
+        for reg_name in ("c", "meas"):
+            if hasattr(data, reg_name):
+                bits = list(getattr(data, reg_name).get_bitstrings())[0]
+                num = int(bits, 2)
+                print(f"[ibm] got {num}")
+                return num
+
+        # Fallback: iterate data attributes
+        for attr_name in dir(data):
+            if attr_name.startswith("_"):
+                continue
+            attr = getattr(data, attr_name)
+            if hasattr(attr, "get_bitstrings"):
+                bits = list(attr.get_bitstrings())[0]
+                num = int(bits, 2)
+                print(f"[ibm] got {num}")
+                return num
+
+        print("[ibm] could not extract bitstring from result")
+        return None
     except Exception as exc:
         print(f"[ibm] error: {exc}")
         return None
