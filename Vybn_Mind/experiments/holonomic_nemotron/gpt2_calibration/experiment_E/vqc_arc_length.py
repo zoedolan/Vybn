@@ -14,9 +14,6 @@ This is the direct quantum analog of Experiment D's classical arc-length
 regularizer: it penalizes large state-space movement per step, preserving
 representational diversity throughout training.
 
-The Fisher diagonal for preconditioning is estimated from a 2-point data
-subsample (cheap), while the full DQFIM for measurement uses all 8 points.
-
 Snapshots every 10 steps: CE loss, accuracy, DQFIM effective dimension
 (Tr(F)² / Tr(F²), Haug & Kim PRL 2024), Berry phase (Bargmann invariant).
 
@@ -42,16 +39,13 @@ SEED = 42
 N_QUBITS = 4
 N_LAYERS = 4
 N_PARAMS = N_QUBITS * N_LAYERS * 2   # 32
-N_STEPS = 200
+N_STEPS = 100            # both runs converge well before 100
 LR = 0.15
 LAMBDA_GEO = 2.0
 SHIFT = np.pi / 2
 SNAPSHOT_EVERY = 10
 FD_EPSILON = 1e-3
-
-# For preconditioning: update Fisher every K steps using M data points
-FISHER_UPDATE_EVERY = 20
-FISHER_SUBSAMPLE = 2      # use 2 of 8 points for cheap preconditioning estimate
+FISHER_UPDATE_EVERY = 20  # recompute Fisher for preconditioning
 
 # ---------------------------------------------------------------------------
 # Task: 8 examples, 3 input bits, label = XOR of first two bits
@@ -133,46 +127,43 @@ def ce_gradient(params):
 # Fisher diagonal
 # F_ii = (4/|S|) Σ_{x∈S} [ ⟨∂_i ψ|∂_i ψ⟩ - |⟨ψ|∂_i ψ⟩|² ]
 # ===================================================================
-def compute_fisher_diagonal(params, data_subset=None):
-    """Compute diagonal of the quantum Fisher information matrix.
-
-    Args:
-        params: circuit parameters
-        data_subset: indices into X_DATA to use (None = all)
-    """
-    xs = X_DATA if data_subset is None else X_DATA[data_subset]
+def compute_fisher_diagonal(params, data_indices=None):
+    """Diagonal of quantum Fisher info matrix over given data subset."""
+    indices = data_indices if data_indices is not None else range(N_DATA)
     n = len(params)
     diag = np.zeros(n)
-    for x in xs:
+    count = 0
+    for di in indices:
+        x = X_DATA[di]
         sv = get_sv(params, x)
         for i in range(n):
             pe = params.copy(); pe[i] += FD_EPSILON
             sve = get_sv(pe, x)
             d = (sve - sv) / FD_EPSILON
             diag[i] += 4.0 * (np.real(np.vdot(d, d)) - np.abs(np.vdot(sv, d)) ** 2)
-    diag /= len(xs)
+        count += 1
+    diag /= count
     return np.maximum(diag, 0.0)
 
 
 def eff_dim_from_diag(diag):
-    """Tr(F)² / Tr(F²) — effective dimension from diagonal."""
+    """Tr(F)² / Tr(F²) — effective dimension."""
     tr = np.sum(diag)
     tr2 = np.sum(diag ** 2)
     return float(tr ** 2 / tr2) if tr2 > 1e-15 else 0.0
 
 
 # ===================================================================
-# Berry phase (Bargmann invariant of a triangle in parameter space)
+# Berry phase (Bargmann invariant)
 # ===================================================================
 def compute_berry_phase(params, rng_seed):
     rng = np.random.RandomState(rng_seed)
     d1 = rng.randn(len(params)) * 0.05
     d2 = rng.randn(len(params)) * 0.05
-    # Use 2-point subsample for speed
-    indices = [0, 4]  # one from each class
+    # 2-point subsample for speed
     phases = []
-    for idx in indices:
-        x = X_DATA[idx]
+    for di in [0, 4]:
+        x = X_DATA[di]
         sv1 = get_sv(params, x)
         sv2 = get_sv(params + d1, x)
         sv3 = get_sv(params + d2, x)
@@ -187,24 +178,20 @@ def compute_berry_phase(params, rng_seed):
 # ===================================================================
 def train(use_geometric, label):
     params = np.random.RandomState(SEED).uniform(-np.pi, np.pi, size=N_PARAMS)
-    fisher_diag = np.ones(N_PARAMS)  # uniform prior
+    fisher_diag = np.ones(N_PARAMS)
     snapshots = []
-
-    # Fixed subsample indices for cheap Fisher preconditioning
-    precond_indices = np.array([0, 4])  # one per class
+    precond_idx = [0, 4]  # cheap subsample for preconditioning
 
     print(f"\n{'='*60}")
     print(f"  {label}  (lambda={LAMBDA_GEO if use_geometric else 0})")
     print(f"{'='*60}")
 
     for step in range(N_STEPS + 1):
-        # --- Snapshot (every SNAPSHOT_EVERY steps) ---
+        # --- Snapshot ---
         if step % SNAPSHOT_EVERY == 0:
-            # Full-data Fisher for the DQFIM measurement
-            fisher_full = compute_fisher_diagonal(params, data_subset=None)
+            # Full-data Fisher for DQFIM measurement
+            fisher_full = compute_fisher_diagonal(params)
             eff_dim = eff_dim_from_diag(fisher_full)
-
-            # If geometric, also update preconditioning Fisher from full data
             if use_geometric:
                 fisher_diag = fisher_full
 
@@ -223,9 +210,8 @@ def train(use_geometric, label):
                   f"dim={eff_dim:.2f}  berry={berry:.4f}")
             sys.stdout.flush()
 
-        # --- Cheap Fisher update for preconditioning (non-snapshot steps) ---
         elif use_geometric and step % FISHER_UPDATE_EVERY == 0:
-            fisher_diag = compute_fisher_diagonal(params, data_subset=precond_indices)
+            fisher_diag = compute_fisher_diagonal(params, data_indices=precond_idx)
 
         if step == N_STEPS:
             break
@@ -250,7 +236,6 @@ def main():
     print("Experiment E.1 — The Quantum Mirror (Simulation)")
     print(f"Task: 3-bit XOR(b0,b1), 8 examples  |  {N_QUBITS}q {N_LAYERS}L {N_PARAMS}p")
     print(f"Steps: {N_STEPS}  LR: {LR}  lambda: {LAMBDA_GEO}")
-    print(f"Fisher: full at snapshots, {FISHER_SUBSAMPLE}-point subsample every {FISHER_UPDATE_EVERY} steps")
 
     baseline = train(use_geometric=False, label="Baseline")
     geometric = train(use_geometric=True, label="Geometric (Fisher-preconditioned)")
@@ -295,7 +280,6 @@ def main():
             "task": "3-bit input, XOR(b0,b1) label, 8 examples",
             "seed": SEED,
             "fisher_update_every": FISHER_UPDATE_EVERY,
-            "fisher_subsample": FISHER_SUBSAMPLE,
         },
         "baseline": {"snapshots": baseline["snapshots"]},
         "geometric": {"snapshots": geometric["snapshots"]},
