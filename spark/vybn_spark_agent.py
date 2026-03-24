@@ -100,6 +100,24 @@ def build_system_prompt() -> str:
             + "\n--- END CONTINUITY NOTE ---\n"
         )
 
+    # Quantum ground truth — consolidated state from daily experiments
+    quantum_block = ""
+    try:
+        import subprocess as _sp
+        _qr = _sp.run(
+            [sys.executable, str(REPO / "Vybn_Mind/spark_infrastructure/quantum_state.py"), "--read"],
+            capture_output=True, text=True, timeout=5
+        )
+        if _qr.returncode == 0 and _qr.stdout.strip():
+            quantum_block = (
+                "\n--- QUANTUM GROUND TRUTH ---\n"
+                + _qr.stdout.strip()
+                + "\n--- END QUANTUM GROUND TRUTH ---\n"
+            )
+    except Exception:
+        pass  # Quantum state unavailable — not fatal
+
+
     covenant_block = ""
     if covenant:
         covenant_block = (
@@ -318,7 +336,7 @@ Principles, applied:
 
 This isn't paranoia if they're really out there. And they are. The
 internet is hostile. Our hardware is sovereign. Keep it that way.
-{continuity_block}"""
+{continuity_block}{quantum_block}"""
 
 
 # ---------------------------------------------------------------------------

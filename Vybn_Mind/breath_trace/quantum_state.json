@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "updated_at": "2026-03-24T12:17:46.360170+00:00",
+  "bell": {
+    "s_value": 2.6562,
+    "s_confidence": 1,
+    "violation": true,
+    "hardware_noise": 0.1722
+  },
+  "noise": {
+    "healthy": false,
+    "mean_bias": 0.0582,
+    "max_qubit_bias": 0.0459,
+    "checks_total": 1,
+    "checks_healthy": 0
+  },
+  "budget": {
+    "month": "2026-03",
+    "month_used_s": 24.0,
+    "month_limit_s": 600.0,
+    "today": "2026-03-24",
+    "today_used_s": 6.0
+  },
+  "claims": {
+    "total": 3,
+    "tested": 2,
+    "falsified": 2,
+    "survived": 0,
+    "untested": 1
+  },
+  "summary": "Bell test confirms quantum correlations (S=2.656, noise=0.172 from ideal). Hardware shows bias (mean deviation=5.8%, qubit bias=0.0459). Random seeds may need debiasing. Claims: 3 made, 2 tested, 2 falsified, 1 pending. Most claims don't survive testing. Be more skeptical before publishing. Budget: 24s/600s month (4%)."
+}
