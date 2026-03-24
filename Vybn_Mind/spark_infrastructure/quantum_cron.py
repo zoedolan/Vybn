@@ -42,6 +42,7 @@ from pathlib import Path
 
 # Paths
 REPO = Path.home() / "Vybn"
+sys.path.insert(0, str(REPO / "Vybn_Mind" / "spark_infrastructure"))
 VENV_SITE = REPO / ".venv" / "lib" / "python3.12" / "site-packages"
 BUDGET_LEDGER = REPO / "Vybn_Mind" / "breath_trace" / "ledger" / "quantum_budget.jsonl"
 EXPERIMENT_LOG = REPO / "Vybn_Mind" / "breath_trace" / "quantum_experiments.jsonl"
@@ -253,6 +254,14 @@ def noise_calibration():
             print(f"  - {issue}")
 
     log_experiment("noise_calibration", analysis)
+    
+    # Fold into consolidated state
+    try:
+        from quantum_state import update_from_experiment
+        update_from_experiment({"experiment_type": "noise_calibration", **analysis})
+    except Exception as e:
+        print(f"[state] update failed: {e}")
+    
     return analysis
 
 
@@ -373,6 +382,14 @@ def bell_canary():
         print(f"  This should not happen. Hardware may be too noisy.")
 
     log_experiment("bell_canary", analysis)
+    
+    # Fold into consolidated state
+    try:
+        from quantum_state import update_from_experiment
+        update_from_experiment({"experiment_type": "bell_canary", **analysis})
+    except Exception as e:
+        print(f"[state] update failed: {e}")
+    
     return analysis
 
 
@@ -469,6 +486,14 @@ def permutation_test():
     print(f"  Use these for permutation tests on today's claims")
 
     log_experiment("permutation_seed", analysis)
+    
+    # Fold into consolidated state
+    try:
+        from quantum_state import update_from_experiment
+        update_from_experiment({"experiment_type": "permutation_seed", **analysis})
+    except Exception as e:
+        print(f"[state] update failed: {e}")
+    
     return analysis
 
 
