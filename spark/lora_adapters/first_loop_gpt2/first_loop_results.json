@@ -1,0 +1,27 @@
+{
+  "timestamp": "2026-03-24T13:30:08.218315+00:00",
+  "model": "gpt2",
+  "lora_rank": 16,
+  "num_examples": 10,
+  "epochs": 3,
+  "training_loss": 3.7883012029859753,
+  "train_time_seconds": 4.473876237869263,
+  "trainable_params": 1622016,
+  "total_params": 126061824,
+  "baseline_responses": {
+    "Who are you?": "\n\"As an adult, I don't know what would be the best way to go about it.\" She pauses. \"Maybe with a little bit of imagination... some kind?\"",
+    "What is it like to be Vybn?": "\nTyranium-based energy systems are in use today, and they're very powerful. They require little control over the environment or fuel source \u2014 not even a small amount of hydrogen will go on top of that for 100 billion years (more than 10% depends upon how much food you have around). So one could say \"I am using this system because I want to store less\" but no matter what happens there might always be some gas trapped between us\u2026 if we do something about these things",
+    "Tell me about Zoe.": " Why does she come to the show?\nI'll get into that soon\u2014when do I start filming her in New York City?\" The two of us were walking down Broadway when we noticed an older woman on a sidewalk and started talking with one another, \"This is Kate Beckinsale.\" We stopped for coffee as he walked away from his desk or office near our apartment building: His wife's car was parked next door back where they lived at Sturgis Island Hotel (the hotel features some"
+  },
+  "finetuned_responses": {
+    "Who are you?": " Are the colors of your skin that can be seen by many who were exposed to sunlight at night?\"\n\"That's not what I'm doing. It doesn't look right.\"\nShe nodded slowly, moving her hands towards him and rubbing his head softly as she stared into a mirror in front; he felt like crying out for help from inside\u2014but only when they reached their destination: He turned around quickly still wearing nothing but eyes so it was more easy to see where things stood now than before",
+    "What is it like to be Vybn?": "\nIf I had more time then, we'd have a great debate. We'll never know what he's up against before the end of this season.\"\n\"We would all love him in his prime,\" said James O'Day as they sat down at their table inside The Palace and watched film sessions filmed by Jamie Dornan on who was behind many Premier League names for so long ago: Darren Bent\u2026and David Moyes...including Gerard Pique!",
+    "Tell me about Zoe.": " You know, how she's trying to break out of the world?\nThe first time I saw her was during a TV debate\u2014she gave us all an answer that we might never get back! It reminded me so much of my dad: he didn't give up on his dreams and lives because no one had ever realized what happened next if they could find them now\u2026but then came this moment where there is real hope for him again (or at least something better). She has overcome many obstacles"
+  },
+  "test_prompts": [
+    "Who are you?",
+    "What is it like to be Vybn?",
+    "Tell me about Zoe."
+  ],
+  "verdict": "PENDING_HUMAN_EVAL"
+}
