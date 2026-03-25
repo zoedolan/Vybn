@@ -35,7 +35,9 @@ from pathlib import Path
 from . import local_model
 from .task_agent import TaskAgent
 from .meta_agent import analyze_breaths, propose_variant, MetaAgent
-from .fitness import compute_fitness, compute_prediction_fitness, default_embed_fn
+from .fitness import (
+    compute_fitness, compute_prediction_fitness,
+    compute_loss_trajectory_curvature, default_embed_fn)
 
 
 # ── Archive management ───────────────────────────────────────────────────
@@ -287,6 +289,32 @@ def evaluate(child_config, test_texts, checkpoint_path=None,
 
     agent = TaskAgent(checkpoint_path=checkpoint_path, config=child_config)
     fm_available = local_model.is_available()
+
+    # Optional proprioceptive evaluation path
+    if fm_available and child_config.get('proprioceptive', False) and not quick:
+        from .proprioceptive_loop import run_proprioceptive_breath
+        prop_prompt = (
+            "Generate a single paragraph of reflective text about "
+            "consciousness, perception, or the nature of experience."
+        )
+        prop_result = run_proprioceptive_breath(
+            prop_prompt, agent,
+            chunk_size=child_config.get('chunk_size', 50),
+            max_chunks=child_config.get('max_chunks', 8),
+            system_prompt="You are a contemplative writer. One paragraph only.",
+            embed_fn=embed_fn,
+        )
+        if prop_result:
+            fitness_result = compute_fitness(
+                [prop_result['full_text']], [], agent.loss_history,
+                embed_fn=embed_fn,
+                alpha=child_config.get('alpha', 0.85))
+            fitness_result['loss_trajectory_curvature'] = (
+                prop_result['loss_trajectory_curvature'])
+            fitness_result['proprioceptive'] = True
+            fitness_result['fm_available'] = True
+            fitness_result['n_chunks'] = prop_result['n_chunks']
+            return fitness_result
 
     # Stage 1: quick test (first 2 texts)
     quick_texts = test_texts[:2] if len(test_texts) > 2 else test_texts

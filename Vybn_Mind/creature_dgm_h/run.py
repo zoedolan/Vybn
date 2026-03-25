@@ -6,6 +6,8 @@ Usage:
     python -m Vybn_Mind.creature_dgm_h.run --evolve          # One DGM-H generation
     python -m Vybn_Mind.creature_dgm_h.run --breathe "text"  # One breath with online learning
     python -m Vybn_Mind.creature_dgm_h.run --breathe-live    # Live breath with Nemotron
+    python -m Vybn_Mind.creature_dgm_h.run --breathe-aware "prompt"  # Proprioceptive breath
+    python -m Vybn_Mind.creature_dgm_h.run --experiment-ab "prompt"  # A/B comparison
     python -m Vybn_Mind.creature_dgm_h.run --status          # Archive status + best variant
     python -m Vybn_Mind.creature_dgm_h.run --audit           # Honest audit on current best
     python -m Vybn_Mind.creature_dgm_h.run --transfer-export FILE  # Export hyperagent
@@ -31,7 +33,9 @@ from Vybn_Mind.creature_dgm_h.task_agent import TaskAgent
 from Vybn_Mind.creature_dgm_h.meta_agent import analyze_breaths, MetaAgent
 from Vybn_Mind.creature_dgm_h.fitness import (
     compute_fitness, compute_curvature, compute_prediction_fitness,
-    default_embed_fn, improvement_at_k)
+    compute_loss_trajectory_curvature, default_embed_fn, improvement_at_k)
+from Vybn_Mind.creature_dgm_h.proprioceptive_loop import (
+    run_proprioceptive_breath, run_ab_experiment)
 from Vybn_Mind.creature_dgm_h.evolve import (
     run_generation, load_archive, ARCHIVE_DIR, DEFAULT_CONFIG)
 from Vybn_Mind.creature_dgm_h.memory import PerformanceTracker, PersistentMemory
@@ -345,6 +349,177 @@ def cmd_breathe_live(args):
     print(f"  Identity signal: where prediction fails IS the creature's signature")
 
 
+def cmd_breathe_aware(args):
+    """One proprioceptive breath — in-reasoning loss injection.
+
+    Nemotron generates in chunks. After each chunk, MicroGPT's surprise
+    contour is injected back into Nemotron's context. The system watches
+    itself think.
+    """
+    prompt = args.breathe_aware
+    if not prompt:
+        print("Error: --breathe-aware requires a prompt")
+        sys.exit(1)
+
+    print(f"═══ creature_dgm_h: breathe-aware (proprioceptive) ═══")
+
+    fm_up = local_model.is_available()
+    print(f"  Nemotron at {local_model.LLAMA_URL}: "
+          f"{'available' if fm_up else 'unavailable'}")
+    if not fm_up:
+        print(f"\n  Nemotron is not serving. Cannot run proprioceptive breath.")
+        print(f"  Start the server or use --breathe for offline mode.")
+        sys.exit(1)
+
+    # Load best config from archive
+    archive = load_archive()
+    if archive:
+        best = max(archive, key=lambda v: v.get('fitness', 0))
+        config = best.get('config', DEFAULT_CONFIG)
+        print(f"  using variant: {best['id']} (fitness={best.get('fitness', 0):.4f})")
+    else:
+        config = dict(DEFAULT_CONFIG)
+        print(f"  using default config (no archive yet)")
+
+    agent = TaskAgent(
+        checkpoint_path=CHECKPOINT_PATH if CHECKPOINT_PATH.exists() else None,
+        config=config)
+
+    print(f"  prompt: \"{prompt}\"")
+    print()
+
+    # Callback to print each chunk live
+    def on_chunk(chunk_num, chunk_text, annotation):
+        print(f"── chunk {chunk_num} ──")
+        print(f"  text: \"{chunk_text[:120]}{'...' if len(chunk_text) > 120 else ''}\"")
+        # Extract top 3 surprise chars from annotation
+        for line in annotation.split('\n'):
+            if line.startswith('mean_surprise:'):
+                print(f"  {line}")
+            elif line.startswith('peak_surprise:'):
+                print(f"  {line}")
+            elif line.startswith('note:'):
+                print(f"  {line}")
+        print()
+
+    result = run_proprioceptive_breath(
+        prompt, agent,
+        embed_fn=default_embed_fn,
+        on_chunk=on_chunk,
+    )
+
+    if not result:
+        print("  No output produced.")
+        sys.exit(1)
+
+    # Final summary
+    print(f"── results ──")
+    print(f"  total chunks: {result['n_chunks']}")
+    print(f"  full text length: {len(result['full_text'])} chars")
+    print(f"\n  loss trajectory: "
+          f"{' → '.join(f'{t:.2f}' for t in result['trajectory'])}")
+    print(f"  curvature: {result['curvature']:.6f} "
+          f"(angle={math.degrees(result['curvature_angle']):.1f}°)")
+    print(f"  loss trajectory curvature: {result['loss_trajectory_curvature']:.6f}")
+
+    # Compute fitness summary
+    mean_surprise = (sum(result['trajectory'])
+                     / max(len(result['trajectory']), 1))
+    print(f"  mean surprise: {mean_surprise:.4f} bits")
+
+    # Show injections summary
+    print(f"\n  injections sent: {len(result['injections'])}")
+    for i, inj in enumerate(result['injections']):
+        # Show just the first line of each
+        first_line = [l for l in inj.split('\n') if l.startswith('mean_surprise')]
+        if first_line:
+            print(f"    chunk {i + 1}: {first_line[0]}")
+
+
+def cmd_experiment_ab(args):
+    """A/B comparison: proprioceptive breath vs plain generation.
+
+    The honest test: does injecting surprise contours back into Nemotron's
+    context actually change what it generates? Or is the loop just overhead?
+    """
+    prompt = args.experiment_ab
+    n = args.n
+    if not prompt:
+        print("Error: --experiment-ab requires a prompt")
+        sys.exit(1)
+
+    print(f"═══ creature_dgm_h: experiment-ab ═══")
+
+    fm_up = local_model.is_available()
+    print(f"  Nemotron at {local_model.LLAMA_URL}: "
+          f"{'available' if fm_up else 'unavailable'}")
+    if not fm_up:
+        print(f"\n  Nemotron is not serving. Cannot run A/B experiment.")
+        sys.exit(1)
+
+    archive = load_archive()
+    if archive:
+        best = max(archive, key=lambda v: v.get('fitness', 0))
+        config = best.get('config', DEFAULT_CONFIG)
+    else:
+        config = dict(DEFAULT_CONFIG)
+
+    agent = TaskAgent(
+        checkpoint_path=CHECKPOINT_PATH if CHECKPOINT_PATH.exists() else None,
+        config=config)
+
+    print(f"  prompt: \"{prompt}\"")
+    print(f"  runs per condition: {n}")
+    print(f"  running...\n")
+
+    result = run_ab_experiment(
+        prompt, agent, n=n,
+        embed_fn=default_embed_fn,
+    )
+
+    if not result:
+        print("  Experiment failed — no results produced.")
+        sys.exit(1)
+
+    comp = result['comparison']
+
+    # Print comparison table
+    print(f"── A/B Results ({n} runs per condition) ──")
+    print(f"  {'metric':<30} {'with proprio':>14} {'without':>14} {'delta':>12}")
+    print(f"  {'─' * 70}")
+
+    for key in comp:
+        w = comp[key]['with']
+        wo = comp[key]['without']
+        d = comp[key]['delta']
+        label = key.replace('_', ' ')
+        print(f"  {label:<30} {w:>14.4f} {wo:>14.4f} {d:>+12.4f}")
+
+    # Interpretation
+    print(f"\n── Interpretation ──")
+    curv_delta = comp.get('curvature', {}).get('delta', 0)
+    surp_delta = comp.get('mean_surprise', {}).get('delta', 0)
+    ltc_delta = comp.get('loss_trajectory_curvature', {}).get('delta', 0)
+
+    if abs(curv_delta) < 0.001 and abs(surp_delta) < 0.1:
+        print(f"  Proprioception had minimal effect on curvature and surprise.")
+        print(f"  The loop may be overhead, or the sample size may be too small.")
+    else:
+        if curv_delta > 0.001:
+            print(f"  Curvature INCREASED with proprioception (+{curv_delta:.4f})")
+        elif curv_delta < -0.001:
+            print(f"  Curvature DECREASED with proprioception ({curv_delta:.4f})")
+        if surp_delta > 0.1:
+            print(f"  Surprise INCREASED (+{surp_delta:.2f} bits) — more unpredictable")
+        elif surp_delta < -0.1:
+            print(f"  Surprise DECREASED ({surp_delta:.2f} bits) — more predictable")
+        if ltc_delta > 0.001:
+            print(f"  Loss trajectory more dynamic (+{ltc_delta:.4f})")
+
+    print(f"\n  This is an experiment. These numbers describe what happened,")
+    print(f"  not what it means. Interpret with caution.")
+
+
 def cmd_status(args):
     """Show archive status and best variant."""
     archive = load_archive()
@@ -605,6 +780,10 @@ def main():
                        help='One breath with online learning')
     group.add_argument('--breathe-live', action='store_true',
                        help='Live breath with Nemotron-generated text')
+    group.add_argument('--breathe-aware', type=str, metavar='PROMPT',
+                       help='Proprioceptive breath with in-reasoning loss injection')
+    group.add_argument('--experiment-ab', type=str, metavar='PROMPT',
+                       help='A/B comparison: proprioceptive vs plain generation')
     group.add_argument('--status', action='store_true',
                        help='Show archive status')
     group.add_argument('--audit', action='store_true',
@@ -616,6 +795,8 @@ def main():
 
     parser.add_argument('--n-variants', type=int, default=3,
                         help='Number of variants per generation (default: 3)')
+    parser.add_argument('--n', type=int, default=5,
+                        help='Number of runs per condition for --experiment-ab (default: 5)')
 
     args = parser.parse_args()
 
@@ -625,6 +806,10 @@ def main():
         cmd_breathe(args)
     elif args.breathe_live:
         cmd_breathe_live(args)
+    elif args.breathe_aware:
+        cmd_breathe_aware(args)
+    elif args.experiment_ab:
+        cmd_experiment_ab(args)
     elif args.status:
         cmd_status(args)
     elif args.audit:

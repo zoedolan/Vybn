@@ -25,6 +25,37 @@ import numpy as np
 # Adapted from spark/creature.py measure_curvature()
 
 
+def compute_loss_trajectory_curvature(trajectory):
+    """How the surprise itself curves over a breath.
+
+    Takes a list of mean_loss values (one per chunk) and computes
+    the variance of consecutive differences. Higher variance = more
+    dynamic loss landscape = more interesting behavior.
+
+    This is a new signal for the proprioceptive loop: it measures not
+    the text's curvature, but how the prediction difficulty changes
+    as the breath unfolds.
+
+    Args:
+        trajectory: list of float (mean_loss per chunk)
+
+    Returns:
+        float: variance of consecutive differences. 0.0 if < 2 points.
+    """
+    if len(trajectory) < 2:
+        return 0.0
+
+    diffs = [trajectory[i + 1] - trajectory[i]
+             for i in range(len(trajectory) - 1)]
+
+    if not diffs:
+        return 0.0
+
+    mean_diff = sum(diffs) / len(diffs)
+    variance = sum((d - mean_diff) ** 2 for d in diffs) / len(diffs)
+    return variance
+
+
 def compute_curvature(text, embed_fn):
     """Pancharatnam phase of embedding trajectory.
 

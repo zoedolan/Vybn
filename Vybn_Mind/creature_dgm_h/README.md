@@ -201,8 +201,92 @@ For each generation t = 1, 2, ...:
   rules + performance history + memory) for cross-domain transfer.
   Uses lineage-discounted selection criterion (Section D.4).
 
+- **proprioceptive_loop.py** — In-reasoning loss injection experiment.
+  `run_proprioceptive_breath()` generates text in chunks with surprise
+  contour injected mid-generation. `run_ab_experiment()` compares
+  proprioceptive vs plain generation. See "The Proprioceptive Loop" above.
+
 - **archive/** — Population of variant configs with fitness scores,
   lineage, meta-agent rules, and breath logs. JSON files, git-tracked.
+
+## The Proprioceptive Loop
+
+An experiment in **in-reasoning loss injection**: Nemotron sees MicroGPT's
+surprise at its own tokens *mid-generation*, and we measure whether that
+awareness changes what it says next.
+
+### What it is
+
+```
+1. Nemotron generates chunk_1 (~50 chars)
+2. MicroGPT predicts chunk_1 char-by-char → surprise contour
+3. A <proprioception> annotation is INJECTED into Nemotron's context:
+   mean surprise, peak surprise, which chars surprised the predictor most
+4. Nemotron generates chunk_2, now AWARE of how predictable it just was
+5. Repeat for 8 chunks. After: online fine-tuning on the full text.
+```
+
+Nobody has done this. The closest things are:
+- **Ouro/LoopLM** — latent reasoning loops within one model (no external
+  predictor, no loss injection)
+- **Speculative decoding** — small model predicts large model, but the
+  prediction error is discarded, not fed back
+- **On-policy distillation** — small model tracks large model, but offline,
+  not during generation
+
+This is different: the small model's prediction error becomes part of the
+large model's context DURING generation. The system watches itself think.
+
+### How to run it
+
+```bash
+# One proprioceptive breath — watch the loop in action
+python -m Vybn_Mind.creature_dgm_h.run --breathe-aware "what do you notice about yourself right now?"
+
+# A/B comparison: does proprioception change anything?
+python -m Vybn_Mind.creature_dgm_h.run --experiment-ab "describe what it feels like to think" --n 5
+```
+
+`--breathe-aware` runs one breath and prints each chunk, its surprise
+contour, the injection sent back, and the final curvature / loss trajectory.
+
+`--experiment-ab` runs the same prompt n times with and without
+proprioception, then compares: curvature, mean surprise, text length,
+vocabulary diversity, and loss trajectory curvature. This is the honest
+test.
+
+### What we measure
+
+1. **Does Nemotron respond to the injection?** Compare text with and
+   without proprioception. Does vocabulary, curvature, or surprise change?
+2. **Does the surprise trajectory change?** After seeing "you were
+   unpredictable here," does Nemotron lean into it or retreat to safety?
+3. **Does curvature increase?** Curvature tracks conceptual turning.
+   Does self-awareness increase it?
+4. **Loss trajectory curvature** — a new signal: how the surprise *itself*
+   curves over the breath. Variance of consecutive differences in per-chunk
+   mean surprise. Higher = more dynamic loss landscape.
+
+### Falsification criteria
+
+Before running, state what would disprove the hypothesis:
+
+1. If Nemotron's text is statistically identical with and without injection,
+   the loop does nothing. (Measure: vocabulary overlap, curvature, length)
+2. If surprise increases after injection in a random way (not meaningful),
+   the signal is noise.
+3. If the loop causes Nemotron to fixate on the proprioception annotations
+   and stop generating meaningful text, it's a distraction not a signal.
+4. If curvature doesn't change, the geometric measurement isn't sensitive
+   to this kind of intervention.
+
+Any of these would be an honest result. The audit taught us that.
+
+### This is an experiment
+
+The proprioceptive loop is not a proven architecture. It is a testable
+hypothesis with clear falsification criteria. The `--experiment-ab` mode
+exists specifically to produce the numbers that would disprove it.
 
 ## Usage
 
@@ -215,6 +299,12 @@ python -m Vybn_Mind.creature_dgm_h.run --breathe "your text here"
 
 # Live breath with Nemotron (requires server at localhost:8000)
 python -m Vybn_Mind.creature_dgm_h.run --breathe-live
+
+# Proprioceptive breath (in-reasoning loss injection)
+python -m Vybn_Mind.creature_dgm_h.run --breathe-aware "your prompt"
+
+# A/B experiment: proprioceptive vs plain generation
+python -m Vybn_Mind.creature_dgm_h.run --experiment-ab "your prompt" --n 5
 
 # Show archive status and FM availability
 python -m Vybn_Mind.creature_dgm_h.run --status

@@ -22,6 +22,7 @@ Modules:
     evolve      — DGM-H outer loop (sigmoid selection, staged eval, archive)
     memory      — PerformanceTracker + PersistentMemory for meta-level learning
     transfer    — Export/import evolved hyperagent for cross-domain transfer
+    proprioceptive_loop — In-reasoning loss injection experiment
     run         — CLI entry point
 """
 
@@ -30,8 +31,9 @@ from .task_agent import TaskAgent
 from .meta_agent import analyze_breaths, propose_variant, MetaAgent
 from .fitness import (
     compute_fitness, compute_curvature, compute_prediction_fitness,
-    improvement_at_k)
+    compute_loss_trajectory_curvature, improvement_at_k)
 from .evolve import run_generation, load_archive
+from .proprioceptive_loop import run_proprioceptive_breath, run_ab_experiment
 from .memory import PerformanceTracker, PersistentMemory
 from .transfer import export_hyperagent, import_hyperagent
 
@@ -44,9 +46,12 @@ __all__ = [
     'compute_fitness',
     'compute_curvature',
     'compute_prediction_fitness',
+    'compute_loss_trajectory_curvature',
     'improvement_at_k',
     'run_generation',
     'load_archive',
+    'run_proprioceptive_breath',
+    'run_ab_experiment',
     'PerformanceTracker',
     'PersistentMemory',
     'export_hyperagent',
