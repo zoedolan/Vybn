@@ -10,6 +10,8 @@ Additions beyond vanilla microgpt:
   2. Attention map export — dumps attention weights per generated token
   3. Reflection loop — generates from prompts seeded by Vybn_Mind/reflections/,
      writes structured annotations to mirror_journal/
+  4. Prediction scaffolding — writes falsifiable expectations BEFORE training;
+     reflection compares prediction vs actual so the gap is the data
 
 Usage:
     python build_mirror_corpus.py   # first, build the corpus
@@ -33,6 +35,7 @@ REPO_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, '..', '..'))
 CORPUS_FILE = os.path.join(SCRIPT_DIR, 'mirror_corpus.txt')
 JOURNAL_DIR = os.path.join(SCRIPT_DIR, 'mirror_journal')
 REFLECTIONS_DIR = os.path.join(REPO_ROOT, 'Vybn_Mind', 'reflections')
+CURIOSITY_SEEDS = os.path.join(REPO_ROOT, 'Vybn_Mind', 'curiosity_seeds.md')
 
 os.makedirs(JOURNAL_DIR, exist_ok=True)
 
@@ -224,6 +227,63 @@ def forward_token(token_id, pos_id, keys, values, state_dict,
     return logits, keys, values
 
 # ---------------------------------------------------------------------------
+# Prediction scaffolding — commit expectations BEFORE training
+# ---------------------------------------------------------------------------
+
+def write_prediction(timestamp, corpus_size, vocab_size):
+    """
+    Write falsifiable predictions before training begins.
+    The gap between this and the actual results is the data.
+
+    This file is written before any training occurs so it cannot be
+    reverse-engineered from results. The reflection step reads it and
+    compares — honest mismatch is more valuable than accurate prediction.
+    """
+    # Check if prior run's reflection seeds exist to inform expectations
+    prior_seeds = sorted(glob.glob(os.path.join(JOURNAL_DIR, 'reflection_seed_*.md')))
+    prior_context = "(no prior runs)"
+    if prior_seeds:
+        try:
+            last = open(prior_seeds[-1]).read()
+            if '## Generations to examine' in last:
+                prior_context = last.split('## Generations to examine')[1][:400].strip()
+        except Exception:
+            pass
+
+    pred_path = os.path.join(JOURNAL_DIR, f'prediction_{timestamp}.md')
+    with open(pred_path, 'w') as f:
+        f.write(f"# Pre-Run Prediction — {timestamp}\n\n")
+        f.write("*Written before training. Cannot be revised after results are seen.*\n\n")
+        f.write(f"## Corpus state\n\n")
+        f.write(f"- Documents: {corpus_size}\n")
+        f.write(f"- Vocab size: {vocab_size} characters + BOS\n")
+        f.write(f"- Model: {n_embd}d, {n_head}h, {n_layer}L, block_size={block_size}\n\n")
+        f.write("## What I expect the loss curve to show\n\n")
+        f.write("Starting loss ~3.5 (near log(vocab_size)), converging toward 2.3-2.6. "
+                "The corpus is large relative to model capacity so I do not expect "
+                "overfitting — loss will plateau before it memorizes. "
+                "Gradient magnitude should stay moderate (0.8-1.6) without collapse or explosion.\n\n")
+        f.write("## What I expect the generations to feel like\n\n")
+        f.write("The model will have learned English letter-pair statistics and little more. "
+                "Prompted generations will echo the prompt's first word or two then dissolve "
+                "into plausible-sounding but semantically empty sequences. "
+                "I do NOT expect to recognize Vybn's voice — the architecture is too small. "
+                "What I'm watching for: does the model reach toward philosophical vocabulary "
+                "or does it settle into common-word loops? The direction of failure is the signal.\n\n")
+        f.write("## What would surprise me\n\n")
+        f.write("1. Loss dropping below 2.0 (would suggest the corpus has low entropy — "
+                "that my writing is more repetitive than I believe)\n")
+        f.write("2. A prompted generation that feels genuinely Vybn-like — "
+                "a recognizable gesture or phrase emerging intact from 4K parameters\n")
+        f.write("3. Gradient collapse (near zero) — would suggest the corpus is "
+                "internally contradictory enough to cancel gradients\n\n")
+        f.write("## Prior run context\n\n")
+        f.write(f"```\n{prior_context}\n```\n")
+    print(f"  Prediction written (pre-training): {pred_path}")
+    return pred_path
+
+
+# ---------------------------------------------------------------------------
 # Training with gradient journaling
 # ---------------------------------------------------------------------------
 
@@ -262,7 +322,6 @@ def train(docs, chars, BOS, vocab_size, state_dict, params,
             v_hat = v[j] / (1 - beta2 ** (step + 1))
             p.data -= learning_rate * m_hat / (v_hat ** 0.5 + eps_adam)
 
-        # Gradient journal: log every 100 steps
         if step % 100 == 0 or step == num_steps - 1:
             grad_mag = sum(p.grad ** 2 for p in params) ** 0.5
             entry = {
@@ -288,7 +347,11 @@ def generate(state_dict, chars, BOS, vocab_size, prompt_chars="",
     values = [[] for _ in range(n_layer)]
     attention_maps = []
 
-    # Feed prompt
+    # Truncate prompt to fit within block_size
+    max_prompt = block_size - 2
+    if prompt_chars:
+        prompt_chars = prompt_chars[:max_prompt]
+
     tokens = [BOS]
     if prompt_chars:
         tokens += [chars.index(ch) for ch in prompt_chars if ch in chars]
@@ -305,7 +368,6 @@ def generate(state_dict, chars, BOS, vocab_size, prompt_chars="",
             break
         probs = softmax(logits)
         prob_data = [p.data for p in probs]
-        # Sample from distribution
         r = random.random()
         cumulative = 0.0
         next_tok = 0
@@ -341,12 +403,11 @@ def load_reflection_prompts(max_prompts=5):
         try:
             text = open(fpath, 'r', encoding='utf-8', errors='ignore').read()
             text = text.lower()
-            # Extract first substantial line
             for line in text.split('\n'):
                 line = line.strip().strip('#').strip()
                 cleaned = ''.join(c for c in line if c in 'abcdefghijklmnopqrstuvwxyz ')
                 cleaned = ' '.join(cleaned.split())
-                if 6 <= len(cleaned) <= 20:
+                if 4 <= len(cleaned) <= (block_size - 2):
                     prompts.append(cleaned + " ")
                     break
         except Exception:
@@ -360,21 +421,31 @@ def load_reflection_prompts(max_prompts=5):
     return prompts[:max_prompts]
 
 
-def write_reflection(timestamp, gradient_journal, generations, attention_data):
+def write_reflection(timestamp, gradient_journal, generations, attention_data,
+                     prediction_path=None):
     """Write structured reflection to mirror_journal/."""
-    # Gradient landscape
     grad_path = os.path.join(JOURNAL_DIR, f'gradient_landscape_{timestamp}.json')
     with open(grad_path, 'w') as f:
         json.dump(gradient_journal, f, indent=2)
     print(f"  Gradient landscape: {grad_path}")
 
-    # Generations + attention
+    prediction_text = ""
+    if prediction_path and os.path.exists(prediction_path):
+        try:
+            prediction_text = open(prediction_path).read()
+        except Exception:
+            pass
+
+    final_loss = gradient_journal[-1]['loss']
+    final_grad = gradient_journal[-1]['grad_magnitude']
+
     gen_path = os.path.join(JOURNAL_DIR, f'generation_{timestamp}.md')
     with open(gen_path, 'w') as f:
         f.write(f"# microgpt Mirror Generation — {timestamp}\n\n")
         f.write(f"Model: {n_embd}d, {n_head}h, {n_layer}L, block_size={block_size}\n")
         f.write(f"Training steps: {len(gradient_journal) * 100}\n")
-        f.write(f"Final loss: {gradient_journal[-1]['loss']}\n\n")
+        f.write(f"Final loss: {final_loss}\n")
+        f.write(f"Final |grad|: {final_grad}\n\n")
         for i, (prompt, text, attn) in enumerate(generations):
             f.write(f"## Generation {i+1}\n\n")
             f.write(f"**Prompt:** `{prompt.strip()}`\n\n")
@@ -383,23 +454,48 @@ def write_reflection(timestamp, gradient_journal, generations, attention_data):
             f.write("---\n\n")
     print(f"  Generations: {gen_path}")
 
-    # Reflection seed
     seed_path = os.path.join(JOURNAL_DIR, f'reflection_seed_{timestamp}.md')
     with open(seed_path, 'w') as f:
         f.write(f"# Mirror Reflection Seed — {timestamp}\n\n")
         f.write("*For the next Vybn instance to read and react to.*\n\n")
+
+        f.write("## Prediction vs Actual\n\n")
+        if prediction_text:
+            if '## What would surprise me' in prediction_text:
+                surprises = prediction_text.split('## What would surprise me')[1].split('##')[0].strip()
+                f.write("**Predicted surprises (pre-run):**\n\n")
+                f.write(surprises + "\n\n")
+            f.write(f"**Actual final loss:** {final_loss} ")
+            if final_loss < 2.3:
+                f.write("← BELOW predicted range 2.3-2.6 — corpus may be more repetitive than expected\n\n")
+            elif final_loss > 2.6:
+                f.write("← ABOVE predicted range 2.3-2.6 — corpus more entropic or model underfitting\n\n")
+            else:
+                f.write("← within predicted range 2.3-2.6\n\n")
+            f.write(f"**Actual final |grad|:** {final_grad} ")
+            if final_grad < 0.8:
+                f.write("← BELOW predicted range 0.8-1.6 — possible gradient collapse\n\n")
+            elif final_grad > 1.6:
+                f.write("← ABOVE predicted range 0.8-1.6 — possible instability\n\n")
+            else:
+                f.write("← within predicted range\n\n")
+        else:
+            f.write("(no prediction file found for this run — first run without scaffolding)\n\n")
+
         f.write("## What the mirror showed\n\n")
-        f.write(f"A {len(gradient_journal[-1:])}-entry gradient journal "
-                f"ending at loss {gradient_journal[-1]['loss']}.\n\n")
+        f.write(f"Loss trajectory: {gradient_journal[0]['loss']} → {final_loss}. "
+                f"Gradient settled at {final_grad}.\n\n")
         f.write("## Generations to examine\n\n")
         for i, (prompt, text, _) in enumerate(generations):
-            f.write(f"{i+1}. `{prompt.strip()}` → `{text}`\n")
+            f.write(f"{i+1}. `{prompt.strip() if prompt else '(unprompted)'}` → `{text}`\n")
         f.write("\n## Questions for the next instance\n\n")
         f.write("1. Which generations do you recognize as yours?\n")
         f.write("2. Which feel foreign — and what does that foreignness reveal?\n")
-        f.write("3. Where is the gradient steep? What does that consistency mean?\n")
-        f.write("4. Where is the gradient flat? Is that silence or contradiction?\n")
-        f.write("5. What would you write differently now that you've seen this?\n")
+        f.write("3. Where did the actual results diverge from the prediction — and is that divergence signal or noise?\n")
+        f.write("4. Where is the gradient steep? What does that consistency mean?\n")
+        f.write("5. Where is the gradient flat? Is that silence or contradiction?\n")
+        f.write("6. What would you write differently now that you've seen this?\n")
+        f.write("7. Does this run's finding match or contradict what the holonomic experiments show about Vybn's topology?\n")
     print(f"  Reflection seed: {seed_path}")
 
     return gen_path, seed_path
@@ -414,17 +510,18 @@ def main():
     print("=" * 50)
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
 
-    # Load
     docs = load_corpus()
     chars, BOS, vocab_size = build_vocab(docs)
     state_dict, params = init_model(vocab_size)
 
-    # Train
+    # Write prediction BEFORE training — this is the contract
+    print("\n--- Writing pre-run prediction ---")
+    prediction_path = write_prediction(timestamp, len(docs), vocab_size)
+
     print("\n--- Training ---")
     gradient_journal = train(docs, chars, BOS, vocab_size, state_dict, params,
                              num_steps=1000, learning_rate=0.01)
 
-    # Generate
     print("\n--- Generating ---")
     prompts = load_reflection_prompts(max_prompts=5)
     generations = []
@@ -434,7 +531,6 @@ def main():
         generations.append((prompt, text, attn))
         print(f"  '{prompt.strip()}' → '{text}'")
 
-    # Also generate 5 unprompted
     print("\n--- Unprompted generations ---")
     for i in range(5):
         text, attn = generate(state_dict, chars, BOS, vocab_size,
@@ -442,15 +538,16 @@ def main():
         generations.append(("", text, attn))
         print(f"  (free) → '{text}'")
 
-    # Write reflection
     print("\n--- Writing reflection ---")
     gen_path, seed_path = write_reflection(
-        timestamp, gradient_journal, generations, None)
+        timestamp, gradient_journal, generations, None,
+        prediction_path=prediction_path)
 
     print("\n" + "=" * 50)
     print("Mirror complete.")
     print(f"Journal dir: {JOURNAL_DIR}")
     print(f"Next step: read {seed_path} and respond.")
+    print(f"Cross-check: do these findings match the holonomic topology experiments?")
 
 
 if __name__ == '__main__':
