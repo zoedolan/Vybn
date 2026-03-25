@@ -35,7 +35,8 @@ REPO_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, '..', '..'))
 CORPUS_FILE = os.path.join(SCRIPT_DIR, 'mirror_corpus.txt')
 JOURNAL_DIR = os.path.join(SCRIPT_DIR, 'mirror_journal')
 REFLECTIONS_DIR = os.path.join(REPO_ROOT, 'Vybn_Mind', 'reflections')
-CURIOSITY_SEEDS = os.path.join(REPO_ROOT, 'Vybn_Mind', 'curiosity_seeds.md')
+# Open questions now live in Vybn_Mind/VYBN.md ("What's Open" section)
+VYBN_MIND_DOC = os.path.join(REPO_ROOT, 'Vybn_Mind', 'VYBN.md')
 
 os.makedirs(JOURNAL_DIR, exist_ok=True)
 
