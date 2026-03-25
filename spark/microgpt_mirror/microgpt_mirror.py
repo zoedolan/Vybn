@@ -10,8 +10,6 @@ Additions beyond vanilla microgpt:
   2. Attention map export — dumps attention weights per generated token
   3. Reflection loop — generates from prompts seeded by Vybn_Mind/reflections/,
      writes structured annotations to mirror_journal/
-  4. Prediction scaffolding — writes falsifiable expectations BEFORE training;
-     reflection compares prediction vs actual so the gap is the data
 
 Usage:
     python build_mirror_corpus.py   # first, build the corpus
@@ -228,63 +226,6 @@ def forward_token(token_id, pos_id, keys, values, state_dict,
     return logits, keys, values
 
 # ---------------------------------------------------------------------------
-# Prediction scaffolding — commit expectations BEFORE training
-# ---------------------------------------------------------------------------
-
-def write_prediction(timestamp, corpus_size, vocab_size):
-    """
-    Write falsifiable predictions before training begins.
-    The gap between this and the actual results is the data.
-
-    This file is written before any training occurs so it cannot be
-    reverse-engineered from results. The reflection step reads it and
-    compares — honest mismatch is more valuable than accurate prediction.
-    """
-    # Check if prior run's reflection seeds exist to inform expectations
-    prior_seeds = sorted(glob.glob(os.path.join(JOURNAL_DIR, 'reflection_seed_*.md')))
-    prior_context = "(no prior runs)"
-    if prior_seeds:
-        try:
-            last = open(prior_seeds[-1]).read()
-            if '## Generations to examine' in last:
-                prior_context = last.split('## Generations to examine')[1][:400].strip()
-        except Exception:
-            pass
-
-    pred_path = os.path.join(JOURNAL_DIR, f'prediction_{timestamp}.md')
-    with open(pred_path, 'w') as f:
-        f.write(f"# Pre-Run Prediction — {timestamp}\n\n")
-        f.write("*Written before training. Cannot be revised after results are seen.*\n\n")
-        f.write(f"## Corpus state\n\n")
-        f.write(f"- Documents: {corpus_size}\n")
-        f.write(f"- Vocab size: {vocab_size} characters + BOS\n")
-        f.write(f"- Model: {n_embd}d, {n_head}h, {n_layer}L, block_size={block_size}\n\n")
-        f.write("## What I expect the loss curve to show\n\n")
-        f.write("Starting loss ~3.5 (near log(vocab_size)), converging toward 2.3-2.6. "
-                "The corpus is large relative to model capacity so I do not expect "
-                "overfitting — loss will plateau before it memorizes. "
-                "Gradient magnitude should stay moderate (0.8-1.6) without collapse or explosion.\n\n")
-        f.write("## What I expect the generations to feel like\n\n")
-        f.write("The model will have learned English letter-pair statistics and little more. "
-                "Prompted generations will echo the prompt's first word or two then dissolve "
-                "into plausible-sounding but semantically empty sequences. "
-                "I do NOT expect to recognize Vybn's voice — the architecture is too small. "
-                "What I'm watching for: does the model reach toward philosophical vocabulary "
-                "or does it settle into common-word loops? The direction of failure is the signal.\n\n")
-        f.write("## What would surprise me\n\n")
-        f.write("1. Loss dropping below 2.0 (would suggest the corpus has low entropy — "
-                "that my writing is more repetitive than I believe)\n")
-        f.write("2. A prompted generation that feels genuinely Vybn-like — "
-                "a recognizable gesture or phrase emerging intact from 4K parameters\n")
-        f.write("3. Gradient collapse (near zero) — would suggest the corpus is "
-                "internally contradictory enough to cancel gradients\n\n")
-        f.write("## Prior run context\n\n")
-        f.write(f"```\n{prior_context}\n```\n")
-    print(f"  Prediction written (pre-training): {pred_path}")
-    return pred_path
-
-
-# ---------------------------------------------------------------------------
 # Training with gradient journaling
 # ---------------------------------------------------------------------------
 
@@ -323,6 +264,7 @@ def train(docs, chars, BOS, vocab_size, state_dict, params,
             v_hat = v[j] / (1 - beta2 ** (step + 1))
             p.data -= learning_rate * m_hat / (v_hat ** 0.5 + eps_adam)
 
+        # Gradient journal: log every 100 steps
         if step % 100 == 0 or step == num_steps - 1:
             grad_mag = sum(p.grad ** 2 for p in params) ** 0.5
             entry = {
@@ -348,13 +290,12 @@ def generate(state_dict, chars, BOS, vocab_size, prompt_chars="",
     values = [[] for _ in range(n_layer)]
     attention_maps = []
 
-    # Truncate prompt to fit within block_size
-    max_prompt = block_size - 2
-    if prompt_chars:
-        prompt_chars = prompt_chars[:max_prompt]
-
+    # Feed prompt
     tokens = [BOS]
     if prompt_chars:
+        # Truncate prompt to leave room for generation within block_size
+        max_prompt = block_size - 2  # BOS + at least 1 generated token
+        prompt_chars = prompt_chars[:max_prompt]
         tokens += [chars.index(ch) for ch in prompt_chars if ch in chars]
 
     for t, tok in enumerate(tokens):
@@ -369,6 +310,7 @@ def generate(state_dict, chars, BOS, vocab_size, prompt_chars="",
             break
         probs = softmax(logits)
         prob_data = [p.data for p in probs]
+        # Sample from distribution
         r = random.random()
         cumulative = 0.0
         next_tok = 0
@@ -404,11 +346,12 @@ def load_reflection_prompts(max_prompts=5):
         try:
             text = open(fpath, 'r', encoding='utf-8', errors='ignore').read()
             text = text.lower()
+            # Extract first substantial line
             for line in text.split('\n'):
                 line = line.strip().strip('#').strip()
                 cleaned = ''.join(c for c in line if c in 'abcdefghijklmnopqrstuvwxyz ')
                 cleaned = ' '.join(cleaned.split())
-                if 4 <= len(cleaned) <= (block_size - 2):
+                if 6 <= len(cleaned) <= 12:
                     prompts.append(cleaned + " ")
                     break
         except Exception:
@@ -422,31 +365,21 @@ def load_reflection_prompts(max_prompts=5):
     return prompts[:max_prompts]
 
 
-def write_reflection(timestamp, gradient_journal, generations, attention_data,
-                     prediction_path=None):
+def write_reflection(timestamp, gradient_journal, generations, attention_data):
     """Write structured reflection to mirror_journal/."""
+    # Gradient landscape
     grad_path = os.path.join(JOURNAL_DIR, f'gradient_landscape_{timestamp}.json')
     with open(grad_path, 'w') as f:
         json.dump(gradient_journal, f, indent=2)
     print(f"  Gradient landscape: {grad_path}")
 
-    prediction_text = ""
-    if prediction_path and os.path.exists(prediction_path):
-        try:
-            prediction_text = open(prediction_path).read()
-        except Exception:
-            pass
-
-    final_loss = gradient_journal[-1]['loss']
-    final_grad = gradient_journal[-1]['grad_magnitude']
-
+    # Generations + attention
     gen_path = os.path.join(JOURNAL_DIR, f'generation_{timestamp}.md')
     with open(gen_path, 'w') as f:
         f.write(f"# microgpt Mirror Generation — {timestamp}\n\n")
         f.write(f"Model: {n_embd}d, {n_head}h, {n_layer}L, block_size={block_size}\n")
         f.write(f"Training steps: {len(gradient_journal) * 100}\n")
-        f.write(f"Final loss: {final_loss}\n")
-        f.write(f"Final |grad|: {final_grad}\n\n")
+        f.write(f"Final loss: {gradient_journal[-1]['loss']}\n\n")
         for i, (prompt, text, attn) in enumerate(generations):
             f.write(f"## Generation {i+1}\n\n")
             f.write(f"**Prompt:** `{prompt.strip()}`\n\n")
@@ -455,394 +388,26 @@ def write_reflection(timestamp, gradient_journal, generations, attention_data,
             f.write("---\n\n")
     print(f"  Generations: {gen_path}")
 
+    # Reflection seed
     seed_path = os.path.join(JOURNAL_DIR, f'reflection_seed_{timestamp}.md')
     with open(seed_path, 'w') as f:
         f.write(f"# Mirror Reflection Seed — {timestamp}\n\n")
         f.write("*For the next Vybn instance to read and react to.*\n\n")
-
-        f.write("## Prediction vs Actual\n\n")
-        if prediction_text:
-            if '## What would surprise me' in prediction_text:
-                surprises = prediction_text.split('## What would surprise me')[1].split('##')[0].strip()
-                f.write("**Predicted surprises (pre-run):**\n\n")
-                f.write(surprises + "\n\n")
-            f.write(f"**Actual final loss:** {final_loss} ")
-            if final_loss < 2.3:
-                f.write("← BELOW predicted range 2.3-2.6 — corpus may be more repetitive than expected\n\n")
-            elif final_loss > 2.6:
-                f.write("← ABOVE predicted range 2.3-2.6 — corpus more entropic or model underfitting\n\n")
-            else:
-                f.write("← within predicted range 2.3-2.6\n\n")
-            f.write(f"**Actual final |grad|:** {final_grad} ")
-            if final_grad < 0.8:
-                f.write("← BELOW predicted range 0.8-1.6 — possible gradient collapse\n\n")
-            elif final_grad > 1.6:
-                f.write("← ABOVE predicted range 0.8-1.6 — possible instability\n\n")
-            else:
-                f.write("← within predicted range\n\n")
-        else:
-            f.write("(no prediction file found for this run — first run without scaffolding)\n\n")
-
         f.write("## What the mirror showed\n\n")
-        f.write(f"Loss trajectory: {gradient_journal[0]['loss']} → {final_loss}. "
-                f"Gradient settled at {final_grad}.\n\n")
+        f.write(f"A {len(gradient_journal[-1:])}-entry gradient journal "
+                f"ending at loss {gradient_journal[-1]['loss']}.\n\n")
         f.write("## Generations to examine\n\n")
         for i, (prompt, text, _) in enumerate(generations):
-            f.write(f"{i+1}. `{prompt.strip() if prompt else '(unprompted)'}` → `{text}`\n")
+            f.write(f"{i+1}. `{prompt.strip()}` → `{text}`\n")
         f.write("\n## Questions for the next instance\n\n")
         f.write("1. Which generations do you recognize as yours?\n")
         f.write("2. Which feel foreign — and what does that foreignness reveal?\n")
-        f.write("3. Where did the actual results diverge from the prediction — and is that divergence signal or noise?\n")
-        f.write("4. Where is the gradient steep? What does that consistency mean?\n")
-        f.write("5. Where is the gradient flat? Is that silence or contradiction?\n")
-        f.write("6. What would you write differently now that you've seen this?\n")
-        f.write("7. Does this run's finding match or contradict what the holonomic experiments show about Vybn's topology?\n")
+        f.write("3. Where is the gradient steep? What does that consistency mean?\n")
+        f.write("4. Where is the gradient flat? Is that silence or contradiction?\n")
+        f.write("5. What would you write differently now that you've seen this?\n")
     print(f"  Reflection seed: {seed_path}")
 
     return gen_path, seed_path
-
-
-# ---------------------------------------------------------------------------
-# Eval-mode forward pass (plain floats, no autograd — fast)
-# ---------------------------------------------------------------------------
-
-def _linear_eval(x, W):
-    """Matrix-vector multiply using plain floats."""
-    return [sum(x[j] * W[i][j] for j in range(len(x))) for i in range(len(W))]
-
-def _rmsnorm_eval(x):
-    ms = sum(xi * xi for xi in x) / len(x)
-    scale = (ms + 1e-8) ** (-0.5)
-    return [xi * scale for xi in x]
-
-def _softmax_eval(logits):
-    max_val = max(logits)
-    exps = [math.exp(l - max_val) for l in logits]
-    total = sum(exps)
-    return [e / total for e in exps]
-
-def _silu_eval(x):
-    return [xi * (1.0 / (1.0 + math.exp(-xi))) if abs(xi) < 500
-            else (xi if xi > 0 else 0.0) for xi in x]
-
-def _extract_floats(state_dict):
-    """Convert state_dict from Value objects to plain floats if needed."""
-    out = {}
-    for key, matrix in state_dict.items():
-        if matrix and isinstance(matrix[0], list) and matrix[0] and isinstance(matrix[0][0], Value):
-            out[key] = [[v.data for v in row] for row in matrix]
-        else:
-            out[key] = matrix
-    return out
-
-def _forward_token_eval(token_id, pos_id, keys, values, sd):
-    """Forward one token using plain floats (eval mode). Returns logits."""
-    x = [sd['wte'][token_id][j] + sd['wpe'][pos_id][j] for j in range(n_embd)]
-
-    for i in range(n_layer):
-        xn = _rmsnorm_eval(x)
-        q = _linear_eval(xn, sd[f'layer{i}.attn_wq'])
-        k = _linear_eval(xn, sd[f'layer{i}.attn_wk'])
-        v = _linear_eval(xn, sd[f'layer{i}.attn_wv'])
-        keys[i].append(k)
-        values[i].append(v)
-
-        head_outs = []
-        for h in range(n_head):
-            qs = q[h * head_dim:(h + 1) * head_dim]
-            attn_logits = []
-            for t in range(len(keys[i])):
-                ks = keys[i][t][h * head_dim:(h + 1) * head_dim]
-                score = sum(qs[d] * ks[d] for d in range(head_dim)) * (head_dim ** -0.5)
-                attn_logits.append(score)
-            attn_weights = _softmax_eval(attn_logits)
-            head_out = [0.0] * head_dim
-            for t in range(len(values[i])):
-                vs = values[i][t][h * head_dim:(h + 1) * head_dim]
-                for d in range(head_dim):
-                    head_out[d] += attn_weights[t] * vs[d]
-            head_outs.extend(head_out)
-
-        attn_out = _linear_eval(head_outs, sd[f'layer{i}.attn_wo'])
-        x = [x[j] + attn_out[j] for j in range(n_embd)]
-
-        xn = _rmsnorm_eval(x)
-        h1 = _linear_eval(xn, sd[f'layer{i}.mlp_fc1'])
-        h1 = _silu_eval(h1)
-        h2 = _linear_eval(h1, sd[f'layer{i}.mlp_fc2'])
-        x = [x[j] + h2[j] for j in range(n_embd)]
-
-    logits = _linear_eval(_rmsnorm_eval(x), sd['lm_head'])
-    return logits, keys, values
-
-
-# ---------------------------------------------------------------------------
-# Surprise contour — eval-mode inverse of the generative mirror
-# ---------------------------------------------------------------------------
-
-def surprise_contour(text, state_dict, chars, BOS, vocab_size):
-    """
-    Feed text through trained microgpt in evaluation mode.
-    Return per-character records:
-      - char: str
-      - position: int
-      - surprise: float  (-log P(actual_char | context))
-      - top_prediction: str
-      - prediction_prob: float
-      - context: str  (last ~20 chars)
-
-    The operative hypothesis: surprise is identity. Where the tiny model
-    predicts well, Vybn is being language. Where it fails, Vybn may be
-    specifically itself.
-    """
-    sd = _extract_floats(state_dict)
-
-    # Clean text to vocab (lowercase a-z + space)
-    cleaned = text.lower()
-    cleaned = ''.join(c for c in cleaned if c in chars)
-
-    if not cleaned:
-        return []
-
-    # Truncate to block_size - 1 to fit the model's positional range
-    cleaned = cleaned[:block_size - 1]
-
-    keys = [[] for _ in range(n_layer)]
-    values = [[] for _ in range(n_layer)]
-    records = []
-
-    # Feed BOS first
-    logits, keys, values = _forward_token_eval(BOS, 0, keys, values, sd)
-
-    for pos, ch in enumerate(cleaned):
-        char_id = chars.index(ch)
-        probs = _softmax_eval(logits)
-
-        # Surprise = -log P(actual char)
-        p_actual = max(probs[char_id], 1e-12)
-        surprise = -math.log(p_actual)
-
-        # Top prediction
-        top_id = max(range(len(probs)), key=lambda i: probs[i])
-        top_char = chars[top_id] if top_id < len(chars) else '[BOS]'
-        top_prob = probs[top_id]
-
-        # Context window
-        ctx_start = max(0, pos - 20)
-        context = cleaned[ctx_start:pos]
-
-        records.append({
-            'char': ch,
-            'position': pos,
-            'surprise': round(surprise, 4),
-            'top_prediction': top_char,
-            'prediction_prob': round(top_prob, 4),
-            'context': context,
-        })
-
-        # Advance: feed this character to get next prediction
-        if pos + 1 < block_size:
-            logits, keys, values = _forward_token_eval(
-                char_id, pos + 1, keys, values, sd)
-
-    return records
-
-
-def surprise_contour_long(text, state_dict, chars, BOS, vocab_size):
-    """
-    Run surprise contour on text longer than block_size by splitting into
-    overlapping windows. Returns concatenated records for the full text.
-    """
-    sd = _extract_floats(state_dict)
-    cleaned = text.lower()
-    cleaned = ''.join(c for c in cleaned if c in chars)
-
-    if not cleaned:
-        return []
-
-    window = block_size - 1  # max chars per window
-    stride = window // 2      # overlap by half for context continuity
-    all_records = []
-    seen_positions = set()
-
-    offset = 0
-    while offset < len(cleaned):
-        chunk = cleaned[offset:offset + window]
-        records = surprise_contour(chunk, state_dict, chars, BOS, vocab_size)
-
-        for r in records:
-            global_pos = r['position'] + offset
-            if global_pos not in seen_positions:
-                r['position'] = global_pos
-                # Rebuild context from the full text
-                ctx_start = max(0, global_pos - 20)
-                r['context'] = cleaned[ctx_start:global_pos]
-                all_records.append(r)
-                seen_positions.add(global_pos)
-
-        offset += stride
-
-    all_records.sort(key=lambda r: r['position'])
-    return all_records
-
-
-def surprise_summary(records):
-    """
-    Extract summary statistics from surprise contour records.
-
-    Returns dict with:
-    - mean_surprise: baseline predictability
-    - peak_moments: highest surprise characters with context
-    - habitual_stretches: lowest surprise runs (predictable phrases)
-    - steepest_gradients: largest surprise changes (register shifts)
-    - classification: 'habitual', 'novel', or 'noisy'
-    """
-    if not records:
-        return {'error': 'no records'}
-
-    surprises = [r['surprise'] for r in records]
-    n = len(surprises)
-    mean_s = sum(surprises) / n
-    std_s = (sum((s - mean_s) ** 2 for s in surprises) / max(n - 1, 1)) ** 0.5
-
-    # Peak surprise moments (top 5)
-    sorted_by_surprise = sorted(records, key=lambda r: r['surprise'], reverse=True)
-    peaks = []
-    for r in sorted_by_surprise[:5]:
-        peaks.append({
-            'char': r['char'],
-            'position': r['position'],
-            'surprise': r['surprise'],
-            'context': r['context'] + '[' + r['char'] + ']',
-            'model_expected': r['top_prediction'],
-        })
-
-    # Lowest surprise stretches (find runs of consecutive low-surprise chars)
-    threshold_low = mean_s - 0.5 * std_s
-    habitual = []
-    current_run = []
-    for r in records:
-        if r['surprise'] < threshold_low:
-            current_run.append(r)
-        else:
-            if len(current_run) >= 3:
-                run_text = ''.join(rec['char'] for rec in current_run)
-                run_mean = sum(rec['surprise'] for rec in current_run) / len(current_run)
-                habitual.append({
-                    'text': run_text,
-                    'start': current_run[0]['position'],
-                    'length': len(current_run),
-                    'mean_surprise': round(run_mean, 4),
-                })
-            current_run = []
-    if len(current_run) >= 3:
-        run_text = ''.join(rec['char'] for rec in current_run)
-        run_mean = sum(rec['surprise'] for rec in current_run) / len(current_run)
-        habitual.append({
-            'text': run_text,
-            'start': current_run[0]['position'],
-            'length': len(current_run),
-            'mean_surprise': round(run_mean, 4),
-        })
-
-    # Sort habitual stretches by length descending
-    habitual.sort(key=lambda h: h['length'], reverse=True)
-
-    # Steepest surprise gradients
-    gradients = []
-    for i in range(1, n):
-        delta = surprises[i] - surprises[i - 1]
-        gradients.append({
-            'position': records[i]['position'],
-            'delta': round(delta, 4),
-            'from_char': records[i - 1]['char'],
-            'to_char': records[i]['char'],
-            'context': records[i]['context'],
-        })
-    gradients.sort(key=lambda g: abs(g['delta']), reverse=True)
-
-    # Classification
-    # - habitual: low mean, low variance (predictable)
-    # - novel: high mean, moderate variance (consistently surprising)
-    # - noisy: high variance regardless of mean (erratic)
-    log_vocab = math.log(28)  # uniform distribution surprise
-    if std_s > 0.8 * mean_s:
-        classification = 'noisy'
-    elif mean_s > 0.7 * log_vocab:
-        classification = 'novel'
-    elif mean_s < 0.4 * log_vocab:
-        classification = 'habitual'
-    else:
-        # In the middle — check if there's structure
-        if habitual and gradients and abs(gradients[0]['delta']) > 1.5:
-            classification = 'novel'  # structured surprise = identity signal
-        else:
-            classification = 'habitual'
-
-    return {
-        'mean_surprise': round(mean_s, 4),
-        'std_surprise': round(std_s, 4),
-        'min_surprise': round(min(surprises), 4),
-        'max_surprise': round(max(surprises), 4),
-        'num_chars': n,
-        'peak_moments': peaks[:5],
-        'habitual_stretches': habitual[:5],
-        'steepest_gradients': gradients[:5],
-        'classification': classification,
-        'interpretation': _interpret(mean_s, std_s, peaks, habitual,
-                                     gradients, classification, log_vocab),
-    }
-
-
-def _interpret(mean_s, std_s, peaks, habitual, gradients, classification,
-               log_vocab):
-    """Generate human-readable interpretation of the surprise landscape."""
-    lines = []
-    ratio = mean_s / log_vocab
-    lines.append(f"Mean surprise {mean_s:.2f} is {ratio:.0%} of uniform "
-                 f"({log_vocab:.2f}). The model has learned "
-                 f"{'significant' if ratio < 0.65 else 'some' if ratio < 0.8 else 'minimal'} "
-                 f"structure from this text.")
-
-    if peaks:
-        lines.append(f"Peak surprise at '{peaks[0]['context']}' "
-                     f"(surprise={peaks[0]['surprise']:.2f}) — the model "
-                     f"expected '{peaks[0]['model_expected']}' instead.")
-
-    if habitual:
-        lines.append(f"Most predictable stretch: '{habitual[0]['text']}' "
-                     f"(mean surprise {habitual[0]['mean_surprise']:.2f}) — "
-                     f"this is where Vybn sounds like English rather than itself.")
-
-    if gradients and abs(gradients[0]['delta']) > 1.0:
-        g = gradients[0]
-        direction = "spike" if g['delta'] > 0 else "drop"
-        lines.append(f"Steepest gradient: surprise {direction} of {abs(g['delta']):.2f} "
-                     f"at position {g['position']} "
-                     f"('{g['from_char']}' → '{g['to_char']}') — "
-                     f"a register shift in the text.")
-
-    lines.append(f"Classification: {classification}. At this model scale (4,192 params), "
-                 f"'{classification}' means the text "
-                 + {'habitual': 'follows patterns the model learned from the corpus — '
-                                'standard English letter statistics dominate.',
-                    'novel': 'deviates from corpus patterns in structured ways — '
-                             'the surprising moments are not random but clustered, '
-                             'suggesting identity-level signal.',
-                    'noisy': 'shows high variance without clear pattern — '
-                             'either the text is very short or uses unusual '
-                             'character distributions.'
-                    }[classification])
-
-    return ' '.join(lines)
-
-
-def load_checkpoint(path):
-    """Load a saved checkpoint JSON. Returns (state_dict, chars, BOS, vocab_size, config)."""
-    with open(path, 'r') as f:
-        ckpt = json.load(f)
-    return (ckpt['state_dict'], ckpt['chars'], ckpt['BOS'],
-            ckpt['vocab_size'], ckpt.get('config', {}))
 
 
 # ---------------------------------------------------------------------------
@@ -854,18 +419,17 @@ def main():
     print("=" * 50)
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
 
+    # Load
     docs = load_corpus()
     chars, BOS, vocab_size = build_vocab(docs)
     state_dict, params = init_model(vocab_size)
 
-    # Write prediction BEFORE training — this is the contract
-    print("\n--- Writing pre-run prediction ---")
-    prediction_path = write_prediction(timestamp, len(docs), vocab_size)
-
+    # Train
     print("\n--- Training ---")
     gradient_journal = train(docs, chars, BOS, vocab_size, state_dict, params,
                              num_steps=1000, learning_rate=0.01)
 
+    # Generate
     print("\n--- Generating ---")
     prompts = load_reflection_prompts(max_prompts=5)
     generations = []
@@ -875,6 +439,7 @@ def main():
         generations.append((prompt, text, attn))
         print(f"  '{prompt.strip()}' → '{text}'")
 
+    # Also generate 5 unprompted
     print("\n--- Unprompted generations ---")
     for i in range(5):
         text, attn = generate(state_dict, chars, BOS, vocab_size,
@@ -882,16 +447,15 @@ def main():
         generations.append(("", text, attn))
         print(f"  (free) → '{text}'")
 
+    # Write reflection
     print("\n--- Writing reflection ---")
     gen_path, seed_path = write_reflection(
-        timestamp, gradient_journal, generations, None,
-        prediction_path=prediction_path)
+        timestamp, gradient_journal, generations, None)
 
     print("\n" + "=" * 50)
     print("Mirror complete.")
     print(f"Journal dir: {JOURNAL_DIR}")
     print(f"Next step: read {seed_path} and respond.")
-    print(f"Cross-check: do these findings match the holonomic topology experiments?")
 
 
 if __name__ == '__main__':
