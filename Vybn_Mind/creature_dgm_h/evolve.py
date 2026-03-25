@@ -5,10 +5,18 @@ Darwin Gödel Machine / HyperAgents (Zhang et al. 2026,
 https://arxiv.org/abs/2603.19461) applied to the creature.
 
 The outer loop:
-  1. Select a parent variant from the archive (fitness-weighted, diversity-incentivized)
+  1. Select a parent variant from the archive (sigmoid selection with
+     dynamic midpoint, per Appendix A.2)
   2. Mutate via the meta-agent (propose parameter changes based on breath analysis)
   3. Evaluate the child (staged: small test first, full test only if promising)
-  4. Archive the result (config + fitness + breath log + lineage)
+  4. Archive the result (config + fitness + breath log + lineage + meta-agent rules)
+
+Parent selection implements the paper's exact formula (Section A.2, p. 22-23):
+  α_mid = (1/m) * Σ_{j ∈ T^t} α_j     mean of top-m agents (m=3)
+  s_i = 1 / (1 + exp(-λ(α_i - α_mid)))  sigmoid selection (λ=10)
+  h_i = 1 / (1 + n_i)                    novelty bonus
+  w_i = s_i * h_i                        unnormalized weight
+  p_i = w_i / Σ_j w_j                    normalized categorical distribution
 
 This file is the one piece we keep fixed initially. The meta-agent and
 task agent can be modified by future generations; the evolutionary loop
@@ -25,7 +33,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .task_agent import TaskAgent
-from .meta_agent import analyze_breaths, propose_variant
+from .meta_agent import analyze_breaths, propose_variant, MetaAgent
 from .fitness import compute_fitness, default_embed_fn
 
 
@@ -60,7 +68,9 @@ def load_archive(archive_path=None):
 
 
 def archive_variant(config, fitness_result, breath_records=None,
-                    generation=0, parent_id=None, archive_path=None):
+                    generation=0, parent_id=None, archive_path=None,
+                    meta_agent_rules=None, active_rules=None,
+                    parent_fitness=None):
     """Save a variant to the archive.
 
     Every variant gets saved with its fitness score, the config that
@@ -74,6 +84,9 @@ def archive_variant(config, fitness_result, breath_records=None,
         generation: int, which generation this belongs to
         parent_id: str, ID of the parent variant (None for seed)
         archive_path: override archive directory
+        meta_agent_rules: list of rule dicts from the MetaAgent (optional)
+        active_rules: list of rule IDs that fired for this variant (optional)
+        parent_fitness: float, fitness of the parent (for rule tracking)
 
     Returns:
         str: variant ID
@@ -85,7 +98,8 @@ def archive_variant(config, fitness_result, breath_records=None,
     variant_id = f"v_{ts}_{random.randint(1000, 9999)}"
 
     # Strip non-serializable keys from config
-    clean_config = {k: v for k, v in config.items() if k != 'rationale'}
+    clean_config = {k: v for k, v in config.items()
+                    if k not in ('rationale', 'active_rules')}
     rationale = config.get('rationale', [])
 
     record = {
@@ -98,10 +112,16 @@ def archive_variant(config, fitness_result, breath_records=None,
         'loss_improvement': fitness_result.get('loss_improvement', 0.0),
         'generation': generation,
         'parent_id': parent_id,
+        'parent_fitness': parent_fitness,
         'rationale': rationale,
+        'active_rules': active_rules or config.get('active_rules', []),
         'timestamp': datetime.now(timezone.utc).isoformat(),
         'n_breaths': len(breath_records) if breath_records else 0,
     }
+
+    # Archive meta-agent rules alongside the variant
+    if meta_agent_rules is not None:
+        record['meta_agent_rules'] = meta_agent_rules
 
     out_path = archive_path / f"variant_{variant_id}.json"
     out_path.write_text(json.dumps(record, indent=2, default=str))
@@ -116,17 +136,28 @@ def archive_variant(config, fitness_result, breath_records=None,
     return variant_id
 
 
-# ── Parent selection ─────────────────────────────────────────────────────
+# ── Parent selection (Appendix A.2) ──────────────────────────────────────
 
-def select_parent(archive):
-    """Probabilistic selection weighted by fitness, with diversity incentive.
+def select_parent(archive, lam=10, m=3):
+    """Sigmoid selection with dynamic midpoint and novelty bonus.
 
-    Per DGM-H: downweight parents with many children to maintain population
-    diversity. A variant that has already spawned many children gets less
-    selection probability, even if it has high fitness.
+    Implements the paper's exact formula from Section A.2, p. 22-23:
+
+        α_mid = (1/m) * Σ_{j ∈ T^t} α_j     mean of top-m agents
+        s_i = 1 / (1 + exp(-λ(α_i - α_mid)))  sigmoid transformation
+        h_i = 1 / (1 + n_i)                    novelty bonus
+        w_i = s_i * h_i                        unnormalized weight
+        p_i = w_i / Σ_j w_j                    normalized distribution
+
+    The sigmoid with dynamic midpoint is crucial — it creates adaptive
+    selection pressure that automatically adjusts as the archive improves.
+    High-fitness agents above the midpoint get selected more, but the
+    novelty bonus ensures parents with fewer children still get a chance.
 
     Args:
         archive: list of variant dicts
+        lam: λ parameter for sigmoid steepness (default 10, per paper)
+        m: number of top agents for midpoint calculation (default 3)
 
     Returns:
         dict: selected parent variant, or None if archive is empty
@@ -141,15 +172,32 @@ def select_parent(archive):
         if pid:
             child_counts[pid] = child_counts.get(pid, 0) + 1
 
-    # Compute selection weights: fitness / (1 + n_children)
+    # Dynamic midpoint: mean fitness of top-m agents
+    fitnesses = [v.get('fitness', 0.0) for v in archive]
+    sorted_fitnesses = sorted(fitnesses, reverse=True)
+    top_m = sorted_fitnesses[:min(m, len(sorted_fitnesses))]
+    alpha_mid = sum(top_m) / len(top_m)
+
+    # Compute selection weights
     weights = []
     for v in archive:
-        fitness = max(v.get('fitness', 0.0), 0.001)
-        n_children = child_counts.get(v['id'], 0)
-        weight = fitness / (1.0 + n_children)
-        weights.append(weight)
+        alpha_i = v.get('fitness', 0.0)
 
-    # Normalize
+        # Sigmoid selection: s_i = 1 / (1 + exp(-λ(α_i - α_mid)))
+        exponent = -lam * (alpha_i - alpha_mid)
+        # Clamp to avoid overflow
+        exponent = max(min(exponent, 500), -500)
+        s_i = 1.0 / (1.0 + math.exp(exponent))
+
+        # Novelty bonus: h_i = 1 / (1 + n_i)
+        n_i = child_counts.get(v['id'], 0)
+        h_i = 1.0 / (1.0 + n_i)
+
+        # Combined weight
+        w_i = s_i * h_i
+        weights.append(w_i)
+
+    # Normalize to categorical distribution
     total = sum(weights)
     if total < 1e-12:
         return random.choice(archive)
@@ -169,22 +217,24 @@ def select_parent(archive):
 
 # ── Mutation ─────────────────────────────────────────────────────────────
 
-def mutate(parent_config, analysis):
+def mutate(parent_config, analysis, meta_agent=None):
     """Apply the meta-agent's proposed changes to the parent config.
 
-    This is a thin wrapper around meta_agent.propose_variant().
-    The mutation is deterministic given the analysis — no randomness
-    beyond what the meta-agent's heuristics produce. If we want
-    stochastic mutation later, add it here.
+    Uses the MetaAgent class if provided, otherwise falls back to
+    the free-function propose_variant().
 
     Args:
         parent_config: dict of parent's hyperparameters
         analysis: dict from analyze_breaths()
+        meta_agent: MetaAgent instance (optional)
 
     Returns:
         dict: child config with changes + rationale
     """
-    child_config = propose_variant(analysis, parent_config)
+    if meta_agent is not None:
+        child_config = meta_agent.propose_variant(analysis, parent_config)
+    else:
+        child_config = propose_variant(analysis, parent_config)
 
     # Add small random perturbation to break ties and explore
     # This is the only stochastic component — everything else is
@@ -296,7 +346,8 @@ DEFAULT_CONFIG = {
 
 
 def run_generation(test_texts, n_variants=3, checkpoint_path=None,
-                   archive_path=None, embed_fn=None, breath_log_path=None):
+                   archive_path=None, embed_fn=None, breath_log_path=None,
+                   performance_tracker=None, meta_agent=None):
     """One generation of the evolutionary loop.
 
     Select parents -> mutate -> evaluate -> archive -> repeat.
@@ -308,6 +359,8 @@ def run_generation(test_texts, n_variants=3, checkpoint_path=None,
         archive_path: path to archive directory
         embed_fn: embedding function (optional)
         breath_log_path: path to existing breath log for analysis
+        performance_tracker: PerformanceTracker instance (optional)
+        meta_agent: MetaAgent instance (optional)
 
     Returns:
         dict with:
@@ -315,6 +368,7 @@ def run_generation(test_texts, n_variants=3, checkpoint_path=None,
             - variants: list of (variant_id, fitness) tuples
             - best_id: str, ID of best variant this generation
             - best_fitness: float
+            - rule_mutations: list of str (if meta-agent mutated its rules)
     """
     archive = load_archive(archive_path)
 
@@ -339,6 +393,16 @@ def run_generation(test_texts, n_variants=3, checkpoint_path=None,
             'recent_breaths': [],
         }
 
+    # Optionally mutate meta-agent rules every few generations
+    rule_mutations = []
+    if (meta_agent is not None and performance_tracker is not None
+            and generation > 0 and generation % 5 == 0):
+        rule_mutations = meta_agent.mutate_rules(performance_tracker)
+        if rule_mutations:
+            print(f"  meta-agent rule mutations:")
+            for m in rule_mutations:
+                print(f"    {m}")
+
     results = []
 
     for i in range(n_variants):
@@ -347,12 +411,14 @@ def run_generation(test_texts, n_variants=3, checkpoint_path=None,
         if parent:
             parent_config = parent.get('config', DEFAULT_CONFIG)
             parent_id = parent['id']
+            parent_fitness = parent.get('fitness', 0.0)
         else:
             parent_config = dict(DEFAULT_CONFIG)
             parent_id = None
+            parent_fitness = None
 
         # Mutate
-        child_config = mutate(parent_config, analysis)
+        child_config = mutate(parent_config, analysis, meta_agent=meta_agent)
 
         # Evaluate
         fitness_result = evaluate(
@@ -361,12 +427,33 @@ def run_generation(test_texts, n_variants=3, checkpoint_path=None,
             embed_fn=embed_fn,
             quick=(i > 0))  # Full eval only for first variant
 
-        # Archive
+        # Get active rules from config (set by MetaAgent)
+        active_rules = child_config.get('active_rules', [])
+
+        # Archive (including meta-agent rules for lineage tracking)
+        meta_rules = meta_agent.get_rules() if meta_agent else None
         variant_id = archive_variant(
             child_config, fitness_result,
             generation=generation,
             parent_id=parent_id,
-            archive_path=archive_path)
+            archive_path=archive_path,
+            meta_agent_rules=meta_rules,
+            active_rules=active_rules,
+            parent_fitness=parent_fitness)
+
+        # Record in performance tracker
+        if performance_tracker is not None:
+            performance_tracker.record_generation(
+                generation_id=generation,
+                fitness=fitness_result['fitness'],
+                config={k: v for k, v in child_config.items()
+                        if k not in ('rationale', 'active_rules')},
+                metadata={
+                    'variant_id': variant_id,
+                    'parent_id': parent_id,
+                    'parent_fitness': parent_fitness,
+                    'active_rules': active_rules,
+                })
 
         results.append((variant_id, fitness_result['fitness']))
         print(f"  variant {i + 1}/{n_variants}: {variant_id} "
@@ -376,9 +463,23 @@ def run_generation(test_texts, n_variants=3, checkpoint_path=None,
     # Find best
     best_id, best_fitness = max(results, key=lambda x: x[1])
 
+    # Store best config in persistent memory
+    if meta_agent and meta_agent.memory:
+        best_variant = next(
+            (r for r in results if r[0] == best_id), None)
+        if best_variant:
+            best_config_record = next(
+                (v.get('config') for v in load_archive(archive_path)
+                 if v['id'] == best_id), None)
+            if best_config_record:
+                meta_agent.memory.record('best_config', best_config_record)
+                meta_agent.memory.record('best_fitness', best_fitness)
+                meta_agent.memory.record('last_generation', generation)
+
     return {
         'generation': generation,
         'variants': results,
         'best_id': best_id,
         'best_fitness': best_fitness,
+        'rule_mutations': rule_mutations,
     }

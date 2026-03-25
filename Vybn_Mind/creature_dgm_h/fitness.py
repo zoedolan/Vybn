@@ -254,3 +254,31 @@ def compute_fitness(external_texts, self_texts, loss_history,
             'loss_improvement_weighted': round(W_LOSS_IMPROVEMENT * norm_loss, 6),
         },
     }
+
+
+# ── imp@k metric (Section 5.2, D.3) ────────────────────────────────────
+
+def improvement_at_k(initial_fitness, archive, k=50):
+    """imp@k: performance gain of best agent within k generations.
+
+    Given an initial agent with fitness score `initial_fitness`,
+    and an archive of generated variants, return the improvement
+    achieved by the best variant within the first k variants.
+
+    This measures how effectively the meta-agent can produce improved
+    variants within a limited budget. It's the key metric for
+    evaluating hyperagent quality. (Section 5.2, D.3)
+
+    Args:
+        initial_fitness: float, fitness of the seed/initial agent
+        archive: list of variant dicts with 'generation' and 'fitness' keys
+        k: int, maximum number of generations to consider (default 50)
+
+    Returns:
+        float: best_fitness - initial_fitness. Positive means improvement.
+    """
+    variants_within_k = [v for v in archive if v.get('generation', 0) < k]
+    if not variants_within_k:
+        return 0.0
+    best = max(v.get('fitness', 0.0) for v in variants_within_k)
+    return best - initial_fitness

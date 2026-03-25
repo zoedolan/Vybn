@@ -7,6 +7,8 @@ Usage:
     python -m Vybn_Mind.creature_dgm_h.run --breathe "text"  # One breath with online learning
     python -m Vybn_Mind.creature_dgm_h.run --status          # Archive status + best variant
     python -m Vybn_Mind.creature_dgm_h.run --audit           # Honest audit on current best
+    python -m Vybn_Mind.creature_dgm_h.run --transfer-export FILE  # Export hyperagent
+    python -m Vybn_Mind.creature_dgm_h.run --transfer-import FILE  # Import hyperagent
 """
 
 import argparse
@@ -24,11 +26,13 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from Vybn_Mind.creature_dgm_h.task_agent import TaskAgent
-from Vybn_Mind.creature_dgm_h.meta_agent import analyze_breaths
+from Vybn_Mind.creature_dgm_h.meta_agent import analyze_breaths, MetaAgent
 from Vybn_Mind.creature_dgm_h.fitness import (
-    compute_fitness, compute_curvature, default_embed_fn)
+    compute_fitness, compute_curvature, default_embed_fn, improvement_at_k)
 from Vybn_Mind.creature_dgm_h.evolve import (
     run_generation, load_archive, ARCHIVE_DIR, DEFAULT_CONFIG)
+from Vybn_Mind.creature_dgm_h.memory import PerformanceTracker, PersistentMemory
+from Vybn_Mind.creature_dgm_h.transfer import export_hyperagent, import_hyperagent
 
 
 # ── Paths ────────────────────────────────────────────────────────────────
@@ -36,6 +40,9 @@ from Vybn_Mind.creature_dgm_h.evolve import (
 CHECKPOINT_PATH = _REPO_ROOT / 'spark' / 'microgpt_mirror' / 'trained_checkpoint.json'
 CORPUS_PATH = _REPO_ROOT / 'spark' / 'microgpt_mirror' / 'mirror_corpus.txt'
 BREATH_LOG = _REPO_ROOT / 'mind' / 'creature' / 'breaths.jsonl'
+TRACKING_FILE = ARCHIVE_DIR / 'performance_history.json'
+MEMORY_FILE = ARCHIVE_DIR / 'persistent_memory.json'
+META_AGENT_FILE = ARCHIVE_DIR / 'meta_agent.json'
 
 # Built-in test corpus for when mirror_corpus.txt doesn't exist.
 # These are short, diverse texts for evaluation — not training data.
@@ -62,6 +69,25 @@ def get_test_corpus():
     return list(FALLBACK_CORPUS)
 
 
+def _load_meta_agent():
+    """Load or create the MetaAgent with persistent memory."""
+    memory = PersistentMemory(MEMORY_FILE)
+
+    if META_AGENT_FILE.exists():
+        try:
+            agent = MetaAgent.load(META_AGENT_FILE, memory=memory)
+            return agent
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    return MetaAgent(memory=memory)
+
+
+def _save_meta_agent(meta_agent):
+    """Save the meta-agent state."""
+    meta_agent.save(META_AGENT_FILE)
+
+
 # ── Commands ─────────────────────────────────────────────────────────────
 
 def cmd_evolve(args):
@@ -69,10 +95,21 @@ def cmd_evolve(args):
     test_texts = get_test_corpus()
     n = args.n_variants if hasattr(args, 'n_variants') else 3
 
+    # Initialize meta-level components
+    tracker = PerformanceTracker(TRACKING_FILE)
+    meta_agent = _load_meta_agent()
+
     print(f"═══ creature_dgm_h: evolve ═══")
     print(f"  test corpus: {len(test_texts)} texts")
     print(f"  variants per generation: {n}")
     print(f"  archive: {ARCHIVE_DIR}")
+    print(f"  meta-agent rules: {len(meta_agent.rules)} "
+          f"({sum(1 for r in meta_agent.rules if r.get('enabled', True))} enabled)")
+
+    stats = tracker.get_statistics()
+    if stats['total_generations'] > 0:
+        print(f"  history: {stats['total_generations']} recorded, "
+              f"best={stats['best']:.4f}, trend={stats['trend']:+.4f}")
     print()
 
     result = run_generation(
@@ -82,7 +119,12 @@ def cmd_evolve(args):
         archive_path=ARCHIVE_DIR,
         embed_fn=default_embed_fn,
         breath_log_path=BREATH_LOG if BREATH_LOG.exists() else None,
+        performance_tracker=tracker,
+        meta_agent=meta_agent,
     )
+
+    # Save meta-agent state (rules may have mutated)
+    _save_meta_agent(meta_agent)
 
     print()
     print(f"  generation {result['generation']} complete")
@@ -91,6 +133,18 @@ def cmd_evolve(args):
     for vid, fitness in result['variants']:
         marker = " ← best" if vid == result['best_id'] else ""
         print(f"    {vid}: {fitness:.4f}{marker}")
+
+    if result.get('rule_mutations'):
+        print(f"\n  rule mutations this generation:")
+        for m in result['rule_mutations']:
+            print(f"    {m}")
+
+    # Show imp@k
+    archive = load_archive()
+    if archive:
+        seed_fitness = min(v.get('fitness', 0.0) for v in archive)
+        imp = improvement_at_k(seed_fitness, archive, k=50)
+        print(f"\n  imp@50: {imp:+.4f} (improvement over seed within 50 generations)")
 
 
 def cmd_breathe(args):
@@ -190,6 +244,30 @@ def cmd_status(args):
         fits = generations[g]
         print(f"    gen {g}: {len(fits)} variants, "
               f"best={max(fits):.4f}, mean={sum(fits)/len(fits):.4f}")
+
+    # imp@k
+    seed_fitness = min(v.get('fitness', 0.0) for v in archive)
+    imp = improvement_at_k(seed_fitness, archive, k=50)
+    print(f"\n  imp@50: {imp:+.4f}")
+
+    # Performance tracker stats
+    tracker = PerformanceTracker(TRACKING_FILE)
+    stats = tracker.get_statistics()
+    if stats['total_generations'] > 0:
+        print(f"\n  performance tracker:")
+        print(f"    total recorded: {stats['total_generations']}")
+        print(f"    best: {stats['best']:.4f}")
+        print(f"    average: {stats['average']:.4f}")
+        print(f"    trend: {stats['trend']:+.6f}")
+
+    # Meta-agent info
+    meta_agent = _load_meta_agent()
+    enabled = sum(1 for r in meta_agent.rules if r.get('enabled', True))
+    print(f"\n  meta-agent: {len(meta_agent.rules)} rules ({enabled} enabled)")
+    if meta_agent.mutation_log:
+        print(f"    mutations: {len(meta_agent.mutation_log)}")
+        for m in meta_agent.mutation_log[-3:]:
+            print(f"      {m}")
 
     # Lineage of best
     if best.get('parent_id'):
@@ -301,6 +379,76 @@ def cmd_audit(args):
     print(f"  These are honest labels for what the numbers actually mean.")
 
 
+def cmd_transfer_export(args):
+    """Export the evolved hyperagent for cross-domain transfer."""
+    output_path = args.transfer_export
+
+    print(f"═══ creature_dgm_h: transfer-export ═══")
+    print(f"  archive: {ARCHIVE_DIR}")
+    print(f"  output: {output_path}")
+
+    tracker = PerformanceTracker(TRACKING_FILE)
+    meta_agent = _load_meta_agent()
+
+    bundle = export_hyperagent(
+        archive_path=ARCHIVE_DIR,
+        output_path=output_path,
+        meta_agent=meta_agent,
+        performance_tracker=tracker,
+        memory=meta_agent.memory)
+
+    print(f"\n  exported:")
+    print(f"    source archive: {bundle.get('source_archive_size', 0)} variants")
+    if 'selected_variant' in bundle:
+        sv = bundle['selected_variant']
+        print(f"    transfer agent: {sv['id']} (fitness={sv['fitness']:.4f})")
+    if 'meta_agent_rules' in bundle:
+        print(f"    rules: {len(bundle['meta_agent_rules'])}")
+    if 'performance_stats' in bundle:
+        ps = bundle['performance_stats']
+        print(f"    best fitness: {ps.get('best', 0):.4f}")
+    if 'memory' in bundle:
+        print(f"    memory entries: {len(bundle['memory'])}")
+    print(f"\n  written to {output_path}")
+
+
+def cmd_transfer_import(args):
+    """Import a transferred hyperagent as seed for this domain."""
+    input_path = args.transfer_import
+
+    print(f"═══ creature_dgm_h: transfer-import ═══")
+    print(f"  input: {input_path}")
+    print(f"  target archive: {ARCHIVE_DIR}")
+
+    result = import_hyperagent(
+        input_path=input_path,
+        target_archive_path=ARCHIVE_DIR)
+
+    print(f"\n  imported:")
+    if result['rules']:
+        print(f"    rules: {len(result['rules'])}")
+    if result['seed_config']:
+        print(f"    seed config: {result['seed_config']}")
+    if result['memory_entries']:
+        print(f"    memory entries: {len(result['memory_entries'])}")
+    if result['performance_stats']:
+        ps = result['performance_stats']
+        print(f"    source best fitness: {ps.get('best', 0):.4f}")
+
+    # Initialize meta-agent with imported rules and memory
+    memory = PersistentMemory(MEMORY_FILE)
+    for key, entry in result['memory_entries'].items():
+        val = entry.get('value', entry) if isinstance(entry, dict) else entry
+        memory.record(key, val)
+
+    meta_agent = MetaAgent(rules=result['rules'], memory=memory)
+    meta_agent.mutation_log = result['mutation_log']
+    _save_meta_agent(meta_agent)
+
+    print(f"\n  meta-agent initialized with imported rules")
+    print(f"  run --evolve to start evolution from transferred state")
+
+
 # ── Main ─────────────────────────────────────────────────────────────────
 
 def main():
@@ -318,6 +466,10 @@ def main():
                        help='Show archive status')
     group.add_argument('--audit', action='store_true',
                        help='Run honest audit on current best')
+    group.add_argument('--transfer-export', type=str, metavar='FILE',
+                       help='Export hyperagent for cross-domain transfer')
+    group.add_argument('--transfer-import', type=str, metavar='FILE',
+                       help='Import hyperagent from another domain')
 
     parser.add_argument('--n-variants', type=int, default=3,
                         help='Number of variants per generation (default: 3)')
@@ -332,6 +484,10 @@ def main():
         cmd_status(args)
     elif args.audit:
         cmd_audit(args)
+    elif args.transfer_export:
+        cmd_transfer_export(args)
+    elif args.transfer_import:
+        cmd_transfer_import(args)
 
 
 if __name__ == '__main__':
