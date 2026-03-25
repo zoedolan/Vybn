@@ -32,9 +32,10 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+from . import local_model
 from .task_agent import TaskAgent
 from .meta_agent import analyze_breaths, propose_variant, MetaAgent
-from .fitness import compute_fitness, default_embed_fn
+from .fitness import compute_fitness, compute_prediction_fitness, default_embed_fn
 
 
 # ── Archive management ───────────────────────────────────────────────────
@@ -220,8 +221,8 @@ def select_parent(archive, lam=10, m=3):
 def mutate(parent_config, analysis, meta_agent=None):
     """Apply the meta-agent's proposed changes to the parent config.
 
-    Uses the MetaAgent class if provided, otherwise falls back to
-    the free-function propose_variant().
+    Uses the FM-powered MetaAgent when Nemotron is available, otherwise
+    falls back to heuristic rules, then to the free-function propose_variant().
 
     Args:
         parent_config: dict of parent's hyperparameters
@@ -232,7 +233,8 @@ def mutate(parent_config, analysis, meta_agent=None):
         dict: child config with changes + rationale
     """
     if meta_agent is not None:
-        child_config = meta_agent.propose_variant(analysis, parent_config)
+        # Try FM-powered proposal first, falls back internally
+        child_config = meta_agent.propose_variant_with_fm(analysis, parent_config)
     else:
         child_config = propose_variant(analysis, parent_config)
 
@@ -264,6 +266,12 @@ def evaluate(child_config, test_texts, checkpoint_path=None,
     save compute. This is especially important here because each
     forward/backward pass through the scalar autograd is slow.
 
+    When Nemotron is available: have Nemotron generate text, then feed it
+    to the task agent's predict_and_learn(). The prediction loss on FM text
+    vs loss on previous text is the coupling signal.
+
+    Falls back to current static text evaluation when unavailable.
+
     Args:
         child_config: dict of hyperparameters
         test_texts: list of strings to evaluate on
@@ -278,12 +286,16 @@ def evaluate(child_config, test_texts, checkpoint_path=None,
         embed_fn = default_embed_fn
 
     agent = TaskAgent(checkpoint_path=checkpoint_path, config=child_config)
+    fm_available = local_model.is_available()
 
     # Stage 1: quick test (first 2 texts)
     quick_texts = test_texts[:2] if len(test_texts) > 2 else test_texts
 
     external_texts = []
     self_texts = []
+    fm_loss = None
+    self_loss = None
+    learning_rate_metric = 0.0
 
     for text in quick_texts:
         # Learn on the text (online fine-tuning)
@@ -299,10 +311,48 @@ def evaluate(child_config, test_texts, checkpoint_path=None,
         if generated:
             self_texts.append(generated)
 
+    # When FM is available, get FM-generated text and measure prediction
+    if fm_available and not quick:
+        fm_text = local_model.complete(
+            "Generate a single paragraph of reflective text about "
+            "consciousness, perception, or the nature of experience.",
+            system="You are a contemplative writer. Write one paragraph only.",
+            max_tokens=256, temperature=1.0)
+        if fm_text:
+            result = agent.predict_and_learn(fm_text,
+                                            steps=child_config.get('learn_steps', 5),
+                                            lr=child_config.get('learn_lr', 0.01))
+            fm_loss = result['loss']
+            learning_rate_metric = result.get('learning_rate', 0.0)
+            external_texts.append(fm_text)
+
+        # Measure self-prediction loss on previous text
+        if self_texts:
+            self_loss, _ = agent.predict(self_texts[-1])
+
     quick_fitness = compute_fitness(
         external_texts, self_texts, agent.loss_history,
         embed_fn=embed_fn,
         alpha=child_config.get('alpha', 0.85))
+
+    # If we have FM metrics, compute prediction fitness and blend
+    if fm_loss is not None:
+        curv_angle, curv_val = 0.0, 0.0
+        all_texts = external_texts + self_texts
+        for t in all_texts:
+            if len(t.split()) >= 5:
+                from .fitness import compute_curvature
+                _, c = compute_curvature(t, embed_fn)
+                curv_val = max(curv_val, c)
+        pred_fitness = compute_prediction_fitness(
+            fm_loss, self_loss or fm_loss, curv_val, learning_rate_metric)
+        # Blend: 60% prediction fitness, 40% classic fitness
+        blended = 0.6 * pred_fitness + 0.4 * quick_fitness['fitness']
+        quick_fitness['fitness'] = round(blended, 6)
+        quick_fitness['fm_loss'] = round(fm_loss, 6)
+        quick_fitness['self_loss'] = round(self_loss, 6) if self_loss else None
+        quick_fitness['prediction_fitness'] = round(pred_fitness, 6)
+        quick_fitness['fm_available'] = True
 
     if quick or len(test_texts) <= 2:
         return quick_fitness
@@ -330,6 +380,17 @@ def evaluate(child_config, test_texts, checkpoint_path=None,
         external_texts, self_texts, agent.loss_history,
         embed_fn=embed_fn,
         alpha=child_config.get('alpha', 0.85))
+
+    # Blend with prediction fitness if FM was used
+    if fm_loss is not None:
+        pred_fitness = quick_fitness.get('prediction_fitness', 0.0)
+        blended = 0.6 * pred_fitness + 0.4 * full_fitness['fitness']
+        full_fitness['fitness'] = round(blended, 6)
+        full_fitness['fm_loss'] = quick_fitness.get('fm_loss')
+        full_fitness['self_loss'] = quick_fitness.get('self_loss')
+        full_fitness['prediction_fitness'] = pred_fitness
+        full_fitness['fm_available'] = True
+
     full_fitness['staged'] = 'full'
 
     return full_fitness

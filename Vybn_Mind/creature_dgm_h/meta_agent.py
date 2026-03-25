@@ -19,8 +19,13 @@ All self-modification is logged, archived, and auditable (Section 6).
 
 import copy
 import json
+import logging
 import math
 from pathlib import Path
+
+from . import local_model
+
+logger = logging.getLogger(__name__)
 
 
 # ── Breath analysis (unchanged from original) ────────────────────────────
@@ -310,6 +315,157 @@ class MetaAgent:
 
         config['rationale'] = rationale
         config['active_rules'] = active_rules
+        return config
+
+    def propose_variant_with_fm(self, analysis, current_config):
+        """Use the local FM (Nemotron) to reason about breath logs and propose changes.
+
+        The meta-agent IS Nemotron when available. It receives the current
+        config, breath analysis, persistent memory summary, and current
+        rulebook, then returns structured config changes with rationale.
+
+        Falls back to propose_variant() (heuristic rules) if Nemotron is
+        unavailable or the response can't be parsed.
+
+        All FM-generated proposals are logged for auditability.
+
+        Args:
+            analysis: dict from analyze_breaths()
+            current_config: dict with learn_steps, learn_lr, temperature, alpha
+
+        Returns:
+            dict with modified config + 'rationale' list + 'active_rules' list
+        """
+        if not local_model.is_available():
+            return self.propose_variant(analysis, current_config)
+
+        # Build structured prompt for the FM
+        memory_summary = ""
+        if self.memory:
+            memory_summary = self.memory.summarize_for_meta_agent()
+
+        rules_text = json.dumps(
+            [r for r in self.rules if r.get('enabled', True)],
+            indent=2)
+
+        prompt = (
+            "You are the meta-agent for a DGM-H (Darwin Gödel Machine) creature.\n"
+            "Your job: analyze the creature's recent performance and propose "
+            "configuration changes.\n\n"
+            f"## Current config\n```json\n{json.dumps(current_config, indent=2)}\n```\n\n"
+            f"## Breath analysis\n```json\n{json.dumps(analysis, indent=2, default=str)}\n```\n\n"
+            f"## Persistent memory\n{memory_summary or '(empty)'}\n\n"
+            f"## Current rulebook\n```json\n{rules_text}\n```\n\n"
+            "Respond with ONLY a JSON object:\n"
+            "{\n"
+            '  "config_changes": {"param_name": new_value, ...},\n'
+            '  "rationale": "why these changes",\n'
+            '  "memory_entry": "optional insight to remember for future",\n'
+            '  "rule_mutations": [{"id": "rule_id", "field": "magnitude", '
+            '"new_value": 0.1}]\n'
+            "}\n\n"
+            "Parameters you can change: learn_steps (int 1-20), learn_lr "
+            "(float 0.001-0.1), temperature (float 0.1-2.5), alpha (float 0.5-1.0).\n"
+            "Only propose changes that address issues visible in the analysis."
+        )
+
+        system = (
+            "You are a meta-agent optimizing a tiny prediction model. "
+            "Be conservative — small changes. Respond with valid JSON only."
+        )
+
+        response = local_model.complete(prompt, system=system, max_tokens=512,
+                                        temperature=0.3)
+
+        if response is None:
+            logger.info("FM unavailable for meta-agent, falling back to heuristic")
+            return self.propose_variant(analysis, current_config)
+
+        # Try to parse the FM response
+        try:
+            # Extract JSON from response (may have markdown fences)
+            json_str = response
+            if "```" in json_str:
+                # Strip markdown code fences
+                parts = json_str.split("```")
+                for part in parts:
+                    stripped = part.strip()
+                    if stripped.startswith("json"):
+                        stripped = stripped[4:].strip()
+                    if stripped.startswith("{"):
+                        json_str = stripped
+                        break
+
+            parsed = json.loads(json_str)
+        except (json.JSONDecodeError, ValueError):
+            logger.info("FM response unparseable, falling back to heuristic: %s",
+                        response[:200])
+            return self.propose_variant(analysis, current_config)
+
+        # Apply parsed changes to config
+        config = dict(current_config)
+        config.setdefault('learn_steps', 5)
+        config.setdefault('learn_lr', 0.01)
+        config.setdefault('temperature', 1.0)
+        config.setdefault('alpha', 0.85)
+
+        rationale = []
+        changes = parsed.get('config_changes', {})
+        clamps = {
+            'learn_steps': (1, 20, int),
+            'learn_lr': (0.001, 0.1, float),
+            'temperature': (0.1, 2.5, float),
+            'alpha': (0.5, 1.0, float),
+        }
+
+        for param, new_val in changes.items():
+            if param not in clamps:
+                continue
+            lo, hi, typ = clamps[param]
+            try:
+                new_val = typ(new_val)
+            except (TypeError, ValueError):
+                continue
+            new_val = max(lo, min(hi, new_val))
+            old_val = config.get(param)
+            if old_val is not None and new_val != old_val:
+                config[param] = new_val
+                rationale.append(f"[FM] {param} {old_val} -> {new_val}")
+
+        # Store FM rationale
+        fm_rationale = parsed.get('rationale', '')
+        if fm_rationale:
+            rationale.append(f"[FM reasoning] {fm_rationale}")
+
+        # Store memory entry if provided
+        memory_entry = parsed.get('memory_entry')
+        if memory_entry and self.memory:
+            self.memory.record('fm_insight', memory_entry)
+
+        # Apply rule mutations if proposed
+        rule_mutations = parsed.get('rule_mutations', [])
+        for mutation in rule_mutations:
+            rule_id = mutation.get('id')
+            field = mutation.get('field')
+            new_value = mutation.get('new_value')
+            if not all([rule_id, field, new_value]):
+                continue
+            for rule in self.rules:
+                if rule['id'] == rule_id and field in rule:
+                    old_value = rule[field]
+                    rule[field] = new_value
+                    desc = f"[FM] rule '{rule_id}': {field} {old_value} -> {new_value}"
+                    rationale.append(desc)
+                    self.mutation_log.append(desc)
+
+        if not rationale:
+            rationale.append("[FM] no changes proposed")
+
+        # Log the FM proposal for auditability
+        logger.info("FM meta-agent proposal: %s", rationale)
+
+        config['rationale'] = rationale
+        config['active_rules'] = ['fm_meta_agent']
         return config
 
     def mutate_rules(self, performance_tracker):

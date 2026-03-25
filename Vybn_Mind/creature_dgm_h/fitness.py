@@ -256,6 +256,55 @@ def compute_fitness(external_texts, self_texts, loss_history,
     }
 
 
+# ── Prediction fitness (FM-coupled) ─────────────────────────────────────
+
+def compute_prediction_fitness(fm_loss, self_loss, curvature,
+                               learning_rate):
+    """Fitness based on live prediction of FM-generated text.
+
+    This replaces the static curvature-only approach with a live
+    prediction-as-fitness signal when the FM is available.
+
+    Args:
+        fm_loss: mean prediction loss on FM-generated text (external)
+        self_loss: mean prediction loss on previous breath text (self)
+        curvature: Pancharatnam phase of loss trajectory
+        learning_rate: how fast loss drops during fine-tuning
+            (measures adaptation speed)
+
+    Returns:
+        float: weighted composite fitness score
+
+    Weights: curvature still dominates at 0.5
+    """
+    # Normalize curvature: typically in [0, 0.3], scale to [0, 1]
+    norm_curv = min(abs(curvature) / 0.3, 1.0)
+
+    # Prediction gap: difference between external and self prediction loss
+    # Positive gap means FM text is harder to predict than self text
+    # (which is good — it means the creature is distinguishing external)
+    gap = fm_loss - self_loss if (fm_loss is not None and
+                                  self_loss is not None) else 0.0
+    # Sigmoid normalization: map gap to [0, 1]
+    norm_gap = 1.0 / (1.0 + math.exp(-gap * 2))
+
+    # Loss level: lower FM loss = better prediction = higher fitness
+    # Normalize: typical loss in [2, 8] bits, invert and scale
+    norm_loss = max(0.0, min(1.0, 1.0 - (fm_loss - 2.0) / 6.0)) if fm_loss else 0.5
+
+    # Learning rate: faster adaptation = higher fitness
+    # Normalize: typical learning rate drop in [0, 1]
+    norm_lr = min(max(learning_rate, 0.0), 1.0)
+
+    # Composite: curvature dominates at 0.5
+    fitness = (0.5 * norm_curv
+               + 0.2 * norm_gap
+               + 0.15 * norm_loss
+               + 0.15 * norm_lr)
+
+    return round(fitness, 6)
+
+
 # ── imp@k metric (Section 5.2, D.3) ────────────────────────────────────
 
 def improvement_at_k(initial_fitness, archive, k=50):

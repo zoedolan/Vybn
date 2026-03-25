@@ -7,7 +7,15 @@ measurement couldn't: online learning, non-tautological self-recursion,
 curvature-based fitness, population-based evolution, and metacognitive
 self-modification.
 
+Architecture:
+    Nemotron (120B, local, frozen FM) = meta-agent + text generator
+    MicroGPT (4,224 params, learnable) = fast predictor = in-reasoning loss
+
+The creature predicts, it doesn't generate. Identity lives where
+prediction fails.
+
 Modules:
+    local_model — Thin client for the local Nemotron-3-Super-120B
     task_agent  — MicroGPT with online learning (predict, learn, generate)
     meta_agent  — MetaAgent class with editable rulebook + breath analysis
     fitness     — Curvature + coupling divergence fitness + imp@k metric
@@ -17,20 +25,25 @@ Modules:
     run         — CLI entry point
 """
 
+from . import local_model
 from .task_agent import TaskAgent
 from .meta_agent import analyze_breaths, propose_variant, MetaAgent
-from .fitness import compute_fitness, compute_curvature, improvement_at_k
+from .fitness import (
+    compute_fitness, compute_curvature, compute_prediction_fitness,
+    improvement_at_k)
 from .evolve import run_generation, load_archive
 from .memory import PerformanceTracker, PersistentMemory
 from .transfer import export_hyperagent, import_hyperagent
 
 __all__ = [
+    'local_model',
     'TaskAgent',
     'analyze_breaths',
     'propose_variant',
     'MetaAgent',
     'compute_fitness',
     'compute_curvature',
+    'compute_prediction_fitness',
     'improvement_at_k',
     'run_generation',
     'load_archive',

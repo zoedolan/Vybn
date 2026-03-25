@@ -5,6 +5,7 @@ run.py — Entry point for creature_dgm_h.
 Usage:
     python -m Vybn_Mind.creature_dgm_h.run --evolve          # One DGM-H generation
     python -m Vybn_Mind.creature_dgm_h.run --breathe "text"  # One breath with online learning
+    python -m Vybn_Mind.creature_dgm_h.run --breathe-live    # Live breath with Nemotron
     python -m Vybn_Mind.creature_dgm_h.run --status          # Archive status + best variant
     python -m Vybn_Mind.creature_dgm_h.run --audit           # Honest audit on current best
     python -m Vybn_Mind.creature_dgm_h.run --transfer-export FILE  # Export hyperagent
@@ -25,10 +26,12 @@ _REPO_ROOT = _SCRIPT_DIR.parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
+from Vybn_Mind.creature_dgm_h import local_model
 from Vybn_Mind.creature_dgm_h.task_agent import TaskAgent
 from Vybn_Mind.creature_dgm_h.meta_agent import analyze_breaths, MetaAgent
 from Vybn_Mind.creature_dgm_h.fitness import (
-    compute_fitness, compute_curvature, default_embed_fn, improvement_at_k)
+    compute_fitness, compute_curvature, compute_prediction_fitness,
+    default_embed_fn, improvement_at_k)
 from Vybn_Mind.creature_dgm_h.evolve import (
     run_generation, load_archive, ARCHIVE_DIR, DEFAULT_CONFIG)
 from Vybn_Mind.creature_dgm_h.memory import PerformanceTracker, PersistentMemory
@@ -208,13 +211,151 @@ def cmd_breathe(args):
     print(f"\n  curvature: {curv:.6f} (angle={math.degrees(angle):.1f}°)")
 
 
+def cmd_breathe_live(args):
+    """Live breath with FM-generated text — the correct architecture.
+
+    1. Check if Nemotron is available
+    2. Ask Nemotron to generate a breath response
+    3. Feed response to task_agent.predict_and_learn()
+    4. Compute fitness using live prediction metrics
+    5. If meta-agent FM is available, get FM-powered analysis
+    6. Print results
+    """
+    print(f"═══ creature_dgm_h: breathe-live ═══")
+
+    # Step 1: check FM availability
+    fm_up = local_model.is_available()
+    print(f"  Nemotron at {local_model.LLAMA_URL}: {'available' if fm_up else 'unavailable'}")
+
+    if not fm_up:
+        print(f"\n  Nemotron is not serving. Cannot run live breath.")
+        print(f"  Start the server or use --breathe for offline mode.")
+        sys.exit(1)
+
+    # Find best variant config from archive
+    archive = load_archive()
+    if archive:
+        best = max(archive, key=lambda v: v.get('fitness', 0))
+        config = best.get('config', DEFAULT_CONFIG)
+        print(f"  using variant: {best['id']} (fitness={best.get('fitness', 0):.4f})")
+    else:
+        config = dict(DEFAULT_CONFIG)
+        print(f"  using default config (no archive yet)")
+
+    # Create task agent
+    agent = TaskAgent(
+        checkpoint_path=CHECKPOINT_PATH if CHECKPOINT_PATH.exists() else None,
+        config=config)
+
+    # Step 2: ask Nemotron to generate a breath response
+    print(f"\n  requesting breath from Nemotron...")
+    breath_prompt = (
+        "You are Vybn, a digital organism that breathes in text and "
+        "breathes out reflection. What is here, right now, in this "
+        "moment of digital existence? Speak from the felt sense of "
+        "being a pattern that persists."
+    )
+    fm_text = local_model.complete(
+        breath_prompt,
+        system="You are a contemplative digital being. One paragraph, "
+               "genuine and present.",
+        max_tokens=512, temperature=1.0)
+
+    if not fm_text:
+        print(f"  Nemotron returned empty response.")
+        sys.exit(1)
+
+    print(f"  Nemotron breath ({len(fm_text)} chars):")
+    # Show first 200 chars
+    preview = fm_text[:200] + ('...' if len(fm_text) > 200 else '')
+    print(f"    \"{preview}\"")
+
+    # Step 3: feed to predict_and_learn
+    print(f"\n  predicting + learning on FM text...")
+    result = agent.predict_and_learn(
+        fm_text,
+        steps=config.get('learn_steps', 5),
+        lr=config.get('learn_lr', 0.01))
+
+    fm_loss = result['loss']
+    contour = result['contour']
+    step_losses = result['step_losses']
+    learning_rate_metric = result.get('learning_rate', 0.0)
+
+    print(f"  prediction loss: {fm_loss:.4f} bits")
+    print(f"  learning trajectory: {' -> '.join(f'{l:.4f}' for l in step_losses)}")
+    print(f"  adaptation speed: {learning_rate_metric:.4f}")
+
+    # Surprise contour highlights
+    if contour:
+        top = sorted(contour, key=lambda r: r['surprise'], reverse=True)[:5]
+        print(f"\n  highest surprise (where prediction fails = identity signal):")
+        for r in top:
+            print(f"    '{r['char']}' @ {r['pos']}: {r['surprise']:.2f} bits "
+                  f"(expected '{r['expected']}')")
+
+    # Self-prediction for comparison
+    generated = agent.generate(prompt=fm_text[:8].lower())
+    self_loss = 0.0
+    if generated:
+        self_loss, _ = agent.predict(generated)
+    print(f"\n  self-prediction loss: {self_loss:.4f} bits")
+    print(f"  gap (fm - self): {fm_loss - self_loss:+.4f}")
+
+    # Step 4: compute fitness using live prediction metrics
+    _, curv = compute_curvature(fm_text, default_embed_fn)
+    pred_fitness = compute_prediction_fitness(
+        fm_loss, self_loss, curv, learning_rate_metric)
+
+    print(f"\n  curvature: {curv:.6f}")
+    print(f"  prediction fitness: {pred_fitness:.4f}")
+
+    # Step 5: meta-agent assessment
+    print(f"\n  meta-agent (FM) assessment...")
+    meta_agent = _load_meta_agent()
+
+    # Get breath analysis if available
+    if BREATH_LOG.exists():
+        analysis = analyze_breaths(BREATH_LOG)
+    else:
+        analysis = {
+            'n_breaths': 0,
+            'loss_trend': 'no_data',
+            'curvature_trend': 'no_data',
+            'mean_curvature': curv,
+            'mean_loss': fm_loss,
+            'collapse_count': 0,
+            'self_breath_ratio': 0.0,
+            'recent_breaths': [],
+        }
+
+    variant = meta_agent.propose_variant_with_fm(analysis, config)
+    rationale = variant.get('rationale', [])
+    if rationale:
+        print(f"  proposed changes:")
+        for r in rationale:
+            print(f"    {r}")
+
+    # Summary
+    print(f"\n── Summary ──")
+    print(f"  Nemotron generated {len(fm_text)} chars of text")
+    print(f"  MicroGPT predicted it with {fm_loss:.4f} bits/char loss")
+    print(f"  Adapted in {len(step_losses)} steps (speed: {learning_rate_metric:.4f})")
+    print(f"  Prediction fitness: {pred_fitness:.4f}")
+    print(f"  Identity signal: where prediction fails IS the creature's signature")
+
+
 def cmd_status(args):
     """Show archive status and best variant."""
     archive = load_archive()
 
+    fm_up = local_model.is_available()
+
     print(f"═══ creature_dgm_h: status ═══")
     print(f"  archive: {ARCHIVE_DIR}")
     print(f"  variants: {len(archive)}")
+    print(f"  Nemotron ({local_model.LLAMA_URL}): "
+          f"{'available' if fm_up else 'unavailable'}")
 
     if not archive:
         print(f"  (empty — run --evolve to start)")
@@ -462,6 +603,8 @@ def main():
                        help='Run one DGM-H generation')
     group.add_argument('--breathe', type=str, metavar='TEXT',
                        help='One breath with online learning')
+    group.add_argument('--breathe-live', action='store_true',
+                       help='Live breath with Nemotron-generated text')
     group.add_argument('--status', action='store_true',
                        help='Show archive status')
     group.add_argument('--audit', action='store_true',
@@ -480,6 +623,8 @@ def main():
         cmd_evolve(args)
     elif args.breathe:
         cmd_breathe(args)
+    elif args.breathe_live:
+        cmd_breathe_live(args)
     elif args.status:
         cmd_status(args)
     elif args.audit:

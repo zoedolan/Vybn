@@ -408,6 +408,117 @@ class TaskAgent:
 
         return ''.join(generated)
 
+    def predict_stream(self, token_generator):
+        """Predict tokens as they stream from the FM.
+
+        This is the in-reasoning loss function. As Nemotron generates each
+        character, MicroGPT predicts what the next one will be. The per-token
+        loss is accumulated and the surprise contour is built in real time.
+
+        Args:
+            token_generator: iterator yielding characters one at a time
+                (from local_model.stream_tokens)
+
+        Returns:
+            (mean_loss: float, contour: list[dict], full_text: str)
+        """
+        keys = [[] for _ in range(N_LAYER)]
+        values = [[] for _ in range(N_LAYER)]
+        contour = []
+        total_loss = 0.0
+        n_tokens = 0
+        full_text = []
+
+        # Prime with BOS
+        prev_token = self.BOS
+        logits, keys, values = forward_token(
+            prev_token, 0, keys, values, self.state_dict)
+
+        pos = 1
+        for ch in token_generator:
+            ch_lower = ch.lower()
+            if ch_lower not in self.char_to_idx:
+                full_text.append(ch)
+                continue
+
+            actual = self.char_to_idx[ch_lower]
+            full_text.append(ch)
+
+            # Score prediction against actual
+            probs = softmax(logits)
+            prob_actual = probs[actual].data
+            surprise = -math.log2(max(prob_actual, 1e-12))
+            total_loss += surprise
+            n_tokens += 1
+
+            top_idx = max(range(len(probs)), key=lambda i: probs[i].data)
+            top_char = self.chars[top_idx] if top_idx < len(self.chars) else '?'
+
+            contour.append({
+                'char': ch_lower,
+                'pos': n_tokens - 1,
+                'surprise': round(surprise, 4),
+                'expected': top_char,
+            })
+
+            # Feed actual token and get next prediction
+            if pos < BLOCK_SIZE:
+                logits, keys, values = forward_token(
+                    actual, pos, keys, values, self.state_dict)
+                pos += 1
+            else:
+                # Truncate KV cache and continue
+                for i in range(N_LAYER):
+                    keys[i] = keys[i][-(BLOCK_SIZE - 1):]
+                    values[i] = values[i][-(BLOCK_SIZE - 1):]
+                pos = BLOCK_SIZE - 1
+                logits, keys, values = forward_token(
+                    actual, pos, keys, values, self.state_dict)
+
+        mean_loss = total_loss / max(n_tokens, 1)
+        return mean_loss, contour, ''.join(full_text)
+
+    def predict_and_learn(self, text, steps=None, lr=None):
+        """Combined predict + online fine-tune in one pass.
+
+        This is the core breath operation:
+        1. Predict the text token-by-token (compute loss)
+        2. Do online fine-tuning on the same text (update weights)
+        3. Return both the prediction loss and the learning trajectory
+
+        The creature changes DURING the breath, not after it.
+
+        Args:
+            text: string to predict and learn from
+            steps: number of gradient steps (default from config)
+            lr: learning rate (default from config)
+
+        Returns:
+            dict with:
+                - loss: float, mean prediction loss before learning
+                - contour: list[dict], per-character surprise
+                - step_losses: list[float], per-step loss during fine-tuning
+                - text: str, cleaned text that was processed
+        """
+        # Step 1: predict (measure loss before learning)
+        loss, contour = self.predict(text)
+
+        # Step 2: learn (online fine-tuning on this text)
+        step_losses = self.learn(text, steps=steps, lr=lr)
+
+        # Compute learning rate (how fast loss drops)
+        learning_rate_metric = 0.0
+        if len(step_losses) >= 2:
+            learning_rate_metric = step_losses[0] - step_losses[-1]
+
+        return {
+            'loss': loss,
+            'contour': contour,
+            'step_losses': step_losses,
+            'text': self._clean_text(text),
+            'learning_rate': learning_rate_metric,
+        }
+
     def get_loss_trend(self, window=5):
         """Return recent loss trend for the meta-agent.
 
