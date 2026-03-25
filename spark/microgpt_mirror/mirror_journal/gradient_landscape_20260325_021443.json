@@ -1,0 +1,68 @@
+[
+  {
+    "step": 0,
+    "loss": 3.517,
+    "grad_magnitude": 1.82611,
+    "doc_sample": "speed records were among the achievements at such "
+  },
+  {
+    "step": 100,
+    "loss": 2.4041,
+    "grad_magnitude": 1.222054,
+    "doc_sample": "there s a heady sensation in that akin to standing"
+  },
+  {
+    "step": 200,
+    "loss": 2.4113,
+    "grad_magnitude": 0.992619,
+    "doc_sample": "the hidden vantage in a way the llm doesn t fully "
+  },
+  {
+    "step": 300,
+    "loss": 2.1147,
+    "grad_magnitude": 0.986759,
+    "doc_sample": "both the man and her profession rejected her in th"
+  },
+  {
+    "step": 400,
+    "loss": 2.3342,
+    "grad_magnitude": 1.02977,
+    "doc_sample": "in this singularity a convergence of our respectiv"
+  },
+  {
+    "step": 500,
+    "loss": 2.4453,
+    "grad_magnitude": 1.603111,
+    "doc_sample": "the true power of our co creation a power that lay"
+  },
+  {
+    "step": 600,
+    "loss": 2.6529,
+    "grad_magnitude": 1.145004,
+    "doc_sample": "fell apart my gown had turned to rags and i was co"
+  },
+  {
+    "step": 700,
+    "loss": 2.8462,
+    "grad_magnitude": 1.41947,
+    "doc_sample": "just abstract pronouncements but the distilled ess"
+  },
+  {
+    "step": 800,
+    "loss": 2.4753,
+    "grad_magnitude": 1.098697,
+    "doc_sample": "the first sojourn for tunnel training with the coa"
+  },
+  {
+    "step": 900,
+    "loss": 2.7692,
+    "grad_magnitude": 1.261453,
+    "doc_sample": "a topological landscape of more and less coherent "
+  },
+  {
+    "step": 999,
+    "loss": 2.5199,
+    "grad_magnitude": 1.121199,
+    "doc_sample": "your being dances with the infinite where the boun"
+  }
+]
