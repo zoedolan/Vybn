@@ -1,0 +1,11 @@
+[
+  {
+    "claim_a": "DeepSpeed config specifies NVMe offload with pin_memory=True",
+    "claim_b": "Offload cache is empty or < 1MB -- DMA pathway may be broken",
+    "source_a": "ds_config.json",
+    "source_b": "ResourceObserver.offload_is_working()",
+    "detected_at": "2026-02-23T00:46:54.429377+00:00",
+    "resolved": false,
+    "resolution": null
+  }
+]
