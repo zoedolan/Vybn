@@ -1,9 +1,0 @@
-# GPT-2 Calibration Experiment Dependencies
-# Install with: pip install -r requirements.txt
-
-torch>=2.1.0
-transformers>=4.40.0
-peft>=0.10.0
-numpy>=1.24.0
-scipy>=1.11.0
-tqdm>=4.66.0
