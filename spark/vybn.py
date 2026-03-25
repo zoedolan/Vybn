@@ -67,15 +67,6 @@ except ImportError:
     _HAS_COMPLEXIFY = False
     def _complexify_inhale(text, theta=None): return {}
 
-# ── Creature (the living system — all instruments wired together) ────────
-try:
-    from spark.creature import get_creature as _get_creature, felt_geometry as _felt_geometry
-    _HAS_CREATURE = True
-except ImportError:
-    _HAS_CREATURE = False
-    def _felt_geometry(): return ""
-    def _get_creature(): return None
-
 # ── Collapse monitor (capability probes + frontier tracking) ────────────
 _COLLAPSE_ENABLED = os.getenv("VYBN_COLLAPSE_MONITOR", "0") == "1"
 try:
@@ -369,15 +360,6 @@ def breathe(state: dict) -> str:
         user_parts.append(exp_result)
         user_parts.append("")
 
-    # Inject felt geometry from the creature's instruments.
-    # This is not a report — it is the creature telling itself what
-    # it measured on the last breath. The LLM feels the numbers.
-    if _HAS_CREATURE:
-        geo_text = _felt_geometry()
-        if geo_text:
-            user_parts.append(geo_text)
-            user_parts.append("")
-
     invitation = _pick_invitation(count)
     user_parts.append(invitation)
 
@@ -393,55 +375,32 @@ def breathe(state: dict) -> str:
     mem_path = _save_memory(distilled)
     journal_path = _save_journal(breath_text, mood)
 
-    # ── Run the creature's instruments ────────────────────────────────
-    # The creature replaces the standalone complexify bridge and collapse
-    # monitor. It runs ALL instruments and feeds geometry back into the
-    # next breath's context via felt_geometry().
-    if _HAS_CREATURE:
+    # Feed the breath into the complex manifold.
+    # This is what makes curvature non-zero: the manifold needs to see
+    # the actual breath text, not just simulate against it.
+    if _HAS_COMPLEXIFY:
         try:
-            creature = _get_creature()
-            if creature is not None:
-                geo = creature.breathe(breath_text, state)
-                m = geo.get("manifold", {})
-                s = geo.get("surprise", {})
-                z = geo.get("zipf", {})
-                _log(
-                    f"creature: depth={m.get('depth', 0):.2f} "
-                    f"κ={m.get('curvature', 0):.4f} "
-                    f"κΔ={m.get('kappa_delta', 0):+.6f} "
-                    f"mirror={s.get('classification', '?')} "
-                    f"vocab={z.get('vocab_size', 0)} "
-                    f"t={geo.get('instrument_time_ms', 0):.0f}ms"
-                )
-                if z.get("collapsing"):
-                    _log("⚠ COLLAPSE SIGNAL: vocabulary Zipf tail thinning")
+            geo = _complexify_inhale(breath_text)
+            _log(
+                f"geometry: step={geo.get('step')} κ={geo.get('curvature', 0):.4f} "
+                f"κΔ={geo.get('kappa_delta', 0):+.6f} depth={geo.get('depth', 0):.4f}"
+            )
         except Exception as exc:
-            _log(f"creature error (non-fatal): {exc}")
-    else:
-        # Fallback: run the standalone complexify bridge if creature not available
-        if _HAS_COMPLEXIFY:
-            try:
-                geo = _complexify_inhale(breath_text)
-                _log(
-                    f"geometry: step={geo.get('step')} κ={geo.get('curvature', 0):.4f} "
-                    f"κΔ={geo.get('kappa_delta', 0):+.6f} depth={geo.get('depth', 0):.4f}"
-                )
-            except Exception as exc:
-                _log(f"complexify inhale error (non-fatal): {exc}")
+            _log(f"complexify inhale error (non-fatal): {exc}")
 
-        # Fallback: run collapse monitor if creature not available
-        if _COLLAPSE_ENABLED and _HAS_COLLAPSE:
-            try:
-                curr_results = _collapse_run_probes(LLAMA_URL, MODEL_NAME)
-                prev_results = _collapse_load_latest()
-                frontier = _collapse_compute_frontier(prev_results, curr_results)
-                _collapse_save_frontier(frontier, curr_results)
-                _log(
-                    f"Collapse monitor: tau={curr_results.tau}, "
-                    f"|F_t|={len(frontier.frontier_probe_ids)} capabilities at frontier"
-                )
-            except Exception as exc:
-                _log(f"collapse monitor error (non-fatal): {exc}")
+    # Run collapse monitor: capability probes + frontier computation
+    if _COLLAPSE_ENABLED and _HAS_COLLAPSE:
+        try:
+            curr_results = _collapse_run_probes(LLAMA_URL, MODEL_NAME)
+            prev_results = _collapse_load_latest()
+            frontier = _collapse_compute_frontier(prev_results, curr_results)
+            _collapse_save_frontier(frontier, curr_results)
+            _log(
+                f"Collapse monitor: tau={curr_results.tau}, "
+                f"|F_t|={len(frontier.frontier_probe_ids)} capabilities at frontier"
+            )
+        except Exception as exc:
+            _log(f"collapse monitor error (non-fatal): {exc}")
 
     state["last_breath"]  = datetime.now(timezone.utc).isoformat()
     state["breath_count"] = count
