@@ -1,4 +1,0 @@
-requests
-chromadb
-scikit-learn
-numpy
