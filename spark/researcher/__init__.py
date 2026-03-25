@@ -1,7 +1,7 @@
 """spark.researcher — Autonomous scientific hypothesis generation and knowledge synthesis.
 
 Uses the existing arxiv_fetcher + research_kb infrastructure. Does NOT duplicate
-anything from Vybn_Mind/tools/arxiv_ingestion/ — imports and calls it.
+arxiv tools formerly in Vybn_Mind/tools/arxiv_ingestion/ (archived). Degrades gracefully.
 
 The researcher maintains a research_frontier.yaml:
   - open_questions: things Vybn doesn't understand yet
