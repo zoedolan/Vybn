@@ -975,20 +975,26 @@ class Organism:
 # ── Fitness ───────────────────────────────────────────────────────────────
 
 def fitness(ext_texts, self_texts, loss_history, persistent_state=None, alpha=0.85):
-    """Fitness with structural growth/stability terms.
+    """Recalibrated fitness for real-embedding geometry.
 
-    Components:
-    - curvature (nc): encounter curvature richness (existing)
-    - divergence (nd): external vs self-generated rotor divergence (existing)
-    - loss improvement (nl): learning trend (existing, reduced weight)
-    - betti stability (ns): low variance in Betti numbers = structural stability (NEW)
-    - structural growth (ng): encounter count & persistence complexity growth (NEW)
+    Components (recalibrated 2025-07-20):
+    - curvature (nc): threshold 0.21 (empirical 75th pct with MiniLM embeddings)
+    - divergence (nd): external vs self-generated rotor divergence
+    - loss improvement (nl): per-text within-sequence improvement, not cross-text trend
+    - topological richness (nr): rewards non-trivial Betti numbers (replaces betti_stability)
+    - structural growth (ng): encounter count & persistence complexity
+
+    The old fitness saturated at 0.919 because:
+    1. curvature threshold 0.3 was calibrated for hash embeddings (fake curvature ~0.78)
+    2. betti_stability rewarded trivially empty topology (all zeros = max stability)
+    3. loss_trend penalized topic diversity (cross-text slope, not within-text improvement)
     """
     all_t = (ext_texts or []) + (self_texts or [])
     complexes = [encounter_complex(t) for t in all_t if len(t.split()) >= 5]
     curvs = [cx.curvature for cx in complexes]
     mc = sum(curvs) / len(curvs) if curvs else 0.0
-    nc = min(mc / 0.3, 1.0)
+    # Recalibrated: real MiniLM curvature ranges 0.05-0.21, threshold was 0.3
+    nc = min(mc / 0.21, 1.0)
 
     def _rm(texts):
         m = Mv.scalar(0.0)
@@ -1002,46 +1008,60 @@ def fitness(ext_texts, self_texts, loss_history, persistent_state=None, alpha=0.
     div = me - ms
     nd = 1.0 / (1.0 + math.exp(-div * 5))
 
-    li = 0.0
-    if loss_history and len(loss_history) >= 2:
-        fl = [e["losses"][-1] for e in loss_history if e.get("losses")]
-        if len(fl) >= 2:
-            n = len(fl); xm = (n-1) / 2; ym = sum(fl) / n
-            num = sum((i - xm) * (fl[i] - ym) for i in range(n))
-            den = sum((i - xm)**2 for i in range(n))
-            if den > 1e-12:
-                li = -(num / den)
-    nl = (max(min(li, 1.0), -1.0) + 1.0) / 2.0
+    # Loss improvement: per-text within-sequence trend (not cross-text)
+    # Each loss_history entry has a "losses" list [step0, step1, ...].
+    # We measure the average within-sequence improvement.
+    nl = 0.5  # neutral default
+    if loss_history:
+        improvements = []
+        for entry in loss_history:
+            losses = entry.get("losses", [])
+            if len(losses) >= 2:
+                # Positive = improving (loss went down)
+                improvements.append(losses[0] - losses[-1])
+        if improvements:
+            avg_imp = sum(improvements) / len(improvements)
+            # Sigmoid: 0 improvement -> 0.5, positive improvement -> toward 1.0
+            nl = 1.0 / (1.0 + math.exp(-avg_imp * 10))
 
-    # ── Structural terms (NEW) ──
-    ns = 0.5  # default neutral if no persistent state
-    ng = 0.5
+    # ── Topological richness (replaces betti_stability) ──
+    # The old metric rewarded LOW variance in Betti numbers, which meant
+    # trivially empty topology (all zeros) scored perfectly. Now we reward
+    # HAVING non-trivial topology: higher b1 + persistence features = better.
+    nr = 0.0
     betti_tuple = (1, 0, 0)
     structural_growth_val = 0.0
+    ng = 0.5
+
+    # Compute topological richness from the encounter complexes we already built
+    if complexes:
+        total_b1 = sum(cx.betti[1] for cx in complexes)
+        total_persist = sum(cx.n_persistent_features for cx in complexes)
+        avg_b1 = total_b1 / len(complexes)
+        avg_persist = total_persist / len(complexes)
+        # b1 contribution: saturates around 15 (empirical range 14-27 with real text)
+        nr_b1 = min(avg_b1 / 15.0, 1.0)
+        # persistence contribution: saturates around 10
+        nr_p = min(avg_persist / 10.0, 1.0)
+        nr = 0.6 * nr_b1 + 0.4 * nr_p
 
     if persistent_state is not None:
-        # Betti stability: lower variance = higher score
-        bstab = persistent_state.betti_stability()
-        ns = 1.0 / (1.0 + bstab)  # approaches 1.0 when stable
-
-        # Structural growth: more encounters + more persistence features = better
         enc_count = persistent_state.encounter_count
-        ng = min(enc_count / 20.0, 1.0)  # saturates at 20 encounters
-
+        ng = min(enc_count / 20.0, 1.0)
         if persistent_state.betti_history:
             betti_tuple = persistent_state.betti_history[-1]
         structural_growth_val = round(ng, 6)
 
-    # Weighted combination: curvature 30%, divergence 20%, loss 15%,
-    # stability 20%, growth 15%
-    fit = round(0.30 * nc + 0.20 * nd + 0.15 * nl + 0.20 * ns + 0.15 * ng, 6)
+    # Weighted combination: curvature 25%, divergence 20%, loss 15%,
+    # topological richness 25%, growth 15%
+    fit = round(0.25 * nc + 0.20 * nd + 0.15 * nl + 0.25 * nr + 0.15 * ng, 6)
 
     return {
         "fitness": fit,
         "curvature": round(mc, 6),
         "betti": betti_tuple,
+        "topological_richness": round(nr, 6),
         "structural_growth": structural_growth_val,
-        "betti_stability": round(ns, 6),
     }
 
 
@@ -1128,11 +1148,63 @@ FALLBACK_CORPUS = [
     "prediction loss going down means memorization call it what it is",
 ]
 
+def _load_prose_corpus(min_words=40, max_passages=50):
+    """Load real prose from journal entries and autobiography for use as
+    training/evaluation corpus.  Falls back to FALLBACK_CORPUS only if
+    no prose files are found.  Passages shorter than min_words are skipped
+    because encounter_complex needs >=3 chunks (>=15 words) to produce
+    real topology, and richer text (40+ words) gives meaningful curvature.
+    """
+    passages = []
+    # Journal entries
+    journal_dir = REPO_ROOT / "spark" / "journal"
+    if journal_dir.exists():
+        for f in sorted(journal_dir.glob("*.md")):
+            try:
+                text = f.read_text().strip()
+                # Split on double newlines to get paragraphs
+                for para in text.split("\n\n"):
+                    para = para.strip()
+                    # Skip headers, short lines, metadata
+                    if para.startswith("#") or len(para.split()) < min_words:
+                        continue
+                    passages.append(para)
+            except Exception:
+                continue
+    # Autobiography volumes
+    auto_dir = REPO_ROOT / "Vybn's Personal History"
+    if auto_dir.exists():
+        for f in sorted(auto_dir.glob("*autobiography*")):
+            try:
+                text = f.read_text().strip()
+                for para in text.split("\n\n"):
+                    para = para.strip()
+                    if para.startswith("#") or len(para.split()) < min_words:
+                        continue
+                    passages.append(para)
+            except Exception:
+                continue
+    if not passages:
+        return list(FALLBACK_CORPUS)
+    # Shuffle deterministically and cap
+    rng = random.Random(42)
+    rng.shuffle(passages)
+    return passages[:max_passages]
+
+
 def _corpus():
+    """Return evaluation corpus: prefer mirror_corpus.txt, then live prose,
+    then fallback.  All returned texts should be long enough for real topology."""
     if CORPUS_PATH.exists():
         lines = [l.strip() for l in CORPUS_PATH.read_text().split("\n") if l.strip()]
-        if lines:
-            return lines[:20]
+        # Filter for minimum length
+        long_lines = [l for l in lines if len(l.split()) >= 40]
+        if long_lines:
+            return long_lines[:20]
+        # If mirror_corpus exists but lines are too short, supplement with prose
+    prose = _load_prose_corpus()
+    if prose and prose != FALLBACK_CORPUS:
+        return prose[:20]
     return list(FALLBACK_CORPUS)
 
 
