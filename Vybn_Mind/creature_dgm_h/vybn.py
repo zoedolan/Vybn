@@ -1096,10 +1096,35 @@ def evolve(test_texts, n_variants=3):
                     parent = v; break
         pc = parent.get("config", {}) if parent else {}
         pid = parent["id"] if parent else None
-        child = organism.propose_variant(
-            {"n_breaths": 0, "loss_trend": "no_data", "curvature_trend": "no_data",
-             "mean_curvature": 0, "curvature_median": 0, "mean_loss": 0,
-             "collapse_count": 0, "self_breath_ratio": 0}, pc)
+                # ── Build real analysis from archive history ──
+        analysis = {
+            "n_breaths": len(archive),
+            "loss_trend": "no_data",
+            "curvature_trend": "no_data",
+            "mean_curvature": 0,
+            "curvature_median": 0,
+            "mean_loss": 0,
+            "collapse_count": 0,
+            "self_breath_ratio": 0,
+        }
+        if len(archive) >= 3:
+            recent = archive[-10:]
+            curvs = [v.get("curvature", 0) for v in recent if isinstance(v.get("curvature"), (int, float))]
+            fits = [v.get("fitness", 0) for v in recent if isinstance(v.get("fitness"), (int, float))]
+            if len(curvs) >= 2:
+                analysis["mean_curvature"] = sum(curvs) / len(curvs)
+                analysis["curvature_median"] = sorted(curvs)[len(curvs) // 2]
+                analysis["curvature_trend"] = "increasing" if curvs[-1] > curvs[0] else "decreasing" if curvs[-1] < curvs[0] else "flat"
+            if len(fits) >= 2:
+                analysis["loss_trend"] = "increasing" if fits[-1] < fits[0] else "decreasing" if fits[-1] > fits[0] else "flat"
+                analysis["mean_loss"] = sum(fits) / len(fits)
+            if len(fits) >= 3:
+                analysis["collapse_count"] = sum(1 for f in fits if abs(f - fits[-1]) < 0.001) - 1
+            enc = organism.persistent.encounter_count
+            analysis["self_breath_ratio"] = min(enc / max(len(archive), 1), 1.0)
+        analysis["rotor_coherence"] = organism.rotor_coherence()
+
+        child = organism.propose_variant(analysis, pc)
         agent = TopoAgent(config=child)
         ext, slf = [], []
         texts = test_texts[:2] if i > 0 else test_texts
