@@ -30,15 +30,13 @@ if str(_REPO_ROOT) not in sys.path:
 
 from Vybn_Mind.creature_dgm_h import local_model
 from Vybn_Mind.creature_dgm_h.task_agent import TaskAgent
-from Vybn_Mind.creature_dgm_h.meta_agent import analyze_breaths, MetaAgent
-from Vybn_Mind.creature_dgm_h.fitness import (
+from Vybn_Mind.creature_dgm_h.organism import Organism, analyze_breaths
+from Vybn_Mind.creature_dgm_h.field import (
     compute_fitness, compute_curvature, compute_prediction_fitness,
-    compute_loss_trajectory_curvature, default_embed_fn, improvement_at_k)
-from Vybn_Mind.creature_dgm_h.proprioceptive_loop import (
-    run_proprioceptive_breath, run_ab_experiment)
+    compute_loss_trajectory_curvature, default_embed_fn, improvement_at_k,
+    Field)
 from Vybn_Mind.creature_dgm_h.evolve import (
     run_generation, load_archive, ARCHIVE_DIR, DEFAULT_CONFIG)
-from Vybn_Mind.creature_dgm_h.memory import PerformanceTracker, PersistentMemory
 from Vybn_Mind.creature_dgm_h.transfer import export_hyperagent, import_hyperagent
 
 
@@ -50,6 +48,7 @@ BREATH_LOG = _REPO_ROOT / 'mind' / 'creature' / 'breaths.jsonl'
 TRACKING_FILE = ARCHIVE_DIR / 'performance_history.json'
 MEMORY_FILE = ARCHIVE_DIR / 'persistent_memory.json'
 META_AGENT_FILE = ARCHIVE_DIR / 'meta_agent.json'
+ORGANISM_FILE = ARCHIVE_DIR / 'organism_state.json'
 
 # Built-in test corpus for when mirror_corpus.txt doesn't exist.
 # These are short, diverse texts for evaluation — not training data.
@@ -76,23 +75,21 @@ def get_test_corpus():
     return list(FALLBACK_CORPUS)
 
 
-def _load_meta_agent():
-    """Load or create the MetaAgent with persistent memory."""
-    memory = PersistentMemory(MEMORY_FILE)
-
-    if META_AGENT_FILE.exists():
-        try:
-            agent = MetaAgent.load(META_AGENT_FILE, memory=memory)
-            return agent
-        except (json.JSONDecodeError, OSError):
-            pass
-
-    return MetaAgent(memory=memory)
+def _load_organism():
+    """Load or create the Organism."""
+    # Try new organism file first, fall back to old meta_agent file
+    for path in (ORGANISM_FILE, META_AGENT_FILE):
+        if path.exists():
+            try:
+                return Organism.load(path)
+            except (json.JSONDecodeError, OSError):
+                continue
+    return Organism()
 
 
-def _save_meta_agent(meta_agent):
-    """Save the meta-agent state."""
-    meta_agent.save(META_AGENT_FILE)
+def _save_organism(organism):
+    """Save the organism state."""
+    organism.save(ORGANISM_FILE)
 
 
 # ── Commands ─────────────────────────────────────────────────────────────
@@ -102,18 +99,16 @@ def cmd_evolve(args):
     test_texts = get_test_corpus()
     n = args.n_variants if hasattr(args, 'n_variants') else 3
 
-    # Initialize meta-level components
-    tracker = PerformanceTracker(TRACKING_FILE)
-    meta_agent = _load_meta_agent()
+    organism = _load_organism()
 
     print(f"═══ creature_dgm_h: evolve ═══")
     print(f"  test corpus: {len(test_texts)} texts")
     print(f"  variants per generation: {n}")
     print(f"  archive: {ARCHIVE_DIR}")
-    print(f"  meta-agent rules: {len(meta_agent.rules)} "
-          f"({sum(1 for r in meta_agent.rules if r.get('enabled', True))} enabled)")
+    print(f"  rules: {len(organism.rules)} "
+          f"({sum(1 for r in organism.rules if r.get('enabled', True))} enabled)")
 
-    stats = tracker.get_statistics()
+    stats = organism.get_statistics()
     if stats['total_generations'] > 0:
         print(f"  history: {stats['total_generations']} recorded, "
               f"best={stats['best']:.4f}, trend={stats['trend']:+.4f}")
@@ -126,12 +121,11 @@ def cmd_evolve(args):
         archive_path=ARCHIVE_DIR,
         embed_fn=default_embed_fn,
         breath_log_path=BREATH_LOG if BREATH_LOG.exists() else None,
-        performance_tracker=tracker,
-        meta_agent=meta_agent,
+        performance_tracker=organism,
+        meta_agent=organism,
     )
 
-    # Save meta-agent state (rules may have mutated)
-    _save_meta_agent(meta_agent)
+    _save_organism(organism)
 
     print()
     print(f"  generation {result['generation']} complete")
@@ -211,7 +205,7 @@ def cmd_breathe(args):
     print(f"    '{generated}'")
 
     # Curvature
-    angle, curv = compute_curvature(text, default_embed_fn)
+    angle, curv, _ = compute_curvature(text, default_embed_fn)
     print(f"\n  curvature: {curv:.6f} (angle={math.degrees(angle):.1f}°)")
 
 
@@ -307,7 +301,7 @@ def cmd_breathe_live(args):
     print(f"  gap (fm - self): {fm_loss - self_loss:+.4f}")
 
     # Step 4: compute fitness using live prediction metrics
-    _, curv = compute_curvature(fm_text, default_embed_fn)
+    _, curv, _ = compute_curvature(fm_text, default_embed_fn)
     pred_fitness = compute_prediction_fitness(
         fm_loss, self_loss, curv, learning_rate_metric)
 
@@ -316,7 +310,7 @@ def cmd_breathe_live(args):
 
     # Step 5: meta-agent assessment
     print(f"\n  meta-agent (FM) assessment...")
-    meta_agent = _load_meta_agent()
+    organism = _load_organism()
 
     # Get breath analysis if available
     if BREATH_LOG.exists():
@@ -333,7 +327,7 @@ def cmd_breathe_live(args):
             'recent_breaths': [],
         }
 
-    variant = meta_agent.propose_variant_with_fm(analysis, config)
+    variant = organism.propose_variant_with_fm(analysis, config)
     rationale = variant.get('rationale', [])
     if rationale:
         print(f"  proposed changes:")
@@ -402,11 +396,8 @@ def cmd_breathe_aware(args):
                 print(f"  {line}")
         print()
 
-    result = run_proprioceptive_breath(
-        prompt, agent,
-        embed_fn=default_embed_fn,
-        on_chunk=on_chunk,
-    )
+    field = Field(task_agent=agent, embed_fn=default_embed_fn)
+    result = field.breathe(prompt, on_chunk=on_chunk)
 
     if not result:
         print("  No output produced.")
@@ -414,26 +405,24 @@ def cmd_breathe_aware(args):
 
     # Final summary
     print(f"── results ──")
-    print(f"  total chunks: {result['n_chunks']}")
-    print(f"  full text length: {len(result['full_text'])} chars")
+    print(f"  total chunks: {len(result.chunks)}")
+    print(f"  full text length: {len(result.full_text)} chars")
     print(f"\n  loss trajectory: "
-          f"{' → '.join(f'{t:.2f}' for t in result['trajectory'])}")
-    print(f"  curvature: {result['curvature']:.6f} "
-          f"(angle={math.degrees(result['curvature_angle']):.1f}°)")
-    print(f"  loss trajectory curvature: {result['loss_trajectory_curvature']:.6f}")
+          f"{' → '.join(f'{t:.2f}' for t in result.trajectory)}")
+    print(f"  curvature: {result.curvature:.6f} "
+          f"(angle={math.degrees(result.curvature_angle):.1f}°)")
+    print(f"  loss trajectory curvature: {result.loss_trajectory_curvature:.6f}")
+    print(f"  holonomy: bv_norm={result.holonomy.get('e12', 0):.4f}")
 
     # Compute fitness summary
-    mean_surprise = (sum(result['trajectory'])
-                     / max(len(result['trajectory']), 1))
+    mean_surprise = (sum(result.trajectory)
+                     / max(len(result.trajectory), 1))
     print(f"  mean surprise: {mean_surprise:.4f} bits")
 
-    # Show injections summary
-    print(f"\n  injections sent: {len(result['injections'])}")
-    for i, inj in enumerate(result['injections']):
-        # Show just the first line of each
-        first_line = [l for l in inj.split('\n') if l.startswith('mean_surprise')]
-        if first_line:
-            print(f"    chunk {i + 1}: {first_line[0]}")
+    # Show disagreement trace
+    print(f"\n  disagreement traces: {len(result.disagreement_trace)}")
+    for i, dt in enumerate(result.disagreement_trace):
+        print(f"    chunk {i + 1}: {dt}")
 
 
 def cmd_experiment_ab(args):
@@ -472,10 +461,8 @@ def cmd_experiment_ab(args):
     print(f"  runs per condition: {n}")
     print(f"  running...\n")
 
-    result = run_ab_experiment(
-        prompt, agent, n=n,
-        embed_fn=default_embed_fn,
-    )
+    field = Field(task_agent=agent, embed_fn=default_embed_fn)
+    result = field.compare_conditions(prompt, n=n)
 
     if not result:
         print("  Experiment failed — no results produced.")
@@ -489,17 +476,20 @@ def cmd_experiment_ab(args):
     print(f"  {'─' * 70}")
 
     for key in comp:
-        w = comp[key]['with']
-        wo = comp[key]['without']
-        d = comp[key]['delta']
+        w = comp[key].get('with_median', comp[key].get('with', 0))
+        wo = comp[key].get('without_median', comp[key].get('without', 0))
+        d = comp[key].get('delta_median', comp[key].get('delta', 0))
         label = key.replace('_', ' ')
         print(f"  {label:<30} {w:>14.4f} {wo:>14.4f} {d:>+12.4f}")
 
     # Interpretation
     print(f"\n── Interpretation ──")
-    curv_delta = comp.get('curvature', {}).get('delta', 0)
-    surp_delta = comp.get('mean_surprise', {}).get('delta', 0)
-    ltc_delta = comp.get('loss_trajectory_curvature', {}).get('delta', 0)
+    curv_delta = comp.get('curvature', {}).get('delta_median',
+                 comp.get('curvature', {}).get('delta', 0))
+    surp_delta = comp.get('mean_surprise', {}).get('delta_median',
+                 comp.get('mean_surprise', {}).get('delta', 0))
+    ltc_delta = comp.get('loss_trajectory_curvature', {}).get('delta_median',
+                comp.get('loss_trajectory_curvature', {}).get('delta', 0))
 
     if abs(curv_delta) < 0.001 and abs(surp_delta) < 0.1:
         print(f"  Proprioception had minimal effect on curvature and surprise.")
@@ -566,24 +556,23 @@ def cmd_status(args):
     imp = improvement_at_k(seed_fitness, archive, k=50)
     print(f"\n  imp@50: {imp:+.4f}")
 
-    # Performance tracker stats
-    tracker = PerformanceTracker(TRACKING_FILE)
-    stats = tracker.get_statistics()
+    # Organism stats
+    organism = _load_organism()
+    stats = organism.get_statistics()
     if stats['total_generations'] > 0:
-        print(f"\n  performance tracker:")
+        print(f"\n  organism:")
         print(f"    total recorded: {stats['total_generations']}")
         print(f"    best: {stats['best']:.4f}")
         print(f"    average: {stats['average']:.4f}")
         print(f"    trend: {stats['trend']:+.6f}")
 
-    # Meta-agent info
-    meta_agent = _load_meta_agent()
-    enabled = sum(1 for r in meta_agent.rules if r.get('enabled', True))
-    print(f"\n  meta-agent: {len(meta_agent.rules)} rules ({enabled} enabled)")
-    if meta_agent.mutation_log:
-        print(f"    mutations: {len(meta_agent.mutation_log)}")
-        for m in meta_agent.mutation_log[-3:]:
-            print(f"      {m}")
+    enabled = sum(1 for r in organism.rules if r.get('enabled', True))
+    print(f"\n  rules: {len(organism.rules)} ({enabled} enabled)")
+    print(f"  tensions: {len(organism.state.tensions)}")
+    if organism.state.mutation_log:
+        print(f"  mutations: {len(organism.state.mutation_log)}")
+        for m in organism.state.mutation_log[-3:]:
+            print(f"    {m}")
 
     # Lineage of best
     if best.get('parent_id'):
@@ -661,8 +650,8 @@ def cmd_audit(args):
                "quantum mechanics describes probability the pizza was delicious "
                "democracy requires participation the speed of light is constant")
 
-    _, curv_reframe = compute_curvature(reframing, default_embed_fn)
-    _, curv_hop = compute_curvature(hopping, default_embed_fn)
+    _, curv_reframe, _ = compute_curvature(reframing, default_embed_fn)
+    _, curv_hop, _ = compute_curvature(hopping, default_embed_fn)
     passed = curv_reframe > curv_hop
     print(f"  reframing curvature: {curv_reframe:.6f}")
     print(f"  topic-hopping curvature: {curv_hop:.6f}")
@@ -703,15 +692,14 @@ def cmd_transfer_export(args):
     print(f"  archive: {ARCHIVE_DIR}")
     print(f"  output: {output_path}")
 
-    tracker = PerformanceTracker(TRACKING_FILE)
-    meta_agent = _load_meta_agent()
+    organism = _load_organism()
 
     bundle = export_hyperagent(
         archive_path=ARCHIVE_DIR,
         output_path=output_path,
-        meta_agent=meta_agent,
-        performance_tracker=tracker,
-        memory=meta_agent.memory)
+        meta_agent=organism,
+        performance_tracker=organism,
+        memory=organism)
 
     print(f"\n  exported:")
     print(f"    source archive: {bundle.get('source_archive_size', 0)} variants")
@@ -751,17 +739,18 @@ def cmd_transfer_import(args):
         ps = result['performance_stats']
         print(f"    source best fitness: {ps.get('best', 0):.4f}")
 
-    # Initialize meta-agent with imported rules and memory
-    memory = PersistentMemory(MEMORY_FILE)
+    # Initialize organism with imported rules and memory
+    from .organism import OrganismState
+    state = OrganismState()
+    state.rulebook = result['rules']
+    state.mutation_log = result['mutation_log']
     for key, entry in result['memory_entries'].items():
         val = entry.get('value', entry) if isinstance(entry, dict) else entry
-        memory.record(key, val)
+        state.persistent_memory[key] = {'value': val, 'timestamp': 0}
+    organism = Organism(state=state)
+    _save_organism(organism)
 
-    meta_agent = MetaAgent(rules=result['rules'], memory=memory)
-    meta_agent.mutation_log = result['mutation_log']
-    _save_meta_agent(meta_agent)
-
-    print(f"\n  meta-agent initialized with imported rules")
+    print(f"\n  organism initialized with imported rules")
     print(f"  run --evolve to start evolution from transferred state")
 
 
