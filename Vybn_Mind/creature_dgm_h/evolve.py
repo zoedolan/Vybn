@@ -34,10 +34,11 @@ from pathlib import Path
 
 from . import local_model
 from .task_agent import TaskAgent
-from .meta_agent import analyze_breaths, propose_variant, MetaAgent
-from .fitness import (
+from .organism import Organism, analyze_breaths, propose_variant
+from .field import (
     compute_fitness, compute_prediction_fitness,
-    compute_loss_trajectory_curvature, default_embed_fn)
+    compute_loss_trajectory_curvature, default_embed_fn,
+    compute_curvature, Field)
 
 
 # ── Archive management ───────────────────────────────────────────────────
@@ -292,28 +293,27 @@ def evaluate(child_config, test_texts, checkpoint_path=None,
 
     # Optional proprioceptive evaluation path
     if fm_available and child_config.get('proprioceptive', False) and not quick:
-        from .proprioceptive_loop import run_proprioceptive_breath
         prop_prompt = (
             "Generate a single paragraph of reflective text about "
             "consciousness, perception, or the nature of experience."
         )
-        prop_result = run_proprioceptive_breath(
-            prop_prompt, agent,
+        field = Field(task_agent=agent, embed_fn=embed_fn)
+        prop_result = field.breathe(
+            prop_prompt,
             chunk_size=child_config.get('chunk_size', 50),
             max_chunks=child_config.get('max_chunks', 8),
             system_prompt="You are a contemplative writer. One paragraph only.",
-            embed_fn=embed_fn,
         )
         if prop_result:
             fitness_result = compute_fitness(
-                [prop_result['full_text']], [], agent.loss_history,
+                [prop_result.full_text], [], agent.loss_history,
                 embed_fn=embed_fn,
                 alpha=child_config.get('alpha', 0.85))
             fitness_result['loss_trajectory_curvature'] = (
-                prop_result['loss_trajectory_curvature'])
+                prop_result.loss_trajectory_curvature)
             fitness_result['proprioceptive'] = True
             fitness_result['fm_available'] = True
-            fitness_result['n_chunks'] = prop_result['n_chunks']
+            fitness_result['n_chunks'] = len(prop_result.chunks)
             return fitness_result
 
     # Stage 1: quick test (first 2 texts)
@@ -369,8 +369,7 @@ def evaluate(child_config, test_texts, checkpoint_path=None,
         all_texts = external_texts + self_texts
         for t in all_texts:
             if len(t.split()) >= 5:
-                from .fitness import compute_curvature
-                _, c = compute_curvature(t, embed_fn)
+                _, c, _ = compute_curvature(t, embed_fn)
                 curv_val = max(curv_val, c)
         pred_fitness = compute_prediction_fitness(
             fm_loss, self_loss or fm_loss, curv_val, learning_rate_metric)
@@ -486,7 +485,9 @@ def run_generation(test_texts, n_variants=3, checkpoint_path=None,
     rule_mutations = []
     if (meta_agent is not None and performance_tracker is not None
             and generation > 0 and generation % 5 == 0):
-        rule_mutations = meta_agent.mutate_rules(performance_tracker)
+        rule_mutations = meta_agent.mutate_rules(
+            rule_outcomes_fn=performance_tracker.get_rule_outcomes
+            if hasattr(performance_tracker, 'get_rule_outcomes') else None)
         if rule_mutations:
             print(f"  meta-agent rule mutations:")
             for m in rule_mutations:
