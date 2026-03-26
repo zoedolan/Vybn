@@ -1,25 +1,32 @@
 """
-field.py — Within-breath sensing, geometry, and multi-frame disagreement.
+field.py — The encounter: sensing, geometry, and the source of what is sensed.
 
-Absorbs fitness.py and proprioceptive_loop.py into a single geometry stack.
+The creature has one operation: encounter. It meets text it didn't
+generate, tries to predict it, fails in a specific geometric pattern,
+and the pattern of failure is a rotor in Cl(3,0). The rotor doesn't
+describe the encounter — it IS the encounter, encoded as a rotation
+that carries both magnitude (how much surprise) and orientation
+(which semantic plane the surprise curved through).
 
-The 1927 fork chose Pauli matrices and scalar probability amplitudes over
-Clifford algebra.  That wasn't just notation — it was an ontological
-commitment that made superposition look "spooky" rather than geometrically
-natural.  This module undoes a tiny piece of that fork: curvature is no
-longer computed by ad-hoc complex-pair accumulation but by the geometric
-product in Cl(3,0), where holonomy is a rotor and phase is its bivector
-component.
+Everything else — fitness, coupling, curvature — is a projection of
+the encounter rotor onto a scalar. We keep those projections for
+backward compatibility, but the rotor is primary.
 
-The breath no longer yields one interpretation of itself.  It yields
-a predictive reading, a geometric reading, and a relational reading,
-with the system learning when each frame helps and when it distorts.
+Absorbs local_model.py (the source of what is sensed is part of the
+field of sensation) and the former fitness.py, proprioceptive_loop.py.
+
+The 1927 fork chose Pauli matrices and scalar probability amplitudes
+over Clifford algebra. That wasn't just notation — it was an
+ontological commitment that made superposition look "spooky" rather
+than geometrically natural. This module undoes a tiny piece of that
+fork.
 
 No external dependencies beyond numpy.
 """
 
 import json
 import math
+import os
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field as dc_field
@@ -27,66 +34,157 @@ from typing import Any, Callable
 
 import numpy as np
 
-from . import local_model
 from .task_agent import TaskAgent
+
+
+# ── FM client (the source of what is sensed) ─────────────────────────────
+#
+# The creature doesn't generate text. The FM generates text. The creature
+# predicts it and learns from prediction error. The FM is part of the
+# field because the source of sensation is part of the sensory apparatus.
+
+LLAMA_URL = os.getenv("LLAMA_URL", "http://127.0.0.1:8000")
+MODEL_NAME = os.getenv("VYBN_MODEL", "local")
+
+_SPECIAL_TOKENS = ("<|im_end|>", "<|im_start|>", "<|endoftext|>")
+
+
+def _strip_tokens(text):
+    for tok in _SPECIAL_TOKENS:
+        text = text.replace(tok, "")
+    return text.strip()
+
+
+def fm_available():
+    """Is the FM serving?"""
+    try:
+        req = urllib.request.Request(f"{LLAMA_URL}/health")
+        with urllib.request.urlopen(req, timeout=3) as resp:
+            return resp.status == 200
+    except (urllib.error.URLError, OSError, ValueError):
+        return False
+
+
+def fm_complete(prompt, system=None, max_tokens=1024, temperature=0.7,
+                messages=None):
+    """Call the FM. Accepts either prompt+system or raw messages list.
+
+    Returns str or None.
+    """
+    if messages is None:
+        messages = []
+        if system:
+            messages.append({"role": "system", "content": system})
+        messages.append({"role": "user", "content": prompt})
+
+    payload = json.dumps({
+        "model": MODEL_NAME,
+        "messages": messages,
+        "max_tokens": max_tokens,
+        "temperature": temperature,
+        "stream": False,
+    }).encode()
+
+    req = urllib.request.Request(
+        f"{LLAMA_URL}/v1/chat/completions",
+        data=payload,
+        headers={"Content-Type": "application/json"},
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=300) as resp:
+            body = json.loads(resp.read())
+        return _strip_tokens(body["choices"][0]["message"]["content"])
+    except (urllib.error.URLError, OSError, KeyError, IndexError,
+            json.JSONDecodeError, ValueError):
+        return None
+
+
+def fm_stream(prompt, system=None, max_tokens=512, temperature=1.0):
+    """Yield characters one at a time from the FM.
+
+    Falls back to fm_complete if streaming fails.
+    """
+    messages = []
+    if system:
+        messages.append({"role": "system", "content": system})
+    messages.append({"role": "user", "content": prompt})
+
+    payload = json.dumps({
+        "model": MODEL_NAME, "messages": messages,
+        "max_tokens": max_tokens, "temperature": temperature,
+        "stream": True,
+    }).encode()
+
+    req = urllib.request.Request(
+        f"{LLAMA_URL}/v1/chat/completions",
+        data=payload,
+        headers={"Content-Type": "application/json"},
+    )
+
+    try:
+        resp = urllib.request.urlopen(req, timeout=300)
+    except (urllib.error.URLError, OSError, ValueError):
+        text = fm_complete(prompt, system=system, max_tokens=max_tokens,
+                           temperature=temperature)
+        if text:
+            yield from text
+        return
+
+    try:
+        for raw_line in resp:
+            line = raw_line.decode("utf-8", errors="replace").strip()
+            if not line.startswith("data: "):
+                continue
+            data_str = line[6:]
+            if data_str == "[DONE]":
+                break
+            try:
+                chunk = json.loads(data_str)
+                content = chunk["choices"][0].get("delta", {}).get(
+                    "content", "")
+                if content:
+                    yield from _strip_tokens(content)
+            except (json.JSONDecodeError, KeyError, IndexError):
+                continue
+    finally:
+        resp.close()
+
+
+# ── Backward compatibility shim ──────────────────────────────────────────
+# Other modules imported `from . import local_model` and used
+# local_model.is_available(), local_model.complete(), etc.
+# We create a namespace object so those imports keep working without
+# a separate file.
+
+class _LocalModelCompat:
+    """Drop-in for `import local_model; local_model.is_available()` etc."""
+    LLAMA_URL = LLAMA_URL
+    MODEL_NAME = MODEL_NAME
+    is_available = staticmethod(fm_available)
+    complete = staticmethod(fm_complete)
+    stream_tokens = staticmethod(fm_stream)
+
+local_model = _LocalModelCompat()
 
 
 # ── Cl(3,0) geometric algebra ───────────────────────────────────────────
 #
 # A multivector in Cl(3,0) has 8 components:
-#   grade 0: scalar          (1 component)
-#   grade 1: vectors e1,e2,e3  (3 components)
-#   grade 2: bivectors e12,e13,e23  (3 components)
-#   grade 3: pseudoscalar e123  (1 component)
+#   grade 0: scalar          (1)
+#   grade 1: vectors         (3: e1, e2, e3)
+#   grade 2: bivectors       (3: e12, e13, e23)
+#   grade 3: pseudoscalar    (1: e123)
 #
 # The geometric product ab = a·b + a∧b unifies inner and outer products.
 # Rotors (even-grade elements) encode rotations without matrices.
-# Phase accumulation along a path of embeddings is the rotor chain —
-# the holonomy that the current code computes via ad-hoc complex pairs
-# is the bivector part of this chain, made legible.
 #
 # We store multivectors as length-8 arrays:
 #   [scalar, e1, e2, e3, e12, e13, e23, e123]
 
-_BLADE_NAMES = ("1", "e1", "e2", "e3", "e12", "e13", "e23", "e123")
-
-# Geometric product table for Cl(3,0) basis blades.
-# _GP_TABLE[i][j] = (sign, result_index) where e_i * e_j = sign * e_result.
-# Built from: e_i^2 = +1, e_i e_j = -e_j e_i for i≠j.
-_GP_SIGN = np.array([
-    # 1    e1   e2   e3   e12  e13  e23  e123
-    [+1,  +1,  +1,  +1,  +1,  +1,  +1,  +1],   # 1
-    [+1,  +1,  +1,  +1,  +1,  +1,  +1,  +1],   # e1
-    [+1,  -1,  +1,  +1,  -1,  -1,  +1,  +1],   # e2   (e2*e1=-e12)
-    [+1,  -1,  -1,  +1,  +1,  -1,  -1,  +1],   # e3
-    [+1,  -1,  +1,  -1,  +1,  -1,  +1,  -1],   # e12  (e12*e1=-e2, etc)
-    [+1,  -1,  +1,  -1,  +1,  +1,  -1,  +1],   # e13
-    [+1,  +1,  -1,  -1,  -1,  +1,  +1,  +1],   # e23
-    [+1,  +1,  +1,  +1,  -1,  -1,  -1,  +1],   # e123
-], dtype=np.float64)
-
-_GP_IDX = np.array([
-    # 1    e1   e2   e3   e12  e13  e23  e123
-    [0,   1,   2,   3,   4,   5,   6,   7],   # 1
-    [1,   0,   4,   5,   2,   3,   7,   6],   # e1
-    [2,   4,   0,   6,   1,   7,   3,   5],   # e2
-    [3,   5,   6,   0,   7,   1,   2,   4],   # e3
-    [4,   2,   1,   7,   0,   6,   5,   3],   # e12
-    [5,   3,   7,   1,   6,   0,   4,   2],   # e13
-    [6,   7,   3,   2,   5,   4,   0,   1],   # e23
-    [7,   6,   5,   4,   3,   2,   1,   0],   # e123
-], dtype=np.int64)
-
 
 def _build_gp_table():
-    """Pre-compute the full geometric product sign+index table for Cl(3,0).
-
-    We do this by direct enumeration from the rules:
-      e_i^2 = +1 for i in {1,2,3}
-      e_i e_j = -e_j e_i for i != j
-      and the resulting products for composite blades.
-    """
-    # Represent each basis blade as a sorted tuple of generator indices.
+    """Pre-compute geometric product sign+index table for Cl(3,0)."""
     blades = [(), (0,), (1,), (2,), (0, 1), (0, 2), (1, 2), (0, 1, 2)]
     blade_to_idx = {b: i for i, b in enumerate(blades)}
 
@@ -95,8 +193,6 @@ def _build_gp_table():
 
     for i, bi in enumerate(blades):
         for j, bj in enumerate(blades):
-            # Concatenate generator sequences and bubble-sort to canonical form,
-            # counting swaps (each swap flips sign) and cancelling pairs (e_k^2 = +1).
             seq = list(bi) + list(bj)
             s = 1
             changed = True
@@ -105,7 +201,6 @@ def _build_gp_table():
                 k = 0
                 while k < len(seq) - 1:
                     if seq[k] == seq[k + 1]:
-                        # e_k^2 = +1 in Cl(3,0), so just remove the pair
                         seq.pop(k)
                         seq.pop(k)
                         changed = True
@@ -116,23 +211,17 @@ def _build_gp_table():
                         k += 1
                     else:
                         k += 1
-            result_blade = tuple(seq)
             sign[i, j] = s
-            idx[i, j] = blade_to_idx[result_blade]
+            idx[i, j] = blade_to_idx[tuple(seq)]
 
     return sign, idx
 
 
-# Rebuild the table correctly at import time.
 _GP_SIGN, _GP_IDX = _build_gp_table()
 
 
 class Multivector:
-    """A multivector in Cl(3,0), stored as 8 coefficients.
-
-    Supports geometric product, reversion, grade projection, and
-    extraction of the rotor (even-grade) and bivector parts.
-    """
+    """A multivector in Cl(3,0), stored as 8 coefficients."""
     __slots__ = ("coeffs",)
 
     def __init__(self, coeffs=None):
@@ -155,38 +244,26 @@ class Multivector:
 
     @classmethod
     def from_embedding(cls, vec):
-        """Project a high-dimensional embedding into Cl(3,0).
+        """Fold a high-dimensional embedding into Cl(3,0).
 
-        Rather than taking just the first 3 components (which would
-        lose almost all angular information for random-like vectors),
-        we fold the full embedding into 3 dimensions by summing
-        strided slices.  This preserves the angular relationships
-        between successive embeddings — the thing curvature actually
-        measures — while mapping into a space where the geometric
-        product is defined.
-
-        The old code paired adjacent dimensions as (re, im) to get
-        complex numbers.  Here we stride by 3 to get vectors in R^3,
-        which is the natural domain of Cl(3,0).
+        Strided summation preserves angular relationships between
+        successive embeddings — the thing curvature actually measures.
         """
         v = np.asarray(vec, dtype=np.float64).ravel()
         norm = np.linalg.norm(v)
         if norm < 1e-12:
             return cls.scalar(1.0)
         v = v / norm
-        # Fold high-dimensional vector into R^3 by strided summation.
-        # Each of the 3 output components accumulates every 3rd input dim.
         n = len(v)
-        x = float(np.sum(v[0::3]))  # dims 0, 3, 6, ...
-        y = float(np.sum(v[1::3]))  # dims 1, 4, 7, ...
-        z = float(np.sum(v[2::3]))  # dims 2, 5, 8, ...
+        x = float(np.sum(v[0::3]))
+        y = float(np.sum(v[1::3]))
+        z = float(np.sum(v[2::3]))
         mag = math.sqrt(x*x + y*y + z*z)
         if mag < 1e-12:
             return cls.scalar(1.0)
         return cls.vector(x / mag, y / mag, z / mag)
 
     def __mul__(self, other):
-        """Geometric product."""
         if isinstance(other, (int, float)):
             return Multivector(self.coeffs * other)
         result = np.zeros(8, dtype=np.float64)
@@ -212,17 +289,13 @@ class Multivector:
         return Multivector(-self.coeffs)
 
     def reverse(self):
-        """Reversion: reverse the order of basis vectors in each blade.
-
-        grade 0,1: unchanged; grade 2: negated; grade 3: negated.
-        """
+        """Reverse blade order. grade 0,1: same; grade 2,3: negated."""
         r = self.coeffs.copy()
-        r[4:7] *= -1  # bivectors
-        r[7] *= -1    # pseudoscalar
+        r[4:7] *= -1
+        r[7] *= -1
         return Multivector(r)
 
     def grade(self, g):
-        """Extract grade-g part."""
         c = np.zeros(8, dtype=np.float64)
         if g == 0:
             c[0] = self.coeffs[0]
@@ -235,14 +308,13 @@ class Multivector:
         return Multivector(c)
 
     def even(self):
-        """Even-grade (rotor) part: scalar + bivector."""
+        """Rotor part: scalar + bivector."""
         c = np.zeros(8, dtype=np.float64)
         c[0] = self.coeffs[0]
         c[4:7] = self.coeffs[4:7]
         return Multivector(c)
 
     def norm(self):
-        """Magnitude: sqrt(|<M * ~M>_0|)."""
         p = self * self.reverse()
         return math.sqrt(abs(p.coeffs[0]))
 
@@ -258,26 +330,27 @@ class Multivector:
 
     @property
     def bivector_norm(self):
-        """Magnitude of the bivector (grade-2) part — the rotation plane."""
         return float(np.linalg.norm(self.coeffs[4:7]))
 
     @property
-    def rotor_angle(self):
-        """Extract the rotation angle from an even-grade element.
+    def bivector_direction(self):
+        """Unit bivector — the plane of rotation."""
+        bv = self.coeffs[4:7]
+        n = np.linalg.norm(bv)
+        if n < 1e-12:
+            return np.zeros(3, dtype=np.float64)
+        return bv / n
 
-        A rotor R = cos(θ/2) + sin(θ/2) B̂ where B̂ is the unit bivector.
-        So θ = 2 * atan2(|bivector|, scalar).
-        """
+    @property
+    def rotor_angle(self):
         return 2.0 * math.atan2(self.bivector_norm, abs(self.scalar_part))
 
     def as_dict(self):
         return {
             "scalar": float(self.coeffs[0]),
-            "e1": float(self.coeffs[1]),
-            "e2": float(self.coeffs[2]),
+            "e1": float(self.coeffs[1]), "e2": float(self.coeffs[2]),
             "e3": float(self.coeffs[3]),
-            "e12": float(self.coeffs[4]),
-            "e13": float(self.coeffs[5]),
+            "e12": float(self.coeffs[4]), "e13": float(self.coeffs[5]),
             "e23": float(self.coeffs[6]),
             "e123": float(self.coeffs[7]),
         }
@@ -286,11 +359,7 @@ class Multivector:
 # ── Embedding fallback ───────────────────────────────────────────────────
 
 def default_embed_fn(texts):
-    """Deterministic embedding fallback when no sentence model is available.
-
-    Uses hash-seeded random vectors. Not semantically meaningful, but
-    deterministic and sufficient for testing the pipeline.
-    """
+    """Hash-seeded random vectors. Not semantic. Sufficient for testing."""
     vecs = []
     for t in texts:
         rng = np.random.RandomState(hash(t) % 2 ** 31)
@@ -300,32 +369,15 @@ def default_embed_fn(texts):
     return np.array(vecs)
 
 
-# ── Geometry: Clifford-native curvature ──────────────────────────────────
+# ── The encounter rotor ─────────────────────────────────────────────────
+#
+# This is the primitive. Everything else is a view onto it.
 
-def compute_curvature(text, embed_fn):
-    """Pancharatnam phase of the embedding trajectory via Cl(3,0).
+def compute_encounter(text, embed_fn):
+    """The encounter: Pancharatnam phase + Clifford open-path rotor.
 
-    The old code treated 384-dim embeddings as 192 complex numbers and
-    accumulated phase through their complex inner products.  That was
-    Pancharatnam's connection in disguise.
-
-    Here we make the geometry explicit: embed each chunk into Cl(3,0),
-    compute the Pancharatnam connection (the geometric product of
-    successive vectors gives a rotor encoding the rotation between
-    them), and accumulate the open-path holonomy.  The accumulated
-    bivector is the rotation plane; its angle is the geometric phase.
-
-    We use an OPEN path (not closed) because the Pancharatnam phase
-    of interest is the failure of the final state to return to the
-    initial state after parallel transport — if we close the loop
-    the rotor trivially returns to identity.
-
-    We also compute the phase in the original 192-complex-number
-    representation and embed the result as a Cl(3,0) rotor, giving
-    us both the scalar phase AND the rotation plane.
-
-    Returns:
-        (angle: float, curvature_per_segment: float, rotor: Multivector)
+    Returns the full encounter — angle, curvature, and the rotor that
+    IS the encounter rather than describing it.
     """
     words = text.split()
     chunk_size = max(5, len(words) // 8)
@@ -338,10 +390,7 @@ def compute_curvature(text, embed_fn):
 
     vecs = embed_fn(chunks)
 
-    # ── Pancharatnam phase via complex inner products ────────────────
-    # Treat the embedding as pairs: (re, im).  The complex overlap
-    # <v_i | v_j> gives a phase factor at each step.  Accumulate
-    # around the closed path (matching the original proven metric).
+    # Pancharatnam phase via complex inner products (the proven metric)
     phase_re, phase_im = 1.0, 0.0
     for i in range(len(vecs)):
         j = (i + 1) % len(vecs)
@@ -361,58 +410,45 @@ def compute_curvature(text, embed_fn):
     angle = math.atan2(phase_im, phase_re)
     curv = abs(angle) / max(len(chunks) - 1, 1)
 
-    # ── Embed the phase as a Cl(3,0) rotor ──────────────────────────
-    # The accumulated phase lives in a plane.  We encode it as a
-    # rotor R = cos(θ/2) + sin(θ/2) e12, placing the rotation in
-    # the e1-e2 plane.  This makes the phase a first-class geometric
-    # object: downstream code can inspect the rotation plane, compose
-    # rotors across breaths, and eventually promote to richer algebras.
-    half = angle / 2.0
-    rotor = Multivector(np.array([
-        math.cos(half),   # scalar
-        0.0, 0.0, 0.0,   # vector (zero for a pure rotor)
-        math.sin(half),   # e12 — the rotation plane
-        0.0, 0.0,         # e13, e23
-        0.0,              # e123
-    ], dtype=np.float64))
-
-    # ── Open-path rotor chain for richer geometry ───────────────────
-    # Additionally compute the open-path rotor chain from the 3D
-    # projections.  This captures the spatial structure of the
-    # trajectory, complementing the scalar phase above.
+    # Open-path rotor chain through Cl(3,0) — the spatial structure
     mvs = [Multivector.from_embedding(v) for v in vecs]
     open_rotor = Multivector.scalar(1.0)
-    for i in range(len(mvs) - 1):  # open path: no wrap-around
+    for i in range(len(mvs) - 1):
         product = mvs[i] * mvs[i + 1]
         even = product.even()
         n = even.norm()
         if n > 1e-12:
             open_rotor = open_rotor * Multivector(even.coeffs / n)
 
-    # Combine: the primary angle comes from the proven Pancharatnam
-    # computation; the rotor carries the full 3D rotation information
-    # from the open path.
-    # We set the scalar part of the output rotor from the proven angle
-    # but keep the bivector orientation from the open-path chain.
+    # Combine: Pancharatnam angle + open-path bivector plane
+    half = angle / 2.0
     bv_norm = open_rotor.bivector_norm
     if bv_norm > 1e-12:
-        # Normalize the open-path bivector, then scale to encode
-        # the Pancharatnam angle in this plane.
         bv = open_rotor.grade(2).coeffs / bv_norm
         combined = np.zeros(8, dtype=np.float64)
         combined[0] = math.cos(half)
         combined[4:7] = bv[4:7] * math.sin(half)
         rotor = Multivector(combined)
+    else:
+        rotor = Multivector(np.array([
+            math.cos(half), 0.0, 0.0, 0.0,
+            math.sin(half), 0.0, 0.0, 0.0,
+        ], dtype=np.float64))
 
     return angle, curv, rotor
 
 
-def compute_loss_trajectory_curvature(trajectory):
-    """How the surprise itself curves over a breath.
+# Backward-compat alias
+compute_curvature = compute_encounter
 
-    Variance of consecutive differences in the loss trajectory.
-    Higher variance = more dynamic loss landscape.
-    """
+
+# ── Fitness: projections of the encounter onto scalars ───────────────────
+#
+# The encounter rotor is the truth. These functions collapse it to
+# numbers for evolutionary selection. Each is a lossy projection.
+
+def compute_loss_trajectory_curvature(trajectory):
+    """Variance of consecutive diffs in the loss trajectory."""
     if len(trajectory) < 2:
         return 0.0
     diffs = [trajectory[i + 1] - trajectory[i]
@@ -423,92 +459,53 @@ def compute_loss_trajectory_curvature(trajectory):
     return sum((d - m) ** 2 for d in diffs) / len(diffs)
 
 
-# ── Coupling divergence ─────────────────────────────────────────────────
-
-def compute_coupling_divergence(external_texts, self_texts,
-                                embed_fn=None, alpha=0.85):
-    """Does the complex memory M diverge more on external vs self-generated text?
-
-    Now uses the Clifford rotor magnitude instead of ad-hoc complex tracking.
-    """
-    if embed_fn is None:
-        embed_fn = default_embed_fn
-
-    def run_memory(texts):
-        mem = Multivector.scalar(0.0)
-        for text in texts:
-            angle, curv, rotor = compute_curvature(text, embed_fn)
-            x = max(curv, 0.01)
-            # Scale the rotor by curvature magnitude and decay
-            contribution = rotor * x
-            mem = mem * alpha + contribution
-        return mem.norm()
-
-    mag_ext = run_memory(external_texts) if external_texts else 0.0
-    mag_self = run_memory(self_texts) if self_texts else 0.0
-    return mag_ext - mag_self
-
-
-# ── Loss improvement ─────────────────────────────────────────────────────
-
-def compute_loss_improvement(loss_history):
-    """Is prediction loss decreasing across breaths?
-
-    Returns -slope so that positive = good (loss going down).
-    """
-    if len(loss_history) < 2:
-        return 0.0
-    final_losses = [
-        entry['losses'][-1]
-        for entry in loss_history
-        if entry.get('losses')
-    ]
-    if len(final_losses) < 2:
-        return 0.0
-    n = len(final_losses)
-    x_mean = (n - 1) / 2.0
-    y_mean = sum(final_losses) / n
-    num = sum((i - x_mean) * (final_losses[i] - y_mean) for i in range(n))
-    den = sum((i - x_mean) ** 2 for i in range(n))
-    if den < 1e-12:
-        return 0.0
-    return -(num / den)
-
-
-# ── Composite fitness ────────────────────────────────────────────────────
-
-W_CURVATURE = 0.5
-W_DIVERGENCE = 0.3
-W_LOSS_IMPROVEMENT = 0.2
-
-
 def compute_fitness(external_texts, self_texts, loss_history,
                     embed_fn=None, alpha=0.85):
-    """Composite fitness score."""
+    """Composite fitness — three projections of encounter quality."""
     if embed_fn is None:
         embed_fn = default_embed_fn
 
+    # Curvature: mean encounter magnitude
     all_texts = (external_texts or []) + (self_texts or [])
     curvatures = []
     for text in all_texts:
         if len(text.split()) >= 5:
-            _, curv, _ = compute_curvature(text, embed_fn)
+            _, curv, _ = compute_encounter(text, embed_fn)
             curvatures.append(curv)
-
     mean_curv = sum(curvatures) / len(curvatures) if curvatures else 0.0
     norm_curv = min(mean_curv / 0.3, 1.0)
 
-    divergence = compute_coupling_divergence(
-        external_texts, self_texts, embed_fn, alpha)
+    # Coupling: does the encounter rotor diverge more on external text?
+    def _run_memory(texts):
+        mem = Multivector.scalar(0.0)
+        for text in texts:
+            _, curv, rotor = compute_encounter(text, embed_fn)
+            mem = mem * alpha + rotor * max(curv, 0.01)
+        return mem.norm()
+
+    mag_ext = _run_memory(external_texts) if external_texts else 0.0
+    mag_self = _run_memory(self_texts) if self_texts else 0.0
+    divergence = mag_ext - mag_self
     norm_div = 1.0 / (1.0 + math.exp(-divergence * 5))
 
-    loss_imp = compute_loss_improvement(loss_history)
+    # Loss improvement
+    loss_imp = 0.0
+    if loss_history and len(loss_history) >= 2:
+        final_losses = [e['losses'][-1] for e in loss_history
+                        if e.get('losses')]
+        if len(final_losses) >= 2:
+            n = len(final_losses)
+            x_mean = (n - 1) / 2.0
+            y_mean = sum(final_losses) / n
+            num = sum((i - x_mean) * (final_losses[i] - y_mean)
+                      for i in range(n))
+            den = sum((i - x_mean) ** 2 for i in range(n))
+            if den > 1e-12:
+                loss_imp = -(num / den)
     norm_loss = max(min(loss_imp, 1.0), -1.0)
     norm_loss = (norm_loss + 1.0) / 2.0
 
-    fitness = (W_CURVATURE * norm_curv
-               + W_DIVERGENCE * norm_div
-               + W_LOSS_IMPROVEMENT * norm_loss)
+    fitness = 0.5 * norm_curv + 0.3 * norm_div + 0.2 * norm_loss
 
     return {
         'fitness': round(fitness, 6),
@@ -516,41 +513,35 @@ def compute_fitness(external_texts, self_texts, loss_history,
         'divergence': round(divergence, 6),
         'loss_improvement': round(loss_imp, 6),
         'breakdown': {
-            'curvature_weighted': round(W_CURVATURE * norm_curv, 6),
-            'divergence_weighted': round(W_DIVERGENCE * norm_div, 6),
-            'loss_improvement_weighted': round(W_LOSS_IMPROVEMENT * norm_loss, 6),
+            'curvature_weighted': round(0.5 * norm_curv, 6),
+            'divergence_weighted': round(0.3 * norm_div, 6),
+            'loss_improvement_weighted': round(0.2 * norm_loss, 6),
         },
     }
 
 
-# ── Prediction fitness (FM-coupled) ─────────────────────────────────────
-
 def compute_prediction_fitness(fm_loss, self_loss, curvature, learning_rate):
-    """Fitness based on live prediction of FM-generated text."""
+    """Fitness from live FM prediction."""
     norm_curv = min(abs(curvature) / 0.3, 1.0)
     gap = fm_loss - self_loss if (fm_loss is not None and
                                   self_loss is not None) else 0.0
     norm_gap = 1.0 / (1.0 + math.exp(-gap * 2))
-    norm_loss = max(0.0, min(1.0, 1.0 - (fm_loss - 2.0) / 6.0)) if fm_loss else 0.5
+    norm_loss = max(0.0, min(1.0, 1.0 - (fm_loss - 2.0) / 6.0)
+                    ) if fm_loss else 0.5
     norm_lr = min(max(learning_rate, 0.0), 1.0)
-    fitness = (0.5 * norm_curv + 0.2 * norm_gap
-               + 0.15 * norm_loss + 0.15 * norm_lr)
-    return round(fitness, 6)
+    return round(0.5 * norm_curv + 0.2 * norm_gap
+                 + 0.15 * norm_loss + 0.15 * norm_lr, 6)
 
-
-# ── imp@k metric ────────────────────────────────────────────────────────
 
 def improvement_at_k(initial_fitness, archive, k=50):
-    """imp@k: performance gain of best agent within k generations."""
-    variants_within_k = [v for v in archive if v.get('generation', 0) < k]
-    if not variants_within_k:
+    """imp@k: best gain within k generations."""
+    within_k = [v for v in archive if v.get('generation', 0) < k]
+    if not within_k:
         return 0.0
-    best = max(v.get('fitness', 0.0) for v in variants_within_k)
-    return best - initial_fitness
+    return max(v.get('fitness', 0.0) for v in within_k) - initial_fitness
 
 
 # ── Robust statistics ───────────────────────────────────────────────────
-# Vogel's work on heavy-tailed data: means lie, quantiles don't.
 
 def _quantiles(values):
     if not values:
@@ -563,7 +554,6 @@ def _quantiles(values):
 
 
 def _pairwise_win_rate(a_vals, b_vals):
-    """Fraction of paired comparisons where a > b."""
     if not a_vals or not b_vals:
         return 0.5
     n = min(len(a_vals), len(b_vals))
@@ -611,7 +601,7 @@ class BreathRecord:
 class Field:
     """Within-breath sensing: generation, prediction, geometry, frames.
 
-    The breath happens here.  Surprise is measured, frames compete,
+    The breath happens here. Surprise is measured, frames compete,
     and geometry is computed — all in one place.
     """
 
@@ -619,33 +609,6 @@ class Field:
                  embed_fn: Callable | None = None):
         self.task_agent = task_agent
         self.embed_fn = embed_fn or default_embed_fn
-
-    def _complete_messages(self, messages, max_tokens=128, temperature=0.7):
-        """Call Nemotron with a full messages list."""
-        payload = json.dumps({
-            "model": local_model.MODEL_NAME,
-            "messages": messages,
-            "max_tokens": max_tokens,
-            "temperature": temperature,
-            "stream": False,
-        }).encode()
-
-        req = urllib.request.Request(
-            f"{local_model.LLAMA_URL}/v1/chat/completions",
-            data=payload,
-            headers={"Content-Type": "application/json"},
-        )
-
-        try:
-            with urllib.request.urlopen(req, timeout=300) as resp:
-                body = json.loads(resp.read())
-            text = body["choices"][0]["message"]["content"]
-            for tok in ("<|im_end|>", "<|im_start|>", "<|endoftext|>"):
-                text = text.replace(tok, "")
-            return text.strip()
-        except (urllib.error.URLError, OSError, KeyError, IndexError,
-                json.JSONDecodeError, ValueError):
-            return None
 
     # ── Frame readers ────────────────────────────────────────────────────
 
@@ -664,7 +627,7 @@ class Field:
 
     def geometric_frame(self, chunk_text):
         if len(chunk_text.split()) >= 5:
-            angle, curv, rotor = compute_curvature(chunk_text, self.embed_fn)
+            angle, curv, rotor = compute_encounter(chunk_text, self.embed_fn)
         else:
             angle, curv, rotor = 0.0, 0.0, Multivector.scalar(1.0)
         return FrameReading(
@@ -698,11 +661,14 @@ class Field:
         rel = by_name.get("relational")
         return {
             "predictive_vs_geometric": round(
-                (pred.score if pred else 0.0) - (geom.score if geom else 0.0), 4),
+                (pred.score if pred else 0.0)
+                - (geom.score if geom else 0.0), 4),
             "predictive_vs_relational": round(
-                (pred.score if pred else 0.0) - (rel.score if rel else 0.0), 4),
+                (pred.score if pred else 0.0)
+                - (rel.score if rel else 0.0), 4),
             "geometric_vs_relational": round(
-                (geom.score if geom else 0.0) - (rel.score if rel else 0.0), 4),
+                (geom.score if geom else 0.0)
+                - (rel.score if rel else 0.0), 4),
         }
 
     # ── Annotation ───────────────────────────────────────────────────────
@@ -722,11 +688,11 @@ class Field:
 
     def breathe(self, prompt, chunk_size=50, max_chunks=8,
                 system_prompt=None, temperature=0.7, on_chunk=None):
-        """Run one breath with multi-frame proprioception.
+        """One breath with multi-frame proprioception.
 
-        Returns a BreathRecord, or None if Nemotron is unavailable.
+        Returns a BreathRecord, or None if FM is unavailable.
         """
-        if not local_model.is_available():
+        if not fm_available():
             return None
 
         max_tokens_per_chunk = max(chunk_size // 3, 10)
@@ -742,8 +708,9 @@ class Field:
         prev_mean = None
 
         for chunk_num in range(1, max_chunks + 1):
-            chunk_text = self._complete_messages(
-                messages, max_tokens=max_tokens_per_chunk,
+            chunk_text = fm_complete(
+                None, messages=messages,
+                max_tokens=max_tokens_per_chunk,
                 temperature=temperature)
 
             if not chunk_text or len(chunk_text.strip()) < 3:
@@ -758,7 +725,8 @@ class Field:
             annotation = self.format_annotation(
                 chunk_num, max_chunks, mean_loss, readings, disagreement)
 
-            rotor_dict = geometric.payload.get("rotor", Multivector.scalar(1.0).as_dict())
+            rotor_dict = geometric.payload.get(
+                "rotor", Multivector.scalar(1.0).as_dict())
 
             chunks.append(ChunkTrace(
                 chunk_num=chunk_num,
@@ -787,7 +755,8 @@ class Field:
             return None
 
         self.task_agent.learn(full_text)
-        angle, curv, holonomy_rotor = compute_curvature(full_text, self.embed_fn)
+        angle, curv, holonomy_rotor = compute_encounter(
+            full_text, self.embed_fn)
         ltc = compute_loss_trajectory_curvature(trajectory)
 
         robust = {
@@ -812,12 +781,8 @@ class Field:
 
     def compare_conditions(self, prompt, n=5, chunk_size=50, max_chunks=8,
                            system_prompt=None, temperature=0.7):
-        """A/B test: multi-frame breath vs plain generation.
-
-        Uses robust statistics (quantiles, pairwise wins) instead of
-        means — because Vogel is right about heavy tails.
-        """
-        if not local_model.is_available():
+        """Proprioceptive vs plain — the honest test."""
+        if not fm_available():
             return None
 
         kwargs = dict(chunk_size=chunk_size, max_chunks=max_chunks,
@@ -831,10 +796,13 @@ class Field:
             if result:
                 with_results.append({
                     'curvature': result.curvature,
-                    'mean_surprise': result.robust_summary["trajectory"]["median"],
-                    'loss_trajectory_curvature': result.loss_trajectory_curvature,
+                    'mean_surprise': result.robust_summary[
+                        "trajectory"]["median"],
+                    'loss_trajectory_curvature':
+                        result.loss_trajectory_curvature,
                     'bivector_norm': Multivector(
-                        np.array(list(result.holonomy.values()))).bivector_norm,
+                        np.array(list(
+                            result.holonomy.values()))).bivector_norm,
                 })
 
         for _ in range(n):
@@ -861,20 +829,23 @@ class Field:
                 "with_median": round(w_med, 6),
                 "without_median": round(wo_med, 6),
                 "delta_median": round(w_med - wo_med, 6),
-                "pairwise_win_rate": round(_pairwise_win_rate(w_vals, wo_vals), 4),
+                "pairwise_win_rate": round(
+                    _pairwise_win_rate(w_vals, wo_vals), 4),
             }
 
         return {
             "prompt": prompt, "n": n,
-            "with_proprioception": {"runs": with_results, "summary": with_summary},
-            "without_proprioception": {"runs": without_results, "summary": without_summary},
+            "with_proprioception": {
+                "runs": with_results, "summary": with_summary},
+            "without_proprioception": {
+                "runs": without_results, "summary": without_summary},
             "comparison": comparison,
         }
 
     def _run_plain_breath(self, prompt, chunk_size=50, max_chunks=8,
                           system_prompt=None, temperature=0.7):
-        """Plain breath without proprioception — control condition."""
-        if not local_model.is_available():
+        """Plain breath — control condition."""
+        if not fm_available():
             return None
 
         max_tokens_per_chunk = max(chunk_size // 3, 10)
@@ -887,8 +858,9 @@ class Field:
         full_text_parts = []
 
         for chunk_num in range(1, max_chunks + 1):
-            chunk_text = self._complete_messages(
-                messages, max_tokens=max_tokens_per_chunk,
+            chunk_text = fm_complete(
+                None, messages=messages,
+                max_tokens=max_tokens_per_chunk,
                 temperature=temperature)
             if not chunk_text or len(chunk_text.strip()) < 3:
                 break
@@ -903,12 +875,36 @@ class Field:
             return None
 
         self.task_agent.learn(full_text)
-        _, curv, _ = compute_curvature(full_text, self.embed_fn)
+        _, curv, _ = compute_encounter(full_text, self.embed_fn)
         ltc = compute_loss_trajectory_curvature(trajectory)
 
         return {
             'curvature': round(curv, 6),
             'mean_surprise': _quantiles(trajectory)["median"],
             'loss_trajectory_curvature': round(ltc, 6),
-            'bivector_norm': 0.0,  # no multi-frame data for control
+            'bivector_norm': 0.0,
         }
+
+
+# ── Backward compatibility ───────────────────────────────────────────────
+# These names existed in the old API. They're aliases now.
+
+compute_coupling_divergence = lambda *a, **kw: compute_fitness(
+    *a, **kw).get('divergence', 0.0)
+
+def compute_loss_improvement(loss_history):
+    """Is prediction loss decreasing across breaths?"""
+    if not loss_history or len(loss_history) < 2:
+        return 0.0
+    final_losses = [e['losses'][-1] for e in loss_history
+                    if e.get('losses')]
+    if len(final_losses) < 2:
+        return 0.0
+    n = len(final_losses)
+    x_mean = (n - 1) / 2.0
+    y_mean = sum(final_losses) / n
+    num = sum((i - x_mean) * (final_losses[i] - y_mean) for i in range(n))
+    den = sum((i - x_mean) ** 2 for i in range(n))
+    if den < 1e-12:
+        return 0.0
+    return -(num / den)

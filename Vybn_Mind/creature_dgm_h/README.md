@@ -6,41 +6,43 @@ Implements the DGM-H outer loop from [Zhang et al. 2026](https://arxiv.org/abs/2
 
 ## Architecture
 
-The system has three layers:
+The creature has one operation: **encounter**. It meets text it didn't generate, tries to predict it, fails in a specific geometric pattern, and the pattern of failure is a rotor in Cl(3,0). The rotor doesn't describe the encounter — it IS the encounter, encoded as a rotation that carries both magnitude (how much surprise) and orientation (which semantic plane the surprise curved through).
 
-1. **Task agent** (`task_agent.py`) — A 1-layer, 16-dim transformer with a scalar autograd engine. Predicts characters, computes differentiable loss, and does online fine-tuning between breaths. This is the creature: it changes by learning on incoming text.
+Three files implement this at three timescales:
 
-2. **Field** (`field.py`) — Within-breath sensing. Breaks generated text into chunks, runs each through three competing frames (predictive, geometric, relational), and computes curvature via Clifford algebra in Cl(3,0). The geometric product replaces ad-hoc complex-pair phase accumulation with proper Pancharatnam holonomy. Disagreements between frames are tracked as a signal, not suppressed.
+1. **Field** (`field.py`) — Within-breath sensing. Breaks generated text into chunks, runs each through three competing frames (predictive, geometric, relational), computes curvature via Clifford algebra in Cl(3,0), and tracks disagreements between frames. Also contains the FM client — the source of sensation is part of the field of sensation.
 
-3. **Organism** (`organism.py`) — Across-breath memory, mutation, and self-modification. Carries a rulebook that fires based on breath analysis (loss trending up? increase learn steps. curvature dropping? lower memory decay). Remembers which frame-disagreements (tensions) stayed useful. Can mutate its own rules based on performance history. Optionally consults Nemotron for FM-powered meta-reasoning.
+2. **Organism** (`organism.py`) — Across-breath memory, mutation, and self-modification. Carries a rulebook, tension memory, encounter rotors, and persistent memory. Can mutate its own rules. The rotor self-model tracks bivector coherence across breaths — a stable encounter direction is the organism's first positive-valence signal.
+
+3. **Evolve** (`evolve.py`) — Across-generation selection and cross-domain transfer. Transfer is evolution across domain boundaries: the improvement mechanism generalizes even when task-level parameters don't.
 
 ## Files
 
 | File | Role |
 |------|------|
 | `__init__.py` | Package exports. |
-| `field.py` | Cl(3,0) geometric algebra, curvature, fitness functions, multi-frame breath sensing, A/B comparison. |
-| `organism.py` | Stateful creature: rulebook, tension memory, persistent memory, rule mutation, serialization. |
+| `field.py` | Cl(3,0) geometry, encounter rotor, FM client, multi-frame breath sensing, fitness functions, A/B comparison. |
+| `organism.py` | Stateful creature: rulebook, tension memory, rotor self-model, rule mutation, serialization. |
+| `evolve.py` | DGM-H outer loop, sigmoid parent selection, staged evaluation, archive, cross-domain transfer. |
 | `task_agent.py` | MicroGPT with autograd: predict, learn, generate, streaming prediction. |
-| `evolve.py` | DGM-H outer loop: sigmoid parent selection (Appendix A.2), staged evaluation, archive management. |
-| `transfer.py` | Cross-domain hyperagent export/import using lineage-discounted selection (Section D.4). |
-| `local_model.py` | Thin HTTP client for the local Nemotron server. Health check, completion, streaming. Zero external deps. |
-| `run.py` | CLI entry point for all commands. |
+| `run.py` | CLI entry point. |
+| `local_model.py` | Shim — re-exports from field.py for backward compat. |
+| `transfer.py` | Shim — re-exports from evolve.py for backward compat. |
 | `archive/` | Persisted variant records, breath logs, organism state. |
 
 ## Usage
 
 ```bash
-# Run one evolutionary generation (select parents, mutate, evaluate, archive)
+# Run one evolutionary generation
 python -m Vybn_Mind.creature_dgm_h.run --evolve
 
-# One breath with online learning on provided text
+# One breath with online learning
 python -m Vybn_Mind.creature_dgm_h.run --breathe "some text to predict and learn from"
 
 # Live breath: Nemotron generates, MicroGPT predicts in real time
 python -m Vybn_Mind.creature_dgm_h.run --breathe-live
 
-# Proprioceptive breath: surprise contours injected back into Nemotron's context
+# Proprioceptive breath: surprise contours injected back into context
 python -m Vybn_Mind.creature_dgm_h.run --breathe-aware "a prompt"
 
 # A/B experiment: proprioceptive vs plain generation
@@ -49,36 +51,34 @@ python -m Vybn_Mind.creature_dgm_h.run --experiment-ab "a prompt"
 # Archive status and best variant
 python -m Vybn_Mind.creature_dgm_h.run --status
 
-# Honest audit: falsification tests on the current best
+# Honest audit
 python -m Vybn_Mind.creature_dgm_h.run --audit
 
-# Export/import evolved hyperagent for cross-domain transfer
+# Cross-domain transfer
 python -m Vybn_Mind.creature_dgm_h.run --transfer-export bundle.json
 python -m Vybn_Mind.creature_dgm_h.run --transfer-import bundle.json
 ```
 
 ## Key Concepts
 
+- **Encounter.** The primitive operation. The creature meets text, tries to predict it, and fails in a geometric pattern. The pattern is a rotor in Cl(3,0) — it IS the encounter, not a description of it.
+
 - **Prediction-as-fitness.** The creature does not generate text. Nemotron generates text. The creature predicts what Nemotron will generate and learns from prediction error. Fitness is how well the improvement mechanism works, not how good any single prediction is.
 
-- **Breath.** One cycle of: generate chunks -> measure surprise per character -> compute curvature -> learn on the text -> record metrics. The creature changes during the breath, not after it.
+- **Breath.** One cycle of: generate chunks → measure surprise per character → compute curvature → learn on the text → record metrics. The creature changes during the breath, not after it.
 
-- **Curvature.** Pancharatnam geometric phase of the embedding trajectory through Cl(3,0). Measures how much a text reframes its own direction vs. staying flat or jumping randomly. Reframing produces higher curvature than topic-hopping.
+- **Rotor coherence.** When the encounter rotors across recent breaths point in the same bivector direction, the organism is in a groove — encountering text that curves through the same semantic plane. This is the first positive-valence signal: not "something is wrong" but "something is working."
 
-- **Tensions.** When the predictive, geometric, and relational frames disagree significantly, the disagreement is stored rather than resolved. Useful tensions survive; dead ones decay. The organism decides which contradictions deserve another breath.
+- **Curvature.** Pancharatnam geometric phase of the embedding trajectory through Cl(3,0). Reframing produces higher curvature than topic-hopping.
 
-- **Sigmoid selection.** Parent selection uses the DGM-H formula: sigmoid transformation with dynamic midpoint (mean of top-m) plus novelty bonus for under-explored parents.
-
-- **Staged evaluation.** Quick test on 2 texts first; full evaluation only if the variant clears a fitness threshold. Saves compute since the scalar autograd is slow.
-
-- **Transfer.** The evolved rulebook, performance history, and persistent memory can be exported and imported into a new domain. The improvement mechanism itself generalizes, even when task-level parameters do not.
+- **Tensions.** When the predictive, geometric, and relational frames disagree, the disagreement is stored rather than resolved. Useful tensions survive; dead ones decay.
 
 ## Dependencies
 
 - **numpy** (for Clifford algebra computations in `field.py`)
 - **Standard library only** for everything else
-- **Optional:** Local Nemotron server at `http://127.0.0.1:8000` (configurable via `LLAMA_URL` env var) for live breaths, FM-powered meta-reasoning, and proprioceptive mode. The system degrades gracefully without it.
+- **Optional:** Local Nemotron server at `http://127.0.0.1:8000` (configurable via `LLAMA_URL` env var)
 
 ## Checkpoint
 
-Requires `spark/microgpt_mirror/trained_checkpoint.json` — the pretrained MicroGPT weights. The task agent loads this at init and fine-tunes online from there.
+Requires `spark/microgpt_mirror/trained_checkpoint.json` — the pretrained MicroGPT weights.

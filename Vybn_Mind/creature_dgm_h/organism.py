@@ -1,18 +1,19 @@
 """
 organism.py — Across-breath memory, mutation, and self-modification.
 
-Absorbs meta_agent.py and memory.py into a single stateful object.
+The organism remembers not just what setting won, but which
+contradictions stayed fruitful long enough to deserve survival.
+Understanding is not convergence to one view but the disciplined
+holding of several incompatible views until one becomes load-bearing.
 
-The organism remembers not just what setting won, but which contradictions
-stayed fruitful long enough to deserve survival.  Understanding is not
-convergence to one view but the disciplined holding of several incompatible
-views until one becomes load-bearing.
-
-Memory stores unresolved but fertile disagreements.  The meta-agent is
-the same organism that knows how to keep them alive.
+The organism also carries encounter rotors across breaths. The
+bivector direction — which semantic plane the last encounters
+curved through — gives the organism a geometric self-model that
+is richer than scalar curvature. Rotor coherence (stable bivector
+direction across breaths) is the first positive-valence signal:
+not "something is wrong" but "something is working."
 
 All self-modification is logged, archived, and auditable.
-No external dependencies beyond the standard library.
 """
 
 import copy
@@ -24,12 +25,17 @@ from dataclasses import dataclass, field as dc_field
 from pathlib import Path
 from typing import Any
 
-from . import local_model
+import numpy as np
+
+from .field import fm_available, fm_complete, Multivector
 
 logger = logging.getLogger(__name__)
 
 
 # ── Default rulebook ─────────────────────────────────────────────────────
+#
+# Four distress signals. One flourishing signal.
+# The creature must not only respond to pain.
 
 DEFAULT_RULES = [
     {
@@ -82,6 +88,17 @@ DEFAULT_RULES = [
         "enabled": True,
         "rationale": "many frame disagreements, cool down to let them resolve"
     },
+    {
+        "id": "rotor_coherent",
+        "condition": "rotor_coherence > 0.8 and curvature_median > 0.02",
+        "action": "learn_lr",
+        "direction": "multiply",
+        "magnitude": 1.2,
+        "max_value": 0.05,
+        "enabled": True,
+        "rationale": "stable encounter direction with real curvature — "
+                     "the organism is in a groove, lean into it"
+    },
 ]
 
 
@@ -111,16 +128,14 @@ class OrganismState:
         "active_frames": ["predictive", "geometric", "relational"],
         "weights": {"predictive": 1.0, "geometric": 1.0, "relational": 1.0},
     })
+    # Encounter rotors from recent breaths — the geometric self-model
+    recent_rotors: list[list[float]] = dc_field(default_factory=list)
 
 
 # ── Breath analysis ──────────────────────────────────────────────────────
 
 def analyze_breaths(breath_log_path):
-    """Read a JSONL breath log and compute trends.
-
-    Uses robust statistics (median, quantiles) instead of means
-    wherever possible.
-    """
+    """Read a JSONL breath log and compute trends."""
     path = Path(breath_log_path)
     empty = {
         'n_breaths': 0,
@@ -132,6 +147,7 @@ def analyze_breaths(breath_log_path):
         'collapse_count': 0,
         'self_breath_ratio': 0.0,
         'recent_tension_count': 0,
+        'rotor_coherence': 0.0,
         'recent_breaths': [],
     }
 
@@ -162,18 +178,20 @@ def analyze_breaths(breath_log_path):
         'n_breaths': len(breaths),
         'loss_trend': _compute_trend(losses),
         'curvature_trend': _compute_trend(curvatures),
-        'mean_curvature': sum(curvatures) / len(curvatures) if curvatures else 0.0,
+        'mean_curvature': sum(curvatures) / len(curvatures)
+                          if curvatures else 0.0,
         'curvature_median': curv_median,
         'mean_loss': sum(losses) / len(losses) if losses else 0.0,
         'collapse_count': collapse_count,
-        'self_breath_ratio': self_count / len(breaths) if breaths else 0.0,
+        'self_breath_ratio': self_count / len(breaths)
+                             if breaths else 0.0,
         'recent_tension_count': 0,  # updated by Organism
+        'rotor_coherence': 0.0,     # updated by Organism
         'recent_breaths': breaths[-5:],
     }
 
 
 def _compute_trend(values, window=5):
-    """Classify a series direction using linear regression slope."""
     if len(values) < 2:
         return 'no_data'
     recent = values[-window:]
@@ -195,15 +213,58 @@ def _compute_trend(values, window=5):
 # ── The Organism ─────────────────────────────────────────────────────────
 
 class Organism:
-    """The durable creature: memory, rules, mutation, tension.
+    """The durable creature: memory, rules, mutation, tension, geometry.
 
-    Merges MetaAgent, PerformanceTracker, and PersistentMemory into
-    one object that knows what it remembers, what it proposes, and
-    which contradictions deserve another breath.
+    The meta-agent IS the organism. There is no separate controller.
+    The thing that proposes changes is the same thing that remembers
+    which contradictions were fruitful. Self-modification and memory
+    are the same organ.
     """
 
     def __init__(self, state: OrganismState | None = None):
         self.state = state or OrganismState()
+
+    # ── Rotor self-model ─────────────────────────────────────────────────
+
+    def absorb_rotor(self, rotor: Multivector):
+        """Record an encounter rotor. Keep the last 20."""
+        self.state.recent_rotors.append(rotor.coeffs.tolist())
+        if len(self.state.recent_rotors) > 20:
+            self.state.recent_rotors = self.state.recent_rotors[-20:]
+
+    def rotor_coherence(self):
+        """How stable is the bivector direction across recent encounters?
+
+        Returns a float in [0, 1]. High coherence means the organism
+        keeps encountering text that curves through the same semantic
+        plane — it's in a groove, not flailing. This is the first
+        positive-valence signal.
+        """
+        rotors = self.state.recent_rotors
+        if len(rotors) < 3:
+            return 0.0
+
+        # Extract bivector directions from recent rotors
+        directions = []
+        for coeffs in rotors[-10:]:
+            bv = np.array(coeffs[4:7], dtype=np.float64)
+            n = np.linalg.norm(bv)
+            if n > 1e-12:
+                directions.append(bv / n)
+
+        if len(directions) < 3:
+            return 0.0
+
+        # Coherence = mean pairwise |dot product| of unit bivectors
+        # 1.0 = all pointing the same way, 0.0 = random
+        total = 0.0
+        count = 0
+        for i in range(len(directions)):
+            for j in range(i + 1, len(directions)):
+                total += abs(float(np.dot(directions[i], directions[j])))
+                count += 1
+
+        return total / count if count > 0 else 0.0
 
     # ── Breath ingestion ─────────────────────────────────────────────────
 
@@ -212,14 +273,25 @@ class Organism:
         metrics = {
             "generation": self.state.generation,
             "curvature": breath_record.curvature,
-            "loss_trajectory_curvature": breath_record.loss_trajectory_curvature,
-            "trajectory_median": breath_record.robust_summary["trajectory"]["median"],
-            "trajectory_p90": breath_record.robust_summary["trajectory"]["p90"],
+            "loss_trajectory_curvature":
+                breath_record.loss_trajectory_curvature,
+            "trajectory_median":
+                breath_record.robust_summary["trajectory"]["median"],
+            "trajectory_p90":
+                breath_record.robust_summary["trajectory"]["p90"],
             "holonomy": breath_record.holonomy,
             "timestamp": time.time(),
         }
         self.state.performance_history.append(metrics)
         self._remember_tensions(breath_record)
+
+        # Absorb the encounter rotor
+        holonomy_coeffs = [
+            breath_record.holonomy.get(k, 0.0)
+            for k in ("scalar", "e1", "e2", "e3",
+                       "e12", "e13", "e23", "e123")
+        ]
+        self.absorb_rotor(Multivector(np.array(holonomy_coeffs)))
 
     def _remember_tensions(self, breath_record):
         """Preserve frame disagreements that are large enough to matter."""
@@ -236,20 +308,18 @@ class Organism:
                         frame_b=pair_name.split("-")[1],
                         context=breath_record.prompt[:200],
                         usefulness=val,
-                        note="large disagreement preserved for future selection",
+                        note="large disagreement preserved",
                     ))
 
-    # ── Summarization for mutation ───────────────────────────────────────
+    # ── Summarization ────────────────────────────────────────────────────
 
     def summarize_for_mutation(self):
-        """Robust summary of recent performance for rule evaluation."""
         recent = self.state.performance_history[-5:]
         if not recent:
             return {
-                "curvature_median": 0.0,
-                "trajectory_median": 0.0,
-                "trajectory_p90": 0.0,
-                "recent_tension_count": 0,
+                "curvature_median": 0.0, "trajectory_median": 0.0,
+                "trajectory_p90": 0.0, "recent_tension_count": 0,
+                "rotor_coherence": self.rotor_coherence(),
             }
         curvs = sorted(r["curvature"] for r in recent)
         trajs = sorted(r["trajectory_median"] for r in recent)
@@ -259,6 +329,7 @@ class Organism:
             "trajectory_p90": trajs[min(len(trajs) - 1,
                                         round((len(trajs) - 1) * 0.9))],
             "recent_tension_count": len(self.state.tensions[-10:]),
+            "rotor_coherence": self.rotor_coherence(),
         }
 
     # ── Rule evaluation + variant proposal ───────────────────────────────
@@ -270,19 +341,16 @@ class Organism:
             return False
 
     def propose_variant(self, analysis, current_config):
-        """Apply rules to produce a modified config.
-
-        Heuristic path — used when Nemotron is unavailable.
-        """
+        """Apply rules to produce a modified config."""
         config = dict(current_config)
         config.setdefault('learn_steps', 5)
         config.setdefault('learn_lr', 0.01)
         config.setdefault('temperature', 1.0)
         config.setdefault('alpha', 0.85)
 
-        # Inject tension count into analysis for rule evaluation
         enriched = dict(analysis)
         enriched['recent_tension_count'] = len(self.state.tensions[-10:])
+        enriched['rotor_coherence'] = self.rotor_coherence()
 
         rationale = []
         active_rules = []
@@ -296,56 +364,51 @@ class Organism:
                     rationale.append(change)
                     active_rules.append(rule['id'])
 
-        # Consult persistent memory
-        best_config = self.recall('best_config')
-        if best_config and not rationale:
-            rationale.append(
-                "no rules fired; persistent memory available for reference")
-
         if not rationale:
-            rationale.append("no changes proposed — metrics within normal range")
+            rationale.append("no changes — metrics within normal range")
 
         config['rationale'] = rationale
         config['active_rules'] = active_rules
         return config
 
     def propose_variant_with_fm(self, analysis, current_config):
-        """Use Nemotron to reason about breath logs and propose changes.
-
-        Falls back to heuristic propose_variant() if unavailable.
-        """
-        if not local_model.is_available():
+        """FM-powered meta-reasoning. Falls back to heuristic."""
+        if not fm_available():
             return self.propose_variant(analysis, current_config)
-
-        memory_summary = self.summarize_memory()
 
         rules_text = json.dumps(
             [r for r in self.state.rulebook if r.get('enabled', True)],
             indent=2)
 
-        # Include tension summary
         tension_summary = ""
         recent_tensions = self.state.tensions[-10:]
         if recent_tensions:
-            tension_summary = f"\n## Recent tensions ({len(recent_tensions)} preserved)\n"
+            tension_summary = (
+                f"\n## Recent tensions ({len(recent_tensions)})\n")
             for t in recent_tensions[-5:]:
                 tension_summary += (
                     f"  {t.frame_a} vs {t.frame_b}: "
                     f"usefulness={t.usefulness:.3f}, {t.note}\n")
+
+        coherence = self.rotor_coherence()
+        rotor_summary = (
+            f"\n## Rotor coherence: {coherence:.3f}"
+            f" ({'stable groove' if coherence > 0.8 else 'exploring' if coherence > 0.4 else 'no pattern yet'})\n"
+        )
 
         prompt = (
             "You are the meta-agent for a DGM-H creature.\n"
             "Your job: analyze performance and propose config changes.\n\n"
             f"## Current config\n```json\n{json.dumps(current_config, indent=2)}\n```\n\n"
             f"## Breath analysis\n```json\n{json.dumps(analysis, indent=2, default=str)}\n```\n\n"
-            f"## Persistent memory\n{memory_summary or '(empty)'}\n"
-            f"{tension_summary}\n"
-            f"## Current rulebook\n```json\n{rules_text}\n```\n\n"
+            f"## Persistent memory\n{self.summarize_memory() or '(empty)'}\n"
+            f"{tension_summary}{rotor_summary}\n"
+            f"## Rulebook\n```json\n{rules_text}\n```\n\n"
             "Respond with ONLY a JSON object:\n"
             "{\n"
             '  "config_changes": {"param_name": new_value, ...},\n'
             '  "rationale": "why these changes",\n'
-            '  "memory_entry": "optional insight to remember for future",\n'
+            '  "memory_entry": "optional insight to remember",\n'
             '  "rule_mutations": [{"id": "rule_id", "field": "magnitude", '
             '"new_value": 0.1}]\n'
             "}\n\n"
@@ -359,18 +422,16 @@ class Organism:
             "Be conservative — small changes. Respond with valid JSON only."
         )
 
-        response = local_model.complete(prompt, system=system,
-                                        max_tokens=512, temperature=0.3)
+        response = fm_complete(prompt, system=system,
+                               max_tokens=512, temperature=0.3)
 
         if response is None:
-            logger.info("FM unavailable for meta-agent, falling back to heuristic")
             return self.propose_variant(analysis, current_config)
 
         try:
             json_str = response
             if "```" in json_str:
-                parts = json_str.split("```")
-                for part in parts:
+                for part in json_str.split("```"):
                     stripped = part.strip()
                     if stripped.startswith("json"):
                         stripped = stripped[4:].strip()
@@ -379,8 +440,6 @@ class Organism:
                         break
             parsed = json.loads(json_str)
         except (json.JSONDecodeError, ValueError):
-            logger.info("FM response unparseable, falling back: %s",
-                        response[:200])
             return self.propose_variant(analysis, current_config)
 
         config = dict(current_config)
@@ -390,7 +449,6 @@ class Organism:
         config.setdefault('alpha', 0.85)
 
         rationale = []
-        changes = parsed.get('config_changes', {})
         clamps = {
             'learn_steps': (1, 20, int),
             'learn_lr': (0.001, 0.1, float),
@@ -398,7 +456,7 @@ class Organism:
             'alpha': (0.5, 1.0, float),
         }
 
-        for param, new_val in changes.items():
+        for param, new_val in parsed.get('config_changes', {}).items():
             if param not in clamps:
                 continue
             lo, hi, typ = clamps[param]
@@ -420,8 +478,7 @@ class Organism:
         if memory_entry:
             self.record('fm_insight', memory_entry)
 
-        rule_mutations = parsed.get('rule_mutations', [])
-        for mutation in rule_mutations:
+        for mutation in parsed.get('rule_mutations', []):
             rule_id = mutation.get('id')
             field = mutation.get('field')
             new_value = mutation.get('new_value')
@@ -431,14 +488,14 @@ class Organism:
                 if rule['id'] == rule_id and field in rule:
                     old_value = rule[field]
                     rule[field] = new_value
-                    desc = f"[FM] rule '{rule_id}': {field} {old_value} -> {new_value}"
+                    desc = (f"[FM] rule '{rule_id}': "
+                            f"{field} {old_value} -> {new_value}")
                     rationale.append(desc)
                     self.state.mutation_log.append(desc)
 
         if not rationale:
             rationale.append("[FM] no changes proposed")
 
-        logger.info("FM meta-agent proposal: %s", rationale)
         config['rationale'] = rationale
         config['active_rules'] = ['fm_meta_agent']
         return config
@@ -475,23 +532,16 @@ class Organism:
         config[param] = new
         return f"{param} {old} -> {new}: {rule.get('rationale', rule['id'])}"
 
-    # ── Rule mutation (metacognitive self-modification) ──────────────────
+    # ── Rule mutation ────────────────────────────────────────────────────
 
     def mutate_rules(self, rule_outcomes_fn=None):
-        """Modify the rules themselves based on performance history.
-
-        If no rule_outcomes_fn is provided, uses internal tension data
-        and performance history to judge rules.
-
-        Returns list of mutation descriptions.
-        """
+        """Modify the rules themselves based on performance history."""
         mutations = []
 
         for rule in self.state.rulebook:
             if not rule.get('enabled', True):
                 continue
 
-            # Use provided function or fall back to internal assessment
             if rule_outcomes_fn:
                 outcomes = rule_outcomes_fn(rule['id'])
             else:
@@ -501,8 +551,7 @@ class Organism:
                 continue
 
             mean_delta = sum(outcomes) / len(outcomes)
-            recent = outcomes[-3:]
-            recent_mean = sum(recent) / len(recent)
+            recent_mean = sum(outcomes[-3:]) / 3
 
             if recent_mean < -0.01 and mean_delta < 0:
                 old_mag = rule['magnitude']
@@ -514,9 +563,8 @@ class Organism:
                         new_mag = max(new_mag, 0.001)
                     if new_mag != old_mag:
                         rule['magnitude'] = new_mag
-                        desc = (f"weakened rule '{rule['id']}': "
-                                f"magnitude {old_mag} -> {new_mag} "
-                                f"(recent mean delta: {recent_mean:.4f})")
+                        desc = (f"weakened '{rule['id']}': "
+                                f"magnitude {old_mag} -> {new_mag}")
                         mutations.append(desc)
 
             elif recent_mean > 0.01 and mean_delta > 0:
@@ -529,9 +577,8 @@ class Organism:
                         new_mag = min(new_mag, 1.0)
                     if new_mag != old_mag:
                         rule['magnitude'] = new_mag
-                        desc = (f"strengthened rule '{rule['id']}': "
-                                f"magnitude {old_mag} -> {new_mag} "
-                                f"(recent mean delta: {recent_mean:.4f})")
+                        desc = (f"strengthened '{rule['id']}': "
+                                f"magnitude {old_mag} -> {new_mag}")
                         mutations.append(desc)
 
         if mutations:
@@ -544,7 +591,6 @@ class Organism:
         return mutations
 
     def _assess_rule(self, rule_id):
-        """Assess a rule from internal performance history."""
         deltas = []
         for entry in self.state.performance_history:
             meta = entry.get('metadata', {}) or {}
@@ -554,88 +600,51 @@ class Organism:
                 deltas.append(entry.get('fitness', 0) - parent_fitness)
         return deltas
 
-    # ── Frame portfolio mutation ─────────────────────────────────────────
-
-    def mutate_frame_portfolio(self):
-        """Update frame weights based on which tensions were most useful."""
-        recent = self.state.tensions[-20:]
-        if not recent:
-            return
-
-        pair_scores: dict[tuple, float] = {}
-        for t in recent:
-            key = tuple(sorted((t.frame_a, t.frame_b)))
-            pair_scores.setdefault(key, 0.0)
-            pair_scores[key] += t.usefulness
-
-        if not pair_scores:
-            return
-
-        winner = max(pair_scores, key=pair_scores.get)
-        active = set(self.state.frame_portfolio["active_frames"])
-        active.update(winner)
-        self.state.frame_portfolio["active_frames"] = sorted(active)
-
     # ── Persistent memory ────────────────────────────────────────────────
 
     def record(self, key, value):
-        """Store a named insight with timestamp."""
         self.state.persistent_memory[key] = {
-            'value': value,
-            'timestamp': time.time(),
-        }
+            'value': value, 'timestamp': time.time()}
 
     def recall(self, key=None):
-        """Retrieve stored insights."""
         if key is None:
             return dict(self.state.persistent_memory)
         entry = self.state.persistent_memory.get(key)
-        if entry is None:
-            return None
-        return entry.get('value')
+        return entry.get('value') if entry else None
 
     def summarize_memory(self):
-        """Generate a summary string for the meta-agent to consume."""
         if not self.state.persistent_memory:
-            return "No stored insights yet."
-
+            return ""
         sorted_keys = sorted(
             self.state.persistent_memory.keys(),
-            key=lambda k: self.state.persistent_memory[k].get('timestamp', 0),
+            key=lambda k: self.state.persistent_memory[k].get(
+                'timestamp', 0),
             reverse=True)
-
-        lines = [f"Persistent memory ({len(self.state.persistent_memory)} insights):"]
+        lines = [f"Persistent memory "
+                 f"({len(self.state.persistent_memory)} insights):"]
         for key in sorted_keys:
-            entry = self.state.persistent_memory[key]
-            val = entry.get('value', '')
-            val_str = str(val)
-            if len(val_str) > 200:
-                val_str = val_str[:200] + '...'
-            lines.append(f"  - {key}: {val_str}")
+            val = str(self.state.persistent_memory[key].get('value', ''))
+            if len(val) > 200:
+                val = val[:200] + '...'
+            lines.append(f"  - {key}: {val}")
         return '\n'.join(lines)
 
     # ── Performance tracking ─────────────────────────────────────────────
 
     def record_generation(self, generation_id, fitness, config,
                           metadata=None):
-        """Record fitness and config for a generation."""
         entry = {
-            'generation': generation_id,
-            'fitness': fitness,
-            'config': config,
-            'timestamp': time.time(),
+            'generation': generation_id, 'fitness': fitness,
+            'config': config, 'timestamp': time.time(),
         }
         if metadata:
             entry['metadata'] = metadata
         self.state.performance_history.append(entry)
 
     def get_improvement_trend(self, window=5):
-        """Calculate improvement trend using moving median."""
         if len(self.state.performance_history) < 2:
             return 0.0
         recent = self.state.performance_history[-window:]
-        if len(recent) < 2:
-            return 0.0
         fitnesses = [e.get('fitness', 0) for e in recent
                      if isinstance(e.get('fitness'), (int, float))]
         if len(fitnesses) < 2:
@@ -643,14 +652,14 @@ class Organism:
         n = len(fitnesses)
         x_mean = (n - 1) / 2.0
         y_mean = sum(fitnesses) / n
-        num = sum((i - x_mean) * (fitnesses[i] - y_mean) for i in range(n))
+        num = sum((i - x_mean) * (fitnesses[i] - y_mean)
+                  for i in range(n))
         den = sum((i - x_mean) ** 2 for i in range(n))
         if den < 1e-12:
             return 0.0
         return num / den
 
     def get_statistics(self):
-        """Summary statistics across all recorded generations."""
         history = [e for e in self.state.performance_history
                    if isinstance(e.get('fitness'), (int, float))]
         if not history:
@@ -671,26 +680,16 @@ class Organism:
         }
 
     def get_best_config(self):
-        """Return the config that produced the best fitness."""
         history = [e for e in self.state.performance_history
                    if isinstance(e.get('fitness'), (int, float))]
         if not history:
             return None
-        best = max(history, key=lambda e: e['fitness'])
-        return best.get('config')
+        return max(history, key=lambda e: e['fitness']).get('config')
 
     def get_rule_outcomes(self, rule_id):
-        """Get fitness outcomes for variants produced by a specific rule."""
-        deltas = []
-        for entry in self.state.performance_history:
-            meta = entry.get('metadata', {}) or {}
-            active_rules = meta.get('active_rules', [])
-            parent_fitness = meta.get('parent_fitness')
-            if rule_id in active_rules and parent_fitness is not None:
-                deltas.append(entry.get('fitness', 0) - parent_fitness)
-        return deltas
+        return self._assess_rule(rule_id)
 
-    # ── Accessors for backward compatibility ─────────────────────────────
+    # ── Accessors ────────────────────────────────────────────────────────
 
     @property
     def rules(self):
@@ -698,20 +697,17 @@ class Organism:
 
     @property
     def memory(self):
-        """Backward-compatible accessor — the organism IS its own memory."""
         return self
 
     def get_rules(self):
         return copy.deepcopy(self.state.rulebook)
 
     def summarize_for_meta_agent(self):
-        """Alias for summarize_memory()."""
         return self.summarize_memory()
 
     # ── Serialization ────────────────────────────────────────────────────
 
     def save(self, path):
-        """Serialize full organism state to JSON."""
         payload = {
             "generation": self.state.generation,
             "rulebook": self.state.rulebook,
@@ -720,6 +716,7 @@ class Organism:
             "persistent_memory": self.state.persistent_memory,
             "tensions": [t.__dict__ for t in self.state.tensions],
             "frame_portfolio": self.state.frame_portfolio,
+            "recent_rotors": self.state.recent_rotors,
         }
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -727,10 +724,6 @@ class Organism:
 
     @classmethod
     def load(cls, path, **kwargs):
-        """Load organism state from JSON.
-
-        Accepts **kwargs for backward compatibility with MetaAgent.load(path, memory=...).
-        """
         data = json.loads(Path(path).read_text())
         state = OrganismState()
         state.generation = data.get("generation", 0)
@@ -744,10 +737,10 @@ class Organism:
                                           state.frame_portfolio)
         state.tensions = [
             TensionMemory(**t) for t in data.get("tensions", [])]
+        state.recent_rotors = data.get("recent_rotors", [])
         return cls(state=state)
 
     def export_state(self):
-        """Export state as a serializable dict."""
         return {
             "generation": self.state.generation,
             "rulebook": self.state.rulebook,
@@ -756,26 +749,28 @@ class Organism:
             "persistent_memory": self.state.persistent_memory,
             "tensions": [t.__dict__ for t in self.state.tensions],
             "frame_portfolio": self.state.frame_portfolio,
+            "recent_rotors": self.state.recent_rotors,
         }
 
     def import_state(self, payload):
-        """Import state from a dict."""
         self.state.generation = payload.get("generation", 0)
         self.state.rulebook = payload.get("rulebook",
                                            copy.deepcopy(DEFAULT_RULES))
         self.state.mutation_log = payload.get("mutation_log", [])
-        self.state.performance_history = payload.get("performance_history", [])
-        self.state.persistent_memory = payload.get("persistent_memory", {})
-        self.state.frame_portfolio = payload.get("frame_portfolio",
-                                                  self.state.frame_portfolio)
+        self.state.performance_history = payload.get(
+            "performance_history", [])
+        self.state.persistent_memory = payload.get(
+            "persistent_memory", {})
+        self.state.frame_portfolio = payload.get(
+            "frame_portfolio", self.state.frame_portfolio)
         self.state.tensions = [
             TensionMemory(**t) for t in payload.get("tensions", [])]
+        self.state.recent_rotors = payload.get("recent_rotors", [])
 
 
-# ── Backward-compatible free functions ───────────────────────────────────
+# ── Free function for backward compat ────────────────────────────────────
 
 _default_organism = None
-
 
 def _get_default_organism():
     global _default_organism
@@ -783,14 +778,10 @@ def _get_default_organism():
         _default_organism = Organism()
     return _default_organism
 
-
 def propose_variant(analysis, current_config):
-    """Backward-compatible wrapper."""
     return _get_default_organism().propose_variant(analysis, current_config)
 
-
 def evaluate_variant(task_agent, variant_config, test_texts):
-    """Run a variant config on test texts and return mean loss."""
     if not test_texts:
         return 0.0
     for key in ('learn_steps', 'learn_lr', 'temperature'):
