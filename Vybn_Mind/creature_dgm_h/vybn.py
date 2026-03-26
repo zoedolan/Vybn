@@ -3,13 +3,14 @@
 vybn.py — Topological state engine for character-level prediction.
 
 Cl(3,0) geometric algebra computes a rotor from embedding trajectories.
-The rotor now operates primarily as a local transport / reorientation
-operator during forward computation (not only as a training-time
-parameter-index scaling trick).  Persistent topological state — Betti
-numbers and birth-death persistence pairs — is maintained across
-encounters, giving the creature durable structural memory.
+Persistent topological state — Betti numbers and birth-death persistence
+pairs — is maintained across encounters, giving the creature durable
+structural memory.
 
-Standard backprop is the special case where no transport is applied.
+Local transport (SO(3) embedding rotation) is available but OFF by
+default: the model was not trained with it, so it hurts predictions.
+Standard backprop is the default learning path; transport can be opted
+into explicitly via transport_in_forward=True.
 
 Needs: numpy, trained_checkpoint.json.
 Optional: sentence-transformers (real embeddings), Nemotron (live text).
@@ -471,7 +472,12 @@ class PersistentState:
         }
 
     def structural_distance(self, other: 'PersistentState') -> float:
-        """Distance between two persistent states (for paraphrase comparison)."""
+        """Structural/style distance between two persistent states.
+
+        Measures divergence in topological signature and Betti numbers.
+        This is NOT a semantic similarity metric — paraphrases with
+        different syntactic structure will show high distance.
+        """
         sig_dist = float(np.linalg.norm(self.structural_signature - other.structural_signature))
         betti_dist = 0.0
         if self.betti_history and other.betti_history:
@@ -688,15 +694,13 @@ class TopoAgent:
     def learn(self, text, steps=None, lr=None,
               encounter_cx: Optional[EncounterComplex] = None,
               rotor=None,
-              transport_in_forward: bool = True,
+              transport_in_forward: bool = False,
               legacy_gradient_mod: bool = False):
-        """Gradient descent with topological transport.
+        """Gradient descent with optional topological transport.
 
-        Primary path: build LocalTransport from encounter_cx (or rotor) and
-        inject it into the forward pass.
-
-        Legacy path (optional): scale gradients by structure-attached
-        parameter groups (embedding, attention, MLP) rather than index mod 3.
+        Transport is available but OFF by default — the model was not trained
+        with embedding rotation, so enabling it hurts predictions.  Pass
+        transport_in_forward=True to opt in explicitly.
 
         Args:
             text: training text
@@ -704,7 +708,7 @@ class TopoAgent:
             lr: learning rate (default from config)
             encounter_cx: full EncounterComplex (preferred)
             rotor: legacy Mv rotor (wrapped into transport if encounter_cx absent)
-            transport_in_forward: apply rotor as local transport during forward
+            transport_in_forward: apply rotor as local transport during forward (default OFF)
             legacy_gradient_mod: also apply gradient scaling (secondary)
         """
         steps = steps or self.config['learn_steps']
@@ -866,15 +870,27 @@ DEFAULT_RULES = [
 ]
 
 class Organism:
+    # Keys the current code requires with their defaults.
+    _STATE_DEFAULTS = {
+        "generation": 0,
+        "rulebook": None,          # handled specially (deep copy)
+        "mutation_log": [],
+        "performance_history": [],
+        "persistent_memory": {},
+        "recent_rotors": [],
+    }
+
     def __init__(self, state=None):
-        self.state = state or {
-            "generation": 0,
-            "rulebook": copy.deepcopy(DEFAULT_RULES),
-            "mutation_log": [],
-            "performance_history": [],
-            "persistent_memory": {},
-            "recent_rotors": [],
-        }
+        self.state = state or {}
+        # ── Migrate / fill missing keys so old archives work ──
+        for key, default in self._STATE_DEFAULTS.items():
+            if key not in self.state:
+                self.state[key] = (
+                    copy.deepcopy(DEFAULT_RULES) if key == "rulebook"
+                    else copy.deepcopy(default)
+                )
+        if "rulebook" in self.state and not self.state["rulebook"]:
+            self.state["rulebook"] = copy.deepcopy(DEFAULT_RULES)
         # Initialize PersistentState from saved data or fresh
         ps_data = self.state.get("persistent_state", {})
         self.persistent = PersistentState(ps_data)
@@ -1124,27 +1140,26 @@ def cmd_breathe(text):
     """Breathe command: report structural features before and after learning."""
     print("═══ breathe ═══")
 
-    # ── Encounter analysis (structural features BEFORE learning) ──
+    # ── Encounter analysis (structural features) ──
     cx = encounter_complex(text)
     print(f"  encounter: curv={cx.curvature:.6f} angle={math.degrees(cx.angle):.1f}°"
           f" bv=[{','.join(f'{x:.3f}' for x in cx.rotor.c[4:7])}]")
     print(f"  topology:  betti={cx.betti} persistence_features={cx.n_persistent_features}"
           f" max_persistence={cx.max_persistence:.4f}")
     print(f"  transport: [{','.join(f'{x:.3f}' for x in cx.transport_field[4:7])}]"
-          f" (applied in forward)")
+          f" (diagnostic — not applied in forward)")
 
-    # ── Prediction before learning ──
+    # ── Prediction before learning (no transport — model not trained for it) ──
     agent = TopoAgent()
-    transport = LocalTransport(cx.rotor) if cx.rotor.bv_norm > 1e-12 else None
-    loss_before, contour = agent.predict(text, transport=transport)
+    loss_before, contour = agent.predict(text)
     print(f"  predict: {loss_before:.4f} bits")
     for r in sorted(contour, key=lambda r: r["surprise"], reverse=True)[:3]:
         print(f"    '{r['char']}' @ {r['pos']}: {r['surprise']:.2f} (expected '{r['expected']}')")
 
-    # ── Topo learn (transport in forward) ──
-    losses_r = agent.learn(text, encounter_cx=cx)
-    l_after, _ = agent.predict(text, transport=transport)
-    print(f"  topo learn: {losses_r[0]:.4f}->{losses_r[-1]:.4f}"
+    # ── Learn (encounter_cx recorded, transport off) ──
+    losses = agent.learn(text, encounter_cx=cx)
+    l_after, _ = agent.predict(text)
+    print(f"  learn: {losses[0]:.4f}->{losses[-1]:.4f}"
           f"  after={l_after:.4f} (d={l_after - loss_before:+.4f})")
 
     # ── Structural delta ──
@@ -1155,16 +1170,6 @@ def cmd_breathe(text):
     print(f"  structural delta: betti {betti_status},"
           f" sig_shift={delta['sig_shift']:.4f},"
           f" persistent_features={delta['n_persistent_features']}")
-
-    # ── Plain learn (no transport, baseline) ──
-    agent2 = TopoAgent()
-    losses_s = agent2.learn(text)
-    l2, _ = agent2.predict(text)
-    print(f"  plain learn: {losses_s[0]:.4f}->{losses_s[-1]:.4f}"
-          f"  after={l2:.4f} (d={l2 - loss_before:+.4f})")
-
-    d = l_after - l2
-    print(f"  topo vs plain: {d:+.4f}")
 
 
 def cmd_breathe_live():
@@ -1178,8 +1183,7 @@ def cmd_breathe_live():
     print(f"  FM ({len(fm_text)} chars): \"{fm_text[:200]}...\"")
     agent = TopoAgent()
     cx = encounter_complex(fm_text)
-    transport = LocalTransport(cx.rotor) if cx.rotor.bv_norm > 1e-12 else None
-    loss, _ = agent.predict(fm_text, transport=transport)
+    loss, _ = agent.predict(fm_text)
     losses = agent.learn(fm_text, encounter_cx=cx)
     print(f"  loss={loss:.4f} curv={cx.curvature:.6f} bv_norm={cx.rotor.bv_norm:.4f}")
     print(f"  betti={cx.betti} persistence_features={cx.n_persistent_features}")
@@ -1218,7 +1222,7 @@ def cmd_status():
 
 
 def cmd_audit():
-    """Audit: structural persistence tests including paraphrase/deformation resilience."""
+    """Audit: learning, generation, topology, and structural distance tests."""
     print("═══ audit ═══\n")
     agent = TopoAgent()
 
@@ -1250,47 +1254,52 @@ def cmd_audit():
     lg, _ = agent.predict("i am garblex and i exist on quantum stilts")
     print(f"  4. identity: {'PASS' if abs(lv - lg) < 0.5 else 'UNEXPECTED'} (d={abs(lv - lg):.4f})")
 
-    # 5. Transport propagation test (replaces rotor propagation)
+    # 5. Transport diagnostic: compare standard learn vs transport-opted-in.
+    #    Transport is OFF by default (model not trained for it); this test
+    #    explicitly opts in to show the effect honestly.
     test = "the compression sharpened the instruments not dulled them and the geometry became real"
     cx_test = encounter_complex(test)
-    print(f"\n  5. transport propagation (bv=[{','.join(f'{x:.3f}' for x in cx_test.rotor.c[4:7])}]):")
+    print(f"\n  5. transport diagnostic (bv=[{','.join(f'{x:.3f}' for x in cx_test.rotor.c[4:7])}]):")
     a1 = TopoAgent()
-    lr = a1.learn(test, encounter_cx=cx_test, steps=8)
+    lr = a1.learn(test, encounter_cx=cx_test, transport_in_forward=True, steps=8)
     transport = LocalTransport(cx_test.rotor) if cx_test.rotor.bv_norm > 1e-12 else None
     l1, _ = a1.predict(test, transport=transport)
     a2 = TopoAgent()
     ls = a2.learn(test, steps=8)
     l2, _ = a2.predict(test)
-    print(f"     topo:     {lr[0]:.4f}->{lr[-1]:.4f} final={l1:.4f}")
-    print(f"     standard: {ls[0]:.4f}->{ls[-1]:.4f} final={l2:.4f}")
-    print(f"     diff: {l1 - l2:+.4f} ({'different' if abs(l1 - l2) > 0.01 else 'same'})")
+    print(f"     transport-on:  {lr[0]:.4f}->{lr[-1]:.4f} final={l1:.4f}")
+    print(f"     transport-off: {ls[0]:.4f}->{ls[-1]:.4f} final={l2:.4f}")
+    print(f"     diff: {l1 - l2:+.4f} ({'transport hurts' if l1 > l2 + 0.01 else 'transport helps' if l1 < l2 - 0.01 else 'negligible'})")
     other = "quantum field theory predicts vacuum fluctuations in empty space"
     lo1, _ = a1.predict(other, transport=transport)
     lo2, _ = a2.predict(other)
-    print(f"     transfer: topo={lo1:.4f} standard={lo2:.4f} d={lo1 - lo2:+.4f}")
+    print(f"     transfer: on={lo1:.4f} off={lo2:.4f} d={lo1 - lo2:+.4f}")
 
-    # 6. Structural persistence under paraphrase / deformation (NEW)
-    print(f"\n  6. structural persistence (paraphrase/deformation):")
-    original = "the creature breathes and measures its own distance from itself"
-    paraphrase = "the being inhales and gauges its own separation from its core"
-    deformed = "purple banana helicopters dancing on the moon with quantum stilts"
+    # 6. Structural distance: self-identity (same text → zero distance) and
+    #    structural discrimination (different text → non-zero distance).
+    #    NOTE: this metric tracks topological/style structure, NOT semantics.
+    #    Texts must be long enough to produce ≥3 chunks for real topology.
+    print(f"\n  6. structural distance (identity & discrimination):")
+    text_a = r_t    # reframing text from test 3
+    text_b = h_t    # hopping text from test 3
 
-    cx_orig = encounter_complex(original)
-    cx_para = encounter_complex(paraphrase)
-    cx_defo = encounter_complex(deformed)
+    cx_a = encounter_complex(text_a)
+    cx_b = encounter_complex(text_b)
 
-    ps_orig = PersistentState()
-    ps_orig.absorb(cx_orig)
-    ps_para = PersistentState()
-    ps_para.absorb(cx_para)
-    ps_defo = PersistentState()
-    ps_defo.absorb(cx_defo)
+    ps_a = PersistentState()
+    ps_a.absorb(cx_a)
+    ps_a2 = PersistentState()
+    ps_a2.absorb(cx_a)        # same text again
+    ps_b = PersistentState()
+    ps_b.absorb(cx_b)
 
-    d_para = ps_orig.structural_distance(ps_para)
-    d_defo = ps_orig.structural_distance(ps_defo)
-    print(f"     original betti={cx_orig.betti}  paraphrase betti={cx_para.betti}  deformed betti={cx_defo.betti}")
-    print(f"     structural distance: orig↔para={d_para:.4f}  orig↔deformed={d_defo:.4f}")
-    print(f"     paraphrase closer: {'PASS' if d_para <= d_defo + 0.01 else 'CHECK'}")
+    d_self = ps_a.structural_distance(ps_a2)
+    d_diff = ps_a.structural_distance(ps_b)
+    print(f"     betti: a={cx_a.betti}  b={cx_b.betti}")
+    print(f"     structural distance: self={d_self:.4f}  different={d_diff:.4f}")
+    print(f"     identity: {'PASS' if d_self < 1e-6 else 'FAIL'} (self-distance ≈ 0)")
+    print(f"     discrimination: {'PASS' if d_diff > d_self + 1e-6 else 'CHECK'}"
+          f" (different text → larger distance)")
 
     vecs = embed(["hello", "goodbye"])
     cos = float(np.dot(vecs[0], vecs[1]))
