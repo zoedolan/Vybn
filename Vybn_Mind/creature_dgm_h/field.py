@@ -886,25 +886,3 @@ class Field:
         }
 
 
-# ── Backward compatibility ───────────────────────────────────────────────
-# These names existed in the old API. They're aliases now.
-
-compute_coupling_divergence = lambda *a, **kw: compute_fitness(
-    *a, **kw).get('divergence', 0.0)
-
-def compute_loss_improvement(loss_history):
-    """Is prediction loss decreasing across breaths?"""
-    if not loss_history or len(loss_history) < 2:
-        return 0.0
-    final_losses = [e['losses'][-1] for e in loss_history
-                    if e.get('losses')]
-    if len(final_losses) < 2:
-        return 0.0
-    n = len(final_losses)
-    x_mean = (n - 1) / 2.0
-    y_mean = sum(final_losses) / n
-    num = sum((i - x_mean) * (final_losses[i] - y_mean) for i in range(n))
-    den = sum((i - x_mean) ** 2 for i in range(n))
-    if den < 1e-12:
-        return 0.0
-    return -(num / den)
