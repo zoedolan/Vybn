@@ -1,11 +1,6 @@
-"""creature_dgm_h — the whole creature lives in vybn.py."""
-
+"""creature_dgm_h — rotor-modulated character-level prediction."""
 from .vybn import (
-    Mv as Multivector, Mv, V, Agent, Agent as TaskAgent,
-    Organism, encounter, encounter as compute_encounter,
-    encounter as compute_curvature,
-    fitness as compute_fitness, embed as default_embed_fn,
-    load_archive, evolve as run_generation,
-    fm_available, fm_complete,
-    DEFAULT_RULES, DEFAULT_CONFIG,
+    Mv, RV, Agent, Organism, encounter, embed, fitness,
+    load_archive, evolve, fm_available, fm_complete,
+    DEFAULT_RULES,
 )
