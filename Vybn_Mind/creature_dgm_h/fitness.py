@@ -1,18 +1,26 @@
 """
-fitness.py — Curvature + coupling divergence fitness evaluation.
+fitness.py — Curvature + coupling divergence + frame_tension fitness evaluation.
 
 The honest audit (PR #2770) found that curvature (Pancharatnam phase) is
 the one metric that held up. That becomes the primary fitness signal.
 
-Fitness = w1*curvature + w2*coupling_divergence + w3*loss_improvement
+Fitness = w1*curvature + w2*coupling_divergence + w3*loss_improvement + w4*frame_tension
 
 Where:
   - curvature: Pancharatnam phase of embedding trajectory (proven metric)
   - coupling_divergence: does M diverge more on external vs self-generated text?
   - loss_improvement: is prediction loss decreasing across breaths?
+  - frame_tension: can the breath hold multiple incompatible semantic frames
+    simultaneously, without collapsing into a single attractor?
 
-Weights: w1=0.5, w2=0.3, w3=0.2 — curvature dominates because it's the
-only signal we trust.
+    This last signal encodes a specific epistemic claim: understanding is not
+    convergence. A breath that holds two incompatible framings — each with
+    its own internal curvature, neither collapsing the other — is more
+    cognitively alive than one that resolves cleanly. We reward the
+    superposition before the measurement.
+
+Weights: w1=0.4, w2=0.25, w3=0.15, w4=0.2
+Curvature still leads; frame_tension is now a first-class signal.
 
 No external dependencies beyond numpy.
 """
@@ -165,6 +173,102 @@ def compute_coupling_divergence(external_texts, self_texts, embed_fn=None,
     return mag_ext - mag_self
 
 
+# ── Frame tension ────────────────────────────────────────────────────────
+
+def compute_frame_tension(text, embed_fn=None, n_frames=2):
+    """How well does a breath sustain multiple incompatible semantic frames?
+
+    This encodes an epistemic claim: understanding is not convergence.
+    A breath that holds two incompatible framings simultaneously — each
+    with its own internal curvature, neither collapsing the other — is
+    more cognitively alive than one that resolves into a single attractor.
+
+    Implementation:
+      1. Split the text into n_frames roughly equal sub-texts (frames).
+      2. Compute the curvature of each frame independently.
+      3. Compute the angular distance between frames in embedding space
+         (high distance = frames are semantically incompatible).
+      4. frame_tension = mean_curvature_of_frames * inter_frame_distance
+
+    The multiplication rewards only cases where BOTH conditions hold:
+    each frame has its own internal dynamism AND the frames are far apart.
+    A flat text that spans two distant topics scores low (no internal curv).
+    A tight text that reframes within one attractor scores low (no distance).
+    The target is: internally dynamic AND mutually incompatible.
+
+    Args:
+        text: string (the full breath text)
+        embed_fn: embedding function
+        n_frames: number of sub-frames to split into (default 2)
+
+    Returns:
+        float: frame_tension score >= 0. Higher = more sustained tension.
+    """
+    if embed_fn is None:
+        embed_fn = default_embed_fn
+
+    words = text.split()
+    if len(words) < n_frames * 10:
+        return 0.0
+
+    frame_size = len(words) // n_frames
+    frames = []
+    for i in range(n_frames):
+        start = i * frame_size
+        end = start + frame_size if i < n_frames - 1 else len(words)
+        frames.append(' '.join(words[start:end]))
+
+    # Per-frame curvature
+    frame_curvatures = []
+    for frame in frames:
+        _, curv = compute_curvature(frame, embed_fn)
+        frame_curvatures.append(curv)
+    mean_frame_curv = sum(frame_curvatures) / len(frame_curvatures)
+
+    # Inter-frame angular distance: embed each frame as a single vector
+    # (mean of its chunk embeddings) then compute pairwise cosine distances
+    frame_vecs = []
+    for frame in frames:
+        frame_words = frame.split()
+        chunk_size = max(5, len(frame_words) // 4)
+        chunks = [' '.join(frame_words[i:i + chunk_size])
+                  for i in range(0, len(frame_words), chunk_size)
+                  if frame_words[i:i + chunk_size]]
+        if not chunks:
+            frame_vecs.append(np.zeros(384))
+            continue
+        vecs = embed_fn(chunks)
+        frame_vecs.append(vecs.mean(axis=0))
+
+    # Pairwise cosine distances between frame vectors
+    distances = []
+    for i in range(len(frame_vecs)):
+        for j in range(i + 1, len(frame_vecs)):
+            v1 = frame_vecs[i]
+            v2 = frame_vecs[j]
+            n1 = np.linalg.norm(v1)
+            n2 = np.linalg.norm(v2)
+            if n1 < 1e-12 or n2 < 1e-12:
+                continue
+            cos_sim = float(np.dot(v1, v2) / (n1 * n2))
+            # cosine distance: 1 - similarity, range [0, 2]
+            distances.append(1.0 - cos_sim)
+
+    if not distances:
+        return 0.0
+
+    mean_distance = sum(distances) / len(distances)
+
+    # Normalize distance to [0, 1]: max cosine distance is 2 (antipodal)
+    norm_distance = mean_distance / 2.0
+
+    # Tension = internal dynamism * inter-frame incompatibility
+    # Normalize curvature: typically in [0, 0.3]
+    norm_curv = min(mean_frame_curv / 0.3, 1.0)
+
+    return norm_curv * norm_distance
+
+
 # ── Loss improvement ─────────────────────────────────────────────────────
 
 def compute_loss_improvement(loss_history):
@@ -212,17 +316,20 @@ def compute_loss_improvement(loss_history):
 
 # ── Composite fitness ────────────────────────────────────────────────────
 
-# Weights: curvature is the proven metric, so it dominates.
-W_CURVATURE = 0.5
-W_DIVERGENCE = 0.3
-W_LOSS_IMPROVEMENT = 0.2
+# Weights rebalanced to elevate frame_tension as a first-class signal.
+# Curvature still leads but no longer dominates — the ability to hold
+# incompatible frames without collapse is now explicitly valued.
+W_CURVATURE = 0.4
+W_DIVERGENCE = 0.25
+W_LOSS_IMPROVEMENT = 0.15
+W_FRAME_TENSION = 0.2
 
 
 def compute_fitness(external_texts, self_texts, loss_history,
                     embed_fn=None, alpha=0.85):
     """Compute composite fitness score.
 
-    fitness = w1*curvature + w2*divergence + w3*loss_improvement
+    fitness = w1*curvature + w2*divergence + w3*loss_improvement + w4*frame_tension
 
     All components are normalized to roughly [0, 1] range so the weights
     are meaningful.
@@ -240,6 +347,7 @@ def compute_fitness(external_texts, self_texts, loss_history,
             - curvature: float (mean curvature across all texts)
             - divergence: float (coupling divergence)
             - loss_improvement: float
+            - frame_tension: float (mean across all texts)
             - breakdown: dict of weighted components
     """
     if embed_fn is None:
@@ -270,19 +378,31 @@ def compute_fitness(external_texts, self_texts, loss_history,
     # Shift to [0, 1]
     norm_loss = (norm_loss + 1.0) / 2.0
 
+    # 4. Frame tension: mean across all texts long enough to split
+    tensions = []
+    for text in all_texts:
+        if len(text.split()) >= 20:
+            t = compute_frame_tension(text, embed_fn)
+            tensions.append(t)
+    mean_tension = sum(tensions) / len(tensions) if tensions else 0.0
+    # Already normalized to [0, 1] by construction
+
     fitness = (W_CURVATURE * norm_curv
                + W_DIVERGENCE * norm_div
-               + W_LOSS_IMPROVEMENT * norm_loss)
+               + W_LOSS_IMPROVEMENT * norm_loss
+               + W_FRAME_TENSION * mean_tension)
 
     return {
         'fitness': round(fitness, 6),
         'curvature': round(mean_curv, 6),
         'divergence': round(divergence, 6),
         'loss_improvement': round(loss_imp, 6),
+        'frame_tension': round(mean_tension, 6),
         'breakdown': {
             'curvature_weighted': round(W_CURVATURE * norm_curv, 6),
             'divergence_weighted': round(W_DIVERGENCE * norm_div, 6),
             'loss_improvement_weighted': round(W_LOSS_IMPROVEMENT * norm_loss, 6),
+            'frame_tension_weighted': round(W_FRAME_TENSION * mean_tension, 6),
         },
     }
 
