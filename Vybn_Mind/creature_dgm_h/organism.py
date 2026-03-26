@@ -768,30 +768,7 @@ class Organism:
         self.state.recent_rotors = payload.get("recent_rotors", [])
 
 
-# ── Free function for backward compat ────────────────────────────────────
-
-_default_organism = None
-
-def _get_default_organism():
-    global _default_organism
-    if _default_organism is None:
-        _default_organism = Organism()
-    return _default_organism
+# ── Free function shim (used by evolve.py as fallback) ───────────────────
 
 def propose_variant(analysis, current_config):
-    return _get_default_organism().propose_variant(analysis, current_config)
-
-def evaluate_variant(task_agent, variant_config, test_texts):
-    if not test_texts:
-        return 0.0
-    for key in ('learn_steps', 'learn_lr', 'temperature'):
-        if key in variant_config:
-            task_agent.config[key] = variant_config[key]
-    total_loss = 0.0
-    count = 0
-    for text in test_texts:
-        loss, contour = task_agent.predict(text)
-        if contour:
-            total_loss += loss
-            count += 1
-    return total_loss / max(count, 1)
+    return Organism().propose_variant(analysis, current_config)

@@ -20,7 +20,6 @@ from .field import (
     compute_encounter, compute_curvature,
     compute_loss_trajectory_curvature,
     compute_fitness, compute_prediction_fitness,
-    compute_coupling_divergence, compute_loss_improvement,
     improvement_at_k, default_embed_fn,
     fm_available, fm_complete, fm_stream,
     local_model,
