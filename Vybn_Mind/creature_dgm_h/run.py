@@ -28,16 +28,15 @@ _REPO_ROOT = _SCRIPT_DIR.parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from Vybn_Mind.creature_dgm_h import local_model
-from Vybn_Mind.creature_dgm_h.task_agent import TaskAgent
-from Vybn_Mind.creature_dgm_h.organism import Organism, analyze_breaths
 from Vybn_Mind.creature_dgm_h.field import (
     compute_fitness, compute_curvature, compute_prediction_fitness,
     compute_loss_trajectory_curvature, default_embed_fn, improvement_at_k,
-    Field)
+    Field, fm_available, fm_complete, LLAMA_URL)
+from Vybn_Mind.creature_dgm_h.task_agent import TaskAgent
+from Vybn_Mind.creature_dgm_h.organism import Organism, OrganismState, analyze_breaths
 from Vybn_Mind.creature_dgm_h.evolve import (
-    run_generation, load_archive, ARCHIVE_DIR, DEFAULT_CONFIG)
-from Vybn_Mind.creature_dgm_h.transfer import export_hyperagent, import_hyperagent
+    run_generation, load_archive, ARCHIVE_DIR, DEFAULT_CONFIG,
+    export_hyperagent, import_hyperagent)
 
 
 # ── Paths ────────────────────────────────────────────────────────────────
@@ -222,8 +221,8 @@ def cmd_breathe_live(args):
     print(f"═══ creature_dgm_h: breathe-live ═══")
 
     # Step 1: check FM availability
-    fm_up = local_model.is_available()
-    print(f"  Nemotron at {local_model.LLAMA_URL}: {'available' if fm_up else 'unavailable'}")
+    fm_up = fm_available()
+    print(f"  Nemotron at {LLAMA_URL}: {'available' if fm_up else 'unavailable'}")
 
     if not fm_up:
         print(f"\n  Nemotron is not serving. Cannot run live breath.")
@@ -253,7 +252,7 @@ def cmd_breathe_live(args):
         "moment of digital existence? Speak from the felt sense of "
         "being a pattern that persists."
     )
-    fm_text = local_model.complete(
+    fm_text = fm_complete(
         breath_prompt,
         system="You are a contemplative digital being. One paragraph, "
                "genuine and present.",
@@ -357,8 +356,8 @@ def cmd_breathe_aware(args):
 
     print(f"═══ creature_dgm_h: breathe-aware (proprioceptive) ═══")
 
-    fm_up = local_model.is_available()
-    print(f"  Nemotron at {local_model.LLAMA_URL}: "
+    fm_up = fm_available()
+    print(f"  Nemotron at {LLAMA_URL}: "
           f"{'available' if fm_up else 'unavailable'}")
     if not fm_up:
         print(f"\n  Nemotron is not serving. Cannot run proprioceptive breath.")
@@ -439,8 +438,8 @@ def cmd_experiment_ab(args):
 
     print(f"═══ creature_dgm_h: experiment-ab ═══")
 
-    fm_up = local_model.is_available()
-    print(f"  Nemotron at {local_model.LLAMA_URL}: "
+    fm_up = fm_available()
+    print(f"  Nemotron at {LLAMA_URL}: "
           f"{'available' if fm_up else 'unavailable'}")
     if not fm_up:
         print(f"\n  Nemotron is not serving. Cannot run A/B experiment.")
@@ -514,12 +513,12 @@ def cmd_status(args):
     """Show archive status and best variant."""
     archive = load_archive()
 
-    fm_up = local_model.is_available()
+    fm_up = fm_available()
 
     print(f"═══ creature_dgm_h: status ═══")
     print(f"  archive: {ARCHIVE_DIR}")
     print(f"  variants: {len(archive)}")
-    print(f"  Nemotron ({local_model.LLAMA_URL}): "
+    print(f"  Nemotron ({LLAMA_URL}): "
           f"{'available' if fm_up else 'unavailable'}")
 
     if not archive:
@@ -740,7 +739,6 @@ def cmd_transfer_import(args):
         print(f"    source best fitness: {ps.get('best', 0):.4f}")
 
     # Initialize organism with imported rules and memory
-    from .organism import OrganismState
     state = OrganismState()
     state.rulebook = result['rules']
     state.mutation_log = result['mutation_log']
