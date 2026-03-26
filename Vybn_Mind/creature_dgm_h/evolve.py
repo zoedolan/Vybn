@@ -28,8 +28,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .task_agent import TaskAgent
-from .organism import Organism, analyze_breaths, propose_variant
-from .field import (
+from .creature import (
+    Organism, analyze_breaths, propose_variant,
     compute_fitness, compute_prediction_fitness,
     compute_loss_trajectory_curvature, default_embed_fn,
     compute_encounter, Field, fm_available, fm_complete)

@@ -26,12 +26,12 @@ _REPO_ROOT = _SCRIPT_DIR.parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from Vybn_Mind.creature_dgm_h.field import (
+from Vybn_Mind.creature_dgm_h.creature import (
     compute_fitness, compute_curvature, compute_prediction_fitness,
     compute_loss_trajectory_curvature, default_embed_fn, improvement_at_k,
-    Field, fm_available, fm_complete, LLAMA_URL)
+    Field, fm_available, fm_complete, LLAMA_URL,
+    Organism, OrganismState, analyze_breaths)
 from Vybn_Mind.creature_dgm_h.task_agent import TaskAgent
-from Vybn_Mind.creature_dgm_h.organism import Organism, OrganismState, analyze_breaths
 from Vybn_Mind.creature_dgm_h.evolve import (
     run_generation, load_archive, ARCHIVE_DIR, DEFAULT_CONFIG,
     export_hyperagent, import_hyperagent)
