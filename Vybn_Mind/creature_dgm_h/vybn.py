@@ -1137,7 +1137,7 @@ def evolve(test_texts, n_variants=3):
         agent = TopoAgent(config=child)
         ext, slf = [], []
         weight_vectors_list = []
-        texts = test_texts[:2] if i > 0 else test_texts
+        texts = test_texts[:3] if i > 0 else test_texts
         for text in texts:
             cx = encounter_complex(text)
             agent.learn(text, steps=child.get("learn_steps", 5),
