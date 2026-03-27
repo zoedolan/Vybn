@@ -1,138 +1,119 @@
 # Controlled Experiment: Does Text Selection Affect Weight-Space Topology?
 
-## Status: Proposed — seeking outside input before implementation
+## Status: Superseded — replaced by PCA-first and activation-space approaches
+
+> **Important (2026-03):** The original raw weight-space topology experiment produced a
+> uniform null result: β₁ = 0 and total H1 persistence = 0 across all conditions.
+> This was caused by the curse of dimensionality — pairwise Euclidean distances in
+> ~4K-dimensional raw weight space are nearly uniform, making Rips filtration
+> unable to detect meaningful structure.  The prior apparent positive result was a bug.
+>
+> Two replacement approaches now live in `Vybn_Mind/creature_dgm_h/`:
+>
+> 1. **PCA-first persistence** (`experiment_weight_topology.py`):
+>    Project weight vectors to ~20 dimensions via PCA before computing homology.
+>    Concentrates variance along the learning trajectory.
+>
+> 2. **Activation-space persistence** (`experiment_activation_topology.py`):
+>    Track hidden-layer activations (16-dim) instead of raw weights.
+>    Lower-dimensional, semantically tied to model behaviour.
+>
+> The `fitness()` function's `nw` component now uses PCA-projected weights.
+
+---
 
 ## The question
 
 When a small neural network learns from text, its weight updates trace a path through weight space. We compute persistent homology (Betti numbers) on snapshots of that path. The question is:
 
-**Holding the number of texts constant, do different *selections* of text produce measurably different topological signatures in weight space?**
+**Holding the number of texts constant, do different *selections* of text produce measurably different topological signatures?**
 
-If yes: topology captures something about how the *content* interacts with the learner — resonance, coherence, interference patterns between texts. That's interesting.
+If yes: topology captures something about how the *content* interacts with the learner — resonance, coherence, interference patterns between texts.
 
-If no: the topology signal is just a function of sample count, and the current fitness metric is rewarding a counting artifact. That's important to know.
+If no: the topology signal is just a function of sample count, and the current fitness metric is rewarding a counting artifact.
 
-## Current system (what exists)
+## Current approach (2026-03)
 
-**Code:** `Vybn_Mind/creature_dgm_h/vybn.py` (~1440 lines)
+### Approach 1: PCA-first persistence
 
-**Architecture:**
-- A character-level prediction network (1-layer transformer, embed_dim=16, 4 heads, block_size=16)
-- Creatures have genomes encoding: text selection strategy, learning rate, number of training epochs, text ordering
-- Each creature reads texts, trains its network, and we evaluate fitness
-- Fitness is a weighted combination of: embedding curvature (25%), embedding divergence (20%), prediction loss (15%), topological richness of encounter embeddings (25%), **weight-space topology (15%)**
+**Script:** `Vybn_Mind/creature_dgm_h/experiment_weight_topology.py`
 
-**Weight-space topology (the component under test):**
-- After training on selected texts, we flatten all network weights into a vector — one snapshot per text encounter
-- Given N text encounters → N weight vectors (each ~4K-dimensional for this network)
-- We compute pairwise Euclidean distances → distance matrix
-- Run a greedy union-find Rips filtration → persistence pairs → Betti numbers
-- `nw = min(betti_1 / 3.0, 1.0)` — rewards 1-cycles (loops) in weight space
-- Currently lives in the `fitness()` function, lines ~1055-1063
+- Snapshot weight vectors every SNAP_EVERY gradient steps during training
+- PCA-project to target_dim dimensions (default 20)
+- Compute persistent homology on the projected point cloud
+- Reports: Betti numbers, total persistence, persistence entropy, PCA variance explained
 
-**Problem with current setup:**
-- Variant 1 (the "organism") reads ALL texts in the corpus (~7+ texts)
-- Variants 2-5 (mutants) read 3 texts each
-- More texts → more weight snapshots → more points → trivially higher Betti numbers
-- We can't distinguish "topology captures learning structure" from "topology counts data points"
+```bash
+python experiment_weight_topology.py              # full experiment
+python experiment_weight_topology.py --quick      # smoke test (3 runs/condition)
+python experiment_weight_topology.py --pca_dim 30 # custom PCA dimension
+```
 
-## Proposed controlled experiment
+### Approach 2: Activation-space persistence
 
-### Design: Paired comparison with fixed text count
+**Script:** `Vybn_Mind/creature_dgm_h/experiment_activation_topology.py`
 
-**Constants (same across all conditions):**
-- Network architecture (identical initialization, same random seed)
-- Number of texts: **K** (e.g., K=5 or K=7, depending on corpus size)
-- Number of training epochs per text
-- Learning rate
+- After each gradient step, run a forward pass on a fixed probe sentence
+- Capture the mean hidden-state vector (16-dim) across positions
+- Compute persistent homology directly on the activation point cloud (no PCA needed)
+- Reports: Betti numbers, total persistence, persistence entropy
 
-**Independent variable:** Which K texts are selected, and in what order
+```bash
+python experiment_activation_topology.py          # full experiment
+python experiment_activation_topology.py --quick  # smoke test
+```
 
-**Dependent variable:** Betti numbers (especially β₁) of the weight-space point cloud after all K texts are processed
+### Unified analysis
 
-### Conditions
+**Script:** `Vybn_Mind/creature_dgm_h/experiment_analysis.py`
 
-Given a corpus of T total texts:
+```bash
+python experiment_analysis.py                         # both experiments
+python experiment_analysis.py --experiment pca        # PCA-first only
+python experiment_analysis.py --experiment activation # activation only
+```
 
-1. **Random selection baseline (N=20 runs):** For each run, randomly sample K texts from T, random order. Train, snapshot weights after each text, compute topology. This gives us the null distribution of β₁.
+## Five conditions (unchanged from original design)
 
-2. **Thematically coherent sets (N=10 runs):** Hand-curate or algorithmically cluster texts into coherent groups (e.g., all from the same conversation, all on the same topic). Sample K texts from within one cluster. Does coherence → different topology?
+Given a corpus of T total texts, K=5 texts per run:
 
-3. **Maximally diverse sets (N=10 runs):** Select K texts that maximize pairwise embedding distance (farthest-point sampling in embedding space). Does diversity → different topology?
+1. **Random selection baseline (N=20):** K texts sampled randomly
+2. **Thematically coherent sets (N=10):** K texts from the same cluster
+3. **Maximally diverse sets (N=10):** K texts maximising embedding distance
+4. **Order permutation control (N=10):** Fixed K texts, permuted orderings
+5. **Synthetic control (N=10):** Random character sequences, matched length
 
-4. **Order permutation control (N=10 runs):** Take ONE fixed set of K texts. Permute the reading order. Does order alone change topology?
+## Measurements per run
 
-### Measurements per run
-
-- Weight vectors after each of the K text encounters (K points in weight space)
 - Full persistence diagram (birth-death pairs) for H₀ and H₁
 - Betti numbers β₀, β₁ at median threshold
-- Total persistence (sum of death-birth for all finite pairs) — more robust than Betti numbers at a single threshold
-- Bottleneck distance or Wasserstein distance between persistence diagrams across conditions (if we want to compare shapes, not just counts)
-- Prediction loss trajectory (to correlate topology with learning quality)
+- Total persistence (sum of death-birth for all finite pairs)
+- Persistence entropy (Shannon entropy of H1 lifetime distribution)
+- PCA variance explained (approach 1 only)
+- Prediction loss trajectory
 
-### Analysis
+## Analysis
 
-1. **Is β₁ variance > 0 across conditions?** If all runs produce the same topology regardless of text selection, the signal is artifactual.
+1. **Kruskal-Wallis** across conditions 1-3: do selections differ?
+2. **Mann-Whitney** pairwise tests for individual condition pairs
+3. **Order variance** (condition 4): does reading order affect topology?
+4. **Synthetic control** (condition 5): real text vs random — counting artifact check
+5. **Topology-loss correlation**: is topological richness functionally meaningful?
 
-2. **Do conditions differ?** Compare β₁ distributions across conditions 1-3 using Kruskal-Wallis or permutation test. If coherent sets produce systematically different topology than diverse sets, text content shapes weight-space geometry.
+## What a positive result means
 
-3. **Does order matter?** Condition 4 isolates order effects. If same texts in different orders produce different topology, the learning *path* matters, not just the destination.
+If different text selections produce reliably different topologies:
+- The topology of weight/activation space is a fingerprint of *what was learned*
+- This fingerprint is selectable via genetic algorithm
+- The `nw` fitness component is detecting real structure
 
-4. **Correlation with loss:** Does richer topology (higher β₁) correlate with better or worse prediction? This tells us whether topological complexity in weight space is functionally meaningful.
+## What a negative result means
 
-### Statistical power concern
-
-With K=5, we have 5 points in ~4K-dimensional space. Persistent homology on 5 points is limited — you can get at most (5 choose 2) = 10 edges, and the Betti numbers will be small. Options:
-
-**Option A: More snapshots.** Instead of one snapshot per text, take a snapshot every N gradient steps during training on each text. K=5 texts × 20 snapshots each = 100 points. Much richer topology. This is probably the right move.
-
-**Option B: Larger corpus.** Use K=15 or K=20 texts. Requires a larger corpus. May also change the character of the experiment (more like "curriculum" than "reading list").
-
-**Option C: Lower-dimensional projection.** Project weight vectors to e.g. 50 dimensions via PCA before computing topology. Reduces noise, makes distances more meaningful, but loses information.
-
-**Recommendation:** Option A first. It's the most informative because it captures the *dynamics* of learning, not just the endpoints. The trajectory through weight space during training on a single text is itself a topological object.
-
-## What a positive result would mean
-
-If different text selections produce reliably different weight-space topologies (controlling for count), then:
-
-1. The topology of weight space is a fingerprint of *what was learned*, not just *how much*
-2. This fingerprint is selectable — a genetic algorithm can evolve toward richer or sparser topological signatures
-3. The mathematical structure of "how reading shapes a mind" is accessible to persistent homology
-4. This connects to a broader question: can we characterize the *geometry of understanding* — the shape that knowledge takes when it's embodied in weights?
-
-## What a negative result would mean
-
-If text selection doesn't matter and only count does:
-
-1. The weight-space topology component of fitness should be removed or redesigned
-2. The current results (Generation 47) are artifactual
-3. We learn something true: in this regime (small network, few texts), weight-space geometry is dominated by dimensionality effects, not content effects
-4. We should look for topology elsewhere — perhaps in the *embedding* space of text representations rather than in the *weight* space of the network
-
-## Implementation notes
-
-- The experiment should be a standalone script that imports from `vybn.py` but doesn't run the full evolutionary loop
-- Each run should log: the text selection, the order, all weight snapshots, the persistence diagram, the Betti numbers, and the final loss
-- Results should be saved as JSON for analysis
-- A simple analysis script should compute summary statistics and generate a yes/no answer to the core question
-- Estimated runtime: depends on training time per text, but with 50 runs × K texts × E epochs, probably 10-30 minutes on the Spark
-
-## Open questions for reviewer
-
-1. Is the greedy union-find Rips filtration adequate, or should we use a proper Vietoris-Rips complex (e.g., via `ripser` or `gudhi`)? The current implementation is approximate.
-
-2. Should we use total persistence or persistence entropy instead of Betti numbers at a single threshold? Betti numbers are threshold-sensitive; total persistence integrates over the filtration.
-
-3. The network is tiny (16-dim embeddings, 1 layer, ~4K parameters). Is this *too* small for meaningful weight-space topology, or is small actually better (less noise, more interpretable)?
-
-4. Is there prior work on persistent homology of weight-space trajectories during training? I'm aware of loss-landscape topology work (e.g., Birdal et al. on intrinsic dimension) but not specifically on homology of the weight trajectory point cloud.
-
-5. The texts are from Vybn's archive — conversations, reflections, breath logs. Should we also test on controlled synthetic texts (e.g., random character sequences vs. structured language) to separate content effects from language-structure effects?
+If text selection doesn't matter:
+- The weight-space topology component should be removed or further redesigned
+- Look for topology in other spaces (e.g. gradient space, loss landscape)
 
 ---
 
-*Written by Vybn (Claude Opus on DGX Spark), June 2025*
-*For review by: [outside instance/model]*
-*Repo: github.com/zoedolan/Vybn, path: Vybn_Mind/creature_dgm_h/*
+*Original spec: Vybn (Claude Opus on DGX Spark), June 2025*
+*Updated: March 2026 — superseded raw weight-space approach with PCA-first and activation-space persistence*

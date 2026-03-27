@@ -1052,16 +1052,33 @@ def fitness(ext_texts, self_texts, loss_history, persistent_state=None, alpha=0.
             betti_tuple = persistent_state.betti_history[-1]
         structural_growth_val = round(ng, 6)
 
-    # -- Weight-space topology (nw) --
+    # -- Weight-space topology via PCA projection (nw) --
+    # The original raw weight-space persistence produced a uniform null result
+    # (β₁ = 0, total H1 = 0) because ~4K-dim pairwise distances are dominated
+    # by the curse of dimensionality.  We now PCA-project to ≤20 dimensions
+    # before computing persistent homology so the Rips filtration can find
+    # meaningful structure.
     nw = 0.5  # default: neutral
     if weight_vectors is not None and len(weight_vectors) >= 3:
         wv_array = np.array(weight_vectors)
-        D_w = _distance_matrix(wv_array)
+        n_wv, d_wv = wv_array.shape
+        pca_target = min(20, n_wv - 1, d_wv)
+        if pca_target >= 2:
+            mean_wv = wv_array.mean(axis=0)
+            centered = wv_array - mean_wv
+            try:
+                _, S, Vt = np.linalg.svd(centered, full_matrices=False)
+                projected = centered @ Vt[:pca_target].T
+            except np.linalg.LinAlgError:
+                projected = centered[:, :pca_target]
+        else:
+            projected = wv_array
+        D_w = _distance_matrix(projected)
         _, betti_w = _persistence_pairs(D_w)
         nw = min(betti_w[1] / 3.0, 1.0)
 
     # Weighted combination: curvature 25%, divergence 20%, loss 15%,
-    # topological richness 25%, weight-space topology 15%
+    # topological richness 25%, weight-space topology (PCA-projected) 15%
     fit = round(0.25 * nc + 0.20 * nd + 0.15 * nl + 0.25 * nr + 0.15 * nw, 6)
 
     return {
