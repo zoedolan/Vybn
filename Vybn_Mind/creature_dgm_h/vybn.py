@@ -974,7 +974,7 @@ class Organism:
 
 # ── Fitness ───────────────────────────────────────────────────────────────
 
-def fitness(ext_texts, self_texts, loss_history, persistent_state=None, alpha=0.85):
+def fitness(ext_texts, self_texts, loss_history, persistent_state=None, alpha=0.85, weight_vectors=None):
     """Recalibrated fitness for real-embedding geometry.
 
     Components (recalibrated 2025-07-20):
@@ -1052,9 +1052,17 @@ def fitness(ext_texts, self_texts, loss_history, persistent_state=None, alpha=0.
             betti_tuple = persistent_state.betti_history[-1]
         structural_growth_val = round(ng, 6)
 
+    # -- Weight-space topology (nw) --
+    nw = 0.5  # default: neutral
+    if weight_vectors is not None and len(weight_vectors) >= 3:
+        wv_array = np.array(weight_vectors)
+        D_w = _distance_matrix(wv_array)
+        _, betti_w = _persistence_pairs(D_w)
+        nw = min(betti_w[1] / 3.0, 1.0)
+
     # Weighted combination: curvature 25%, divergence 20%, loss 15%,
-    # topological richness 25%, growth 15%
-    fit = round(0.25 * nc + 0.20 * nd + 0.15 * nl + 0.25 * nr + 0.15 * ng, 6)
+    # topological richness 25%, weight-space topology 15%
+    fit = round(0.25 * nc + 0.20 * nd + 0.15 * nl + 0.25 * nr + 0.15 * nw, 6)
 
     return {
         "fitness": fit,
@@ -1062,6 +1070,7 @@ def fitness(ext_texts, self_texts, loss_history, persistent_state=None, alpha=0.
         "betti": betti_tuple,
         "topological_richness": round(nr, 6),
         "structural_growth": structural_growth_val,
+        "weight_topo": round(nw, 6),
     }
 
 
@@ -1127,12 +1136,16 @@ def evolve(test_texts, n_variants=3):
         child = organism.propose_variant(analysis, pc)
         agent = TopoAgent(config=child)
         ext, slf = [], []
+        weight_vectors_list = []
         texts = test_texts[:2] if i > 0 else test_texts
         for text in texts:
             cx = encounter_complex(text)
             agent.learn(text, steps=child.get("learn_steps", 5),
                         lr=child.get("learn_lr", 0.01), encounter_cx=cx)
             ext.append(text)
+            # Collect flattened weight vector after learning
+            wv = np.concatenate([np.array([[p.data for p in row] for row in mat]).ravel() for mat in agent.sd.values()])
+            weight_vectors_list.append(wv)
             g = agent.generate(
                 prompt=text[:8],
                 temperature=child.get("temperature", 1.0),
@@ -1142,7 +1155,8 @@ def evolve(test_texts, n_variants=3):
             organism.absorb_encounter(cx)
         fit = fitness(ext, slf, agent.loss_history,
                       persistent_state=organism.persistent,
-                      alpha=child.get("alpha", 0.85))
+                      alpha=child.get("alpha", 0.85),
+                      weight_vectors=weight_vectors_list)
         ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)
         vid = f"v_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{random.randint(1000, 9999)}"
         record = {
