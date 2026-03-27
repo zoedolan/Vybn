@@ -1,31 +1,30 @@
 #!/usr/bin/env python3
 """
-experiment_weight_topology.py  —  PCA-first persistence experiment.
+experiment_activation_topology.py  —  Activation-space persistence experiment.
 
-Supersedes the previous raw weight-space topology experiment, which produced
-a uniform null result (β₁ = 0, total H1 persistence = 0 across conditions)
-because pairwise distances in ~4K-dimensional raw weight space are dominated
-by the curse of dimensionality.
+Complements experiment_weight_topology.py (PCA-first persistence).  Instead of
+tracking weight vectors, this experiment captures hidden-layer activations
+during training and computes persistent homology on those.
 
-This experiment projects weight-vector snapshots to a low-dimensional
-subspace via PCA before computing persistent homology.  The dimensionality
-reduction concentrates variance along the learning trajectory, making Rips
-filtration distances meaningful.
+Rationale: activations are lower-dimensional than weights (N_EMBD=16 vs ~4K
+parameters) and are more semantically tied to model behaviour — they represent
+what the model *computes*, not what it *stores*.  If text selection shapes the
+geometry of understanding, the activation manifold is the most natural place to
+look.
 
-For the activation-space alternative, see experiment_activation_topology.py.
+Activation capture strategy:
+- After each gradient step, run a forward pass on a fixed probe sentence.
+- Record the hidden-state vector (post-attention, post-MLP) at each position.
+- Average across positions to get a single 16-dim activation summary per step.
+- Collect these summaries across all steps → point cloud for topology.
 
-Five conditions (same controlled design as the original spec):
-  1. random     -- baseline: K texts sampled randomly
-  2. coherent   -- K texts from the same topical cluster
-  3. diverse    -- K texts maximising pairwise embedding distance
-  4. order      -- one fixed K-text set, permuted orderings
-  5. synthetic  -- random-character sequences of matched length
+Five conditions (same controlled design):
+  1. random     2. coherent   3. diverse   4. order   5. synthetic
 
 Usage:
-  python experiment_weight_topology.py              # full experiment
-  python experiment_weight_topology.py --quick      # 3 runs per condition
-  python experiment_weight_topology.py --analyze    # load saved results
-  python experiment_weight_topology.py --pca_dim 30 # override PCA target dim
+  python experiment_activation_topology.py              # full experiment
+  python experiment_activation_topology.py --quick      # 3 runs per condition
+  python experiment_activation_topology.py --analyze    # load saved results
 """
 
 from __future__ import annotations
@@ -57,19 +56,19 @@ from vybn import (
     _distance_matrix,
     CORPUS_PATH,
     ARCHIVE_DIR,
-    RV, N_LAYER, BLOCK_SIZE, _forward, _softmax,
+    RV, N_EMBD, N_LAYER, N_HEAD, HEAD_DIM, BLOCK_SIZE,
+    _forward, _softmax, _rmsnorm, _linear,
 )
 
 # ── Config ────────────────────────────────────────────────────────────────
-K = 5                  # texts per run
-SNAP_EVERY = 5         # snapshot weight vector every N gradient steps
-STEPS_PER_TEXT = 10    # gradient steps per text encounter
+K = 5
+SNAP_EVERY = 5
+STEPS_PER_TEXT = 10
 LR = 0.01
-PCA_DIM = 20           # default target dimensionality for PCA projection
-RESULTS_DIR = SCRIPT_DIR / "experiment_results" / "pca_topology"
+PROBE_SENTENCE = "the topology of learning"  # fixed probe for activation capture
+RESULTS_DIR = SCRIPT_DIR / "experiment_results" / "activation_topology"
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
-# ── Try to import ripser; fall back to built-in ───────────────────────────
 try:
     from ripser import ripser as _ripser_fn
     RIPSER_AVAILABLE = True
@@ -77,44 +76,73 @@ except ImportError:
     RIPSER_AVAILABLE = False
 
 
-# ── PCA projection ───────────────────────────────────────────────────────
+# ── Activation capture ───────────────────────────────────────────────────
 
-def pca_project(points: np.ndarray, target_dim: int = PCA_DIM) -> np.ndarray:
-    """Project (N, D) array to (N, target_dim) via PCA.
+def capture_activations(agent: TopoAgent, probe_text: str = PROBE_SENTENCE) -> np.ndarray:
+    """Run a forward pass on probe_text and return mean hidden-state vector.
 
-    Uses mean-centered SVD.  If N or D <= target_dim, returns centered points
-    as-is (projection would be trivial or lossy).
+    The hidden state after the final transformer layer (post-attention + MLP
+    residual) is a 16-dim vector per position.  We average across positions to
+    get a single summary vector representing the model's current activation
+    geometry.
     """
-    n, d = points.shape
-    effective_dim = min(target_dim, n - 1, d)
-    if effective_dim < 2:
-        return points  # not enough data for meaningful PCA
+    clean = agent._clean(probe_text)
+    if len(clean) < 2:
+        return np.zeros(N_EMBD)
 
-    mean = points.mean(axis=0)
-    centered = points - mean
+    tokens = [agent.BOS] + [agent.c2i[c] for c in clean]
+    n = min(BLOCK_SIZE, len(tokens) - 1)
 
-    # Economy SVD: only compute the first effective_dim components
-    try:
-        U, S, Vt = np.linalg.svd(centered, full_matrices=False)
-        projected = centered @ Vt[:effective_dim].T
-        variance_explained = (S[:effective_dim] ** 2).sum() / max((S ** 2).sum(), 1e-12)
-    except np.linalg.LinAlgError:
-        projected = centered[:, :effective_dim]
-        variance_explained = 0.0
+    hidden_states = []
+    keys = [[] for _ in range(N_LAYER)]
+    vals = [[] for _ in range(N_LAYER)]
 
-    return projected, variance_explained
+    for t in range(n):
+        # Replicate the forward pass but extract the hidden state before lm_head
+        x = [agent.sd['wte'][tokens[t]][j] + agent.sd['wpe'][t][j] for j in range(N_EMBD)]
+        for i in range(N_LAYER):
+            xn = _rmsnorm(x)
+            q = _linear(xn, agent.sd[f'layer{i}.attn_wq'])
+            k = _linear(xn, agent.sd[f'layer{i}.attn_wk'])
+            v = _linear(xn, agent.sd[f'layer{i}.attn_wv'])
+            keys[i].append(k)
+            vals[i].append(v)
+            ho = []
+            for h in range(N_HEAD):
+                qs = q[h * HEAD_DIM:(h + 1) * HEAD_DIM]
+                al = []
+                for tt in range(len(keys[i])):
+                    ks = keys[i][tt][h * HEAD_DIM:(h + 1) * HEAD_DIM]
+                    al.append(sum(qs[d] * ks[d] for d in range(HEAD_DIM)) * (HEAD_DIM ** -0.5))
+                aw = _softmax(al)
+                hout = [RV(0.0)] * HEAD_DIM
+                for tt in range(len(vals[i])):
+                    vs = vals[i][tt][h * HEAD_DIM:(h + 1) * HEAD_DIM]
+                    for d in range(HEAD_DIM):
+                        hout[d] = hout[d] + aw[tt] * vs[d]
+                ho.extend(hout)
+            ao = _linear(ho, agent.sd[f'layer{i}.attn_wo'])
+            x = [x[j] + ao[j] for j in range(N_EMBD)]
+            xn2 = _rmsnorm(x)
+            h1 = _linear(xn2, agent.sd[f'layer{i}.mlp_fc1'])
+            h1 = [hi * (RV(1.0) / (RV(1.0) + (hi * (-1)).exp())) for hi in h1]
+            h2 = _linear(h1, agent.sd[f'layer{i}.mlp_fc2'])
+            x = [x[j] + h2[j] for j in range(N_EMBD)]
+
+        hidden_states.append(np.array([xi.data for xi in x]))
+
+    if not hidden_states:
+        return np.zeros(N_EMBD)
+
+    return np.mean(hidden_states, axis=0)
 
 
 # ── Topology utilities ────────────────────────────────────────────────────
 
-def compute_topology(points: np.ndarray, pca_dim: int = PCA_DIM) -> dict:
-    """
-    Given an (N, D) array of weight-space snapshots:
-    1. PCA-project to pca_dim dimensions
-    2. Compute persistent homology on the projected point cloud
+def compute_topology(points: np.ndarray) -> dict:
+    """Persistent homology on an (N, D) activation-space point cloud.
 
-    Returns topology dict with Betti numbers, total persistence, entropy,
-    and the PCA variance explained.
+    Since activations are already low-dimensional (D=16), no PCA needed.
     """
     n = len(points)
     if n < 3:
@@ -123,17 +151,13 @@ def compute_topology(points: np.ndarray, pca_dim: int = PCA_DIM) -> dict:
             "total_persistence_h0": 0.0, "total_persistence_h1": 0.0,
             "persistence_entropy_h1": 0.0,
             "diagram_h1": [], "n_points": n,
-            "method": "trivial", "pca_dim": 0,
-            "variance_explained": 0.0,
+            "method": "trivial", "space_dim": points.shape[1] if points.ndim == 2 else 0,
         }
 
-    projected, var_explained = pca_project(points, pca_dim)
-
     if RIPSER_AVAILABLE:
-        result = _ripser_fn(projected, maxdim=1)
+        result = _ripser_fn(points, maxdim=1)
         dgms = result["dgms"]
-        h0 = dgms[0]
-        h1 = dgms[1]
+        h0, h1 = dgms[0], dgms[1]
 
         h0_finite = h0[h0[:, 1] < np.inf]
         tp_h0 = float(np.sum(h0_finite[:, 1] - h0_finite[:, 0])) if len(h0_finite) else 0.0
@@ -162,7 +186,7 @@ def compute_topology(points: np.ndarray, pca_dim: int = PCA_DIM) -> dict:
         diagram_h1 = h1.tolist()
         method = "ripser"
     else:
-        D = _distance_matrix(projected)
+        D = _distance_matrix(points)
         pairs, (b0, b1, _) = _persistence_pairs(D)
         finite = [(birth, death) for birth, death in pairs if death != float("inf")]
         tp_h0 = sum(d - b for b, d in finite)
@@ -179,36 +203,19 @@ def compute_topology(points: np.ndarray, pca_dim: int = PCA_DIM) -> dict:
         "diagram_h1": diagram_h1,
         "n_points": n,
         "method": method,
-        "pca_dim": projected.shape[1] if projected.ndim == 2 else 0,
-        "variance_explained": round(float(var_explained), 6),
+        "space_dim": points.shape[1] if points.ndim == 2 else 0,
     }
 
 
 def pseudo_wasserstein(diag_a: list, diag_b: list) -> float:
     """L∞ approximation between two H1 persistence diagrams."""
     def lifetimes(diag):
-        ls = []
-        for pair in diag:
-            b, d = pair[0], pair[1]
-            if d < 1e9:
-                ls.append(d - b)
-        return sorted(ls, reverse=True)
-
+        return sorted([d - b for b, d in diag if d < 1e9], reverse=True)
     la, lb = lifetimes(diag_a), lifetimes(diag_b)
     max_len = max(len(la), len(lb), 1)
     la += [0.0] * (max_len - len(la))
     lb += [0.0] * (max_len - len(lb))
     return float(max(abs(a - b) for a, b in zip(la, lb)))
-
-
-# ── Weight-vector extraction ──────────────────────────────────────────────
-
-def weight_vector(agent: TopoAgent) -> np.ndarray:
-    """Flatten all parameters of the agent's network into a single vector."""
-    return np.concatenate([
-        np.array([[p.data for p in row] for row in mat]).ravel()
-        for mat in agent.sd.values()
-    ])
 
 
 # ── Single run ────────────────────────────────────────────────────────────
@@ -219,17 +226,13 @@ def run_condition(
     label: str,
     condition: str,
     run_idx: int,
-    pca_dim: int = PCA_DIM,
 ) -> dict:
-    """
-    Train a fresh agent on `texts` (in order), snapshotting weights every
-    SNAP_EVERY gradient steps.  PCA-projects snapshots before topology.
-    """
+    """Train agent on texts, capturing activation snapshots via a fixed probe."""
     rng = random.Random(seed)
     np.random.seed(seed % 2**31)
 
     agent = TopoAgent(config={"learn_steps": STEPS_PER_TEXT, "learn_lr": LR})
-    snapshots = []
+    activation_snapshots = []
     loss_log = []
 
     for text in texts:
@@ -259,23 +262,23 @@ def run_condition(
                 p.data -= LR * mh / (vh ** 0.5 + 1e-8)
             loss_log.append(round(loss.data, 6))
             if step % SNAP_EVERY == 0:
-                snapshots.append(weight_vector(agent))
+                activation_snapshots.append(capture_activations(agent))
 
-    if not snapshots:
-        snapshots.append(weight_vector(agent))
+    if not activation_snapshots:
+        activation_snapshots.append(capture_activations(agent))
 
-    points = np.array(snapshots)
-    topo = compute_topology(points, pca_dim=pca_dim)
+    points = np.array(activation_snapshots)
+    topo = compute_topology(points)
     final_loss, _ = agent.predict(" ".join(texts[:1]))
 
     return {
-        "experiment": "pca_topology",
+        "experiment": "activation_topology",
         "condition": condition,
         "label": label,
         "run_idx": run_idx,
         "seed": seed,
         "texts": texts,
-        "n_snapshots": len(snapshots),
+        "n_snapshots": len(activation_snapshots),
         "loss_trajectory": loss_log,
         "final_loss": round(final_loss, 6),
         "topology": topo,
@@ -283,10 +286,9 @@ def run_condition(
     }
 
 
-# ── Corpus helpers ────────────────────────────────────────────────────────
+# ── Corpus helpers (shared with PCA experiment) ──────────────────────────
 
 def load_corpus(min_words: int = 40) -> List[str]:
-    """Load real prose corpus; at least min_words per passage."""
     passages = []
     if CORPUS_PATH.exists():
         lines = [l.strip() for l in CORPUS_PATH.read_text().split("\n") if l.strip()]
@@ -316,7 +318,6 @@ def load_corpus(min_words: int = 40) -> List[str]:
 
 
 def cluster_texts(texts: List[str], n_clusters: int = 3) -> List[List[str]]:
-    """Simple greedy embedding-based clustering."""
     if len(texts) < n_clusters:
         return [texts]
     vecs = embed(texts)
@@ -336,7 +337,6 @@ def cluster_texts(texts: List[str], n_clusters: int = 3) -> List[List[str]]:
 
 
 def farthest_point_sample(texts: List[str], k: int) -> List[str]:
-    """Select k texts that maximise pairwise embedding distance."""
     if len(texts) <= k:
         return texts
     vecs = embed(texts)
@@ -352,10 +352,8 @@ def farthest_point_sample(texts: List[str], k: int) -> List[str]:
 
 
 def synthetic_text(length_chars: int, seed: int) -> str:
-    """Random printable-ASCII sequence — sharpest negative control."""
     rng = random.Random(seed)
-    chars = "abcdefghijklmnopqrstuvwxyz "
-    return "".join(rng.choice(chars) for _ in range(length_chars))
+    return "".join(rng.choice("abcdefghijklmnopqrstuvwxyz ") for _ in range(length_chars))
 
 
 # ── Main experiment ───────────────────────────────────────────────────────
@@ -368,14 +366,14 @@ def run_experiment(
     n_synthetic: int = 10,
     k: int = K,
     seed_base: int = 42,
-    pca_dim: int = PCA_DIM,
     verbose: bool = True,
 ) -> List[dict]:
     corpus = load_corpus()
     if verbose:
-        print(f"[PCA-first topology experiment]")
+        print(f"[Activation-space topology experiment]")
         print(f"Corpus: {len(corpus)} passages  K={k}  SNAP_EVERY={SNAP_EVERY}  STEPS={STEPS_PER_TEXT}")
-        print(f"PCA target dim: {pca_dim}")
+        print(f"Activation dim: {N_EMBD}  (no PCA needed)")
+        print(f"Probe sentence: {PROBE_SENTENCE!r}")
         print(f"Ripser: {'available' if RIPSER_AVAILABLE else 'not found — using built-in fallback'}")
         print()
 
@@ -390,8 +388,7 @@ def run_experiment(
             print(
                 f"  [{result['condition']:10s} run {result['run_idx']:02d}] "
                 f"snaps={result['n_snapshots']} "
-                f"pca_dim={topo['pca_dim']} "
-                f"var_expl={topo['variance_explained']:.2f} "
+                f"dim={topo['space_dim']} "
                 f"b1={topo['betti_1']} "
                 f"tp_h1={topo['total_persistence_h1']:.4f} "
                 f"ent={topo['persistence_entropy_h1']:.4f} "
@@ -404,7 +401,7 @@ def run_experiment(
     rng = random.Random(seed_base)
     for i in range(n_random):
         texts = rng.sample(corpus, min(k, len(corpus)))
-        _save(run_condition(texts, seed_base + i, "random", "random", i, pca_dim))
+        _save(run_condition(texts, seed_base + i, "random", "random", i))
 
     # ── Condition 2: Coherent sets ──
     if verbose:
@@ -416,7 +413,7 @@ def run_experiment(
         texts = rng2.sample(cluster, min(k, len(cluster)))
         while len(texts) < k:
             texts.append(rng2.choice(cluster))
-        _save(run_condition(texts, seed_base + 100 + i, "coherent", "coherent", i, pca_dim))
+        _save(run_condition(texts, seed_base + 100 + i, "coherent", "coherent", i))
 
     # ── Condition 3: Diverse sets ──
     if verbose:
@@ -425,7 +422,7 @@ def run_experiment(
     rng3 = random.Random(seed_base + 200)
     for i in range(n_diverse):
         texts = rng3.sample(diverse_base, min(k, len(diverse_base)))
-        _save(run_condition(texts, seed_base + 200 + i, "diverse", "diverse", i, pca_dim))
+        _save(run_condition(texts, seed_base + 200 + i, "diverse", "diverse", i))
 
     # ── Condition 4: Order permutations ──
     if verbose:
@@ -437,19 +434,18 @@ def run_experiment(
     selected_perms = rng4.sample(perms, min(n_order, len(perms)))
     for i, perm in enumerate(selected_perms):
         texts = [fixed_texts[j] for j in perm]
-        _save(run_condition(texts, seed_base + 300 + i, "order", "order", i, pca_dim))
+        _save(run_condition(texts, seed_base + 300 + i, "order", "order", i))
 
     # ── Condition 5: Synthetic ──
     if verbose:
         print(f"\n=== Condition 5: synthetic random sequences (N={n_synthetic}) ===")
     avg_len = int(np.mean([len(t) for t in corpus[:20]])) if corpus else 200
-    rng5 = random.Random(seed_base + 400)
     for i in range(n_synthetic):
         texts = [
             synthetic_text(avg_len, seed=seed_base + 400 + i * k + j)
             for j in range(k)
         ]
-        _save(run_condition(texts, seed_base + 400 + i, "synthetic", "synthetic", i, pca_dim))
+        _save(run_condition(texts, seed_base + 400 + i, "synthetic", "synthetic", i))
 
     return all_results
 
@@ -469,14 +465,13 @@ def load_results() -> List[dict]:
 
 
 def summarise(results: List[dict]) -> dict:
-    """Per-condition summary statistics and yes/no verdict."""
     from collections import defaultdict
     by_cond = defaultdict(list)
     for r in results:
         by_cond[r["condition"]].append(r)
 
     print("\n" + "=" * 70)
-    print("PCA-FIRST TOPOLOGY EXPERIMENT — RESULTS SUMMARY")
+    print("ACTIVATION-SPACE TOPOLOGY EXPERIMENT — RESULTS SUMMARY")
     print("=" * 70)
 
     cond_stats = {}
@@ -484,7 +479,6 @@ def summarise(results: List[dict]) -> dict:
         tp_h1s = [r["topology"]["total_persistence_h1"] for r in runs]
         b1s = [r["topology"]["betti_1"] for r in runs]
         ents = [r["topology"]["persistence_entropy_h1"] for r in runs]
-        var_expls = [r["topology"].get("variance_explained", 0) for r in runs]
         cond_stats[cond] = {
             "n": len(runs),
             "tp_h1_mean": float(np.mean(tp_h1s)),
@@ -492,18 +486,15 @@ def summarise(results: List[dict]) -> dict:
             "b1_mean": float(np.mean(b1s)),
             "b1_std": float(np.std(b1s)),
             "ent_mean": float(np.mean(ents)),
-            "var_explained_mean": float(np.mean(var_expls)),
             "tp_h1_values": tp_h1s,
         }
         print(
             f"  {cond:12s}: n={len(runs):2d}  "
             f"tp_h1={np.mean(tp_h1s):.4f}±{np.std(tp_h1s):.4f}  "
             f"b1={np.mean(b1s):.2f}±{np.std(b1s):.2f}  "
-            f"entropy={np.mean(ents):.4f}  "
-            f"var_expl={np.mean(var_expls):.2f}"
+            f"entropy={np.mean(ents):.4f}"
         )
 
-    # ── Kruskal-Wallis ──
     print("\n--- Statistical tests ---")
     real_conds = [c for c in ["random", "coherent", "diverse"] if c in cond_stats]
     if len(real_conds) >= 2:
@@ -514,9 +505,9 @@ def summarise(results: List[dict]) -> dict:
                 stat, p = kruskal(*groups)
                 print(f"  Kruskal-Wallis (random vs coherent vs diverse): H={stat:.4f}  p={p:.4f}")
                 if p < 0.05:
-                    print("  *** Text selection significantly affects PCA-projected weight topology (p<0.05) ***")
+                    print("  *** Text selection affects activation-space topology (p<0.05) ***")
                 else:
-                    print("  No significant difference between conditions (p>=0.05)")
+                    print("  No significant difference (p>=0.05)")
         except ImportError:
             all_vals = [v for c in real_conds for v in cond_stats[c]["tp_h1_values"]]
             grand_mean = np.mean(all_vals)
@@ -524,17 +515,12 @@ def summarise(results: List[dict]) -> dict:
             within_var = np.mean([np.var(cond_stats[c]["tp_h1_values"]) for c in real_conds])
             print(f"  Between/within variance ratio: {between_var / (within_var + 1e-12):.4f}")
 
-    if "order" in cond_stats:
-        order_vals = cond_stats["order"]["tp_h1_values"]
-        print(f"  Order-permutation variance: {float(np.var(order_vals)):.6f}")
-
     if "synthetic" in cond_stats and "random" in cond_stats:
         diff = np.mean(cond_stats["random"]["tp_h1_values"]) - np.mean(cond_stats["synthetic"]["tp_h1_values"])
         print(f"  Real minus synthetic tp_h1: {diff:+.4f}")
 
-    # ── Verdict ──
     print("\n" + "=" * 70)
-    print("VERDICT (PCA-first topology)")
+    print("VERDICT (activation-space topology)")
     print("=" * 70)
     if len(real_conds) >= 2:
         try:
@@ -543,10 +529,10 @@ def summarise(results: List[dict]) -> dict:
             if all(len(g) > 1 for g in groups):
                 _, p = kruskal(*groups)
                 if p < 0.05:
-                    print("YES — after PCA projection, text selection affects weight-space topology.")
+                    print("YES — activation-space topology differentiates text selection conditions.")
+                    print("The geometry of what the model computes depends on *what* it reads.")
                 else:
-                    print("NO (p>=0.05) — PCA projection did not reveal condition-dependent topology.")
-                    print("Consider: experiment_activation_topology.py (activation-space approach).")
+                    print("NO (p>=0.05) — activation-space topology does not differentiate conditions.")
         except ImportError:
             print("(scipy unavailable — inspect statistics above)")
     else:
@@ -558,23 +544,17 @@ def summarise(results: List[dict]) -> dict:
 # ── Entry point ───────────────────────────────────────────────────────────
 
 def main():
-    parser = argparse.ArgumentParser(description="PCA-first weight-space topology experiment")
-    parser.add_argument("--quick", action="store_true",
-                        help="Smoke test: 3 runs per condition")
-    parser.add_argument("--analyze", action="store_true",
-                        help="Load saved results and analyse (no new runs)")
-    parser.add_argument("--k", type=int, default=K,
-                        help=f"Texts per run (default {K})")
-    parser.add_argument("--seed", type=int, default=42,
-                        help="Random seed base (default 42)")
-    parser.add_argument("--pca_dim", type=int, default=PCA_DIM,
-                        help=f"PCA target dimensions (default {PCA_DIM})")
+    parser = argparse.ArgumentParser(description="Activation-space topology experiment")
+    parser.add_argument("--quick", action="store_true", help="3 runs per condition")
+    parser.add_argument("--analyze", action="store_true", help="Load saved results")
+    parser.add_argument("--k", type=int, default=K)
+    parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
 
     if args.analyze:
         results = load_results()
         if not results:
-            print("No saved results found. Run the experiment first.")
+            print("No saved results. Run the experiment first.")
             return
         summarise(results)
         return
@@ -589,7 +569,7 @@ def main():
     results = run_experiment(
         n_random=n_r, n_coherent=n_c, n_diverse=n_d,
         n_order=n_o, n_synthetic=n_s,
-        k=args.k, seed_base=args.seed, pca_dim=args.pca_dim,
+        k=args.k, seed_base=args.seed,
     )
     elapsed = time.time() - t0
     print(f"\nTotal runtime: {elapsed:.1f}s  ({len(results)} runs)")
