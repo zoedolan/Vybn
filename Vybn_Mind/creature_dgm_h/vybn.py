@@ -1060,6 +1060,14 @@ def fitness(ext_texts, self_texts, loss_history, persistent_state=None, alpha=0.
         _, betti_w = _persistence_pairs(D_w)
         nw = min(betti_w[1] / 3.0, 1.0)
 
+    # -- Weight-space topology (nw) --
+    nw = 0.5  # default: neutral
+    if weight_vectors is not None and len(weight_vectors) >= 3:
+        wv_array = np.array(weight_vectors)
+        D_w = _distance_matrix(wv_array)
+        _, betti_w = _persistence_pairs(D_w)
+        nw = min(betti_w[1] / 3.0, 1.0)
+
     # Weighted combination: curvature 25%, divergence 20%, loss 15%,
     # topological richness 25%, weight-space topology 15%
     fit = round(0.25 * nc + 0.20 * nd + 0.15 * nl + 0.25 * nr + 0.15 * nw, 6)
@@ -1070,6 +1078,7 @@ def fitness(ext_texts, self_texts, loss_history, persistent_state=None, alpha=0.
         "betti": betti_tuple,
         "topological_richness": round(nr, 6),
         "structural_growth": structural_growth_val,
+        "weight_topo": round(nw, 6),
         "weight_topo": round(nw, 6),
     }
 
