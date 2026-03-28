@@ -209,7 +209,7 @@ def build_creature_loop_qasm(bloch_angles: List[tuple]) -> str:
 
 def run_on_ibm(circuits_qasm: List[str], token: Optional[str] = None,
                shots: int = 4096) -> List[dict]:
-    """Submit QASM circuits to IBM hardware or fall back to AerSimulator.
+        """Submit QASM circuits to IBM quantum hardware. No simulator fallback.
 
     Returns a list of count dicts, one per circuit.
     """
@@ -217,44 +217,32 @@ def run_on_ibm(circuits_qasm: List[str], token: Optional[str] = None,
         from qiskit import QuantumCircuit
     except ImportError:
         raise ImportError(
-            "qiskit is required. Install with: pip install qiskit qiskit-aer"
+            "qiskit is required. Install with: pip install qiskit qiskit-ibm-runtime"
         )
 
     qcs = [QuantumCircuit.from_qasm_str(q) for q in circuits_qasm]
 
         token = token or os.environ.get("QISKIT_IBM_TOKEN") or os.environ.get("IBM_QUANTUM_TOKEN")
-    if token:
-        try:
-            from qiskit_ibm_runtime import QiskitRuntimeService, SamplerV2
-                            channel = os.environ.get("QISKIT_IBM_CHANNEL", "ibm_quantum")
-                instance = os.environ.get("QISKIT_IBM_INSTANCE")
-                service = QiskitRuntimeService(channel=channel, token=token, instance=instance)
-            backend = service.least_busy(simulator=False, operational=True)
-            print(f"  IBM backend: {backend.name}")
-            sampler = SamplerV2(backend)
-            job = sampler.run(qcs, shots=shots)
-            result = job.result()
-            all_counts = []
-            for pub_result in result:
-                counts = pub_result.data.c.get_counts()
-                all_counts.append(counts)
-            return all_counts
-        except Exception as exc:
-            print(f"  IBM submission failed ({exc}); falling back to AerSimulator")
+    if not token:
+        raise RuntimeError(
+            "No IBM Quantum token found. Set QISKIT_IBM_TOKEN (or IBM_QUANTUM_TOKEN) "
+            "in your environment. This experiment runs on real quantum hardware only."
+        )
 
-    # Aer fallback
-    try:
-        from qiskit_aer import AerSimulator
-    except ImportError:
-        from qiskit.providers.aer import AerSimulator
-    sim = AerSimulator()
+    from qiskit_ibm_runtime import QiskitRuntimeService, SamplerV2
+    channel = os.environ.get("QISKIT_IBM_CHANNEL", "ibm_quantum")
+    instance = os.environ.get("QISKIT_IBM_INSTANCE")
+    service = QiskitRuntimeService(channel=channel, token=token, instance=instance)
+    backend = service.least_busy(simulator=False, operational=True)
+    print(f"\u26a1 IBM backend: {backend.name}")
+    sampler = SamplerV2(backend)
+    job = sampler.run(qcs, shots=shots)
+    result = job.result()
     all_counts = []
-    for qc in qcs:
-        job = sim.run(qc, shots=shots)
-        result = job.result()
-        all_counts.append(result.get_counts(qc))
+    for pub_result in result:
+        counts = pub_result.data.c.get_counts()
+        all_counts.append(counts)
     return all_counts
-
 
 WINDING_EXPERIMENT_SUITE = [
     {
@@ -550,7 +538,7 @@ SEED_FOR_LIVING_LOOP = {
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Winding-number topological probe: run circuits on IBM/Aer."
+        description="Winding-number topological probe: run circuits on IBM."
     )
     parser.add_argument("--basin-json", type=str, default=None,
                         help="Path to basin geometry JSON to derive a creature loop")
@@ -603,12 +591,10 @@ def main() -> None:
         all_counts = run_on_ibm(qasm_list, shots=args.shots)
     except ImportError as exc:
         print(f"\nCannot execute: {exc}")
-        print("Install qiskit + qiskit-aer to run circuits locally.")
-        return
-
+        print("Install qiskit + qiskit-ibm-runtime to run on IBM hardware.")
+                
     # Attach counts to suite entries
-    for exp, counts in zip(suite, all_counts):
-        exp["counts"] = counts
+            "counts"] = counts
         total = sum(counts.values())
         p0 = counts.get("0", 0) / total if total else 0
         print(f"  {exp['circuit_name']:40s}  P(0)={p0:.4f}  counts={counts}")
