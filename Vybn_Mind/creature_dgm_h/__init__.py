@@ -4,3 +4,8 @@ from .vybn import (
     load_archive, evolve, fm_available, fm_complete,
     DEFAULT_RULES,
 )
+
+# Absorb __main__.py so `python -m Vybn_Mind.creature_dgm_h` still works
+if __name__ == "__main__":
+    from .vybn import main
+    main()
