@@ -201,8 +201,8 @@ def build_creature_loop_qasm(bloch_angles: List[tuple]) -> str:
         f'// Creature-derived loop: {len(bloch_angles)} steps from weight trajectory PCA',
     ]
     for theta, phi in bloch_angles:
-        lines.append(f'rz({math.degrees(phi):.6f}) q[0];')
-        lines.append(f'ry({math.degrees(theta):.6f}) q[0];')
+                lines.append(f'rz({phi:.6f}) q[0];')
+                lines.append(f'ry({theta:.6f}) q[0];')
     lines += ['h q[0];', 'measure q[0] -> c[0];']
     return '\n'.join(lines)
 
@@ -222,11 +222,13 @@ def run_on_ibm(circuits_qasm: List[str], token: Optional[str] = None,
 
     qcs = [QuantumCircuit.from_qasm_str(q) for q in circuits_qasm]
 
-    token = token or os.environ.get("IBM_QUANTUM_TOKEN")
+        token = token or os.environ.get("QISKIT_IBM_TOKEN") or os.environ.get("IBM_QUANTUM_TOKEN")
     if token:
         try:
             from qiskit_ibm_runtime import QiskitRuntimeService, SamplerV2
-            service = QiskitRuntimeService(channel="ibm_quantum", token=token)
+                            channel = os.environ.get("QISKIT_IBM_CHANNEL", "ibm_quantum")
+                instance = os.environ.get("QISKIT_IBM_INSTANCE")
+                service = QiskitRuntimeService(channel=channel, token=token, instance=instance)
             backend = service.least_busy(simulator=False, operational=True)
             print(f"  IBM backend: {backend.name}")
             sampler = SamplerV2(backend)
