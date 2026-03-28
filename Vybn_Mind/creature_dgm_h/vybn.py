@@ -38,6 +38,12 @@ import numpy as np
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent.parent
 LLAMA_URL = os.getenv("LLAMA_URL", "http://127.0.0.1:8000")
+
+# ── breathe-winding (quantum-aware Nemotron generation) ──────────────────
+try:
+    from breathe_winding import cmd_breathe_winding
+except ImportError:
+    cmd_breathe_winding = None
 MODEL_NAME = os.getenv("VYBN_MODEL", "local")
 ARCHIVE_DIR = SCRIPT_DIR / "archive"
 CHECKPOINT_PATH = REPO_ROOT / "spark" / "microgpt_mirror" / "trained_checkpoint.json"
@@ -1564,6 +1570,7 @@ def main():
     sub = parser.add_subparsers(dest="cmd")
     p = sub.add_parser("breathe"); p.add_argument("text")
     sub.add_parser("breathe-live")
+    sub.add_parser("breathe-winding")
     p = sub.add_parser("evolve"); p.add_argument("--n", type=int, default=3)
     sub.add_parser("status")
     sub.add_parser("audit")
@@ -1571,6 +1578,7 @@ def main():
     {
         "breathe": lambda: cmd_breathe(args.text),
         "breathe-live": cmd_breathe_live,
+        "breathe-winding": cmd_breathe_winding,
         "evolve": lambda: cmd_evolve(args.n),
         "status": cmd_status,
         "audit": cmd_audit,
