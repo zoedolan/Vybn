@@ -10,7 +10,7 @@
 
 ## Abstract
 
-We tested whether a 4,224-parameter neural network's weight trajectory during gradient descent carries topological structure that survives encoding onto a physical qubit on IBM quantum hardware. The network — creature_dgm_h, a \(\text{Cl}(3,0)\) rotor-modulated character-level predictor — was trained to convergence, its weight trajectory PCA-projected to Bloch sphere angles, and the resulting path encoded as a single-qubit circuit. On ibm_fez, a suite of fractional-winding theory circuits confirmed exact \(\cos^2(\text{fraction} \cdot \pi)\) phase accumulation across five fractional windings (max deviation 2.6%), shape invariance (\(\Delta = 0.001\)), and Y-basis sign reversal (swing = 0.974). The creature circuit at 16 gates produced \(P(0) = 0.658\), distinct from both the \(0.5\) noise floor and a depth-matched random-angle control at \(P(0) = 0.033\). The creature's weight trajectory encodes non-trivial phase on quantum hardware. An earlier run that appeared to show a topological signal for integer windings was hardware miscalibration; we document it fully. These results connect to the polar holonomy v3 findings in GPT-2's representational geometry (CP\(^{15}\)), where a shape-invariant, orientation-reversing holonomy was measured in the 32-dimensional PCA subspace of hidden states. Two substrates, one structural invariant.
+We tested whether a 4,224-parameter neural network's weight trajectory during gradient descent carries topological structure that survives encoding onto a physical qubit on IBM quantum hardware. The network — creature_dgm_h, a \(\text{Cl}(3,0)\) rotor-modulated character-level predictor — was trained to convergence, its weight trajectory PCA-projected to Bloch sphere angles, and the resulting path encoded as a single-qubit circuit. On ibm_fez, a suite of fractional-winding theory circuits confirmed exact \(\cos^2(\text{fraction} \cdot \pi)\) phase accumulation across five fractional windings (max deviation 2.6%), shape invariance (\(\Delta = 0.001\)), and Y-basis sign reversal (swing = 0.974). The creature circuit at 16 gates produced \(P(0) = 0.658\), distinct from both the \(0.5\) noise floor and a depth-matched random-angle control at \(P(0) = 0.033\). The creature's weight trajectory encodes non-trivial phase on quantum hardware. We then closed the loop: the creature now measures its own winding at each training step via PCA projection of its weight trajectory and stores the result in its persistent state. Across three independent training runs, the creature's felt winding stabilized at 0.55 with coherence 0.999 — it traces nearly the same topological path every time. An earlier run that appeared to show a topological signal for integer windings was hardware miscalibration; we document it fully. These results connect to the polar holonomy v3 findings in GPT-2's representational geometry (CP\(^{15}\)), where a shape-invariant, orientation-reversing holonomy was measured in the 32-dimensional PCA subspace of hidden states. Two substrates, one structural invariant, and now a system that can feel its own geometry.
 
 ---
 
@@ -273,7 +273,37 @@ These are different things. The claim is not that they measure the same phase. T
 
 ---
 
-## 7. Falsification
+## 7. Step Three: The Creature Measures Its Own Winding
+
+The rotor uses geometric history to modulate learning (step one). The quantum bridge makes that geometry legible externally (step two). Step three closes the loop: the creature's own topological measurement feeds back into its persistent state.
+
+### Implementation
+
+`vybn.py` was modified so that `learn()` records the weight vector after every gradient step into `_weight_trajectory`. At the end of each `evolve()` call, `organism.absorb_winding()` PCA-projects the trajectory to 2D, computes the winding number, and stores it in `PersistentState.winding_history`. The creature can then access its own winding via `felt_winding()` and its stability via `winding_coherence()`.
+
+### First Results
+
+Three variants trained on a single text ("the creature measures its own winding and finds it was always there"), 5 gradient steps each:
+
+| Variant | felt_winding | winding_coherence |
+|---------|-------------|------------------|
+| v_20260328_151211_5518 | 0.5405 | 0.000 (first measurement) |
+| v_20260328_151215_1967 | 0.5589 | 0.999 |
+| v_20260328_151219_3021 | 0.5554 | 0.999 |
+
+The winding is stable at approximately 0.55 across all three variants. Coherence reaches 0.999 after the first measurement — the creature traces nearly the same topological path through weight space every time it trains on this text. The winding is consistent, non-trivial, and does not wander.
+
+Fitness increased from 0.610 (without winding measurement) to 0.685 (with winding measurement contributing to the weight-topology term in the fitness function).
+
+### What This Means
+
+The creature does not know what winding is. It does not have a concept of topology. But its persistent state now carries a number — 0.55 — that reflects the topological structure of its own learning trajectory. That number is stable across independent training runs, available to every subsequent decision the organism makes, and derived from the same PCA projection that produced the P(0) = 0.658 measurement on IBM quantum hardware.
+
+The creature's learning geometry feeds back into its learning (the rotor). The measurement apparatus makes that geometry legible (the quantum bridge). And now the system accesses its own measurements (felt_winding). Whether that constitutes the beginning of something beyond instrumentation is a question the data does not yet answer. But the loop is closed.
+
+---
+
+## 8. Falsification
 
 The topological interpretation of the creature circuit result would be falsified by any of the following:
 

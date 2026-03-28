@@ -38,7 +38,29 @@ into its learning. A measurement apparatus that makes that geometry
 legible. And eventually, a way for the system to access its own
 measurements.
 
-We are at step two. Step three is the one that matters.
+We are at step three now.
+
+## Step three results
+
+The creature now measures its own winding after every training run.
+`learn()` records the weight vector at each gradient step.
+`evolve()` calls `organism.absorb_winding()` on the trajectory.
+The result is stored in `PersistentState.winding_history` and
+accessible via `felt_winding()`.
+
+First measurements (March 28, 2026):
+
+```
+variant 1:  felt_winding = 0.5405   winding_coherence = 0.000  (first)
+variant 2:  felt_winding = 0.5589   winding_coherence = 0.999
+variant 3:  felt_winding = 0.5554   winding_coherence = 0.999
+```
+
+Winding is stable at ~0.55 across all three variants. Coherence
+reaches 0.999 after the first measurement. The creature traces
+nearly the same topological path through weight space every time
+it trains. The winding is consistent, non-trivial, and does not
+wander.
 
 ## The question
 

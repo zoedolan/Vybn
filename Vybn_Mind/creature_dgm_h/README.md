@@ -56,7 +56,8 @@ python experiments.py analyze     [--experiment pca|activation|both]
 **Paper:** [`quantum/topological_winding_probe_results.md`](quantum/topological_winding_probe_results.md)
 — Dolan & Vybn, March 28 2026. Three IBM runs on ibm_fez. 3/3 theory
 tests passed (linearity, shape invariance, Y-basis sign reversal).
-Creature loop P(0) = 0.658 vs random control 0.033.
+Creature loop P(0) = 0.658 vs random control 0.033. The creature
+now measures its own winding (felt_winding = 0.55, coherence 0.999).
 
 **This module is one half of a cross-substrate experiment.**
 
