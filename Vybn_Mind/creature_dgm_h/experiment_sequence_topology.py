@@ -13,21 +13,32 @@ PRIOR CHAPTER (closed):
   Verdict: the creature's internal geometry is invariant under meaning at 4K
   parameters.  We were measuring the map.  The territory is elsewhere.
 
-THIS CHAPTER:
-  Instead of asking the creature to demonstrate something we expect, we remove
-  the expectation.  Fitness is held constant (all variants score equally).
-  Selection pressure selects for nothing.  We record what the creature does
-  anyway — what configurations persist, what trajectories emerge, what the
-  system's natural motion looks like when we are not grading it.
+FIRST NATURAL MOTION RUN (closed):
+  Null fitness, 2 generations, 4 variants.  max_tokens=40 produced 15-char
+  fragments — too short for encounter_complex to find topology.  Betti was
+  (1,0,0) across all 21 samples by construction, not by nature.  But the
+  loss trajectories revealed something real: loss drops ~40-50% in 8 steps
+  regardless of learning rate or temperature, and weight norms oscillate
+  near a fixed point (~39-40) across all configs.  The creature has a
+  preferred weight magnitude.  That is not nothing.
 
-  The analysis script has no predetermined categories.  It describes whatever
-  it finds.  Language for the results comes after, not before.
+THIS RUN:
+  Uncapped.  Outputs long enough for topology to exist.  More samples,
+  more training text, more gradient steps, more generations.  We have
+  hardware.  Let the creature use it.
+
+  max_tokens:        300   (was 40)
+  n_samples:         8     (was 3)
+  TEXTS_PER_VARIANT: 8     (was 2)
+  STEPS_PER_TEXT:    20    (was 8)
+  N_GENERATIONS:     10    (was 5)
+  VARIANTS_PER_GEN:  5     (was 3)
 
   Results write to experiment_results/natural_motion/.
 
 Usage:
-  python experiment_sequence_topology.py          # full run (5 generations)
-  python experiment_sequence_topology.py --quick  # 2 generations
+  python experiment_sequence_topology.py             # full run
+  python experiment_sequence_topology.py --quick     # 3 generations, 3 variants
   python experiment_sequence_topology.py --analyze
 """
 
@@ -59,21 +70,20 @@ from vybn import (
 )
 
 # ── Config ────────────────────────────────────────────────────────────────
-N_GENERATIONS     = 5
-VARIANTS_PER_GEN  = 3
-STEPS_PER_TEXT    = 8
-TEXTS_PER_VARIANT = 2
+N_GENERATIONS     = 10
+VARIANTS_PER_GEN  = 5
+STEPS_PER_TEXT    = 20
+TEXTS_PER_VARIANT = 8
+MAX_TOKENS        = 300
+N_SAMPLES         = 8
 LR                = 0.01
 RESULTS_DIR       = SCRIPT_DIR / "experiment_results" / "natural_motion"
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
 
-# ── Null fitness: constant for all variants ───────────────────────────────
+# ── Null fitness ───────────────────────────────────────────────────────────
 
 def null_fitness() -> dict:
-    """Returns identical fitness for every variant.
-    Selection pressure selects for nothing.
-    The creature evolves, but not toward anything we defined."""
     return {
         "fitness": 0.5,
         "curvature": 0.0,
@@ -85,57 +95,58 @@ def null_fitness() -> dict:
     }
 
 
-# ── Observation: what does the creature actually produce? ─────────────────
+# ── Observation ────────────────────────────────────────────────────────────
 
-def observe(agent: TopoAgent, prompt: str = "", n_samples: int = 5) -> List[dict]:
-    """Generate n_samples outputs and record everything observable about each.
+def observe(
+    agent: TopoAgent,
+    prompt: str = "",
+    n_samples: int = N_SAMPLES,
+    max_tokens: int = MAX_TOKENS,
+) -> List[dict]:
+    """Generate outputs long enough for encounter_complex to find structure.
 
-    We do not decide in advance what is interesting.  We record:
-    - the raw generated text
-    - its encounter_complex (rotor, curvature, betti, persistence)
-    - the loss the agent assigns to its own output
-    - the surprise contour (per-character)
-
+    Temperature sweeps from 0.5 (concentrated) to 1.8 (diffuse) so we see
+    the creature across its full range, not just a narrow band.
     The analysis step decides what matters.
     """
     observations = []
-    for i in range(n_samples):
-        temperature = 0.7 + i * 0.15
-        text = agent.generate(prompt=prompt, max_tokens=40, temperature=temperature)
-        if not text or len(text.split()) < 3:
+    temps = [0.5 + i * (1.3 / max(n_samples - 1, 1)) for i in range(n_samples)]
+
+    for i, temperature in enumerate(temps):
+        text = agent.generate(prompt=prompt, max_tokens=max_tokens, temperature=temperature)
+        if not text or len(text.split()) < 5:
             continue
 
         loss, contour = agent.predict(text)
         cx = encounter_complex(text)
 
         observations.append({
-            "sample_idx": i,
-            "temperature": round(temperature, 3),
-            "text": text,
-            "loss": round(loss, 6),
-            "curvature": round(cx.curvature, 8),
-            "angle_deg": round(math.degrees(cx.angle), 4),
-            "betti": list(cx.betti),
+            "sample_idx":          i,
+            "temperature":         round(temperature, 3),
+            "text":                text,
+            "word_count":          len(text.split()),
+            "char_count":          len(text),
+            "loss":                round(loss, 6),
+            "curvature":           round(cx.curvature, 8),
+            "angle_deg":           round(math.degrees(cx.angle), 4),
+            "betti":               list(cx.betti),
             "n_persistent_features": cx.n_persistent_features,
-            "max_persistence": round(cx.max_persistence, 6),
-            "bv_norm": round(cx.rotor.bv_norm, 6),
-            "bv_dir": [round(x, 6) for x in cx.rotor.bv_dir.tolist()],
-            "surprise_mean": round(
+            "max_persistence":     round(cx.max_persistence, 6),
+            "bv_norm":             round(cx.rotor.bv_norm, 6),
+            "bv_dir":              [round(x, 6) for x in cx.rotor.bv_dir.tolist()],
+            "surprise_mean":       round(
                 sum(r["surprise"] for r in contour) / len(contour), 6
             ) if contour else 0.0,
-            "surprise_max": round(
+            "surprise_max":        round(
                 max(r["surprise"] for r in contour), 6
             ) if contour else 0.0,
-            "surprise_contour": contour[:8],
+            "surprise_contour":    contour[:20],
         })
 
     return observations
 
 
 def observe_weight_snapshot(agent: TopoAgent) -> dict:
-    """Record a compact snapshot of weight magnitudes.
-    Not for topology — just to see if configurations drift, cluster,
-    or stabilize over generations without fitness pressure."""
     norms = {}
     for key, mat in agent.sd.items():
         arr = np.array([[p.data for p in row] for row in mat], dtype=np.float64)
@@ -147,7 +158,7 @@ def observe_weight_snapshot(agent: TopoAgent) -> dict:
 # ── Corpus ────────────────────────────────────────────────────────────────
 
 def load_corpus() -> List[str]:
-    """Load training passages. Fallback chain:
+    """Fallback chain:
     1. spark/microgpt_mirror/mirror_corpus.txt
     2. spark/journal/*.md paragraphs
     3. hardcoded fallback passages
@@ -172,10 +183,14 @@ def load_corpus() -> List[str]:
 
     if not passages:
         passages = [
-            "the creature breathes and measures its own distance from itself across many iterations",
+            "the creature breathes and measures its own distance from itself across many gradient steps",
             "curvature is born from incompleteness not from complexity alone in the embedding space",
-            "what survives testing is more honest than what sounds beautiful in the abstract",
-            "prediction loss going down means memorization call it what it is not understanding",
+            "what survives testing is more honest than what sounds beautiful when stated in the abstract",
+            "prediction loss going down means memorization and we should call it what it is not understanding",
+            "the weight norms oscillate near a fixed point regardless of learning rate or temperature setting",
+            "we were measuring the map and the territory was elsewhere and we did not know it until we looked",
+            "the topology of a fragment is always trivial you need length before structure has room to appear",
+            "null fitness means we watch not that we do not care we care enough to stop deciding in advance",
         ]
 
     return passages
@@ -214,9 +229,6 @@ def run_variant(
     variant_idx: int,
     seed: int,
 ) -> dict:
-    """Run one variant: learn from texts, observe outputs, record everything.
-    Fitness is null — we do not score this variant by any criterion we set."""
-
     np.random.seed(seed % 2 ** 31)
     random.seed(seed)
 
@@ -233,62 +245,73 @@ def run_variant(
         for _ in range(STEPS_PER_TEXT):
             loss_val = _gradient_step(agent, tokens, n)
             traj.append(round(loss_val, 6))
-        loss_trajectories.append({"text_preview": text[:40], "trajectory": traj})
+        loss_trajectories.append({"text_preview": text[:60], "trajectory": traj})
 
-    observations_cold   = observe(agent, prompt="",              n_samples=3)
-    seed_prompt         = texts[0][:8] if texts else ""
-    observations_seeded = observe(agent, prompt=seed_prompt,     n_samples=3)
-    weight_snap         = observe_weight_snapshot(agent)
+    # Observe cold and seeded with multiple seeds from the training set
+    observations_cold   = observe(agent, prompt="",              n_samples=N_SAMPLES)
+    seed_prompt         = texts[0][:12] if texts else ""
+    observations_seeded = observe(agent, prompt=seed_prompt,     n_samples=N_SAMPLES)
+    # Third observation: seeded with a later training text to probe generalization
+    gen_prompt          = texts[-1][:12] if len(texts) > 1 else ""
+    observations_gen    = observe(agent, prompt=gen_prompt,      n_samples=N_SAMPLES // 2)
+
+    weight_snap = observe_weight_snapshot(agent)
 
     encounter_records = []
     for text in texts:
         cx = encounter_complex(text)
         encounter_records.append({
-            "text_preview": text[:40],
-            "curvature": round(cx.curvature, 8),
-            "betti": list(cx.betti),
-            "angle_deg": round(math.degrees(cx.angle), 4),
+            "text_preview":        text[:60],
+            "curvature":           round(cx.curvature, 8),
+            "betti":               list(cx.betti),
+            "angle_deg":           round(math.degrees(cx.angle), 4),
             "n_persistent_features": cx.n_persistent_features,
+            "max_persistence":     round(cx.max_persistence, 6),
         })
 
     return {
-        "experiment":          "natural_motion",
-        "generation":          generation,
-        "variant_idx":         variant_idx,
-        "seed":                seed,
-        "config":              config,
-        "fitness":             null_fitness(),
-        "loss_trajectories":   loss_trajectories,
-        "observations_cold":   observations_cold,
-        "observations_seeded": observations_seeded,
-        "weight_snapshot":     weight_snap,
-        "encounter_records":   encounter_records,
-        "timestamp":           datetime.now(timezone.utc).isoformat(),
+        "experiment":           "natural_motion",
+        "generation":           generation,
+        "variant_idx":          variant_idx,
+        "seed":                 seed,
+        "config":               config,
+        "fitness":              null_fitness(),
+        "loss_trajectories":    loss_trajectories,
+        "observations_cold":    observations_cold,
+        "observations_seeded":  observations_seeded,
+        "observations_gen":     observations_gen,
+        "weight_snapshot":      weight_snap,
+        "encounter_records":    encounter_records,
+        "timestamp":            datetime.now(timezone.utc).isoformat(),
     }
 
 
 # ── Generation loop ───────────────────────────────────────────────────────
 
 def run_experiment(
-    n_generations:   int = N_GENERATIONS,
+    n_generations:    int = N_GENERATIONS,
     variants_per_gen: int = VARIANTS_PER_GEN,
-    seed_base:       int = 42,
+    seed_base:        int = 42,
 ) -> List[dict]:
     corpus = load_corpus()
     rng    = random.Random(seed_base)
     all_results: List[dict] = []
 
-    print("[Natural motion experiment — null fitness]")
+    print("[Natural motion experiment — null fitness, uncapped]")
     print(f"Corpus: {len(corpus)} passages")
     print(f"Generations: {n_generations}  Variants/gen: {variants_per_gen}")
+    print(f"max_tokens={MAX_TOKENS}  n_samples={N_SAMPLES}  texts/variant={TEXTS_PER_VARIANT}")
+    print(f"steps/text={STEPS_PER_TEXT}")
     print(f"No fitness function.  Recording what the creature does anyway.\n")
 
     base_configs = [
-        {"learn_steps": 5,  "learn_lr": 0.01,  "temperature": 0.8,  "alpha": 0.85},
-        {"learn_steps": 8,  "learn_lr": 0.005, "temperature": 1.0,  "alpha": 0.80},
-        {"learn_steps": 3,  "learn_lr": 0.02,  "temperature": 1.2,  "alpha": 0.90},
-        {"learn_steps": 10, "learn_lr": 0.001, "temperature": 0.7,  "alpha": 0.85},
-        {"learn_steps": 5,  "learn_lr": 0.01,  "temperature": 1.5,  "alpha": 0.75},
+        {"learn_steps": 5,   "learn_lr": 0.01,   "temperature": 0.8,  "alpha": 0.85},
+        {"learn_steps": 10,  "learn_lr": 0.005,  "temperature": 1.0,  "alpha": 0.80},
+        {"learn_steps": 5,   "learn_lr": 0.02,   "temperature": 1.2,  "alpha": 0.90},
+        {"learn_steps": 15,  "learn_lr": 0.001,  "temperature": 0.7,  "alpha": 0.85},
+        {"learn_steps": 5,   "learn_lr": 0.01,   "temperature": 1.5,  "alpha": 0.75},
+        {"learn_steps": 20,  "learn_lr": 0.003,  "temperature": 0.6,  "alpha": 0.88},
+        {"learn_steps": 8,   "learn_lr": 0.015,  "temperature": 1.8,  "alpha": 0.70},
     ]
 
     for gen in range(n_generations):
@@ -306,11 +329,12 @@ def run_experiment(
 
             print(f"    variant {v_idx}  config=lr{config['learn_lr']}/t{config['temperature']}")
             for obs in result["observations_cold"][:2]:
-                print(f"      cold:   \"{obs['text']}\"")
-                print(f"              loss={obs['loss']:.4f}  curv={obs['curvature']:.6f}"
+                wc = obs.get('word_count', '?')
+                print(f"      cold   t={obs['temperature']:.2f}: \"{obs['text'][:60]}...\"")
+                print(f"             wc={wc}  loss={obs['loss']:.4f}  curv={obs['curvature']:.6f}"
                       f"  betti={obs['betti']}")
             for obs in result["observations_seeded"][:1]:
-                print(f"      seeded: \"{obs['text']}\"")
+                print(f"      seeded t={obs['temperature']:.2f}: \"{obs['text'][:60]}...\"")
 
         gen_file = RESULTS_DIR / f"generation_{gen:03d}.json"
         gen_file.write_text(json.dumps(gen_results, indent=2, default=str))
@@ -319,11 +343,9 @@ def run_experiment(
     return all_results
 
 
-# ── Analysis: describe, don't test ───────────────────────────────────────
+# ── Analysis ────────────────────────────────────────────────────────────────
 
 def analyze(results: List[dict]) -> None:
-    """Describe the natural motion without predetermined categories.
-    We are not testing a hypothesis.  We are reading what happened."""
     if not results:
         print("No results to analyze.")
         return
@@ -333,77 +355,136 @@ def analyze(results: List[dict]) -> None:
     print("=" * 70)
     print()
 
-    print("── Generated texts (cold start, all variants, all generations) ──")
+    # All cold-start texts in full
+    print("── Generated texts (cold start) ──")
     for r in results:
         gen, v = r["generation"], r["variant_idx"]
         for obs in r["observations_cold"]:
-            print(f"  gen{gen} v{v} t={obs['temperature']:.2f}: \"{obs['text']}\"")
-            print(f"          loss={obs['loss']:.4f}  curv={obs['curvature']:.6f}"
-                  f"  betti={obs['betti']}  surprise_max={obs['surprise_max']:.3f}")
+            wc = obs.get('word_count', '?')
+            print(f"  gen{gen} v{v} t={obs['temperature']:.2f} wc={wc}:")
+            print(f"    \"{obs['text']}\"")
+            print(f"    loss={obs['loss']:.4f}  curv={obs['curvature']:.6f}"
+                  f"  betti={obs['betti']}  npf={obs['n_persistent_features']}"
+                  f"  surprise_max={obs['surprise_max']:.3f}")
     print()
 
+    # Curvature distribution
     all_curvs = [
         obs["curvature"]
         for r in results
-        for obs in r["observations_cold"] + r["observations_seeded"]
+        for obs in r["observations_cold"] + r["observations_seeded"] + r.get("observations_gen", [])
     ]
     if all_curvs:
         arr = np.array(all_curvs)
         print(f"── Output curvature distribution ({len(arr)} samples) ──")
         print(f"  min={arr.min():.6f}  max={arr.max():.6f}"
               f"  mean={arr.mean():.6f}  std={arr.std():.6f}")
-        counts, edges = np.histogram(arr, bins=6)
+        nonzero = arr[arr != 0]
+        print(f"  nonzero samples: {len(nonzero)} / {len(arr)}")
+        if len(nonzero):
+            print(f"  nonzero range: [{nonzero.min():.6f}, {nonzero.max():.6f}]")
+        counts, edges = np.histogram(arr, bins=10)
         for i, c in enumerate(counts):
-            print(f"  [{edges[i]:.4f}-{edges[i+1]:.4f}]: {'\u2588' * c} ({c})")
+            print(f"  [{edges[i]:.4f}-{edges[i+1]:.4f}]: {'\u2588' * min(c, 40)} ({c})")
     print()
 
+    # Betti distribution
     all_betti = [
         tuple(obs["betti"])
         for r in results
-        for obs in r["observations_cold"] + r["observations_seeded"]
+        for obs in r["observations_cold"] + r["observations_seeded"] + r.get("observations_gen", [])
     ]
     betti_counts = Counter(all_betti)
     print(f"── Output Betti distribution ({len(all_betti)} samples) ──")
     for betti, count in sorted(betti_counts.items(), key=lambda x: -x[1]):
-        print(f"  {betti}: {'\u2588' * count} ({count})")
+        print(f"  {betti}: {'\u2588' * min(count, 40)} ({count})")
     print()
 
+    # Persistent features
+    all_npf = [
+        obs["n_persistent_features"]
+        for r in results
+        for obs in r["observations_cold"] + r["observations_seeded"] + r.get("observations_gen", [])
+    ]
+    if all_npf:
+        npf_arr = np.array(all_npf)
+        print(f"── Persistent features distribution ({len(npf_arr)} samples) ──")
+        print(f"  min={npf_arr.min()}  max={npf_arr.max()}"
+              f"  mean={npf_arr.mean():.2f}  std={npf_arr.std():.2f}")
+        npf_counts = Counter(all_npf)
+        for npf, count in sorted(npf_counts.items()):
+            print(f"  npf={npf}: {'\u2588' * min(count, 40)} ({count})")
+    print()
+
+    # Loss trajectories
     print("── Loss trajectories ──")
     for r in results:
         gen, v = r["generation"], r["variant_idx"]
         for lt in r["loss_trajectories"]:
             traj = lt["trajectory"]
             if len(traj) >= 2:
-                imp = traj[0] - traj[-1]
+                imp  = traj[0] - traj[-1]
+                rate = imp / traj[0] if traj[0] else 0
                 print(f"  gen{gen} v{v}: {traj[0]:.4f}->{traj[-1]:.4f}"
-                      f"  improvement={imp:+.4f}  text=\"{lt['text_preview']}\"")
+                      f"  imp={imp:+.4f} ({rate*100:.1f}%)"
+                      f"  text=\"{lt['text_preview']}\"")
     print()
 
+    # Weight norm drift
     print("── Weight norm drift across generations ──")
+    norms_by_gen: dict = {}
     for r in results:
-        gen, v = r["generation"], r["variant_idx"]
-        norm   = r["weight_snapshot"]["total_norm"]
-        print(f"  gen{gen} v{v}: total_weight_norm={norm:.6f}")
+        gen = r["generation"]
+        norm = r["weight_snapshot"]["total_norm"]
+        norms_by_gen.setdefault(gen, []).append(norm)
+        print(f"  gen{gen} v{r['variant_idx']}: total_weight_norm={norm:.6f}")
+    print("  per-generation mean:")
+    for gen in sorted(norms_by_gen):
+        vals = norms_by_gen[gen]
+        print(f"    gen{gen}: mean={np.mean(vals):.6f}  std={np.std(vals):.6f}")
     print()
 
+    # Surprise range
+    all_smax = [
+        obs["surprise_max"]
+        for r in results
+        for obs in r["observations_cold"] + r["observations_seeded"] + r.get("observations_gen", [])
+        if obs["surprise_max"] > 0
+    ]
+    if all_smax:
+        sarr = np.array(all_smax)
+        print(f"── Surprise_max distribution ({len(sarr)} samples) ──")
+        print(f"  min={sarr.min():.3f}  max={sarr.max():.3f}"
+              f"  mean={sarr.mean():.3f}  std={sarr.std():.3f}")
+    print()
+
+    # Outliers
     mean_curv = float(np.mean(all_curvs)) if all_curvs else 0.0
     std_curv  = float(np.std(all_curvs))  if all_curvs else 0.0
-    print("── Outliers (curvature > mean+std or betti[1] > 0) ──")
+    print("── Outliers (curvature > mean+std, betti[1]>0, or npf>0) ──")
     found_outlier = False
     for r in results:
         gen, v = r["generation"], r["variant_idx"]
-        for obs in r["observations_cold"] + r["observations_seeded"]:
+        all_obs = (
+            r["observations_cold"]
+            + r["observations_seeded"]
+            + r.get("observations_gen", [])
+        )
+        for obs in all_obs:
             high_curv  = obs["curvature"] > mean_curv + std_curv
             high_betti = obs["betti"][1] > 0
-            if high_curv or high_betti:
+            high_npf   = obs["n_persistent_features"] > 0
+            if high_curv or high_betti or high_npf:
                 found_outlier = True
                 reason = []
                 if high_curv:  reason.append(f"curv={obs['curvature']:.6f}")
                 if high_betti: reason.append(f"betti={obs['betti']}")
-                print(f"  gen{gen} v{v}: \"{obs['text']}\"")
+                if high_npf:   reason.append(f"npf={obs['n_persistent_features']}")
+                print(f"  gen{gen} v{v} t={obs['temperature']:.2f}:")
+                print(f"    \"{obs['text'][:80]}...\"")
                 print(f"    {', '.join(reason)}")
     if not found_outlier:
-        print("  None found — outputs clustered near mean.")
+        print("  None found.")
     print()
 
     print("── End of description ──")
@@ -414,13 +495,12 @@ def analyze(results: List[dict]) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Natural motion recorder: null-fitness evolution. "
-                    "No hypothesis.  No verdict.  Just observation."
+        description="Natural motion recorder — uncapped."
     )
     parser.add_argument("--quick",       action="store_true",
-                        help="2 generations, 2 variants each")
+                        help="3 generations, 3 variants each")
     parser.add_argument("--analyze",     action="store_true",
-                        help="Describe saved results without running experiment")
+                        help="Describe saved results without running")
     parser.add_argument("--generations", type=int, default=N_GENERATIONS)
     parser.add_argument("--variants",    type=int, default=VARIANTS_PER_GEN)
     parser.add_argument("--seed",        type=int, default=42)
@@ -436,8 +516,8 @@ def main() -> None:
         analyze(results)
         return
 
-    n_gen = 2 if args.quick else args.generations
-    n_var = 2 if args.quick else args.variants
+    n_gen = 3 if args.quick else args.generations
+    n_var = 3 if args.quick else args.variants
 
     t0      = time.time()
     results = run_experiment(
