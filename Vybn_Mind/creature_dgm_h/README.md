@@ -51,6 +51,45 @@ python experiments.py analyze     [--experiment pca|activation|both]
 | `sgd`        | SGD vs Adam ablation on the weight-norm attractor |
 | `analyze`    | Post-hoc statistical analysis of topology results |
 
+## Quantum bridge
+
+**This module is one half of a cross-substrate experiment.**
+
+The `basin` probe records the full weight trajectory during convergence
+to the ~40-norm fixed point. That trajectory is a path through ~4K-dimensional
+parameter space. The quantum winding number probe in
+`quantum_delusions/experiments/` encodes that path as Bloch-sphere
+rotations on IBM quantum hardware and tests whether the path has
+non-trivial topological winding.
+
+The bridge lives at:
+```
+quantum_delusions/experiments/creature_quantum_bridge.py
+```
+
+It reads basin results from `experiment_results/basin_geometry/`,
+PCA-projects the weight trajectory to 2D, computes the estimated
+winding number, and encodes it as a QASM circuit that runs alongside
+the theory winding circuits on IBM hardware.
+
+```bash
+# From quantum_delusions/experiments/:
+python creature_quantum_bridge.py scan                   # find basin results
+python creature_quantum_bridge.py build <basin.json>     # generate creature QASM
+python creature_quantum_bridge.py run <basin.json>       # full suite on IBM
+```
+
+The thesis being tested: the same topological invariance (shape-invariant,
+speed-invariant, winding-number-dependent phase) appears in both the
+creature's classical weight space and in physical quantum hardware.
+Cross-substrate confirmation is the goal.
+
+See `quantum_delusions/experiments/winding_probe_reanalysis.md` for the
+current state of IBM hardware results.
+
+**If you are refactoring this module, do not break the weight_trajectory
+output from the basin probe. The quantum bridge depends on it.**
+
 ## Dependencies
 
 - numpy
