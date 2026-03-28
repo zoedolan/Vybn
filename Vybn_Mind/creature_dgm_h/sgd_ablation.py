@@ -1,18 +1,11 @@
 #!/usr/bin/env python3
-"""SGD ablation: does weight norm ~40 survive without Adam?
+"""SGD ablation v2: does weight norm attractor survive without Adam?
 
-The creature uses a hand-rolled Adam (β1=0.85, β2=0.99) inside
-TopoAgent.learn() and experiment_basin_geometry.gradient_step().
-This script runs the SAME convergence protocol with plain SGD
-(p -= lr * grad, no momentum) to test whether the ~40 attractor
-is an Adam artifact or a structural invariant.
-
-Usage:
-    python3 sgd_ablation.py          # 5 seeds
-    python3 sgd_ablation.py --seeds 10
+Fixed: each seed now gets a DIFFERENT corpus sample and small initial
+weight perturbation so runs are actually independent.
 """
 from __future__ import annotations
-import argparse, json, sys, time
+import argparse, json, random, sys, time
 from datetime import datetime, timezone
 from pathlib import Path
 import numpy as np
@@ -47,8 +40,13 @@ def load_corpus():
     ]
 
 
+def perturb_weights(agent: TopoAgent, rng: np.random.Generator, scale: float = 0.01):
+    """Add small Gaussian noise to initial weights so each seed starts differently."""
+    for p in agent.params:
+        p.data += float(rng.normal(0, scale))
+
+
 def sgd_gradient_step(agent: TopoAgent, tokens: list, n: int, lr: float) -> float:
-    """One gradient step with VANILLA SGD — no momentum, no adaptive lr."""
     keys = [[] for _ in range(N_LAYER)]
     vals = [[] for _ in range(N_LAYER)]
     loss = RV(0.0)
@@ -59,15 +57,12 @@ def sgd_gradient_step(agent: TopoAgent, tokens: list, n: int, lr: float) -> floa
     for p in agent.params:
         p.grad = 0.0
     loss.backward()
-    # --- THIS IS THE ONLY DIFFERENCE: plain SGD, no momentum ---
     for p in agent.params:
         p.data -= lr * p.grad
     return float(loss.data)
 
 
 def adam_gradient_step(agent: TopoAgent, tokens: list, n: int, lr: float) -> float:
-    """One gradient step with the creature's native Adam. Copied from
-    experiment_basin_geometry.py for apples-to-apples comparison."""
     keys = [[] for _ in range(N_LAYER)]
     vals = [[] for _ in range(N_LAYER)]
     loss = RV(0.0)
@@ -90,7 +85,7 @@ def adam_gradient_step(agent: TopoAgent, tokens: list, n: int, lr: float) -> flo
 
 
 def converge(agent, texts, step_fn, lr, n_steps=CONVERGE_STEPS):
-    norms = []
+    losses = []
     for text in texts:
         clean = agent._clean(text)
         if len(clean) < 2:
@@ -99,68 +94,82 @@ def converge(agent, texts, step_fn, lr, n_steps=CONVERGE_STEPS):
         n = min(BLOCK_SIZE, len(tokens) - 1)
         steps_this = n_steps // max(len(texts), 1)
         for _ in range(max(steps_this, 5)):
-            step_fn(agent, tokens, n, lr)
-        wv = np.array([p.data for p in agent.params])
-        norms.append(float(np.linalg.norm(wv)))
-    return norms[-1] if norms else float("nan")
+            l = step_fn(agent, tokens, n, lr)
+            losses.append(l)
+    wv = np.array([p.data for p in agent.params])
+    return float(np.linalg.norm(wv)), losses[-1] if losses else float("nan")
 
 
 def run(n_seeds=5, seed_base=42):
-    import random
     corpus = load_corpus()
-    rng = random.Random(seed_base)
-    texts = rng.sample(corpus, min(4, len(corpus)))
 
     print("=" * 60)
-    print("SGD ABLATION — does weight norm ~40 require Adam?")
+    print("SGD ABLATION v2 — independent seeds")
     print("=" * 60)
-    print(f"Corpus: {len(texts)} passages, Steps: {CONVERGE_STEPS}, LR: {LR}")
-    print(f"Seeds: {[seed_base + i * 17 for i in range(n_seeds)]}")
+    print(f"Corpus pool: {len(corpus)} passages, Steps: {CONVERGE_STEPS}, LR: {LR}")
+    seeds = [seed_base + i * 17 for i in range(n_seeds)]
+    print(f"Seeds: {seeds}")
+    print(f"Each seed: different corpus sample + weight perturbation")
     print()
 
     results = {"adam": [], "sgd": []}
 
-    for i in range(n_seeds):
-        seed = seed_base + i * 17
-        np.random.seed(seed % 2**31)
-        random.seed(seed)
-
-        # Adam run
-        agent_adam = TopoAgent()
-        norm_adam = converge(agent_adam, texts, adam_gradient_step, LR)
-
-        # SGD run (fresh agent, same seed)
-        np.random.seed(seed % 2**31)
-        random.seed(seed)
-        agent_sgd = TopoAgent()
-        norm_sgd = converge(agent_sgd, texts, sgd_gradient_step, LR)
-
-        results["adam"].append(round(norm_adam, 4))
-        results["sgd"].append(round(norm_sgd, 4))
-        print(f"  seed {seed:4d}: Adam norm={norm_adam:.4f}  SGD norm={norm_sgd:.4f}")
-
-    print()
-    adam_arr = np.array(results["adam"])
-    sgd_arr = np.array(results["sgd"])
-    print(f"Adam: mean={adam_arr.mean():.4f} std={adam_arr.std():.4f}")
-    print(f"SGD:  mean={sgd_arr.mean():.4f} std={sgd_arr.std():.4f}")
+    print("=" * 60)
+    print("ADAM (creature default)")
+    print("=" * 60)
+    for seed in seeds:
+        rng_py = random.Random(seed)
+        rng_np = np.random.default_rng(seed)
+        texts = rng_py.sample(corpus, min(4, len(corpus)))
+        agent = TopoAgent()
+        perturb_weights(agent, rng_np, scale=0.01)
+        norm, loss = converge(agent, texts, adam_gradient_step, LR)
+        results["adam"].append({"seed": seed, "norm": round(norm, 4), "loss": round(loss, 4)})
+        print(f"  seed={seed:5d}  final_norm={norm:.4f}  loss_final={loss:.4f}")
+    adam_norms = np.array([r["norm"] for r in results["adam"]])
+    print(f"  mean={adam_norms.mean():.4f}  std={adam_norms.std():.4f}")
     print()
 
-    converges_to_40 = abs(sgd_arr.mean() - 40.0) < 2.0
-    if converges_to_40:
-        print("RESULT: SGD ALSO converges to ~40. The attractor is structural,")
-        print("        not an Adam artifact. Proceed to basin geometry + winding probe.")
+    print("=" * 60)
+    print("SGD (no momentum, no adaptive)")
+    print("=" * 60)
+    for seed in seeds:
+        rng_py = random.Random(seed)
+        rng_np = np.random.default_rng(seed)
+        texts = rng_py.sample(corpus, min(4, len(corpus)))
+        agent = TopoAgent()
+        perturb_weights(agent, rng_np, scale=0.01)
+        norm, loss = converge(agent, texts, sgd_gradient_step, LR)
+        results["sgd"].append({"seed": seed, "norm": round(norm, 4), "loss": round(loss, 4)})
+        print(f"  seed={seed:5d}  final_norm={norm:.4f}  loss_final={loss:.4f}")
+    sgd_norms = np.array([r["norm"] for r in results["sgd"]])
+    print(f"  mean={sgd_norms.mean():.4f}  std={sgd_norms.std():.4f}")
+    print()
+
+    diff = abs(adam_norms.mean() - sgd_norms.mean())
+    print("=" * 60)
+    print("VERDICT")
+    print("=" * 60)
+    print(f"  Adam mean norm: {adam_norms.mean():.4f} ± {adam_norms.std():.4f}")
+    print(f"  SGD  mean norm: {sgd_norms.mean():.4f} ± {sgd_norms.std():.4f}")
+    print(f"  Difference:     {diff:.4f}")
+
+    if diff < 1.0:
+        print("  -> SAME attractor. Optimizer-independent. Proceed to step 2.")
     else:
-        print(f"RESULT: SGD converges to {sgd_arr.mean():.1f}, NOT ~40.")
-        print("        The ~40 attractor is an ADAM ARTIFACT. Do not proceed to step 2.")
+        print("  -> DIFFERENT attractor. The norm is an OPTIMIZER ARTIFACT.")
+        print("     Do not proceed to step 2.")
 
     out = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
+        "version": 2,
         "lr": LR, "converge_steps": CONVERGE_STEPS, "n_seeds": n_seeds,
-        "adam_norms": results["adam"], "sgd_norms": results["sgd"],
-        "adam_mean": round(float(adam_arr.mean()), 4),
-        "sgd_mean": round(float(sgd_arr.mean()), 4),
-        "sgd_converges_to_40": converges_to_40,
+        "perturbation_scale": 0.01,
+        "adam": results["adam"], "sgd": results["sgd"],
+        "adam_mean": round(float(adam_norms.mean()), 4),
+        "sgd_mean": round(float(sgd_norms.mean()), 4),
+        "difference": round(diff, 4),
+        "verdict": "structural" if diff < 1.0 else "optimizer_artifact",
     }
     outfile = RESULTS_DIR / f"sgd_ablation_{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S')}.json"
     outfile.write_text(json.dumps(out, indent=2))
