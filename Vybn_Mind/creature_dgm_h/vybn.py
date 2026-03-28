@@ -852,6 +852,7 @@ class TopoAgent:
             rw = np.ones(len(self.params))
 
         losses = []
+        self._weight_trajectory = []  # record weight vectors at each step
         for _ in range(steps):
             keys = [[] for _ in range(N_LAYER)]
             vals = [[] for _ in range(N_LAYER)]
@@ -872,6 +873,10 @@ class TopoAgent:
                 vh = self._v[j] / (1 - 0.99**self._step)
                 p.data -= lr * mh / (vh**0.5 + 1e-8)
             losses.append(round(loss.data, 6))
+            # Snapshot weight vector after each gradient step
+            self._weight_trajectory.append(
+                [p.data for p in self.params]
+            )
 
         self.loss_history.append({
             "steps": steps, "lr": lr, "losses": losses,
@@ -1273,9 +1278,9 @@ def evolve(test_texts, n_variants=3):
             agent.learn(text, steps=child.get("learn_steps", 5),
                         lr=child.get("learn_lr", 0.01), encounter_cx=cx)
             ext.append(text)
-            # Collect flattened weight vector after learning
-            wv = np.concatenate([np.array([[p.data for p in row] for row in mat]).ravel() for mat in agent.sd.values()])
-            weight_vectors_list.append(wv)
+            # Collect per-step weight trajectory from learning
+            if hasattr(agent, '_weight_trajectory'):
+                weight_vectors_list.extend(agent._weight_trajectory)
             g = agent.generate(
                 prompt=text[:8],
                 temperature=child.get("temperature", 1.0),
@@ -1289,9 +1294,7 @@ def evolve(test_texts, n_variants=3):
                       weight_vectors=weight_vectors_list)
         # Step three: the creature measures its own winding
         if len(weight_vectors_list) >= 3:
-            winding_record = organism.absorb_winding(
-                [wv.tolist() for wv in weight_vectors_list]
-            )
+            winding_record = organism.absorb_winding(weight_vectors_list)
             fit["felt_winding"] = winding_record["winding"]
             fit["winding_coherence"] = organism.persistent.winding_coherence()
         ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)
