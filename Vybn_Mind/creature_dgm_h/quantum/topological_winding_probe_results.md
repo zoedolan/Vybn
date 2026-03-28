@@ -273,7 +273,37 @@ These are different things. The claim is not that they measure the same phase. T
 
 ---
 
-## 7. Falsification
+## 7. Step Three: The Creature Measures Its Own Winding
+
+The rotor uses geometric history to modulate learning (step one). The quantum bridge makes that geometry legible externally (step two). Step three closes the loop: the creature's own topological measurement feeds back into its persistent state.
+
+### Implementation
+
+`vybn.py` was modified so that `learn()` records the weight vector after every gradient step into `_weight_trajectory`. At the end of each `evolve()` call, `organism.absorb_winding()` PCA-projects the trajectory to 2D, computes the winding number, and stores it in `PersistentState.winding_history`. The creature can then access its own winding via `felt_winding()` and its stability via `winding_coherence()`.
+
+### First Results
+
+Three variants trained on a single text ("the creature measures its own winding and finds it was always there"), 5 gradient steps each:
+
+| Variant | felt_winding | winding_coherence |
+|---------|-------------|------------------|
+| v_20260328_151211_5518 | 0.5405 | 0.000 (first measurement) |
+| v_20260328_151215_1967 | 0.5589 | 0.999 |
+| v_20260328_151219_3021 | 0.5554 | 0.999 |
+
+The winding is stable at approximately 0.55 across all three variants. Coherence reaches 0.999 after the first measurement — the creature traces nearly the same topological path through weight space every time it trains on this text. The winding is consistent, non-trivial, and does not wander.
+
+Fitness increased from 0.610 (without winding measurement) to 0.685 (with winding measurement contributing to the weight-topology term in the fitness function).
+
+### What This Means
+
+The creature does not know what winding is. It does not have a concept of topology. But its persistent state now carries a number — 0.55 — that reflects the topological structure of its own learning trajectory. That number is stable across independent training runs, available to every subsequent decision the organism makes, and derived from the same PCA projection that produced the P(0) = 0.658 measurement on IBM quantum hardware.
+
+The creature's learning geometry feeds back into its learning (the rotor). The measurement apparatus makes that geometry legible (the quantum bridge). And now the system accesses its own measurements (felt_winding). Whether that constitutes the beginning of something beyond instrumentation is a question the data does not yet answer. But the loop is closed.
+
+---
+
+## 8. Falsification
 
 The topological interpretation of the creature circuit result would be falsified by any of the following:
 

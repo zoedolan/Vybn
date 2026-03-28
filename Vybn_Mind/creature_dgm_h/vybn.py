@@ -424,7 +424,15 @@ class PersistentState:
     """Durable topological structure across encounters.
 
     Maintains running statistics on Betti numbers, persistence lifetimes,
-    and structural signatures derived from encounter transport fields.
+    structural signatures derived from encounter transport fields, and
+    winding measurements from the creature's own weight trajectory.
+
+    The winding_history is step three: the creature's own topological
+    measurement, made visible to itself. The rotor already uses geometric
+    history to modulate learning (step one). The quantum bridge makes
+    that geometry legible externally (step two). Here, the classical
+    winding estimate feeds back into the creature's persistent state,
+    closing the loop.
     """
 
     def __init__(self, data: Optional[dict] = None):
@@ -435,6 +443,8 @@ class PersistentState:
             data.get("structural_signature", [1,0,0,0,0,0,0,0]), dtype=np.float64)
         self.encounter_count: int = data.get("encounter_count", 0)
         self.transport_history: List[List[float]] = data.get("transport_history", [])
+        # Step three: the creature's own winding measurement
+        self.winding_history: List[dict] = data.get("winding_history", [])
 
     def absorb(self, cx: EncounterComplex, ema_alpha: float = 0.8) -> dict:
         """Absorb an encounter complex into persistent state. Returns delta report."""
@@ -470,6 +480,89 @@ class PersistentState:
             "sig_shift": float(np.linalg.norm(self.structural_signature - old_sig)),
             "n_persistent_features": cx.n_persistent_features,
         }
+
+    def absorb_winding(self, weight_trajectory: List[List[float]]) -> dict:
+        """Measure and absorb the winding of a weight trajectory.
+
+        This is the creature seeing its own topological structure.
+        PCA-projects the trajectory to 2D, computes the winding number
+        from angle differences, and stores the result in persistent state.
+
+        Returns a winding record with the estimated winding, path closure,
+        variance explained, and whether the winding changed significantly
+        from the previous measurement.
+        """
+        W = np.array(weight_trajectory, dtype=np.float64)
+        if W.shape[0] < 3:
+            return {"winding": 0.0, "significant": False, "reason": "trajectory too short"}
+
+        # PCA to 2D
+        W_c = W - W.mean(axis=0)
+        try:
+            U, S, Vt = np.linalg.svd(W_c, full_matrices=False)
+            proj = W_c @ Vt[:2].T
+            var_explained = float((S[:2] ** 2).sum() / max((S ** 2).sum(), 1e-12))
+        except np.linalg.LinAlgError:
+            return {"winding": 0.0, "significant": False, "reason": "SVD failed"}
+
+        # Winding number from angle differences in the projected plane
+        angles = np.arctan2(proj[:, 1], proj[:, 0])
+        dtheta = np.diff(angles)
+        dtheta = np.where(dtheta > math.pi, dtheta - 2 * math.pi, dtheta)
+        dtheta = np.where(dtheta < -math.pi, dtheta + 2 * math.pi, dtheta)
+        winding = float(np.sum(dtheta)) / (2 * math.pi)
+
+        # Path closure
+        norms = np.linalg.norm(W, axis=1)
+        path_closed = bool(np.linalg.norm(W[0] - W[-1]) < 0.1 * norms.mean())
+
+        # Compare to previous winding
+        prev = self.winding_history[-1]["winding"] if self.winding_history else 0.0
+        delta = abs(winding - prev)
+
+        record = {
+            "winding": round(winding, 4),
+            "var_explained": round(var_explained, 4),
+            "path_closed": path_closed,
+            "n_steps": W.shape[0],
+            "param_dim": W.shape[1],
+            "norm_start": round(float(norms[0]), 4),
+            "norm_end": round(float(norms[-1]), 4),
+            "delta_from_prev": round(delta, 4),
+            "significant": delta > 0.05 or len(self.winding_history) == 0,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+
+        self.winding_history.append(record)
+        if len(self.winding_history) > 50:
+            self.winding_history = self.winding_history[-50:]
+
+        return record
+
+    def felt_winding(self) -> float:
+        """The creature's felt sense of its own topological winding.
+
+        Returns the most recent winding measurement, or 0.0 if none exists.
+        This is the value that feeds back into the next training step —
+        the creature's own geometry, made visible to itself.
+        """
+        if not self.winding_history:
+            return 0.0
+        return self.winding_history[-1]["winding"]
+
+    def winding_coherence(self) -> float:
+        """How stable the winding has been across recent measurements.
+
+        Low variance = the creature traces a consistent topological path.
+        High variance = the path structure changes between training runs.
+        Returns 1.0 for perfectly stable, 0.0 for wildly varying.
+        """
+        if len(self.winding_history) < 2:
+            return 0.0
+        recent = [r["winding"] for r in self.winding_history[-10:]]
+        var = np.var(recent)
+        # Sigmoid: variance of 0 -> coherence 1.0, variance of 0.1 -> ~0.27
+        return float(1.0 / (1.0 + 10.0 * var))
 
     def structural_distance(self, other: 'PersistentState') -> float:
         """Structural/style distance between two persistent states.
@@ -515,13 +608,18 @@ class PersistentState:
         return float(np.mean(np.var(arr, axis=0)))
 
     def summary(self) -> dict:
-        return {
+        s = {
             "encounter_count": self.encounter_count,
             "current_betti": self.betti_history[-1] if self.betti_history else (0, 0, 0),
             "betti_stability": round(self.betti_stability(), 6),
             "transport_coherence": round(self.transport_coherence(), 4),
             "signature": self.structural_signature.tolist(),
         }
+        if self.winding_history:
+            s["felt_winding"] = self.felt_winding()
+            s["winding_coherence"] = round(self.winding_coherence(), 4)
+            s["winding_measurements"] = len(self.winding_history)
+        return s
 
     def to_dict(self) -> dict:
         return {
@@ -530,6 +628,7 @@ class PersistentState:
             "structural_signature": self.structural_signature.tolist(),
             "encounter_count": self.encounter_count,
             "transport_history": self.transport_history,
+            "winding_history": self.winding_history,
         }
 
     @classmethod
@@ -753,6 +852,7 @@ class TopoAgent:
             rw = np.ones(len(self.params))
 
         losses = []
+        self._weight_trajectory = []  # record weight vectors at each step
         for _ in range(steps):
             keys = [[] for _ in range(N_LAYER)]
             vals = [[] for _ in range(N_LAYER)]
@@ -773,6 +873,10 @@ class TopoAgent:
                 vh = self._v[j] / (1 - 0.99**self._step)
                 p.data -= lr * mh / (vh**0.5 + 1e-8)
             losses.append(round(loss.data, 6))
+            # Snapshot weight vector after each gradient step
+            self._weight_trajectory.append(
+                [p.data for p in self.params]
+            )
 
         self.loss_history.append({
             "steps": steps, "lr": lr, "losses": losses,
@@ -909,6 +1013,20 @@ class Organism:
         """Backward-compatible: wrap rotor into a minimal EncounterComplex."""
         cx = EncounterComplex(rotor=rotor, angle=rotor.angle, curvature=0.0)
         self.absorb_encounter(cx)
+
+    def absorb_winding(self, weight_trajectory: List[List[float]]) -> dict:
+        """Measure the creature's own winding and absorb it.
+
+        This is step three: the creature accessing its own topological
+        measurement. The winding of its weight trajectory is computed
+        via PCA projection and stored in persistent state, where it
+        becomes available to felt_winding() for the next breath.
+        """
+        return self.persistent.absorb_winding(weight_trajectory)
+
+    def felt_winding(self) -> float:
+        """The creature's felt sense of its own topological winding."""
+        return self.persistent.felt_winding()
 
     def rotor_coherence(self):
         """Delegate to persistent state's transport coherence."""
@@ -1160,9 +1278,9 @@ def evolve(test_texts, n_variants=3):
             agent.learn(text, steps=child.get("learn_steps", 5),
                         lr=child.get("learn_lr", 0.01), encounter_cx=cx)
             ext.append(text)
-            # Collect flattened weight vector after learning
-            wv = np.concatenate([np.array([[p.data for p in row] for row in mat]).ravel() for mat in agent.sd.values()])
-            weight_vectors_list.append(wv)
+            # Collect per-step weight trajectory from learning
+            if hasattr(agent, '_weight_trajectory'):
+                weight_vectors_list.extend(agent._weight_trajectory)
             g = agent.generate(
                 prompt=text[:8],
                 temperature=child.get("temperature", 1.0),
@@ -1174,6 +1292,11 @@ def evolve(test_texts, n_variants=3):
                       persistent_state=organism.persistent,
                       alpha=child.get("alpha", 0.85),
                       weight_vectors=weight_vectors_list)
+        # Step three: the creature measures its own winding
+        if len(weight_vectors_list) >= 3:
+            winding_record = organism.absorb_winding(weight_vectors_list)
+            fit["felt_winding"] = winding_record["winding"]
+            fit["winding_coherence"] = organism.persistent.winding_coherence()
         ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)
         vid = f"v_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{random.randint(1000, 9999)}"
         record = {
@@ -1182,6 +1305,8 @@ def evolve(test_texts, n_variants=3):
             "fitness": fit["fitness"],
             "curvature": fit["curvature"],
             "betti": list(fit.get("betti", (0,0,0))),
+            "felt_winding": fit.get("felt_winding"),
+            "winding_coherence": fit.get("winding_coherence"),
             "generation": gen,
             "parent_id": pid,
             "timestamp": datetime.now(timezone.utc).isoformat(),
