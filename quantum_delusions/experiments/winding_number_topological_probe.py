@@ -65,11 +65,15 @@ cross-substrate support: polar-time topology appears in both the physical
 quantum system and in the transformer's representational geometry.
 """
 
+import argparse
 import json
 import math
+import os
 from pathlib import Path
 from datetime import datetime, timezone
-from typing import Optional
+from typing import List, Optional
+
+import numpy as np
 
 
 def winding_n_qasm(n: int, phi_step: float = math.pi / 4) -> str:
@@ -143,6 +147,111 @@ def winding_speed_deformed_qasm(n: int = 1, density: int = 4) -> str:
         lines.append(f'rz({math.degrees(phi_step):.6f}) q[0];')
     lines += ['h q[0];', 'measure q[0] -> c[0];']
     return '\n'.join(lines)
+
+
+# ── Creature-derived loop from basin weight trajectory ─────────────────────
+
+def trajectory_to_bloch_angles(weight_vecs: List[List[float]]) -> List[tuple]:
+    """Project weight trajectory onto top-2 PCA directions, convert to Bloch angles.
+
+    Returns list of (theta, phi) pairs suitable for rz/ry gate encoding.
+    If the trajectory is too short or degenerate, returns an empty list.
+    """
+    W = np.array(weight_vecs, dtype=np.float64)
+    if W.shape[0] < 3:
+        return []
+    # Centre the trajectory
+    W_c = W - W.mean(axis=0)
+    # PCA via SVD on centred matrix
+    U, S, Vt = np.linalg.svd(W_c, full_matrices=False)
+    # Project onto the top-2 principal directions
+    proj = W_c @ Vt[:2].T  # shape (T, 2)
+    # Normalise to unit-circle scale so angles are meaningful
+    norms = np.linalg.norm(proj, axis=1, keepdims=True)
+    max_norm = norms.max()
+    if max_norm < 1e-12:
+        return []
+    proj = proj / max_norm
+    # Convert (x, y) path to Bloch angles:
+    #   phi   = atan2(y, x)           (azimuthal, mapped to rz)
+    #   theta = pi * sqrt(x^2+y^2)    (polar, mapped to ry; 0 at centre, pi at rim)
+    angles = []
+    for x, y in proj:
+        phi = math.atan2(y, x)
+        r = math.sqrt(x * x + y * y)
+        theta = math.pi * min(r, 1.0)
+        angles.append((theta, phi))
+    return angles
+
+
+def build_creature_loop_qasm(bloch_angles: List[tuple]) -> str:
+    """Encode Bloch angle sequence as rz/ry gates matching the probe family.
+
+    Uses the same gate pattern as the existing winding circuits:
+    H -> sequence of (rz, ry) pairs -> H -> measure.
+    """
+    if not bloch_angles:
+        raise ValueError("Empty Bloch angle sequence; cannot build circuit")
+    lines = [
+        'OPENQASM 2.0;',
+        'include "qelib1.inc";',
+        'qreg q[1];',
+        'creg c[1];',
+        'h q[0];',
+        f'// Creature-derived loop: {len(bloch_angles)} steps from weight trajectory PCA',
+    ]
+    for theta, phi in bloch_angles:
+        lines.append(f'rz({math.degrees(phi):.6f}) q[0];')
+        lines.append(f'ry({math.degrees(theta):.6f}) q[0];')
+    lines += ['h q[0];', 'measure q[0] -> c[0];']
+    return '\n'.join(lines)
+
+
+def run_on_ibm(circuits_qasm: List[str], token: Optional[str] = None,
+               shots: int = 4096) -> List[dict]:
+    """Submit QASM circuits to IBM hardware or fall back to AerSimulator.
+
+    Returns a list of count dicts, one per circuit.
+    """
+    try:
+        from qiskit import QuantumCircuit
+    except ImportError:
+        raise ImportError(
+            "qiskit is required. Install with: pip install qiskit qiskit-aer"
+        )
+
+    qcs = [QuantumCircuit.from_qasm_str(q) for q in circuits_qasm]
+
+    token = token or os.environ.get("IBM_QUANTUM_TOKEN")
+    if token:
+        try:
+            from qiskit_ibm_runtime import QiskitRuntimeService, SamplerV2
+            service = QiskitRuntimeService(channel="ibm_quantum", token=token)
+            backend = service.least_busy(simulator=False, operational=True)
+            print(f"  IBM backend: {backend.name}")
+            sampler = SamplerV2(backend)
+            job = sampler.run(qcs, shots=shots)
+            result = job.result()
+            all_counts = []
+            for pub_result in result:
+                counts = pub_result.data.c.get_counts()
+                all_counts.append(counts)
+            return all_counts
+        except Exception as exc:
+            print(f"  IBM submission failed ({exc}); falling back to AerSimulator")
+
+    # Aer fallback
+    try:
+        from qiskit_aer import AerSimulator
+    except ImportError:
+        from qiskit.providers.aer import AerSimulator
+    sim = AerSimulator()
+    all_counts = []
+    for qc in qcs:
+        job = sim.run(qc, shots=shots)
+        result = job.result()
+        all_counts.append(result.get_counts(qc))
+    return all_counts
 
 
 WINDING_EXPERIMENT_SUITE = [
@@ -236,7 +345,48 @@ WINDING_EXPERIMENT_SUITE = [
         "winding":            1,
         "variant":            "speed_deformed",
     },
+    # Creature-derived entry is added dynamically via add_creature_circuit()
 ]
+
+
+def add_creature_circuit(weight_trajectory: List[List[float]],
+                         subsample: int = 32) -> Optional[dict]:
+    """Build creature-loop circuit from a basin geometry weight trajectory.
+
+    Sub-samples the trajectory to keep gate count manageable, converts to
+    Bloch angles via PCA, and appends the circuit to the experiment suite.
+    Returns the new suite entry, or None if the trajectory is degenerate.
+    """
+    # Sub-sample if trajectory is long
+    wt = weight_trajectory
+    if len(wt) > subsample:
+        step = len(wt) / subsample
+        wt = [wt[int(i * step)] for i in range(subsample)]
+
+    angles = trajectory_to_bloch_angles(wt)
+    if not angles:
+        return None
+
+    entry = {
+        "circuit_name":       "creature_loop",
+        "is_theory_relevant": True,
+        "hypothesis": (
+            "Creature-derived loop from basin geometry weight trajectory. "
+            "PCA projects the training path into 2D, then Bloch-encodes it. "
+            "If the creature's learning path has topological winding, this "
+            "circuit should show non-trivial P(0) deviation comparable to "
+            "the theory circuits. If the path is open or unwound, P(0) stays "
+            "near 0.5 — which is itself informative."
+        ),
+        "expected_counts":    {"0": 0.5, "1": 0.5},
+        "estimated_seconds":  5.0,
+        "qasm_fn":            lambda a=angles: build_creature_loop_qasm(a),
+        "family":             "creature",
+        "winding":            0,  # unknown a priori; measured empirically
+        "variant":            "creature_pca",
+    }
+    WINDING_EXPERIMENT_SUITE.append(entry)
+    return entry
 
 
 def get_suite_qasm() -> list[dict]:
@@ -396,16 +546,91 @@ SEED_FOR_LIVING_LOOP = {
 }
 
 
-if __name__ == "__main__":
-    print("Winding number experiment suite:")
-    for exp in SEED_FOR_LIVING_LOOP["circuits"]:
-        lines = exp["circuit_qasm"].count("\n")
-        print(f"  {exp['circuit_name']:40s}  w={exp.get('winding', '?'):+d}  {exp.get('variant','?'):18s}  {lines} QASM lines")
-    print()
-    print("Falsification:")
-    print(SEED_FOR_LIVING_LOOP["falsification"])
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Winding-number topological probe: run circuits on IBM/Aer."
+    )
+    parser.add_argument("--basin-json", type=str, default=None,
+                        help="Path to basin geometry JSON to derive a creature loop")
+    parser.add_argument("--shots", type=int, default=4096)
+    parser.add_argument("--dry-run", action="store_true",
+                        help="Print circuits and metadata without executing")
+    args = parser.parse_args()
 
-    seed_path = Path(__file__).parent / "winding_number_seed.json"
-    with seed_path.open("w") as f:
-        json.dump(SEED_FOR_LIVING_LOOP, f, indent=2, default=str)
-    print(f"\nSeed written to {seed_path}")
+    # Optionally load a basin geometry result and add the creature circuit
+    if args.basin_json:
+        bp = Path(args.basin_json)
+        if bp.exists():
+            basin_data = json.loads(bp.read_text())
+            if isinstance(basin_data, list):
+                basin_data = basin_data[0]
+            wt = basin_data.get("weight_trajectory", [])
+            if wt:
+                entry = add_creature_circuit(wt)
+                if entry:
+                    print(f"  Added creature_loop circuit ({len(wt)} weight vectors)")
+                else:
+                    print("  WARNING: weight trajectory too short/degenerate for creature loop")
+            else:
+                print(f"  WARNING: no weight_trajectory in {bp.name}")
+        else:
+            print(f"  WARNING: basin JSON not found: {bp}")
+
+    suite = get_suite_qasm()
+
+    print(f"Winding number experiment suite ({len(suite)} circuits):")
+    for exp in suite:
+        lines = exp["circuit_qasm"].count("\n")
+        w = exp.get("winding", "?")
+        w_str = f"{w:+d}" if isinstance(w, int) else str(w)
+        print(f"  {exp['circuit_name']:40s}  w={w_str}  "
+              f"{exp.get('variant','?'):18s}  {lines} QASM lines")
+
+    if args.dry_run:
+        print("\n[dry-run] No execution.")
+        seed_path = Path(__file__).parent / "winding_number_seed.json"
+        with seed_path.open("w") as f:
+            json.dump(SEED_FOR_LIVING_LOOP, f, indent=2, default=str)
+        print(f"Seed written to {seed_path}")
+        return
+
+    # Execute circuits
+    print(f"\nRunning {len(suite)} circuits (shots={args.shots})...")
+    qasm_list = [exp["circuit_qasm"] for exp in suite]
+    try:
+        all_counts = run_on_ibm(qasm_list, shots=args.shots)
+    except ImportError as exc:
+        print(f"\nCannot execute: {exc}")
+        print("Install qiskit + qiskit-aer to run circuits locally.")
+        return
+
+    # Attach counts to suite entries
+    for exp, counts in zip(suite, all_counts):
+        exp["counts"] = counts
+        total = sum(counts.values())
+        p0 = counts.get("0", 0) / total if total else 0
+        print(f"  {exp['circuit_name']:40s}  P(0)={p0:.4f}  counts={counts}")
+
+    # Analyze
+    analysis = analyze_winding_suite(suite)
+    print(f"\nVerdict: {analysis['verdict']}")
+    for note in analysis.get("notes", []):
+        print(f"  {note}")
+
+    # Save results
+    results_dir = Path(__file__).parent / "results"
+    results_dir.mkdir(parents=True, exist_ok=True)
+    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
+    out_path = results_dir / f"winding_run_{ts}.json"
+    out = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "shots":     args.shots,
+        "circuits":  suite,
+        "analysis":  analysis,
+    }
+    out_path.write_text(json.dumps(out, indent=2, default=str))
+    print(f"\nResults saved to {out_path}")
+
+
+if __name__ == "__main__":
+    main()
