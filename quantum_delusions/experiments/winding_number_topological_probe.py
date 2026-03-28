@@ -69,6 +69,7 @@ import argparse
 import json
 import math
 import os
+import random
 from pathlib import Path
 from datetime import datetime, timezone
 from typing import List, Optional
@@ -109,6 +110,26 @@ def winding_shape_deformed_qasm(n: int = 1, ellipse_ratio: float = 0.5) -> str:
     for step in range(total_steps):
         phi = step_large if step % 2 == 0 else step_small
         lines.append(f'rz({phi:.6f}) q[0];')
+    lines += ['h q[0];', 'measure q[0] -> c[0];']
+    return '\n'.join(lines)
+
+
+def _random_control_qasm(n_pairs: int = 8, seed: int = 2026) -> str:
+    """Random-angle rz/ry circuit. Same structure as creature loop, random content."""
+    rng = random.Random(seed)
+    lines = [
+        'OPENQASM 2.0;',
+        'include "qelib1.inc";',
+        'qreg q[1];',
+        'creg c[1];',
+        'h q[0];',
+        f'// Random control: {n_pairs} rz/ry pairs, seed={seed}',
+    ]
+    for _ in range(n_pairs):
+        rz_angle = rng.uniform(-math.pi, math.pi)
+        ry_angle = rng.uniform(-math.pi, math.pi)
+        lines.append(f'rz({rz_angle:.6f}) q[0];')
+        lines.append(f'ry({ry_angle:.6f}) q[0];')
     lines += ['h q[0];', 'measure q[0] -> c[0];']
     return '\n'.join(lines)
 
@@ -474,6 +495,23 @@ WINDING_EXPERIMENT_SUITE = [
         "winding":            -0.25,
         "variant":            "ybasis_rev",
     },
+    # ── Random control: same gate depth as creature, random angles ──
+    {
+        "circuit_name":       "random_control",
+        "is_theory_relevant": True,
+        "hypothesis": (
+            "Random-angle circuit with same gate structure as the creature loop "
+            "(8 rz + 8 ry pairs = 16 gates). If this gives P(0) near 0.5 and "
+            "the creature loop does not, the creature's encoding carries signal. "
+            "If both are near 0.5, the gate depth decoheres everything."
+        ),
+        "expected_counts":    {"0": 0.5, "1": 0.5},
+        "estimated_seconds":  3.0,
+        "qasm_fn":            lambda: _random_control_qasm(8, seed=2026),
+        "family":             "control",
+        "winding":            0,
+        "variant":            "random_control",
+    },
     # Creature-derived entry is added dynamically via add_creature_circuit()
 ]
 
@@ -528,14 +566,16 @@ def get_suite_qasm() -> list[dict]:
 
 
 def analyze_winding_suite(results: list[dict]) -> dict:
-    """Analyse winding suite results using the cos²(n*Phi_0) phase model.
-    
-    The correct model for integer windings is:
-      P(0) = cos²(4*n*eps)
-    where eps is a per-gate phase (systematic + any topological contribution).
-    The factor 4 comes from: 8 gates/winding, total_phase/2 in cos².
+    """Analyse v2 fractional winding suite.
+
+    Model: P(0) = cos²(fraction * pi) for each fractional winding.
+    Tests:
+      1. Linearity — do all fractional base circuits match cos²(f*pi)?
+      2. Shape invariance — does frac_0.50_shape match frac_0.50?
+      3. Sign reversal — do Y-basis fwd/rev differ at quarter-winding?
+      4. Creature loop — does it differ from 0.5 (noise) and from random control?
     """
-    def p0(counts: dict) -> Optional[float]:
+    def p0(counts: dict) -> float | None:
         total = sum(counts.values())
         return counts.get("0", 0) / total if total else None
 
@@ -543,155 +583,131 @@ def analyze_winding_suite(results: list[dict]) -> dict:
     analysis = {
         "timestamp":          datetime.now(timezone.utc).isoformat(),
         "n_circuits":         len(results),
-        "phase_model":        None,
+        "fractional_ladder":  None,
         "shape_invariance":   None,
-        "speed_invariance":   None,
         "sign_reversal":      None,
-        "half_winding":       None,
+        "creature_loop":      None,
+        "random_control":     None,
         "verdict":            "INSUFFICIENT_DATA",
         "notes":              [],
     }
 
-    # ── Phase model fit: P(0) = cos²(4*n*eps) ──
-    winding_data = {}
+    # ── Fractional ladder: P(0) = cos²(fraction * pi) ──
+    ladder = {}
     for entry in results:
-        if entry.get("variant") == "base" and "winding" in entry:
+        if entry.get("variant") == "base" and entry.get("family") == "fractional":
             p = p0(entry.get("counts", {}))
-            if p is not None:
-                winding_data[entry["winding"]] = p
-
-    if len(winding_data) >= 2:
-        # Grid search for eps that minimises sum of squared residuals
-        best_eps, best_err = 0.0, float("inf")
-        for trial in range(1, 3142):  # 0.001 to pi in steps of 0.001
-            eps = trial * 0.001
-            err = sum((math.cos(4 * n * eps) ** 2 - p) ** 2
-                      for n, p in winding_data.items())
-            if err < best_err:
-                best_eps, best_err = eps, err
-
-        predictions = {}
-        residuals = {}
-        for n, p in sorted(winding_data.items()):
-            pred = math.cos(4 * n * best_eps) ** 2
-            predictions[n] = round(pred, 4)
-            residuals[n] = round(abs(pred - p), 4)
-
-        max_residual = max(residuals.values())
-        analysis["phase_model"] = {
-            "eps_per_gate_rad":    round(best_eps, 4),
-            "eps_per_gate_deg":    round(math.degrees(best_eps), 2),
-            "phi_per_winding_rad": round(8 * best_eps, 4),
-            "fit_error_sum":       round(best_err, 6),
-            "max_residual":        round(max_residual, 4),
-            "predictions":         predictions,
-            "residuals":           residuals,
-            "actual":              {n: round(p, 4) for n, p in sorted(winding_data.items())},
-            "passes":              max_residual < 0.03,
+            w = entry.get("winding")
+            if p is not None and w is not None:
+                theory = math.cos(w * math.pi) ** 2
+                ladder[entry["circuit_name"]] = {
+                    "winding": w, "p0": round(p, 4),
+                    "theory": round(theory, 4),
+                    "delta": round(abs(p - theory), 4),
+                }
+    if ladder:
+        max_delta = max(v["delta"] for v in ladder.values())
+        analysis["fractional_ladder"] = {
+            "circuits": ladder,
+            "max_delta": round(max_delta, 4),
+            "passes": max_delta < 0.06,
         }
 
-    # ── Shape invariance ──
-    base   = by_name.get("winding_n1")
-    shaped = by_name.get("winding_n1_shape_deformed")
-    if base and shaped:
-        p_b = p0(base.get("counts", {}))
-        p_s = p0(shaped.get("counts", {}))
+    # ── Shape invariance: frac_0.50 vs frac_0.50_shape ──
+    base_half = by_name.get("frac_0.50")
+    shape_half = by_name.get("frac_0.50_shape")
+    if base_half and shape_half:
+        p_b = p0(base_half.get("counts", {}))
+        p_s = p0(shape_half.get("counts", {}))
         if p_b is not None and p_s is not None:
             delta = abs(p_b - p_s)
             analysis["shape_invariance"] = {
-                "p0_base":   round(p_b, 4),
+                "p0_base": round(p_b, 4),
                 "p0_shaped": round(p_s, 4),
-                "delta":     round(delta, 4),
-                "passes":    delta < 0.05,
+                "delta": round(delta, 4),
+                "passes": delta < 0.05,
             }
 
-    # ── Speed invariance ──
-    speed = by_name.get("winding_n1_speed_deformed")
-    if base and speed:
-        p_b = p0(base.get("counts", {}))
-        p_sp = p0(speed.get("counts", {}))
-        if p_b is not None and p_sp is not None:
-            delta = abs(p_b - p_sp)
-            analysis["speed_invariance"] = {
-                "p0_base":  round(p_b, 4),
-                "p0_speed": round(p_sp, 4),
-                "delta":    round(delta, 4),
-                "passes":   delta < 0.05,
-            }
-
-    # ── Sign reversal (Y-basis if available, else mark invalid) ──
-    yfwd = by_name.get("winding_n1_ybasis_fwd")
-    yrev = by_name.get("winding_n1_ybasis_rev")
+    # ── Sign reversal: Y-basis at quarter-winding ──
+    yfwd = by_name.get("frac_0.25_ybasis_fwd")
+    yrev = by_name.get("frac_0.25_ybasis_rev")
     if yfwd and yrev:
         p_f = p0(yfwd.get("counts", {}))
         p_r = p0(yrev.get("counts", {}))
         if p_f is not None and p_r is not None:
             delta = abs(p_f - p_r)
             analysis["sign_reversal"] = {
-                "basis":     "Y",
-                "p0_fwd":    round(p_f, 4),
-                "p0_rev":    round(p_r, 4),
-                "delta":     round(delta, 4),
-                "passes":    delta > 0.02,  # Y-basis SHOULD differ for opposite signs
-            }
-    else:
-        # Check if old Z-basis reversal is present
-        zrev = by_name.get("winding_n1_reversed")
-        if base and zrev:
-            analysis["sign_reversal"] = {
-                "basis":   "Z",
-                "note":    "Z-basis sign reversal is structurally invalid: cos²(θ) = cos²(-θ). "
-                           "Use Y-basis circuits (winding_n1_ybasis_fwd/rev) instead.",
-                "passes":  None,  # Cannot evaluate
+                "basis": "Y",
+                "p0_fwd": round(p_f, 4),
+                "p0_rev": round(p_r, 4),
+                "delta": round(delta, 4),
+                "passes": delta > 0.5,  # should be near 1.0 swing
             }
 
-    # ── Half-winding calibration ──
-    half = by_name.get("winding_half")
-    if half and analysis.get("phase_model"):
-        p_h = p0(half.get("counts", {}))
-        if p_h is not None:
-            eps = analysis["phase_model"]["eps_per_gate_rad"]
-            # Half winding = 4 gates of rz(pi/4), so total = pi
-            # P(0) = cos²(pi/2 + 2*eps) ... actually:
-            # P(0) = cos²(total_phase/2) = cos²(4 * 0.5 * eps) = cos²(2*eps)
-            pred = math.cos(2 * eps) ** 2
-            delta = abs(pred - p_h)
-            analysis["half_winding"] = {
-                "p0_actual":    round(p_h, 4),
-                "p0_predicted": round(pred, 4),
-                "delta":        round(delta, 4),
-                "passes":       delta < 0.03,
+    # ── Creature loop ──
+    creature = by_name.get("creature_loop")
+    if creature:
+        p_c = p0(creature.get("counts", {}))
+        if p_c is not None:
+            deviation_from_noise = abs(p_c - 0.5)
+            analysis["creature_loop"] = {
+                "p0": round(p_c, 4),
+                "deviation_from_noise": round(deviation_from_noise, 4),
+                "significant": deviation_from_noise > 0.05,
             }
+
+    # ── Random control ──
+    control = by_name.get("random_control")
+    if control:
+        p_ctrl = p0(control.get("counts", {}))
+        if p_ctrl is not None:
+            analysis["random_control"] = {
+                "p0": round(p_ctrl, 4),
+            }
+            # Compare creature to control
+            if analysis.get("creature_loop"):
+                creature_p = analysis["creature_loop"]["p0"]
+                gap = abs(creature_p - p_ctrl)
+                analysis["creature_vs_control"] = {
+                    "creature_p0": creature_p,
+                    "control_p0": round(p_ctrl, 4),
+                    "gap": round(gap, 4),
+                    "creature_differs": gap > 0.05,
+                }
 
     # ── Verdict ──
-    checks = {
-        "phase_model":      analysis["phase_model"] and analysis["phase_model"]["passes"],
-        "shape_invariance":  analysis["shape_invariance"] and analysis["shape_invariance"]["passes"],
-        "speed_invariance":  analysis["speed_invariance"] and analysis["speed_invariance"]["passes"],
-    }
-    # Only count sign reversal if it has a valid test
-    if analysis.get("sign_reversal") and analysis["sign_reversal"].get("passes") is not None:
-        checks["sign_reversal"] = analysis["sign_reversal"]["passes"]
+    checks = {}
+    if analysis["fractional_ladder"]:
+        checks["linearity"] = analysis["fractional_ladder"]["passes"]
+    if analysis["shape_invariance"]:
+        checks["shape"] = analysis["shape_invariance"]["passes"]
+    if analysis["sign_reversal"]:
+        checks["sign"] = analysis["sign_reversal"]["passes"]
 
     n_valid = len(checks)
     n_pass = sum(1 for v in checks.values() if v)
 
-    if n_pass == n_valid and n_valid >= 2:
+    # Report
+    lines = []
+    for name, passed in checks.items():
+        lines.append(f"{name}: {'PASS' if passed else 'FAIL'}")
+    if analysis.get("creature_loop"):
+        cl = analysis["creature_loop"]
+        lines.append(f"creature: P(0)={cl['p0']} ({'signal' if cl['significant'] else 'noise'})")
+    if analysis.get("creature_vs_control"):
+        cc = analysis["creature_vs_control"]
+        lines.append(f"creature vs random: gap={cc['gap']} ({'differs' if cc['creature_differs'] else 'same'})")
+
+    if n_pass == n_valid and n_valid >= 3:
         analysis["verdict"] = "TOPOLOGICAL"
-        analysis["notes"].append(
-            f"{n_pass}/{n_valid} valid tests passed. Phase accumulates linearly "
-            "with winding number, is path-shape invariant, and speed invariant. "
-            "Consistent with pi_1(M) = Z."
-        )
+    elif n_pass == n_valid and n_valid >= 2:
+        analysis["verdict"] = "TOPOLOGICAL"
     elif n_pass >= 2:
         analysis["verdict"] = "TOPOLOGICAL_PARTIAL"
-        analysis["notes"].append(
-            f"{n_pass}/{n_valid} valid tests passed."
-        )
     else:
         analysis["verdict"] = "NOISE"
-        analysis["notes"].append(f"{n_pass}/{n_valid} tests passed.")
 
+    analysis["notes"] = [f"{n_pass}/{n_valid} theory tests passed."] + lines
     return analysis
 
 
