@@ -171,9 +171,14 @@ def converge(
     agent: TopoAgent,
     texts: List[str],
     n_steps: int = CONVERGE_STEPS,
-) -> List[float]:
-    """Run gradient steps until convergence. Return loss trajectory."""
-    trajectory = []
+) -> Tuple[List[float], List[List[float]]]:
+    """Run gradient steps until convergence.
+
+    Returns (loss_trajectory, weight_trajectory) where weight_trajectory
+    is the full weight vector recorded at every gradient step.
+    """
+    loss_trajectory = []
+    weight_trajectory = []
     for text in texts:
         clean = agent._clean(text)
         if len(clean) < 2:
@@ -183,8 +188,9 @@ def converge(
         steps_this_text = n_steps // max(len(texts), 1)
         for _ in range(max(steps_this_text, 5)):
             loss_val = gradient_step(agent, tokens, n)
-            trajectory.append(round(loss_val, 6))
-    return trajectory
+            loss_trajectory.append(round(loss_val, 6))
+            weight_trajectory.append(get_weight_vector(agent).tolist())
+    return loss_trajectory, weight_trajectory
 
 
 # ── Basin probe ───────────────────────────────────────────────────────────────
@@ -264,7 +270,7 @@ def run_agent(
     random.seed(seed)
 
     agent = TopoAgent(config=config or {})
-    conv_trajectory = converge(agent, texts)
+    conv_trajectory, weight_traj = converge(agent, texts)
     w_star = get_weight_vector(agent)
     w_norm = float(np.linalg.norm(w_star))
     loss_converged = compute_loss(agent, texts)
@@ -319,6 +325,7 @@ def run_agent(
         "convergence_norm":  round(w_norm, 6),
         "convergence_loss":  round(loss_converged, 6),
         "conv_trajectory":   conv_trajectory,
+        "weight_trajectory": weight_traj,
         "probe_results":     probe_results,
         "basin_summary":     summary,
         "timestamp":         datetime.now(timezone.utc).isoformat(),
