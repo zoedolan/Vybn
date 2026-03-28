@@ -113,6 +113,28 @@ def winding_shape_deformed_qasm(n: int = 1, ellipse_ratio: float = 0.5) -> str:
     return '\n'.join(lines)
 
 
+def winding_fractional_shape_deformed_qasm(fraction: float, ellipse_ratio: float = 0.5) -> str:
+    """Fractional winding with elliptical step pattern. Same total phase, different path."""
+    total_phase = fraction * 2 * math.pi
+    n_steps = 4
+    base_step = total_phase / n_steps
+    step_large = base_step * (1 + ellipse_ratio)
+    step_small = base_step * (1 - ellipse_ratio)
+    lines = [
+        'OPENQASM 2.0;',
+        'include "qelib1.inc";',
+        'qreg q[1];',
+        'creg c[1];',
+        'h q[0];',
+        f'// Shape-deformed fractional: frac={fraction}, ellipse={ellipse_ratio}',
+    ]
+    for step in range(n_steps):
+        phi = step_large if step % 2 == 0 else step_small
+        lines.append(f'rz({phi:.6f}) q[0];')
+    lines += ['h q[0];', 'measure q[0] -> c[0];']
+    return '\n'.join(lines)
+
+
 def winding_reversed_qasm(n: int = 1) -> str:
     total_steps = n * 8
     phi_step = -(math.pi / 4)
@@ -148,21 +170,47 @@ def winding_speed_deformed_qasm(n: int = 1, density: int = 4) -> str:
     return '\n'.join(lines)
 
 
-def winding_half_qasm(n_half: int = 1) -> str:
-    """Half-integer winding: n_half half-windings = n_half*pi total phase."""
-    total_steps = n_half * 4  # 4 steps of pi/4 = pi per half-winding
-    phi_step = math.pi / 4
+def winding_fractional_qasm(fraction: float, n_steps: int = 4) -> str:
+    """Fractional winding: total phase = fraction * 2*pi.
+
+    Uses n_steps gates of equal size. Fewer gates = less decoherence.
+    Key fractions:
+      0.25 -> P(0) = cos²(pi/4) = 0.5
+      0.50 -> P(0) = cos²(pi/2) = 0.0
+      0.75 -> P(0) = cos²(3*pi/4) = 0.5
+      1.50 -> P(0) = cos²(3*pi/2) = 0.0
+    """
+    total_phase = fraction * 2 * math.pi
+    phi_step = total_phase / n_steps
     lines = [
         'OPENQASM 2.0;',
         'include "qelib1.inc";',
         'qreg q[1];',
         'creg c[1];',
         'h q[0];',
-        f'// {n_half} half-winding(s), 4 steps each',
+        f'// fractional winding {fraction}, {n_steps} steps, total={total_phase:.4f} rad',
     ]
-    for _ in range(total_steps):
+    for _ in range(n_steps):
         lines.append(f'rz({phi_step:.6f}) q[0];')
     lines += ['h q[0];', 'measure q[0] -> c[0];']
+    return '\n'.join(lines)
+
+
+def winding_fractional_ybasis_qasm(fraction: float, direction: int = 1, n_steps: int = 4) -> str:
+    """Fractional winding with Y-basis measurement for sign sensitivity."""
+    total_phase = direction * fraction * 2 * math.pi
+    phi_step = total_phase / n_steps
+    lines = [
+        'OPENQASM 2.0;',
+        'include "qelib1.inc";',
+        'qreg q[1];',
+        'creg c[1];',
+        'h q[0];',
+        f'// fractional Y-basis: frac={fraction}, dir={direction:+d}, {n_steps} steps',
+    ]
+    for _ in range(n_steps):
+        lines.append(f'rz({phi_step:.6f}) q[0];')
+    lines += ['sdg q[0];', 'h q[0];', 'measure q[0] -> c[0];']
     return '\n'.join(lines)
 
 
@@ -291,140 +339,139 @@ def run_on_ibm(circuits_qasm: List[str], token: Optional[str] = None,
     return all_counts
 
 
+# ── v2 suite: fractional windings that produce real signal on calibrated hardware ──
+#
+# Integer windings (n=1,2,3) give rz(n*2*pi) = global phase = identity.
+# On a well-calibrated machine P(0) ≈ 1.0 for all of them — no discriminating
+# power. The previous run confirmed this (P(0) = 0.99 across the board).
+#
+# Fractional windings produce DISTINCT P(0) values via cos²(fraction*pi):
+#   0.25 -> P(0) = 0.500    (4 gates)
+#   0.50 -> P(0) = 0.000    (4 gates) — confirmed on ibm_fez: 0.018
+#   0.75 -> P(0) = 0.500    (4 gates)
+#   1.00 -> P(0) = 1.000    (4 gates) — confirmed: 0.992
+#   1.50 -> P(0) = 0.000    (4 gates)
+#
+# Shape invariance test: same fraction, different step-size pattern.
+# Speed invariance test: same fraction, more smaller steps.
+# Sign reversal: Y-basis at fractional winding where sin(theta) != 0.
+# Creature loop: subsampled to 8 points (16 gates) to survive decoherence.
+
 WINDING_EXPERIMENT_SUITE = [
+    # ── Fractional winding ladder: 4 gates each, distinct P(0) values ──
     {
-        "circuit_name":       "winding_n1",
+        "circuit_name":       "frac_0.25",
         "is_theory_relevant": True,
         "hypothesis": (
-            "1 full equatorial winding. If polar-time topology is real, P(0) shifts "
-            "from 0.5 by a hardware-independent amount Phi_0. This establishes the "
-            "baseline for all winding-number comparisons."
-        ),
-        "expected_counts":    {"0": 0.5, "1": 0.5},
-        "estimated_seconds":  3.0,
-        "qasm_fn":            lambda: winding_n_qasm(1),
-        "family":             "winding_number",
-        "winding":            1,
-        "variant":            "base",
-    },
-    {
-        "circuit_name":       "winding_n2",
-        "is_theory_relevant": True,
-        "hypothesis": (
-            "2 windings -> phase 2*Phi_0. Topological: doubles exactly. "
-            "Geometric (Berry): scales with loop area, not winding count. "
-            "Comparing n1 vs n2 is the linearity test."
-        ),
-        "expected_counts":    {"0": 0.5, "1": 0.5},
-        "estimated_seconds":  4.0,
-        "qasm_fn":            lambda: winding_n_qasm(2),
-        "family":             "winding_number",
-        "winding":            2,
-        "variant":            "base",
-    },
-    {
-        "circuit_name":       "winding_n3",
-        "is_theory_relevant": True,
-        "hypothesis": (
-            "3 windings -> phase 3*Phi_0. Linear scaling with integer n is "
-            "the topological signature. Non-linear scaling falsifies pi_1(M)=Z."
-        ),
-        "expected_counts":    {"0": 0.5, "1": 0.5},
-        "estimated_seconds":  5.0,
-        "qasm_fn":            lambda: winding_n_qasm(3),
-        "family":             "winding_number",
-        "winding":            3,
-        "variant":            "base",
-    },
-    {
-        "circuit_name":       "winding_n1_reversed",
-        "is_theory_relevant": True,
-        "hypothesis": (
-            "Reverse direction: phase -Phi_0. Exact sign reversal required. "
-            "Decoherence shows asymmetric damping; topology shows symmetric negation."
-        ),
-        "expected_counts":    {"0": 0.5, "1": 0.5},
-        "estimated_seconds":  3.0,
-        "qasm_fn":            lambda: winding_reversed_qasm(1),
-        "family":             "winding_number",
-        "winding":            -1,
-        "variant":            "reversed",
-    },
-    {
-        "circuit_name":       "winding_n1_shape_deformed",
-        "is_theory_relevant": True,
-        "hypothesis": (
-            "Elliptical path, 1 winding. TOPOLOGICAL PREDICTION: same phase as winding_n1. "
-            "GEOMETRIC PREDICTION: different phase (depends on enclosed area). "
-            "THIS IS THE CRITICAL DISTINGUISHING TEST between topological and geometric holonomy. "
-            "If shape changes the phase, the pi_1(M)=Z interpretation is falsified."
-        ),
-        "expected_counts":    {"0": 0.5, "1": 0.5},
-        "estimated_seconds":  3.0,
-        "qasm_fn":            lambda: winding_shape_deformed_qasm(1, 0.5),
-        "family":             "winding_number",
-        "winding":            1,
-        "variant":            "shape_deformed",
-    },
-    {
-        "circuit_name":       "winding_n1_speed_deformed",
-        "is_theory_relevant": True,
-        "hypothesis": (
-            "1 winding at 4x slower traversal. TOPOLOGICAL: same phase. "
-            "DECOHERENCE: more noise (more gates). "
-            "Schedule invariance was detected in GPT-2 v3 (delta=-0.012 rad at CP^15). "
-            "This tests the same invariance on physical IBM hardware."
-        ),
-        "expected_counts":    {"0": 0.5, "1": 0.5},
-        "estimated_seconds":  5.0,
-        "qasm_fn":            lambda: winding_speed_deformed_qasm(1, 4),
-        "family":             "winding_number",
-        "winding":            1,
-        "variant":            "speed_deformed",
-    },
-    {
-        "circuit_name":       "winding_half",
-        "is_theory_relevant": True,
-        "hypothesis": (
-            "Half-winding: total rz(pi). P(0) = cos\u00b2(pi/2 + 2*eps) where eps is the "
-            "per-gate phase. Calibration point at non-integer winding to disambiguate "
-            "the two eps solutions from integer-winding data."
+            "Quarter winding (4 gates). P(0) = cos²(pi/4) = 0.5. "
+            "Baseline for the fractional ladder."
         ),
         "expected_counts":    {"0": 0.5, "1": 0.5},
         "estimated_seconds":  2.0,
-        "qasm_fn":            lambda: winding_half_qasm(1),
-        "family":             "winding_number",
-        "winding":            0.5,
-        "variant":            "half",
+        "qasm_fn":            lambda: winding_fractional_qasm(0.25),
+        "family":             "fractional",
+        "winding":            0.25,
+        "variant":            "base",
     },
     {
-        "circuit_name":       "winding_n1_ybasis_fwd",
+        "circuit_name":       "frac_0.50",
         "is_theory_relevant": True,
         "hypothesis": (
-            "Y-basis forward winding. The Y-basis expectation is sin(theta), "
-            "which IS sign-sensitive. Combined with winding_n1_ybasis_rev, "
-            "this replaces the structurally invalid Z-basis sign reversal test."
+            "Half winding (4 gates). P(0) = cos²(pi/2) = 0.0. "
+            "Already confirmed on ibm_fez at P(0) = 0.018."
+        ),
+        "expected_counts":    {"0": 0.0, "1": 1.0},
+        "estimated_seconds":  2.0,
+        "qasm_fn":            lambda: winding_fractional_qasm(0.50),
+        "family":             "fractional",
+        "winding":            0.50,
+        "variant":            "base",
+    },
+    {
+        "circuit_name":       "frac_0.75",
+        "is_theory_relevant": True,
+        "hypothesis": (
+            "Three-quarter winding (4 gates). P(0) = cos²(3*pi/4) = 0.5. "
+            "Same P(0) as 0.25 but different phase — Y-basis distinguishes them."
         ),
         "expected_counts":    {"0": 0.5, "1": 0.5},
-        "estimated_seconds":  3.0,
-        "qasm_fn":            lambda: winding_ybasis_qasm(1, +1),
-        "family":             "winding_number",
-        "winding":            1,
+        "estimated_seconds":  2.0,
+        "qasm_fn":            lambda: winding_fractional_qasm(0.75),
+        "family":             "fractional",
+        "winding":            0.75,
+        "variant":            "base",
+    },
+    {
+        "circuit_name":       "frac_1.00",
+        "is_theory_relevant": True,
+        "hypothesis": (
+            "Full winding (4 gates). P(0) = cos²(pi) = 1.0. "
+            "Calibration anchor — confirms the circuit works."
+        ),
+        "expected_counts":    {"0": 1.0, "1": 0.0},
+        "estimated_seconds":  2.0,
+        "qasm_fn":            lambda: winding_fractional_qasm(1.00),
+        "family":             "fractional",
+        "winding":            1.00,
+        "variant":            "base",
+    },
+    {
+        "circuit_name":       "frac_1.50",
+        "is_theory_relevant": True,
+        "hypothesis": (
+            "One-and-a-half windings (4 gates). P(0) = cos²(3*pi/2) = 0.0. "
+            "Same P(0) as 0.50 — tests linearity at higher winding."
+        ),
+        "expected_counts":    {"0": 0.0, "1": 1.0},
+        "estimated_seconds":  2.0,
+        "qasm_fn":            lambda: winding_fractional_qasm(1.50),
+        "family":             "fractional",
+        "winding":            1.50,
+        "variant":            "base",
+    },
+    # ── Shape invariance at half-winding (the only fraction with sharp P(0)) ──
+    {
+        "circuit_name":       "frac_0.50_shape",
+        "is_theory_relevant": True,
+        "hypothesis": (
+            "Half winding, elliptical path. TOPOLOGICAL: same P(0) as frac_0.50. "
+            "GEOMETRIC: different P(0). This is the critical test at a fraction "
+            "where the signal is maximal (P(0) near 0)."
+        ),
+        "expected_counts":    {"0": 0.0, "1": 1.0},
+        "estimated_seconds":  2.0,
+        "qasm_fn":            lambda: winding_fractional_shape_deformed_qasm(0.50, 0.5),
+        "family":             "fractional",
+        "winding":            0.50,
+        "variant":            "shape_deformed",
+    },
+    # ── Y-basis sign reversal at quarter-winding (where sin != 0) ──
+    {
+        "circuit_name":       "frac_0.25_ybasis_fwd",
+        "is_theory_relevant": True,
+        "hypothesis": (
+            "Quarter winding Y-basis FORWARD. P(0) = (1 + sin(pi/2))/2 = 1.0. "
+            "Y-basis breaks the cos² symmetry and CAN distinguish sign."
+        ),
+        "expected_counts":    {"0": 1.0, "1": 0.0},
+        "estimated_seconds":  2.0,
+        "qasm_fn":            lambda: winding_fractional_ybasis_qasm(0.25, +1),
+        "family":             "fractional",
+        "winding":            0.25,
         "variant":            "ybasis_fwd",
     },
     {
-        "circuit_name":       "winding_n1_ybasis_rev",
+        "circuit_name":       "frac_0.25_ybasis_rev",
         "is_theory_relevant": True,
         "hypothesis": (
-            "Y-basis reversed winding. If the phase is topological and sign-sensitive, "
-            "P(0) here should differ from winding_n1_ybasis_fwd by a predictable amount. "
-            "If both Y-basis circuits give the same P(0), the phase is unsigned."
+            "Quarter winding Y-basis REVERSED. P(0) = (1 + sin(-pi/2))/2 = 0.0. "
+            "If sign reversal works, this should be ~0 while fwd is ~1."
         ),
-        "expected_counts":    {"0": 0.5, "1": 0.5},
-        "estimated_seconds":  3.0,
-        "qasm_fn":            lambda: winding_ybasis_qasm(1, -1),
-        "family":             "winding_number",
-        "winding":            -1,
+        "expected_counts":    {"0": 0.0, "1": 1.0},
+        "estimated_seconds":  2.0,
+        "qasm_fn":            lambda: winding_fractional_ybasis_qasm(0.25, -1),
+        "family":             "fractional",
+        "winding":            -0.25,
         "variant":            "ybasis_rev",
     },
     # Creature-derived entry is added dynamically via add_creature_circuit()
@@ -432,7 +479,7 @@ WINDING_EXPERIMENT_SUITE = [
 
 
 def add_creature_circuit(weight_trajectory: List[List[float]],
-                         subsample: int = 32) -> Optional[dict]:
+                         subsample: int = 8) -> Optional[dict]:
     """Build creature-loop circuit from a basin geometry weight trajectory.
 
     Sub-samples the trajectory to keep gate count manageable, converts to
