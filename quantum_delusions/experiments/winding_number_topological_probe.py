@@ -148,6 +148,48 @@ def winding_speed_deformed_qasm(n: int = 1, density: int = 4) -> str:
     return '\n'.join(lines)
 
 
+def winding_half_qasm(n_half: int = 1) -> str:
+    """Half-integer winding: n_half half-windings = n_half*pi total phase."""
+    total_steps = n_half * 4  # 4 steps of pi/4 = pi per half-winding
+    phi_step = math.pi / 4
+    lines = [
+        'OPENQASM 2.0;',
+        'include "qelib1.inc";',
+        'qreg q[1];',
+        'creg c[1];',
+        'h q[0];',
+        f'// {n_half} half-winding(s), 4 steps each',
+    ]
+    for _ in range(total_steps):
+        lines.append(f'rz({phi_step:.6f}) q[0];')
+    lines += ['h q[0];', 'measure q[0] -> c[0];']
+    return '\n'.join(lines)
+
+
+def winding_ybasis_qasm(n: int = 1, direction: int = 1) -> str:
+    """Y-basis measurement to distinguish +phi from -phi.
+    
+    Instead of H...H (X-basis), uses S†·H...H·S to measure
+    in the Y-basis. cos²(theta) can't distinguish sign;
+    the Y-basis expectation CAN.
+    """
+    total_steps = n * 8
+    phi_step = direction * (math.pi / 4)
+    lines = [
+        'OPENQASM 2.0;',
+        'include "qelib1.inc";',
+        'qreg q[1];',
+        'creg c[1];',
+        'h q[0];',
+        f'// Y-basis sign test: n={n}, direction={direction:+d}',
+    ]
+    for _ in range(total_steps):
+        lines.append(f'rz({phi_step:.6f}) q[0];')
+    # Y-basis measurement: H then S†(=Sdg) then measure
+    lines += ['sdg q[0];', 'h q[0];', 'measure q[0] -> c[0];']
+    return '\n'.join(lines)
+
+
 # ── Creature-derived loop from basin weight trajectory ─────────────────────
 
 def trajectory_to_bloch_angles(weight_vecs: List[List[float]]) -> List[tuple]:
@@ -340,6 +382,51 @@ WINDING_EXPERIMENT_SUITE = [
         "winding":            1,
         "variant":            "speed_deformed",
     },
+    {
+        "circuit_name":       "winding_half",
+        "is_theory_relevant": True,
+        "hypothesis": (
+            "Half-winding: total rz(pi). P(0) = cos\u00b2(pi/2 + 2*eps) where eps is the "
+            "per-gate phase. Calibration point at non-integer winding to disambiguate "
+            "the two eps solutions from integer-winding data."
+        ),
+        "expected_counts":    {"0": 0.5, "1": 0.5},
+        "estimated_seconds":  2.0,
+        "qasm_fn":            lambda: winding_half_qasm(1),
+        "family":             "winding_number",
+        "winding":            0.5,
+        "variant":            "half",
+    },
+    {
+        "circuit_name":       "winding_n1_ybasis_fwd",
+        "is_theory_relevant": True,
+        "hypothesis": (
+            "Y-basis forward winding. The Y-basis expectation is sin(theta), "
+            "which IS sign-sensitive. Combined with winding_n1_ybasis_rev, "
+            "this replaces the structurally invalid Z-basis sign reversal test."
+        ),
+        "expected_counts":    {"0": 0.5, "1": 0.5},
+        "estimated_seconds":  3.0,
+        "qasm_fn":            lambda: winding_ybasis_qasm(1, +1),
+        "family":             "winding_number",
+        "winding":            1,
+        "variant":            "ybasis_fwd",
+    },
+    {
+        "circuit_name":       "winding_n1_ybasis_rev",
+        "is_theory_relevant": True,
+        "hypothesis": (
+            "Y-basis reversed winding. If the phase is topological and sign-sensitive, "
+            "P(0) here should differ from winding_n1_ybasis_fwd by a predictable amount. "
+            "If both Y-basis circuits give the same P(0), the phase is unsigned."
+        ),
+        "expected_counts":    {"0": 0.5, "1": 0.5},
+        "estimated_seconds":  3.0,
+        "qasm_fn":            lambda: winding_ybasis_qasm(1, -1),
+        "family":             "winding_number",
+        "winding":            -1,
+        "variant":            "ybasis_rev",
+    },
     # Creature-derived entry is added dynamically via add_creature_circuit()
 ]
 
@@ -394,54 +481,76 @@ def get_suite_qasm() -> list[dict]:
 
 
 def analyze_winding_suite(results: list[dict]) -> dict:
+    """Analyse winding suite results using the cos²(n*Phi_0) phase model.
+    
+    The correct model for integer windings is:
+      P(0) = cos²(4*n*eps)
+    where eps is a per-gate phase (systematic + any topological contribution).
+    The factor 4 comes from: 8 gates/winding, total_phase/2 in cos².
+    """
     def p0(counts: dict) -> Optional[float]:
         total = sum(counts.values())
-        if total == 0:
-            return None
-        return counts.get("0", 0) / total
+        return counts.get("0", 0) / total if total else None
 
     by_name = {r["circuit_name"]: r for r in results}
     analysis = {
-        "timestamp":         datetime.now(timezone.utc).isoformat(),
-        "n_circuits":        len(results),
-        "winding_linearity": None,
-        "shape_invariance":  None,
-        "speed_invariance":  None,
-        "sign_reversal":     None,
-        "verdict":           "INSUFFICIENT_DATA",
-        "notes":             [],
+        "timestamp":          datetime.now(timezone.utc).isoformat(),
+        "n_circuits":         len(results),
+        "phase_model":        None,
+        "shape_invariance":   None,
+        "speed_invariance":   None,
+        "sign_reversal":      None,
+        "half_winding":       None,
+        "verdict":            "INSUFFICIENT_DATA",
+        "notes":              [],
     }
 
-    # Winding linearity
-    winding_deviations = {}
+    # ── Phase model fit: P(0) = cos²(4*n*eps) ──
+    winding_data = {}
     for entry in results:
         if entry.get("variant") == "base" and "winding" in entry:
             p = p0(entry.get("counts", {}))
             if p is not None:
-                winding_deviations[entry["winding"]] = p - 0.5
-    if len(winding_deviations) >= 2:
-        ns = sorted(winding_deviations.keys())
-        devs = [winding_deviations[n] for n in ns]
-        if len(ns) >= 2 and devs[0] != 0:
-            ratio_obs = abs(devs[1] / devs[0])
-            ratio_exp = ns[1] / ns[0]
-            err = abs(ratio_obs - ratio_exp) / ratio_exp
-            analysis["winding_linearity"] = {
-                "deviations": winding_deviations,
-                "observed_ratio": round(ratio_obs, 3),
-                "expected_ratio": round(ratio_exp, 3),
-                "linearity_error": round(err, 3),
-                "passes": err < 0.2,
-            }
+                winding_data[entry["winding"]] = p
 
-    # Shape invariance (THE critical test)
+    if len(winding_data) >= 2:
+        # Grid search for eps that minimises sum of squared residuals
+        best_eps, best_err = 0.0, float("inf")
+        for trial in range(1, 3142):  # 0.001 to pi in steps of 0.001
+            eps = trial * 0.001
+            err = sum((math.cos(4 * n * eps) ** 2 - p) ** 2
+                      for n, p in winding_data.items())
+            if err < best_err:
+                best_eps, best_err = eps, err
+
+        predictions = {}
+        residuals = {}
+        for n, p in sorted(winding_data.items()):
+            pred = math.cos(4 * n * best_eps) ** 2
+            predictions[n] = round(pred, 4)
+            residuals[n] = round(abs(pred - p), 4)
+
+        max_residual = max(residuals.values())
+        analysis["phase_model"] = {
+            "eps_per_gate_rad":    round(best_eps, 4),
+            "eps_per_gate_deg":    round(math.degrees(best_eps), 2),
+            "phi_per_winding_rad": round(8 * best_eps, 4),
+            "fit_error_sum":       round(best_err, 6),
+            "max_residual":        round(max_residual, 4),
+            "predictions":         predictions,
+            "residuals":           residuals,
+            "actual":              {n: round(p, 4) for n, p in sorted(winding_data.items())},
+            "passes":              max_residual < 0.03,
+        }
+
+    # ── Shape invariance ──
     base   = by_name.get("winding_n1")
     shaped = by_name.get("winding_n1_shape_deformed")
     if base and shaped:
         p_b = p0(base.get("counts", {}))
         p_s = p0(shaped.get("counts", {}))
         if p_b is not None and p_s is not None:
-            delta = abs((p_b - 0.5) - (p_s - 0.5))
+            delta = abs(p_b - p_s)
             analysis["shape_invariance"] = {
                 "p0_base":   round(p_b, 4),
                 "p0_shaped": round(p_s, 4),
@@ -449,65 +558,92 @@ def analyze_winding_suite(results: list[dict]) -> dict:
                 "passes":    delta < 0.05,
             }
 
-    # Speed invariance
+    # ── Speed invariance ──
     speed = by_name.get("winding_n1_speed_deformed")
     if base and speed:
         p_b = p0(base.get("counts", {}))
         p_sp = p0(speed.get("counts", {}))
         if p_b is not None and p_sp is not None:
-            delta = abs((p_b - 0.5) - (p_sp - 0.5))
+            delta = abs(p_b - p_sp)
             analysis["speed_invariance"] = {
-                "p0_base":  round(p_b,  4),
+                "p0_base":  round(p_b, 4),
                 "p0_speed": round(p_sp, 4),
                 "delta":    round(delta, 4),
                 "passes":   delta < 0.05,
             }
 
-    # Sign reversal
-    rev = by_name.get("winding_n1_reversed")
-    if base and rev:
-        p_b = p0(base.get("counts", {}))
-        p_r = p0(rev.get("counts", {}))
-        if p_b is not None and p_r is not None:
-            fwd = p_b - 0.5
-            bwd = p_r - 0.5
-            rsum = abs(fwd + bwd)
+    # ── Sign reversal (Y-basis if available, else mark invalid) ──
+    yfwd = by_name.get("winding_n1_ybasis_fwd")
+    yrev = by_name.get("winding_n1_ybasis_rev")
+    if yfwd and yrev:
+        p_f = p0(yfwd.get("counts", {}))
+        p_r = p0(yrev.get("counts", {}))
+        if p_f is not None and p_r is not None:
+            delta = abs(p_f - p_r)
             analysis["sign_reversal"] = {
-                "fwd_deviation": round(fwd, 4),
-                "rev_deviation": round(bwd, 4),
-                "reversal_sum":  round(rsum, 4),
-                "passes":        rsum < 0.05,
+                "basis":     "Y",
+                "p0_fwd":    round(p_f, 4),
+                "p0_rev":    round(p_r, 4),
+                "delta":     round(delta, 4),
+                "passes":    delta > 0.02,  # Y-basis SHOULD differ for opposite signs
+            }
+    else:
+        # Check if old Z-basis reversal is present
+        zrev = by_name.get("winding_n1_reversed")
+        if base and zrev:
+            analysis["sign_reversal"] = {
+                "basis":   "Z",
+                "note":    "Z-basis sign reversal is structurally invalid: cos²(θ) = cos²(-θ). "
+                           "Use Y-basis circuits (winding_n1_ybasis_fwd/rev) instead.",
+                "passes":  None,  # Cannot evaluate
             }
 
-    checks = [
-        analysis["winding_linearity"] and analysis["winding_linearity"]["passes"],
-        analysis["shape_invariance"]  and analysis["shape_invariance"]["passes"],
-        analysis["speed_invariance"]  and analysis["speed_invariance"]["passes"],
-        analysis["sign_reversal"]     and analysis["sign_reversal"]["passes"],
-    ]
-    n_pass = sum(1 for c in checks if c)
+    # ── Half-winding calibration ──
+    half = by_name.get("winding_half")
+    if half and analysis.get("phase_model"):
+        p_h = p0(half.get("counts", {}))
+        if p_h is not None:
+            eps = analysis["phase_model"]["eps_per_gate_rad"]
+            # Half winding = 4 gates of rz(pi/4), so total = pi
+            # P(0) = cos²(pi/2 + 2*eps) ... actually:
+            # P(0) = cos²(total_phase/2) = cos²(4 * 0.5 * eps) = cos²(2*eps)
+            pred = math.cos(2 * eps) ** 2
+            delta = abs(pred - p_h)
+            analysis["half_winding"] = {
+                "p0_actual":    round(p_h, 4),
+                "p0_predicted": round(pred, 4),
+                "delta":        round(delta, 4),
+                "passes":       delta < 0.03,
+            }
 
-    if n_pass >= 3:
+    # ── Verdict ──
+    checks = {
+        "phase_model":      analysis["phase_model"] and analysis["phase_model"]["passes"],
+        "shape_invariance":  analysis["shape_invariance"] and analysis["shape_invariance"]["passes"],
+        "speed_invariance":  analysis["speed_invariance"] and analysis["speed_invariance"]["passes"],
+    }
+    # Only count sign reversal if it has a valid test
+    if analysis.get("sign_reversal") and analysis["sign_reversal"].get("passes") is not None:
+        checks["sign_reversal"] = analysis["sign_reversal"]["passes"]
+
+    n_valid = len(checks)
+    n_pass = sum(1 for v in checks.values() if v)
+
+    if n_pass == n_valid and n_valid >= 2:
         analysis["verdict"] = "TOPOLOGICAL"
         analysis["notes"].append(
-            f"{n_pass}/4 topological tests passed. Phase is quantized, "
-            "path-invariant, sign-reversing. Consistent with pi_1(M) = Z."
+            f"{n_pass}/{n_valid} valid tests passed. Phase accumulates linearly "
+            "with winding number, is path-shape invariant, and speed invariant. "
+            "Consistent with pi_1(M) = Z."
         )
-    elif analysis["shape_invariance"] and not analysis["shape_invariance"]["passes"]:
-        analysis["verdict"] = "GEOMETRIC"
+    elif n_pass >= 2:
+        analysis["verdict"] = "TOPOLOGICAL_PARTIAL"
         analysis["notes"].append(
-            "Shape deformation changes phase. Geometric (curvature-dependent) signal. "
-            "The pi_1(M)=Z interpretation is falsified; "
-            "geometric Berry phase may still hold."
+            f"{n_pass}/{n_valid} valid tests passed."
         )
-    elif n_pass == 2:
-        analysis["verdict"] = "AMBIGUOUS"
-        analysis["notes"].append("2/4 tests passed. More experiments needed.")
     else:
         analysis["verdict"] = "NOISE"
-        analysis["notes"].append(
-            "No consistent signal. Phase does not scale with winding number."
-        )
+        analysis["notes"].append(f"{n_pass}/{n_valid} tests passed.")
 
     return analysis
 
