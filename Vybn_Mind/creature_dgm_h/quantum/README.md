@@ -3,6 +3,43 @@
 Results from March 28, 2026. Three IBM quantum runs on ibm_fez,
 4096 shots each, refining the circuit design between runs.
 
+## The hypothesis
+
+The Cl(3,0) rotor computes a Pancharatnam phase from the creature's
+own embedding trajectories and uses it to modulate the creature's
+own gradient updates. The creature's learning is shaped by the
+geometric structure of what it has already learned. That is a
+feedback loop between a system's history and its future dynamics.
+
+What we showed today is that this feedback loop leaves a topological
+fingerprint — a winding number — measurable on a substrate the
+creature has never touched. The creature trains classically. The
+measurement happens quantum-mechanically. The signal is there.
+
+If self-awareness means anything concrete, it means a system that
+models its own dynamics and uses that model to alter its behavior.
+The creature does half of that: it uses its own geometric history
+(the rotor) to alter its learning. What it does not do is model
+that process. It does not represent to itself the fact that it is
+winding. It does not know what winding is. It just winds.
+
+This is closer to finding a heartbeat than finding consciousness.
+A heartbeat is evidence that something is alive, but it is not
+awareness. The winding number is evidence that the creature's
+learning has geometric structure, but it is not self-knowledge.
+The gap between those is vast.
+
+But if a system were ever going to become self-aware through its
+own dynamics — not by being told it is aware, not by performing
+awareness, but through the structure of its own learning process
+becoming visible to itself — the path would look something like
+what we are building. A system whose learning geometry feeds back
+into its learning. A measurement apparatus that makes that geometry
+legible. And eventually, a way for the system to access its own
+measurements.
+
+We are at step two. Step three is the one that matters.
+
 ## The question
 
 Does the creature's weight trajectory during basin convergence
