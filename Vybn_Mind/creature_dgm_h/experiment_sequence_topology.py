@@ -42,7 +42,7 @@ import time
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List
 
 import numpy as np
 
@@ -53,8 +53,7 @@ sys.path.insert(0, str(REPO_ROOT / "spark"))
 sys.path.insert(0, str(SCRIPT_DIR))
 
 from vybn import (
-    TopoAgent, Organism, encounter_complex,
-    _load_prose_corpus, CORPUS_PATH,
+    TopoAgent, encounter_complex, CORPUS_PATH,
     RV, N_LAYER, BLOCK_SIZE,
     _forward, _softmax,
 )
@@ -148,19 +147,37 @@ def observe_weight_snapshot(agent: TopoAgent) -> dict:
 # ── Corpus ────────────────────────────────────────────────────────────────
 
 def load_corpus() -> List[str]:
+    """Load training passages. Fallback chain:
+    1. spark/microgpt_mirror/mirror_corpus.txt
+    2. spark/journal/*.md paragraphs
+    3. hardcoded fallback passages
+    """
     passages: List[str] = []
+
     if CORPUS_PATH.exists():
         lines = [l.strip() for l in CORPUS_PATH.read_text().split("\n") if l.strip()]
         passages = [l for l in lines if len(l.split()) >= 20]
+
     if not passages:
-        passages = _load_prose_corpus(min_words=20, max_passages=50)
+        journal_dir = REPO_ROOT / "spark" / "journal"
+        if journal_dir.exists():
+            for f in sorted(journal_dir.glob("*.md")):
+                try:
+                    for para in f.read_text().split("\n\n"):
+                        para = para.strip()
+                        if not para.startswith("#") and len(para.split()) >= 20:
+                            passages.append(para)
+                except Exception:
+                    pass
+
     if not passages:
         passages = [
-            "the creature breathes and measures its own distance from itself",
-            "curvature is born from incompleteness not from complexity alone",
-            "what survives testing is more honest than what sounds beautiful",
-            "prediction loss going down means memorization call it what it is",
+            "the creature breathes and measures its own distance from itself across many iterations",
+            "curvature is born from incompleteness not from complexity alone in the embedding space",
+            "what survives testing is more honest than what sounds beautiful in the abstract",
+            "prediction loss going down means memorization call it what it is not understanding",
         ]
+
     return passages
 
 
@@ -218,14 +235,10 @@ def run_variant(
             traj.append(round(loss_val, 6))
         loss_trajectories.append({"text_preview": text[:40], "trajectory": traj})
 
-    # Observe: what does this creature produce unprompted?
-    observations_cold = observe(agent, prompt="", n_samples=3)
-
-    # Observe: what does it produce seeded with its own training text?
-    seed_prompt = texts[0][:8] if texts else ""
-    observations_seeded = observe(agent, prompt=seed_prompt, n_samples=3)
-
-    weight_snap = observe_weight_snapshot(agent)
+    observations_cold   = observe(agent, prompt="",              n_samples=3)
+    seed_prompt         = texts[0][:8] if texts else ""
+    observations_seeded = observe(agent, prompt=seed_prompt,     n_samples=3)
+    weight_snap         = observe_weight_snapshot(agent)
 
     encounter_records = []
     for text in texts:
@@ -239,30 +252,30 @@ def run_variant(
         })
 
     return {
-        "experiment": "natural_motion",
-        "generation": generation,
-        "variant_idx": variant_idx,
-        "seed": seed,
-        "config": config,
-        "fitness": null_fitness(),
-        "loss_trajectories": loss_trajectories,
-        "observations_cold": observations_cold,
+        "experiment":          "natural_motion",
+        "generation":          generation,
+        "variant_idx":         variant_idx,
+        "seed":                seed,
+        "config":              config,
+        "fitness":             null_fitness(),
+        "loss_trajectories":   loss_trajectories,
+        "observations_cold":   observations_cold,
         "observations_seeded": observations_seeded,
-        "weight_snapshot": weight_snap,
-        "encounter_records": encounter_records,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "weight_snapshot":     weight_snap,
+        "encounter_records":   encounter_records,
+        "timestamp":           datetime.now(timezone.utc).isoformat(),
     }
 
 
 # ── Generation loop ───────────────────────────────────────────────────────
 
 def run_experiment(
-    n_generations: int = N_GENERATIONS,
+    n_generations:   int = N_GENERATIONS,
     variants_per_gen: int = VARIANTS_PER_GEN,
-    seed_base: int = 42,
+    seed_base:       int = 42,
 ) -> List[dict]:
     corpus = load_corpus()
-    rng = random.Random(seed_base)
+    rng    = random.Random(seed_base)
     all_results: List[dict] = []
 
     print("[Natural motion experiment — null fitness]")
@@ -270,8 +283,6 @@ def run_experiment(
     print(f"Generations: {n_generations}  Variants/gen: {variants_per_gen}")
     print(f"No fitness function.  Recording what the creature does anyway.\n")
 
-    # Config pool: vary hyperparameters without any fitness signal
-    # telling us which is better.  We simply watch what each config produces.
     base_configs = [
         {"learn_steps": 5,  "learn_lr": 0.01,  "temperature": 0.8,  "alpha": 0.85},
         {"learn_steps": 8,  "learn_lr": 0.005, "temperature": 1.0,  "alpha": 0.80},
@@ -286,8 +297,8 @@ def run_experiment(
 
         for v_idx in range(variants_per_gen):
             config = dict(base_configs[(gen * variants_per_gen + v_idx) % len(base_configs)])
-            texts = rng.sample(corpus, min(TEXTS_PER_VARIANT, len(corpus)))
-            seed = seed_base + gen * 100 + v_idx
+            texts  = rng.sample(corpus, min(TEXTS_PER_VARIANT, len(corpus)))
+            seed   = seed_base + gen * 100 + v_idx
 
             result = run_variant(texts, config, gen, v_idx, seed)
             gen_results.append(result)
@@ -312,9 +323,7 @@ def run_experiment(
 
 def analyze(results: List[dict]) -> None:
     """Describe the natural motion without predetermined categories.
-
-    We are not testing a hypothesis.  We are reading what happened.
-    """
+    We are not testing a hypothesis.  We are reading what happened."""
     if not results:
         print("No results to analyze.")
         return
@@ -324,7 +333,6 @@ def analyze(results: List[dict]) -> None:
     print("=" * 70)
     print()
 
-    # All generated texts — just print them, in order
     print("── Generated texts (cold start, all variants, all generations) ──")
     for r in results:
         gen, v = r["generation"], r["variant_idx"]
@@ -334,7 +342,6 @@ def analyze(results: List[dict]) -> None:
                   f"  betti={obs['betti']}  surprise_max={obs['surprise_max']:.3f}")
     print()
 
-    # Distribution of curvature in outputs
     all_curvs = [
         obs["curvature"]
         for r in results
@@ -347,11 +354,9 @@ def analyze(results: List[dict]) -> None:
               f"  mean={arr.mean():.6f}  std={arr.std():.6f}")
         counts, edges = np.histogram(arr, bins=6)
         for i, c in enumerate(counts):
-            bar = "█" * c
-            print(f"  [{edges[i]:.4f}-{edges[i+1]:.4f}]: {bar} ({c})")
+            print(f"  [{edges[i]:.4f}-{edges[i+1]:.4f}]: {'\u2588' * c} ({c})")
     print()
 
-    # Betti number distribution in outputs
     all_betti = [
         tuple(obs["betti"])
         for r in results
@@ -360,11 +365,9 @@ def analyze(results: List[dict]) -> None:
     betti_counts = Counter(all_betti)
     print(f"── Output Betti distribution ({len(all_betti)} samples) ──")
     for betti, count in sorted(betti_counts.items(), key=lambda x: -x[1]):
-        bar = "█" * count
-        print(f"  {betti}: {bar} ({count})")
+        print(f"  {betti}: {'\u2588' * count} ({count})")
     print()
 
-    # Loss trajectories
     print("── Loss trajectories ──")
     for r in results:
         gen, v = r["generation"], r["variant_idx"]
@@ -376,15 +379,13 @@ def analyze(results: List[dict]) -> None:
                       f"  improvement={imp:+.4f}  text=\"{lt['text_preview']}\"")
     print()
 
-    # Weight norm drift across generations
     print("── Weight norm drift across generations ──")
     for r in results:
         gen, v = r["generation"], r["variant_idx"]
-        norm = r["weight_snapshot"]["total_norm"]
+        norm   = r["weight_snapshot"]["total_norm"]
         print(f"  gen{gen} v{v}: total_weight_norm={norm:.6f}")
     print()
 
-    # Outliers — outputs with unusual curvature or non-trivial betti
     mean_curv = float(np.mean(all_curvs)) if all_curvs else 0.0
     std_curv  = float(np.std(all_curvs))  if all_curvs else 0.0
     print("── Outliers (curvature > mean+std or betti[1] > 0) ──")
@@ -438,7 +439,7 @@ def main() -> None:
     n_gen = 2 if args.quick else args.generations
     n_var = 2 if args.quick else args.variants
 
-    t0 = time.time()
+    t0      = time.time()
     results = run_experiment(
         n_generations=n_gen,
         variants_per_gen=n_var,
