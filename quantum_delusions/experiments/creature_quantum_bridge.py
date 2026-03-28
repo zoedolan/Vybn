@@ -263,12 +263,12 @@ def main():
     p_build = sub.add_parser("build", help="Generate creature QASM from basin result")
     p_build.add_argument("basin_json", type=str)
     p_build.add_argument("--agent-idx", type=int, default=0)
-    p_build.add_argument("--subsample", type=int, default=32)
+    p_build.add_argument("--subsample", type=int, default=8)
     
     p_run = sub.add_parser("run", help="Run full suite on IBM with creature circuit")
     p_run.add_argument("basin_json", type=str)
     p_run.add_argument("--agent-idx", type=int, default=0)
-    p_run.add_argument("--subsample", type=int, default=32)
+    p_run.add_argument("--subsample", type=int, default=8)
     p_run.add_argument("--shots", type=int, default=4096)
     p_run.add_argument("--dry-run", action="store_true")
     
