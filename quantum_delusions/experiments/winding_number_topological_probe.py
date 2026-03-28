@@ -79,7 +79,6 @@ import numpy as np
 def winding_n_qasm(n: int, phi_step: float = math.pi / 4) -> str:
     steps_per_winding = int(round(2 * math.pi / phi_step))
     total_steps = n * steps_per_winding
-    phi_deg = math.degrees(phi_step)
     lines = [
         'OPENQASM 2.0;',
         'include "qelib1.inc";',
@@ -89,13 +88,13 @@ def winding_n_qasm(n: int, phi_step: float = math.pi / 4) -> str:
         f'// {n} winding(s), {steps_per_winding} steps each',
     ]
     for step in range(total_steps):
-        lines.append(f'rz({phi_deg:.6f}) q[0];')
+        lines.append(f'rz({phi_step:.6f}) q[0];')
     lines += ['h q[0];', 'measure q[0] -> c[0];']
     return '\n'.join(lines)
 
 
 def winding_shape_deformed_qasm(n: int = 1, ellipse_ratio: float = 0.5) -> str:
-    base_step  = math.pi / 4
+    base_step  = math.pi / 4  # radians
     step_large = base_step * (1 + ellipse_ratio)
     step_small = base_step * (1 - ellipse_ratio)
     total_steps = n * 8
@@ -109,14 +108,14 @@ def winding_shape_deformed_qasm(n: int = 1, ellipse_ratio: float = 0.5) -> str:
     ]
     for step in range(total_steps):
         phi = step_large if step % 2 == 0 else step_small
-        lines.append(f'rz({math.degrees(phi):.6f}) q[0];')
+        lines.append(f'rz({phi:.6f}) q[0];')
     lines += ['h q[0];', 'measure q[0] -> c[0];']
     return '\n'.join(lines)
 
 
 def winding_reversed_qasm(n: int = 1) -> str:
     total_steps = n * 8
-    phi_deg = -math.degrees(math.pi / 4)
+    phi_step = -(math.pi / 4)
     lines = [
         'OPENQASM 2.0;',
         'include "qelib1.inc";',
@@ -126,7 +125,7 @@ def winding_reversed_qasm(n: int = 1) -> str:
         f'// Reversed winding: n={n}',
     ]
     for _ in range(total_steps):
-        lines.append(f'rz({phi_deg:.6f}) q[0];')
+        lines.append(f'rz({phi_step:.6f}) q[0];')
     lines += ['h q[0];', 'measure q[0] -> c[0];']
     return '\n'.join(lines)
 
@@ -144,7 +143,7 @@ def winding_speed_deformed_qasm(n: int = 1, density: int = 4) -> str:
         f'// Speed-deformed winding: n={n}, density={density}x',
     ]
     for _ in range(total_steps):
-        lines.append(f'rz({math.degrees(phi_step):.6f}) q[0];')
+        lines.append(f'rz({phi_step:.6f}) q[0];')
     lines += ['h q[0];', 'measure q[0] -> c[0];']
     return '\n'.join(lines)
 
@@ -201,15 +200,15 @@ def build_creature_loop_qasm(bloch_angles: List[tuple]) -> str:
         f'// Creature-derived loop: {len(bloch_angles)} steps from weight trajectory PCA',
     ]
     for theta, phi in bloch_angles:
-                lines.append(f'rz({phi:.6f}) q[0];')
-                lines.append(f'ry({theta:.6f}) q[0];')
+        lines.append(f'rz({phi:.6f}) q[0];')
+        lines.append(f'ry({theta:.6f}) q[0];')
     lines += ['h q[0];', 'measure q[0] -> c[0];']
     return '\n'.join(lines)
 
 
 def run_on_ibm(circuits_qasm: List[str], token: Optional[str] = None,
                shots: int = 4096) -> List[dict]:
-        """Submit QASM circuits to IBM quantum hardware. No simulator fallback.
+    """Submit QASM circuits to IBM quantum hardware. No simulator fallback.
 
     Returns a list of count dicts, one per circuit.
     """
@@ -222,7 +221,7 @@ def run_on_ibm(circuits_qasm: List[str], token: Optional[str] = None,
 
     qcs = [QuantumCircuit.from_qasm_str(q) for q in circuits_qasm]
 
-        token = token or os.environ.get("QISKIT_IBM_TOKEN") or os.environ.get("IBM_QUANTUM_TOKEN")
+    token = token or os.environ.get("QISKIT_IBM_TOKEN") or os.environ.get("IBM_QUANTUM_TOKEN")
     if not token:
         raise RuntimeError(
             "No IBM Quantum token found. Set QISKIT_IBM_TOKEN (or IBM_QUANTUM_TOKEN) "
@@ -235,14 +234,20 @@ def run_on_ibm(circuits_qasm: List[str], token: Optional[str] = None,
     service = QiskitRuntimeService(channel=channel, token=token, instance=instance)
     backend = service.least_busy(simulator=False, operational=True)
     print(f"\u26a1 IBM backend: {backend.name}")
+    # Transpile to backend's native gate set (required since March 2024)
+    from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
+    pm = generate_preset_pass_manager(backend=backend, optimization_level=1)
+    qcs_isa = pm.run(qcs)
+    print(f"  Transpiled {len(qcs_isa)} circuits for {backend.name}")
     sampler = SamplerV2(backend)
-    job = sampler.run(qcs, shots=shots)
+    job = sampler.run(qcs_isa, shots=shots)
     result = job.result()
     all_counts = []
     for pub_result in result:
         counts = pub_result.data.c.get_counts()
         all_counts.append(counts)
     return all_counts
+
 
 WINDING_EXPERIMENT_SUITE = [
     {
@@ -592,9 +597,11 @@ def main() -> None:
     except ImportError as exc:
         print(f"\nCannot execute: {exc}")
         print("Install qiskit + qiskit-ibm-runtime to run on IBM hardware.")
-                
+        return
+
     # Attach counts to suite entries
-            "counts"] = counts
+    for exp, counts in zip(suite, all_counts):
+        exp["counts"] = counts
         total = sum(counts.values())
         p0 = counts.get("0", 0) / total if total else 0
         print(f"  {exp['circuit_name']:40s}  P(0)={p0:.4f}  counts={counts}")
