@@ -215,13 +215,18 @@ def cmd_breathe_winding():
     print(f"  quantum: P(0)={quantum_ctx['P0_creature']} vs control={quantum_ctx['P0_random_control']}")
     print(f"  seed: \"{seed[:80]}...\"")
 
-    raw_fm = fm_complete(
-        prompt=user_prompt, system=system_prompt,
-        max_tokens=512, temperature=0.9,
-    )
+        raw_fm = ""
+    for _attempt in range(3):
+        raw_fm = fm_complete(
+            prompt=user_prompt, system=system_prompt,
+            max_tokens=512, temperature=0.9,
+        )
+        if raw_fm:
+            break
+        import time; time.sleep(2)
+        print(f"  FM attempt {_attempt+1} empty, retrying...")
     if not raw_fm:
-        print("  Empty response from FM."); return
-
+        print("  Empty response from FM after 3 attempts."); return
     fm_text = _strip_thinking(raw_fm)
     stripped_n = len(raw_fm) - len(fm_text)
     if stripped_n > 0:
