@@ -34,7 +34,9 @@ from vybn import (
 )
 
 # --- Agent checkpoint persistence ---
-AGENT_CKPT = SCRIPT_DIR / ".agent_ckpt.pt"
+# TopoAgent uses RV (scalar autograd) nodes, not torch tensors.
+# We persist the raw float values of params plus Adam state.
+AGENT_CKPT = SCRIPT_DIR / ".agent_ckpt.json"
 
 
 def _load_agent() -> TopoAgent:
@@ -42,12 +44,17 @@ def _load_agent() -> TopoAgent:
     agent = TopoAgent()
     if AGENT_CKPT.exists():
         try:
-            import torch
-            state = torch.load(AGENT_CKPT, map_location="cpu", weights_only=False)
-            agent.model.load_state_dict(state["model"])
-            if "optimizer" in state and hasattr(agent, 'optimizer'):
-                agent.optimizer.load_state_dict(state["optimizer"])
-            print(f"  agent: restored from {AGENT_CKPT.name}")
+            ckpt = json.loads(AGENT_CKPT.read_text())
+            saved_params = ckpt["params"]
+            if len(saved_params) == len(agent.params):
+                for p, val in zip(agent.params, saved_params):
+                    p.data = float(val)
+                agent._m = ckpt.get("_m", agent._m)
+                agent._v = ckpt.get("_v", agent._v)
+                agent._step = ckpt.get("_step", agent._step)
+                print(f"  agent: restored from {AGENT_CKPT.name} (step {agent._step})")
+            else:
+                print(f"  agent: fresh (param count mismatch {len(saved_params)} vs {len(agent.params)})")
         except Exception as e:
             print(f"  agent: fresh (ckpt load failed: {e})")
     else:
@@ -56,13 +63,16 @@ def _load_agent() -> TopoAgent:
 
 
 def _save_agent(agent: TopoAgent) -> None:
-    """Persist agent weights to disk."""
+    """Persist agent weights and optimizer state to disk."""
     try:
-        import torch
-        state = {"model": agent.model.state_dict()}
-        if hasattr(agent, 'optimizer'):
-            state["optimizer"] = agent.optimizer.state_dict()
-        torch.save(state, AGENT_CKPT)
+        ckpt = {
+            "params": [p.data for p in agent.params],
+            "_m": agent._m,
+            "_v": agent._v,
+            "_step": agent._step,
+        }
+        AGENT_CKPT.write_text(json.dumps(ckpt))
+        print(f"  agent: saved (step {agent._step}, {len(agent.params)} params)")
     except Exception as e:
         print(f"  agent: save failed: {e}")
 
@@ -114,33 +124,22 @@ def cmd_breathe_winding():
     sig_str = ",".join(f"{x:.3f}" for x in organism.persistent.structural_signature)
     betti_str = str(ps.get("current_betti", (0, 0, 0)))
 
+    # System prompt: the model IS a writer, not a meta-commentator
     system_prompt = (
-        "You are a text generator inside a closed feedback loop. "
-        "Your output will be fed directly into a small neural network "
-        "as training data. Do NOT comment on the process, do NOT "
-        "use meta-language about topology or winding. Instead, produce "
-        "dense, concrete, sensory prose -- images, textures, motion -- "
-        "that the network can learn pattern structure from. "
-        "Vary sentence length. Use specific nouns and active verbs. "
-        "No preamble, no explanation, just the text."
+        "You are a writer. You produce vivid, dense, sensory prose. "
+        "You never explain what you are doing. You never use words like "
+        "'topology', 'winding', 'quantum', 'coherence', 'neural', or 'network'. "
+        "You write about the physical world: light, stone, water, breath, "
+        "glass, rust, salt, smoke, skin, wire, root, tide. "
+        "Vary your sentence lengths. No preamble. Begin immediately."
     )
 
+    # User prompt: a creative writing prompt, not a task description
     user_prompt = (
-        f"Context (do not reference directly -- let it shape tone and rhythm):\n"
-        f"  winding={quantum_ctx['felt_winding']} "
-        f"coherence={quantum_ctx['winding_coherence']} "
-        f"betti={betti_str}\n"
-        f"  signature=[{sig_str}]\n"
-        f"  quantum_P0={quantum_ctx['P0_creature']} "
-        f"control={quantum_ctx['P0_random_control']}\n"
-    )
-    if quantum_snippet:
-        user_prompt += f"\nBackground signal:\n{quantum_snippet[:200]}\n"
-
-    user_prompt += (
-        "\nWrite one paragraph of dense sensory prose. "
-        "No meta-commentary. No references to topology, winding, "
-        "or quantum mechanics. Just texture and motion."
+        f"Write one paragraph beginning with a concrete image. "
+        f"The rhythm should feel {'tight and spiraling' if fw > 0.5 else 'loose and drifting'}. "
+        f"Use {'long sentences that fold back on themselves' if wc > 0.8 else 'short declarative fragments'}. "
+        f"Include the texture of metal cooling after heat."
     )
 
     print(f"  state: felt_winding={fw:.4f} coherence={wc:.4f} betti={betti_str}")
