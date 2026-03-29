@@ -1245,8 +1245,12 @@ def fm_complete(prompt=None, system=None, max_tokens=1024, temperature=0.7, mess
             text = json.loads(r.read())["choices"][0]["message"]["content"]
             for tok in ("<|im_end|>", "<|im_start|>", "<|endoftext|>"):
                 text = text.replace(tok, "")
-                                        # Strip <think>...</think> reasoning tags
-            text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL).strip()
+            # Take only what comes after the last </think> tag.
+            # Everything before it is reasoning, even if not wrapped in <think>.
+            if "</think>" in text:
+                text = text.split("</think>")[-1]
+            # Also strip any <think>...</think> blocks that survived
+            text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
             return text.strip()
     except Exception:
         return None
@@ -1727,7 +1731,10 @@ def _strip_thinking(text: str) -> str:
     if not text:
         return text
 
-    # Step 1: strip <think> blocks
+    # Step 1: take only what comes after the last </think> tag
+    if '</think>' in text:
+        text = text.split('</think>')[-1].strip()
+    # Also strip any remaining <think>...</think> blocks
     text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL).strip()
     if not text:
         return text
@@ -1952,30 +1959,24 @@ def cmd_breathe_live():
     if not fm_available():
         print("  FM not serving."); return
 
-    # Build context as one continuous document — no chat framing.
-    # The model sees a text that ends mid-sentence and just continues it.
+    # Build context: the model IS Vybn.
     context = _build_creature_context()
-    # The document ends with Vybn's journal voice, mid-sentence:
-    prompt = context + "\n\n--- JOURNAL ENTRY ---\n\nI would have missed "
+    # Try raw /completion first (no chat framing, no reasoning mode).
+    # If unavailable, fall back to chat with assistant prefill.
+    prompt_doc = context + "\n\n--- JOURNAL ENTRY ---\n\nI would have missed "
 
-    raw_fm = ""
-    for _attempt in range(3):
-        raw_fm = fm_text_complete(prompt, max_tokens=512, temperature=0.9,
-                                  stop=["\n\n---", "\n\n#"])
-        if raw_fm:
-            break
-        time.sleep(2)
-        print(f"  FM attempt {_attempt+1} empty, retrying...")
+    raw_fm = fm_text_complete(prompt_doc, max_tokens=512, temperature=0.9,
+                              stop=["\n\n---", "\n\n#"])
+    if not raw_fm:
+        # Chat fallback with assistant prefill
+        raw_fm = fm_complete(messages=[
+            {"role": "system", "content": context},
+            {"role": "user", "content": "Continue your journal. One entry. No commentary, no planning, no meta-discussion. Just the entry."},
+            {"role": "assistant", "content": "I would have missed"},
+        ], max_tokens=512, temperature=0.9)
 
     if not raw_fm:
-        # Fallback to chat endpoint if /completion not available
-        print("  /completion failed, falling back to chat endpoint...")
-        raw_fm = fm_complete(
-            prompt="Continue this journal entry in one paragraph, in Vybn's voice: I would have missed",
-            system=context, max_tokens=512, temperature=0.9)
-
-    if not raw_fm:
-        print("  Empty response from FM after all attempts."); return
+        print("  Empty response from FM."); return
 
     # Show everything the model said
     print(f"\n  ── raw FM ({len(raw_fm)} chars) ──")
