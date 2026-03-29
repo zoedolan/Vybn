@@ -1751,75 +1751,56 @@ def _strip_thinking(text: str) -> str:
     # Step 1: take only what comes after the last </think> tag
     if '</think>' in text:
         text = text.split('</think>')[-1].strip()
-    # Also strip any remaining <think>...</think> blocks
     text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL).strip()
     if not text:
         return text
 
-    # Step 1b: sentence-level removal of prompt-referencing meta
-    _PROMPT_REF_PATS = [
-        re.compile(r'(?i)\bI notice\b'),
-        re.compile(r'(?i)\bthey specified\b'),
-        re.compile(r'(?i)\bI must\b'),
-        re.compile(r'(?i)\bthe challenge is\b'),
-        re.compile(r'(?i)\bno commentary\b'),
-        re.compile(r'(?i)\bstay in scene\b'),
-        re.compile(r'(?i)\bpure narrative\b'),
-        re.compile(r'(?i)\bI should\b'),
-        re.compile(r'(?i)\bI need to\b(?!.{0,5}\b(?:breathe|eat|sleep|run|walk|see|hear|feel)\b)'),
-        re.compile(r'(?i)\blet me\b(?!.{0,5}\b(?:go|see|think|sleep|breathe)\b)'),
-        re.compile(r'(?i)\bavoid any\b'),
-        re.compile(r'(?i)\bthe (?:user|prompt|instruction)\b'),
-        re.compile(r'(?i)\bmaintain(?:ing)?\s+(?:that|the|this)\s+(?:imagery|tone|style)\b'),
-        re.compile(r'(?i)\bwe need to write\b'),
-        re.compile(r'(?i)\bwrite a paragraph\b'),
-        re.compile(r'(?i)\bas vybn\b.*(?:continu|reflect|produc)'),
-        re.compile(r'(?i)\bfirst person\b'),
-        re.compile(r'(?i)\bno <'),
-        re.compile(r'(?i)\bjust (?:voice|prose|text)\b'),
-        re.compile(r'(?i)\bso produce\b'),
-        re.compile(r'(?i)\btopological state\b.*\b(?:above|shown|given)\b'),
-    ]
+    # Step 2: detect tagless reasoning.
+    # If the text contains reasoning patterns (planning, self-correction,
+    # references to "the user"/"the prompt"), find the last sentence that
+    # starts with "I would have missed" and take from there.
+    _REASONING_MARKERS = re.compile(
+        r'(?i)(?:'
+        r'\bwe need to\b|\bwe should\b|\blet\'s \b|\bLet me\b'
+        r'|\bthe user\b|\bthe prompt\b|\bthe instruction\b'
+        r'|\bI should\b|\bI need to\b|\bI recall\b'
+        r'|\bScanning\b|\bLooking at\b|\bChecking\b'
+        r'|\bHmm\b|\bWait:\b|\bActually\b|\bOkay,\b'
+        r'|\bI\'ll craft\b|\bSo produce\b|\bThus we\b'
+        r'|\bno commentary\b|\bno meta\b'
+        r'|\bthe entry should\b|\bthe journal\b.*\bformat\b'
+        r')'
+    )
+    if _REASONING_MARKERS.search(text):
+        # The model reasoned in plain text. Find the actual prose.
+        # Look for the last "I would have missed" as the start of real output.
+        idx = text.lower().rfind('i would have missed')
+        if idx >= 0:
+            candidate = text[idx:].strip()
+            # But it might be followed by more reasoning — take until
+            # reasoning markers reappear
+            lines = candidate.split('\n')
+            prose_lines = []
+            for line in lines:
+                if _REASONING_MARKERS.search(line) and prose_lines:
+                    break  # reasoning resumed
+                prose_lines.append(line)
+            candidate = '\n'.join(prose_lines).strip()
+            if len(candidate) >= 40:
+                return candidate
+
+    # Step 3: sentence-level removal of remaining meta patterns
+    _META_SENT = re.compile(
+        r'(?i)(?:'
+        r'\bwrite a paragraph\b|\bas vybn\b.*(?:continu|reflect)'
+        r'|\bfirst person\b|\bjust (?:voice|prose|text|the entry)\b'
+        r'|\bno <|\bso produce\b'
+        r')'
+    )
     sentences = re.split(r'(?<=[.!?])\s+', text)
-    cleaned = [s for s in sentences if not any(p.search(s) for p in _PROMPT_REF_PATS)]
+    cleaned = [s for s in sentences if not _META_SENT.search(s)]
     if cleaned:
         text = ' '.join(cleaned).strip()
-    if not text:
-        return text
-
-    # Step 2: split into paragraphs
-    paragraphs = re.split(r'\n\s*\n', text)
-    if len(paragraphs) <= 1:
-        paragraphs = text.split('\n')
-
-    # Step 3: score each paragraph
-    meta_words = {
-        'i ', 'i\'m', 'i\'ll', 'i\'ve', 'my ', 'the user', 'they ',
-        'must ', 'should ', 'challenge', 'meta', 'commentary',
-        'avoid', 'specified', 'noting ', 'prompt', 'immersion',
-        'need to', 'want to', 'going to', 'let me', 'okay',
-        'hmm', 'alright', 'here\'s', 'here is', 'pure ',
-        'organically', 'extending', 'maybe ', 'perhaps ',
-    }
-    prose_paras = []
-    for para in paragraphs:
-        stripped = para.strip()
-        if not stripped:
-            continue
-        low = stripped.lower()
-        meta_hits = sum(1 for m in meta_words if m in low)
-        if meta_hits < 2:
-            prose_paras.append(stripped)
-
-    if prose_paras:
-        result = '\n\n'.join(prose_paras)
-        if len(result) >= 50:
-            return result
-
-    # Fallback: return everything after the last blank line
-    parts = text.rsplit('\n\n', 1)
-    if len(parts) == 2 and len(parts[1].strip()) >= 50:
-        return parts[1].strip()
 
     return text.strip()
 
