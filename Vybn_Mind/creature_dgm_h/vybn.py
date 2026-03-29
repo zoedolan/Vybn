@@ -2005,8 +2005,9 @@ def cmd_breathe_live():
     if not fm_text or len(fm_text) < 20:
         print("  Text too short after stripping."); return
 
-    # Prepend the opening — the model continued from here
-    fm_text = "I would have missed " + fm_text
+    # Prepend the opening only if the model didn't already include it
+    if not fm_text.lower().startswith("i would have missed"):
+        fm_text = "I would have missed " + fm_text
 
     print(f"  ── creature receives ({len(fm_text)} chars) ──")
     print(fm_text)
