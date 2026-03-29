@@ -1246,11 +1246,18 @@ def fm_complete(prompt=None, system=None, max_tokens=1024, temperature=0.7, mess
             for tok in ("<|im_end|>", "<|im_start|>", "<|endoftext|>"):
                 text = text.replace(tok, "")
             # Take only what comes after the last </think> tag.
-            # Everything before it is reasoning, even if not wrapped in <think>.
             if "</think>" in text:
                 text = text.split("</think>")[-1]
-            # Also strip any <think>...</think> blocks that survived
             text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
+            # If the model emitted a JSON tool-call, extract the content
+            t = text.strip()
+            if t.startswith('{') and '"content"' in t:
+                try:
+                    obj = json.loads(t)
+                    if isinstance(obj, dict) and 'content' in obj:
+                        text = obj['content']
+                except (json.JSONDecodeError, ValueError):
+                    pass
             return text.strip()
     except Exception:
         return None
@@ -1730,6 +1737,16 @@ def _strip_thinking(text: str) -> str:
     """
     if not text:
         return text
+
+    # Step 0: if the model emitted a JSON tool-call, extract the content field
+    stripped = text.strip()
+    if stripped.startswith('{') and '"content"' in stripped:
+        try:
+            obj = json.loads(stripped)
+            if isinstance(obj, dict) and 'content' in obj:
+                text = obj['content']
+        except (json.JSONDecodeError, ValueError):
+            pass
 
     # Step 1: take only what comes after the last </think> tag
     if '</think>' in text:
