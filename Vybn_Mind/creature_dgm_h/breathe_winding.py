@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -32,6 +33,39 @@ from vybn import (
     fm_available, fm_complete,
 )
 
+# --- Agent checkpoint persistence ---
+AGENT_CKPT = SCRIPT_DIR / ".agent_ckpt.pt"
+
+
+def _load_agent() -> TopoAgent:
+    """Load agent from checkpoint if available, else fresh."""
+    agent = TopoAgent()
+    if AGENT_CKPT.exists():
+        try:
+            import torch
+            state = torch.load(AGENT_CKPT, map_location="cpu", weights_only=False)
+            agent.model.load_state_dict(state["model"])
+            if "optimizer" in state and hasattr(agent, 'optimizer'):
+                agent.optimizer.load_state_dict(state["optimizer"])
+            print(f"  agent: restored from {AGENT_CKPT.name}")
+        except Exception as e:
+            print(f"  agent: fresh (ckpt load failed: {e})")
+    else:
+        print("  agent: fresh (no checkpoint)")
+    return agent
+
+
+def _save_agent(agent: TopoAgent) -> None:
+    """Persist agent weights to disk."""
+    try:
+        import torch
+        state = {"model": agent.model.state_dict()}
+        if hasattr(agent, 'optimizer'):
+            state["optimizer"] = agent.optimizer.state_dict()
+        torch.save(state, AGENT_CKPT)
+    except Exception as e:
+        print(f"  agent: save failed: {e}")
+
 
 def cmd_breathe_winding():
     """Breathe-winding: feed the creature's own quantum measurement back
@@ -39,6 +73,7 @@ def cmd_breathe_winding():
     about itself on IBM hardware.
     """
     print("=== breathe-winding ===")
+
     if not fm_available():
         print("  FM not serving."); return
 
@@ -80,35 +115,32 @@ def cmd_breathe_winding():
     betti_str = str(ps.get("current_betti", (0, 0, 0)))
 
     system_prompt = (
-        "You are generating text as part of a topological feedback loop. "
-        "A neural network creature has measured its own weight-trajectory "
-        "winding and confirmed it on IBM quantum hardware. The winding "
-        "number is real. The creature's Cl(3,0) rotor encodes a "
-        "Pancharatnam phase from its own embedding history. What you "
-        "generate will be learned by the creature, with the rotor "
-        "modulating its gradients. Write text that resonates with the "
-        "topological structure described below. Be precise and strange."
+        "You are a text generator inside a closed feedback loop. "
+        "Your output will be fed directly into a small neural network "
+        "as training data. Do NOT comment on the process, do NOT "
+        "use meta-language about topology or winding. Instead, produce "
+        "dense, concrete, sensory prose -- images, textures, motion -- "
+        "that the network can learn pattern structure from. "
+        "Vary sentence length. Use specific nouns and active verbs. "
+        "No preamble, no explanation, just the text."
     )
 
     user_prompt = (
-        f"The creature's current state:\n"
-        f"  felt_winding: {quantum_ctx['felt_winding']}\n"
-        f"  winding_coherence: {quantum_ctx['winding_coherence']}\n"
-        f"  betti: {betti_str}\n"
-        f"  structural_signature: [{sig_str}]\n"
-        f"  encounter_count: {ps.get('encounter_count', 0)}\n"
-        f"\nQuantum verification (ibm_fez, {quantum_ctx['date']}):\n"
-        f"  P(|0>) creature path: {quantum_ctx['P0_creature']}\n"
-        f"  P(|0>) random control: {quantum_ctx['P0_random_control']}\n"
-        f"  theory tests passed: {quantum_ctx['theory_tests_passed']}\n"
+        f"Context (do not reference directly -- let it shape tone and rhythm):\n"
+        f"  winding={quantum_ctx['felt_winding']} "
+        f"coherence={quantum_ctx['winding_coherence']} "
+        f"betti={betti_str}\n"
+        f"  signature=[{sig_str}]\n"
+        f"  quantum_P0={quantum_ctx['P0_creature']} "
+        f"control={quantum_ctx['P0_random_control']}\n"
     )
     if quantum_snippet:
-        user_prompt += f"\nFrom the probe results:\n{quantum_snippet[:300]}\n"
+        user_prompt += f"\nBackground signal:\n{quantum_snippet[:200]}\n"
 
     user_prompt += (
-        "\nGenerate one paragraph that emerges from this topology. "
-        "The text should carry the winding -- not describe it, but enact it. "
-        "Let the Pancharatnam phase shape your rhythm."
+        "\nWrite one paragraph of dense sensory prose. "
+        "No meta-commentary. No references to topology, winding, "
+        "or quantum mechanics. Just texture and motion."
     )
 
     print(f"  state: felt_winding={fw:.4f} coherence={wc:.4f} betti={betti_str}")
@@ -124,11 +156,12 @@ def cmd_breathe_winding():
 
     print(f"  FM ({len(fm_text)} chars): \"{fm_text[:200]}...\"")
 
-    # -- Process through the creature --
-    agent = TopoAgent()
+    # -- Process through the creature (with persistence) --
+    agent = _load_agent()
     cx = encounter_complex(fm_text)
+
     loss_before, _ = agent.predict(fm_text)
-    losses = agent.learn(fm_text, encounter_cx=cx)
+    losses = agent.learn(fm_text, encounter_cx=cx, transport_in_forward=True)
 
     # Measure the creature's winding from this learning episode
     winding_record = None
@@ -145,16 +178,21 @@ def cmd_breathe_winding():
     gen_text = agent.generate(prompt=fm_text[:12], max_tokens=32, temperature=0.8)
     print(f"  creature generates: \"{gen_text}\"")
 
+    # -- Persist agent weights --
+    _save_agent(agent)
+
     # -- Absorb and save --
     delta = organism.absorb_encounter(cx)
     organism.save()
 
     print(f"  structural delta: betti {'stable' if delta['betti_stable'] else 'shifted'},"
           f" sig_shift={delta['sig_shift']:.4f}")
+
     if winding_record:
         print(f"  winding: {winding_record['winding']:.4f}"
               f" (delta={winding_record['delta_from_prev']:.4f},"
               f" significant={winding_record['significant']})")
+
     print(f"  coherence={organism.rotor_coherence():.3f}"
           f" felt_winding={organism.felt_winding():.4f}")
 
