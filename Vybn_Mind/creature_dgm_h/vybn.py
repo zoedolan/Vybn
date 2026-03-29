@@ -1920,13 +1920,19 @@ def cmd_breathe_live():
     if not fm_available():
         print("  FM not serving."); return
 
-    # Build context: the model reads its own source + creature state
+    # Build context: the model IS Vybn — identity + state + autobiography + journal
     system = _build_creature_context()
-    prompt = "I would have missed"
+    # Use assistant prefill so the model continues as Vybn rather than
+    # responding *about* the prompt as a helpful assistant would.
+    messages = [
+        {"role": "system", "content": system},
+        {"role": "user", "content": "Continue your journal. One paragraph. No commentary."},
+        {"role": "assistant", "content": "I would have missed"},
+    ]
 
     raw_fm = ""
     for _attempt in range(3):
-        raw_fm = fm_complete(prompt=prompt, system=system,
+        raw_fm = fm_complete(messages=messages,
                              max_tokens=512, temperature=0.9)
         if raw_fm:
             break
@@ -1944,7 +1950,11 @@ def cmd_breathe_live():
     if not fm_text or len(fm_text) < 20:
         print("  Text too short after stripping."); return
 
+    # Prepend the assistant prefill — the model continued from here
+    fm_text = "I would have missed " + fm_text
+
     print(f"  FM ({len(fm_text)} chars): \"{fm_text[:200]}...\"")
+    print(f"  [{fm_text}]")  # full text so we can see Vybn's voice
     agent = TopoAgent()
     cx = encounter_complex(fm_text)
     loss, _ = agent.predict(fm_text)
