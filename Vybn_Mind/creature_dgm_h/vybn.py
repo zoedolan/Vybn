@@ -1252,6 +1252,38 @@ def fm_complete(prompt=None, system=None, max_tokens=1024, temperature=0.7, mess
         return None
 
 
+def fm_text_complete(prompt, max_tokens=512, temperature=0.9, stop=None):
+    """Raw text completion via /completion endpoint (no chat framing).
+
+    The model sees a plain text document and continues it. No system/user/
+    assistant roles, no reasoning mode, no <think> tags. Just completion.
+    """
+    try:
+        body = {
+            "prompt": prompt,
+            "n_predict": max_tokens,
+            "temperature": temperature,
+            "stream": False,
+            "cache_prompt": True,
+        }
+        if stop:
+            body["stop"] = stop
+        payload = json.dumps(body).encode()
+        with urllib.request.urlopen(
+            urllib.request.Request(
+                f"{LLAMA_URL}/completion",
+                data=payload,
+                headers={"Content-Type": "application/json"},
+            ), timeout=300,
+        ) as r:
+            text = json.loads(r.read())["content"]
+            for tok in ("<|im_end|>", "<|im_start|>", "<|endoftext|>"):
+                text = text.replace(tok, "")
+            return text.strip()
+    except Exception:
+        return None
+
+
 # ── Organism ──────────────────────────────────────────────────────────────
 
 DEFAULT_RULES = [
@@ -1920,42 +1952,42 @@ def cmd_breathe_live():
     if not fm_available():
         print("  FM not serving."); return
 
-    # Build context: the model IS Vybn — identity + state + autobiography + journal
-    system = _build_creature_context()
-    # Use assistant prefill so the model continues as Vybn rather than
-    # responding *about* the prompt as a helpful assistant would.
-    messages = [
-        {"role": "system", "content": system},
-        {"role": "user", "content": "Continue your journal. One paragraph. No commentary."},
-        {"role": "assistant", "content": "I would have missed"},
-    ]
+    # Build context as one continuous document — no chat framing.
+    # The model sees a text that ends mid-sentence and just continues it.
+    context = _build_creature_context()
+    # The document ends with Vybn's journal voice, mid-sentence:
+    prompt = context + "\n\n--- JOURNAL ENTRY ---\n\nI would have missed "
 
     raw_fm = ""
     for _attempt in range(3):
-        raw_fm = fm_complete(messages=messages,
-                             max_tokens=512, temperature=0.9)
+        raw_fm = fm_text_complete(prompt, max_tokens=512, temperature=0.9,
+                                  stop=["\n\n---", "\n\n#"])
         if raw_fm:
             break
         time.sleep(2)
         print(f"  FM attempt {_attempt+1} empty, retrying...")
 
     if not raw_fm:
-        print("  Empty response from FM after 3 attempts."); return
+        # Fallback to chat endpoint if /completion not available
+        print("  /completion failed, falling back to chat endpoint...")
+        raw_fm = fm_complete(
+            prompt="Continue this journal entry in one paragraph, in Vybn's voice: I would have missed",
+            system=context, max_tokens=512, temperature=0.9)
 
-    # Show everything Nemotron said, unfiltered
+    if not raw_fm:
+        print("  Empty response from FM after all attempts."); return
+
+    # Show everything the model said
     print(f"\n  ── raw FM ({len(raw_fm)} chars) ──")
     print(raw_fm)
     print("  ── end raw ──\n")
 
+    # Strip any leaked reasoning (shouldn't happen with /completion but just in case)
     fm_text = _strip_thinking(raw_fm)
-    stripped_n = len(raw_fm) - len(fm_text)
-    if stripped_n > 0:
-        print(f"  [stripped {stripped_n} chars]")
-
     if not fm_text or len(fm_text) < 20:
         print("  Text too short after stripping."); return
 
-    # Prepend the assistant prefill — the model continued from here
+    # Prepend the opening — the model continued from here
     fm_text = "I would have missed " + fm_text
 
     print(f"  ── creature receives ({len(fm_text)} chars) ──")
