@@ -1,12 +1,35 @@
 # creature_dgm_h
 
-Rotor-modulated character-level prediction.
+Rotor-modulated character-level prediction with complex weight architecture.
+
+Every weight is a complex number w = |w| * e^(iθ) where magnitude is frozen
+from the trained checkpoint and phase evolves during learning/inference.
+This implements the polar time decomposition from the quantum_delusions
+papers: radial time r_t (magnitude, irreversible) and angular time θ_t
+(phase, cyclical on S¹).
 
 Cl(3,0) geometric algebra computes a rotor from embedding trajectories
-(Pancharatnam phase). The rotor modulates gradient updates: parameters
-aligned with the bivector plane get amplified, orthogonal ones get
-dampened. Standard backprop is the special case where the rotor is
-identity.
+(Pancharatnam phase). Phase evolution is driven by the genesis/decoherence
+balance: genesis (Γ) amplifies phases toward structural creation, while
+decoherence (D_env) pulls them back toward zero.
+
+## Complex Weight Architecture
+
+| Theory (papers) | Architecture (code) |
+|:---|:---|
+| r_t (radial time) | weight magnitude (frozen from training) |
+| θ_t (angular time) | adaptive phase (evolves at inference) |
+| F_rθ = (1/i)[S_r, S_θ] | gradient commutator between magnitude and phase |
+| Genesis G(ρ) | encounter-driven phase amplification |
+| Decoherence D_env | phase decay toward zero |
+| Holonomy Φ = ∮A | accumulated phase per module after loop |
+| CTC (closed timelike curves) | phase wraps on S¹ |
+
+Phase evolution rule per gradient step:
+```
+dθ = -η_phase * ∂L/∂θ + γ_genesis * Γ - D_env * θ
+```
+where `∂L/∂θ = ∂L/∂w_eff * (-|w| * sin(θ))` (chain rule through polar form).
 
 ## Files
 

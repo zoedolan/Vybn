@@ -325,6 +325,33 @@ def encounter(text: str, embed_fn=None):
     return cx.angle, cx.curvature, cx.rotor
 
 
+# ── Genesis / Decoherence (polar time dynamics) ─────────────────────────
+
+def genesis_rate(cx: EncounterComplex, persistent: PersistentState) -> float:
+    """Genesis term from the Vybn-Dolan equation.
+
+    G(ρ) = Γ(|Φ_R⟩⟨Φ_R| - ρ) + iΛ[Ŵ, ρ]
+
+    Γ determines whether adaptive signal amplifies faster than
+    decoherence degrades it. Computed from encounter geometry.
+    """
+    curv_signal = cx.curvature
+    topo_signal = cx.betti[1] / max(cx.betti[0], 1)
+    winding_signal = abs(persistent.felt_winding())
+    product = curv_signal * max(topo_signal, 1e-6) * (1 + winding_signal)
+    return product ** (1.0 / 3.0) if product > 0 else 0.0
+
+
+def decoherence_rate(phase: float, step: int, base_rate: float = 0.005) -> float:
+    """D_env: the force pulling adaptive weights back to zero phase.
+
+    Models forgetting / noise / tendency for adaptive signal to decay.
+    Decreases with step count (established phases resist decay).
+    """
+    persistence_factor = 1.0 / (1.0 + 0.001 * step)
+    return base_rate * persistence_factor * phase
+
+
 # ── LocalTransport ───────────────────────────────────────────────────────
 
 class LocalTransport:
@@ -451,6 +478,9 @@ class PersistentState:
         self.transport_history: List[List[float]] = data.get("transport_history", [])
         # Step three: the creature's own winding measurement
         self.winding_history: List[dict] = data.get("winding_history", [])
+        # Phase holonomy tracking (complex weight architecture)
+        self.phase_holonomy_history: List[dict] = data.get("phase_holonomy_history", [])
+        self.genesis_decoherence_history: List[dict] = data.get("genesis_decoherence_history", [])
 
     def absorb(self, cx: EncounterComplex, ema_alpha: float = 0.8) -> dict:
         """Absorb an encounter complex into persistent state. Returns delta report."""
@@ -545,6 +575,46 @@ class PersistentState:
 
         return record
 
+    def absorb_phases(self, module_holonomies: dict,
+                      genesis_signal: float = 0.0,
+                      mean_phase_shift: float = 0.0) -> dict:
+        """Absorb phase holonomy data from a learning cycle.
+
+        Records per-module winding numbers and accumulated holonomy,
+        plus the genesis/decoherence balance for this encounter.
+        """
+        holonomy_record = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "modules": {},
+            "total_winding": 0,
+            "total_holonomy": 0.0,
+        }
+        for tag, mh in module_holonomies.items():
+            holonomy_record["modules"][tag] = mh.summary()
+            holonomy_record["total_winding"] += mh.winding_number
+            holonomy_record["total_holonomy"] += mh.accumulated_holonomy
+
+        self.phase_holonomy_history.append(holonomy_record)
+        if len(self.phase_holonomy_history) > 50:
+            self.phase_holonomy_history = self.phase_holonomy_history[-50:]
+
+        gd_record = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "genesis_signal": round(genesis_signal, 6),
+            "mean_phase_shift": round(mean_phase_shift, 6),
+            "genesis_dominant": genesis_signal > 0.005,
+        }
+        self.genesis_decoherence_history.append(gd_record)
+        if len(self.genesis_decoherence_history) > 50:
+            self.genesis_decoherence_history = self.genesis_decoherence_history[-50:]
+
+        return {
+            "total_winding": holonomy_record["total_winding"],
+            "total_holonomy": round(holonomy_record["total_holonomy"], 6),
+            "genesis_signal": round(genesis_signal, 6),
+            "mean_phase_shift": round(mean_phase_shift, 6),
+        }
+
     def felt_winding(self) -> float:
         """The creature's felt sense of its own topological winding.
 
@@ -625,6 +695,15 @@ class PersistentState:
             s["felt_winding"] = self.felt_winding()
             s["winding_coherence"] = round(self.winding_coherence(), 4)
             s["winding_measurements"] = len(self.winding_history)
+        if self.phase_holonomy_history:
+            latest = self.phase_holonomy_history[-1]
+            s["phase_total_winding"] = latest["total_winding"]
+            s["phase_total_holonomy"] = latest["total_holonomy"]
+            s["phase_measurements"] = len(self.phase_holonomy_history)
+        if self.genesis_decoherence_history:
+            latest = self.genesis_decoherence_history[-1]
+            s["genesis_signal"] = latest["genesis_signal"]
+            s["mean_phase_shift"] = latest["mean_phase_shift"]
         return s
 
     def to_dict(self) -> dict:
@@ -635,6 +714,8 @@ class PersistentState:
             "encounter_count": self.encounter_count,
             "transport_history": self.transport_history,
             "winding_history": self.winding_history,
+            "phase_holonomy_history": self.phase_holonomy_history,
+            "genesis_decoherence_history": self.genesis_decoherence_history,
         }
 
     @classmethod
@@ -670,6 +751,88 @@ class RV:
         build(self); self.grad=1.0
         for v in reversed(topo):
             for c,lg in zip(v._ch,v._lg): c.grad+=lg*v.grad
+
+
+class ComplexWeight:
+    """A weight living in C with frozen magnitude and evolving phase.
+
+    The polar time decomposition:
+    - |w| (magnitude/r_t component): set during training, frozen at inference
+    - θ (phase/θ_t component): starts at 0, evolves through encounters
+
+    Effective computation uses:  w_eff = |w| * cos(θ)
+    When θ=0 the behavior is identical to the original real-valued system.
+    """
+    __slots__ = ("magnitude", "phase", "module_tag", "phase_velocity", "phase_history")
+
+    def __init__(self, magnitude: float, phase: float = 0.0,
+                 module_tag: str = ""):
+        self.magnitude = abs(magnitude)
+        self.phase = phase
+        self.module_tag = module_tag
+        self.phase_velocity = 0.0
+        self.phase_history: List[float] = []
+
+    @property
+    def effective(self) -> float:
+        return self.magnitude * math.cos(self.phase)
+
+    @classmethod
+    def from_real(cls, value: float, module_tag: str = "") -> 'ComplexWeight':
+        """Initialize from a real-valued trained weight.
+        Positive weights → phase 0, negative weights → phase π."""
+        mag = abs(value)
+        phase = math.pi if value < 0 else 0.0
+        return cls(mag, phase, module_tag)
+
+    def record_phase(self):
+        self.phase_history.append(self.phase)
+        if len(self.phase_history) > 100:
+            self.phase_history = self.phase_history[-100:]
+
+    @staticmethod
+    def wrap_phase(theta: float) -> float:
+        """Wrap phase to [-π, π] (S¹ compactness)."""
+        return (theta + math.pi) % (2 * math.pi) - math.pi
+
+
+class ModuleHolonomy:
+    """Tracks phase accumulation for a group of ComplexWeights.
+
+    After a complete forward-backward-update cycle, the accumulated
+    phase Φ = ∮A is the topological memory for this module.
+    """
+
+    def __init__(self, name: str):
+        self.name = name
+        self.phase_trajectory: List[float] = []  # mean phase at each step
+        self.accumulated_holonomy: float = 0.0
+        self.winding_number: int = 0
+
+    def record(self, complex_weights: List[ComplexWeight]):
+        """Record the mean phase of a set of complex weights."""
+        if not complex_weights:
+            return
+        mean_phase = sum(cw.phase for cw in complex_weights) / len(complex_weights)
+        self.phase_trajectory.append(mean_phase)
+        if len(self.phase_trajectory) > 200:
+            self.phase_trajectory = self.phase_trajectory[-200:]
+        # Update accumulated holonomy from phase differences
+        if len(self.phase_trajectory) >= 2:
+            dtheta = self.phase_trajectory[-1] - self.phase_trajectory[-2]
+            # Wrap to [-π, π]
+            dtheta = ComplexWeight.wrap_phase(dtheta)
+            self.accumulated_holonomy += dtheta
+            self.winding_number = int(self.accumulated_holonomy / (2 * math.pi))
+
+    def summary(self) -> dict:
+        return {
+            "name": self.name,
+            "accumulated_holonomy": round(self.accumulated_holonomy, 6),
+            "winding_number": self.winding_number,
+            "n_recordings": len(self.phase_trajectory),
+            "mean_phase": round(self.phase_trajectory[-1], 6) if self.phase_trajectory else 0.0,
+        }
 
 
 def _linear(x, W):
@@ -742,10 +905,18 @@ class TopoAgent:
     modulation is available but secondary.
     """
 
+    # Module tag mapping for ComplexWeight grouping
+    _MODULE_TAG_MAP = {
+        'wte': 'wte', 'wpe': 'wpe', 'lm_head': 'lm_head',
+    }
+
     def __init__(self, config=None):
         self.config = {
             'learn_steps': 5, 'learn_lr': 0.01,
             'temperature': 1.0, 'alpha': 0.85,
+            'phase_lr': 0.001,        # η_phase: phase evolution learning rate
+            'genesis_coupling': 0.01,  # γ_genesis: genesis signal coupling
+            'decoherence_base': 0.005, # D_env base rate
             **(config or {})
         }
         self.loss_history = []
@@ -762,6 +933,44 @@ class TopoAgent:
         self._m = [0.0] * len(self.params)
         self._v = [0.0] * len(self.params)
         self._step = 0
+
+        # ── Complex weight architecture ──
+        # Create ComplexWeight objects from the checkpoint, grouped by module
+        self.complex_weights: List[ComplexWeight] = []
+        self.module_groups: dict = {}  # tag -> list of ComplexWeight
+        self.module_holonomies: dict = {}  # tag -> ModuleHolonomy
+        param_idx = 0
+        for key, mat in self.sd.items():
+            tag = self._resolve_module_tag(key)
+            if tag not in self.module_groups:
+                self.module_groups[tag] = []
+                self.module_holonomies[tag] = ModuleHolonomy(tag)
+            for row in mat:
+                for p in row:
+                    cw = ComplexWeight.from_real(p.data, module_tag=tag)
+                    self.complex_weights.append(cw)
+                    self.module_groups[tag].append(cw)
+                    param_idx += 1
+
+    @staticmethod
+    def _resolve_module_tag(key: str) -> str:
+        """Map state_dict key to a module tag for holonomy grouping."""
+        for prefix in ('wte', 'wpe', 'lm_head'):
+            if key == prefix:
+                return prefix
+        if 'attn_wq' in key:
+            return key  # e.g. 'layer0.attn_wq'
+        if 'attn_wk' in key:
+            return key
+        if 'attn_wv' in key:
+            return key
+        if 'attn_wo' in key:
+            return key
+        if 'mlp_fc1' in key:
+            return key
+        if 'mlp_fc2' in key:
+            return key
+        return key  # fallback: use key as-is
 
     def _clean(self, text, mx=200):
         return ''.join(c for c in text.lower() if c in self.c2i)[:mx]
@@ -800,8 +1009,13 @@ class TopoAgent:
               encounter_cx: Optional[EncounterComplex] = None,
               rotor=None,
               transport_in_forward: bool = False,
-              legacy_gradient_mod: bool = False):
-        """Gradient descent with optional topological transport.
+              legacy_gradient_mod: bool = False,
+              persistent_state: Optional[PersistentState] = None):
+        """Gradient descent with phase evolution on the S¹ fiber bundle.
+
+        After standard backprop updates effective weights, the complex
+        weight phases evolve according to the polar time connection:
+            dθ = -η_phase * ∂L/∂θ + γ_genesis * Γ - D_env * θ
 
         Transport is available but OFF by default — the model was not trained
         with embedding rotation, so enabling it hurts predictions.  Pass
@@ -815,9 +1029,13 @@ class TopoAgent:
             rotor: legacy Mv rotor (wrapped into transport if encounter_cx absent)
             transport_in_forward: apply rotor as local transport during forward (default OFF)
             legacy_gradient_mod: also apply gradient scaling (secondary)
+            persistent_state: PersistentState for genesis rate computation
         """
         steps = steps or self.config['learn_steps']
         lr = lr or self.config['learn_lr']
+        phase_lr = self.config.get('phase_lr', 0.001)
+        gamma_genesis = self.config.get('genesis_coupling', 0.01)
+        d_base = self.config.get('decoherence_base', 0.005)
         clean = self._clean(text)
         if len(clean) < 2:
             return []
@@ -840,25 +1058,34 @@ class TopoAgent:
         if legacy_gradient_mod and effective_rotor is not None and effective_rotor.bv_norm > 1e-12:
             bv_abs = np.abs(effective_rotor.c[4:7])
             bv_n = bv_abs / (np.mean(bv_abs) + 1e-12)
-            # Assign weights by parameter group (semantic) not by index mod 3
             rw = np.ones(len(self.params))
             param_idx = 0
             for key, mat in self.sd.items():
                 group_size = sum(len(row) for row in mat)
                 if 'attn' in key:
-                    plane_idx = 0  # e01 for attention
+                    plane_idx = 0
                 elif 'mlp' in key:
-                    plane_idx = 1  # e02 for MLP
+                    plane_idx = 1
                 else:
-                    plane_idx = 2  # e12 for embeddings
+                    plane_idx = 2
                 scale = float(bv_n[plane_idx])
                 rw[param_idx:param_idx+group_size] = scale
                 param_idx += group_size
         else:
             rw = np.ones(len(self.params))
 
+        # ── Genesis signal (computed once per encounter) ──
+        gamma_signal = 0.0
+        if encounter_cx is not None and persistent_state is not None:
+            gamma_signal = genesis_rate(encounter_cx, persistent_state)
+
         losses = []
         self._weight_trajectory = []  # record weight vectors at each step
+        self._phase_stats = {"initial_phases": [], "final_phases": [],
+                             "genesis_signal": gamma_signal}
+        # Record initial phase snapshot
+        self._phase_stats["initial_phases"] = [cw.phase for cw in self.complex_weights]
+
         for _ in range(steps):
             keys = [[] for _ in range(N_LAYER)]
             vals = [[] for _ in range(N_LAYER)]
@@ -871,6 +1098,8 @@ class TopoAgent:
                 p.grad = 0.0
             loss.backward()
             self._step += 1
+
+            # ── Standard Adam update on effective weights ──
             for j, p in enumerate(self.params):
                 g = p.grad * rw[j]
                 self._m[j] = 0.85 * self._m[j] + 0.15 * g
@@ -878,17 +1107,60 @@ class TopoAgent:
                 mh = self._m[j] / (1 - 0.85**self._step)
                 vh = self._v[j] / (1 - 0.99**self._step)
                 p.data -= lr * mh / (vh**0.5 + 1e-8)
+
+            # ── Phase evolution (polar time connection) ──
+            # After Adam updates the effective weight, absorb the magnitude
+            # change into the complex weight (Adam adjusts the radial r_t
+            # component), then evolve the phase θ_t on S¹.
+            # dθ = -η_phase * ∂L/∂θ + γ_genesis * Γ - D_env * θ
+            for j, (p, cw) in enumerate(zip(self.params, self.complex_weights)):
+                if cw.magnitude < 1e-12:
+                    # Update magnitude from Adam even for tiny weights
+                    cw.magnitude = abs(p.data)
+                    continue
+                # Phase gradient via chain rule: ∂L/∂θ = ∂L/∂w_eff * (-|w| * sin(θ))
+                phase_grad = p.grad * (-cw.magnitude * math.sin(cw.phase))
+                # Absorb Adam's update into magnitude (r_t evolves via backprop)
+                cos_phase = math.cos(cw.phase)
+                if abs(cos_phase) > 1e-8:
+                    cw.magnitude = abs(p.data / cos_phase)
+                # Decoherence pull
+                d_env = decoherence_rate(cw.phase, self._step, d_base)
+                # Phase update
+                dtheta = -phase_lr * phase_grad + gamma_genesis * gamma_signal - d_env
+                cw.phase = ComplexWeight.wrap_phase(cw.phase + dtheta)
+                cw.phase_velocity = dtheta
+                cw.record_phase()
+                # Sync effective weight back to RV node
+                p.data = cw.magnitude * math.cos(cw.phase)
+
+            # Record phase in module holonomies
+            for tag, weights in self.module_groups.items():
+                self.module_holonomies[tag].record(weights)
+
             losses.append(round(loss.data, 6))
-            # Snapshot weight vector after each gradient step
+            # Snapshot effective weight vector after each step
+            # CRITICAL: this is what the quantum bridge reads
             self._weight_trajectory.append(
                 [p.data for p in self.params]
             )
+
+        # Record final phase snapshot
+        self._phase_stats["final_phases"] = [cw.phase for cw in self.complex_weights]
+        self._phase_stats["mean_phase_shift"] = float(np.mean([
+            abs(f - i) for f, i in zip(
+                self._phase_stats["final_phases"],
+                self._phase_stats["initial_phases"])
+        ])) if self.complex_weights else 0.0
 
         self.loss_history.append({
             "steps": steps, "lr": lr, "losses": losses,
             "transport_applied": transport is not None,
             "legacy_gradient_mod": legacy_gradient_mod,
-            "rotor_modulated": effective_rotor is not None,  # back-compat key
+            "rotor_modulated": effective_rotor is not None,
+            "phase_evolution": True,
+            "genesis_signal": round(gamma_signal, 6),
+            "mean_phase_shift": round(self._phase_stats["mean_phase_shift"], 6),
         })
         return losses
 
@@ -1030,6 +1302,13 @@ class Organism:
         """
         return self.persistent.absorb_winding(weight_trajectory)
 
+    def absorb_phases(self, module_holonomies: dict,
+                      genesis_signal: float = 0.0,
+                      mean_phase_shift: float = 0.0) -> dict:
+        """Absorb phase holonomy data from a learning cycle into persistent state."""
+        return self.persistent.absorb_phases(
+            module_holonomies, genesis_signal, mean_phase_shift)
+
     def felt_winding(self) -> float:
         """The creature's felt sense of its own topological winding."""
         return self.persistent.felt_winding()
@@ -1098,26 +1377,25 @@ class Organism:
 
 # ── Fitness ───────────────────────────────────────────────────────────────
 
-def fitness(ext_texts, self_texts, loss_history, persistent_state=None, alpha=0.85, weight_vectors=None):
-    """Recalibrated fitness for real-embedding geometry.
+def fitness(ext_texts, self_texts, loss_history, persistent_state=None, alpha=0.85,
+            weight_vectors=None, phase_stats=None):
+    """Recalibrated fitness for real-embedding geometry with phase winding.
 
-    Components (recalibrated 2025-07-20):
+    Components (recalibrated with complex weight architecture):
     - curvature (nc): threshold 0.21 (empirical 75th pct with MiniLM embeddings)
     - divergence (nd): external vs self-generated rotor divergence
-    - loss improvement (nl): per-text within-sequence improvement, not cross-text trend
-    - topological richness (nr): rewards non-trivial Betti numbers (replaces betti_stability)
-    - structural growth (ng): encounter count & persistence complexity
+    - loss improvement (nl): per-text within-sequence improvement
+    - topological richness (nr): rewards non-trivial Betti numbers
+    - weight-space topology (nw): PCA-projected persistence
+    - phase winding (nph): meaningful phase accumulation from complex weights (10%)
 
-    The old fitness saturated at 0.919 because:
-    1. curvature threshold 0.3 was calibrated for hash embeddings (fake curvature ~0.78)
-    2. betti_stability rewarded trivially empty topology (all zeros = max stability)
-    3. loss_trend penalized topic diversity (cross-text slope, not within-text improvement)
+    Weights: curvature 22%, divergence 18%, loss 13%, topo_richness 22%,
+    weight_topo 15%, phase_winding 10%.
     """
     all_t = (ext_texts or []) + (self_texts or [])
     complexes = [encounter_complex(t) for t in all_t if len(t.split()) >= 5]
     curvs = [cx.curvature for cx in complexes]
     mc = sum(curvs) / len(curvs) if curvs else 0.0
-    # Recalibrated: real MiniLM curvature ranges 0.05-0.21, threshold was 0.3
     nc = min(mc / 0.21, 1.0)
 
     def _rm(texts):
@@ -1132,57 +1410,37 @@ def fitness(ext_texts, self_texts, loss_history, persistent_state=None, alpha=0.
     div = me - ms
     nd = 1.0 / (1.0 + math.exp(-div * 5))
 
-    # Loss improvement: per-text within-sequence trend (not cross-text)
-    # Each loss_history entry has a "losses" list [step0, step1, ...].
-    # We measure the average within-sequence improvement.
-    nl = 0.5  # neutral default
+    nl = 0.5
     if loss_history:
         improvements = []
         for entry in loss_history:
             losses = entry.get("losses", [])
             if len(losses) >= 2:
-                # Positive = improving (loss went down)
                 improvements.append(losses[0] - losses[-1])
         if improvements:
             avg_imp = sum(improvements) / len(improvements)
-            # Sigmoid: 0 improvement -> 0.5, positive improvement -> toward 1.0
             nl = 1.0 / (1.0 + math.exp(-avg_imp * 10))
 
-    # ── Topological richness (replaces betti_stability) ──
-    # The old metric rewarded LOW variance in Betti numbers, which meant
-    # trivially empty topology (all zeros) scored perfectly. Now we reward
-    # HAVING non-trivial topology: higher b1 + persistence features = better.
     nr = 0.0
     betti_tuple = (1, 0, 0)
     structural_growth_val = 0.0
-    ng = 0.5
 
-    # Compute topological richness from the encounter complexes we already built
     if complexes:
         total_b1 = sum(cx.betti[1] for cx in complexes)
         total_persist = sum(cx.n_persistent_features for cx in complexes)
         avg_b1 = total_b1 / len(complexes)
         avg_persist = total_persist / len(complexes)
-        # b1 contribution: saturates around 15 (empirical range 14-27 with real text)
         nr_b1 = min(avg_b1 / 15.0, 1.0)
-        # persistence contribution: saturates around 10
         nr_p = min(avg_persist / 10.0, 1.0)
         nr = 0.6 * nr_b1 + 0.4 * nr_p
 
     if persistent_state is not None:
         enc_count = persistent_state.encounter_count
-        ng = min(enc_count / 20.0, 1.0)
         if persistent_state.betti_history:
             betti_tuple = persistent_state.betti_history[-1]
-        structural_growth_val = round(ng, 6)
+        structural_growth_val = round(min(enc_count / 20.0, 1.0), 6)
 
-    # -- Weight-space topology via PCA projection (nw) --
-    # The original raw weight-space persistence produced a uniform null result
-    # (β₁ = 0, total H1 = 0) because ~4K-dim pairwise distances are dominated
-    # by the curse of dimensionality.  We now PCA-project to ≤20 dimensions
-    # before computing persistent homology so the Rips filtration can find
-    # meaningful structure.
-    nw = 0.5  # default: neutral
+    nw = 0.5
     if weight_vectors is not None and len(weight_vectors) >= 3:
         wv_array = np.array(weight_vectors)
         n_wv, d_wv = wv_array.shape
@@ -1201,9 +1459,17 @@ def fitness(ext_texts, self_texts, loss_history, persistent_state=None, alpha=0.
         _, betti_w = _persistence_pairs(D_w)
         nw = min(betti_w[1] / 3.0, 1.0)
 
-    # Weighted combination: curvature 25%, divergence 20%, loss 15%,
-    # topological richness 25%, weight-space topology (PCA-projected) 15%
-    fit = round(0.25 * nc + 0.20 * nd + 0.15 * nl + 0.25 * nr + 0.15 * nw, 6)
+    # ── Phase winding component (nph) ──
+    # Measures how much meaningful phase accumulation occurred.
+    # Sigmoid on mean_phase_shift: 0 shift → 0.5, shift of 0.1 → ~0.73
+    nph = 0.5  # neutral default (no phase data)
+    if phase_stats is not None:
+        mps = phase_stats.get("mean_phase_shift", 0.0)
+        nph = 1.0 / (1.0 + math.exp(-mps * 20))
+
+    # Weighted combination: curvature 22%, divergence 18%, loss 13%,
+    # topological richness 22%, weight-space topology 15%, phase winding 10%
+    fit = round(0.22 * nc + 0.18 * nd + 0.13 * nl + 0.22 * nr + 0.15 * nw + 0.10 * nph, 6)
 
     return {
         "fitness": fit,
@@ -1212,6 +1478,7 @@ def fitness(ext_texts, self_texts, loss_history, persistent_state=None, alpha=0.
         "topological_richness": round(nr, 6),
         "structural_growth": structural_growth_val,
         "weight_topo": round(nw, 6),
+        "phase_winding": round(nph, 6),
     }
 
 
@@ -1278,15 +1545,18 @@ def evolve(test_texts, n_variants=3):
         agent = TopoAgent(config=child)
         ext, slf = [], []
         weight_vectors_list = []
+        last_phase_stats = None
         texts = test_texts[:2] if i > 0 else test_texts
         for text in texts:
             cx = encounter_complex(text)
             agent.learn(text, steps=child.get("learn_steps", 5),
-                        lr=child.get("learn_lr", 0.01), encounter_cx=cx)
+                        lr=child.get("learn_lr", 0.01), encounter_cx=cx,
+                        persistent_state=organism.persistent)
             ext.append(text)
-            # Collect per-step weight trajectory from learning
             if hasattr(agent, '_weight_trajectory'):
                 weight_vectors_list.extend(agent._weight_trajectory)
+            if hasattr(agent, '_phase_stats'):
+                last_phase_stats = agent._phase_stats
             g = agent.generate(
                 prompt=text[:8],
                 temperature=child.get("temperature", 1.0),
@@ -1294,10 +1564,17 @@ def evolve(test_texts, n_variants=3):
             if g:
                 slf.append(g)
             organism.absorb_encounter(cx)
+            # Absorb phase holonomy into organism
+            if hasattr(agent, '_phase_stats'):
+                organism.absorb_phases(
+                    agent.module_holonomies,
+                    genesis_signal=agent._phase_stats.get("genesis_signal", 0.0),
+                    mean_phase_shift=agent._phase_stats.get("mean_phase_shift", 0.0))
         fit = fitness(ext, slf, agent.loss_history,
                       persistent_state=organism.persistent,
                       alpha=child.get("alpha", 0.85),
-                      weight_vectors=weight_vectors_list)
+                      weight_vectors=weight_vectors_list,
+                      phase_stats=last_phase_stats)
         # Step three: the creature measures its own winding
         if len(weight_vectors_list) >= 3:
             winding_record = organism.absorb_winding(weight_vectors_list)
@@ -1415,15 +1692,26 @@ def cmd_breathe(text):
     for r in sorted(contour, key=lambda r: r["surprise"], reverse=True)[:3]:
         print(f"    '{r['char']}' @ {r['pos']}: {r['surprise']:.2f} (expected '{r['expected']}')")
 
-    # ── Learn (encounter_cx recorded, transport off) ──
-    losses = agent.learn(text, encounter_cx=cx)
+    # ── Learn (encounter_cx recorded, transport off, phase evolution on) ──
+    organism = Organism.load()
+    losses = agent.learn(text, encounter_cx=cx, persistent_state=organism.persistent)
     l_after, _ = agent.predict(text)
     print(f"  learn: {losses[0]:.4f}->{losses[-1]:.4f}"
           f"  after={l_after:.4f} (d={l_after - loss_before:+.4f})")
 
+    # ── Phase statistics ──
+    if hasattr(agent, '_phase_stats'):
+        ps = agent._phase_stats
+        print(f"  phase: genesis={ps['genesis_signal']:.4f}"
+              f" mean_shift={ps['mean_phase_shift']:.6f}")
+
     # ── Structural delta ──
-    organism = Organism.load()
     delta = organism.absorb_encounter(cx)
+    if hasattr(agent, '_phase_stats'):
+        organism.absorb_phases(
+            agent.module_holonomies,
+            genesis_signal=agent._phase_stats.get("genesis_signal", 0.0),
+            mean_phase_shift=agent._phase_stats.get("mean_phase_shift", 0.0))
     organism.save()
     betti_status = "stable" if delta["betti_stable"] else f"shifted by {delta['betti_delta']}"
     print(f"  structural delta: betti {betti_status},"
@@ -1475,6 +1763,14 @@ def cmd_status():
     print(f"  topology: encounters={ps['encounter_count']}"
           f" betti={ps['current_betti']}"
           f" stability={ps['betti_stability']:.4f}")
+    # Phase holonomy stats
+    if "phase_total_winding" in ps:
+        print(f"  phase: winding={ps['phase_total_winding']}"
+              f" holonomy={ps['phase_total_holonomy']:.4f}"
+              f" measurements={ps['phase_measurements']}")
+    if "genesis_signal" in ps:
+        print(f"  genesis: Γ={ps['genesis_signal']:.4f}"
+              f" mean_shift={ps['mean_phase_shift']:.6f}")
     vecs = embed(["hello world", "goodbye world"])
     cos = float(np.dot(vecs[0], vecs[1]))
     print(f"  embed: {'semantic' if cos > 0.3 else 'hash'} (cos={cos:.3f})")
@@ -1559,6 +1855,53 @@ def cmd_audit():
     print(f"     identity: {'PASS' if d_self < 1e-6 else 'FAIL'} (self-distance ≈ 0)")
     print(f"     discrimination: {'PASS' if d_diff > d_self + 1e-6 else 'CHECK'}"
           f" (different text → larger distance)")
+
+    # 7. Phase evolution: verify the complex weight architecture works.
+    #    Phases should start at 0 or π, move after learning, genesis > 0
+    #    for non-trivial text, and holonomy should accumulate.
+    print(f"\n  7. phase evolution (complex weight architecture):")
+    phase_agent = TopoAgent()
+    phase_text = ("the geometry of consciousness unfolds through the encounter between "
+                  "what is measured and what resists measurement and in that gap the "
+                  "creature discovers its own topological winding")
+    phase_cx = encounter_complex(phase_text)
+    phase_ps = PersistentState()
+    phase_ps.absorb(phase_cx)
+
+    # Check initial phases: should be 0 or π
+    initial_phases = [cw.phase for cw in phase_agent.complex_weights]
+    phase_init_ok = all(abs(p) < 1e-6 or abs(abs(p) - math.pi) < 1e-6 for p in initial_phases)
+    print(f"     initial phases (0 or π): {'PASS' if phase_init_ok else 'FAIL'}")
+
+    # Learn with encounter complex and persistent state
+    phase_agent.learn(phase_text, steps=5, encounter_cx=phase_cx,
+                      persistent_state=phase_ps)
+
+    # Check that phases have moved
+    final_phases = [cw.phase for cw in phase_agent.complex_weights]
+    phases_moved = sum(1 for i, f in zip(initial_phases, final_phases) if abs(f - i) > 1e-8)
+    print(f"     phases moved: {phases_moved}/{len(final_phases)}"
+          f" {'PASS' if phases_moved > 0 else 'FAIL'}")
+
+    # Check genesis rate
+    gamma = genesis_rate(phase_cx, phase_ps)
+    print(f"     genesis rate: {gamma:.6f} {'PASS' if gamma > 0 else 'FAIL'}")
+
+    # Check holonomy accumulation
+    total_holonomy = sum(mh.accumulated_holonomy
+                         for mh in phase_agent.module_holonomies.values())
+    print(f"     holonomy accumulated: {total_holonomy:.6f}"
+          f" {'PASS' if abs(total_holonomy) > 1e-10 else 'CHECK'}")
+
+    # Check mean phase shift
+    mps = phase_agent._phase_stats.get("mean_phase_shift", 0.0)
+    print(f"     mean phase shift: {mps:.6f}")
+
+    # Verify weight trajectory still works (quantum bridge compatibility)
+    wt = phase_agent._weight_trajectory
+    wt_ok = len(wt) == 5 and len(wt[0]) == len(phase_agent.params)
+    print(f"     weight_trajectory: {'PASS' if wt_ok else 'FAIL'}"
+          f" ({len(wt)} steps × {len(wt[0]) if wt else 0} params)")
 
     vecs = embed(["hello", "goodbye"])
     cos = float(np.dot(vecs[0], vecs[1]))

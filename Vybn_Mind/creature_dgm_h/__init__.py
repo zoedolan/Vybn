@@ -1,8 +1,9 @@
-"""creature_dgm_h — rotor-modulated character-level prediction."""
+"""creature_dgm_h — rotor-modulated character-level prediction with complex weight architecture."""
 from .vybn import (
     Mv, RV, Agent, Organism, encounter, embed, fitness,
     load_archive, evolve, fm_available, fm_complete,
     DEFAULT_RULES,
+    ComplexWeight, ModuleHolonomy, genesis_rate, decoherence_rate,
 )
 
 # Absorb __main__.py so `python -m Vybn_Mind.creature_dgm_h` still works
