@@ -24,6 +24,7 @@ import json
 import math
 import os
 import random
+import re
 import sys
 import time
 import urllib.error
@@ -1236,6 +1237,8 @@ def fm_complete(prompt=None, system=None, max_tokens=1024, temperature=0.7, mess
             text = json.loads(r.read())["choices"][0]["message"]["content"]
             for tok in ("<|im_end|>", "<|im_start|>", "<|endoftext|>"):
                 text = text.replace(tok, "")
+                                        # Strip <think>...</think> reasoning tags
+            text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL).strip()
             return text.strip()
     except Exception:
         return None
@@ -1723,7 +1726,7 @@ def cmd_breathe_live():
     print("═══ breathe-live ═══")
     if not fm_available():
         print("  FM not serving."); return
-    fm_text = fm_complete("Generate one paragraph.", system="Write naturally.",
+    fm_text = fm_complete("Generate one paragraph.", system="You are generating text for a topological creature (creature_dgm_h) that learns from your output. Write naturally and diversely — varied topics, styles, and structures help the creature develop richer geometry. Do not use <think> tags or reasoning preambles; output only the final text.",
                           max_tokens=512, temperature=1.0)
     if not fm_text:
         print("  Empty."); return
