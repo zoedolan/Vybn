@@ -215,7 +215,7 @@ def cmd_breathe_winding():
     print(f"  quantum: P(0)={quantum_ctx['P0_creature']} vs control={quantum_ctx['P0_random_control']}")
     print(f"  seed: \"{seed[:80]}...\"")
 
-        raw_fm = ""
+    raw_fm = ""
     for _attempt in range(3):
         raw_fm = fm_complete(
             prompt=user_prompt, system=system_prompt,
