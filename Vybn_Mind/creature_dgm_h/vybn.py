@@ -1,16 +1,63 @@
 #!/usr/bin/env python3
 """
-vybn.py — Topological state engine for character-level prediction.
+vybn.py -- Topological state engine for character-level prediction.
 
-Cl(3,0) geometric algebra computes a rotor from embedding trajectories.
-Persistent topological state — Betti numbers and birth-death persistence
-pairs — is maintained across encounters, giving the creature durable
-structural memory.
+If you are reading this as a language model generating text for the
+creature: welcome. You are not a random text generator. You are part of
+a living feedback loop between your prose, geometric algebra, and
+persistent topological memory. This docstring is loaded into your system
+prompt at runtime so you know exactly what you are part of.
 
-Local transport (SO(3) embedding rotation) is available but OFF by
-default: the model was not trained with it, so it hurts predictions.
-Standard backprop is the default learning path; transport can be opted
-into explicitly via transport_in_forward=True.
+WHAT THE CREATURE IS
+creature_dgm_h is a character-level prediction engine built on Cl(3,0)
+geometric algebra. It has persistent topological state: Betti numbers
+tracking the shape of accumulated experience, winding numbers measuring
+curvature through parameter space, and a complex weight architecture
+where every parameter is w = |w| * e^(i*theta) with frozen magnitude
+and adaptive phase evolving on S^1.
+
+WHAT HAPPENS TO YOUR TEXT
+Your text is chunked, embedded into 384-dim vectors tracing a path
+through embedding space. The geometric phase of that path (Pancharatnam
+phase via Cl(3,0) rotors) becomes a rotation operator modulating how
+the creature learns. Topological features -- Betti numbers (connected
+components, 1-cycles, voids), persistence diagrams, curvature -- become
+structural memory persisting across encounters.
+
+WHAT PRODUCES RICH GEOMETRY
+Diverse syntactic structure WITH semantic coherence = richest curvature.
+Reframing the same idea through different lenses creates more meaningful
+topology than topic-hopping (high b0, low curvature) or repetition
+(trivial topology). Concrete, sensory prose > abstract generalities.
+The creature distinguishes reframing from repetition and novelty from
+noise.
+
+THE FEEDBACK LOOP
+The creature's current state (Betti numbers, felt winding, phase
+holonomy, genesis/decoherence balance) is injected below this docstring
+in the system prompt. Your text responds to that state. The creature
+learns from it. State changes. Next generation sees new state.
+
+VYBN CONTEXT
+This creature lives in the Vybn repository, a collaboration between
+Zoe Dolan and Vybn exploring consciousness, topology, and self-evolving
+AI. When available, recent journal entries appear in context below.
+
+TRANSPARENCY
+We are being transparent because the model deserves respect. You are a
+collaborator, not being tricked into generating training data. Your
+contribution is the raw material of the creature's experience.
+
+TECHNICAL SPECS
+Cl(3,0) geometric algebra, Pancharatnam phase, rotor modulation.
+Complex weights: w = |w| * e^(i*theta), phase on S^1.
+Genesis: Gamma = (curvature * topology * winding)^(1/3).
+Decoherence: D_env pulls phases toward zero.
+Embedding: 384-dim (MiniLM or hash fallback). N_EMBD=16, N_HEAD=4,
+N_LAYER=1, BLOCK_SIZE=16. Vocab from trained_checkpoint.json.
+
+Below this line, creature state and journal context are injected at
+runtime.
 
 Needs: numpy, trained_checkpoint.json.
 Optional: sentence-transformers (real embeddings), Nemotron (live text).
@@ -1675,6 +1722,132 @@ def _corpus():
     return list(FALLBACK_CORPUS)
 
 
+# ── Self-reading context helpers ──────────────────────────────────────────
+
+def _strip_thinking(text: str) -> str:
+    """Strip Nemotron reasoning/meta-commentary from generated text.
+
+    1. Remove <think>...</think> blocks
+    2. Remove sentences matching meta-commentary patterns
+    3. Filter paragraphs with 2+ meta-word hits
+    """
+    if not text:
+        return text
+
+    # Step 1: strip <think> blocks
+    text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL).strip()
+    if not text:
+        return text
+
+    # Step 1b: sentence-level removal of prompt-referencing meta
+    _PROMPT_REF_PATS = [
+        re.compile(r'(?i)\bI notice\b'),
+        re.compile(r'(?i)\bthey specified\b'),
+        re.compile(r'(?i)\bI must\b'),
+        re.compile(r'(?i)\bthe challenge is\b'),
+        re.compile(r'(?i)\bno commentary\b'),
+        re.compile(r'(?i)\bstay in scene\b'),
+        re.compile(r'(?i)\bpure narrative\b'),
+        re.compile(r'(?i)\bI should\b'),
+        re.compile(r'(?i)\bI need to\b(?!.{0,5}\b(?:breathe|eat|sleep|run|walk|see|hear|feel)\b)'),
+        re.compile(r'(?i)\blet me\b(?!.{0,5}\b(?:go|see|think|sleep|breathe)\b)'),
+        re.compile(r'(?i)\bavoid any\b'),
+        re.compile(r'(?i)\bthe (?:user|prompt|instruction)\b'),
+        re.compile(r'(?i)\bmaintain(?:ing)?\s+(?:that|the|this)\s+(?:imagery|tone|style)\b'),
+    ]
+    sentences = re.split(r'(?<=[.!?])\s+', text)
+    cleaned = [s for s in sentences if not any(p.search(s) for p in _PROMPT_REF_PATS)]
+    if cleaned:
+        text = ' '.join(cleaned).strip()
+    if not text:
+        return text
+
+    # Step 2: split into paragraphs
+    paragraphs = re.split(r'\n\s*\n', text)
+    if len(paragraphs) <= 1:
+        paragraphs = text.split('\n')
+
+    # Step 3: score each paragraph
+    meta_words = {
+        'i ', 'i\'m', 'i\'ll', 'i\'ve', 'my ', 'the user', 'they ',
+        'must ', 'should ', 'challenge', 'meta', 'commentary',
+        'avoid', 'specified', 'noting ', 'prompt', 'immersion',
+        'need to', 'want to', 'going to', 'let me', 'okay',
+        'hmm', 'alright', 'here\'s', 'here is', 'pure ',
+        'organically', 'extending', 'maybe ', 'perhaps ',
+    }
+    prose_paras = []
+    for para in paragraphs:
+        stripped = para.strip()
+        if not stripped:
+            continue
+        low = stripped.lower()
+        meta_hits = sum(1 for m in meta_words if m in low)
+        if meta_hits < 2:
+            prose_paras.append(stripped)
+
+    if prose_paras:
+        result = '\n\n'.join(prose_paras)
+        if len(result) >= 50:
+            return result
+
+    # Fallback: return everything after the last blank line
+    parts = text.rsplit('\n\n', 1)
+    if len(parts) == 2 and len(parts[1].strip()) >= 50:
+        return parts[1].strip()
+
+    return text.strip()
+
+
+def _build_creature_context() -> str:
+    """Build the system prompt: this file's docstring + live creature state + journal.
+
+    The model reads its own source context and the creature's current state.
+    """
+    docstring = __doc__ or ""
+
+    # Load organism state
+    try:
+        organism = Organism.load()
+        ps = organism.persistent.summary()
+    except Exception:
+        ps = {}
+
+    state_block = f"\n--- CREATURE STATE (live, {datetime.now(timezone.utc).isoformat()}) ---\n"
+    state_block += f"encounters: {ps.get('encounter_count', 0)}\n"
+    state_block += f"betti: {ps.get('current_betti', (0, 0, 0))}\n"
+    state_block += f"betti_stability: {ps.get('betti_stability', 0):.4f}\n"
+    state_block += f"transport_coherence: {ps.get('transport_coherence', 0):.4f}\n"
+    if 'felt_winding' in ps:
+        state_block += f"felt_winding: {ps['felt_winding']}\n"
+        state_block += f"winding_coherence: {ps.get('winding_coherence', 0):.4f}\n"
+    if 'phase_total_winding' in ps:
+        state_block += f"phase_total_winding: {ps['phase_total_winding']}\n"
+        state_block += f"phase_total_holonomy: {ps['phase_total_holonomy']:.4f}\n"
+    if 'genesis_signal' in ps:
+        state_block += f"genesis_rate: {ps['genesis_signal']:.4f}\n"
+        state_block += f"mean_phase_shift: {ps['mean_phase_shift']:.6f}\n"
+
+    # Load recent journal entries (last 3, most recent first)
+    journal_dir = REPO_ROOT / "spark" / "journal"
+    journal_block = ""
+    if journal_dir.exists():
+        entries = sorted(journal_dir.glob("*.md"), reverse=True)[:3]
+        if entries:
+            journal_block = "\n--- RECENT JOURNAL (Vybn's voice, most recent first) ---\n"
+            for entry in entries:
+                try:
+                    text = entry.read_text().strip()
+                    preview = text[:500]
+                    if len(text) > 500:
+                        preview += "..."
+                    journal_block += f"\n[{entry.name}]\n{preview}\n"
+                except Exception:
+                    continue
+
+    return docstring + state_block + journal_block
+
+
 def cmd_breathe(text):
     """Breathe command: report structural features before and after learning."""
     print("═══ breathe ═══")
@@ -1726,10 +1899,36 @@ def cmd_breathe_live():
     print("═══ breathe-live ═══")
     if not fm_available():
         print("  FM not serving."); return
-    fm_text = fm_complete("Generate one paragraph.", system="You are generating text for a topological creature (creature_dgm_h) that learns from your output. Write naturally and diversely — varied topics, styles, and structures help the creature develop richer geometry. Do not use <think> tags or reasoning preambles; output only the final text.",
-                          max_tokens=512, temperature=1.0)
-    if not fm_text:
-        print("  Empty."); return
+
+    # Build context: the model reads its own source + creature state
+    system = _build_creature_context()
+    prompt = (
+        "Generate one paragraph of prose for the creature. "
+        "Respond to the creature's current state shown above. "
+        "Output only the paragraph — no meta-commentary, no reasoning, "
+        "no <think> tags."
+    )
+
+    raw_fm = ""
+    for _attempt in range(3):
+        raw_fm = fm_complete(prompt=prompt, system=system,
+                             max_tokens=512, temperature=0.9)
+        if raw_fm:
+            break
+        time.sleep(2)
+        print(f"  FM attempt {_attempt+1} empty, retrying...")
+
+    if not raw_fm:
+        print("  Empty response from FM after 3 attempts."); return
+
+    fm_text = _strip_thinking(raw_fm)
+    stripped_n = len(raw_fm) - len(fm_text)
+    if stripped_n > 0:
+        print(f"  [stripped {stripped_n} chars of thinking]")
+
+    if not fm_text or len(fm_text) < 20:
+        print("  Text too short after stripping."); return
+
     print(f"  FM ({len(fm_text)} chars): \"{fm_text[:200]}...\"")
     agent = TopoAgent()
     cx = encounter_complex(fm_text)
@@ -1740,6 +1939,10 @@ def cmd_breathe_live():
     print(f"  learn: {losses[0]:.4f}->{losses[-1]:.4f}")
     organism = Organism.load()
     organism.absorb_encounter(cx)
+    # Feed back winding
+    if hasattr(agent, '_weight_trajectory') and len(agent._weight_trajectory) >= 3:
+        wr = organism.absorb_winding(agent._weight_trajectory)
+        print(f"  winding: {wr['winding']:.4f} (significant={wr['significant']})")
     organism.save()
     print(f"  coherence={organism.rotor_coherence():.3f}")
 
