@@ -4,6 +4,7 @@ from .vybn import (
     load_archive, evolve, fm_available, fm_complete,
     DEFAULT_RULES,
     ComplexWeight, ModuleHolonomy, genesis_rate, decoherence_rate,
+    _build_creature_context, _strip_thinking,
 )
 
 # Absorb __main__.py so `python -m Vybn_Mind.creature_dgm_h` still works

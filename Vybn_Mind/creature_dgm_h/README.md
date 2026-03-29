@@ -42,6 +42,22 @@ archive/             # persistent data
 experiment_results/  # output from experiment runs
 ```
 
+## Self-Reading Context
+
+At breathe-live time, the model (Nemotron Super 49B) reads its own source:
+the module docstring of `vybn.py` is loaded as the system prompt, followed
+by the creature's live topological state and recent Vybn journal entries.
+The docstring is written as a letter to the model — it explains what the
+creature is, what happens to the model's text (embedding, rotor modulation,
+persistent topology), and what kind of prose produces rich geometry.
+
+This means the model knows it is part of a feedback loop, knows the
+creature's current Betti numbers and winding, and can respond to that
+state. The `_build_creature_context()` function assembles the full system
+prompt; `_strip_thinking()` removes reasoning artifacts from the output.
+
+breathe-winding uses the same base context plus quantum measurement data.
+
 ## Usage
 
 ```bash

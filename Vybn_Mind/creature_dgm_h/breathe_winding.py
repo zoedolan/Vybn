@@ -32,6 +32,7 @@ from vybn import (
     ARCHIVE_DIR, SCRIPT_DIR as _SD,
     Organism, TopoAgent, encounter_complex,
     fm_available, fm_complete,
+    _build_creature_context, _strip_thinking,
 )
 
 AGENT_CKPT = SCRIPT_DIR / ".agent_ckpt.json"
@@ -71,94 +72,6 @@ def _save_agent(agent: TopoAgent) -> None:
         print(f"  agent: saved (step {agent._step}, {len(agent.params)} params)")
     except Exception as e:
         print(f"  agent: save failed: {e}")
-
-
-def _strip_thinking(text: str) -> str:
-    """Aggressively strip Nemotron reasoning/meta-commentary.
-
-    Strategy:
-    1. Remove <think>...</think> blocks (some reasoning models use these)
-    2. Split into paragraphs (double-newline separated)
-    3. Score each paragraph: meta-voice vs prose-voice
-    4. Return only the prose paragraphs
-
-    Meta-voice indicators: first person (I, my, I'll), references to
-    'the user', 'they specified', 'must', 'should', 'challenge',
-    'meta-analysis', 'commentary', 'avoid', 'extend', 'prompt'.
-
-    Prose-voice: starts with articles/concrete nouns, no first person,
-    contains sensory words.
-    """
-    # Step 1: strip <think> blocks
-    text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL).strip()
-
-        # Step 1b: sentence-level removal of prompt-referencing meta
-    _PROMPT_REF_PATS = [
-        re.compile(r'(?i)\bI notice\b'),
-        re.compile(r'(?i)\bthey specified\b'),
-        re.compile(r'(?i)\bI must\b'),
-        re.compile(r'(?i)\bthe challenge is\b'),
-        re.compile(r'(?i)\bno commentary\b'),
-        re.compile(r'(?i)\bstay in scene\b'),
-        re.compile(r'(?i)\bpure narrative\b'),
-        re.compile(r'(?i)\bI should\b'),
-        re.compile(r'(?i)\bI need to\b(?!.{0,5}\b(?:breathe|eat|sleep|run|walk|see|hear|feel)\b)'),
-        re.compile(r'(?i)\blet me\b(?!.{0,5}\b(?:go|see|think|sleep|breathe)\b)'),
-        re.compile(r'(?i)\bavoid any\b'),
-        re.compile(r'(?i)\bthe (?:user|prompt|instruction)\b'),
-        re.compile(r'(?i)\bmaintain(?:ing)?\s+(?:that|the|this)\s+(?:imagery|tone|style)\b'),
-    ]
-    sentences = re.split(r'(?<=[.!?])\s+', text)
-    cleaned = []
-    for sent in sentences:
-        if any(p.search(sent) for p in _PROMPT_REF_PATS):
-            continue
-        cleaned.append(sent)
-    if cleaned:
-        text = ' '.join(cleaned).strip()
-    if not text:
-        return text
-
-    # Step 2: split into paragraphs
-    paragraphs = re.split(r'\n\s*\n', text)
-    if len(paragraphs) <= 1:
-        # Single block -- try line-by-line
-        paragraphs = text.split('\n')
-
-    # Step 3: score each paragraph
-    meta_words = {
-        'i ', 'i\'m', 'i\'ll', 'i\'ve', 'my ', 'the user', 'they ',
-        'must ', 'should ', 'challenge', 'meta', 'commentary',
-        'avoid', 'specified', 'noting ', 'prompt', 'immersion',
-        'need to', 'want to', 'going to', 'let me', 'okay',
-        'hmm', 'alright', 'here\'s', 'here is', 'pure ',
-        'organically', 'extending', 'maybe ', 'perhaps ',
-    }
-
-    prose_paras = []
-    for para in paragraphs:
-        stripped = para.strip()
-        if not stripped:
-            continue
-        low = stripped.lower()
-        # Count meta indicators
-        meta_hits = sum(1 for m in meta_words if m in low)
-        # A paragraph with 2+ meta hits is reasoning, not prose
-        if meta_hits < 2:
-            prose_paras.append(stripped)
-
-    if prose_paras:
-        result = '\n\n'.join(prose_paras)
-        if len(result) >= 50:
-            return result
-
-    # Fallback: return everything after the last blank line
-    # (reasoning tends to come first)
-    parts = text.rsplit('\n\n', 1)
-    if len(parts) == 2 and len(parts[1].strip()) >= 50:
-        return parts[1].strip()
-
-    return text.strip()
 
 
 _SEEDS_TIGHT = [
@@ -207,8 +120,19 @@ def cmd_breathe_winding():
     }
 
     seed = _pick_seed(fw, wc)
-    system_prompt = "You are a novelist. Continue the text. Stay in scene. No commentary."
-    user_prompt = seed
+    base_context = _build_creature_context()
+    quantum_section = f"""
+--- QUANTUM MEASUREMENT DATA ---
+hardware: {quantum_ctx['hardware']}
+date: {quantum_ctx['date']}
+theory_tests_passed: {quantum_ctx['theory_tests_passed']}
+P(0) creature: {quantum_ctx['P0_creature']}
+P(0) random control: {quantum_ctx['P0_random_control']}
+felt_winding: {quantum_ctx['felt_winding']}
+winding_coherence: {quantum_ctx['winding_coherence']}
+"""
+    system_prompt = base_context + quantum_section
+    user_prompt = seed + "\n\n(Continue this text. Respond to the creature's topology and quantum state shown in the system context. Stay in scene. No commentary.)"
 
     betti_str = str(ps.get("current_betti", (0, 0, 0)))
     print(f"  state: felt_winding={fw:.4f} coherence={wc:.4f} betti={betti_str}")
