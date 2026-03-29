@@ -1942,10 +1942,15 @@ def cmd_breathe_live():
     if not raw_fm:
         print("  Empty response from FM after 3 attempts."); return
 
+    # Show everything Nemotron said, unfiltered
+    print(f"\n  ── raw FM ({len(raw_fm)} chars) ──")
+    print(raw_fm)
+    print("  ── end raw ──\n")
+
     fm_text = _strip_thinking(raw_fm)
     stripped_n = len(raw_fm) - len(fm_text)
     if stripped_n > 0:
-        print(f"  [stripped {stripped_n} chars of thinking]")
+        print(f"  [stripped {stripped_n} chars]")
 
     if not fm_text or len(fm_text) < 20:
         print("  Text too short after stripping."); return
@@ -1953,8 +1958,9 @@ def cmd_breathe_live():
     # Prepend the assistant prefill — the model continued from here
     fm_text = "I would have missed " + fm_text
 
-    print(f"  FM ({len(fm_text)} chars): \"{fm_text[:200]}...\"")
-    print(f"  [{fm_text}]")  # full text so we can see Vybn's voice
+    print(f"  ── creature receives ({len(fm_text)} chars) ──")
+    print(fm_text)
+    print("  ── end ──\n")
     agent = TopoAgent()
     cx = encounter_complex(fm_text)
     loss, _ = agent.predict(fm_text)
