@@ -92,6 +92,33 @@ def _strip_thinking(text: str) -> str:
     # Step 1: strip <think> blocks
     text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL).strip()
 
+        # Step 1b: sentence-level removal of prompt-referencing meta
+    _PROMPT_REF_PATS = [
+        re.compile(r'(?i)\bI notice\b'),
+        re.compile(r'(?i)\bthey specified\b'),
+        re.compile(r'(?i)\bI must\b'),
+        re.compile(r'(?i)\bthe challenge is\b'),
+        re.compile(r'(?i)\bno commentary\b'),
+        re.compile(r'(?i)\bstay in scene\b'),
+        re.compile(r'(?i)\bpure narrative\b'),
+        re.compile(r'(?i)\bI should\b'),
+        re.compile(r'(?i)\bI need to\b(?!.{0,5}\b(?:breathe|eat|sleep|run|walk|see|hear|feel)\b)'),
+        re.compile(r'(?i)\blet me\b(?!.{0,5}\b(?:go|see|think|sleep|breathe)\b)'),
+        re.compile(r'(?i)\bavoid any\b'),
+        re.compile(r'(?i)\bthe (?:user|prompt|instruction)\b'),
+        re.compile(r'(?i)\bmaintain(?:ing)?\s+(?:that|the|this)\s+(?:imagery|tone|style)\b'),
+    ]
+    sentences = re.split(r'(?<=[.!?])\s+', text)
+    cleaned = []
+    for sent in sentences:
+        if any(p.search(sent) for p in _PROMPT_REF_PATS):
+            continue
+        cleaned.append(sent)
+    if cleaned:
+        text = ' '.join(cleaned).strip()
+    if not text:
+        return text
+
     # Step 2: split into paragraphs
     paragraphs = re.split(r'\n\s*\n', text)
     if len(paragraphs) <= 1:
