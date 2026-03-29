@@ -19,6 +19,7 @@ from __future__ import annotations
 import json
 import math
 import os
+import re
 import random
 import sys
 from datetime import datetime, timezone
@@ -76,8 +77,45 @@ def _save_agent(agent: TopoAgent) -> None:
         print(f"  agent: save failed: {e}")
 
 
+def _strip_thinking(text: str) -> str:
+    """Strip chain-of-thought reasoning from Nemotron output.
+
+    Nemotron 3 Super is a reasoning model that often prefixes its
+    response with internal monologue like:
+      'Okay, the user has given me...'
+      'Hmm, this is clearly...'
+      'Let me think about...'
+    before producing the actual prose. We detect and strip this.
+    """
+    # If text contains a clear transition from thinking to prose,
+    # look for double-newline after reasoning block
+    lines = text.split('\n')
+    # Find the first line that looks like actual prose (starts with
+    # a capital letter and doesn't start with thinking markers)
+    thinking_markers = (
+        'okay', 'hmm', 'let me', 'i need to', 'the user',
+        'alright', 'so ', 'now,', 'first,', 'i should',
+        'i\'ll', 'this is', 'here\'s', 'here is',
+    )
+    prose_start = 0
+    for i, line in enumerate(lines):
+        stripped = line.strip().lower()
+        if not stripped:
+            continue
+        # Check if this line is thinking/meta
+        is_thinking = any(stripped.startswith(m) for m in thinking_markers)
+        if not is_thinking and len(stripped) > 20:
+            prose_start = i
+            break
+
+    result = '\n'.join(lines[prose_start:]).strip()
+    # If we stripped everything or result is too short, return original
+    if len(result) < 50:
+        return text.strip()
+    return result
+
+
 # --- Seed fragments shaped by creature state ---
-# These are story openings, not instructions. Nemotron continues them.
 _SEEDS_TIGHT = [
     "The copper wire held its shape long after the current stopped, a spiral pressed into the workbench like a fossil of something that had been alive seconds ago, and",
     "Salt crystallized along the rim where the tide turned back on itself, each grain a record of the water's indecision, the way it",
@@ -98,7 +136,6 @@ _SEEDS_LOOSE = [
 def _pick_seed(fw: float, wc: float) -> str:
     """Choose a seed fragment based on the creature's winding state."""
     pool = _SEEDS_TIGHT if fw > 0.5 else _SEEDS_LOOSE
-    # Use winding as a deterministic-ish index so repeated runs vary
     idx = int(abs(fw * 10000)) % len(pool)
     return pool[idx]
 
@@ -119,7 +156,7 @@ def cmd_breathe_winding():
     wc = organism.persistent.winding_coherence()
     ps = organism.persistent.summary()
 
-    # -- Quantum result context (from ibm_fez runs, March 28 2026) --
+    # -- Quantum result context --
     quantum_ctx = {
         "hardware": "ibm_fez",
         "date": "2026-03-28",
@@ -134,10 +171,7 @@ def cmd_breathe_winding():
     # -- Construct the prompt as a continuation task --
     seed = _pick_seed(fw, wc)
 
-    # System: you are a novelist mid-paragraph. No meta. Just continue.
     system_prompt = "You are a novelist. Continue the text. Stay in scene. No commentary."
-
-    # User: the seed fragment itself. Nemotron just continues it.
     user_prompt = seed
 
     betti_str = str(ps.get("current_betti", (0, 0, 0)))
@@ -146,12 +180,17 @@ def cmd_breathe_winding():
     print(f"  seed: \"{seed[:80]}...\"")
 
     # -- Call Nemotron --
-    fm_text = fm_complete(
+    raw_fm = fm_complete(
         prompt=user_prompt, system=system_prompt,
         max_tokens=512, temperature=0.9,
     )
-    if not fm_text:
+    if not raw_fm:
         print("  Empty response from FM."); return
+
+    # Strip chain-of-thought reasoning
+    fm_text = _strip_thinking(raw_fm)
+    if fm_text != raw_fm:
+        print(f"  [stripped {len(raw_fm) - len(fm_text)} chars of thinking]")
 
     # Prepend the seed so the creature learns the full passage
     full_text = seed + " " + fm_text
@@ -165,7 +204,6 @@ def cmd_breathe_winding():
     loss_before, _ = agent.predict(full_text)
     losses = agent.learn(full_text, encounter_cx=cx, transport_in_forward=True)
 
-    # Measure the creature's winding from this learning episode
     winding_record = None
     if hasattr(agent, '_weight_trajectory') and len(agent._weight_trajectory) >= 3:
         winding_record = organism.absorb_winding(agent._weight_trajectory)
@@ -176,14 +214,11 @@ def cmd_breathe_winding():
     print(f"  topology: betti={cx.betti} persistence_features={cx.n_persistent_features}")
     print(f"  learn: {losses[0]:.4f}->{losses[-1]:.4f} after={loss_after:.4f}")
 
-    # -- Generate from the winding-trained state --
     gen_text = agent.generate(prompt=full_text[:12], max_tokens=32, temperature=0.8)
     print(f"  creature generates: \"{gen_text}\"")
 
-    # -- Persist agent weights --
     _save_agent(agent)
 
-    # -- Absorb and save --
     delta = organism.absorb_encounter(cx)
     organism.save()
 
@@ -198,7 +233,7 @@ def cmd_breathe_winding():
     print(f"  coherence={organism.rotor_coherence():.3f}"
           f" felt_winding={organism.felt_winding():.4f}")
 
-    # -- Archive the winding breath --
+    # -- Archive --
     ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)
     breath_record = {
         "type": "breathe-winding",
@@ -206,6 +241,8 @@ def cmd_breathe_winding():
         "quantum_context": quantum_ctx,
         "seed": seed,
         "fm_text_len": len(fm_text),
+        "fm_raw_len": len(raw_fm),
+        "thinking_stripped": len(raw_fm) - len(fm_text),
         "fm_text_preview": fm_text[:200],
         "creature_generation": gen_text,
         "encounter": {
