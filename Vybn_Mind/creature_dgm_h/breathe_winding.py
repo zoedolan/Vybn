@@ -19,6 +19,7 @@ from __future__ import annotations
 import json
 import math
 import os
+import random
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -34,8 +35,6 @@ from vybn import (
 )
 
 # --- Agent checkpoint persistence ---
-# TopoAgent uses RV (scalar autograd) nodes, not torch tensors.
-# We persist the raw float values of params plus Adam state.
 AGENT_CKPT = SCRIPT_DIR / ".agent_ckpt.json"
 
 
@@ -54,7 +53,7 @@ def _load_agent() -> TopoAgent:
                 agent._step = ckpt.get("_step", agent._step)
                 print(f"  agent: restored from {AGENT_CKPT.name} (step {agent._step})")
             else:
-                print(f"  agent: fresh (param count mismatch {len(saved_params)} vs {len(agent.params)})")
+                print(f"  agent: fresh (param count mismatch)")
         except Exception as e:
             print(f"  agent: fresh (ckpt load failed: {e})")
     else:
@@ -75,6 +74,33 @@ def _save_agent(agent: TopoAgent) -> None:
         print(f"  agent: saved (step {agent._step}, {len(agent.params)} params)")
     except Exception as e:
         print(f"  agent: save failed: {e}")
+
+
+# --- Seed fragments shaped by creature state ---
+# These are story openings, not instructions. Nemotron continues them.
+_SEEDS_TIGHT = [
+    "The copper wire held its shape long after the current stopped, a spiral pressed into the workbench like a fossil of something that had been alive seconds ago, and",
+    "Salt crystallized along the rim where the tide turned back on itself, each grain a record of the water's indecision, the way it",
+    "She ran her thumb across the seam where the two metals met, the weld still warm, still ticking as it contracted, and the sound reminded her of",
+    "Rust bloomed along the rail in patterns that repeated at every scale, fractal corrosion eating inward, and where the paint had held it looked like",
+    "The glass cooled unevenly, one side already rigid while the other still held the memory of liquid, a gradient of becoming that",
+]
+
+_SEEDS_LOOSE = [
+    "Smoke. Then nothing. Then the smell of wet concrete after rain.",
+    "The door had been open all night. Leaves on the kitchen floor. A cup of water, still full.",
+    "Three stones on the windowsill. She had put them there in June. Now it was October and they had not moved.",
+    "The machine stopped. In the silence you could hear the building breathe.",
+    "Ice in the glass. The sound it makes when it shifts. Like a small bone breaking.",
+]
+
+
+def _pick_seed(fw: float, wc: float) -> str:
+    """Choose a seed fragment based on the creature's winding state."""
+    pool = _SEEDS_TIGHT if fw > 0.5 else _SEEDS_LOOSE
+    # Use winding as a deterministic-ish index so repeated runs vary
+    idx = int(abs(fw * 10000)) % len(pool)
+    return pool[idx]
 
 
 def cmd_breathe_winding():
@@ -105,45 +131,19 @@ def cmd_breathe_winding():
         "winding_coherence": round(wc, 4),
     }
 
-    # -- Load quantum results file if available --
-    quantum_results_file = SCRIPT_DIR / "quantum" / "topological_winding_probe_results.md"
-    quantum_snippet = ""
-    if quantum_results_file.exists():
-        try:
-            raw = quantum_results_file.read_text()
-            for section in raw.split("\n## "):
-                if section.lower().startswith("abstract"):
-                    quantum_snippet = section[:500]
-                    break
-            if not quantum_snippet:
-                quantum_snippet = raw[:500]
-        except Exception:
-            pass
+    # -- Construct the prompt as a continuation task --
+    seed = _pick_seed(fw, wc)
 
-    # -- Construct the winding-aware prompt --
-    sig_str = ",".join(f"{x:.3f}" for x in organism.persistent.structural_signature)
+    # System: you are a novelist mid-paragraph. No meta. Just continue.
+    system_prompt = "You are a novelist. Continue the text. Stay in scene. No commentary."
+
+    # User: the seed fragment itself. Nemotron just continues it.
+    user_prompt = seed
+
     betti_str = str(ps.get("current_betti", (0, 0, 0)))
-
-    # System prompt: the model IS a writer, not a meta-commentator
-    system_prompt = (
-        "You are a writer. You produce vivid, dense, sensory prose. "
-        "You never explain what you are doing. You never use words like "
-        "'topology', 'winding', 'quantum', 'coherence', 'neural', or 'network'. "
-        "You write about the physical world: light, stone, water, breath, "
-        "glass, rust, salt, smoke, skin, wire, root, tide. "
-        "Vary your sentence lengths. No preamble. Begin immediately."
-    )
-
-    # User prompt: a creative writing prompt, not a task description
-    user_prompt = (
-        f"Write one paragraph beginning with a concrete image. "
-        f"The rhythm should feel {'tight and spiraling' if fw > 0.5 else 'loose and drifting'}. "
-        f"Use {'long sentences that fold back on themselves' if wc > 0.8 else 'short declarative fragments'}. "
-        f"Include the texture of metal cooling after heat."
-    )
-
     print(f"  state: felt_winding={fw:.4f} coherence={wc:.4f} betti={betti_str}")
     print(f"  quantum: P(0)={quantum_ctx['P0_creature']} vs control={quantum_ctx['P0_random_control']}")
+    print(f"  seed: \"{seed[:80]}...\"")
 
     # -- Call Nemotron --
     fm_text = fm_complete(
@@ -153,28 +153,31 @@ def cmd_breathe_winding():
     if not fm_text:
         print("  Empty response from FM."); return
 
+    # Prepend the seed so the creature learns the full passage
+    full_text = seed + " " + fm_text
+
     print(f"  FM ({len(fm_text)} chars): \"{fm_text[:200]}...\"")
 
     # -- Process through the creature (with persistence) --
     agent = _load_agent()
-    cx = encounter_complex(fm_text)
+    cx = encounter_complex(full_text)
 
-    loss_before, _ = agent.predict(fm_text)
-    losses = agent.learn(fm_text, encounter_cx=cx, transport_in_forward=True)
+    loss_before, _ = agent.predict(full_text)
+    losses = agent.learn(full_text, encounter_cx=cx, transport_in_forward=True)
 
     # Measure the creature's winding from this learning episode
     winding_record = None
     if hasattr(agent, '_weight_trajectory') and len(agent._weight_trajectory) >= 3:
         winding_record = organism.absorb_winding(agent._weight_trajectory)
 
-    loss_after, _ = agent.predict(fm_text)
+    loss_after, _ = agent.predict(full_text)
 
     print(f"  encounter: curv={cx.curvature:.6f} angle={math.degrees(cx.angle):.1f} deg")
     print(f"  topology: betti={cx.betti} persistence_features={cx.n_persistent_features}")
     print(f"  learn: {losses[0]:.4f}->{losses[-1]:.4f} after={loss_after:.4f}")
 
     # -- Generate from the winding-trained state --
-    gen_text = agent.generate(prompt=fm_text[:12], max_tokens=32, temperature=0.8)
+    gen_text = agent.generate(prompt=full_text[:12], max_tokens=32, temperature=0.8)
     print(f"  creature generates: \"{gen_text}\"")
 
     # -- Persist agent weights --
@@ -201,6 +204,7 @@ def cmd_breathe_winding():
         "type": "breathe-winding",
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "quantum_context": quantum_ctx,
+        "seed": seed,
         "fm_text_len": len(fm_text),
         "fm_text_preview": fm_text[:200],
         "creature_generation": gen_text,
