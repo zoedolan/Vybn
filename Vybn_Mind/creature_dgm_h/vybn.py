@@ -1239,6 +1239,9 @@ def fm_complete(prompt=None, system=None, max_tokens=1024, temperature=0.7, mess
                 text = text.replace(tok, "")
                                         # Strip <think>...</think> reasoning tags
             text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL).strip()
+                        # Strip reasoning preamble (model may dump reasoning without tags)
+                        if '\n\n' in text:
+                                            text = text.split('\n\n')[-1].strip()
             return text.strip()
     except Exception:
         return None
@@ -1711,8 +1714,7 @@ def cmd_breathe(text):
     # ── Structural delta ──
     delta = organism.absorb_encounter(cx)
     if hasattr(agent, '_phase_stats'):
-        organism.absorb_phases(
-            agent.module_holonomies,
+# Strip <think>            agent.module_holonomies,
             genesis_signal=agent._phase_stats.get("genesis_signal", 0.0),
             mean_phase_shift=agent._phase_stats.get("mean_phase_shift", 0.0))
     organism.save()
@@ -1726,9 +1728,10 @@ def cmd_breathe_live():
     print("═══ breathe-live ═══")
     if not fm_available():
         print("  FM not serving."); return
-    fm_text = fm_complete("Generate one paragraph.", system="You are generating text for a topological creature (creature_dgm_h) that learns from your output. Write naturally and diversely — varied topics, styles, and structures help the creature develop richer geometry. Do not use <think> tags or reasoning preambles; output only the final text.",
-                          max_tokens=512, temperature=1.0)
-    if not fm_text:
+        fm_text = fm_complete(prompt="Write one vivid paragraph on any topic.", system="Respond with ONLY the paragraph. No preamble, no reasoning, no commentary, no meta-discussion. Just the paragraph itself.",
+                                                       max_tokens=512, temperature=1.0)
+                    
+        if not fm_text:
         print("  Empty."); return
     print(f"  FM ({len(fm_text)} chars): \"{fm_text[:200]}...\"")
     agent = TopoAgent()
