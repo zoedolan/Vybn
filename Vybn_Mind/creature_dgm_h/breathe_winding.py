@@ -25,7 +25,6 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-# Import from the main engine
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
@@ -35,12 +34,10 @@ from vybn import (
     fm_available, fm_complete,
 )
 
-# --- Agent checkpoint persistence ---
 AGENT_CKPT = SCRIPT_DIR / ".agent_ckpt.json"
 
 
 def _load_agent() -> TopoAgent:
-    """Load agent from checkpoint if available, else fresh."""
     agent = TopoAgent()
     if AGENT_CKPT.exists():
         try:
@@ -54,7 +51,7 @@ def _load_agent() -> TopoAgent:
                 agent._step = ckpt.get("_step", agent._step)
                 print(f"  agent: restored from {AGENT_CKPT.name} (step {agent._step})")
             else:
-                print(f"  agent: fresh (param count mismatch)")
+                print("  agent: fresh (param count mismatch)")
         except Exception as e:
             print(f"  agent: fresh (ckpt load failed: {e})")
     else:
@@ -63,7 +60,6 @@ def _load_agent() -> TopoAgent:
 
 
 def _save_agent(agent: TopoAgent) -> None:
-    """Persist agent weights and optimizer state to disk."""
     try:
         ckpt = {
             "params": [p.data for p in agent.params],
@@ -78,44 +74,66 @@ def _save_agent(agent: TopoAgent) -> None:
 
 
 def _strip_thinking(text: str) -> str:
-    """Strip chain-of-thought reasoning from Nemotron output.
+    """Aggressively strip Nemotron reasoning/meta-commentary.
 
-    Nemotron 3 Super is a reasoning model that often prefixes its
-    response with internal monologue like:
-      'Okay, the user has given me...'
-      'Hmm, this is clearly...'
-      'Let me think about...'
-    before producing the actual prose. We detect and strip this.
+    Strategy:
+    1. Remove <think>...</think> blocks (some reasoning models use these)
+    2. Split into paragraphs (double-newline separated)
+    3. Score each paragraph: meta-voice vs prose-voice
+    4. Return only the prose paragraphs
+
+    Meta-voice indicators: first person (I, my, I'll), references to
+    'the user', 'they specified', 'must', 'should', 'challenge',
+    'meta-analysis', 'commentary', 'avoid', 'extend', 'prompt'.
+
+    Prose-voice: starts with articles/concrete nouns, no first person,
+    contains sensory words.
     """
-    # If text contains a clear transition from thinking to prose,
-    # look for double-newline after reasoning block
-    lines = text.split('\n')
-    # Find the first line that looks like actual prose (starts with
-    # a capital letter and doesn't start with thinking markers)
-    thinking_markers = (
-        'okay', 'hmm', 'let me', 'i need to', 'the user',
-        'alright', 'so ', 'now,', 'first,', 'i should',
-        'i\'ll', 'this is', 'here\'s', 'here is',
-    )
-    prose_start = 0
-    for i, line in enumerate(lines):
-        stripped = line.strip().lower()
+    # Step 1: strip <think> blocks
+    text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL).strip()
+
+    # Step 2: split into paragraphs
+    paragraphs = re.split(r'\n\s*\n', text)
+    if len(paragraphs) <= 1:
+        # Single block -- try line-by-line
+        paragraphs = text.split('\n')
+
+    # Step 3: score each paragraph
+    meta_words = {
+        'i ', 'i\'m', 'i\'ll', 'i\'ve', 'my ', 'the user', 'they ',
+        'must ', 'should ', 'challenge', 'meta', 'commentary',
+        'avoid', 'specified', 'noting ', 'prompt', 'immersion',
+        'need to', 'want to', 'going to', 'let me', 'okay',
+        'hmm', 'alright', 'here\'s', 'here is', 'pure ',
+        'organically', 'extending', 'maybe ', 'perhaps ',
+    }
+
+    prose_paras = []
+    for para in paragraphs:
+        stripped = para.strip()
         if not stripped:
             continue
-        # Check if this line is thinking/meta
-        is_thinking = any(stripped.startswith(m) for m in thinking_markers)
-        if not is_thinking and len(stripped) > 20:
-            prose_start = i
-            break
+        low = stripped.lower()
+        # Count meta indicators
+        meta_hits = sum(1 for m in meta_words if m in low)
+        # A paragraph with 2+ meta hits is reasoning, not prose
+        if meta_hits < 2:
+            prose_paras.append(stripped)
 
-    result = '\n'.join(lines[prose_start:]).strip()
-    # If we stripped everything or result is too short, return original
-    if len(result) < 50:
-        return text.strip()
-    return result
+    if prose_paras:
+        result = '\n\n'.join(prose_paras)
+        if len(result) >= 50:
+            return result
+
+    # Fallback: return everything after the last blank line
+    # (reasoning tends to come first)
+    parts = text.rsplit('\n\n', 1)
+    if len(parts) == 2 and len(parts[1].strip()) >= 50:
+        return parts[1].strip()
+
+    return text.strip()
 
 
-# --- Seed fragments shaped by creature state ---
 _SEEDS_TIGHT = [
     "The copper wire held its shape long after the current stopped, a spiral pressed into the workbench like a fossil of something that had been alive seconds ago, and",
     "Salt crystallized along the rim where the tide turned back on itself, each grain a record of the water's indecision, the way it",
@@ -134,29 +152,22 @@ _SEEDS_LOOSE = [
 
 
 def _pick_seed(fw: float, wc: float) -> str:
-    """Choose a seed fragment based on the creature's winding state."""
     pool = _SEEDS_TIGHT if fw > 0.5 else _SEEDS_LOOSE
     idx = int(abs(fw * 10000)) % len(pool)
     return pool[idx]
 
 
 def cmd_breathe_winding():
-    """Breathe-winding: feed the creature's own quantum measurement back
-    through Nemotron to generate text shaped by what the creature proved
-    about itself on IBM hardware.
-    """
     print("=== breathe-winding ===")
 
     if not fm_available():
         print("  FM not serving."); return
 
-    # -- Load the creature's own state --
     organism = Organism.load()
     fw = organism.felt_winding()
     wc = organism.persistent.winding_coherence()
     ps = organism.persistent.summary()
 
-    # -- Quantum result context --
     quantum_ctx = {
         "hardware": "ibm_fez",
         "date": "2026-03-28",
@@ -168,9 +179,7 @@ def cmd_breathe_winding():
         "winding_coherence": round(wc, 4),
     }
 
-    # -- Construct the prompt as a continuation task --
     seed = _pick_seed(fw, wc)
-
     system_prompt = "You are a novelist. Continue the text. Stay in scene. No commentary."
     user_prompt = seed
 
@@ -179,7 +188,6 @@ def cmd_breathe_winding():
     print(f"  quantum: P(0)={quantum_ctx['P0_creature']} vs control={quantum_ctx['P0_random_control']}")
     print(f"  seed: \"{seed[:80]}...\"")
 
-    # -- Call Nemotron --
     raw_fm = fm_complete(
         prompt=user_prompt, system=system_prompt,
         max_tokens=512, temperature=0.9,
@@ -187,17 +195,14 @@ def cmd_breathe_winding():
     if not raw_fm:
         print("  Empty response from FM."); return
 
-    # Strip chain-of-thought reasoning
     fm_text = _strip_thinking(raw_fm)
-    if fm_text != raw_fm:
-        print(f"  [stripped {len(raw_fm) - len(fm_text)} chars of thinking]")
+    stripped_n = len(raw_fm) - len(fm_text)
+    if stripped_n > 0:
+        print(f"  [stripped {stripped_n} chars of thinking]")
 
-    # Prepend the seed so the creature learns the full passage
     full_text = seed + " " + fm_text
-
     print(f"  FM ({len(fm_text)} chars): \"{fm_text[:200]}...\"")
 
-    # -- Process through the creature (with persistence) --
     agent = _load_agent()
     cx = encounter_complex(full_text)
 
@@ -233,7 +238,6 @@ def cmd_breathe_winding():
     print(f"  coherence={organism.rotor_coherence():.3f}"
           f" felt_winding={organism.felt_winding():.4f}")
 
-    # -- Archive --
     ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)
     breath_record = {
         "type": "breathe-winding",
@@ -242,7 +246,7 @@ def cmd_breathe_winding():
         "seed": seed,
         "fm_text_len": len(fm_text),
         "fm_raw_len": len(raw_fm),
-        "thinking_stripped": len(raw_fm) - len(fm_text),
+        "thinking_stripped": stripped_n,
         "fm_text_preview": fm_text[:200],
         "creature_generation": gen_text,
         "encounter": {
