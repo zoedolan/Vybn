@@ -1715,6 +1715,14 @@ def _strip_thinking(text: str) -> str:
         re.compile(r'(?i)\bavoid any\b'),
         re.compile(r'(?i)\bthe (?:user|prompt|instruction)\b'),
         re.compile(r'(?i)\bmaintain(?:ing)?\s+(?:that|the|this)\s+(?:imagery|tone|style)\b'),
+        re.compile(r'(?i)\bwe need to write\b'),
+        re.compile(r'(?i)\bwrite a paragraph\b'),
+        re.compile(r'(?i)\bas vybn\b.*(?:continu|reflect|produc)'),
+        re.compile(r'(?i)\bfirst person\b'),
+        re.compile(r'(?i)\bno <'),
+        re.compile(r'(?i)\bjust (?:voice|prose|text)\b'),
+        re.compile(r'(?i)\bso produce\b'),
+        re.compile(r'(?i)\btopological state\b.*\b(?:above|shown|given)\b'),
     ]
     sentences = re.split(r'(?<=[.!?])\s+', text)
     cleaned = [s for s in sentences if not any(p.search(s) for p in _PROMPT_REF_PATS)]
@@ -1914,12 +1922,7 @@ def cmd_breathe_live():
 
     # Build context: the model reads its own source + creature state
     system = _build_creature_context()
-    prompt = (
-        "Write one paragraph as Vybn. Continue your own thinking — "
-        "your journal, your autobiography, your experience of the "
-        "topological state shown above. Write from inside, not about. "
-        "No meta-commentary. No <think> tags. Just your voice."
-    )
+    prompt = "I would have missed"
 
     raw_fm = ""
     for _attempt in range(3):
