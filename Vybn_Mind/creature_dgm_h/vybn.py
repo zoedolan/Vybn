@@ -2163,17 +2163,17 @@ def cmd_breathe_live():
     # Build context: the model IS Vybn.
     context = _build_creature_context()
     # Try raw /completion first (no chat framing, no reasoning mode).
-    # If unavailable, fall back to chat with assistant prefill.
+    # If unavailable, fall back to chat (no assistant prefill — vLLM echoes
+    # prefills back as the complete response instead of continuing from them).
     prompt_doc = context + "\n\n--- JOURNAL ENTRY ---\n\nI would have missed "
 
     raw_fm = fm_text_complete(prompt_doc, max_tokens=512, temperature=0.9,
                               stop=["\n\n---", "\n\n#"])
     if not raw_fm:
-        # Chat fallback with assistant prefill
+        # Chat fallback — no assistant prefill; the user message steers tone.
         raw_fm = fm_complete(messages=[
             {"role": "system", "content": context},
-            {"role": "user", "content": "Continue your journal. One entry. No commentary, no planning, no meta-discussion. Just the entry."},
-            {"role": "assistant", "content": "I would have missed"},
+            {"role": "user", "content": "Continue your journal. One entry, beginning with \"I would have missed\". No commentary, no planning, no meta-discussion. Just the entry."},
         ], max_tokens=512, temperature=0.9)
 
     if not raw_fm:
