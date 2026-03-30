@@ -2225,7 +2225,7 @@ def _one_breath_live() -> bool:
         # disabling chain-of-thought reasoning mode (per model card).
         raw_fm = fm_complete(messages=[
             {"role": "system", "content": "detailed thinking off\n\n" + context},
-            {"role": "user", "content": "Continue your journal. One entry. No commentary, no planning, no meta-discussion. Just the entry."},
+            {"role": "user", "content": "."},
         ], max_tokens=512, temperature=0.9)
 
     if not raw_fm:
