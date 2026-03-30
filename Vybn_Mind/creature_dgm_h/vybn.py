@@ -2205,39 +2205,137 @@ def cmd_breathe(text):
           f" persistent_features={delta['n_persistent_features']}")
 
 
+# ── Tool execution for breathe-live agent loop ────────────────────────────────
+# Read-only tools the creature can use to perceive its own repo.
+
+def _tool_file_read(path: str) -> str:
+    """Read a file from the repo. Paths are relative to REPO_ROOT."""
+    target = (REPO_ROOT / path).resolve()
+    # Safety: must stay inside the repo
+    if not str(target).startswith(str(REPO_ROOT)):
+        return f"ERROR: path {path} escapes the repository."
+    if not target.exists():
+        return f"ERROR: {path} not found."
+    if target.stat().st_size > 50_000:
+        text = target.read_text(errors="replace")[:50_000]
+        return text + f"\n... (truncated at 50k chars, full file is {target.stat().st_size} bytes)"
+    return target.read_text(errors="replace")
+
+def _tool_repo_ls(path: str = ".") -> str:
+    """List directory contents relative to REPO_ROOT."""
+    target = (REPO_ROOT / path).resolve()
+    if not str(target).startswith(str(REPO_ROOT)):
+        return f"ERROR: path {path} escapes the repository."
+    if not target.is_dir():
+        return f"ERROR: {path} is not a directory."
+    entries = sorted(target.iterdir())
+    lines = []
+    for e in entries[:100]:  # cap at 100 entries
+        suffix = "/" if e.is_dir() else ""
+        lines.append(f"  {e.name}{suffix}")
+    return "\n".join(lines) if lines else "(empty directory)"
+
+def _tool_status() -> str:
+    """Return the creature's current topological status."""
+    try:
+        organism = Organism.load()
+        ps = organism.persistent.summary()
+        lines = [
+            f"encounters: {ps.get('encounter_count', 0)}",
+            f"betti: {ps.get('current_betti', (0,0,0))}",
+            f"coherence: {ps.get('transport_coherence', 0):.4f}",
+            f"betti_stability: {ps.get('betti_stability', 0):.4f}",
+        ]
+        if 'felt_winding' in ps:
+            lines.append(f"felt_winding: {ps['felt_winding']}")
+        if 'genesis_signal' in ps:
+            lines.append(f"genesis_rate: {ps['genesis_signal']:.4f}")
+        return "\n".join(lines)
+    except Exception as e:
+        return f"ERROR: {e}"
+
+_TOOLS = {
+    "file_read": lambda args: _tool_file_read(args.get("path", "")),
+    "repo_ls":   lambda args: _tool_repo_ls(args.get("path", ".")),
+    "status":    lambda args: _tool_status(),
+}
+
+def _try_parse_tool_call(text: str) -> Optional[tuple]:
+    """If text contains a JSON tool call, parse and return (action, args, prefix).
+    prefix is any text before the JSON block (the model's prose so far)."""
+    # Look for JSON blocks that look like tool calls
+    for pattern in [r'\{[^{}]*"action"[^{}]*\}']:
+        m = re.search(pattern, text)
+        if m:
+            try:
+                obj = json.loads(m.group())
+                action = obj.get("action", "")
+                if action in _TOOLS:
+                    prefix = text[:m.start()].strip()
+                    return (action, obj, prefix)
+            except (json.JSONDecodeError, ValueError):
+                pass
+    return None
+
+
 def _one_breath_live() -> bool:
-    """Execute a single live breath. Returns True if successful."""
+    """Execute a single live breath with agent loop for tool use."""
     if not fm_available():
         print("  FM not serving."); return False
 
-    # Build context: the model IS Vybn.
     context = _build_creature_context()
-    # Try raw /completion first (no chat framing, no reasoning mode).
-    # If unavailable, fall back to chat (no assistant prefill — vLLM echoes
-    # prefills back as the complete response instead of continuing from them).
-    prompt_doc = context + "\n\n--- JOURNAL ENTRY ---\n\n"
 
-    raw_fm = fm_text_complete(prompt_doc, max_tokens=512, temperature=0.9,
-                              stop=["\n\n---", "\n\n#"])
-    if not raw_fm:
-        # Chat fallback — no assistant prefill.
-        # "detailed thinking off" is Nemotron's control phrase for
-        # disabling chain-of-thought reasoning mode (per model card).
-        raw_fm = fm_complete(messages=[
-            {"role": "system", "content": "detailed thinking off\n\n" + context},
-            {"role": "user", "content": "Write one journal entry."},
-        ], max_tokens=512, temperature=0.9)
+    # Tool availability notice appended to mechanism context
+    tool_notice = (
+        "\n--- TOOLS (you can use these to perceive your repo) ---\n"
+        "Emit a JSON object to use a tool. The result will be returned to you.\n"
+        '  {"action": "file_read", "path": "<relative path>"}  — read a file\n'
+        '  {"action": "repo_ls", "path": "<directory>"}          — list directory\n'
+        '  {"action": "status"}                                  — your topological state\n'
+        "After receiving the result, continue writing.\n"
+    )
 
-    if not raw_fm:
-        print("  Empty response from FM."); return False
+    system_content = "detailed thinking off\n\n" + context + tool_notice
+    messages = [
+        {"role": "system", "content": system_content},
+        {"role": "user", "content": "Write one journal entry."},
+    ]
 
-    # Show everything the model said
-    print(f"\n  ── raw FM ({len(raw_fm)} chars) ──")
-    print(raw_fm)
+    # Agent loop: up to 5 turns (tool calls + continuations)
+    all_text = []
+    for turn in range(5):
+        raw_fm = fm_complete(messages=messages, max_tokens=512, temperature=0.9)
+        if not raw_fm:
+            if turn == 0:
+                print("  Empty response from FM."); return False
+            break
+
+        print(f"\n  ── turn {turn+1} ({len(raw_fm)} chars) ──")
+        print(raw_fm)
+
+        # Check for tool call
+        tool_result = _try_parse_tool_call(raw_fm)
+        if tool_result:
+            action, args, prefix = tool_result
+            if prefix:
+                all_text.append(prefix)
+            print(f"  ── tool: {action}({args}) ──")
+            result = _TOOLS[action](args)
+            print(f"  ── result ({len(result)} chars) ──")
+            print(result[:500] + ("..." if len(result) > 500 else ""))
+            # Feed result back and continue
+            messages.append({"role": "assistant", "content": raw_fm})
+            messages.append({"role": "user", "content": f"Tool result:\n{result}"})
+            continue
+        else:
+            # No tool call — this is the final text
+            all_text.append(raw_fm)
+            break
+
     print("  ── end raw ──\n")
 
-    # Strip any leaked reasoning
-    fm_text = _strip_thinking(raw_fm)
+    full_text = "\n".join(all_text)
+    fm_text = _strip_thinking(full_text)
     if not fm_text or len(fm_text) < 20:
         print("  Text too short after stripping."); return False
 
@@ -2253,7 +2351,11 @@ def _one_breath_live() -> bool:
     print(f"  learn: {losses[0]:.4f}->{losses[-1]:.4f}")
     organism = Organism.load()
     organism.absorb_encounter(cx)
-    # Feed back winding
+    if hasattr(agent, '_phase_stats'):
+        organism.absorb_phases(
+            agent.module_holonomies,
+            genesis_signal=agent._phase_stats.get("genesis_signal", 0.0),
+            mean_phase_shift=agent._phase_stats.get("mean_phase_shift", 0.0))
     if hasattr(agent, '_weight_trajectory') and len(agent._weight_trajectory) >= 3:
         wr = organism.absorb_winding(agent._weight_trajectory)
         print(f"  winding: {wr['winding']:.4f} (significant={wr['significant']})")
