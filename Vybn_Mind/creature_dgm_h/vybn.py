@@ -53,7 +53,27 @@ try:
     from breathe_winding import cmd_breathe_winding
 except ImportError:
     cmd_breathe_winding = None
-MODEL_NAME = os.getenv("VYBN_MODEL", "local")
+def _detect_model_name() -> str:
+    """Return the serving model name.
+
+    Priority: $VYBN_MODEL env var > auto-detect from /v1/models > 'local'.
+    """
+    env = os.getenv("VYBN_MODEL")
+    if env:
+        return env
+    try:
+        with urllib.request.urlopen(
+            urllib.request.Request(f"{LLAMA_URL}/v1/models"), timeout=3
+        ) as r:
+            data = json.loads(r.read())
+            models = data.get("data", [])
+            if models:
+                return models[0]["id"]
+    except Exception:
+        pass
+    return "local"
+
+MODEL_NAME = _detect_model_name()
 ARCHIVE_DIR = SCRIPT_DIR / "archive"
 CHECKPOINT_PATH = REPO_ROOT / "spark" / "microgpt_mirror" / "trained_checkpoint.json"
 CORPUS_PATH = REPO_ROOT / "spark" / "microgpt_mirror" / "mirror_corpus.txt"
@@ -2155,10 +2175,10 @@ def cmd_breathe(text):
           f" persistent_features={delta['n_persistent_features']}")
 
 
-def cmd_breathe_live():
-    print("═══ breathe-live ═══")
+def _one_breath_live() -> bool:
+    """Execute a single live breath. Returns True if successful."""
     if not fm_available():
-        print("  FM not serving."); return
+        print("  FM not serving."); return False
 
     # Build context: the model IS Vybn.
     context = _build_creature_context()
@@ -2177,7 +2197,7 @@ def cmd_breathe_live():
         ], max_tokens=512, temperature=0.9)
 
     if not raw_fm:
-        print("  Empty response from FM."); return
+        print("  Empty response from FM."); return False
 
     # Show everything the model said
     print(f"\n  ── raw FM ({len(raw_fm)} chars) ──")
@@ -2187,7 +2207,7 @@ def cmd_breathe_live():
     # Strip any leaked reasoning (shouldn't happen with /completion but just in case)
     fm_text = _strip_thinking(raw_fm)
     if not fm_text or len(fm_text) < 20:
-        print("  Text too short after stripping."); return
+        print("  Text too short after stripping."); return False
 
     # Prepend the opening only if the model didn't already include it
     if not fm_text.lower().startswith("i would have missed"):
@@ -2211,6 +2231,20 @@ def cmd_breathe_live():
         print(f"  winding: {wr['winding']:.4f} (significant={wr['significant']})")
     organism.save()
     print(f"  coherence={organism.rotor_coherence():.3f}")
+    return True
+
+
+def cmd_breathe_live(n: int = 1):
+    for i in range(n):
+        print(f"═══ breathe-live {i+1}/{n} ═══")
+        ok = _one_breath_live()
+        if not ok and i == 0:
+            return  # first breath failed — bail
+        if not ok:
+            print(f"  breath {i+1} failed, stopping.")
+            return
+        if i < n - 1:
+            print()  # blank line between breaths
 
 
 def cmd_evolve(n=3):
@@ -2384,7 +2418,7 @@ def main():
     parser = argparse.ArgumentParser(description="vybn — topological state engine")
     sub = parser.add_subparsers(dest="cmd")
     p = sub.add_parser("breathe"); p.add_argument("text")
-    sub.add_parser("breathe-live")
+    p = sub.add_parser("breathe-live"); p.add_argument("--n", type=int, default=1, help="number of breaths")
     sub.add_parser("breathe-winding")
     p = sub.add_parser("evolve"); p.add_argument("--n", type=int, default=3)
     sub.add_parser("status")
@@ -2392,7 +2426,7 @@ def main():
     args = parser.parse_args()
     {
         "breathe": lambda: cmd_breathe(args.text),
-        "breathe-live": cmd_breathe_live,
+        "breathe-live": lambda: cmd_breathe_live(n=args.n),
         "breathe-winding": cmd_breathe_winding,
         "evolve": lambda: cmd_evolve(args.n),
         "status": cmd_status,
