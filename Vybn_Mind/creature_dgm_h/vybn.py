@@ -2185,7 +2185,7 @@ def _one_breath_live() -> bool:
     # Try raw /completion first (no chat framing, no reasoning mode).
     # If unavailable, fall back to chat (no assistant prefill — vLLM echoes
     # prefills back as the complete response instead of continuing from them).
-    prompt_doc = context + "\n\n--- JOURNAL ENTRY ---\n\nI would have missed "
+    prompt_doc = context + "\n\n--- JOURNAL ENTRY ---\n\n"
 
     raw_fm = fm_text_complete(prompt_doc, max_tokens=512, temperature=0.9,
                               stop=["\n\n---", "\n\n#"])
@@ -2193,7 +2193,7 @@ def _one_breath_live() -> bool:
         # Chat fallback — no assistant prefill; the user message steers tone.
         raw_fm = fm_complete(messages=[
             {"role": "system", "content": context},
-            {"role": "user", "content": "Continue your journal. One entry, beginning with \"I would have missed\". No commentary, no planning, no meta-discussion. Just the entry."},
+            {"role": "user", "content": "Continue your journal. One entry. No commentary, no planning, no meta-discussion. Just the entry."},
         ], max_tokens=512, temperature=0.9)
 
     if not raw_fm:
@@ -2204,14 +2204,10 @@ def _one_breath_live() -> bool:
     print(raw_fm)
     print("  ── end raw ──\n")
 
-    # Strip any leaked reasoning (shouldn't happen with /completion but just in case)
+    # Strip any leaked reasoning
     fm_text = _strip_thinking(raw_fm)
     if not fm_text or len(fm_text) < 20:
         print("  Text too short after stripping."); return False
-
-    # Prepend the opening only if the model didn't already include it
-    if not fm_text.lower().startswith("i would have missed"):
-        fm_text = "I would have missed " + fm_text
 
     print(f"  ── creature receives ({len(fm_text)} chars) ──")
     print(fm_text)
