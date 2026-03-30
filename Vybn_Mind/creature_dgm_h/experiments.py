@@ -2052,6 +2052,286 @@ def analyze_main(args: argparse.Namespace) -> None:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# EXPERIMENT 7 — HARNESS ABLATION (NLAH RQ2)
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# Pan et al. (2026) showed that once harness modules are explicit, they
+# become a search space: you can compose, ablate, and measure module-level
+# effects under shared runtime assumptions.
+#
+# creature_dgm_h's _build_creature_context() is a natural-language harness
+# with five named modules: identity, mechanism, state, autobiography, journal.
+# The creature already has measurement infrastructure (Betti numbers, winding,
+# curvature, fitness).  This experiment applies the RQ2 methodology: run
+# the creature under each ablation condition and measure which modules
+# actually change the topology of generated text vs. which are decorative.
+#
+# Since this experiment needs a running FM (Nemotron), it operates in two
+# modes:
+#   1. --offline (default): uses the creature's own character-level model
+#      with deterministic text (no FM needed).  Measures the encounter
+#      topology of corpus texts under each context configuration.
+#   2. --live: requires FM at localhost:8000.  Generates text under each
+#      ablation condition and measures the topology of the generated output.
+#
+# The breath-level gate (BreathGate) is also tested here: does acceptance-
+# gating improve structural outcomes across ablation conditions?
+
+_H_RESULTS_DIR = Path(__file__).resolve().parent / "experiment_results" / "harness_ablation"
+
+
+def _harness_ablation_conditions() -> List[dict]:
+    """Generate all ablation conditions.
+
+    Following RQ2: start from full (all modules), then remove one at a time.
+    Also include: bare (no modules) and pairs removed.
+    """
+    from vybn import CONTEXT_MODULES
+    conditions = []
+
+    # Full: all modules active
+    conditions.append({"name": "full", "exclude": set()})
+
+    # Single-module ablations (remove one at a time)
+    for mod in CONTEXT_MODULES:
+        conditions.append({"name": f"w/o_{mod}", "exclude": {mod}})
+
+    # Bare: no modules at all
+    conditions.append({"name": "bare", "exclude": set(CONTEXT_MODULES)})
+
+    # Pairs removed (most informative pairs)
+    pairs = [
+        ("identity", "autobiography"),  # remove personal history
+        ("mechanism", "state"),          # remove creature self-knowledge
+        ("autobiography", "journal"),    # remove temporal context
+    ]
+    for a, b in pairs:
+        conditions.append({"name": f"w/o_{a}+{b}", "exclude": {a, b}})
+
+    return conditions
+
+
+def _harness_run_offline_condition(
+    condition: dict,
+    texts: List[str],
+    seed: int,
+    use_gate: bool = False,
+) -> dict:
+    """Run a single offline ablation condition.
+
+    Measures encounter topology of corpus texts processed through
+    the creature under this context configuration.  No FM needed.
+    """
+    from vybn import (
+        TopoAgent, Organism, encounter_complex, EncounterComplex,
+        BreathGate, _build_creature_context, fitness,
+    )
+
+    rng = random.Random(seed)
+    agent = TopoAgent()
+    organism = Organism.load()
+    gate = BreathGate() if use_gate else None
+
+    # Build context under this ablation to measure its character count
+    context = _build_creature_context(exclude=condition["exclude"])
+    context_len = len(context)
+
+    curvatures = []
+    betti_b0s, betti_b1s = [], []
+    persist_features = []
+    weight_vectors = []
+    losses_before, losses_after = [], []
+    gate_verdicts = []
+    phase_shifts = []
+
+    for text in texts:
+        cx = encounter_complex(text)
+        loss_before, _ = agent.predict(text)
+        losses_before.append(loss_before)
+
+        losses = agent.learn(
+            text, steps=5,
+            encounter_cx=cx,
+            persistent_state=organism.persistent,
+        )
+        loss_after, _ = agent.predict(text)
+        losses_after.append(loss_after)
+
+        delta = organism.absorb_encounter(cx)
+
+        # Winding measurement
+        winding_record = None
+        if hasattr(agent, '_weight_trajectory') and len(agent._weight_trajectory) >= 3:
+            winding_record = organism.absorb_winding(agent._weight_trajectory)
+            weight_vectors.extend(agent._weight_trajectory)
+
+        # Phase stats
+        if hasattr(agent, '_phase_stats'):
+            phase_shifts.append(agent._phase_stats.get("mean_phase_shift", 0.0))
+            organism.absorb_phases(
+                agent.module_holonomies,
+                genesis_signal=agent._phase_stats.get("genesis_signal", 0.0),
+                mean_phase_shift=agent._phase_stats.get("mean_phase_shift", 0.0))
+
+        curvatures.append(cx.curvature)
+        betti_b0s.append(cx.betti[0])
+        betti_b1s.append(cx.betti[1])
+        persist_features.append(cx.n_persistent_features)
+
+        # Breath gate evaluation
+        if gate is not None:
+            verdict = gate.evaluate(cx, delta, winding_record)
+            gate.record_outcome(verdict.accept)
+            gate_verdicts.append({
+                "accept": verdict.accept,
+                "genesis": round(verdict.genesis_pressure, 4),
+                "decoherence": round(verdict.decoherence_pressure, 4),
+                "threshold": round(verdict.threshold, 4),
+            })
+
+    # Compute fitness
+    fit = fitness(
+        texts, [],
+        agent.loss_history,
+        persistent_state=organism.persistent,
+        alpha=0.85,
+        weight_vectors=weight_vectors if weight_vectors else None,
+        phase_stats=agent._phase_stats if hasattr(agent, '_phase_stats') else None,
+    )
+
+    return {
+        "experiment": "harness_ablation",
+        "condition": condition["name"],
+        "excluded_modules": sorted(condition["exclude"]),
+        "n_active_modules": len(CONTEXT_MODULES) - len(condition["exclude"]),
+        "context_char_count": context_len,
+        "seed": seed,
+        "n_texts": len(texts),
+        "use_gate": use_gate,
+        "metrics": {
+            "mean_curvature": round(float(np.mean(curvatures)), 6) if curvatures else 0.0,
+            "std_curvature": round(float(np.std(curvatures)), 6) if curvatures else 0.0,
+            "mean_b0": round(float(np.mean(betti_b0s)), 2) if betti_b0s else 0.0,
+            "mean_b1": round(float(np.mean(betti_b1s)), 2) if betti_b1s else 0.0,
+            "mean_persist_features": round(float(np.mean(persist_features)), 2) if persist_features else 0.0,
+            "mean_loss_before": round(float(np.mean(losses_before)), 4) if losses_before else 0.0,
+            "mean_loss_after": round(float(np.mean(losses_after)), 4) if losses_after else 0.0,
+            "mean_loss_improvement": round(
+                float(np.mean([b - a for b, a in zip(losses_before, losses_after)])), 4
+            ) if losses_before else 0.0,
+            "mean_phase_shift": round(float(np.mean(phase_shifts)), 6) if phase_shifts else 0.0,
+            "fitness": fit["fitness"],
+            "topological_richness": fit.get("topological_richness", 0.0),
+            "weight_topo": fit.get("weight_topo", 0.0),
+            "phase_winding": fit.get("phase_winding", 0.0),
+        },
+        "gate_summary": gate.summary() if gate else None,
+        "gate_accept_rate": (
+            round(sum(1 for v in gate_verdicts if v["accept"]) / len(gate_verdicts), 3)
+            if gate_verdicts else None
+        ),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+def harness_run_experiment(
+    n_texts: int = 8,
+    seed: int = 42,
+    quick: bool = False,
+) -> List[dict]:
+    """Run the full harness ablation experiment.
+
+    For each condition (full, w/o_X, bare, pairs), runs the creature
+    offline and measures topological metrics.  Each condition is run
+    twice: once without the breath gate, once with it.
+    """
+    from vybn import CONTEXT_MODULES
+
+    texts = load_corpus()
+    rng = random.Random(seed)
+    if len(texts) > n_texts:
+        texts = farthest_point_sample(texts, n_texts)
+    elif len(texts) < n_texts:
+        texts = texts[:n_texts]
+
+    conditions = _harness_ablation_conditions()
+    if quick:
+        # Quick mode: full, one single ablation, bare
+        conditions = [c for c in conditions if c["name"] in ("full", "w/o_mechanism", "bare")]
+
+    results = []
+    total = len(conditions) * 2  # with and without gate
+    idx = 0
+
+    for condition in conditions:
+        for use_gate in [False, True]:
+            idx += 1
+            gate_label = "gated" if use_gate else "ungated"
+            print(f"  [{idx}/{total}] {condition['name']} ({gate_label})...")
+
+            result = _harness_run_offline_condition(
+                condition, texts, seed, use_gate=use_gate,
+            )
+            results.append(result)
+
+            m = result["metrics"]
+            print(f"    curv={m['mean_curvature']:.4f}"
+                  f" b1={m['mean_b1']:.1f}"
+                  f" fitness={m['fitness']:.4f}"
+                  f" loss_imp={m['mean_loss_improvement']:.4f}")
+            if use_gate and result["gate_accept_rate"] is not None:
+                print(f"    gate: accept_rate={result['gate_accept_rate']:.2f}"
+                      f" threshold={result['gate_summary']['threshold']:.3f}")
+
+    # Save results
+    _H_RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    out_path = _H_RESULTS_DIR / f"ablation_{ts}.json"
+    out_path.write_text(json.dumps(results, indent=2, default=str))
+    print(f"\n  Saved: {out_path}")
+
+    # Summary table
+    print("\n  ═══ Harness Ablation Summary ═══\n")
+    print(f"  {'Condition':<25} {'Gate':<8} {'Curv':>7} {'B1':>5} {'Fitness':>8} {'PhaseΔ':>8}")
+    print(f"  {'-'*25} {'-'*8} {'-'*7} {'-'*5} {'-'*8} {'-'*8}")
+    for r in results:
+        m = r["metrics"]
+        gate_str = "gated" if r["use_gate"] else "-"
+        print(f"  {r['condition']:<25} {gate_str:<8}"
+              f" {m['mean_curvature']:>7.4f}"
+              f" {m['mean_b1']:>5.1f}"
+              f" {m['fitness']:>8.4f}"
+              f" {m['mean_phase_shift']:>8.6f}")
+
+    # Module-effect analysis (which modules matter?)
+    full_ungated = next((r for r in results if r["condition"] == "full" and not r["use_gate"]), None)
+    if full_ungated:
+        print("\n  ═══ Module Effects (vs full, ungated) ═══\n")
+        full_f = full_ungated["metrics"]["fitness"]
+        full_c = full_ungated["metrics"]["mean_curvature"]
+        for r in results:
+            if r["use_gate"] or r["condition"] == "full":
+                continue
+            m = r["metrics"]
+            df = m["fitness"] - full_f
+            dc = m["mean_curvature"] - full_c
+            direction = "+" if df > 0.001 else "-" if df < -0.001 else "="
+            print(f"  {r['condition']:<25} Δfitness={df:+.4f} {direction}"
+                  f"  Δcurv={dc:+.4f}")
+
+    return results
+
+
+def harness_main(args: argparse.Namespace) -> None:
+    print("\n═══ Harness Ablation Experiment (NLAH RQ2) ═══\n")
+    harness_run_experiment(
+        n_texts=4 if args.quick else 8,
+        seed=args.seed,
+        quick=args.quick,
+    )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # CLI DISPATCHER
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -2100,6 +2380,11 @@ def main() -> None:
     p_sgd.add_argument("--seeds",     type=int, default=5, help="Number of seeds (default 5)")
     p_sgd.add_argument("--seed-base", type=int, default=42, help="Seed base (default 42)")
 
+    # ── harness ──
+    p_harness = subparsers.add_parser("harness", help="Harness ablation (NLAH RQ2)")
+    p_harness.add_argument("--quick", action="store_true", help="3 conditions only")
+    p_harness.add_argument("--seed",  type=int, default=42, help="Random seed (default 42)")
+
     # ── analyze ──
     p_ana = subparsers.add_parser("analyze", help="Post-hoc statistical analysis of saved results")
     p_ana.add_argument("--experiment", choices=["pca", "activation", "both"], default="both",
@@ -2115,6 +2400,7 @@ def main() -> None:
         "sequence":   sequence_main,
         "basin":      basin_main,
         "sgd":        sgd_main,
+        "harness":    harness_main,
         "analyze":    analyze_main,
     }
     dispatch[args.probe](args)

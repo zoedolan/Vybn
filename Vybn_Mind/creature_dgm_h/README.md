@@ -35,7 +35,7 @@ where `∂L/∂θ = ∂L/∂w_eff * (-|w| * sin(θ))` (chain rule through polar 
 
 ```
 vybn.py              # engine — the creature itself
-experiments.py       # unified probe suite (6 experiments)
+experiments.py       # unified probe suite (7 experiments)
 __init__.py          # package init + `python -m` hook
 README.md            # this file
 archive/             # persistent data
@@ -70,7 +70,7 @@ python -m Vybn_Mind.creature_dgm_h audit
 
 ## Experiments
 
-Six probes characterising the creature's geometry, all in `experiments.py`:
+Seven probes characterising the creature's geometry, all in `experiments.py`:
 
 ```bash
 python experiments.py weight      [--quick] [--pca_dim 30]
@@ -79,6 +79,7 @@ python experiments.py sequence    [--quick] [--generations 10]
 python experiments.py basin       [--quick] [--agents 8]
 python experiments.py sgd         [--seeds 5]
 python experiments.py analyze     [--experiment pca|activation|both]
+python experiments.py harness     [--quick] [--seed 42]
 ```
 
 | Probe        | What it measures |
@@ -89,6 +90,26 @@ python experiments.py analyze     [--experiment pca|activation|both]
 | `basin`      | Loss-landscape geometry around the weight-norm fixed point |
 | `sgd`        | SGD vs Adam ablation on the weight-norm attractor |
 | `analyze`    | Post-hoc statistical analysis of topology results |
+| `harness`    | NLAH-style context ablation + breath-level gating |
+
+## Harness Ablation (NLAH RQ2)
+
+Pan et al. (2026, arXiv:2603.25723) showed that natural-language agent
+harnesses decompose into identifiable modules whose individual
+contributions can be measured. The creature's `_build_creature_context()`
+is exactly such a harness — five named modules (identity, mechanism,
+state, autobiography, journal) that together compose the system prompt
+the model reads before each breath.
+
+The `harness` experiment drops each module in turn and measures what
+happens to the creature's topology (Betti-0, Betti-1, total persistence,
+birth-death spread). Each condition runs twice: once raw, once gated by
+`BreathGate`. The gate evaluates genesis pressure against decoherence
+pressure at the whole-breath level and retries when structural delta is
+trivial — an adaptive acceptance threshold that tightens on consecutive
+accepts and relaxes on retries.
+
+Results land in `experiment_results/harness_ablation/`.
 
 ## Quantum bridge
 

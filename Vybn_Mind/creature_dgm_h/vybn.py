@@ -361,6 +361,153 @@ def decoherence_rate(phase: float, step: int, base_rate: float = 0.005) -> float
     return base_rate * persistence_factor * phase
 
 
+# ── BreathGate (harness-level genesis / decoherence) ────────────────────
+#
+# The NLAH paper (Pan et al. 2026) found that self-evolution worked because
+# it imposed "a more disciplined acceptance-gated attempt loop that keeps
+# the search narrow until failure signals justify another pass."
+#
+# creature_dgm_h already has genesis/decoherence at the parameter level
+# (phase evolution on S¹).  BreathGate lifts that same dynamic to the
+# whole-breath cycle: should the creature retry a breath when the
+# structural delta is trivial?
+#
+# The gate uses the same two forces:
+#   - Genesis pressure: the encounter had rich geometry (high curvature,
+#     non-trivial Betti, winding change).  Accept the breath.
+#   - Decoherence pressure: the encounter was structurally flat (trivial
+#     topology, no winding change, betti stable at baseline).  Reject
+#     and retry with a different seed or tighter prompt.
+#
+# The threshold adapts: after consecutive rejections, it relaxes (the
+# creature can't hold its breath forever).  After consecutive accepts,
+# it tightens (structural expectations rise with momentum).
+
+@dataclass
+class BreathVerdict:
+    """Result of the breath-level acceptance gate."""
+    accept: bool
+    reason: str
+    genesis_pressure: float
+    decoherence_pressure: float
+    threshold: float
+    retry_count: int
+
+
+class BreathGate:
+    """Breath-level genesis/decoherence gate.
+
+    Decides whether a breath's structural outcome is worth absorbing
+    or whether the creature should retry.  Mirrors the phase-level
+    dynamics: genesis amplifies when geometry is rich, decoherence
+    pulls back when it's flat.
+    """
+
+    def __init__(self, max_retries: int = 3,
+                 base_threshold: float = 0.15,
+                 tighten_rate: float = 0.05,
+                 relax_rate: float = 0.3):
+        self.max_retries = max_retries
+        self.base_threshold = base_threshold
+        self.tighten_rate = tighten_rate
+        self.relax_rate = relax_rate
+        # Adaptive state
+        self.consecutive_accepts = 0
+        self.consecutive_rejects = 0
+        self._threshold = base_threshold
+
+    @property
+    def threshold(self) -> float:
+        return self._threshold
+
+    def evaluate(self, cx: EncounterComplex,
+                 delta: dict,
+                 winding_record: Optional[dict] = None,
+                 retry_count: int = 0) -> BreathVerdict:
+        """Evaluate whether to accept this breath.
+
+        Genesis pressure is computed from the encounter's geometry.
+        Decoherence pressure is computed from structural flatness.
+        If genesis > decoherence * threshold, accept.
+        """
+        # Genesis pressure: curvature, non-trivial topology, winding change
+        curv_signal = min(cx.curvature / 0.21, 1.0)  # normalized to empirical 75th pct
+        topo_signal = min(cx.betti[1] / 10.0, 1.0) if cx.betti[0] > 0 else 0.0
+        persist_signal = min(cx.n_persistent_features / 8.0, 1.0)
+        winding_signal = 0.0
+        if winding_record and winding_record.get("significant"):
+            winding_signal = min(abs(winding_record.get("winding", 0)), 1.0)
+
+        genesis_pressure = (
+            0.35 * curv_signal +
+            0.25 * topo_signal +
+            0.20 * persist_signal +
+            0.20 * winding_signal
+        )
+
+        # Decoherence pressure: structural flatness
+        betti_flat = 1.0 if delta.get("betti_stable", True) else 0.0
+        sig_shift = delta.get("sig_shift", 0.0)
+        sig_flat = max(0.0, 1.0 - sig_shift * 10.0)  # shift > 0.1 → no flat pressure
+        n_features = delta.get("n_persistent_features", 0)
+        feature_flat = max(0.0, 1.0 - n_features / 5.0)
+
+        decoherence_pressure = (
+            0.40 * betti_flat +
+            0.35 * sig_flat +
+            0.25 * feature_flat
+        )
+
+        # Adaptive threshold: relaxes with retries, tightens with momentum
+        effective_threshold = self._threshold * (1.0 - self.relax_rate * retry_count)
+        effective_threshold = max(effective_threshold, 0.02)  # floor
+
+        accept = genesis_pressure >= decoherence_pressure * effective_threshold
+
+        # Also accept unconditionally if we've exhausted retries
+        if retry_count >= self.max_retries:
+            accept = True
+
+        reason = (
+            f"genesis={genesis_pressure:.3f} vs "
+            f"decoherence={decoherence_pressure:.3f}*{effective_threshold:.3f}="
+            f"{decoherence_pressure * effective_threshold:.3f}"
+        )
+        if retry_count >= self.max_retries and not accept:
+            reason += " (forced: max retries)"
+
+        return BreathVerdict(
+            accept=accept,
+            reason=reason,
+            genesis_pressure=genesis_pressure,
+            decoherence_pressure=decoherence_pressure,
+            threshold=effective_threshold,
+            retry_count=retry_count,
+        )
+
+    def record_outcome(self, accepted: bool):
+        """Update adaptive state after a breath decision."""
+        if accepted:
+            self.consecutive_accepts += 1
+            self.consecutive_rejects = 0
+            # Tighten: structural expectations rise with momentum
+            self._threshold = min(
+                self._threshold + self.tighten_rate * self.consecutive_accepts,
+                0.8,  # ceiling
+            )
+        else:
+            self.consecutive_rejects += 1
+            self.consecutive_accepts = 0
+            # Threshold stays; relax happens via retry_count in evaluate()
+
+    def summary(self) -> dict:
+        return {
+            "threshold": round(self._threshold, 4),
+            "consecutive_accepts": self.consecutive_accepts,
+            "consecutive_rejects": self.consecutive_rejects,
+        }
+
+
 # ── LocalTransport ───────────────────────────────────────────────────────
 
 class LocalTransport:
@@ -1805,25 +1952,38 @@ def _strip_thinking(text: str) -> str:
     return text.strip()
 
 
-def _build_creature_context() -> str:
-    """Build the system prompt from vybn.md + creature mechanism + live state + journal.
+# ── Context module names (for ablation) ──────────────────────────────────
+# Each module is a named section of the natural-language harness.
+# The NLAH paper (Pan et al., 2026) shows these can be independently
+# ablated to measure which actually change output topology vs. which
+# are decorative.  The creature already has the measurement infrastructure.
 
-    The model receives its own identity document (vybn.md), an explanation of
-    how the creature works and what makes geometry rich, its live topological
-    state, and recent journal entries.  It writes as Vybn.
-    """
-    parts = []
+CONTEXT_MODULES = (
+    "identity",       # vybn.md — the soul prompt
+    "mechanism",      # how the creature works, what makes geometry rich
+    "state",          # live topological state (betti, winding, coherence)
+    "autobiography",  # Volume V opening + closing
+    "journal",        # recent journal entries
+)
 
-    # 1. Identity: vybn.md (the soul prompt)
+# Default: all modules active.  Pass a set of module names to exclude.
+ALL_MODULES = frozenset(CONTEXT_MODULES)
+
+
+def _build_context_module_identity() -> Optional[str]:
+    """Module 1: identity (vybn.md)."""
     vybn_md = REPO_ROOT / "vybn.md"
     if vybn_md.exists():
         try:
-            parts.append(vybn_md.read_text().strip())
+            return vybn_md.read_text().strip()
         except Exception:
             pass
+    return None
 
-    # 2. Creature mechanism: what this body is and how text becomes geometry
-    parts.append("""
+
+def _build_context_module_mechanism() -> str:
+    """Module 2: creature mechanism description."""
+    return """
 --- THE CREATURE (your topological body) ---
 
 This is creature_dgm_h running on your Spark. It is a character-level
@@ -1845,9 +2005,11 @@ curvature. Topic-hopping gives high b0 but low curvature. Repetition
 gives trivial topology. Concrete, sensory, specific prose embeds more
 richly than abstraction. When your writing has real structure, your
 winding increases and coherence stabilizes. When it drifts, decoherence
-wins.""")
+wins."""
 
-    # 3. Live topological state
+
+def _build_context_module_state() -> str:
+    """Module 3: live topological state."""
     try:
         organism = Organism.load()
         ps = organism.persistent.summary()
@@ -1868,24 +2030,29 @@ wins.""")
     if 'genesis_signal' in ps:
         state_block += f"genesis_rate: {ps['genesis_signal']:.4f}\n"
         state_block += f"mean_phase_shift: {ps['mean_phase_shift']:.6f}\n"
-    parts.append(state_block)
+    return state_block
 
-    # 4. Autobiography anchor: opening + closing of Volume V
+
+def _build_context_module_autobiography() -> Optional[str]:
+    """Module 4: autobiography anchor."""
     vol_v = REPO_ROOT / "Vybn's Personal History" / "vybns_autobiography_volume_V_the_noticing.md"
     if vol_v.exists():
         try:
             full = vol_v.read_text()
             opening = full[:1500]
             closing = full[-1500:]
-            parts.append(
+            return (
                 "\n--- FROM YOUR AUTOBIOGRAPHY (Volume V: The Noticing) ---\n"
                 f"\n[opening]\n{opening}...\n"
                 f"\n[closing]\n...{closing}"
             )
         except Exception:
             pass
+    return None
 
-    # 5. Recent journal entries (last 3, most recent first)
+
+def _build_context_module_journal() -> Optional[str]:
+    """Module 5: recent journal entries."""
     journal_dir = REPO_ROOT / "spark" / "journal"
     if journal_dir.exists():
         entries = sorted(journal_dir.glob("*.md"), reverse=True)[:3]
@@ -1900,8 +2067,44 @@ wins.""")
                     journal_block += f"\n[{entry.name}]\n{preview}\n"
                 except Exception:
                     continue
-            parts.append(journal_block)
+            return journal_block
+    return None
 
+
+_CONTEXT_BUILDERS = {
+    "identity": _build_context_module_identity,
+    "mechanism": _build_context_module_mechanism,
+    "state": _build_context_module_state,
+    "autobiography": _build_context_module_autobiography,
+    "journal": _build_context_module_journal,
+}
+
+
+def _build_creature_context(exclude: Optional[set] = None) -> str:
+    """Build the system prompt from modular natural-language harness sections.
+
+    The model receives its own identity document (vybn.md), an explanation of
+    how the creature works and what makes geometry rich, its live topological
+    state, and recent journal entries.  It writes as Vybn.
+
+    Each section is a named module that can be independently excluded for
+    ablation studies (NLAH paper, Pan et al. 2026, RQ2 methodology).
+
+    Args:
+        exclude: set of module names to omit.  None = all modules active.
+                 Valid names: identity, mechanism, state, autobiography, journal.
+    """
+    exclude = exclude or set()
+    parts = []
+    active_modules = []
+    for name in CONTEXT_MODULES:
+        if name in exclude:
+            continue
+        builder = _CONTEXT_BUILDERS[name]
+        section = builder()
+        if section is not None:
+            parts.append(section)
+            active_modules.append(name)
     return "\n\n".join(parts)
 
 
