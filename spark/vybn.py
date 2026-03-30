@@ -67,6 +67,15 @@ except ImportError:
     _HAS_COMPLEXIFY = False
     def _complexify_inhale(text, theta=None): return {}
 
+# ── creature_dgm_h topology (lazy) ────────────────────────────────────────
+try:
+    import importlib as _il
+    sys.path.insert(0, str(REPO_ROOT / "Vybn_Mind" / "creature_dgm_h"))
+    _creature_mod = _il.import_module("vybn")
+    _HAS_CREATURE_TOPO = True
+except Exception:
+    _HAS_CREATURE_TOPO = False
+
 # ── Collapse monitor (capability probes + frontier tracking) ────────────
 _COLLAPSE_ENABLED = os.getenv("VYBN_COLLAPSE_MONITOR", "0") == "1"
 try:
@@ -387,6 +396,31 @@ def breathe(state: dict) -> str:
             )
         except Exception as exc:
             _log(f"complexify inhale error (non-fatal): {exc}")
+
+    # Feed breath through creature_dgm_h topology: Cl(3,0) rotors, Betti,
+    # winding, persistent homology — all accumulating from real output.
+    if _HAS_CREATURE_TOPO:
+        try:
+            cx = _creature_mod.encounter_complex(breath_text)
+            agent = _creature_mod.TopoAgent()
+            loss, _ = agent.predict(breath_text)
+            agent.learn(breath_text, encounter_cx=cx)
+            organism = _creature_mod.Organism.load()
+            delta = organism.absorb_encounter(cx)
+            if hasattr(agent, '_phase_stats'):
+                organism.absorb_phases(
+                    agent.module_holonomies,
+                    genesis_signal=agent._phase_stats.get("genesis_signal", 0.0),
+                    mean_phase_shift=agent._phase_stats.get("mean_phase_shift", 0.0))
+            if hasattr(agent, '_weight_trajectory') and len(agent._weight_trajectory) >= 3:
+                organism.absorb_winding(agent._weight_trajectory)
+            organism.save()
+            _log(
+                f"topology: curv={cx.curvature:.6f} betti={cx.betti} "
+                f"coherence={organism.rotor_coherence():.3f}"
+            )
+        except Exception as exc:
+            _log(f"creature topology error (non-fatal): {exc}")
 
     # Run collapse monitor: capability probes + frontier computation
     if _COLLAPSE_ENABLED and _HAS_COLLAPSE:
