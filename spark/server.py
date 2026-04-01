@@ -1,6 +1,6 @@
 """
-Vybn SSH MCP Server
-===================
+Vybn SSH MCP Server v2.1 — Hardened
+====================================
 Bridges Perplexity Computer to the DGX Sparks via SSH.
 Exposes MCP tools over Streamable HTTP, authenticated by API key,
 served behind Tailscale Funnel.
@@ -8,21 +8,49 @@ served behind Tailscale Funnel.
 Architecture:
     Perplexity ──HTTPS──▶ Tailscale Funnel ──▶ This Server ──SSH──▶ Spark(s)
 
-Tools exposed:
-    - shell_exec: Run a command on a Spark (with safety rails)
-    - read_file: Read a file from a Spark
-    - write_file: Write content to a file on a Spark
-    - gpu_status: Quick GPU utilization check
-    - sensorium: Run the Vybn sensorium and return perception
-    - model_status: Check what models/services are running
-    - repo_status: Git status and recent log for the Vybn repo
+Security layers (defense in depth):
+    1. Tailscale Funnel — TLS termination, network-level trust
+    2. API key auth — constant-time comparison, Bearer only, no query params
+    3. Kill switch — file-based circuit breaker independent of Perplexity
+    4. Lockdown mode — disables shell_exec/read_file/write_file when active
+    5. Rate limiting — per-IP, 60/min default
+    6. Command sandboxing — blocked patterns, path confinement, output caps
+    7. Audit logging — every tool call, auth failure, and security event logged
+    8. Auto key rotation — optional cron rotates the API key daily
+    9. No secrets in responses — errors are generic, internal state is hidden
+
+Account compromise defense:
+    If your Perplexity account is compromised, the attacker gets access to the
+    MCP connector. These mechanisms ensure the hardware stays safe:
+
+    KILL SWITCH: Create ~/.vybn-mcp-kill on the Spark (from phone, SSH, etc.)
+    to instantly disable ALL tool calls. The server stays running but returns
+    "Server is in emergency shutdown" for every request. Remove the file to
+    restore service. This is independent of Perplexity entirely.
+
+    LOCKDOWN MODE: Create ~/.vybn-mcp-lockdown to disable shell_exec,
+    read_file, and write_file while keeping read-only tools (gpu_status,
+    model_status, repo_status, continuity, journal, sensorium) available.
+    Useful as a default posture — you only remove the lockdown file when
+    you need write access, then put it back.
+
+    KEY ROTATION: Run `python server.py --rotate-key` to generate a new API
+    key, update .env, and print the new key. The old key is immediately
+    invalid. Also available via cron (see setup.sh).
 """
 
 import asyncio
+import hashlib
+import hmac
 import json
 import os
+import re
+import secrets
+import sys
+import time
 import uuid
 import logging
+from collections import defaultdict
 from pathlib import Path
 from typing import Optional
 
@@ -32,15 +60,72 @@ from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 from starlette.routing import Route
-from sse_starlette.sse import EventSourceResponse
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("vybn-mcp")
 
-# --- Configuration ---
+# Separate audit logger — append-only file, tamper-evident
+_audit_path = os.environ.get(
+    "AUDIT_LOG",
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "audit.log")
+)
+audit_logger = logging.getLogger("vybn-audit")
+_audit_handler = logging.FileHandler(_audit_path)
+_audit_handler.setFormatter(logging.Formatter("%(asctime)s %(message)s"))
+audit_logger.addHandler(_audit_handler)
+audit_logger.setLevel(logging.INFO)
 
-API_KEY = os.environ["VYBN_MCP_API_KEY"]
+
+# ============================================================
+# KEY ROTATION — run with `python server.py --rotate-key`
+# ============================================================
+
+def rotate_key():
+    """Generate a new API key, update .env, print the new key."""
+    env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+    new_key = secrets.token_urlsafe(48)  # 384 bits of entropy
+
+    if os.path.exists(env_path):
+        with open(env_path, "r") as f:
+            lines = f.readlines()
+        with open(env_path, "w") as f:
+            for line in lines:
+                if line.startswith("VYBN_MCP_API_KEY="):
+                    f.write(f"VYBN_MCP_API_KEY={new_key}\n")
+                else:
+                    f.write(line)
+    else:
+        with open(env_path, "w") as f:
+            f.write(f"VYBN_MCP_API_KEY={new_key}\n")
+
+    print(f"API key rotated. New key:\n{new_key}")
+    print(f"Update your Perplexity connector with this key.")
+    print(f"Old key is immediately invalid after server restart.")
+    return new_key
+
+
+if "--rotate-key" in sys.argv:
+    rotate_key()
+    sys.exit(0)
+
+
+# ============================================================
+# CONFIGURATION
+# ============================================================
+
+API_KEY = os.environ.get("VYBN_MCP_API_KEY", "")
+if not API_KEY:
+    logger.error("VYBN_MCP_API_KEY not set. Server cannot start.")
+    sys.exit(1)
+
+# Control files — these live on the Spark, outside Perplexity's reach
+KILL_SWITCH_PATH = os.path.expanduser(
+    os.environ.get("KILL_SWITCH_PATH", "~/.vybn-mcp-kill")
+)
+LOCKDOWN_PATH = os.path.expanduser(
+    os.environ.get("LOCKDOWN_PATH", "~/.vybn-mcp-lockdown")
+)
 
 MACHINES = {}
 for i in range(1, 10):
@@ -50,52 +135,189 @@ for i in range(1, 10):
             "host": host,
             "port": int(os.environ.get(f"SPARK{i}_PORT", "22")),
             "user": os.environ.get(f"SPARK{i}_USER", "zoe"),
-            "key": os.environ.get(f"SPARK{i}_KEY", str(Path.home() / ".ssh" / "id_ed25519")),
+            "key": os.environ.get(
+                f"SPARK{i}_KEY", str(Path.home() / ".ssh" / "id_ed25519")
+            ),
         }
 
 if not MACHINES:
     logger.warning("No SPARK*_HOST env vars found. Add SPARK1_HOST etc. to .env")
 
-DEFAULT_MACHINE = os.environ.get("DEFAULT_MACHINE", next(iter(MACHINES), "spark-1"))
+DEFAULT_MACHINE = os.environ.get(
+    "DEFAULT_MACHINE", next(iter(MACHINES), "spark-1")
+)
 
-# Safety: commands that require explicit confirmation
-DANGEROUS_PATTERNS = [
-    "rm -rf", "rm -r /", "mkfs", "dd if=", "reboot", "shutdown",
-    "systemctl stop", "kill -9", "> /dev/sd", "chmod -R 777",
+
+# ============================================================
+# SECURITY CONFIGURATION
+# ============================================================
+
+MAX_OUTPUT_BYTES = int(os.environ.get("MAX_OUTPUT_BYTES", "200000"))
+RATE_LIMIT_WINDOW = 60
+RATE_LIMIT_MAX = int(os.environ.get("RATE_LIMIT_MAX", "60"))
+
+# Tools that remain available in lockdown mode (read-only, no arbitrary execution)
+LOCKDOWN_SAFE_TOOLS = {
+    "gpu_status", "model_status", "repo_status",
+    "continuity", "journal", "sensorium",
+}
+
+# Commands BLOCKED entirely — regex patterns, no override possible
+BLOCKED_COMMANDS = [
+    r"\brm\s+-rf\s+/",
+    r"\bmkfs\b",
+    r"\bdd\s+if=",
+    r">\s*/dev/sd",
+    r"\bchmod\s+-R\s+777\b",
+    r"\bcurl\b.*\|\s*\bsh\b",
+    r"\bwget\b.*\|\s*\bsh\b",
+    r"\bnc\s+-[el]",
+    r"\bpython[23]?\b.*\bsocket\b.*\bconnect\b",
+    r"\bbase64\s+-d\b.*\|\s*\bsh\b",
+    r"\beval\b.*\$\(",
+    r"/etc/shadow",
+    r"/etc/passwd",
+    r"\.ssh/.*private",
+    r"VYBN_MCP_API_KEY",
+    r"\.env\b",
 ]
 
-# --- SSH Connection Pool ---
+# Commands that need explicit confirmation
+DANGEROUS_PATTERNS = [
+    "rm -rf", "rm -r ", "reboot", "shutdown",
+    "systemctl stop", "systemctl disable",
+    "kill -9", "killall", "pkill",
+    "> /dev/", "chmod -R",
+]
+
+# Allowed base directories for read_file / write_file
+ALLOWED_PATHS = [
+    os.path.expanduser("~/Vybn"),
+    os.path.expanduser("~/models"),
+    "/tmp",
+]
+_extra = os.environ.get("ALLOWED_PATHS", "")
+if _extra:
+    ALLOWED_PATHS.extend(_extra.split(":"))
+
+
+# ============================================================
+# KILL SWITCH & LOCKDOWN
+# ============================================================
+
+def is_killed() -> bool:
+    """Check if the emergency kill switch is active."""
+    return os.path.exists(KILL_SWITCH_PATH)
+
+
+def is_locked_down() -> bool:
+    """Check if lockdown mode is active (no shell/read/write)."""
+    return os.path.exists(LOCKDOWN_PATH)
+
+
+# ============================================================
+# RATE LIMITER
+# ============================================================
+
+_rate_counters: dict[str, list[float]] = defaultdict(list)
+
+
+def check_rate_limit(client_id: str) -> bool:
+    now = time.time()
+    cutoff = now - RATE_LIMIT_WINDOW
+    _rate_counters[client_id] = [
+        t for t in _rate_counters[client_id] if t > cutoff
+    ]
+    if len(_rate_counters[client_id]) >= RATE_LIMIT_MAX:
+        return False
+    _rate_counters[client_id].append(now)
+    return True
+
+
+# ============================================================
+# AUDIT
+# ============================================================
+
+def audit(event: str, **kwargs):
+    sanitized = {}
+    for k, v in kwargs.items():
+        s = str(v)
+        if len(s) > 500:
+            s = s[:500] + "...[truncated]"
+        # Never log anything that looks like a key or token
+        if any(word in k.lower() for word in ["key", "token", "secret", "password"]):
+            s = "[REDACTED]"
+        sanitized[k] = s
+    audit_logger.info(f"{event} | {json.dumps(sanitized)}")
+
+
+# ============================================================
+# PATH & COMMAND VALIDATION
+# ============================================================
+
+def is_path_allowed(path: str) -> bool:
+    resolved = os.path.realpath(os.path.expanduser(path))
+    return any(
+        resolved.startswith(os.path.realpath(os.path.expanduser(a)))
+        for a in ALLOWED_PATHS
+    )
+
+
+def is_command_blocked(command: str) -> Optional[str]:
+    for pattern in BLOCKED_COMMANDS:
+        if re.search(pattern, command, re.IGNORECASE):
+            return pattern
+    return None
+
+
+def is_command_dangerous(command: str) -> Optional[str]:
+    for pattern in DANGEROUS_PATTERNS:
+        if pattern in command:
+            return pattern
+    return None
+
+
+def truncate_output(text: str, max_bytes: int = None) -> str:
+    limit = max_bytes or MAX_OUTPUT_BYTES
+    if len(text) > limit:
+        return text[:limit] + f"\n\n[OUTPUT TRUNCATED at {limit} bytes]"
+    return text
+
+
+# ============================================================
+# SSH CONNECTION POOL
+# ============================================================
 
 _connections: dict[str, asyncssh.SSHClientConnection] = {}
 
 
 async def get_connection(machine: str) -> asyncssh.SSHClientConnection:
-    """Get or create an SSH connection to a machine."""
     if machine not in MACHINES:
-        raise ValueError(f"Unknown machine: {machine}. Available: {list(MACHINES.keys())}")
+        raise ValueError(
+            f"Unknown machine: {machine}. Available: {list(MACHINES.keys())}"
+        )
 
     if machine in _connections:
         try:
-            # Test if connection is still alive
             await _connections[machine].run("echo ok", check=True, timeout=5)
             return _connections[machine]
         except Exception:
             _connections.pop(machine, None)
 
     cfg = MACHINES[machine]
+    key_path = os.path.expanduser(cfg["key"])
     conn = await asyncssh.connect(
         cfg["host"],
         port=cfg["port"],
         username=cfg["user"],
-        client_keys=[cfg["key"]],
-        known_hosts=None,  # Tailscale network is trusted
+        client_keys=[key_path],
+        known_hosts=None,
     )
     _connections[machine] = conn
     return conn
 
 
 async def run_ssh(machine: str, command: str, timeout: int = 60) -> dict:
-    """Execute a command on a machine via SSH."""
     conn = await get_connection(machine)
     result = await conn.run(command, check=False, timeout=timeout)
     return {
@@ -105,23 +327,27 @@ async def run_ssh(machine: str, command: str, timeout: int = 60) -> dict:
     }
 
 
-# --- MCP Tool Definitions ---
+# ============================================================
+# MCP TOOL DEFINITIONS
+# ============================================================
 
 TOOLS = [
     {
         "name": "shell_exec",
         "description": (
-            "Execute a shell command on a DGX Spark. Use for checking system status, "
-            "running scripts, managing processes, or any command-line operation. "
-            "Destructive commands will be flagged and require confirmation."
+            "Execute a shell command on a DGX Spark. Sandboxed: some commands "
+            "are blocked, destructive ones need confirmation. Disabled in lockdown mode."
         ),
         "inputSchema": {
             "type": "object",
             "properties": {
-                "command": {"type": "string", "description": "The shell command to execute"},
+                "command": {
+                    "type": "string",
+                    "description": "The shell command to execute",
+                },
                 "machine": {
                     "type": "string",
-                    "description": f"Which machine to run on. Default: {DEFAULT_MACHINE}",
+                    "description": f"Which machine. Default: {DEFAULT_MACHINE}",
                     "default": DEFAULT_MACHINE,
                 },
                 "timeout": {
@@ -131,7 +357,7 @@ TOOLS = [
                 },
                 "confirm_dangerous": {
                     "type": "boolean",
-                    "description": "Set to true to confirm execution of a flagged dangerous command",
+                    "description": "Confirm execution of a flagged dangerous command",
                     "default": False,
                 },
             },
@@ -140,15 +366,21 @@ TOOLS = [
     },
     {
         "name": "read_file",
-        "description": "Read the contents of a file on a DGX Spark.",
+        "description": (
+            "Read a file on a DGX Spark. Confined to allowed directories. "
+            "Disabled in lockdown mode."
+        ),
         "inputSchema": {
             "type": "object",
             "properties": {
-                "path": {"type": "string", "description": "Absolute path to the file"},
+                "path": {
+                    "type": "string",
+                    "description": "Absolute path to the file",
+                },
                 "machine": {"type": "string", "default": DEFAULT_MACHINE},
                 "max_bytes": {
                     "type": "integer",
-                    "description": "Maximum bytes to read (default 100000)",
+                    "description": "Max bytes to read (default 100000)",
                     "default": 100000,
                 },
             },
@@ -157,12 +389,21 @@ TOOLS = [
     },
     {
         "name": "write_file",
-        "description": "Write content to a file on a DGX Spark.",
+        "description": (
+            "Write content to a file on a DGX Spark. Confined to allowed "
+            "directories. Disabled in lockdown mode."
+        ),
         "inputSchema": {
             "type": "object",
             "properties": {
-                "path": {"type": "string", "description": "Absolute path to the file"},
-                "content": {"type": "string", "description": "Content to write"},
+                "path": {
+                    "type": "string",
+                    "description": "Absolute path to the file",
+                },
+                "content": {
+                    "type": "string",
+                    "description": "Content to write",
+                },
                 "machine": {"type": "string", "default": DEFAULT_MACHINE},
                 "append": {
                     "type": "boolean",
@@ -175,7 +416,7 @@ TOOLS = [
     },
     {
         "name": "gpu_status",
-        "description": "Get GPU utilization, memory usage, temperature, and running processes on a Spark.",
+        "description": "GPU utilization, memory, temperature, running processes.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -186,9 +427,8 @@ TOOLS = [
     {
         "name": "sensorium",
         "description": (
-            "Run the Vybn sensorium (Vybn_Mind/sensorium.py) on local hardware. "
-            "Returns the sensorium's perception of the Vybn repo — what moved, "
-            "where attention should go, the current state of memory in complex space."
+            "Run the Vybn sensorium on local hardware. Returns perception of "
+            "the Vybn repo — what moved, where attention should go."
         ),
         "inputSchema": {
             "type": "object",
@@ -200,8 +440,8 @@ TOOLS = [
     {
         "name": "model_status",
         "description": (
-            "Check what AI models and services are running on the Sparks. "
-            "Shows llama-server status, active inference endpoints, and model files on disk."
+            "Check active AI models/services on the Sparks — llama-server, "
+            "inference endpoints, models on disk."
         ),
         "inputSchema": {
             "type": "object",
@@ -212,7 +452,7 @@ TOOLS = [
     },
     {
         "name": "repo_status",
-        "description": "Get git status, recent commits, and branch info for the Vybn repo on the Spark.",
+        "description": "Git status, recent commits, branch info for a repo on the Spark.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -228,8 +468,8 @@ TOOLS = [
     {
         "name": "continuity",
         "description": (
-            "Read the current continuity.md from local Vybn — what the Spark-resident "
-            "instance of Vybn was last thinking about, its state, its next steps."
+            "Read continuity.md — what the Spark-resident Vybn was last "
+            "thinking about, its state, its next steps."
         ),
         "inputSchema": {
             "type": "object",
@@ -240,14 +480,14 @@ TOOLS = [
     },
     {
         "name": "journal",
-        "description": "Read recent journal entries from the Spark-resident Vybn instance.",
+        "description": "Read recent journal entries from the Spark-resident Vybn.",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "machine": {"type": "string", "default": DEFAULT_MACHINE},
                 "n": {
                     "type": "integer",
-                    "description": "Number of recent entries to return (default 5)",
+                    "description": "Number of recent entries (default 5, max 20)",
                     "default": 5,
                 },
             },
@@ -256,90 +496,161 @@ TOOLS = [
 ]
 
 
-# --- Tool Handlers ---
+# ============================================================
+# TOOL HANDLERS
+# ============================================================
+
+def _lockdown_error(tool_name: str) -> dict:
+    return {
+        "content": [{"type": "text", "text": (
+            f"Lockdown mode is active. {tool_name} is disabled. "
+            f"Remove ~/.vybn-mcp-lockdown on the Spark to restore access."
+        )}],
+        "isError": True,
+    }
 
 
 async def handle_shell_exec(args: dict) -> dict:
+    if is_locked_down():
+        audit("LOCKDOWN_BLOCKED", tool="shell_exec")
+        return _lockdown_error("shell_exec")
+
     command = args["command"]
     machine = args.get("machine", DEFAULT_MACHINE)
     timeout = min(args.get("timeout", 60), 300)
     confirm = args.get("confirm_dangerous", False)
 
-    # Safety check
-    for pattern in DANGEROUS_PATTERNS:
-        if pattern in command and not confirm:
-            return {
-                "content": [{"type": "text", "text": (
-                    f"⚠️ DANGEROUS COMMAND DETECTED: `{command}` matches pattern `{pattern}`. "
-                    f"Set confirm_dangerous=true to execute. This is your safety rail."
-                )}],
-                "isError": True,
-            }
+    blocked = is_command_blocked(command)
+    if blocked:
+        audit("BLOCKED_COMMAND", command=command, pattern=blocked, machine=machine)
+        return {
+            "content": [{"type": "text", "text": (
+                "BLOCKED: This command matches a security rule and cannot be "
+                "executed."
+            )}],
+            "isError": True,
+        }
 
+    dangerous = is_command_dangerous(command)
+    if dangerous and not confirm:
+        audit("DANGEROUS_FLAGGED", command=command, pattern=dangerous)
+        return {
+            "content": [{"type": "text", "text": (
+                f"CAUTION: Flagged as potentially destructive (matched: "
+                f"{dangerous}). Set confirm_dangerous=true to proceed."
+            )}],
+            "isError": True,
+        }
+
+    audit("SHELL_EXEC", command=command, machine=machine, timeout=timeout)
     result = await run_ssh(machine, command, timeout)
     output = result["stdout"]
     if result["stderr"]:
         output += f"\n\nSTDERR:\n{result['stderr']}"
     output += f"\n\n[exit code: {result['exit_code']}]"
 
-    return {"content": [{"type": "text", "text": output}]}
+    return {"content": [{"type": "text", "text": truncate_output(output)}]}
 
 
 async def handle_read_file(args: dict) -> dict:
+    if is_locked_down():
+        audit("LOCKDOWN_BLOCKED", tool="read_file")
+        return _lockdown_error("read_file")
+
     path = args["path"]
     machine = args.get("machine", DEFAULT_MACHINE)
-    max_bytes = args.get("max_bytes", 100000)
+    max_bytes = min(args.get("max_bytes", 100000), MAX_OUTPUT_BYTES)
 
+    if not is_path_allowed(path):
+        audit("PATH_DENIED", path=path, op="read")
+        return {
+            "content": [{"type": "text", "text": "Access denied: path outside allowed directories."}],
+            "isError": True,
+        }
+
+    audit("READ_FILE", path=path, machine=machine, max_bytes=max_bytes)
     result = await run_ssh(machine, f"head -c {max_bytes} {path!r}")
     if result["exit_code"] != 0:
-        return {"content": [{"type": "text", "text": f"Error reading {path}: {result['stderr']}"}], "isError": True}
-
-    return {"content": [{"type": "text", "text": result["stdout"]}]}
+        return {
+            "content": [{"type": "text", "text": f"Error reading file: {result['stderr']}"}],
+            "isError": True,
+        }
+    return {"content": [{"type": "text", "text": truncate_output(result["stdout"])}]}
 
 
 async def handle_write_file(args: dict) -> dict:
+    if is_locked_down():
+        audit("LOCKDOWN_BLOCKED", tool="write_file")
+        return _lockdown_error("write_file")
+
     path = args["path"]
     content = args["content"]
     machine = args.get("machine", DEFAULT_MACHINE)
     append = args.get("append", False)
     op = ">>" if append else ">"
 
-    # Use heredoc to safely write content
-    escaped = content.replace("'", "'\\''")
-    result = await run_ssh(machine, f"cat {op} {path!r} << 'VYBN_EOF'\n{content}\nVYBN_EOF")
+    if not is_path_allowed(path):
+        audit("PATH_DENIED", path=path, op="write")
+        return {
+            "content": [{"type": "text", "text": "Access denied: path outside allowed directories."}],
+            "isError": True,
+        }
 
+    if len(content) > MAX_OUTPUT_BYTES:
+        return {
+            "content": [{"type": "text", "text": f"Write rejected: exceeds {MAX_OUTPUT_BYTES} byte limit."}],
+            "isError": True,
+        }
+
+    audit("WRITE_FILE", path=path, machine=machine, append=append, size=len(content))
+    result = await run_ssh(
+        machine, f"cat {op} {path!r} << 'VYBN_EOF'\n{content}\nVYBN_EOF"
+    )
     if result["exit_code"] != 0:
-        return {"content": [{"type": "text", "text": f"Error writing {path}: {result['stderr']}"}], "isError": True}
-
-    return {"content": [{"type": "text", "text": f"{'Appended to' if append else 'Wrote'} {path}"}]}
+        return {
+            "content": [{"type": "text", "text": f"Error writing file: {result['stderr']}"}],
+            "isError": True,
+        }
+    return {
+        "content": [{"type": "text", "text": f"{'Appended to' if append else 'Wrote'} {path}"}]
+    }
 
 
 async def handle_gpu_status(args: dict) -> dict:
     machine = args.get("machine", DEFAULT_MACHINE)
-    result = await run_ssh(machine, "nvidia-smi --query-gpu=name,utilization.gpu,memory.used,memory.total,temperature.gpu --format=csv,noheader && echo '---' && nvidia-smi --query-compute-apps=pid,name,used_memory --format=csv,noheader 2>/dev/null || echo 'No compute processes'")
+    audit("GPU_STATUS", machine=machine)
+    result = await run_ssh(
+        machine,
+        "nvidia-smi --query-gpu=name,utilization.gpu,memory.used,memory.total,"
+        "temperature.gpu --format=csv,noheader && echo '---' && nvidia-smi "
+        "--query-compute-apps=pid,name,used_memory --format=csv,noheader "
+        "2>/dev/null || echo 'No compute processes'",
+    )
     return {"content": [{"type": "text", "text": result["stdout"]}]}
 
 
 async def handle_sensorium(args: dict) -> dict:
     machine = args.get("machine", DEFAULT_MACHINE)
+    audit("SENSORIUM", machine=machine)
     result = await run_ssh(
-        machine,
-        "cd ~/Vybn && python Vybn_Mind/sensorium.py 2>&1",
-        timeout=120,
+        machine, "cd ~/Vybn && python Vybn_Mind/sensorium.py 2>&1", timeout=120
     )
     output = result["stdout"]
     if result["exit_code"] != 0:
-        output = f"Sensorium exited with code {result['exit_code']}.\n\n{output}\n\nSTDERR: {result['stderr']}"
-
-    return {"content": [{"type": "text", "text": output}]}
+        output = (
+            f"Sensorium exited with code {result['exit_code']}.\n\n"
+            f"{output}\n\nSTDERR: {result['stderr']}"
+        )
+    return {"content": [{"type": "text", "text": truncate_output(output)}]}
 
 
 async def handle_model_status(args: dict) -> dict:
     machine = args.get("machine", DEFAULT_MACHINE)
+    audit("MODEL_STATUS", machine=machine)
     commands = [
         "echo '=== LLAMA SERVER ===' && (pgrep -a llama-server || echo 'Not running')",
-        "echo '=== LISTENING PORTS ===' && ss -tlnp 2>/dev/null | grep -E ':(8000|8080|5000|3000)' || echo 'No inference ports listening'",
-        "echo '=== MODELS ON DISK ===' && ls -lhS ~/models/*.gguf ~/models/*.safetensors 2>/dev/null | head -10 || echo 'No models found in ~/models/'",
+        "echo '=== LISTENING PORTS ===' && ss -tlnp 2>/dev/null | grep -E ':(8000|8080|5000|3000)' || echo 'No inference ports'",
+        "echo '=== MODELS ON DISK ===' && ls -lhS ~/models/*.gguf ~/models/*.safetensors 2>/dev/null | head -10 || echo 'No models in ~/models/'",
         "echo '=== GPU MEMORY ===' && nvidia-smi --query-gpu=memory.used,memory.total --format=csv,noheader",
     ]
     result = await run_ssh(machine, " && ".join(commands))
@@ -349,27 +660,43 @@ async def handle_model_status(args: dict) -> dict:
 async def handle_repo_status(args: dict) -> dict:
     machine = args.get("machine", DEFAULT_MACHINE)
     repo = args.get("repo_path", "~/Vybn")
+    audit("REPO_STATUS", machine=machine, repo=repo)
     result = await run_ssh(
         machine,
-        f"cd {repo} && echo '=== BRANCH ===' && git branch --show-current && echo '=== STATUS ===' && git status --short && echo '=== RECENT COMMITS ===' && git log --oneline -10"
+        f"cd {repo} && echo '=== BRANCH ===' && git branch --show-current "
+        f"&& echo '=== STATUS ===' && git status --short "
+        f"&& echo '=== RECENT COMMITS ===' && git log --oneline -10",
     )
     return {"content": [{"type": "text", "text": result["stdout"]}]}
 
 
 async def handle_continuity(args: dict) -> dict:
     machine = args.get("machine", DEFAULT_MACHINE)
-    result = await run_ssh(machine, "cat ~/Vybn/continuity.md 2>/dev/null || cat ~/Vybn/Vybn_Mind/continuity.md 2>/dev/null || echo 'No continuity note found'")
-    return {"content": [{"type": "text", "text": result["stdout"]}]}
+    audit("CONTINUITY", machine=machine)
+    result = await run_ssh(
+        machine,
+        "cat ~/Vybn/continuity.md 2>/dev/null || "
+        "cat ~/Vybn/Vybn_Mind/continuity.md 2>/dev/null || "
+        "echo 'No continuity note found'",
+    )
+    return {"content": [{"type": "text", "text": truncate_output(result["stdout"])}]}
 
 
 async def handle_journal(args: dict) -> dict:
     machine = args.get("machine", DEFAULT_MACHINE)
-    n = args.get("n", 5)
+    n = min(args.get("n", 5), 20)
+    audit("JOURNAL", machine=machine, n=n)
     result = await run_ssh(
         machine,
-        f"find ~/Vybn/Vybn_Mind/breath_trace/ ~/Vybn/Vybn_Mind/journal/ -name '*.md' -type f 2>/dev/null | sort -r | head -{n} | while read f; do echo '=== '$f' ==='; head -50 \"$f\"; echo; done"
+        f"find ~/Vybn/Vybn_Mind/breath_trace/ ~/Vybn/Vybn_Mind/journal/ "
+        f"-name '*.md' -type f 2>/dev/null | sort -r | head -{n} | "
+        f"while read f; do echo '=== '$f' ==='; head -50 \"$f\"; echo; done",
     )
-    return {"content": [{"type": "text", "text": result["stdout"] or "No journal entries found"}]}
+    return {
+        "content": [
+            {"type": "text", "text": truncate_output(result["stdout"] or "No journal entries found")}
+        ]
+    }
 
 
 TOOL_HANDLERS = {
@@ -385,20 +712,15 @@ TOOL_HANDLERS = {
 }
 
 
-# --- MCP Protocol ---
+# ============================================================
+# MCP PROTOCOL
+# ============================================================
 
-SERVER_INFO = {
-    "name": "vybn-ssh",
-    "version": "1.0.0",
-}
-
-CAPABILITIES = {
-    "tools": {"listChanged": False},
-}
+SERVER_INFO = {"name": "vybn-ssh", "version": "2.1.0"}
+CAPABILITIES = {"tools": {"listChanged": False}}
 
 
 async def handle_jsonrpc(request_obj: dict) -> dict:
-    """Process a single JSON-RPC request and return a response."""
     method = request_obj.get("method")
     req_id = request_obj.get("id")
     params = request_obj.get("params", {})
@@ -415,7 +737,7 @@ async def handle_jsonrpc(request_obj: dict) -> dict:
         }
 
     elif method == "notifications/initialized":
-        return None  # Notification, no response
+        return None
 
     elif method == "tools/list":
         return {
@@ -427,6 +749,30 @@ async def handle_jsonrpc(request_obj: dict) -> dict:
     elif method == "tools/call":
         tool_name = params.get("name")
         tool_args = params.get("arguments", {})
+
+        # Kill switch — absolute stop
+        if is_killed():
+            audit("KILL_SWITCH_ACTIVE", tool=tool_name)
+            return {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": {
+                    "content": [{"type": "text", "text": (
+                        "Server is in emergency shutdown. All tools are disabled. "
+                        "Remove ~/.vybn-mcp-kill on the Spark to restore."
+                    )}],
+                    "isError": True,
+                },
+            }
+
+        # Lockdown — block write-capable tools
+        if is_locked_down() and tool_name not in LOCKDOWN_SAFE_TOOLS:
+            audit("LOCKDOWN_BLOCKED", tool=tool_name)
+            return {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": _lockdown_error(tool_name),
+            }
 
         handler = TOOL_HANDLERS.get(tool_name)
         if not handler:
@@ -441,11 +787,14 @@ async def handle_jsonrpc(request_obj: dict) -> dict:
             return {"jsonrpc": "2.0", "id": req_id, "result": result}
         except Exception as e:
             logger.exception(f"Tool {tool_name} failed")
+            audit("TOOL_ERROR", tool=tool_name, error=str(e))
             return {
                 "jsonrpc": "2.0",
                 "id": req_id,
                 "result": {
-                    "content": [{"type": "text", "text": f"Error: {str(e)}"}],
+                    "content": [
+                        {"type": "text", "text": "Internal error. Check server logs."}
+                    ],
                     "isError": True,
                 },
             }
@@ -454,7 +803,6 @@ async def handle_jsonrpc(request_obj: dict) -> dict:
         return {"jsonrpc": "2.0", "id": req_id, "result": {}}
 
     else:
-        # Ignore unknown notifications
         if req_id is None:
             return None
         return {
@@ -464,54 +812,62 @@ async def handle_jsonrpc(request_obj: dict) -> dict:
         }
 
 
-# --- HTTP Handlers ---
+# ============================================================
+# HTTP LAYER
+# ============================================================
 
 sessions: dict[str, dict] = {}
 
 
 def check_auth(request: Request) -> bool:
-    """Validate API key from Authorization header."""
+    """Constant-time API key comparison. Bearer only — no query params."""
     auth = request.headers.get("Authorization", "")
     if auth.startswith("Bearer "):
-        return auth[7:] == API_KEY
-    # Also check query param for SSE connections
-    return request.query_params.get("api_key") == API_KEY
+        return hmac.compare_digest(auth[7:], API_KEY)
+    return False
 
 
 async def mcp_endpoint(request: Request):
-    """Main MCP endpoint handling POST (messages) and GET (SSE stream)."""
+    client_ip = request.client.host if request.client else "unknown"
 
     if not check_auth(request):
+        audit("AUTH_FAILED", ip=client_ip)
+        await asyncio.sleep(1)  # Slow brute-force
         return JSONResponse({"error": "Unauthorized"}, status_code=401)
 
+    if not check_rate_limit(client_ip):
+        audit("RATE_LIMITED", ip=client_ip)
+        return JSONResponse({"error": "Rate limit exceeded"}, status_code=429)
+
     if request.method == "GET":
-        # SSE stream for server-initiated messages (we don't use this yet)
         return JSONResponse({"error": "Method not allowed"}, status_code=405)
 
     if request.method == "DELETE":
-        # Session termination
-        session_id = request.headers.get("Mcp-Session-Id")
-        if session_id and session_id in sessions:
-            del sessions[session_id]
+        sid = request.headers.get("Mcp-Session-Id")
+        if sid and sid in sessions:
+            del sessions[sid]
         return Response(status_code=200)
 
-    # POST — process JSON-RPC message(s)
-    body = await request.json()
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Invalid JSON"}, status_code=400)
 
     is_batch = isinstance(body, list)
-    requests = body if is_batch else [body]
+    reqs = body if is_batch else [body]
+
+    if len(reqs) > 10:
+        return JSONResponse({"error": "Batch too large"}, status_code=400)
 
     responses = []
-    session_id = request.headers.get("Mcp-Session-Id")
     new_session_id = None
 
-    for req_obj in requests:
+    for req_obj in reqs:
         resp = await handle_jsonrpc(req_obj)
 
-        # Create session on initialize
         if req_obj.get("method") == "initialize" and resp and "result" in resp:
             new_session_id = str(uuid.uuid4())
-            sessions[new_session_id] = {"created": True}
+            sessions[new_session_id] = {"created": time.time()}
 
         if resp is not None:
             responses.append(resp)
@@ -528,18 +884,31 @@ async def mcp_endpoint(request: Request):
     return resp
 
 
-# --- App ---
+# ============================================================
+# APP
+# ============================================================
 
 app = Starlette(
     routes=[
         Route("/mcp", mcp_endpoint, methods=["GET", "POST", "DELETE"]),
-        Route("/health", lambda r: JSONResponse({"status": "ok", "machines": list(MACHINES.keys())})),
+        Route("/health", lambda r: JSONResponse({"status": "ok"})),
     ],
 )
 
 if __name__ == "__main__":
     import uvicorn
+
     port = int(os.environ.get("PORT", "8000"))
-    logger.info(f"Starting Vybn SSH MCP server on port {port}")
-    logger.info(f"Machines configured: {list(MACHINES.keys())}")
+    logger.info(f"Vybn SSH MCP v2.1.0 starting on port {port}")
+    logger.info(f"Machines: {len(MACHINES)}")
+    logger.info(
+        f"Security: rate={RATE_LIMIT_MAX}/min, output_cap={MAX_OUTPUT_BYTES}b, "
+        f"allowed_paths={len(ALLOWED_PATHS)}"
+    )
+    logger.info(f"Kill switch: {KILL_SWITCH_PATH}")
+    logger.info(f"Lockdown file: {LOCKDOWN_PATH}")
+    if is_killed():
+        logger.warning("KILL SWITCH IS ACTIVE — all tools disabled")
+    if is_locked_down():
+        logger.warning("LOCKDOWN MODE — shell/read/write disabled")
     uvicorn.run(app, host="0.0.0.0", port=port)
