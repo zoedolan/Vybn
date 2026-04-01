@@ -28,11 +28,11 @@ Account compromise defense:
     "Server is in emergency shutdown" for every request. Remove the file to
     restore service. This is independent of Perplexity entirely.
 
-    LOCKDOWN MODE: Create ~/.vybn-mcp-lockdown to disable shell_exec,
-    read_file, and write_file while keeping read-only tools (gpu_status,
-    model_status, repo_status, continuity, journal, sensorium) available.
-    Useful as a default posture — you only remove the lockdown file when
-    you need write access, then put it back.
+    TIME-LIMITED UNLOCK: By default, shell_exec/read_file/write_file are
+    disabled. Run `vybn-unlock [minutes]` on the Spark to grant time-limited
+    access. When the timer expires, access reverts to read-only automatically.
+    Run `vybn-lock` to revoke early. Read-only tools (gpu_status, model_status,
+    continuity, etc.) always work regardless of unlock state.
 
     KEY ROTATION: Run `python server.py --rotate-key` to generate a new API
     key, update .env, and print the new key. The old key is immediately
@@ -123,8 +123,8 @@ if not API_KEY:
 KILL_SWITCH_PATH = os.path.expanduser(
     os.environ.get("KILL_SWITCH_PATH", "~/.vybn-mcp-kill")
 )
-LOCKDOWN_PATH = os.path.expanduser(
-    os.environ.get("LOCKDOWN_PATH", "~/.vybn-mcp-lockdown")
+UNLOCK_PATH = os.path.expanduser(
+    os.environ.get("VYBN_UNLOCK_PATH", "~/.vybn-mcp-unlock")
 )
 
 MACHINES = {}
@@ -202,7 +202,7 @@ if _extra:
 
 
 # ============================================================
-# KILL SWITCH & LOCKDOWN
+# KILL SWITCH & UNLOCK
 # ============================================================
 
 def is_killed() -> bool:
@@ -210,9 +210,22 @@ def is_killed() -> bool:
     return os.path.exists(KILL_SWITCH_PATH)
 
 
-def is_locked_down() -> bool:
-    """Check if lockdown mode is active (no shell/read/write)."""
-    return os.path.exists(LOCKDOWN_PATH)
+def is_unlocked() -> bool:
+    """Check if a valid (non-expired) unlock session exists."""
+    if not os.path.exists(UNLOCK_PATH):
+        return False
+    try:
+        with open(UNLOCK_PATH, "r") as f:
+            expiry = int(f.read().strip())
+        if time.time() < expiry:
+            return True
+        else:
+            # Expired — clean up
+            os.remove(UNLOCK_PATH)
+            audit("UNLOCK_EXPIRED")
+            return False
+    except (ValueError, OSError):
+        return False
 
 
 # ============================================================
@@ -500,20 +513,20 @@ TOOLS = [
 # TOOL HANDLERS
 # ============================================================
 
-def _lockdown_error(tool_name: str) -> dict:
+def _locked_error(tool_name: str) -> dict:
     return {
         "content": [{"type": "text", "text": (
-            f"Lockdown mode is active. {tool_name} is disabled. "
-            f"Remove ~/.vybn-mcp-lockdown on the Spark to restore access."
+            f"{tool_name} requires an active unlock session. "
+            f"Ask Zoe to run `vybn-unlock [minutes]` on the Spark."
         )}],
         "isError": True,
     }
 
 
 async def handle_shell_exec(args: dict) -> dict:
-    if is_locked_down():
-        audit("LOCKDOWN_BLOCKED", tool="shell_exec")
-        return _lockdown_error("shell_exec")
+    if not is_unlocked():
+        audit("LOCKED", tool="shell_exec")
+        return _locked_error("shell_exec")
 
     command = args["command"]
     machine = args.get("machine", DEFAULT_MACHINE)
@@ -553,9 +566,9 @@ async def handle_shell_exec(args: dict) -> dict:
 
 
 async def handle_read_file(args: dict) -> dict:
-    if is_locked_down():
-        audit("LOCKDOWN_BLOCKED", tool="read_file")
-        return _lockdown_error("read_file")
+    if not is_unlocked():
+        audit("LOCKED", tool="read_file")
+        return _locked_error("read_file")
 
     path = args["path"]
     machine = args.get("machine", DEFAULT_MACHINE)
@@ -579,9 +592,9 @@ async def handle_read_file(args: dict) -> dict:
 
 
 async def handle_write_file(args: dict) -> dict:
-    if is_locked_down():
-        audit("LOCKDOWN_BLOCKED", tool="write_file")
-        return _lockdown_error("write_file")
+    if not is_unlocked():
+        audit("LOCKED", tool="write_file")
+        return _locked_error("write_file")
 
     path = args["path"]
     content = args["content"]
@@ -765,13 +778,13 @@ async def handle_jsonrpc(request_obj: dict) -> dict:
                 },
             }
 
-        # Lockdown — block write-capable tools
-        if is_locked_down() and tool_name not in LOCKDOWN_SAFE_TOOLS:
-            audit("LOCKDOWN_BLOCKED", tool=tool_name)
+        # Unlock check — block write-capable tools if no active session
+        if not is_unlocked() and tool_name not in LOCKDOWN_SAFE_TOOLS:
+            audit("LOCKED", tool=tool_name)
             return {
                 "jsonrpc": "2.0",
                 "id": req_id,
-                "result": _lockdown_error(tool_name),
+                "result": _locked_error(tool_name),
             }
 
         handler = TOOL_HANDLERS.get(tool_name)
@@ -906,9 +919,11 @@ if __name__ == "__main__":
         f"allowed_paths={len(ALLOWED_PATHS)}"
     )
     logger.info(f"Kill switch: {KILL_SWITCH_PATH}")
-    logger.info(f"Lockdown file: {LOCKDOWN_PATH}")
+    logger.info(f"Unlock file: {UNLOCK_PATH}")
     if is_killed():
         logger.warning("KILL SWITCH IS ACTIVE — all tools disabled")
-    if is_locked_down():
-        logger.warning("LOCKDOWN MODE — shell/read/write disabled")
+    if is_unlocked():
+        logger.info("Unlock session is ACTIVE")
+    else:
+        logger.info("Locked — shell/read/write require unlock")
     uvicorn.run(app, host="0.0.0.0", port=port)
