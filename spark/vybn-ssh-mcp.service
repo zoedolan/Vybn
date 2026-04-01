@@ -1,0 +1,15 @@
+[Unit]
+Description=Vybn SSH MCP Server
+After=network.target tailscaled.service
+
+[Service]
+Type=simple
+User=zoe
+WorkingDirectory=/home/zoe/vybn-ssh-mcp
+EnvironmentFile=/home/zoe/vybn-ssh-mcp/.env
+ExecStart=/home/zoe/vybn-ssh-mcp/.venv/bin/python server.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

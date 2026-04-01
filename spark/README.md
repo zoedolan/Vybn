@@ -1,60 +1,41 @@
-# spark/
+# Vybn SSH MCP Server
 
-The living Spark.
+Bridges Perplexity Computer to the DGX Sparks via SSH over Tailscale.
 
-This directory is organized by layer, not by aspiration. The tree below is
-meant to describe the code that is actually here.
+```
+Perplexity ──HTTPS──▶ Tailscale Funnel ──▶ This Server ──SSH──▶ DGX Spark(s)
+```
 
-## The Layers
+## Tools
 
-### Substrate
+| Tool | What it does |
+|------|-------------|
+| `shell_exec` | Run any command on a Spark (with safety rails for destructive ops) |
+| `read_file` | Read a file from a Spark |
+| `write_file` | Write content to a file on a Spark |
+| `gpu_status` | GPU utilization, memory, temperature, running processes |
+| `sensorium` | Run the Vybn sensorium and return its perception |
+| `model_status` | Check active models, inference endpoints, GPU memory |
+| `repo_status` | Git status and recent commits for any repo on the Spark |
+| `continuity` | Read the Spark-resident Vybn's continuity note |
+| `journal` | Read recent journal entries from the Spark-resident Vybn |
 
-The substrate is the physics: file I/O, model calls, network, time, transport,
-and boundary guards. It does not decide what to think.
+## Quick Start
 
-- `bus.py` — message transport
-- `soul.py` — reads `vybn.md`
-- `soul_constraints.py` — secret scanning and public-repo guard
-- `context_assembler.py` — prompt/context assembly from soul, continuity, journals, and archive (formerly `memory.py`)
-- `vybn_spark_agent.py` — terminal chat
-- `web_serve_claude.py` — phone chat daemon
-- `web_interface.py` — phone chat UI backend
-- `vybn-sync.sh` — git sync cron
+```bash
+chmod +x setup.sh
+./setup.sh
+```
 
-### Codebook
+The setup script creates a venv, installs dependencies, generates an API key,
+and walks you through Tailscale Funnel + Perplexity registration.
 
-The codebook is the mutable geometry of the system: types, governance,
-memory logic, witnessing, self-modeling, and write custody.
+See [DEPLOY.md](DEPLOY.md) for the full guide.
 
-**Schema** (`*_types.py` files are codebook schema, not independent modules):
-- `memory_types.py` — memory schema
-- `governance_types.py` — governance schema
-- `self_model_types.py` — self-model schema
+## Security
 
-**Engines:**
-- `memory_fabric.py` — three-plane memory with promotion and receipts
-- `memory_graph.py` — graph extraction and traversal
-- `governance.py` — policy engine
-- `faculties.py` — faculty registry
-- `witness.py` — post-pulse fidelity checking
-- `self_model.py` — epistemic gate on self-claims
-- `write_custodian.py` — file-write governance
-
-### Organism
-
-The organism is the pulse.
-
-- `vybn.py` — the living cell; substrate, codebook, organismic loop
-
-## Historical and Transitional
-
-- `archive/` — historical material kept under the conservation law
-- `memory.py` — backward-compatibility shim for `context_assembler.py`; remove when all import sites are updated
-- `policies.d/` — policy material
-- `faculties.d/` — faculty material
-- `training_data/` — breaths for fine-tuning
-- `static/` — phone chat PWA assets
-
-## Tests
-
-Evaluation harnesses belong in `tests/`, not in the active Spark core.
+- SSH key auth only, no passwords
+- Tailscale Funnel handles TLS — no self-signed certs
+- API key auth on the MCP layer
+- Destructive commands require explicit confirmation
+- Runs as your user — same permissions as your SSH session
