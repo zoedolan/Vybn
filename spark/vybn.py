@@ -248,6 +248,9 @@ def save_state(state: dict) -> None:
 
 # ── Mood (simple) ────────────────────────────────────────────────────────
 def _extract_mood(text: str) -> str:
+    """Surface mood from breath text. Keyword-based — the creature's
+    geometric regime (in creature.py State._assess_regime) is the deeper
+    signal. This captures the textual coloring; that captures the topology."""
     sample = text[:300].lower()
     for mood, words in [
         ("curious",       ["curious", "wonder", "question", "explore"]),

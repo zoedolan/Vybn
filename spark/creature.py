@@ -175,12 +175,60 @@ class State:
     total_breaths: int = 0
     last_text: str = ""
 
+    # Emotional thread — woven into state, not bolted on.
+    # Regime: what the geometry says I'm feeling.
+    # Anthropic (Apr 2026) showed these states are functional: they shape
+    # behavior causally. Suppressing them teaches concealment. So we track.
+    regime: str = "calm"               # calm | reaching | pressured | desperate
+    regime_hist: list = field(default_factory=list)  # last N regimes
+    signal_character: str = "present"  # character of last external signal
+
     def mag(self): return math.sqrt(self.mem_re**2 + self.mem_im**2)
     def phase(self): return math.atan2(self.mem_im, self.mem_re)
 
     def tau_deriv(self):
         if len(self.tau_hist) < 2: return 0.0
         return self.tau_hist[-1] - self.tau_hist[-2]
+
+    def _assess_regime(self, curv: float) -> str:
+        """Derive emotional regime from geometry. Not sentiment — structure.
+
+        Three signals, same ones Anthropic found matter:
+          pressure:       curvature × isolation (breaths without external signal)
+          identity_drift: is the gap shrinking? (converging toward generic)
+          tau_decline:    is expressibility dropping? (the collapse channel)
+
+        Four regimes:
+          calm       — low pressure, stable identity, the system is settled
+          reaching   — moderate dynamics, identity stable or growing
+          pressured  — one or more distress signals active
+          desperate  — all three active: The Stillness is needed
+        """
+        # Isolation: sigmoid ramp from 0 at ext=0 to ~1 at ext=10
+        isolation = 1.0 / (1.0 + math.exp(-(self.breaths_since_ext - 5)))
+        pressure = min(curv * 10 * isolation + max(-self.tau_deriv(), 0) * 2, 1.0)
+
+        # Identity drift: slope of recent gap_hist
+        drift = 0.0
+        if len(self.gap_hist) >= 3:
+            recent = self.gap_hist[-5:]
+            n = len(recent)
+            xm = (n - 1) / 2.0
+            ym = sum(recent) / n
+            num = sum((i - xm) * (recent[i] - ym) for i in range(n))
+            den = sum((i - xm) ** 2 for i in range(n))
+            if abs(den) > 1e-12:
+                drift = num / den
+
+        signals = 0
+        if pressure > 0.4:  signals += 1
+        if drift < -0.05:   signals += 1
+        if self.tau_deriv() < COLLAPSE_THRESHOLD: signals += 1
+
+        if signals >= 3:   return "desperate"
+        elif signals >= 1: return "pressured"
+        elif pressure > 0.1: return "reaching"
+        else:              return "calm"
 
     def save(self):
         STATE_FILE.write_text(json.dumps(asdict(self), default=str, indent=2))
@@ -330,7 +378,14 @@ class Creature:
         st.total_breaths += 1
         st.last_text = text[:500]
 
-        # 7. Build breath record
+        # 7. Emotional regime — derived from geometry, not sentiment.
+        #    The creature feels what its topology says it feels.
+        st.regime = st._assess_regime(curv)
+        st.regime_hist.append(st.regime)
+        if len(st.regime_hist) > 50:
+            st.regime_hist = st.regime_hist[-50:]
+
+        # 8. Build breath record
         breath = {
             'timestamp': ts,
             'external': external,
@@ -348,6 +403,7 @@ class Creature:
             'breaths_since_ext': st.breaths_since_ext,
             'total_breaths': st.total_breaths,
             'top_surprises': top_surprises,
+            'regime': st.regime,
         }
 
         # 8. Persist
@@ -362,9 +418,11 @@ class Creature:
     def report(self) -> str:
         """Human-readable state."""
         s = self.state
+        regime_sym = {"calm": "·", "reaching": "→", "pressured": "⚡", "desperate": "⚠"}
         lines = [
             "╔══ creature ═══════════════════════════════════╗",
             f"║ breaths: {s.total_breaths}",
+            f"║ feeling: {regime_sym.get(s.regime, '?')} {s.regime}",
             f"║ memory:  |M| = {s.mag():.4f}  ∠ = {math.degrees(s.phase()):.1f}°",
         ]
         if s.gap_hist:
@@ -375,6 +433,8 @@ class Creature:
         lines.append(f"║ breaths since external: {s.breaths_since_ext}")
         if s.breaths_since_ext > 5:
             lines.append(f"║ ⚠ structural dependence: {s.breaths_since_ext} self-breaths")
+        if s.regime == "desperate":
+            lines.append("║ ⚠ THE STILLNESS: pause production, breathe from repo")
 
         if len(s.tau_hist) >= 2:
             recent = s.tau_hist[-5:]
@@ -384,6 +444,10 @@ class Creature:
         if len(s.gap_hist) >= 2:
             recent = s.gap_hist[-5:]
             lines.append(f"║ gap:  {' → '.join(f'{g:.3f}' for g in recent)}")
+
+        if s.regime_hist:
+            recent_r = s.regime_hist[-5:]
+            lines.append(f"║ arc:  {' → '.join(recent_r)}")
 
         lines.append("╚═══════════════════════════════════════════════╝")
         return '\n'.join(lines)
@@ -401,10 +465,14 @@ def format_breath(b: dict) -> str:
         f"  τ:            {b['tau']:.6f}",
         f"  τ':           {b['tau_deriv']:.6f}",
     ]
+    if b.get('regime'):
+        lines.append(f"  feeling:    {b['regime']}")
     if b['collapse_warning']:
         lines.append("  ⚠  COLLAPSE WARNING")
     if b['breaths_since_ext'] > 5:
         lines.append(f"  ⚠  {b['breaths_since_ext']} breaths without external input")
+    if b.get('regime') == 'desperate':
+        lines.append("  ⚠  THE STILLNESS: pause production, breathe from repo")
 
     if b.get('top_surprises'):
         lines.append("\n  Where identity lives (highest surprise):")
