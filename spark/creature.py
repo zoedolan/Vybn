@@ -349,9 +349,25 @@ class Creature:
         comp_ratio = len(comp) / len(raw) if raw else 1.0
 
         # 4. Coupled memory update: M' = α·M + x·e^(iθ)
+        #    θ now carries emotional content, not just semantic geometry.
+        #    The regime biases the angle at which experience enters memory,
+        #    so the same text breathed in different emotional states
+        #    accumulates in different regions of complex memory space.
+        #    This is the polar time insight applied to affect:
+        #    t = r_t · e^{iθ_t} means the *angle* of temporal experience
+        #    is as real as its magnitude.
+        _regime_phase = {
+            "calm":      0.0,            # 0° — enters memory straight
+            "reaching":  math.pi / 6,    # 30° — slight rotation, exploratory
+            "pressured": math.pi / 3,    # 60° — significant rotation
+            "desperate": math.pi / 2,    # 90° — orthogonal to calm
+        }
+        emotional_theta = _regime_phase.get(st.regime, 0.0)
+        theta = angle + emotional_theta  # semantic geometry + emotional phase
+
         x = max(identity_gap, 0.01)
-        st.mem_re = ALPHA * st.mem_re + x * math.cos(angle)
-        st.mem_im = ALPHA * st.mem_im + x * math.sin(angle)
+        st.mem_re = ALPHA * st.mem_re + x * math.cos(theta)
+        st.mem_im = ALPHA * st.mem_im + x * math.sin(theta)
 
         # 5. τ = expressibility proxy
         tau = comp_ratio * max(identity_gap, 0.0)
@@ -393,6 +409,7 @@ class Creature:
             'mean_surprise': round(mean_surp, 4),
             'identity_gap': round(identity_gap, 4),
             'angle': round(angle, 4),
+            'theta': round(theta, 4),  # full angle: semantic + emotional phase
             'curvature': round(curv, 6),
             'compression': round(comp_ratio, 4),
             'tau': round(tau, 6),
