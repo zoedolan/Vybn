@@ -1,0 +1,221 @@
+{
+  "timestamp": "2026-03-28T14:30:44.840074+00:00",
+  "basin_source": "/home/vybnz69/Vybn/Vybn_Mind/creature_dgm_h/experiment_results/basin_geometry/basin_20260328T141855.json",
+  "creature_trajectory": {
+    "n_steps": 40,
+    "param_dim": 4224,
+    "norm_start": 13.8297,
+    "norm_end": 16.1692,
+    "norm_mean": 15.0327,
+    "norm_std": 0.6634,
+    "pca_var_explained": 0.9191,
+    "estimated_winding": -0.656,
+    "path_closed": false
+  },
+  "shots": 4096,
+  "circuits": [
+    {
+      "circuit_name": "frac_0.25",
+      "is_theory_relevant": true,
+      "hypothesis": "Quarter winding (4 gates). P(0) = cos\u00b2(pi/4) = 0.5. Baseline for the fractional ladder.",
+      "expected_counts": {
+        "0": 0.5,
+        "1": 0.5
+      },
+      "estimated_seconds": 2.0,
+      "family": "fractional",
+      "winding": 0.25,
+      "variant": "base",
+      "circuit_qasm": "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[1];\ncreg c[1];\nh q[0];\n// fractional winding 0.25, 4 steps, total=1.5708 rad\nrz(0.392699) q[0];\nrz(0.392699) q[0];\nrz(0.392699) q[0];\nrz(0.392699) q[0];\nh q[0];\nmeasure q[0] -> c[0];",
+      "counts": {
+        "1": 1876,
+        "0": 2220
+      }
+    },
+    {
+      "circuit_name": "frac_0.50",
+      "is_theory_relevant": true,
+      "hypothesis": "Half winding (4 gates). P(0) = cos\u00b2(pi/2) = 0.0. Already confirmed on ibm_fez at P(0) = 0.018.",
+      "expected_counts": {
+        "0": 0.0,
+        "1": 1.0
+      },
+      "estimated_seconds": 2.0,
+      "family": "fractional",
+      "winding": 0.5,
+      "variant": "base",
+      "circuit_qasm": "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[1];\ncreg c[1];\nh q[0];\n// fractional winding 0.5, 4 steps, total=3.1416 rad\nrz(0.785398) q[0];\nrz(0.785398) q[0];\nrz(0.785398) q[0];\nrz(0.785398) q[0];\nh q[0];\nmeasure q[0] -> c[0];",
+      "counts": {
+        "1": 4011,
+        "0": 85
+      }
+    },
+    {
+      "circuit_name": "frac_0.75",
+      "is_theory_relevant": true,
+      "hypothesis": "Three-quarter winding (4 gates). P(0) = cos\u00b2(3*pi/4) = 0.5. Same P(0) as 0.25 but different phase \u2014 Y-basis distinguishes them.",
+      "expected_counts": {
+        "0": 0.5,
+        "1": 0.5
+      },
+      "estimated_seconds": 2.0,
+      "family": "fractional",
+      "winding": 0.75,
+      "variant": "base",
+      "circuit_qasm": "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[1];\ncreg c[1];\nh q[0];\n// fractional winding 0.75, 4 steps, total=4.7124 rad\nrz(1.178097) q[0];\nrz(1.178097) q[0];\nrz(1.178097) q[0];\nrz(1.178097) q[0];\nh q[0];\nmeasure q[0] -> c[0];",
+      "counts": {
+        "0": 2234,
+        "1": 1862
+      }
+    },
+    {
+      "circuit_name": "frac_1.00",
+      "is_theory_relevant": true,
+      "hypothesis": "Full winding (4 gates). P(0) = cos\u00b2(pi) = 1.0. Calibration anchor \u2014 confirms the circuit works.",
+      "expected_counts": {
+        "0": 1.0,
+        "1": 0.0
+      },
+      "estimated_seconds": 2.0,
+      "family": "fractional",
+      "winding": 1.0,
+      "variant": "base",
+      "circuit_qasm": "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[1];\ncreg c[1];\nh q[0];\n// fractional winding 1.0, 4 steps, total=6.2832 rad\nrz(1.570796) q[0];\nrz(1.570796) q[0];\nrz(1.570796) q[0];\nrz(1.570796) q[0];\nh q[0];\nmeasure q[0] -> c[0];",
+      "counts": {
+        "0": 4064,
+        "1": 32
+      }
+    },
+    {
+      "circuit_name": "frac_1.50",
+      "is_theory_relevant": true,
+      "hypothesis": "One-and-a-half windings (4 gates). P(0) = cos\u00b2(3*pi/2) = 0.0. Same P(0) as 0.50 \u2014 tests linearity at higher winding.",
+      "expected_counts": {
+        "0": 0.0,
+        "1": 1.0
+      },
+      "estimated_seconds": 2.0,
+      "family": "fractional",
+      "winding": 1.5,
+      "variant": "base",
+      "circuit_qasm": "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[1];\ncreg c[1];\nh q[0];\n// fractional winding 1.5, 4 steps, total=9.4248 rad\nrz(2.356194) q[0];\nrz(2.356194) q[0];\nrz(2.356194) q[0];\nrz(2.356194) q[0];\nh q[0];\nmeasure q[0] -> c[0];",
+      "counts": {
+        "1": 4004,
+        "0": 92
+      }
+    },
+    {
+      "circuit_name": "frac_0.50_shape",
+      "is_theory_relevant": true,
+      "hypothesis": "Half winding, elliptical path. TOPOLOGICAL: same P(0) as frac_0.50. GEOMETRIC: different P(0). This is the critical test at a fraction where the signal is maximal (P(0) near 0).",
+      "expected_counts": {
+        "0": 0.0,
+        "1": 1.0
+      },
+      "estimated_seconds": 2.0,
+      "family": "fractional",
+      "winding": 0.5,
+      "variant": "shape_deformed",
+      "circuit_qasm": "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[1];\ncreg c[1];\nh q[0];\n// Shape-deformed fractional: frac=0.5, ellipse=0.5\nrz(1.178097) q[0];\nrz(0.392699) q[0];\nrz(1.178097) q[0];\nrz(0.392699) q[0];\nh q[0];\nmeasure q[0] -> c[0];",
+      "counts": {
+        "1": 3981,
+        "0": 115
+      }
+    },
+    {
+      "circuit_name": "frac_0.25_ybasis_fwd",
+      "is_theory_relevant": true,
+      "hypothesis": "Quarter winding Y-basis FORWARD. P(0) = (1 + sin(pi/2))/2 = 1.0. Y-basis breaks the cos\u00b2 symmetry and CAN distinguish sign.",
+      "expected_counts": {
+        "0": 1.0,
+        "1": 0.0
+      },
+      "estimated_seconds": 2.0,
+      "family": "fractional",
+      "winding": 0.25,
+      "variant": "ybasis_fwd",
+      "circuit_qasm": "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[1];\ncreg c[1];\nh q[0];\n// fractional Y-basis: frac=0.25, dir=+1, 4 steps\nrz(0.392699) q[0];\nrz(0.392699) q[0];\nrz(0.392699) q[0];\nrz(0.392699) q[0];\nsdg q[0];\nh q[0];\nmeasure q[0] -> c[0];",
+      "counts": {
+        "0": 4059,
+        "1": 37
+      }
+    },
+    {
+      "circuit_name": "frac_0.25_ybasis_rev",
+      "is_theory_relevant": true,
+      "hypothesis": "Quarter winding Y-basis REVERSED. P(0) = (1 + sin(-pi/2))/2 = 0.0. If sign reversal works, this should be ~0 while fwd is ~1.",
+      "expected_counts": {
+        "0": 0.0,
+        "1": 1.0
+      },
+      "estimated_seconds": 2.0,
+      "family": "fractional",
+      "winding": -0.25,
+      "variant": "ybasis_rev",
+      "circuit_qasm": "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[1];\ncreg c[1];\nh q[0];\n// fractional Y-basis: frac=0.25, dir=-1, 4 steps\nrz(-0.392699) q[0];\nrz(-0.392699) q[0];\nrz(-0.392699) q[0];\nrz(-0.392699) q[0];\nsdg q[0];\nh q[0];\nmeasure q[0] -> c[0];",
+      "counts": {
+        "1": 4007,
+        "0": 89
+      }
+    },
+    {
+      "circuit_name": "creature_loop",
+      "is_theory_relevant": true,
+      "hypothesis": "Creature-derived loop from basin geometry weight trajectory. PCA projects the training path into 2D, then Bloch-encodes it. If the creature's learning path has topological winding, this circuit should show non-trivial P(0) deviation comparable to the theory circuits. If the path is open or unwound, P(0) stays near 0.5 \u2014 which is itself informative.",
+      "expected_counts": {
+        "0": 0.5,
+        "1": 0.5
+      },
+      "estimated_seconds": 5.0,
+      "family": "creature",
+      "winding": 0,
+      "variant": "creature_pca",
+      "circuit_qasm": "OPENQASM 2.0;\ninclude \"qelib1.inc\";\nqreg q[1];\ncreg c[1];\nh q[0];\n// Creature-derived loop: 8 steps from weight trajectory PCA\nrz(2.604810) q[0];\nry(3.141593) q[0];\nrz(2.973156) q[0];\nry(2.252952) q[0];\nrz(-2.740711) q[0];\nry(1.738398) q[0];\nrz(-2.004847) q[0];\nry(1.374731) q[0];\nrz(-1.265939) q[0];\nry(1.385938) q[0];\nrz(-0.290102) q[0];\nry(1.554893) q[0];\nrz(0.225865) q[0];\nry(2.423942) q[0];\nrz(0.390479) q[0];\nry(3.061705) q[0];\nh q[0];\nmeasure q[0] -> c[0];",
+      "counts": {
+        "0": 2819,
+        "1": 1277
+      }
+    }
+  ],
+  "analysis": {
+    "timestamp": "2026-03-28T14:30:44.837662+00:00",
+    "n_circuits": 9,
+    "phase_model": {
+      "eps_per_gate_rad": 2.345,
+      "eps_per_gate_deg": 134.36,
+      "phi_per_winding_rad": 18.76,
+      "fit_error_sum": 0.003735,
+      "max_residual": 0.0532,
+      "predictions": {
+        "0.25": 0.4888,
+        "0.5": 0.0005,
+        "0.75": 0.5336,
+        "1.0": 0.998,
+        "1.5": 0.0045
+      },
+      "residuals": {
+        "0.25": 0.0532,
+        "0.5": 0.0203,
+        "0.75": 0.0119,
+        "1.0": 0.0058,
+        "1.5": 0.018
+      },
+      "actual": {
+        "0.25": 0.542,
+        "0.5": 0.0208,
+        "0.75": 0.5454,
+        "1.0": 0.9922,
+        "1.5": 0.0225
+      },
+      "passes": false
+    },
+    "shape_invariance": null,
+    "speed_invariance": null,
+    "sign_reversal": null,
+    "half_winding": null,
+    "verdict": "NOISE",
+    "notes": [
+      "0/3 tests passed."
+    ]
+  }
+}
