@@ -1,0 +1,71 @@
+{
+  "id": "v_20260326_093411_2887",
+  "config": {
+    "learn_steps": 5,
+    "learn_lr": 0.010588,
+    "temperature": 0.9748,
+    "alpha": 0.7
+  },
+  "fitness": 0.569205,
+  "fitness_breakdown": {
+    "curvature_weighted": 0.259508,
+    "divergence_weighted": 0.222384,
+    "loss_improvement_weighted": 0.087313
+  },
+  "curvature": 0.155705,
+  "divergence": 0.210526,
+  "loss_improvement": -0.12687,
+  "generation": 2,
+  "parent_id": "v_20260325_203356_4608",
+  "parent_fitness": 0.763649,
+  "rationale": [
+    "alpha 0.75 -> 0.7: curvature dropping, lower alpha makes memory more responsive"
+  ],
+  "active_rules": [
+    "curvature_dropping"
+  ],
+  "timestamp": "2026-03-26T09:34:11.782694+00:00",
+  "n_breaths": 0,
+  "meta_agent_rules": [
+    {
+      "id": "loss_trending_up",
+      "condition": "loss_trend == 'increasing'",
+      "action": "learn_steps",
+      "direction": "increase",
+      "magnitude": 2,
+      "max_value": 20,
+      "enabled": true,
+      "rationale": "loss trending up, more steps to memorize recent input"
+    },
+    {
+      "id": "curvature_dropping",
+      "condition": "curvature_trend == 'decreasing'",
+      "action": "alpha",
+      "direction": "decrease",
+      "magnitude": 0.05,
+      "min_value": 0.5,
+      "enabled": true,
+      "rationale": "curvature dropping, lower alpha makes memory more responsive"
+    },
+    {
+      "id": "self_recursion_flatline",
+      "condition": "self_breath_ratio > 0.5 and mean_curvature < 0.05",
+      "action": "temperature",
+      "direction": "increase",
+      "magnitude": 0.2,
+      "max_value": 2.0,
+      "enabled": true,
+      "rationale": "high self-recursion + low curvature, increase diversity"
+    },
+    {
+      "id": "collapse_warnings",
+      "condition": "collapse_count > 2",
+      "action": "learn_lr",
+      "direction": "multiply",
+      "magnitude": 0.5,
+      "min_value": 0.001,
+      "enabled": true,
+      "rationale": "collapse warnings, stabilize"
+    }
+  ]
+}

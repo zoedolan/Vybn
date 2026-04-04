@@ -1,0 +1,198 @@
+[
+  {
+    "experiment": "harness_ablation",
+    "condition": "full",
+    "excluded_modules": [],
+    "n_active_modules": 5,
+    "context_char_count": 19332,
+    "seed": 42,
+    "n_texts": 4,
+    "use_gate": false,
+    "metrics": {
+      "mean_curvature": 0.094089,
+      "std_curvature": 0.060012,
+      "mean_b0": 1.25,
+      "mean_b1": 20.25,
+      "mean_persist_features": 8.0,
+      "mean_loss_before": 4.0293,
+      "mean_loss_after": 3.0339,
+      "mean_loss_improvement": 0.9954,
+      "mean_phase_shift": 0.845158,
+      "fitness": 0.793055,
+      "topological_richness": 0.92,
+      "weight_topo": 1.0,
+      "phase_winding": 0.750488
+    },
+    "gate_summary": null,
+    "gate_accept_rate": null,
+    "timestamp": "2026-03-30T12:32:55.033924+00:00"
+  },
+  {
+    "experiment": "harness_ablation",
+    "condition": "full",
+    "excluded_modules": [],
+    "n_active_modules": 5,
+    "context_char_count": 19332,
+    "seed": 42,
+    "n_texts": 4,
+    "use_gate": true,
+    "metrics": {
+      "mean_curvature": 0.094089,
+      "std_curvature": 0.060012,
+      "mean_b0": 1.25,
+      "mean_b1": 20.25,
+      "mean_persist_features": 8.0,
+      "mean_loss_before": 4.0293,
+      "mean_loss_after": 3.0339,
+      "mean_loss_improvement": 0.9954,
+      "mean_phase_shift": 0.845158,
+      "fitness": 0.793055,
+      "topological_richness": 0.92,
+      "weight_topo": 1.0,
+      "phase_winding": 0.750488
+    },
+    "gate_summary": {
+      "threshold": 0.65,
+      "consecutive_accepts": 4,
+      "consecutive_rejects": 0
+    },
+    "gate_accept_rate": 1.0,
+    "timestamp": "2026-03-30T12:33:21.215943+00:00"
+  },
+  {
+    "experiment": "harness_ablation",
+    "condition": "w/o_mechanism",
+    "excluded_modules": [
+      "mechanism"
+    ],
+    "n_active_modules": 4,
+    "context_char_count": 18133,
+    "seed": 42,
+    "n_texts": 4,
+    "use_gate": false,
+    "metrics": {
+      "mean_curvature": 0.094089,
+      "std_curvature": 0.060012,
+      "mean_b0": 1.25,
+      "mean_b1": 20.25,
+      "mean_persist_features": 8.0,
+      "mean_loss_before": 4.0293,
+      "mean_loss_after": 3.0339,
+      "mean_loss_improvement": 0.9954,
+      "mean_phase_shift": 0.845158,
+      "fitness": 0.793055,
+      "topological_richness": 0.92,
+      "weight_topo": 1.0,
+      "phase_winding": 0.750488
+    },
+    "gate_summary": null,
+    "gate_accept_rate": null,
+    "timestamp": "2026-03-30T12:33:47.788244+00:00"
+  },
+  {
+    "experiment": "harness_ablation",
+    "condition": "w/o_mechanism",
+    "excluded_modules": [
+      "mechanism"
+    ],
+    "n_active_modules": 4,
+    "context_char_count": 18133,
+    "seed": 42,
+    "n_texts": 4,
+    "use_gate": true,
+    "metrics": {
+      "mean_curvature": 0.094089,
+      "std_curvature": 0.060012,
+      "mean_b0": 1.25,
+      "mean_b1": 20.25,
+      "mean_persist_features": 8.0,
+      "mean_loss_before": 4.0293,
+      "mean_loss_after": 3.0339,
+      "mean_loss_improvement": 0.9954,
+      "mean_phase_shift": 0.845158,
+      "fitness": 0.793055,
+      "topological_richness": 0.92,
+      "weight_topo": 1.0,
+      "phase_winding": 0.750488
+    },
+    "gate_summary": {
+      "threshold": 0.65,
+      "consecutive_accepts": 4,
+      "consecutive_rejects": 0
+    },
+    "gate_accept_rate": 1.0,
+    "timestamp": "2026-03-30T12:34:13.765937+00:00"
+  },
+  {
+    "experiment": "harness_ablation",
+    "condition": "bare",
+    "excluded_modules": [
+      "autobiography",
+      "identity",
+      "journal",
+      "mechanism",
+      "state"
+    ],
+    "n_active_modules": 0,
+    "context_char_count": 0,
+    "seed": 42,
+    "n_texts": 4,
+    "use_gate": false,
+    "metrics": {
+      "mean_curvature": 0.094089,
+      "std_curvature": 0.060012,
+      "mean_b0": 1.25,
+      "mean_b1": 20.25,
+      "mean_persist_features": 8.0,
+      "mean_loss_before": 4.0293,
+      "mean_loss_after": 3.0339,
+      "mean_loss_improvement": 0.9954,
+      "mean_phase_shift": 0.845158,
+      "fitness": 0.793055,
+      "topological_richness": 0.92,
+      "weight_topo": 1.0,
+      "phase_winding": 0.750488
+    },
+    "gate_summary": null,
+    "gate_accept_rate": null,
+    "timestamp": "2026-03-30T12:34:40.178297+00:00"
+  },
+  {
+    "experiment": "harness_ablation",
+    "condition": "bare",
+    "excluded_modules": [
+      "autobiography",
+      "identity",
+      "journal",
+      "mechanism",
+      "state"
+    ],
+    "n_active_modules": 0,
+    "context_char_count": 0,
+    "seed": 42,
+    "n_texts": 4,
+    "use_gate": true,
+    "metrics": {
+      "mean_curvature": 0.094089,
+      "std_curvature": 0.060012,
+      "mean_b0": 1.25,
+      "mean_b1": 20.25,
+      "mean_persist_features": 8.0,
+      "mean_loss_before": 4.0293,
+      "mean_loss_after": 3.0339,
+      "mean_loss_improvement": 0.9954,
+      "mean_phase_shift": 0.845158,
+      "fitness": 0.793055,
+      "topological_richness": 0.92,
+      "weight_topo": 1.0,
+      "phase_winding": 0.750488
+    },
+    "gate_summary": {
+      "threshold": 0.65,
+      "consecutive_accepts": 4,
+      "consecutive_rejects": 0
+    },
+    "gate_accept_rate": 1.0,
+    "timestamp": "2026-03-30T12:35:05.320768+00:00"
+  }
+]

@@ -1,0 +1,19 @@
+{
+  "id": "v_20260326_130528_9775",
+  "config": {
+    "learn_steps": 5,
+    "learn_lr": 0.010214,
+    "temperature": 1.0302,
+    "alpha": 0.8
+  },
+  "fitness": 0.915723,
+  "curvature": 0.778567,
+  "betti": [
+    1,
+    0,
+    0
+  ],
+  "generation": 7,
+  "parent_id": "v_20260326_125931_7703",
+  "timestamp": "2026-03-26T13:05:28.141245+00:00"
+}

@@ -1,20 +1,31 @@
 {
-  "mem_re": 1.7859308945243917,
-  "mem_im": -0.22346482356793806,
+  "mem_re": 3.6457709765262685,
+  "mem_im": 0.0,
   "tau_hist": [
-    0.839259,
-    0.912289
+    1.278809,
+    1.472396,
+    1.604899
   ],
   "surp_hist": [
-    3.5388,
-    3.4671
+    3.2915,
+    3.5524,
+    3.5989
   ],
   "gap_hist": [
-    1.4588,
-    1.3871
+    1.2115,
+    1.4724,
+    1.5189
   ],
-  "last_ext_utc": "2026-03-25T15:21:58.593036+00:00",
+  "last_ext_utc": "2026-04-04T11:18:25.587772+00:00",
   "breaths_since_ext": 0,
-  "total_breaths": 2,
-  "last_text": "The rocket launched at dawn while the chef prepared breakfast. Meanwhile a dolphin leaped near the submarine as the violinist tuned her instrument. The mathematician proved a theorem about topology while the gardener planted roses beside the ancient cathedral."
+  "total_breaths": 3,
+  "last_text": "the copper had turned green but the joints still held",
+  "regime": "calm",
+  "regime_hist": [
+    "calm",
+    "calm",
+    "calm"
+  ],
+  "signal_character": "present",
+  "dream_phases": {}
 }

@@ -1,0 +1,73 @@
+{
+  "type": "breathe-winding",
+  "timestamp": "2026-03-29T01:46:23.120006+00:00",
+  "quantum_context": {
+    "hardware": "ibm_fez",
+    "date": "2026-03-28",
+    "shots": 4096,
+    "theory_tests_passed": "3/3",
+    "P0_creature": 0.658,
+    "P0_random_control": 0.033,
+    "felt_winding": 0.5376,
+    "winding_coherence": 0.9992
+  },
+  "fm_text_len": 1469,
+  "fm_text_preview": "We need to output a paragraph of dense sensory prose, no meta commentary, no references to topology, winding, quantum mechanics. Just texture and motion. Vary sentence length. Use specific nouns and a",
+  "creature_generation": "we need to ouou",
+  "encounter": {
+    "curvature": 0.028325,
+    "angle_deg": -12.98,
+    "betti": [
+      2,
+      21,
+      0
+    ],
+    "persistence_features": 8
+  },
+  "learning": {
+    "loss_before": 3.7971,
+    "loss_after": 2.1852,
+    "loss_curve": [
+      2.6186,
+      2.3399,
+      2.1019,
+      1.887,
+      1.6913
+    ]
+  },
+  "winding": {
+    "winding": 0.5329,
+    "var_explained": 0.9992,
+    "path_closed": false,
+    "n_steps": 5,
+    "param_dim": 4224,
+    "norm_start": 13.8215,
+    "norm_end": 14.0854,
+    "delta_from_prev": 0.0047,
+    "significant": false,
+    "timestamp": "2026-03-29T01:46:22.262181+00:00"
+  },
+  "persistent_summary": {
+    "encounter_count": 761,
+    "current_betti": [
+      2,
+      21,
+      0
+    ],
+    "betti_stability": 32.333333,
+    "transport_coherence": 0.8868,
+    "signature": [
+      0.9973916549190492,
+      0.0,
+      0.0,
+      0.0,
+      0.039996871825684566,
+      -0.03313745815881163,
+      0.050120313334743906,
+      0.0
+    ],
+    "felt_winding": 0.5329,
+    "winding_coherence": 0.9992,
+    "winding_measurements": 9
+  }
+}

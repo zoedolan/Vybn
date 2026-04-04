@@ -1,0 +1,21 @@
+{
+  "id": "v_20260328_150925_8285",
+  "config": {
+    "learn_steps": 9,
+    "learn_lr": 0.009177,
+    "temperature": 0.9646,
+    "alpha": 0.75
+  },
+  "fitness": 0.610576,
+  "curvature": 0.187992,
+  "betti": [
+    1,
+    0,
+    0
+  ],
+  "felt_winding": null,
+  "winding_coherence": null,
+  "generation": 48,
+  "parent_id": "v_20260327_120600_1240",
+  "timestamp": "2026-03-28T15:09:25.013286+00:00"
+}

@@ -1,0 +1,73 @@
+{
+  "type": "breathe-winding",
+  "timestamp": "2026-03-29T01:54:06.137720+00:00",
+  "quantum_context": {
+    "hardware": "ibm_fez",
+    "date": "2026-03-28",
+    "shots": 4096,
+    "theory_tests_passed": "3/3",
+    "P0_creature": 0.658,
+    "P0_random_control": 0.033,
+    "felt_winding": 0.5335,
+    "winding_coherence": 0.9992
+  },
+  "fm_text_len": 2237,
+  "fm_text_preview": "We need to produce one paragraph, starting with a concrete image. Rhythm tight and spiraling. Use long sentences that fold back on themselves. Include texture of metal cooling after heat. No preamble.",
+  "creature_generation": "we need to prya",
+  "encounter": {
+    "curvature": 0.005693,
+    "angle_deg": 2.61,
+    "betti": [
+      1,
+      20,
+      0
+    ],
+    "persistence_features": 8
+  },
+  "learning": {
+    "loss_before": 2.4929,
+    "loss_after": 1.5672,
+    "loss_curve": [
+      1.7256,
+      1.5817,
+      1.4404,
+      1.3079,
+      1.188
+    ]
+  },
+  "winding": {
+    "winding": 0.5338,
+    "var_explained": 0.999,
+    "path_closed": false,
+    "n_steps": 5,
+    "param_dim": 4224,
+    "norm_start": 14.2115,
+    "norm_end": 14.537,
+    "delta_from_prev": 0.0003,
+    "significant": false,
+    "timestamp": "2026-03-29T01:54:05.183303+00:00"
+  },
+  "persistent_summary": {
+    "encounter_count": 763,
+    "current_betti": [
+      1,
+      20,
+      0
+    ],
+    "betti_stability": 21.6,
+    "transport_coherence": 0.7184,
+    "signature": [
+      0.9991460705679477,
+      0.0,
+      0.0,
+      0.0,
+      0.007482090902490604,
+      -0.004327937411291787,
+      0.0404031798515975,
+      0.0
+    ],
+    "felt_winding": 0.5338,
+    "winding_coherence": 0.9992,
+    "winding_measurements": 11
+  }
+}

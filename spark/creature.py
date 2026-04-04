@@ -257,14 +257,38 @@ def measure_curvature(text: str, embed_fn) -> tuple:
     """Pancharatnam phase of embedding trajectory.
     Returns (angle, curvature_per_segment)."""
     words = text.split()
-    chunk_size = max(5, len(words) // 8)
-    chunks = []
-    for i in range(0, len(words), chunk_size):
-        c = ' '.join(words[i:i+chunk_size])
-        if c.strip():
-            chunks.append(c)
+    # For short text (concept pairs), create an interpolated loop.
+    # Two points can't enclose area — Berry phase needs >= 3 vertices.
+    # We embed each word and interpolate between them to build a loop
+    # with enough geometry to produce nontrivial holonomy.
+    if len(words) <= 8 and len(words) >= 2:
+        import numpy as _np
+        vecs = embed_fn(words)
+        # Build closed loop: interpolate a -> b -> a with 6 steps each
+        path_vecs = []
+        for i in range(len(vecs)):
+            j = (i + 1) % len(vecs)
+            for t_step in range(6):
+                t = t_step / 6.0
+                v = (1 - t) * vecs[i] + t * vecs[j]
+                v = v / (_np.linalg.norm(v) + 1e-12)
+                path_vecs.append(v)
+        chunks = [f'__vec_{i}' for i in range(len(path_vecs))]
+        # Override embed_fn for this call to return our interpolated vecs
+        _cached_vecs = _np.array(path_vecs)
+        _orig_embed = embed_fn
+        embed_fn = lambda texts: _cached_vecs[:len(texts)]
+    elif len(words) <= 8:
+        chunks = [w for w in words if w.strip()]
+    else:
+        chunk_size = max(5, len(words) // 8)
+        chunks = []
+        for i in range(0, len(words), chunk_size):
+            c = ' '.join(words[i:i+chunk_size])
+            if c.strip():
+                chunks.append(c)
 
-    if len(chunks) < 3:
+    if len(chunks) < 2:
         return 0.0, 0.0
 
     vecs = embed_fn(chunks)  # (n, 384)
@@ -346,7 +370,7 @@ class Creature:
 
         # 2. Semantic curvature
         angle, curv = 0.0, 0.0
-        if len(text.split()) >= 15:
+        if len(text.split()) >= 2:
             angle, curv = measure_curvature(text, self._embed)
 
         # 3. Compression (complexity proxy)

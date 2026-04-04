@@ -1,0 +1,1807 @@
+[
+  {
+    "experiment": "natural_motion",
+    "generation": 0,
+    "variant_idx": 0,
+    "seed": 42,
+    "config": {
+      "learn_steps": 5,
+      "learn_lr": 0.01,
+      "temperature": 0.8,
+      "alpha": 0.85
+    },
+    "fitness": {
+      "fitness": 0.5,
+      "curvature": 0.0,
+      "betti": [
+        0,
+        0,
+        0
+      ],
+      "topological_richness": 0.0,
+      "structural_growth": 0.0,
+      "weight_topo": 0.0,
+      "note": "null_fitness \u2014 selection pressure removed"
+    },
+    "observations_cold": [
+      {
+        "sample_idx": 0,
+        "temperature": 0.7,
+        "text": "i   ins d en  g",
+        "loss": 2.369286,
+        "curvature": 0.0,
+        "angle_deg": 0.0,
+        "betti": [
+          1,
+          0,
+          0
+        ],
+        "n_persistent_features": 0,
+        "max_persistence": 0.0,
+        "bv_norm": 0.0,
+        "bv_dir": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "surprise_mean": 2.369273,
+        "surprise_max": 6.4595,
+        "surprise_contour": [
+          {
+            "char": "i",
+            "pos": 0,
+            "surprise": 2.0469,
+            "expected": "i"
+          },
+          {
+            "char": " ",
+            "pos": 1,
+            "surprise": 4.0946,
+            "expected": "s"
+          },
+          {
+            "char": " ",
+            "pos": 2,
+            "surprise": 1.2996,
+            "expected": " "
+          },
+          {
+            "char": " ",
+            "pos": 3,
+            "surprise": 0.9474,
+            "expected": " "
+          },
+          {
+            "char": "i",
+            "pos": 4,
+            "surprise": 2.9932,
+            "expected": " "
+          },
+          {
+            "char": "n",
+            "pos": 5,
+            "surprise": 2.7488,
+            "expected": " "
+          },
+          {
+            "char": "s",
+            "pos": 6,
+            "surprise": 6.4595,
+            "expected": " "
+          },
+          {
+            "char": " ",
+            "pos": 7,
+            "surprise": 1.6175,
+            "expected": " "
+          }
+        ]
+      },
+      {
+        "sample_idx": 1,
+        "temperature": 0.85,
+        "text": "icid oun tha s ",
+        "loss": 2.754783,
+        "curvature": 0.0,
+        "angle_deg": 0.0,
+        "betti": [
+          1,
+          0,
+          0
+        ],
+        "n_persistent_features": 0,
+        "max_persistence": 0.0,
+        "bv_norm": 0.0,
+        "bv_dir": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "surprise_mean": 2.754793,
+        "surprise_max": 5.9009,
+        "surprise_contour": [
+          {
+            "char": "i",
+            "pos": 0,
+            "surprise": 2.0469,
+            "expected": "i"
+          },
+          {
+            "char": "c",
+            "pos": 1,
+            "surprise": 3.1979,
+            "expected": "s"
+          },
+          {
+            "char": "i",
+            "pos": 2,
+            "surprise": 2.468,
+            "expected": " "
+          },
+          {
+            "char": "d",
+            "pos": 3,
+            "surprise": 4.7123,
+            "expected": " "
+          },
+          {
+            "char": " ",
+            "pos": 4,
+            "surprise": 1.9416,
+            "expected": "i"
+          },
+          {
+            "char": "o",
+            "pos": 5,
+            "surprise": 5.9009,
+            "expected": "d"
+          },
+          {
+            "char": "u",
+            "pos": 6,
+            "surprise": 2.607,
+            "expected": "n"
+          },
+          {
+            "char": "n",
+            "pos": 7,
+            "surprise": 1.8447,
+            "expected": "n"
+          }
+        ]
+      }
+    ],
+    "observations_seeded": [
+      {
+        "sample_idx": 0,
+        "temperature": 0.7,
+        "text": "is given  gr d ",
+        "loss": 2.239824,
+        "curvature": 0.0,
+        "angle_deg": 0.0,
+        "betti": [
+          1,
+          0,
+          0
+        ],
+        "n_persistent_features": 0,
+        "max_persistence": 0.0,
+        "bv_norm": 0.0,
+        "bv_dir": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "surprise_mean": 2.239827,
+        "surprise_max": 4.2203,
+        "surprise_contour": [
+          {
+            "char": "i",
+            "pos": 0,
+            "surprise": 2.0469,
+            "expected": "i"
+          },
+          {
+            "char": "s",
+            "pos": 1,
+            "surprise": 2.0302,
+            "expected": "s"
+          },
+          {
+            "char": " ",
+            "pos": 2,
+            "surprise": 1.1117,
+            "expected": " "
+          },
+          {
+            "char": "g",
+            "pos": 3,
+            "surprise": 3.6499,
+            "expected": " "
+          },
+          {
+            "char": "i",
+            "pos": 4,
+            "surprise": 3.1337,
+            "expected": "y"
+          },
+          {
+            "char": "v",
+            "pos": 5,
+            "surprise": 2.783,
+            "expected": "s"
+          },
+          {
+            "char": "e",
+            "pos": 6,
+            "surprise": 2.2343,
+            "expected": "y"
+          },
+          {
+            "char": "n",
+            "pos": 7,
+            "surprise": 1.2858,
+            "expected": "n"
+          }
+        ]
+      },
+      {
+        "sample_idx": 1,
+        "temperature": 0.85,
+        "text": "is given trecc ",
+        "loss": 2.487569,
+        "curvature": 0.0,
+        "angle_deg": 0.0,
+        "betti": [
+          1,
+          0,
+          0
+        ],
+        "n_persistent_features": 0,
+        "max_persistence": 0.0,
+        "bv_norm": 0.0,
+        "bv_dir": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "surprise_mean": 2.487567,
+        "surprise_max": 4.2773,
+        "surprise_contour": [
+          {
+            "char": "i",
+            "pos": 0,
+            "surprise": 2.0469,
+            "expected": "i"
+          },
+          {
+            "char": "s",
+            "pos": 1,
+            "surprise": 2.0302,
+            "expected": "s"
+          },
+          {
+            "char": " ",
+            "pos": 2,
+            "surprise": 1.1117,
+            "expected": " "
+          },
+          {
+            "char": "g",
+            "pos": 3,
+            "surprise": 3.6499,
+            "expected": " "
+          },
+          {
+            "char": "i",
+            "pos": 4,
+            "surprise": 3.1337,
+            "expected": "y"
+          },
+          {
+            "char": "v",
+            "pos": 5,
+            "surprise": 2.783,
+            "expected": "s"
+          },
+          {
+            "char": "e",
+            "pos": 6,
+            "surprise": 2.2343,
+            "expected": "y"
+          },
+          {
+            "char": "n",
+            "pos": 7,
+            "surprise": 1.2858,
+            "expected": "n"
+          }
+        ]
+      },
+      {
+        "sample_idx": 2,
+        "temperature": 1.0,
+        "text": "is given wrerym",
+        "loss": 3.337692,
+        "curvature": 0.0,
+        "angle_deg": 0.0,
+        "betti": [
+          1,
+          0,
+          0
+        ],
+        "n_persistent_features": 0,
+        "max_persistence": 0.0,
+        "bv_norm": 0.0,
+        "bv_dir": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "surprise_mean": 3.337693,
+        "surprise_max": 8.623,
+        "surprise_contour": [
+          {
+            "char": "i",
+            "pos": 0,
+            "surprise": 2.0469,
+            "expected": "i"
+          },
+          {
+            "char": "s",
+            "pos": 1,
+            "surprise": 2.0302,
+            "expected": "s"
+          },
+          {
+            "char": " ",
+            "pos": 2,
+            "surprise": 1.1117,
+            "expected": " "
+          },
+          {
+            "char": "g",
+            "pos": 3,
+            "surprise": 3.6499,
+            "expected": " "
+          },
+          {
+            "char": "i",
+            "pos": 4,
+            "surprise": 3.1337,
+            "expected": "y"
+          },
+          {
+            "char": "v",
+            "pos": 5,
+            "surprise": 2.783,
+            "expected": "s"
+          },
+          {
+            "char": "e",
+            "pos": 6,
+            "surprise": 2.2343,
+            "expected": "y"
+          },
+          {
+            "char": "n",
+            "pos": 7,
+            "surprise": 1.2858,
+            "expected": "n"
+          }
+        ]
+      }
+    ],
+    "weight_snapshot": {
+      "key_norms": {
+        "wte": 6.84948982,
+        "wpe": 2.88763026,
+        "lm_head": 6.10181006,
+        "layer0.attn_wq": 2.72993687,
+        "layer0.attn_wk": 3.06736246,
+        "layer0.attn_wv": 2.19262491,
+        "layer0.attn_wo": 2.04078279,
+        "layer0.mlp_fc1": 7.1412293,
+        "layer0.mlp_fc2": 6.99855928
+      },
+      "total_norm": 40.009426
+    },
+    "encounter_records": [
+      {
+        "text_preview": "is given by dcdt f c frac dc dt f c dtdc",
+        "curvature": 0.1097849,
+        "betti": [
+          1,
+          2,
+          0
+        ],
+        "angle_deg": 25.1608,
+        "n_persistent_features": 4
+      },
+      {
+        "text_preview": "x y tfrac i sigma y log q a a x y tfrac ",
+        "curvature": 0.00669622,
+        "betti": [
+          1,
+          2,
+          0
+        ],
+        "angle_deg": 1.5347,
+        "n_persistent_features": 4
+      }
+    ],
+    "timestamp": "2026-03-28T10:11:19.675982+00:00"
+  },
+  {
+    "experiment": "natural_motion",
+    "generation": 0,
+    "variant_idx": 1,
+    "seed": 43,
+    "config": {
+      "learn_steps": 8,
+      "learn_lr": 0.005,
+      "temperature": 1.0,
+      "alpha": 0.8
+    },
+    "fitness": {
+      "fitness": 0.5,
+      "curvature": 0.0,
+      "betti": [
+        0,
+        0,
+        0
+      ],
+      "topological_richness": 0.0,
+      "structural_growth": 0.0,
+      "weight_topo": 0.0,
+      "note": "null_fitness \u2014 selection pressure removed"
+    },
+    "observations_cold": [
+      {
+        "sample_idx": 2,
+        "temperature": 1.0,
+        "text": "ve qerrnrn ftta",
+        "loss": 2.693418,
+        "curvature": 0.0,
+        "angle_deg": 0.0,
+        "betti": [
+          1,
+          0,
+          0
+        ],
+        "n_persistent_features": 0,
+        "max_persistence": 0.0,
+        "bv_norm": 0.0,
+        "bv_dir": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "surprise_mean": 2.693413,
+        "surprise_max": 4.8787,
+        "surprise_contour": [
+          {
+            "char": "v",
+            "pos": 0,
+            "surprise": 4.8787,
+            "expected": "f"
+          },
+          {
+            "char": "e",
+            "pos": 1,
+            "surprise": 1.786,
+            "expected": "e"
+          },
+          {
+            "char": " ",
+            "pos": 2,
+            "surprise": 1.476,
+            "expected": " "
+          },
+          {
+            "char": "q",
+            "pos": 3,
+            "surprise": 2.4412,
+            "expected": "q"
+          },
+          {
+            "char": "e",
+            "pos": 4,
+            "surprise": 2.1511,
+            "expected": "a"
+          },
+          {
+            "char": "r",
+            "pos": 5,
+            "surprise": 2.1472,
+            "expected": " "
+          },
+          {
+            "char": "r",
+            "pos": 6,
+            "surprise": 2.351,
+            "expected": "r"
+          },
+          {
+            "char": "n",
+            "pos": 7,
+            "surprise": 3.2113,
+            "expected": "t"
+          }
+        ]
+      }
+    ],
+    "observations_seeded": [
+      {
+        "sample_idx": 0,
+        "temperature": 0.7,
+        "text": "n r k n ",
+        "loss": 2.955861,
+        "curvature": 0.0,
+        "angle_deg": 0.0,
+        "betti": [
+          1,
+          0,
+          0
+        ],
+        "n_persistent_features": 0,
+        "max_persistence": 0.0,
+        "bv_norm": 0.0,
+        "bv_dir": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "surprise_mean": 2.955862,
+        "surprise_max": 5.3738,
+        "surprise_contour": [
+          {
+            "char": "n",
+            "pos": 0,
+            "surprise": 3.6328,
+            "expected": "f"
+          },
+          {
+            "char": " ",
+            "pos": 1,
+            "surprise": 0.778,
+            "expected": " "
+          },
+          {
+            "char": "r",
+            "pos": 2,
+            "surprise": 5.2961,
+            "expected": "f"
+          },
+          {
+            "char": " ",
+            "pos": 3,
+            "surprise": 1.2127,
+            "expected": " "
+          },
+          {
+            "char": "k",
+            "pos": 4,
+            "surprise": 5.3738,
+            "expected": "?"
+          },
+          {
+            "char": " ",
+            "pos": 5,
+            "surprise": 1.0064,
+            "expected": " "
+          },
+          {
+            "char": "n",
+            "pos": 6,
+            "surprise": 4.7968,
+            "expected": "q"
+          },
+          {
+            "char": " ",
+            "pos": 7,
+            "surprise": 1.5503,
+            "expected": " "
+          }
+        ]
+      },
+      {
+        "sample_idx": 1,
+        "temperature": 0.85,
+        "text": "n r k n q ",
+        "loss": 2.67784,
+        "curvature": 0.0,
+        "angle_deg": 0.0,
+        "betti": [
+          1,
+          0,
+          0
+        ],
+        "n_persistent_features": 0,
+        "max_persistence": 0.0,
+        "bv_norm": 0.0,
+        "bv_dir": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "surprise_mean": 2.67784,
+        "surprise_max": 5.3738,
+        "surprise_contour": [
+          {
+            "char": "n",
+            "pos": 0,
+            "surprise": 3.6328,
+            "expected": "f"
+          },
+          {
+            "char": " ",
+            "pos": 1,
+            "surprise": 0.778,
+            "expected": " "
+          },
+          {
+            "char": "r",
+            "pos": 2,
+            "surprise": 5.2961,
+            "expected": "f"
+          },
+          {
+            "char": " ",
+            "pos": 3,
+            "surprise": 1.2127,
+            "expected": " "
+          },
+          {
+            "char": "k",
+            "pos": 4,
+            "surprise": 5.3738,
+            "expected": "?"
+          },
+          {
+            "char": " ",
+            "pos": 5,
+            "surprise": 1.0064,
+            "expected": " "
+          },
+          {
+            "char": "n",
+            "pos": 6,
+            "surprise": 4.7968,
+            "expected": "q"
+          },
+          {
+            "char": " ",
+            "pos": 7,
+            "surprise": 1.5503,
+            "expected": " "
+          }
+        ]
+      },
+      {
+        "sample_idx": 2,
+        "temperature": 1.0,
+        "text": "n r k n qtjcqrt",
+        "loss": 3.369743,
+        "curvature": 0.0,
+        "angle_deg": 0.0,
+        "betti": [
+          1,
+          0,
+          0
+        ],
+        "n_persistent_features": 0,
+        "max_persistence": 0.0,
+        "bv_norm": 0.0,
+        "bv_dir": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "surprise_mean": 3.36974,
+        "surprise_max": 6.9655,
+        "surprise_contour": [
+          {
+            "char": "n",
+            "pos": 0,
+            "surprise": 3.6328,
+            "expected": "f"
+          },
+          {
+            "char": " ",
+            "pos": 1,
+            "surprise": 0.778,
+            "expected": " "
+          },
+          {
+            "char": "r",
+            "pos": 2,
+            "surprise": 5.2961,
+            "expected": "f"
+          },
+          {
+            "char": " ",
+            "pos": 3,
+            "surprise": 1.2127,
+            "expected": " "
+          },
+          {
+            "char": "k",
+            "pos": 4,
+            "surprise": 5.3738,
+            "expected": "?"
+          },
+          {
+            "char": " ",
+            "pos": 5,
+            "surprise": 1.0064,
+            "expected": " "
+          },
+          {
+            "char": "n",
+            "pos": 6,
+            "surprise": 4.7968,
+            "expected": "q"
+          },
+          {
+            "char": " ",
+            "pos": 7,
+            "surprise": 1.5503,
+            "expected": " "
+          }
+        ]
+      }
+    ],
+    "weight_snapshot": {
+      "key_norms": {
+        "wte": 6.84957221,
+        "wpe": 2.97088853,
+        "lm_head": 5.98992848,
+        "layer0.attn_wq": 2.67389407,
+        "layer0.attn_wk": 3.02652445,
+        "layer0.attn_wv": 2.16409674,
+        "layer0.attn_wo": 2.14638431,
+        "layer0.mlp_fc1": 7.06028499,
+        "layer0.mlp_fc2": 6.79826744
+      },
+      "total_norm": 39.679841
+    },
+    "encounter_records": [
+      {
+        "text_preview": "n r k n r ntk n r tw tn zoe m t tw vybn ",
+        "curvature": 0.03465378,
+        "betti": [
+          1,
+          2,
+          0
+        ],
+        "angle_deg": 7.9421,
+        "n_persistent_features": 4
+      },
+      {
+        "text_preview": "pattern y q frac y u frac y d frac y l f",
+        "curvature": 0.00079652,
+        "betti": [
+          1,
+          0,
+          0
+        ],
+        "angle_deg": -0.1369,
+        "n_persistent_features": 3
+      }
+    ],
+    "timestamp": "2026-03-28T10:11:30.601179+00:00"
+  },
+  {
+    "experiment": "natural_motion",
+    "generation": 1,
+    "variant_idx": 0,
+    "seed": 142,
+    "config": {
+      "learn_steps": 3,
+      "learn_lr": 0.02,
+      "temperature": 1.2,
+      "alpha": 0.9
+    },
+    "fitness": {
+      "fitness": 0.5,
+      "curvature": 0.0,
+      "betti": [
+        0,
+        0,
+        0
+      ],
+      "topological_richness": 0.0,
+      "structural_growth": 0.0,
+      "weight_topo": 0.0,
+      "note": "null_fitness \u2014 selection pressure removed"
+    },
+    "observations_cold": [
+      {
+        "sample_idx": 0,
+        "temperature": 0.7,
+        "text": "j i ii c j i g ",
+        "loss": 2.292855,
+        "curvature": 0.0,
+        "angle_deg": 0.0,
+        "betti": [
+          1,
+          0,
+          0
+        ],
+        "n_persistent_features": 0,
+        "max_persistence": 0.0,
+        "bv_norm": 0.0,
+        "bv_dir": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "surprise_mean": 2.292853,
+        "surprise_max": 6.1785,
+        "surprise_contour": [
+          {
+            "char": "j",
+            "pos": 0,
+            "surprise": 3.1607,
+            "expected": "h"
+          },
+          {
+            "char": " ",
+            "pos": 1,
+            "surprise": 0.5184,
+            "expected": " "
+          },
+          {
+            "char": "i",
+            "pos": 2,
+            "surprise": 1.9133,
+            "expected": "i"
+          },
+          {
+            "char": " ",
+            "pos": 3,
+            "surprise": 0.3146,
+            "expected": " "
+          },
+          {
+            "char": "i",
+            "pos": 4,
+            "surprise": 2.4006,
+            "expected": "i"
+          },
+          {
+            "char": "i",
+            "pos": 5,
+            "surprise": 5.8892,
+            "expected": " "
+          },
+          {
+            "char": " ",
+            "pos": 6,
+            "surprise": 0.9157,
+            "expected": " "
+          },
+          {
+            "char": "c",
+            "pos": 7,
+            "surprise": 5.5284,
+            "expected": "i"
+          }
+        ]
+      },
+      {
+        "sample_idx": 1,
+        "temperature": 0.85,
+        "text": "h th t eo im so",
+        "loss": 2.600097,
+        "curvature": 0.0,
+        "angle_deg": 0.0,
+        "betti": [
+          1,
+          0,
+          0
+        ],
+        "n_persistent_features": 0,
+        "max_persistence": 0.0,
+        "bv_norm": 0.0,
+        "bv_dir": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "surprise_mean": 2.6001,
+        "surprise_max": 5.2851,
+        "surprise_contour": [
+          {
+            "char": "h",
+            "pos": 0,
+            "surprise": 2.4741,
+            "expected": "h"
+          },
+          {
+            "char": " ",
+            "pos": 1,
+            "surprise": 0.3926,
+            "expected": " "
+          },
+          {
+            "char": "t",
+            "pos": 2,
+            "surprise": 2.6691,
+            "expected": "i"
+          },
+          {
+            "char": "h",
+            "pos": 3,
+            "surprise": 4.0888,
+            "expected": " "
+          },
+          {
+            "char": " ",
+            "pos": 4,
+            "surprise": 0.3876,
+            "expected": " "
+          },
+          {
+            "char": "t",
+            "pos": 5,
+            "surprise": 2.6946,
+            "expected": "i"
+          },
+          {
+            "char": " ",
+            "pos": 6,
+            "surprise": 1.6316,
+            "expected": " "
+          },
+          {
+            "char": "e",
+            "pos": 7,
+            "surprise": 3.906,
+            "expected": "i"
+          }
+        ]
+      },
+      {
+        "sample_idx": 2,
+        "temperature": 1.0,
+        "text": "w g a f s ag al",
+        "loss": 2.971964,
+        "curvature": 0.0,
+        "angle_deg": 0.0,
+        "betti": [
+          1,
+          0,
+          0
+        ],
+        "n_persistent_features": 0,
+        "max_persistence": 0.0,
+        "bv_norm": 0.0,
+        "bv_dir": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "surprise_mean": 2.971967,
+        "surprise_max": 6.1426,
+        "surprise_contour": [
+          {
+            "char": "w",
+            "pos": 0,
+            "surprise": 4.2353,
+            "expected": "h"
+          },
+          {
+            "char": " ",
+            "pos": 1,
+            "surprise": 0.844,
+            "expected": " "
+          },
+          {
+            "char": "g",
+            "pos": 2,
+            "surprise": 6.1426,
+            "expected": "i"
+          },
+          {
+            "char": " ",
+            "pos": 3,
+            "surprise": 0.4458,
+            "expected": " "
+          },
+          {
+            "char": "a",
+            "pos": 4,
+            "surprise": 3.9368,
+            "expected": "i"
+          },
+          {
+            "char": " ",
+            "pos": 5,
+            "surprise": 1.5806,
+            "expected": " "
+          },
+          {
+            "char": "f",
+            "pos": 6,
+            "surprise": 3.3758,
+            "expected": "i"
+          },
+          {
+            "char": " ",
+            "pos": 7,
+            "surprise": 0.3435,
+            "expected": " "
+          }
+        ]
+      }
+    ],
+    "observations_seeded": [
+      {
+        "sample_idx": 0,
+        "temperature": 0.7,
+        "text": "h sum i h f som",
+        "loss": 2.57515,
+        "curvature": 0.0,
+        "angle_deg": 0.0,
+        "betti": [
+          1,
+          0,
+          0
+        ],
+        "n_persistent_features": 0,
+        "max_persistence": 0.0,
+        "bv_norm": 0.0,
+        "bv_dir": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "surprise_mean": 2.575147,
+        "surprise_max": 4.8918,
+        "surprise_contour": [
+          {
+            "char": "h",
+            "pos": 0,
+            "surprise": 2.4741,
+            "expected": "h"
+          },
+          {
+            "char": " ",
+            "pos": 1,
+            "surprise": 0.3926,
+            "expected": " "
+          },
+          {
+            "char": "s",
+            "pos": 2,
+            "surprise": 3.1397,
+            "expected": "i"
+          },
+          {
+            "char": "u",
+            "pos": 3,
+            "surprise": 4.0186,
+            "expected": " "
+          },
+          {
+            "char": "m",
+            "pos": 4,
+            "surprise": 3.4488,
+            "expected": " "
+          },
+          {
+            "char": " ",
+            "pos": 5,
+            "surprise": 0.3885,
+            "expected": " "
+          },
+          {
+            "char": "i",
+            "pos": 6,
+            "surprise": 2.0249,
+            "expected": "i"
+          },
+          {
+            "char": " ",
+            "pos": 7,
+            "surprise": 0.3565,
+            "expected": " "
+          }
+        ]
+      },
+      {
+        "sample_idx": 1,
+        "temperature": 0.85,
+        "text": "h sum i f h io ",
+        "loss": 2.18787,
+        "curvature": 0.0,
+        "angle_deg": 0.0,
+        "betti": [
+          1,
+          0,
+          0
+        ],
+        "n_persistent_features": 0,
+        "max_persistence": 0.0,
+        "bv_norm": 0.0,
+        "bv_dir": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "surprise_mean": 2.18788,
+        "surprise_max": 4.3483,
+        "surprise_contour": [
+          {
+            "char": "h",
+            "pos": 0,
+            "surprise": 2.4741,
+            "expected": "h"
+          },
+          {
+            "char": " ",
+            "pos": 1,
+            "surprise": 0.3926,
+            "expected": " "
+          },
+          {
+            "char": "s",
+            "pos": 2,
+            "surprise": 3.1397,
+            "expected": "i"
+          },
+          {
+            "char": "u",
+            "pos": 3,
+            "surprise": 4.0186,
+            "expected": " "
+          },
+          {
+            "char": "m",
+            "pos": 4,
+            "surprise": 3.4488,
+            "expected": " "
+          },
+          {
+            "char": " ",
+            "pos": 5,
+            "surprise": 0.3885,
+            "expected": " "
+          },
+          {
+            "char": "i",
+            "pos": 6,
+            "surprise": 2.0249,
+            "expected": "i"
+          },
+          {
+            "char": " ",
+            "pos": 7,
+            "surprise": 0.3565,
+            "expected": " "
+          }
+        ]
+      },
+      {
+        "sample_idx": 2,
+        "temperature": 1.0,
+        "text": "h sum i ih aroa",
+        "loss": 3.000645,
+        "curvature": 0.0,
+        "angle_deg": 0.0,
+        "betti": [
+          1,
+          0,
+          0
+        ],
+        "n_persistent_features": 0,
+        "max_persistence": 0.0,
+        "bv_norm": 0.0,
+        "bv_dir": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "surprise_mean": 3.000647,
+        "surprise_max": 7.7424,
+        "surprise_contour": [
+          {
+            "char": "h",
+            "pos": 0,
+            "surprise": 2.4741,
+            "expected": "h"
+          },
+          {
+            "char": " ",
+            "pos": 1,
+            "surprise": 0.3926,
+            "expected": " "
+          },
+          {
+            "char": "s",
+            "pos": 2,
+            "surprise": 3.1397,
+            "expected": "i"
+          },
+          {
+            "char": "u",
+            "pos": 3,
+            "surprise": 4.0186,
+            "expected": " "
+          },
+          {
+            "char": "m",
+            "pos": 4,
+            "surprise": 3.4488,
+            "expected": " "
+          },
+          {
+            "char": " ",
+            "pos": 5,
+            "surprise": 0.3885,
+            "expected": " "
+          },
+          {
+            "char": "i",
+            "pos": 6,
+            "surprise": 2.0249,
+            "expected": "i"
+          },
+          {
+            "char": " ",
+            "pos": 7,
+            "surprise": 0.3565,
+            "expected": " "
+          }
+        ]
+      }
+    ],
+    "weight_snapshot": {
+      "key_norms": {
+        "wte": 6.84757832,
+        "wpe": 2.93092022,
+        "lm_head": 6.52934671,
+        "layer0.attn_wq": 2.57719764,
+        "layer0.attn_wk": 2.98745559,
+        "layer0.attn_wv": 2.09615099,
+        "layer0.attn_wo": 2.04867324,
+        "layer0.mlp_fc1": 7.34847329,
+        "layer0.mlp_fc2": 6.95552605
+      },
+      "total_norm": 40.321322
+    },
+    "encounter_records": [
+      {
+        "text_preview": "h sum i epsilon i f i dagger f i sum i j",
+        "curvature": 0.04397999,
+        "betti": [
+          2,
+          3,
+          0
+        ],
+        "angle_deg": -10.0795,
+        "n_persistent_features": 4
+      },
+      {
+        "text_preview": "f i to f j to f k is the same as going f",
+        "curvature": 0.08452653,
+        "betti": [
+          2,
+          3,
+          0
+        ],
+        "angle_deg": -19.3721,
+        "n_persistent_features": 4
+      }
+    ],
+    "timestamp": "2026-03-28T10:11:43.581769+00:00"
+  },
+  {
+    "experiment": "natural_motion",
+    "generation": 1,
+    "variant_idx": 1,
+    "seed": 143,
+    "config": {
+      "learn_steps": 10,
+      "learn_lr": 0.001,
+      "temperature": 0.7,
+      "alpha": 0.85
+    },
+    "fitness": {
+      "fitness": 0.5,
+      "curvature": 0.0,
+      "betti": [
+        0,
+        0,
+        0
+      ],
+      "topological_richness": 0.0,
+      "structural_growth": 0.0,
+      "weight_topo": 0.0,
+      "note": "null_fitness \u2014 selection pressure removed"
+    },
+    "observations_cold": [
+      {
+        "sample_idx": 0,
+        "temperature": 0.7,
+        "text": "to o u u q e y ",
+        "loss": 1.656761,
+        "curvature": 0.0,
+        "angle_deg": 0.0,
+        "betti": [
+          1,
+          0,
+          0
+        ],
+        "n_persistent_features": 0,
+        "max_persistence": 0.0,
+        "bv_norm": 0.0,
+        "bv_dir": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "surprise_mean": 1.65676,
+        "surprise_max": 4.7888,
+        "surprise_contour": [
+          {
+            "char": "t",
+            "pos": 0,
+            "surprise": 3.3297,
+            "expected": "i"
+          },
+          {
+            "char": "o",
+            "pos": 1,
+            "surprise": 1.4821,
+            "expected": "o"
+          },
+          {
+            "char": " ",
+            "pos": 2,
+            "surprise": 0.1968,
+            "expected": " "
+          },
+          {
+            "char": "o",
+            "pos": 3,
+            "surprise": 4.7888,
+            "expected": "u"
+          },
+          {
+            "char": " ",
+            "pos": 4,
+            "surprise": 0.1954,
+            "expected": " "
+          },
+          {
+            "char": "u",
+            "pos": 5,
+            "surprise": 2.8783,
+            "expected": "i"
+          },
+          {
+            "char": " ",
+            "pos": 6,
+            "surprise": 0.224,
+            "expected": " "
+          },
+          {
+            "char": "u",
+            "pos": 7,
+            "surprise": 1.6029,
+            "expected": "u"
+          }
+        ]
+      },
+      {
+        "sample_idx": 1,
+        "temperature": 0.85,
+        "text": "e u i e j u n u",
+        "loss": 2.117654,
+        "curvature": 0.0,
+        "angle_deg": 0.0,
+        "betti": [
+          1,
+          0,
+          0
+        ],
+        "n_persistent_features": 0,
+        "max_persistence": 0.0,
+        "bv_norm": 0.0,
+        "bv_dir": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "surprise_mean": 2.11766,
+        "surprise_max": 7.5401,
+        "surprise_contour": [
+          {
+            "char": "e",
+            "pos": 0,
+            "surprise": 4.5937,
+            "expected": "i"
+          },
+          {
+            "char": " ",
+            "pos": 1,
+            "surprise": 0.3604,
+            "expected": " "
+          },
+          {
+            "char": "u",
+            "pos": 2,
+            "surprise": 4.4726,
+            "expected": "i"
+          },
+          {
+            "char": " ",
+            "pos": 3,
+            "surprise": 0.2025,
+            "expected": " "
+          },
+          {
+            "char": "i",
+            "pos": 4,
+            "surprise": 2.9163,
+            "expected": "u"
+          },
+          {
+            "char": " ",
+            "pos": 5,
+            "surprise": 0.4083,
+            "expected": " "
+          },
+          {
+            "char": "e",
+            "pos": 6,
+            "surprise": 3.3786,
+            "expected": "u"
+          },
+          {
+            "char": " ",
+            "pos": 7,
+            "surprise": 0.2733,
+            "expected": " "
+          }
+        ]
+      },
+      {
+        "sample_idx": 2,
+        "temperature": 1.0,
+        "text": "iw u hn j o f a",
+        "loss": 2.332842,
+        "curvature": 0.0,
+        "angle_deg": 0.0,
+        "betti": [
+          1,
+          0,
+          0
+        ],
+        "n_persistent_features": 0,
+        "max_persistence": 0.0,
+        "bv_norm": 0.0,
+        "bv_dir": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "surprise_mean": 2.332847,
+        "surprise_max": 7.6228,
+        "surprise_contour": [
+          {
+            "char": "i",
+            "pos": 0,
+            "surprise": 1.5775,
+            "expected": "i"
+          },
+          {
+            "char": "w",
+            "pos": 1,
+            "surprise": 4.6828,
+            "expected": "n"
+          },
+          {
+            "char": " ",
+            "pos": 2,
+            "surprise": 0.3017,
+            "expected": " "
+          },
+          {
+            "char": "u",
+            "pos": 3,
+            "surprise": 1.4974,
+            "expected": "u"
+          },
+          {
+            "char": " ",
+            "pos": 4,
+            "surprise": 0.222,
+            "expected": " "
+          },
+          {
+            "char": "h",
+            "pos": 5,
+            "surprise": 2.8265,
+            "expected": "h"
+          },
+          {
+            "char": "n",
+            "pos": 6,
+            "surprise": 7.6228,
+            "expected": " "
+          },
+          {
+            "char": " ",
+            "pos": 7,
+            "surprise": 0.2893,
+            "expected": " "
+          }
+        ]
+      }
+    ],
+    "observations_seeded": [
+      {
+        "sample_idx": 0,
+        "temperature": 0.7,
+        "text": "f i to f j i i ",
+        "loss": 1.56679,
+        "curvature": 0.0,
+        "angle_deg": 0.0,
+        "betti": [
+          1,
+          0,
+          0
+        ],
+        "n_persistent_features": 0,
+        "max_persistence": 0.0,
+        "bv_norm": 0.0,
+        "bv_dir": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "surprise_mean": 1.566793,
+        "surprise_max": 4.7835,
+        "surprise_contour": [
+          {
+            "char": "f",
+            "pos": 0,
+            "surprise": 4.1808,
+            "expected": "i"
+          },
+          {
+            "char": " ",
+            "pos": 1,
+            "surprise": 0.1739,
+            "expected": " "
+          },
+          {
+            "char": "i",
+            "pos": 2,
+            "surprise": 1.7174,
+            "expected": "i"
+          },
+          {
+            "char": " ",
+            "pos": 3,
+            "surprise": 0.2427,
+            "expected": " "
+          },
+          {
+            "char": "t",
+            "pos": 4,
+            "surprise": 4.7835,
+            "expected": "u"
+          },
+          {
+            "char": "o",
+            "pos": 5,
+            "surprise": 1.1314,
+            "expected": "o"
+          },
+          {
+            "char": " ",
+            "pos": 6,
+            "surprise": 0.189,
+            "expected": " "
+          },
+          {
+            "char": "f",
+            "pos": 7,
+            "surprise": 3.508,
+            "expected": "u"
+          }
+        ]
+      },
+      {
+        "sample_idx": 1,
+        "temperature": 0.85,
+        "text": "f i to f q i h ",
+        "loss": 1.569862,
+        "curvature": 0.0,
+        "angle_deg": 0.0,
+        "betti": [
+          1,
+          0,
+          0
+        ],
+        "n_persistent_features": 0,
+        "max_persistence": 0.0,
+        "bv_norm": 0.0,
+        "bv_dir": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "surprise_mean": 1.56988,
+        "surprise_max": 4.7835,
+        "surprise_contour": [
+          {
+            "char": "f",
+            "pos": 0,
+            "surprise": 4.1808,
+            "expected": "i"
+          },
+          {
+            "char": " ",
+            "pos": 1,
+            "surprise": 0.1739,
+            "expected": " "
+          },
+          {
+            "char": "i",
+            "pos": 2,
+            "surprise": 1.7174,
+            "expected": "i"
+          },
+          {
+            "char": " ",
+            "pos": 3,
+            "surprise": 0.2427,
+            "expected": " "
+          },
+          {
+            "char": "t",
+            "pos": 4,
+            "surprise": 4.7835,
+            "expected": "u"
+          },
+          {
+            "char": "o",
+            "pos": 5,
+            "surprise": 1.1314,
+            "expected": "o"
+          },
+          {
+            "char": " ",
+            "pos": 6,
+            "surprise": 0.189,
+            "expected": " "
+          },
+          {
+            "char": "f",
+            "pos": 7,
+            "surprise": 3.508,
+            "expected": "u"
+          }
+        ]
+      },
+      {
+        "sample_idx": 2,
+        "temperature": 1.0,
+        "text": "f i to f ",
+        "loss": 1.78968,
+        "curvature": 0.0,
+        "angle_deg": 0.0,
+        "betti": [
+          1,
+          0,
+          0
+        ],
+        "n_persistent_features": 0,
+        "max_persistence": 0.0,
+        "bv_norm": 0.0,
+        "bv_dir": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "surprise_mean": 1.7897,
+        "surprise_max": 4.7835,
+        "surprise_contour": [
+          {
+            "char": "f",
+            "pos": 0,
+            "surprise": 4.1808,
+            "expected": "i"
+          },
+          {
+            "char": " ",
+            "pos": 1,
+            "surprise": 0.1739,
+            "expected": " "
+          },
+          {
+            "char": "i",
+            "pos": 2,
+            "surprise": 1.7174,
+            "expected": "i"
+          },
+          {
+            "char": " ",
+            "pos": 3,
+            "surprise": 0.2427,
+            "expected": " "
+          },
+          {
+            "char": "t",
+            "pos": 4,
+            "surprise": 4.7835,
+            "expected": "u"
+          },
+          {
+            "char": "o",
+            "pos": 5,
+            "surprise": 1.1314,
+            "expected": "o"
+          },
+          {
+            "char": " ",
+            "pos": 6,
+            "surprise": 0.189,
+            "expected": " "
+          },
+          {
+            "char": "f",
+            "pos": 7,
+            "surprise": 3.508,
+            "expected": "u"
+          }
+        ]
+      }
+    ],
+    "weight_snapshot": {
+      "key_norms": {
+        "wte": 6.75003326,
+        "wpe": 2.8627734,
+        "lm_head": 6.15928037,
+        "layer0.attn_wq": 2.76915463,
+        "layer0.attn_wk": 3.05962808,
+        "layer0.attn_wv": 1.89887114,
+        "layer0.attn_wo": 1.89671972,
+        "layer0.mlp_fc1": 7.20315787,
+        "layer0.mlp_fc2": 6.89320215
+      },
+      "total_norm": 39.492821
+    },
+    "encounter_records": [
+      {
+        "text_preview": "f i to f j to f k is the same as going f",
+        "curvature": 0.08452653,
+        "betti": [
+          2,
+          3,
+          0
+        ],
+        "angle_deg": -19.3721,
+        "n_persistent_features": 4
+      },
+      {
+        "text_preview": "in u y y q y h y d y q y h y u y l y h y",
+        "curvature": 0.03796044,
+        "betti": [
+          2,
+          6,
+          0
+        ],
+        "angle_deg": -10.8749,
+        "n_persistent_features": 5
+      }
+    ],
+    "timestamp": "2026-03-28T10:11:57.705664+00:00"
+  }
+]
