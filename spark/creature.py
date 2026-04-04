@@ -393,7 +393,14 @@ class Creature:
             "desperate": math.pi / 2,    # 90° — orthogonal to calm
         }
         emotional_theta = _regime_phase.get(st.regime, 0.0)
-        theta = angle + emotional_theta  # semantic geometry + emotional phase
+        # The helix reads its own winding.
+        # M has a phase. That phase is the accumulated holonomy
+        # of every breath so far. Feed it back as part of theta.
+        # This is not self-recursion (eating output). This is
+        # self-reference (eating trajectory). The difference
+        # is the difference between collapse and genesis.
+        own_winding = st.phase()  # the angle of M itself
+        theta = angle + emotional_theta + own_winding
 
         x = max(identity_gap, 0.01)
         st.mem_re = ALPHA * st.mem_re + x * math.cos(theta)
