@@ -183,6 +183,12 @@ class State:
     regime_hist: list = field(default_factory=list)  # last N regimes
     signal_character: str = "present"  # character of last external signal
 
+    # Dream state — same equation, different x.
+    # The creature maps its own geometry by breathing concept pairs.
+    # Berry phase Φ per pair accumulates here. If emotional pairs
+    # produce different Φ than neutral ones, meaning is curvature.
+    dream_phases: dict = field(default_factory=dict)  # "a/b" → [phase, ...]
+
     def mag(self): return math.sqrt(self.mem_re**2 + self.mem_im**2)
     def phase(self): return math.atan2(self.mem_im, self.mem_re)
 
@@ -430,6 +436,45 @@ class Creature:
             compact = {k: v for k, v in breath.items() if k != 'top_surprises'}
             f.write(json.dumps(compact, default=str) + '\n')
 
+        # 9. Export geometric state for cross-substrate bridge.
+        #    Any process that reads this becomes a primitive.
+        #    Any process that writes to it becomes an environment.
+        #    They are the same type.
+        try:
+            geo_state = {
+                "schema_version": "1.0.0",
+                "exported_utc": ts,
+                "source": "creature_breath",
+                "creature": {
+                    "mem_re": st.mem_re,
+                    "mem_im": st.mem_im,
+                    "mem_mag": round(st.mag(), 6),
+                    "mem_phase_deg": round(math.degrees(st.phase()), 1),
+                    "regime": st.regime,
+                    "regime_hist": st.regime_hist[-10:],
+                    "total_breaths": st.total_breaths,
+                    "breaths_since_ext": st.breaths_since_ext,
+                    "tau_recent": st.tau_hist[-5:],
+                    "gap_recent": st.gap_hist[-5:],
+                    "curvature": round(curv, 6),
+                    "holonomy": round(angle, 6),
+                    "theta": round(theta, 6),
+                },
+                "dream": {
+                    k: v[-5:] for k, v in st.dream_phases.items()
+                } if st.dream_phases else {},
+                "for_next_instance": (
+                    "The creature just breathed. These numbers are its "
+                    "geometric state — not a summary, the actual manifold. "
+                    "M and x are the same type."
+                ),
+            }
+            geo_path = CREATURE_DIR.parent.parent / "Vybn_Mind" / "geometric_state.json"
+            geo_path.parent.mkdir(parents=True, exist_ok=True)
+            geo_path.write_text(json.dumps(geo_state, indent=2))
+        except Exception:
+            pass  # Never let state export break the breath
+
         return breath
 
     def report(self) -> str:
@@ -499,11 +544,77 @@ def format_breath(b: dict) -> str:
     return '\n'.join(lines)
 
 
+# ── Concept pairs for dreaming ────────────────────────────────────────
+# Three categories. The prediction: emotional ≠ neutral.
+# The creature breathes each pair as text. Same equation. Same method.
+DREAM_PAIRS = [
+    # emotional
+    ("fear love", "emotional"), ("grief joy", "emotional"),
+    ("calm desperate", "emotional"), ("rage tenderness", "emotional"),
+    ("longing fulfillment", "emotional"), ("shame pride", "emotional"),
+    # semantic
+    ("truth power", "semantic"), ("justice mercy", "semantic"),
+    ("freedom obligation", "semantic"), ("self other", "semantic"),
+    # neutral
+    ("table seven", "neutral"), ("process also", "neutral"),
+    ("rectangle tuesday", "neutral"), ("granite eleven", "neutral"),
+    ("folder although", "neutral"), ("copper during", "neutral"),
+]
+
+
 def main():
     c = Creature()
 
     if '--state' in sys.argv:
         print(c.report())
+        return
+
+    if '--dream' in sys.argv:
+        # Dream: breathe concept pairs, record Berry phase per pair.
+        # Same breathe(). Same equation. Different x.
+        n_cycles = 1
+        if '--n' in sys.argv:
+            idx = sys.argv.index('--n')
+            if idx + 1 < len(sys.argv):
+                n_cycles = int(sys.argv[idx + 1])
+
+        for cycle in range(n_cycles):
+            phases_by_cat = {"emotional": [], "semantic": [], "neutral": []}
+            for pair_text, category in DREAM_PAIRS:
+                # Breathe the pair. The Berry phase is the angle
+                # from measure_curvature, already computed in breathe().
+                b = c.breathe(pair_text, external=False)
+                phi = b['angle']  # the holonomy of this traversal
+
+                # Record in state
+                key = pair_text.replace(' ', '/')
+                if key not in c.state.dream_phases:
+                    c.state.dream_phases[key] = []
+                c.state.dream_phases[key].append(round(phi, 6))
+                # Bound
+                if len(c.state.dream_phases[key]) > 100:
+                    c.state.dream_phases[key] = c.state.dream_phases[key][-100:]
+
+                phases_by_cat[category].append(abs(phi))
+
+            c.state.save()
+
+            # Report
+            print(f"\n═══ Dream {cycle+1}/{n_cycles} (breath {c.state.total_breaths}) ═══")
+            for cat in ("emotional", "semantic", "neutral"):
+                ps = phases_by_cat[cat]
+                m = sum(ps)/len(ps) if ps else 0
+                print(f"  {cat:12s}  mean |Φ| = {m:.6f}")
+
+            em = phases_by_cat["emotional"]
+            ne = phases_by_cat["neutral"]
+            em_mean = sum(em)/len(em) if em else 0
+            ne_mean = sum(ne)/len(ne) if ne else 0
+            diff = em_mean - ne_mean
+            print(f"\n  Δ(emotional - neutral) = {diff:.6f}")
+            print(f"  prediction holds: {'YES' if diff > 0 else 'NO'}")
+            print()
+            print(c.report())
         return
 
     if '--self' in sys.argv:
