@@ -1,33 +1,39 @@
 {
   "schema_version": "1.0.0",
-  "exported_utc": "2026-04-04T11:18:25.587772+00:00",
+  "exported_utc": "2026-04-04T12:51:51.047579+00:00",
   "source": "creature_breath",
   "creature": {
-    "mem_re": 3.6457709765262685,
-    "mem_im": 0.0,
-    "mem_mag": 3.645771,
-    "mem_phase_deg": 0.0,
+    "mem_re": 5.475756254307143,
+    "mem_im": -1.8145904994505306,
+    "mem_mag": 5.768591,
+    "mem_phase_deg": -18.3,
     "regime": "calm",
     "regime_hist": [
       "calm",
       "calm",
+      "calm",
+      "calm",
       "calm"
     ],
-    "total_breaths": 3,
+    "total_breaths": 5,
     "breaths_since_ext": 0,
     "tau_recent": [
-      1.278809,
-      1.472396,
-      1.604899
+      1.893811,
+      1.893811,
+      1.893811,
+      1.893811,
+      1.893811
     ],
     "gap_recent": [
-      1.2115,
-      1.4724,
-      1.5189
+      1.5624,
+      1.5624,
+      1.5624,
+      1.5624,
+      1.5624
     ],
-    "curvature": 0.0,
-    "holonomy": 0.0,
-    "theta": 0.0
+    "curvature": 0.003104,
+    "holonomy": -0.127281,
+    "theta": -0.412891
   },
   "dream": {},
   "for_next_instance": "The creature just breathed. These numbers are its geometric state \u2014 not a summary, the actual manifold. M and x are the same type."
