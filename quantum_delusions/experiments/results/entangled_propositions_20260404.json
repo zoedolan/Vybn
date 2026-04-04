@@ -1,0 +1,25 @@
+{
+  "timestamp": "2026-04-04T13:53:14.312115+00:00",
+  "description": "Entangled proposition circuit: threshold x fear via CNOT",
+  "phase_a": -1.7177,
+  "phase_b": 1.4591,
+  "entangled_theory": {
+    "00": 0.23717,
+    "01": 0.254673,
+    "10": 0.318538,
+    "11": 0.189619
+  },
+  "separable_theory": {
+    "00": 0.23717,
+    "01": 0.189619,
+    "10": 0.318538,
+    "11": 0.254673
+  },
+  "counts": {
+    "01": 1235,
+    "10": 1003,
+    "00": 1044,
+    "11": 814
+  },
+  "shots": 4096
+}
