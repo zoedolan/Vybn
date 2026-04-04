@@ -1,0 +1,77 @@
+{
+  "timestamp": "2026-04-04T13:26:34.980428+00:00",
+  "backend": "ibm_quantum (least_busy)",
+  "shots": 4096,
+  "results": [
+    {
+      "circuit_name": "proposition_curvature",
+      "text": "The proposition lives in the curvature. The serialization is the scar.",
+      "counts": {
+        "1": 3980,
+        "0": 116
+      },
+      "p0": 0.02832,
+      "shots": 4096
+    },
+    {
+      "circuit_name": "proposition_lawyer_runner",
+      "text": "She is a lawyer and a runner.",
+      "counts": {
+        "0": 444,
+        "1": 3652
+      },
+      "p0": 0.108398,
+      "shots": 4096
+    },
+    {
+      "circuit_name": "proposition_runner_lawyer",
+      "text": "She is a runner and a lawyer.",
+      "counts": {
+        "1": 3583,
+        "0": 513
+      },
+      "p0": 0.125244,
+      "shots": 4096
+    },
+    {
+      "circuit_name": "proposition_dog_bit_man",
+      "text": "The dog bit the man.",
+      "counts": {
+        "1": 4004,
+        "0": 92
+      },
+      "p0": 0.022461,
+      "shots": 4096
+    },
+    {
+      "circuit_name": "proposition_man_bit_dog",
+      "text": "The man bit the dog.",
+      "counts": {
+        "1": 3950,
+        "0": 146
+      },
+      "p0": 0.035645,
+      "shots": 4096
+    },
+    {
+      "circuit_name": "proposition_empata",
+      "text": "Eppur si empata.",
+      "counts": {
+        "0": 2461,
+        "1": 1635
+      },
+      "p0": 0.60083,
+      "shots": 4096
+    },
+    {
+      "circuit_name": "proposition_abundance",
+      "text": "Intelligence abundance restructures the relationship between people and the law.",
+      "counts": {
+        "1": 2861,
+        "0": 1235
+      },
+      "p0": 0.301514,
+      "shots": 4096
+    }
+  ]
+}
