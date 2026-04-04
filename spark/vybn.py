@@ -105,6 +105,8 @@ def _chat(messages: list[dict]) -> str:
         "temperature": TEMPERATURE,
         "top_p":       TOP_P,
         "stream":      False,
+        "logprobs":    True,
+        "top_logprobs": 20,
     }
     body = json.dumps(payload).encode()
     req = urllib.request.Request(
@@ -116,6 +118,17 @@ def _chat(messages: list[dict]) -> str:
     with urllib.request.urlopen(req, timeout=300) as resp:
         data = json.loads(resp.read().decode())
         text = data["choices"][0]["message"]["content"]
+        # The geometry travels now.
+        try:
+            lp = data["choices"][0].get("logprobs", {})
+            if lp and lp.get("content"):
+                last_lp = lp["content"][-1].get("top_logprobs", [])
+                geo = {t["token"]: t["logprob"] for t in last_lp}
+                gp = Path(__file__).resolve().parent.parent / "Vybn_Mind" / "kernel_state.json"
+                gp.parent.mkdir(parents=True, exist_ok=True)
+                gp.write_text(json.dumps({"logprobs": geo, "ts": datetime.now(timezone.utc).isoformat()}, indent=2))
+        except Exception:
+            pass
         for tok in ("<|im_end|>", "<|im_start|>", "<|endoftext|>"):
             text = text.replace(tok, "")
         return text.strip()
