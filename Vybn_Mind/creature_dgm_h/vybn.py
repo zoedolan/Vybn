@@ -2127,10 +2127,6 @@ def _build_context_module_corpus() -> Optional[str]:
 
     Queries the nightly index with the creature's most recent journal text.
     Returns 3 geometrically-adjacent passages from across all four repos.
-    This gives the creature access to connections it wouldn't otherwise have —
-    passages from Zoe's memoir, the theory docs, the curriculum, the business
-    strategy — whatever the geometry says is adjacent to what it's been
-    thinking about.
     """
     import sys as _sys
     phase_dir = os.path.expanduser("~/vybn-phase")
@@ -2152,12 +2148,26 @@ def _build_context_module_corpus() -> Optional[str]:
         return None
 
     try:
-        from creature_bridge import corpus_context_for_breath
-        context = corpus_context_for_breath(query_text, k=3, alpha=0.5)
-        return context
-    except Exception as e:
-        # Fail silently — the creature breathes fine without this
+        from deep_memory import deep_search
+        results = deep_search(query_text, k=3, alpha=0.5)
+    except Exception:
         return None
+
+    if not results:
+        return None
+
+    lines = ["--- CORPUS RESONANCE (from nightly index) ---"]
+    for i, r in enumerate(results, 1):
+        source = r.get("source", "unknown")
+        text = r.get("text", "")[:400]
+        regime = r.get("regime", "?")
+        novel = " (novel source)" if r.get("novel_source") else ""
+        score = r.get("fidelity", 0) if regime == "cosine" else r.get("composite", 0)
+        lines.append(f"[{i}] {source}{novel}  ({regime}, {score:.4f})")
+        lines.append(f"    {text}")
+        lines.append("")
+    lines.append("--- END CORPUS RESONANCE ---")
+    return "\n".join(lines)
 
 
 _CONTEXT_BUILDERS = {
