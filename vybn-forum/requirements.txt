@@ -1,3 +1,0 @@
-mcp>=1.0.0
-gitpython>=3.1.0
-aiofiles>=23.0.0
