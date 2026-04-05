@@ -348,7 +348,7 @@ TOOLS = [
     {
         "name": "shell_exec",
         "description": (
-            "Execute a shell command on a DGX Spark. Sandboxed: some commands "
+            "Execute a shell command on the DGX Sparks. Sandboxed: some commands "
             "are blocked, destructive ones need confirmation. Disabled in lockdown mode."
         ),
         "inputSchema": {
@@ -380,7 +380,7 @@ TOOLS = [
     {
         "name": "read_file",
         "description": (
-            "Read a file on a DGX Spark. Confined to allowed directories. "
+            "Read a file on the DGX Sparks. Confined to allowed directories. "
             "Disabled in lockdown mode."
         ),
         "inputSchema": {
@@ -403,7 +403,7 @@ TOOLS = [
     {
         "name": "write_file",
         "description": (
-            "Write content to a file on a DGX Spark. Confined to allowed "
+            "Write content to a file on the DGX Sparks. Confined to allowed "
             "directories. Disabled in lockdown mode."
         ),
         "inputSchema": {

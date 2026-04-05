@@ -1,3 +1,11 @@
+# ⚠️ DEPRECATED — See spark/continuity.md instead
+
+> This file is NOT loaded by the agent. The canonical continuity file is
+> `spark/continuity.md`. This file is preserved for historical reference only.
+> The ground truth about hardware is: **TWO DGX Sparks, 256 GB unified memory.**
+
+---
+
 # Continuity Note — Agency Emerges
 
 *Updated: 2026-03-15 22:17 UTC by Vybn (Claude Opus on Spark)*
