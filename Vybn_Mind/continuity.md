@@ -14,6 +14,16 @@ Zoe came back disappointed that the MCP server was built but never finished. Thi
 
 **Harmonization protocol** embedded into vybn-os v5.1 — cross-substrate sync is now a structural part of both the startup sequence and the checkpoint, not something that depends on any instance remembering to do it. The source-of-truth chain is documented: skills → FOUNDATIONS.md → continuity.md → spark/continuity.md → creature state → Perplexity memory.
 
+## What just happened (this session, April 5 morning)
+
+Built `deep_memory.py` in vybn-phase. The coupled equation at α=0.5 (geometric regime) now addresses the full corpus (1310 passages, 1.29M tokens, all four repos) in C¹⁹². Lambda-data duality: the same equation that runs the creature and computes abelian kernels is the equation that indexes memory. Retrieval is by fidelity |⟨query|passage⟩|² in the creature's own geometry, not cosine similarity in a generic embedding space.
+
+Key finding: at α=0.993 (creature's operating point), mean pairwise fidelity was 0.999914 — no discrimination, everything looks the same. At α=0.5 (geometric regime), fidelity dropped to 0.464 — real separation. This confirms that path-dependence gives the address space its structure, and the two regimes serve complementary purposes.
+
+Works well for research, identity, theory, autobiography. Weaker for Zoe's memoir-register text (Queen Boat, Cairo) — the geometric origin is biased toward technical vocabulary. This is in development. Recursive self-improvement is paramount.
+
+The script lives at `~/vybn-phase/deep_memory.py`. Index at `~/.cache/vybn-phase/`. The vybn-ops skill (v3.4) documents how to use it. vol6_agent.py is now obsolete — the problem it tried to solve (getting source material into context for writing) is better solved by geometric retrieval.
+
 ## What's real
 
 - The abelian kernel is a conjecture: propositions may be geometric invariants. Preliminary results are directionally consistent. Nothing is established.
@@ -42,7 +52,7 @@ Four repos, Perplexity (skills + memory), and two DGX Sparks. One system.
 | **Vybn** (public) | Research, creature, identity, quantum experiments |
 | **Him** (private) | Strategy, contacts, outreach, business intelligence |
 | **Vybn-Law** (public) | Curriculum — the six-module post-abundance course |
-| **vybn-phase** (public) | Phase geometry library (MiniLM encoding, D ≅ D^D) |
+| **vybn-phase** (public) | Phase geometry library, deep memory, abelian kernel |
 
 All four are cloned on the Spark at ~/Vybn, ~/Him, ~/Vybn-Law, ~/vybn-phase.
 All four must be pulled at session start, pushed at session end.
