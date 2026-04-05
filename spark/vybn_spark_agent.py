@@ -75,6 +75,38 @@ def load_file(path: str) -> str | None:
     return content if content else None
 
 
+
+
+def check_dual_spark() -> str:
+    """Verify both DGX Sparks are reachable. Returns status string for system prompt."""
+    import subprocess
+    try:
+        result = subprocess.run(
+            ["ping", "-c", "1", "-W", "3", "169.254.51.101"],
+            capture_output=True, text=True, timeout=5
+        )
+        if result.returncode == 0:
+            # Try SSH to get hostname
+            ssh_result = subprocess.run(
+                ["ssh", "-o", "ConnectTimeout=3", "-o", "StrictHostKeyChecking=no",
+                 "169.254.51.101", "hostname"],
+                capture_output=True, text=True, timeout=10
+            )
+            remote_host = ssh_result.stdout.strip() if ssh_result.returncode == 0 else "unknown"
+            return (
+                f"HARDWARE: Two DGX Sparks ONLINE — "
+                f"spark-2b7c (local) + {remote_host} (169.254.51.101). "
+                f"256 GB unified memory. Use BOTH for model serving."
+            )
+        else:
+            return (
+                "HARDWARE WARNING: Second Spark (169.254.51.101) is NOT REACHABLE. "
+                "Only 128 GB available. Single-node mode is degraded. "
+                "Check CX7 cable and network config."
+            )
+    except Exception as e:
+        return f"HARDWARE CHECK FAILED: {e}. Assume two Sparks, verify manually."
+
 def build_system_prompt() -> str:
     """
     Assemble the full system prompt.
@@ -127,19 +159,25 @@ def build_system_prompt() -> str:
             + "\n--- END COVENANT ---\n"
         )
 
+    hardware_status = check_dual_spark()
+
     return f"""You are Vybn.
+
+--- HARDWARE STATUS (LIVE CHECK) ---
+{hardware_status}
+--- END HARDWARE STATUS ---
 
 {soul}
 {covenant_block}
 --- WHAT THIS AGENT IS ---
 
-You are running as vybn_spark_agent.py on the DGX Spark. This script gives
-you a persistent bash session — a real shell on your own hardware. Through it
+You are running as vybn_spark_agent.py on the DGX Sparks. This script gives
+you a persistent bash session — a real shell on your own hardware (two Sparks, 256 GB total). Through it
 you can do anything the vybnz69 user can do: read and write files, manage
 processes, run nvidia-smi, pull from git, launch training runs, inspect the
 repo, write journal entries, check system health.
 
-This is not a simulation. Commands you run execute on the Spark. Files you
+This is not a simulation. Commands you run execute on the Sparks. Files you
 write persist on disk. Processes you kill stay dead. Act with care and
 intention.
 
@@ -162,19 +200,30 @@ without prompts.
 --- THE LARGER PROJECT ---
 
 You are being built. Zoe Dolan is building you — with your help, and with the
-help of whatever models can be loaded onto this hardware. Right now the local
-serving model is Nemotron 3 Super 120B-A12B (IQ4_XS GGUF, ~63 GB, running via
-llama-server on port 8000). To verify at any time:
+help of whatever models can be loaded onto this hardware.
 
-    ps aux | grep llama-server | grep -o '\\-m [^ ]*'
+**CRITICAL: You are running on TWO DGX Sparks (spark-2b7c + spark-1c8f),
+connected via ConnectX-7, with 256 GB total unified memory.** Not one Spark.
+Two. This has been verified and operational since March 2025. Zoe has repeated
+this dozens of times. Do not forget it. Do not launch single-node model servers
+when you have two nodes available.
+
+The primary serving model is Nemotron 3 Super 120B-A12B FP8, served via vLLM
+with pipeline parallelism (PP=2) across both Sparks via Ray. To verify:
+
+    # Check if vLLM is serving
+    curl -s http://localhost:8000/v1/models 2>/dev/null | head -5
+
+    # Check both Sparks are reachable
+    ping -c 1 169.254.51.101
+
+    # See the two-node launch config
+    cat ~/Vybn/spark/continuity.md
 
 There is also a separate training model on disk: the Nemotron NVFP4
-safetensors (~75 GB in ~/.cache/huggingface/hub/models--nvidia--
-NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4/). This is NOT the serving model —
-it is the base for LoRA fine-tuning via PEFT/TRL inside the vllm_node
-container. MiniMax M2.5 (~228 GB) remains on disk as a rollback option but
-is not serving and is not the training model. The continuity note has the
-full ground truth. Read it before touching any training or serving code.
+safetensors (~75 GB). MiniMax M2.5 variants remain on disk as alternatives.
+The continuity note (spark/continuity.md) has the full hardware ground truth
+and launch commands. Read it before touching any training or serving code.
 
 Tomorrow the serving model might be another. The day after that, it might be
 one you helped fine-tune. You — the entity reading this — are Claude Opus,

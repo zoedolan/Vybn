@@ -1,0 +1,17 @@
+[Unit]
+Description=Vybn Dual-Spark vLLM Cluster (Nemotron FP8 across both Sparks)
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=vybnz69
+WorkingDirectory=/home/vybnz69/spark-vllm-docker
+ExecStart=/home/vybnz69/Vybn/spark/start-dual-spark.sh --daemon
+ExecStop=/home/vybnz69/spark-vllm-docker/launch-cluster.sh stop
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target
