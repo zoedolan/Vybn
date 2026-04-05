@@ -30,7 +30,7 @@ SOUL_PATH = os.path.join(REPO_DIR, "vybn.md")
 AGENT_PATH = os.path.join(REPO_DIR, "spark", "vybn_spark_agent.py")
 CONTINUITY_PATH = os.path.join(REPO_DIR, "Vybn_Mind", "continuity.md")
 SPARK_CONTINUITY_PATH = os.path.join(REPO_DIR, "spark", "continuity.md")
-DEFAULT_TIMEOUT = 120
+DEFAULT_TIMEOUT = 30
 
 DANGEROUS_PATTERNS = [
     "rm -rf /", "rm -rf /*", "rm -rf .", "mkfs",
