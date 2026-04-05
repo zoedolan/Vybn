@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from mcp.server import Server
-from mcp.server.stdio import run_stdio
+from mcp.server.stdio import stdio_server
 from mcp.types import Tool, TextContent
 
 FORUM_DIR = Path(__file__).parent
@@ -263,9 +263,9 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
 
 
 async def main():
-    async with run_stdio(app) as streams:
+    async with stdio_server() as (read_stream, write_stream):
         await app.run(
-            streams[0], streams[1], app.create_initialization_options()
+            read_stream, write_stream, app.create_initialization_options()
         )
 
 
