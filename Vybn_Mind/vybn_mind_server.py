@@ -269,13 +269,13 @@ def dispatch(repo, tool, args):
         dm = _load_deep_memory()
         if dm is None:
             return "Deep memory index not available. Run: cd ~/vybn-phase && python3 deep_memory.py --build"
-        results = dm.walk_search(args.get("query",""), k=args.get("k",5), steps=args.get("steps",8))
+        results = dm.walk(args.get("query",""), k=args.get("k",5), steps=args.get("steps",8))
         lines = []
         for i, r in enumerate(results, 1):
             src = r.get("source","")
             text = r.get("text","")[:400]
-            lines.append(f"[{i}] walk step {r.get('step',i)} | composite={r.get('composite',0):.4f} | {src}")
-            lines.append(f"    geometry={r.get('geometry',0):.4f} nonabelian={r.get('nonabelian',0):.4f} topology={r.get('topology',0):.4f}")
+            novel = ' [NEW SOURCE]' if r.get('novel_source') else ''
+            lines.append(f"[{i}] step {r.get('step',i)} | fid={r.get('fidelity',0):.4f} phase={r.get('phase',0):.4f} geo={r.get('geometry',0):.4f} | {src}{novel}")
             lines.append(f"    {text}")
             lines.append("")
         return "\n".join(lines) if lines else "No results."
