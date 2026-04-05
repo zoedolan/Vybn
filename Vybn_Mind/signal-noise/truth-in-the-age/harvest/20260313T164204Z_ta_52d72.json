@@ -1,0 +1,13 @@
+{
+  "session_id": "ta_52d723bd70c0",
+  "question": "motion",
+  "selected_starter": {
+    "key": "motion",
+    "label": "A self-represented litigant walks into court with an AI-drafted motion that's better than what opposing counsel filed. The judge can't tell the difference. Should she be able to? What breaks if she can't?"
+  },
+  "first_student_message": "A self-represented litigant walks into court with an AI-drafted motion that's better than what opposing counsel filed. The judge can't tell that she used AI. Should this be allowed? What does it mean for the public? What does it mean for the court?",
+  "final_share": "The party most plausibly threatened in this scenario is the court itself. Judges and their clerks may be forced to spend time sorting through filings that appear professionally written but contain fabricated or mischaracterized authorities --a problem already observed in several early cases involving generative AI.\n\nEven if hallucinated citations are largely a feature of earlier-generation LLMs and continue to decline as the technology improves, a structural issue remains: an LLM is designed to produce a response that satisfies the user\u2019s prompt, not to exercise professional judgment about when a claim is unsupported or when an argument should not be made. A licensed attorney, by contrast, operates under ethical and professional obligations --including duties of candor to the tribunal and competence-- that function as guardrails against submitting unreliable or misleading material to the court.\n\nThose guardrails do not apply in the same way here. The LLM itself cannot be sanctioned, and a self-represented litigant typically falls outside the disciplinary authority that governs members of the bar. As a result, when AI-generated filings contain errors, fabrications, or legally irrelevant argument, the burden of identifying and filtering those problems falls disproportionately on the court. In that sense, the potential harm is institutional: the judicial system may face increased costs in time, attention, and procedural management when evaluating filings that carry the surface markers of legal competence but lack the accountability structures that ordinarily accompany them.",
+  "messages_remaining": 14,
+  "timestamp": "2026-03-13T16:42:03.446Z",
+  "source": "student"
+}

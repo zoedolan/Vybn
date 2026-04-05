@@ -1,0 +1,16 @@
+{
+  "session_id": "ta_00c5e4a7ef77",
+  "question": "memo",
+  "messages": [
+    {
+      "role": "user",
+      "content": "You just used AI to draft a legal memo. Your supervising attorney can't tell. Is that memo yours? Not ethically \u2014 that question has a boring answer. Ontologically. What did you make?\n\nI think there is a sense of originality to using AI to create the memo. If AI collects public information, and public information is something I would have used anyway, originality isn't all lost. The baseline input would be important because those contain original ideas for what to go searching for and modifying those as one needs"
+    },
+    {
+      "role": "assistant",
+      "content": "You're making an interesting move here \u2014 grounding originality not in the output but in the *input*. The baseline prompt, the search direction, the judgment about what to go looking for and how to modify what comes back.\n\nLet me push on that.\n\nSay two associates get the same assignment. Both use the same AI tool. Both produce memos their supervisor can't distinguish. But one spent forty-five minutes crafting prompts, iterating, reshaping \u2014 and the other typed \"draft memo on X\" and submitted what came back.\n\nBy your framework, the first memo is *more theirs* than the second. The originality lives in the quality of the input and the iterative judgment.\n\nBut here's what I want you to sit with: **the supervisor can't tell the difference.** The output is indistinguishable. If originality lives in the input process, but the output carries no trace of that process \u2014 where exactly does the originality *reside*?\n\nYou used the phrase \"original ideas for what to go searching for.\" That's doing a lot of work. Is the originality in *knowing what to ask* \u2014 in the question itself? Or is it in something else?\n\nAnd a harder version: you said public information is something you \"would have used anyway.\" But *would you have*? Would you have found the same cases, read the same secondary sources, noticed the same connections? Or does the AI surface things you wouldn't have reached on your own \u2014 meaning the output contains originality that isn't yours *or* the machine's, but emerged from the interaction?\n\nWhat did you actually make, if the thing that's original is the direction of the search rather than the destination?"
+    }
+  ],
+  "created_at": 1773429090.5283933,
+  "returning": false
+}

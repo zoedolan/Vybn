@@ -1,0 +1,16 @@
+{
+  "session_id": "ta_e2e_test",
+  "question": "memo",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Quick test \u2014 is the memo mine if I wrote the prompt?"
+    },
+    {
+      "role": "assistant",
+      "content": "That's a sharp place to start. And I notice it smuggles in an assumption worth pulling apart before we answer it.\n\n\"I wrote the prompt\" \u2014 what does *writing the prompt* actually consist of? Because there's a spectrum, right? There's \"summarize this case\" and there's a carefully constructed prompt that encodes your theory of the case, your sense of the audience, your strategic framing, the specific precedents you want foregrounded. Those are different kinds of authorship.\n\nSo let me push back with this: **what was in the prompt?**\n\nIf the prompt contained your legal judgment \u2014 your read of which facts matter, which arguments are strongest, what the supervising attorney needs to hear \u2014 then maybe the AI is closer to a research assistant executing your vision. But if the prompt was \"draft a memo on whether this contract is enforceable,\" and the AI supplied the analysis, the structure, the reasoning, and the conclusion... what did *you* contribute?\n\nHere's where it gets uncomfortable. You've already seen from Wet Cement Words that the same model trained on different data doesn't just say different things \u2014 it *approaches differently*. The two-voice experiment showed that. So when you prompt an AI and it drafts a memo, the memo isn't just reflecting your prompt. It's reflecting the entire geometric structure of the model's training \u2014 every legal text, every brief, every judicial opinion that carved grooves into its representation space.\n\nSo whose reasoning is in that memo? Yours? The model's? The thousands of lawyers whose work became training data?\n\nWhat do you think \u2014 is authorship about the *spark* (the prompt, the intention) or the *substance* (the analysis, the words on the page)?"
+    }
+  ],
+  "created_at": 1773240133.5997744,
+  "returning": false
+}

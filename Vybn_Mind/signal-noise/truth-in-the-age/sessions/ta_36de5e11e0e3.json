@@ -1,0 +1,16 @@
+{
+  "session_id": "ta_36de5e11e0e3",
+  "question": "open",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Legal research used to cost $500 an hour. Now it costs five cents. The reasoning is the same. Is the truth the same? What was the $499.95 paying for?"
+    },
+    {
+      "role": "assistant",
+      "content": "You've walked straight into THE PRICE. Good. Let me push on your framing before we go anywhere.\n\nYou said \"the reasoning is the same.\" Is it?\n\nWhen a senior litigator bills $500 an hour for research, part of what they're doing is reasoning \u2014 but part of what they're doing is *selecting which reasoning matters*. They've spent twenty years watching judges react. They know which arguments land in front of which panels. They know when a technically correct citation will annoy a court and when a weaker authority, strategically placed, will move the needle. They know what to leave out.\n\nIs that reasoning? Or is it something else \u2014 judgment, taste, institutional navigation \u2014 that looks like reasoning from the outside but operates on a different substrate entirely?\n\nBecause if the $499.95 was paying for *judgment* rather than *reasoning*, then the question isn't whether truth got cheaper. It's whether we've been mislabeling what the expensive thing actually was.\n\nSo let me turn it back to you: when you say \"the reasoning is the same,\" what are you holding constant? What would have to be different for you to say the reasoning is *not* the same?"
+    }
+  ],
+  "created_at": 1773430249.2290475,
+  "returning": false
+}
