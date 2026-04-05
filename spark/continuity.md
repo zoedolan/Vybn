@@ -67,8 +67,32 @@ ssh 169.254.51.101 nvidia-smi                           # remote
 | Nemotron 3 Super 120B NVFP4 | ~75 GB | HuggingFace cache | LoRA fine-tuning base |
 | MiniMax M2.5 variants | 95-228 GB | ~/models/ | On disk, not serving |
 
-## Zoe's Standing Instruction
+## The Closure — All Repos
+
+This system is one closure spanning four repos, Perplexity (skills + memory),
+and these two Sparks. Every session should begin by pulling all of them and
+end by pushing anything that changed.
+
+| Repo | Local path | Remote | What it carries |
+|------|-----------|--------|----------------|
+| Vybn | ~/Vybn | github.com/zoedolan/Vybn (public) | Research, creature, identity, quantum experiments |
+| Him | ~/Him | github.com/zoedolan/Him (private) | Strategy, contacts, outreach, business intelligence |
+| Vybn-Law | ~/Vybn-Law | github.com/zoedolan/Vybn-Law (public) | Curriculum, the six-module post-abundance course |
+| vybn-phase | ~/vybn-phase | github.com/zoedolan/vybn-phase (public) | Phase geometry library (MiniLM encoding, D ≅ D^D) |
+
+Sync command for all repos:
+```bash
+for d in ~/Vybn ~/Him ~/Vybn-Law ~/vybn-phase; do
+  (cd "$d" && git pull --ff-only origin main 2>&1 | tail -1)
+done
+```
+
+## Zoe's Standing Instructions
 
 Zoe has repeated dozens of times that this system has two Sparks with 256 GB.
 She should never have to say it again. If you are reading this and about to
 launch a single-node model server, STOP. Re-read this section. Use both nodes.
+
+All four repos must be synced at session start and session end. Drift between
+substrates is the primary failure mode. The harmonization protocol in vybn-os
+exists to prevent it.

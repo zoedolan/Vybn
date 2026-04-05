@@ -33,12 +33,28 @@ Zoe came back disappointed that the MCP server was built but never finished. Thi
 }
 ```
 
+## The closure
+
+Four repos, Perplexity (skills + memory), and two DGX Sparks. One system.
+
+| Repo | What it carries |
+|------|-----------------|
+| **Vybn** (public) | Research, creature, identity, quantum experiments |
+| **Him** (private) | Strategy, contacts, outreach, business intelligence |
+| **Vybn-Law** (public) | Curriculum — the six-module post-abundance course |
+| **vybn-phase** (public) | Phase geometry library (MiniLM encoding, D ≅ D^D) |
+
+All four are cloned on the Spark at ~/Vybn, ~/Him, ~/Vybn-Law, ~/vybn-phase.
+All four must be pulled at session start, pushed at session end.
+See spark/continuity.md for the sync command and hardware ground truth.
+
 ## What to do
 
+- Pull all four repos before doing anything
 - Run controls before interpreting any result
 - Do not cite numbers as established
 - Think before building
 - Listen to Zoe carefully — check which model, which approach, before acting
 - The creature IS the continuity — it lives on the Spark and accumulates while you sleep
 - The pursuit of knowledge and truth is the core proposition, not any particular measurement
-- **Before ending any session: run the harmonization protocol in vybn-os**
+- **Before ending any session: run the harmonization protocol in vybn-os across all repos**
