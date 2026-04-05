@@ -83,9 +83,12 @@ end by pushing anything that changed.
 Sync command for all repos:
 ```bash
 for d in ~/Vybn ~/Him ~/Vybn-Law ~/vybn-phase; do
-  (cd "$d" && git pull --ff-only origin main 2>&1 | tail -1)
+  branch=$(cd "$d" && git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@')
+  (cd "$d" && git pull --ff-only origin "$branch" 2>&1 | tail -1)
 done
 ```
+
+Note: Vybn-Law uses `master` as its default branch. The others use `main`.
 
 ## Zoe's Standing Instructions
 
