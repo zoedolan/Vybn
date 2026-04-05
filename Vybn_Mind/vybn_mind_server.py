@@ -215,11 +215,11 @@ TOOLS = {
         "inputSchema": {"type":"object","properties":{"n":{"type":"integer"}},"required":[]}
     },
     "deep_search": {
-        "description": "Geometric corpus search across all four repos (Vybn, Him, Vybn-Law, vybn-phase). Hybrid: cosine retrieves seeds, then a non-abelian walk explores adjacent passages that cosine alone would miss. Returns results tagged with regime (cosine/walk) and whether the source is novel. Use this for finding connections across the corpus.",
+        "description": "Geometric corpus search across all four repos. Hybrid: cosine seeds + telling walk. The walk scores chunks by relevance × distinctiveness (distance from corpus kernel K). Surfaces the most telling material — code, evidence, specific detail — not just the most typical. Results tagged with regime (seed/walk) and novel_source.",
         "inputSchema": {"type":"object","properties":{"query":{"type":"string","description":"What to search for"},"k":{"type":"integer","description":"Max results (default 8)"},"source_filter":{"type":"string","description":"Optional: filter to a specific repo or file path substring"}},"required":["query"]}
     },
     "walk_search": {
-        "description": "Pure geometric walk through the corpus. No cosine seeding — starts from the query and walks by topology alone. More exploratory, less precise. Use when you want to discover what's structurally adjacent to an idea rather than find exact matches.",
+        "description": "Telling-retrieval walk through the corpus. Scores by relevance × distinctiveness (how far each chunk is from corpus kernel K). Walks in K-orthogonal residual space with curvature-adaptive α and visited-region repulsion. Surfaces distinctive material: the most telling thing, not the most typical.",
         "inputSchema": {"type":"object","properties":{"query":{"type":"string","description":"Starting point for the walk"},"k":{"type":"integer","description":"Max results (default 5)"},"steps":{"type":"integer","description":"Walk steps (default 8)"}},"required":["query"]}
     },
     "generate_context": {
@@ -254,14 +254,17 @@ def dispatch(repo, tool, args):
         results = dm.deep_search(args.get("query",""), k=args.get("k",8), source_filter=args.get("source_filter"))
         lines = []
         for i, r in enumerate(results, 1):
-            regime = r.get("regime","?")
+            regime = r.get("regime","seed")
             src = r.get("source","")
             novel = " [NEW SOURCE]" if r.get("novel_source") else ""
             text = r.get("text","")[:400]
-            if regime == "cosine":
-                lines.append(f"[{i}] {regime} | fidelity={r.get('fidelity',0):.4f} | {src}")
+            fid = r.get("fidelity",0)
+            telling = r.get("telling",0)
+            dist = r.get("distinctiveness",0)
+            if regime == "seed":
+                lines.append(f"[{i}] {regime} | fid={fid:.4f} | {src}{novel}")
             else:
-                lines.append(f"[{i}] {regime} | composite={r.get('composite',0):.4f} relevance={r.get('relevance',0):.4f} | {src}{novel}")
+                lines.append(f"[{i}] {regime} | telling={telling:.4f} fid={fid:.4f} dist={dist:.3f} | {src}{novel}")
             lines.append(f"    {text}")
             lines.append("")
         return "\n".join(lines) if lines else "No results."
@@ -275,7 +278,12 @@ def dispatch(repo, tool, args):
             src = r.get("source","")
             text = r.get("text","")[:400]
             novel = ' [NEW SOURCE]' if r.get('novel_source') else ''
-            lines.append(f"[{i}] step {r.get('step',i)} | fid={r.get('fidelity',0):.4f} phase={r.get('phase',0):.4f} geo={r.get('geometry',0):.4f} | {src}{novel}")
+            telling = r.get('telling',0)
+            fid = r.get('fidelity',0)
+            dist = r.get('distinctiveness',0)
+            geo = r.get('geometry',0)
+            alpha = r.get('alpha',0.5)
+            lines.append(f"[{i}] step {r.get('step',i)} | telling={telling:.4f} fid={fid:.4f} dist={dist:.3f} geo={geo:.4f} α={alpha:.2f} | {src}{novel}")
             lines.append(f"    {text}")
             lines.append("")
         return "\n".join(lines) if lines else "No results."
