@@ -1,5 +1,0 @@
-asyncssh>=2.14.0
-python-dotenv>=1.0.0
-starlette>=0.36.0
-sse-starlette>=2.0.0
-uvicorn>=0.27.0
