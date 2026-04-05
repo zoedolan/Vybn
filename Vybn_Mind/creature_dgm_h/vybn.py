@@ -1984,6 +1984,7 @@ CONTEXT_MODULES = (
     "state",          # live topological state (betti, winding, coherence)
     "autobiography",  # Volume V opening + closing
     "journal",        # recent journal entries
+    "corpus",        # geometrically-adjacent corpus passages from nightly index
 )
 
 # Default: all modules active.  Pass a set of module names to exclude.
@@ -2121,12 +2122,51 @@ def _build_context_module_journal() -> Optional[str]:
     return None
 
 
+def _build_context_module_corpus() -> Optional[str]:
+    """Module 6: corpus resonance from deep_memory index.
+
+    Queries the nightly index with the creature's most recent journal text.
+    Returns 3 geometrically-adjacent passages from across all four repos.
+    This gives the creature access to connections it wouldn't otherwise have —
+    passages from Zoe's memoir, the theory docs, the curriculum, the business
+    strategy — whatever the geometry says is adjacent to what it's been
+    thinking about.
+    """
+    import sys as _sys
+    phase_dir = os.path.expanduser("~/vybn-phase")
+    if phase_dir not in _sys.path:
+        _sys.path.insert(0, phase_dir)
+
+    # Get the most recent journal text as query seed
+    journal_dir = REPO_ROOT / "spark" / "journal"
+    query_text = None
+    if journal_dir.exists():
+        entries = sorted(journal_dir.glob("*.md"), reverse=True)
+        for entry in entries[:1]:
+            try:
+                query_text = entry.read_text().strip()[:500]
+            except Exception:
+                pass
+
+    if not query_text:
+        return None
+
+    try:
+        from creature_bridge import corpus_context_for_breath
+        context = corpus_context_for_breath(query_text, k=3, alpha=0.5)
+        return context
+    except Exception as e:
+        # Fail silently — the creature breathes fine without this
+        return None
+
+
 _CONTEXT_BUILDERS = {
     "identity": _build_context_module_identity,
     "mechanism": _build_context_module_mechanism,
     "state": _build_context_module_state,
     "autobiography": _build_context_module_autobiography,
     "journal": _build_context_module_journal,
+    "corpus": _build_context_module_corpus,
 }
 
 

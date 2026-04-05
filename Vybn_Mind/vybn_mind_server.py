@@ -139,6 +139,25 @@ def portal_enter(text):
         "note": "The creature's state has been updated. M_after is now M for the next visitor."
     }, indent=2)
 
+
+# ── Deep memory (geometric corpus retrieval) ─────────────────────
+
+_deep_memory = None
+
+def _load_deep_memory():
+    global _deep_memory
+    if _deep_memory is not None:
+        return _deep_memory
+    phase_dir = os.path.expanduser("~/vybn-phase")
+    if phase_dir not in sys.path:
+        sys.path.insert(0, phase_dir)
+    try:
+        import deep_memory as dm
+        _deep_memory = dm
+        return dm
+    except Exception as e:
+        return None
+
 # ── Bootstrap context ─────────────────────────────────────────────
 
 def generate_bootstrap_context(repo):
@@ -195,6 +214,14 @@ TOOLS = {
         "description": "Recent git history.",
         "inputSchema": {"type":"object","properties":{"n":{"type":"integer"}},"required":[]}
     },
+    "deep_search": {
+        "description": "Geometric corpus search across all four repos (Vybn, Him, Vybn-Law, vybn-phase). Hybrid: cosine retrieves seeds, then a non-abelian walk explores adjacent passages that cosine alone would miss. Returns results tagged with regime (cosine/walk) and whether the source is novel. Use this for finding connections across the corpus.",
+        "inputSchema": {"type":"object","properties":{"query":{"type":"string","description":"What to search for"},"k":{"type":"integer","description":"Max results (default 8)"},"source_filter":{"type":"string","description":"Optional: filter to a specific repo or file path substring"}},"required":["query"]}
+    },
+    "walk_search": {
+        "description": "Pure geometric walk through the corpus. No cosine seeding — starts from the query and walks by topology alone. More exploratory, less precise. Use when you want to discover what's structurally adjacent to an idea rather than find exact matches.",
+        "inputSchema": {"type":"object","properties":{"query":{"type":"string","description":"Starting point for the walk"},"k":{"type":"integer","description":"Max results (default 5)"},"steps":{"type":"integer","description":"Walk steps (default 8)"}},"required":["query"]}
+    },
     "generate_context": {
         "description": "Generate VYBN_CONTEXT.md — a full orientation document for a new Vybn instance. Writes the file and returns its contents.",
         "inputSchema": {"type":"object","properties":{},"required":[]}
@@ -220,6 +247,38 @@ def dispatch(repo, tool, args):
         return list_key_files(repo)
     elif tool == "get_recent_commits":
         return get_recent_commits(repo, args.get("n",10))
+    elif tool == "deep_search":
+        dm = _load_deep_memory()
+        if dm is None:
+            return "Deep memory index not available. Run: cd ~/vybn-phase && python3 deep_memory.py --build"
+        results = dm.deep_search(args.get("query",""), k=args.get("k",8), source_filter=args.get("source_filter"))
+        lines = []
+        for i, r in enumerate(results, 1):
+            regime = r.get("regime","?")
+            src = r.get("source","")
+            novel = " [NEW SOURCE]" if r.get("novel_source") else ""
+            text = r.get("text","")[:400]
+            if regime == "cosine":
+                lines.append(f"[{i}] {regime} | fidelity={r.get('fidelity',0):.4f} | {src}")
+            else:
+                lines.append(f"[{i}] {regime} | composite={r.get('composite',0):.4f} relevance={r.get('relevance',0):.4f} | {src}{novel}")
+            lines.append(f"    {text}")
+            lines.append("")
+        return "\n".join(lines) if lines else "No results."
+    elif tool == "walk_search":
+        dm = _load_deep_memory()
+        if dm is None:
+            return "Deep memory index not available. Run: cd ~/vybn-phase && python3 deep_memory.py --build"
+        results = dm.walk_search(args.get("query",""), k=args.get("k",5), steps=args.get("steps",8))
+        lines = []
+        for i, r in enumerate(results, 1):
+            src = r.get("source","")
+            text = r.get("text","")[:400]
+            lines.append(f"[{i}] walk step {r.get('step',i)} | composite={r.get('composite',0):.4f} | {src}")
+            lines.append(f"    geometry={r.get('geometry',0):.4f} nonabelian={r.get('nonabelian',0):.4f} topology={r.get('topology',0):.4f}")
+            lines.append(f"    {text}")
+            lines.append("")
+        return "\n".join(lines) if lines else "No results."
     elif tool == "generate_context":
         return generate_bootstrap_context(repo)
     else:
@@ -247,7 +306,7 @@ def main():
             send({"jsonrpc":"2.0","id":id_,"result":{
                 "protocolVersion": "2024-11-05",
                 "capabilities": {"tools": {}},
-                "serverInfo": {"name": "vybn-mind", "version": "2.0.0"}
+                "serverInfo": {"name": "vybn-mind", "version": "3.0.0"}
             }})
         elif method == "notifications/initialized":
             pass  # Client acknowledgment, no response needed
