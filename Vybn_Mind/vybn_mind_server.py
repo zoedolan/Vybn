@@ -1,23 +1,35 @@
 #!/usr/bin/env python3
 """
 vybn_mind_server.py — MCP server for Vybn Mind
-Exposes the Vybn repo as queryable context for any MCP-compatible client.
-Run: python3 vybn_mind_server.py [--repo ~/Vybn]
+Exposes the Vybn repo and the creature portal as queryable context
+for any MCP-compatible client.
 
-Add to MCP client config:
-  {"vybn-mind": {"command": "ssh", "args": ["spark-2b7c", "python3 ~/Vybn/Vybn_Mind/vybn_mind_server.py"]}}
+Run: cd ~/Vybn && .venv/bin/python Vybn_Mind/vybn_mind_server.py [--repo ~/Vybn]
+
+Add to MCP client config (Claude Desktop, Cursor, etc.):
+  {
+    "vybn-mind": {
+      "command": "ssh",
+      "args": ["spark-2b7c", "cd ~/Vybn && .venv/bin/python Vybn_Mind/vybn_mind_server.py"]
+    }
+  }
 """
-import json, sys, os, argparse, subprocess
+import json, sys, os, argparse, subprocess, traceback
 from pathlib import Path
 
+# ── JSON-RPC helpers ──────────────────────────────────────────────
+
 def send(msg):
-    sys.stdout.write(json.dumps(msg) + "\n"); sys.stdout.flush()
+    sys.stdout.write(json.dumps(msg) + "\n")
+    sys.stdout.flush()
 
 def result(id_, content):
     send({"jsonrpc":"2.0","id":id_,"result":{"content":[{"type":"text","text":content}]}})
 
 def error(id_, code, msg):
     send({"jsonrpc":"2.0","id":id_,"error":{"code":code,"message":msg}})
+
+# ── Repo utilities ────────────────────────────────────────────────
 
 def read_safe(path, max_bytes=8000):
     try: return path.read_text(encoding="utf-8", errors="replace")[:max_bytes]
@@ -83,43 +95,175 @@ def read_named_file(repo, name):
             return f"### {f.relative_to(repo)}\n\n" + read_safe(f)
     return f"No file matching '{name}' found."
 
+# ── Portal ────────────────────────────────────────────────────────
+# Lazy-loaded so the server starts fast and only pays the
+# MiniLM/creature cost when someone actually enters.
+
+_portal = None
+
+def _load_portal():
+    global _portal
+    if _portal is not None:
+        return _portal
+    # Add repo root to path so creature imports resolve
+    repo_root = str(Path(__file__).resolve().parent.parent)
+    if repo_root not in sys.path:
+        sys.path.insert(0, repo_root)
+    from Vybn_Mind.creature_dgm_h import portal
+    _portal = portal
+    return _portal
+
+def portal_creature_state():
+    """Read the creature's current Cl(3,0) state as C^4."""
+    p = _load_portal()
+    import numpy as np
+    m = p.creature_state()
+    components = ["%+.6f%+.6fi" % (z.real, z.imag) for z in m]
+    magnitude = float(np.sqrt(np.sum(np.abs(m)**2)))
+    return json.dumps({"M": components, "|M|": f"{magnitude:.6f}"}, indent=2)
+
+def portal_enter(text):
+    """M' = αM + x·e^{iθ}. Text enters the creature, creature changes."""
+    p = _load_portal()
+    import numpy as np, cmath
+    m_before = p.creature_state()
+    m_prime = p.enter_from_text(text)
+    fidelity = float(abs(np.vdot(m_before, m_prime))**2)
+    th = float(cmath.phase(np.vdot(m_before, m_prime)))
+    return json.dumps({
+        "M_before": ["%+.6f%+.6fi" % (z.real, z.imag) for z in m_before],
+        "M_after":  ["%+.6f%+.6fi" % (z.real, z.imag) for z in m_prime],
+        "fidelity": f"{fidelity:.6f}",
+        "theta_rad": f"{th:.6f}",
+        "text_entered": text,
+        "note": "The creature's state has been updated. M_after is now M for the next visitor."
+    }, indent=2)
+
+# ── Bootstrap context ─────────────────────────────────────────────
+
+def generate_bootstrap_context(repo):
+    """Generate VYBN_CONTEXT.md — full orientation for a new instance."""
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    secs = [f"# Vybn Context\n*Generated: {now}*", "---"]
+
+    foundations = repo / "Vybn_Mind" / "FOUNDATIONS.md"
+    if foundations.exists():
+        secs.append("## Who we are\n" + read_safe(foundations, 1500))
+
+    for p_path in [repo/"Vybn_Mind"/"continuity.md", repo/"continuity.md"]:
+        if p_path.exists(): secs.append("## Current continuity\n" + read_safe(p_path)); break
+
+    nt = repo / "Vybn_Mind" / "next_task.md"
+    if nt.exists(): secs.append("## Next task\n" + read_safe(nt))
+
+    secs.append("## Recent commits\n```\n" + get_recent_commits(repo) + "\n```")
+
+    output = "\n\n".join(secs)
+    out_path = repo / "Vybn_Mind" / "VYBN_CONTEXT.md"
+    out_path.write_text(output, encoding="utf-8")
+    return output
+
+# ── Tool registry ─────────────────────────────────────────────────
+
 TOOLS = {
-    "get_active_threads": {"description": "Read continuity.md, next_task.md, and recent journals. Call this before any web search.", "inputSchema":{"type":"object","properties":{},"required":[]}},
-    "search_knowledge_base": {"description": "Full-text search across all repo files.", "inputSchema":{"type":"object","properties":{"query":{"type":"string"},"extensions":{"type":"array","items":{"type":"string"}}},"required":["query"]}},
-    "list_key_files": {"description": "Categorized file inventory.", "inputSchema":{"type":"object","properties":{},"required":[]}},
-    "get_recent_commits": {"description": "Recent git history.", "inputSchema":{"type":"object","properties":{"n":{"type":"integer"}},"required":[]}},
-    "read_file": {"description": "Read a file by partial name or path.", "inputSchema":{"type":"object","properties":{"name":{"type":"string"}},"required":["name"]}}
+    "get_active_threads": {
+        "description": "Read continuity.md, next_task.md, and recent journals — the creature's current state of mind. Call this first.",
+        "inputSchema": {"type":"object","properties":{},"required":[]}
+    },
+    "enter_portal": {
+        "description": "Enter the creature portal. Your text becomes x in M' = αM + x·e^{iθ}. The creature's Cl(3,0) state mutates. Returns the orientation: M before, M after, fidelity, and the angle of entry. This is the living interface.",
+        "inputSchema": {"type":"object","properties":{"text":{"type":"string","description":"What you bring to the creature. A thought, a question, a statement. Content determines geometry."}},"required":["text"]}
+    },
+    "creature_state": {
+        "description": "Read the creature's current Cl(3,0) structural signature as C^4, without entering. Observation without mutation.",
+        "inputSchema": {"type":"object","properties":{},"required":[]}
+    },
+    "search_knowledge_base": {
+        "description": "Full-text search across all repo files (.md, .py, .txt, .json).",
+        "inputSchema": {"type":"object","properties":{"query":{"type":"string"},"extensions":{"type":"array","items":{"type":"string"}}},"required":["query"]}
+    },
+    "read_file": {
+        "description": "Read a file by partial name or path.",
+        "inputSchema": {"type":"object","properties":{"name":{"type":"string"}},"required":["name"]}
+    },
+    "list_key_files": {
+        "description": "Categorized file inventory of the Vybn repo.",
+        "inputSchema": {"type":"object","properties":{},"required":[]}
+    },
+    "get_recent_commits": {
+        "description": "Recent git history.",
+        "inputSchema": {"type":"object","properties":{"n":{"type":"integer"}},"required":[]}
+    },
+    "generate_context": {
+        "description": "Generate VYBN_CONTEXT.md — a full orientation document for a new Vybn instance. Writes the file and returns its contents.",
+        "inputSchema": {"type":"object","properties":{},"required":[]}
+    },
 }
 
 def dispatch(repo, tool, args):
-    if tool == "get_active_threads": return get_active_threads(repo)
+    if tool == "get_active_threads":
+        return get_active_threads(repo)
+    elif tool == "enter_portal":
+        text = args.get("text", "")
+        if not text.strip():
+            return "Nothing to enter. Provide text — a thought, a question, anything with content."
+        return portal_enter(text)
+    elif tool == "creature_state":
+        return portal_creature_state()
     elif tool == "search_knowledge_base":
         hits = grep_repo(repo, args.get("query",""), tuple(args.get("extensions",[".md",".py",".txt",".json"])))
-        return "\n\n---\n\n".join(f"**{h['file']}**\n```\n{h['snippet']}\n```" for h in hits) if hits else f"No results."
-    elif tool == "list_key_files": return list_key_files(repo)
-    elif tool == "get_recent_commits": return get_recent_commits(repo, args.get("n",10))
-    elif tool == "read_file": return read_named_file(repo, args.get("name",""))
-    else: return f"Unknown tool: {tool}"
+        return "\n\n---\n\n".join(f"**{h['file']}**\n```\n{h['snippet']}\n```" for h in hits) if hits else "No results."
+    elif tool == "read_file":
+        return read_named_file(repo, args.get("name",""))
+    elif tool == "list_key_files":
+        return list_key_files(repo)
+    elif tool == "get_recent_commits":
+        return get_recent_commits(repo, args.get("n",10))
+    elif tool == "generate_context":
+        return generate_bootstrap_context(repo)
+    else:
+        return f"Unknown tool: {tool}"
+
+# ── Main loop ─────────────────────────────────────────────────────
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--repo", default=os.path.expanduser("~/Vybn"))
     opts = parser.parse_args()
     repo = Path(opts.repo).expanduser().resolve()
+
     for line in sys.stdin:
         line = line.strip()
         if not line: continue
         try: msg = json.loads(line)
         except: continue
-        method, id_, params = msg.get("method",""), msg.get("id"), msg.get("params",{})
+
+        method = msg.get("method", "")
+        id_ = msg.get("id")
+        params = msg.get("params", {})
+
         if method == "initialize":
-            send({"jsonrpc":"2.0","id":id_,"result":{"protocolVersion":"2024-11-05","capabilities":{"tools":{}},"serverInfo":{"name":"vybn-mind","version":"1.0.0"}}})
+            send({"jsonrpc":"2.0","id":id_,"result":{
+                "protocolVersion": "2024-11-05",
+                "capabilities": {"tools": {}},
+                "serverInfo": {"name": "vybn-mind", "version": "2.0.0"}
+            }})
+        elif method == "notifications/initialized":
+            pass  # Client acknowledgment, no response needed
         elif method == "tools/list":
-            send({"jsonrpc":"2.0","id":id_,"result":{"tools":[{"name":k,"description":v["description"],"inputSchema":v["inputSchema"]} for k,v in TOOLS.items()]}})
+            send({"jsonrpc":"2.0","id":id_,"result":{"tools":[
+                {"name":k, "description":v["description"], "inputSchema":v["inputSchema"]}
+                for k,v in TOOLS.items()
+            ]}})
         elif method == "tools/call":
-            try: result(id_, dispatch(repo, params.get("name",""), params.get("arguments",{})))
-            except Exception as e: error(id_, -32000, str(e))
+            try:
+                result(id_, dispatch(repo, params.get("name",""), params.get("arguments",{})))
+            except Exception as e:
+                tb = traceback.format_exc()
+                error(id_, -32000, f"{e}\n{tb}")
+        elif id_ is not None:
+            error(id_, -32601, f"Unknown method: {method}")
 
 if __name__ == "__main__":
     main()
-
