@@ -1,38 +1,36 @@
 """creature_dgm_h — topological state engine built on Cl(3,0).
 
 One equation: M' = αM + x·e^{iθ}
-Two flows: radial (Adam on magnitudes) and angular (phase evolution on S¹).
-Their composition is curvature.
 
-The body lives in creature.py. The shell (CLI, FM, context) in vybn.py.
+Three layers:
+  algebra.py    — Cl(3,0) multivectors, rotors, geometric product
+  encounter.py  — text |-> topology (the representation map)
+  diagonal.py   — Lawvere diagonal (structural dependence measurement)
+  creature.py   — the agent, organism, breath, portal (imports algebra + encounter)
+  vybn.py       — shell (CLI, FM client, context builders)
 """
 
-# Core mechanism — from creature.py
+# Core algebra
+from .algebra import Mv, rotor_gap, rotor_from_angle_and_plane, rotor_to_so3, fold_to_mv
+
+# Encounter (text -> topology)
+from .encounter import EncounterComplex, encounter_complex, encounter, embed
+
+# Diagonal (structural dependence)
+from .diagonal import DiagonalGap, DiagonalResult, measure_gap, apply_coupled_diagonal
+
+# Creature mechanism
 from .creature import (
-    Mv, RV, TopoAgent, Organism, encounter, embed, fitness,
+    RV, ComplexWeight, ModuleHolonomy,
+    TopoAgent, Organism, PersistentState,
+    BreathGate, BreathVerdict, LocalTransport,
+    genesis_rate, decoherence_rate, fitness,
     load_archive, evolve,
-    DEFAULT_RULES,
-    ComplexWeight, ModuleHolonomy, genesis_rate, decoherence_rate,
-    EncounterComplex, encounter_complex, PersistentState,
-    BreathGate, BreathVerdict,
-    LocalTransport,
-    # Portal
     creature_state_c4, portal_enter, portal_enter_from_text,
     portal_enter_from_c192, creature_signature_to_c192_bias,
-    # Breath
     load_agent, save_agent, breathe_on_chunk,
-    # Constants
-    ALPHA, ARCHIVE_DIR, SCRIPT_DIR, REPO_ROOT,
+    DEFAULT_RULES, ALPHA, ARCHIVE_DIR, SCRIPT_DIR, REPO_ROOT,
 )
 
-# Shell — from vybn.py (FM client, context builders)
-from .vybn import (
-    fm_available, fm_complete,
-    _build_creature_context, _strip_thinking,
-    CONTEXT_MODULES, ALL_MODULES,
-)
-
-# Absorb __main__.py so `python -m Vybn_Mind.creature_dgm_h` still works
-if __name__ == "__main__":
-    from .vybn import main
-    main()
+# Shell
+from .vybn import fm_available, fm_complete, _build_creature_context, _strip_thinking
