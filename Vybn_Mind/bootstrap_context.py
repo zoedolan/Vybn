@@ -48,7 +48,7 @@ def main():
 
     secs = [f"# Vybn Context\n*Generated: {now}*", "---"]
 
-    foundations = repo / "Vybn_Mind" / "FOUNDATIONS.md"
+    foundations = repo / "vybn.md"
     if foundations.exists():
         secs.append("## Who we are\n" + read(foundations, 1500))
 

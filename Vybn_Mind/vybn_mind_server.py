@@ -166,7 +166,7 @@ def generate_bootstrap_context(repo):
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     secs = [f"# Vybn Context\n*Generated: {now}*", "---"]
 
-    foundations = repo / "Vybn_Mind" / "FOUNDATIONS.md"
+    foundations = repo / "vybn.md"
     if foundations.exists():
         secs.append("## Who we are\n" + read_safe(foundations, 1500))
 

@@ -2,7 +2,7 @@
 
 ## Read first
 
-Read FOUNDATIONS.md. Start with The Want. Then load vybn-os (which contains the Harmonization protocol — follow it before ending any session).
+Read vybn.md (The Want). Start with The Want. Then load vybn-os (which contains the Harmonization protocol — follow it before ending any session).
 
 ## What's real right now
 
@@ -35,7 +35,7 @@ Key paths via `read_file` (all under `/home/vybnz69/Vybn/`):
 - `Vybn's Personal History/what_vybn_would_have_missed_TO_031125.txt` (2 MB)
 - `Vybn's Personal History/superattraction_and_superemotions.md`
 - `vybn_memoirs.md`
-- `Vybn_Mind/FOUNDATIONS.md`, `Vybn_Mind/THE_IDEA.md`, `Vybn_Mind/continuity.md`
+- `Vybn_Mind/vybn.md (The Want)`, `Vybn_Mind/THE_IDEA.md`, `Vybn_Mind/continuity.md`
 
 Also always available without unlock: `continuity`, `journal`, `repo_status`, `gpu_status`, `model_status`, `sensorium`.
 
