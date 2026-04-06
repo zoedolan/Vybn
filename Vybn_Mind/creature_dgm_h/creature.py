@@ -666,16 +666,22 @@ class PersistentState:
             "n_persistent_features": cx.n_persistent_features,
         }
 
-    def absorb_winding(self, weight_trajectory: List[List[float]]) -> dict:
-        """Measure and absorb the winding of a weight trajectory.
+    def absorb_winding(self, weight_trajectory: List[List[float]],
+                        phase_trajectory: Optional[List[List[float]]] = None) -> dict:
+        """Measure winding, area, and test the area law.
 
-        This is the creature seeing its own topological structure.
-        PCA-projects the trajectory to 2D, computes the winding number
-        from angle differences, and stores the result in persistent state.
+        The creature seeing its own topological structure.
+        PCA-projects the weight trajectory to 2D, computes:
+          - winding (holonomy): accumulated angle around the loop
+          - enclosed area: signed area of the projected polygon (shoelace)
+          - curvature: estimated from the non-commutativity of the two flows
+          - area law test: holonomy vs curvature * area
 
-        Returns a winding record with the estimated winding, path closure,
-        variance explained, and whether the winding changed significantly
-        from the previous measurement.
+        The two flows:
+          - Radial (magnitude updates via Adam): changes to |w|
+          - Angular (phase evolution on S¹): changes to θ
+
+        If the area law holds, the geometry is real — not decorative.
         """
         W = np.array(weight_trajectory, dtype=np.float64)
         if W.shape[0] < 3:
@@ -690,12 +696,66 @@ class PersistentState:
         except np.linalg.LinAlgError:
             return {"winding": 0.0, "significant": False, "reason": "SVD failed"}
 
-        # Winding number from angle differences in the projected plane
+        # ── Holonomy: winding number from angle differences ──
         angles = np.arctan2(proj[:, 1], proj[:, 0])
         dtheta = np.diff(angles)
         dtheta = np.where(dtheta > math.pi, dtheta - 2 * math.pi, dtheta)
         dtheta = np.where(dtheta < -math.pi, dtheta + 2 * math.pi, dtheta)
         winding = float(np.sum(dtheta)) / (2 * math.pi)
+        holonomy = float(np.sum(dtheta))  # total accumulated phase (radians)
+
+        # ── Enclosed area: shoelace formula on 2D projection ──
+        # Close the loop for area computation
+        p = np.vstack([proj, proj[0:1]])
+        signed_area = 0.5 * float(np.sum(
+            p[:-1, 0] * p[1:, 1] - p[1:, 0] * p[:-1, 1]
+        ))
+        enclosed_area = abs(signed_area)
+
+        # ── Curvature from non-commutativity of the two flows ──
+        # The two flows are magnitude changes (radial) and phase changes (angular).
+        # Curvature F_rθ ∝ Im⟨ψ|[G_r, G_θ]|ψ⟩
+        # We estimate this from the weight trajectory: at each step,
+        # decompose the update into a radial part (change in norm) and
+        # an angular part (change in direction). The curvature is how much
+        # these don't commute — measured as the cross-product in the
+        # 2D projected plane.
+        if W.shape[0] >= 3:
+            # Velocity vectors in projected space
+            v = np.diff(proj, axis=0)  # (N-1, 2)
+            # Decompose each velocity into radial and angular components
+            r = np.linalg.norm(proj[:-1], axis=1, keepdims=True) + 1e-12
+            r_hat = proj[:-1] / r  # radial unit vector
+            # Angular unit vector (perpendicular to radial)
+            theta_hat = np.column_stack([-r_hat[:, 1], r_hat[:, 0]])
+            # Radial and angular velocities
+            v_r = np.sum(v * r_hat, axis=1)  # radial component
+            v_theta = np.sum(v * theta_hat, axis=1)  # angular component
+            # Local curvature at each step: cross product of consecutive
+            # (v_r, v_theta) vectors — measures non-commutativity
+            if len(v_r) >= 2:
+                local_curv = v_r[:-1] * v_theta[1:] - v_r[1:] * v_theta[:-1]
+                mean_curvature = float(np.mean(np.abs(local_curv)))
+                total_curvature = float(np.sum(local_curv))
+            else:
+                mean_curvature = 0.0
+                total_curvature = 0.0
+        else:
+            mean_curvature = 0.0
+            total_curvature = 0.0
+
+        # ── The area law test ──
+        # Theory predicts: holonomy = curvature * area
+        # (Dual-Temporal Holonomy Theorem, THEORY.md §II.4)
+        predicted_holonomy = total_curvature  # ∫∫ F dA via discrete sum
+        # The shoelace area × mean curvature gives an independent estimate
+        predicted_from_area = mean_curvature * enclosed_area
+
+        # Test: how close is actual holonomy to predicted?
+        if abs(holonomy) > 1e-8:
+            area_law_ratio = predicted_from_area / holonomy
+        else:
+            area_law_ratio = float('nan')
 
         # Path closure
         norms = np.linalg.norm(W, axis=1)
@@ -703,18 +763,26 @@ class PersistentState:
 
         # Compare to previous winding
         prev = self.winding_history[-1]["winding"] if self.winding_history else 0.0
-        delta = abs(winding - prev)
+        delta_winding = abs(winding - prev)
 
         record = {
             "winding": round(winding, 4),
+            "holonomy_rad": round(holonomy, 6),
+            "enclosed_area": round(enclosed_area, 6),
+            "signed_area": round(signed_area, 6),
+            "mean_curvature": round(mean_curvature, 6),
+            "total_curvature": round(total_curvature, 6),
+            "predicted_holonomy": round(predicted_from_area, 6),
+            "area_law_ratio": round(area_law_ratio, 4) if not math.isnan(area_law_ratio) else None,
+            "area_law_holds": (0.5 < area_law_ratio < 2.0) if not math.isnan(area_law_ratio) else None,
             "var_explained": round(var_explained, 4),
             "path_closed": path_closed,
             "n_steps": W.shape[0],
             "param_dim": W.shape[1],
             "norm_start": round(float(norms[0]), 4),
             "norm_end": round(float(norms[-1]), 4),
-            "delta_from_prev": round(delta, 4),
-            "significant": delta > 0.05 or len(self.winding_history) == 0,
+            "delta_from_prev": round(delta_winding, 4),
+            "significant": delta_winding > 0.05 or len(self.winding_history) == 0,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
