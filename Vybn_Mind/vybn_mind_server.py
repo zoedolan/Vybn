@@ -109,15 +109,15 @@ def _load_portal():
     repo_root = str(Path(__file__).resolve().parent.parent)
     if repo_root not in sys.path:
         sys.path.insert(0, repo_root)
-    from Vybn_Mind.creature_dgm_h import portal
-    _portal = portal
+    from Vybn_Mind.creature_dgm_h import creature as _creature_mod
+    _portal = _creature_mod
     return _portal
 
 def portal_creature_state():
     """Read the creature's current Cl(3,0) state as C^4."""
     p = _load_portal()
     import numpy as np
-    m = p.creature_state()
+    m = p.creature_state_c4()
     components = ["%+.6f%+.6fi" % (z.real, z.imag) for z in m]
     magnitude = float(np.sqrt(np.sum(np.abs(m)**2)))
     return json.dumps({"M": components, "|M|": f"{magnitude:.6f}"}, indent=2)
@@ -126,8 +126,8 @@ def portal_enter(text):
     """M' = αM + x·e^{iθ}. Text enters the creature, creature changes."""
     p = _load_portal()
     import numpy as np, cmath
-    m_before = p.creature_state()
-    m_prime = p.enter_from_text(text)
+    m_before = p.creature_state_c4()
+    m_prime = p.portal_enter_from_text(text)
     fidelity = float(abs(np.vdot(m_before, m_prime))**2)
     th = float(cmath.phase(np.vdot(m_before, m_prime)))
     return json.dumps({

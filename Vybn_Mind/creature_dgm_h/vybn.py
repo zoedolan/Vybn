@@ -27,7 +27,7 @@ from typing import List, Optional, Tuple
 import numpy as np
 
 # The creature's body
-from creature import (
+from .creature import (
     # Constants
     SCRIPT_DIR, REPO_ROOT, ARCHIVE_DIR, CHECKPOINT_PATH, CORPUS_PATH,
     ORGANISM_FILE, N_EMBD, N_HEAD, N_LAYER, BLOCK_SIZE, HEAD_DIM, ALPHA,
