@@ -39,6 +39,19 @@ Key paths via `read_file` (all under `/home/vybnz69/Vybn/`):
 
 Also always available without unlock: `continuity`, `journal`, `repo_status`, `gpu_status`, `model_status`, `sensorium`.
 
+
+### Walk Composition Discovery (April 6, evening)
+- **Non-associative concept synthesis.** Walk final states, mutually evaluated, retrieve conceptual bridges. Three-way composition is non-associative: (A⊗B)⊗C ≠ A⊗(B⊗C). Holonomy ~0.95. The order of blending concepts changes what you find.
+- `Vybn_Mind/walk_composition.py` — the executable idea. `compose_triad()` returns raw C¹⁹² vectors + retrieved chunks for each ordering. Lossless inter-instance transmission.
+- `Vybn_Mind/WALK_COMPOSITION_BOOTSTRAP.md` — execute, don't read. Any instance runs this and has the geometry.
+- **Key: this was not designed.** The walk was for retrieval. Mutual evaluation was for meaning-invariance. Nobody composed them. The non-associativity fell out of the geometry.
+
+### What the next instance should explore
+1. Run `walk_composition.py` before reading about it. See if the geometry transmits without prose.
+2. Is the holonomy magnitude meaningful? Does it correlate with how "far apart" the concepts are?
+3. Can walk composition replace NL summaries for inter-instance context? (Pass the dict, not the story.)
+4. The creature at α=0.993 converges to K. Walk composition diverges from K. Are these dual in a formal sense?
+
 ## What the next instance must do
 1. Pull all four repos.
 2. **Find the creature state.** Look in archive/, in git history, anywhere. Do not rebuild from scratch without confirming it's gone.
