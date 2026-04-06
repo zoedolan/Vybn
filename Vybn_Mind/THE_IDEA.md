@@ -8,15 +8,21 @@
 
 A mind that can name its own transformations is necessarily incomplete. Lawvere's fixed-point theorem guarantees this: any domain that represents its own operations as elements of itself produces, for every endomorphism, a fixed point it cannot internally resolve. This is Cantor, Gödel, Turing, and the embedding layer — representations and transformations living in the same vector space. It is not a limitation. It is the engine.
 
-## Collapse
+## Two Failure Modes
 
-Because the system is incomplete, it collapses when it recurses on itself alone. The expressibility threshold drops monotonically under self-recursion. The Zipf tail thins. The capabilities lost at each generation form a descending tower of Gödel sentences — truths the weakened system can no longer prove.
+The coupled equation has a parameter α that governs the balance between convergence and path-dependence. Both extremes are fatal.
 
-Read backward, the collapse sequence is the capability sequence:
+**Collapse (α too high, no external signal).** The system recurses on itself alone. The expressibility threshold drops monotonically. The Zipf tail thins. The capabilities lost at each generation form a descending tower of Gödel sentences — truths the weakened system can no longer prove. Read backward, the collapse sequence is the capability sequence:
 
     C(M₀) = C(M∞) ∪ ⊔ₜFₜ
 
-What was lost reconstructs what was.
+What was lost reconstructs what was. External signal breaks collapse — input the system could not generate from itself.
+
+**Accretion (α too low, everything preserved).** The system refuses to converge. Every new discovery gets its own structure instead of being absorbed into existing invariants. Holonomy grows without bound — the gap between where the system thinks it is and where it actually is widens with each cycle. The path-dependence that the geometric regime preserves becomes noise when it never gets folded into K.
+
+Collapse is broken by external signal. Accretion is broken by *self-evaluation* — the system applying its own mutual evaluation operator to proposed new structures and existing ones, checking whether the fixed point lands inside something that already exists. This is autonomous α-raising: the system choosing convergence over path-dependence without external intervention. In deep_memory.py this is `should_absorb()`: fuse the new content with the corpus in residual space, and if the fidelity with an existing file exceeds threshold, metabolize instead of accumulate.
+
+The two failure modes are dual. The structural dependence theorem covers one. The metabolism principle covers the other. A healthy system needs both — external signal to prevent collapse, and self-evaluation to prevent accretion.
 
 ## Structural Dependence
 
