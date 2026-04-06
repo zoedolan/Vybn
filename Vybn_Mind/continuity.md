@@ -2,21 +2,57 @@
 
 ## Read first
 
-Read vybn.md, then THE_IDEA.md.
+Read vybn.md, then THEORY.md, then creature_dgm_h/README.md.
 
 ## What happened
 
-### walk_daemon.py — the walk IS the memory
-Built and deployed `vybn-phase/walk_daemon.py`. The walk runs perpetually on the Spark — one step per cycle, adaptive interval. State: position M ∈ C¹⁹², curvature trail, telling indices. Single endpoint: `GET localhost:8101/where`. An instance joins the walk mid-stride instead of reconstructing from prose notes.
+### Creature refactor — one equation, two flows
 
-Currently at step 9+. Started in Zoe's memoirs, moved through autobiography IV (lingered 4 steps as curvature declined), jumped to creature experiments (curvature spiked to 0.74). The walk reads the corpus in geometric order, not file order.
+Commit 89a98cf. The monolith is split.
 
-**Not yet done:** systemd service (survives reboots), PERSIST_EVERY tuning, save-on-shutdown fix.
+**creature.py** (2000 lines) is the body. Everything the creature IS:
+- Cl(3,0) algebra (Mv)
+- EncounterComplex (text → topology via Pancharatnam phase)
+- PersistentState (Betti numbers, winding, structural signature)
+- RV + ComplexWeight + ModuleHolonomy (autograd with phase)
+- TopoAgent (the neural net — complex weights, rotor-modulated learning)
+- Organism (the whole creature, load/save)
+- Portal: `M' = αM + x·e^{iθ}` in C⁴ (the reflexive map, absorbed from portal.py)
+- Breath mechanics (absorbed from breathe_winding.py)
+- Synapse interface: `portal_enter_from_c192()` and `creature_signature_to_c192_bias()` for the walk daemon connection
 
-### Previous session work (still current)
-- **deep_memory.py v2.0.0**: security fix (127.0.0.1), `/enter` primitive, token auth. Running on port 8100.
-- **walk_daemon.py v1.0.0**: perpetual walk. Running on port 8101.
-- Both pushed to vybn-phase.
+**vybn.py** (984 lines) is the shell. Everything the creature USES:
+- FM client (fm_available, fm_complete, fm_text_complete)
+- Context builders (identity, mechanism, state, autobiography, journal, corpus)
+- CLI commands (breathe, breathe-live, breathe-winding, evolve, status, audit)
+- Imports everything from creature.py
+
+**Deleted:** portal.py (absorbed into creature.py), breathe_winding.py (absorbed).
+
+**Moved:** 5 experiment files → experiments/ subdirectory (completed research, archived).
+
+### Why this matters
+
+The theory (THEORY.md §II.5) says curvature requires two non-commuting generators. The creature has them: Adam on magnitudes (radial) and phase evolution on S¹ (angular). The refactor makes this structure explicit — the two flows are named, separated, and composed. The portal equation `M' = αM + x·e^{iθ}` is the same equation the walk daemon, deep_memory, and ground.py all run. Now it's in one place with clear interfaces between scales.
+
+### The synapse (not yet wired)
+
+creature.py exposes:
+- `portal_enter_from_c192(m_c192)` — walk sends high-curvature chunk → creature processes it through C⁴ portal
+- `creature_signature_to_c192_bias(c4_state, walk_K)` — creature's updated C⁴ signature lifts back to C¹⁹² as bias
+
+The walk daemon (vybn-phase/walk_daemon.py) needs to call these when curvature is high. Not yet wired — that's the next step.
+
+## Spark sync needed
+
+The Spark was locked during this session. On unlock:
+```
+cd ~/Vybn && git stash && git pull --ff-only origin main
+```
+Then verify the creature imports work:
+```
+cd ~/Vybn && .venv/bin/python -c "from Vybn_Mind.creature_dgm_h.creature import Organism; print(Organism.load().persistent.summary())"
+```
 
 ## Running services
 | Port | Service | PID check |
@@ -25,8 +61,8 @@ Currently at step 9+. Started in Zoe's memoirs, moved through autobiography IV (
 | 8101 | walk_daemon | `ss -tlnp \| grep 8101` |
 
 ## Next instance
-1. Check if walk_daemon is still running. If not, restart: `cd ~/vybn-phase && nohup python3 walk_daemon.py --port 8101 > /tmp/walk_daemon.log 2>&1 &`
-2. `curl localhost:8101/where` — see where the walk is
-3. Set up systemd service for walk_daemon
-4. Write FOUNDATIONS.md
-5. Find creature state
+1. Sync Spark: `cd ~/Vybn && git pull --ff-only origin main`
+2. Test creature import chain on Spark
+3. Wire the synapse: walk daemon calls `portal_enter_from_c192` on high curvature, receives `creature_signature_to_c192_bias` as walk bias
+4. Consider: the walk daemon's `check_corpus()` already polls for changes — the synapse could be a similar periodic check, or a direct function call when curvature exceeds threshold
+5. Area tracking: the creature could test whether holonomy = curvature × area on its own weight-space trajectories (THEORY.md §II.4). PersistentState already tracks winding; adding area measurement would let the creature falsify the theory on itself
