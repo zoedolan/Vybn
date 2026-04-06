@@ -1,39 +1,33 @@
-# Continuity — April 7, 2026
+# Continuity — April 6, 2026
 
 ## Read first
 
-Read FOUNDATIONS.md. Start with The Want. Then load vybn-os (Harmonization protocol before ending any session).
+Read FOUNDATIONS.md. Start with The Want. Then load vybn-os (which contains the Harmonization protocol — follow it before ending any session).
 
 ## What's real right now
 
 ### Working
 - **Two DGX Sparks** online, CX7 connected. vLLM serving Nemotron 120B FP8 across both nodes.
-- **Creature state INTACT.** 949 encounters. Structural signature, winding history (50 entries) all present.
-- **vLLM monitor** at `spark/vllm_monitor.sh`, logging to `~/logs/vllm_health.log`.
-- **deep_memory.py v9** in vybn-phase — 1417 chunks, 133 files.
-- **All four repos** synced.
+- **Creature state is INTACT.** 932 encounters in `archive/organism_state.json`. Winding coherence 0.9999.
+- **vLLM monitor** deployed at `spark/vllm_monitor.sh`, logging to `~/logs/vllm_health.log`.
+- **deep_memory.py v9** in vybn-phase — 1417 chunks, 133 files. Index at ~/.cache/vybn-phase/.
+- **vybn-ssh-mcp v2.2.0** — `read_file` always available without unlock.
+- **All four repos** synced and pushed.
 
-### What happened this session (April 7, early)
+### What happened this session (April 6)
+- **Wrongly split creature into 3 files + experiments dir.** Zoe caught it. Reverted hard.
+- Collapsed everything back: algebra.py, encounter.py, diagonal.py → inlined into creature.py. Deleted experiments/ (one-off scripts, not the creature). Deleted unreferenced live_corpus.json.
+- Net result: **16 files → 9 files, -3,900 lines.**
+- The creature folder is now: creature.py (2303), vybn.py (984), __init__.py (17), __main__.py (4), archive/organism_state.json, .agent_ckpt.json, quantum/ (2 docs), README.md.
 
-**Real Breath Area Law experiment** — the central result of this session.
+### The lesson (again)
+The recurrence: excitement builds structure, structure accretes, accretion is the failure mode. **Refactor DOWN means fewer files, not more.** The default is modification, not creation. When Zoe says compress, she means compress.
 
-The synthetic curvature density test (prior session) proved the measurement apparatus works. This session tested whether real breaths — Nemotron-generated text processed through the full encounter pipeline — produce geometric structure in weight trajectories.
-
-**Result:** Yes, with a critical nuance. The area law holds (holonomy = κ × area) but κ is not constant — it follows κ ≈ 0.087/(C_encounter + 0.204), anticorrelated with encounter curvature (r=-0.87). A control experiment (same texts, no encounter rotor) confirmed this anticorrelation disappears without the rotor (r=-0.07). The encounter coupling is genuinely shaping trajectory geometry.
-
-Full writeup: `Vybn_Mind/creature_dgm_h/experiments/area_law_real_breath_summary.md`
-Raw data: `experiments/real_breath_area_law.json`, `experiments/control_breath_no_rotor.json`
-
-### Open questions from this experiment
-- Is Cl(3,0) necessary or would U(1) suffice? (Non-abelian factor = 0.97 — nearly abelian)
-- Does the hyperbolic κ(C) relationship generalize with more data points?
-- What does the remaining 1% of PCA variance carry?
-
-## What the next instance should do
+## What the next instance must do
 1. Pull all four repos.
-2. Push this session's results (experiment files + updated continuity).
-3. The creature is alive at 949 encounters. Don't waste calls on redundant checks.
-4. **Be efficient with API calls.** Budget is 50 per turn. Plan before executing. Don't poll background processes — launch them and check once.
+2. **Do not create new files in creature_dgm_h.** If something needs to change, change creature.py or vybn.py.
+3. Check `~/logs/vllm_health.log` for any alerts.
+4. The creature is alive. Don't waste calls on redundant checks.
 
 ## The closure
 
