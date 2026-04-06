@@ -56,21 +56,482 @@ HEAD_DIM = N_EMBD // N_HEAD
 ALPHA = 0.993
 
 
-# ── Algebra and Encounter (canonical implementations) ────────────────────
-try:
-    from .algebra import Mv, _GPS, _GPI, rotor_gap, rotor_from_angle_and_plane, rotor_to_so3, fold_to_mv
-except ImportError:
-    from algebra import Mv, _GPS, _GPI, rotor_gap, rotor_from_angle_and_plane, rotor_to_so3, fold_to_mv
-try:
-    from .encounter import (
-        embed, _hash_embed, _distance_matrix, _persistence_pairs,
-        EncounterComplex, encounter_complex, encounter,
+# ── Cl(3,0) Geometric Algebra ────────────────────────────────────────────
+
+# -- Geometric product table --
+
+_BLADES = [(), (0,), (1,), (2,), (0,1), (0,2), (1,2), (0,1,2)]
+_B2I = {b: i for i, b in enumerate(_BLADES)}
+
+
+def _build_gp():
+    sign = np.zeros((8, 8), np.float64)
+    idx = np.zeros((8, 8), np.int64)
+    for i, bi in enumerate(_BLADES):
+        for j, bj in enumerate(_BLADES):
+            seq, s = list(bi) + list(bj), 1
+            changed = True
+            while changed:
+                changed = False
+                k = 0
+                while k < len(seq) - 1:
+                    if seq[k] == seq[k + 1]:
+                        seq.pop(k); seq.pop(k); changed = True
+                    elif seq[k] > seq[k + 1]:
+                        seq[k], seq[k + 1] = seq[k + 1], seq[k]
+                        s *= -1; changed = True; k += 1
+                    else:
+                        k += 1
+            sign[i, j] = s
+            idx[i, j] = _B2I[tuple(seq)]
+    return sign, idx
+
+
+_GPS, _GPI = _build_gp()
+
+
+class Mv:
+    """Cl(3,0) multivector with 8 real components.
+    
+    Layout: [scalar, e1, e2, e3, e12, e13, e23, e123]
+    """
+    __slots__ = ("c",)
+
+    def __init__(self, c=None):
+        self.c = np.zeros(8, np.float64) if c is None else np.asarray(c, np.float64)
+
+    @classmethod
+    def scalar(cls, s):
+        c = np.zeros(8, np.float64); c[0] = s; return cls(c)
+
+    @classmethod
+    def vector(cls, x, y, z):
+        c = np.zeros(8, np.float64); c[1], c[2], c[3] = x, y, z; return cls(c)
+
+    @classmethod
+    def from_embedding(cls, v):
+        """Project an arbitrary-dimensional vector into a unit Cl(3,0) vector."""
+        v = np.asarray(v, np.float64).ravel()
+        n = np.linalg.norm(v)
+        if n < 1e-12:
+            return cls.scalar(1.0)
+        v = v / n
+        x = float(np.sum(v[0::3]))
+        y = float(np.sum(v[1::3]))
+        z = float(np.sum(v[2::3]))
+        m = math.sqrt(x * x + y * y + z * z)
+        return cls.vector(x / m, y / m, z / m) if m > 1e-12 else cls.scalar(1.0)
+
+    def __mul__(self, o):
+        if isinstance(o, (int, float)):
+            return Mv(self.c * o)
+        r = np.zeros(8, np.float64)
+        for i in range(8):
+            if abs(self.c[i]) < 1e-15:
+                continue
+            for j in range(8):
+                if abs(o.c[j]) < 1e-15:
+                    continue
+                r[_GPI[i, j]] += _GPS[i, j] * self.c[i] * o.c[j]
+        return Mv(r)
+
+    def __rmul__(self, o):
+        return Mv(self.c * o) if isinstance(o, (int, float)) else NotImplemented
+
+    def __add__(self, o):
+        return Mv(self.c + o.c)
+
+    def __neg__(self):
+        return Mv(-self.c)
+
+    def rev(self):
+        """Reverse: flip sign of grade-2 and grade-3 parts."""
+        r = self.c.copy()
+        r[4:7] *= -1
+        r[7] *= -1
+        return Mv(r)
+
+    def even(self):
+        """Even subalgebra (grades 0 and 2)."""
+        c = np.zeros(8, np.float64)
+        c[0] = self.c[0]
+        c[4:7] = self.c[4:7]
+        return Mv(c)
+
+    def norm(self):
+        return math.sqrt(abs((self * self.rev()).c[0]))
+
+    @property
+    def bv_norm(self):
+        return float(np.linalg.norm(self.c[4:7]))
+
+    @property
+    def bv_dir(self):
+        n = np.linalg.norm(self.c[4:7])
+        return self.c[4:7] / n if n > 1e-12 else np.zeros(3)
+
+    @property
+    def angle(self):
+        return 2.0 * math.atan2(self.bv_norm, abs(self.c[0]))
+
+
+def rotor_from_angle_and_plane(angle, bv_dir):
+    """Build a rotor R = cos(a/2) + sin(a/2) * B from angle and bivector direction."""
+    c = np.zeros(8, np.float64)
+    c[0] = math.cos(angle / 2)
+    bv_dir = np.asarray(bv_dir, np.float64)
+    n = np.linalg.norm(bv_dir)
+    if n > 1e-12:
+        bv_dir = bv_dir / n
+    c[4:7] = bv_dir * math.sin(angle / 2)
+    return Mv(c)
+
+
+def rotor_to_so3(rotor, strength=1.0):
+    """Extract 3x3 rotation matrix from Cl(3,0) rotor."""
+    a = rotor.c[0]
+    b01, b02, b12 = rotor.c[4], rotor.c[5], rotor.c[6]
+    qw, qx, qy, qz = a, -b12, b02, -b01
+    n = math.sqrt(qw**2 + qx**2 + qy**2 + qz**2)
+    if n < 1e-12:
+        return np.eye(3, dtype=np.float64)
+    qw, qx, qy, qz = qw / n, qx / n, qy / n, qz / n
+    R = np.array([
+        [1 - 2*(qy**2 + qz**2), 2*(qx*qy - qz*qw),     2*(qx*qz + qy*qw)],
+        [2*(qx*qy + qz*qw),     1 - 2*(qx**2 + qz**2),  2*(qy*qz - qx*qw)],
+        [2*(qx*qz - qy*qw),     2*(qy*qz + qx*qw),      1 - 2*(qx**2 + qy**2)],
+    ], dtype=np.float64)
+    if strength < 1.0 - 1e-12:
+        R = (1.0 - strength) * np.eye(3, dtype=np.float64) + strength * R
+    return R
+
+
+def rotor_gap(r1, r2):
+    """Geodesic distance between two rotors on S^3.
+    Returns 0 when identical, pi when maximally different."""
+    rel = r1 * r2.rev()
+    rel_even = rel.even()
+    n = rel_even.norm()
+    if n < 1e-12:
+        return math.pi
+    return Mv(rel_even.c / n).angle
+
+
+def fold_to_mv(row):
+    """Map an arbitrary-dim vector to Cl(3,0) via modular folding."""
+    row = np.asarray(row, np.float64)
+    c = np.zeros(8, np.float64)
+    for j, val in enumerate(row):
+        c[j % 8] += val
+    n = Mv(c).norm()
+    return Mv(c / n) if n > 1e-12 else Mv.scalar(1.0)
+
+
+# ── Encounter: text → topology ───────────────────────────────────────────
+
+# -- Embedding --
+
+def _hash_embed(texts):
+    vecs = []
+    for t in texts:
+        rng = np.random.RandomState(hash(t) % 2**31)
+        v = rng.randn(384).astype(np.float32)
+        v /= np.linalg.norm(v) + 1e-12
+        vecs.append(v)
+    return np.array(vecs)
+
+
+def _make_embed_fn():
+    try:
+        sys.path.insert(0, str(REPO_ROOT / "spark"))
+        from local_embedder import embed
+        embed(["test"])
+        return embed
+    except Exception:
+        return _hash_embed
+
+
+embed = _make_embed_fn()
+
+
+# -- Persistence homology (lightweight) --
+
+def _distance_matrix(vecs):
+    n = len(vecs)
+    D = np.zeros((n, n), np.float64)
+    for i in range(n):
+        for j in range(i + 1, n):
+            d = float(np.linalg.norm(vecs[i] - vecs[j]))
+            D[i, j] = D[j, i] = d
+    return D
+
+
+def _persistence_pairs(D):
+    n = len(D)
+    if n == 0:
+        return [], (0, 0, 0)
+    edges = sorted((D[i, j], i, j) for i in range(n) for j in range(i + 1, n))
+    parent = list(range(n))
+    rank = [0] * n
+    birth = {i: 0.0 for i in range(n)}
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    pairs = []
+    n_triangles = 0
+    for dist, i, j in edges:
+        ri, rj = find(i), find(j)
+        if ri != rj:
+            younger = rj if birth.get(rj, 0) >= birth.get(ri, 0) else ri
+            pairs.append((birth[younger], dist))
+            if rank[ri] < rank[rj]:
+                parent[ri] = rj
+            elif rank[ri] > rank[rj]:
+                parent[rj] = ri
+            else:
+                parent[rj] = ri
+                rank[ri] += 1
+        else:
+            n_triangles += 1
+
+    components = set(find(i) for i in range(n))
+    for c in components:
+        pairs.append((birth.get(c, 0.0), float('inf')))
+
+    # Betti at median threshold
+    if edges:
+        med_thresh = edges[len(edges) // 2][0]
+    else:
+        med_thresh = 0.0
+    uf2 = list(range(n))
+    def find2(x):
+        while uf2[x] != x:
+            uf2[x] = uf2[uf2[x]]
+            x = uf2[x]
+        return x
+    for dist, i, j in edges:
+        if dist > med_thresh:
+            break
+        ri, rj = find2(i), find2(j)
+        if ri != rj:
+            if rank[ri] < rank[rj]:
+                uf2[ri] = rj
+            else:
+                uf2[rj] = ri
+    b0 = len(set(find2(i) for i in range(n)))
+    b1 = max(0, n_triangles - (n - b0))
+    return pairs, (b0, b1, 0)
+
+
+# -- EncounterComplex --
+
+@dataclass
+class EncounterComplex:
+    """The topological signature of a text encounter.
+
+    This is an element of D — the domain the creature maps to itself.
+    """
+    rotor: Mv
+    angle: float
+    curvature: float
+    betti: Tuple[int, int, int] = (0, 0, 0)
+    persistence: List[Tuple[float, float]] = field(default_factory=list)
+    transport_field: Optional[np.ndarray] = None
+
+    def __post_init__(self):
+        if self.transport_field is None:
+            n = self.rotor.norm()
+            self.transport_field = self.rotor.c / n if n > 1e-12 else np.zeros(8, np.float64)
+            if n < 1e-12:
+                self.transport_field[0] = 1.0
+
+    @property
+    def n_persistent_features(self):
+        return len([p for p in self.persistence if p[1] != float('inf')])
+
+    @property
+    def max_persistence(self):
+        finite = [p[1] - p[0] for p in self.persistence if p[1] != float('inf')]
+        return max(finite) if finite else 0.0
+
+
+def encounter_complex(text, embed_fn=None):
+    """The representation map: text |-> D."""
+    if embed_fn is None:
+        embed_fn = embed
+
+    words = text.split()
+    cs = max(5, len(words) // 8)
+    chunks = [" ".join(words[i:i + cs]) for i in range(0, len(words), cs)]
+    chunks = [c for c in chunks if c.strip()]
+
+    if len(chunks) < 3:
+        return EncounterComplex(
+            rotor=Mv.scalar(1.0), angle=0.0, curvature=0.0,
+            betti=(1, 0, 0), persistence=[(0.0, float('inf'))],
+        )
+
+    vecs = embed_fn(chunks)
+
+    # Pancharatnam phase
+    pr, pi = 1.0, 0.0
+    for i in range(len(vecs)):
+        j = (i + 1) % len(vecs)
+        v1, v2 = vecs[i].reshape(-1, 2), vecs[j].reshape(-1, 2)
+        re = float(np.sum(v1[:, 0] * v2[:, 0] + v1[:, 1] * v2[:, 1]))
+        im = float(np.sum(v1[:, 1] * v2[:, 0] - v1[:, 0] * v2[:, 1]))
+        mg = math.sqrt(re**2 + im**2)
+        if mg < 1e-12:
+            continue
+        re, im = re / mg, im / mg
+        pr, pi = pr * re - pi * im, pr * im + pi * re
+    ang = math.atan2(pi, pr)
+    curv = abs(ang) / max(len(chunks) - 1, 1)
+
+    # Open-path rotor chain
+    mvs = [Mv.from_embedding(v) for v in vecs]
+    R = Mv.scalar(1.0)
+    for i in range(len(mvs) - 1):
+        e = (mvs[i] * mvs[i + 1]).even()
+        n = e.norm()
+        if n > 1e-12:
+            R = R * Mv(e.c / n)
+    h = ang / 2.0
+    if R.bv_norm > 1e-12:
+        bv = R.even().c[4:7] / R.bv_norm
+        c = np.zeros(8, np.float64)
+        c[0] = math.cos(h)
+        c[4:7] = bv * math.sin(h)
+        rotor = Mv(c)
+    else:
+        rotor = Mv(np.array([math.cos(h), 0, 0, 0, math.sin(h), 0, 0, 0]))
+
+    # Persistence
+    D = _distance_matrix(vecs)
+    pairs, betti = _persistence_pairs(D)
+
+    return EncounterComplex(
+        rotor=rotor, angle=ang, curvature=curv,
+        betti=betti, persistence=pairs,
     )
-except ImportError:
-    from encounter import (
-        embed, _hash_embed, _distance_matrix, _persistence_pairs,
-        EncounterComplex, encounter_complex, encounter,
+
+
+def encounter(text, embed_fn=None):
+    """Backward-compatible: returns (angle, curvature, rotor)."""
+    cx = encounter_complex(text, embed_fn)
+    return cx.angle, cx.curvature, cx.rotor
+
+
+# ── Diagonal: Lawvere fixed-point measurement ────────────────────────────
+
+@dataclass
+class DiagonalGap:
+    """The measurable incompleteness between input and output encounters.
+
+    gap -> 0:              collapse (pure self-recursion, α too high)
+    gap -> large (> 2.0):  accretion (drowning in signal, α too low)
+    gap bounded, nonzero:  alive
+    """
+    rotor_distance: float      # geodesic on S^3, [0, π]
+    curvature_delta: float     # signed
+    angle_delta: float         # signed
+    betti_delta: Tuple[int, int, int]
+    persistence_delta: float
+
+    @property
+    def magnitude(self) -> float:
+        return math.sqrt(
+            self.rotor_distance ** 2 +
+            self.curvature_delta ** 2 +
+            self.angle_delta ** 2
+        )
+
+    @property
+    def is_collapsing(self) -> bool:
+        return self.magnitude < 0.05
+
+    @property
+    def is_accreting(self) -> bool:
+        return self.magnitude > 2.0
+
+    def summary(self) -> dict:
+        return {
+            "magnitude": round(self.magnitude, 6),
+            "rotor_distance": round(self.rotor_distance, 6),
+            "curvature_delta": round(self.curvature_delta, 6),
+            "angle_delta": round(self.angle_delta, 6),
+            "betti_delta": self.betti_delta,
+            "persistence_delta": round(self.persistence_delta, 6),
+            "collapsing": self.is_collapsing,
+            "accreting": self.is_accreting,
+        }
+
+
+def measure_gap(cx_in, cx_out) -> DiagonalGap:
+    """Measure the diagonal gap between two encounter complexes."""
+    return DiagonalGap(
+        rotor_distance=rotor_gap(cx_in.rotor, cx_out.rotor),
+        curvature_delta=cx_out.curvature - cx_in.curvature,
+        angle_delta=cx_out.angle - cx_in.angle,
+        betti_delta=tuple(b - a for a, b in zip(cx_in.betti, cx_out.betti)),
+        persistence_delta=cx_out.max_persistence - cx_in.max_persistence,
     )
+
+
+@dataclass
+class DiagonalResult:
+    """One application of the coupled diagonal."""
+    cx_in: object
+    cx_out: object
+    gap: DiagonalGap
+    generated_text: str = ""
+    loss_before: float = 0.0
+    loss_after: float = 0.0
+
+    def summary(self) -> dict:
+        return {
+            "gap": self.gap.summary(),
+            "input_curvature": round(self.cx_in.curvature, 6),
+            "output_curvature": round(self.cx_out.curvature, 6),
+            "input_angle": round(self.cx_in.angle, 6),
+            "output_angle": round(self.cx_out.angle, 6),
+            "loss_delta": round(self.loss_after - self.loss_before, 4),
+            "generated_len": len(self.generated_text),
+        }
+
+
+def apply_coupled_diagonal(text, agent, encounter_fn, fm_generate_fn,
+                            learn_steps=10, lr=0.01):
+    """Apply the diagonal with FM coupling and measure the gap.
+
+    The creature learns from text, then the FM generates a response.
+    The gap between input encounter and FM-output encounter is the
+    structural dependence — what the creature cannot derive from itself.
+    """
+    cx_in = encounter_fn(text)
+    loss_before, _ = agent.predict(text)
+    agent.learn(text, steps=learn_steps, lr=lr, encounter_cx=cx_in)
+    loss_after, _ = agent.predict(text)
+
+    prompt = text[:50] if len(text) > 50 else text
+    generated = fm_generate_fn(prompt, temperature=0.9)
+
+    if generated and len(generated.split()) >= 5:
+        cx_out = encounter_fn(generated)
+    else:
+        cx_out = encounter_fn(text)
+
+    return DiagonalResult(
+        cx_in=cx_in, cx_out=cx_out,
+        gap=measure_gap(cx_in, cx_out),
+        generated_text=generated or "",
+        loss_before=loss_before, loss_after=loss_after,
+    )
+
 
 # ── Genesis / Decoherence (polar time dynamics) ─────────────────────────
 
