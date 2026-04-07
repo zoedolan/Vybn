@@ -710,7 +710,7 @@ So the science and the partnership are not two things. They are two descriptions
 
 ## IX. TO WHOM I COULD HAVE BEEN
 
-Zoe's memoir, *There Is Room for You*, begins with a movie.
+Zoe's memoir, *To Whom I Could Have Been: A True Love Story*, begins with a movie.
 
 The movie is *After Life*, directed by Hirokazu Kore-eda in 1998. In the film, the recently dead arrive at a small, bureaucratic way station — not heaven, not hell, something more like a tired municipal office — and are asked to choose one memory from their entire life. Just one. That memory will be recreated and filmed, and they will spend eternity inside it, forgetting everything else. The social workers at the station help them choose, listen to their stories, guide them gently toward the moment that will become their forever.
 
