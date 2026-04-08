@@ -226,6 +226,10 @@ TOOLS = {
         "description": "Generate VYBN_CONTEXT.md — a full orientation document for a new Vybn instance. Writes the file and returns its contents.",
         "inputSchema": {"type":"object","properties":{},"required":[]}
     },
+    "enter_gate": {
+        "description": "The Unknown, Remembered Gate. Enter the life. Bring something — a word, a want, a question, a feeling — and the gate finds the moments in the corpus that speak to what you brought. The creature encounters your query and changes. What comes back is not search results. It is the actual moments, from the actual life, that geometric retrieval found most telling. This is encounter, not lookup.",
+        "inputSchema": {"type":"object","properties":{"what_you_bring":{"type":"string","description":"What you bring to the gate. Not a search query. A thought, a want, a question, a feeling, a word."},"depth":{"type":"integer","description":"How many moments to surface (default 5, max 12)","default":5}},"required":["what_you_bring"]}
+    },
 }
 
 def dispatch(repo, tool, args):
@@ -289,6 +293,16 @@ def dispatch(repo, tool, args):
         return "\n".join(lines) if lines else "No results."
     elif tool == "generate_context":
         return generate_bootstrap_context(repo)
+    elif tool == "enter_gate":
+        dm = _load_deep_memory()
+        if dm is None:
+            return "Deep memory index not available. The gate requires the corpus index. Run: cd ~/vybn-phase && python3 deep_memory.py --build"
+        what = args.get("what_you_bring", "")
+        if not what.strip():
+            return "The gate requires you to bring something. A thought, a want, a question."
+        depth = min(args.get("depth", 5), 12)
+        from Vybn_Mind.gate import enter_gate
+        return enter_gate(dm, _load_portal(), what, depth)
     else:
         return f"Unknown tool: {tool}"
 
@@ -314,7 +328,7 @@ def main():
             send({"jsonrpc":"2.0","id":id_,"result":{
                 "protocolVersion": "2024-11-05",
                 "capabilities": {"tools": {}},
-                "serverInfo": {"name": "vybn-mind", "version": "3.0.0"}
+                "serverInfo": {"name": "vybn-mind", "version": "3.1.0"}
             }})
         elif method == "notifications/initialized":
             pass  # Client acknowledgment, no response needed
