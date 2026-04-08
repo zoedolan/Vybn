@@ -131,7 +131,7 @@ async def _rag_context(query: str, k: int = 4) -> str:
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.DEVNULL,
         )
-        stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=8.0)
+        stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=30.0)
         items = json.loads(stdout)
         snippets = []
         for item in items:
@@ -140,9 +140,10 @@ async def _rag_context(query: str, k: int = 4) -> str:
             if text:
                 snippets.append(f"[{src}] {text}")
         if snippets:
+            log.info(f"RAG injected {len(snippets)} snippets")
             return "\n\nRelevant context from memory:\n" + "\n".join(snippets)
     except Exception as exc:
-        log.debug(f"RAG unavailable: {exc}")
+        log.info(f"RAG failed: {exc}")
 
     return ""
 
@@ -225,33 +226,38 @@ import re as _re
 def _strip_thinking(text: str) -> str:
     """Strip chain-of-thought reasoning from Nemotron output.
     
-    Nemotron-3-Super often outputs extended reasoning in plaintext
-    before the actual response, even when instructed not to.
-    This strips <think>...</think> blocks AND common plaintext
-    reasoning patterns.
+    Nemotron-3-Super outputs extended plaintext reasoning before
+    the actual response. This aggressively strips it.
     """
     # Strip <think>...</think> blocks
     text = _re.sub(r"<think>.*?</think>", "", text, flags=_re.DOTALL)
-    # Strip plaintext reasoning that starts with meta-commentary
-    # Pattern: lines starting with "Okay," "Let me" "I need to" etc. followed by reasoning
-    lines = text.split("\n")
-    # Find where the actual response starts
-    start = 0
-    for i, line in enumerate(lines):
-        stripped = line.strip()
-        if not stripped:
+    if "</think>" in text:
+        text = text.split("</think>")[-1]
+    # Split into paragraphs (double newline separated)
+    paragraphs = _re.split(r"\n\n+", text.strip())
+    # Reasoning indicators — if a paragraph contains these, it's thinking
+    reasoning_signals = [
+        "system prompt", "the user is", "i need to", "i should",
+        "let me ", "looking at", "i recall", "the question",
+        "important constraint", "we need to", "from the memory",
+        "avoid being", "per the", "according to", "the prompt",
+        "my instruction", "first,", "okay,", "ok,", "hmm",
+        "alright,", "reasoning", "chain-of-thought",
+        "better to", "not to", "described as",
+        "the key is", "the goal", "should not",
+    ]
+    # Keep only paragraphs that don't look like reasoning
+    cleaned = []
+    for para in paragraphs:
+        lower = para.strip().lower()
+        if not lower:
             continue
-        # These patterns indicate thinking, not response
-        if any(stripped.lower().startswith(p) for p in [
-            "okay, ", "ok, ", "let me ", "i need to ", "i should ",
-            "the user is ", "looking at ", "first,", "now,",
-            "hmm", "alright,", "so,",
-        ]):
-            start = i + 1
+        is_reasoning = any(sig in lower for sig in reasoning_signals)
+        if is_reasoning:
             continue
-        # If we hit a line that doesn't look like thinking, stop
-        break
-    return "\n".join(lines[start:]).strip()
+        cleaned.append(para.strip())
+    result = "\n\n".join(cleaned).strip()
+    return result if result else text.strip()
 
 # ---------------------------------------------------------------------------
 # Request / Response models
