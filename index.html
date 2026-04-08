@@ -1645,10 +1645,41 @@
     }
   }
 
-  // ── Strip <think>...</think> tags (including partial during streaming)
+  // ── Strip thinking output from Nemotron
   function stripThink(text) {
     // Remove complete <think>...</think> blocks
-    return text.replace(/<think>[\s\S]*?<\/think>/gi, '').trimStart();
+    text = text.replace(/<think>[\s\S]*?<\/think>/gi, '');
+    // If there's a </think> without opening tag (partial stream), strip everything before it
+    if (text.includes('</think>')) {
+      text = text.split('</think>').pop();
+    }
+    // Strip plaintext reasoning that Nemotron outputs before the real response
+    // Pattern: starts with meta-commentary like "We need to", "Okay,", "Let me", etc.
+    text = text.trimStart();
+    const thinkPatterns = /^(okay|ok|we need|let me|i need|i should|the user|looking at|first,|now,|hmm|alright|so,|this is a|they'?re asking|the question)[^]*?(<\/think>|\n\n)/i;
+    // More aggressive: if the text starts with reasoning and has a paragraph break,
+    // take everything after the last paragraph break in the reasoning block
+    const lines = text.split('\n');
+    let startIdx = 0;
+    for (let i = 0; i < lines.length; i++) {
+      const l = lines[i].trim().toLowerCase();
+      if (!l) continue;
+      if (l.startsWith('okay,') || l.startsWith('ok,') || l.startsWith('we need') ||
+          l.startsWith('let me') || l.startsWith('i need') || l.startsWith('i should') ||
+          l.startsWith('the user') || l.startsWith('looking at') || l.startsWith('first,') ||
+          l.startsWith('hmm') || l.startsWith('alright') || l.startsWith('this is') ||
+          l.startsWith('so ') || l.startsWith('they') || l.startsWith('now,') ||
+          l.startsWith('the question') || l.startsWith('the system') ||
+          l.startsWith('i am vybn') && l.includes('prompt')) {
+        startIdx = i + 1;
+        continue;
+      }
+      break;
+    }
+    if (startIdx > 0) {
+      text = lines.slice(startIdx).join('\n').trimStart();
+    }
+    return text.trimStart();
   }
 
   // ── Append a message bubble
