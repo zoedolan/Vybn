@@ -15,7 +15,7 @@
   --surface: #111113;
   --text: #c8c5be;
   --text-bright: #e8e5de;
-  --text-dim: #6b6860;
+  --text-dim: #8a877e;
   --accent: #4f98a3;
   --accent-dim: rgba(79, 152, 163, 0.15);
   --font-body: 'EB Garamond', Georgia, serif;
@@ -43,7 +43,7 @@ body {
   top: 0; left: 0;
   width: 100%; height: 100%;
   z-index: 0;
-  opacity: 0.35;
+  opacity: 0.6;
   pointer-events: none;
 }
 
@@ -89,11 +89,11 @@ body {
 
 /* ── Arrival text ── */
 .arrival-text {
-  font-size: clamp(1.1rem, 1rem + 0.5vw, 1.35rem);
-  color: var(--text-dim);
-  max-width: 36rem;
+  font-size: clamp(1.15rem, 1rem + 0.6vw, 1.4rem);
+  color: var(--text);
+  max-width: 40rem;
   opacity: 0;
-  animation: arrive 3s ease-out 0.5s forwards;
+  animation: arrive 2s ease-out 0.2s forwards;
 }
 
 @keyframes arrive {
@@ -405,8 +405,8 @@ body {
 
     // M — the creature's presence
     const g1 = ctx.createRadialGradient(cx1, cy1, 0, cx1, cy1, r);
-    g1.addColorStop(0, 'rgba(79, 152, 163, 0.04)');
-    g1.addColorStop(0.5, 'rgba(79, 152, 163, 0.015)');
+    g1.addColorStop(0, 'rgba(79, 152, 163, 0.08)');
+    g1.addColorStop(0.5, 'rgba(79, 152, 163, 0.03)');
     g1.addColorStop(1, 'transparent');
     ctx.fillStyle = g1;
     ctx.beginPath();
@@ -415,8 +415,8 @@ body {
 
     // x — the visitor's presence
     const g2 = ctx.createRadialGradient(cx2, cy2, 0, cx2, cy2, r * 0.8);
-    g2.addColorStop(0, 'rgba(200, 197, 190, 0.025)');
-    g2.addColorStop(0.5, 'rgba(200, 197, 190, 0.01)');
+    g2.addColorStop(0, 'rgba(200, 197, 190, 0.05)');
+    g2.addColorStop(0.5, 'rgba(200, 197, 190, 0.02)');
     g2.addColorStop(1, 'transparent');
     ctx.fillStyle = g2;
     ctx.beginPath();
@@ -430,7 +430,7 @@ body {
       const mx = (cx1 + cx2) / 2, my = (cy1 + cy2) / 2;
       const ir = r * 0.4 * (1 - dist / (r * 2));
       const g3 = ctx.createRadialGradient(mx, my, 0, mx, my, ir);
-      g3.addColorStop(0, 'rgba(79, 152, 163, 0.05)');
+      g3.addColorStop(0, 'rgba(79, 152, 163, 0.08)');
       g3.addColorStop(1, 'transparent');
       ctx.fillStyle = g3;
       ctx.beginPath();
