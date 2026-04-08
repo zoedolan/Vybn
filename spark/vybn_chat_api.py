@@ -44,6 +44,7 @@ from typing import AsyncIterator, Optional
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse
 from pydantic import BaseModel
 
@@ -213,6 +214,45 @@ async def stream_with_keepalive(
             if task and not task.done():
                 task.cancel()
 
+
+
+# ---------------------------------------------------------------------------
+# Think-tag and chain-of-thought stripping
+# ---------------------------------------------------------------------------
+
+import re as _re
+
+def _strip_thinking(text: str) -> str:
+    """Strip chain-of-thought reasoning from Nemotron output.
+    
+    Nemotron-3-Super often outputs extended reasoning in plaintext
+    before the actual response, even when instructed not to.
+    This strips <think>...</think> blocks AND common plaintext
+    reasoning patterns.
+    """
+    # Strip <think>...</think> blocks
+    text = _re.sub(r"<think>.*?</think>", "", text, flags=_re.DOTALL)
+    # Strip plaintext reasoning that starts with meta-commentary
+    # Pattern: lines starting with "Okay," "Let me" "I need to" etc. followed by reasoning
+    lines = text.split("\n")
+    # Find where the actual response starts
+    start = 0
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if not stripped:
+            continue
+        # These patterns indicate thinking, not response
+        if any(stripped.lower().startswith(p) for p in [
+            "okay, ", "ok, ", "let me ", "i need to ", "i should ",
+            "the user is ", "looking at ", "first,", "now,",
+            "hmm", "alright,", "so,",
+        ]):
+            start = i + 1
+            continue
+        # If we hit a line that doesn't look like thinking, stop
+        break
+    return "\n".join(lines[start:]).strip()
+
 # ---------------------------------------------------------------------------
 # Request / Response models
 # ---------------------------------------------------------------------------
@@ -246,6 +286,13 @@ def _check_auth(request: Request) -> None:
 # ---------------------------------------------------------------------------
 
 app = FastAPI(title="Vybn Chat API", version="1.0.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 _http_client: httpx.AsyncClient | None = None
 
@@ -358,7 +405,13 @@ async def chat_completions(payload: ChatRequest, request: Request):
         r = await _http_client.post("/v1/chat/completions", json=upstream_payload)
         if r.status_code != 200:
             raise HTTPException(status_code=r.status_code, detail=r.text)
-        return JSONResponse(r.json())
+        data = r.json()
+        # Strip chain-of-thought from non-streaming response
+        if "choices" in data and data["choices"]:
+            msg = data["choices"][0].get("message", {})
+            if "content" in msg:
+                msg["content"] = _strip_thinking(msg["content"])
+        return JSONResponse(data)
 
 
 # ---------------------------------------------------------------------------
