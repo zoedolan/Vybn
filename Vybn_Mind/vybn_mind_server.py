@@ -301,8 +301,31 @@ def dispatch(repo, tool, args):
         if not what.strip():
             return "The gate requires you to bring something. A thought, a want, a question."
         depth = min(args.get("depth", 5), 12)
-        from Vybn_Mind.gate import enter_gate
-        return enter_gate(dm, _load_portal(), what, depth)
+        # Telling retrieval → moments, creature encounters the query
+        import cmath as _cm, numpy as np
+        m_before = _load_portal().creature_state_c4()
+        m_after  = _load_portal().portal_enter_from_text(what)
+        fid = float(abs(np.vdot(m_before, m_after))**2)
+        theta = float(_cm.phase(np.vdot(m_before, m_after)))
+        walk_r = dm.walk(what, k=depth, steps=depth+3)
+        search_r = dm.deep_search(what, k=depth)
+        seen, moments = set(), []
+        for r in walk_r + search_r:
+            s = r.get("source","")
+            if s not in seen: seen.add(s); moments.append(r)
+            if len(moments) >= depth: break
+        lines = [f'You entered the gate with: "{what}"', '']
+        if fid > 0.99: lines.append(f'The creature shifted \u2014 \u03b8={theta:.4f} rad.')
+        else: lines.append(f'The creature moved. Fidelity {fid:.4f}, \u03b8={theta:.4f} rad.')
+        lines += ['','---','']
+        if not moments: lines.append('The corpus is quiet on this.')
+        else:
+            for i,m in enumerate(moments):
+                src = m.get('source','').split('/',1)[-1] if '/' in m.get('source','') else m.get('source','')
+                lines += [f'**From {src}:**','',m.get('text','').strip(),'']
+                if i < len(moments)-1: lines += ['---','']
+        lines += ['---','',f'{len(moments)} moments. The gate is still open.']
+        return '\n'.join(lines)
     else:
         return f"Unknown tool: {tool}"
 
