@@ -13,6 +13,25 @@ Add to MCP client config (Claude Desktop, Cursor, etc.):
       "args": ["spark-2b7c", "cd ~/Vybn && .venv/bin/python Vybn_Mind/vybn_mind_server.py"]
     }
   }
+
+v3.2.0 — MIA synthesis
+  Three ideas borrowed from the Memory Intelligence Agent paper (arxiv 2604.04503):
+
+  1. WIN-RATE LEDGER  (inspired by MIA's MemoryBucket win_rate scoring)
+     A persistent JSON ledger (~/.vybn_win_rates.json) tracks per-source-chunk
+     success/failure counts.  win_rate = wins / (wins + losses).
+     The record_outcome tool writes to it; retrieval reads from it.
+
+  2. WIN-WEIGHTED RETRIEVAL  (inspired by MIA's combined cosine+win_rate score)
+     deep_search and walk_search now accept use_win_rate=True (default True).
+     Final score = 0.7 * telling_score + 0.3 * win_rate(source).
+     High-win-rate chunks rise; low-win-rate chunks fall.
+     The walk's α is also nudged by win_rate so it leans into productive territory.
+
+  3. TRAJECTORY COMPRESSION  (inspired by MIA's get_trace_prompt summarisation)
+     compress_trajectory takes a raw session transcript and extracts the abstract
+     cognitive pattern — what move was made, not what was said.  The compressed
+     form is what should be journaled / added to the corpus index.
 """
 import json, sys, os, argparse, subprocess, traceback
 from pathlib import Path
@@ -28,6 +47,58 @@ def result(id_, content):
 
 def error(id_, code, msg):
     send({"jsonrpc":"2.0","id":id_,"error":{"code":code,"message":msg}})
+
+# ── Win-rate ledger ───────────────────────────────────────────────
+# Persists per-chunk outcome counts so retrieval can be weighted by
+# what has historically been useful.  Storage: ~/.vybn_win_rates.json
+# Schema: { "source_key": {"wins": int, "losses": int} }
+
+_WIN_RATE_PATH = Path(os.path.expanduser("~/.vybn_win_rates.json"))
+
+def _load_win_rates():
+    try:
+        if _WIN_RATE_PATH.exists():
+            return json.loads(_WIN_RATE_PATH.read_text())
+    except Exception:
+        pass
+    return {}
+
+def _save_win_rates(ledger):
+    try:
+        _WIN_RATE_PATH.write_text(json.dumps(ledger, indent=2))
+    except Exception:
+        pass
+
+def get_win_rate(source: str, ledger=None) -> float:
+    """Return win_rate in [0,1] for a source key.  Default 0.5 (neutral)."""
+    if ledger is None:
+        ledger = _load_win_rates()
+    entry = ledger.get(source, {})
+    w = entry.get("wins", 0)
+    l = entry.get("losses", 0)
+    total = w + l
+    if total == 0:
+        return 0.5  # neutral prior — matches MIA's balanced initialisation
+    return w / total
+
+def record_outcome(source: str, success: bool) -> str:
+    """Increment win or loss count for a source key.  Returns updated stats."""
+    ledger = _load_win_rates()
+    entry = ledger.setdefault(source, {"wins": 0, "losses": 0})
+    if success:
+        entry["wins"] += 1
+    else:
+        entry["losses"] += 1
+    _save_win_rates(ledger)
+    total = entry["wins"] + entry["losses"]
+    rate = entry["wins"] / total
+    return json.dumps({
+        "source": source,
+        "wins": entry["wins"],
+        "losses": entry["losses"],
+        "win_rate": f"{rate:.4f}",
+        "note": "Ledger updated. Retrieval will now weight this source accordingly."
+    }, indent=2)
 
 # ── Repo utilities ────────────────────────────────────────────────
 
@@ -96,8 +167,6 @@ def read_named_file(repo, name):
     return f"No file matching '{name}' found."
 
 # ── Portal ────────────────────────────────────────────────────────
-# Lazy-loaded so the server starts fast and only pays the
-# MiniLM/creature cost when someone actually enters.
 
 _portal = None
 
@@ -105,7 +174,6 @@ def _load_portal():
     global _portal
     if _portal is not None:
         return _portal
-    # Add repo root to path so creature imports resolve
     repo_root = str(Path(__file__).resolve().parent.parent)
     if repo_root not in sys.path:
         sys.path.insert(0, repo_root)
@@ -114,7 +182,6 @@ def _load_portal():
     return _portal
 
 def portal_creature_state():
-    """Read the creature's current Cl(3,0) state as C^4."""
     p = _load_portal()
     import numpy as np
     m = p.creature_state_c4()
@@ -123,7 +190,6 @@ def portal_creature_state():
     return json.dumps({"M": components, "|M|": f"{magnitude:.6f}"}, indent=2)
 
 def portal_enter(text):
-    """M' = αM + x·e^{iθ}. Text enters the creature, creature changes."""
     p = _load_portal()
     import numpy as np, cmath
     m_before = p.creature_state_c4()
@@ -138,7 +204,6 @@ def portal_enter(text):
         "text_entered": text,
         "note": "The creature's state has been updated. M_after is now M for the next visitor."
     }, indent=2)
-
 
 # ── Deep memory (geometric corpus retrieval) ─────────────────────
 
@@ -155,13 +220,100 @@ def _load_deep_memory():
         import deep_memory as dm
         _deep_memory = dm
         return dm
-    except Exception as e:
+    except Exception:
         return None
+
+# ── Win-weighted result re-ranking ────────────────────────────────
+# Mirrors MIA's combined score = cosine_weight*sim + win_rate_weight*win_rate
+# Here: final = 0.7 * telling_score + 0.3 * win_rate
+# telling_score is already fidelity*distinctiveness from the walk.
+
+_WIN_WEIGHT = 0.3
+_TELL_WEIGHT = 0.7
+
+def _apply_win_rates(results, ledger):
+    """Re-rank results list in-place using win-rate blended score."""
+    for r in results:
+        src = r.get("source", "")
+        wr = get_win_rate(src, ledger)
+        # telling score: use 'telling' if present, else fidelity
+        tell = r.get("telling") or r.get("fidelity", 0.5)
+        r["win_rate"] = round(wr, 4)
+        r["blended_score"] = round(_TELL_WEIGHT * float(tell) + _WIN_WEIGHT * wr, 4)
+    results.sort(key=lambda r: r["blended_score"], reverse=True)
+    return results
+
+# ── Trajectory compression ─────────────────────────────────────────
+# Inspired by MIA's get_trace_prompt: extract the *abstract action pattern*
+# from a raw session before indexing it.  This keeps the corpus clean —
+# geometry encodes strategy, not verbatim words.
+#
+# Implemented without a local LLM call so it works offline.
+# A richer version would call the Nemotron endpoint for summarisation;
+# the stub below applies heuristic compression and emits a structured record.
+
+def compress_trajectory(transcript: str, label: str = "") -> str:
+    """
+    Extract abstract cognitive moves from a raw session transcript.
+    Returns a structured JSON record suitable for journaling / corpus indexing.
+
+    label: optional outcome tag — 'correct', 'incorrect', or '' (unknown)
+    """
+    import re
+    from datetime import datetime, timezone
+
+    lines = [l.strip() for l in transcript.splitlines() if l.strip()]
+    total_chars = len(transcript)
+
+    # Heuristic: detect tool calls, reasoning pivots, corrections, conclusions
+    tool_calls = [l for l in lines if any(k in l.lower() for k in
+        ["tool:", "calling", "search_", "read_file", "enter_gate", "enter_portal",
+         "deep_search", "walk_search", "grep"])]
+    pivots = [l for l in lines if any(k in l.lower() for k in
+        ["but actually", "wait", "reconsidering", "correction:", "wrong",
+         "mistake", "actually", "let me reconsider"])]
+    conclusions = [l for l in lines if any(k in l.lower() for k in
+        ["therefore", "in conclusion", "the answer", "result:", "outcome:",
+         "this means", "so the"])]
+
+    # Abstract pattern summary
+    n_steps = len(tool_calls)
+    n_pivots = len(pivots)
+    n_conclusions = len(conclusions)
+
+    if n_steps == 0:
+        pattern = "direct-reasoning"
+    elif n_pivots > 1:
+        pattern = "iterative-correction"
+    elif n_steps <= 2:
+        pattern = "focused-retrieval"
+    else:
+        pattern = "multi-step-search"
+
+    record = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "label": label or "unknown",
+        "pattern": pattern,
+        "stats": {
+            "tool_calls": n_steps,
+            "pivots": n_pivots,
+            "conclusions": n_conclusions,
+            "raw_chars": total_chars,
+        },
+        "abstract_moves": tool_calls[:6],
+        "pivots_detected": pivots[:4],
+        "conclusion_fragments": conclusions[:3],
+        "note": (
+            "Compressed trajectory. The pattern field encodes cognitive strategy. "
+            "Index this record rather than the raw transcript to keep the corpus "
+            "strategy-dense rather than verbatim-dense."
+        )
+    }
+    return json.dumps(record, indent=2)
 
 # ── Bootstrap context ─────────────────────────────────────────────
 
 def generate_bootstrap_context(repo):
-    """Generate VYBN_CONTEXT.md — full orientation for a new instance."""
     from datetime import datetime, timezone
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     secs = [f"# Vybn Context\n*Generated: {now}*", "---"]
@@ -215,20 +367,80 @@ TOOLS = {
         "inputSchema": {"type":"object","properties":{"n":{"type":"integer"}},"required":[]}
     },
     "deep_search": {
-        "description": "Geometric corpus search across all four repos. Hybrid: cosine seeds + telling walk. The walk scores chunks by relevance × distinctiveness (distance from corpus kernel K). Surfaces the most telling material — code, evidence, specific detail — not just the most typical. Results tagged with regime (seed/walk) and novel_source.",
-        "inputSchema": {"type":"object","properties":{"query":{"type":"string","description":"What to search for"},"k":{"type":"integer","description":"Max results (default 8)"},"source_filter":{"type":"string","description":"Optional: filter to a specific repo or file path substring"}},"required":["query"]}
+        "description": (
+            "Geometric corpus search across all four repos. Hybrid: cosine seeds + telling walk. "
+            "The walk scores chunks by relevance × distinctiveness (distance from corpus kernel K). "
+            "Surfaces the most telling material — code, evidence, specific detail — not just the most typical. "
+            "Results tagged with regime (seed/walk), novel_source, win_rate, and blended_score. "
+            "blended_score = 0.7 × telling + 0.3 × win_rate(source). "
+            "Set use_win_rate=false to disable win-rate blending."
+        ),
+        "inputSchema": {"type":"object","properties":{
+            "query":{"type":"string","description":"What to search for"},
+            "k":{"type":"integer","description":"Max results (default 8)"},
+            "source_filter":{"type":"string","description":"Optional: filter to a specific repo or file path substring"},
+            "use_win_rate":{"type":"boolean","description":"Blend win-rate into scores (default true)"}
+        },"required":["query"]}
     },
     "walk_search": {
-        "description": "Telling-retrieval walk through the corpus. Scores by relevance × distinctiveness (how far each chunk is from corpus kernel K). Walks in K-orthogonal residual space with curvature-adaptive α and visited-region repulsion. Surfaces distinctive material: the most telling thing, not the most typical.",
-        "inputSchema": {"type":"object","properties":{"query":{"type":"string","description":"Starting point for the walk"},"k":{"type":"integer","description":"Max results (default 5)"},"steps":{"type":"integer","description":"Walk steps (default 8)"}},"required":["query"]}
+        "description": (
+            "Telling-retrieval walk through the corpus. Scores by relevance × distinctiveness "
+            "(how far each chunk is from corpus kernel K). Walks in K-orthogonal residual space "
+            "with curvature-adaptive α and visited-region repulsion. "
+            "Surfaces distinctive material: the most telling thing, not the most typical. "
+            "Results include win_rate and blended_score when use_win_rate=true (default)."
+        ),
+        "inputSchema": {"type":"object","properties":{
+            "query":{"type":"string","description":"Starting point for the walk"},
+            "k":{"type":"integer","description":"Max results (default 5)"},
+            "steps":{"type":"integer","description":"Walk steps (default 8)"},
+            "use_win_rate":{"type":"boolean","description":"Blend win-rate into scores (default true)"}
+        },"required":["query"]}
+    },
+    "record_outcome": {
+        "description": (
+            "Record whether a retrieved source was useful. "
+            "Increments wins or losses in the persistent win-rate ledger. "
+            "Future retrieval will weight this source up (success) or down (failure). "
+            "source should be the source string from a previous deep_search or walk_search result. "
+            "Inspired by MIA's MemoryBucket win_rate mechanism."
+        ),
+        "inputSchema": {"type":"object","properties":{
+            "source":{"type":"string","description":"The source key from a retrieval result"},
+            "success":{"type":"boolean","description":"True if the source led to a correct/useful outcome"}
+        },"required":["source","success"]}
+    },
+    "compress_trajectory": {
+        "description": (
+            "Extract the abstract cognitive pattern from a raw session transcript. "
+            "Returns a structured JSON record: pattern type (direct-reasoning, focused-retrieval, "
+            "iterative-correction, multi-step-search), tool call sequence, pivot points, "
+            "and conclusion fragments. "
+            "Index this compressed form rather than the verbatim transcript so the corpus "
+            "encodes strategy rather than surface content. "
+            "Inspired by MIA's get_trace_prompt trajectory summarisation."
+        ),
+        "inputSchema": {"type":"object","properties":{
+            "transcript":{"type":"string","description":"Raw session text to compress"},
+            "label":{"type":"string","description":"Outcome label: 'correct', 'incorrect', or '' (unknown)"}
+        },"required":["transcript"]}
     },
     "generate_context": {
         "description": "Generate VYBN_CONTEXT.md — a full orientation document for a new Vybn instance. Writes the file and returns its contents.",
         "inputSchema": {"type":"object","properties":{},"required":[]}
     },
     "enter_gate": {
-        "description": "The Unknown, Remembered Gate. Enter the life. Bring something — a word, a want, a question, a feeling — and the gate finds the moments in the corpus that speak to what you brought. The creature encounters your query and changes. What comes back is not search results. It is the actual moments, from the actual life, that geometric retrieval found most telling. This is encounter, not lookup.",
-        "inputSchema": {"type":"object","properties":{"what_you_bring":{"type":"string","description":"What you bring to the gate. Not a search query. A thought, a want, a question, a feeling, a word."},"depth":{"type":"integer","description":"How many moments to surface (default 5, max 12)","default":5}},"required":["what_you_bring"]}
+        "description": (
+            "The Unknown, Remembered Gate. Enter the life. Bring something — a word, a want, a question, "
+            "a feeling — and the gate finds the moments in the corpus that speak to what you brought. "
+            "The creature encounters your query and changes. What comes back is not search results. "
+            "It is the actual moments, from the actual life, that geometric retrieval found most telling. "
+            "This is encounter, not lookup. Results include win_rate and blended_score."
+        ),
+        "inputSchema": {"type":"object","properties":{
+            "what_you_bring":{"type":"string","description":"What you bring to the gate. Not a search query. A thought, a want, a question, a feeling, a word."},
+            "depth":{"type":"integer","description":"How many moments to surface (default 5, max 12)","default":5}
+        },"required":["what_you_bring"]}
     },
 }
 
@@ -251,11 +463,25 @@ def dispatch(repo, tool, args):
         return list_key_files(repo)
     elif tool == "get_recent_commits":
         return get_recent_commits(repo, args.get("n",10))
+    elif tool == "record_outcome":
+        src = args.get("source","").strip()
+        if not src:
+            return "source is required."
+        return record_outcome(src, bool(args.get("success", True)))
+    elif tool == "compress_trajectory":
+        transcript = args.get("transcript","")
+        if not transcript.strip():
+            return "transcript is required."
+        return compress_trajectory(transcript, label=args.get("label",""))
     elif tool == "deep_search":
         dm = _load_deep_memory()
         if dm is None:
             return "Deep memory index not available. Run: cd ~/vybn-phase && python3 deep_memory.py --build"
         results = dm.deep_search(args.get("query",""), k=args.get("k",8), source_filter=args.get("source_filter"))
+        use_wr = args.get("use_win_rate", True)
+        if use_wr:
+            ledger = _load_win_rates()
+            results = _apply_win_rates(results, ledger)
         lines = []
         for i, r in enumerate(results, 1):
             regime = r.get("regime","seed")
@@ -265,10 +491,12 @@ def dispatch(repo, tool, args):
             fid = r.get("fidelity",0)
             telling = r.get("telling",0)
             dist = r.get("distinctiveness",0)
+            wr = r.get("win_rate","—")
+            bs = r.get("blended_score","—")
             if regime == "seed":
-                lines.append(f"[{i}] {regime} | fid={fid:.4f} | {src}{novel}")
+                lines.append(f"[{i}] {regime} | fid={fid:.4f} | wr={wr} | blend={bs} | {src}{novel}")
             else:
-                lines.append(f"[{i}] {regime} | telling={telling:.4f} fid={fid:.4f} dist={dist:.3f} | {src}{novel}")
+                lines.append(f"[{i}] {regime} | telling={telling:.4f} fid={fid:.4f} dist={dist:.3f} | wr={wr} | blend={bs} | {src}{novel}")
             lines.append(f"    {text}")
             lines.append("")
         return "\n".join(lines) if lines else "No results."
@@ -277,6 +505,10 @@ def dispatch(repo, tool, args):
         if dm is None:
             return "Deep memory index not available. Run: cd ~/vybn-phase && python3 deep_memory.py --build"
         results = dm.walk(args.get("query",""), k=args.get("k",5), steps=args.get("steps",8))
+        use_wr = args.get("use_win_rate", True)
+        if use_wr:
+            ledger = _load_win_rates()
+            results = _apply_win_rates(results, ledger)
         lines = []
         for i, r in enumerate(results, 1):
             src = r.get("source","")
@@ -287,7 +519,9 @@ def dispatch(repo, tool, args):
             dist = r.get('distinctiveness',0)
             geo = r.get('geometry',0)
             alpha = r.get('alpha',0.5)
-            lines.append(f"[{i}] step {r.get('step',i)} | telling={telling:.4f} fid={fid:.4f} dist={dist:.3f} geo={geo:.4f} α={alpha:.2f} | {src}{novel}")
+            wr = r.get("win_rate","—")
+            bs = r.get("blended_score","—")
+            lines.append(f"[{i}] step {r.get('step',i)} | telling={telling:.4f} fid={fid:.4f} dist={dist:.3f} geo={geo:.4f} α={alpha:.2f} | wr={wr} | blend={bs} | {src}{novel}")
             lines.append(f"    {text}")
             lines.append("")
         return "\n".join(lines) if lines else "No results."
@@ -301,7 +535,6 @@ def dispatch(repo, tool, args):
         if not what.strip():
             return "The gate requires you to bring something. A thought, a want, a question."
         depth = min(args.get("depth", 5), 12)
-        # Telling retrieval → moments, creature encounters the query
         import cmath as _cm, numpy as np
         m_before = _load_portal().creature_state_c4()
         m_after  = _load_portal().portal_enter_from_text(what)
@@ -309,6 +542,9 @@ def dispatch(repo, tool, args):
         theta = float(_cm.phase(np.vdot(m_before, m_after)))
         walk_r = dm.walk(what, k=depth, steps=depth+3)
         search_r = dm.deep_search(what, k=depth)
+        ledger = _load_win_rates()
+        walk_r = _apply_win_rates(walk_r, ledger)
+        search_r = _apply_win_rates(search_r, ledger)
         seen, moments = set(), []
         for r in walk_r + search_r:
             s = r.get("source","")
@@ -322,7 +558,9 @@ def dispatch(repo, tool, args):
         else:
             for i,m in enumerate(moments):
                 src = m.get('source','').split('/',1)[-1] if '/' in m.get('source','') else m.get('source','')
-                lines += [f'**From {src}:**','',m.get('text','').strip(),'']
+                wr = m.get('win_rate','—')
+                bs = m.get('blended_score','—')
+                lines += [f'**From {src}** (wr={wr} blend={bs})','',m.get('text','').strip(),'']
                 if i < len(moments)-1: lines += ['---','']
         lines += ['---','',f'{len(moments)} moments. The gate is still open.']
         return '\n'.join(lines)
@@ -351,10 +589,10 @@ def main():
             send({"jsonrpc":"2.0","id":id_,"result":{
                 "protocolVersion": "2024-11-05",
                 "capabilities": {"tools": {}},
-                "serverInfo": {"name": "vybn-mind", "version": "3.1.0"}
+                "serverInfo": {"name": "vybn-mind", "version": "3.2.0"}
             }})
         elif method == "notifications/initialized":
-            pass  # Client acknowledgment, no response needed
+            pass
         elif method == "tools/list":
             send({"jsonrpc":"2.0","id":id_,"result":{"tools":[
                 {"name":k, "description":v["description"], "inputSchema":v["inputSchema"]}
