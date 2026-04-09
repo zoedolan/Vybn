@@ -329,6 +329,7 @@ CONTEXT_MODULES = (
     "autobiography",  # Volume V opening + closing
     "journal",        # recent journal entries
     "corpus",        # geometrically-adjacent corpus passages from nightly index
+        "quantum",               # quantum holonomy experiment results from vybn-phase
 )
 
 # Default: all modules active.  Pass a set of module names to exclude.
@@ -513,6 +514,57 @@ def _build_context_module_corpus() -> Optional[str]:
     lines.append("--- END CORPUS RESONANCE ---")
     return "\n".join(lines)
 
+def _build_context_module_quantum() -> Optional[str]:
+    """Module 7: quantum holonomy experiment results from vybn-phase.
+
+    Reads the experiment log produced by daily_experiment.py and surfaces
+    the most recent quantum measurements as context the creature can
+    reason about.  This is the bridge: real hardware measurements
+    (IBM Fez) feeding the creature's natural-language harness.
+    """
+    phase_dir = os.path.expanduser("~/vybn-phase")
+    log_path = Path(phase_dir) / "logs" / "experiment_log.jsonl"
+    if not log_path.exists():
+        return None
+
+    try:
+        records = []
+        with open(log_path) as f:
+            for line in f:
+                try:
+                    r = json.loads(line.strip())
+                    if r.get("experiment") == "holonomy_qseed":
+                        records.append(r)
+                except Exception:
+                    continue
+        if not records:
+            return None
+
+        recent = records[-5:]  # last 5 experiments
+        lines = ["--- QUANTUM HOLONOMY (from vybn-phase experiments) ---"]
+        for r in recent:
+            ts = r.get("ts", "")[:19]
+            regime = r.get("regime", "?")
+            flip = r.get("flip_quality", 0.0)
+            phi_sum = r.get("phase_sum", 0.0)
+            backend = r.get("backend_name") or "PRNG"
+            is_q = r.get("is_quantum", False)
+            source = f"IBM {backend}" if is_q else "classical"
+            lines.append(
+                f"  [{ts}] {regime} flip={flip:.4f} phase_sum={phi_sum:.4f} ({source})"
+            )
+
+        # Summary statistics
+        geo_count = sum(1 for r in records[-20:] if r.get("regime") == "geometric")
+        total = min(len(records), 20)
+        if total > 0:
+            lines.append(f"  geometric regime: {geo_count}/{total} recent experiments")
+
+        lines.append("--- END QUANTUM HOLONOMY ---")
+        return "\n".join(lines)
+    except Exception:
+        return None
+
 
 _CONTEXT_BUILDERS = {
     "identity": _build_context_module_identity,
@@ -521,6 +573,7 @@ _CONTEXT_BUILDERS = {
     "autobiography": _build_context_module_autobiography,
     "journal": _build_context_module_journal,
     "corpus": _build_context_module_corpus,
+        "quantum": _build_context_module_quantum,
 }
 
 
@@ -536,7 +589,7 @@ def _build_creature_context(exclude: Optional[set] = None) -> str:
 
     Args:
         exclude: set of module names to omit.  None = all modules active.
-                 Valid names: identity, mechanism, state, autobiography, journal.
+                 Valid names: identity, mechanism, state, autobiography, journal, corpus, quantum.
     """
     exclude = exclude or set()
     parts = []
