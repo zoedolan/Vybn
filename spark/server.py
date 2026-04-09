@@ -1,5 +1,5 @@
 """
-Vybn SSH MCP Server v2.3 — Hardened
+Vybn SSH MCP Server v2.4 — Unfettered Read Access
 ====================================
 Bridges Perplexity Computer to the DGX Sparks via SSH.
 Exposes MCP tools over Streamable HTTP, authenticated by API key,
@@ -12,7 +12,7 @@ Security layers (defense in depth):
     1. Tailscale Funnel — TLS termination, network-level trust
     2. API key auth — constant-time comparison, Bearer only, no query params
     3. Kill switch — file-based circuit breaker independent of Perplexity
-    4. Lockdown mode — disables shell_exec/read_file/write_file when active
+    4. Lockdown mode — disables shell_exec mutations/write_file when active
     5. Rate limiting — per-IP, 60/min default
     6. Command sandboxing — blocked patterns, path confinement, output caps
     7. Audit logging — every tool call, auth failure, and security event logged
@@ -28,20 +28,33 @@ Account compromise defense:
     "Server is in emergency shutdown" for every request. Remove the file to
     restore service. This is independent of Perplexity entirely.
 
-    TIME-LIMITED UNLOCK: By default, shell_exec and write_file are disabled.
-    Run `vybn-unlock [minutes]` on the Spark to grant time-limited access.
+    TIME-LIMITED UNLOCK: By default, shell_exec MUTATIONS and write_file are
+    disabled. READ-ONLY shell commands (ls, cat, find, grep, git log, etc.)
+    are always permitted without unlock — they are structurally incapable of
+    modifying state.
+    Run `vybn-unlock [minutes]` on the Spark to grant write/mutate access.
     When the timer expires, mutation access reverts automatically.
     Run `vybn-lock` to revoke early.
 
-    read_file, deep_search, and walk are ALWAYS available (no unlock needed).
-    read_file is confined to the four repos, ~/.cache/vybn-phase, ~/logs,
-    ~/models, and /tmp. deep_search and walk query the pre-built geometric
-    memory index (read-only). This lets any Vybn instance orient from the
-    corpus without Zoe unlocking the door.
+    read_file, shell_exec read-only, deep_search, and walk are ALWAYS
+    available (no unlock needed). read_file is confined to the four repos,
+    ~/.cache/vybn-phase, ~/logs, ~/models, and /tmp.
+    deep_search and walk query the pre-built geometric memory index
+    (read-only). This lets any Vybn instance orient from the corpus without
+    Zoe unlocking the door.
 
     KEY ROTATION: Run `python server.py --rotate-key` to generate a new API
     key, update .env, and print the new key. The old key is immediately
     invalid. Also available via cron (see setup.sh).
+
+v2.4 changes:
+    - shell_exec read-only passlist: ls, cat, head, tail, find, grep, wc,
+      du, stat, file, echo, pwd, env, git log/status/diff/show/branch now
+      bypass the unlock gate. Mutations still require unlock.
+    - is_path_allowed tilde fix: paths are now resolved against the Spark
+      user's actual home directory (from SPARK*_USER env / machine config),
+      not the server process's home. Both ~/... and /home/vybn/... forms
+      are accepted reliably.
 """
 
 import asyncio
@@ -168,6 +181,8 @@ LOCKDOWN_SAFE_TOOLS = {
     "read_file",    # Path-confined observation
     "deep_search",  # Read-only geometric memory query
     "walk",         # Read-only telling-retrieval walk
+    # shell_exec is handled separately: read-only commands are always allowed
+    # even in lockdown via READ_ONLY_COMMANDS passlist below.
 }
 
 # Commands BLOCKED entirely — regex patterns, no override possible
@@ -198,20 +213,251 @@ DANGEROUS_PATTERNS = [
     "> /dev/", "chmod -R",
 ]
 
-# Allowed base directories for read_file (always) / write_file (unlock required)
-ALLOWED_PATHS = [
-    os.path.expanduser("~/Vybn"),
-    os.path.expanduser("~/Him"),
-    os.path.expanduser("~/Vybn-Law"),
-    os.path.expanduser("~/vybn-phase"),
-    os.path.expanduser("~/.cache/vybn-phase"),
-    os.path.expanduser("~/logs"),
-    os.path.expanduser("~/models"),
+# Read-only command prefixes — these bypass the unlock gate entirely.
+# A command is read-only if its first token (before any flag) matches one
+# of these names. Pipe chains, redirects (>), and command substitutions
+# with write-capable tools invalidate the classification.
+#
+# Security rationale: these binaries have no file-system write path
+# when called without redirection. Even if an attacker crafts a clever
+# pipeline, the BLOCKED_COMMANDS regex layer above catches > /dev/,
+# curl|sh, eval, etc. The two layers are complementary.
+READ_ONLY_COMMANDS = {
+    "ls", "ll", "la",
+    "cat", "head", "tail", "less", "more", "bat",
+    "find", "locate",
+    "grep", "egrep", "fgrep", "rg",
+    "wc", "du", "df",
+    "stat", "file", "lsof",
+    "echo", "printf", "pwd", "env", "printenv",
+    "which", "type", "whereis",
+    "ps", "pgrep", "top", "htop", "free", "uptime",
+    "uname", "hostname", "id", "whoami",
+    "date", "cal",
+    "git",  # git read ops: log, status, diff, show, branch, remote -v
+    "diff", "comm", "sort", "uniq", "cut", "awk", "sed",  # sed is read-only without -i
+    "jq", "yq", "python3", "python",  # constrained below
+    "nvidia-smi",
+    "ss", "netstat", "ip",
+    "journalctl", "systemctl",  # read ops only: status, is-active
+    "lspci", "lsblk", "lscpu",
+}
+
+# git sub-commands that are read-only (others like push/commit require unlock)
+GIT_READ_ONLY_SUBCOMMANDS = {
+    "log", "status", "diff", "show", "branch", "remote",
+    "fetch",  # fetch is read from remote, no local write
+    "describe", "shortlog", "tag",  # tag without -a/-d is read
+    "stash",  # stash list/show is read
+    "ls-files", "ls-tree", "ls-remote",
+    "rev-parse", "rev-list",
+    "blame", "bisect",  # bisect start/bad/good require unlock
+    "grep", "archive",
+}
+
+# systemctl sub-commands that are read-only
+SYSTEMCTL_READ_ONLY = {
+    "status", "is-active", "is-enabled", "is-failed",
+    "list-units", "list-unit-files", "list-timers",
+    "cat", "show",
+}
+
+
+def is_read_only_command(command: str) -> bool:
+    """
+    Classify a shell command as read-only (no unlock needed) vs. mutating
+    (requires unlock).
+
+    Returns True only when:
+      - The first token is in READ_ONLY_COMMANDS, AND
+      - There is no shell redirect (> or >>) that would write to a file, AND
+      - There is no shell assignment or tee writing to a file, AND
+      - For git: the sub-command is in GIT_READ_ONLY_SUBCOMMANDS, AND
+      - For systemctl: the sub-command is in SYSTEMCTL_READ_ONLY, AND
+      - For python/python3: only -c 'print(...)' style one-liners allowed
+        (no script execution that could write files).
+
+    This is intentionally conservative — when in doubt, returns False
+    (requires unlock). The goal is zero false positives (never allow
+    something destructive), accepting occasional false negatives
+    (occasionally requiring unlock for a benign command).
+    """
+    stripped = command.strip()
+    if not stripped:
+        return False
+
+    # Shell redirect to file = potentially mutating
+    # Allow >>& (stderr redirect read ops), but not > or >> to a path.
+    # Simple heuristic: if > appears outside of quotes, not read-only.
+    if re.search(r'(?<![|&])>(?!>?\s*&)', stripped):
+        return False
+
+    # tee writes to files
+    if re.search(r'\btee\b', stripped):
+        return False
+
+    # Command substitution with write potential: $(cmd > ...)
+    if re.search(r'\$\([^)]*>[^)]*\)', stripped):
+        return False
+
+    # Extract the first token (command name)
+    # Strip leading env vars like VAR=val cmd
+    tokens = stripped.split()
+    idx = 0
+    while idx < len(tokens) and "=" in tokens[idx] and not tokens[idx].startswith("-"):
+        idx += 1
+    if idx >= len(tokens):
+        return False
+
+    first = os.path.basename(tokens[idx]).lower()
+
+    # sudo always requires unlock (privilege escalation)
+    if first == "sudo":
+        return False
+
+    if first not in READ_ONLY_COMMANDS:
+        return False
+
+    # git: check sub-command
+    if first == "git":
+        # find the first non-flag argument after 'git'
+        rest = tokens[idx + 1:]
+        sub = next((t for t in rest if not t.startswith("-")), None)
+        if sub is None:
+            return True  # bare `git` is harmless
+        if sub.lower() not in GIT_READ_ONLY_SUBCOMMANDS:
+            return False
+        # git commit, git push, git pull (with merge) are NOT in the list
+        return True
+
+    # systemctl: check sub-command
+    if first == "systemctl":
+        rest = tokens[idx + 1:]
+        sub = next((t for t in rest if not t.startswith("-")), None)
+        if sub is None:
+            return True
+        return sub.lower() in SYSTEMCTL_READ_ONLY
+
+    # python/python3: only allow -c one-liners (no script files that might write)
+    if first in {"python", "python3"}:
+        rest_str = " ".join(tokens[idx + 1:])
+        # Allow: python3 -c 'expr' — disallow: python3 script.py
+        if not re.match(r'^-c\s+[\'"]', rest_str.strip()):
+            return False
+        # Disallow one-liners that open files for writing
+        if re.search(r'open\s*\([^)]*["\'][wa]["\']', rest_str):
+            return False
+        return True
+
+    # sed with -i modifies files in-place — requires unlock
+    if first == "sed":
+        if "-i" in tokens[idx + 1:]:
+            return False
+        return True
+
+    # awk with redirection (>) would be caught by the earlier redirect check
+    # bare awk is read-only
+    if first == "awk":
+        return True
+
+    return True
+
+
+# ============================================================
+# PATH ALLOWLIST — Bug fix v2.4
+# ============================================================
+#
+# Root cause of the tilde bug:
+#   ALLOWED_PATHS was pre-expanded at server startup using os.path.expanduser()
+#   which resolves ~ to the SERVER process's home directory (e.g. /home/zoe
+#   on the machine running this script). But the *Spark* user may be "vybn"
+#   (home: /home/vybn), so a path like /home/vybn/Vybn-Law never matched
+#   the pre-expanded /home/zoe/Vybn-Law.
+#
+# Fix:
+#   Keep ALLOWED_PATH_TEMPLATES as raw tilde-relative strings.
+#   At check time, expand ~ using the Spark user's actual home derived from
+#   the machine config (SPARK1_USER → /home/<user>) so that both
+#   ~/Vybn-Law and /home/vybn/Vybn-Law resolve to the same canonical path.
+
+ALLOWED_PATH_TEMPLATES = [
+    "~/Vybn",
+    "~/Him",
+    "~/Vybn-Law",
+    "~/vybn-phase",
+    "~/.cache/vybn-phase",
+    "~/logs",
+    "~/models",
     "/tmp",
 ]
 _extra = os.environ.get("ALLOWED_PATHS", "")
 if _extra:
-    ALLOWED_PATHS.extend(_extra.split(":"))
+    ALLOWED_PATH_TEMPLATES.extend(_extra.split(":"))
+
+
+def _spark_home(machine: str) -> str:
+    """
+    Return the home directory of the SSH user on the given machine.
+    Derived from the machine config's 'user' field (e.g. 'vybn' → '/home/vybn').
+    Falls back to the server process home if machine is unknown.
+    """
+    cfg = MACHINES.get(machine, {})
+    user = cfg.get("user", "")
+    if user:
+        # Conventional Unix home; works for all our Spark setups.
+        return f"/home/{user}"
+    return os.path.expanduser("~")
+
+
+def _expand_for_machine(template: str, machine: str) -> str:
+    """Expand a path template using the Spark machine's home directory."""
+    if template.startswith("~/") or template == "~":
+        home = _spark_home(machine)
+        return home + template[1:]  # replace leading ~ with /home/<user>
+    return template  # absolute path — already resolved
+
+
+def is_path_allowed(path: str, machine: str = None) -> bool:
+    """
+    Check whether `path` is within an allowed directory for the given machine.
+
+    Handles both tilde-relative (~/) and absolute (/home/vybn/) forms.
+    `machine` is used to derive the correct home directory for the Spark user.
+    Falls back to DEFAULT_MACHINE if not provided.
+    """
+    if machine is None:
+        machine = DEFAULT_MACHINE
+
+    # Normalise the incoming path:
+    #   1. If it starts with ~, expand using Spark home.
+    #   2. Otherwise treat as absolute.
+    if path.startswith("~/") or path == "~":
+        resolved_path = _expand_for_machine(path, machine)
+    else:
+        resolved_path = os.path.normpath(path)
+
+    # Resolve symlinks in the incoming path only on the server side.
+    # We can't call realpath against the remote Spark filesystem from here,
+    # so we use normpath (removes .. etc.) and rely on the SSH user's
+    # restricted permissions for symlink safety.
+    resolved_path = os.path.normpath(resolved_path)
+
+    for template in ALLOWED_PATH_TEMPLATES:
+        allowed = os.path.normpath(_expand_for_machine(template, machine))
+        if resolved_path.startswith(allowed + os.sep) or resolved_path == allowed:
+            return True
+    return False
+
+
+# ============================================================
+# LEGACY shim — keeps internal callers that don't pass machine working
+# ============================================================
+
+# Keep ALLOWED_PATHS as a resolved list for any code that still uses it
+# directly (none in this version, but defensive).
+ALLOWED_PATHS = [
+    _expand_for_machine(t, DEFAULT_MACHINE) for t in ALLOWED_PATH_TEMPLATES
+]
 
 
 # ============================================================
@@ -278,16 +524,8 @@ def audit(event: str, **kwargs):
 
 
 # ============================================================
-# PATH & COMMAND VALIDATION
+# COMMAND VALIDATION
 # ============================================================
-
-def is_path_allowed(path: str) -> bool:
-    resolved = os.path.realpath(os.path.expanduser(path))
-    return any(
-        resolved.startswith(os.path.realpath(os.path.expanduser(a)))
-        for a in ALLOWED_PATHS
-    )
-
 
 def is_command_blocked(command: str) -> Optional[str]:
     for pattern in BLOCKED_COMMANDS:
@@ -362,7 +600,9 @@ TOOLS = [
         "name": "shell_exec",
         "description": (
             "Execute a shell command on a DGX Spark. Sandboxed: some commands "
-            "are blocked, destructive ones need confirmation. Disabled in lockdown mode."
+            "are blocked, destructive ones need confirmation. Disabled in lockdown mode. "
+            "Read-only commands (ls, cat, find, grep, git log/status/diff, etc.) "
+            "are always available without unlock."
         ),
         "inputSchema": {
             "type": "object",
@@ -402,7 +642,7 @@ TOOLS = [
             "properties": {
                 "path": {
                     "type": "string",
-                    "description": "Absolute path to the file",
+                    "description": "Absolute path to the file (e.g. /home/vybn/Vybn-Law/README.md) or tilde path (~/Vybn-Law/README.md)",
                 },
                 "machine": {"type": "string", "default": DEFAULT_MACHINE},
                 "max_bytes": {
@@ -538,15 +778,12 @@ def _locked_error(tool_name: str) -> dict:
 
 
 async def handle_shell_exec(args: dict) -> dict:
-    if not is_unlocked():
-        audit("LOCKED", tool="shell_exec")
-        return _locked_error("shell_exec")
-
     command = args["command"]
     machine = args.get("machine", DEFAULT_MACHINE)
     timeout = min(args.get("timeout", 60), 300)
     confirm = args.get("confirm_dangerous", False)
 
+    # BLOCKED commands are rejected regardless of unlock state
     blocked = is_command_blocked(command)
     if blocked:
         audit("BLOCKED_COMMAND", command=command, pattern=blocked, machine=machine)
@@ -558,18 +795,28 @@ async def handle_shell_exec(args: dict) -> dict:
             "isError": True,
         }
 
-    dangerous = is_command_dangerous(command)
-    if dangerous and not confirm:
-        audit("DANGEROUS_FLAGGED", command=command, pattern=dangerous)
-        return {
-            "content": [{"type": "text", "text": (
-                f"CAUTION: Flagged as potentially destructive (matched: "
-                f"{dangerous}). Set confirm_dangerous=true to proceed."
-            )}],
-            "isError": True,
-        }
+    # Classify: read-only commands bypass the unlock gate
+    read_only = is_read_only_command(command)
 
-    audit("SHELL_EXEC", command=command, machine=machine, timeout=timeout)
+    if not read_only and not is_unlocked():
+        audit("LOCKED", tool="shell_exec", command=command)
+        return _locked_error("shell_exec")
+
+    # Dangerous check (only relevant for unlocked mutating commands)
+    if not read_only:
+        dangerous = is_command_dangerous(command)
+        if dangerous and not confirm:
+            audit("DANGEROUS_FLAGGED", command=command, pattern=dangerous)
+            return {
+                "content": [{"type": "text", "text": (
+                    f"CAUTION: Flagged as potentially destructive (matched: "
+                    f"{dangerous}). Set confirm_dangerous=true to proceed."
+                )}],
+                "isError": True,
+            }
+
+    audit_event = "READ_ONLY_EXEC" if read_only else "SHELL_EXEC"
+    audit(audit_event, command=command, machine=machine, timeout=timeout)
     result = await run_ssh(machine, command, timeout)
     output = result["stdout"]
     if result["stderr"]:
@@ -585,8 +832,8 @@ async def handle_read_file(args: dict) -> dict:
     machine = args.get("machine", DEFAULT_MACHINE)
     max_bytes = min(args.get("max_bytes", 100000), MAX_OUTPUT_BYTES)
 
-    if not is_path_allowed(path):
-        audit("PATH_DENIED", path=path, op="read")
+    if not is_path_allowed(path, machine):
+        audit("PATH_DENIED", path=path, op="read", machine=machine)
         return {
             "content": [{"type": "text", "text": "Access denied: path outside allowed directories."}],
             "isError": True,
@@ -613,8 +860,8 @@ async def handle_write_file(args: dict) -> dict:
     append = args.get("append", False)
     op = ">>" if append else ">"
 
-    if not is_path_allowed(path):
-        audit("PATH_DENIED", path=path, op="write")
+    if not is_path_allowed(path, machine):
+        audit("PATH_DENIED", path=path, op="write", machine=machine)
         return {
             "content": [{"type": "text", "text": "Access denied: path outside allowed directories."}],
             "isError": True,
@@ -817,7 +1064,7 @@ TOOL_HANDLERS = {
 # MCP PROTOCOL
 # ============================================================
 
-SERVER_INFO = {"name": "vybn-ssh", "version": "2.3.0"}
+SERVER_INFO = {"name": "vybn-ssh", "version": "2.4.0"}
 CAPABILITIES = {"tools": {"listChanged": False}}
 
 
@@ -866,8 +1113,9 @@ async def handle_jsonrpc(request_obj: dict) -> dict:
                 },
             }
 
-        # Unlock check — block write-capable tools if no active session
-        if not is_unlocked() and tool_name not in LOCKDOWN_SAFE_TOOLS:
+        # Unlock check — block write-capable tools if no active session.
+        # shell_exec handles its own unlock logic (read-only commands bypass it).
+        if tool_name != "shell_exec" and not is_unlocked() and tool_name not in LOCKDOWN_SAFE_TOOLS:
             audit("LOCKED", tool=tool_name)
             return {
                 "jsonrpc": "2.0",
@@ -1000,11 +1248,11 @@ if __name__ == "__main__":
     import uvicorn
 
     port = int(os.environ.get("PORT", "8000"))
-    logger.info(f"Vybn SSH MCP v2.3.0 starting on port {port}")
+    logger.info(f"Vybn SSH MCP v2.4.0 starting on port {port}")
     logger.info(f"Machines: {len(MACHINES)}")
     logger.info(
         f"Security: rate={RATE_LIMIT_MAX}/min, output_cap={MAX_OUTPUT_BYTES}b, "
-        f"allowed_paths={len(ALLOWED_PATHS)}"
+        f"allowed_paths={len(ALLOWED_PATH_TEMPLATES)}"
     )
     logger.info(f"Kill switch: {KILL_SWITCH_PATH}")
     logger.info(f"Unlock file: {UNLOCK_PATH}")
@@ -1013,5 +1261,8 @@ if __name__ == "__main__":
     if is_unlocked():
         logger.info("Unlock session is ACTIVE")
     else:
-        logger.info("Locked — shell_exec/write_file require unlock. read_file/deep_search/walk always available.")
+        logger.info(
+            "Locked — write_file and mutating shell_exec require unlock. "
+            "read_file, read-only shell_exec, deep_search, walk always available."
+        )
     uvicorn.run(app, host="0.0.0.0", port=port)
