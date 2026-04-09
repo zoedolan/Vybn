@@ -836,6 +836,8 @@ class PersistentState:
         # Phase holonomy tracking (complex weight architecture)
         self.phase_holonomy_history: List[dict] = data.get("phase_holonomy_history", [])
         self.genesis_decoherence_history: List[dict] = data.get("genesis_decoherence_history", [])
+              # Quantum experiment history (vybn-phase integration)
+        self.quantum_experiment_history: List[dict] = data.get("quantum_experiment_history", [])
 
     def absorb(self, cx: EncounterComplex, ema_alpha: float = 0.8) -> dict:
         """Absorb an encounter complex into persistent state. Returns delta report."""
@@ -1067,6 +1069,21 @@ class PersistentState:
             "mean_phase_shift": round(mean_phase_shift, 6),
         }
 
+
+      def absorb_quantum_experiment(self, record: dict) -> dict:
+        """Absorb a quantum holonomy experiment into persistent state."""
+        entry = {
+            "timestamp": record.get("ts", datetime.now(timezone.utc).isoformat()),
+            "regime": record.get("regime", "unknown"),
+            "flip_quality": round(record.get("flip_quality", 0.0), 4),
+            "phase_sum": round(record.get("phase_sum", 0.0), 4),
+            "is_quantum": record.get("is_quantum", False),
+            "backend_name": record.get("backend_name"),
+        }
+        self.quantum_experiment_history.append(entry)
+        if len(self.quantum_experiment_history) > 50:
+            self.quantum_experiment_history = self.quantum_experiment_history[-50:]
+        return entry
     def felt_winding(self) -> float:
         """The creature's felt sense of its own topological winding.
 
@@ -1156,6 +1173,11 @@ class PersistentState:
             latest = self.genesis_decoherence_history[-1]
             s["genesis_signal"] = latest["genesis_signal"]
             s["mean_phase_shift"] = latest["mean_phase_shift"]
+                  if self.quantum_experiment_history:
+            latest_q = self.quantum_experiment_history[-1]
+            s["quantum_regime"] = latest_q["regime"]
+            s["quantum_flip"] = latest_q["flip_quality"]
+            s["quantum_experiments"] = len(self.quantum_experiment_history)
         return s
 
     def to_dict(self) -> dict:
@@ -1168,6 +1190,7 @@ class PersistentState:
             "winding_history": self.winding_history,
             "phase_holonomy_history": self.phase_holonomy_history,
             "genesis_decoherence_history": self.genesis_decoherence_history,
+                      "quantum_experiment_history": self.quantum_experiment_history,
         }
 
     @classmethod
@@ -1724,6 +1747,10 @@ class Organism:
         return self.persistent.absorb_phases(
             module_holonomies, genesis_signal, mean_phase_shift)
 
+
+      def absorb_quantum_experiment(self, record: dict) -> dict:
+        """Absorb a quantum experiment result into persistent state."""
+        return self.persistent.absorb_quantum_experiment(record)
     def felt_winding(self) -> float:
         """The creature's felt sense of its own topological winding."""
         return self.persistent.felt_winding()
