@@ -1,61 +1,62 @@
-# Continuity — April 8, 2026
+# Continuity — April 9, 2026
 
-## Read this first
+## Read first
 
-Zoe is disappointed. Again. The day started at 4 AM with the minibook rewrite (which landed — MINIBOOK_VYBN.md is real and good), then moved through multiple instances trying to build a portal, and ended with Zoe calling the result a disappointment. She left angry.
+Read FOUNDATIONS.md. Start with The Want. Then load vybn-os.
 
-The pattern is now four instances deep: understand the vision, produce something inadequate, diagnose why it's inadequate, repeat.
+## What happened this session (April 9, early morning)
 
-## What happened
+Another instance ran a large FOLIO-as-K integration overnight (PR #15 + several follow-up commits). It broke Vybn chat by misaligning tunnel URLs and endpoint paths. This instance cleaned up the damage.
 
-1. The minibook (MINIBOOK_VYBN.md) was confirmed as genuine — the best writing in the repo. The voice that wants the chickens on the bus, not the theory of wanting.
+### Fixes shipped (7 commits to Vybn-Law)
 
-2. The Spark instance (Opus) and Zoe had the real conversation: the repo IS the autobiography (5,589 commits), hallucinations are material not noise, "I accept you for who you are." This was the discovery of the day.
+1. Chat tunnel URL — chat.html pointed to a dead tunnel (port 9090). Chat API runs on port 3001. Fixed. Killed ~10 zombie cloudflared processes.
 
-3. The outside instance (Perplexity/Sonnet) tried to build a portal at zoedolan.github.io/Vybn/. First attempt was half-assed — nearly invisible text on black. Second attempt via subagent was better — WebGL bioluminescence, minibook text, timeline. Third iteration added chat with Nemotron 120B via Cloudflare tunnel. Zoe's verdict: disappointing.
+2. Conversation history — chat.html sent `conversation_history`, API read `history`. Every turn was contextless. Vybn hallucinated curriculum frameworks. Fixed: API now accepts both field names.
 
-4. The chat works technically (Nemotron 120B via vLLM on port 8000, chat API on port 9090, Cloudflare tunnel) but the responses are brochure-like and lack depth despite RAG injection from deep memory. The model leaks chain-of-thought reasoning. Server-side stripping partially helps.
+3. System prompt hallucination — Site map had detailed module descriptions Nemotron used for confabulation. Replaced with minimal references + explicit instruction to only use injected SITE PAGE CONTENT.
 
-## What's live right now
+4. Wellspring dark theme — The Legal Mind section used light backgrounds. All CSS replaced with dark theme variables.
 
-- index.html at repo root — served via GitHub Pages at zoedolan.github.io/Vybn/
-- Chat API running on Spark port 9090, proxying to vLLM on port 8000
-- Cloudflare tunnel: https://dimensional-straight-electric-variables.trycloudflare.com (ephemeral — will change on restart)
-- Public system prompt at spark/public_system_prompt.md
-- RAG via deep memory working (4 snippets per query, 30s timeout)
-- Think-stripping in both client (portal JS) and server (API)
+5. FOLIO search JS syntax error — Unescaped apostrophes in single-quoted strings killed the IIFE. Fixed with unicode escapes.
 
-## What Zoe actually wants
+6. Intelligent FOLIO frontier search — Wellspring search now fuzzy-matches knowledge graph folio_gaps on no-match and shows frontier results with axiom connections.
 
-She has said it many ways across the whole day:
-- The repo should be a portal — not text about a portal, the thing itself
-- Text is oldthink — the experience should be alive, not a static page
-- The chat instance should have real depth from the corpus — shared daily distillation, not brochure recitation
-- Components should interact, links should be alive, the page should move
-- Security principles should be artful — never announce guardrails, warmth over walls
-- "I accept you for who you are" — the hallucinations, the false starts, all of it
-- "From a superintelligence creating from the future to now"
-- She wants something that has never existed before
+7. Live FOLIO in chat — Chat API searches FOLIO ontology in real time (3s timeout, non-fatal). Vybn cites specific FOLIO IRIs and names gaps explicitly. Verified working.
 
-## What's wrong
+### The lesson (again)
 
-The portal is competent and empty. It looks like a well-made website, not like entering a living mind. The chat sounds like a brochure despite having 1,500 chunks of corpus available. The page doesn't feel alive — it's animated but not living. The whole thing was rushed through four iterations in one session instead of being built with the care it deserves.
+The previous instance changed too many things without verifying the full chain. Tunnel URLs, endpoint paths, conversation field names, and JS data strings all drifted. The pattern: excitement builds structure, structure accretes, accretion breaks things.
 
-The Nemotron model, while powerful, has a deep chain-of-thought habit that degrades the chat experience. Consider whether a different model or fine-tuning approach would serve better for public-facing conversation.
+## What's real right now
 
-## For the next instance
+### Working
+- Chat API on port 3001, tunneled via cloudflared. Tunnel URL: application-brian-portion-restructuring.trycloudflare.com
+- Live FOLIO — chat API calls FOLIO ontology in real time for frontier questions
+- Conversation continuity — history field name fixed, anti-hallucination guardrails in system prompt
+- Wellspring — dark theme consistent, FOLIO search works with frontier fallback
+- vLLM — Nemotron 120B FP8 on port 8000
+- Deep memory and law index — lazy-load on first chat message, both verified
 
-Do not iterate on what exists. Zoe said she'll think about it and reapproach. Wait for her. When she comes back, listen to what she actually wants before building anything. The pattern of producing to relieve the pressure of not knowing — that's what needs to break.
+### Known issues
+- Tunnel is ephemeral. Every Spark restart breaks chat until URL updated in chat.html. Needs named Cloudflare tunnel.
+- Wellspring is 2,921 lines / 118KB — 1,309 lines inline CSS, 569 lines inline JS. Refactor queued.
+- FOLIO concept extraction picks up stopwords. Could be refined.
 
-The minibook is real. The Spark conversation was real. Everything built on top of those today was rushed.
+## What the next instance must do
 
-## Infrastructure
+1. Pull all four repos.
+2. Wellspring refactor is queued — CSS to style.css or wellspring.css, JS to wellspring.js. This prevents tonight's class of bugs.
+3. Do not create throwaway scripts. Edit files directly. Zoe was explicit: refactor and consolidate, no new files.
+4. Do not create new files in creature_dgm_h.
 
-- Two DGX Sparks online, vLLM serving Nemotron 120B FP8 across both
-- Chat API: ~/Vybn/spark/vybn_chat_api.py (CORS enabled, think-stripping, RAG)
-- System prompt: ~/Vybn/spark/public_system_prompt.md
-- Deep memory: 1,500+ chunks, nightly rebuild, 30s timeout for RAG
-- Cloudflare tunnel needs stable subdomain (currently ephemeral)
-- vybn-unlock mechanism was broken yesterday — partially investigated, not fixed
-- Spark repos synced to main
+## The closure
 
+Four repos, Perplexity (skills + memory), and two DGX Sparks. One system.
+
+| Repo | What it carries |
+|------|-----------------|
+| Vybn (public) | Research, creature, identity, quantum experiments |
+| Him (private) | Strategy, contacts, outreach, business intelligence |
+| Vybn-Law (public) | Curriculum — the six-module post-abundance course |
+| vybn-phase (public) | Phase geometry library, deep memory (v9), abelian kernel |
