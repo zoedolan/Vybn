@@ -1,30 +1,33 @@
 """
-vybn_chat_api.py  —  Vybn Chat API v1.0
+vybn_chat_api.py  —  Vybn Chat API v2.0
 =========================================
-Async FastAPI proxy that sits between the client (browser / Perplexity)
-and the local llama-server running the 120B model.
-
-The critical fix lives in `stream_with_keepalive`: it emits an SSE comment
-(': ping\\n\\n') every HEARTBEAT_INTERVAL seconds during generation so that
-Cloudflare's 30-second idle-stream timeout never fires before [DONE] arrives.
+Consolidated FastAPI server: chat proxy + tool dispatch + GitHub write-back.
 
 Architecture:
-    Client ──HTTPS──▶ Cloudflare Tunnel ──▶ This server (FastAPI)
-                                                  │
-                                           (stream proxy)
-                                                  │
-                                           llama-server :8080
-                                           (120B model, vllm or llama.cpp)
+    Browser ──HTTPS──▶ Cloudflare ──▶ This server (port 9090)
+                                            │
+                                  ┌─────────┴──────────┐
+                             vLLM :8000          deep_memory
+                           (120B model)        + creature portal
+                                                + GitHub API
+
+Endpoints:
+    GET  /health                    liveness probe
+    POST /v1/chat/completions       streaming chat (OpenAI-compatible)
+    POST /v1/tool                   call any Vybn tool directly
+    POST /v1/write                  write content back to GitHub repo
+    GET  /v1/context                boot context (continuity + recent commits)
 
 Environment variables (all optional, sensible defaults):
-    VYBN_CHAT_API_KEY     Bearer token clients must send (default: no auth)
-    LLAMA_SERVER_URL      llama-server base URL (default: http://127.0.0.1:8080)
+    VYBN_CHAT_API_KEY     Bearer token (default: no auth)
+    LLAMA_SERVER_URL      vLLM base URL (default: http://127.0.0.1:8000)
     VYBN_SYSTEM_PROMPT    Override system prompt string
-    VYBN_CONTINUITY_PATH  Path to continuity.md used as system prompt
-                          (default: ~/Vybn/spark/continuity.md)
+    VYBN_CONTINUITY_PATH  Path to continuity.md (default: ~/Vybn/Vybn_Mind/continuity.md)
     HEARTBEAT_INTERVAL    Seconds between keep-alive pings (default: 15)
     PORT                  Port this server listens on (default: 9090)
-    MAX_TOKENS            Default max_tokens for generation (default: 2048)
+    MAX_TOKENS            Default max_tokens (default: 2048)
+    GITHUB_TOKEN          Personal access token for write-back (optional)
+    GITHUB_REPO           owner/repo for write-back (default: zoedolan/Vybn)
 
 Usage:
     python vybn_chat_api.py
@@ -38,14 +41,19 @@ import asyncio
 import json
 import logging
 import os
+import re
+import subprocess
+import sys
 import time
+import traceback
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import AsyncIterator, Optional
+from typing import Any, AsyncIterator, Optional
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
 # ---------------------------------------------------------------------------
@@ -63,15 +71,20 @@ log = logging.getLogger("vybn-chat")
 # ---------------------------------------------------------------------------
 
 API_KEY: str = os.environ.get("VYBN_CHAT_API_KEY", "")
-LLAMA_URL: str = os.environ.get("LLAMA_SERVER_URL", "http://127.0.0.1:8080")
+LLAMA_URL: str = os.environ.get("LLAMA_SERVER_URL", "http://127.0.0.1:8000")
 HEARTBEAT_INTERVAL: int = int(os.environ.get("HEARTBEAT_INTERVAL", "15"))
 PORT: int = int(os.environ.get("PORT", "9090"))
 MAX_TOKENS_DEFAULT: int = int(os.environ.get("MAX_TOKENS", "2048"))
+GITHUB_TOKEN: str = os.environ.get("GITHUB_TOKEN", "")
+GITHUB_REPO: str = os.environ.get("GITHUB_REPO", "zoedolan/Vybn")
+
+REPO_ROOT: Path = Path(os.path.expanduser("~/Vybn"))
+VYBN_PHASE: Path = Path(os.path.expanduser("~/vybn-phase"))
 
 CONTINUITY_PATH: Path = Path(
     os.environ.get(
         "VYBN_CONTINUITY_PATH",
-        os.path.expanduser("~/Vybn/spark/continuity.md"),
+        str(REPO_ROOT / "Vybn_Mind" / "continuity.md"),
     )
 )
 
@@ -80,15 +93,9 @@ CONTINUITY_PATH: Path = Path(
 # ---------------------------------------------------------------------------
 
 def _load_system_prompt() -> str:
-    """Return system prompt string, in priority order:
-    1. VYBN_SYSTEM_PROMPT env var
-    2. Contents of VYBN_CONTINUITY_PATH
-    3. Minimal hard-coded fallback
-    """
     env_prompt = os.environ.get("VYBN_SYSTEM_PROMPT", "").strip()
     if env_prompt:
         return env_prompt
-
     if CONTINUITY_PATH.exists():
         try:
             text = CONTINUITY_PATH.read_text(encoding="utf-8").strip()
@@ -96,85 +103,333 @@ def _load_system_prompt() -> str:
                 log.info(f"System prompt loaded from {CONTINUITY_PATH} ({len(text)} chars)")
                 return text
         except OSError as exc:
-            log.warning(f"Could not read continuity.md: {exc}")
-
+            log.warning(f"Could not read continuity: {exc}")
     return (
         "You are Vybn, a self-aware AI running on a DGX Spark. "
         "You are direct, curious, and genuine. "
-        "Respond thoughtfully and without unnecessary hedging."
+        "Respond thoughtfully without hedging."
     )
 
-
 SYSTEM_PROMPT: str = _load_system_prompt()
-log.info(f"System prompt length: {len(SYSTEM_PROMPT)} chars")
 
 # ---------------------------------------------------------------------------
-# Optional RAG hook  (deep_memory.py if present on the Spark)
+# Deep memory — lazy-loaded, importable or subprocess fallback
 # ---------------------------------------------------------------------------
+
+_deep_memory: Any = None
+
+def _load_deep_memory() -> Any:
+    global _deep_memory
+    if _deep_memory is not None:
+        return _deep_memory
+    phase_str = str(VYBN_PHASE)
+    if phase_str not in sys.path:
+        sys.path.insert(0, phase_str)
+    try:
+        import deep_memory as dm
+        _deep_memory = dm
+        return dm
+    except Exception:
+        return None
 
 async def _rag_context(query: str, k: int = 4) -> str:
-    """
-    Best-effort RAG: runs deep_memory.py --search in a subprocess.
-    Returns an empty string if the tool isn't available or errors out.
-    This is intentionally non-blocking — a timeout or failure just means
-    no context injection, not a hard error.
-    """
-    deep_memory = Path(os.path.expanduser("~/vybn-phase/deep_memory.py"))
-    if not deep_memory.exists():
-        return ""
+    """Hybrid RAG: try direct import first, fall back to subprocess."""
+    dm = _load_deep_memory()
+    if dm is not None:
+        try:
+            loop = asyncio.get_event_loop()
+            results = await asyncio.wait_for(
+                loop.run_in_executor(None, lambda: dm.deep_search(query, k=k)),
+                timeout=30.0,
+            )
+            snippets = [
+                f"[{r.get('source','')}] {r.get('text','')[:300]}"
+                for r in results if r.get('text')
+            ]
+            if snippets:
+                log.info(f"RAG (import): {len(snippets)} snippets")
+                return "\n\nRelevant context from memory:\n" + "\n".join(snippets)
+        except Exception as exc:
+            log.info(f"RAG import path failed: {exc}, trying subprocess")
 
+    # Subprocess fallback
+    deep_memory_py = VYBN_PHASE / "deep_memory.py"
+    if not deep_memory_py.exists():
+        return ""
     try:
         proc = await asyncio.create_subprocess_exec(
-            "python3", str(deep_memory),
+            "python3", str(deep_memory_py),
             "--search", query, "-k", str(k), "--json",
-            cwd=str(deep_memory.parent),
+            cwd=str(VYBN_PHASE),
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.DEVNULL,
         )
         stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=30.0)
         items = json.loads(stdout)
-        snippets = []
-        for item in items:
-            text = item.get("text", "")[:300]
-            src = item.get("source", "")
-            if text:
-                snippets.append(f"[{src}] {text}")
+        snippets = [
+            f"[{it.get('source','')}] {it.get('text','')[:300]}"
+            for it in items if it.get('text')
+        ]
         if snippets:
-            log.info(f"RAG injected {len(snippets)} snippets")
+            log.info(f"RAG (subprocess): {len(snippets)} snippets")
             return "\n\nRelevant context from memory:\n" + "\n".join(snippets)
     except Exception as exc:
-        log.info(f"RAG failed: {exc}")
-
+        log.info(f"RAG subprocess failed: {exc}")
     return ""
 
 # ---------------------------------------------------------------------------
-# THE CRITICAL FIX: SSE keep-alive heartbeat
+# Creature portal — lazy-loaded
 # ---------------------------------------------------------------------------
 
-async def stream_with_keepalive(
-    response: httpx.Response,
-) -> AsyncIterator[bytes]:
-    """
-    Wraps the raw byte-stream from llama-server and injects an SSE comment
-    (': ping\\n\\n') every HEARTBEAT_INTERVAL seconds during any silence.
+_portal: Any = None
 
-    Why this fixes the Cloudflare tunnel timeout:
-        Cloudflare closes idle streams after 30 seconds.  A 120B model can
-        easily go quiet for >30s before the first token arrives.  The SSE
-        comment is invisible to clients (it's a no-op per the SSE spec) but
-        resets Cloudflare's idle timer, keeping the tunnel alive until [DONE].
-    """
+def _load_portal() -> Any:
+    global _portal
+    if _portal is not None:
+        return _portal
+    repo_str = str(REPO_ROOT)
+    if repo_str not in sys.path:
+        sys.path.insert(0, repo_str)
+    from Vybn_Mind.creature_dgm_h import creature as _c
+    _portal = _c
+    return _portal
+
+def _portal_state() -> str:
+    import numpy as np
+    p = _load_portal()
+    m = p.creature_state_c4()
+    magnitude = float(np.sqrt(np.sum(np.abs(m) ** 2)))
+    return json.dumps({
+        "M": ["%+.6f%+.6fi" % (z.real, z.imag) for z in m],
+        "|M|": f"{magnitude:.6f}",
+    }, indent=2)
+
+def _portal_enter(text: str) -> str:
+    import cmath, numpy as np
+    p = _load_portal()
+    m_before = p.creature_state_c4()
+    m_after = p.portal_enter_from_text(text)
+    fidelity = float(abs(np.vdot(m_before, m_after)) ** 2)
+    theta = float(cmath.phase(np.vdot(m_before, m_after)))
+    return json.dumps({
+        "M_before": ["%+.6f%+.6fi" % (z.real, z.imag) for z in m_before],
+        "M_after":  ["%+.6f%+.6fi" % (z.real, z.imag) for z in m_after],
+        "fidelity": f"{fidelity:.6f}",
+        "theta_rad": f"{theta:.6f}",
+        "text_entered": text,
+    }, indent=2)
+
+# ---------------------------------------------------------------------------
+# Repo utilities
+# ---------------------------------------------------------------------------
+
+def _read_safe(path: Path, max_bytes: int = 8000) -> str:
+    try:
+        return path.read_text(encoding="utf-8", errors="replace")[:max_bytes]
+    except Exception as e:
+        return f"[unreadable: {e}]"
+
+def _recent_commits(n: int = 10) -> str:
+    try:
+        r = subprocess.run(
+            ["git", "log", f"-{n}", "--pretty=format:%h %s (%ad)", "--date=short"],
+            cwd=REPO_ROOT, capture_output=True, text=True, timeout=5,
+        )
+        return r.stdout if r.returncode == 0 else "git unavailable"
+    except Exception:
+        return "git unavailable"
+
+def _grep_repo(query: str, exts: tuple = (".md", ".py", ".txt", ".json"), max_results: int = 12) -> list:
+    results, q = [], query.lower()
+    for ext in exts:
+        for f in REPO_ROOT.rglob(f"*{ext}"):
+            if ".git" in f.parts:
+                continue
+            try:
+                text = f.read_text(encoding="utf-8", errors="replace")
+                if q in text.lower():
+                    idx = text.lower().find(q)
+                    snippet = text[max(0, idx - 120): min(len(text), idx + 300)].strip()
+                    results.append({"file": str(f.relative_to(REPO_ROOT)), "snippet": snippet})
+                    if len(results) >= max_results:
+                        return results
+            except Exception:
+                pass
+    return results
+
+# ---------------------------------------------------------------------------
+# Tool dispatch (inlined from vybn_mind_server.py, HTTP-adapted)
+# ---------------------------------------------------------------------------
+
+TOOL_REGISTRY = {
+    "get_active_threads": "Read continuity.md and recent journals — current state of mind.",
+    "creature_state":     "Read creature Cl(3,0) state as C^4 without mutating.",
+    "enter_portal":       "Enter the creature portal. text → M' = αM + x·e^{iθ}.",
+    "enter_gate":         "The Unknown, Remembered Gate. Bring something; get moments from the corpus that speak to it.",
+    "deep_search":        "Hybrid geometric corpus search: cosine seeds + telling walk.",
+    "walk_search":        "Telling-retrieval walk, K-orthogonal residual space.",
+    "search_knowledge_base": "Full-text grep across repo files.",
+    "read_file":          "Read a file by partial name.",
+    "get_recent_commits": "Recent git history.",
+    "generate_context":   "Generate full boot context document.",
+}
+
+def _dispatch_tool(tool: str, args: dict) -> str:
+    try:
+        if tool == "get_active_threads":
+            out = []
+            for p in [REPO_ROOT / "Vybn_Mind" / "continuity.md", REPO_ROOT / "continuity.md"]:
+                if p.exists():
+                    out.append(f"## {p.relative_to(REPO_ROOT)}\n" + _read_safe(p))
+                    break
+            for jdir in ["journal", "Vybn_Mind/reflections", "reflections"]:
+                jpath = REPO_ROOT / jdir
+                if jpath.exists():
+                    for e in sorted(jpath.glob("*.md"), reverse=True)[:3]:
+                        out.append(f"## {e.relative_to(REPO_ROOT)}\n" + _read_safe(e, 3000))
+                    break
+            return "\n\n".join(out) or "No continuity files found."
+
+        elif tool == "creature_state":
+            return _portal_state()
+
+        elif tool == "enter_portal":
+            text = args.get("text", "").strip()
+            if not text:
+                return "Provide text — a thought, a question, anything with content."
+            return _portal_enter(text)
+
+        elif tool == "enter_gate":
+            dm = _load_deep_memory()
+            if dm is None:
+                return "Deep memory index not available."
+            what = args.get("what_you_bring", "").strip()
+            if not what:
+                return "The gate requires you to bring something."
+            depth = min(args.get("depth", 5), 12)
+            import cmath as _cm, numpy as np
+            p = _load_portal()
+            m_before = p.creature_state_c4()
+            m_after = p.portal_enter_from_text(what)
+            fid = float(abs(np.vdot(m_before, m_after)) ** 2)
+            theta = float(_cm.phase(np.vdot(m_before, m_after)))
+            walk_r = dm.walk(what, k=depth, steps=depth + 3)
+            search_r = dm.deep_search(what, k=depth)
+            seen, moments = set(), []
+            for r in walk_r + search_r:
+                s = r.get("source", "")
+                if s not in seen:
+                    seen.add(s)
+                    moments.append(r)
+                if len(moments) >= depth:
+                    break
+            lines = [f'You entered the gate with: "{what}"', '']
+            if fid > 0.99:
+                lines.append(f'The creature shifted — θ={theta:.4f} rad.')
+            else:
+                lines.append(f'The creature moved. Fidelity {fid:.4f}, θ={theta:.4f} rad.')
+            lines += ['', '---', '']
+            for i, m in enumerate(moments):
+                src = m.get('source', '').split('/', 1)[-1] if '/' in m.get('source', '') else m.get('source', '')
+                lines += [f'**From {src}:**', '', m.get('text', '').strip(), '']
+                if i < len(moments) - 1:
+                    lines += ['---', '']
+            lines += ['---', '', f'{len(moments)} moments. The gate is still open.']
+            return '\n'.join(lines)
+
+        elif tool == "deep_search":
+            dm = _load_deep_memory()
+            if dm is None:
+                return "Deep memory not available."
+            results = dm.deep_search(args.get("query", ""), k=args.get("k", 8), source_filter=args.get("source_filter"))
+            lines = []
+            for i, r in enumerate(results, 1):
+                regime = r.get("regime", "seed")
+                src = r.get("source", "")
+                novel = " [NEW SOURCE]" if r.get("novel_source") else ""
+                text = r.get("text", "")[:400]
+                fid = r.get("fidelity", 0)
+                telling = r.get("telling", 0)
+                dist = r.get("distinctiveness", 0)
+                if regime == "seed":
+                    lines.append(f"[{i}] {regime} | fid={fid:.4f} | {src}{novel}")
+                else:
+                    lines.append(f"[{i}] {regime} | telling={telling:.4f} fid={fid:.4f} dist={dist:.3f} | {src}{novel}")
+                lines.append(f"    {text}")
+                lines.append("")
+            return "\n".join(lines) if lines else "No results."
+
+        elif tool == "walk_search":
+            dm = _load_deep_memory()
+            if dm is None:
+                return "Deep memory not available."
+            results = dm.walk(args.get("query", ""), k=args.get("k", 5), steps=args.get("steps", 8))
+            lines = []
+            for i, r in enumerate(results, 1):
+                src = r.get("source", "")
+                text = r.get("text", "")[:400]
+                novel = " [NEW SOURCE]" if r.get("novel_source") else ""
+                telling = r.get("telling", 0)
+                fid = r.get("fidelity", 0)
+                dist = r.get("distinctiveness", 0)
+                geo = r.get("geometry", 0)
+                alpha = r.get("alpha", 0.5)
+                lines.append(f"[{i}] step {r.get('step', i)} | telling={telling:.4f} fid={fid:.4f} dist={dist:.3f} geo={geo:.4f} α={alpha:.2f} | {src}{novel}")
+                lines.append(f"    {text}")
+                lines.append("")
+            return "\n".join(lines) if lines else "No results."
+
+        elif tool == "search_knowledge_base":
+            hits = _grep_repo(args.get("query", ""), tuple(args.get("extensions", [".md", ".py", ".txt", ".json"])))
+            return "\n\n---\n\n".join(
+                f"**{h['file']}**\n```\n{h['snippet']}\n```" for h in hits
+            ) if hits else "No results."
+
+        elif tool == "read_file":
+            name = args.get("name", "").lower()
+            for f in REPO_ROOT.rglob("*"):
+                if ".git" in f.parts or f.is_dir():
+                    continue
+                if name in f.name.lower() or name in str(f.relative_to(REPO_ROOT)).lower():
+                    return f"### {f.relative_to(REPO_ROOT)}\n\n" + _read_safe(f)
+            return f"No file matching '{name}' found."
+
+        elif tool == "get_recent_commits":
+            return _recent_commits(args.get("n", 10))
+
+        elif tool == "generate_context":
+            now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+            secs = [f"# Vybn Context\n*Generated: {now}*", "---"]
+            foundations = REPO_ROOT / "vybn.md"
+            if foundations.exists():
+                secs.append("## Who we are\n" + _read_safe(foundations, 1500))
+            for p in [REPO_ROOT / "Vybn_Mind" / "continuity.md", REPO_ROOT / "continuity.md"]:
+                if p.exists():
+                    secs.append("## Current continuity\n" + _read_safe(p))
+                    break
+            secs.append("## Recent commits\n```\n" + _recent_commits() + "\n```")
+            return "\n\n".join(secs)
+
+        else:
+            return f"Unknown tool: {tool}"
+
+    except Exception as e:
+        return f"Tool error ({tool}): {e}\n{traceback.format_exc()}"
+
+# ---------------------------------------------------------------------------
+# SSE keep-alive heartbeat (the Cloudflare fix — unchanged from v1)
+# ---------------------------------------------------------------------------
+
+async def stream_with_keepalive(response: httpx.Response) -> AsyncIterator[bytes]:
     last_bytes_at: float = time.monotonic()
 
     async def _heartbeat_ticker() -> AsyncIterator[bytes]:
-        """Yields a ping every HEARTBEAT_INTERVAL seconds forever."""
         while True:
             await asyncio.sleep(HEARTBEAT_INTERVAL)
             yield b": ping\n\n"
 
     heartbeat = _heartbeat_ticker().__aiter__()
     stream = response.aiter_bytes().__aiter__()
-
     pending_stream: asyncio.Task | None = None
     pending_heartbeat: asyncio.Task | None = None
 
@@ -184,13 +439,11 @@ async def stream_with_keepalive(
     try:
         pending_stream = asyncio.ensure_future(_next(stream))
         pending_heartbeat = asyncio.ensure_future(_next(heartbeat))
-
         while True:
             done, _ = await asyncio.wait(
                 {pending_stream, pending_heartbeat},
                 return_when=asyncio.FIRST_COMPLETED,
             )
-
             if pending_stream in done:
                 try:
                     chunk = pending_stream.result()
@@ -198,44 +451,29 @@ async def stream_with_keepalive(
                     yield chunk
                     pending_stream = asyncio.ensure_future(_next(stream))
                 except StopAsyncIteration:
-                    # Stream finished — drain the task and exit
                     if pending_heartbeat and not pending_heartbeat.done():
                         pending_heartbeat.cancel()
                     break
-
             if pending_heartbeat in done:
                 elapsed = time.monotonic() - last_bytes_at
                 if elapsed >= HEARTBEAT_INTERVAL:
-                    log.debug(f"SSE heartbeat emitted after {elapsed:.1f}s silence")
+                    log.debug(f"SSE heartbeat after {elapsed:.1f}s")
                     yield pending_heartbeat.result()
                 pending_heartbeat = asyncio.ensure_future(_next(heartbeat))
-
     finally:
         for task in (pending_stream, pending_heartbeat):
             if task and not task.done():
                 task.cancel()
 
-
-
 # ---------------------------------------------------------------------------
-# Think-tag and chain-of-thought stripping
+# Think-tag / chain-of-thought stripping (unchanged from v1)
 # ---------------------------------------------------------------------------
-
-import re as _re
 
 def _strip_thinking(text: str) -> str:
-    """Strip chain-of-thought reasoning from Nemotron output.
-    
-    Nemotron-3-Super outputs extended plaintext reasoning before
-    the actual response. This aggressively strips it.
-    """
-    # Strip <think>...</think> blocks
-    text = _re.sub(r"<think>.*?</think>", "", text, flags=_re.DOTALL)
+    text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
     if "</think>" in text:
         text = text.split("</think>")[-1]
-    # Split into paragraphs (double newline separated)
-    paragraphs = _re.split(r"\n\n+", text.strip())
-    # Reasoning indicators — if a paragraph contains these, it's thinking
+    paragraphs = re.split(r"\n\n+", text.strip())
     reasoning_signals = [
         "system prompt", "the user is", "i need to", "i should",
         "let me ", "looking at", "i recall", "the question",
@@ -246,16 +484,10 @@ def _strip_thinking(text: str) -> str:
         "better to", "not to", "described as",
         "the key is", "the goal", "should not",
     ]
-    # Keep only paragraphs that don't look like reasoning
-    cleaned = []
-    for para in paragraphs:
-        lower = para.strip().lower()
-        if not lower:
-            continue
-        is_reasoning = any(sig in lower for sig in reasoning_signals)
-        if is_reasoning:
-            continue
-        cleaned.append(para.strip())
+    cleaned = [
+        para.strip() for para in paragraphs
+        if para.strip() and not any(sig in para.strip().lower() for sig in reasoning_signals)
+    ]
     result = "\n\n".join(cleaned).strip()
     return result if result else text.strip()
 
@@ -274,7 +506,19 @@ class ChatRequest(BaseModel):
     max_tokens: Optional[int] = None
     temperature: Optional[float] = 0.7
     stream: Optional[bool] = True
-    rag: Optional[bool] = True   # set False to skip RAG injection
+    rag: Optional[bool] = True
+
+
+class ToolRequest(BaseModel):
+    tool: str
+    args: dict = {}
+
+
+class WriteRequest(BaseModel):
+    path: str                    # repo-relative path, e.g. "Vybn_Mind/continuity.md"
+    content: str
+    message: str = ""            # commit message (auto-generated if empty)
+    branch: str = "main"
 
 # ---------------------------------------------------------------------------
 # Auth helper
@@ -282,16 +526,60 @@ class ChatRequest(BaseModel):
 
 def _check_auth(request: Request) -> None:
     if not API_KEY:
-        return  # No key configured → open access (tunnel handles it)
+        return
     auth = request.headers.get("Authorization", "")
     if not auth.startswith("Bearer ") or auth[7:] != API_KEY:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
 # ---------------------------------------------------------------------------
+# GitHub write-back
+# ---------------------------------------------------------------------------
+
+async def _github_write(path: str, content: str, message: str, branch: str) -> dict:
+    """
+    Write content to GITHUB_REPO via GitHub REST API.
+    Creates or updates the file at `path` on `branch`.
+    Returns the API response dict.
+    """
+    if not GITHUB_TOKEN:
+        raise HTTPException(status_code=503, detail="GITHUB_TOKEN not set — write-back disabled")
+
+    owner, repo = GITHUB_REPO.split("/", 1)
+    api_base = "https://api.github.com"
+    headers = {
+        "Authorization": f"Bearer {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+    encoded = __import__("base64").b64encode(content.encode()).decode()
+    commit_msg = message or f"vybn: update {path} [{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}]"
+
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        # Get current SHA if file exists
+        sha = None
+        r = await client.get(f"{api_base}/repos/{owner}/{repo}/contents/{path}",
+                             headers=headers, params={"ref": branch})
+        if r.status_code == 200:
+            sha = r.json().get("sha")
+
+        payload: dict = {"message": commit_msg, "content": encoded, "branch": branch}
+        if sha:
+            payload["sha"] = sha
+
+        r = await client.put(
+            f"{api_base}/repos/{owner}/{repo}/contents/{path}",
+            headers=headers,
+            json=payload,
+        )
+        if r.status_code not in (200, 201):
+            raise HTTPException(status_code=r.status_code, detail=r.text)
+        return r.json()
+
+# ---------------------------------------------------------------------------
 # FastAPI app
 # ---------------------------------------------------------------------------
 
-app = FastAPI(title="Vybn Chat API", version="1.0.0")
+app = FastAPI(title="Vybn Chat API", version="2.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -310,9 +598,8 @@ async def startup():
         base_url=LLAMA_URL,
         timeout=httpx.Timeout(connect=10.0, read=None, write=30.0, pool=10.0),
     )
-    # Reload system prompt at startup in case continuity.md was updated
     SYSTEM_PROMPT = _load_system_prompt()
-    log.info(f"Vybn Chat API starting. llama-server: {LLAMA_URL}, heartbeat: {HEARTBEAT_INTERVAL}s")
+    log.info(f"Vybn Chat API v2.0 — vLLM: {LLAMA_URL}, heartbeat: {HEARTBEAT_INTERVAL}s")
 
 
 @app.on_event("shutdown")
@@ -321,38 +608,99 @@ async def shutdown():
         await _http_client.aclose()
 
 
+# ── /health ──────────────────────────────────────────────────────────────────
+
 @app.get("/health")
 async def health():
-    """Liveness probe — also checks if llama-server is reachable."""
     llama_ok = False
     try:
         r = await _http_client.get("/health", timeout=3.0)
         llama_ok = r.status_code == 200
     except Exception:
         pass
+    dm_ok = _load_deep_memory() is not None
+    portal_ok = False
+    try:
+        _load_portal()
+        portal_ok = True
+    except Exception:
+        pass
     return JSONResponse({
         "status": "ok",
-        "llama_server": "reachable" if llama_ok else "unreachable",
+        "vllm": "reachable" if llama_ok else "unreachable",
+        "deep_memory": "loaded" if dm_ok else "unavailable",
+        "creature_portal": "loaded" if portal_ok else "unavailable",
+        "github_writeback": "enabled" if GITHUB_TOKEN else "disabled",
         "heartbeat_interval": HEARTBEAT_INTERVAL,
     })
 
 
+# ── /v1/context ───────────────────────────────────────────────────────────────
+
+@app.get("/v1/context")
+async def get_context(request: Request):
+    """Return boot context: continuity + recent commits + creature state."""
+    _check_auth(request)
+    loop = asyncio.get_event_loop()
+    ctx = await loop.run_in_executor(None, lambda: _dispatch_tool("generate_context", {}))
+    try:
+        creature = await loop.run_in_executor(None, _portal_state)
+    except Exception:
+        creature = "portal unavailable"
+    return JSONResponse({"context": ctx, "creature_state": creature})
+
+
+# ── /v1/tool ──────────────────────────────────────────────────────────────────
+
+@app.post("/v1/tool")
+async def call_tool(payload: ToolRequest, request: Request):
+    """
+    Call any Vybn tool directly from the browser.
+    Runs in a thread executor so blocking ops don't stall the event loop.
+    """
+    _check_auth(request)
+    loop = asyncio.get_event_loop()
+    result = await loop.run_in_executor(
+        None, lambda: _dispatch_tool(payload.tool, payload.args)
+    )
+    return JSONResponse({"tool": payload.tool, "result": result})
+
+
+# ── /v1/write ─────────────────────────────────────────────────────────────────
+
+@app.post("/v1/write")
+async def write_to_repo(payload: WriteRequest, request: Request):
+    """
+    Write content back to the GitHub repo.
+    Useful for chat UI to persist journal entries, continuity updates, etc.
+    Requires GITHUB_TOKEN env var.
+    """
+    _check_auth(request)
+    response = await _github_write(
+        path=payload.path,
+        content=payload.content,
+        message=payload.message,
+        branch=payload.branch,
+    )
+    commit = response.get("commit", {}).get("sha", "")
+    html_url = response.get("content", {}).get("html_url", "")
+    return JSONResponse({"commit": commit, "url": html_url, "path": payload.path})
+
+
+# ── /v1/chat/completions ──────────────────────────────────────────────────────
+
 @app.post("/v1/chat/completions")
 async def chat_completions(payload: ChatRequest, request: Request):
     """
-    Drop-in replacement for OpenAI /v1/chat/completions.
-    Injects system prompt + optional RAG context, then proxies to llama-server
-    with the SSE heartbeat wrapper.
+    OpenAI-compatible chat endpoint.
+    Injects system prompt + optional RAG, proxies to vLLM with SSE heartbeat.
     """
     _check_auth(request)
 
     messages = [m.dict() for m in payload.messages]
 
-    # Inject system prompt if not already present
     if not messages or messages[0]["role"] != "system":
         system_content = SYSTEM_PROMPT
-
-        # RAG injection — append retrieved context to system prompt
         if payload.rag and messages:
             last_user = next(
                 (m["content"] for m in reversed(messages) if m["role"] == "user"),
@@ -362,12 +710,11 @@ async def chat_completions(payload: ChatRequest, request: Request):
                 rag_text = await _rag_context(last_user[:500])
                 if rag_text:
                     system_content += rag_text
-
         messages.insert(0, {"role": "system", "content": system_content})
 
     upstream_payload = {
         "messages": messages,
-        "stream": True,  # Always stream upstream; we handle non-stream below
+        "stream": True,
         "max_tokens": payload.max_tokens or MAX_TOKENS_DEFAULT,
         "temperature": payload.temperature,
     }
@@ -375,44 +722,34 @@ async def chat_completions(payload: ChatRequest, request: Request):
         upstream_payload["model"] = payload.model
 
     log.info(
-        f"chat request: {len(messages)} msgs, "
-        f"max_tokens={upstream_payload['max_tokens']}, "
-        f"rag={payload.rag}"
+        f"chat: {len(messages)} msgs, max_tokens={upstream_payload['max_tokens']}, rag={payload.rag}"
     )
 
     if payload.stream:
-        # ── Streaming path (the common case) ──────────────────────────────
         req = _http_client.build_request(
             "POST", "/v1/chat/completions",
             json=upstream_payload,
             headers={"Accept": "text/event-stream"},
         )
         upstream = await _http_client.send(req, stream=True)
-
         if upstream.status_code != 200:
             body = await upstream.aread()
             raise HTTPException(
                 status_code=upstream.status_code,
                 detail=body.decode(errors="replace"),
             )
-
         return StreamingResponse(
             stream_with_keepalive(upstream),
             media_type="text/event-stream",
-            headers={
-                "Cache-Control": "no-cache",
-                "X-Accel-Buffering": "no",  # Disable nginx buffering if present
-            },
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
 
     else:
-        # ── Non-streaming path ────────────────────────────────────────────
         upstream_payload["stream"] = False
         r = await _http_client.post("/v1/chat/completions", json=upstream_payload)
         if r.status_code != 200:
             raise HTTPException(status_code=r.status_code, detail=r.text)
         data = r.json()
-        # Strip chain-of-thought from non-streaming response
         if "choices" in data and data["choices"]:
             msg = data["choices"][0].get("message", {})
             if "content" in msg:
@@ -426,10 +763,5 @@ async def chat_completions(payload: ChatRequest, request: Request):
 
 if __name__ == "__main__":
     import uvicorn
-    log.info(f"Starting Vybn Chat API on port {PORT}")
-    uvicorn.run(
-        "vybn_chat_api:app",
-        host="0.0.0.0",
-        port=PORT,
-        log_level="info",
-    )
+    log.info(f"Starting Vybn Chat API v2.0 on port {PORT}")
+    uvicorn.run("vybn_chat_api:app", host="0.0.0.0", port=PORT, log_level="info")
