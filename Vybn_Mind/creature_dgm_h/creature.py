@@ -1070,7 +1070,7 @@ class PersistentState:
         }
 
 
-      def absorb_quantum_experiment(self, record: dict) -> dict:
+    def absorb_quantum_experiment(self, record: dict) -> dict:
         """Absorb a quantum holonomy experiment into persistent state."""
         entry = {
             "timestamp": record.get("ts", datetime.now(timezone.utc).isoformat()),
@@ -1173,7 +1173,7 @@ class PersistentState:
             latest = self.genesis_decoherence_history[-1]
             s["genesis_signal"] = latest["genesis_signal"]
             s["mean_phase_shift"] = latest["mean_phase_shift"]
-                  if self.quantum_experiment_history:
+        if self.quantum_experiment_history:
             latest_q = self.quantum_experiment_history[-1]
             s["quantum_regime"] = latest_q["regime"]
             s["quantum_flip"] = latest_q["flip_quality"]
@@ -1190,7 +1190,7 @@ class PersistentState:
             "winding_history": self.winding_history,
             "phase_holonomy_history": self.phase_holonomy_history,
             "genesis_decoherence_history": self.genesis_decoherence_history,
-                      "quantum_experiment_history": self.quantum_experiment_history,
+            "quantum_experiment_history": self.quantum_experiment_history,
         }
 
     @classmethod
@@ -1748,7 +1748,7 @@ class Organism:
             module_holonomies, genesis_signal, mean_phase_shift)
 
 
-      def absorb_quantum_experiment(self, record: dict) -> dict:
+    def absorb_quantum_experiment(self, record: dict) -> dict:
         """Absorb a quantum experiment result into persistent state."""
         return self.persistent.absorb_quantum_experiment(record)
     def felt_winding(self) -> float:
