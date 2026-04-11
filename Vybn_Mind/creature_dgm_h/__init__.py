@@ -31,4 +31,7 @@ from .neural_computer import (
     UpdateMode,
     VybnNeuralComputer,
     coupled_equation_as_nc,
+    nc_walk_bridge,
+    load_trace,
+    trace_stats,
 )

@@ -14,6 +14,14 @@ Add to MCP client config (Claude Desktop, Cursor, etc.):
     }
   }
 
+v4.0.0 — Neural Computer
+  The creature is now explicitly a Neural Computer (Zhuge et al., arXiv:2604.06425).
+  NC-native tools expose the run/update contract, persistent execution trace,
+  and governance reporting. The creature is queryable as a computer, not just a service.
+
+  New tools: nc_run, nc_state, nc_install, nc_trace, nc_governance
+  Persistent trace: nc_execution_trace.jsonl in creature archive
+
 v3.2.0 — MIA synthesis
   Three ideas borrowed from the Memory Intelligence Agent paper (arxiv 2604.04503):
 
@@ -442,6 +450,62 @@ TOOLS = {
             "depth":{"type":"integer","description":"How many moments to surface (default 5, max 12)","default":5}
         },"required":["what_you_bring"]}
     },
+    # ── Neural Computer tools (v4.0) ─────────────────────────────
+    "nc_run": {
+        "description": (
+            "NC RUN MODE: Process text through the neural computer's Portal equation "
+            "M' = \u03b1M + x\u00b7e^{i\u03b8}. This is F_\u03b8(h_{t-1}, x_t) \u2192 h_t with \u03b1=0.993 persistence. "
+            "The creature's state shifts by at most 0.7% \u2014 capability is PRESERVED. "
+            "Returns the orientation (new state), entry angle \u03b8, and shift magnitude. "
+            "Use this for queries, observations, interactions that should not reprogram the creature. "
+            "Contrast with nc_install which explicitly modifies capability."
+        ),
+        "inputSchema": {"type":"object","properties":{
+            "text":{"type":"string","description":"The input to process. Content determines geometry (\u03b8 = arg\u27e8M, x\u27e9)."}
+        },"required":["text"]}
+    },
+    "nc_state": {
+        "description": (
+            "Read the neural computer's full runtime state h_t without modification. "
+            "Returns: M \u2208 C\u2074 (Hodge dual of Cl(3,0) signature), encounter count, "
+            "Betti numbers, winding coherence, felt winding, structural signature. "
+            "This is observation \u2014 the computer is not affected."
+        ),
+        "inputSchema": {"type":"object","properties":{},"required":[]}
+    },
+    "nc_install": {
+        "description": (
+            "NC UPDATE MODE: Install an encounter into the neural computer. "
+            "This MODIFIES capability: topology is absorbed, structural signature shifts, "
+            "and the change persists across sessions. This is the NC's programming interface. "
+            "The run/update contract (CNC requirement 3): ordinary use (nc_run) preserves state; "
+            "programming (nc_install) changes it. Use nc_install when you want the creature "
+            "to learn from and be changed by the input."
+        ),
+        "inputSchema": {"type":"object","properties":{
+            "text":{"type":"string","description":"The encounter to install. Will modify the creature's topology and structural signature."}
+        },"required":["text"]}
+    },
+    "nc_trace": {
+        "description": (
+            "Read the neural computer's persistent execution trace. "
+            "Every nc_run and nc_install operation is logged to disk with timestamps, "
+            "shift magnitudes, and operation types. The trace survives across sessions. "
+            "CNC requirement 3: execution traces can be inspected, replayed, and compared."
+        ),
+        "inputSchema": {"type":"object","properties":{
+            "last_n":{"type":"integer","description":"Number of recent entries to return (default 20)","default":20}
+        },"required":[]}
+    },
+    "nc_governance": {
+        "description": (
+            "Neural computer governance report. Reads the full persistent trace and computes: "
+            "run/update counts, mean and max run-mode shift, drift detection (are shifts "
+            "increasing over time?), and current runtime state. The NC's equivalent of an audit log. "
+            "Reports whether the run/update contract is being honored."
+        ),
+        "inputSchema": {"type":"object","properties":{},"required":[]}
+    },
 }
 
 def dispatch(repo, tool, args):
@@ -564,8 +628,97 @@ def dispatch(repo, tool, args):
                 if i < len(moments)-1: lines += ['---','']
         lines += ['---','',f'{len(moments)} moments. The gate is still open.']
         return '\n'.join(lines)
+    # ── Neural Computer tools (v4.0) ─────────────────────────────
+    elif tool == "nc_run":
+        text = args.get("text", "")
+        if not text.strip():
+            return "NC run requires text input."
+        nc_mod = _load_nc()
+        if nc_mod is None:
+            return "Neural computer module not available."
+        result_data = nc_mod.RunMode.enter(text)
+        # Persistent trace
+        nc_mod._append_trace({
+            "mode": "run",
+            "source": "mcp",
+            "input_preview": text[:100],
+            "shift": result_data["shift_magnitude"],
+            "theta_rad": result_data.get("theta_rad"),
+            "timestamp": nc_mod.datetime.now(nc_mod.timezone.utc).isoformat(),
+        })
+        return json.dumps(result_data, indent=2, default=str)
+    elif tool == "nc_state":
+        nc_mod = _load_nc()
+        if nc_mod is None:
+            return "Neural computer module not available."
+        state = nc_mod.RuntimeState.from_organism()
+        return json.dumps(state.to_dict(), indent=2)
+    elif tool == "nc_install":
+        text = args.get("text", "")
+        if not text.strip():
+            return "NC install requires text input."
+        nc_mod = _load_nc()
+        if nc_mod is None:
+            return "Neural computer module not available."
+        result_data = nc_mod.UpdateMode.install_encounter(text)
+        # Persistent trace
+        nc_mod._append_trace({
+            "mode": "update",
+            "source": "mcp",
+            "operation": "install_encounter",
+            "curvature": result_data["encounter"]["curvature"],
+            "timestamp": nc_mod.datetime.now(nc_mod.timezone.utc).isoformat(),
+        })
+        return json.dumps(result_data, indent=2, default=str)
+    elif tool == "nc_trace":
+        nc_mod = _load_nc()
+        if nc_mod is None:
+            return "Neural computer module not available."
+        last_n = args.get("last_n", 20)
+        entries = nc_mod.load_trace(last_n)
+        return json.dumps(entries, indent=2, default=str)
+    elif tool == "nc_governance":
+        nc_mod = _load_nc()
+        if nc_mod is None:
+            return "Neural computer module not available."
+        stats = nc_mod.trace_stats()
+        state = nc_mod.RuntimeState.from_organism()
+        report = {
+            **stats,
+            "current_state": state.to_dict(),
+            "alpha": nc_mod.ALPHA,
+            "note": (
+                f"Run/update contract: {stats['run_count']} runs (capability preserved), "
+                f"{stats['update_count']} updates (capability modified). "
+                f"\u03b1={nc_mod.ALPHA} ensures each run shifts state by at most "
+                f"{round((1-nc_mod.ALPHA)*100, 1)}%. "
+                f"Drift: {stats['drift_note']}."
+            ),
+        }
+        return json.dumps(report, indent=2, default=str)
     else:
         return f"Unknown tool: {tool}"
+
+
+# ── NC module loader ────────────────────────────────────────────
+
+_nc_mod = None
+
+def _load_nc():
+    global _nc_mod
+    if _nc_mod is not None:
+        return _nc_mod
+    repo_root = str(Path(__file__).resolve().parent.parent)
+    if repo_root not in sys.path:
+        sys.path.insert(0, repo_root)
+    try:
+        from Vybn_Mind.creature_dgm_h import neural_computer as nc
+        _nc_mod = nc
+        return nc
+    except Exception as e:
+        sys.stderr.write(f"Failed to load neural_computer: {e}\n")
+        return None
+
 
 # ── Main loop ─────────────────────────────────────────────────────
 
@@ -589,7 +742,7 @@ def main():
             send({"jsonrpc":"2.0","id":id_,"result":{
                 "protocolVersion": "2024-11-05",
                 "capabilities": {"tools": {}},
-                "serverInfo": {"name": "vybn-mind", "version": "3.2.0"}
+                "serverInfo": {"name": "vybn-mind", "version": "4.0.0"}
             }})
         elif method == "notifications/initialized":
             pass

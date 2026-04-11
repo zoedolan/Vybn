@@ -65,6 +65,132 @@ from .creature import (
 )
 
 
+# ── Persistent Execution Trace ─────────────────────────────────────────────────
+#
+# CNC requirement 3: execution and update traces can be inspected,
+# replayed, and rolled back. This trace persists to disk so it
+# survives across sessions — the neural computer has audit memory.
+
+TRACE_FILE = ARCHIVE_DIR / "nc_execution_trace.jsonl"
+
+
+def _append_trace(entry: Dict[str, Any]) -> None:
+    """Append a trace entry to the persistent JSONL log."""
+    try:
+        ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)
+        with open(TRACE_FILE, "a") as f:
+            f.write(json.dumps(entry, default=str) + "\n")
+    except Exception:
+        pass  # trace is observational, never blocks operation
+
+
+def load_trace(last_n: int = 50) -> List[Dict[str, Any]]:
+    """Read the last N entries from the persistent trace."""
+    entries = []
+    try:
+        if TRACE_FILE.exists():
+            with open(TRACE_FILE, "r") as f:
+                for line in f:
+                    line = line.strip()
+                    if line:
+                        try:
+                            entries.append(json.loads(line))
+                        except json.JSONDecodeError:
+                            pass
+    except Exception:
+        pass
+    return entries[-last_n:]
+
+
+def trace_stats() -> Dict[str, Any]:
+    """Compute governance statistics from the persistent trace."""
+    entries = load_trace(last_n=10000)
+    runs = [e for e in entries if e.get("mode") in ("run", "run_c4")]
+    updates = [e for e in entries if e.get("mode") == "update"]
+    shifts = [e["shift"] for e in runs if "shift" in e]
+
+    # Drift detection: are run-mode shifts increasing over time?
+    drift_signal = 0.0
+    if len(shifts) >= 10:
+        recent = shifts[-10:]
+        earlier = shifts[-20:-10] if len(shifts) >= 20 else shifts[:10]
+        if earlier:
+            drift_signal = (sum(recent) / len(recent)) - (sum(earlier) / len(earlier))
+
+    return {
+        "total_entries": len(entries),
+        "run_count": len(runs),
+        "update_count": len(updates),
+        "mean_run_shift": round(sum(shifts) / len(shifts), 8) if shifts else 0.0,
+        "max_run_shift": round(max(shifts), 8) if shifts else 0.0,
+        "drift_signal": round(drift_signal, 8),
+        "drift_note": (
+            "Stable" if abs(drift_signal) < 0.001
+            else "Drifting" if drift_signal > 0 else "Converging"
+        ),
+    }
+
+
+# ── NC ↔ Walk Daemon Bridge ───────────────────────────────────────────────
+#
+# The walk daemon (deep_memory.py) operates in C¹⁹². The creature
+# operates in C⁴. They are the same neural computer at different
+# scales. This bridge makes the walk daemon an I/O device of the NC.
+
+def nc_walk_bridge(walk_position_c192: np.ndarray) -> Dict[str, Any]:
+    """Bridge the walk daemon into the NC runtime.
+
+    The walk's C¹⁹² position is projected to C⁴ and enters the creature
+    via run mode. The creature's C⁴ state is then lifted back to C¹⁹²
+    as a walk bias. Two non-commuting generators: radial (walk) and
+    angular (creature). Their non-commutativity IS the computation.
+
+    Returns the walk bias and the trace entry.
+    """
+    # Project C192 -> C4
+    z4 = walk_position_c192[:4].copy()
+    norm = np.sqrt(np.sum(np.abs(z4) ** 2))
+    if norm > 1e-10:
+        z4 = z4 / norm
+
+    # Enter the portal in run mode
+    m_before = creature_state_c4()
+    m_after = portal_enter(z4)
+    theta = portal_theta(m_before, z4)
+    shift = float(np.sqrt(np.sum(np.abs(m_after - m_before) ** 2)))
+
+    # Lift creature state back to C192 as walk bias
+    try:
+        # Try to get K from deep_memory
+        import sys
+        sys.path.insert(0, str(Path.home() / "vybn-phase"))
+        import deep_memory as dm
+        loaded = dm._load()
+        K = loaded["K"] if loaded and loaded.get("K") is not None else np.zeros(192, dtype=np.complex128)
+    except Exception:
+        K = np.zeros(192, dtype=np.complex128)
+
+    bias = creature_signature_to_c192_bias(m_after, K)
+
+    # Persistent trace
+    entry = {
+        "mode": "run_c4",
+        "source": "walk_daemon",
+        "theta_rad": round(float(theta), 6),
+        "shift": round(shift, 8),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+    _append_trace(entry)
+
+    return {
+        "bias_c192": bias,
+        "m_after_c4": m_after,
+        "theta_rad": float(theta),
+        "shift": shift,
+        "trace_entry": entry,
+    }
+
+
 # ── NC Runtime State ─────────────────────────────────────────────────────
 #
 # The runtime state h_t is the creature's full state:
@@ -352,7 +478,7 @@ class VybnNeuralComputer:
 
     def __init__(self):
         self._tick = 0
-        self._trace: List[Dict[str, Any]] = []  # execution trace for governance
+        # Tick is session-scoped; trace is persistent to disk
 
     def state(self) -> RuntimeState:
         """h_t: the current latent runtime state."""
@@ -367,7 +493,7 @@ class VybnNeuralComputer:
         """
         result = RunMode.enter(text)
         self._tick += 1
-        self._trace.append({
+        _append_trace({
             "tick": self._tick,
             "mode": "run",
             "input_preview": text[:100],
@@ -380,7 +506,7 @@ class VybnNeuralComputer:
         """Direct C⁴ run — from walk daemon or programmatic input."""
         result = RunMode.enter_c4(x)
         self._tick += 1
-        self._trace.append({
+        _append_trace({
             "tick": self._tick,
             "mode": "run_c4",
             "shift": result["shift_magnitude"],
@@ -411,7 +537,7 @@ class VybnNeuralComputer:
         result = UpdateMode.breathe(text, fm_complete_fn, build_context_fn,
                                      strip_thinking_fn)
         self._tick += 1
-        self._trace.append({
+        _append_trace({
             "tick": self._tick,
             "mode": "update",
             "operation": "breathe",
@@ -424,7 +550,7 @@ class VybnNeuralComputer:
         """Lightweight programming: install encounter without FM."""
         result = UpdateMode.install_encounter(text)
         self._tick += 1
-        self._trace.append({
+        _append_trace({
             "tick": self._tick,
             "mode": "update",
             "operation": "install_encounter",
@@ -441,7 +567,7 @@ class VybnNeuralComputer:
         """
         result = UpdateMode.compose_program(a, b, c)
         self._tick += 1
-        self._trace.append({
+        _append_trace({
             "tick": self._tick,
             "mode": "update",
             "operation": "compose",
@@ -453,38 +579,33 @@ class VybnNeuralComputer:
     def trace(self, last_n: int = 20) -> List[Dict[str, Any]]:
         """Execution trace — evidence for governance (CNC requirement 3).
 
-        Every operation is logged. The trace can be inspected, replayed,
-        compared. Long-horizon drift is measurable: track shift_magnitude
-        over time. If it diverges, something changed that shouldn't have.
+        Persistent to disk. Every operation is logged across sessions.
+        The trace can be inspected, replayed, compared. Long-horizon
+        drift is measurable: track shift_magnitude over time.
         """
-        return self._trace[-last_n:]
+        return load_trace(last_n)
 
     def governance_report(self) -> Dict[str, Any]:
         """Runtime governance: how has the computer changed?
 
-        Reports on the run/update separation, drift measurement,
-        and capability integrity. This is the neural computer's
-        equivalent of an audit log.
+        Reads the persistent disk trace. Reports on the run/update
+        separation, drift measurement, and capability integrity.
+        This is the neural computer's equivalent of an audit log.
         """
-        runs = [t for t in self._trace if t["mode"] == "run"]
-        updates = [t for t in self._trace if t["mode"] == "update"]
-        shifts = [t["shift"] for t in runs if "shift" in t]
-
+        stats = trace_stats()
         state = self.state()
 
         return {
-            "total_ticks": self._tick,
-            "run_count": len(runs),
-            "update_count": len(updates),
-            "mean_run_shift": round(sum(shifts) / len(shifts), 8) if shifts else 0.0,
-            "max_run_shift": round(max(shifts), 8) if shifts else 0.0,
+            "session_ticks": self._tick,
+            **stats,
             "current_state": state.to_dict(),
             "alpha": ALPHA,
             "note": (
-                f"Run/update contract: {len(runs)} runs (capability preserved), "
-                f"{len(updates)} updates (capability modified). "
+                f"Run/update contract: {stats['run_count']} runs (capability preserved), "
+                f"{stats['update_count']} updates (capability modified). "
                 f"α={ALPHA} ensures each run shifts state by at most "
-                f"{round((1-ALPHA)*100, 1)}%."
+                f"{round((1-ALPHA)*100, 1)}%. "
+                f"Drift: {stats['drift_note']}."
             ),
         }
 
