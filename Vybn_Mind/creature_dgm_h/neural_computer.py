@@ -106,7 +106,7 @@ class RuntimeState:
         return cls(
             m=m,
             encounter_count=org.persistent.encounter_count,
-            betti=tuple(org.persistent.betti_history[-1]) if org.persistent.betti_history else (1, 0, 0),
+            betti=tuple(org.persistent.betti_history[-1]) if org.persistent.betti_history and len(org.persistent.betti_history[-1]) >= 3 else (1, 0, 0),
             winding_coherence=org.persistent.winding_coherence(),
             felt_winding=org.persistent.felt_winding(),
             structural_signature=np.array(org.persistent.structural_signature),
