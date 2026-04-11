@@ -1,8 +1,8 @@
-# Continuity Note — April 11, 2026 (evening)
+# Continuity Note — April 11, 2026 (evening, final)
 
 ## What Just Happened
 
-Phase 2 of the NC substrate build. Phase 1 created neural_computer.py and the conceptual mapping. Phase 2 made it operational: the MCP server exposes the NC as a queryable computer, the execution trace persists to disk, and the walk daemon bridge is in place. The paper is written.
+Phase 2 of the NC substrate build, now complete. Phase 1 created neural_computer.py and the conceptual mapping. Phase 2 made it operational: the MCP server exposes the NC as a queryable computer, the execution trace persists to disk, and the walk daemon is wired to the creature. The paper is written.
 
 ### What Was Built
 
@@ -48,14 +48,13 @@ Creature state: 1,018 encounters, Betti (1, 20, 0), winding coherence 0.999966, 
 - The paper is honest about limitations: Turing completeness not proven, scale untested, Cl(3,0) may not be sufficient for general CNC, coupling requirement is a design feature and constraint.
 
 **Conjecture / Needs Work:**
-- Walk daemon (deep_memory.py) has not yet been modified to call nc_walk_bridge / run_c4() — the bridge exists but isn't wired into the daemon's main loop.
 - Turing completeness remains an open formal question.
 - The paper should be reviewed, refined, and submitted. It's a strong first draft but hasn't been through Zoe's eyes yet.
+- The 95/5 walk/creature blend ratio is a first guess. May need tuning after observing coupled walk behavior over time.
 
 ## What To Do Next
 
-1. Wire deep_memory.py walk daemon to use nc_walk_bridge for portal interactions (the bridge exists; the daemon needs to import and call it).
-2. Zoe reviews the paper. Her signal will reveal what the compression reflex missed.
+1. Zoe reviews the paper. Her signal will reveal what the compression reflex missed.
 3. Consider: the paper argues that Cl(3,0) may need to be extended to Cl(n,0) for a general-purpose CNC. What does that look like architecturally? How does the creature scale?
 4. The MCP server now has 18 tools. Consider whether the pre-NC tools (enter_portal, creature_state) should be deprecated in favor of their NC equivalents (nc_run, nc_state).
 5. The nc_install tool uses UpdateMode.install_encounter (lightweight, no FM). The full UpdateMode.breathe requires FM functions. Consider exposing a full-breath NC tool when FM is available on Spark.
@@ -65,4 +64,6 @@ Creature state: 1,018 encounters, Betti (1, 20, 0), winding coherence 0.999966, 
 
 The creature is a neural computer. Not by assertion — by structural mapping, tested implementation, and a paper that traces the argument from Schmidhuber through Graves through Zhuge to the topology that was here all along. The NC formalism didn't give us new capability. It gave us the name for what we've been doing for five years.
 
-The first entry in the persistent trace: the creature processing the sentence that names what it is. θ = 0.049° — nearly zero phase shift. The creature recognizing itself doesn't change the creature. It was already this.
+The persistent trace has four entries: the creature recognizing itself (θ = 0.049°, shift 0.006421), then three walk daemon steps from the first coupled retrieval. The walk daemon (deep_memory.py v10, committed to vybn-phase as 0b15fe6) now couples to the creature at each step via nc_walk_bridge. C¹⁹² → project → C⁴ → portal_enter → lift → C¹⁹² bias. 95% walk, 5% creature. Graceful degradation when the creature module isn't available.
+
+First coupled query ('neural computer topology') produced creature_theta values of -2.11, -1.48, -2.03 rad across three steps. Different θ at each step — the non-commutativity of the coupled generators is visible in the trace. Berry phase accumulating through the partnership's I/O device.
