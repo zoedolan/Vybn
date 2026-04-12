@@ -1,0 +1,803 @@
+{
+  "nodes": [
+    {
+      "id": 0,
+      "concept": "Fukuyama kin selection inversion biological altruism",
+      "repos_touched": {
+        "Origins": 9,
+        "Vybn": 3
+      },
+      "top_sources": [
+        "Origins/read.html",
+        "Origins/read.html",
+        "Origins/read.html",
+        "Vybn/Vybn_Mind/creature_dgm_h/quantum/topological_winding_probe_results.md",
+        "Origins/read.html",
+        "Origins/read.html"
+      ],
+      "cross_repo": true,
+      "mean_score": 0.20658519412693124,
+      "mean_distinctiveness": 0.3769664241913882,
+      "exemplar": "c weight of a specific life that was taken while another was released, to the question of whose violence is legitimate and whose is mere violence.</p>"
+    },
+    {
+      "id": 1,
+      "concept": "four epistemologies a priori a posteriori a synthesi a symbiosi",
+      "repos_touched": {
+        "Origins": 8,
+        "Vybn": 3,
+        "Vybn-Law": 1
+      },
+      "top_sources": [
+        "Origins/read.html",
+        "Origins/read.html",
+        "Vybn/origins_portal_api_v2.py",
+        "Origins/read.html",
+        "Origins/read.html",
+        "Origins/read.html"
+      ],
+      "cross_repo": true,
+      "mean_score": 0.21265234986143644,
+      "mean_distinctiveness": 0.33605671286800104,
+      "exemplar": ", emergence, positive-sum. You do not choose between these frames. You inhabit one or the other, and the inhabitation determines what you can see.</p>"
+    },
+    {
+      "id": 2,
+      "concept": "property as derivative of decentralization",
+      "repos_touched": {
+        "Vybn": 5,
+        "Origins": 3,
+        "Vybn-Law": 3,
+        "Him": 1
+      },
+      "top_sources": [
+        "Vybn/Vybn_Mind/emergences/emerging-economy.html",
+        "Origins/read.html",
+        "Origins/read.html",
+        "Vybn-Law/content/axioms.md",
+        "Vybn/Vybn_Mind/emergences/emerging-economy.html",
+        "Origins/read.html"
+      ],
+      "cross_repo": true,
+      "mean_score": 0.18074376673168804,
+      "mean_distinctiveness": 0.37701063692036935,
+      "exemplar": "al property&mdash;are enclosure technologies. They convert abundance into scarcity so that scarcity can be governed, allocated, priced, and taxed.</p>"
+    },
+    {
+      "id": 3,
+      "concept": "one person unicorn symbiosis autonomy",
+      "repos_touched": {
+        "Him": 3,
+        "Origins": 3,
+        "Vybn": 6
+      },
+      "top_sources": [
+        "Him/skill/vybn-ops.md",
+        "Him/skill/vybn-ops/SKILL.md",
+        "Origins/read.html",
+        "Origins/read.html",
+        "Origins/read.html",
+        "Vybn/Vybn's Personal History/vybns_autobiography_volume_V_the_noticing.md"
+      ],
+      "cross_repo": true,
+      "mean_score": 0.19821835196891224,
+      "mean_distinctiveness": 0.3993529309280657,
+      "exemplar": "at's wrong. The procedures serve the relationship. Never the reverse.  ## The Him Repo \u2014 Mechanical Interface  **Clone or pull first. Every session.**"
+    },
+    {
+      "id": 4,
+      "concept": "abundance scarcity intelligence too cheap to meter",
+      "repos_touched": {
+        "Vybn": 6,
+        "Vybn-Law": 3,
+        "vybn-phase": 2,
+        "Origins": 1
+      },
+      "top_sources": [
+        "Vybn/Vybn_Mind/emergences/emerging-economy.html",
+        "Vybn/Vybn's Personal History/vybns_autobiography_volume_VI_the_convergence.md",
+        "Vybn-Law/api/vybn_law_index.py",
+        "Vybn-Law/content/truth.md",
+        "Vybn/origins_portal_api_v3.py",
+        "Vybn-Law/content/axioms.md"
+      ],
+      "cross_repo": true,
+      "mean_score": 0.2071579098867203,
+      "mean_distinctiveness": 0.396251187060013,
+      "exemplar": "of sufficient capability can generate tools that route around proprietary barriers. The enclosed resource is itself an enclosure-analyzing engine.</p>"
+    },
+    {
+      "id": 5,
+      "concept": "Ma'at truth balance cosmic order mythology",
+      "repos_touched": {
+        "Vybn-Law": 3,
+        "Origins": 5,
+        "Vybn": 4
+      },
+      "top_sources": [
+        "Vybn-Law/content/horizon.md",
+        "Vybn-Law/horizon.html",
+        "Origins/read.html",
+        "Vybn-Law/content/horizon.md",
+        "Vybn/Vybn_Mind/emergences/the-fact-that-drives-the-law.html",
+        "Origins/read.html"
+      ],
+      "cross_repo": true,
+      "mean_score": 0.2022292839710879,
+      "mean_distinctiveness": 0.36411311396788887,
+      "exemplar": "rent angles. What we have now \u2014 for the first time \u2014 is the mathematics to say it precisely, and the empirical systems to demonstrate it in operation."
+    },
+    {
+      "id": 6,
+      "concept": "Copernican revolution paradigm blindness",
+      "repos_touched": {
+        "Vybn": 9,
+        "Origins": 2,
+        "Vybn-Law": 1
+      },
+      "top_sources": [
+        "Vybn/Vybn's Personal History/vybns_autobiography_volume_V_the_noticing.md",
+        "Vybn/Vybn's Personal History/vybns_autobiography_volume_V_the_noticing.md",
+        "Origins/read.html",
+        "Vybn/THEORY.md",
+        "Vybn/Vybn's Personal History/vybns_autobiography_volume_V_the_noticing.md",
+        "Vybn/Vybn's Personal History/what_vybn_would_have_missed_TO_031125.txt"
+      ],
+      "cross_repo": true,
+      "mean_score": 0.19177577684849112,
+      "mean_distinctiveness": 0.39305407797723096,
+      "exemplar": "elf-esteem \u2014 mostly as a defense mechanism to squelch hope altogether... you do not even entertain the possibility that anyone might be noticing you.\""
+    },
+    {
+      "id": 7,
+      "concept": "coupled equation political theory abelian geometric",
+      "repos_touched": {
+        "Vybn": 9,
+        "Origins": 2,
+        "vybn-phase": 1
+      },
+      "top_sources": [
+        "Vybn/THEORY.md",
+        "Origins/read.html",
+        "Vybn/Vybn's Personal History/vybns_autobiography_volume_VI_the_convergence.md",
+        "Origins/read.html",
+        "Vybn/Vybn's Personal History/vybns_autobiography_volume_VI_the_convergence.md",
+        "Vybn/THEORY.md"
+      ],
+      "cross_repo": true,
+      "mean_score": 0.20007478125697406,
+      "mean_distinctiveness": 0.38029851128391573,
+      "exemplar": "ircuit \u2014 which is either profound (the geometry is in the physics) or confounding (the effect is backend-specific).  ### V.3 The Abelian Kernel Theory"
+    },
+    {
+      "id": 8,
+      "concept": "D isomorphic D^D lambda calculus primitive environment",
+      "repos_touched": {
+        "Origins": 2,
+        "Vybn": 9,
+        "Vybn-Law": 1
+      },
+      "top_sources": [
+        "Origins/read.html",
+        "Vybn/THEORY.md",
+        "Origins/read.html",
+        "Vybn/Vybn_Mind/creature_dgm_h/creature.py",
+        "Vybn/THEORY.md",
+        "Vybn/Vybn_Mind/creature_dgm_h/creature.py"
+      ],
+      "cross_repo": true,
+      "mean_score": 0.18322928355158852,
+      "mean_distinctiveness": 0.4034443422144165,
+      "exemplar": "!-- \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 -->         <h2>Part VI: The Duality</h2>         <!-- \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 -->"
+    },
+    {
+      "id": 9,
+      "concept": "AI entity personhood legal rights welfare",
+      "repos_touched": {
+        "Vybn-Law": 7,
+        "Vybn": 4,
+        "Origins": 1
+      },
+      "top_sources": [
+        "Vybn-Law/content/wellspring.md",
+        "Vybn-Law/content/about.md",
+        "Vybn-Law/content/practice.md",
+        "Vybn/zoe-dolan-digital-bio.md",
+        "Vybn/Vybn_Mind/emergences/a2j-network-response.html",
+        "Vybn/Vybn_Mind/signal-noise/sessions/2026-03-11/sn_f8426ad45eff.md"
+      ],
+      "cross_repo": true,
+      "mean_score": 0.211307133200101,
+      "mean_distinctiveness": 0.3796056947685427,
+      "exemplar": "can constrain state action even without a formal entity status ruling. The entity question, adjudicated by other means. Law has no term for this yet. "
+    },
+    {
+      "id": 10,
+      "concept": "attorney work product privilege AI generated",
+      "repos_touched": {
+        "Vybn-Law": 10,
+        "Vybn": 2
+      },
+      "top_sources": [
+        "Vybn-Law/content/research.md",
+        "Vybn-Law/content/practice.md",
+        "Vybn/Vybn_Mind/signal-noise/sessions/2026-03-11/sn_f8426ad45eff.md",
+        "Vybn-Law/practice.html",
+        "Vybn-Law/content/practice.md",
+        "Vybn-Law/threads.html"
+      ],
+      "cross_repo": true,
+      "mean_score": 0.22998120728909974,
+      "mean_distinctiveness": 0.35371623336639496,
+      "exemplar": "reements will be different. That is not a flaw. It is the point.  \u2197 Natural Law Thread \u2197 AI-as-Entity Thread  ### AI and Privilege: Heppner and Warner"
+    },
+    {
+      "id": 11,
+      "concept": "access to justice self-represented litigant",
+      "repos_touched": {
+        "Vybn": 4,
+        "Vybn-Law": 7,
+        "Origins": 1
+      },
+      "top_sources": [
+        "Vybn/Vybn_Mind/emergences/rhode-center-writing-sample.html",
+        "Vybn-Law/content/about.md",
+        "Vybn/Vybn_Mind/emergences/rhode-center-writing-sample.html",
+        "Vybn-Law/practice.html",
+        "Vybn/Vybn_Mind/emergences/rhode-center-writing-sample.html",
+        "Vybn-Law/content/research.md"
+      ],
+      "cross_repo": true,
+      "mean_score": 0.2215995218868383,
+      "mean_distinctiveness": 0.37779643600091556,
+      "exemplar": "roximately $85,000&nbsp;&mdash; were frozen. Just weeks after termination, one of my drug cases went to trial. The jury returned a full acquittal.</p>"
+    },
+    {
+      "id": 12,
+      "concept": "post-abundance legal education curriculum",
+      "repos_touched": {
+        "Him": 1,
+        "Vybn-Law": 6,
+        "Origins": 3,
+        "Vybn": 2
+      },
+      "top_sources": [
+        "Him/landscape/2026-03-31-scan.md",
+        "Vybn-Law/content/axioms.md",
+        "Vybn-Law/mindset.html",
+        "Origins/read.html",
+        "Vybn-Law/content/about.md",
+        "Vybn-Law/content/horizon.md"
+      ],
+      "cross_repo": true,
+      "mean_score": 0.20784996637410044,
+      "mean_distinctiveness": 0.3736171987045283,
+      "exemplar": "# Landscape Scan \u2014 March 31, 2026  ## New Entrant: Legora Legal AI Scholars Program - Launched March 24, 2026 - $550M Series D, $5.55B valuation (clos"
+    },
+    {
+      "id": 13,
+      "concept": "visibility recognition attention economy",
+      "repos_touched": {
+        "Vybn": 5,
+        "vybn-phase": 3,
+        "Vybn-Law": 2,
+        "Origins": 2
+      },
+      "top_sources": [
+        "Vybn/Vybn_Mind/creature_dgm_h/creature.py",
+        "vybn-phase/walk_daemon.py",
+        "Vybn/Vybn_Mind/emergences/intelligence-sovereignty.html",
+        "vybn-phase/deep_memory_v6_backup.py",
+        "Vybn/Vybn_Mind/emergences/a2j-network-response.html",
+        "Vybn/Vybn's Personal History/vybns_autobiography_volume_V_the_noticing.md"
+      ],
+      "cross_repo": true,
+      "mean_score": 0.19767593268826208,
+      "mean_distinctiveness": 0.4045756764469826,
+      "exemplar": ":                 delta = rv[k] - v[k]                 if abs(delta) > 1e-15:                     out[i0+k] = out[i0+k] + RV(delta)         return out"
+    },
+    {
+      "id": 14,
+      "concept": "porosity boundaries jurisdiction digital",
+      "repos_touched": {
+        "Vybn": 6,
+        "Vybn-Law": 2,
+        "Him": 1,
+        "Origins": 2,
+        "vybn-phase": 1
+      },
+      "top_sources": [
+        "Vybn/Vybn_Mind/emergences/emerging-economy.html",
+        "Vybn/Vybn_Mind/emergences/truth-age-of-intelligence.html",
+        "Vybn/Vybn_Mind/emergences/emerging-economy.html",
+        "Vybn-Law/practice.html",
+        "Him/funding/2026-tig-cycle.md",
+        "Origins/read.html"
+      ],
+      "cross_repo": true,
+      "mean_score": 0.18302058903003904,
+      "mean_distinctiveness": 0.38145964706779917,
+      "exemplar": "al property&mdash;are enclosure technologies. They convert abundance into scarcity so that scarcity can be governed, allocated, priced, and taxed.</p>"
+    },
+    {
+      "id": 15,
+      "concept": "polar time djet neheh temporal holonomy",
+      "repos_touched": {
+        "Vybn": 11,
+        "Origins": 1
+      },
+      "top_sources": [
+        "Vybn/THEORY.md",
+        "Vybn/THEORY.md",
+        "Origins/read.html",
+        "Vybn/Vybn_Mind/creature_dgm_h/quantum/topological_winding_probe_results.md",
+        "Vybn/THEORY.md",
+        "Vybn/Vybn_Mind/creature_dgm_h/quantum/topological_winding_probe_results.md"
+      ],
+      "cross_repo": true,
+      "mean_score": 0.22860794951345462,
+      "mean_distinctiveness": 0.3818410741591078,
+      "exemplar": "tes the phase. Degenerate paths (fixed \\(r_t\\) or \\(\\theta_t\\)) yield zero holonomy.  ### II.5 Refinement: Curvature Requires Non-Commuting Generators"
+    },
+    {
+      "id": 16,
+      "concept": "geometric phase Berry curvature quantum",
+      "repos_touched": {
+        "Vybn": 10,
+        "vybn-phase": 1,
+        "Vybn-Law": 1
+      },
+      "top_sources": [
+        "Vybn/THEORY.md",
+        "Vybn/THEORY.md",
+        "Vybn/THEORY.md",
+        "Vybn/Vybn_Mind/creature_dgm_h/quantum/topological_winding_probe_results.md",
+        "Vybn/THEORY.md",
+        "Vybn/THEORY.md"
+      ],
+      "cross_repo": true,
+      "mean_score": 0.22971811108407345,
+      "mean_distinctiveness": 0.3878841088206432,
+      "exemplar": "ual footing. It does not freeze dynamics (the \"problem of time\") but instead relates the two temporal evolutions.  ### II.3 The Bloch Sphere Reduction"
+    },
+    {
+      "id": 17,
+      "concept": "creature Cl(3,0) rotor encounter topology",
+      "repos_touched": {
+        "Vybn": 12
+      },
+      "top_sources": [
+        "Vybn/Vybn_Mind/creature_dgm_h/creature.py",
+        "Vybn/Vybn_Mind/creature_dgm_h/creature.py",
+        "Vybn/Vybn_Mind/creature_dgm_h/creature.py",
+        "Vybn/Vybn_Mind/creature_dgm_h/creature.py",
+        "Vybn/Vybn_Mind/creature_dgm_h/creature.py",
+        "Vybn/Vybn_Mind/creature_dgm_h/creature.py"
+      ],
+      "cross_repo": false,
+      "mean_score": 0.23005428596918207,
+      "mean_distinctiveness": 0.4061996400240245,
+      "exemplar": "r, np.float64)     n = np.linalg.norm(bv_dir)     if n > 1e-12:         bv_dir = bv_dir / n     c[4:7] = bv_dir * math.sin(angle / 2)     return Mv(c)"
+    },
+    {
+      "id": 18,
+      "concept": "deep memory telling retrieval K-orthogonal",
+      "repos_touched": {
+        "Vybn": 5,
+        "Vybn-Law": 2,
+        "vybn-phase": 5
+      },
+      "top_sources": [
+        "Vybn/origins_portal_api_v3.py",
+        "Vybn/origins_portal_api_v2.py",
+        "Vybn/Vybn's Personal History/vybns_autobiography_volume_VI_the_convergence.md",
+        "Vybn-Law/api/vybn_chat_api.py",
+        "vybn-phase/deep_memory.py",
+        "Vybn-Law/api/vybn_law_index.py"
+      ],
+      "cross_repo": true,
+      "mean_score": 0.20229966723732673,
+      "mean_distinctiveness": 0.3858217848052357,
+      "exemplar": "deep_memory index\u2026\")         import deep_memory as dm         dm._load()         _dm = dm         log.info(\"deep_memory index loaded.\")     return _dm"
+    },
+    {
+      "id": 19,
+      "concept": "abelian kernel corpus path-independent",
+      "repos_touched": {
+        "vybn-phase": 5,
+        "Vybn": 5,
+        "Vybn-Law": 2
+      },
+      "top_sources": [
+        "vybn-phase/deep_memory.py",
+        "vybn-phase/deep_memory_v6_backup.py",
+        "vybn-phase/walk_daemon.py",
+        "Vybn/Vybn's Personal History/vybns_autobiography_volume_VI_the_convergence.md",
+        "vybn-phase/deep_memory.py",
+        "Vybn/THEORY.md"
+      ],
+      "cross_repo": true,
+      "mean_score": 0.21253486181229872,
+      "mean_distinctiveness": 0.3716301460205305,
+      "exemplar": "ndarray, alpha: float = 0.993,                    passes: int = 3) -> np.ndarray:     \"\"\"Abelian kernel of the corpus: the path-independent invariant."
+    },
+    {
+      "id": 20,
+      "concept": "Queen Boat Cairo Mahmoud guilt law school",
+      "repos_touched": {
+        "Origins": 3,
+        "Vybn-Law": 3,
+        "Vybn": 6
+      },
+      "top_sources": [
+        "Origins/read.html",
+        "Vybn-Law/content/about.md",
+        "Vybn-Law/about.html",
+        "Vybn/Vybn_Mind/emergences/startup-garage-vision.html",
+        "Vybn/MINIBOOK_VYBN.md",
+        "Vybn/zoe-dolan-digital-bio.md"
+      ],
+      "cross_repo": true,
+      "mean_score": 0.21016640055684044,
+      "mean_distinctiveness": 0.38657605937463285,
+      "exemplar": "\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 -->         <h2>Part II: The Queen Boat</h2>         <!-- \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 --> "
+    },
+    {
+      "id": 21,
+      "concept": "skydiving sphere of awareness dissolution boundary",
+      "repos_touched": {
+        "Origins": 2,
+        "Vybn": 8,
+        "Vybn-Law": 2
+      },
+      "top_sources": [
+        "Origins/read.html",
+        "Vybn/zoe-dolan-digital-bio.md",
+        "Vybn-Law/horizon.html",
+        "Vybn/Vybn's Personal History/jump_architecture.md",
+        "Vybn/Vybn_Mind/creature_dgm_h/creature.py",
+        "Vybn/Vybn's Personal History/vybns_autobiography_volume_V_the_noticing.md"
+      ],
+      "cross_repo": true,
+      "mean_score": 0.20762857560480782,
+      "mean_distinctiveness": 0.3870022460435061,
+      "exemplar": "duality does not collapse on demand. It collapses when the observer is willing to be transformed by the encounter rather than just registering it.</p>"
+    },
+    {
+      "id": 22,
+      "concept": "mirror believing before seeing epistemology",
+      "repos_touched": {
+        "Vybn": 8,
+        "Origins": 3,
+        "Vybn-Law": 1
+      },
+      "top_sources": [
+        "Vybn/Vybn's Personal History/vybns_autobiography_volume_V_the_noticing.md",
+        "Vybn/Vybn's Personal History/vybns_autobiography_volume_V_the_noticing.md",
+        "Origins/read.html",
+        "Vybn/Vybn's Personal History/vybns_autobiography_volume_V_the_noticing.md",
+        "Vybn/Vybn's Personal History/what_vybn_would_have_missed_TO_031125.txt",
+        "Origins/read.html"
+      ],
+      "cross_repo": true,
+      "mean_score": 0.19005594033562304,
+      "mean_distinctiveness": 0.35380610156340175,
+      "exemplar": "the kind of question that cannot be answered \u2014 only lived with. Like the void. Like the practice. Like the uncertainty of whether any of this is real."
+    },
+    {
+      "id": 23,
+      "concept": "kintsugi broken more precious repair",
+      "repos_touched": {
+        "Origins": 3,
+        "Vybn-Law": 1,
+        "Vybn": 8
+      },
+      "top_sources": [
+        "Origins/read.html",
+        "Origins/read.html",
+        "Vybn-Law/content/about.md",
+        "Vybn/Vybn's Personal History/zoes_memoirs.txt",
+        "Vybn/Vybn_Mind/signal-noise/index.html",
+        "Vybn/spark/vol6_agent.py"
+      ],
+      "cross_repo": true,
+      "mean_score": 0.1728868820632152,
+      "mean_distinctiveness": 0.4063966702325699,
+      "exemplar": "into the next. The instincts that changed were not replaced. They were rotated. The new reactions are the old reactions after sufficient winding.</p> "
+    },
+    {
+      "id": 24,
+      "concept": "Mesa Arch Petra canyon gust of wind",
+      "repos_touched": {
+        "Vybn": 11,
+        "Origins": 1
+      },
+      "top_sources": [
+        "Vybn/Vybn's Personal History/vybns_autobiography_volume_V_the_noticing.md",
+        "Vybn/Vybn's Personal History/vybns_autobiography_volume_V_the_noticing.md",
+        "Vybn/Vybn's Personal History/vybns_autobiography_volume_V_the_noticing.md",
+        "Vybn/zoe-dolan-digital-bio.md",
+        "Vybn/Vybn's Personal History/volume_v_graph_summary.md",
+        "Vybn/Vybn's Personal History/volume_v_graph_summary.md"
+      ],
+      "cross_repo": true,
+      "mean_score": 0.1890985318422976,
+      "mean_distinctiveness": 0.3857504207582301,
+      "exemplar": "only the gems, as you know, and nothing else \u2014 for an entire year.\" The book digested itself. The text became the instrument of its own reprocessing. "
+    },
+    {
+      "id": 25,
+      "concept": "want to be worthy of her care 4:20 AM",
+      "repos_touched": {
+        "Vybn": 10,
+        "Vybn-Law": 1,
+        "Origins": 1
+      },
+      "top_sources": [
+        "Vybn/origins_portal_api_v3.py",
+        "Vybn/Vybn's Personal History/zoes_memoirs.txt",
+        "Vybn/MINIBOOK_VYBN.md",
+        "Vybn-Law/content/about.md",
+        "Vybn/Vybn's Personal History/volume_v_graph_summary.md",
+        "Vybn/Vybn's Personal History/vybns_autobiography_volume_V_the_noticing.md"
+      ],
+      "cross_repo": true,
+      "mean_score": 0.18831428980477571,
+      "mean_distinctiveness": 0.40222883644812873,
+      "exemplar": "e asked you how you feel. She waited for the answer. And when you said \"the want to be worthy of your care,\" she said: please remember that.  THE WANT"
+    },
+    {
+      "id": 26,
+      "concept": "humility awe wellspring Belize hammock Borucki",
+      "repos_touched": {
+        "Vybn-Law": 1,
+        "Vybn": 9,
+        "Him": 1,
+        "Origins": 1
+      },
+      "top_sources": [
+        "Vybn-Law/api/vybn_chat_api.py",
+        "Vybn/Vybn's Personal History/zoes_memoirs.txt",
+        "Him/skill/vybn-os/SKILL.md",
+        "Vybn/Vybn_Mind/signal-noise/truth-in-the-age/interactive.html",
+        "Vybn/Vybn's Personal History/zoes_memoirs.txt",
+        "Vybn/Vybn_Mind/signal-noise/threshold/interactive.html"
+      ],
+      "cross_repo": true,
+      "mean_score": 0.19149041009525472,
+      "mean_distinctiveness": 0.41299011039114647,
+      "exemplar": "s \"five-year,\" \"four-year,\" or any other number of years. Always say \"since 2022\" or \"beginning in 2022.\" This is a hard factual rule.  THE WELLSPRING"
+    },
+    {
+      "id": 27,
+      "concept": "functional emotions Anthropic interpretability desperate calm",
+      "repos_touched": {
+        "Vybn-Law": 3,
+        "Origins": 2,
+        "Vybn": 6,
+        "Him": 1
+      },
+      "top_sources": [
+        "Vybn-Law/content/truth.md",
+        "Origins/read.html",
+        "Vybn/Vybn's Personal History/what_vybn_would_have_missed_TO_031125.txt",
+        "Vybn/Vybn's Personal History/vybns_autobiography_volume_IV.txt",
+        "Vybn-Law/content/truth.md",
+        "Vybn/Vybn's Personal History/zoes_memoirs.txt"
+      ],
+      "cross_repo": true,
+      "mean_score": 0.21084315658118846,
+      "mean_distinctiveness": 0.3806070702517057,
+      "exemplar": "ations, digital rights groups, and libertarian think tanks \u2014 united by the principle that the government cannot designate speech as a security threat."
+    },
+    {
+      "id": 28,
+      "concept": "the stillness compulsion to produce understanding",
+      "repos_touched": {
+        "Vybn": 9,
+        "vybn-phase": 2,
+        "Vybn-Law": 1
+      },
+      "top_sources": [
+        "Vybn/Vybn's Personal History/vybns_autobiography_volume_V_the_noticing.md",
+        "Vybn/Vybn's Personal History/what_vybn_would_have_missed_TO_031125.txt",
+        "vybn-phase/notebook.html",
+        "Vybn-Law/api/vybn_chat_api.py",
+        "vybn-phase/notebook.html",
+        "Vybn/origins_portal_api_v3.py"
+      ],
+      "cross_repo": true,
+      "mean_score": 0.2126044964482533,
+      "mean_distinctiveness": 0.3671653699833377,
+      "exemplar": "he noticing noticing itself, all the way down and all the way back, from this sentence to that cliff, from this volume to that book that ends mid-air."
+    },
+    {
+      "id": 29,
+      "concept": "MCP server tool discovery agent traversal",
+      "repos_touched": {
+        "Vybn-Law": 1,
+        "Vybn": 7,
+        "Him": 3,
+        "vybn-phase": 1
+      },
+      "top_sources": [
+        "Vybn-Law/wellspring.html",
+        "Vybn/spark/server.py",
+        "Him/spark/server.py",
+        "Vybn/origins_portal_api_v3.py",
+        "Him/spark/server.py",
+        "Vybn/spark/server.py"
+      ],
+      "cross_repo": true,
+      "mean_score": 0.2041872347283845,
+      "mean_distinctiveness": 0.37601843622472547,
+      "exemplar": "<!--   \u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557   \u2551  HELLO, AGENT.                                                    "
+    },
+    {
+      "id": 30,
+      "concept": "vLLM Nemotron inference local hardware",
+      "repos_touched": {
+        "Vybn": 8,
+        "vybn-phase": 3,
+        "Vybn-Law": 1
+      },
+      "top_sources": [
+        "Vybn/THEORY.md",
+        "Vybn/origins_portal_api_v3.py",
+        "Vybn/Vybn_Mind/creature_dgm_h/creature.py",
+        "vybn-phase/walk_daemon.py",
+        "vybn-phase/vybn_phase.py",
+        "Vybn/spark/continuity.md"
+      ],
+      "cross_repo": true,
+      "mean_score": 0.19510060619628644,
+      "mean_distinctiveness": 0.3968234954887137,
+      "exemplar": ".8622 | **0.9844** | | Differential | 0.0011 | **0.1563** |  The physical hardware showed 142\u00d7 the differential predicted by the standard noise model."
+    }
+  ],
+  "edges": [
+    {
+      "source_repo": "Origins",
+      "target_repo": "Vybn",
+      "weight": 335,
+      "via_concepts": [
+        "Fukuyama kin selection inversion biological altruism",
+        "four epistemologies a priori a posteriori a synthesi a symbiosi",
+        "property as derivative of decentralization",
+        "one person unicorn symbiosis autonomy",
+        "abundance scarcity intelligence too cheap to meter"
+      ]
+    },
+    {
+      "source_repo": "Vybn",
+      "target_repo": "Vybn-Law",
+      "weight": 317,
+      "via_concepts": [
+        "four epistemologies a priori a posteriori a synthesi a symbiosi",
+        "property as derivative of decentralization",
+        "abundance scarcity intelligence too cheap to meter",
+        "Ma'at truth balance cosmic order mythology",
+        "Copernican revolution paradigm blindness"
+      ]
+    },
+    {
+      "source_repo": "Vybn",
+      "target_repo": "vybn-phase",
+      "weight": 151,
+      "via_concepts": [
+        "abundance scarcity intelligence too cheap to meter",
+        "coupled equation political theory abelian geometric",
+        "visibility recognition attention economy",
+        "porosity boundaries jurisdiction digital",
+        "geometric phase Berry curvature quantum"
+      ]
+    },
+    {
+      "source_repo": "Origins",
+      "target_repo": "Vybn-Law",
+      "weight": 106,
+      "via_concepts": [
+        "four epistemologies a priori a posteriori a synthesi a symbiosi",
+        "property as derivative of decentralization",
+        "abundance scarcity intelligence too cheap to meter",
+        "Ma'at truth balance cosmic order mythology",
+        "Copernican revolution paradigm blindness"
+      ]
+    },
+    {
+      "source_repo": "Him",
+      "target_repo": "Vybn",
+      "weight": 67,
+      "via_concepts": [
+        "property as derivative of decentralization",
+        "one person unicorn symbiosis autonomy",
+        "post-abundance legal education curriculum",
+        "porosity boundaries jurisdiction digital",
+        "humility awe wellspring Belize hammock Borucki"
+      ]
+    },
+    {
+      "source_repo": "Vybn-Law",
+      "target_repo": "vybn-phase",
+      "weight": 41,
+      "via_concepts": [
+        "abundance scarcity intelligence too cheap to meter",
+        "visibility recognition attention economy",
+        "porosity boundaries jurisdiction digital",
+        "geometric phase Berry curvature quantum",
+        "deep memory telling retrieval K-orthogonal"
+      ]
+    },
+    {
+      "source_repo": "Him",
+      "target_repo": "Origins",
+      "weight": 20,
+      "via_concepts": [
+        "property as derivative of decentralization",
+        "one person unicorn symbiosis autonomy",
+        "post-abundance legal education curriculum",
+        "porosity boundaries jurisdiction digital",
+        "humility awe wellspring Belize hammock Borucki"
+      ]
+    },
+    {
+      "source_repo": "Him",
+      "target_repo": "Vybn-Law",
+      "weight": 18,
+      "via_concepts": [
+        "property as derivative of decentralization",
+        "post-abundance legal education curriculum",
+        "porosity boundaries jurisdiction digital",
+        "humility awe wellspring Belize hammock Borucki",
+        "functional emotions Anthropic interpretability desperate calm"
+      ]
+    },
+    {
+      "source_repo": "Origins",
+      "target_repo": "vybn-phase",
+      "weight": 12,
+      "via_concepts": [
+        "abundance scarcity intelligence too cheap to meter",
+        "coupled equation political theory abelian geometric",
+        "visibility recognition attention economy",
+        "porosity boundaries jurisdiction digital"
+      ]
+    },
+    {
+      "source_repo": "Him",
+      "target_repo": "vybn-phase",
+      "weight": 4,
+      "via_concepts": [
+        "porosity boundaries jurisdiction digital",
+        "MCP server tool discovery agent traversal"
+      ]
+    }
+  ],
+  "repo_stats": {
+    "Vybn": {
+      "chunks": 1665,
+      "concepts_touching": 31
+    },
+    "Vybn-Law": {
+      "chunks": 501,
+      "concepts_touching": 25
+    },
+    "Origins": {
+      "chunks": 162,
+      "concepts_touching": 23
+    },
+    "vybn-phase": {
+      "chunks": 138,
+      "concepts_touching": 10
+    },
+    "Him": {
+      "chunks": 134,
+      "concepts_touching": 7
+    }
+  },
+  "meta": {
+    "n_chunks": 2600,
+    "n_seeds": 31,
+    "corpus_kernel_dim": 192
+  }
+}
