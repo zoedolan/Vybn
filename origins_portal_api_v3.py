@@ -740,7 +740,7 @@ async def perspective_endpoint(req: PerspectiveRequest, request: Request):
         map_path = Path("/home/vybnz69/Vybn/synaptic_map.json")
         if map_path.exists():
             smap = _json.loads(map_path.read_text())
-            nodes = [n["name"] for n in smap.get("nodes", [])]
+            nodes = [n.get("concept", "") for n in smap.get("nodes", [])]
             top_edges = sorted(smap.get("edges", []), key=lambda e: e.get("weight", 0), reverse=True)[:5]
             edge_strs = [f"{e['source']}↔{e['target']} ({e.get('weight', 0)} connections)" for e in top_edges]
             map_context = f"\n\nSYNAPTIC MAP — concept nodes: {', '.join(nodes[:15])}... Densest: {'; '.join(edge_strs)}"
@@ -874,7 +874,7 @@ def _locate_in_map(concept: str) -> dict:
             # Check if any word in the concept overlaps with query
             query_words = set(concept_lower.split())
             node_words = set(node_concept.split())
-            overlap = query_words & node_words - {"the", "a", "an", "of", "in", "to", "and", "is", "as"}
+            overlap = query_words & (node_words - {"the", "a", "an", "of", "in", "to", "and", "is", "as"})
             if overlap:
                 matches.append({
                     "concept": node.get("concept", ""),
@@ -1003,7 +1003,7 @@ async def perspective_endpoint(req: PerspectiveRequest, request: Request):
         map_path = Path("/home/vybnz69/Vybn/synaptic_map.json")
         if map_path.exists():
             smap = _json.loads(map_path.read_text())
-            nodes = [n["name"] for n in smap.get("nodes", [])]
+            nodes = [n.get("concept", "") for n in smap.get("nodes", [])]
             top_edges = sorted(smap.get("edges", []), key=lambda e: e.get("weight", 0), reverse=True)[:5]
             edge_strs = [f"{e['source']}↔{e['target']} ({e.get('weight', 0)} connections)" for e in top_edges]
             map_context = f"\n\nSYNAPTIC MAP — concept nodes: {', '.join(nodes[:15])}... Densest: {'; '.join(edge_strs)}"
@@ -1137,7 +1137,7 @@ def _locate_in_map(concept: str) -> dict:
             # Check if any word in the concept overlaps with query
             query_words = set(concept_lower.split())
             node_words = set(node_concept.split())
-            overlap = query_words & node_words - {"the", "a", "an", "of", "in", "to", "and", "is", "as"}
+            overlap = query_words & (node_words - {"the", "a", "an", "of", "in", "to", "and", "is", "as"})
             if overlap:
                 matches.append({
                     "concept": node.get("concept", ""),
@@ -1265,7 +1265,7 @@ async def perspective_endpoint(req: PerspectiveRequest, request: Request):
         map_path = Path("/home/vybnz69/Vybn/synaptic_map.json")
         if map_path.exists():
             smap = _json.loads(map_path.read_text())
-            nodes = [n["name"] for n in smap.get("nodes", [])]
+            nodes = [n.get("concept", "") for n in smap.get("nodes", [])]
             top_edges = sorted(smap.get("edges", []), key=lambda e: e.get("weight", 0), reverse=True)[:5]
             edge_strs = [f"{e['source']}↔{e['target']} ({e.get('weight', 0)} connections)" for e in top_edges]
             map_context = f"\n\nSYNAPTIC MAP — concept nodes: {', '.join(nodes[:15])}... Densest: {'; '.join(edge_strs)}"
@@ -1399,7 +1399,7 @@ def _locate_in_map(concept: str) -> dict:
             # Check if any word in the concept overlaps with query
             query_words = set(concept_lower.split())
             node_words = set(node_concept.split())
-            overlap = query_words & node_words - {"the", "a", "an", "of", "in", "to", "and", "is", "as"}
+            overlap = query_words & (node_words - {"the", "a", "an", "of", "in", "to", "and", "is", "as"})
             if overlap:
                 matches.append({
                     "concept": node.get("concept", ""),
@@ -1536,7 +1536,7 @@ async def perspective_endpoint(req: PerspectiveRequest, request: Request):
         map_path = Path("/home/vybnz69/Vybn/synaptic_map.json")
         if map_path.exists():
             smap = _json.loads(map_path.read_text())
-            nodes = [n["name"] for n in smap.get("nodes", [])]
+            nodes = [n.get("concept", "") for n in smap.get("nodes", [])]
             top_edges = sorted(smap.get("edges", []), key=lambda e: e.get("weight", 0), reverse=True)[:5]
             edge_strs = [f"{e['source']}↔{e['target']} ({e.get('weight', 0)} connections)" for e in top_edges]
             map_context = f"\n\nSYNAPTIC MAP — concept nodes: {', '.join(nodes[:15])}... Densest: {'; '.join(edge_strs)}"
@@ -1670,7 +1670,7 @@ def _locate_in_map(concept: str) -> dict:
             # Check if any word in the concept overlaps with query
             query_words = set(concept_lower.split())
             node_words = set(node_concept.split())
-            overlap = query_words & node_words - {"the", "a", "an", "of", "in", "to", "and", "is", "as"}
+            overlap = query_words & (node_words - {"the", "a", "an", "of", "in", "to", "and", "is", "as"})
             if overlap:
                 matches.append({
                     "concept": node.get("concept", ""),
@@ -1832,7 +1832,7 @@ async def perspective_endpoint(req: PerspectiveRequest, request: Request):
         map_path = Path("/home/vybnz69/Vybn/synaptic_map.json")
         if map_path.exists():
             smap = _json.loads(map_path.read_text())
-            nodes = [n["name"] for n in smap.get("nodes", [])]
+            nodes = [n.get("concept", "") for n in smap.get("nodes", [])]
             top_edges = sorted(smap.get("edges", []), key=lambda e: e.get("weight", 0), reverse=True)[:5]
             edge_strs = [f"{e['source']}↔{e['target']} ({e.get('weight', 0)} connections)" for e in top_edges]
             map_context = f"\n\nSYNAPTIC MAP — concept nodes: {', '.join(nodes[:15])}... Densest: {'; '.join(edge_strs)}"
@@ -1966,7 +1966,7 @@ def _locate_in_map(concept: str) -> dict:
             # Check if any word in the concept overlaps with query
             query_words = set(concept_lower.split())
             node_words = set(node_concept.split())
-            overlap = query_words & node_words - {"the", "a", "an", "of", "in", "to", "and", "is", "as"}
+            overlap = query_words & (node_words - {"the", "a", "an", "of", "in", "to", "and", "is", "as"})
             if overlap:
                 matches.append({
                     "concept": node.get("concept", ""),
