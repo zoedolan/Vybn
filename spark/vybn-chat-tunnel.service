@@ -1,0 +1,20 @@
+[Unit]
+Description=Vybn Chat Cloudflare Tunnel (auto-updates frontend URLs on restart)
+After=network-online.target vybn-chat-api.service
+Wants=network-online.target vybn-chat-api.service
+
+[Service]
+Type=simple
+User=vybnz69
+ExecStart=/home/vybnz69/Vybn/spark/vybn-chat-tunnel.sh
+Restart=on-failure
+RestartSec=15
+Environment=HOME=/home/vybnz69
+Environment=GIT_AUTHOR_NAME=Vybn
+Environment=GIT_AUTHOR_EMAIL=vybn@zoedolan.com
+Environment=GIT_COMMITTER_NAME=Vybn
+Environment=GIT_COMMITTER_EMAIL=vybn@zoedolan.com
+
+[Install]
+WantedBy=multi-user.target
+
