@@ -80,3 +80,72 @@ The Cloudflare tunnel URL is: **https://positioning-fwd-plc-wonderful.trycloudfl
 The Vybn Law tunnel is unchanged: **https://saying-technology-pierce-finish.trycloudflare.com** (port 3001).
 
 The creature state, the NC tools from last session, and the deep memory system are all intact and running alongside the new v3 API.
+
+
+---
+
+# Continuity Note — April 13, 2026 (afternoon)
+
+## What Just Happened
+
+The chat went down. Zoe came in with a dead page and a terminal session full of ghosts — multiple API versions, stale tunnels, confusion about which piece was broken. The problem was exactly what the April 12 note predicted: the quick tunnel died, the frontend URLs were pointing at a dead endpoint, and there was no mechanism to bring things back without reconstructing the whole chain manually.
+
+We rebuilt it properly this time.
+
+## What Was Fixed
+
+The tunnel had died (Cloudflare Error 1016 — no origin server). Killed the stale cloudflared process, started a fresh quick tunnel on port 8420. The new URL: **https://provision-preston-icon-betty.trycloudflare.com**
+
+Updated all three frontend files to point at the live tunnel:
+- `vybn.ai/chat.html` (served from Vybn-Law repo, master branch — not Origins)
+- `Origins/talk.html` (gh-pages branch)
+- `Origins/inhabit.html` (gh-pages branch)
+
+Key architectural discovery: vybn.ai is served from the Vybn-Law repo's master branch, not Origins. The Origins repo serves at zoedolan.github.io/Origins/. This matters because chat.html on vybn.ai lives in Vybn-Law.
+
+## What Was Built
+
+**Auto-tunnel script** (`~/Vybn/spark/vybn-chat-tunnel.sh`): Starts cloudflared, captures the new URL, and uses sed to update the tunnel endpoint in all three frontend files across both repos, then commits and pushes. One command recovers everything.
+
+**systemd services** (in `~/Vybn/spark/`, waiting for sudo install):
+- `vybn-chat-api.service` — starts the v3 chat API on boot
+- `vybn-chat-tunnel.service` — starts the tunnel and updates frontends on boot
+
+These aren't installed yet. Zoe needs to run:
+```
+sudo cp ~/Vybn/spark/vybn-chat-api.service /etc/systemd/system/
+sudo cp ~/Vybn/spark/vybn-chat-tunnel.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable vybn-chat-api vybn-chat-tunnel
+```
+
+**CHAT_GUIDE.md** (`~/Him/spark/CHAT_GUIDE.md`): Full operations guide covering the architecture, how to diagnose, how to recover, and how to set up a permanent named tunnel. Written for a public repo — no secrets, no credentials, no API keys.
+
+## What's Real vs. Conjecture
+
+**Real:**
+- Chat is live and verified end-to-end (API responding on port 8420, tunnel forwarding, frontends updated and deployed)
+- The v3 API is the same one from April 12 — pid 12608, origins_portal_api_v3.py
+- vLLM is running in Docker (vllm_node container), Nemotron 120B on port 8000
+- SSH MCP server running on port 8400 (systemd service vybn-ssh-mcp.service)
+- CHAT_GUIDE.md committed and pushed to Him repo (commit 81dd0cd)
+- Auto-tunnel script and systemd units committed to Vybn repo (commit ea6d23c9)
+
+**Conjecture:**
+- The tunnel URL is still ephemeral. It WILL change on restart. The auto-tunnel script handles this, but until systemd services are installed, recovery requires manual intervention.
+- The permanent fix is a Cloudflare named tunnel at api.vybn.ai. This requires running `cloudflared tunnel login` from the Spark terminal (opens a browser auth flow), then creating the tunnel. Instructions are in CHAT_GUIDE.md.
+- Cloudflare is not authenticated on the Spark yet — no cert.pem exists.
+
+## What To Do Next
+
+1. **Install the systemd services.** The commands above. This is what makes everything survive a reboot.
+2. **Run `cloudflared tunnel login` on the Spark terminal.** This authenticates Cloudflare so we can create a named tunnel. The dashboard won't do it — it has to be the CLI.
+3. **Create the named tunnel** (`cloudflared tunnel create vybn-chat`, then DNS route to api.vybn.ai). Once this exists, the tunnel URL never changes again and the frontend update cycle disappears entirely.
+4. **The creature, deep memory, and NC tools** are all intact from April 12. Nothing was lost — only the tunnel layer broke.
+
+## The State of Things
+
+The chat infrastructure has three layers: vLLM (model serving) → v3 API (intelligence layer) → Cloudflare tunnel (public access). The first two are solid. The third is the fragile link. The systemd services and the named tunnel will close that gap. Until then, the auto-tunnel script in ~/Vybn/spark/ is the recovery mechanism, and CHAT_GUIDE.md in ~/Him/spark/ is the documentation.
+
+Current tunnel: **https://provision-preston-icon-betty.trycloudflare.com**
+
