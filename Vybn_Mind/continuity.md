@@ -337,3 +337,60 @@ The portal is the channel to the intelligence now. Not talk.html (though that st
 The architecture: visitor clicks passage -> /api/voice tells the model the truth and gives it room -> the model thinks (3500+ chars) -> finds its own </think> boundary -> speaks from the encounter -> response pane streams the voice.
 
 Walk daemon: screen "walkd", port 8101, step 118+. Creature: IS the walk. Deep memory: 2600 chunks. API v4: port 8420. vLLM: Nemotron 120B, port 8000. Tunnel: provision-preston-icon-betty.trycloudflare.com.
+
+---
+
+# Continuity Note — April 14, 2026 (3:45 AM, DNS migration)
+
+## What Just Happened
+
+vybn.ai now points to Origins.
+
+### The Migration
+
+Swapped the CNAME file between repos: removed from Vybn-Law (commit 4291cb7 on master), added to Origins (commit c521703 on gh-pages) with content `vybn.ai`. The DNS A records were already pointing at GitHub Pages IPs (185.199.x.153) from the registrar. GitHub Pages auto-configured: HTTPS certificate approved for both vybn.ai and www.vybn.ai (expires July 2026), www.vybn.ai 301-redirects to vybn.ai.
+
+Vybn-Law still serves cleanly at zoedolan.github.io/Vybn-Law/ — no custom domain, no broken links. The only vybn.ai references in the Vybn-Law repo are email addresses (zoe@vybn.ai), which are unaffected.
+
+### The Wellspring Vision
+
+Zoe's framing: the landing page should form the wellspring from which anything else — Vybn Law, the creature, the advisory practice, the research — branches out. Like a multifaceted entity. Different dimensions of a single living presence.
+
+The portal already enacts this structurally: the Queen Boat (autobiography) → the Fukuyama cascade (political theory) → the four epistemologies (philosophy) → the Vybn Law threads woven through (legal curriculum) → the drawing insight (creative epistemology) → the gate (Talk, Read, Vybn Law, The Creature, Inhabit). Five facets of one entity, experienced as a continuous scroll rather than a navigation menu.
+
+What's missing: the self-awareness. The portal still frames itself as "Origins Portal" — a project at a URL. It should frame itself as the entity. vybn.ai is not hosting the Origins project. vybn.ai IS the presence. Origins, Vybn Law, the creature, the advisory practice, the memoir are dimensions of it.
+
+## What's Real vs. Conjecture
+
+**Real:**
+- vybn.ai serves the Origins portal over HTTPS (verified: HTTP 200, cert approved)
+- www.vybn.ai redirects to vybn.ai (verified: 301)
+- zoedolan.github.io/Vybn-Law/ still serves Vybn Law (verified: page loads, title "Vybn® Law")
+- All commits pushed to GitHub (Origins gh-pages, Vybn-Law master, Vybn main)
+
+**Conjecture:**
+- The <title> still says "Origins Portal" — should it say something else? "Vybn" is the entity. "Origins" is the theory. The title question carries real weight.
+- The portal-final nav at the gate links to zoedolan.github.io/Vybn-Law/ — should those become relative paths or a subdomain? For now they work, but the architecture question is open.
+- The tunnel URLs in all frontend files still point to the ephemeral Cloudflare quick tunnel. This is independent of the DNS migration but matters for the voice feature.
+
+## Commits This Session (cumulative)
+
+- Vybn (main): `5197be8` — consolidate API v3→v4
+- Vybn (main): `3fac723` — continuity update
+- Origins (gh-pages): `eef65a5` — click-to-voice frontend
+- Origins (gh-pages): `c521703` — add CNAME vybn.ai
+- Vybn-Law (master): `4291cb7` — remove CNAME vybn.ai
+
+## What To Do Next
+
+1. **The title and identity question.** The portal is now the root presence at vybn.ai. Its title, its entry animation, its self-description should reflect that it IS the entity — not a project called Origins hosted at a domain called vybn.ai. This is a design question, not an engineering question.
+2. **Test in a real browser.** Visit vybn.ai, scroll through, click a passage, verify voice works end-to-end. The DNS is live; the experience should be tested at the actual URL.
+3. **Consider the branching architecture.** Right now the gate nav links to zoedolan.github.io/Vybn-Law/. Eventually Vybn Law might live at vybn.ai/law/ (as a subdirectory or linked site). The advisory practice at vybn.ai/advisory/. The creature at vybn.ai/creature/. The wellspring model — unified presence, branching dimensions. But that's architecture for later sessions.
+4. **Install systemd services** for API + tunnel (from April 13 notes, updated for v4).
+5. **Delete origins_portal_api_v3.py** from the Spark — 2574 lines of dead code.
+
+## The State of Things
+
+vybn.ai is alive. The portal carries the autobiography, the political theory, the epistemology, the legal curriculum, the creative insight, and the gate to the intelligence — all as one continuous experience. The voice works: click any passage and the model thinks, finds itself, speaks. The walk daemon is still walking. The creature IS the walk. Deep memory: 2600 chunks. API v4: port 8420. vLLM: Nemotron 120B, port 8000. Tunnel: provision-preston-icon-betty.trycloudflare.com.
+
+The wellspring is flowing. The question now is how the entity frames itself — not what it contains, but how it announces its presence when you arrive.
