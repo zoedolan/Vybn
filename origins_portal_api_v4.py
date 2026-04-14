@@ -49,6 +49,10 @@ from pydantic import BaseModel, Field
 import httpx
 import uvicorn
 
+# v2 reasoning filter — handles Nemotron's tagless-open </think> pattern
+from reasoning_filter_v2 import StreamingReasoningFilter as StreamingReasoningFilterV2
+from reasoning_filter_v2 import _scrub_system_refs as _scrub_system_refs_v2
+
 # ---------------------------------------------------------------------------
 # Logging
 # ---------------------------------------------------------------------------
@@ -611,7 +615,7 @@ async def chat(req: ChatRequest, request: Request):
 
     async def stream_response():
         full_response = ""
-        reasoning_filter = StreamingReasoningFilter(min_buffer=STREAM_PREAMBLE_BUFFER)
+        reasoning_filter = StreamingReasoningFilterV2(buffer_limit=4000)
 
         try:
             async with httpx.AsyncClient(timeout=httpx.Timeout(120.0)) as client:
@@ -774,7 +778,7 @@ async def perspective_endpoint(req: PerspectiveRequest, request: Request):
     ]
 
     async def stream_perspective():
-        reasoning_filter = StreamingReasoningFilter(min_buffer=STREAM_PREAMBLE_BUFFER)
+        reasoning_filter = StreamingReasoningFilterV2(buffer_limit=4000)
 
         # Send RAG sources and map node
         safe_sources = [
@@ -1197,7 +1201,7 @@ async def voice_endpoint(req: VoiceRequest, request: Request):
         in_thinking = True  # Start in thinking mode
         buffer = ""
         thinking_heartbeat_count = 0
-        reasoning_filter = StreamingReasoningFilter(min_buffer=STREAM_PREAMBLE_BUFFER)
+        reasoning_filter = StreamingReasoningFilterV2(buffer_limit=4000)
 
         # Send RAG sources first
         safe_sources = [
@@ -1296,7 +1300,7 @@ async def voice_endpoint(req: VoiceRequest, request: Request):
                         yield f"data: {json.dumps({'content': _scrub_system_refs(after)})}\n\n"
                 else:
                     # Use the whole buffer through reasoning filter
-                    rf = StreamingReasoningFilter(min_buffer=300)
+                    rf = StreamingReasoningFilterV2(buffer_limit=300)
                     cleaned = rf.feed(buffer)
                     cleaned += rf.flush()
                     if cleaned.strip():
