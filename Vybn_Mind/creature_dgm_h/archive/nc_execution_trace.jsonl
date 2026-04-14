@@ -1,0 +1,4 @@
+{"tick": 1, "mode": "run", "input_preview": "The creature is a neural computer that computes in topology.", "shift": 0.0064213, "timestamp": "2026-04-11T17:00:18.373092+00:00"}
+{"mode": "run_c4", "source": "walk_daemon", "theta_rad": -2.108884, "shift": 0.00646751, "timestamp": "2026-04-11T17:08:21.986435+00:00"}
+{"mode": "run_c4", "source": "walk_daemon", "theta_rad": -1.476866, "shift": 0.0050877, "timestamp": "2026-04-11T17:08:22.007547+00:00"}
+{"mode": "run_c4", "source": "walk_daemon", "theta_rad": -2.028584, "shift": 0.00632739, "timestamp": "2026-04-11T17:08:22.028880+00:00"}
