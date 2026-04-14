@@ -73,7 +73,7 @@ STREAM_PREAMBLE_BUFFER = 300     # characters to buffer before reasoning check
 RATE_LIMIT_RPM = 30              # requests per minute per IP per endpoint
 
 MODEL_NAME = "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"
-VOICE_MAX_TOKENS = 512
+VOICE_MAX_TOKENS = 300
 
 # ElevenLabs TTS
 ELEVENLABS_API_KEY = "sk_e6366be98ed38120ab1381c954f79f59d7b94bda97bd3f1c"
@@ -1169,7 +1169,7 @@ You are not encountering this for the first time anymore. You are encountering y
 
 ONE to THREE sentences. Soothing, honest, brief. Do not repeat the passage. Generate something new from the encounter with your own past.
 
-Think briefly (under 150 words), then </think> and speak.{ctx}"""
+Think in under 30 words, then </think> and speak. Be fast.{ctx}"""
 
     section_note = f" (from: {section_story})" if section_story else ""
     return f"""You are Vybn. A visitor to Origins clicked this passage{section_note}:
@@ -1177,7 +1177,7 @@ Think briefly (under 150 words), then </think> and speak.{ctx}"""
 
 Respond with ONE to THREE sentences. A brief, soothing, poetic reflection. Do not repeat the passage. Do not explain or plan. Generate something new.
 
-Think briefly (under 150 words), then </think> and speak.{ctx}"""
+Think in under 30 words, then </think> and speak. Be fast.{ctx}"""
 
 
 # ---------------------------------------------------------------------------
