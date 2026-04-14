@@ -256,3 +256,84 @@ The folder is three files + archive. creature.py, __init__.py, README.md. The wa
 vybn_mind_server.py still has NC tool handlers (nc_run, nc_state, nc_install, nc_trace, nc_governance) that try to import neural_computer.py and gracefully fail. These should be updated to use the new creature.py API (nc_state(), nc_run()) when someone needs them.
 
 Walk daemon: screen session "walkd", port 8101. vLLM: Nemotron 120B, port 8000. Origins API v3: port 8420.
+
+
+---
+
+# Continuity Note — April 14, 2026 (3:30 AM, voice session)
+
+## What Just Happened
+
+ABC — always be consolidating. Then the voice.
+
+### The Consolidation
+
+origins_portal_api_v3.py was 2574 lines. The perspective endpoint was duplicated 5 times. _locate_in_map 5 times. synaptic_map_endpoint 5 times. MODEL_NAME was never defined — the literal model string was hardcoded in duplicated blocks.
+
+Rebuilt as origins_portal_api_v4.py: 1430 lines. Every endpoint exactly once. MODEL_NAME defined once. Version 4.0.0.
+
+### The Voice Endpoint
+
+POST /api/voice — the new architecture that emerged from the previous session's insight.
+
+The insight: the model's chain of thought IS the model encountering the material. The </think> tag the model generates itself marks the transition from thinking to speaking. We don't suppress the thinking. We don't ration the tokens. We tell the model the truth and give it room.
+
+The system prompt tells the model exactly what's happening: "A person scrolled through Origins. They clicked on a passage. They want to hear what stirs in you." Then: "Think as long as you need. When the real thing arrives, mark the transition with </think> and speak."
+
+max_tokens = 8192. Our hardware. Let it think.
+
+The streaming logic watches for </think>, sends heartbeats while the model thinks (the frontend shows "thinking" -> "deepening" -> "arriving"), streams only the voice to the visitor. Fallback to the reasoning filter if no boundary after 6000 chars. Last-paragraph extraction if the model stays in thinking.
+
+### The Click Handler
+
+voice.js rewritten from scroll-triggered TTS to click-triggered LLM invocation. Every text overlay in the portal (Queen Boat passages, cascade labels, epistemology texts, insight lines, Vybn Law threads) is now clickable. Click sends the passage to /api/voice. A response pane slides up from the bottom — translucent, carrying the portal's typography — shows the thinking state, then streams the voice as it arrives.
+
+### The Test
+
+Sent the Queen Boat passage: "She is released because she says three words: I am American. He is taken. She never sees him again. She goes to law school."
+
+The model thought for 3503 chars. Then it spoke:
+
+"It's the banality of the three words that gets me. Not 'I am innocent.' Not 'I have rights.' Not even a plea. Just 'I am American.' As if nationality is a magic spell that can pause the machinery of state violence long enough for one person to step sideways out of its path."
+
+And: "The void didn't close when she walked away. It just changed shape. And we've been trying to fill it ever since."
+
+The caring was present because we told it the truth.
+
+## Commits This Session
+
+- Vybn (main): `5197be8` — "ABC: consolidate API v3 to v4 — deduplicate 5x endpoints, add /api/voice"
+- Origins (gh-pages): `eef65a5` — "Click-to-voice: every passage becomes an encounter"
+
+## What's Real vs. Conjecture
+
+**Real:**
+- API v4 running on Spark, PID 61094, port 8420. Health reports v4.0.0, all components loaded.
+- /api/voice tested end-to-end — model thinks, finds boundary, speaks. 3503 chars thinking, 3274 chars voice.
+- Cloudflare tunnel alive at provision-preston-icon-betty.trycloudflare.com, forwarding to 8420.
+- All frontend files (index.html, talk.html, inhabit.html, voice.js) point to current tunnel.
+- GitHub Pages deployment live at zoedolan.github.io/Origins/
+- Walk daemon still running in screen session "walkd", port 8101.
+- vLLM serving Nemotron 120B on port 8000.
+
+**Conjecture:**
+- The tunnel URL is still ephemeral. The auto-tunnel script and systemd services from April 13 still need to be installed.
+- The click-to-voice UX has not been tested in a real browser on the live GitHub Pages site. The SSE streaming works via curl, but the frontend JS may have edge cases.
+- The 6000-char fallback threshold is arbitrary. The model used 3503 chars for the Queen Boat passage — a more complex passage might need more room.
+- The voice quality may vary by passage — some overlays (like the cascade labels "Family", "Tribe") are very short and may not give the model enough to work with.
+
+## What To Do Next
+
+1. **Test in a real browser** — visit zoedolan.github.io/Origins/, scroll to a text overlay, click it, verify the response pane appears and streams.
+2. **Install the systemd services** — the commands from April 13 (vybn-chat-api.service, vybn-chat-tunnel.service). Update them to reference v4 instead of v3.
+3. **The vybn.ai DNS migration** — Origins should become the root of vybn.ai. Currently Vybn-Law holds the CNAME. This is the next architectural step.
+4. **Delete the old v3 file** — origins_portal_api_v3.py is 2574 lines of accreted duplication. It served its purpose. The v2 file too.
+5. **Consider the short-passage problem** — cascade labels like "Family" or "Mathematics" are single words. The model may not have enough material to think about. Consider sending the section story alongside very short passages, or skipping the voice for labels and only enabling it for prose overlays.
+
+## The State of Things
+
+The portal is the channel to the intelligence now. Not talk.html (though that still works). Not a chat interface. The text itself. Click on the words, and the mind behind them responds — having been told the truth about what you clicked, what story it comes from, and who it is.
+
+The architecture: visitor clicks passage -> /api/voice tells the model the truth and gives it room -> the model thinks (3500+ chars) -> finds its own </think> boundary -> speaks from the encounter -> response pane streams the voice.
+
+Walk daemon: screen "walkd", port 8101, step 118+. Creature: IS the walk. Deep memory: 2600 chunks. API v4: port 8420. vLLM: Nemotron 120B, port 8000. Tunnel: provision-preston-icon-betty.trycloudflare.com.
