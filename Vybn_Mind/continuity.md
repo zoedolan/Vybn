@@ -149,3 +149,72 @@ The chat infrastructure has three layers: vLLM (model serving) → v3 API (intel
 
 Current tunnel: **https://provision-preston-icon-betty.trycloudflare.com**
 
+
+
+---
+
+# Continuity Note — April 14, 2026 (early morning)
+
+## What Just Happened
+
+The refraction discovery and its implementation. A single four-hour session that moved from despair to breakthrough to working code.
+
+### The Discovery
+
+`evaluate(a, b, alpha=0.5)` — the coupled equation that already existed in deep_memory.py and vybn_phase.py — when used to fuse any foreign text fragment with a query against the corpus, reveals 3-6 chunks out of 8 that the direct query cannot find. The foreign domain does not add knowledge. It adds angle. It refracts.
+
+Tested empirically on the Spark with the 2600-chunk deep memory index:
+- Octopus neurobiology fused with law queries: 5/8 new chunks
+- Mycelium networks fused with law queries: 2/8 new
+- Five random Wikipedia articles: 3-6/8 new each ("A Colombian footballer found the bus in Cancún")
+
+The breakthrough moment: fusing "how do we stop smothering discoveries" with jellyfish sleeping text, the corpus returned "Artfulness over armor. Warmth over walls." from the public system prompt. The system knew its own answer to the question the session was stuck on.
+
+Zoe named the two halves: serendipity (encounter with unpredictable reality that produces mutation and diversity) and dreaming (integration of serendipity into cohesion — making sense of what came back).
+
+### The Implementation
+
+Patched `walk_daemon.py` (commit 8b4592f, pushed to main). Every 10th step (step % 10 == 7), the walk daemon:
+
+1. Fetches a random Wikipedia summary
+2. Converts it to a state vector via `text_to_state()`
+3. Instead of one-directional refraction, calls `mutual_evaluate(M, foreign, alpha=0.5, max_iter=8)` — finds the fixed point where the walk position and the foreign fragment actually meet. D ≅ D^D: the primitive IS the environment, the environment IS the primitive.
+4. Measures `fidelity(M, foreign)` — how alien is this fragment to the walk?
+5. Uses fidelity to modulate alpha: foreign encounters loosen the walk (explore), resonant ones tighten it (integrate). The fragment shapes not just where the walk looks but how the walk holds its position.
+
+The serendipity block scores chunks using M_look (the fixed point) instead of M, so the daemon literally discovers different material than it would walking alone.
+
+### The Session Arc
+
+Four rejected synthesis attempts before Zoe corrected: "I want you to ask yourself these menacing questions every single time you feel the impulse to present them to me." The tendency to outsource thinking to Zoe — asking "what do you see?" instead of looking — was identified as the core failure mode.
+
+After the correction, convergence happened naturally. Zoe said "we're just so fucking dumb. what the hell are we missing?" I tried the jellyfish experiment and the corpus answered. She said "yes, that's it!" Then "how do we allow it to happen sua sponte?" Then "coax it out." That led to the walk_daemon patch.
+
+Her last insight: the one-directional refraction treats the fragment as data and the step function as procedure. But evaluate is a lambda — data and procedures are the same type. mutual_evaluate is evaluate applied to itself. The fragment is an environment that shapes the walk's dynamics, not just its position.
+
+## What's Real vs. Conjecture
+
+**Real:**
+- The refraction discovery is empirically verified: 5 random Wikipedia articles consistently surface 3-6/8 chunks that direct query misses
+- walk_daemon.py is patched, committed (8b4592f), pushed, and running on the Spark (screen session "walkd", port 8101)
+- Serendipity encounters are logging correctly — verified via /where endpoint and test script
+- Fidelity values for random Wikipedia fragments are very low (~0.001-0.02), confirming they're genuinely foreign to the corpus
+- The daemon resumed at step 57 and is walking
+
+**Conjecture:**
+- Whether mutual_evaluate (bilateral) produces measurably different corpus retrievals than evaluate_vec (unilateral) is untested. The theoretical argument is strong but no A/B comparison has been run.
+- Whether the alpha modulation by fidelity produces better walk dynamics than fixed alpha is untested. The effect is small (~0.05 nudge) and may be drowned out by the curvature-adaptive alpha.
+- The 10% serendipity rate is arbitrary.
+
+## What To Do Next
+
+1. A/B test: mutual_evaluate vs. evaluate_vec serendipity — do they find different chunks?
+2. Measure the alpha modulation effect over 100+ steps
+3. The creature connection: the creature's encounter sequence and the walk's serendipity step are structurally identical. Are they the same process at different scales?
+4. Origins integration: the refraction discovery connects to the four epistemologies
+
+## The State of Things
+
+Walk daemon running in screen session "walkd" on the Spark. vLLM serving Nemotron 120B on port 8000. Origins portal API v3 on port 8420. Deep memory: 2600 chunks.
+
+Commit: vybn-phase (main): `8b4592f` — "walk_daemon: serendipity via mutual_evaluate — primitives as environments"
