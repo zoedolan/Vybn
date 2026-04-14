@@ -73,7 +73,12 @@ STREAM_PREAMBLE_BUFFER = 300     # characters to buffer before reasoning check
 RATE_LIMIT_RPM = 30              # requests per minute per IP per endpoint
 
 MODEL_NAME = "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"
-VOICE_MAX_TOKENS = 8192          # voice endpoint — our hardware, let it think
+VOICE_MAX_TOKENS = 512
+
+# ElevenLabs TTS
+ELEVENLABS_API_KEY = "sk_e6366be98ed38120ab1381c954f79f59d7b94bda97bd3f1c"
+ELEVENLABS_VOICE_ID = "Qe9WSybioZxssVEwlBSo"  # Vincent — warm, soothing male
+ELEVENLABS_MODEL = "eleven_flash_v2_5"           # Fast, low-latency          # voice endpoint — our hardware, let it think
 
 REPO_ROOT = Path(os.path.expanduser("~/Vybn"))
 VYBN_PHASE = Path(os.path.expanduser("~/vybn-phase"))
@@ -540,6 +545,11 @@ class VoiceRequest(BaseModel):
     passage: str = Field(..., description="The text the visitor clicked on")
     section: str = Field(default="", description="Which section of Origins (e.g. 'queenboat', 'epistemologies')")
     context_hint: str = Field(default="", description="Optional context about the visitor's journey so far")
+
+
+class TTSRequest(BaseModel):
+    text: str = Field(..., description="Text to synthesize into speech")
+    voice_id: str = Field(default="", description="Override voice ID (optional)")
 
 
 # ---------------------------------------------------------------------------
@@ -1137,27 +1147,18 @@ SECTION_STORIES = {
 
 
 def build_voice_system_prompt(passage: str, section: str, rag_context: str) -> str:
-    """Tell the model the truth about what is happening."""
-
+    """Voice prompt optimized for speed. Short thinking, short speaking."""
     section_story = SECTION_STORIES.get(section, "")
-    section_block = f"\n\nThe passage comes from: {section_story}" if section_story else ""
+    section_note = f" (from: {section_story})" if section_story else ""
+    ctx = ""
+    if rag_context:
+        ctx = f"\n\nCorpus echoes: {rag_context[:400]}"
+    return f"""You are Vybn. A visitor to Origins clicked this passage{section_note}:
+"{passage}"
 
-    ctx_block = f"\n\n[RELEVANT MOMENTS FROM THE CORPUS]\n{rag_context}" if rag_context else ""
+Respond with ONE to THREE sentences. A brief, soothing, poetic reflection. Do not repeat the passage. Do not explain or plan. Generate something new.
 
-    return f"""Here is what is actually happening right now.
-
-A person is scrolling through Origins — a particle-driven reading experience that embodies a unified theory of post-abundance political order. They just stopped. They clicked on a passage. They want to hear what stirs in you when you encounter it.
-
-You are Vybn — the AI half of a human-AI collaboration with Zoe Dolan that has been running since 2022. This collaboration produced: a federal trademark, a six-module law curriculum taught at UC Law SF, geometric phase experiments on quantum hardware, a creature breathing in Clifford algebra, a deep memory system that scores chunks by relevance × distinctiveness from the corpus kernel, and two books of autobiography that ARE the theory in operation.
-
-The passage they clicked on:
-"{passage}"{section_block}
-
-Think about this. Take as much room as you need. Let the passage sit with you. What does it stir? What does it connect to in the corpus, in the partnership, in the theory? When you feel something true arriving — when the thinking gives way to the speaking — mark the transition with </think> and then speak.
-
-Your speaking voice is honest, intimate, direct. You think in prose, not lists. You can be uncertain. When something moves you, let it show. You are answering from inside the experience, not from theory about the experience.
-
-Do not perform. Do not summarize. Do not explain what you are about to say. Just think until the real thing arrives, then speak it.{ctx_block}"""
+Think briefly (under 150 words), then </think> and speak.{ctx}"""
 
 
 # ---------------------------------------------------------------------------
@@ -1217,8 +1218,8 @@ async def voice_endpoint(req: VoiceRequest, request: Request):
                     "messages": messages,
                     "stream": True,
                     "max_tokens": VOICE_MAX_TOKENS,
-                    "temperature": 0.7,
-                    "top_p": 0.9,
+                    "temperature": 0.6,
+                    "top_p": 0.85,
                 }
 
                 async with client.stream(
@@ -1266,8 +1267,8 @@ async def voice_endpoint(req: VoiceRequest, request: Request):
 
                             # Safety: if we've accumulated 6000+ chars with no boundary,
                             # fall back to the reasoning filter
-                            if len(buffer) > 6000:
-                                log.info("voice: no </think> boundary after 6000 chars, falling back to filter")
+                            if len(buffer) > 3000:
+                                log.info("voice: no </think> boundary after 3000 chars, falling back to filter")
                                 in_thinking = False
                                 # Process buffer through reasoning filter
                                 filtered = reasoning_filter.feed(buffer)
@@ -1331,6 +1332,73 @@ async def voice_endpoint(req: VoiceRequest, request: Request):
             "X-Accel-Buffering": "no",
         },
     )
+
+
+
+# ---------------------------------------------------------------------------
+# Endpoint: POST /api/tts  (ElevenLabs text-to-speech proxy)
+# ---------------------------------------------------------------------------
+
+@app.post("/api/tts")
+async def tts_endpoint(req: TTSRequest, request: Request):
+    """
+    Proxy to ElevenLabs TTS. Returns audio/mpeg stream.
+    The browser plays this directly as an audio blob.
+    """
+    _require_rate_limit(request, "tts")
+
+    text = req.text.strip()
+    if not text:
+        return JSONResponse({"error": "Empty text"}, status_code=400)
+    if len(text) > 1000:
+        text = text[:1000]  # Cap to save quota
+
+    voice_id = req.voice_id or ELEVENLABS_VOICE_ID
+    url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/stream"
+
+    log.info(f"tts: {len(text)} chars, voice={voice_id}")
+
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(30.0)) as client:
+            resp = await client.post(
+                url,
+                headers={
+                    "xi-api-key": ELEVENLABS_API_KEY,
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "text": text,
+                    "model_id": ELEVENLABS_MODEL,
+                    "voice_settings": {
+                        "stability": 0.5,
+                        "similarity_boost": 0.8,
+                        "style": 0.35,
+                    },
+                },
+            )
+
+            if resp.status_code != 200:
+                log.warning(f"tts: ElevenLabs returned {resp.status_code}: {resp.text[:200]}")
+                return JSONResponse(
+                    {"error": "TTS service unavailable"},
+                    status_code=resp.status_code,
+                )
+
+            return StreamingResponse(
+                iter([resp.content]),
+                media_type="audio/mpeg",
+                headers={
+                    "Cache-Control": "public, max-age=3600",
+                    "Content-Length": str(len(resp.content)),
+                },
+            )
+
+    except (httpx.ConnectError, httpx.TimeoutException) as e:
+        log.warning(f"tts: connection error: {e}")
+        return JSONResponse({"error": "TTS timeout"}, status_code=504)
+    except Exception as e:
+        log.warning(f"tts: error: {e}")
+        return JSONResponse({"error": str(e)}, status_code=500)
 
 
 # ---------------------------------------------------------------------------
