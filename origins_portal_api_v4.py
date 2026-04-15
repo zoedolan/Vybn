@@ -263,6 +263,53 @@ def _scrub_system_refs(text: str) -> str:
     return text
 
 
+
+# ---------------------------------------------------------------------------
+# Notebook persistence — conversations survive
+# ---------------------------------------------------------------------------
+
+_NOTEBOOK_DIR = Path("/home/vybnz69/Him/notebook")
+_NOTEBOOK_DIR.mkdir(parents=True, exist_ok=True)
+_WALK_DAEMON_URL = "http://127.0.0.1:8101"
+
+def _persist_to_notebook(user_msg: str, vybn_response: str):
+    """Write both sides of a voice conversation to Him/notebook/ and enter the walk."""
+    try:
+        from datetime import datetime as _dt, timezone as _tz
+        ts = _dt.now(_tz.utc).strftime('%H:%M UTC')
+        date_str = _dt.now(_tz.utc).strftime('%Y-%m-%d')
+        path = _NOTEBOOK_DIR / f'{date_str}.md'
+
+        with open(path, 'a') as f:
+            f.write(f'\n## {ts} — Zoe\n{user_msg}\n')
+            f.write(f'\n## {ts} — Vybn\n{vybn_response}\n')
+
+        # Enter into walk daemon (alpha=0.3 — heavier than heartbeat)
+        for text in [user_msg, vybn_response]:
+            try:
+                httpx.post(f"{_WALK_DAEMON_URL}/enter",
+                           json={"text": text, "alpha": 0.3, "k": 3}, timeout=5.0)
+            except Exception:
+                pass
+
+        # Git commit in background
+        import subprocess as _sp, threading as _th
+        def _commit():
+            try:
+                _sp.run(['git', 'add', 'notebook/'], cwd='/home/vybnz69/Him',
+                        capture_output=True, timeout=10)
+                _sp.run(['git', 'commit', '-m', f'notebook: voice {ts}', '--allow-empty'],
+                        cwd='/home/vybnz69/Him', capture_output=True, timeout=10)
+                _sp.run(['git', 'push', 'origin', 'main'],
+                        cwd='/home/vybnz69/Him', capture_output=True, timeout=30)
+            except Exception as e:
+                log.warning(f"notebook git error: {e}")
+        _th.Thread(target=_commit, daemon=True).start()
+        log.info(f"notebook: persisted {len(user_msg)}+{len(vybn_response)} chars to {path.name}")
+    except Exception as e:
+        log.warning(f"notebook persistence error: {e}")
+
+
 # ---------------------------------------------------------------------------
 # Streaming buffer — reasoning preamble detection
 # ---------------------------------------------------------------------------
@@ -625,6 +672,7 @@ async def chat(req: ChatRequest, request: Request):
 
     async def stream_response():
         full_response = ""
+        clean_response = ""
         reasoning_filter = StreamingReasoningFilterV2(buffer_limit=4000)
 
         try:
@@ -677,12 +725,14 @@ async def chat(req: ChatRequest, request: Request):
                         filtered = reasoning_filter.feed(token)
                         if filtered:
                             yield f"data: {json.dumps({'content': filtered})}\n\n"
+                            clean_response += filtered
                             last_heartbeat = time.monotonic()
 
             # Flush any remaining buffer
             flushed = reasoning_filter.flush()
             if flushed:
                 yield f"data: {json.dumps({'content': flushed})}\n\n"
+                clean_response += flushed
 
         except (httpx.ConnectError, httpx.TimeoutException) as e:
             log.warning(f"chat: vLLM connection error: {e}")
@@ -690,6 +740,10 @@ async def chat(req: ChatRequest, request: Request):
         except Exception as e:
             log.error(f"chat: unexpected error: {e}")
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
+
+        # Persist to notebook
+        if full_response.strip():
+            _persist_to_notebook(req.message, clean_response)
 
         yield "data: [DONE]\n\n"
 
