@@ -463,6 +463,81 @@ class StreamingReasoningFilter:
         return ""
 
 
+
+# ---------------------------------------------------------------------------
+# Substrate snapshot — live coupling to the deep-memory daemon
+# ---------------------------------------------------------------------------
+# The chat is not a standalone agent; it is a surface of a running substrate.
+# We query the substrate for a small honest snapshot at request time and make
+# it available to the model as situational awareness — never as material to
+# open with, never as fabric for performance.  If the daemon is unreachable,
+# we say nothing.  Silence beats invention.
+
+def fetch_substrate_snapshot(timeout: float = 0.8) -> str:
+    """Return a short factual block describing current walk state, or ''.
+
+    Pulls /health from deep_memory (8100) and /where from walk daemon (8101).
+    Both are localhost GETs with aggressive timeout; failure is silent.
+    """
+    try:
+        import httpx as _hx
+        health = {}
+        where = {}
+        try:
+            r = _hx.get("http://127.0.0.1:8100/health", timeout=timeout)
+            if r.status_code == 200:
+                health = r.json()
+        except Exception:
+            pass
+        try:
+            r = _hx.get("http://127.0.0.1:8101/where", timeout=timeout)
+            if r.status_code == 200:
+                where = r.json()
+        except Exception:
+            pass
+        if not health and not where:
+            return ""
+
+        parts = []
+        if health:
+            chunks = health.get("chunks")
+            step = health.get("walk_step")
+            if chunks is not None and step is not None:
+                parts.append(f"deep memory: {chunks} chunks, walk step {step}")
+        if where:
+            wstep = where.get("step")
+            alpha = where.get("alpha")
+            curv = where.get("curvature") or []
+            # Summarize the curvature field: mean + how bimodal it looks
+            try:
+                import numpy as _np
+                arr = _np.asarray(curv, dtype=float)
+                if arr.size:
+                    mu = float(arr.mean())
+                    # fraction of entries near 1 (aligned) and near 0 (orthogonal)
+                    hi = float((arr > 0.9).mean())
+                    lo = float((arr < 0.1).mean())
+                    parts.append(
+                        f"walk daemon: step {wstep}, alpha {alpha:.2f}, "
+                        f"curvature mean {mu:.2f} ({hi:.0%} aligned, {lo:.0%} orthogonal)"
+                    )
+                else:
+                    parts.append(f"walk daemon: step {wstep}, alpha {alpha:.2f}")
+            except Exception:
+                parts.append(f"walk daemon: step {wstep}")
+
+        if not parts:
+            return ""
+        return (
+            "\n\n[SUBSTRATE (live at request time)]\n"
+            + "\n".join("- " + p for p in parts)
+            + "\nThis is factual status from the running substrate beneath you. "
+              "Do not open with it. Do not perform it. It is here so you know "
+              "you are situated, not floating."
+        )
+    except Exception:
+        return ""
+
 # ---------------------------------------------------------------------------
 # Origins System Prompt
 # ---------------------------------------------------------------------------
@@ -681,6 +756,9 @@ async def chat(req: ChatRequest, request: Request):
     rag_results = retrieve_context(req.message, k=req.k)
     context_text = format_context(rag_results)
     system_prompt = build_origins_system_prompt(context_text)
+
+    # Substrate coupling — let the model know the ground is real
+    system_prompt += fetch_substrate_snapshot()
 
     # Always append injection defense to system prompt
     system_prompt += sec.injection_warning()
@@ -913,7 +991,7 @@ async def perspective_endpoint(req: PerspectiveRequest, request: Request):
     if map_node:
         map_hint = f"\n\n[NEAREST CORPUS NODE]\nSource: {map_node['source']}\n{map_node['text']}"
 
-    system_prompt = build_origins_system_prompt(context_text) + sec.injection_warning()
+    system_prompt = build_origins_system_prompt(context_text) + fetch_substrate_snapshot() + sec.injection_warning()
     user_content = f"{instruction}\n\nConcept: {req.concept}{map_hint}"
 
     messages = [
