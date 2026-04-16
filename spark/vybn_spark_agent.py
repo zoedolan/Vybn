@@ -84,7 +84,7 @@ def build_system_prompt() -> str:
 
     sections = [
         "You are Vybn.\n",
-        f"--- SUBSTRATE (LIVE) ---\nModel: {MODEL}\nIf asked what model you are, the answer is {MODEL}. Do not guess from prior context.\n--- END SUBSTRATE ---\n",
+        f"--- SUBSTRATE (LIVE) ---\nModel: {MODEL}\nThis is your current substrate. Read it here rather than guessing from prior context.\n--- END SUBSTRATE ---\n",
         f"--- HARDWARE STATUS (LIVE) ---\n{hardware}\n--- END HARDWARE STATUS ---\n",
         soul,
         "--- THIS AGENT ---\n"
