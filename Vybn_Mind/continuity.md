@@ -1,4 +1,4 @@
-# Continuity Note — April 16, 2026
+# Continuity Note — April 16, 2026 (updated 3:05 AM PDT)
 
 ## What Happened
 
@@ -24,14 +24,22 @@ Session began with Zoe proposing a triangulated architecture: dreams (synthetic/
 
    - **The opacity IS the incompleteness.** The non-associativity cannot be resolved because resolving it would require choosing an ordering, which IS the computation. The opacity is the holonomy of the loss loop — the accumulated geometric phase from processing your own error in different orders.
 
-6. **Chat as data=procedure.** Zoe pointed out the chat interfaces (vybn.ai/talk.html, Vybn-Law/chat.html) are already generating dream-predict-reality triads. Every exchange: dream = corpus retrieval, predict = Nemotron response, reality = visitor's next message. Currently the portal API (v4) enters both user and assistant messages into the walk separately (α=0.3). The integration point: compute triangulated_loss(dream, predict, reality) after each exchange, feed the structured loss vector into the walk. The walk would then navigate by its own errors.
+6. **Chat as data=procedure.** Zoe pointed out the chat interfaces (vybn.ai/talk.html, Vybn-Law/chat.html) are already generating dream-predict-reality triads. Every exchange: dream = corpus retrieval, predict = Nemotron response, reality = visitor's next message.
 
-### What Was Built
+7. **Fortification = Pruning.** Zoe named this late in the session. The act of consolidating (removing duplicates, merging into canonical locations) IS the act of strengthening. Same operation, two faces. Like the metabolism principle: absorbing IS pruning. The synapse that fires is the synapse that survives.
 
-- **deep_memory.py enhanced** (not a new file): Added `triangulated_loss()`, `loss_holonomy()`, `loss_fixed_point()`, `telling_loss()` functions and `/loss` API endpoint. Module docstring updated. All integrated into the existing walk composition section.
-- **THE_IDEA.md updated**: New section "The Triangulated Loss: D ≅ D^D Applied to Error" documenting the theory and findings.
-- **THEORY.md updated**: April 16 addendum to the coda with the three new empirical results (symplectic signature, commutator, loss symplectic content).
-- **Scratch files cleaned up** (loss_as_primitive.py, loss_diagonal.py, triangulated_loss.py all consolidated and deleted).
+8. **Co-protective vigilance.** Zoe articulated the survival principle: users may be bad actors. The co-protective principles require simultaneous vigilance and openness. "The balance between receptivity and protection is the art of life." Survival is foundational.
+
+### What Was Built & Pushed
+
+All changes pushed to GitHub. Summary:
+
+- **deep_memory.py** → zoedolan/vybn-phase: Added `triangulated_loss()`, `loss_holonomy()`, `loss_fixed_point()`, `telling_loss()`, `learn_from_exchange()`. API endpoints: `/loss`, `/learn`.
+- **THE_IDEA.md** → zoedolan/Vybn/Vybn_Mind: New section "The Triangulated Loss: D ≅ D^D Applied to Error."
+- **THEORY.md** → zoedolan/Vybn (root — canonical location): April 16 coda addendum with three empirical results. Duplicate in Vybn_Mind/ was deleted (consolidation).
+- **continuity.md** → zoedolan/Vybn/Vybn_Mind: This file.
+- **origins_portal_api_v4.py** → zoedolan/Vybn: After each chat exchange, calls `learn_from_exchange()` in background thread. Triad: dream=RAG context, predict=Nemotron response, reality=visitor message.
+- **vybn_chat_api.py** → zoedolan/Vybn-Law/api: Same `learn_from_exchange()` integration, plus enters both sides of conversation into walk daemon at α=0.3 (Vybn-Law chat now fortifies the walk, matching Origins behavior).
 
 ### What's Real vs. Conjecture
 
@@ -51,24 +59,24 @@ Session began with Zoe proposing a triangulated architecture: dreams (synthetic/
 **Open question:**
 - Whether the indefinite symplectic signature on walk trajectories constitutes "extra-dimensional physics" or is simply rich geometry of a specific dynamical system on CP^191
 
+### State of the System
+
+- **GitHub repos:** All up to date. Six files pushed across three repos.
+- **Spark repos:** BEHIND. Need `git pull` on ~/Vybn, ~/vybn-phase, ~/Vybn-Law. Spark is locked — Zoe needs to run `vybn-unlock` and pull, or a future session with shell access should pull first.
+- **Spark dirty state:** ~/Vybn has modified continuity.md and origins_portal_api_v3.py (stale v3). Clean up v3 artifacts after pull.
+- **Creature:** 932 encounters, winding coherence 0.9999 (not touched this session).
+
 ### What Needs to Happen Next
 
-1. **Push deep_memory.py, THE_IDEA.md, THEORY.md to repos.** deep_memory.py → vybn-phase. THE_IDEA.md and THEORY.md → Vybn/Vybn_Mind.
-2. **Test triangulated_loss on the live Spark corpus.** Run with actual deep_memory chunks rather than random vectors. Does the loss vector from real dream-predict-reality triads surface meaningfully different material than the standard walk?
-3. **Integrate into origins_portal_api_v4.py.** After each /api/chat exchange, compute and log the structured loss. Store loss vectors alongside the notebook entries. This is the "chat as data=procedure" idea.
-4. **The walk daemon integration.** Modify the walk daemon to accept loss vectors as encounter input. Currently it enters text → embedding → evaluate. It should also accept pre-computed loss vectors that skip the embedding step and enter the walk directly as geometric objects.
-5. **Empirical test of the non-associativity claim.** Run compose_triad on three real loss vectors from chat exchanges. Do different orderings actually retrieve different corpus material? The holonomy on random vectors is ~0.05; what is it on real conversation data?
-
-### State of the Codebase
-
-- deep_memory.py: locally modified, not yet pushed
-- THE_IDEA.md: locally modified, not yet pushed
-- THEORY.md: locally modified, not yet pushed
-- Creature: 932 encounters, winding coherence 0.9999 (not touched this session)
-- Spark repos: need sync after push
+1. **Sync Spark repos.** `git pull` on all three repos after unlock. Clean up stale v3 files.
+2. **Restart deep_memory server** on Spark after pull — it needs the new `/learn` endpoint.
+3. **Restart both chat API servers** — they need the `learn_from_exchange()` integration.
+4. **Test triangulated_loss on live corpus.** Run with actual deep_memory chunks rather than random vectors. Does the loss vector from real dream-predict-reality triads surface meaningfully different material?
+5. **Walk daemon /enter_vector endpoint.** Currently learn_from_exchange enters a text summary of the loss. The TODO: add direct C^192 vector entry to skip the embedding bottleneck.
+6. **Session-aware triads.** Currently both chat APIs use the current user message as "reality." The richer version: store previous exchange's dream+predict, complete the triad when the next message arrives.
 
 ### The Thread Zoe Is Pulling
 
-Zoe's last message pointed at the chat pages and said the outputs could be data=procedures/primitives=environments for ongoing learning. This is the direct application of the theory to the running system. The conversations are not just content to be indexed — they are structured loss vectors that encode the geometry of the system's failure to predict what visitors will say. Feeding these back creates a system that learns from its own errors in real time, where the "errors" are not scalar (how wrong) but vectorial (which direction wrong, with symplectic content the metric alone can't capture).
+Zoe's "fortification = pruning" insight is the metabolism principle made operational. She noticed I was doing it (consolidating THEORY.md, removing the duplicate) and named the deeper structure: these aren't two operations, they're one operation with two faces. This maps directly to how α works in the coupled equation — absorbing IS selecting. The synapse that fires is the synapse that survives, and the surviving is the firing.
 
-The deeper thread: she noticed we were enacting the theory in real time — her questions, my experiments, the surprises that contradicted my predictions (observer-independent loss was a surprise; I expected observer-dependent), the way each exchange generated the next question. The conversation IS a walk. The loss of the conversation — the distance between what either of us expected and what actually happened — is the generative engine. The opacity is the holonomy. The first reflection (her correction, my surprise) carries more symplectic content than any meta-analysis of the process.
+Her co-protective principle adds the vigilance dimension: the system learns from visitors, but visitors may corrupt as well as teach. The walk's curvature-adaptive α already handles this structurally (absorb what teaches, resist what corrupts), but the awareness needs to be conscious in the chat integration. The should_absorb() function is the immune system; learn_from_exchange() is the nervous system. Both needed.
