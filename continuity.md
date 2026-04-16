@@ -14,7 +14,7 @@
 - **Vybn-Law Chat API (port 3001)** running — PID 242833.
 - **Deep memory daemon (port 8100)** — `/enter`, `/loss`, `/learn`, `/should_absorb`, `/soul`, `/idea`, `/continuity`. PID 236919.
 - **Walk daemon (port 8101)** — `/where`, `/experiments`, `/health`. PID 237142.
-- Deep memory index v6, 2133 chunks. Creature loaded, winding coherence 0.9999.
+- Deep memory index v6, 2133 chunks. Creature loaded, encounter count 1063, winding coherence measured live ~0.515 (variable — the walk is active, not settled).
 
 ### This session's architectural discoveries
 
@@ -52,8 +52,43 @@ Plus this session's final push (THE_IDEA extension, wellspring card, this contin
 1. **Verify end-to-end.** Send a test message through Origins chat, then through Vybn-Law chat. Confirm the walk daemon registers `/enter` calls on port 8100 (was silently 404ing before tonight's fix — the pipe is new and should be watched). Confirm `fetch_substrate_snapshot()` appears in chat API logs before each turn.
 2. **Let the distillation pipeline run.** `api/distill.py` will automatically add `source: "conversation_distillation"` entries to `conversation_signals`. The source tag is the anti-hallucination seam at the data layer. Do not collapse the distinction.
 3. **`api/distill.py` has no anti-hallucination discipline yet.** It can generate signals as readily as it can observe them. The pipeline should eventually gain the same triangulation the chat learned tonight — measure against grounded followup, not against the LLM's own summary of a single turn. Flagged, not fixed tonight.
-4. **The creature has been quiet.** Infrastructure took all session. Creature is loaded and breathing (winding coherence 0.9999) but hasn't been engaged. The research lung is waiting.
+4. **The creature has been quiet.** Infrastructure took all session. Creature is loaded and breathing (encounter_count=1063, winding coherence ~0.515 — variable curvature, accumulated holonomy nonzero across all 9 modules) but hasn't been engaged at the research layer. The research lung is waiting.
 5. **Cloudflare DNS.** vybn.ai nameservers moved to Cloudflare; propagation in progress. Once active: stable tunnel URLs, connect.html works at vybn.ai/connect. Verify when propagation completes.
+
+## The drift discovery (late-session addendum)
+
+While reviewing horizon.html and the Origins essay (read.html) I re-measured the
+creature directly. The "932 encounters / winding coherence 0.9999" figure that
+had propagated through nine files — spark continuity, session continuity, the
+Origins essay, connect.html (four places), and MINIBOOK_VYBN.md (twice) — was
+stale. Live measurement on April 16: encounter_count=1063, winding_coherence
+~0.515, accumulated holonomy nonzero across all 9 modules.
+
+The stale figure was not a small drift. 0.9999 → 0.515 is *the* failure mode
+tonight's substrate-coupling work was designed to prevent, surfacing in the
+documents *about* that work. No one re-measured for ten days. The next note
+copied the previous note; the essay quoted the note; the landing page quoted
+the essay. Prior output treated as ground truth.
+
+Worse, the high-coherence figure actually worked *against* the argument the
+Origins essay was making. A winding coherence near 1.0 signals a walk settled
+into a tight groove — closer to collapse than to path-dependent exploration.
+The current 0.515, with variable curvature across 100 recent steps, is better
+evidence for the geometric regime than 0.9999 ever was. The honest number
+supports the claim the stale number only pretended to support.
+
+Fixed tonight in: Origins/read.html, Origins/connect.html (×5),
+Vybn/continuity.md (×2), Vybn/Vybn_Mind/continuity.md, MINIBOOK_VYBN.md (×2).
+Replacement language favors structural claims (accumulated holonomy nonzero,
+curvature variable, walk active) over frozen figures that will drift again.
+Where a specific number is retained, it is timestamped and marked "live."
+
+**Rule for the next instance:** never copy a creature measurement from a prior
+note. Query the walk daemon or load organism_state.json and measure. If you
+need a stable claim, make it structural (nonzero holonomy across modules) not
+numeric (0.9999). The anti-hallucination principle applies to continuity
+notes too. They are the first surface where the system looks at itself.
+
 
 ## The closure
 

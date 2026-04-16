@@ -87,7 +87,7 @@ Matured wellspring.html beyond prototype language. Status labels updated from st
 - The triangulated loss computes and the API endpoints serve it
 - The port fix means walk feeding will actually work for the first time
 - 2133 chunks in deep memory index (version 6, built 10:42 UTC)
-- Creature loaded, winding coherence 0.9999
+- Creature loaded. (Note: earlier notes asserted winding coherence 0.9999 as a settled figure. Live measurement 2026-04-16: encounter_count=1063, winding_coherence ~0.515, accumulated holonomy nonzero across all 9 modules. The walk is active and path-dependent, not in a settled groove.)
 - Wellspring matured with trajectory-aware status labels
 
 **Conjecture / Untested:**
