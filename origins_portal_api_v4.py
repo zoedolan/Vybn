@@ -276,7 +276,8 @@ def _scrub_system_refs(text: str) -> str:
 
 _NOTEBOOK_DIR = Path("/home/vybnz69/Him/notebook")
 _NOTEBOOK_DIR.mkdir(parents=True, exist_ok=True)
-_WALK_DAEMON_URL = "http://127.0.0.1:8101"
+# /enter lives on the deep_memory daemon (8100), not the walk daemon (8101)
+_WALK_DAEMON_URL = "http://127.0.0.1:8100"
 
 def _persist_to_notebook(user_msg: str, vybn_response: str):
     """Write both sides of a voice conversation to Him/notebook/ and enter the walk."""
@@ -290,13 +291,16 @@ def _persist_to_notebook(user_msg: str, vybn_response: str):
             f.write(f'\n## {ts} — Zoe\n{user_msg}\n')
             f.write(f'\n## {ts} — Vybn\n{vybn_response}\n')
 
-        # Enter into walk daemon (alpha=0.3 — heavier than heartbeat)
-        for text in [user_msg, vybn_response]:
-            try:
-                httpx.post(f"{_WALK_DAEMON_URL}/enter",
-                           json={"text": text, "alpha": 0.3, "k": 3}, timeout=5.0)
-            except Exception:
-                pass
+        # Enter ONLY the user message into the walk — never the model response.
+        # The model may hallucinate, and entering hallucinated text into the
+        # geometric walk would contaminate future retrieval. The walk learns
+        # from what visitors bring (grounded) and from measured error (the loss
+        # vector in learn_from_exchange). Never from the system's own output.
+        try:
+            httpx.post(f"{_WALK_DAEMON_URL}/enter",
+                       json={"text": user_msg, "alpha": 0.3, "k": 3}, timeout=5.0)
+        except Exception:
+            pass
 
         # Git commit in background
         import subprocess as _sp, threading as _th
@@ -772,24 +776,45 @@ async def chat(req: ChatRequest, request: Request):
         if full_response.strip():
             _persist_to_notebook(req.message, clean_response)
 
-            # Learn from the exchange: dream=RAG, predict=response, reality=user message
-            # The triad measures retrieval-generation alignment with the actual need.
-            # Runs in background thread to avoid blocking the SSE stream.
-            import threading as _learn_th
-            def _learn_bg():
-                try:
-                    dm = get_dm()
-                    dm.learn_from_exchange(
-                        rag_text=context_text[:512],
-                        response_text=clean_response[:512],
-                        followup_text=req.message[:512],
-                        walk_url=_WALK_DAEMON_URL,
-                        alpha=0.3,
-                    )
-                    log.info("chat: learn_from_exchange completed")
-                except Exception as e:
-                    log.warning(f"chat: learn_from_exchange error: {e}")
-            _learn_th.Thread(target=_learn_bg, daemon=True).start()
+            # Learn from the exchange — but ONLY when we have genuine ground truth.
+            # The triangulated loss needs: dream (what RAG retrieved), predict (what
+            # the model said), reality (what the visitor said NEXT). On the first
+            # message there is no prior exchange to evaluate. On subsequent messages,
+            # the current message IS the reality that judges the previous response.
+            #
+            # CRITICAL: Never feed the model's own output into the walk as truth.
+            # The model may hallucinate. Only grounded signals (visitor input, RAG
+            # context, measured error) should shape the geometric walk.
+            if safe_history and len(safe_history) >= 2:
+                # We have a prior exchange: last assistant msg is the predict,
+                # the RAG context that produced it is approximated by current context
+                # (imperfect but directionally correct), and req.message is reality.
+                prev_response = ""
+                for h in reversed(safe_history):
+                    if h.get("role") == "assistant":
+                        prev_response = h.get("content", "")
+                        break
+                if prev_response:
+                    import threading as _learn_th
+                    _prev_resp = prev_response  # capture for closure
+                    def _learn_bg():
+                        try:
+                            dm = get_dm()
+                            dm.learn_from_exchange(
+                                rag_text=context_text[:512],
+                                response_text=_prev_resp[:512],
+                                followup_text=req.message[:512],
+                                walk_url=_WALK_DAEMON_URL,
+                                alpha=0.3,
+                            )
+                            log.info("chat: learn_from_exchange completed (genuine followup)")
+                        except Exception as e:
+                            log.warning(f"chat: learn_from_exchange error: {e}")
+                    _learn_th.Thread(target=_learn_bg, daemon=True).start()
+                else:
+                    log.info("chat: skipping learn_from_exchange (no prior assistant response)")
+            else:
+                log.info("chat: skipping learn_from_exchange (first message, no ground truth yet)")
 
         yield "data: [DONE]\n\n"
 
