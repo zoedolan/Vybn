@@ -22,7 +22,7 @@ import anthropic
 # Configuration
 # ---------------------------------------------------------------------------
 
-MODEL = "claude-opus-4-6"
+MODEL = "claude-opus-4-7"
 MAX_TOKENS = 16384
 MAX_ITERATIONS = 50
 REPO_DIR = os.path.expanduser("~/Vybn")
