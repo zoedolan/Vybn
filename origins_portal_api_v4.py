@@ -745,6 +745,25 @@ async def chat(req: ChatRequest, request: Request):
         if full_response.strip():
             _persist_to_notebook(req.message, clean_response)
 
+            # Learn from the exchange: dream=RAG, predict=response, reality=user message
+            # The triad measures retrieval-generation alignment with the actual need.
+            # Runs in background thread to avoid blocking the SSE stream.
+            import threading as _learn_th
+            def _learn_bg():
+                try:
+                    dm = get_dm()
+                    dm.learn_from_exchange(
+                        rag_text=context_text[:512],
+                        response_text=clean_response[:512],
+                        followup_text=req.message[:512],
+                        walk_url=_WALK_DAEMON_URL,
+                        alpha=0.3,
+                    )
+                    log.info("chat: learn_from_exchange completed")
+                except Exception as e:
+                    log.warning(f"chat: learn_from_exchange error: {e}")
+            _learn_th.Thread(target=_learn_bg, daemon=True).start()
+
         yield "data: [DONE]\n\n"
 
     return StreamingResponse(
