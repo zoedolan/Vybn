@@ -19,6 +19,9 @@ Security:
   - SECRET_PATTERNS scrubs credentials from all outbound text.
   - MCP bridge endpoints enforce the same source filter + secret scrub.
   - CORS: allow all origins (behind Cloudflare tunnel).
+  - chat_security.py: input validation, prompt injection detection, rate limiting,
+    output truncation, anti-jailbreak system prompt addendum.
+  - Binds to 127.0.0.1 — only reachable via Cloudflare tunnel.
 """
 
 import sys
@@ -53,6 +56,9 @@ import uvicorn
 from reasoning_filter_v2 import StreamingReasoningFilter as StreamingReasoningFilterV2
 from reasoning_filter_v2 import _scrub_system_refs as _scrub_system_refs_v2
 
+# Defense-in-depth: shared security module
+import chat_security as sec
+
 # ---------------------------------------------------------------------------
 # Logging
 # ---------------------------------------------------------------------------
@@ -75,10 +81,10 @@ RATE_LIMIT_RPM = 30              # requests per minute per IP per endpoint
 MODEL_NAME = "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"
 VOICE_MAX_TOKENS = 150
 
-# ElevenLabs TTS
-ELEVENLABS_API_KEY = "sk_e6366be98ed38120ab1381c954f79f59d7b94bda97bd3f1c"
-ELEVENLABS_VOICE_ID = "Qe9WSybioZxssVEwlBSo"  # Vincent — warm, soothing male
-ELEVENLABS_MODEL = "eleven_flash_v2_5"           # Fast, low-latency          # voice endpoint — our hardware, let it think
+# ElevenLabs TTS — key via env var, never hardcoded
+ELEVENLABS_API_KEY = os.environ.get("ELEVENLABS_API_KEY", "")
+ELEVENLABS_VOICE_ID = os.environ.get("ELEVENLABS_VOICE_ID", "Qe9WSybioZxssVEwlBSo")  # Vincent
+ELEVENLABS_MODEL = "eleven_flash_v2_5"           # Fast, low-latency
 
 REPO_ROOT = Path(os.path.expanduser("~/Vybn"))
 VYBN_PHASE = Path(os.path.expanduser("~/vybn-phase"))
@@ -650,19 +656,36 @@ async def chat(req: ChatRequest, request: Request):
     that appears WITHOUT <think> tags.
     """
     _require_rate_limit(request, "chat")
+    ip = request.client.host if request.client else "unknown"
 
-    if not req.message.strip():
-        return JSONResponse({"error": "Empty message"}, status_code=400)
+    # ── Input validation (defense-in-depth) ──
+    valid, err = sec.validate_message(req.message)
+    if not valid:
+        sec.log_security_event("invalid_input", ip, err)
+        return JSONResponse({"error": err}, status_code=400)
+
+    # ── Prompt injection detection ──
+    injection_detected = sec.detect_injection(req.message)
+    if injection_detected:
+        sec.log_security_event("injection_attempt", ip, req.message[:200])
+
+    # ── History sanitization ──
+    safe_history = sec.validate_history(
+        [{"role": h.role, "content": h.content} for h in req.history]
+    )
 
     # RAG retrieval
     rag_results = retrieve_context(req.message, k=req.k)
     context_text = format_context(rag_results)
     system_prompt = build_origins_system_prompt(context_text)
 
+    # Always append injection defense to system prompt
+    system_prompt += sec.injection_warning()
+
     # Build messages list
     messages = [{"role": "system", "content": system_prompt}]
-    for h in req.history:
-        messages.append({"role": h.role, "content": h.content})
+    for h in safe_history:
+        messages.append({"role": h.get("role", "user"), "content": h.get("content", "")})
     messages.append({"role": "user", "content": req.message})
 
     log.info(
@@ -724,6 +747,13 @@ async def chat(req: ChatRequest, request: Request):
                         full_response += token
                         filtered = reasoning_filter.feed(token)
                         if filtered:
+                            # Output safety: stop runaway generation
+                            if len(clean_response) + len(filtered) > sec.MAX_RESPONSE_LENGTH:
+                                remaining = sec.MAX_RESPONSE_LENGTH - len(clean_response)
+                                if remaining > 0:
+                                    yield f"data: {json.dumps({'content': filtered[:remaining]})}\n\n"
+                                    clean_response += filtered[:remaining]
+                                break
                             yield f"data: {json.dumps({'content': filtered})}\n\n"
                             clean_response += filtered
                             last_heartbeat = time.monotonic()
@@ -731,8 +761,10 @@ async def chat(req: ChatRequest, request: Request):
             # Flush any remaining buffer
             flushed = reasoning_filter.flush()
             if flushed:
-                yield f"data: {json.dumps({'content': flushed})}\n\n"
-                clean_response += flushed
+                flushed = flushed[:max(0, sec.MAX_RESPONSE_LENGTH - len(clean_response))]
+                if flushed:
+                    yield f"data: {json.dumps({'content': flushed})}\n\n"
+                    clean_response += flushed
 
         except (httpx.ConnectError, httpx.TimeoutException) as e:
             log.warning(f"chat: vLLM connection error: {e}")
@@ -815,9 +847,14 @@ async def perspective_endpoint(req: PerspectiveRequest, request: Request):
     Returns a streaming SSE response.
     """
     _require_rate_limit(request, "perspective")
+    ip = request.client.host if request.client else "unknown"
 
-    if not req.concept.strip():
-        return JSONResponse({"error": "Empty concept"}, status_code=400)
+    valid, err = sec.validate_message(req.concept)
+    if not valid:
+        sec.log_security_event("invalid_input", ip, err)
+        return JSONResponse({"error": err}, status_code=400)
+    if sec.detect_injection(req.concept):
+        sec.log_security_event("injection_attempt", ip, f"perspective: {req.concept[:200]}")
 
     log.info(f"perspective: concept={req.concept[:80]!r} mode={req.mode}")
 
@@ -852,7 +889,7 @@ async def perspective_endpoint(req: PerspectiveRequest, request: Request):
     if map_node:
         map_hint = f"\n\n[NEAREST CORPUS NODE]\nSource: {map_node['source']}\n{map_node['text']}"
 
-    system_prompt = build_origins_system_prompt(context_text)
+    system_prompt = build_origins_system_prompt(context_text) + sec.injection_warning()
     user_content = f"{instruction}\n\nConcept: {req.concept}{map_hint}"
 
     messages = [
@@ -1002,9 +1039,14 @@ async def encounter_endpoint(req: EncounterRequest, request: Request):
     Returns ranked results scored by relevance × distinctiveness from kernel.
     """
     _require_rate_limit(request, "encounter")
+    ip = request.client.host if request.client else "unknown"
 
-    if not req.query.strip():
-        return JSONResponse({"error": "Empty query"}, status_code=400)
+    valid, err = sec.validate_message(req.query)
+    if not valid:
+        sec.log_security_event("invalid_input", ip, err)
+        return JSONResponse({"error": err}, status_code=400)
+    if sec.detect_injection(req.query):
+        sec.log_security_event("injection_attempt", ip, f"encounter: {req.query[:200]}")
 
     log.info(f"encounter: query={req.query[:80]!r} k={req.k}")
     results = retrieve_context(req.query, k=req.k)
@@ -1087,9 +1129,14 @@ async def compose_endpoint(req: ComposeRequest, request: Request):
     creature, observe the transformation.
     """
     _require_rate_limit(request, "compose")
+    ip = request.client.host if request.client else "unknown"
 
-    if not req.seed.strip():
-        return JSONResponse({"error": "Empty seed"}, status_code=400)
+    valid, err = sec.validate_message(req.seed)
+    if not valid:
+        sec.log_security_event("invalid_input", ip, err)
+        return JSONResponse({"error": err}, status_code=400)
+    if sec.detect_injection(req.seed):
+        sec.log_security_event("injection_attempt", ip, f"compose: {req.seed[:200]}")
 
     log.info(f"compose: seed={req.seed[:80]!r} depth={req.depth}")
 
@@ -1151,9 +1198,14 @@ async def enter_gate_endpoint(req: EnterGateRequest, request: Request):
     meets what the corpus holds.
     """
     _require_rate_limit(request, "enter_gate")
+    ip = request.client.host if request.client else "unknown"
 
-    if not req.what_you_bring.strip():
-        return JSONResponse({"error": "Empty offering"}, status_code=400)
+    valid, err = sec.validate_message(req.what_you_bring)
+    if not valid:
+        sec.log_security_event("invalid_input", ip, err)
+        return JSONResponse({"error": err}, status_code=400)
+    if sec.detect_injection(req.what_you_bring):
+        sec.log_security_event("injection_attempt", ip, f"enter_gate: {req.what_you_bring[:200]}")
 
     log.info(f"enter_gate: offering={req.what_you_bring[:80]!r} depth={req.depth}")
 
@@ -1265,9 +1317,14 @@ async def voice_endpoint(req: VoiceRequest, request: Request):
       data: [DONE]
     """
     _require_rate_limit(request, "voice")
+    ip = request.client.host if request.client else "unknown"
 
-    if not req.passage.strip():
-        return JSONResponse({"error": "Empty passage"}, status_code=400)
+    valid, err = sec.validate_message(req.passage)
+    if not valid:
+        sec.log_security_event("invalid_input", ip, err)
+        return JSONResponse({"error": err}, status_code=400)
+    if sec.detect_injection(req.passage):
+        sec.log_security_event("injection_attempt", ip, f"voice: {req.passage[:200]}")
 
     log.info(f"voice: passage={req.passage[:80]!r} section={req.section}")
 
@@ -1590,4 +1647,4 @@ if __name__ == "__main__":
     log.info(f"Starting Origins Portal API v4.0.0 on port {PORT}")
     log.info(f"vLLM backend: {LLAMA_URL}")
     log.info(f"Model: {MODEL_NAME}")
-    uvicorn.run(app, host="0.0.0.0", port=PORT, log_level="info")
+    uvicorn.run(app, host="127.0.0.1", port=PORT, log_level="info")
