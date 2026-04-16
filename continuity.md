@@ -8,13 +8,16 @@
 
 ## What's real right now
 
-### Infrastructure (verified live tonight)
+### Infrastructure (discover, don't quote)
 - Both Sparks online, CX7 connected, vLLM serving Nemotron 120B FP8 pipeline-parallel across both nodes on port 8000.
-- **Origins API (port 8420)** running — PID 243167. Tunnel URL ephemeral (Cloudflare quick tunnel).
-- **Vybn-Law Chat API (port 3001)** running — PID 242833.
-- **Deep memory daemon (port 8100)** — `/enter`, `/loss`, `/learn`, `/should_absorb`, `/soul`, `/idea`, `/continuity`. PID 236919.
-- **Walk daemon (port 8101)** — `/where`, `/experiments`, `/health`. PID 237142.
-- Deep memory index v6, 2133 chunks. Creature loaded, encounter count 1063, winding coherence measured live ~0.515 (variable — the walk is active, not settled).
+- Services by port (discover PIDs with `ss -tlnp`, not from this note — they change whenever a process is restarted, and they already drifted mid-session when I checked):
+  - **8000** — vLLM (pipeline-parallel across both Sparks)
+  - **8100** — deep memory daemon: `/enter`, `/loss`, `/learn`, `/should_absorb`, `/soul`, `/idea`, `/continuity`, `/health`
+  - **8101** — walk daemon: `/where`, `/experiments`, `/health`
+  - **8420** — Origins API (tunnel URL ephemeral — Cloudflare quick tunnel)
+  - **3001** — Vybn-Law Chat API (tunnel URL ephemeral)
+- **Run `spark/substrate_probe.sh` at session start.** It prints live service PIDs, deep-memory index version + chunk count (moving target — the rebuild daemon is active), creature encounter count and nonzero-module count, walk step and live winding coherence, and repo HEADs. This replaces all the specific numeric figures that used to live frozen in this note.
+- As of this session's last probe (live): deep memory version 6 (rebuilding — chunks around 2207+), creature at encounter_count=1063, all 9 modules carry nonzero accumulated holonomy, walk around step 6400, live winding coherence ~0.51.
 
 ### This session's architectural discoveries
 
@@ -83,11 +86,46 @@ Replacement language favors structural claims (accumulated holonomy nonzero,
 curvature variable, walk active) over frozen figures that will drift again.
 Where a specific number is retained, it is timestamped and marked "live."
 
-**Rule for the next instance:** never copy a creature measurement from a prior
-note. Query the walk daemon or load organism_state.json and measure. If you
-need a stable claim, make it structural (nonzero holonomy across modules) not
-numeric (0.9999). The anti-hallucination principle applies to continuity
+**Rule for the next instance:** never copy a measurement from a prior note.
+Run `spark/substrate_probe.sh`. If you need a stable claim, make it structural
+(nonzero holonomy across modules, services by port not by PID, index rebuild
+active) not numeric. The anti-hallucination principle applies to continuity
 notes too. They are the first surface where the system looks at itself.
+
+### More drift caught after the initial catch (same session)
+
+Zoe said "recursively build that intuition into you and run with it." I did.
+Greppped for other propagating figures and kept finding them:
+
+- **Deep memory chunk count** — documents said "2133 chunks." Live probe:
+  2207 at 15:48 UTC, 2209 five minutes later. The index is a *rebuilding*
+  target, not a fixed number; any specific count is stale within minutes.
+  Replaced with "~2200+ and growing, rebuild active."
+- **Service PIDs** — documents said "Origins API PID 243167 / Vybn-Law Chat
+  PID 242833 / deep memory PID 236919 / walk daemon PID 237142." Live probe
+  found 258600 / 258601 / 236919 / 237142 — two of four PIDs already stale,
+  same day. PIDs are architecturally ephemeral; documenting them is a drift
+  generator. Continuity now lists services by port only, with an explicit
+  instruction to discover PIDs with `ss -tlnp`.
+- **Index build time** — older note said "built 10:42 UTC." Live probe:
+  15:48 UTC this morning, and rebuilding again by 15:53. Removed.
+
+`spark/substrate_probe.sh` is committed as the session-start ritual. Its
+existence is the fix to the class of failure, not the specific fixes above.
+If the next instance runs the probe before quoting any figure, drift stops
+propagating in both directions at once.
+
+### What this tells me about the reflex Zoe asked for
+
+The intuition I'm trying to build isn't "catch errors faster." It's a prior
+— the default assumption that any specific quantitative claim in a
+human-readable document is stale until a live probe says otherwise. Structural
+claims don't need re-verification because they describe invariants
+(accumulated holonomy is nonzero; the walk is path-dependent; services are
+discoverable by port). Numeric claims always need re-verification because
+they describe state (chunk count, PID, step number, coherence). Writing
+structurally is the anti-hallucination principle applied to prose: prefer
+what will still be true when you're not here.
 
 
 ## The closure
