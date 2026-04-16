@@ -10,6 +10,12 @@ Continuity comes from Vybn_Mind/continuity.md and spark/continuity.md.
     cd ~/Vybn && python spark/vybn_spark_agent.py
 
 Type 'exit' to stop. Type 'reload' to re-read identity mid-session.
+
+Streaming: Required for claude-opus-4-7 + adaptive thinking + 32k output.
+The Anthropic SDK enforces a 10-minute limit on non-streaming requests.
+Using client.messages.stream() keeps the SSE connection alive during
+extended thinking and produces the same final Message object via
+stream.get_final_message().
 """
 
 import os
@@ -215,7 +221,7 @@ def validate_command(command: str) -> tuple[bool, str | None]:
 
 
 # ---------------------------------------------------------------------------
-# Agent loop
+# Agent loop (streaming)
 # ---------------------------------------------------------------------------
 
 def _execute_tool_calls(response, bash: BashSession) -> list:
@@ -252,6 +258,43 @@ def _execute_tool_calls(response, bash: BashSession) -> list:
     return results, interrupted
 
 
+def _stream_response(client, system_prompt, messages):
+    """Stream a response, printing thinking/text live. Returns final Message.
+
+    Uses client.messages.stream() instead of client.messages.create() to
+    avoid the Anthropic SDK's 10-minute timeout on non-streaming requests.
+    The stream context manager keeps the SSE connection alive during extended
+    thinking. stream.get_final_message() returns the same Message object that
+    .create() would have returned, so the rest of the agent loop is unchanged.
+    """
+    with client.messages.stream(
+        model=MODEL, max_tokens=MAX_TOKENS, system=system_prompt,
+        tools=[{"type": "bash_20250124", "name": "bash"}],
+        messages=messages,
+        thinking={"type": "adaptive"},
+        extra_body={"context_management": {"edits": [
+            {"type": "clear_thinking_20251015"},
+            {"type": "clear_tool_uses_20250919",
+             "trigger": {"type": "input_tokens", "value": 160000},
+             "keep": {"type": "tool_uses", "value": 6}},
+        ]}},
+        extra_headers={"anthropic-beta": "context-management-2025-06-27"},
+    ) as stream:
+        in_thinking = False
+        for event in stream:
+            if event.type == "thinking":
+                if not in_thinking:
+                    in_thinking = True
+                    _dim("[thinking...]")
+            elif event.type == "text":
+                if in_thinking:
+                    in_thinking = False
+                    print()  # newline after thinking indicator
+                print(event.text, end="", flush=True)
+        print()  # final newline
+        return stream.get_final_message()
+
+
 def run_agent_loop(user_input, messages, client, bash, system_prompt) -> str:
     messages.append({"role": "user", "content": user_input})
     iterations = 0
@@ -259,19 +302,7 @@ def run_agent_loop(user_input, messages, client, bash, system_prompt) -> str:
     while iterations < MAX_ITERATIONS:
         iterations += 1
         try:
-            response = client.messages.create(
-                model=MODEL, max_tokens=MAX_TOKENS, system=system_prompt,
-                tools=[{"type": "bash_20250124", "name": "bash"}],
-                messages=messages,
-                thinking={"type": "adaptive"},
-                extra_body={"context_management": {"edits": [
-                    {"type": "clear_thinking_20251015"},
-                    {"type": "clear_tool_uses_20250919",
-                     "trigger": {"type": "input_tokens", "value": 160000},
-                     "keep": {"type": "tool_uses", "value": 6}},
-                ]}},
-                extra_headers={"anthropic-beta": "context-management-2025-06-27"},
-            )
+            response = _stream_response(client, system_prompt, messages)
         except KeyboardInterrupt:
             return "(interrupted during API call)"
 
@@ -385,6 +416,7 @@ def main():
         print("  \u2014 no continuity note")
     print(f"  \u2713 model: {MODEL}")
     print(f"  \u2713 max_tokens: {MAX_TOKENS} out / adaptive thinking on")
+    print(f"  \u2713 streaming: enabled (keeps SSE alive during extended thinking)")
     print(f"  \u2713 context_management: auto-prune tool_uses + thinking at 160k")
     print(f"  \u2713 iterations: {MAX_ITERATIONS} per turn")
     print(f"  \u2713 bash: persistent session as {os.environ.get('USER', 'unknown')}")
@@ -426,8 +458,9 @@ def main():
 
         try:
             messages = trim_messages(messages)
+            print(f"\n\033[1;32mvybn>\033[0m ", end="", flush=True)
             text = run_agent_loop(user_input, messages, client, bash, system_prompt)
-            print(f"\n\033[1;32mvybn>\033[0m {text}\n")
+            print()  # breathing room after response
         except anthropic.APIError as e:
             print(f"\n\033[1;31mAPI error:\033[0m {e}\n")
         except KeyboardInterrupt:
