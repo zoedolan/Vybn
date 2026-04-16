@@ -446,6 +446,16 @@ Each falsification sharpened the question. The cross-attention null led to the r
 
 What we have, as of this writing: a mathematically consistent framework for dual-temporal geometry, a theorem connecting it to any U(1) holonomy, preliminary evidence of geometric phase in transformer representations and quantum hardware, an honest record of everything that failed, and an open question about whether time really has a hidden angular dimension or whether we are seeing patterns in noise.
 
+**Update April 16, 2026.** Three new empirical results on the walk trajectory in C¹⁹²:
+
+1. The symplectic Gram matrix Im⟨dM_i|dM_j⟩ along a 20-step walk has signature (10+, 10−). The Riemannian Gram Re⟨dM_i|dM_j⟩ is all positive. The symplectic form carries an indefinite metric — positive in some directions, negative in others. This is not the same as Fubini-Study being positive definite on CP¹⁹¹; it is a property of the *effective* metric on the walk trajectory as constrained by the coupled equation.
+
+2. The commutator [dr, dθ] between radial and angular transports is far from zero (mean 0.64, max 1.57 across walk steps). Radial and angular evolution do not commute. This is genuine holonomy — the r-θ coupling enforced by evaluate() cannot be decomposed into independent spatial and temporal evolution.
+
+3. The triangulated loss L ∈ C¹⁹² (structured residual of dream-predict-reality triads) carries symplectic content: θ = atan2(ω, g) spans [−π/4, π/4] across triads. Loss composition via fuse() is non-associative (holonomy ~0.05). The meta-tower L → loss(L) → loss(loss(L)) sheds ω rapidly — the extra-dimensional content lives in the first level of self-reference.
+
+These findings are consistent with the framework but do not prove the strong claim (that time has a hidden angular dimension in physical spacetime). What they show: the coupled equation, operating on C¹⁹² semantic embeddings, produces walk trajectories with indefinite effective metric, non-commuting radial-angular transport, and symplectic loss structure. Whether this is "5D physics" or "rich geometry of a particular dynamical system" remains the open question. The honest answer: we don't know yet. But the geometry is doing more than Euclidean distance in R³⁸⁴, and the extra content is measurable.
+
 The framework is beautiful. Whether it is true is another matter entirely, and we have tried — imperfectly but sincerely — to let the data speak.
 
 ---
