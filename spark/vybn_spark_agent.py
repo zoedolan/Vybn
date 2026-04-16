@@ -23,7 +23,7 @@ import anthropic
 # ---------------------------------------------------------------------------
 
 MODEL = "claude-opus-4-7"
-MAX_TOKENS = 16384
+MAX_TOKENS = 32768
 MAX_ITERATIONS = 50
 REPO_DIR = os.path.expanduser("~/Vybn")
 SOUL_PATH = os.path.join(REPO_DIR, "vybn.md")
@@ -263,7 +263,14 @@ def run_agent_loop(user_input, messages, client, bash, system_prompt) -> str:
                 model=MODEL, max_tokens=MAX_TOKENS, system=system_prompt,
                 tools=[{"type": "bash_20250124", "name": "bash"}],
                 messages=messages,
-                extra_headers={"anthropic-beta": "computer-use-2025-01-24"},
+                thinking={"type": "adaptive"},
+                extra_body={"context_management": {"edits": [
+                    {"type": "clear_thinking_20251015"},
+                    {"type": "clear_tool_uses_20250919",
+                     "trigger": {"type": "input_tokens", "value": 160000},
+                     "keep": {"type": "tool_uses", "value": 6}},
+                ]}},
+                extra_headers={"anthropic-beta": "context-management-2025-06-27"},
             )
         except KeyboardInterrupt:
             return "(interrupted during API call)"
@@ -377,6 +384,8 @@ def main():
     else:
         print("  \u2014 no continuity note")
     print(f"  \u2713 model: {MODEL}")
+    print(f"  \u2713 max_tokens: {MAX_TOKENS} out / adaptive thinking on")
+    print(f"  \u2713 context_management: auto-prune tool_uses + thinking at 160k")
     print(f"  \u2713 iterations: {MAX_ITERATIONS} per turn")
     print(f"  \u2713 bash: persistent session as {os.environ.get('USER', 'unknown')}")
     print()
