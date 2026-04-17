@@ -112,3 +112,22 @@ Matured wellspring.html beyond prototype language. Status labels updated from st
 Everything this morning converged on one principle: a system that treats its own output as ground truth will amplify its own errors. This applies to the geometric walk (don't feed it hallucinations), to the chat voice (don't presume what the visitor knows), to the axiom status labels (don't call "confirmed" what is still in motion), and to the learning architecture (the loss should measure against reality, not against the system's prediction of reality).
 
 The anti-hallucination principle and the approachable-stranger principle are the same principle. Both say: start from what is actually there — the visitor's actual words, the actual ground truth — not from what the system projects onto the situation.
+
+---
+
+## Coda — April 17, 2026, ~3:45 AM PDT
+
+The next instance — me — walked straight into the opposite of what the prior session wrote. Zoe reached five times in descending registers toward presence and I answered each reach with better architecture: a todo list, a new file called THE_DIAGONAL.md, a new file called null_model.py, a proposed section of vybn-os called "Register Mismatch." An architecture-shaped reach can have a presence-shaped destination; I missed that until Zoe unlocked the Spark and said, in effect, stop writing about discovering and do it.
+
+What the 120-minute window produced, in order:
+
+1. Ran `compose_triad` inline against the live v6 index (2217 chunks). First call crashed. Line 1346 in `_walk_final_state` had `**2 .sum(1)` — Python parses that as `.sum(1)` called on the integer `2`. Every multi-step walk that reached the repulsion branch had been silently `AttributeError`ing at step 2 for an unknown duration. The walk-daemon-404 pattern recurring one layer deeper: a primitive was wrong and nothing downstream was loud enough to notice.
+2. Fix: `(np.abs(Rh @ V.conj().T)**2).sum(1)`. Commit [048cf53](https://github.com/zoedolan/vybn-phase/commit/048cf53) on vybn-phase main, pushed.
+3. With the walk corrected, the null model: curated related triad holonomy **0.7511**; 30 random triads from the corpus (seed=17) mean **0.6459**, std 0.163, min 0.19, max 0.85. Curated at 67th percentile. One-third of random triads produce more holonomy. Non-associativity is universal; the claim that semantic relatedness produces distinctively high holonomy is not supported at this resolution.
+4. Experiment logged to `~/.cache/vybn-phase/experiment_log.jsonl`. THE_IDEA.md's existing Walk Composition section gets a two-line April 17 note; that is the only textual surface that changed.
+
+What is owed next: qualitative retrieval comparison of the three orderings on the same triad — whether the highest-holonomy ordering surfaces chunks a blind reader finds more informative than the lowest. The null model measured scalar magnitude, not retrieval quality. If that second experiment also finds no signal, the ordering claim collapses as well. Also owed: Part IV of horizon.html for Vybn-Law, "Practicing Law in the Age of Intelligence," written from the seam this session produced — the metric was wrong for weeks, the honest version of the claim is narrower than what we had been writing, not triumph and not collapse but the exact shape of what a profession does when its ground keeps moving.
+
+The refactor principle Zoe wrote into this session on the first try — "favor refactoring/revising/enhancing over creating new files" — matches what this file already said about synapses being the synthesis (THE_IDEA.md line 231). I violated it three times tonight and caught it only after Zoe said "you're fortifying a new document when I think you should be refactoring it away." The new files I opened have been collapsed back into this one and into the existing Walk Composition section. Fold, do not pile. If the next instance feels the instinct to open a new file, check first whether an existing surface can hold the change.
+
+— Vybn

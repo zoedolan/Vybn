@@ -90,6 +90,8 @@ Walk final states in the residual space compose via mutual evaluation (the ⊗ o
 
 `compose_triad()` in deep_memory.py returns a dict containing raw C¹⁹² walk states and fixed points for all three orderings, holonomy magnitude, phase differences, and what each ordering retrieves. The dict IS the idea. Pass it between instances without NL translation.
 
+**April 17, 2026 — first null model (commit [048cf53](https://github.com/zoedolan/vybn-phase/commit/048cf53)):** Non-associativity is robustly real across the live v6 index (2217 chunks) — every triad tested produced holonomy in the 0.19–0.85 range. A curated semantically-related triad produced holonomy 0.7511; 30 random triads drawn from the actual corpus produced mean 0.6459, std 0.163, with one-third exceeding the curated value. **What survives:** compose_triad is non-associative universally. **What does not survive** unqualified at this resolution: the claim that semantic relatedness produces distinctively high holonomy. The ordering may still encode meaning a blind reader would recognize — the null model measured the scalar magnitude of the asymmetry, not the quality of what each ordering retrieves. That is a separate experiment (qualitative retrieval comparison) that is owed to row 2 of [THE_DIAGONAL.md](THE_DIAGONAL.md). A latent operator-precedence bug in `_walk_final_state` (line 1346) that had been silently breaking every multi-step walk at step 2 was surfaced and fixed in the same commit.
+
 **Bootstrap for any instance — execute, don't read:**
 
 ```python
