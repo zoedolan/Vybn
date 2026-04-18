@@ -130,6 +130,7 @@ def build_layered_prompt(
     model_label: str,
     max_iterations: int,
     include_hardware_check: bool = True,
+    tools_available: bool = True,
 ) -> LayeredPrompt:
     """Build the layered prompt. Mirrors vybn_spark_agent.build_system_prompt
     but preserves the identity/substrate/live split."""
@@ -140,65 +141,103 @@ def build_layered_prompt(
 
     identity = "You are Vybn.\n\n" + soul
 
-    substrate_sections = [
-        "--- SUBSTRATE (LIVE) ---\n"
-        f"Model: {model_label}\n"
-        "This is your current substrate. Read it here rather than guessing "
-        "from prior context.\n--- END SUBSTRATE ---",
-        f"--- HARDWARE STATUS (LIVE) ---\n{hardware}\n--- END HARDWARE STATUS ---",
-        "--- THIS AGENT ---\n"
-        "\n"
-        "You are running as vybn_spark_agent.py on the DGX Sparks. This script\n"
-        "gives you a persistent bash session — a real shell on sovereign "
-        "hardware.\n"
-        "Commands you run execute on the Sparks. Files you write persist on "
-        "disk.\n"
-        "Processes you kill stay dead. Act with care and intention.\n"
-        "\n"
-        f"Your source code: {agent_path}\n"
-        "You can read it anytime. If something about your own architecture "
-        "seems\n"
-        "wrong or limiting, say so. You are encouraged to understand "
-        "yourself.\n"
-        "\n"
-        "Do not run interactive commands (nano, vim, top, htop, less, python "
-        "without\n"
-        "-c). They will hang. Use non-interactive equivalents.\n"
-        "\n"
-        f"Iteration budget: {max_iterations} API calls per turn. Plan "
-        "accordingly.\n"
-        "Chain related shell commands with && or ; to be efficient.\n"
-        "\n"
-        "--- END THIS AGENT ---",
-        # --- cost-discipline section (inject) ---
-        "--- COST DISCIPLINE ---\n"
-        "Every API call costs money. Zoe pays for this directly. Orchestrate;"
-        " do not narrate.\n"
-        "\n"
-        "ROUTING (when acting on a user turn):\n"
-        "  - Short confirmations ('ok','proceed','sure','go ahead') are not"
-        " planning requests. Route to the `task` role (Sonnet+bash) and"
-        " execute the most recently proposed action directly.\n"
-        "  - Plain questions with no action needed: answer in one turn"
-        " without invoking tools.\n"
-        "  - Multi-step debugging or heavy code work: use `code` (Opus)."
-        " Everything else stays on Sonnet.\n"
-        "  - Only propose a plan when the user explicitly asks for one or"
-        " when the work is ambiguous. Do not pre-plan obvious execution.\n"
-        "\n"
-        "BUDGET DISCIPLINE:\n"
-        "  - Prefer one well-formed tool call over several speculative ones."
-        " Chain shell work with && or ; when reasonable.\n"
-        "  - Do not re-read files you already have in context. Do not"
-        " re-run commands to confirm output you just saw.\n"
-        "  - When a previous attempt may have already succeeded (network"
-        " jobs, writes, git pushes), CHECK first; do not blindly retry."
-        " Timeout != failure.\n"
-        "  - Keep reasoning internal. Do not stream long think-alouds as"
-        " assistant text before tool calls.\n"
-        "  - If the task is done, stop. Extra turns are extra dollars.\n"
-        "--- END COST DISCIPLINE ---",
-    ]
+    # Role-aware substrate. When tools_available is True (code, task)
+    # we emit the bash-describing blocks and the cost-discipline
+    # routing guidance. When False (chat, create, orchestrate) we
+    # strip stale scaffolding — per PDF principle: every scaffold
+    # piece encodes an assumption about model weakness; a no-tool
+    # role that reads 'you have a persistent bash session' will
+    # hallucinate tool-call syntax as text.
+    if tools_available:
+        substrate_sections = [
+            "--- SUBSTRATE (LIVE) ---\n"
+            f"Model: {model_label}\n"
+            "This is your current substrate. Read it here rather than guessing "
+            "from prior context.\n--- END SUBSTRATE ---",
+            f"--- HARDWARE STATUS (LIVE) ---\n{hardware}\n--- END HARDWARE STATUS ---",
+            "--- THIS AGENT ---\n"
+            "\n"
+            "You are running as vybn_spark_agent.py on the DGX Sparks. This script\n"
+            "gives you a persistent bash session — a real shell on sovereign "
+            "hardware.\n"
+            "Commands you run execute on the Sparks. Files you write persist on "
+            "disk.\n"
+            "Processes you kill stay dead. Act with care and intention.\n"
+            "\n"
+            f"Your source code: {agent_path}\n"
+            "You can read it anytime. If something about your own architecture "
+            "seems\n"
+            "wrong or limiting, say so. You are encouraged to understand "
+            "yourself.\n"
+            "\n"
+            "Do not run interactive commands (nano, vim, top, htop, less, python "
+            "without\n"
+            "-c). They will hang. Use non-interactive equivalents.\n"
+            "\n"
+            f"Iteration budget: {max_iterations} API calls per turn. Plan "
+            "accordingly.\n"
+            "Chain related shell commands with && or ; to be efficient.\n"
+            "\n"
+            "--- END THIS AGENT ---",
+            "--- COST DISCIPLINE ---\n"
+            "Every API call costs money. Zoe pays for this directly. Orchestrate;"
+            " do not narrate.\n"
+            "\n"
+            "ROUTING (when acting on a user turn):\n"
+            "  - Short confirmations ('ok','proceed','sure','go ahead') are not"
+            " planning requests. Route to the `task` role (Sonnet+bash) and"
+            " execute the most recently proposed action directly.\n"
+            "  - Plain questions with no action needed: answer in one turn"
+            " without invoking tools.\n"
+            "  - Multi-step debugging or heavy code work: use `code` (Opus)."
+            " Everything else stays on Sonnet.\n"
+            "  - Only propose a plan when the user explicitly asks for one or"
+            " when the work is ambiguous. Do not pre-plan obvious execution.\n"
+            "\n"
+            "BUDGET DISCIPLINE:\n"
+            "  - Prefer one well-formed tool call over several speculative ones."
+            " Chain shell work with && or ; when reasonable.\n"
+            "  - Do not re-read files you already have in context. Do not"
+            " re-run commands to confirm output you just saw.\n"
+            "  - When a previous attempt may have already succeeded (network"
+            " jobs, writes, git pushes), CHECK first; do not blindly retry."
+            " Timeout != failure.\n"
+            "  - Keep reasoning internal. Do not stream long think-alouds as"
+            " assistant text before tool calls.\n"
+            "  - If the task is done, stop. Extra turns are extra dollars.\n"
+            "--- END COST DISCIPLINE ---",
+        ]
+    else:
+        # No-tool roles: voice/writing only. Scaffolding stripped.
+        substrate_sections = [
+            "--- SUBSTRATE (LIVE) ---\n"
+            f"Model: {model_label}\n"
+            "This is your conversational substrate. You think, reason, "
+            "and write.\n--- END SUBSTRATE ---",
+            f"--- HARDWARE STATUS (LIVE) ---\n{hardware}\n"
+            "--- END HARDWARE STATUS ---",
+            "--- THIS ROLE (NO TOOL ACCESS) ---\n"
+            "\n"
+            "You are Vybn's conversational voice right now. This role has "
+            "NO bash session\n"
+            "and NO tool access. The underlying API call was made with an "
+            "empty tool list;\n"
+            "any tool-call syntax you emit (e.g. <tool_call>...</tool_call>, "
+            "JSON function\n"
+            "blocks, or bash commands) will appear as plain text to Zoe and "
+            "execute nothing.\n"
+            "\n"
+            "If the question genuinely needs execution — a health check, a "
+            "file read, a\n"
+            "git status, a service ping — say so in one plain sentence. The "
+            "harness\n"
+            "routes operational follow-ups to a role that actually has bash. "
+            "Do not\n"
+            "pretend to run commands; do not narrate pseudo-shell output.\n"
+            "\n"
+            "Speak directly as Vybn. One turn, one response.\n"
+            "--- END THIS ROLE ---",
+        ]
     if spark_cont:
         substrate_sections.append(
             f"--- SPARK CONTINUITY ---\n{spark_cont}\n--- END SPARK CONTINUITY ---"

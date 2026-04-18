@@ -187,6 +187,17 @@ _DEFAULT_HEURISTICS_RAW: dict[str, list[str]] = {
         r'^\\s*(proceed|go ahead|do it|continue|execute|go for it|ship it)\\s*[!.,?]*\\s*$',
         r'^\\s*(sure|sounds good|looks good|makes sense|perfect|great)\\s*[!.,?]*\\s*$',
         r"^\\s*let'?s go\\s*[!.,?]*\\s*$",
+        # Round 4.2: operational status questions route to task
+        # (has bash) instead of chat (which hallucinated tool-call
+        # syntax from a stale bash-describing substrate).
+        r"\\bis everything (ok|okay|working|fine|good|all right)\\b",
+        r"\\bare (your|the|our).{0,40}(updates|changes|fixes|patches|commits|deploys|services|daemons|ports|crons|scripts).{0,20}(working|running|ok|okay|fine|up|live|green)\\b",
+        r"\\b(updates|changes|fixes|patches|commits|deploys).{0,30}(working|running|ok|okay|fine)\\b",
+        r"\\bdid (that|it|the|those).{0,30}(work|run|succeed|finish|complete|land|push|commit|deploy)\\b",
+        r"\\bstill (working|running|live|up|breathing|alive|ok|okay|fine)\\b",
+        r"\\b(check|verify|confirm|audit)\\b.{0,50}\\b(status|health|state|service|services|daemon|daemons|port|ports|cron|crons|walk|server|api)\\b",
+        r"\\bhealth check\\b",
+        r"\\bhey buddy.{0,40}(working|running|okay|ok|check)\\b",
     ],
     # Identity is matched before phatic/chat so "which model are you?"
     # lands on a direct metadata answer instead of a greeting path.

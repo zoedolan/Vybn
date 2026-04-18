@@ -62,9 +62,22 @@ from harness.prompt import rag_snippets  # noqa: E402
 # failure; no effect on the agent loop's critical path.
 # ---------------------------------------------------------------------------
 
+import re as _re
 import threading as _threading
 
 _LEARN_PENDING: dict = {"rag": "", "response": ""}
+
+# Round 4.2: detect when a no-tool role emits tool-call syntax as
+# plain text. Opus 4.6 with tools=[] but bash-describing substrate
+# was producing <tool_call>{"name":"bash",...}</tool_call> strings
+# that the API did not execute. The stripped substrate (via
+# tools_available=False in build_layered_prompt) is the primary
+# fix; this regex is a blast-radius guard so any residual leak
+# reroutes to the role that actually has bash.
+_HALLUCINATED_TOOL_RE = _re.compile(
+    r'<tool_call>|(?s)\{\s*"name"\s*:\s*"bash"\s*,\s*"arguments"',
+    _re.IGNORECASE,
+)
 
 
 def _fire_learn_async(rag_text: str, response_text: str, followup_text: str) -> None:
@@ -362,6 +375,8 @@ def run_agent_loop(
     logger: EventLogger,
     turn_number: int,
     forced_role: str | None = None,
+    system_prompt_no_tools: LayeredPrompt | None = None,
+    _reroute_depth: int = 0,
 ) -> str:
     # (round 4) Fire learn_from_exchange for the PREVIOUS turn. We have
     # all three legs now: what RAG retrieved (dream), what the model said
@@ -375,6 +390,16 @@ def run_agent_loop(
 
     decision = router.classify(user_input, forced_role=forced_role)
     role_cfg = decision.config
+
+    # Round 4.2: pick the role-appropriate system prompt. No-tool
+    # roles (chat/create/orchestrate/phatic/identity/local) get the
+    # stripped variant. If system_prompt_no_tools wasn't passed
+    # in (legacy callers), fall back to the tools-on prompt — the
+    # behavior is unchanged in that case.
+    if not role_cfg.tools and system_prompt_no_tools is not None:
+        active_prompt = system_prompt_no_tools
+    else:
+        active_prompt = system_prompt
 
     logger.emit(
         "route_decision",
@@ -418,9 +443,9 @@ def run_agent_loop(
     if role_cfg.rag and not getattr(role_cfg, "lightweight", False):
         enrichment = rag_snippets(decision.cleaned_input[:500], k=4)
         if enrichment:
-            system_prompt = LayeredPrompt(
-                identity=system_prompt.identity,
-                substrate=system_prompt.substrate,
+            active_prompt = LayeredPrompt(
+                identity=active_prompt.identity,
+                substrate=active_prompt.substrate,
                 live=enrichment,
             )
             _dim("[deep-memory: enriched prompt]")
@@ -446,7 +471,7 @@ def run_agent_loop(
                     registry=registry,
                     role_cfg=role_cfg,
                     provider=provider,
-                    system_prompt=system_prompt,
+                    system_prompt=active_prompt,
                     messages=messages,
                     tools=tools,
                     logger=logger,
@@ -489,6 +514,49 @@ def run_agent_loop(
             if response.stop_reason == "end_turn":
                 bag["stop_reason"] = "end_turn"
                 _LEARN_PENDING["response"] = (response.text or "")[:2000]
+
+                # Round 4.2: escape hatch. If a no-tool role still
+                # emitted tool-call syntax as text (should not happen
+                # with the stripped substrate, but guard anyway),
+                # pop the broken exchange and reroute to task which
+                # has bash. One-shot — _reroute_depth gates recursion.
+                if (
+                    not role_cfg.tools
+                    and _HALLUCINATED_TOOL_RE.search(response.text or "")
+                    and _reroute_depth == 0
+                    and not forced_role
+                ):
+                    logger.emit(
+                        "chat_tool_hallucination",
+                        turn=turn_number,
+                        role=decision.role,
+                        model=role_cfg.model,
+                        snippet=(response.text or "")[:200],
+                    )
+                    _warn(
+                        f"[{decision.role}/{role_cfg.model} emitted tool-call "
+                        "syntax — rerouting to task]"
+                    )
+                    bag["stop_reason"] = "rerouted"
+                    # Pop the hallucinated assistant + its paired user
+                    # turn so the reroute starts clean.
+                    if messages and messages[-1].get("role") == "assistant":
+                        messages.pop()
+                    if messages and messages[-1].get("role") == "user":
+                        messages.pop()
+                    return run_agent_loop(
+                        user_input=user_input,
+                        messages=messages,
+                        bash=bash,
+                        system_prompt=system_prompt,
+                        router=router,
+                        registry=registry,
+                        logger=logger,
+                        turn_number=turn_number,
+                        forced_role="task",
+                        system_prompt_no_tools=system_prompt_no_tools,
+                        _reroute_depth=1,
+                    )
                 return response.text
             if response.stop_reason == "max_tokens":
                 bag["stop_reason"] = "max_tokens"
@@ -579,7 +647,11 @@ def trim_messages(messages: list, max_pairs: int = 20) -> list:
 # Main
 # ---------------------------------------------------------------------------
 
-def _build_prompt(policy_default_max_iters: int) -> LayeredPrompt:
+def _build_prompt(
+    policy_default_max_iters: int,
+    *,
+    tools_available: bool = True,
+) -> LayeredPrompt:
     return build_layered_prompt(
         soul_path=SOUL_PATH_STR,
         continuity_path=CONTINUITY_PATH,
@@ -587,7 +659,19 @@ def _build_prompt(policy_default_max_iters: int) -> LayeredPrompt:
         agent_path=AGENT_PATH,
         model_label="policy-driven (see spark/router_policy.yaml)",
         max_iterations=policy_default_max_iters,
+        tools_available=tools_available,
     )
+
+
+def _build_prompts(policy_default_max_iters: int) -> tuple[LayeredPrompt, LayeredPrompt]:
+    """Return (tools_on, tools_off) prompt variants. Both share the
+    same identity layer (vybn.md) so Anthropic's cache_control on
+    that block still hits across role switches. Only the substrate
+    differs: tools_off omits the bash/cost-discipline sections so
+    a no-tool role never sees stale scaffolding."""
+    tools_on = _build_prompt(policy_default_max_iters, tools_available=True)
+    tools_off = _build_prompt(policy_default_max_iters, tools_available=False)
+    return tools_on, tools_off
 
 
 def main() -> None:
@@ -630,7 +714,9 @@ def main() -> None:
     bash = BashTool()
 
     default_cfg = policy.role(policy.default_role)
-    system_prompt = _build_prompt(default_cfg.max_iterations)
+    system_prompt, system_prompt_no_tools = _build_prompts(
+        default_cfg.max_iterations
+    )
     messages: list = []
 
     soul_ok = os.path.exists(SOUL_PATH_STR)
@@ -680,8 +766,10 @@ def main() -> None:
             print("  Cleared.\n")
             continue
         if low == "reload":
-            system_prompt = _build_prompt(default_cfg.max_iterations)
-            print("  Reloaded vybn.md + continuity.\n")
+            system_prompt, system_prompt_no_tools = _build_prompts(
+                default_cfg.max_iterations
+            )
+            print("  Reloaded vybn.md + continuity (both prompt variants).\n")
             continue
         if low == "policy":
             for name, cfg in sorted(policy.roles.items()):
@@ -737,6 +825,7 @@ def main() -> None:
                 messages=messages,
                 bash=bash,
                 system_prompt=system_prompt,
+                system_prompt_no_tools=system_prompt_no_tools,
                 router=router,
                 registry=registry,
                 logger=logger,

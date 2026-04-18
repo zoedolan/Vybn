@@ -111,6 +111,18 @@ heuristics:
     - "^\\s*(proceed|go ahead|do it|continue|execute|go for it|ship it)\\s*[!.,?]*\\s*$"
     - "^\\s*(sure|sounds good|looks good|makes sense|perfect|great)\\s*[!.,?]*\\s*$"
     - "^\\s*let'?s go\\s*[!.,?]*\\s*$"
+    # Round 4.2: operational status questions. These kept routing to
+    # chat (no tools) where Opus 4.6 hallucinated <tool_call> syntax
+    # as text because the substrate described a bash session. Send
+    # them to task (Sonnet + bash) so actual health checks can run.
+    - "\\bis everything (ok|okay|working|fine|good|all right)\\b"
+    - "\\bare (your|the|our).{0,40}(updates|changes|fixes|patches|commits|deploys|services|daemons|ports|crons|scripts).{0,20}(working|running|ok|okay|fine|up|live|green)\\b"
+    - "\\b(updates|changes|fixes|patches|commits|deploys).{0,30}(working|running|ok|okay|fine)\\b"
+    - "\\bdid (that|it|the|those).{0,30}(work|run|succeed|finish|complete|land|push|commit|deploy)\\b"
+    - "\\bstill (working|running|live|up|breathing|alive|ok|okay|fine)\\b"
+    - "\\b(check|verify|confirm|audit)\\b.{0,50}\\b(status|health|state|service|services|daemon|daemons|port|ports|cron|crons|walk|server|api)\\b"
+    - "\\bhealth check\\b"
+    - "\\bhey buddy.{0,40}(working|running|okay|ok|check)\\b"
   # Identity matched first so "which model are you?" skips the chat path.
   identity:
     - "\\bwhich model\\b"
