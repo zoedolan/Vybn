@@ -190,6 +190,9 @@ _DEFAULT_HEURISTICS_RAW: dict[str, list[str]] = {
         r"\bgit\b", r"\bpython\b", r"\.py\b", r"\bdef\s+\w+",
         r"^\s*\$ ", r"[Tt]raceback", r"\bpip\b", r"\bnpm\b",
         r"\bpatch\b", r"\bgrep\b", r"\bsed\b", r"\bawk\b",
+        r"\bbugs?\b", r"\bdebug(ging)?\b", r"\bdeficits?\b",
+        r"\bharness\b", r"\bstack trace\b", r"\bHTTP \d{3}\b",
+        r"\bprovider error\b",
     ],
     "create": [
         r"\bbrainstorm\b", r"\bsketch\b", r"\bwhat if\b",

@@ -397,10 +397,16 @@ class OpenAIProvider:
         if base and not base.rstrip("/").endswith("/v1"):
             base = base.rstrip("/") + "/v1"
 
+        # Cloud OpenAI (no base_url) requires max_completion_tokens for
+        # GPT-5.x and o-series models; passing the legacy max_tokens key
+        # returns HTTP 400. Local vLLM / Nemotron (base_url set) still
+        # speaks the legacy key. Branch on transport rather than model
+        # name so new OpenAI-compatible models don't need a code change.
+        max_key = "max_tokens" if base else "max_completion_tokens"
         payload: dict[str, Any] = {
             "model": role.model,
             "messages": openai_messages,
-            "max_tokens": role.max_tokens,
+            max_key: role.max_tokens,
             "temperature": role.temperature,
             "stream": False,
         }

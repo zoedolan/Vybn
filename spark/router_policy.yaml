@@ -123,6 +123,13 @@ heuristics:
     - "\\bgrep\\b"
     - "\\bsed\\b"
     - "\\bawk\\b"
+    - "\\bbugs?\\b"
+    - "\\bdebug(ging)?\\b"
+    - "\\bdeficits?\\b"
+    - "\\bharness\\b"
+    - "\\bstack trace\\b"
+    - "\\bHTTP \\d{3}\\b"
+    - "\\bprovider error\\b"
   create:
     - "\\bbrainstorm\\b"
     - "\\bsketch\\b"

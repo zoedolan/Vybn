@@ -154,6 +154,95 @@ def _stream_and_print(handle) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Fallback resolution — policy declares fallback_chain by model name.
+# When a provider call fails we walk that chain, look for a role that
+# already uses the fallback model, and retry with its config. If no
+# matching role exists we synthesise a minimal RoleConfig from the
+# original so tool list / max_tokens / etc. are preserved.
+# ---------------------------------------------------------------------------
+
+def _resolve_fallback(policy, role_cfg, model_name):
+    """Return a RoleConfig for `model_name` or None."""
+    from harness.policy import RoleConfig
+    for cfg in policy.roles.values():
+        if cfg.model == model_name:
+            return cfg
+    # No exact role for this model — infer provider from the name.
+    provider = "anthropic" if model_name.startswith("claude-") else (
+        "openai" if model_name.startswith("gpt-") else role_cfg.provider
+    )
+    return RoleConfig(
+        role=role_cfg.role + ":fb",
+        provider=provider,
+        model=model_name,
+        thinking=role_cfg.thinking,
+        max_tokens=role_cfg.max_tokens,
+        max_iterations=role_cfg.max_iterations,
+        tools=list(role_cfg.tools),
+        temperature=role_cfg.temperature,
+        base_url=None,
+        rag=role_cfg.rag,
+        lightweight=role_cfg.lightweight,
+    )
+
+
+def _stream_with_fallback(
+    *,
+    router,
+    registry,
+    role_cfg,
+    provider,
+    system_prompt,
+    messages,
+    tools,
+    logger,
+    turn_number,
+):
+    """Try provider.stream() and walk the fallback chain on failure.
+
+    Returns (handle, active_role_cfg, active_provider) on success, or
+    raises the last exception if every link in the chain failed.
+    KeyboardInterrupt is never caught here — it must propagate so the
+    REPL can surface "interrupted during API call".
+    """
+    attempts = [(role_cfg, provider)]
+    for fb_model in router.policy.fallback_chain.get(role_cfg.model, []):
+        fb_cfg = _resolve_fallback(router.policy, role_cfg, fb_model)
+        if fb_cfg is None:
+            continue
+        attempts.append((fb_cfg, registry.get(fb_cfg)))
+
+    last_exc = None
+    for cfg, prov in attempts:
+        try:
+            handle = prov.stream(
+                system=system_prompt,
+                messages=messages,
+                tools=tools,
+                role=cfg,
+            )
+            if cfg is not role_cfg:
+                _warn(
+                    f"primary failed ({last_exc.__class__.__name__}); "
+                    f"fell back to {cfg.provider}:{cfg.model}"
+                )
+                logger.emit(
+                    "fallback",
+                    turn=turn_number,
+                    from_model=role_cfg.model,
+                    to_model=cfg.model,
+                    reason=str(last_exc)[:200],
+                )
+            return handle, cfg, prov
+        except KeyboardInterrupt:
+            raise
+        except Exception as e:  # noqa: BLE001 — we want every provider error
+            last_exc = e
+            continue
+    raise last_exc if last_exc else RuntimeError("no providers available")
+
+
+# ---------------------------------------------------------------------------
 # Agent loop — policy-driven.
 # ---------------------------------------------------------------------------
 
@@ -234,11 +323,16 @@ def run_agent_loop(
         while iterations < role_cfg.max_iterations:
             iterations += 1
             try:
-                handle = provider.stream(
-                    system=system_prompt,
+                handle, role_cfg, provider = _stream_with_fallback(
+                    router=router,
+                    registry=registry,
+                    role_cfg=role_cfg,
+                    provider=provider,
+                    system_prompt=system_prompt,
                     messages=messages,
                     tools=tools,
-                    role=role_cfg,
+                    logger=logger,
+                    turn_number=turn_number,
                 )
                 _stream_and_print(handle)
                 response = handle.final()
