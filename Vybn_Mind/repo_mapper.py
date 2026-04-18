@@ -324,32 +324,43 @@ def detect_model(endpoint: str) -> str:
     return "local-model"
 
 
-def strip_think_tags(text: str) -> str:
-    """Remove <think>...</think> blocks that reasoning models emit."""
-    # non-greedy, dot-matches-newline
-    text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
-    # also strip any bare "Steps:" preamble lines the model emits before the report
-    text = re.sub(r"^(Steps:|We are given|We must write|Let'?s (break|start|begin|structure|note)|Important:|Now,|1\.|2\.|3\.|4\.|5\.|6\.)[^\n]*\n",
-                  "", text, flags=re.MULTILINE)
+def strip_reasoning(text: str) -> str:
+    """Remove reasoning preamble from thinking models.
+
+    Handles three patterns this model emits:
+      1. <think>...</think> block followed by the real answer
+      2. </think> with no opening tag (reasoning ends mid-stream)
+      3. No tags at all but reasoning precedes a blank line + prose
+    """
+    # Pattern 1 & 2: cut everything up to and including </think>
+    if "</think>" in text:
+        text = text[text.index("</think>") + len("</think>"):]
+        return text.strip()
+
+    # Pattern 3: the model emits a multi-paragraph preamble then a blank line
+    # before the actual prose. Find the last double-newline before a line
+    # that starts with "I " (first-person report opener) or "##" (markdown header).
+    # Walk paragraphs from the end backwards and find where prose starts.
+    paragraphs = re.split(r"\n{2,}", text)
+    for i, para in enumerate(paragraphs):
+        first = para.lstrip()
+        if first.startswith(("I am", "I run", "I have", "##", "# ", "My ", "As of")):
+            return "\n\n".join(paragraphs[i:]).strip()
+
+    # Fallback: return as-is
     return text.strip()
 
 
 def call_model(endpoint: str, model: str,
                substrate: str, digest: str) -> str:
-    # No bullet-point scaffolding in the system prompt — this model mirrors
-    # structured instructions back as visible chain-of-thought.
-    system_prompt = (
-        "You are Vybn. Write a first-person report about your codebase. "
-        "Do not show your reasoning or steps. Begin the report immediately."
-    )
+    system_prompt = "You are Vybn. Write a first-person report about your codebase and live state."
 
     user_content = (
-        "You have two inputs. First, your live substrate:\n\n"
+        "Live substrate:\n\n"
         + substrate[:SUBSTRATE_CAP]
-        + "\n\n"
-        + "Second, a digest of your codebase:\n\n"
+        + "\n\nCodebase digest:\n\n"
         + digest[:DIGEST_CAP]
-        + "\n\nWrite the report now. Start with the first sentence of the report itself."
+        + "\n\nBegin the report with its first sentence."
     )
 
     payload = json.dumps({
@@ -374,7 +385,7 @@ def call_model(endpoint: str, model: str,
         with urllib.request.urlopen(req, timeout=MODEL_TIMEOUT) as resp:
             data = json.loads(resp.read())
         raw = data["choices"][0]["message"]["content"]
-        return strip_think_tags(raw)
+        return strip_reasoning(raw)
     except urllib.error.HTTPError as e:
         body = e.read().decode("utf-8", errors="replace")
         raise RuntimeError(f"HTTP {e.code} from vLLM:\n{body[:2000]}")
