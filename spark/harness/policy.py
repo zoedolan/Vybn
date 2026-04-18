@@ -117,19 +117,26 @@ _DEFAULT_ROLES: dict[str, RoleConfig] = {
         tools=["bash"],
         rag=False,
     ),
-    # GPT-5.4 is the orchestrator brain. Default role falls through to
-    # this when no heuristic matches, so normal turns hit GPT-5.4
-    # instead of the full Opus+bash loop. Code work still escalates to
-    # the `code` role (Claude Opus 4.7) via heuristics below.
+    # Round 7: real orchestrator. Opus 4.7 + adaptive thinking +
+    # bash + the delegate tool. This is the default route when no
+    # heuristic matches — a bare "what do you think about X" now
+    # lands on a DECOMPOSE/DELEGATE/EVALUATE/SYNTHESIZE loop with a
+    # 25-iteration budget and the ability to dispatch work to
+    # specialists (code/task/create/local/chat) with isolated
+    # message histories. Greetings still absorb to phatic, identity
+    # questions still absorb to identity, and explicit code-shaped
+    # turns still escalate to the `code` role via heuristics. Only
+    # the fallthrough path is promoted from Sonnet/no-tools to the
+    # real orchestrator layer.
     "orchestrate": RoleConfig(
         role="orchestrate",
         provider="anthropic",
-        model="claude-sonnet-4-6",
-        thinking="off",
-        max_tokens=4096,
-        max_iterations=1,
-        tools=[],
-        rag=False,
+        model="claude-opus-4-7",
+        thinking="adaptive",
+        max_tokens=16384,
+        max_iterations=25,
+        tools=["bash", "delegate"],
+        rag=True,
     ),
     # Local Nemotron (vLLM) — OpenAI-compatible endpoint.
     "local": RoleConfig(
@@ -336,7 +343,11 @@ def default_policy() -> Policy:
         directives=dict(_DEFAULT_DIRECTIVES),
         fallback_chain=dict(_DEFAULT_FALLBACK),
         budgets=dict(_DEFAULT_BUDGETS),
-        default_role="task",
+        # Round 7: orchestrate is the EVAL primitive (delegate = apply;
+        # sub-task string = quoted form). Per the Lisp duality, eval is
+        # not the default — it is explicitly invoked (/plan). Unclassified
+        # turns stay conversational; orchestrate runs only when asked.
+        default_role="chat",  # round 4.1 + 7: quoted is the default; /plan evaluates.
         model_aliases=dict(_DEFAULT_MODEL_ALIASES),
     )
 
@@ -395,7 +406,10 @@ def load_policy(path: str | os.PathLike | None = None) -> Policy:
     directives = dict(data.get("directives") or _DEFAULT_DIRECTIVES)
     fallback = dict(data.get("fallback_chain") or _DEFAULT_FALLBACK)
     budgets = dict(data.get("budgets") or _DEFAULT_BUDGETS)
-    default_role = str(data.get("default_role", "chat"))  # round 4.1: task -> chat
+    # Round 7: orchestrate is eval, not the default. /plan invokes it;
+    # unclassified turns stay quoted (chat). YAML can override if an
+    # operator wants auto-eval, but the shipped default is quoted.
+    default_role = str(data.get("default_role", "chat"))
     if default_role not in roles:
         default_role = next(iter(roles))
 

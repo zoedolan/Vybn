@@ -7,13 +7,20 @@
 # Heuristics are regex patterns applied to the raw user input.
 # Directives are /-prefixed keywords that force a role deterministically.
 
-# GPT-5.4 is the orchestrator brain: short, stateless routing/answering
-# for turns that don't trip a specific heuristic. Code work still
-# escalates via the `code` heuristic (git/python/traceback/etc.) to
-# Claude Opus 4.7 with bash + adaptive thinking. Greetings go to
-# `phatic`, identity questions to `identity`. This keeps normal chat
-# cheap and fast without the full Opus+bash loop firing on every turn.
-default_role: chat  # was: task (round 4.1 — unclassified turns are conversational by default; explicit heuristics still escalate to task/code for bash work)
+# Round 7: `orchestrate` is the EVAL primitive — Opus 4.7 + bash +
+# delegate tool + 25-iter budget. It dispatches sub-tasks to
+# specialists (code/task/create/local/chat) with isolated histories;
+# specialists cannot themselves delegate (one-level eval).
+#
+# Per the Lisp duality (primitives ↔ environments, data ↔ procedures):
+# orchestrate is eval, delegate is apply, the sub-task string is the
+# quoted form. Eval is NOT the default — most turns should stay quoted
+# and run directly. /plan is the explicit `(eval ...)` call.
+#
+# Unclassified turns → chat (safe quoted default). Greetings → phatic,
+# identity → identity, code-shaped → code. Orchestrate only fires on
+# /plan (directive) or an explicit alias.
+default_role: chat
 
 roles:
   code:
@@ -57,14 +64,18 @@ roles:
     max_iterations: 10
     tools: [bash]
     rag: false
+  # Round 7: real orchestrator layer. Opus 4.7 + adaptive thinking +
+  # bash + delegate tool. 25-iteration budget per turn. Default route
+  # when no heuristic matches. The orchestrator spawns specialists via
+  # the delegate tool with isolated message histories.
   orchestrate:
     provider: anthropic
-    model: claude-sonnet-4-6
-    thinking: off
-    max_tokens: 4096
-    max_iterations: 1
-    tools: []
-    rag: false
+    model: claude-opus-4-7
+    thinking: adaptive
+    max_tokens: 16384
+    max_iterations: 25
+    tools: [bash, delegate]
+    rag: true
   # Local Nemotron via OpenAI-compatible vLLM endpoint. First-class
   # low-cost provider for bulk chat/summarisation when appropriate.
   local:

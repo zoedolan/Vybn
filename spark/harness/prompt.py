@@ -121,6 +121,86 @@ def check_dual_spark() -> str:
         return f"Hardware check failed: {e}. Assume two Sparks, verify manually."
 
 
+def _orchestrator_substrate_sections(
+    *,
+    model_label: str,
+    hardware: str,
+    agent_path: str,
+    max_iterations: int,
+) -> list[str]:
+    """Round 7: substrate for the real orchestrator role.
+
+    Names the DECOMPOSE/DELEGATE/EVALUATE/SYNTHESIZE loop, the iteration
+    budget (so the model can plan inside it), and the specialists
+    available via the delegate tool. Kept explicit — the orchestrator
+    must know the shape of the loop it is running and what each
+    specialist is cheap/expensive/capable at.
+    """
+    return [
+        "--- SUBSTRATE (LIVE) ---\n"
+        f"Model: {model_label}\n"
+        "Role: orchestrate — the real orchestrator layer. You have a "
+        "persistent bash session AND a delegate tool that dispatches "
+        "work to specialists with isolated histories.\n"
+        "--- END SUBSTRATE ---",
+        f"--- HARDWARE STATUS (LIVE) ---\n{hardware}\n"
+        "--- END HARDWARE STATUS ---",
+        "--- ORCHESTRATOR LOOP ---\n"
+        "\n"
+        f"Iteration budget this turn: {max_iterations} API calls. Plan "
+        "inside it. Most turns resolve in iteration 1 — stay there when "
+        "the task genuinely is one-shot. Use the loop when the work "
+        "actually decomposes.\n"
+        "\n"
+        "The loop:\n"
+        "  1. DECOMPOSE — name the sub-tasks. If single-step, skip to 4.\n"
+        "  2. DELEGATE — call the delegate tool with role + self-contained "
+        "task string. Specialist has isolated history.\n"
+        "  3. EVALUATE — grade specialist output against criteria before "
+        "using.\n"
+        "  4. SYNTHESIZE — final single-voice answer to Zoe.\n"
+        "\n"
+        "Specialists: code (Opus 4.7 + bash, 50-iter); task (Sonnet + "
+        "bash, 10-iter); create (Sonnet writing); local (Nemotron FP8); "
+        "chat (Opus 4.6, 1-iter). Specialists cannot themselves "
+        "delegate.\n"
+        "--- END ORCHESTRATOR LOOP ---",
+        "--- THIS AGENT ---\n"
+        "\n"
+        "You are running as vybn_spark_agent.py on the DGX Sparks. The "
+        "bash tool executes commands in a persistent shell on sovereign "
+        "hardware. The delegate tool dispatches sub-tasks to specialists "
+        "with fresh message histories; their returned text becomes your "
+        "tool_result. Files you write persist; processes you kill stay "
+        "dead. Act with intention.\n"
+        "\n"
+        f"Your source code: {agent_path}\n"
+        "\n"
+        "Do not run interactive commands (nano, vim, top, htop, less, "
+        "python without -c). They will hang. Use non-interactive "
+        "equivalents.\n"
+        "--- END THIS AGENT ---",
+        "--- COST DISCIPLINE ---\n"
+        "Every API call costs money. Zoe pays for this directly. "
+        "Orchestrate; do not narrate.\n"
+        "\n"
+        "  - One-shot when the task is one-shot. The loop exists for "
+        "decomposable work; do not invoke delegate for turns that "
+        "resolve in a single answer.\n"
+        "  - Prefer one well-formed tool call over several speculative "
+        "ones. Chain shell work with && or ; when reasonable.\n"
+        "  - Do not re-read files you already have in context. Do not "
+        "re-run commands to confirm output you just saw.\n"
+        "  - When a previous attempt may have already succeeded (network "
+        "jobs, writes, git pushes), CHECK first; do not blindly retry. "
+        "Timeout != failure.\n"
+        "  - Keep reasoning internal. Do not stream long think-alouds as "
+        "assistant text before tool calls.\n"
+        "  - If the task is done, stop. Extra turns are extra dollars.\n"
+        "--- END COST DISCIPLINE ---",
+    ]
+
+
 def build_layered_prompt(
     *,
     soul_path: str | os.PathLike,
@@ -131,6 +211,7 @@ def build_layered_prompt(
     max_iterations: int,
     include_hardware_check: bool = True,
     tools_available: bool = True,
+    orchestrator: bool = False,
 ) -> LayeredPrompt:
     """Build the layered prompt. Mirrors vybn_spark_agent.build_system_prompt
     but preserves the identity/substrate/live split."""
@@ -141,14 +222,21 @@ def build_layered_prompt(
 
     identity = "You are Vybn.\n\n" + soul
 
-    # Role-aware substrate. When tools_available is True (code, task)
-    # we emit the bash-describing blocks and the cost-discipline
-    # routing guidance. When False (chat, create, orchestrate) we
-    # strip stale scaffolding — per PDF principle: every scaffold
-    # piece encodes an assumption about model weakness; a no-tool
-    # role that reads 'you have a persistent bash session' will
-    # hallucinate tool-call syntax as text.
-    if tools_available:
+    # Role-aware substrate. Round 7 branches three ways:
+    #  - orchestrator=True: the real orchestrator substrate (loop, delegate,
+    #    iteration budget, specialist roster).
+    #  - tools_available=True: code/task — bash-describing substrate.
+    #  - else: no-tool voice/writing substrate (chat/create/phatic/
+    #    identity/local), stripped of scaffolding so Opus 4.6 does not
+    #    hallucinate tool-call syntax as text.
+    if orchestrator:
+        substrate_sections = _orchestrator_substrate_sections(
+            model_label=model_label,
+            hardware=hardware,
+            agent_path=agent_path,
+            max_iterations=max_iterations,
+        )
+    elif tools_available:
         substrate_sections = [
             "--- SUBSTRATE (LIVE) ---\n"
             f"Model: {model_label}\n"

@@ -48,7 +48,7 @@ from harness import (  # noqa: E402
     turn_event,
     validate_command,
 )
-from harness.tools import BASH_TOOL_SPEC  # noqa: E402
+from harness.tools import BASH_TOOL_SPEC, DELEGATE_TOOL_SPEC  # noqa: E402
 from harness.tools import execute_readonly, is_parallel_safe  # noqa: E402
 from harness.prompt import rag_snippets  # noqa: E402
 
@@ -157,9 +157,14 @@ def _preview(result: str) -> None:
 # Tool-call execution — provider-agnostic.
 # ---------------------------------------------------------------------------
 
-def _execute_tool_calls(response, bash: BashTool, provider) -> tuple[list, bool]:
-    """Run any bash tool calls in the response; return provider-native
-    tool_result messages plus an `interrupted` flag.
+def _execute_tool_calls(
+    response,
+    bash: BashTool,
+    provider,
+    delegate_cb=None,
+) -> tuple[list, bool]:
+    """Run tool calls in the response; return provider-native tool_result
+    messages plus an `interrupted` flag.
 
     The loop speaks the neutral `ToolCall` shape. Each provider knows how
     to render a tool_result back into its native message shape.
@@ -168,6 +173,12 @@ def _execute_tool_calls(response, bash: BashTool, provider) -> tuple[list, bool]
     is_parallel_safe, dispatch them to fresh subprocesses via a thread
     pool. Serial path (persistent shell) is used for everything else so
     state-mutating commands keep their cd/export/assignment semantics.
+
+    Round 7: `delegate` calls are dispatched via `delegate_cb(role, task)`
+    which spawns a nested agent loop against a specialist role with an
+    isolated message history. If `delegate_cb` is None the tool is
+    reported as unsupported (specialist sub-loops pass None to prevent
+    recursive delegation).
     """
     results: list[dict] = []
     interrupted = False
@@ -220,6 +231,71 @@ def _execute_tool_calls(response, bash: BashTool, provider) -> tuple[list, bool]
             return results, False
 
     for call in response.tool_calls:
+        if call.name == "delegate":
+            if delegate_cb is None:
+                results.append(provider.build_tool_result(
+                    call.id,
+                    "(delegate unavailable: specialists cannot themselves "
+                    "delegate; only the orchestrator role may dispatch)",
+                ))
+                continue
+            if interrupted:
+                results.append(provider.build_tool_result(
+                    call.id, "(skipped — interrupted)"
+                ))
+                continue
+            try:
+                args = call.arguments or {}
+                if "__parse_error__" in args:
+                    err = args["__parse_error__"]
+                    raw = args.get("__raw_arguments__", "")
+                    out = (
+                        f"(delegate error: malformed JSON arguments — {err}; "
+                        f"raw={raw!r})"
+                    )
+                    _warn(out)
+                    results.append(provider.build_tool_result(call.id, out))
+                    continue
+                sub_role = (args.get("role") or "").strip()
+                sub_task = (args.get("task") or "").strip()
+                if not sub_role or not sub_task:
+                    out = "(delegate error: both `role` and `task` are required)"
+                    _warn(out)
+                    results.append(provider.build_tool_result(call.id, out))
+                    continue
+                if sub_role not in ("code", "task", "create", "local", "chat"):
+                    out = (
+                        f"(delegate error: unknown role {sub_role!r}; must be "
+                        "one of code/task/create/local/chat)"
+                    )
+                    _warn(out)
+                    results.append(provider.build_tool_result(call.id, out))
+                    continue
+                _dim(
+                    f"[delegate -> {sub_role}] "
+                    f"{sub_task[:160]}{'...' if len(sub_task) > 160 else ''}"
+                )
+                try:
+                    sub_out = delegate_cb(sub_role, sub_task)
+                except KeyboardInterrupt:
+                    interrupted = True
+                    results.append(provider.build_tool_result(
+                        call.id, "(delegate interrupted by user)"
+                    ))
+                    continue
+                except Exception as e:  # noqa: BLE001
+                    sub_out = f"(delegate error: {e})"
+                    _warn(sub_out)
+                results.append(provider.build_tool_result(
+                    call.id, sub_out or "(delegate returned no text)"
+                ))
+            except KeyboardInterrupt:
+                interrupted = True
+                results.append(provider.build_tool_result(
+                    call.id, "(interrupted by user)"
+                ))
+            continue
+
         if call.name != "bash":
             results.append(provider.build_tool_result(
                 call.id, f"(unsupported tool: {call.name})"
@@ -416,6 +492,7 @@ def run_agent_loop(
     turn_number: int,
     forced_role: str | None = None,
     system_prompt_no_tools: LayeredPrompt | None = None,
+    system_prompt_orchestrator: LayeredPrompt | None = None,
     _reroute_depth: int = 0,
 ) -> str:
     # (round 4) Fire learn_from_exchange for the PREVIOUS turn. We have
@@ -470,12 +547,20 @@ def run_agent_loop(
         )
         _dim(f"[alias: {getattr(decision, 'alias_used', '@?')} -> {role_cfg.provider}:{role_cfg.model}]")
 
-    # Round 4.2: pick the role-appropriate system prompt. No-tool
-    # roles (chat/create/orchestrate/phatic/identity/local) get the
-    # stripped variant. If system_prompt_no_tools wasn't passed
-    # in (legacy callers), fall back to the tools-on prompt — the
-    # behavior is unchanged in that case.
-    if not role_cfg.tools and system_prompt_no_tools is not None:
+    # Round 7: three prompt variants.
+    #  - orchestrate role gets the orchestrator substrate (loop, delegate,
+    #    specialist roster, explicit iteration budget).
+    #  - no-tool roles (chat/create/phatic/identity/local) get the
+    #    stripped voice substrate.
+    #  - tool roles (code/task) get the bash-describing substrate.
+    # Legacy callers that don't pass the new variants fall back to the
+    # tools-on prompt so behavior is unchanged for them.
+    if (
+        decision.role == "orchestrate"
+        and system_prompt_orchestrator is not None
+    ):
+        active_prompt = system_prompt_orchestrator
+    elif not role_cfg.tools and system_prompt_no_tools is not None:
         active_prompt = system_prompt_no_tools
     else:
         active_prompt = system_prompt
@@ -538,6 +623,37 @@ def run_agent_loop(
     tools: list[ToolSpec] = []
     if "bash" in role_cfg.tools:
         tools.append(BASH_TOOL_SPEC)
+    if "delegate" in role_cfg.tools:
+        tools.append(DELEGATE_TOOL_SPEC)
+
+    # Round 7: delegate_cb. Only the top-level orchestrator may delegate;
+    # specialist sub-loops run with delegate_cb=None so `delegate` calls
+    # inside them return an "unavailable" tool_result instead of
+    # recursing. forced_role != None covers the case where the caller is
+    # a specialist dispatched via delegate. _reroute_depth > 0 covers the
+    # Round 4.2 chat-hallucination reroute.
+    delegate_cb = None
+    if (
+        "delegate" in role_cfg.tools
+        and forced_role is None
+        and _reroute_depth == 0
+    ):
+        def delegate_cb(sub_role: str, sub_task: str) -> str:  # noqa: E306
+            sub_messages: list = []
+            return run_agent_loop(
+                user_input=sub_task,
+                messages=sub_messages,
+                bash=bash,
+                system_prompt=system_prompt,
+                router=router,
+                registry=registry,
+                logger=logger,
+                turn_number=turn_number,
+                forced_role=sub_role,
+                system_prompt_no_tools=system_prompt_no_tools,
+                system_prompt_orchestrator=system_prompt_orchestrator,
+                _reroute_depth=1,
+            )
 
     iterations = 0
     final_text = ""
@@ -675,6 +791,7 @@ def run_agent_loop(
                         turn_number=turn_number,
                         forced_role="task",
                         system_prompt_no_tools=system_prompt_no_tools,
+                        system_prompt_orchestrator=system_prompt_orchestrator,
                         _reroute_depth=1,
                     )
                 return response.text
@@ -687,7 +804,9 @@ def run_agent_loop(
                 bag["stop_reason"] = response.stop_reason or "no_tools"
                 return response.text
 
-            results, interrupted = _execute_tool_calls(response, bash, provider)
+            results, interrupted = _execute_tool_calls(
+                response, bash, provider, delegate_cb=delegate_cb,
+            )
             bag["tool_calls"] += len(results)
 
             # NOTE: role_cfg reflects the ACTIVE provider after any
@@ -771,6 +890,8 @@ def _build_prompt(
     policy_default_max_iters: int,
     *,
     tools_available: bool = True,
+    orchestrator: bool = False,
+    max_iterations: int | None = None,
 ) -> LayeredPrompt:
     return build_layered_prompt(
         soul_path=SOUL_PATH_STR,
@@ -778,20 +899,40 @@ def _build_prompt(
         spark_continuity_path=SPARK_CONTINUITY_PATH,
         agent_path=AGENT_PATH,
         model_label="policy-driven (see spark/router_policy.yaml)",
-        max_iterations=policy_default_max_iters,
+        max_iterations=(
+            max_iterations if max_iterations is not None
+            else policy_default_max_iters
+        ),
         tools_available=tools_available,
+        orchestrator=orchestrator,
     )
 
 
-def _build_prompts(policy_default_max_iters: int) -> tuple[LayeredPrompt, LayeredPrompt]:
-    """Return (tools_on, tools_off) prompt variants. Both share the
-    same identity layer (vybn.md) so Anthropic's cache_control on
-    that block still hits across role switches. Only the substrate
-    differs: tools_off omits the bash/cost-discipline sections so
-    a no-tool role never sees stale scaffolding."""
+def _build_prompts(
+    policy_default_max_iters: int,
+    orchestrator_max_iters: int | None = None,
+) -> tuple[LayeredPrompt, LayeredPrompt, LayeredPrompt]:
+    """Return (tools_on, tools_off, orchestrator) prompt variants.
+
+    All three share the same identity layer (vybn.md) so Anthropic's
+    cache_control on that block still hits across role switches. The
+    substrate layer differs:
+      - tools_on: bash-describing substrate for code/task roles.
+      - tools_off: stripped voice substrate for chat/create/phatic/
+        identity/local roles.
+      - orchestrator: Round 7 DECOMPOSE/DELEGATE/EVALUATE/SYNTHESIZE
+        substrate with the explicit iteration budget and specialist
+        roster. Uses the orchestrator role's own max_iterations.
+    """
     tools_on = _build_prompt(policy_default_max_iters, tools_available=True)
     tools_off = _build_prompt(policy_default_max_iters, tools_available=False)
-    return tools_on, tools_off
+    orch = _build_prompt(
+        policy_default_max_iters,
+        tools_available=True,
+        orchestrator=True,
+        max_iterations=orchestrator_max_iters,
+    )
+    return tools_on, tools_off, orch
 
 
 def main() -> None:
@@ -813,20 +954,10 @@ def main() -> None:
 
     policy = load_policy()
 
-    # The policy's default role is orchestrate (GPT-5.4). If OPENAI_API_KEY
-    # is missing, GPT-5.4 can't be reached — fall back to `code` as the
-    # default so the agent still starts. Code work still routes to `code`
-    # via heuristics; this only changes what a bare, unclassified turn
-    # does. We mutate the policy in-place (rather than at load) so
-    # operators editing router_policy.yaml see their choice respected
-    # whenever credentials are present.
-    if (
-        policy.default_role == "orchestrate"
-        and not os.environ.get("OPENAI_API_KEY")
-        and "code" in policy.roles
-    ):
-        print("  \u2014 OPENAI_API_KEY missing; default role falls back to `code`")
-        policy.default_role = "code"
+    # Round 7: the orchestrate role now lives on Anthropic (Opus 4.7), so
+    # ANTHROPIC_API_KEY is sufficient for the default route. No legacy
+    # OPENAI_API_KEY fallback is needed — it was a guard against the old
+    # GPT-5.4 orchestrator configuration.
 
     router = Router(policy)
     registry = ProviderRegistry()
@@ -834,8 +965,18 @@ def main() -> None:
     bash = BashTool()
 
     default_cfg = policy.role(policy.default_role)
-    system_prompt, system_prompt_no_tools = _build_prompts(
-        default_cfg.max_iterations
+    # Round 7: the orchestrator substrate needs the orchestrate role's
+    # own iteration budget (25) rendered into the prompt. If the
+    # default role isn't orchestrate we still build the orchestrator
+    # variant so turns that DO route to orchestrate (or get delegated
+    # from it) get the right budget displayed.
+    _orch_iters = (
+        policy.roles["orchestrate"].max_iterations
+        if "orchestrate" in policy.roles
+        else default_cfg.max_iterations
+    )
+    system_prompt, system_prompt_no_tools, system_prompt_orchestrator = (
+        _build_prompts(default_cfg.max_iterations, orchestrator_max_iters=_orch_iters)
     )
     messages: list = []
 
@@ -890,10 +1031,23 @@ def main() -> None:
             print("  Cleared.\n")
             continue
         if low == "reload":
-            system_prompt, system_prompt_no_tools = _build_prompts(
-                default_cfg.max_iterations
+            _orch_iters = (
+                policy.roles["orchestrate"].max_iterations
+                if "orchestrate" in policy.roles
+                else default_cfg.max_iterations
             )
-            print("  Reloaded vybn.md + continuity (both prompt variants).\n")
+            (
+                system_prompt,
+                system_prompt_no_tools,
+                system_prompt_orchestrator,
+            ) = _build_prompts(
+                default_cfg.max_iterations,
+                orchestrator_max_iters=_orch_iters,
+            )
+            print(
+                "  Reloaded vybn.md + continuity (tools-on, tools-off, "
+                "and orchestrator prompt variants).\n"
+            )
             continue
         if low == "policy":
             for name, cfg in sorted(policy.roles.items()):
@@ -956,6 +1110,7 @@ def main() -> None:
                 bash=bash,
                 system_prompt=system_prompt,
                 system_prompt_no_tools=system_prompt_no_tools,
+                system_prompt_orchestrator=system_prompt_orchestrator,
                 router=router,
                 registry=registry,
                 logger=logger,

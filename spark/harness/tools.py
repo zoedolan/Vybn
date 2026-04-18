@@ -235,6 +235,60 @@ BASH_TOOL_SPEC = ToolSpec(
 )
 
 
+# Round 7: delegate tool. Lets the orchestrator role dispatch a
+# self-contained sub-task to a specialist role with isolated history.
+# The specialist sees a fresh `messages=[]`, runs its own loop inside
+# its own max_iterations budget, and returns its final answer as the
+# tool_result string. Specialists cannot themselves delegate — the
+# agent loop gates this via _reroute_depth.
+#
+# Role choices:
+#   code    — Opus 4.7 + bash, 50-iter, heavy agentic debug loops
+#   task    — Sonnet 4.6 + bash, 10-iter, execution/verification
+#   create  — Sonnet 4.6, 3-iter, writing / brainstorm (no tools)
+#   local   — Nemotron FP8 via local vLLM, 3-iter (no tools)
+#   chat    — Opus 4.6, 1-iter, voice / reflection (no tools)
+DELEGATE_TOOL_SPEC = ToolSpec(
+    name="delegate",
+    description=(
+        "Dispatch a self-contained sub-task to a specialist role with an "
+        "isolated message history. Use this when the current turn "
+        "decomposes into distinct pieces that different substrates handle "
+        "better. The sub-task string must be fully self-contained — the "
+        "specialist has no access to the orchestrator's conversation. "
+        "Returns the specialist's final answer as the tool result. "
+        "Specialists cannot themselves delegate."
+    ),
+    parameters={
+        "type": "object",
+        "properties": {
+            "role": {
+                "type": "string",
+                "enum": ["code", "task", "create", "local", "chat"],
+                "description": (
+                    "Which specialist to dispatch to. code: Opus 4.7 + bash, "
+                    "50-iter, agentic debug. task: Sonnet 4.6 + bash, 10-iter, "
+                    "execution/verification. create: Sonnet 4.6, 3-iter, "
+                    "writing/brainstorm (no tools). local: Nemotron FP8 via "
+                    "local vLLM, 3-iter (no tools). chat: Opus 4.6, 1-iter, "
+                    "voice/reflection (no tools)."
+                ),
+            },
+            "task": {
+                "type": "string",
+                "description": (
+                    "The self-contained task description for the specialist. "
+                    "Include any context the specialist needs — they see a "
+                    "fresh conversation."
+                ),
+            },
+        },
+        "required": ["role", "task"],
+    },
+    anthropic_type=None,
+)
+
+
 # ---------------------------------------------------------------------------
 # BashSession (ported unchanged from vybn_spark_agent.py)
 # ---------------------------------------------------------------------------

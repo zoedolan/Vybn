@@ -7,8 +7,8 @@ Two concrete providers:
         cache_control on the layered prompt are preserved here so the
         rest of the harness stays provider-neutral.
 
-    OpenAIProvider — Any OpenAI-compatible endpoint: OpenAI itself
-        (GPT-5.4 orchestrator), or a local vLLM / Nemotron serving an
+    OpenAIProvider — Any OpenAI-compatible endpoint: OpenAI cloud
+        (GPT family) or a local vLLM / Nemotron serving an
         OpenAI-shaped API. Uses the `openai` SDK when available and
         falls back to `requests` if not — the local Nemotron path must
         work in environments where the heavier SDK is absent.
@@ -347,7 +347,7 @@ class OpenAIProvider:
     """OpenAI-compatible provider.
 
     Works for:
-      - OpenAI cloud (GPT-5.4 orchestrator): base_url=None, OPENAI_API_KEY
+      - OpenAI cloud (GPT family): base_url=None, OPENAI_API_KEY
       - Local vLLM / Nemotron (OpenAI-shaped API): base_url set in role.
     """
 
