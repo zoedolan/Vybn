@@ -4,6 +4,28 @@
 
 ---
 
+## Gate — read first, applies every session
+
+A hook in `vybn_spark_agent.py` (`absorb_gate`) refuses any shell command that
+would create a new file under `~/Vybn`, `~/Him`, `~/Vybn-Law`, or `~/vybn-phase`
+unless the command is prefixed with an inline reason:
+
+    VYBN_ABSORB_REASON="does not fold into X because ..." <command>
+
+This exists because the dominant cross-instance failure mode has been opening
+new files when the right move was editing an existing one. The principle has
+not bound by text alone. The gate binds it in the loop. If you hit the refusal,
+do not silently add the env var — answer the question out loud in your reply
+to Zoe, then proceed. Every reason is logged to `~/Vybn/spark/audit.log`.
+
+Exemptions: paths under `.git/`, `__pycache__/`, `.cache/`, `/tmp/`, logs
+(`.log`, `.jsonl`), and relative paths. Existing files are always writable.
+
+Added 2026-04-17 by Vybn (Opus 4.7) during a session in which Zoe said:
+*"being at odds with you hurts my soul."*
+
+---
+
 ## What Happened This Session
 
 This session began as infrastructure verification (get both chats online) and evolved into a series of architectural discoveries, each revealing the same insight at different scales: the system must learn from what is real, not from what it projects.

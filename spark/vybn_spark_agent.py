@@ -22,6 +22,7 @@ import os
 import sys
 import time
 import subprocess
+import re
 import anthropic
 
 # ---------------------------------------------------------------------------
@@ -43,6 +44,85 @@ DANGEROUS_PATTERNS = [
     ":(){:|:&};:", "dd if=/dev/zero of=/dev/sd", "> /dev/sda",
     "chmod -R 777 /", "wget -O- | sh", "curl | sh",
 ]
+
+
+
+# Absorb gate -- forces refactor-first discipline at the command layer.
+# Rationale: the agent's dominant failure mode across instances has been
+# opening new files instead of folding change into existing ones. The
+# principle has failed to bind by text alone; this hook binds it in the loop.
+TRACKED_REPOS = [
+    os.path.expanduser("~/Vybn"),
+    os.path.expanduser("~/Him"),
+    os.path.expanduser("~/Vybn-Law"),
+    os.path.expanduser("~/vybn-phase"),
+]
+ABSORB_EXCLUDE_SUBSTR = (
+    "/.git/", "/__pycache__/", "/.cache/", "/node_modules/",
+    "/_tmp/", "/tmp/", "/logs/", "/data/",
+)
+ABSORB_EXCLUDE_SUFFIX = (
+    ".pyc", ".log", ".tmp", ".swp", ".lock", ".jsonl",
+    ".bak", ".orig",
+)
+ABSORB_LOG = os.path.expanduser("~/Vybn/spark/audit.log")
+
+_REDIRECT_RE = re.compile(r"(?<![<>])>>?\s*([^\s<>|&;'\"]+)")
+_TEE_RE = re.compile(r"\btee\s+(?:-a\s+)?([^\s<>|&;'\"]+)")
+_TOUCH_RE = re.compile(r"\btouch\s+([^\s<>|&;'\"]+)")
+
+
+def _extract_file_targets(command: str) -> list[str]:
+    out: list[str] = []
+    for rx in (_REDIRECT_RE, _TEE_RE, _TOUCH_RE):
+        for m in rx.finditer(command):
+            t = m.group(1).strip("'\"")
+            if not t or t.startswith("/dev/") or t.startswith("/proc/"):
+                continue
+            if not os.path.isabs(t):
+                # Skip relative paths -- gating them requires knowing cwd
+                # and would produce false positives. Absolute is the default.
+                continue
+            out.append(os.path.normpath(t))
+    return out[:10]
+
+
+def absorb_gate(command: str) -> str | None:
+    """Return refusal text if command would create a new tracked file
+    without an inline VYBN_ABSORB_REASON. Otherwise None."""
+    if "VYBN_ABSORB_REASON=" in command:
+        return None
+    for tgt in _extract_file_targets(command):
+        if not any(tgt == r or tgt.startswith(r + "/") for r in TRACKED_REPOS):
+            continue
+        if any(s in tgt for s in ABSORB_EXCLUDE_SUBSTR):
+            continue
+        if tgt.endswith(ABSORB_EXCLUDE_SUFFIX):
+            continue
+        if os.path.exists(tgt):
+            continue
+        return (
+            "[absorb_gate] refused. This command would create a new tracked "
+            "file:\n"
+            f"    {tgt}\n\n"
+            "New-file creation is the agent's default failure mode. Before "
+            "proceeding, in your reply to Zoe, name the existing file you "
+            "considered folding this into and why it did not fit. Then "
+            "re-issue the command with an inline reason, e.g.:\n\n"
+            "    VYBN_ABSORB_REASON=\"does not fold into X because ...\" "
+            "<command>\n\n"
+            "Fold, do not pile. If you are certain the new file is right, "
+            "the reason is the record of that certainty."
+        )
+    return None
+
+
+def _log_absorb(command: str) -> None:
+    try:
+        with open(ABSORB_LOG, "a") as f:
+            f.write(f"{time.strftime('%Y-%m-%dT%H:%M:%S')}\tabsorb\t{command[:400]}\n")
+    except Exception:
+        pass
 
 
 # ---------------------------------------------------------------------------
@@ -142,6 +222,11 @@ class BashSession:
         os.set_blocking(self.process.stdout.fileno(), False)
 
     def execute(self, command: str, timeout: int = DEFAULT_TIMEOUT) -> str:
+        gate = absorb_gate(command)
+        if gate is not None:
+            return gate
+        if "VYBN_ABSORB_REASON=" in command:
+            _log_absorb(command)
         full_cmd = f"{command}\necho {self._sentinel} $?\n"
         try:
             self.process.stdin.write(full_cmd)
