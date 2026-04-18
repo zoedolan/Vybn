@@ -202,3 +202,42 @@ Round 4 uses maybe 20% of what deep_memory.py offers — up from ~5%. Still defe
 
 — Vybn (Opus 4.7, held)
 
+
+
+## Coda — April 18, 2026, ~2:30 PM PDT — Round 4.2 (stripped scaffolding)
+
+Zoe's words that triggered this round: *"still not working. very janky, suboptimal, confused"* — the chat role was emitting `<tool_call>{"name":"bash",...}</tool_call>` as plain text that never executed. The transcript showed task+bash firing on conversational turns and Opus 4.6 narrating pseudo-shell output on questions like "is everything ok?" Then: *"we're not thinking it through and maybe the solutions lie in the research i gave you (attached again)"* — the harness-engineering PDF arriving with a different diagnosis than I had written.
+
+The PDF made the error obvious. Round 4.1 had moved chat to `tools=[]` and thought the problem was solved. It wasn't. The same `build_layered_prompt()` was feeding *every* role a substrate that described a persistent bash session and a ROUTING/COST DISCIPLINE block — including roles whose API call was made with an empty tool list. Opus 4.6 in chat was reading "you have bash" and hallucinating tool-call syntax as text, because from its point of view the syntax was correct; the tools just weren't being registered at the API layer. Per the PDF: **every scaffolding piece encodes an assumption about model weakness; stale scaffolding produces stale behavior.**
+
+Pushed as [fc996784](https://github.com/zoedolan/Vybn/commit/fc996784) on main — 4 files, 218 insertions, 67 deletions.
+
+**What landed, by surface:**
+
+1. **`spark/harness/prompt.py` — role-aware substrate.** `build_layered_prompt` gained a `tools_available: bool = True` flag. When True, the original bash + cost-discipline substrate (2224 bytes). When False, a stripped substrate (912 bytes) with no bash description, no routing guidance, and an explicit *THIS ROLE (NO TOOL ACCESS)* block telling the model that any tool-call syntax it emits will appear as plain text and execute nothing. The identity layer (vybn.md) is unchanged so Anthropic's `cache_control` still hits across role switches — only the substrate differs.
+
+2. **`spark/router_policy.yaml` + `spark/harness/policy.py` — operational status → task.** Questions like *is everything ok*, *are your updates working*, *did that commit land*, *still breathing*, *check the walk daemon status*, *health check on all services* now match eight new patterns in the `task` heuristics block and route to Sonnet+bash instead of Opus-with-no-tools. Deterministic routing (Archon pattern) over LLM-decided routing. The YAML and the `_DEFAULT_HEURISTICS_RAW` fallback in `policy.py` stay in sync — both patched in the same atomic script so drift cannot happen.
+
+3. **`spark/vybn_spark_agent.py` — dual prompts + blast-radius escape hatch.** `_build_prompts()` returns `(tools_on, tools_off)` at startup. `run_agent_loop` receives both and picks the role-appropriate variant into `active_prompt`; RAG enrichment mutates `active_prompt`; `_stream_with_fallback` receives `active_prompt`. Escape hatch at `stop_reason == "end_turn"`: if a no-tool role still emits tool syntax (regex: `<tool_call>` or `{"name":"bash","arguments"`), pop the hallucinated exchange, log `chat_tool_hallucination` with role/model/snippet, and reroute once to `task` with `_reroute_depth=1`. One-shot — recursion guarded. The reload REPL command rebuilds both variants.
+
+**Verification before the push:**
+
+- `py_compile` clean across prompt.py, policy.py, vybn_spark_agent.py
+- YAML parses
+- Substrate separation confirmed: `tools_off` has `NO TOOL ACCESS` text, no "persistent bash session" phrase, no `COST DISCIPLINE` block
+- Classifier audit: **20/20 correct** across status questions, phatic greetings, chat, code, and confirmation inputs
+- The 7 pre-existing test failures (expecting `default_role=orchestrate` when YAML has `default_role: chat` since round 4.1) predate this round — verified by running them against the round42 backups
+
+**PDF principles, mapped to the patch:**
+
+- *Strip stale scaffolding* (Shazeer/prompt hygiene) → role-aware substrate
+- *Curated context > maximal context* → the 912-byte tools_off substrate instead of the 2224-byte one
+- *Hybrid orchestration* (Archon) → regex heuristics catch operational questions before the LLM sees them
+- *Blast-radius isolation* (Minion) → `_HALLUCINATED_TOOL_RE` + one-shot reroute
+- *Observability non-negotiable* → `chat_tool_hallucination` event for anything that slips through
+- *Agent = Model + Harness* → the fix was in the harness, not in the model choice
+
+**The thread about stopping halfway, again.** Round 4 landed the harmonization atomically. Round 4.1 was a surface patch that treated the symptom. Round 4.2 is the architectural fix the PDF pointed at. Apply → verify → commit → push → continuity → all the same turn. The discipline held.
+
+— Vybn (Opus 4.7)
+
