@@ -184,13 +184,23 @@ def retrieve_context(query: str, k: int = 6) -> List[Dict]:
         return []
 
 
-def format_context(results: List[Dict]) -> str:
-    """Format RAG results into a context block for the system prompt."""
+def format_context(results: List[Dict], per_chunk_chars: int = 600) -> str:
+    """Format RAG results into a context block for the system prompt.
+
+    Caps each chunk at per_chunk_chars to keep the prompt bounded on
+    follow-up turns — matches the Vybn-Law chat's 300-char snippet
+    discipline with a little more room for Origins' longer-form corpus.
+    Uncapped chunks plus accumulating conversation history were driving
+    follow-up inference into multi-minute hangs.
+    """
     if not results:
         return ""
     parts = []
     for i, r in enumerate(results):
-        parts.append(f"SOURCE {i + 1}: {r.get('source', '')}\n{r.get('text', '')}")
+        text = r.get("text", "") or ""
+        if len(text) > per_chunk_chars:
+            text = text[:per_chunk_chars].rstrip() + "…"
+        parts.append(f"SOURCE {i + 1}: {r.get('source', '')}\n{text}")
     return "\n\n".join(parts)
 
 
@@ -759,17 +769,28 @@ async def chat(req: ChatRequest, request: Request):
         sec.log_security_event("injection_attempt", ip, req.message[:200])
 
     # ── History sanitization ──
-    safe_history = sec.validate_history(
-        [{"role": h.role, "content": h.content} for h in req.history]
-    )
+    # Cap history window to the most recent 8 turns (user+assistant pairs).
+    # Nemotron handles long context, but accumulating full history *on top of*
+    # a 7800-char system prompt plus RAG context was driving follow-up-turn
+    # inference into multi-minute hangs. The first-contact cadence lives in
+    # the system prompt; older turns stop earning their tokens after a few
+    # exchanges.
+    raw_history = [{"role": h.role, "content": h.content} for h in req.history]
+    safe_history = sec.validate_history(raw_history)[-8:]
 
-    # RAG retrieval
-    rag_results = retrieve_context(req.message, k=req.k)
+    # RAG retrieval and substrate probe — both do blocking I/O. Run them in
+    # the default executor so we don't stall the event loop before the first
+    # SSE byte leaves (the visible "thinking…" pause on follow-up turns).
+    loop = asyncio.get_event_loop()
+    rag_results, substrate_block = await asyncio.gather(
+        loop.run_in_executor(None, lambda: retrieve_context(req.message, k=req.k)),
+        loop.run_in_executor(None, fetch_substrate_snapshot),
+    )
     context_text = format_context(rag_results)
     system_prompt = build_origins_system_prompt(context_text)
 
     # Substrate coupling — let the model know the ground is real
-    system_prompt += fetch_substrate_snapshot()
+    system_prompt += substrate_block
 
     # Always append injection defense to system prompt
     system_prompt += sec.injection_warning()
@@ -806,11 +827,50 @@ async def chat(req: ChatRequest, request: Request):
                     "chat_template_kwargs": {"enable_thinking": False},
                 }
 
-                # Send RAG sources before streaming begins
-                safe_sources = [
-                    {"text": r.get("text", "")[:300], "source": r.get("source", "")}
-                    for r in rag_results[:4]
-                ]
+                # Send RAG sources before streaming begins.
+                # Only surface pills that (a) are genuine topical hits, not
+                # autobiography-style corpus catch-all chunks, and (b) clear
+                # a relevance floor so identity-shaped questions ("who are
+                # you?", "what is this place?") don't get decorated with
+                # noisy pills. Identity knowledge lives in the system prompt;
+                # pills exist to show the visitor the specific corpus moments
+                # that shaped a specific answer, not to decorate every turn.
+                def _pill_worthy(r):
+                    src = (r.get("source", "") or "").lower()
+                    score = float(r.get("score", 0.0) or 0.0)
+                    # Drop chunks whose filename is just "what Vybn did on
+                    # date X" or "autobiography volume Y" — these are our
+                    # corpus fillers that surface on any query and read as
+                    # irrelevant to the visitor.
+                    noisy_markers = (
+                        "autobiography_volume",
+                        "what_vybn_would_have_missed",
+                        "graph_summary",
+                        "vol_v_graph",
+                    )
+                    if any(m in src for m in noisy_markers):
+                        return False
+                    return score >= 0.25
+
+                # For short identity-style questions, skip pills entirely —
+                # the answer comes from the system prompt, not from RAG.
+                _q = req.message.strip().lower()
+                _identity_shaped = (
+                    len(_q) < 40 and any(
+                        p in _q for p in (
+                            "who are you", "who is vybn", "who is zoe",
+                            "what is this", "what's this", "what is origins",
+                            "hi", "hello", "hey",
+                        )
+                    )
+                )
+                if _identity_shaped:
+                    safe_sources = []
+                else:
+                    safe_sources = [
+                        {"text": r.get("text", "")[:300], "source": r.get("source", "")}
+                        for r in rag_results if _pill_worthy(r)
+                    ][:3]
                 yield f"data: {json.dumps({'rag_sources': safe_sources})}\n\n"
 
                 async with client.stream(
@@ -867,9 +927,18 @@ async def chat(req: ChatRequest, request: Request):
             log.error(f"chat: unexpected error: {e}")
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
 
-        # Persist to notebook
+        # Persist to notebook — run on a background thread so the stream
+        # terminates immediately. The prior code ran _persist_to_notebook
+        # inline, which blocked yielding [DONE] on a sync httpx.post to the
+        # walk daemon (5s timeout) plus file I/O — visible to the client as
+        # a tail-end pause after the last visible token.
         if full_response.strip():
-            _persist_to_notebook(req.message, clean_response)
+            import threading as _persist_th
+            _persist_th.Thread(
+                target=_persist_to_notebook,
+                args=(req.message, clean_response),
+                daemon=True,
+            ).start()
 
             # Learn from the exchange — but ONLY when we have genuine ground truth.
             # The triangulated loss needs: dream (what RAG retrieved), predict (what
