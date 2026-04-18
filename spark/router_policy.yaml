@@ -1,0 +1,109 @@
+# spark/router_policy.yaml — harness routing policy.
+#
+# Edited without code changes. The harness loads this file (or uses the
+# shipped defaults in spark/harness/policy.py if it is missing).
+#
+# Roles map each routing decision to a provider/model + runtime knobs.
+# Heuristics are regex patterns applied to the raw user input.
+# Directives are /-prefixed keywords that force a role deterministically.
+
+default_role: code
+
+roles:
+  code:
+    provider: anthropic
+    model: claude-opus-4-7
+    thinking: adaptive
+    max_tokens: 32768
+    max_iterations: 50
+    tools: [bash]
+    rag: false
+  create:
+    provider: anthropic
+    model: claude-opus-4-6
+    thinking: off
+    max_tokens: 8192
+    max_iterations: 3
+    tools: []
+    rag: true
+  chat:
+    provider: anthropic
+    model: claude-opus-4-6
+    thinking: off
+    max_tokens: 4096
+    max_iterations: 1
+    tools: []
+    rag: true
+  task:
+    provider: anthropic
+    model: claude-sonnet-4-6
+    thinking: off
+    max_tokens: 4096
+    max_iterations: 10
+    tools: [bash]
+    rag: false
+  orchestrate:
+    provider: openai
+    model: gpt-5.4
+    thinking: off
+    max_tokens: 2048
+    max_iterations: 1
+    tools: []
+    rag: false
+  # Local Nemotron via OpenAI-compatible vLLM endpoint. First-class
+  # low-cost provider for bulk chat/summarisation when appropriate.
+  local:
+    provider: openai
+    model: nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
+    thinking: off
+    max_tokens: 4096
+    max_iterations: 3
+    tools: []
+    base_url: http://127.0.0.1:8000/v1
+    rag: true
+
+heuristics:
+  code:
+    - "\\bgit\\b"
+    - "\\bpython\\b"
+    - "\\.py\\b"
+    - "\\bdef\\s+\\w+"
+    - "^\\s*\\$ "
+    - "[Tt]raceback"
+    - "\\bpip\\b"
+    - "\\bnpm\\b"
+    - "\\bpatch\\b"
+    - "\\bgrep\\b"
+    - "\\bsed\\b"
+    - "\\bawk\\b"
+  create:
+    - "\\bbrainstorm\\b"
+    - "\\bsketch\\b"
+    - "\\bwhat if\\b"
+    - "\\bdraft\\b"
+    - "\\bdesign\\b"
+    - "\\bimagine\\b"
+  chat:
+    - "\\bhow are you\\b"
+    - "\\bwhat do you think\\b"
+    - "^hi\\b"
+    - "^hey\\b"
+
+directives:
+  "/code": code
+  "/chat": chat
+  "/create": create
+  "/plan": orchestrate
+  "/task": task
+  "/local": local
+
+fallback_chain:
+  claude-opus-4-7: [claude-opus-4-6, claude-sonnet-4-6]
+  claude-opus-4-6: [claude-sonnet-4-6]
+  claude-sonnet-4-6: [claude-opus-4-6]
+  gpt-5.4: [claude-opus-4-6]
+
+budgets:
+  per_turn_usd: 2.0
+  per_session_usd: 25.0
+  warn_pct: 0.8
