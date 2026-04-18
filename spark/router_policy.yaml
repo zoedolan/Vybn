@@ -210,6 +210,23 @@ fallback_chain:
   # 'hi' or 'which model are you?' never hard-fails.
   nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8: [claude-sonnet-4-6]
 
+# Round 5: @alias model pin. Prefix any turn with @<alias> to force a
+# specific model for that turn. Role determination is unchanged — only
+# the model is swapped. Useful for quick A/B on voice/vibe or for pinning
+# a specific capability: "@opus47 walk me through this proof",
+# "@nemotron summarize this", "@sonnet hey". Bare "@sonnet" with no
+# payload routes as a greeting on Sonnet.
+model_aliases:
+  "@opus": claude-opus-4-6
+  "@opus46": claude-opus-4-6
+  "@opus47": claude-opus-4-7
+  "@sonnet": claude-sonnet-4-6
+  "@sonnet46": claude-sonnet-4-6
+  "@nemotron": nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
+  "@local": nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
+  "@gpt": gpt-5.4
+  "@gpt5": gpt-5.4
+
 budgets:
   per_turn_usd: 2.0
   per_session_usd: 25.0

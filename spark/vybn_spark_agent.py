@@ -79,6 +79,18 @@ _HALLUCINATED_TOOL_RE = _re.compile(
     _re.IGNORECASE | _re.DOTALL,
 )
 
+# Round 5: positive-signal probe sub-turn. A no-tool role (chat, create,
+# orchestrate) may embed a single [NEEDS-EXEC: <cmd>] directive in its
+# response. The harness runs the command via the same BashTool that
+# powers task/code, gates it through validate_command + absorb_gate,
+# prints the output to Zoe, and appends a synthetic user-turn with the
+# result so the model sees it on the NEXT turn. One-shot: only the
+# first match is executed.
+_PROBE_RE = _re.compile(
+    r'\[NEEDS-EXEC:\s*(.+?)\]',
+    _re.IGNORECASE | _re.DOTALL,
+)
+
 
 def _fire_learn_async(rag_text: str, response_text: str, followup_text: str) -> None:
     def _run():
@@ -361,6 +373,34 @@ def _stream_with_fallback(
 
 
 # ---------------------------------------------------------------------------
+# Round 5: positive-signal probe sub-turn.
+# ---------------------------------------------------------------------------
+
+def _run_probe_subturn(command: str, bash: BashTool) -> tuple[bool, str]:
+    """Execute one read-only probe emitted by a no-tool role.
+
+    Returns (ran, output_text). `ran` is True iff the command passed
+    both validate_command and absorb_gate and was executed. The gate
+    output (refusal reason) is returned as the text when ran=False
+    so the next turn sees exactly why the probe was refused.
+    """
+    cmd = (command or "").strip()
+    if not cmd:
+        return False, "(empty probe command)"
+    ok, reason = validate_command(cmd)
+    if not ok:
+        return False, f"(probe refused by validate_command: {reason})"
+    # BashTool.execute() itself runs absorb_gate and returns its
+    # refusal message as the output string, so a refusal flows
+    # through cleanly as the result.
+    try:
+        out = bash.execute(cmd)
+    except Exception as e:  # noqa: BLE001
+        return False, f"(probe exec error: {e})"
+    return True, out or "(no output)"
+
+
+# ---------------------------------------------------------------------------
 # Agent loop — policy-driven.
 # ---------------------------------------------------------------------------
 
@@ -390,6 +430,45 @@ def run_agent_loop(
 
     decision = router.classify(user_input, forced_role=forced_role)
     role_cfg = decision.config
+
+    # Round 5: @alias model pin. If the user prefixed with @sonnet/@opus47/etc,
+    # swap the resolved role's model (and provider base) for this turn only.
+    # Role determination already used the stripped input; only the model
+    # changes. Provider is inferred from the model name so YAML doesn't need
+    # per-alias provider hints.
+    if getattr(decision, "model_override", None):
+        import dataclasses as _dc
+        override_model = decision.model_override
+        if override_model.startswith("claude-"):
+            override_provider = "anthropic"
+            override_base_url = None
+        elif override_model.startswith("gpt-"):
+            override_provider = "openai"
+            override_base_url = None
+        elif "nemotron" in override_model.lower() or override_model.startswith("nvidia/"):
+            override_provider = "openai"
+            override_base_url = "http://127.0.0.1:8000/v1"
+        else:
+            override_provider = role_cfg.provider
+            override_base_url = role_cfg.base_url
+        role_cfg = _dc.replace(
+            role_cfg,
+            model=override_model,
+            provider=override_provider,
+            base_url=override_base_url,
+            # A pinned model on a no-tool role stays no-tool; a pinned
+            # model on a tool role keeps its tools. The pin is a model
+            # swap, not a capability swap.
+        )
+        logger.emit(
+            "alias_override",
+            turn=turn_number,
+            alias=getattr(decision, "alias_used", None),
+            role=decision.role,
+            model=role_cfg.model,
+            provider=role_cfg.provider,
+        )
+        _dim(f"[alias: {getattr(decision, 'alias_used', '@?')} -> {role_cfg.provider}:{role_cfg.model}]")
 
     # Round 4.2: pick the role-appropriate system prompt. No-tool
     # roles (chat/create/orchestrate/phatic/identity/local) get the
@@ -514,6 +593,47 @@ def run_agent_loop(
             if response.stop_reason == "end_turn":
                 bag["stop_reason"] = "end_turn"
                 _LEARN_PENDING["response"] = (response.text or "")[:2000]
+
+                # Round 5: positive-signal probe sub-turn. A no-tool role
+                # that embeds [NEEDS-EXEC: <cmd>] gets one deterministic
+                # read-only execution. Output is printed to Zoe and
+                # appended to history as a synthetic user turn so the
+                # NEXT turn sees it naturally. No recursion, no extra
+                # LLM call on this turn.
+                if not role_cfg.tools:
+                    probe_match = _PROBE_RE.search(response.text or "")
+                    if probe_match:
+                        probe_cmd = probe_match.group(1).strip()
+                        ran, probe_out = _run_probe_subturn(probe_cmd, bash)
+                        _dim(f"[probe: {probe_cmd[:120]}{'...' if len(probe_cmd) > 120 else ''}]")
+                        _preview(probe_out)
+                        logger.emit(
+                            "probe_exec",
+                            turn=turn_number,
+                            role=decision.role,
+                            model=role_cfg.model,
+                            ran=ran,
+                            command=probe_cmd[:500],
+                            out_chars=len(probe_out),
+                        )
+                        # Synthetic user turn with the probe result so
+                        # the model can integrate it naturally next
+                        # turn. Keep it compact — 4 KB cap.
+                        probe_note = (
+                            f"[probe from previous turn | cmd: {probe_cmd[:200]}]\n"
+                            f"{probe_out[:4000]}"
+                        )
+                        messages.append({
+                            "role": "user",
+                            "content": probe_note,
+                        })
+                        # Paired assistant stub so Anthropic's strict
+                        # user/assistant alternation survives when the
+                        # real next user turn lands.
+                        messages.append({
+                            "role": "assistant",
+                            "content": "(probe output observed)",
+                        })
 
                 # Round 4.2: escape hatch. If a no-tool role still
                 # emitted tool-call syntax as text (should not happen
@@ -737,12 +857,16 @@ def main() -> None:
           f"{default_cfg.provider}:{default_cfg.model}")
     print(f"  \u2713 roles available: {', '.join(sorted(policy.roles))}")
     print(f"  \u2713 directives: {', '.join(sorted(policy.directives))}")
+    _aliases = sorted(getattr(policy, 'model_aliases', {}) or {})
+    if _aliases:
+        print(f"  \u2713 @aliases: {', '.join(_aliases)}")
     print(f"  \u2713 bash: persistent session as "
           f"{os.environ.get('USER', 'unknown')}")
     print(f"  \u2713 events: {logger.path}")
     print()
     print("  Type naturally. Prefix with /chat, /create, /plan, /task, /local "
-          "to force a role.")
+          "to force a role,")
+    print("  or with @sonnet/@opus/@opus47/@nemotron/@gpt to pin a model for one turn.")
     print("  REPL commands: exit | clear | reload | history | policy")
     print()
 
@@ -777,6 +901,12 @@ def main() -> None:
                 print(f"  {name}{marker}: {cfg.provider}:{cfg.model} "
                       f"(thinking={cfg.thinking}, max_tokens={cfg.max_tokens}, "
                       f"tools={cfg.tools})")
+            aliases = getattr(policy, 'model_aliases', {}) or {}
+            if aliases:
+                print()
+                print("  @aliases (prefix any turn to pin the model):")
+                for alias, model in sorted(aliases.items()):
+                    print(f"    {alias} -> {model}")
             print()
             continue
         if low in ("selfcheck", "/selfcheck"):

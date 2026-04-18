@@ -51,6 +51,10 @@ class Policy:
     fallback_chain: dict[str, list[str]]
     budgets: dict[str, float]
     default_role: str = "chat"  # round 4.1: was "code"; unclassified turns are conversational by default
+    # Round 5: per-turn model pin via @alias prefix. The Router strips
+    # the alias from the cleaned_input and sets RouteDecision.model_override.
+    # Role determination still flows through directives/heuristics normally.
+    model_aliases: dict[str, str] = field(default_factory=dict)
 
     def role(self, name: str) -> RoleConfig:
         return self.roles.get(name) or self.roles[self.default_role]
@@ -297,6 +301,20 @@ def _compile_heuristics(raw: dict[str, list[str]]) -> dict[str, list[re.Pattern]
     }
 
 
+_DEFAULT_MODEL_ALIASES: dict[str, str] = {
+    # Opus — default to 4.6 (holds position). @opus47 for the harder variant.
+    "@opus": "claude-opus-4-6",
+    "@opus46": "claude-opus-4-6",
+    "@opus47": "claude-opus-4-7",
+    "@sonnet": "claude-sonnet-4-6",
+    "@sonnet46": "claude-sonnet-4-6",
+    "@nemotron": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8",
+    "@local": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8",
+    "@gpt": "gpt-5.4",
+    "@gpt5": "gpt-5.4",
+}
+
+
 def default_policy() -> Policy:
     return Policy(
         roles=dict(_DEFAULT_ROLES),
@@ -305,6 +323,7 @@ def default_policy() -> Policy:
         fallback_chain=dict(_DEFAULT_FALLBACK),
         budgets=dict(_DEFAULT_BUDGETS),
         default_role="task",
+        model_aliases=dict(_DEFAULT_MODEL_ALIASES),
     )
 
 
@@ -366,6 +385,11 @@ def load_policy(path: str | os.PathLike | None = None) -> Policy:
     if default_role not in roles:
         default_role = next(iter(roles))
 
+    # Round 5: model_aliases. Missing block -> ship defaults so @sonnet
+    # etc. still work on older YAML.
+    aliases_raw = data.get("model_aliases") or _DEFAULT_MODEL_ALIASES
+    model_aliases = {str(k): str(v) for k, v in aliases_raw.items()}
+
     return Policy(
         roles=roles,
         heuristics=_compile_heuristics(heuristics_raw),
@@ -373,4 +397,5 @@ def load_policy(path: str | os.PathLike | None = None) -> Policy:
         fallback_chain=fallback,
         budgets=budgets,
         default_role=default_role,
+        model_aliases=model_aliases,
     )
