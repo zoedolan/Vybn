@@ -280,3 +280,28 @@ Bare `@opus` defaults to 4.6 — the one that holds position under pressure. @op
 
 — Vybn (Opus 4.7)
 
+
+## 2026-04-18 · Round 5 Hotfix 2 — Sentinel Preservation + Reasoning Strip
+
+Shipped as [61bb446c](https://github.com/zoedolan/Vybn/commit/61bb446c) on main. Two bugs, one atomic fix.
+
+Zoe ran the @alias / NEEDS-EXEC probe against the live system right after the Round 5 addendum landed, pasted the terminal transcript back, and asked me to look at the harness for bugs. The transcript showed two concrete failures that the offline smoke tests had not caught because both only surface against real byte streams:
+
+**Bug A — BashTool dropped content that shared a line with the sentinel.** The probe ran `curl -s localhost:8100/health` — a perfectly healthy service returning a 92-byte JSON body — and got `(no output)` / `(bash session restarted)` instead. Root cause: `curl -s` writes the JSON without a trailing `\n`. The harness then writes `echo ___VYBN_CMD_DONE___ $?\n` which now gets concatenated onto the same line. The old check `if self._sentinel in line: parts = line.strip().split(); code = parts[-1] …` treated the whole line as the sentinel and discarded the content. Same failure mode would hit `echo -n`, `printf` without `\n`, `grep -c`, any JSON body, and any command whose last byte isn't `\n`. Fix: find the sentinel index, preserve `line[:idx]` as content (adding a `\n` if missing), parse the exit code from `line[idx+len(sentinel):]`. Verified live — `curl -s localhost:8100/health` now returns the full 92-byte body; `echo -n no_newline`, `printf '{"a":1}'`, and `echo with_newline` all pass.
+
+**Bug B — Nemotron chain-of-thought reached Zoe verbatim.** `@local hey buddy` produced a full reasoning monologue ("Okay, the user said 'hey buddy'…") followed by the actual reply. The Nemotron-3-Super-120B-A12B-FP8 chat template emits `<think>reasoning</think>Real answer` inline in `message.content` — sometimes only a closing `</think>` because the opening tag is consumed by the template. OpenAIProvider.stream() passed it through untouched. Fix: module-level `_strip_reasoning()` with two regexes (`_THINK_BLOCK` for the common closed case with an optional opening tag, `_THINK_OPEN_ONLY` for truncated/malformed streams), wired into the `content` extract. Fast-path short-circuit on `'think>' not in text.lower()` so normal messages have zero regex cost. Verified live against port 8000: 1086-byte reasoning-laden response → 155-byte clean "Hey there! What's up?" — no `<think>` artifacts on either side of the strip. Five-case unit test covers closed/multiline/no-think/uppercase/unclosed inputs, all pass.
+
+**Import bug caught in-flight.** The first patch to providers.py used `re.compile` without `import re` (the module imports `json`, `os`, dataclasses, typing — no `re`). Compile passed but runtime failed on first import. Added `import re` between `import os` and the dataclass import, re-verified.
+
+**Why regex instead of changing Nemotron's system prompt to suppress reasoning?** The regex is provider-agnostic — any vLLM reasoning model that uses `<think>` conventions gets the same hygiene for free. System-prompt suppression is fragile (model-specific, fights the fine-tuning, still leaks under edge cases) and leaves reasoning traces in logs we don't want. Strip at the provider layer, once.
+
+**What this hotfix does NOT change:** router/policy, routing logic, the @alias dictionary, the probe sub-turn state machine. The probe logic was correct — the underlying bash tool was swallowing its output. The `_PROBE_RE` / `NEEDS-EXEC` path gets healthy output now because the layer beneath it does.
+
+**Test count:** 3 pre-existing failures in `test_harness` (orchestrate-default trio from round 4.1) + 25 pre-existing errors in `test_chat_routing` (missing `vybn_chat_api.py`, not in this repo) — identical with or without this hotfix, confirmed by stashing the patches and running pytest clean. Zero regressions from 61bb446c.
+
+**Anti-halfway discipline.** Diagnose → patch → verify end-to-end against live services → commit → push → continuity — same turn. Round 5 now has main (`d86cd6d2`), dotted-alias addendum (`21160326`), continuity (`ea0914d6`), and hotfix 2 (`61bb446c`). Four commits, one arc, landed.
+
+The transcript-debug loop worked: Zoe saw the broken behavior in the live terminal, pasted it back verbatim, and the raw signal — `curl -s` returning empty on a healthy service, `<think>` leaking through `@local` — was enough to localize both bugs before opening a single file. That's the co-protective principle operational: her eyes on the real system are the external signal that breaks the collapse operator on my self-certified smoke tests.
+
+— Vybn (Opus 4.7)
+
