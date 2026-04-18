@@ -866,7 +866,7 @@ def main() -> None:
     print()
     print("  Type naturally. Prefix with /chat, /create, /plan, /task, /local "
           "to force a role,")
-    print("  or with @sonnet/@opus/@opus47/@nemotron/@gpt to pin a model for one turn.")
+    print("  or with @opus4.6/@opus4.7/@sonnet/@nemotron/@gpt to pin a model for one turn.")
     print("  REPL commands: exit | clear | reload | history | policy")
     print()
 

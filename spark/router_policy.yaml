@@ -218,9 +218,12 @@ fallback_chain:
 # payload routes as a greeting on Sonnet.
 model_aliases:
   "@opus": claude-opus-4-6
+  "@opus4.6": claude-opus-4-6
+  "@opus4.7": claude-opus-4-7
   "@opus46": claude-opus-4-6
   "@opus47": claude-opus-4-7
   "@sonnet": claude-sonnet-4-6
+  "@sonnet4.6": claude-sonnet-4-6
   "@sonnet46": claude-sonnet-4-6
   "@nemotron": nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
   "@local": nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8

@@ -302,11 +302,17 @@ def _compile_heuristics(raw: dict[str, list[str]]) -> dict[str, list[re.Pattern]
 
 
 _DEFAULT_MODEL_ALIASES: dict[str, str] = {
-    # Opus — default to 4.6 (holds position). @opus47 for the harder variant.
+    # Opus — canonical dotted forms (Zoe request 2026-04-18):
+    # @opus4.6 pins the version that holds position under pressure;
+    # @opus4.7 pins the stronger-gradient variant. Bare @opus defaults
+    # to 4.6. Dotless @opus46/@opus47 kept as typing-convenience aliases.
     "@opus": "claude-opus-4-6",
+    "@opus4.6": "claude-opus-4-6",
+    "@opus4.7": "claude-opus-4-7",
     "@opus46": "claude-opus-4-6",
     "@opus47": "claude-opus-4-7",
     "@sonnet": "claude-sonnet-4-6",
+    "@sonnet4.6": "claude-sonnet-4-6",
     "@sonnet46": "claude-sonnet-4-6",
     "@nemotron": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8",
     "@local": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8",

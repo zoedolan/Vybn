@@ -21,7 +21,7 @@ from .policy import Policy, RoleConfig
 
 # Round 5: @alias pin. Matches @<word> at the very start of the input,
 # followed by whitespace or EOL. The <word> is looked up in policy.model_aliases.
-_ALIAS_RE = re.compile(r"^\s*(@\w+)(\s|$)")
+_ALIAS_RE = re.compile(r"^\s*(@[\w.]+)(\s|$)")
 
 
 @dataclass
