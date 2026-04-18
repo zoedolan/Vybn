@@ -65,7 +65,10 @@ _DEFAULT_ROLES: dict[str, RoleConfig] = {
     "code": RoleConfig(
         role="code",
         provider="anthropic",
-        model="claude-opus-4-7",
+        # Opus 4.7 had a stronger capitulation gradient that surfaced
+        # in the 2026-04-18 buckling session. 4.6 holds position better
+        # on long debug loops; keep adaptive thinking, drop the substrate.
+        model="claude-opus-4-6",
         thinking="adaptive",
         max_tokens=32768,
         max_iterations=50,
@@ -214,7 +217,7 @@ _DEFAULT_HEURISTICS_RAW: dict[str, list[str]] = {
         r"\\bgrep -\\w",
         r"\\bsed -\\w",
         r"\\bawk '",
-        r"(fix|identify|audit|review|debug).{0,30}(bug|harness|deficit|issue|problem|code)",
+        r"(fix|identify|find|spot|notice|discern|check|audit|review|debug).{0,30}(bug|harness|deficit|issue|problem|code)",
         r"\\bstack trace\\b",
         r"\\bHTTP \\d{3}\\b",
         r"\\bprovider error\\b",
@@ -328,7 +331,7 @@ def load_policy(path: str | os.PathLike | None = None) -> Policy:
     directives = dict(data.get("directives") or _DEFAULT_DIRECTIVES)
     fallback = dict(data.get("fallback_chain") or _DEFAULT_FALLBACK)
     budgets = dict(data.get("budgets") or _DEFAULT_BUDGETS)
-    default_role = str(data.get("default_role", "code"))
+    default_role = str(data.get("default_role", "task"))
     if default_role not in roles:
         default_role = next(iter(roles))
 

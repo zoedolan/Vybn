@@ -54,6 +54,11 @@ class NormalizedResponse:
     stop_reason: str  # "end_turn" | "tool_use" | "max_tokens" | "error"
     in_tokens: int = 0
     out_tokens: int = 0
+    # Cache telemetry (Anthropic prompt caching). Anthropic dropped
+    # ephemeral TTL 1h -> 5min on 2026-03-06; without visibility we
+    # can't tell if the LayeredPrompt cache_control markers hit.
+    cache_creation_tokens: int = 0
+    cache_read_tokens: int = 0
     raw_assistant_content: Any = None
     provider: str = ""
     model: str = ""
@@ -283,12 +288,16 @@ class AnthropicProvider:
             usage = getattr(msg, "usage", None)
             in_tok = getattr(usage, "input_tokens", 0) or 0
             out_tok = getattr(usage, "output_tokens", 0) or 0
+            cache_create = getattr(usage, "cache_creation_input_tokens", 0) or 0
+            cache_read = getattr(usage, "cache_read_input_tokens", 0) or 0
             return NormalizedResponse(
                 text="\n".join(text_parts),
                 tool_calls=calls,
                 stop_reason=getattr(msg, "stop_reason", "") or "end_turn",
                 in_tokens=in_tok,
                 out_tokens=out_tok,
+                cache_creation_tokens=cache_create,
+                cache_read_tokens=cache_read,
                 raw_assistant_content=msg.content,
                 provider=self.name,
                 model=role.model,

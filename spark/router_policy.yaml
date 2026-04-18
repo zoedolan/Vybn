@@ -18,7 +18,11 @@ default_role: task
 roles:
   code:
     provider: anthropic
-    model: claude-opus-4-7
+    # Opus 4.7 had a stronger capitulation gradient that
+    # surfaced in the 2026-04-18 buckling session. 4.6 holds
+    # position better on long debug loops; keep adaptive
+    # thinking, drop the substrate.
+    model: claude-opus-4-6
     thinking: adaptive
     max_tokens: 32768
     max_iterations: 50
@@ -135,7 +139,7 @@ heuristics:
     - "\\bgrep -\\w"
     - "\\bsed -\\w"
     - "\\bawk \\x27"
-    - "(fix|identify|audit|review|debug).{0,30}(bug|harness|deficit|issue|problem|code)"
+    - "(fix|identify|find|spot|notice|discern|check|audit|review|debug).{0,30}(bug|harness|deficit|issue|problem|code)"
     - "\\bstack trace\\b"
     - "\\bHTTP \\d{3}\\b"
     - "\\bprovider error\\b"
@@ -163,6 +167,8 @@ directives:
   "/identity": identity
 
 fallback_chain:
+  # 4.7 kept in the chain so a caller that explicitly pins
+  # it still degrades cleanly; not a default anywhere.
   claude-opus-4-7: [claude-opus-4-6, claude-sonnet-4-6]
   claude-opus-4-6: [claude-sonnet-4-6]
   claude-sonnet-4-6: [claude-opus-4-6]

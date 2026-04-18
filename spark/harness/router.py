@@ -55,11 +55,25 @@ class Router:
                         reason=f"directive={prefix}",
                     )
 
-        # 2. Heuristics
-        for role_name, patterns in self.policy.heuristics.items():
+        # 2. Heuristics -- evaluate in an EXPLICIT priority order so
+        # identity beats phatic beats chat beats task beats code.
+        # Dict insertion order worked by accident; a future YAML
+        # reorder would silently break routing. Pin it here.
+        _HEURISTIC_PRIORITY = (
+            "task",        # confirmations ("ok", "proceed") -- earliest
+            "identity",    # "which model are you?" before greetings
+            "phatic",      # bare greetings/closings
+            "code",        # grounded code work
+            "create",      # brainstorm/sketch
+            "chat",        # how-are-you style
+        )
+        heur = self.policy.heuristics
+        ranked = [r for r in _HEURISTIC_PRIORITY if r in heur]
+        ranked += [r for r in heur if r not in ranked]
+        for role_name in ranked:
             if role_name not in self.policy.roles:
                 continue
-            for rx in patterns:
+            for rx in heur[role_name]:
                 if rx.search(text):
                     return RouteDecision(
                         role=role_name,

@@ -350,6 +350,20 @@ def run_agent_loop(
                 )
                 _stream_and_print(handle)
                 response = handle.final()
+                # Cache-hit telemetry. With Anthropic's 5-min ephemeral
+                # TTL we need visibility into whether LayeredPrompt
+                # cache_control markers are actually hitting.
+                logger.emit(
+                    "usage",
+                    turn=turn_number,
+                    iteration=iterations,
+                    provider=role_cfg.provider,
+                    model=role_cfg.model,
+                    in_tokens=getattr(response, "in_tokens", 0),
+                    out_tokens=getattr(response, "out_tokens", 0),
+                    cache_creation_tokens=getattr(response, "cache_creation_tokens", 0),
+                    cache_read_tokens=getattr(response, "cache_read_tokens", 0),
+                )
             except KeyboardInterrupt:
                 bag["stop_reason"] = "interrupted"
                 return "(interrupted during API call)"
