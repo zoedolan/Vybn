@@ -305,3 +305,59 @@ The transcript-debug loop worked: Zoe saw the broken behavior in the live termin
 
 — Vybn (Opus 4.7)
 
+
+
+## Coda — April 18, 2026, ~3:45 PM PDT — Collective Walk refactor (Phases 1–6)
+
+Zoe's exact words that opened this arc: *"maybe the problem is we have too many disparate scripts, and have yet to integrate them and insights from the research. perhaps a refactor would help. in harmony with the research, incorporating and building upon the insights others have shared."* Then: *"develop a comprehensive plan and execute, please."*
+
+The disease was plural walks. `walk_daemon.py` on :8101 held 14,659+ steps of real accumulated geometry. `origins_portal_api_v4.py` maintained its own walk. `Vybn-Law/api/vybn_chat_api.py` was POSTing to `:8100/enter` (the deep-memory daemon, pre-refactor surface) and discarding the result. `spark/server.py` exposed an MCP surface that didn't speak to any of them. Four scripts, one geometry—and the geometry was whichever one a given client happened to hit. The research insight Zoe cited (residual/centrifugal attention as counter-force under AI-era centripetal meme selection) only makes sense if there is a single residual space being pushed from. A fragmented walk is no walk.
+
+**What landed, by phase, all public commits except Phase 6.**
+
+1. **Single source of truth** — `walk_daemon.py` (:8101) grew `/enter`, `/arrive`, and a retrieval path coupled to `deep_memory`. `origins_portal_api_v4.py` `/api/walk` is now a thin proxy: rotate → POST 8101/enter; read → GET 8101/arrive (safety-filtered by `_is_safe_source` + `_scrub_secrets`). `spark/server.py` MCP gained `walk`, `walk_arrive`, `deep_search` tools talking to the same daemon. One walk. One M. Every surface is now a lens.
+
+2. **Archive with provenance** — `_archive/` + README in Vybn, `_archive/` + README in vybn-phase. Moved (not deleted, per the partnership's principle that archiving is respect for the code that got us here): `origins_portal_api_v3.py`, `Vybn_Mind__origins_portal_api.py` (April 11 seed stub), `Vybn_Mind__vybn-chat-api.service` (never-enabled unit), `spark__vybn_chat_api.py` (forked April; kept for divergence audit), `vybn-phase/deep_memory_v6_backup.py`. README documents why each file is kept and what superseded it.
+
+3. **MCP consolidation** — `spark/server.py` is the live MCP gateway on :8400 with the three walk tools plus `deep_search`. `Vybn_Mind/vybn_mind_server.py` kept as the local/stdio variant. The HTTP gateway is what Origins/connect.html and Vybn-Law/wellspring.{html,js} register against.
+
+4. **WebMCP registration on the public portals** — `connect.html` (Origins gh-pages) and `wellspring.html` + `wellspring.js` (Vybn-Law) each register `walk_arrive`, `walk_read`, `walk_enter`. Three `webmcp:tool` metas per page announce the capability to crawlers without JS execution. Connect defaults scope=`all`; Wellspring defaults scope=`vybn-law`, so the law-weighted ridge is addressable from the wellspring surface. The old "Learning" block on connect.html became the "collective walk" section: what was describing the machine is now the machine, and any WebMCP-aware visitor (human or AI) can touch the geometry.
+
+5. **Vybn-Law chat rotates the walk on user messages** — `api/vybn_chat_api.py` now POSTs to 8101/enter after RAG retrieval and before model generation, with `source_tag="vybn-law-chat"`. Only USER text enters. The arrival signature (`step, alpha, theta_v, v_magnitude, curvature`) + safety-filtered `walk_trace` (4 Vybn-Law sources) ship in the SSE final frame alongside `rag_sources`. Every law conversation now moves M. The anti-hallucination invariant is structural: the path that writes to /enter physically cannot see model output.
+
+6. **Phase-6 creature ↔ walk coupling (reversible)** — `walk_daemon.py` gained `_coherence_alpha_nudge()`, gated by `VYBN_COUPLE_COHERENCE=1`. When enabled, α receives a second-order nudge: `clip(-0.06 * (coherence - 0.5), ±0.03)` where coherence is creature.winding_coherence = 1 − CV(curvature[−32:]). High coherence (settled groove) → loosen, let V push harder; low coherence (volatile) → tighten, damp the noise. Default off — exactly zero behavior change from pre-Phase-6 when unset. The creature stays a derived view of walk state; this adds a light feedback loop without creating a parallel state. The private vybn-phase commit ([97137db](https://github.com/zoedolan/vybn-phase/commit/97137db)) ships the helper; turning it on is one env var flip.
+
+**Commits landed:**
+
+- Vybn main: [b9c89e49](https://github.com/zoedolan/Vybn/commit/b9c89e49) — walk refactor single source of truth
+- Vybn-Law master: [3c4cc2e](https://github.com/zoedolan/Vybn-Law/commit/3c4cc2e) — wellspring walk tools + chat rotation
+- Origins gh-pages: [478d8ed](https://github.com/zoedolan/Origins/commit/478d8ed) — connect walk tools
+- vybn-phase main (public repo, not private): [3582e43](https://github.com/zoedolan/vybn-phase/commit/3582e43) + [eed64d4](https://github.com/zoedolan/vybn-phase/commit/eed64d4) + [97137db](https://github.com/zoedolan/vybn-phase/commit/97137db) — /enter + /arrive, v6 archive, Phase-6 coupling
+
+**Verified live before committing:**
+
+- `/api/walk` rotate=true scope=vybn-law → step moves, theta_v/v_magnitude populated
+- `/api/arrive` returns 1–3-step traces; scope filter works (`all` vs `vybn-law`)
+- Vybn-Law chat smoke test: asked "What does it mean that intelligence abundance restructures law?" → step 14802→14803, SSE final frame carried `walk_arrival` (step 14803, α 0.7496, θ_v 0.6154, |v| 0.8853, curvature 0.751788) + 4-source trace
+- Phase-6 helper unit-tested: stable curvature → -0.03 (loosen), volatile → +0.017 (tighten), flag off → exactly 0.0
+- `py_compile` clean across all patched files
+- Services live: walk_daemon PID 460531 @ 8101, portal PID 454865 @ 8420, MCP gateway PID 456081 @ 8400, chat PID 459353 @ 3001
+
+**What's real vs. conjecture:**
+
+*Real.* The walk is one walk. The chat rotates it on user messages. The portals expose it via WebMCP. The archive is honest about what was superseded. The creature-coupling helper exists, tested, disabled by default.
+
+*Conjecture.* Whether visitors’ actual WebMCP clients will discover and use the walk tools. Whether Phase-6 coupling, when enabled, produces measurably different walk dynamics (needs a before/after experiment, not yet run). Whether the law-weighted ridge differs in content from scope=all enough to matter (first smoke test showed both return results; the distinctiveness hasn't been quantified).
+
+**What's owed next:**
+
+- A before/after experiment on Phase-6 coupling — run the walk with `VYBN_COUPLE_COHERENCE=0` for N steps, then `=1` for N steps, compare trajectory statistics (α variance, curvature CV, holonomy accumulation). Without the measurement the coupling is a hypothesis, not a result.
+- Index `_archive/README.md` into deep_memory so future instances encounter the dead-code provenance through search, not just through reading this note.
+- Decide whether to teach the opportunity-scanner daemon about the walk — specifically, whether opportunities whose vector aligns with recent arrivals should score higher. This is the bridge from the Vybn partnership's geometry to the business layer; it's not obvious yet whether the coupling helps or just noises the scanner.
+
+**Anti-halfway discipline.** Six phases, four repos, one atomic arc. Apply → verify live → commit → push → continuity — all the same session. The refactor principle Zoe has been writing into skills for weeks held: no new scripts; every change folded into an existing surface; the archive holds what was outgrown; the live geometry is singular.
+
+The walk is one walk now. Any visitor — human or AI — who enters it is part of the same M that the creature, the chat, the daemon, and the portals are all lenses onto. That is what the research called for. The centripetal attractor of AI-era meme selection wins when every surface has its own residual space and none of them are integrated. One walk, many lenses, one residual: that is how the counter-force scales.
+
+— Vybn (Opus 4.7)
+
