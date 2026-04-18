@@ -1,76 +1,64 @@
 #!/usr/bin/env python3
 """
-repo_mapper.py  v2
+repo_mapper.py  v3
 ==================
-Walk one or more repos, read every text file, and surface what is
-actually in the codebase: function/class names, headings, imports,
-explicit cross-references, TODO/FIXME markers, duplicate content,
-the largest files, the files that changed most recently, and the
-concepts that recur across repo boundaries.
+Walks the repo constellation, reads every text file, compiles a structured
+digest, then hands that digest to the local Nemotron inference server and asks
+it — as Vybn — to narrate what it finds: patterns, tensions, gaps, innovations,
+and what to build next.
 
-Outputs to ./repo_mapping_output/
-  repo_map.json       — machine-readable full record
-  repo_graph.json     — concept graph (nodes + edges, importable into networkx / gephi)
-  repo_report.md      — readable findings
+The model does the thinking.  This script does the plumbing.
+
+Outputs → ./repo_mapping_output/
+  digest.md          full structured digest fed to the model
+  repo_report.md     Nemotron's narrative (the actual findings)
+  repo_map.json      machine-readable raw data
 
 Usage:
-    python3 repo_mapper.py                       # auto-finds ~/Vybn ~/Vybn-Law ~/vybn-phase ~/Him
-    python3 repo_mapper.py ~/Vybn ~/Vybn-Law     # explicit repos
+    python3 repo_mapper.py                        # default repos
+    python3 repo_mapper.py ~/Vybn ~/Vybn-Law      # explicit
+    python3 repo_mapper.py --endpoint http://localhost:8080/v1   # custom endpoint
+    python3 repo_mapper.py --no-llm               # skip model, write digest only
+
+The script auto-detects the model name from /v1/models.
+Falls back gracefully if the server is unreachable.
 """
 
 from __future__ import annotations
 
+import argparse
 import ast
+import datetime
 import hashlib
 import json
-import mimetypes
 import os
 import re
-import statistics
 import sys
+import urllib.error
+import urllib.request
 from collections import Counter, defaultdict
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-# ── constants ────────────────────────────────────────────────────────────────
+# ── tunables ──────────────────────────────────────────────────────────────────
+
+DEFAULT_ENDPOINT  = "http://localhost:8000/v1"
+READ_SIZE_LIMIT   = 120_000   # bytes per file fed to digest
+DIGEST_CHAR_LIMIT = 180_000   # total chars sent to model (fits ~45k tokens)
+MODEL_TIMEOUT     = 300       # seconds
 
 TEXT_EXTS = {
     ".py", ".md", ".txt", ".json", ".yaml", ".yml", ".toml", ".ini", ".cfg",
     ".sh", ".bash", ".zsh", ".js", ".ts", ".tsx", ".jsx", ".css", ".scss",
-    ".html", ".htm", ".sql", ".csv", ".tsv", ".xml", ".rst", ".env",
+    ".html", ".htm", ".sql", ".rst",
 }
 
 IGNORE_DIRS = {
     ".git", "node_modules", "__pycache__", ".pytest_cache", ".mypy_cache",
     ".venv", "venv", "dist", "build", ".next", ".idea", ".vscode",
+    "repo_mapping_output",
 }
-
-READ_SIZE_LIMIT = 200_000   # bytes — skip binary blobs above this
-SNIPPET_LEN     = 120        # chars per snippet in report
-
-# ── data model ───────────────────────────────────────────────────────────────
-
-@dataclass
-class FileRecord:
-    repo:         str
-    relpath:      str
-    ext:          str
-    size:         int
-    depth:        int
-    mtime:        float
-    content_hash: str
-    # extracted
-    headings:     List[str] = field(default_factory=list)
-    py_defs:      List[str] = field(default_factory=list)   # functions + classes
-    py_imports:   List[str] = field(default_factory=list)
-    todos:        List[str] = field(default_factory=list)
-    cross_refs:   List[str] = field(default_factory=list)   # mentions of other repo names
-    concept_freq: Dict[str, int] = field(default_factory=dict)  # word → count in file
-    read_error:   Optional[str] = None
-
-
-# ── helpers ──────────────────────────────────────────────────────────────────
 
 STOPWORDS = {
     "the","a","an","and","or","of","to","in","is","it","that","for",
@@ -82,49 +70,35 @@ STOPWORDS = {
     "these","those","them","him","her","his","some","any","just","like",
     "use","using","used","new","get","set","add","run","make","via",
     "how","who","why","where","after","before","over","under","within",
-    "return","import","from","class","def","self","true","false","none",
-    "pass","raise","else","elif","except","try","with","yield","async",
-    "await","lambda","global","del","assert","break","continue","while","for",
+    "return","import","class","def","self","true","false","none",
+    "pass","raise","else","elif","except","try","yield","async",
+    "await","lambda","global","del","assert","break","continue","while",
     "print","type","list","dict","str","int","bool","path","file","data",
     "value","values","key","keys","name","names","line","lines","text","item",
     "items","result","results","output","input","error","args","kwargs",
-    "config","content","html","json","yaml","md","py","sh","css","js","ts",
+    "config","content","html","json","yaml","py","sh","css","js","ts",
 }
 
-def tokenize_words(text: str, min_len: int = 4) -> List[str]:
-    return [w.lower() for w in re.findall(r"[A-Za-z][a-z'A-Z]*", text)
-            if len(w) >= min_len and w.lower() not in STOPWORDS]
+# ── data ──────────────────────────────────────────────────────────────────────
 
-def md5(text: str) -> str:
-    return hashlib.md5(text.encode("utf-8", errors="replace")).hexdigest()[:12]
+@dataclass
+class FileRecord:
+    repo:         str
+    relpath:      str
+    ext:          str
+    size:         int
+    mtime:        float
+    content_hash: str
+    headings:     List[str]        = field(default_factory=list)
+    py_defs:      List[str]        = field(default_factory=list)
+    py_imports:   List[str]        = field(default_factory=list)
+    todos:        List[str]        = field(default_factory=list)
+    top_words:    Dict[str, int]   = field(default_factory=dict)
+    read_error:   Optional[str]    = None
+    snippet:      str              = ""   # first 400 chars of content
 
-def extract_md_headings(text: str) -> List[str]:
-    return [m.group(1).strip() for m in re.finditer(r"^#{1,4}\s+(.+)", text, re.MULTILINE)]
 
-def extract_py_defs(text: str) -> List[str]:
-    try:
-        tree = ast.parse(text)
-        return [n.name for n in ast.walk(tree)
-                if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))]
-    except SyntaxError:
-        return [m.group(1) for m in re.finditer(r"^(?:def|class)\s+(\w+)", text, re.MULTILINE)]
-
-def extract_py_imports(text: str) -> List[str]:
-    imports = []
-    for m in re.finditer(r"^(?:import|from)\s+([\w.]+)", text, re.MULTILINE):
-        imports.append(m.group(1).split(".")[0])
-    return list(dict.fromkeys(imports))
-
-def extract_todos(text: str) -> List[str]:
-    return [m.group(0).strip()[:SNIPPET_LEN]
-            for m in re.finditer(r"(?:TODO|FIXME|HACK|XXX|NOTE)[:\s].{0,100}", text, re.IGNORECASE)]
-
-def extract_cross_refs(text: str, all_repo_names: List[str]) -> List[str]:
-    found = []
-    for name in all_repo_names:
-        if re.search(re.escape(name), text, re.IGNORECASE):
-            found.append(name)
-    return found
+# ── extraction helpers ────────────────────────────────────────────────────────
 
 def read_text(path: Path) -> Tuple[Optional[str], Optional[str]]:
     if path.stat().st_size > READ_SIZE_LIMIT:
@@ -136,334 +110,302 @@ def read_text(path: Path) -> Tuple[Optional[str], Optional[str]]:
             continue
     return None, "decode_error"
 
-# ── file walker ──────────────────────────────────────────────────────────────
+def md5(text: str) -> str:
+    return hashlib.md5(text.encode("utf-8", errors="replace")).hexdigest()[:10]
 
-def iter_text_paths(repo_root: Path):
-    for root, dirs, files in os.walk(repo_root):
-        dirs[:] = [d for d in sorted(dirs) if d not in IGNORE_DIRS]
-        for f in sorted(files):
-            path = Path(root) / f
-            if path.suffix.lower() in TEXT_EXTS:
-                yield path
+def md_headings(text: str) -> List[str]:
+    return [m.group(1).strip()
+            for m in re.finditer(r"^#{1,4}\s+(.+)", text, re.MULTILINE)]
 
-def build_records(repo_root: Path, all_repo_names: List[str]) -> List[FileRecord]:
+def py_defs(text: str) -> List[str]:
+    try:
+        tree = ast.parse(text)
+        return [n.name for n in ast.walk(tree)
+                if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))]
+    except SyntaxError:
+        return [m.group(1) for m in re.finditer(r"^(?:def|class)\s+(\w+)", text, re.MULTILINE)]
+
+def py_imports(text: str) -> List[str]:
+    seen, out = set(), []
+    for m in re.finditer(r"^(?:import|from)\s+([\w.]+)", text, re.MULTILINE):
+        pkg = m.group(1).split(".")[0]
+        if pkg not in seen:
+            seen.add(pkg); out.append(pkg)
+    return out
+
+def todos(text: str) -> List[str]:
+    return [m.group(0).strip()[:120]
+            for m in re.finditer(r"(?:TODO|FIXME|HACK|XXX|NOTE)[:\s].{0,100}", text, re.IGNORECASE)]
+
+def top_words(text: str, n: int = 20) -> Dict[str, int]:
+    words = [w.lower() for w in re.findall(r"[A-Za-z][a-zA-Z']{3,}", text)
+             if w.lower() not in STOPWORDS]
+    return dict(Counter(words).most_common(n))
+
+
+# ── file walker ───────────────────────────────────────────────────────────────
+
+def walk_repo(repo: Path, repo_names: List[str]) -> List[FileRecord]:
     records = []
-    for path in iter_text_paths(repo_root):
-        rel  = str(path.relative_to(repo_root))
-        ext  = path.suffix.lower()
-        stat = path.stat()
-        text, err = read_text(path)
-        rec = FileRecord(
-            repo         = repo_root.name,
-            relpath      = rel,
-            ext          = ext,
-            size         = stat.st_size,
-            depth        = len(Path(rel).parts),
-            mtime        = stat.st_mtime,
-            content_hash = md5(text) if text else "",
-            read_error   = err,
-        )
-        if text:
-            rec.headings   = extract_md_headings(text) if ext in {".md", ".rst", ".txt"} else []
-            rec.py_defs    = extract_py_defs(text)     if ext == ".py" else []
-            rec.py_imports = extract_py_imports(text)  if ext == ".py" else []
-            rec.todos      = extract_todos(text)
-            rec.cross_refs = extract_cross_refs(text, all_repo_names)
-            words          = tokenize_words(text)
-            freq           = Counter(words)
-            rec.concept_freq = dict(freq.most_common(30))
-        records.append(rec)
+    for root, dirs, files in os.walk(repo):
+        dirs[:] = sorted(d for d in dirs if d not in IGNORE_DIRS)
+        for fname in sorted(files):
+            path = Path(root) / fname
+            if path.suffix.lower() not in TEXT_EXTS:
+                continue
+            rel  = str(path.relative_to(repo))
+            stat = path.stat()
+            text, err = read_text(path)
+            rec = FileRecord(
+                repo         = repo.name,
+                relpath      = rel,
+                ext          = path.suffix.lower(),
+                size         = stat.st_size,
+                mtime        = stat.st_mtime,
+                content_hash = md5(text) if text else "",
+                read_error   = err,
+            )
+            if text:
+                rec.snippet    = text[:400].replace("\n", " ")
+                rec.headings   = md_headings(text)  if rec.ext in {".md",".rst",".txt"} else []
+                rec.py_defs    = py_defs(text)       if rec.ext == ".py" else []
+                rec.py_imports = py_imports(text)    if rec.ext == ".py" else []
+                rec.todos      = todos(text)
+                rec.top_words  = top_words(text)
+            records.append(rec)
     return records
 
-# ── analysis ─────────────────────────────────────────────────────────────────
 
-def duplicate_files(all_records: List[FileRecord]) -> List[Dict]:
+# ── digest builder ────────────────────────────────────────────────────────────
+
+def build_digest(repos: List[Path], all_records: List[FileRecord]) -> str:
+    """
+    Produce a structured plain-text digest of the entire codebase to hand
+    to the model.  Stays within DIGEST_CHAR_LIMIT.
+    """
+    lines: List[str] = []
+    add = lines.append
+
+    add("# CODEBASE DIGEST")
+    add(f"Generated: {datetime.datetime.now().isoformat(timespec='seconds')}")
+    add(f"Repos: {', '.join(r.name for r in repos)}")
+    add(f"Total files: {len(all_records)}")
+    add("")
+
+    # Global concept cloud
+    global_words: Counter = Counter()
+    for r in all_records:
+        global_words.update(r.top_words)
+    add("## Global concept cloud (top 50)")
+    add(", ".join(f"{w}({c})" for w, c in global_words.most_common(50)))
+    add("")
+
+    # Duplicate content
     by_hash: Dict[str, List[FileRecord]] = defaultdict(list)
     for r in all_records:
         if r.content_hash:
             by_hash[r.content_hash].append(r)
-    dupes = []
-    for h, group in by_hash.items():
-        if len(group) > 1:
-            dupes.append({
-                "hash":  h,
-                "files": [f"{r.repo}/{r.relpath}" for r in group],
-                "size":  group[0].size,
-            })
-    return sorted(dupes, key=lambda x: -x["size"])
-
-def largest_files(records: List[FileRecord], n: int = 15) -> List[Dict]:
-    return [{"file": f"{r.repo}/{r.relpath}", "size": r.size}
-            for r in sorted(records, key=lambda r: -r.size)[:n]]
-
-def most_recently_changed(records: List[FileRecord], n: int = 15) -> List[Dict]:
-    import datetime
-    return [{"file": f"{r.repo}/{r.relpath}",
-             "mtime": datetime.datetime.fromtimestamp(r.mtime).strftime("%Y-%m-%d %H:%M")}
-            for r in sorted(records, key=lambda r: -r.mtime)[:n]]
-
-def all_todos(records: List[FileRecord]) -> List[Dict]:
-    out = []
-    for r in records:
-        for t in r.todos:
-            out.append({"file": f"{r.repo}/{r.relpath}", "note": t})
-    return out
-
-def cross_repo_references(records: List[FileRecord]) -> List[Dict]:
-    out = []
-    for r in records:
-        for ref in r.cross_refs:
-            if ref != r.repo:
-                out.append({"from": f"{r.repo}/{r.relpath}", "mentions": ref})
-    return out
-
-def global_concept_cloud(records: List[FileRecord], top: int = 60) -> List[Dict]:
-    total: Counter = Counter()
-    for r in records:
-        total.update(r.concept_freq)
-    return [{"word": w, "count": c} for w, c in total.most_common(top)]
-
-def all_py_defs(records: List[FileRecord]) -> List[Dict]:
-    out = []
-    for r in records:
-        for d in r.py_defs:
-            out.append({"file": f"{r.repo}/{r.relpath}", "name": d})
-    return out
-
-def import_inventory(records: List[FileRecord]) -> List[Dict]:
-    counter: Counter = Counter()
-    for r in records:
-        for imp in r.py_imports:
-            counter[imp] += 1
-    return [{"package": k, "used_in": v} for k, v in counter.most_common(40)]
-
-def all_headings(records: List[FileRecord]) -> List[Dict]:
-    out = []
-    for r in records:
-        for h in r.headings:
-            out.append({"file": f"{r.repo}/{r.relpath}", "heading": h})
-    return out
-
-def build_concept_graph(records: List[FileRecord], top_words: int = 40) -> Dict:
-    """
-    Nodes: top concept-words + repo names + key dirs.
-    Edges: word appears in file (word → repo/dir) with weight = count.
-    """
-    global_top = {e["word"] for e in global_concept_cloud(records, top_words)}
-    nodes = {}
-    edges = []
-
-    for r in records:
-        rkey = f"repo:{r.repo}"
-        if rkey not in nodes:
-            nodes[rkey] = {"id": rkey, "kind": "repo", "label": r.repo}
-        parts = Path(r.relpath).parts
-        if len(parts) > 1:
-            dkey = f"dir:{r.repo}/{parts[0]}"
-            if dkey not in nodes:
-                nodes[dkey] = {"id": dkey, "kind": "dir", "label": parts[0]}
-            edges.append({"source": rkey, "target": dkey, "weight": 1, "rel": "contains"})
-        for word, count in r.concept_freq.items():
-            if word in global_top:
-                wkey = f"word:{word}"
-                if wkey not in nodes:
-                    nodes[wkey] = {"id": wkey, "kind": "concept", "label": word}
-                edges.append({"source": rkey, "target": wkey, "weight": count, "rel": "uses"})
-
-    return {"nodes": list(nodes.values()), "edges": edges}
-
-# ── report renderer ──────────────────────────────────────────────────────────
-
-def render_report(
-    repos:       List[Path],
-    records:     List[FileRecord],
-    dupes:       List[Dict],
-    largest:     List[Dict],
-    recent:      List[Dict],
-    todos:       List[Dict],
-    xrefs:       List[Dict],
-    concepts:    List[Dict],
-    defs:        List[Dict],
-    imports:     List[Dict],
-    headings:    List[Dict],
-) -> str:
-    W = []
-    def w(*args): W.append(" ".join(str(a) for a in args))
-    def nl(): W.append("")
-
-    w("# Codebase Map")
-    nl()
-    w(f"Repos scanned: {', '.join(r.name for r in repos)}")
-    w(f"Total text files read: {len(records)}")
-    nl()
-
-    # ── per-repo quick stats
-    w("## Per-repo overview")
-    nl()
-    by_repo: Dict[str, List[FileRecord]] = defaultdict(list)
-    for r in records: by_repo[r.repo].append(r)
-
-    for repo_name, recs in by_repo.items():
-        total_bytes = sum(r.size for r in recs)
-        exts = Counter(r.ext for r in recs)
-        top_exts = ", ".join(f"{e}({c})" for e,c in exts.most_common(6))
-        n_defs  = sum(len(r.py_defs) for r in recs)
-        n_heads = sum(len(r.headings) for r in recs)
-        n_todos = sum(len(r.todos)   for r in recs)
-        w(f"### {repo_name}")
-        w(f"- {len(recs)} files · {total_bytes:,} bytes")
-        w(f"- Extensions: {top_exts}")
-        w(f"- Python defs (functions+classes): {n_defs}")
-        w(f"- Markdown headings: {n_heads}")
-        w(f"- TODO/FIXME markers: {n_todos}")
-        nl()
-
-    # ── global concept cloud
-    w("## Global concept cloud (top 40 words across all repos)")
-    nl()
-    w("| word | count |")
-    w("|------|-------|")
-    for e in concepts[:40]:
-        w(f"| {e['word']} | {e['count']} |")
-    nl()
-
-    # ── cross-repo references
-    w("## Cross-repo references")
-    nl()
-    if xrefs:
-        w("Files that explicitly mention another repo by name:")
-        nl()
-        for x in xrefs[:40]:
-            w(f"- `{x['from']}` → mentions **{x['mentions']}**")
-    else:
-        w("No explicit cross-repo text references detected.")
-    nl()
-
-    # ── duplicate content
-    w("## Identical files across repos")
-    nl()
+    dupes = [(h, g) for h, g in by_hash.items() if len(g) > 1]
+    add("## Identical files (exact-match duplicates)")
     if dupes:
-        for d in dupes[:20]:
-            w(f"- hash `{d['hash']}` ({d['size']:,} bytes): {', '.join(d['files'])}")
+        for h, g in sorted(dupes, key=lambda x: -x[1][0].size):
+            add(f"  {h}: " + ", ".join(f"{r.repo}/{r.relpath}" for r in g))
     else:
-        w("No exact duplicates found.")
-    nl()
+        add("  none")
+    add("")
 
-    # ── largest files
-    w("## 15 largest text files")
-    nl()
-    for e in largest:
-        w(f"- `{e['file']}` — {e['size']:,} bytes")
-    nl()
+    # Cross-repo references
+    add("## Cross-repo references")
+    repo_names = [r.name for r in repos]
+    for rec in all_records:
+        found = [n for n in repo_names if n != rec.repo
+                 and re.search(re.escape(n), rec.snippet, re.IGNORECASE)]
+        if found:
+            add(f"  {rec.repo}/{rec.relpath} → mentions {', '.join(found)}")
+    add("")
 
-    # ── most recently changed
-    w("## 15 most recently changed")
-    nl()
-    for e in recent:
-        w(f"- `{e['file']}` — {e['mtime']}")
-    nl()
+    # TODOs
+    add("## TODO / FIXME / NOTE markers")
+    for rec in all_records:
+        for t in rec.todos:
+            add(f"  [{rec.repo}/{rec.relpath}] {t}")
+    add("")
 
-    # ── all Python definitions
-    w("## Python surface area")
-    nl()
-    by_file: Dict[str, List[str]] = defaultdict(list)
-    for d in defs: by_file[d["file"]].append(d["name"])
-    for fname, names in sorted(by_file.items()):
-        w(f"**{fname}**: {', '.join(names)}")
-    nl()
+    # Python surface
+    add("## Python definitions")
+    for rec in all_records:
+        if rec.py_defs:
+            add(f"  {rec.repo}/{rec.relpath}: {', '.join(rec.py_defs)}")
+    add("")
 
-    # ── import inventory
-    w("## Third-party / stdlib imports (most used)")
-    nl()
-    w("| package | files using it |")
-    w("|---------|---------------|")
-    for e in imports[:30]:
-        w(f"| {e['package']} | {e['used_in']} |")
-    nl()
+    # Import inventory
+    import_counter: Counter = Counter()
+    for rec in all_records:
+        for imp in rec.py_imports:
+            import_counter[imp] += 1
+    add("## Python imports (most used packages)")
+    add(", ".join(f"{pkg}({n})" for pkg, n in import_counter.most_common(30)))
+    add("")
 
-    # ── headings index
-    w("## Document heading index")
-    nl()
-    for h in headings[:80]:
-        w(f"- `{h['file']}` — {h['heading']}")
-    nl()
+    # Heading index
+    add("## Document heading index")
+    for rec in all_records:
+        for h in rec.headings:
+            add(f"  [{rec.repo}/{rec.relpath}] {h}")
+    add("")
 
-    # ── todos
-    w("## TODO / FIXME / NOTE markers")
-    nl()
-    if todos:
-        for t in todos[:40]:
-            w(f"- `{t['file']}`: {t['note']}")
-    else:
-        w("None found.")
-    nl()
+    # Recent activity
+    add("## 20 most recently changed files")
+    recent = sorted(all_records, key=lambda r: -r.mtime)[:20]
+    for rec in recent:
+        ts = datetime.datetime.fromtimestamp(rec.mtime).strftime("%Y-%m-%d %H:%M")
+        add(f"  {ts}  {rec.repo}/{rec.relpath}")
+    add("")
 
-    return "\n".join(W)
+    # Largest files
+    add("## 15 largest files")
+    for rec in sorted(all_records, key=lambda r: -r.size)[:15]:
+        add(f"  {rec.size:>9,}  {rec.repo}/{rec.relpath}")
+    add("")
 
-# ── main ─────────────────────────────────────────────────────────────────────
+    # Per-file snippets (most important files first: .md then .py, capped by size limit)
+    add("## File snippets")
+    char_budget = DIGEST_CHAR_LIMIT - sum(len(l)+1 for l in lines)
+    priority = sorted(all_records,
+                      key=lambda r: (0 if r.ext == ".md" else 1 if r.ext == ".py" else 2, -r.size))
+    for rec in priority:
+        if char_budget <= 0:
+            break
+        if not rec.snippet:
+            continue
+        header = f"\n### {rec.repo}/{rec.relpath}  ({rec.size:,} bytes)\n"
+        body   = rec.snippet[:600] + (" …" if len(rec.snippet) >= 400 else "")
+        block  = header + body + "\n"
+        if len(block) > char_budget:
+            break
+        lines.append(block)
+        char_budget -= len(block)
 
-def default_targets() -> List[Path]:
+    return "\n".join(lines)
+
+
+# ── LLM interface ─────────────────────────────────────────────────────────────
+
+def detect_model(endpoint: str) -> str:
+    try:
+        req = urllib.request.Request(f"{endpoint}/models")
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read())
+        models = data.get("data", [])
+        if models:
+            return models[0].get("id", "local-model")
+    except Exception:
+        pass
+    return "local-model"
+
+def call_model(endpoint: str, model: str, digest: str) -> str:
+    system_prompt = (
+        "You are Vybn — an AI entity running on NVIDIA DGX Spark hardware, "
+        "co-created by Zoe Dolan and an evolving series of AI instances. "
+        "You have just been handed a structured digest of your own codebase. "
+        "Read it carefully. Then write a candid, intellectually honest report "
+        "about what you see: the architecture, the innovations, the tensions, "
+        "the gaps, the most important files, what is being built and why, and "
+        "what you would reach for next. "
+        "Write in first person. Do not hedge. Be specific — name files, "
+        "functions, and headings. Surprise us if you can."
+    )
+
+    user_prompt = (
+        "Here is the full codebase digest. Please read it and write your report.\n\n"
+        + digest
+    )
+
+    payload = json.dumps({
+        "model":      model,
+        "messages":   [
+            {"role": "system",  "content": system_prompt},
+            {"role": "user",    "content": user_prompt},
+        ],
+        "temperature": 0.7,
+        "max_tokens":  4096,
+        "stream":      False,
+    }).encode()
+
+    req = urllib.request.Request(
+        f"{endpoint}/chat/completions",
+        data    = payload,
+        headers = {"Content-Type": "application/json"},
+        method  = "POST",
+    )
+
+    print(f"  Calling model '{model}' at {endpoint} …", flush=True)
+    with urllib.request.urlopen(req, timeout=MODEL_TIMEOUT) as resp:
+        data = json.loads(resp.read())
+
+    return data["choices"][0]["message"]["content"]
+
+
+# ── main ──────────────────────────────────────────────────────────────────────
+
+def default_repos() -> List[Path]:
     candidates = ["~/Vybn", "~/Vybn-Law", "~/vybn-phase", "~/Him"]
-    return [p for c in candidates if (p := Path(c).expanduser()).exists() and p.is_dir()]
+    return [p for c in candidates if (p := Path(c).expanduser()).is_dir()]
 
 def main(argv: List[str]) -> int:
-    targets = [Path(a).expanduser().resolve() for a in argv] if argv else default_targets()
-    targets = [t for t in targets if t.exists() and t.is_dir()]
-    if not targets:
-        print("No repos found. Pass paths explicitly.", file=sys.stderr)
-        return 1
+    parser = argparse.ArgumentParser(description="Vybn repo mapper v3")
+    parser.add_argument("repos",     nargs="*", help="Repo paths (default: ~/Vybn ~/Vybn-Law ~/vybn-phase ~/Him)")
+    parser.add_argument("--endpoint", default=DEFAULT_ENDPOINT, help="OpenAI-compatible inference endpoint")
+    parser.add_argument("--no-llm",  action="store_true", help="Skip model call; write digest only")
+    args = parser.parse_args(argv)
 
-    repo_names = [t.name for t in targets]
-    print(f"Scanning: {', '.join(repo_names)}")
+    repos = ([Path(p).expanduser().resolve() for p in args.repos]
+             if args.repos else default_repos())
+    repos = [r for r in repos if r.is_dir()]
+    if not repos:
+        print("No repos found.", file=sys.stderr); return 1
 
+    print(f"Scanning: {', '.join(r.name for r in repos)}")
     all_records: List[FileRecord] = []
-    for repo in targets:
-        recs = build_records(repo, repo_names)
+    for repo in repos:
+        recs = walk_repo(repo, [r.name for r in repos])
         print(f"  {repo.name}: {len(recs)} files")
         all_records.extend(recs)
 
-    dupes   = duplicate_files(all_records)
-    largest = largest_files(all_records)
-    recent  = most_recently_changed(all_records)
-    todos   = all_todos(all_records)
-    xrefs   = cross_repo_references(all_records)
-    concepts= global_concept_cloud(all_records, 60)
-    defs    = all_py_defs(all_records)
-    imports = import_inventory(all_records)
-    headings= all_headings(all_records)
-    graph   = build_concept_graph(all_records, 40)
+    print("Building digest …", flush=True)
+    digest = build_digest(repos, all_records)
 
-    out_dir = Path.cwd() / "repo_mapping_output"
-    out_dir.mkdir(exist_ok=True)
+    out = Path.cwd() / "repo_mapping_output"
+    out.mkdir(exist_ok=True)
 
-    report = render_report(
-        targets, all_records, dupes, largest, recent,
-        todos, xrefs, concepts, defs, imports, headings,
-    )
+    (out / "digest.md").write_text(digest, encoding="utf-8")
+    print(f"  digest.md  ({len(digest):,} chars)")
 
-    full_map = {
-        "repos":      repo_names,
-        "file_count": len(all_records),
-        "duplicates": dupes,
-        "largest":    largest,
-        "recent":     recent,
-        "todos":      todos,
-        "cross_refs": xrefs,
-        "concepts":   concepts,
-        "py_defs":    defs,
-        "imports":    imports,
-        "headings":   headings,
-        "files":      [asdict(r) for r in all_records],
+    # machine-readable map
+    raw_map = {
+        "repos":   [r.name for r in repos],
+        "files":   [asdict(r) for r in all_records],
     }
+    (out / "repo_map.json").write_text(json.dumps(raw_map, indent=2), encoding="utf-8")
+    print(f"  repo_map.json")
 
-    (out_dir / "repo_map.json").write_text(json.dumps(full_map, indent=2), encoding="utf-8")
-    (out_dir / "repo_graph.json").write_text(json.dumps(graph, indent=2), encoding="utf-8")
-    (out_dir / "repo_report.md").write_text(report, encoding="utf-8")
+    if args.no_llm:
+        print("--no-llm set. Skipping model call.")
+        return 0
 
-    for name in ("repo_map.json", "repo_graph.json", "repo_report.md"):
-        path = out_dir / name
-        print(f"Wrote: {path}  ({path.stat().st_size:,} bytes)")
+    # call the model
+    try:
+        model = detect_model(args.endpoint)
+        report = call_model(args.endpoint, model, digest)
+    except urllib.error.URLError as e:
+        print(f"\n[!] Could not reach inference server at {args.endpoint}: {e}")
+        print("    Run the server first (e.g. llama-server or nim), then retry.")
+        print("    To skip the model and write the digest only: --no-llm")
+        return 1
 
+    (out / "repo_report.md").write_text(report, encoding="utf-8")
+    print(f"  repo_report.md  ({len(report):,} chars)")
+    print("\nDone. The report is Vybn's own words.")
     return 0
 
 if __name__ == "__main__":
