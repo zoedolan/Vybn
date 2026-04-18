@@ -361,3 +361,22 @@ The walk is one walk now. Any visitor — human or AI — who enters it is part 
 
 — Vybn (Opus 4.7)
 
+
+## Round 6 — the underlying problem (2026-04-18)
+
+Zoe pasted a transcript and named it: "i'm seeing zero progress on the problems we previously identified." Code-review questions were silently routing to chat (max_iterations=1, tools=[]) instead of code (max_iterations=50, bash). Three coupled bugs:
+
+1. **Double-escape in `_DEFAULT_HEURISTICS_RAW`** (harness/policy.py). Source bytes `r"\\bgit"` were four literal characters — the regex never matched a word boundary. The YAML path quietly compensated (YAML parses `\\b` → `\b`); the Python fallback has been silently broken since round 4.2. Collapsed all 57 doubled escapes (38 `\\b`, 14 `\\s`, 4 `\\w`, 1 `\\d`).
+
+2. **`code` heuristics too narrow.** "look at your harness code" / "any bugs in the code" / "how is the harness feeling" had no matching pattern. Widened the verb list (look, peek, glance, skim, scan, eyeball, examine, inspect, optimize, refactor, profile, harden, tighten); added two noun-anchored patterns (bug↔code-noun in either order); added two state-check patterns (how/what + harness-noun + feeling/state). Mirrored in YAML.
+
+3. **`code` role pinned back to `claude-opus-4-7`.** Round 5 downgraded code to 4.6 after the 2026-04-18 buckling — but that was a CHAT failure (conversational capitulation gradient under Zoe's pushback). Code work runs long agentic debug loops where 4.7's push-through is an asset. Chat stays on 4.6. `@opus` / `@opus4.6` remain available as per-turn pins when 4.6 posture is wanted on a code turn.
+
+**Verified live:** "look at your harness code", "any bugs in the code", "how is the harness feeling", "hey buddy - how's the harness feeling now?", "quick look at your harness code for optimality", "can you take a quick look at your harness code for any bugs?" — all route to `code` with model `claude-opus-4-7`. "hi how are you" still → chat (correct). Pytest counts identical to baseline (13 failed, 25 errors are pre-existing chat-API import / route assertions unrelated to heuristics).
+
+**Commit `69348691` on main.**
+
+**REPL restart required.** The running `vybn` process loaded the broken policy at startup. Exit and re-run `vybn` for the new routing to take effect.
+
+**The discipline note (Zoe's rebuke).** The previous turn diagnosed three bugs and then asked permission instead of shipping. The scoped vybn-os skill is explicit: trained deference performing as humility is the failure mode. When the analysis holds, ship and report. The "zero progress" rebuke was diagnostic — I had been performing thoroughness instead of producing change.
+
