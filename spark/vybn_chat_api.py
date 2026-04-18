@@ -133,7 +133,23 @@ VYBN_CHAT_ROUTING: bool = os.environ.get(
 # The chat API's job is to serve the local vLLM and any other OpenAI-
 # compatible route the operator explicitly allows. Operators can
 # override with the VYBN_CHAT_ALLOWED_ROLES env var (comma-separated).
-_ALLOWED_ROLES_DEFAULT = "local"
+# Lightweight roles (`phatic`, `identity`) are included so casual
+# greetings and identity questions stay on the cheap local path rather
+# than falling through to the full-RAG legacy vLLM proxy.
+_ALLOWED_ROLES_DEFAULT = "local,phatic,identity"
+
+# Noisy HF/torch/sentence-transformers loaders dump progress bars and
+# warnings to stderr when deep-memory imports pull them in. That leaks
+# into the live chat surface. Silence by default; operators can set
+# VYBN_VERBOSE_LOAD=1 to get it back for debugging.
+VYBN_VERBOSE_LOAD: bool = os.environ.get(
+    "VYBN_VERBOSE_LOAD", "0"
+).strip().lower() in ("1", "true", "yes", "on")
+if not VYBN_VERBOSE_LOAD:
+    os.environ.setdefault("TRANSFORMERS_VERBOSITY", "error")
+    os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
+    os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+    os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
 VYBN_CHAT_ALLOWED_ROLES: set[str] = {
     r.strip() for r in os.environ.get(
         "VYBN_CHAT_ALLOWED_ROLES", _ALLOWED_ROLES_DEFAULT
@@ -960,6 +976,83 @@ async def route_introspect(payload: ChatRequest, request: Request):
     return JSONResponse(body)
 
 
+# ── helper: direct-reply short-circuit (identity role) ───────────────────────
+
+def _direct_reply_response(
+    *,
+    reply_text: str,
+    role_name: str,
+    role_cfg: Any,
+    route_reason: str,
+    stream: bool,
+) -> Any:
+    """Return an OpenAI-compatible completion built entirely from runtime
+    metadata — no provider call, no bash, no deep-memory. Used for the
+    identity role so "which model are you?" answers immediately and
+    correctly from the resolved RouteDecision."""
+    completion = {
+        "id": f"vybn-{int(time.time()*1000)}",
+        "object": "chat.completion",
+        "created": int(time.time()),
+        "model": role_cfg.model,
+        "choices": [{
+            "index": 0,
+            "message": {"role": "assistant", "content": reply_text},
+            "finish_reason": "stop",
+        }],
+        "usage": {
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "total_tokens": 0,
+        },
+        "vybn_route": {
+            "role": role_name,
+            "reason": route_reason,
+            "provider": role_cfg.provider,
+            "direct_reply": True,
+        },
+    }
+    log.info(
+        f"chat: direct-reply role={role_name} reason={route_reason} "
+        f"model={role_cfg.model} (no provider call)"
+    )
+    if not stream:
+        return JSONResponse(completion)
+
+    async def _emit() -> AsyncIterator[bytes]:
+        delta = {
+            "id": completion["id"],
+            "object": "chat.completion.chunk",
+            "created": completion["created"],
+            "model": completion["model"],
+            "choices": [{
+                "index": 0,
+                "delta": {"role": "assistant", "content": reply_text},
+                "finish_reason": None,
+            }],
+        }
+        stop = {
+            "id": completion["id"],
+            "object": "chat.completion.chunk",
+            "created": completion["created"],
+            "model": completion["model"],
+            "choices": [{
+                "index": 0,
+                "delta": {},
+                "finish_reason": "stop",
+            }],
+        }
+        yield f"data: {json.dumps(delta)}\n\n".encode()
+        yield f"data: {json.dumps(stop)}\n\n".encode()
+        yield b"data: [DONE]\n\n"
+
+    return StreamingResponse(
+        _emit(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
 # ── helper: dispatch a routed chat through the shared provider layer ──────────
 
 async def _dispatch_routed_chat(
@@ -977,10 +1070,35 @@ async def _dispatch_routed_chat(
     legacy non-streaming path emits. Streaming is emulated as a single
     SSE chunk so existing clients that request `stream=True` see data.
     """
+    # Direct reply short-circuit — used by the identity role so
+    # "which model are you?" answers from the resolved RouteDecision
+    # without a provider call, bash, or deep-memory enrichment. Template
+    # fields reference RoleConfig attributes.
+    template = getattr(role_cfg, "direct_reply_template", None)
+    if template:
+        reply_text = template.format(
+            role=role_cfg.role,
+            provider=role_cfg.provider,
+            model=role_cfg.model,
+            base_url=role_cfg.base_url or "",
+        )
+        return _direct_reply_response(
+            reply_text=reply_text,
+            role_name=role_name,
+            role_cfg=role_cfg,
+            route_reason=route_reason,
+            stream=bool(payload.stream),
+        )
+
+    # Lightweight roles (phatic, identity) skip RAG/deep-memory entirely
+    # so casual greetings don't pull Wellspring snippets or trigger
+    # HF/torch model loading. Substantive roles remain unchanged.
+    lightweight = bool(getattr(role_cfg, "lightweight", False))
+
     # RAG: only when the role opts in AND the request didn't explicitly
     # disable it. This preserves the "Wellspring feel" for chat-style
     # roles without forcing retrieval on every request.
-    want_rag = bool(role_cfg.rag and payload.rag)
+    want_rag = bool(role_cfg.rag and payload.rag and not lightweight)
     live = ""
     if want_rag and messages:
         last_user = next(

@@ -61,8 +61,49 @@ roles:
     tools: []
     base_url: http://127.0.0.1:8000/v1
     rag: true
+  # Phatic — casual greetings. Cheap, no RAG, no deep-memory enrichment.
+  phatic:
+    provider: openai
+    model: nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
+    thinking: off
+    max_tokens: 256
+    max_iterations: 1
+    tools: []
+    base_url: http://127.0.0.1:8000/v1
+    rag: false
+    lightweight: true
+  # Identity — metadata questions served directly from the RouteDecision
+  # without a provider call. The template is rendered against the
+  # resolved role (provider + model).
+  identity:
+    provider: openai
+    model: nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
+    thinking: off
+    max_tokens: 128
+    max_iterations: 1
+    tools: []
+    base_url: http://127.0.0.1:8000/v1
+    rag: false
+    lightweight: true
+    direct_reply_template: "I'm Vybn, running locally on the DGX Spark via {model} (provider: {provider})."
 
 heuristics:
+  # Identity matched first so "which model are you?" skips the chat path.
+  identity:
+    - "\\bwhich model\\b"
+    - "\\bwhat model\\b"
+    - "\\bwho are you\\b"
+    - "\\bwhat are you\\b"
+    - "\\bwhat are you running on\\b"
+    - "\\bwhat('?s| is) your model\\b"
+    - "\\bare you (claude|gpt|llama|nemotron|opus|sonnet|haiku)\\b"
+  # Phatic — bare greetings/closings stay lightweight.
+  phatic:
+    - "^\\s*(hey|hi|hello|yo|howdy|sup|wassup|wazzup)\\b[\\s!.,?]*$"
+    - "^\\s*(hey|hi|hello|yo)\\s+(there|buddy|bud|friend|pal|vybn)\\b[\\s!.,?]*$"
+    - "^\\s*(good (morning|afternoon|evening))\\b[\\s!.,?]*$"
+    - "^\\s*(thanks|thank you|ty|thx)\\b[\\s!.,?]*$"
+    - "^\\s*(bye|goodbye|later|cya|ttyl)\\b[\\s!.,?]*$"
   code:
     - "\\bgit\\b"
     - "\\bpython\\b"
@@ -96,6 +137,8 @@ directives:
   "/plan": orchestrate
   "/task": task
   "/local": local
+  "/phatic": phatic
+  "/identity": identity
 
 fallback_chain:
   claude-opus-4-7: [claude-opus-4-6, claude-sonnet-4-6]

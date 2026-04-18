@@ -199,11 +199,16 @@ class TestAllowedRolesGate(unittest.TestCase):
     if the caller explicitly requests them — the server falls back to
     the legacy vLLM path instead of silently making a cloud call."""
 
-    def test_default_allowed_roles_is_local_only(self):
+    def test_default_allowed_roles_includes_lightweight(self):
         mod = _load_chat_api(env_overrides={"VYBN_CHAT_ALLOWED_ROLES": None})
         if mod is None:
             self.skipTest("fastapi/httpx not importable")
-        self.assertEqual(mod.VYBN_CHAT_ALLOWED_ROLES, {"local"})
+        # `local` stays allowed; `phatic` and `identity` are added so
+        # greetings and identity questions stay on the cheap local path
+        # instead of falling through to the full-RAG legacy proxy.
+        self.assertEqual(
+            mod.VYBN_CHAT_ALLOWED_ROLES, {"local", "phatic", "identity"}
+        )
 
     def test_allowed_roles_env_override(self):
         mod = _load_chat_api(env_overrides={

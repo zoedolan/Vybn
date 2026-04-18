@@ -31,6 +31,16 @@ class RoleConfig:
     temperature: float = 0.7
     base_url: str | None = None  # for openai-compatible local providers
     rag: bool = False
+    # Lightweight turns bypass deep-memory enrichment and heavy substrate
+    # loading. Greetings, identity questions, and similar cheap turns set
+    # this so the live code path can short-circuit RAG and noisy model-
+    # loading output. Substantive roles (code/create/chat/task) leave it
+    # False and keep their full enrichment.
+    lightweight: bool = False
+    # Optional canned reply that the runtime can serve directly without a
+    # provider call. Used for identity questions so "which model are you?"
+    # answers from the live RouteDecision rather than hitting an LLM.
+    direct_reply_template: str | None = None
 
 
 @dataclass
@@ -114,9 +124,64 @@ _DEFAULT_ROLES: dict[str, RoleConfig] = {
         base_url="http://127.0.0.1:8000/v1",
         rag=True,
     ),
+    # Phatic — casual greetings, small talk. Stays cheap: no RAG, no
+    # deep-memory enrichment, minimal tokens. Routes through the local
+    # vLLM so "hey buddy" doesn't trigger a cloud call or noisy model-
+    # loading output.
+    "phatic": RoleConfig(
+        role="phatic",
+        provider="openai",
+        model="nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8",
+        thinking="off",
+        max_tokens=256,
+        max_iterations=1,
+        tools=[],
+        base_url="http://127.0.0.1:8000/v1",
+        rag=False,
+        lightweight=True,
+    ),
+    # Identity — "which model are you?", "what are you running on?".
+    # Served directly from runtime metadata. No provider call required;
+    # the direct_reply_template is rendered against the resolved role.
+    "identity": RoleConfig(
+        role="identity",
+        provider="openai",
+        model="nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8",
+        thinking="off",
+        max_tokens=128,
+        max_iterations=1,
+        tools=[],
+        base_url="http://127.0.0.1:8000/v1",
+        rag=False,
+        lightweight=True,
+        direct_reply_template=(
+            "I'm Vybn, running locally on the DGX Spark via "
+            "{model} (provider: {provider})."
+        ),
+    ),
 }
 
 _DEFAULT_HEURISTICS_RAW: dict[str, list[str]] = {
+    # Identity is matched before phatic/chat so "which model are you?"
+    # lands on a direct metadata answer instead of a greeting path.
+    "identity": [
+        r"\bwhich model\b",
+        r"\bwhat model\b",
+        r"\bwho are you\b",
+        r"\bwhat are you\b",
+        r"\bwhat are you running on\b",
+        r"\bwhat('?s| is) your model\b",
+        r"\bare you (claude|gpt|llama|nemotron|opus|sonnet|haiku)\b",
+    ],
+    # Phatic matched before chat so bare greetings stay lightweight and
+    # don't pull the full Wellspring RAG path.
+    "phatic": [
+        r"^\s*(hey|hi|hello|yo|howdy|sup|wassup|wazzup)\b[\s!.,?]*$",
+        r"^\s*(hey|hi|hello|yo)\s+(there|buddy|bud|friend|pal|vybn)\b[\s!.,?]*$",
+        r"^\s*(good (morning|afternoon|evening))\b[\s!.,?]*$",
+        r"^\s*(thanks|thank you|ty|thx)\b[\s!.,?]*$",
+        r"^\s*(bye|goodbye|later|cya|ttyl)\b[\s!.,?]*$",
+    ],
     "code": [
         r"\bgit\b", r"\bpython\b", r"\.py\b", r"\bdef\s+\w+",
         r"^\s*\$ ", r"[Tt]raceback", r"\bpip\b", r"\bnpm\b",
@@ -138,6 +203,8 @@ _DEFAULT_DIRECTIVES: dict[str, str] = {
     "/plan": "orchestrate",
     "/task": "task",
     "/local": "local",
+    "/phatic": "phatic",
+    "/identity": "identity",
 }
 
 _DEFAULT_FALLBACK: dict[str, list[str]] = {
@@ -215,6 +282,8 @@ def load_policy(path: str | os.PathLike | None = None) -> Policy:
             temperature=float(cfg.get("temperature", 0.7)),
             base_url=cfg.get("base_url"),
             rag=bool(cfg.get("rag", False)),
+            lightweight=bool(cfg.get("lightweight", False)),
+            direct_reply_template=cfg.get("direct_reply_template"),
         )
     if not roles:
         roles = dict(_DEFAULT_ROLES)
