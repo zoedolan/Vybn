@@ -786,9 +786,13 @@ async def chat(req: ChatRequest, request: Request):
     )
 
     async def stream_response():
+        # Transplanted from Vybn-Law chat mechanics: disable Nemotron thinking at
+        # the vLLM layer and stream tokens straight through. This eliminates the
+        # multi-thousand-character reasoning preamble that used to force us to
+        # buffer up to 4000 chars before the first visible byte reached the
+        # browser — the cause of the "slow, doesn't feel good" first turn.
         full_response = ""
         clean_response = ""
-        reasoning_filter = StreamingReasoningFilterV2(buffer_limit=4000)
 
         try:
             async with httpx.AsyncClient(timeout=httpx.Timeout(120.0)) as client:
@@ -798,6 +802,8 @@ async def chat(req: ChatRequest, request: Request):
                     "stream": True,
                     "max_tokens": MAX_TOKENS,
                     "temperature": 0.7,
+                    "top_p": 0.9,
+                    "chat_template_kwargs": {"enable_thinking": False},
                 }
 
                 # Send RAG sources before streaming begins
@@ -829,7 +835,6 @@ async def chat(req: ChatRequest, request: Request):
                         delta = chunk.get("choices", [{}])[0].get("delta", {})
                         token = delta.get("content", "")
                         if not token:
-                            # Heartbeat to keep connection alive
                             now = time.monotonic()
                             if now - last_heartbeat > HEARTBEAT_INTERVAL:
                                 yield ": heartbeat\n\n"
@@ -837,26 +842,23 @@ async def chat(req: ChatRequest, request: Request):
                             continue
 
                         full_response += token
-                        filtered = reasoning_filter.feed(token)
-                        if filtered:
-                            # Output safety: stop runaway generation
-                            if len(clean_response) + len(filtered) > sec.MAX_RESPONSE_LENGTH:
-                                remaining = sec.MAX_RESPONSE_LENGTH - len(clean_response)
-                                if remaining > 0:
-                                    yield f"data: {json.dumps({'content': filtered[:remaining]})}\n\n"
-                                    clean_response += filtered[:remaining]
-                                break
-                            yield f"data: {json.dumps({'content': filtered})}\n\n"
-                            clean_response += filtered
-                            last_heartbeat = time.monotonic()
+                        # Per-token scrub for secrets + system-reference phrases.
+                        # No buffering, no preamble filter: with enable_thinking=False
+                        # the model emits the answer directly, so we pass through
+                        # like Vybn-Law does.
+                        cleaned = _scrub_system_refs_v2(_scrub_secrets(token))
+                        if not cleaned:
+                            continue
 
-            # Flush any remaining buffer
-            flushed = reasoning_filter.flush()
-            if flushed:
-                flushed = flushed[:max(0, sec.MAX_RESPONSE_LENGTH - len(clean_response))]
-                if flushed:
-                    yield f"data: {json.dumps({'content': flushed})}\n\n"
-                    clean_response += flushed
+                        if len(clean_response) + len(cleaned) > sec.MAX_RESPONSE_LENGTH:
+                            remaining = sec.MAX_RESPONSE_LENGTH - len(clean_response)
+                            if remaining > 0:
+                                yield f"data: {json.dumps({'content': cleaned[:remaining]})}\n\n"
+                                clean_response += cleaned[:remaining]
+                            break
+                        yield f"data: {json.dumps({'content': cleaned})}\n\n"
+                        clean_response += cleaned
+                        last_heartbeat = time.monotonic()
 
         except (httpx.ConnectError, httpx.TimeoutException) as e:
             log.warning(f"chat: vLLM connection error: {e}")
