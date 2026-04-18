@@ -46,6 +46,7 @@ import subprocess
 import sys
 import time
 import traceback
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, AsyncIterator, Optional
@@ -55,6 +56,44 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
+
+# Shared multimodel harness primitives. Keep imports optional so the
+# chat-api continues to boot in lean environments where spark/harness
+# isn't importable for some reason — we degrade to the legacy inline
+# implementations below in that case.
+_SPARK_DIR = str(Path(__file__).resolve().parent)
+if _SPARK_DIR not in sys.path:
+    sys.path.insert(0, _SPARK_DIR)
+try:
+    from harness.prompt import (  # type: ignore
+        LayeredPrompt as _LayeredPrompt,
+        rag_snippets_async as _rag_snippets_async,
+    )
+    _HARNESS_OK = True
+except Exception:
+    _LayeredPrompt = None  # type: ignore
+    _rag_snippets_async = None  # type: ignore
+    _HARNESS_OK = False
+
+# Router / Policy / provider plumbing is a separate, strictly-optional
+# concern. If the harness import above succeeded but policy loading
+# fails, we still want the chat API to boot — just without role-based
+# dispatch. `_ROUTING_OK` flips when the full routing stack is live.
+try:
+    from harness.policy import Policy as _Policy, load_policy as _load_policy  # type: ignore
+    from harness.router import Router as _Router  # type: ignore
+    from harness.providers import (  # type: ignore
+        OpenAIProvider as _OpenAIProvider,
+        ProviderRegistry as _ProviderRegistry,
+    )
+    _ROUTING_OK = True
+except Exception:
+    _Policy = None  # type: ignore
+    _load_policy = None  # type: ignore
+    _Router = None  # type: ignore
+    _OpenAIProvider = None  # type: ignore
+    _ProviderRegistry = None  # type: ignore
+    _ROUTING_OK = False
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -77,6 +116,29 @@ PORT: int = int(os.environ.get("PORT", "9090"))
 MAX_TOKENS_DEFAULT: int = int(os.environ.get("MAX_TOKENS", "2048"))
 GITHUB_TOKEN: str = os.environ.get("GITHUB_TOKEN", "")
 GITHUB_REPO: str = os.environ.get("GITHUB_REPO", "zoedolan/Vybn")
+
+# Enable chat-side role dispatch when set to "1"/"true". Off by default so
+# existing clients that don't send a `role` field get byte-identical
+# behaviour. A request can still explicitly ask for a role even when this
+# flag is off — it only controls whether we *infer* a role from the last
+# user message via Router heuristics.
+VYBN_CHAT_ROUTING: bool = os.environ.get(
+    "VYBN_CHAT_ROUTING", "0"
+).strip().lower() in ("1", "true", "yes", "on")
+
+# Which role names are allowed to dispatch through chat-api. We
+# deliberately exclude cloud-only roles (`code`, `create`, `chat`,
+# `task`, `orchestrate`) from the chat-api surface by default — they
+# require cloud credentials and belong to the Spark agent's turn loop.
+# The chat API's job is to serve the local vLLM and any other OpenAI-
+# compatible route the operator explicitly allows. Operators can
+# override with the VYBN_CHAT_ALLOWED_ROLES env var (comma-separated).
+_ALLOWED_ROLES_DEFAULT = "local"
+VYBN_CHAT_ALLOWED_ROLES: set[str] = {
+    r.strip() for r in os.environ.get(
+        "VYBN_CHAT_ALLOWED_ROLES", _ALLOWED_ROLES_DEFAULT
+    ).split(",") if r.strip()
+}
 
 REPO_ROOT: Path = Path(os.path.expanduser("~/Vybn"))
 VYBN_PHASE: Path = Path(os.path.expanduser("~/vybn-phase"))
@@ -113,6 +175,133 @@ def _load_system_prompt() -> str:
 SYSTEM_PROMPT: str = _load_system_prompt()
 
 # ---------------------------------------------------------------------------
+# Routing plumbing (lazy, safe)
+# ---------------------------------------------------------------------------
+
+_POLICY: Any = None
+_ROUTER: Any = None
+_PROVIDER_REGISTRY: Any = None
+
+
+def _load_routing() -> tuple[Any, Any, Any]:
+    """Lazy-construct (policy, router, provider_registry).
+
+    Returns (None, None, None) whenever routing is not importable — the
+    chat API then silently degrades to the legacy single-vLLM proxy.
+    """
+    global _POLICY, _ROUTER, _PROVIDER_REGISTRY
+    if not _ROUTING_OK:
+        return None, None, None
+    if _POLICY is not None and _ROUTER is not None:
+        return _POLICY, _ROUTER, _PROVIDER_REGISTRY
+    try:
+        _POLICY = _load_policy()
+        _ROUTER = _Router(_POLICY)
+        _PROVIDER_REGISTRY = _ProviderRegistry()
+        log.info(
+            f"routing: policy loaded, roles={sorted(_POLICY.roles)}, "
+            f"default={_POLICY.default_role}"
+        )
+    except Exception as exc:
+        log.warning(f"routing: policy load failed ({exc}), legacy path only")
+        _POLICY = None
+        _ROUTER = None
+        _PROVIDER_REGISTRY = None
+    return _POLICY, _ROUTER, _PROVIDER_REGISTRY
+
+
+def _resolve_role(
+    explicit_role: str | None,
+    last_user_text: str,
+    classify: bool,
+) -> tuple[str | None, Any, str]:
+    """Return (role_name, RoleConfig, reason) or (None, None, reason).
+
+    Precedence:
+      1. explicit `role` field on ChatRequest.
+      2. directive (/chat, /local, ...) parsed from the last user message.
+      3. Router heuristics if `classify=True`.
+      4. Otherwise None — caller keeps the legacy vLLM path.
+
+    `role_name is None` means "do not route; use legacy behavior".
+    """
+    policy, router, _ = _load_routing()
+    if policy is None or router is None:
+        return None, None, "routing_unavailable"
+
+    if explicit_role:
+        if explicit_role in policy.roles:
+            return explicit_role, policy.role(explicit_role), f"explicit={explicit_role}"
+        return None, None, f"unknown_role={explicit_role}"
+
+    text = (last_user_text or "").strip()
+    if not text:
+        return None, None, "empty_input"
+
+    # Directive prefix — always honored when present.
+    for prefix, role in policy.directives.items():
+        if text.startswith(prefix + " ") or text == prefix:
+            if role in policy.roles:
+                return role, policy.role(role), f"directive={prefix}"
+
+    if not classify:
+        return None, None, "classify_disabled"
+
+    decision = router.classify(text)
+    return decision.role, decision.config, decision.reason
+
+
+def _strip_directive(text: str, directives: dict) -> str:
+    """Remove a leading /<directive> from the last user message before
+    sending to the upstream model. Keeps the rest of the message intact
+    so "/local what's up" becomes "what's up"."""
+    stripped = text.lstrip()
+    for prefix in directives:
+        if stripped.startswith(prefix + " "):
+            return stripped[len(prefix):].lstrip()
+        if stripped == prefix:
+            return ""
+    return text
+
+
+def _layered_system_prompt(live: str = "") -> Any:
+    """Build a LayeredPrompt (identity/substrate/live) from the same
+    sources as `_load_system_prompt`. Flattening yields a string byte-
+    compatible with the legacy SYSTEM_PROMPT concatenation, so callers
+    can adopt this incrementally without changing upstream behavior.
+
+    Returns the harness LayeredPrompt when the harness is importable,
+    otherwise a tiny shim object with `.flat()` / `.anthropic_blocks()`.
+    """
+    if _HARNESS_OK and _LayeredPrompt is not None:
+        return _LayeredPrompt(
+            identity=SYSTEM_PROMPT,
+            substrate="",
+            live=live or "",
+        )
+
+    class _Shim:
+        def __init__(self, ident: str, live_text: str) -> None:
+            self.identity = ident
+            self.substrate = ""
+            self.live = live_text
+
+        def flat(self) -> str:
+            parts = [p for p in (self.identity, self.substrate, self.live) if p]
+            return "\n\n".join(parts)
+
+        def anthropic_blocks(self) -> list[dict]:
+            out: list[dict] = []
+            if self.identity:
+                out.append({"type": "text", "text": self.identity,
+                            "cache_control": {"type": "ephemeral"}})
+            if self.live:
+                out.append({"type": "text", "text": self.live})
+            return out
+
+    return _Shim(SYSTEM_PROMPT, live or "")
+
+# ---------------------------------------------------------------------------
 # Deep memory — lazy-loaded, importable or subprocess fallback
 # ---------------------------------------------------------------------------
 
@@ -133,7 +322,33 @@ def _load_deep_memory() -> Any:
         return None
 
 async def _rag_context(query: str, k: int = 4) -> str:
-    """Hybrid RAG: try direct import first, fall back to subprocess."""
+    """Hybrid RAG retrieval.
+
+    When the shared harness is importable we delegate to it so chat and
+    the Spark agent read memory through a single code path. The harness
+    helper returns a bare snippets block (no leading newlines); we keep
+    the "\n\n" prefix so existing prompt concatenation stays identical.
+    A local fallback below preserves prior behavior when the harness
+    isn't importable.
+    """
+    if _HARNESS_OK and _rag_snippets_async is not None:
+        try:
+            text = await asyncio.wait_for(
+                _rag_snippets_async(
+                    query, k=k, vybn_phase_dir=str(VYBN_PHASE), timeout=30.0,
+                ),
+                timeout=35.0,
+            )
+        except Exception as exc:
+            log.info(f"RAG harness path failed: {exc}, falling back")
+            text = ""
+        if text:
+            log.info(f"RAG (harness): {text.count(chr(10))} lines")
+            return "\n\n" + text
+        return ""
+
+    # Legacy inline fallback — kept so the endpoint works even if the
+    # harness import fails in some deployment.
     dm = _load_deep_memory()
     if dm is not None:
         try:
@@ -152,7 +367,6 @@ async def _rag_context(query: str, k: int = 4) -> str:
         except Exception as exc:
             log.info(f"RAG import path failed: {exc}, trying subprocess")
 
-    # Subprocess fallback
     deep_memory_py = VYBN_PHASE / "deep_memory.py"
     if not deep_memory_py.exists():
         return ""
@@ -507,6 +721,13 @@ class ChatRequest(BaseModel):
     temperature: Optional[float] = 0.7
     stream: Optional[bool] = True
     rag: Optional[bool] = True
+    # Optional routing controls. Neither is required — omitting both
+    # keeps the legacy single-vLLM proxy behaviour. `role` explicitly
+    # selects a policy role (e.g. "local"). `route` = "auto" asks the
+    # router to pick based on directives + heuristics. `route` = "off"
+    # (the default) keeps legacy behaviour even if VYBN_CHAT_ROUTING=1.
+    role: Optional[str] = None
+    route: Optional[str] = None  # "auto" | "off" | None
 
 
 class ToolRequest(BaseModel):
@@ -579,20 +800,11 @@ async def _github_write(path: str, content: str, message: str, branch: str) -> d
 # FastAPI app
 # ---------------------------------------------------------------------------
 
-app = FastAPI(title="Vybn Chat API", version="2.0.0")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 _http_client: httpx.AsyncClient | None = None
 
 
-@app.on_event("startup")
-async def startup():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     global _http_client, SYSTEM_PROMPT
     _http_client = httpx.AsyncClient(
         base_url=LLAMA_URL,
@@ -600,12 +812,21 @@ async def startup():
     )
     SYSTEM_PROMPT = _load_system_prompt()
     log.info(f"Vybn Chat API v2.0 — vLLM: {LLAMA_URL}, heartbeat: {HEARTBEAT_INTERVAL}s")
+    try:
+        yield
+    finally:
+        if _http_client:
+            await _http_client.aclose()
 
 
-@app.on_event("shutdown")
-async def shutdown():
-    if _http_client:
-        await _http_client.aclose()
+app = FastAPI(title="Vybn Chat API", version="2.0.0", lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 # ── /health ──────────────────────────────────────────────────────────────────
@@ -625,6 +846,10 @@ async def health():
         portal_ok = True
     except Exception:
         pass
+    policy, router, _ = _load_routing()
+    routing_status = "loaded" if (policy and router) else (
+        "importable" if _ROUTING_OK else "unavailable"
+    )
     return JSONResponse({
         "status": "ok",
         "vllm": "reachable" if llama_ok else "unreachable",
@@ -632,6 +857,9 @@ async def health():
         "creature_portal": "loaded" if portal_ok else "unavailable",
         "github_writeback": "enabled" if GITHUB_TOKEN else "disabled",
         "heartbeat_interval": HEARTBEAT_INTERVAL,
+        "routing": routing_status,
+        "chat_routing_classify": VYBN_CHAT_ROUTING,
+        "allowed_roles": sorted(VYBN_CHAT_ALLOWED_ROLES),
     })
 
 
@@ -687,6 +915,203 @@ async def write_to_repo(payload: WriteRequest, request: Request):
     return JSONResponse({"commit": commit, "url": html_url, "path": payload.path})
 
 
+# ── /v1/route (introspection) ─────────────────────────────────────────────────
+
+@app.post("/v1/route")
+async def route_introspect(payload: ChatRequest, request: Request):
+    """Return the routing decision for a given payload without actually
+    calling the upstream model. Useful for UIs that want to show "this
+    would go to role=X, model=Y" before submit. Always returns 200 with
+    a JSON body; `role=null` means "use legacy vLLM path"."""
+    _check_auth(request)
+    messages = [m.model_dump() for m in payload.messages]
+    last_user_text = next(
+        (m["content"] for m in reversed(messages) if m["role"] == "user"),
+        "",
+    )
+    want_classify = (
+        payload.route == "auto" or
+        (VYBN_CHAT_ROUTING and payload.route != "off")
+    )
+    role_name, role_cfg, reason = _resolve_role(
+        explicit_role=payload.role,
+        last_user_text=last_user_text,
+        classify=want_classify,
+    )
+    dispatchable = bool(
+        role_name and role_cfg is not None and
+        role_name in VYBN_CHAT_ALLOWED_ROLES and
+        role_cfg.provider == "openai"
+    )
+    body: dict = {
+        "role": role_name,
+        "reason": reason,
+        "dispatchable": dispatchable,
+        "routing_available": _ROUTING_OK,
+        "classify_used": want_classify,
+        "allowed_roles": sorted(VYBN_CHAT_ALLOWED_ROLES),
+    }
+    if role_cfg is not None:
+        body["provider"] = role_cfg.provider
+        body["model"] = role_cfg.model
+        body["base_url"] = role_cfg.base_url
+        body["max_tokens"] = role_cfg.max_tokens
+        body["rag"] = role_cfg.rag
+    return JSONResponse(body)
+
+
+# ── helper: dispatch a routed chat through the shared provider layer ──────────
+
+async def _dispatch_routed_chat(
+    *,
+    role_name: str,
+    role_cfg: Any,
+    registry: Any,
+    payload: ChatRequest,
+    messages: list[dict],
+    route_reason: str,
+) -> Any:
+    """Handle chat dispatch for a resolved role using OpenAIProvider.
+
+    Returns a FastAPI response in the same OpenAI-compatible shape the
+    legacy non-streaming path emits. Streaming is emulated as a single
+    SSE chunk so existing clients that request `stream=True` see data.
+    """
+    # RAG: only when the role opts in AND the request didn't explicitly
+    # disable it. This preserves the "Wellspring feel" for chat-style
+    # roles without forcing retrieval on every request.
+    want_rag = bool(role_cfg.rag and payload.rag)
+    live = ""
+    if want_rag and messages:
+        last_user = next(
+            (m["content"] for m in reversed(messages) if m["role"] == "user"),
+            "",
+        )
+        if last_user:
+            rag_text = await _rag_context(last_user[:500])
+            if rag_text:
+                live = rag_text.lstrip("\n")
+
+    layered = _layered_system_prompt(live=live)
+
+    # Strip the system message from `messages` if the caller already
+    # included one; the provider will handle system via LayeredPrompt.
+    body_messages = [m for m in messages if m.get("role") != "system"]
+
+    # Max tokens precedence: explicit request > policy > legacy default.
+    max_toks = (
+        payload.max_tokens
+        or getattr(role_cfg, "max_tokens", None)
+        or MAX_TOKENS_DEFAULT
+    )
+    # Clone the role cfg with request-level overrides for this call.
+    call_cfg = type(role_cfg)(
+        role=role_cfg.role,
+        provider=role_cfg.provider,
+        model=role_cfg.model,
+        thinking=role_cfg.thinking,
+        max_tokens=max_toks,
+        max_iterations=role_cfg.max_iterations,
+        tools=list(role_cfg.tools or []),
+        temperature=(
+            payload.temperature
+            if payload.temperature is not None
+            else role_cfg.temperature
+        ),
+        base_url=role_cfg.base_url,
+        rag=role_cfg.rag,
+    )
+
+    provider = registry.get(call_cfg)
+
+    def _blocking_call() -> dict:
+        # OpenAIProvider.stream() is request/response under the hood.
+        handle = provider.stream(
+            system=layered,
+            messages=body_messages,
+            tools=[],
+            role=call_cfg,
+        )
+        for _ in handle:  # drain iterator
+            pass
+        return handle.final()
+
+    loop = asyncio.get_event_loop()
+    try:
+        normalized = await loop.run_in_executor(None, _blocking_call)
+    except Exception as exc:
+        log.warning(f"route: dispatch failed role={role_name}: {exc}")
+        raise HTTPException(status_code=502, detail=f"Routed dispatch failed: {exc}")
+
+    reply_text = _strip_thinking(normalized.text or "")
+
+    completion = {
+        "id": f"vybn-{int(time.time()*1000)}",
+        "object": "chat.completion",
+        "created": int(time.time()),
+        "model": normalized.model,
+        "choices": [{
+            "index": 0,
+            "message": {"role": "assistant", "content": reply_text},
+            "finish_reason": "stop" if normalized.stop_reason == "end_turn" else normalized.stop_reason,
+        }],
+        "usage": {
+            "prompt_tokens": normalized.in_tokens,
+            "completion_tokens": normalized.out_tokens,
+            "total_tokens": normalized.in_tokens + normalized.out_tokens,
+        },
+        "vybn_route": {
+            "role": role_name,
+            "reason": route_reason,
+            "provider": normalized.provider,
+        },
+    }
+
+    log.info(
+        f"chat: routed role={role_name} provider={normalized.provider} "
+        f"model={normalized.model} in={normalized.in_tokens} out={normalized.out_tokens} "
+        f"reason={route_reason}"
+    )
+
+    if not payload.stream:
+        return JSONResponse(completion)
+
+    # Emulate SSE stream with a single delta + DONE frame. Existing
+    # OpenAI-compatible clients that expect text/event-stream still work.
+    async def _emit() -> AsyncIterator[bytes]:
+        delta = {
+            "id": completion["id"],
+            "object": "chat.completion.chunk",
+            "created": completion["created"],
+            "model": completion["model"],
+            "choices": [{
+                "index": 0,
+                "delta": {"role": "assistant", "content": reply_text},
+                "finish_reason": None,
+            }],
+        }
+        stop = {
+            "id": completion["id"],
+            "object": "chat.completion.chunk",
+            "created": completion["created"],
+            "model": completion["model"],
+            "choices": [{
+                "index": 0,
+                "delta": {},
+                "finish_reason": "stop",
+            }],
+        }
+        yield f"data: {json.dumps(delta)}\n\n".encode()
+        yield f"data: {json.dumps(stop)}\n\n".encode()
+        yield b"data: [DONE]\n\n"
+
+    return StreamingResponse(
+        _emit(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
 # ── /v1/chat/completions ──────────────────────────────────────────────────────
 
 @app.post("/v1/chat/completions")
@@ -694,13 +1119,77 @@ async def chat_completions(payload: ChatRequest, request: Request):
     """
     OpenAI-compatible chat endpoint.
     Injects system prompt + optional RAG, proxies to vLLM with SSE heartbeat.
+
+    Optional role-based dispatch (`role` or `route=auto`) selects a
+    different provider/model via the harness policy. When the resolved
+    role isn't in VYBN_CHAT_ALLOWED_ROLES, or routing is unavailable,
+    the request falls back to the legacy vLLM path — existing clients
+    that send neither `role` nor `route` see byte-identical behaviour.
     """
     _check_auth(request)
 
-    messages = [m.dict() for m in payload.messages]
+    messages = [m.model_dump() for m in payload.messages]
 
+    # ── Route resolution (optional, backward-compatible) ──────────────────
+    last_user_text = next(
+        (m["content"] for m in reversed(messages) if m["role"] == "user"),
+        "",
+    )
+    want_classify = (
+        payload.route == "auto" or
+        (VYBN_CHAT_ROUTING and payload.route != "off")
+    )
+    role_name, role_cfg, route_reason = _resolve_role(
+        explicit_role=payload.role,
+        last_user_text=last_user_text,
+        classify=want_classify,
+    )
+
+    # A resolved role that's allowed and non-anthropic can be dispatched
+    # through the shared provider layer. Anthropic roles are cloud-only
+    # and not the chat-api's job; we fall back to legacy vLLM rather
+    # than silently making a paid API call from the chat surface.
+    dispatch = False
+    if role_name and role_cfg is not None:
+        if role_name not in VYBN_CHAT_ALLOWED_ROLES:
+            log.info(
+                f"route: role={role_name} not in allowed={sorted(VYBN_CHAT_ALLOWED_ROLES)}, "
+                f"falling back to legacy vLLM"
+            )
+        elif role_cfg.provider != "openai":
+            log.info(
+                f"route: role={role_name} provider={role_cfg.provider} not dispatchable "
+                f"from chat-api, falling back to legacy vLLM"
+            )
+        else:
+            dispatch = True
+
+    if dispatch and _ROUTING_OK:
+        # Strip directive prefix from the last user message so the model
+        # sees only intent, not the routing control.
+        policy, _, registry = _load_routing()
+        if policy is not None and messages:
+            for i in range(len(messages) - 1, -1, -1):
+                if messages[i]["role"] == "user":
+                    messages[i] = dict(messages[i])
+                    messages[i]["content"] = _strip_directive(
+                        messages[i]["content"], policy.directives
+                    )
+                    break
+
+        result = await _dispatch_routed_chat(
+            role_name=role_name,
+            role_cfg=role_cfg,
+            registry=registry,
+            payload=payload,
+            messages=messages,
+            route_reason=route_reason,
+        )
+        return result
+
+    # ── Legacy vLLM path (unchanged) ──────────────────────────────────────
     if not messages or messages[0]["role"] != "system":
-        system_content = SYSTEM_PROMPT
+        live = ""
         if payload.rag and messages:
             last_user = next(
                 (m["content"] for m in reversed(messages) if m["role"] == "user"),
@@ -709,7 +1198,9 @@ async def chat_completions(payload: ChatRequest, request: Request):
             if last_user:
                 rag_text = await _rag_context(last_user[:500])
                 if rag_text:
-                    system_content += rag_text
+                    live = rag_text.lstrip("\n")
+        layered = _layered_system_prompt(live=live)
+        system_content = layered.flat()
         messages.insert(0, {"role": "system", "content": system_content})
 
     upstream_payload = {
@@ -722,7 +1213,8 @@ async def chat_completions(payload: ChatRequest, request: Request):
         upstream_payload["model"] = payload.model
 
     log.info(
-        f"chat: {len(messages)} msgs, max_tokens={upstream_payload['max_tokens']}, rag={payload.rag}"
+        f"chat: {len(messages)} msgs, max_tokens={upstream_payload['max_tokens']}, "
+        f"rag={payload.rag}, route_reason={route_reason}"
     )
 
     if payload.stream:
