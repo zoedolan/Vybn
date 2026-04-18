@@ -98,6 +98,110 @@ def validate_command(command: str) -> tuple[bool, str | None]:
 
 
 # ---------------------------------------------------------------------------
+# Parallel-safe command classifier.
+#
+# The persistent BashSession exists because cd/export/source/= accumulate
+# state. Most tool calls in a debug loop are reads (cat/ls/grep/head/tail/
+# sed/wc/find/stat/git log|status|diff), which run safely in fresh
+# subprocesses. When a single assistant turn emits >=2 such commands the
+# agent dispatches them in parallel via execute_readonly; mixed turns
+# fall back to the persistent shell.
+# ---------------------------------------------------------------------------
+
+_READONLY_HEADS = (
+    "cat", "ls", "ll", "grep", "rg", "fgrep", "egrep",
+    "head", "tail", "sed", "awk", "wc", "find", "locate",
+    "stat", "file", "tree",
+    "python3 -c", "python -c", "python3 -m py_compile", "python -m py_compile",
+    "git log", "git status", "git diff", "git show", "git rev-parse",
+    "git blame", "git branch", "git remote",
+    "echo", "printf", "date", "whoami", "pwd", "env",
+    "curl -s", "curl -sS", "curl -fs", "curl -fsS",
+    "jq", "yq", "md5sum", "sha1sum", "sha256sum",
+    "diff", "cmp",
+)
+
+# Any of these tokens anywhere in the command disqualifies parallel dispatch.
+_NON_READONLY_TOKENS = (
+    "cd ", "pushd ", "popd ",
+    "export ", "unset ", "source ", ". /", ". ~",
+    ">>", ">", "<", " tee ",
+    "mv ", "cp ", "rm ", "rmdir ", "mkdir ", "touch ",
+    "chmod ", "chown ", "ln ",
+    "kill ", "pkill ", "killall ",
+    "pip install", "pip uninstall", "npm install", "apt ",
+    "systemctl ", "service ", "docker ",
+    "git commit", "git push", "git pull", "git merge", "git rebase",
+    "git add", "git reset", "git checkout", "git stash", "git clone",
+    "VYBN_ABSORB_REASON=",
+)
+
+
+def is_parallel_safe(command: str) -> bool:
+    """True if `command` can run in a fresh subprocess without mutating
+    shell state or the filesystem. Conservative by design — a false
+    negative just routes through the persistent shell."""
+    if not command or not command.strip():
+        return False
+    c = command.strip()
+    for tok in _NON_READONLY_TOKENS:
+        if tok in c:
+            return False
+    # Split by pipeline / logical separators; every segment must START
+    # with a known read verb. We do not try to parse quoting precisely;
+    # if a segment has a quoted separator it will just be treated as one
+    # segment and still needs to start with a readonly head.
+    work = c
+    for sep in ("&&", "||", ";", "|"):
+        work = work.replace(sep, "\x01")
+    segments = [seg.strip() for seg in work.split("\x01") if seg.strip()]
+    for seg in segments:
+        if not any(seg.startswith(h) for h in _READONLY_HEADS):
+            return False
+    return True
+
+
+def execute_readonly(command: str, timeout: int = DEFAULT_TIMEOUT) -> str:
+    """Run a parallel-safe command in a fresh subprocess.
+
+    By construction (is_parallel_safe rejects anything that writes),
+    we skip absorb_gate; the fresh subprocess has no persistent state
+    to leak back into the session.
+    """
+    if timeout > MAX_BASH_TIMEOUT:
+        timeout = MAX_BASH_TIMEOUT
+    MAX_LINES = 2000
+    MAX_BYTES = 256 * 1024
+    try:
+        proc = subprocess.run(
+            ["/bin/bash", "-c", command],
+            capture_output=True, text=True,
+            timeout=timeout,
+            env={**os.environ, "TERM": "dumb"},
+        )
+    except subprocess.TimeoutExpired:
+        return f"[timed out after {timeout}s]"
+    except Exception as e:
+        return f"[exec error: {e}]"
+    out = (proc.stdout or "") + (proc.stderr or "")
+    lines = out.splitlines(keepends=True)
+    byte_count = sum(len(l) for l in lines)
+    if len(lines) > MAX_LINES or byte_count > MAX_BYTES:
+        head = lines[:MAX_LINES]
+        byte_count = sum(len(l) for l in head)
+        head.append(
+            f"\n[output truncated: captured {len(head)} lines / "
+            f"{byte_count} bytes. To continue: sed -n "
+            f"'{len(head)+1},$p' <file> or narrow the command.]\n"
+        )
+        out = "".join(head)
+    if proc.returncode != 0:
+        out += f"\n[exit code: {proc.returncode}]"
+    return out.strip()
+
+
+
+# ---------------------------------------------------------------------------
 # Neutral tool spec
 # ---------------------------------------------------------------------------
 
@@ -175,7 +279,13 @@ class BashTool:
             return self.restart()
 
         lines: list[str] = []
+        byte_count = 0
         start = time.time()
+        # Ceilings chosen so a single 600-line source file fits
+        # whole. Hitting either cap emits a resume hint instead
+        # of silent truncation, so the caller can page cleanly.
+        MAX_LINES = 2000
+        MAX_BYTES = 256 * 1024
         while True:
             if time.time() - start > timeout:
                 self._interrupt()
@@ -197,8 +307,18 @@ class BashTool:
                     lines.append(f"[exit code: {code}]")
                 break
             lines.append(line)
-            if len(lines) > 500:
-                lines.append("\n... [truncated at 500 lines] ...\n")
+            byte_count += len(line)
+            if len(lines) > MAX_LINES or byte_count > MAX_BYTES:
+                reached = (
+                    f"lines>{MAX_LINES}" if len(lines) > MAX_LINES
+                    else f"bytes>{MAX_BYTES}"
+                )
+                lines.append(
+                    f"\n[output truncated: {reached}; "
+                    f"{len(lines)} lines / {byte_count} bytes captured. "
+                    f"To continue: sed -n '{len(lines)+1},$p' <file>  "
+                    f"or pipe to a smaller window (head/tail/grep/sed).]\n"
+                )
                 self._drain(10)
                 break
         return "".join(lines).strip()

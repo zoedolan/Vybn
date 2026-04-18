@@ -49,7 +49,46 @@ from harness import (  # noqa: E402
     validate_command,
 )
 from harness.tools import BASH_TOOL_SPEC  # noqa: E402
+from harness.tools import execute_readonly, is_parallel_safe  # noqa: E402
 from harness.prompt import rag_snippets  # noqa: E402
+
+# ---------------------------------------------------------------------------
+# Learn-from-exchange loop closure (round 4).
+#
+# deep_memory exposes learn_from_exchange(rag_text, response_text,
+# followup_text) — the dream/predict/reality triad. We record the first
+# two at end-of-turn N and fire the learn call at start-of-turn N+1
+# using the current user_input as reality. Background thread; silent
+# failure; no effect on the agent loop's critical path.
+# ---------------------------------------------------------------------------
+
+import threading as _threading
+
+_LEARN_PENDING: dict = {"rag": "", "response": ""}
+
+
+def _fire_learn_async(rag_text: str, response_text: str, followup_text: str) -> None:
+    def _run():
+        try:
+            import urllib.request, json as _json
+            payload = _json.dumps({
+                "rag_text": rag_text[:2000],
+                "response_text": response_text[:2000],
+                "followup_text": followup_text[:2000],
+            }).encode("utf-8")
+            req = urllib.request.Request(
+                "http://127.0.0.1:8100/learn",
+                data=payload,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            urllib.request.urlopen(req, timeout=4.0).read()
+        except Exception:
+            # If the walk daemon is down or the call fails, drop it.
+            # This is observability-grade, not correctness-grade.
+            return
+    t = _threading.Thread(target=_run, daemon=True)
+    t.start()
 
 # Canonical paths come from spark/paths.py. If the module is missing
 # (e.g. paths.py not on this checkout) we fall back to the legacy
@@ -99,9 +138,61 @@ def _execute_tool_calls(response, bash: BashTool, provider) -> tuple[list, bool]
 
     The loop speaks the neutral `ToolCall` shape. Each provider knows how
     to render a tool_result back into its native message shape.
+
+    Parallel path: when the assistant emits 2+ bash calls that all pass
+    is_parallel_safe, dispatch them to fresh subprocesses via a thread
+    pool. Serial path (persistent shell) is used for everything else so
+    state-mutating commands keep their cd/export/assignment semantics.
     """
     results: list[dict] = []
     interrupted = False
+
+    # Gather bash calls first so we can decide serial vs parallel.
+    bash_calls = [c for c in response.tool_calls if c.name == "bash"]
+    parallel_candidates = []
+    if len(bash_calls) >= 2:
+        ok = True
+        for call in bash_calls:
+            args = call.arguments or {}
+            if args.get("restart") or "__parse_error__" in args:
+                ok = False
+                break
+            cmd = args.get("command", "") or ""
+            valid, _ = validate_command(cmd)
+            if not valid or not is_parallel_safe(cmd):
+                ok = False
+                break
+            parallel_candidates.append((call, cmd))
+        if ok and parallel_candidates:
+            # Fan out: fresh subprocess per call, preserve assistant order.
+            from concurrent.futures import ThreadPoolExecutor
+            _dim(f"[parallel: {len(parallel_candidates)} read-only bash calls]")
+            out_by_id: dict[str, str] = {}
+            with ThreadPoolExecutor(max_workers=min(8, len(parallel_candidates))) as ex:
+                future_to_call = {
+                    ex.submit(execute_readonly, cmd): call
+                    for call, cmd in parallel_candidates
+                }
+                for fut in future_to_call:
+                    c = future_to_call[fut]
+                    try:
+                        out_by_id[c.id] = fut.result()
+                    except Exception as e:
+                        out_by_id[c.id] = f"(parallel exec error: {e})"
+            # Preview the first one only — avoids flooding the REPL.
+            first_cmd = parallel_candidates[0][1]
+            _dim(f"$ {first_cmd[:200]}{'...' if len(first_cmd) > 200 else ''}")
+            _preview(out_by_id[parallel_candidates[0][0].id])
+            # Emit results in the original tool_calls order so we hit
+            # the assistant's intended shape.
+            for call in response.tool_calls:
+                if call.id in out_by_id:
+                    results.append(provider.build_tool_result(call.id, out_by_id[call.id]))
+                elif call.name != "bash":
+                    results.append(provider.build_tool_result(
+                        call.id, f"(unsupported tool: {call.name})"
+                    ))
+            return results, False
 
     for call in response.tool_calls:
         if call.name != "bash":
@@ -272,6 +363,16 @@ def run_agent_loop(
     turn_number: int,
     forced_role: str | None = None,
 ) -> str:
+    # (round 4) Fire learn_from_exchange for the PREVIOUS turn. We have
+    # all three legs now: what RAG retrieved (dream), what the model said
+    # (predict), and the current user_input (reality = followup).
+    _prev_rag = _LEARN_PENDING.get("rag", "")
+    _prev_resp = _LEARN_PENDING.get("response", "")
+    if _prev_rag and _prev_resp:
+        _fire_learn_async(_prev_rag, _prev_resp, user_input)
+        _LEARN_PENDING["rag"] = ""
+        _LEARN_PENDING["response"] = ""
+
     decision = router.classify(user_input, forced_role=forced_role)
     role_cfg = decision.config
 
@@ -324,6 +425,9 @@ def run_agent_loop(
             )
             _dim("[deep-memory: enriched prompt]")
             logger.emit("rag_hit", turn=turn_number, chars=len(enrichment))
+            # Record what we retrieved; used by learn_from_exchange at
+            # the NEXT turn boundary (when we have a followup).
+            _LEARN_PENDING["rag"] = enrichment[:2000]
 
     messages.append({"role": "user", "content": decision.cleaned_input})
 
@@ -384,6 +488,7 @@ def run_agent_loop(
 
             if response.stop_reason == "end_turn":
                 bag["stop_reason"] = "end_turn"
+                _LEARN_PENDING["response"] = (response.text or "")[:2000]
                 return response.text
             if response.stop_reason == "max_tokens":
                 bag["stop_reason"] = "max_tokens"
@@ -584,6 +689,31 @@ def main() -> None:
                 print(f"  {name}{marker}: {cfg.provider}:{cfg.model} "
                       f"(thinking={cfg.thinking}, max_tokens={cfg.max_tokens}, "
                       f"tools={cfg.tools})")
+            print()
+            continue
+        if low in ("selfcheck", "/selfcheck"):
+            # Call deep_memory.self_check() for a live diagnostic of
+            # the memory geometry. Falls back to an HTTP health ping
+            # if the module cannot be imported here.
+            try:
+                import sys as _sys
+                _phase = os.path.expanduser("~/vybn-phase")
+                if _phase not in _sys.path:
+                    _sys.path.insert(0, _phase)
+                import deep_memory as _dm  # type: ignore
+                res = _dm.self_check(write_log=False, verbose=False)
+                print("  [deep_memory.self_check]")
+                for k, v in (res.items() if isinstance(res, dict) else []):
+                    print(f"    {k}: {v}")
+            except Exception as _e:
+                try:
+                    import urllib.request as _ur
+                    body = _ur.urlopen(
+                        "http://127.0.0.1:8100/health", timeout=3.0
+                    ).read().decode("utf-8")
+                    print(f"  [walk daemon /health] {body}")
+                except Exception as _e2:
+                    print(f"  selfcheck unavailable: {_e} / {_e2}")
             print()
             continue
         if low == "history":

@@ -239,26 +239,24 @@ def _load_deep_memory(vybn_phase_dir: str | os.PathLike | None = None) -> Any:
         return None
 
 
-def rag_snippets(
-    query: str,
-    k: int = 4,
-    vybn_phase_dir: str | os.PathLike | None = None,
-    timeout: float = 15.0,
-) -> str:
-    """Synchronous deep-memory retrieval. Mirrors vybn_chat_api._rag_context
-    but returns a plain string suitable for the `live` prompt layer.
+def _rag_http(endpoint: str, query: str, k: int, timeout: float) -> list:
+    """POST to the walk daemon's /walk or /search endpoint. Returns
+    the parsed results list (possibly empty) or raises on any error."""
+    import urllib.request, json as _json
+    payload = _json.dumps({"query": query, "k": k}).encode("utf-8")
+    req = urllib.request.Request(
+        f"http://127.0.0.1:8100{endpoint}",
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        body = resp.read().decode("utf-8")
+    data = _json.loads(body)
+    return data.get("results", []) if isinstance(data, dict) else []
 
-    Returns "" if deep_memory is unavailable, retrieval fails, or there
-    are no results. We do not overclaim here: the caller decides whether
-    to include the snippets, and we only attach them when they exist.
-    """
-    dm = _load_deep_memory(vybn_phase_dir)
-    if dm is None:
-        return _rag_subprocess(query, k, vybn_phase_dir, timeout)
-    try:
-        results = dm.deep_search(query, k=k)
-    except Exception:
-        return ""
+
+def _format_snippets(results: list) -> str:
     snippets = [
         f"[{r.get('source', '')}] {r.get('text', '')[:300]}"
         for r in results if r.get("text")
@@ -266,6 +264,52 @@ def rag_snippets(
     if not snippets:
         return ""
     return "Relevant context from memory:\n" + "\n".join(snippets)
+
+
+def rag_snippets(
+    query: str,
+    k: int = 4,
+    vybn_phase_dir: str | os.PathLike | None = None,
+    timeout: float = 15.0,
+) -> str:
+    """Synchronous deep-memory retrieval.
+
+    Four-tier fallback (round 4):
+      1. HTTP POST /walk on :8100 — telling retrieval, relevance x
+         distinctiveness, the geometry the corpus is actually indexed for.
+      2. HTTP POST /search on :8100 — plain top-k against the same server.
+      3. In-process deep_memory.deep_search() — when the daemon is down
+         but the module is importable.
+      4. Subprocess python3 deep_memory.py --search — last resort.
+
+    Returns "" on total failure or empty results.
+    """
+    http_timeout = min(timeout, 5.0)
+    # Tier 1
+    try:
+        results = _rag_http("/walk", query, k, http_timeout)
+        if results:
+            return _format_snippets(results)
+    except Exception:
+        pass
+    # Tier 2
+    try:
+        results = _rag_http("/search", query, k, http_timeout)
+        if results:
+            return _format_snippets(results)
+    except Exception:
+        pass
+    # Tier 3
+    dm = _load_deep_memory(vybn_phase_dir)
+    if dm is not None:
+        try:
+            results = dm.deep_search(query, k=k)
+            if results:
+                return _format_snippets(results)
+        except Exception:
+            pass
+    # Tier 4
+    return _rag_subprocess(query, k, vybn_phase_dir, timeout)
 
 
 def _rag_subprocess(

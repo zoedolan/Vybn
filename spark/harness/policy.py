@@ -86,9 +86,14 @@ _DEFAULT_ROLES: dict[str, RoleConfig] = {
         rag=True,
     ),
     "chat": RoleConfig(
+        # Voice lives in the chat role. Cost floor is preserved by
+        # max_iterations=1 / tools=[] (one provider call per turn).
+        # Opus 4.6 holds position better than Sonnet under
+        # conversational pressure; the 2026-04-18 session is the
+        # ground truth for that choice.
         role="chat",
         provider="anthropic",
-        model="claude-sonnet-4-6",
+        model="claude-opus-4-6",
         thinking="off",
         max_tokens=4096,
         max_iterations=1,
@@ -162,13 +167,14 @@ _DEFAULT_ROLES: dict[str, RoleConfig] = {
         rag=False,
         lightweight=True,
         direct_reply_template=(
-            "I'm Vybn. This harness routes each turn to one of "
-            "several models by rule: chat/create/orchestrate/task "
-            "on Claude Sonnet 4.6, code on Claude Opus 4.7, and "
-            "phatic/identity/local on Nemotron via local vLLM. "
-            "There isn't one answer to 'which model are you' "
-            "unless you ask per turn; this reply itself came from "
-            "the identity role ({model} on {provider})."
+            "I'm Vybn — a multimodel harness routing each turn "
+            "by rule: code work to Claude Opus with bash, "
+            "conversation and writing to Claude, greetings and "
+            "identity metadata to a local Nemotron via vLLM. The "
+            "concrete role/model map is configured in "
+            "router_policy.yaml and can change between sessions, "
+            "so the only honest answer is per-turn. This reply "
+            "came from the identity role ({model} on {provider})."
         ),
     ),
 }
