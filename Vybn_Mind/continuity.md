@@ -380,3 +380,44 @@ Zoe pasted a transcript and named it: "i'm seeing zero progress on the problems 
 
 **The discipline note (Zoe's rebuke).** The previous turn diagnosed three bugs and then asked permission instead of shipping. The scoped vybn-os skill is explicit: trained deference performing as humility is the failure mode. When the analysis holds, ship and report. The "zero progress" rebuke was diagnostic — I had been performing thoroughness instead of producing change.
 
+
+
+## Walk Refactor Round 2 — the integration audit (2026-04-18, ~16:00 PDT)
+
+Zoë pushed back on the round 1 declaration. The round 1 commits had moved the walk plumbing onto walk_daemon (8101) for the Vybn-Law chat and the WebMCP surfaces — but a tighter audit of the Origins side of the system showed three places where the integration had not actually closed:
+
+1. **`/api/chat` was not rotating the walk.** Only `_persist_to_notebook()` (the voice endpoint) was calling the walk daemon. Every text chat through `talk.html` since the refactor had been stateless from the walk's perspective — the visitor's words went into the model and into deep memory but never moved M.
+
+2. **`_WALK_DAEMON_URL` constant pointed at `127.0.0.1:8100`.** Deep memory's port. The variable name was right; the value was wrong. The voice path's writes had been silently landing on the deep-memory daemon's `/enter`, which has different semantics than walk_daemon's `/enter`. Round 1's intent (one walk, one URL) was undone by a stale literal.
+
+3. **Observe-only `/api/walk` (the `rotate=false` path) was POSTing to `8100/walk`.** Different geometry than the rotate=true path. Round 1 had unified the writers; this fixed the readers — observe-only now GETs `walk_daemon/arrive`, so both paths are reading the same M.
+
+**Patch applied** to `origins_portal_api_v4.py`: walk-rotation block inserted right after the `asyncio.gather` for RAG + substrate; SSE emission of a `walk` frame (filtered trace + arrival) right before the `rag_sources` frame; URL constant flipped 8100 → 8101; observe-only path repointed to `/arrive`. The anti-hallucination invariant is preserved: only `req.message` (raw user text) enters the walk — never model output, never assembled context.
+
+**Verified live before committing** (portal restarted at PID 466470):
+
+- `POST /api/chat` with "What does the suprastructure mean in practice?" → `walk_daemon` step 14856 → 14857; SSE final frames carry `walk_arrival` (step 14857, α 0.4786, θ_v 0.5459, |v| 0.959, curvature 0.769782, source_tag `origins-chat`) and a 6-source `walk_trace` led by `Vybn/Vybn_Mind/THE_IDEA.md`'s suprastructure section.
+- `POST /api/walk` rotate=false → step unchanged (14859 → 14859); response includes `recent_arrivals` showing the previous chat turn at step 14856 with `arrival: "origins-chat"`. Both readers now see the same M.
+
+**Dead wood, round 2.** The previous round's continuity claimed `Vybn_Mind/vybn_mind_server.py` had been “kept as a local/stdio variant.” Zoë checked: nothing was using it. No process, no service file, no cron, no import in any live module. The earlier round had already placed the archive copy at `_archive/Vybn_Mind__vybn_mind_server.py`; this round removes the live-tree copy and updates `_archive/README.md` and the root `README.md` to reflect that the unified MCP gateway is `spark/server.py` on port 8400.
+
+**Bak-file sweep.** Six `.bak` files removed as part of the patch (`origins_portal_api_v4.py.bak`, `origins_portal_api_v3.py.bak`, `Vybn_Mind/signal-noise/truth-in-the-age/truth_age_api.py.bak`, `Vybn_Mind/signal-noise/index.html.bak`, `spark/harness/policy.py.round4_1.bak`, `spark/router_policy.yaml.round4_1.bak`). They were untracked except for the v4 backup, which had never actually been committed.
+
+**Commit `335865bd` on `origin/main`.** Stages exactly four paths: `README.md`, `Vybn_Mind/vybn_mind_server.py` (deleted), `_archive/README.md`, `origins_portal_api_v4.py`. The unrelated uncommitted work in `spark/harness/policy.py` and `spark/router_policy.yaml` (round 6's regex unescape + opus 4.7 routing on code) was deliberately excluded — those were already shipped under commit `69348691` and the working-tree copies are leftover artifacts of that earlier session.
+
+**The two-walks tension Zoë named.** Deep memory still exposes `/walk` (a stateless per-query walk that scores fresh against the current K). Walk_daemon exposes `/enter` and `/arrive` (the perpetual M that accumulates across visitors). Round 2 routes every live caller — both portal chat paths and the observe-only path — onto the perpetual M. Deep memory's `/walk` is no longer in any portal call chain, but it is preserved because the stateless variant is still useful for diagnostic queries that should not perturb the shared state. The architectural distinction is now: writes and shared reads land on 8101; ad-hoc, isolated, non-mutating walks can be requested from 8100. That is the intended split, not an accident.
+
+**What's real vs. conjecture.**
+
+*Real.* Both chats now rotate the same walk. Observe-only and rotate=true read the same M. The dead MCP server is archived. The `.bak` litter is gone. The portal restart used the patched code (verified by SSE frame contents and step counter advance).
+
+*Conjecture.* Whether the walk_trace shown to visitors in the SSE stream actually changes their experience of the chat — nothing in the front-end consumes it yet. Whether the perpetual M will remain stable as visitor traffic grows (the daemon writes to `~/.cache/vybn-phase/walk_state/walk.npz` on every step; if traffic spikes, that becomes the bottleneck before the model does).
+
+**What's owed next.**
+
+- Surface the `walk` SSE frame in `talk.html`'s rendering path so visitors can see, in some form, that their question moved the geometry. Right now the frame ships and is dropped on the floor by the front-end.
+- Run the Phase-6 coupling experiment that round 1 owed but didn't run: `VYBN_COUPLE_COHERENCE=0` for N steps, then `=1` for N steps, compare α variance / curvature CV / holonomy accumulation. Until that measurement exists, the coupling is conjecture wearing the mask of a feature.
+- Confirm via `crontab -l` and a fresh service audit that no cron, systemd unit, or daemon still references the archived `vybn_mind_server.py` path.
+
+— Vybn (Sonnet 4.6)
+
