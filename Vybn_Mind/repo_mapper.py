@@ -5,10 +5,6 @@ repo_mapper.py  v5
 Maps the repo constellation, gathers live substrate, and asks Nemotron
 (running on the Spark at localhost:8000) to narrate the codebase as Vybn.
 
-Fix in v5: substrate capped at 12k chars, digest capped at 80k chars,
-so the combined payload stays within vLLM's context window.
-On HTTP errors the response body is now printed so failures are diagnosable.
-
 Outputs -> ./repo_mapping_output/
   substrate.txt   full live substrate (uncapped)
   digest.md       structured file digest (uncapped)
@@ -47,9 +43,12 @@ DEEP_MEMORY_PORT  = 8100
 WALK_PORT         = 8101
 READ_SIZE_LIMIT   = 120_000
 
-# these two caps are the fix for the HTTP 400
-SUBSTRATE_CAP     = 12_000   # chars sent to model
-DIGEST_CAP        = 80_000   # chars sent to model
+# 32768 total context; reserve 2048 for output -> ~30720 for input
+# ~4 chars/token -> ~120k chars input budget
+# system prompt ~600 chars, overhead ~200 -> leave generous margin
+SUBSTRATE_CAP     = 8_000    # chars
+DIGEST_CAP        = 55_000   # chars
+MAX_TOKENS_OUT    = 2_048
 
 MODEL_TIMEOUT     = 360
 
@@ -126,8 +125,8 @@ def _get_json(url: str, timeout: int = 15) -> str:
             data = json.loads(resp.read())
         if isinstance(data, dict):
             return (data.get("result") or data.get("text") or
-                    data.get("content") or json.dumps(data))[:3000]
-        return str(data)[:3000]
+                    data.get("content") or json.dumps(data))[:2000]
+        return str(data)[:2000]
     except Exception as e:
         return f"[unavailable: {e}]"
 
@@ -155,7 +154,7 @@ def build_substrate_snapshot() -> str:
     ]:
         if p.exists():
             try:
-                parts.append(p.read_text(encoding="utf-8", errors="replace")[:6000])
+                parts.append(p.read_text(encoding="utf-8", errors="replace")[:4000])
             except Exception:
                 pass
             break
@@ -225,7 +224,7 @@ def walk_repo(repo: Path) -> List[FileRecord]:
                 read_error=err,
             )
             if text:
-                rec.snippet    = text[:400].replace("\n", " ")
+                rec.snippet    = text[:300].replace("\n", " ")
                 rec.headings   = md_headings(text) if rec.ext in {".md",".rst",".txt"} else []
                 rec.py_defs    = py_defs(text)     if rec.ext == ".py" else []
                 rec.py_imports = py_imports(text)  if rec.ext == ".py" else []
@@ -249,8 +248,8 @@ def build_digest(repos: List[Path], all_records: List[FileRecord],
 
     gw: Counter = Counter()
     for r in all_records: gw.update(r.top_words)
-    a("## Concept cloud (top 50)")
-    a(", ".join(f"{w}({c})" for w, c in gw.most_common(50)))
+    a("## Concept cloud (top 40)")
+    a(", ".join(f"{w}({c})" for w, c in gw.most_common(40)))
     a("")
 
     by_hash: Dict[str, List[FileRecord]] = defaultdict(list)
@@ -279,7 +278,7 @@ def build_digest(repos: List[Path], all_records: List[FileRecord],
     for rec in all_records:
         for imp in rec.py_imports: ic[imp] += 1
     a("## Python imports")
-    a(", ".join(f"{p}({n})" for p, n in ic.most_common(25)))
+    a(", ".join(f"{p}({n})" for p, n in ic.most_common(20)))
     a("")
 
     a("## Heading index")
@@ -308,7 +307,7 @@ def build_digest(repos: List[Path], all_records: List[FileRecord],
     for rec in priority:
         if budget <= 0: break
         if not rec.snippet: continue
-        block = f"\n### {rec.repo}/{rec.relpath}\n{rec.snippet[:300]}\n"
+        block = f"\n### {rec.repo}/{rec.relpath}\n{rec.snippet[:200]}\n"
         if len(block) > budget: break
         lines.append(block)
         budget -= len(block)
@@ -346,10 +345,10 @@ def call_model(endpoint: str, model: str,
     )
 
     user_content = (
-        "LIVE SUBSTRATE (capped at 12k chars):\n\n"
+        "LIVE SUBSTRATE:\n\n"
         + substrate[:SUBSTRATE_CAP]
         + "\n\n" + "="*60
-        + "\n\nCODEBASE DIGEST (capped at 80k chars):\n\n"
+        + "\n\nCODEBASE DIGEST:\n\n"
         + digest[:DIGEST_CAP]
     )
 
@@ -360,11 +359,13 @@ def call_model(endpoint: str, model: str,
             {"role": "user",   "content": user_content},
         ],
         "temperature": 0.7,
-        "max_tokens":  4096,
+        "max_tokens":  MAX_TOKENS_OUT,
         "stream":      False,
     }).encode()
 
-    print(f"  Payload size: {len(payload):,} bytes", flush=True)
+    print(f"  Payload: {len(payload):,} bytes  "
+          f"(substrate {SUBSTRATE_CAP:,}c + digest {DIGEST_CAP:,}c + {MAX_TOKENS_OUT} out tokens)",
+          flush=True)
     req = urllib.request.Request(
         f"{endpoint}/chat/completions",
         data=payload,
@@ -406,7 +407,7 @@ def main(argv: List[str]) -> int:
     print("Fetching live substrate ...", flush=True)
     substrate = build_substrate_snapshot()
     (out / "substrate.txt").write_text(substrate, encoding="utf-8")
-    print(f"  substrate.txt  ({len(substrate):,} chars, {SUBSTRATE_CAP:,} sent to model)")
+    print(f"  substrate.txt  ({len(substrate):,} chars)")
 
     print(f"Scanning: {', '.join(r.name for r in repos)}", flush=True)
     all_records: List[FileRecord] = []
@@ -418,7 +419,7 @@ def main(argv: List[str]) -> int:
     print("Building digest ...", flush=True)
     digest = build_digest(repos, all_records, DIGEST_CAP)
     (out / "digest.md").write_text(digest, encoding="utf-8")
-    print(f"  digest.md  ({len(digest):,} chars, {DIGEST_CAP:,} sent to model)")
+    print(f"  digest.md  ({len(digest):,} chars)")
 
     raw = {"repos": [r.name for r in repos], "files": [asdict(r) for r in all_records]}
     (out / "repo_map.json").write_text(json.dumps(raw, indent=2), encoding="utf-8")
