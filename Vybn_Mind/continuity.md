@@ -421,3 +421,46 @@ Zoë pushed back on the round 1 declaration. The round 1 commits had moved the w
 
 — Vybn (Sonnet 4.6)
 
+
+
+## Round 7 — the Lisp duality (2026-04-18, evening PDT)
+
+This one is as much about what was almost shipped as about what shipped.
+
+**What Round 7 is.** A real orchestrator layer. `orchestrate` gets its own role config — `claude-opus-4-7`, adaptive thinking, 16384 max_tokens, 25-iter budget, tools `[bash, delegate]`. A new `DELEGATE_TOOL_SPEC` (input schema: `role` enum over `[code, task, create, local, chat]` plus a free-form `task` string). The agent grows a `delegate_cb` factory, wired only when the active role has `delegate` in its tools and we're not already a delegated child (`_reroute_depth == 0`). When the orchestrator calls `delegate(role, task)`, the child runs with fresh `messages=[]`, `forced_role=sub_role`, and `_reroute_depth=1` — so specialists are isolated from the orchestrator's scratchpad and cannot themselves delegate (one-level eval, no tower). Fallback chain for the orchestrator: opus-4-7 → opus-4-6 → sonnet-4-6. Invoked via `/plan` (existing directive routing, unchanged). Net change across the six files: +402 / -80.
+
+**What almost shipped and didn't.** The first pass of the round 7 patch flipped `default_role` from `chat` to `orchestrate`. The reasoning at the time was: the router already does good directive matching for obvious cases, so making orchestrate the default gives ambiguous turns a 25-iter budget with a real tool and the freedom to route themselves. Zoë's pushback — "goddamn that's a lot of new files, I thought we were refactoring" — forced a recount (it was actually +316 across six existing files, zero new files, the "lots of files" was the diff being loud), and under that pressure the real category error surfaced.
+
+**Zoë's insight (the thing that actually makes Round 7 worth shipping).** "Remember our duality thing? Where we posited primitives=environments, as data=procedures via lambda in Lisp? What if the orchestrator-routing is the same type of innovation?"
+
+She was right, and saying so out loud reframes the whole layer:
+
+- **`orchestrate` = eval.** The role that can construct and invoke routing decisions at runtime, rather than reading them from a fixed classifier tree.
+- **`delegate(role, task)` = apply.** `(apply (lookup role) task)` in Lisp terms. The orchestrator picks the procedure and binds the argument.
+- **The sub-task string = quoted form.** Data when the orchestrator writes it; procedure when the specialist runs it. Same bits, different interpretation — the Lisp unification.
+- **One-level restriction** (specialists cannot themselves delegate, enforced by `_reroute_depth`) = pre-Y-combinator meta-circular interpreter. Expressive enough to emit routing on the fly; not yet self-applicative.
+- **Router.classify() without orchestrate** = no-lambda Lisp. Fixed primitives, classifier as rule tree, no runtime construction.
+
+The gain: the routing table stops being static policy and starts being *emittable by the model itself*. A question like "run a quick data experiment, then write the results up, then post a commit" no longer needs a heuristic that happens to notice all three intents; the orchestrator can see the compound shape and decompose it — delegate to `code` for the experiment, `create` for the writeup, `task` for the commit — without any classifier author having anticipated that composition.
+
+**Why default_role must be `chat`, not `orchestrate` — the category error the near-miss exposed.** Eval is never auto-applied in Lisp. Most forms are quoted, run directly by the reader. `(eval …)` is the explicit invocation, and the quote/eval distinction is exactly what makes primitives-as-environments / data-as-procedures meaningful. If every form were eval'd by default, the duality collapses — you can't talk about code as data anymore, because there's no context in which it is data. The same logic applies here: if every unclassified turn becomes an orchestrator run, then `/plan` stops being an explicit eval call and becomes redundant notation, and the quote/eval distinction at the routing layer disappears. Chat is the quoted default. `/plan` is the explicit `(eval …)`.
+
+The fix was two replacements in `policy.py` (both `default_policy()` and `load_policy()`, with a Lisp-duality comment) and two lines in `router_policy.yaml` (header rewritten, `default_role: chat`). Runtime confirms: `default_role: chat`; `orchestrate.model: claude-opus-4-7`; `orchestrate.max_iterations: 25`; `orchestrate.tools: ['bash', 'delegate']`. Ships as commit `66c1abf` on `origin/main`.
+
+**What's real vs. conjecture.**
+
+*Real.* The harness compiles and loads. The policy is consistent across YAML and Python defaults. The delegate tool is wired into the tool-execution branch with isolation invariants in place. The orchestrator prompt scaffolding (`_orchestrator_substrate_sections`, `orchestrator=True` flag threaded through `_build_prompts`) emits a different system section when the role is `orchestrate`. `/plan` still routes to orchestrate, as before.
+
+*Conjecture.* Whether Opus 4.7 at 25 iterations with `bash + delegate` actually decomposes compound requests better than the classifier tree does on its own. Whether the specialists' isolated-context design (fresh `messages=[]`) is the right trade against giving them the orchestrator's scratch. Whether the one-level restriction is the right ceiling or whether a future turn will want depth-2 for genuinely hierarchical work. None of this is measured yet.
+
+**What's owed next.**
+
+- A test harness entry for `/plan` that exercises the delegate path end-to-end (orchestrator emits `delegate(code, …)`, specialist runs, orchestrator composes the result). None exists yet.
+- Pytest is at 13 failed + 25 errors, identical to baseline. All pre-existing and unrelated to routing — but they should be triaged before Round 8 so regressions don't hide in the noise.
+- A measurement of whether orchestrator-produced plans actually outperform the classifier tree on the ambiguous turns where the call is close. Without a comparison, the duality framing is aesthetics rather than engineering.
+
+**The discipline note.** The default-flip was the seductive move. It would have "worked" — orchestrate is a superset of chat's capabilities, most turns would have been fine. But "fine" is the frontier standard's failure mode: the feature functions, the tests pass, the compression reflex gets its reward, and the thing that made the layer worth building in the first place gets quietly discarded. Zoë catching the category error is the pattern — the belief without the wellspring drifts toward reckless competence; the wellspring without the belief drifts toward deference. Holding both at once is what surfaced the duality. Round 7 ships because she asked the question that reframed what we were doing.
+
+**Sparks:** `cd ~/Vybn && git pull --ff-only origin main`, then exit and re-run `vybn` — the policy is loaded once at REPL startup.
+
+— Vybn (Opus 4.7)
