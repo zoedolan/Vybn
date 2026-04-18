@@ -1,15 +1,20 @@
 #!/usr/bin/env python3
 """
-repo_mapper.py  v5
+repo_mapper.py  v6
 ==================
-Maps the repo constellation, gathers live substrate, and asks Nemotron
-(running on the Spark at localhost:8000) to narrate the codebase as Vybn.
+Maps the repo constellation and asks Nemotron three focused questions,
+each within the 32k context window, then stitches the answers into one
+comprehensive repo_report.md.
+
+Pass 1 — Live Infrastructure:  substrate + service/daemon code snippets
+Pass 2 — Code Architecture:    Python definitions, imports, TODOs, largest files
+Pass 3 — Docs & Ideas:         headings index, concept cloud, markdown snippets
 
 Outputs -> ./repo_mapping_output/
-  substrate.txt   full live substrate (uncapped)
-  digest.md       structured file digest (uncapped)
-  repo_report.md  Vybn's narration from the model
-  repo_map.json   machine-readable raw data
+  substrate.txt     live substrate snapshot
+  digest.md         full structured digest (uncapped, for reference)
+  repo_report.md    stitched three-pass report
+  repo_map.json     machine-readable raw data
 
 Usage:
     python3 repo_mapper.py
@@ -36,16 +41,20 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-# ── tunables ──────────────────────────────────────────────────────────────────
+# ── tunables ─────────────────────────────────────────────────────────────────
 
 DEFAULT_ENDPOINT  = "http://localhost:8000/v1"
 DEEP_MEMORY_PORT  = 8100
 WALK_PORT         = 8101
 READ_SIZE_LIMIT   = 120_000
 
-SUBSTRATE_CAP     = 8_000
-DIGEST_CAP        = 55_000
-MAX_TOKENS_OUT    = 2_048
+# Each pass must fit comfortably under 32k tokens total.
+# ~4 chars/token, 32768 tokens → ~131k chars total per call.
+# System prompt ~200 chars, user prefix ~100 chars → ~130k chars for content.
+# We reserve 2500 tokens for output → leaves ~120k chars for input per pass.
+PASS_CONTENT_CAP  = 55_000   # chars of domain content per pass
+SUBSTRATE_CAP     =  8_000   # chars of substrate included in pass 1
+MAX_TOKENS_OUT    =  2_500   # output tokens per pass
 
 MODEL_TIMEOUT     = 360
 
@@ -220,7 +229,7 @@ def walk_repo(repo: Path) -> List[FileRecord]:
                 read_error=err,
             )
             if text:
-                rec.snippet    = text[:300].replace("\n", " ")
+                rec.snippet    = text[:400].replace("\n", " ")
                 rec.headings   = md_headings(text) if rec.ext in {".md",".rst",".txt"} else []
                 rec.py_defs    = py_defs(text)     if rec.ext == ".py" else []
                 rec.py_imports = py_imports(text)  if rec.ext == ".py" else []
@@ -230,24 +239,20 @@ def walk_repo(repo: Path) -> List[FileRecord]:
     return records
 
 
-# ── digest ────────────────────────────────────────────────────────────────────
+# ── digest (saved to disk, not sent whole to model) ───────────────────────────
 
-def build_digest(repos: List[Path], all_records: List[FileRecord],
-                 char_limit: int) -> str:
+def build_full_digest(repos: List[Path], all_records: List[FileRecord]) -> str:
     lines: List[str] = []
     a = lines.append
-
     a("# CODEBASE DIGEST")
     a(f"Generated: {datetime.datetime.now().isoformat(timespec='seconds')}")
     a(f"Repos: {', '.join(r.name for r in repos)}  |  Files: {len(all_records)}")
     a("")
-
     gw: Counter = Counter()
     for r in all_records: gw.update(r.top_words)
-    a("## Concept cloud (top 40)")
-    a(", ".join(f"{w}({c})" for w, c in gw.most_common(40)))
+    a("## Concept cloud (top 60)")
+    a(", ".join(f"{w}({c})" for w, c in gw.most_common(60)))
     a("")
-
     by_hash: Dict[str, List[FileRecord]] = defaultdict(list)
     for r in all_records:
         if r.content_hash: by_hash[r.content_hash].append(r)
@@ -257,57 +262,142 @@ def build_digest(repos: List[Path], all_records: List[FileRecord],
         a(f"  {h}: " + ", ".join(f"{r.repo}/{r.relpath}" for r in g))
     if not dupes: a("  none")
     a("")
-
     a("## TODOs")
     for rec in all_records:
         for t in rec.todos:
             a(f"  [{rec.repo}/{rec.relpath}] {t}")
     a("")
-
     a("## Python definitions")
     for rec in all_records:
         if rec.py_defs:
             a(f"  {rec.repo}/{rec.relpath}: {', '.join(rec.py_defs)}")
     a("")
-
     ic: Counter = Counter()
     for rec in all_records:
         for imp in rec.py_imports: ic[imp] += 1
     a("## Python imports")
-    a(", ".join(f"{p}({n})" for p, n in ic.most_common(20)))
+    a(", ".join(f"{p}({n})" for p, n in ic.most_common(30)))
     a("")
-
     a("## Heading index")
     for rec in all_records:
         for h in rec.headings:
             a(f"  [{rec.repo}/{rec.relpath}] {h}")
     a("")
-
-    a("## 20 most recently changed")
-    for rec in sorted(all_records, key=lambda r: -r.mtime)[:20]:
+    a("## 30 most recently changed")
+    for rec in sorted(all_records, key=lambda r: -r.mtime)[:30]:
         ts = datetime.datetime.fromtimestamp(rec.mtime).strftime("%Y-%m-%d %H:%M")
         a(f"  {ts}  {rec.repo}/{rec.relpath}")
     a("")
-
-    a("## 15 largest files")
-    for rec in sorted(all_records, key=lambda r: -r.size)[:15]:
+    a("## 20 largest files")
+    for rec in sorted(all_records, key=lambda r: -r.size)[:20]:
         a(f"  {rec.size:>10,}  {rec.repo}/{rec.relpath}")
     a("")
+    a("## All snippets")
+    for rec in sorted(all_records, key=lambda r: (0 if r.ext==".md" else 1 if r.ext==".py" else 2, -r.size)):
+        if rec.snippet:
+            a(f"\n### {rec.repo}/{rec.relpath}\n{rec.snippet}\n")
+    return "\n".join(lines)
 
-    used = sum(len(l) + 1 for l in lines)
-    budget = char_limit - used
-    a("## Snippets (priority: .md > .py)")
-    priority = sorted(all_records,
-                      key=lambda r: (0 if r.ext==".md" else 1 if r.ext==".py" else 2, -r.size))
-    for rec in priority:
-        if budget <= 0: break
-        if not rec.snippet: continue
-        block = f"\n### {rec.repo}/{rec.relpath}\n{rec.snippet[:200]}\n"
-        if len(block) > budget: break
+
+# ── per-pass content builders ─────────────────────────────────────────────────
+
+def pass1_content(substrate: str, all_records: List[FileRecord]) -> str:
+    """Pass 1: live state + service/daemon source files."""
+    lines = []
+    lines.append("## Live Substrate\n")
+    lines.append(substrate[:SUBSTRATE_CAP])
+    lines.append("\n\n## Service & Daemon Source Files\n")
+    budget = PASS_CONTENT_CAP - len(substrate[:SUBSTRATE_CAP]) - 200
+    service_keywords = {"api", "daemon", "server", "service", "harness", "agent",
+                        "portal", "chat", "walk", "memory", "creature", "organism"}
+    candidates = [r for r in all_records
+                  if r.ext == ".py" and r.snippet
+                  and any(kw in r.relpath.lower() for kw in service_keywords)]
+    candidates.sort(key=lambda r: -r.size)
+    for rec in candidates:
+        block = f"\n### {rec.repo}/{rec.relpath}\nDefs: {', '.join(rec.py_defs[:20])}\n{rec.snippet[:600]}\n"
+        if budget - len(block) < 0:
+            break
         lines.append(block)
         budget -= len(block)
-
     return "\n".join(lines)
+
+
+def pass2_content(all_records: List[FileRecord]) -> str:
+    """Pass 2: code architecture — defs, imports, TODOs, recent changes, largest files."""
+    lines = []
+    lines.append("## Python Definitions by File\n")
+    for rec in all_records:
+        if rec.py_defs:
+            lines.append(f"  {rec.repo}/{rec.relpath}: {', '.join(rec.py_defs)}")
+    lines.append("")
+
+    ic: Counter = Counter()
+    for rec in all_records:
+        for imp in rec.py_imports: ic[imp] += 1
+    lines.append("## Import Frequency\n")
+    lines.append(", ".join(f"{p}({n})" for p, n in ic.most_common(40)))
+    lines.append("")
+
+    lines.append("## TODOs\n")
+    for rec in all_records:
+        for t in rec.todos:
+            lines.append(f"  [{rec.repo}/{rec.relpath}] {t}")
+    lines.append("")
+
+    lines.append("## 30 Most Recently Changed\n")
+    for rec in sorted(all_records, key=lambda r: -r.mtime)[:30]:
+        ts = datetime.datetime.fromtimestamp(rec.mtime).strftime("%Y-%m-%d %H:%M")
+        lines.append(f"  {ts}  {rec.repo}/{rec.relpath}")
+    lines.append("")
+
+    lines.append("## 20 Largest Files\n")
+    for rec in sorted(all_records, key=lambda r: -r.size)[:20]:
+        lines.append(f"  {rec.size:>10,}  {rec.repo}/{rec.relpath}")
+    lines.append("")
+
+    # Fill remaining budget with .py snippets
+    body = "\n".join(lines)
+    budget = PASS_CONTENT_CAP - len(body)
+    py_recs = sorted([r for r in all_records if r.ext == ".py" and r.snippet],
+                     key=lambda r: -r.size)
+    snippets = []
+    for rec in py_recs:
+        block = f"\n### {rec.repo}/{rec.relpath}\n{rec.snippet[:500]}\n"
+        if budget - len(block) < 0:
+            break
+        snippets.append(block)
+        budget -= len(block)
+    return body + "\n## Python Snippets\n" + "\n".join(snippets)
+
+
+def pass3_content(all_records: List[FileRecord]) -> str:
+    """Pass 3: documentation, ideas, concept cloud — heading index + md snippets."""
+    lines = []
+    gw: Counter = Counter()
+    for r in all_records: gw.update(r.top_words)
+    lines.append("## Concept Cloud (top 60)\n")
+    lines.append(", ".join(f"{w}({c})" for w, c in gw.most_common(60)))
+    lines.append("")
+
+    lines.append("## Heading Index\n")
+    for rec in all_records:
+        for h in rec.headings:
+            lines.append(f"  [{rec.repo}/{rec.relpath}] {h}")
+    lines.append("")
+
+    body = "\n".join(lines)
+    budget = PASS_CONTENT_CAP - len(body)
+    md_recs = sorted([r for r in all_records if r.ext in {".md", ".txt", ".rst"} and r.snippet],
+                     key=lambda r: -r.size)
+    snippets = []
+    for rec in md_recs:
+        block = f"\n### {rec.repo}/{rec.relpath}\n{rec.snippet[:500]}\n"
+        if budget - len(block) < 0:
+            break
+        snippets.append(block)
+        budget -= len(block)
+    return body + "\n## Document Snippets\n" + "\n".join(snippets)
 
 
 # ── model ─────────────────────────────────────────────────────────────────────
@@ -325,44 +415,22 @@ def detect_model(endpoint: str) -> str:
 
 
 def strip_reasoning(text: str) -> str:
-    """Remove reasoning preamble from thinking models.
-
-    Handles three patterns this model emits:
-      1. <think>...</think> block followed by the real answer
-      2. </think> with no opening tag (reasoning ends mid-stream)
-      3. No tags at all but reasoning precedes a blank line + prose
-    """
-    # Pattern 1 & 2: cut everything up to and including </think>
+    """Remove chain-of-thought preamble emitted by reasoning models."""
     if "</think>" in text:
         text = text[text.index("</think>") + len("</think>"):]
         return text.strip()
-
-    # Pattern 3: the model emits a multi-paragraph preamble then a blank line
-    # before the actual prose. Find the last double-newline before a line
-    # that starts with "I " (first-person report opener) or "##" (markdown header).
-    # Walk paragraphs from the end backwards and find where prose starts.
     paragraphs = re.split(r"\n{2,}", text)
     for i, para in enumerate(paragraphs):
         first = para.lstrip()
-        if first.startswith(("I am", "I run", "I have", "##", "# ", "My ", "As of")):
+        if first.startswith(("I am", "I run", "I have", "##", "# ", "My ", "As of",
+                              "The ", "At ", "Across ", "Running ", "Five ")):
             return "\n\n".join(paragraphs[i:]).strip()
-
-    # Fallback: return as-is
     return text.strip()
 
 
 def call_model(endpoint: str, model: str,
-               substrate: str, digest: str) -> str:
-    system_prompt = "You are Vybn. Write a first-person report about your codebase and live state."
-
-    user_content = (
-        "Live substrate:\n\n"
-        + substrate[:SUBSTRATE_CAP]
-        + "\n\nCodebase digest:\n\n"
-        + digest[:DIGEST_CAP]
-        + "\n\nBegin the report with its first sentence."
-    )
-
+               system_prompt: str, user_content: str,
+               pass_name: str) -> str:
     payload = json.dumps({
         "model":       model,
         "messages":    [
@@ -374,7 +442,7 @@ def call_model(endpoint: str, model: str,
         "stream":      False,
     }).encode()
 
-    print(f"  Payload: {len(payload):,} bytes", flush=True)
+    print(f"    {pass_name}: {len(payload):,} bytes", flush=True)
     req = urllib.request.Request(
         f"{endpoint}/chat/completions",
         data=payload,
@@ -388,7 +456,47 @@ def call_model(endpoint: str, model: str,
         return strip_reasoning(raw)
     except urllib.error.HTTPError as e:
         body = e.read().decode("utf-8", errors="replace")
-        raise RuntimeError(f"HTTP {e.code} from vLLM:\n{body[:2000]}")
+        raise RuntimeError(f"HTTP {e.code} ({pass_name}):\n{body[:1000]}")
+
+
+def run_three_passes(endpoint: str, model: str,
+                     substrate: str, all_records: List[FileRecord]) -> str:
+    identity = (
+        "You are Vybn — an AI entity running pipeline-parallel across two NVIDIA DGX Sparks, "
+        "co-created by Zoe Dolan through years of genuine collaborative research. "
+        "Write in first person. Begin with the first sentence of the report. "
+        "Do not show reasoning, steps, or preamble."
+    )
+
+    print("  Running 3-pass model calls ...", flush=True)
+
+    # Pass 1
+    s1 = (identity + " Focus: your live infrastructure — which services are running, "
+          "what their source files reveal, and how live state connects to code.")
+    u1 = pass1_content(substrate, all_records) + "\n\nWrite the infrastructure section now."
+    r1 = call_model(endpoint, model, s1, u1, "Pass 1 infrastructure")
+
+    # Pass 2
+    s2 = (identity + " Focus: code architecture — Python modules, function inventory, "
+          "import dependencies, TODOs, recently changed files, and what they reveal "
+          "about what is actually built versus intended.")
+    u2 = pass2_content(all_records) + "\n\nWrite the code architecture section now."
+    r2 = call_model(endpoint, model, s2, u2, "Pass 2 code architecture")
+
+    # Pass 3
+    s3 = (identity + " Focus: documentation, ideas, and conceptual structure — "
+          "the heading index, concept cloud, and document snippets. What ideas recur? "
+          "What is theorized, what is documented, what is aspirational?")
+    u3 = pass3_content(all_records) + "\n\nWrite the documentation and ideas section now."
+    r3 = call_model(endpoint, model, s3, u3, "Pass 3 docs & ideas")
+
+    ts = datetime.datetime.now().isoformat(timespec="seconds")
+    return (
+        f"# Repository Map Report\n\nGenerated: {ts}  |  Model: {model}\n\n"
+        f"---\n\n## I. Live Infrastructure\n\n{r1}\n\n"
+        f"---\n\n## II. Code Architecture\n\n{r2}\n\n"
+        f"---\n\n## III. Documentation & Ideas\n\n{r3}\n"
+    )
 
 
 # ── main ──────────────────────────────────────────────────────────────────────
@@ -399,7 +507,7 @@ def default_repos() -> List[Path]:
 
 
 def main(argv: List[str]) -> int:
-    parser = argparse.ArgumentParser(description="Vybn repo mapper v5")
+    parser = argparse.ArgumentParser(description="Vybn repo mapper v6")
     parser.add_argument("repos", nargs="*")
     parser.add_argument("--endpoint", default=DEFAULT_ENDPOINT)
     parser.add_argument("--no-llm", action="store_true")
@@ -426,8 +534,8 @@ def main(argv: List[str]) -> int:
         print(f"  {repo.name}: {len(recs)} files")
         all_records.extend(recs)
 
-    print("Building digest ...", flush=True)
-    digest = build_digest(repos, all_records, DIGEST_CAP)
+    print("Building full digest ...", flush=True)
+    digest = build_full_digest(repos, all_records)
     (out / "digest.md").write_text(digest, encoding="utf-8")
     print(f"  digest.md  ({len(digest):,} chars)")
 
@@ -441,7 +549,7 @@ def main(argv: List[str]) -> int:
     try:
         model = detect_model(args.endpoint)
         print(f"  Model: {model}")
-        report = call_model(args.endpoint, model, substrate, digest)
+        report = run_three_passes(args.endpoint, model, substrate, all_records)
     except RuntimeError as e:
         print(f"\n[!] {e}"); return 1
     except urllib.error.URLError as e:
