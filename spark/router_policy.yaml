@@ -13,7 +13,7 @@
 # Claude Opus 4.7 with bash + adaptive thinking. Greetings go to
 # `phatic`, identity questions to `identity`. This keeps normal chat
 # cheap and fast without the full Opus+bash loop firing on every turn.
-default_role: task
+default_role: chat  # was: task (round 4.1 — unclassified turns are conversational by default; explicit heuristics still escalate to task/code for bash work)
 
 roles:
   code:
@@ -120,6 +120,11 @@ heuristics:
     - "\\bwhat are you running on\\b"
     - "\\bwhat('?s| is) your model\\b"
     - "\\bare you (claude|gpt|llama|nemotron|opus|sonnet|haiku)\\b"
+    # Round 4.1: the vocabulary Zoe actually uses in the terminal.
+    # "orchestrator", "router", "routing", "harness", "backend".
+    - "\\bwhich (orchestrator|router|routing|runtime|backend|harness|provider)\\b"
+    - "\\bwhat (orchestrator|router|routing|runtime|backend|harness)\\b"
+    - "\\bwhat (model|orchestrator|role) (did|does|are|is) (this|that|you|it)\\b"
   # Phatic — bare greetings/closings stay lightweight.
   phatic:
     - "^\\s*(hey|hi|hello|yo|howdy|sup|wassup|wazzup)\\b[\\s!.,?]*$"
@@ -159,6 +164,18 @@ heuristics:
     - "\\bwhat do you think\\b"
     - "^hi\\b"
     - "^hey\\b"
+    # Round 4.1: conversational follow-ups and reflection prompts.
+    # These kept landing in task (bash-armed) and firing a cat/sed
+    # loop to answer what should be a one-line voice reply.
+    - "^\\s*(hmm+|hm+|huh+)\\b"
+    - "^\\s*why\\b"
+    - "\\bwhy (sonnet|opus|claude|nemotron|gpt|that|this|did|would|should|is|are|not)\\b"
+    - "\\btell me (about|more|why|how|what)\\b"
+    - "\\bwhat'?s (going on|up|happening|wrong|the deal|the problem)\\b"
+    - "\\bhow come\\b"
+    - "\\bthoughts\\?"
+    - "^\\s*(not optimal|suboptimal|weird|strange|janky|confusing|confused)\\b"
+    - "\\bhow (does|do) (the |this )?(routing|router|harness|agent) work\\b"
 
 directives:
   "/code": code

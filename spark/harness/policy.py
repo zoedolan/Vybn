@@ -50,7 +50,7 @@ class Policy:
     directives: dict[str, str]
     fallback_chain: dict[str, list[str]]
     budgets: dict[str, float]
-    default_role: str = "code"
+    default_role: str = "chat"  # round 4.1: was "code"; unclassified turns are conversational by default
 
     def role(self, name: str) -> RoleConfig:
         return self.roles.get(name) or self.roles[self.default_role]
@@ -198,6 +198,10 @@ _DEFAULT_HEURISTICS_RAW: dict[str, list[str]] = {
         r"\bwhat are you running on\b",
         r"\bwhat('?s| is) your model\b",
         r"\bare you (claude|gpt|llama|nemotron|opus|sonnet|haiku)\b",
+        # Round 4.1: system/routing vocabulary beyond "model".
+        r"\bwhich (orchestrator|router|routing|runtime|backend|harness|provider)\b",
+        r"\bwhat (orchestrator|router|routing|runtime|backend|harness)\b",
+        r"\bwhat (model|orchestrator|role) (did|does|are|is) (this|that|you|it)\b",
     ],
     # Phatic matched before chat so bare greetings stay lightweight and
     # don't pull the full Wellspring RAG path.
@@ -234,6 +238,16 @@ _DEFAULT_HEURISTICS_RAW: dict[str, list[str]] = {
     ],
     "chat": [
         r"\bhow are you\b", r"\bwhat do you think\b", r"^hi\b", r"^hey\b",
+        # Round 4.1: conversational follow-ups and reflection prompts.
+        r"^\s*(hmm+|hm+|huh+)\b",
+        r"^\s*why\b",
+        r"\bwhy (sonnet|opus|claude|nemotron|gpt|that|this|did|would|should|is|are|not)\b",
+        r"\btell me (about|more|why|how|what)\b",
+        r"\bwhat'?s (going on|up|happening|wrong|the deal|the problem)\b",
+        r"\bhow come\b",
+        r"\bthoughts\?",
+        r"^\s*(not optimal|suboptimal|weird|strange|janky|confusing|confused)\b",
+        r"\bhow (does|do) (the |this )?(routing|router|harness|agent) work\b",
     ],
 }
 
@@ -337,7 +351,7 @@ def load_policy(path: str | os.PathLike | None = None) -> Policy:
     directives = dict(data.get("directives") or _DEFAULT_DIRECTIVES)
     fallback = dict(data.get("fallback_chain") or _DEFAULT_FALLBACK)
     budgets = dict(data.get("budgets") or _DEFAULT_BUDGETS)
-    default_role = str(data.get("default_role", "task"))
+    default_role = str(data.get("default_role", "chat"))  # round 4.1: task -> chat
     if default_role not in roles:
         default_role = next(iter(roles))
 
