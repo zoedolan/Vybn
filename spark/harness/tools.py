@@ -301,8 +301,17 @@ class BashTool:
                 time.sleep(0.05)
                 continue
             if self._sentinel in line:
-                parts = line.strip().split()
-                code = parts[-1] if len(parts) > 1 else "0"
+                sentinel_idx = line.find(self._sentinel)
+                leading = line[:sentinel_idx]
+                if leading.rstrip():
+                    # Content preceded the sentinel on the same line —
+                    # keep it so commands whose last byte isn't \n
+                    # (curl -s, echo -n, grep -c, JSON bodies, etc.)
+                    # don't silently lose their tail.
+                    lines.append(leading if leading.endswith("\n") else leading + "\n")
+                tail = line[sentinel_idx + len(self._sentinel):]
+                parts = tail.strip().split()
+                code = parts[-1] if parts else "0"
                 if code != "0":
                     lines.append(f"[exit code: {code}]")
                 break

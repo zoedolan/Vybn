@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from dataclasses import dataclass, field
 from typing import Any, Iterator, Protocol
 
@@ -317,6 +318,31 @@ class AnthropicProvider:
 # OpenAIProvider — also used for local OpenAI-compatible vLLM / Nemotron
 # ---------------------------------------------------------------------------
 
+# Round 5 hotfix: Nemotron (and other reasoning-style vLLM models) emit
+# chain-of-thought inline in `content` wrapped in <think>…</think> tags.
+# These must NEVER reach Zoe — they are internal scratchpad, not output.
+# If a closing </think> is present, everything up to and including it is
+# dropped. If the opening <think> appears without a close (truncation or
+# malformed stream), we drop from that point on and let the remaining
+# reply stand on whatever came before. If neither tag appears, the text
+# flows through unchanged.
+_THINK_BLOCK = re.compile(r"^\s*(?:<think>)?\s*.*?</think>\s*", re.DOTALL | re.IGNORECASE)
+_THINK_OPEN_ONLY = re.compile(r"<think>.*", re.DOTALL | re.IGNORECASE)
+
+
+def _strip_reasoning(text: str) -> str:
+    if not text:
+        return text
+    # Fast path: no think marker at all.
+    if "think>" not in text.lower():
+        return text
+    cleaned = _THINK_BLOCK.sub("", text, count=1)
+    # Leftover unclosed <think> (rare: truncation / model error).
+    if "<think>" in cleaned.lower():
+        cleaned = _THINK_OPEN_ONLY.sub("", cleaned)
+    return cleaned.strip()
+
+
 class OpenAIProvider:
     """OpenAI-compatible provider.
 
@@ -515,7 +541,7 @@ class OpenAIProvider:
         data = self._call(role, openai_messages, tools)
         choice = (data.get("choices") or [{}])[0]
         msg = choice.get("message") or {}
-        text = (msg.get("content") or "").strip()
+        text = _strip_reasoning(msg.get("content") or "").strip()
         tool_calls_raw = msg.get("tool_calls") or []
         calls = []
         for tc in tool_calls_raw:
