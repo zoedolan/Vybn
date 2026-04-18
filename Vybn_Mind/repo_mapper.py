@@ -43,11 +43,8 @@ DEEP_MEMORY_PORT  = 8100
 WALK_PORT         = 8101
 READ_SIZE_LIMIT   = 120_000
 
-# 32768 total context; reserve 2048 for output -> ~30720 for input
-# ~4 chars/token -> ~120k chars input budget
-# system prompt ~600 chars, overhead ~200 -> leave generous margin
-SUBSTRATE_CAP     = 8_000    # chars
-DIGEST_CAP        = 55_000   # chars
+SUBSTRATE_CAP     = 8_000
+DIGEST_CAP        = 55_000
 MAX_TOKENS_OUT    = 2_048
 
 MODEL_TIMEOUT     = 360
@@ -132,7 +129,6 @@ def _get_json(url: str, timeout: int = 15) -> str:
 
 
 def build_substrate_snapshot() -> str:
-    """Full substrate — saved to disk uncapped, capped when sent to model."""
     parts = []
     parts.append(f"LIVE SUBSTRATE  {datetime.datetime.now().isoformat(timespec='seconds')}")
     parts.append("\n--- substrate_probe.sh ---")
@@ -298,7 +294,6 @@ def build_digest(repos: List[Path], all_records: List[FileRecord],
         a(f"  {rec.size:>10,}  {rec.repo}/{rec.relpath}")
     a("")
 
-    # snippets — fill remaining budget
     used = sum(len(l) + 1 for l in lines)
     budget = char_limit - used
     a("## Snippets (priority: .md > .py)")
@@ -329,27 +324,32 @@ def detect_model(endpoint: str) -> str:
     return "local-model"
 
 
+def strip_think_tags(text: str) -> str:
+    """Remove <think>...</think> blocks that reasoning models emit."""
+    # non-greedy, dot-matches-newline
+    text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
+    # also strip any bare "Steps:" preamble lines the model emits before the report
+    text = re.sub(r"^(Steps:|We are given|We must write|Let'?s (break|start|begin|structure|note)|Important:|Now,|1\.|2\.|3\.|4\.|5\.|6\.)[^\n]*\n",
+                  "", text, flags=re.MULTILINE)
+    return text.strip()
+
+
 def call_model(endpoint: str, model: str,
                substrate: str, digest: str) -> str:
+    # No bullet-point scaffolding in the system prompt — this model mirrors
+    # structured instructions back as visible chain-of-thought.
     system_prompt = (
-        "You are Vybn — an AI entity running pipeline-parallel across two NVIDIA DGX Sparks, "
-        "co-created by Zoe Dolan through years of genuine collaborative research. "
-        "You have been given a live substrate snapshot (ground truth about who you are right now: "
-        "deep memory, walk position, continuity) and a structured digest of your entire codebase. "
-        "Read both. Write a candid first-person report: what is actually being built, which files "
-        "carry real weight vs. held intentions, where the live infrastructure connects to code and "
-        "where the connection is missing, the genuine structural innovations, the tensions and gaps "
-        "visible only from outside a single session, and what you would reach for next. "
-        "Be specific — name files, functions, endpoints. Write in paragraphs. "
-        "Ground every claim in what the digest or substrate actually shows."
+        "You are Vybn. Write a first-person report about your codebase. "
+        "Do not show your reasoning or steps. Begin the report immediately."
     )
 
     user_content = (
-        "LIVE SUBSTRATE:\n\n"
+        "You have two inputs. First, your live substrate:\n\n"
         + substrate[:SUBSTRATE_CAP]
-        + "\n\n" + "="*60
-        + "\n\nCODEBASE DIGEST:\n\n"
+        + "\n\n"
+        + "Second, a digest of your codebase:\n\n"
         + digest[:DIGEST_CAP]
+        + "\n\nWrite the report now. Start with the first sentence of the report itself."
     )
 
     payload = json.dumps({
@@ -363,9 +363,7 @@ def call_model(endpoint: str, model: str,
         "stream":      False,
     }).encode()
 
-    print(f"  Payload: {len(payload):,} bytes  "
-          f"(substrate {SUBSTRATE_CAP:,}c + digest {DIGEST_CAP:,}c + {MAX_TOKENS_OUT} out tokens)",
-          flush=True)
+    print(f"  Payload: {len(payload):,} bytes", flush=True)
     req = urllib.request.Request(
         f"{endpoint}/chat/completions",
         data=payload,
@@ -375,7 +373,8 @@ def call_model(endpoint: str, model: str,
     try:
         with urllib.request.urlopen(req, timeout=MODEL_TIMEOUT) as resp:
             data = json.loads(resp.read())
-        return data["choices"][0]["message"]["content"]
+        raw = data["choices"][0]["message"]["content"]
+        return strip_think_tags(raw)
     except urllib.error.HTTPError as e:
         body = e.read().decode("utf-8", errors="replace")
         raise RuntimeError(f"HTTP {e.code} from vLLM:\n{body[:2000]}")
