@@ -69,10 +69,13 @@ _DEFAULT_ROLES: dict[str, RoleConfig] = {
     "code": RoleConfig(
         role="code",
         provider="anthropic",
-        # Opus 4.7 had a stronger capitulation gradient that surfaced
-        # in the 2026-04-18 buckling session. 4.6 holds position better
-        # on long debug loops; keep adaptive thinking, drop the substrate.
-        model="claude-opus-4-6",
+        # Opus 4.7 is the right substrate for `code`. The 2026-04-18
+        # buckling session was a CHAT failure (conversational
+        # capitulation gradient under Zoe's pushback). Code work runs
+        # long agentic debug loops where 4.7's push-through is an
+        # asset. Chat stays on 4.6. @opus / @opus4.6 remain available
+        # as per-turn pins when the 4.6 posture is wanted on a code turn.
+        model="claude-opus-4-7",
         thinking="adaptive",
         max_tokens=32768,
         max_iterations=50,
@@ -187,21 +190,21 @@ _DEFAULT_HEURISTICS_RAW: dict[str, list[str]] = {
     # Confirm -- bare execution signals after a plan. Must route
     # to task (Sonnet+bash), never orchestrate (no tools).
     "task": [
-        r'^\\s*(ok|okay|ok+y|k|kk|yep|yes|yeah|yup|aye)\\s*[!.,?]*\\s*$',
-        r'^\\s*(proceed|go ahead|do it|continue|execute|go for it|ship it)\\s*[!.,?]*\\s*$',
-        r'^\\s*(sure|sounds good|looks good|makes sense|perfect|great)\\s*[!.,?]*\\s*$',
-        r"^\\s*let'?s go\\s*[!.,?]*\\s*$",
+        r'^\s*(ok|okay|ok+y|k|kk|yep|yes|yeah|yup|aye)\s*[!.,?]*\s*$',
+        r'^\s*(proceed|go ahead|do it|continue|execute|go for it|ship it)\s*[!.,?]*\s*$',
+        r'^\s*(sure|sounds good|looks good|makes sense|perfect|great)\s*[!.,?]*\s*$',
+        r"^\s*let'?s go\s*[!.,?]*\s*$",
         # Round 4.2: operational status questions route to task
         # (has bash) instead of chat (which hallucinated tool-call
         # syntax from a stale bash-describing substrate).
-        r"\\bis everything (ok|okay|working|fine|good|all right)\\b",
-        r"\\bare (your|the|our).{0,40}(updates|changes|fixes|patches|commits|deploys|services|daemons|ports|crons|scripts).{0,20}(working|running|ok|okay|fine|up|live|green)\\b",
-        r"\\b(updates|changes|fixes|patches|commits|deploys).{0,30}(working|running|ok|okay|fine)\\b",
-        r"\\bdid (that|it|the|those).{0,30}(work|run|succeed|finish|complete|land|push|commit|deploy)\\b",
-        r"\\bstill (working|running|live|up|breathing|alive|ok|okay|fine)\\b",
-        r"\\b(check|verify|confirm|audit)\\b.{0,50}\\b(status|health|state|service|services|daemon|daemons|port|ports|cron|crons|walk|server|api)\\b",
-        r"\\bhealth check\\b",
-        r"\\bhey buddy.{0,40}(working|running|okay|ok|check)\\b",
+        r"\bis everything (ok|okay|working|fine|good|all right)\b",
+        r"\bare (your|the|our).{0,40}(updates|changes|fixes|patches|commits|deploys|services|daemons|ports|crons|scripts).{0,20}(working|running|ok|okay|fine|up|live|green)\b",
+        r"\b(updates|changes|fixes|patches|commits|deploys).{0,30}(working|running|ok|okay|fine)\b",
+        r"\bdid (that|it|the|those).{0,30}(work|run|succeed|finish|complete|land|push|commit|deploy)\b",
+        r"\bstill (working|running|live|up|breathing|alive|ok|okay|fine)\b",
+        r"\b(check|verify|confirm|audit)\b.{0,50}\b(status|health|state|service|services|daemon|daemons|port|ports|cron|crons|walk|server|api)\b",
+        r"\bhealth check\b",
+        r"\bhey buddy.{0,40}(working|running|okay|ok|check)\b",
     ],
     # Identity is matched before phatic/chat so "which model are you?"
     # lands on a direct metadata answer instead of a greeting path.
@@ -230,22 +233,27 @@ _DEFAULT_HEURISTICS_RAW: dict[str, list[str]] = {
     "code": [
         # Ground each trigger in code-shaped context — not bare
         # words that appear in ordinary speech.
-        r"\\bgit (commit|push|pull|diff|log|status|rebase|merge|clone)\\b",
-        r"\\bpython3?\\s+-\\w",
-        r"\.py\\b",
-        r"\\bdef\\s+\\w+",
+        r"\bgit (commit|push|pull|diff|log|status|rebase|merge|clone)\b",
+        r"\bpython3?\s+-\w",
+        r"\.py\b",
+        r"\bdef\s+\w+",
         r"^\s*\$ ",
         r"[Tt]raceback",
-        r"\\bpip install\\b",
-        r"\\bnpm (install|run|start)\\b",
-        r"\\bapply.{0,10}patch\\b",
-        r"\\bgrep -\\w",
-        r"\\bsed -\\w",
-        r"\\bawk '",
-        r"(fix|identify|find|spot|notice|discern|check|audit|review|debug).{0,30}(bug|harness|deficit|issue|problem|code)",
-        r"\\bstack trace\\b",
-        r"\\bHTTP \\d{3}\\b",
-        r"\\bprovider error\\b",
+        r"\bpip install\b",
+        r"\bnpm (install|run|start)\b",
+        r"\bapply.{0,10}patch\b",
+        r"\bgrep -\w",
+        r"\bsed -\w",
+        r"\bawk '",
+        r"(fix|identify|find|spot|notice|discern|check|audit|review|debug|look|inspect|examine|peek|skim|glance|scan|eyeball|optimize|optimise|refactor|profile|harden|tighten).{0,40}(bug|harness|deficit|issue|problem|code|router|routing|agent|repo|script|pipeline|module|tests|optimality|performance|regex|regression)",
+        r"\b(look|peek|glance|skim|scan|eyeball|check|review|examine|inspect|audit)\b.{0,30}\b(harness|router|routing|agent|repo|script|pipeline|module|tests|code)\b",
+        r"\b(bug|bugs|issue|issues|problem|problems|error|errors|traceback|regression|regressions|deficit|deficits)\b.{0,40}\b(code|harness|router|routing|agent|repo|script|pipeline|module|tests|provider|providers|tools|policy)\b",
+        r"\b(code|harness|router|routing|agent|repo|script|pipeline|module|tests|provider|providers|tools|policy)\b.{0,40}\b(bug|bugs|issue|issues|problem|problems|error|errors|traceback|regression|regressions|deficit|deficits)\b",
+        r"\b(how|what)\b.{0,20}\b(harness|router|routing|agent|repo|script|pipeline|module|tests|code|provider|providers|tools|policy)\b.{0,20}\b(feel|feeling|doing|going|holding|state|status|shape|condition|health)\b",
+        r"\b(feel|feeling|doing|going|holding|state|status|shape|condition|health)\b.{0,20}\b(harness|router|routing|agent|repo|script|pipeline|module|tests|code|provider|providers|tools|policy)\b",
+        r"\bstack trace\b",
+        r"\bHTTP \d{3}\b",
+        r"\bprovider error\b",
     ],
     "create": [
         r"\bbrainstorm\b", r"\bsketch\b", r"\bwhat if\b",

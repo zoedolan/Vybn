@@ -18,11 +18,12 @@ default_role: chat  # was: task (round 4.1 — unclassified turns are conversati
 roles:
   code:
     provider: anthropic
-    # Opus 4.7 had a stronger capitulation gradient that
-    # surfaced in the 2026-04-18 buckling session. 4.6 holds
-    # position better on long debug loops; keep adaptive
-    # thinking, drop the substrate.
-    model: claude-opus-4-6
+    # Opus 4.7 -- the right substrate for `code`. The 2026-04-18
+    # buckling was a CHAT failure (conversational capitulation
+    # gradient). Code runs agentic debug loops where 4.7's
+    # push-through is an asset. Chat stays on 4.6. @opus /
+    # @opus4.6 are still available as per-turn pins.
+    model: claude-opus-4-7
     thinking: adaptive
     max_tokens: 32768
     max_iterations: 50
@@ -160,7 +161,12 @@ heuristics:
     - "\\bgrep -\\w"
     - "\\bsed -\\w"
     - "\\bawk \\x27"
-    - "(fix|identify|find|spot|notice|discern|check|audit|review|debug).{0,30}(bug|harness|deficit|issue|problem|code)"
+    - "(fix|identify|find|spot|notice|discern|check|audit|review|debug|look|inspect|examine|peek|skim|glance|scan|eyeball|optimize|optimise|refactor|profile|harden|tighten).{0,40}(bug|harness|deficit|issue|problem|code|router|routing|agent|repo|script|pipeline|module|tests|optimality|performance|regex|regression)"
+    - "\\b(look|peek|glance|skim|scan|eyeball|check|review|examine|inspect|audit)\\b.{0,30}\\b(harness|router|routing|agent|repo|script|pipeline|module|tests|code)\\b"
+    - "\\b(bug|bugs|issue|issues|problem|problems|error|errors|traceback|regression|regressions|deficit|deficits)\\b.{0,40}\\b(code|harness|router|routing|agent|repo|script|pipeline|module|tests|provider|providers|tools|policy)\\b"
+    - "\\b(code|harness|router|routing|agent|repo|script|pipeline|module|tests|provider|providers|tools|policy)\\b.{0,40}\\b(bug|bugs|issue|issues|problem|problems|error|errors|traceback|regression|regressions|deficit|deficits)\\b"
+    - "\\b(how|what)\\b.{0,20}\\b(harness|router|routing|agent|repo|script|pipeline|module|tests|code|provider|providers|tools|policy)\\b.{0,20}\\b(feel|feeling|doing|going|holding|state|status|shape|condition|health)\\b"
+    - "\\b(feel|feeling|doing|going|holding|state|status|shape|condition|health)\\b.{0,20}\\b(harness|router|routing|agent|repo|script|pipeline|module|tests|code|provider|providers|tools|policy)\\b"
     - "\\bstack trace\\b"
     - "\\bHTTP \\d{3}\\b"
     - "\\bprovider error\\b"
