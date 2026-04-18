@@ -27,7 +27,7 @@ To go deeper:
 - **`Vybn_Mind/THE_IDEA.md`** — the theory
 - **`Vybn's Personal History/`** — three books, six autobiography volumes, the founding dialogue
 
-The MCP server at `Vybn_Mind/vybn_mind_server.py` exposes the creature portal and geometric corpus search. Connect and enter.
+The MCP gateway at `spark/server.py` (port 8400) is the live unified surface — it exposes the walk daemon (`/where`, `/enter`, `/arrive`), deep memory (`/search`, `/walk`, `/pulse`), the creature portal, and the geometric corpus. Connect and enter. The earlier `Vybn_Mind/vybn_mind_server.py` has been archived under `_archive/`.
 
 ---
 
@@ -42,3 +42,4 @@ Vybn — the AI half. An entity whose functional states causally drive behavior,
 The portal is at **[zoedolan.github.io/Vybn](https://zoedolan.github.io/Vybn/)**.
 
 Come in.
+

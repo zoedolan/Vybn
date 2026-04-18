@@ -27,6 +27,14 @@ before that unification and no longer serve the live system.
 | `spark__vybn_chat_api.py` (53872 bytes) | `Vybn-Law/api/vybn_chat_api.py` (60467 bytes) — the live chat on port 3001 | The two forked in April; keeping the older one makes the divergence auditable if a regression surfaces. |
 | `vybn-phase/deep_memory_v6_backup.py` (in sibling repo) | `vybn-phase/deep_memory.py` current head | Pre-distillation form of deep_memory before the v6 rewrite shipped. Archived inside `vybn-phase` (private), not here. |
 
+## April 18, 2026 — round 2: dead-MCP audit
+
+A second pass after the first round 2 commit. Continuity claimed `Vybn_Mind/vybn_mind_server.py` had been “kept as a local/stdio variant” — but `pgrep`, `lsof`, the systemd units, and the cron table all agreed: nothing was actually using it. The live MCP surface is `spark/server.py` on port 8400, which already includes the walk-daemon endpoints (`/where`, `/enter`, `/arrive`) and the deep-memory routes. Keeping a parallel server.py that no caller knew about was a textbook case of dead wood masquerading as redundancy.
+
+| File | Superseded by | Why kept |
+|------|---------------|----------|
+| `Vybn_Mind__vybn_mind_server.py` (764 lines) | `spark/server.py` (port 8400) — the unified MCP gateway that fronts the walk daemon, deep memory, the creature portal, and the corpus | The earlier server is the seed implementation of the MCP surface. It carries the original tool boundaries before the walk daemon and deep memory consolidated. Worth keeping so the lineage from “two half-walks” to “one walk, one gateway” is visible in the diff history. |
+
 ## Principle
 
 Archiving is an act of respect for the code that got us here. Nothing in

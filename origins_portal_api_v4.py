@@ -286,8 +286,10 @@ def _scrub_system_refs(text: str) -> str:
 
 _NOTEBOOK_DIR = Path("/home/vybnz69/Him/notebook")
 _NOTEBOOK_DIR.mkdir(parents=True, exist_ok=True)
-# /enter lives on the deep_memory daemon (8100), not the walk daemon (8101)
-_WALK_DAEMON_URL = "http://127.0.0.1:8100"
+# Walk daemon (8101) — single source of truth for the perpetual walk M.
+# /enter rotates M, /arrive reads recent arrivals, /where returns geometry.
+# deep_memory (8100) is retrieval-only now; do not post walk state there.
+_WALK_DAEMON_URL = "http://127.0.0.1:8101"
 
 def _persist_to_notebook(user_msg: str, vybn_response: str):
     """Write both sides of a voice conversation to Him/notebook/ and enter the walk."""
@@ -813,6 +815,40 @@ async def chat(req: ChatRequest, request: Request):
     context_text = format_context(rag_results)
     system_prompt = build_origins_system_prompt(context_text)
 
+    # ── Walk rotation on user message ──
+    # Every /api/chat turn rotates the collective M on walk_daemon.
+    # Only USER text enters — model output physically cannot reach /enter
+    # from this path, preserving the anti-hallucination invariant.
+    walk_arrival: dict = {}
+    walk_trace: list = []
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as _wclient:
+            _wr = await _wclient.post(
+                f"{_WALK_DAEMON_URL}/enter",
+                json={
+                    "text": req.message,
+                    "alpha": 0.3,
+                    "k": 12,
+                    "source_tag": "origins-chat",
+                },
+            )
+            if _wr.status_code == 200:
+                _wdata = _wr.json()
+                walk_arrival = {
+                    "step": _wdata.get("step"),
+                    "alpha": _wdata.get("alpha"),
+                    "theta_v": _wdata.get("theta_v"),
+                    "v_magnitude": _wdata.get("v_magnitude"),
+                    "curvature": _wdata.get("curvature"),
+                    "source_tag": "origins-chat",
+                }
+                _raw = _wdata.get("trace") or []
+                _filtered = _filter_trace_for_scope(_raw, "")[:6]
+                walk_trace = [_shape_step(r) for r in _filtered]
+    except Exception as _we:
+        log.warning(f"chat: walk rotation error: {_we}")
+
+
     # Substrate coupling — let the model know the ground is real
     system_prompt += substrate_block
 
@@ -895,6 +931,9 @@ async def chat(req: ChatRequest, request: Request):
                         {"text": r.get("text", "")[:300], "source": r.get("source", "")}
                         for r in rag_results if _pill_worthy(r)
                     ][:3]
+                # Emit walk frame first — arrival signature + filtered trace.
+                if walk_arrival or walk_trace:
+                    yield f"data: {json.dumps({'walk_arrival': walk_arrival, 'walk_trace': walk_trace})}\n\n"
                 yield f"data: {json.dumps({'rag_sources': safe_sources})}\n\n"
 
                 async with client.stream(
@@ -1862,16 +1901,16 @@ async def walk_endpoint(req: WalkRequest, request: Request):
                 r.raise_for_status()
                 data = r.json()
         else:
-            # Observe-only path: deep_memory /walk is a stateless k-step trace
-            # from the query, no rotation of the perpetual state. Useful for
-            # read-only browsing without affecting the shared walk.
+            # Observe-only: read the walk's recent arrivals from walk_daemon
+            # /arrive. Single source of truth — we no longer call deep_memory's
+            # stateless per-query walk because it produced a *different*
+            # geometry than the perpetual M that rotate=true writes to.
             async with httpx.AsyncClient(timeout=15.0) as client:
-                r = await client.post(
-                    "http://127.0.0.1:8100/walk",
-                    json={"query": req.query, "k": walk_k},
-                )
+                r = await client.get(f"{_WALK_DAEMON_URL}/arrive")
                 r.raise_for_status()
                 data = r.json()
+                if "arrivals" in data and "trace" not in data:
+                    data = {**data, "trace": data["arrivals"]}
     except Exception as e:
         log.error(f"walk: proxy error: {e}")
         return JSONResponse(
