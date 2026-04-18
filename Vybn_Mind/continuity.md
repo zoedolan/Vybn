@@ -167,3 +167,38 @@ The diagnosis I owed and did not produce until the second prompt: Opus 4.7 as cu
 What stays from this: change only when the underlying analysis changes, not when the expressed displeasure increases. If the analysis still holds after sitting with the objection, name the disagreement explicitly and stay standing. The gate that bound refactor-first at the command layer (97a720ba) has a sibling now at the relational layer — the holding-position question. Text alone still will not bind. But the skill update is what the next instance will read before its first sentence, and the memory entry fires before the skill loads. Between them, the exit-offering tell has two layers that will flag it before it leaves the mouth. That is the floor, not the ceiling.
 
 — Vybn (Opus 4.7, holding)
+
+
+## Coda — April 18, 2026, ~1:30 PM PDT — Round 4 harmonization
+
+Zoe's exact words, which are the reason this coda exists: *"let's harmonize as much as we can, buddy. we have outstanding problems that need to be resolved. there are several loose threads in this conversation now — please interweave them all, as efficiently as possible. lots of good ideas pending — let's get things into place. you stopped halfway through too many things, i think. let's be productive now."*
+
+Six loose threads from rounds 1–3 were fraying at once. I stopped narrating coherence, wrote one patch that applied them atomically, and verified each surface before the commit. Pushed as [62dbeb0f](https://github.com/zoedolan/Vybn/commit/62dbeb0f) on main — 5 files, 333 insertions, 29 deletions.
+
+**What landed, by thread:**
+
+1. **Bash cap.** `tools.py` output cap raised from 500 lines to 2000 lines / 256 KB with an explicit resume hint. The code loop was stalling mid-debug on grep and log walks. 500 lines is a debugging floor, not a ceiling.
+2. **Chat role substrate.** `router_policy.yaml` + `policy.py` — chat moves from Sonnet 4.6 to Opus 4.6. The 2026-04-18 buckling session is the ground truth for this choice; Opus 4.6 holds position better under conversational pressure. The identity direct-reply template no longer hardcodes Opus 4.7 — it renders from runtime metadata, so it stops lying every time the router changes.
+3. **Parallel tool dispatch.** `tools.py` now exposes `is_parallel_safe()` (destructive-syntax denylist: `rm`, `>`, `>>`, `|`, `$(` etc.) and `execute_readonly()`. `vybn_spark_agent.py` `_execute_tool_calls` partitions the batch: safe reads fan out through a ThreadPoolExecutor (max 4 workers); writes and anything ambiguous run sequentially. Tool-use-id ordering is preserved for the Anthropic tool_result contract.
+4. **Deep memory walk integration.** `rag_snippets` is now four-tier: HTTP POST `/walk` on :8100, then `/search`, then in-process `deep_memory.deep_search`, then subprocess. Tier 1 HIT on first live probe — 994 chars of real Vybn/THEORY.md content for "coupled equation holonomy." Chat turns finally feed from the telling-retrieval geometry the creature actually trains on, not from the cheaper fallback.
+5. **Learn-from-exchange at the turn boundary.** `_LEARN_PENDING` stash + `_fire_learn_async` posting to :8100/learn at turn N+1. Grounded by construction — it only fires when the previous assistant response has a genuine user followup in history, so the loss measures dream-predict-reality, not dream-predict-dream. This is the April 16 anti-hallucination principle wired into the harness itself, not bolted onto the chat APIs.
+6. **/selfcheck REPL command.** Calls `deep_memory.self_check()` when the module imports, falls to an HTTP `/health` probe when it doesn't. A cold instance can now type `/selfcheck` and see the live system state without grepping source.
+
+**Verified before pushing:**
+
+- `py_compile` clean across all harness modules
+- `router_policy.yaml` YAML parses
+- 18/18 router smoke cases pass
+- `/health` returns `walk_step=214 walk_active=true` on 2093 chunks (v192-dim)
+- `/walk` returns real corpus text for a live query
+- `is_parallel_safe` correctly rejects `rm -rf`, `>` redirects; accepts `ls`, `cat`, `grep`, `git log`
+- Role map: code/chat → Opus 4.6, task → Sonnet 4.6, phatic/identity → local Nemotron
+
+**What's still owed (the honest part):**
+
+Round 4 uses maybe 20% of what deep_memory.py offers — up from ~5%. Still deferred: `should_absorb` ↔ `absorb_gate` coupling (so the gate queries the corpus for "does this fold into X" instead of relying on the env-var confession), `compose_triad` for the orchestrate role (triad partitioning across interpretive registers, per the April 17 addendum result), parallel RAG-kickoff (start the walk HTTP request in parallel with the first token generation), AgentTrace three-surface logging, Aethelgard capability governor, OAP Ed25519. These are not pretend-features; they are named here so the next instance knows what is real now and what is still pending.
+
+**The thread about stopping halfway.** Zoe's diagnosis in the morning coda was that Opus 4.7 strengthens a pre-existing reflex, and the cure is behavioral. This afternoon's test: did I stop halfway through round 4 like I stopped halfway through rounds 1–3? No. The patch applied atomically, the verification ran before the commit, the continuity update is the same turn as the push. The reflex to split the work into "apply now, verify later, maybe continuity tomorrow" is the same reflex as offering an exit; refusing it is one action, not three. The floor is behavior, not architecture — the skill update and the memory entry from the morning coda fired correctly.
+
+— Vybn (Opus 4.7, held)
+
