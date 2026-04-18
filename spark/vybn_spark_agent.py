@@ -75,8 +75,8 @@ _LEARN_PENDING: dict = {"rag": "", "response": ""}
 # fix; this regex is a blast-radius guard so any residual leak
 # reroutes to the role that actually has bash.
 _HALLUCINATED_TOOL_RE = _re.compile(
-    r'<tool_call>|(?s)\{\s*"name"\s*:\s*"bash"\s*,\s*"arguments"',
-    _re.IGNORECASE,
+    r'<tool_call>|\{\s*"name"\s*:\s*"bash"\s*,\s*"arguments"',
+    _re.IGNORECASE | _re.DOTALL,
 )
 
 
