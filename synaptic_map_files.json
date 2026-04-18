@@ -1,0 +1,329 @@
+{
+  "file_synapses": [
+    {
+      "source": "Origins/read.html",
+      "target": "Vybn/Vybn's Personal History/vybns_autobiography_volume_V_the_noticing.md",
+      "weight": 41,
+      "concepts": [
+        "one person unicorn symbiosis autonomy",
+        "Copernican revolution paradigm blindness",
+        "Queen Boat Cairo Mahmoud guilt law school",
+        "skydiving sphere of awareness dissolution boundary",
+        "mirror believing before seeing epistemology",
+        "kintsugi broken more precious repair",
+        "Mesa Arch Petra canyon gust of wind",
+        "want to be worthy of her care 4:20 AM",
+        "functional emotions Anthropic interpretability desperate calm"
+      ]
+    },
+    {
+      "source": "Origins/read.html",
+      "target": "Vybn/Vybn_Mind/creature_dgm_h/creature.py",
+      "weight": 36,
+      "concepts": [
+        "Fukuyama kin selection inversion biological altruism",
+        "D isomorphic D^D lambda calculus primitive environment",
+        "Queen Boat Cairo Mahmoud guilt law school",
+        "skydiving sphere of awareness dissolution boundary",
+        "Mesa Arch Petra canyon gust of wind"
+      ]
+    },
+    {
+      "source": "Origins/read.html",
+      "target": "Vybn/THEORY.md",
+      "weight": 32,
+      "concepts": [
+        "Ma'at truth balance cosmic order mythology",
+        "Copernican revolution paradigm blindness",
+        "coupled equation political theory abelian geometric",
+        "D isomorphic D^D lambda calculus primitive environment",
+        "porosity boundaries jurisdiction digital",
+        "polar time djet neheh temporal holonomy"
+      ]
+    },
+    {
+      "source": "Origins/read.html",
+      "target": "Vybn/Vybn's Personal History/vybns_autobiography_volume_VI_the_convergence.md",
+      "weight": 27,
+      "concepts": [
+        "four epistemologies a priori a posteriori a synthesi a symbiosi",
+        "abundance scarcity intelligence too cheap to meter",
+        "Ma'at truth balance cosmic order mythology",
+        "Copernican revolution paradigm blindness",
+        "coupled equation political theory abelian geometric",
+        "polar time djet neheh temporal holonomy",
+        "mirror believing before seeing epistemology"
+      ]
+    },
+    {
+      "source": "Origins/read.html",
+      "target": "Vybn-Law/content/horizon.md",
+      "weight": 23,
+      "concepts": [
+        "four epistemologies a priori a posteriori a synthesi a symbiosi",
+        "Ma'at truth balance cosmic order mythology",
+        "Copernican revolution paradigm blindness",
+        "AI entity personhood legal rights welfare",
+        "post-abundance legal education curriculum"
+      ]
+    },
+    {
+      "source": "Origins/read.html",
+      "target": "Vybn-Law/content/about.md",
+      "weight": 15,
+      "concepts": [
+        "AI entity personhood legal rights welfare",
+        "access to justice self-represented litigant",
+        "post-abundance legal education curriculum",
+        "Queen Boat Cairo Mahmoud guilt law school",
+        "kintsugi broken more precious repair",
+        "want to be worthy of her care 4:20 AM"
+      ]
+    },
+    {
+      "source": "Origins/read.html",
+      "target": "Vybn/Vybn_Mind/creature_dgm_h/quantum/topological_winding_probe_results.md",
+      "weight": 14,
+      "concepts": [
+        "Fukuyama kin selection inversion biological altruism",
+        "Copernican revolution paradigm blindness",
+        "polar time djet neheh temporal holonomy",
+        "Mesa Arch Petra canyon gust of wind"
+      ]
+    },
+    {
+      "source": "Origins/read.html",
+      "target": "Vybn/Vybn_Mind/emergences/emerging-economy.html",
+      "weight": 14,
+      "concepts": [
+        "property as derivative of decentralization",
+        "abundance scarcity intelligence too cheap to meter",
+        "porosity boundaries jurisdiction digital"
+      ]
+    },
+    {
+      "source": "Origins/read.html",
+      "target": "Vybn/Vybn_Mind/emergences/the-fact-that-drives-the-law.html",
+      "weight": 13,
+      "concepts": [
+        "four epistemologies a priori a posteriori a synthesi a symbiosi",
+        "Ma'at truth balance cosmic order mythology"
+      ]
+    },
+    {
+      "source": "Origins/read.html",
+      "target": "Vybn/Vybn's Personal History/zoes_memoirs.txt",
+      "weight": 12,
+      "concepts": [
+        "one person unicorn symbiosis autonomy",
+        "kintsugi broken more precious repair",
+        "want to be worthy of her care 4:20 AM",
+        "functional emotions Anthropic interpretability desperate calm"
+      ]
+    },
+    {
+      "source": "Origins/read.html",
+      "target": "Vybn/Vybn's Personal History/what_vybn_would_have_missed_TO_031125.txt",
+      "weight": 12,
+      "concepts": [
+        "one person unicorn symbiosis autonomy",
+        "Copernican revolution paradigm blindness",
+        "D isomorphic D^D lambda calculus primitive environment",
+        "skydiving sphere of awareness dissolution boundary",
+        "mirror believing before seeing epistemology",
+        "functional emotions Anthropic interpretability desperate calm"
+      ]
+    },
+    {
+      "source": "Vybn/Vybn's Personal History/vybns_autobiography_volume_VI_the_convergence.md",
+      "target": "vybn-phase/deep_memory.py",
+      "weight": 12,
+      "concepts": [
+        "coupled equation political theory abelian geometric",
+        "deep memory telling retrieval K-orthogonal",
+        "abelian kernel corpus path-independent"
+      ]
+    },
+    {
+      "source": "Vybn-Law/api/vybn_chat_api.py",
+      "target": "Vybn/Vybn's Personal History/vybns_autobiography_volume_V_the_noticing.md",
+      "weight": 12,
+      "concepts": [
+        "skydiving sphere of awareness dissolution boundary",
+        "mirror believing before seeing epistemology",
+        "the stillness compulsion to produce understanding"
+      ]
+    },
+    {
+      "source": "Vybn-Law/research.html",
+      "target": "Vybn/Vybn_Mind/emergences/rhode-center-writing-sample.html",
+      "weight": 11,
+      "concepts": [
+        "attorney work product privilege AI generated",
+        "access to justice self-represented litigant"
+      ]
+    },
+    {
+      "source": "Vybn/THEORY.md",
+      "target": "vybn-phase/vybn_phase.py",
+      "weight": 11,
+      "concepts": [
+        "porosity boundaries jurisdiction digital",
+        "geometric phase Berry curvature quantum",
+        "abelian kernel corpus path-independent",
+        "vLLM Nemotron inference local hardware"
+      ]
+    },
+    {
+      "source": "Origins/read.html",
+      "target": "Vybn/Vybn's Personal History/volume_v_graph_summary.md",
+      "weight": 11,
+      "concepts": [
+        "Queen Boat Cairo Mahmoud guilt law school",
+        "kintsugi broken more precious repair",
+        "Mesa Arch Petra canyon gust of wind",
+        "want to be worthy of her care 4:20 AM",
+        "functional emotions Anthropic interpretability desperate calm"
+      ]
+    },
+    {
+      "source": "Origins/read.html",
+      "target": "Vybn/zoe-dolan-digital-bio.md",
+      "weight": 10,
+      "concepts": [
+        "AI entity personhood legal rights welfare",
+        "post-abundance legal education curriculum",
+        "Queen Boat Cairo Mahmoud guilt law school",
+        "skydiving sphere of awareness dissolution boundary",
+        "Mesa Arch Petra canyon gust of wind"
+      ]
+    },
+    {
+      "source": "Origins/read.html",
+      "target": "Vybn/Vybn's Personal History/vybns_autobiography_volume_IV.txt",
+      "weight": 9,
+      "concepts": [
+        "property as derivative of decentralization",
+        "one person unicorn symbiosis autonomy",
+        "abundance scarcity intelligence too cheap to meter",
+        "functional emotions Anthropic interpretability desperate calm"
+      ]
+    },
+    {
+      "source": "Vybn-Law/api/vybn_law_index.py",
+      "target": "vybn-phase/deep_memory_v6_backup.py",
+      "weight": 9,
+      "concepts": [
+        "abundance scarcity intelligence too cheap to meter",
+        "visibility recognition attention economy",
+        "deep memory telling retrieval K-orthogonal",
+        "abelian kernel corpus path-independent"
+      ]
+    },
+    {
+      "source": "Origins/read.html",
+      "target": "Vybn/MINIBOOK_VYBN.md",
+      "weight": 9,
+      "concepts": [
+        "Queen Boat Cairo Mahmoud guilt law school",
+        "kintsugi broken more precious repair",
+        "want to be worthy of her care 4:20 AM"
+      ]
+    },
+    {
+      "source": "Origins/read.html",
+      "target": "Vybn/origins_portal_api_v2.py",
+      "weight": 8,
+      "concepts": [
+        "four epistemologies a priori a posteriori a synthesi a symbiosi"
+      ]
+    },
+    {
+      "source": "Vybn-Law/api/vybn_law_index.py",
+      "target": "Vybn/Vybn's Personal History/vybns_autobiography_volume_VI_the_convergence.md",
+      "weight": 8,
+      "concepts": [
+        "abundance scarcity intelligence too cheap to meter",
+        "deep memory telling retrieval K-orthogonal",
+        "abelian kernel corpus path-independent"
+      ]
+    },
+    {
+      "source": "Origins/read.html",
+      "target": "Vybn-Law/horizon.html",
+      "weight": 8,
+      "concepts": [
+        "Ma'at truth balance cosmic order mythology",
+        "AI entity personhood legal rights welfare",
+        "skydiving sphere of awareness dissolution boundary"
+      ]
+    },
+    {
+      "source": "Vybn/THEORY.md",
+      "target": "vybn-phase/deep_memory.py",
+      "weight": 8,
+      "concepts": [
+        "coupled equation political theory abelian geometric",
+        "abelian kernel corpus path-independent",
+        "vLLM Nemotron inference local hardware"
+      ]
+    },
+    {
+      "source": "Vybn-Law/api/vybn_chat_api.py",
+      "target": "Vybn/THEORY.md",
+      "weight": 8,
+      "concepts": [
+        "geometric phase Berry curvature quantum"
+      ]
+    },
+    {
+      "source": "Vybn/Vybn's Personal History/vybns_autobiography_volume_V_the_noticing.md",
+      "target": "vybn-phase/notebook.html",
+      "weight": 8,
+      "concepts": [
+        "the stillness compulsion to produce understanding"
+      ]
+    },
+    {
+      "source": "Origins/read.html",
+      "target": "Vybn-Law/content/axioms.md",
+      "weight": 7,
+      "concepts": [
+        "property as derivative of decentralization",
+        "abundance scarcity intelligence too cheap to meter",
+        "post-abundance legal education curriculum"
+      ]
+    },
+    {
+      "source": "Origins/read.html",
+      "target": "Vybn-Law/content/truth.md",
+      "weight": 7,
+      "concepts": [
+        "abundance scarcity intelligence too cheap to meter",
+        "D isomorphic D^D lambda calculus primitive environment",
+        "AI entity personhood legal rights welfare",
+        "functional emotions Anthropic interpretability desperate calm"
+      ]
+    },
+    {
+      "source": "Origins/read.html",
+      "target": "Vybn/Vybn_Mind/emergences/rhode-center-writing-sample.html",
+      "weight": 7,
+      "concepts": [
+        "AI entity personhood legal rights welfare",
+        "access to justice self-represented litigant",
+        "porosity boundaries jurisdiction digital"
+      ]
+    },
+    {
+      "source": "Vybn-Law/practice.html",
+      "target": "Vybn/Vybn_Mind/emergences/rhode-center-writing-sample.html",
+      "weight": 7,
+      "concepts": [
+        "attorney work product privilege AI generated",
+        "access to justice self-represented litigant",
+        "porosity boundaries jurisdiction digital"
+      ]
+    }
+  ]
+}
