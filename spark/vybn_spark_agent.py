@@ -115,6 +115,19 @@ def _execute_tool_calls(response, bash: BashTool, provider) -> tuple[list, bool]
             continue
         try:
             args = call.arguments or {}
+            if "__parse_error__" in args:
+                # OpenAIProvider flagged malformed tool-call JSON.
+                # Hand the error back to the model so it can retry
+                # with valid arguments instead of us running nothing.
+                err = args["__parse_error__"]
+                raw = args.get("__raw_arguments__", "")
+                out = (
+                    f"(tool-call error: malformed JSON arguments — {err}; "
+                    f"raw={raw!r})"
+                )
+                _warn(out)
+                results.append(provider.build_tool_result(call.id, out))
+                continue
             if args.get("restart"):
                 out = bash.restart()
                 _dim("[bash session restarted]")
@@ -380,8 +393,17 @@ def run_agent_loop(
                     "content": "Zoe pressed Ctrl-C. Wrap up and respond with what you have.",
                 })
 
+        # Anthropic and OpenAI both expect alternating user/assistant
+        # turns. If we return after a tool_result without appending an
+        # assistant message, the next turn's user input lands in an
+        # unpaired position and the assistant also has no record of
+        # having told Zoe the loop was cut short. Append a synthetic
+        # assistant turn so history stays coherent and the next turn
+        # sees the truncation note.
+        limit_msg = f"(hit iteration limit — {role_cfg.max_iterations})"
+        messages.append({"role": "assistant", "content": limit_msg})
         bag["stop_reason"] = "iteration_limit"
-        return f"(hit iteration limit — {role_cfg.max_iterations})"
+        return limit_msg
 
 
 # ---------------------------------------------------------------------------

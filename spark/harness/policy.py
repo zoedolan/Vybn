@@ -75,7 +75,7 @@ _DEFAULT_ROLES: dict[str, RoleConfig] = {
     "create": RoleConfig(
         role="create",
         provider="anthropic",
-        model="claude-opus-4-6",
+        model="claude-sonnet-4-6",
         thinking="off",
         max_tokens=8192,
         max_iterations=3,
@@ -85,7 +85,7 @@ _DEFAULT_ROLES: dict[str, RoleConfig] = {
     "chat": RoleConfig(
         role="chat",
         provider="anthropic",
-        model="claude-opus-4-6",
+        model="claude-sonnet-4-6",
         thinking="off",
         max_tokens=4096,
         max_iterations=1,
@@ -108,8 +108,8 @@ _DEFAULT_ROLES: dict[str, RoleConfig] = {
     # the `code` role (Claude Opus 4.7) via heuristics below.
     "orchestrate": RoleConfig(
         role="orchestrate",
-        provider="openai",
-        model="gpt-5.4",
+        provider="anthropic",
+        model="claude-sonnet-4-6",
         thinking="off",
         max_tokens=4096,
         max_iterations=1,
@@ -166,6 +166,14 @@ _DEFAULT_ROLES: dict[str, RoleConfig] = {
 }
 
 _DEFAULT_HEURISTICS_RAW: dict[str, list[str]] = {
+    # Confirm -- bare execution signals after a plan. Must route
+    # to task (Sonnet+bash), never orchestrate (no tools).
+    "task": [
+        r'^\\s*(ok|okay|ok+y|k|kk|yep|yes|yeah|yup|aye)\\s*[!.,?]*\\s*$',
+        r'^\\s*(proceed|go ahead|do it|continue|execute|go for it|ship it)\\s*[!.,?]*\\s*$',
+        r'^\\s*(sure|sounds good|looks good|makes sense|perfect|great)\\s*[!.,?]*\\s*$',
+        r"^\\s*let'?s go\\s*[!.,?]*\\s*$",
+    ],
     # Identity is matched before phatic/chat so "which model are you?"
     # lands on a direct metadata answer instead of a greeting path.
     "identity": [
@@ -218,7 +226,7 @@ _DEFAULT_FALLBACK: dict[str, list[str]] = {
     "claude-opus-4-7": ["claude-opus-4-6", "claude-sonnet-4-6"],
     "claude-opus-4-6": ["claude-sonnet-4-6"],
     "claude-sonnet-4-6": ["claude-opus-4-6"],
-    "gpt-5.4": ["claude-opus-4-6"],
+    "gpt-5.4": ["claude-sonnet-4-6", "claude-opus-4-6"],
 }
 
 _DEFAULT_BUDGETS: dict[str, float] = {
@@ -242,7 +250,7 @@ def default_policy() -> Policy:
         directives=dict(_DEFAULT_DIRECTIVES),
         fallback_chain=dict(_DEFAULT_FALLBACK),
         budgets=dict(_DEFAULT_BUDGETS),
-        default_role="orchestrate",
+        default_role="task",
     )
 
 

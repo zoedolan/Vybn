@@ -235,20 +235,39 @@ class AnthropicProvider:
 
         stream_cm = self.client.messages.stream(**kwargs)
         stream = stream_cm.__enter__()
+        closed = {"v": False}
+
+        def _close() -> None:
+            # Idempotent: __exit__ is called from whichever of _iter or
+            # _final runs to completion or raises first. Without this,
+            # a KeyboardInterrupt during streaming leaks the SDK
+            # context (open HTTP connection, unreleased locks) because
+            # _final() is never invoked.
+            if closed["v"]:
+                return
+            closed["v"] = True
+            try:
+                stream_cm.__exit__(None, None, None)
+            except Exception:
+                pass
 
         def _iter() -> Iterator[tuple[str, str]]:
-            for event in stream:
-                kind = getattr(event, "type", "")
-                if kind == "thinking":
-                    yield ("thinking", "")
-                elif kind == "text":
-                    yield ("text", getattr(event, "text", ""))
+            try:
+                for event in stream:
+                    kind = getattr(event, "type", "")
+                    if kind == "thinking":
+                        yield ("thinking", "")
+                    elif kind == "text":
+                        yield ("text", getattr(event, "text", ""))
+            except BaseException:
+                _close()
+                raise
 
         def _final() -> NormalizedResponse:
             try:
                 msg = stream.get_final_message()
             finally:
-                stream_cm.__exit__(None, None, None)
+                _close()
             calls: list[ToolCall] = []
             text_parts: list[str] = []
             for block in msg.content:
@@ -352,6 +371,11 @@ class OpenAIProvider:
             elif role == "assistant" and not isinstance(content, str):
                 text_parts: list[str] = []
                 tool_calls: list[dict] = []
+                # Anthropic "thinking" / "redacted_thinking" blocks
+                # have no OpenAI equivalent. If the code role (Opus
+                # with adaptive thinking) runs, fails, and falls back
+                # to Sonnet or GPT, the cloud endpoint would reject
+                # the thinking blocks. Silently drop unknown types.
                 for block in content or []:
                     btype = getattr(block, "type", None) or (
                         block.get("type") if isinstance(block, dict) else None
@@ -487,10 +511,17 @@ class OpenAIProvider:
         calls = []
         for tc in tool_calls_raw:
             fn = tc.get("function") or {}
+            raw_args = fn.get("arguments") or "{}"
             try:
-                args = json.loads(fn.get("arguments") or "{}")
-            except Exception:
-                args = {}
+                args = json.loads(raw_args)
+            except Exception as json_exc:
+                # Surface malformed tool-call JSON via sentinel keys so
+                # the agent loop can hand a real error back to the
+                # model instead of silently running an empty command.
+                args = {
+                    "__parse_error__": str(json_exc),
+                    "__raw_arguments__": raw_args[:400],
+                }
             calls.append(ToolCall(
                 id=tc.get("id", ""),
                 name=fn.get("name", ""),

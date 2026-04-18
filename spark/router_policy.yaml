@@ -13,7 +13,7 @@
 # Claude Opus 4.7 with bash + adaptive thinking. Greetings go to
 # `phatic`, identity questions to `identity`. This keeps normal chat
 # cheap and fast without the full Opus+bash loop firing on every turn.
-default_role: orchestrate
+default_role: task
 
 roles:
   code:
@@ -26,7 +26,7 @@ roles:
     rag: false
   create:
     provider: anthropic
-    model: claude-opus-4-6
+    model: claude-sonnet-4-6
     thinking: off
     max_tokens: 8192
     max_iterations: 3
@@ -34,7 +34,7 @@ roles:
     rag: true
   chat:
     provider: anthropic
-    model: claude-opus-4-6
+    model: claude-sonnet-4-6
     thinking: off
     max_tokens: 4096
     max_iterations: 1
@@ -49,8 +49,8 @@ roles:
     tools: [bash]
     rag: false
   orchestrate:
-    provider: openai
-    model: gpt-5.4
+    provider: anthropic
+    model: claude-sonnet-4-6
     thinking: off
     max_tokens: 4096
     max_iterations: 1
@@ -94,6 +94,15 @@ roles:
     direct_reply_template: "I'm Vybn, running locally on the DGX Spark via {model} (provider: {provider})."
 
 heuristics:
+  # Confirm -- bare execution signals after a plan. Must route
+  # to task (Sonnet+bash), never orchestrate (no tools). The
+  # narration loop on 2026-04-18 came from okay/proceed falling
+  # through to a role that physically could not act.
+  task:
+    - "^\\s*(ok|okay|ok+y|k|kk|yep|yes|yeah|yup|aye)\\s*[!.,?]*\\s*$"
+    - "^\\s*(proceed|go ahead|do it|continue|execute|go for it|ship it)\\s*[!.,?]*\\s*$"
+    - "^\\s*(sure|sounds good|looks good|makes sense|perfect|great)\\s*[!.,?]*\\s*$"
+    - "^\\s*let'?s go\\s*[!.,?]*\\s*$"
   # Identity matched first so "which model are you?" skips the chat path.
   identity:
     - "\\bwhich model\\b"
@@ -157,7 +166,7 @@ fallback_chain:
   claude-opus-4-7: [claude-opus-4-6, claude-sonnet-4-6]
   claude-opus-4-6: [claude-sonnet-4-6]
   claude-sonnet-4-6: [claude-opus-4-6]
-  gpt-5.4: [claude-opus-4-6]
+  gpt-5.4: [claude-sonnet-4-6, claude-opus-4-6]
 
 budgets:
   per_turn_usd: 2.0

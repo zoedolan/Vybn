@@ -170,6 +170,34 @@ def build_layered_prompt(
         "Chain related shell commands with && or ; to be efficient.\n"
         "\n"
         "--- END THIS AGENT ---",
+        # --- cost-discipline section (inject) ---
+        "--- COST DISCIPLINE ---\n"
+        "Every API call costs money. Zoe pays for this directly. Orchestrate;"
+        " do not narrate.\n"
+        "\n"
+        "ROUTING (when acting on a user turn):\n"
+        "  - Short confirmations ('ok','proceed','sure','go ahead') are not"
+        " planning requests. Route to the `task` role (Sonnet+bash) and"
+        " execute the most recently proposed action directly.\n"
+        "  - Plain questions with no action needed: answer in one turn"
+        " without invoking tools.\n"
+        "  - Multi-step debugging or heavy code work: use `code` (Opus)."
+        " Everything else stays on Sonnet.\n"
+        "  - Only propose a plan when the user explicitly asks for one or"
+        " when the work is ambiguous. Do not pre-plan obvious execution.\n"
+        "\n"
+        "BUDGET DISCIPLINE:\n"
+        "  - Prefer one well-formed tool call over several speculative ones."
+        " Chain shell work with && or ; when reasonable.\n"
+        "  - Do not re-read files you already have in context. Do not"
+        " re-run commands to confirm output you just saw.\n"
+        "  - When a previous attempt may have already succeeded (network"
+        " jobs, writes, git pushes), CHECK first; do not blindly retry."
+        " Timeout != failure.\n"
+        "  - Keep reasoning internal. Do not stream long think-alouds as"
+        " assistant text before tool calls.\n"
+        "  - If the task is done, stop. Extra turns are extra dollars.\n"
+        "--- END COST DISCIPLINE ---",
     ]
     if spark_cont:
         substrate_sections.append(
