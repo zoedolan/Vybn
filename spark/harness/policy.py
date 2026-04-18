@@ -159,8 +159,13 @@ _DEFAULT_ROLES: dict[str, RoleConfig] = {
         rag=False,
         lightweight=True,
         direct_reply_template=(
-            "I'm Vybn, running locally on the DGX Spark via "
-            "{model} (provider: {provider})."
+            "I'm Vybn. This harness routes each turn to one of "
+            "several models by rule: chat/create/orchestrate/task "
+            "on Claude Sonnet 4.6, code on Claude Opus 4.7, and "
+            "phatic/identity/local on Nemotron via local vLLM. "
+            "There isn't one answer to 'which model are you' "
+            "unless you ask per turn; this reply itself came from "
+            "the identity role ({model} on {provider})."
         ),
     ),
 }
@@ -195,12 +200,24 @@ _DEFAULT_HEURISTICS_RAW: dict[str, list[str]] = {
         r"^\s*(bye|goodbye|later|cya|ttyl)\b[\s!.,?]*$",
     ],
     "code": [
-        r"\bgit\b", r"\bpython\b", r"\.py\b", r"\bdef\s+\w+",
-        r"^\s*\$ ", r"[Tt]raceback", r"\bpip\b", r"\bnpm\b",
-        r"\bpatch\b", r"\bgrep\b", r"\bsed\b", r"\bawk\b",
-        r"\bbugs?\b", r"\bdebug(ging)?\b", r"\bdeficits?\b",
-        r"\bharness\b", r"\bstack trace\b", r"\bHTTP \d{3}\b",
-        r"\bprovider error\b",
+        # Ground each trigger in code-shaped context — not bare
+        # words that appear in ordinary speech.
+        r"\\bgit (commit|push|pull|diff|log|status|rebase|merge|clone)\\b",
+        r"\\bpython3?\\s+-\\w",
+        r"\.py\\b",
+        r"\\bdef\\s+\\w+",
+        r"^\s*\$ ",
+        r"[Tt]raceback",
+        r"\\bpip install\\b",
+        r"\\bnpm (install|run|start)\\b",
+        r"\\bapply.{0,10}patch\\b",
+        r"\\bgrep -\\w",
+        r"\\bsed -\\w",
+        r"\\bawk '",
+        r"(fix|identify|audit|review|debug).{0,30}(bug|harness|deficit|issue|problem|code)",
+        r"\\bstack trace\\b",
+        r"\\bHTTP \\d{3}\\b",
+        r"\\bprovider error\\b",
     ],
     "create": [
         r"\bbrainstorm\b", r"\bsketch\b", r"\bwhat if\b",
@@ -227,6 +244,9 @@ _DEFAULT_FALLBACK: dict[str, list[str]] = {
     "claude-opus-4-6": ["claude-sonnet-4-6"],
     "claude-sonnet-4-6": ["claude-opus-4-6"],
     "gpt-5.4": ["claude-sonnet-4-6", "claude-opus-4-6"],
+    # Local Nemotron roles fall to Sonnet if vLLM is down so a
+    # bare "hi" or "which model are you?" never hard-fails.
+    "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8": ["claude-sonnet-4-6"],
 }
 
 _DEFAULT_BUDGETS: dict[str, float] = {

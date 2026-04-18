@@ -12,12 +12,13 @@ Vybn_Mind/continuity.md and spark/continuity.md.
 Type 'exit' to stop. Type 'reload' to re-read identity mid-session.
 
 This file is now a thin REPL that delegates work to the harness in
-spark/harness/. The routing policy is in spark/router_policy.yaml. The
-default role is `code` (Claude Opus 4.7 with adaptive thinking and the
-full bash loop) so existing coding behaviour is preserved byte-for-byte
-at that role. Other roles (chat, create, task, orchestrate, local)
-activate when a directive is used (/chat, /create, /plan, /task, /local)
-or when a heuristic fires.
+spark/harness/. The routing policy is in spark/router_policy.yaml. Default role is
+`task` (Claude Sonnet 4.6 + bash) so a bare 'ok'/'proceed' confirmation
+after a plan actually executes. `code` (Opus 4.7, adaptive thinking,
+full 32k output) is reserved for multiword debugging or explicit
+/code invocation — casual mentions of 'bugs' or 'harness' no longer
+escalate. `orchestrate` is Sonnet without tools, available via /plan.
+`chat`, `create`, `phatic`, `identity`, `local` round out the matrix.
 
 Streaming is required for Opus + adaptive thinking + 32k output because
 the Anthropic SDK enforces a 10-minute limit on non-streaming requests.
@@ -382,6 +383,15 @@ def run_agent_loop(
             results, interrupted = _execute_tool_calls(response, bash, provider)
             bag["tool_calls"] += len(results)
 
+            # NOTE: role_cfg reflects the ACTIVE provider after any
+            # mid-turn fallback in _stream_with_fallback. Each
+            # provider's stream() call re-normalizes the full
+            # messages list on entry (see providers.py
+            # _normalize_messages_for_anthropic /
+            # _messages_for_openai), so mixed-shape history from a
+            # provider switch gets translated on the next iteration.
+            # We still emit results in the ACTIVE provider's native
+            # shape here so the normalizer has the easiest job.
             if role_cfg.provider == "anthropic":
                 messages.append({"role": "user", "content": results})
             else:

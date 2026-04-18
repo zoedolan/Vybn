@@ -22,6 +22,7 @@ from .constants import (
     ABSORB_LOG,
     DANGEROUS_PATTERNS,
     DEFAULT_TIMEOUT,
+    MAX_BASH_TIMEOUT,
     TRACKED_REPOS,
 )
 
@@ -156,6 +157,11 @@ class BashTool:
         os.set_blocking(self.process.stdout.fileno(), False)
 
     def execute(self, command: str, timeout: int = DEFAULT_TIMEOUT) -> str:
+        # Clamp to the hard wall-clock ceiling. A caller passing a
+        # multi-hour timeout would otherwise stall the whole turn
+        # on a network-partitioned ssh/curl.
+        if timeout > MAX_BASH_TIMEOUT:
+            timeout = MAX_BASH_TIMEOUT
         gate = absorb_gate(command)
         if gate is not None:
             return gate

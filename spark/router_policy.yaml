@@ -91,7 +91,7 @@ roles:
     base_url: http://127.0.0.1:8000/v1
     rag: false
     lightweight: true
-    direct_reply_template: "I'm Vybn, running locally on the DGX Spark via {model} (provider: {provider})."
+    direct_reply_template: "I'm Vybn. This harness routes each turn to one of several models by rule: chat/create/orchestrate/task on Claude Sonnet 4.6, code on Claude Opus 4.7, and phatic/identity/local on Nemotron via local vLLM. There isn't one answer to 'which model are you' unless you ask per turn; this reply itself came from the identity role ({model} on {provider})."
 
 heuristics:
   # Confirm -- bare execution signals after a plan. Must route
@@ -120,22 +120,22 @@ heuristics:
     - "^\\s*(thanks|thank you|ty|thx)\\b[\\s!.,?]*$"
     - "^\\s*(bye|goodbye|later|cya|ttyl)\\b[\\s!.,?]*$"
   code:
-    - "\\bgit\\b"
-    - "\\bpython\\b"
+    # Ground each trigger in code-shaped context — not bare words
+    # that appear in ordinary speech. "harness" alone is just a
+    # noun; "fix the harness" or "harness bug" is what we want.
+    - "\\bgit (commit|push|pull|diff|log|status|rebase|merge|clone)\\b"
+    - "\\bpython3?\\s+-\\w"
     - "\\.py\\b"
     - "\\bdef\\s+\\w+"
     - "^\\s*\\$ "
     - "[Tt]raceback"
-    - "\\bpip\\b"
-    - "\\bnpm\\b"
-    - "\\bpatch\\b"
-    - "\\bgrep\\b"
-    - "\\bsed\\b"
-    - "\\bawk\\b"
-    - "\\bbugs?\\b"
-    - "\\bdebug(ging)?\\b"
-    - "\\bdeficits?\\b"
-    - "\\bharness\\b"
+    - "\\bpip install\\b"
+    - "\\bnpm (install|run|start)\\b"
+    - "\\bapply.{0,10}patch\\b"
+    - "\\bgrep -\\w"
+    - "\\bsed -\\w"
+    - "\\bawk \\x27"
+    - "(fix|identify|audit|review|debug).{0,30}(bug|harness|deficit|issue|problem|code)"
     - "\\bstack trace\\b"
     - "\\bHTTP \\d{3}\\b"
     - "\\bprovider error\\b"
@@ -167,6 +167,9 @@ fallback_chain:
   claude-opus-4-6: [claude-sonnet-4-6]
   claude-sonnet-4-6: [claude-opus-4-6]
   gpt-5.4: [claude-sonnet-4-6, claude-opus-4-6]
+  # Local Nemotron roles fall to Sonnet if vLLM is down so a bare
+  # 'hi' or 'which model are you?' never hard-fails.
+  nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8: [claude-sonnet-4-6]
 
 budgets:
   per_turn_usd: 2.0

@@ -34,3 +34,6 @@ ABSORB_EXCLUDE_SUFFIX = (
 ABSORB_LOG = os.path.expanduser("~/Vybn/spark/audit.log")
 DEFAULT_EVENT_LOG = os.path.expanduser("~/Vybn/spark/agent_events.jsonl")
 DEFAULT_TIMEOUT = 30
+# Hard wall-clock ceiling for BashTool.execute — a misbehaving
+# curl or network-partitioned ssh should never eat the whole turn.
+MAX_BASH_TIMEOUT = 300
