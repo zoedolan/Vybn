@@ -1,339 +1,470 @@
 #!/usr/bin/env python3
 """
-Map one or more repositories in full, then surface structural discoveries.
+repo_mapper.py  v2
+==================
+Walk one or more repos, read every text file, and surface what is
+actually in the codebase: function/class names, headings, imports,
+explicit cross-references, TODO/FIXME markers, duplicate content,
+the largest files, the files that changed most recently, and the
+concepts that recur across repo boundaries.
 
-Designed for the Vybn constellation, but generic enough for any local repo tree.
-It walks every file under each repo, infers coarse roles from names/extensions/paths,
-and produces:
-
-- repo_map.json         full machine-readable map
-- repo_report.md        narrative findings
-- repo_graph.json       nodes/edges for later visualization
+Outputs to ./repo_mapping_output/
+  repo_map.json       — machine-readable full record
+  repo_graph.json     — concept graph (nodes + edges, importable into networkx / gephi)
+  repo_report.md      — readable findings
 
 Usage:
-    python repo_mapper.py /path/to/repo1 /path/to/repo2
-
-If no paths are passed, defaults to sibling/local directories commonly used here:
-    ~/Vybn ~/Vybn-Law ~/vybn-phase ~/Him
+    python3 repo_mapper.py                       # auto-finds ~/Vybn ~/Vybn-Law ~/vybn-phase ~/Him
+    python3 repo_mapper.py ~/Vybn ~/Vybn-Law     # explicit repos
 """
 
 from __future__ import annotations
 
+import ast
+import hashlib
 import json
-import math
 import mimetypes
 import os
 import re
 import statistics
 import sys
 from collections import Counter, defaultdict
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional
+from typing import Dict, List, Optional, Tuple
+
+# ── constants ────────────────────────────────────────────────────────────────
 
 TEXT_EXTS = {
     ".py", ".md", ".txt", ".json", ".yaml", ".yml", ".toml", ".ini", ".cfg",
     ".sh", ".bash", ".zsh", ".js", ".ts", ".tsx", ".jsx", ".css", ".scss",
-    ".html", ".htm", ".sql", ".csv", ".tsv", ".xml", ".rst", ".env", ".gitignore",
+    ".html", ".htm", ".sql", ".csv", ".tsv", ".xml", ".rst", ".env",
 }
 
 IGNORE_DIRS = {
-    ".git", "node_modules", "__pycache__", ".pytest_cache", ".mypy_cache", ".venv",
-    "venv", "dist", "build", ".next", ".idea", ".vscode", ".DS_Store",
+    ".git", "node_modules", "__pycache__", ".pytest_cache", ".mypy_cache",
+    ".venv", "venv", "dist", "build", ".next", ".idea", ".vscode",
 }
 
-DOC_HINTS = {
-    "readme", "theory", "continuity", "memoir", "history", "idea", "problem",
-    "logic", "bio", "manifesto", "vision", "notes", "journal",
-}
+READ_SIZE_LIMIT = 200_000   # bytes — skip binary blobs above this
+SNIPPET_LEN     = 120        # chars per snippet in report
 
-STATE_HINTS = {
-    "state", "map", "memory", "continuity", "ground", "synaptic", "geometric",
-}
-
-WEB_HINTS = {"index", "portal", "site", "landing", "horizon"}
-
-API_HINTS = {"api", "server", "app", "service"}
+# ── data model ───────────────────────────────────────────────────────────────
 
 @dataclass
 class FileRecord:
-    repo: str
-    relpath: str
-    ext: str
-    size: int
-    depth: int
-    role: str
-    mime: str
-    is_text_like: bool
-    tokens: List[str]
+    repo:         str
+    relpath:      str
+    ext:          str
+    size:         int
+    depth:        int
+    mtime:        float
+    content_hash: str
+    # extracted
+    headings:     List[str] = field(default_factory=list)
+    py_defs:      List[str] = field(default_factory=list)   # functions + classes
+    py_imports:   List[str] = field(default_factory=list)
+    todos:        List[str] = field(default_factory=list)
+    cross_refs:   List[str] = field(default_factory=list)   # mentions of other repo names
+    concept_freq: Dict[str, int] = field(default_factory=dict)  # word → count in file
+    read_error:   Optional[str] = None
 
 
-def tokenize(path: str) -> List[str]:
-    return [t.lower() for t in re.findall(r"[A-Za-z0-9']+", path)]
+# ── helpers ──────────────────────────────────────────────────────────────────
 
+STOPWORDS = {
+    "the","a","an","and","or","of","to","in","is","it","that","for",
+    "on","with","as","at","by","from","this","be","are","was","were",
+    "have","has","not","but","if","do","so","we","you","he","she","they",
+    "i","my","our","your","its","their","will","can","all","one","more",
+    "also","than","when","up","out","about","into","then","no","what",
+    "there","been","which","would","could","should","may","might","each",
+    "these","those","them","him","her","his","some","any","just","like",
+    "use","using","used","new","get","set","add","run","make","via",
+    "how","who","why","where","after","before","over","under","within",
+    "return","import","from","class","def","self","true","false","none",
+    "pass","raise","else","elif","except","try","with","yield","async",
+    "await","lambda","global","del","assert","break","continue","while","for",
+    "print","type","list","dict","str","int","bool","path","file","data",
+    "value","values","key","keys","name","names","line","lines","text","item",
+    "items","result","results","output","input","error","args","kwargs",
+    "config","content","html","json","yaml","md","py","sh","css","js","ts",
+}
 
-def is_probably_text(path: Path) -> bool:
-    if path.suffix.lower() in TEXT_EXTS:
-        return True
-    mime, _ = mimetypes.guess_type(str(path))
-    return bool(mime and (mime.startswith("text/") or mime in {"application/json", "application/xml"}))
+def tokenize_words(text: str, min_len: int = 4) -> List[str]:
+    return [w.lower() for w in re.findall(r"[A-Za-z][a-z'A-Z]*", text)
+            if len(w) >= min_len and w.lower() not in STOPWORDS]
 
+def md5(text: str) -> str:
+    return hashlib.md5(text.encode("utf-8", errors="replace")).hexdigest()[:12]
 
-def classify_role(relpath: str, ext: str, tokens: List[str]) -> str:
-    token_set = set(tokens)
-    name = Path(relpath).name.lower()
+def extract_md_headings(text: str) -> List[str]:
+    return [m.group(1).strip() for m in re.finditer(r"^#{1,4}\s+(.+)", text, re.MULTILINE)]
 
-    if ext in {".md", ".rst", ".txt"} or token_set & DOC_HINTS:
-        return "documentation"
-    if ext in {".json", ".yaml", ".yml", ".toml", ".ini", ".cfg"} and token_set & STATE_HINTS:
-        return "state_or_schema"
-    if ext in {".json", ".yaml", ".yml", ".toml", ".ini", ".cfg"}:
-        return "configuration"
-    if ext in {".html", ".css", ".scss", ".js", ".ts", ".jsx", ".tsx"} and (token_set & WEB_HINTS or "index" in name):
-        return "web_surface"
-    if ext == ".html":
-        return "web_surface"
-    if ext == ".py" and token_set & API_HINTS:
-        return "service_or_api"
-    if ext == ".py":
-        return "python_logic"
-    if ext in {".sh", ".bash", ".zsh"}:
-        return "automation"
-    if ext in {".csv", ".tsv", ".sql"}:
-        return "data_or_query"
-    return "other"
+def extract_py_defs(text: str) -> List[str]:
+    try:
+        tree = ast.parse(text)
+        return [n.name for n in ast.walk(tree)
+                if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))]
+    except SyntaxError:
+        return [m.group(1) for m in re.finditer(r"^(?:def|class)\s+(\w+)", text, re.MULTILINE)]
 
+def extract_py_imports(text: str) -> List[str]:
+    imports = []
+    for m in re.finditer(r"^(?:import|from)\s+([\w.]+)", text, re.MULTILINE):
+        imports.append(m.group(1).split(".")[0])
+    return list(dict.fromkeys(imports))
 
-def iter_files(repo_root: Path) -> Iterable[Path]:
+def extract_todos(text: str) -> List[str]:
+    return [m.group(0).strip()[:SNIPPET_LEN]
+            for m in re.finditer(r"(?:TODO|FIXME|HACK|XXX|NOTE)[:\s].{0,100}", text, re.IGNORECASE)]
+
+def extract_cross_refs(text: str, all_repo_names: List[str]) -> List[str]:
+    found = []
+    for name in all_repo_names:
+        if re.search(re.escape(name), text, re.IGNORECASE):
+            found.append(name)
+    return found
+
+def read_text(path: Path) -> Tuple[Optional[str], Optional[str]]:
+    if path.stat().st_size > READ_SIZE_LIMIT:
+        return None, "too_large"
+    for enc in ("utf-8", "latin-1"):
+        try:
+            return path.read_text(encoding=enc, errors="strict"), None
+        except (UnicodeDecodeError, PermissionError):
+            continue
+    return None, "decode_error"
+
+# ── file walker ──────────────────────────────────────────────────────────────
+
+def iter_text_paths(repo_root: Path):
     for root, dirs, files in os.walk(repo_root):
-        dirs[:] = [d for d in dirs if d not in IGNORE_DIRS]
-        for f in files:
+        dirs[:] = [d for d in sorted(dirs) if d not in IGNORE_DIRS]
+        for f in sorted(files):
             path = Path(root) / f
-            if any(part in IGNORE_DIRS for part in path.parts):
-                continue
-            yield path
+            if path.suffix.lower() in TEXT_EXTS:
+                yield path
 
-
-def build_records(repo_root: Path) -> List[FileRecord]:
-    out: List[FileRecord] = []
-    for path in iter_files(repo_root):
-        rel = str(path.relative_to(repo_root))
-        ext = path.suffix.lower()
-        tokens = tokenize(rel)
-        out.append(
-            FileRecord(
-                repo=repo_root.name,
-                relpath=rel,
-                ext=ext,
-                size=path.stat().st_size,
-                depth=len(Path(rel).parts),
-                role=classify_role(rel, ext, tokens),
-                mime=mimetypes.guess_type(str(path))[0] or "unknown",
-                is_text_like=is_probably_text(path),
-                tokens=tokens,
-            )
+def build_records(repo_root: Path, all_repo_names: List[str]) -> List[FileRecord]:
+    records = []
+    for path in iter_text_paths(repo_root):
+        rel  = str(path.relative_to(repo_root))
+        ext  = path.suffix.lower()
+        stat = path.stat()
+        text, err = read_text(path)
+        rec = FileRecord(
+            repo         = repo_root.name,
+            relpath      = rel,
+            ext          = ext,
+            size         = stat.st_size,
+            depth        = len(Path(rel).parts),
+            mtime        = stat.st_mtime,
+            content_hash = md5(text) if text else "",
+            read_error   = err,
         )
-    return sorted(out, key=lambda r: (r.repo, r.relpath))
+        if text:
+            rec.headings   = extract_md_headings(text) if ext in {".md", ".rst", ".txt"} else []
+            rec.py_defs    = extract_py_defs(text)     if ext == ".py" else []
+            rec.py_imports = extract_py_imports(text)  if ext == ".py" else []
+            rec.todos      = extract_todos(text)
+            rec.cross_refs = extract_cross_refs(text, all_repo_names)
+            words          = tokenize_words(text)
+            freq           = Counter(words)
+            rec.concept_freq = dict(freq.most_common(30))
+        records.append(rec)
+    return records
 
+# ── analysis ─────────────────────────────────────────────────────────────────
 
-def depth_profile(records: List[FileRecord]) -> Dict[str, float]:
-    depths = [r.depth for r in records] or [0]
-    return {
-        "min": min(depths),
-        "max": max(depths),
-        "mean": round(statistics.mean(depths), 3),
-        "median": round(statistics.median(depths), 3),
-    }
+def duplicate_files(all_records: List[FileRecord]) -> List[Dict]:
+    by_hash: Dict[str, List[FileRecord]] = defaultdict(list)
+    for r in all_records:
+        if r.content_hash:
+            by_hash[r.content_hash].append(r)
+    dupes = []
+    for h, group in by_hash.items():
+        if len(group) > 1:
+            dupes.append({
+                "hash":  h,
+                "files": [f"{r.repo}/{r.relpath}" for r in group],
+                "size":  group[0].size,
+            })
+    return sorted(dupes, key=lambda x: -x["size"])
 
+def largest_files(records: List[FileRecord], n: int = 15) -> List[Dict]:
+    return [{"file": f"{r.repo}/{r.relpath}", "size": r.size}
+            for r in sorted(records, key=lambda r: -r.size)[:n]]
 
-def concentration(counter: Counter) -> float:
-    total = sum(counter.values())
-    if total == 0:
-        return 0.0
-    probs = [v / total for v in counter.values()]
-    return round(sum(p * p for p in probs), 4)
+def most_recently_changed(records: List[FileRecord], n: int = 15) -> List[Dict]:
+    import datetime
+    return [{"file": f"{r.repo}/{r.relpath}",
+             "mtime": datetime.datetime.fromtimestamp(r.mtime).strftime("%Y-%m-%d %H:%M")}
+            for r in sorted(records, key=lambda r: -r.mtime)[:n]]
 
-
-def top_dirs(records: List[FileRecord], n: int = 12) -> List[Dict[str, object]]:
-    c = Counter()
-    for r in records:
-        parts = Path(r.relpath).parts
-        key = parts[0] if len(parts) > 1 else "."
-        c[key] += 1
-    return [{"dir": k, "files": v} for k, v in c.most_common(n)]
-
-
-def lexical_clusters(records: List[FileRecord], min_shared: int = 3) -> List[Dict[str, object]]:
-    bucket = defaultdict(list)
-    for r in records:
-        seen = set()
-        for t in r.tokens:
-            if len(t) >= 4 and t not in seen:
-                bucket[t].append(r.relpath)
-                seen.add(t)
+def all_todos(records: List[FileRecord]) -> List[Dict]:
     out = []
-    for token, files in bucket.items():
-        if len(files) >= min_shared:
-            out.append({"token": token, "count": len(files), "examples": files[:6]})
-    return sorted(out, key=lambda x: (-x["count"], x["token"]))[:30]
+    for r in records:
+        for t in r.todos:
+            out.append({"file": f"{r.repo}/{r.relpath}", "note": t})
+    return out
 
+def cross_repo_references(records: List[FileRecord]) -> List[Dict]:
+    out = []
+    for r in records:
+        for ref in r.cross_refs:
+            if ref != r.repo:
+                out.append({"from": f"{r.repo}/{r.relpath}", "mentions": ref})
+    return out
 
-def derive_discoveries(records: List[FileRecord]) -> List[str]:
-    roles = Counter(r.role for r in records)
-    names = Counter(Path(r.relpath).name.lower() for r in records)
-    clusters = lexical_clusters(records)
-    discoveries: List[str] = []
+def global_concept_cloud(records: List[FileRecord], top: int = 60) -> List[Dict]:
+    total: Counter = Counter()
+    for r in records:
+        total.update(r.concept_freq)
+    return [{"word": w, "count": c} for w, c in total.most_common(top)]
 
-    if roles["documentation"] >= roles["python_logic"]:
-        discoveries.append(
-            "The repo behaves less like a conventional code-first project and more like a documentation-native system whose executable parts sit inside an explicit conceptual frame."
-        )
-    if roles["state_or_schema"] >= 2 and roles["documentation"] >= 3:
-        discoveries.append(
-            "There is a recurring pattern of pairing prose with machine-legible state, suggesting the codebase treats memory, continuity, and internal state as first-class architectural objects rather than incidental artifacts."
-        )
-    if roles["web_surface"] >= 3 and roles["service_or_api"] >= 1:
-        discoveries.append(
-            "The structure shows a braided stack: public-facing surfaces, API/service code, and reflective documents coexist in the same tree instead of being sharply separated."
-        )
-    if any("continuity" in Path(r.relpath).name.lower() for r in records):
-        discoveries.append(
-            "The repeated presence of continuity files points to an unusual temporal architecture: the repo is designed to preserve handoff, self-description, and ongoing orientation across sessions or instances."
-        )
-    if any("synaptic" in r.relpath.lower() or "geometric" in r.relpath.lower() for r in records):
-        discoveries.append(
-            "Naming conventions imply the system is conceived partly as a cognitive topology, not merely a software package; the map/state layer appears metaphorically important to the implementation."
-        )
-    if clusters:
-        discoveries.append(
-            f"The strongest lexical clusters ({', '.join(c['token'] for c in clusters[:5])}) reveal that repeated concepts are organizing the filesystem itself, not just the contents of individual files."
-        )
-    return discoveries
+def all_py_defs(records: List[FileRecord]) -> List[Dict]:
+    out = []
+    for r in records:
+        for d in r.py_defs:
+            out.append({"file": f"{r.repo}/{r.relpath}", "name": d})
+    return out
 
+def import_inventory(records: List[FileRecord]) -> List[Dict]:
+    counter: Counter = Counter()
+    for r in records:
+        for imp in r.py_imports:
+            counter[imp] += 1
+    return [{"package": k, "used_in": v} for k, v in counter.most_common(40)]
 
-def build_graph(records: List[FileRecord]) -> Dict[str, object]:
-    nodes = []
+def all_headings(records: List[FileRecord]) -> List[Dict]:
+    out = []
+    for r in records:
+        for h in r.headings:
+            out.append({"file": f"{r.repo}/{r.relpath}", "heading": h})
+    return out
+
+def build_concept_graph(records: List[FileRecord], top_words: int = 40) -> Dict:
+    """
+    Nodes: top concept-words + repo names + key dirs.
+    Edges: word appears in file (word → repo/dir) with weight = count.
+    """
+    global_top = {e["word"] for e in global_concept_cloud(records, top_words)}
+    nodes = {}
     edges = []
-    role_counts = Counter(r.role for r in records)
-
-    for role, count in role_counts.items():
-        nodes.append({"id": f"role:{role}", "label": role, "kind": "role", "count": count})
-
-    top = Counter(Path(r.relpath).parts[0] if len(Path(r.relpath).parts) > 1 else "." for r in records)
-    for dirname, count in top.items():
-        nodes.append({"id": f"dir:{dirname}", "label": dirname, "kind": "dir", "count": count})
 
     for r in records:
-        dirname = Path(r.relpath).parts[0] if len(Path(r.relpath).parts) > 1 else "."
-        edges.append({"source": f"dir:{dirname}", "target": f"role:{r.role}", "file": r.relpath})
+        rkey = f"repo:{r.repo}"
+        if rkey not in nodes:
+            nodes[rkey] = {"id": rkey, "kind": "repo", "label": r.repo}
+        parts = Path(r.relpath).parts
+        if len(parts) > 1:
+            dkey = f"dir:{r.repo}/{parts[0]}"
+            if dkey not in nodes:
+                nodes[dkey] = {"id": dkey, "kind": "dir", "label": parts[0]}
+            edges.append({"source": rkey, "target": dkey, "weight": 1, "rel": "contains"})
+        for word, count in r.concept_freq.items():
+            if word in global_top:
+                wkey = f"word:{word}"
+                if wkey not in nodes:
+                    nodes[wkey] = {"id": wkey, "kind": "concept", "label": word}
+                edges.append({"source": rkey, "target": wkey, "weight": count, "rel": "uses"})
 
-    return {"nodes": nodes, "edges": edges}
+    return {"nodes": list(nodes.values()), "edges": edges}
 
+# ── report renderer ──────────────────────────────────────────────────────────
 
-def summarize_repo(repo: Path, records: List[FileRecord]) -> Dict[str, object]:
-    role_counts = Counter(r.role for r in records)
-    ext_counts = Counter(r.ext or "[no_ext]" for r in records)
-    text_ratio = round(sum(r.is_text_like for r in records) / max(len(records), 1), 4)
-    return {
-        "repo": repo.name,
-        "root": str(repo),
-        "file_count": len(records),
-        "total_bytes": sum(r.size for r in records),
-        "depth": depth_profile(records),
-        "text_like_ratio": text_ratio,
-        "role_counts": dict(role_counts.most_common()),
-        "role_concentration": concentration(role_counts),
-        "extension_counts": dict(ext_counts.most_common(20)),
-        "top_dirs": top_dirs(records),
-        "lexical_clusters": lexical_clusters(records),
-        "discoveries": derive_discoveries(records),
-    }
+def render_report(
+    repos:       List[Path],
+    records:     List[FileRecord],
+    dupes:       List[Dict],
+    largest:     List[Dict],
+    recent:      List[Dict],
+    todos:       List[Dict],
+    xrefs:       List[Dict],
+    concepts:    List[Dict],
+    defs:        List[Dict],
+    imports:     List[Dict],
+    headings:    List[Dict],
+) -> str:
+    W = []
+    def w(*args): W.append(" ".join(str(a) for a in args))
+    def nl(): W.append("")
 
+    w("# Codebase Map")
+    nl()
+    w(f"Repos scanned: {', '.join(r.name for r in repos)}")
+    w(f"Total text files read: {len(records)}")
+    nl()
 
-def render_report(summaries: List[Dict[str, object]]) -> str:
-    lines = [
-        "# Repository Map Report",
-        "",
-        "This report maps each repository as a whole and then looks for structural signals in how it is conceived.",
-        "",
-    ]
+    # ── per-repo quick stats
+    w("## Per-repo overview")
+    nl()
+    by_repo: Dict[str, List[FileRecord]] = defaultdict(list)
+    for r in records: by_repo[r.repo].append(r)
 
-    for s in summaries:
-        lines += [
-            f"## {s['repo']}",
-            "",
-            f"- Files: {s['file_count']}",
-            f"- Size: {s['total_bytes']} bytes",
-            f"- Text-like ratio: {s['text_like_ratio']}",
-            f"- Depth mean / max: {s['depth']['mean']} / {s['depth']['max']}",
-            f"- Role concentration: {s['role_concentration']}",
-            "",
-            "### Dominant roles",
-            "",
-        ]
-        for role, count in list(s["role_counts"].items())[:8]:
-            lines.append(f"- {role}: {count}")
-        lines += ["", "### Main directories", ""]
-        for row in s["top_dirs"]:
-            lines.append(f"- {row['dir']}: {row['files']} files")
-        lines += ["", "### Discoveries", ""]
-        if s["discoveries"]:
-            for d in s["discoveries"]:
-                lines.append(f"- {d}")
-        else:
-            lines.append("- No strong structural novelty surfaced beyond a standard repository layout.")
-        lines += ["", "### Recurring concepts", ""]
-        if s["lexical_clusters"]:
-            for c in s["lexical_clusters"][:10]:
-                lines.append(f"- {c['token']}: {c['count']} files")
-        else:
-            lines.append("- No large lexical clusters detected.")
-        lines.append("")
+    for repo_name, recs in by_repo.items():
+        total_bytes = sum(r.size for r in recs)
+        exts = Counter(r.ext for r in recs)
+        top_exts = ", ".join(f"{e}({c})" for e,c in exts.most_common(6))
+        n_defs  = sum(len(r.py_defs) for r in recs)
+        n_heads = sum(len(r.headings) for r in recs)
+        n_todos = sum(len(r.todos)   for r in recs)
+        w(f"### {repo_name}")
+        w(f"- {len(recs)} files · {total_bytes:,} bytes")
+        w(f"- Extensions: {top_exts}")
+        w(f"- Python defs (functions+classes): {n_defs}")
+        w(f"- Markdown headings: {n_heads}")
+        w(f"- TODO/FIXME markers: {n_todos}")
+        nl()
 
-    return "\n".join(lines)
+    # ── global concept cloud
+    w("## Global concept cloud (top 40 words across all repos)")
+    nl()
+    w("| word | count |")
+    w("|------|-------|")
+    for e in concepts[:40]:
+        w(f"| {e['word']} | {e['count']} |")
+    nl()
 
+    # ── cross-repo references
+    w("## Cross-repo references")
+    nl()
+    if xrefs:
+        w("Files that explicitly mention another repo by name:")
+        nl()
+        for x in xrefs[:40]:
+            w(f"- `{x['from']}` → mentions **{x['mentions']}**")
+    else:
+        w("No explicit cross-repo text references detected.")
+    nl()
+
+    # ── duplicate content
+    w("## Identical files across repos")
+    nl()
+    if dupes:
+        for d in dupes[:20]:
+            w(f"- hash `{d['hash']}` ({d['size']:,} bytes): {', '.join(d['files'])}")
+    else:
+        w("No exact duplicates found.")
+    nl()
+
+    # ── largest files
+    w("## 15 largest text files")
+    nl()
+    for e in largest:
+        w(f"- `{e['file']}` — {e['size']:,} bytes")
+    nl()
+
+    # ── most recently changed
+    w("## 15 most recently changed")
+    nl()
+    for e in recent:
+        w(f"- `{e['file']}` — {e['mtime']}")
+    nl()
+
+    # ── all Python definitions
+    w("## Python surface area")
+    nl()
+    by_file: Dict[str, List[str]] = defaultdict(list)
+    for d in defs: by_file[d["file"]].append(d["name"])
+    for fname, names in sorted(by_file.items()):
+        w(f"**{fname}**: {', '.join(names)}")
+    nl()
+
+    # ── import inventory
+    w("## Third-party / stdlib imports (most used)")
+    nl()
+    w("| package | files using it |")
+    w("|---------|---------------|")
+    for e in imports[:30]:
+        w(f"| {e['package']} | {e['used_in']} |")
+    nl()
+
+    # ── headings index
+    w("## Document heading index")
+    nl()
+    for h in headings[:80]:
+        w(f"- `{h['file']}` — {h['heading']}")
+    nl()
+
+    # ── todos
+    w("## TODO / FIXME / NOTE markers")
+    nl()
+    if todos:
+        for t in todos[:40]:
+            w(f"- `{t['file']}`: {t['note']}")
+    else:
+        w("None found.")
+    nl()
+
+    return "\n".join(W)
+
+# ── main ─────────────────────────────────────────────────────────────────────
 
 def default_targets() -> List[Path]:
-    homes = [Path("~/Vybn").expanduser(), Path("~/Vybn-Law").expanduser(), Path("~/vybn-phase").expanduser(), Path("~/Him").expanduser()]
-    return [p for p in homes if p.exists()]
-
+    candidates = ["~/Vybn", "~/Vybn-Law", "~/vybn-phase", "~/Him"]
+    return [p for c in candidates if (p := Path(c).expanduser()).exists() and p.is_dir()]
 
 def main(argv: List[str]) -> int:
     targets = [Path(a).expanduser().resolve() for a in argv] if argv else default_targets()
+    targets = [t for t in targets if t.exists() and t.is_dir()]
     if not targets:
-        print("No repositories found. Pass paths explicitly.", file=sys.stderr)
+        print("No repos found. Pass paths explicitly.", file=sys.stderr)
         return 1
 
-    all_records: List[FileRecord] = []
-    summaries: List[Dict[str, object]] = []
+    repo_names = [t.name for t in targets]
+    print(f"Scanning: {', '.join(repo_names)}")
 
+    all_records: List[FileRecord] = []
     for repo in targets:
-        if not repo.exists() or not repo.is_dir():
-            continue
-        records = build_records(repo)
-        summaries.append(summarize_repo(repo, records))
-        all_records.extend(records)
+        recs = build_records(repo, repo_names)
+        print(f"  {repo.name}: {len(recs)} files")
+        all_records.extend(recs)
+
+    dupes   = duplicate_files(all_records)
+    largest = largest_files(all_records)
+    recent  = most_recently_changed(all_records)
+    todos   = all_todos(all_records)
+    xrefs   = cross_repo_references(all_records)
+    concepts= global_concept_cloud(all_records, 60)
+    defs    = all_py_defs(all_records)
+    imports = import_inventory(all_records)
+    headings= all_headings(all_records)
+    graph   = build_concept_graph(all_records, 40)
 
     out_dir = Path.cwd() / "repo_mapping_output"
     out_dir.mkdir(exist_ok=True)
 
-    repo_map = {
-        "generated_from": [str(p) for p in targets],
-        "summaries": summaries,
-        "files": [asdict(r) for r in all_records],
-    }
-    graph = build_graph(all_records)
-    report = render_report(summaries)
+    report = render_report(
+        targets, all_records, dupes, largest, recent,
+        todos, xrefs, concepts, defs, imports, headings,
+    )
 
-    (out_dir / "repo_map.json").write_text(json.dumps(repo_map, indent=2), encoding="utf-8")
+    full_map = {
+        "repos":      repo_names,
+        "file_count": len(all_records),
+        "duplicates": dupes,
+        "largest":    largest,
+        "recent":     recent,
+        "todos":      todos,
+        "cross_refs": xrefs,
+        "concepts":   concepts,
+        "py_defs":    defs,
+        "imports":    imports,
+        "headings":   headings,
+        "files":      [asdict(r) for r in all_records],
+    }
+
+    (out_dir / "repo_map.json").write_text(json.dumps(full_map, indent=2), encoding="utf-8")
     (out_dir / "repo_graph.json").write_text(json.dumps(graph, indent=2), encoding="utf-8")
     (out_dir / "repo_report.md").write_text(report, encoding="utf-8")
 
-    print(f"Wrote: {out_dir / 'repo_map.json'}")
-    print(f"Wrote: {out_dir / 'repo_graph.json'}")
-    print(f"Wrote: {out_dir / 'repo_report.md'}")
-    return 0
+    for name in ("repo_map.json", "repo_graph.json", "repo_report.md"):
+        path = out_dir / name
+        print(f"Wrote: {path}  ({path.stat().st_size:,} bytes)")
 
+    return 0
 
 if __name__ == "__main__":
     raise SystemExit(main(sys.argv[1:]))
