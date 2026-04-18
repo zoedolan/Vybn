@@ -307,7 +307,7 @@ class Organism:
 def nc_state() -> Dict:
     """The creature's state, for external observation.
 
-    Called by origins_portal_api_v3.py /api/inhabit endpoint.
+    Called by origins_portal_api_v4.py /api/inhabit endpoint.
     """
     state = CreatureState.from_walk()
     d = state.to_dict()

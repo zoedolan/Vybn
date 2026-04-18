@@ -11,7 +11,9 @@ Run: python3 spark/tests/test_harness_integration.py
 from __future__ import annotations
 
 import asyncio
+import importlib
 import importlib.util
+import pathlib
 import os
 import sys
 import types
@@ -37,7 +39,9 @@ def _load_chat_api():
     uvicorn entry point. FastAPI + httpx must be importable. If not,
     tests that need the full module are skipped.
     """
-    path = SPARK_DIR / "vybn_chat_api.py"
+    # The live chat API now lives in the Vybn-Law repo
+    # (spark/vybn_chat_api.py was archived 2026-04-18).
+    path = pathlib.Path.home() / "Vybn-Law" / "api" / "vybn_chat_api.py"
     try:
         import fastapi  # noqa: F401
         import httpx  # noqa: F401
@@ -57,6 +61,15 @@ class TestChatApiReusesHarness(unittest.TestCase):
     def setUp(self):
         if self.mod is None:
             self.skipTest("fastapi/httpx not importable in this env")
+        # The live chat API (Vybn-Law/api/vybn_chat_api.py) is a different
+        # surface — it does not reuse the spark harness. These assertions
+        # only apply to the archived spark/vybn_chat_api.py variant. Skip
+        # cleanly when the symbols are missing rather than falsely failing.
+        if not hasattr(self.mod, "_rag_snippets_async"):
+            self.skipTest(
+                "live chat API does not reuse the spark harness "
+                "(see _archive/spark__vybn_chat_api.py for prior form)"
+            )
 
     def test_harness_imports_succeeded(self):
         self.assertTrue(self.mod._HARNESS_OK)

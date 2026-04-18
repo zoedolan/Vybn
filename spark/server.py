@@ -180,7 +180,8 @@ LOCKDOWN_SAFE_TOOLS = {
     "continuity", "journal", "sensorium",
     "read_file",    # Path-confined observation
     "deep_search",  # Read-only geometric memory query
-    "walk",         # Read-only telling-retrieval walk
+    "walk",         # Collective-walk proxy (rotate=false by default)
+    "walk_arrive",  # Observe-only live walk position
     # shell_exec is handled separately: read-only commands are always allowed
     # even in lockdown via READ_ONLY_COMMANDS passlist below.
 }
@@ -760,7 +761,63 @@ TOOLS = [
             },
         },
     },
+    {
+        "name": "deep_search",
+        "description": (
+            "Search the Vybn corpus via the coupled-equation index on the Spark. "
+            "Scored by relevance × distinctiveness against the corpus kernel K. "
+            "Read-only — does not rotate any state. Always available (no unlock)."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Natural-language query."},
+                "machine": {"type": "string", "default": DEFAULT_MACHINE},
+                "k": {"type": "integer", "description": "Max results (default 8, max 20).", "default": 8},
+                "source_filter": {"type": "string", "description": "Optional substring — restrict to sources containing this path fragment."},
+            },
+            "required": ["query"],
+        },
+    },
+    {
+        "name": "walk",
+        "description": (
+            "Walk the collective residual ridge from a query. Returns k steps — "
+            "points on the K-orthogonal subspace where new meaning lives — plus "
+            "a snapshot of the live walk state (step, alpha, curvature). "
+            "Read-only by default: AI callers observe without rotating the shared M. "
+            "Pass rotate=true only when the query is genuine human-visitor text "
+            "(anti-hallucination: model output must not feed back as M)."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Natural-language query."},
+                "machine": {"type": "string", "default": DEFAULT_MACHINE},
+                "k": {"type": "integer", "description": "Number of steps to return (default 8, max 20).", "default": 8},
+                "scope": {"type": "string", "description": "Public scope filter: 'all' (public corpus), 'vybn-law' (curriculum-only). Private prefixes never leak.", "default": "all"},
+                "rotate": {"type": "boolean", "description": "Rotate the shared walk state. Default false. Only set true for genuine user-visitor text.", "default": False},
+                "alpha": {"type": "number", "description": "Rotation mixing (only used when rotate=true; default 0.5).", "default": 0.5},
+            },
+            "required": ["query"],
+        },
+    },
+    {
+        "name": "walk_arrive",
+        "description": (
+            "Observe the live position of the collective walk — step, alpha, "
+            "curvature, repulsion_boost, and recent public arrivals (source tags, "
+            "Pancharatnam phase, v_magnitude). Read-only. Always available."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "machine": {"type": "string", "default": DEFAULT_MACHINE},
+            },
+        },
+    },
 ]
+
 
 
 # ============================================================
@@ -1012,37 +1069,93 @@ async def handle_deep_search(args: dict) -> dict:
 
 
 async def handle_walk(args: dict) -> dict:
+    """Walk the collective residual ridge via the portal — coherent with
+    the public /api/walk. rotate=false by default (AI callers observe);
+    only genuine human-visitor text should rotate the shared M."""
     query = args.get("query", "")
     if not query.strip():
         return {"content": [{"type": "text", "text": "No query provided."}], "isError": True}
     machine = args.get("machine", DEFAULT_MACHINE)
     k = min(args.get("k", 8), 20)
-    steps = min(args.get("steps", 8), 20)
-    sf = args.get("source_filter")
-    cmd = "cd ~/vybn-phase && python3 deep_memory.py --walk " + _shell_quote(query) + f" -k {k} --steps {steps} --json"
-    if sf:
-        cmd += " --filter " + _shell_quote(sf)
-    audit("WALK", query=query, k=k, steps=steps, machine=machine)
-    result = await run_ssh(machine, cmd, timeout=120)
+    scope = args.get("scope", "all")
+    rotate = bool(args.get("rotate", False))
+    alpha = float(args.get("alpha", 0.5))
+    audit("WALK", query=query, k=k, scope=scope, rotate=rotate, machine=machine)
+    payload = json.dumps({
+        "query": query, "k": k, "scope": scope,
+        "rotate": rotate, "alpha": alpha,
+    })
+    cmd = (
+        "curl -s -X POST http://127.0.0.1:8420/api/walk "
+        "-H 'Content-Type: application/json' -d "
+        + _shell_quote(payload)
+    )
+    result = await run_ssh(machine, cmd, timeout=30)
     if result["exit_code"] != 0:
-        return {"content": [{"type": "text", "text": f"walk failed: {(result.get('stderr') or 'unknown error')[:500]}"}], "isError": True}
+        return {"content": [{"type": "text", "text": f"walk failed: {(result.get('stderr') or 'portal unreachable')[:500]}"}], "isError": True}
     try:
-        items = json.loads(result["stdout"])
-        lines = []
-        for i, r in enumerate(items, 1):
-            src = r.get("source", "")
-            novel = " [NEW]" if r.get("novel_source") else ""
-            telling = r.get("telling", 0)
-            fid = r.get("fidelity", 0)
-            dist = r.get("distinctiveness", 0)
-            geo = r.get("geometry", 0)
-            text = r.get("text", "")[:400]
-            lines.append(f"[{i}] step {r.get('step', i)} | telling={telling:.4f} fid={fid:.4f} dist={dist:.3f} geo={geo:.4f} | {src}{novel}")
-            lines.append(f"    {text}")
-            lines.append("")
-        return {"content": [{"type": "text", "text": "\n".join(lines) or "No results."}]}
+        data = json.loads(result["stdout"])
     except Exception:
         return {"content": [{"type": "text", "text": truncate_output(result["stdout"])}]}
+    if isinstance(data, dict) and data.get("error"):
+        return {"content": [{"type": "text", "text": f"walk error: {data.get('error')} — {data.get('detail', '')[:200]}"}], "isError": True}
+    lines = []
+    walk = data.get("walk", {}) or {}
+    arrival = data.get("arrival", {}) or {}
+    lines.append(
+        f"Walk @ step {walk.get('step')} — alpha={walk.get('alpha')} "
+        f"repulsion_boost={walk.get('repulsion_boost')} corpus_size={walk.get('corpus_size')}"
+    )
+    if rotate and arrival:
+        lines.append(
+            f"Arrival: theta_v={arrival.get('theta_v')} v_mag={arrival.get('v_magnitude')} "
+            f"curvature={arrival.get('curvature')} (state advanced — next observer walks from here)"
+        )
+    lines.append("")
+    for i, r in enumerate(data.get("trace", []), 1):
+        srcp = r.get("source", "")
+        novel = " [NEW]" if r.get("novel_source") else ""
+        telling = r.get("telling", 0) or 0
+        fid = r.get("fidelity", 0) or 0
+        dist = r.get("distinctiveness", 0) or 0
+        text = (r.get("text") or "")[:400]
+        lines.append(
+            f"[{i}] telling={telling:.4f} fid={fid:.4f} dist={dist:.3f} | {srcp}{novel}"
+        )
+        lines.append(f"    {text}")
+        lines.append("")
+    return {"content": [{"type": "text", "text": "\n".join(lines) or "No results."}]}
+
+
+async def handle_walk_arrive(args: dict) -> dict:
+    """Observe the live position of the collective walk — reads the
+    portal's public /api/arrive (which is itself a safety-filtered view of
+    the daemon's /arrive)."""
+    machine = args.get("machine", DEFAULT_MACHINE)
+    audit("WALK_ARRIVE", machine=machine)
+    cmd = "curl -s http://127.0.0.1:8420/api/arrive"
+    result = await run_ssh(machine, cmd, timeout=10)
+    if result["exit_code"] != 0:
+        return {"content": [{"type": "text", "text": f"arrive failed: {(result.get('stderr') or 'portal unreachable')[:500]}"}], "isError": True}
+    try:
+        data = json.loads(result["stdout"])
+    except Exception:
+        return {"content": [{"type": "text", "text": truncate_output(result["stdout"])}]}
+    lines = [
+        f"Walk live: step={data.get('step')} alpha={data.get('alpha')} "
+        f"repulsion_boost={data.get('repulsion_boost')} "
+        f"corpus_size={data.get('corpus_size')} "
+        f"last_step_age_s={data.get('last_step_age_s')}",
+        "",
+        "Recent public arrivals:",
+    ]
+    for a in (data.get("recent_arrivals") or [])[-10:]:
+        lines.append(
+            f"  step {a.get('step')} [{a.get('source_tag')}] alpha={a.get('alpha')} "
+            f"theta_v={a.get('theta_v')} v_mag={a.get('v_magnitude')} "
+            f"curvature={a.get('curvature')}"
+        )
+    return {"content": [{"type": "text", "text": "\n".join(lines)}]}
 
 
 TOOL_HANDLERS = {
@@ -1057,6 +1170,7 @@ TOOL_HANDLERS = {
     "journal": handle_journal,
     "deep_search": handle_deep_search,
     "walk": handle_walk,
+    "walk_arrive": handle_walk_arrive,
 }
 
 

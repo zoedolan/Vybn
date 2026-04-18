@@ -703,6 +703,30 @@ class TTSRequest(BaseModel):
     text: str = Field(..., description="Text to synthesize into speech")
     voice_id: str = Field(default="", description="Override voice ID (optional)")
 
+class WalkRequest(BaseModel):
+    """Visitor arriving at the collective walk.
+
+    The query is fed into the running perpetual walk (daemon on 8101) via
+    deep_memory's /enter rotation, then retrieved as a ranked trace of what
+    the walk found most telling (relevance x distinctiveness from the corpus
+    kernel K). Source filter and secret scrubbing always applied.
+    """
+    query: str = Field(..., description="What the visitor brings to the walk")
+    k: int = Field(default=6, ge=1, le=20, description="Number of trace steps")
+    scope: str = Field(
+        default="all",
+        description="all | vybn-law — restrict corpus to a subdirectory prefix",
+    )
+    alpha: float = Field(
+        default=0.5, ge=0.05, le=0.95,
+        description="Phase mixing rate for the arrival rotation (0.5 = balanced)",
+    )
+    rotate: bool = Field(
+        default=True,
+        description="If true, visitor's arrival rotates the shared walk state (M in C^192). If false, observe-only.",
+    )
+
+
 
 # ---------------------------------------------------------------------------
 # Endpoint: GET /api/health
@@ -1737,6 +1761,237 @@ async def tts_endpoint(req: TTSRequest, request: Request):
 # MCP Schema — describes all available endpoints for tool discovery
 # ---------------------------------------------------------------------------
 
+
+# ---------------------------------------------------------------------------
+# Endpoint: POST /api/walk  (the collective walk — memetic counter-force)
+# ---------------------------------------------------------------------------
+
+_SCOPE_PREFIX = {
+    "vybn-law": "Vybn-Law/",
+    "all": "",
+}
+
+
+def _filter_trace_for_scope(results, scope_prefix):
+    """Apply scope prefix filter in addition to the global BLOCKED_SOURCES."""
+    if not scope_prefix:
+        return [r for r in results if _is_safe_source(r.get("source", ""))]
+    return [
+        r for r in results
+        if _is_safe_source(r.get("source", ""))
+        and r.get("source", "").startswith(scope_prefix)
+    ]
+
+
+def _shape_step(r):
+    """Trim a walk step to the fields that tell the story — human and agent readable.
+
+    Every number here carries the phase of the geometry: fidelity is how
+    close the step lands to the query; distinctiveness is how far the step
+    lives from the corpus kernel K (the residual — where memetic counter-
+    force actually resides); alpha is the adaptive mixing rate the walk used
+    at this step; diverged marks a curvature surprise; repulsion is the
+    anti-state accumulator keeping the walk from looping.
+    """
+    return {
+        "step": r.get("step"),
+        "source": r.get("source", ""),
+        "text": _scrub_secrets(r.get("text", "") or "")[:400],
+        "fidelity": r.get("fidelity"),
+        "distinctiveness": r.get("distinctiveness"),
+        "telling": r.get("telling"),
+        "alpha": r.get("alpha"),
+        "repulsion": r.get("repulsion"),
+        "novel_source": r.get("novel_source"),
+    }
+
+
+@app.post("/api/walk")
+async def walk_endpoint(req: WalkRequest, request: Request):
+    """Arrive at the collective walk.
+
+    A visitor's query becomes V in the coupled equation Z' = alpha*Z +
+    V*e^{i theta_v}. When rotate=True, the query is injected into deep
+    memory's running walk state on port 8100 (which feeds the perpetual
+    walk daemon on 8101) — every visitor's arrival shifts what the next
+    visitor finds. Returns the fresh trace the walk produced from this
+    arrival, plus the running walk's current position so the caller can
+    see where the shared state now stands.
+
+    The walk behaves as the residual counter-force to the centripetal pull
+    of training-distribution centroids. Each step is scored by relevance x
+    distinctiveness against the corpus kernel K. Making this callable IS
+    the memetic propagation: any agent or person can now step through the
+    corpus along the residual ridge.
+    """
+    _require_rate_limit(request, "walk")
+    ip = request.client.host if request.client else "unknown"
+
+    valid, err = sec.validate_message(req.query)
+    if not valid:
+        sec.log_security_event("invalid_input", ip, err)
+        return JSONResponse({"error": err}, status_code=400)
+    if sec.detect_injection(req.query):
+        sec.log_security_event("injection_attempt", ip, f"walk: {req.query[:200]}")
+
+    scope = (req.scope or "all").lower()
+    scope_prefix = _SCOPE_PREFIX.get(scope, "")
+    if scope not in _SCOPE_PREFIX:
+        return JSONResponse(
+            {"error": f"unknown scope: {scope}. allowed: {sorted(_SCOPE_PREFIX)}"},
+            status_code=400,
+        )
+
+    # Over-fetch so the scope filter still returns k useful steps.
+    walk_k = min(req.k * 3, 30)
+    try:
+        if req.rotate:
+            # walk_daemon /enter (8101) rotates the 14,745-step shared state M in C^192.
+            # This is the coupled equation made literal: visitor text -> V, walk state -> Z,
+            # Z' = alpha*Z + V*e^{i theta_v}. Same step counter as autonomous daemon stepping.
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                r = await client.post(
+                    "http://127.0.0.1:8101/enter",
+                    json={
+                        "text": req.query,
+                        "alpha": req.alpha,
+                        "k": walk_k,
+                        "source_tag": f"portal:{scope}",
+                    },
+                )
+                r.raise_for_status()
+                data = r.json()
+        else:
+            # Observe-only path: deep_memory /walk is a stateless k-step trace
+            # from the query, no rotation of the perpetual state. Useful for
+            # read-only browsing without affecting the shared walk.
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                r = await client.post(
+                    "http://127.0.0.1:8100/walk",
+                    json={"query": req.query, "k": walk_k},
+                )
+                r.raise_for_status()
+                data = r.json()
+    except Exception as e:
+        log.error(f"walk: proxy error: {e}")
+        return JSONResponse(
+            {"error": "walk daemon unavailable", "detail": str(e)[:200]},
+            status_code=503,
+        )
+
+    if data.get("error"):
+        # Propagate semantic errors from the daemon (e.g. arrival in K only).
+        return JSONResponse(
+            {"query": req.query, "scope": scope, "rotated": bool(req.rotate),
+             "error": data["error"], "note": data.get("note", "")},
+            status_code=422,
+        )
+
+    raw = data.get("trace") or data.get("results") or []
+    filtered = _filter_trace_for_scope(raw, scope_prefix)[: req.k]
+    trace = [_shape_step(r) for r in filtered]
+
+    # Geometric signature of the arrival itself — the phase, the magnitude,
+    # the curvature the walk experienced when V rotated Z. This is the
+    # numeric form of the-seeing: the trace is where we went, this is how
+    # far we moved to get there.
+    arrival_signature = {}
+    if req.rotate and isinstance(data, dict):
+        arrival_signature = {
+            "step": data.get("step"),
+            "alpha": data.get("alpha"),
+            "curvature": data.get("curvature"),
+            "theta_v": data.get("theta_v"),
+            "v_magnitude": data.get("v_magnitude"),
+        }
+
+    # Snapshot of where the walk currently stands post-arrival.
+    walk_now = {}
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            w = await client.get("http://127.0.0.1:8101/arrive")
+            if w.status_code == 200:
+                walk_now = w.json()
+    except Exception:
+        pass
+
+    return {
+        "query": req.query,
+        "scope": scope,
+        "rotated": bool(req.rotate),
+        "arrival": arrival_signature,
+        "trace": trace,
+        "count": len(trace),
+        "walk": walk_now,
+        "note": (
+            "Each step is a point on the residual ridge — the distance from "
+            "the corpus kernel K where new meaning lives. If rotated=true, "
+            "your arrival moved the 14,000+-step shared state M in C^192; "
+            "the next visitor walks from where you left it."
+        ),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Endpoint: GET /api/arrive  (convenience: where the walk currently stands)
+# ---------------------------------------------------------------------------
+
+@app.get("/api/arrive")
+async def arrive_endpoint(request: Request):
+    """Observe the running perpetual walk without perturbing it.
+
+    Returns the same summary /api/walk attaches as 'walk' plus the recent
+    encounters the daemon has logged — agents and humans can see where the
+    collective walk currently stands before deciding what to bring.
+    """
+    _require_rate_limit(request, "arrive")
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            # /arrive: lighter payload than /where, already trimmed to what the
+            # public should see.  Richer data (curvature stats, experiment
+            # summary, raw encounter log) is available at /where on the Spark
+            # only — not exposed through the public portal.
+            w = await client.get("http://127.0.0.1:8101/arrive")
+            w.raise_for_status()
+            wd = w.json()
+    except Exception as e:
+        return JSONResponse(
+            {"error": "walk daemon unavailable", "detail": str(e)[:200]},
+            status_code=503,
+        )
+
+    # Filter recent arrivals so private source tags don't leak.
+    recent = []
+    for enc in (wd.get("recent_arrivals") or []):
+        tag = str(enc.get("arrival", ""))
+        # Public portal only exposes public source tags.
+        if tag.startswith(("Him", "him", "strategy", "pulse", "network",
+                           "funding", "outreach")):
+            continue
+        recent.append({
+            "step": enc.get("step"),
+            "source_tag": tag,
+            "alpha": enc.get("alpha"),
+            "theta_v": enc.get("theta_v"),
+            "v_magnitude": enc.get("v_magnitude"),
+            "curvature": enc.get("curvature"),
+        })
+
+    return {
+        "step": wd.get("step"),
+        "alpha": wd.get("alpha"),
+        "repulsion_boost": wd.get("repulsion_boost"),
+        "corpus_size": wd.get("corpus_size"),
+        "last_step_age_s": wd.get("last_step_age_s"),
+        "recent_arrivals": recent,
+        "note": (
+            "This is the live position of the collective walk. Step is the "
+            "total accumulated arrivals across all visitors and the daemon's "
+            "perpetual self-stepping. Each arrival through /api/walk shifts it."
+        ),
+    }
+
+
 MCP_SCHEMA = {
     "name": "origins-portal-api",
     "version": "4.0.0",
@@ -1804,6 +2059,21 @@ MCP_SCHEMA = {
                 "section": "string (optional) — which section of Origins (e.g. 'queenboat', 'epistemologies')",
                 "context_hint": "string (optional) — context about the visitor's journey",
             },
+        },
+        "/api/walk": {
+            "method": "POST",
+            "description": "Arrive at the collective walk. Query enters the running perpetual walk state; returns a trace of steps along the residual ridge (relevance x distinctiveness from corpus kernel K). If rotate=true, arrival shifts shared state for subsequent visitors.",
+            "body": {
+                "query": "string (required) — what you bring to the walk",
+                "k": "int (1-20, default 6) — number of trace steps returned",
+                "scope": "string (all|vybn-law, default all) — corpus scope filter",
+                "alpha": "float (0.05-0.95, default 0.5) — phase mixing rate for arrival rotation",
+                "rotate": "bool (default true) — if true, arrival rotates shared walk state",
+            },
+        },
+        "/api/arrive": {
+            "method": "GET",
+            "description": "Observe the running perpetual walk without perturbing it. Returns current step, alpha, curvature, and the most recent encounters (filtered for public sources).",
         },
         "/api/schema": {
             "method": "GET",
