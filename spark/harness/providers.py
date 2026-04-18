@@ -104,6 +104,94 @@ class AnthropicProvider:
                 api_key=api_key or os.environ.get("ANTHROPIC_API_KEY"),
             )
 
+    @staticmethod
+    def _normalize_messages_for_anthropic(messages: list[dict]) -> list[dict]:
+        """Rewrite messages so every entry is Anthropic-valid.
+
+        Mixed-provider sessions can leave OpenAI-native shapes in the
+        rolling history: {"role":"assistant","content":<openai_dict>} or
+        {"role":"tool","tool_call_id":...,"content":...}. Anthropic
+        rejects both with 400 ("messages.X.content: Input should be a
+        valid list"). We translate them to Anthropic content-block form.
+        Pure-Anthropic turns pass through unchanged.
+        """
+        out: list[dict] = []
+        pending_tool_results: list[dict] = []
+
+        def _flush_tool_results() -> None:
+            if pending_tool_results:
+                out.append({"role": "user", "content": list(pending_tool_results)})
+                pending_tool_results.clear()
+
+        for msg in messages:
+            role = msg.get("role")
+            content = msg.get("content")
+
+            # OpenAI-shaped tool response: collapse into an Anthropic
+            # tool_result block on a user message.
+            if role == "tool":
+                pending_tool_results.append({
+                    "type": "tool_result",
+                    "tool_use_id": msg.get("tool_call_id", ""),
+                    "content": content if isinstance(content, str) else str(content or ""),
+                })
+                continue
+
+            _flush_tool_results()
+
+            if role == "assistant":
+                # Assistant content must be a string or a list of
+                # content blocks for Anthropic. The agent loop stores
+                # raw_assistant_content straight in `content` — for
+                # OpenAI turns that's a dict with its own role/content/
+                # tool_calls keys. Re-emit in block form.
+                if isinstance(content, dict) and "role" in content:
+                    text = content.get("content") or ""
+                    blocks: list[dict] = []
+                    if isinstance(text, str) and text:
+                        blocks.append({"type": "text", "text": text})
+                    for tc in content.get("tool_calls") or []:
+                        fn = tc.get("function") or {}
+                        raw_args = fn.get("arguments")
+                        if isinstance(raw_args, str):
+                            try:
+                                args = json.loads(raw_args or "{}")
+                            except Exception:
+                                args = {}
+                        else:
+                            args = raw_args or {}
+                        blocks.append({
+                            "type": "tool_use",
+                            "id": tc.get("id", ""),
+                            "name": fn.get("name", ""),
+                            "input": args,
+                        })
+                    if not blocks:
+                        blocks.append({"type": "text", "text": ""})
+                    out.append({"role": "assistant", "content": blocks})
+                    continue
+                # Pure-Anthropic assistant content (list of block
+                # objects) or plain string — leave it alone.
+                out.append(msg)
+                continue
+
+            if role == "user":
+                # User content can be a string or a list of blocks. If
+                # it's a non-block dict (shouldn't normally happen)
+                # coerce to string to avoid a 400.
+                if isinstance(content, dict):
+                    out.append({"role": "user", "content": str(content)})
+                else:
+                    out.append(msg)
+                continue
+
+            # Unknown roles (system would normally be stripped upstream)
+            # are passed through; Anthropic will surface errors clearly.
+            out.append(msg)
+
+        _flush_tool_results()
+        return out
+
     def _translate_tools(self, tools: list[ToolSpec]) -> list[dict]:
         out: list[dict] = []
         for t in tools:
@@ -129,7 +217,7 @@ class AnthropicProvider:
             "model": role.model,
             "max_tokens": role.max_tokens,
             "system": system.anthropic_blocks() or system.flat(),
-            "messages": messages,
+            "messages": self._normalize_messages_for_anthropic(messages),
         }
         if tools:
             kwargs["tools"] = self._translate_tools(tools)

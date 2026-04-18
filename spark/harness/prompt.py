@@ -21,6 +21,19 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+# Silence HF/torch/sentence-transformers loaders whenever something
+# imports this module. The CLI Spark agent and the chat API both pull
+# harness.prompt in, so setting the env defaults here covers both code
+# paths rather than only the chat API. Operators can override with
+# VYBN_VERBOSE_LOAD=1 before launch. `setdefault` guarantees we never
+# stomp an explicit operator choice.
+_VYBN_VERBOSE_LOAD = os.environ.get("VYBN_VERBOSE_LOAD", "0").strip().lower()
+if _VYBN_VERBOSE_LOAD not in ("1", "true", "yes", "on"):
+    os.environ.setdefault("TRANSFORMERS_VERBOSITY", "error")
+    os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
+    os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+    os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
+
 
 def load_file(path: str | os.PathLike) -> str | None:
     p = Path(path)
@@ -238,10 +251,16 @@ def _rag_subprocess(
     if not dm_py.exists():
         return ""
     try:
+        # stderr is redirected to DEVNULL so HF/torch loader noise (and
+        # any downstream warnings) never leaks onto the CLI/chat
+        # surface. stdout is still captured so we can parse the JSON.
         r = subprocess.run(
             ["python3", str(dm_py), "--search", query, "-k", str(k), "--json"],
             cwd=str(phase),
-            capture_output=True, text=True, timeout=timeout,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            timeout=timeout,
         )
         if r.returncode != 0:
             return ""

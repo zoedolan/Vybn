@@ -87,9 +87,11 @@ class TestPolicy(unittest.TestCase):
         for name in ("code", "create", "chat", "task", "orchestrate"):
             self.assertIn(name, p.roles)
 
-    def test_default_role_is_code(self):
+    def test_default_role_is_orchestrate(self):
+        # Default falls through to GPT-5.4 (orchestrate). Code work
+        # still escalates to the `code` role via heuristics.
         p = default_policy()
-        self.assertEqual(p.default_role, "code")
+        self.assertEqual(p.default_role, "orchestrate")
 
     def test_load_policy_falls_back_to_default(self):
         p = load_policy("/nonexistent/path/router_policy.yaml")
@@ -131,8 +133,9 @@ class TestRouter(unittest.TestCase):
 
     def test_default_role(self):
         d = self.router.classify("say something")
-        # Default is code.
-        self.assertEqual(d.role, "code")
+        # Default is orchestrate (GPT-5.4): bare, unclassified turns
+        # hit the orchestrator brain rather than the Opus+bash loop.
+        self.assertEqual(d.role, "orchestrate")
         self.assertEqual(d.reason, "default")
 
     def test_forced_role(self):
@@ -221,6 +224,148 @@ class TestAnthropicProviderToolResult(unittest.TestCase):
         self.assertEqual(r["type"], "tool_result")
         self.assertEqual(r["tool_use_id"], "abc")
         self.assertEqual(r["content"], "out")
+
+
+class TestAnthropicMessageNormalization(unittest.TestCase):
+    """Mixed-provider sessions (OpenAI turn then Anthropic turn) used to
+    trigger `messages.X.content: Input should be a valid list` because
+    the rolling history still carried OpenAI-native shapes. The
+    normaliser rewrites those into Anthropic content-block form."""
+
+    def _normalize(self, messages):
+        return AnthropicProvider._normalize_messages_for_anthropic(messages)
+
+    def test_openai_assistant_dict_becomes_block_list(self):
+        raw = [
+            {"role": "user", "content": "hi"},
+            {"role": "assistant", "content": {
+                "role": "assistant",
+                "content": "hello back",
+                "tool_calls": [],
+            }},
+        ]
+        out = self._normalize(raw)
+        self.assertEqual(out[1]["role"], "assistant")
+        blocks = out[1]["content"]
+        self.assertIsInstance(blocks, list)
+        self.assertEqual(blocks[0]["type"], "text")
+        self.assertEqual(blocks[0]["text"], "hello back")
+
+    def test_openai_assistant_with_tool_calls_translates(self):
+        raw = [
+            {"role": "user", "content": "do it"},
+            {"role": "assistant", "content": {
+                "role": "assistant",
+                "content": "on it",
+                "tool_calls": [{
+                    "id": "call_1",
+                    "type": "function",
+                    "function": {
+                        "name": "bash",
+                        "arguments": json.dumps({"command": "ls"}),
+                    },
+                }],
+            }},
+        ]
+        out = self._normalize(raw)
+        blocks = out[1]["content"]
+        types = [b["type"] for b in blocks]
+        self.assertIn("text", types)
+        self.assertIn("tool_use", types)
+        tool_use = [b for b in blocks if b["type"] == "tool_use"][0]
+        self.assertEqual(tool_use["id"], "call_1")
+        self.assertEqual(tool_use["name"], "bash")
+        self.assertEqual(tool_use["input"], {"command": "ls"})
+
+    def test_openai_tool_result_collapses_into_user_message(self):
+        raw = [
+            {"role": "user", "content": "run"},
+            {"role": "assistant", "content": {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [{
+                    "id": "call_1", "type": "function",
+                    "function": {"name": "bash", "arguments": "{}"},
+                }],
+            }},
+            {"role": "tool", "tool_call_id": "call_1", "content": "done"},
+        ]
+        out = self._normalize(raw)
+        # assistant turn followed by user turn with tool_result block.
+        self.assertEqual(out[-1]["role"], "user")
+        self.assertIsInstance(out[-1]["content"], list)
+        self.assertEqual(out[-1]["content"][0]["type"], "tool_result")
+        self.assertEqual(out[-1]["content"][0]["tool_use_id"], "call_1")
+        self.assertEqual(out[-1]["content"][0]["content"], "done")
+
+    def test_pure_anthropic_messages_pass_through(self):
+        raw = [
+            {"role": "user", "content": "hi"},
+            {"role": "assistant", "content": "hey"},
+        ]
+        out = self._normalize(raw)
+        self.assertEqual(out, raw)
+
+    def test_multiple_consecutive_tool_results_collapse(self):
+        raw = [
+            {"role": "tool", "tool_call_id": "a", "content": "1"},
+            {"role": "tool", "tool_call_id": "b", "content": "2"},
+        ]
+        out = self._normalize(raw)
+        self.assertEqual(len(out), 1)
+        self.assertEqual(out[0]["role"], "user")
+        self.assertEqual(len(out[0]["content"]), 2)
+        ids = [b["tool_use_id"] for b in out[0]["content"]]
+        self.assertEqual(ids, ["a", "b"])
+
+    def test_stream_uses_normalised_messages(self):
+        """AnthropicProvider.stream() must feed the normaliser output to
+        the SDK — if the unnormalised list leaks through, mixed-provider
+        sessions 400 again."""
+        captured: dict = {}
+
+        class _FakeStream:
+            def __enter__(self_inner):
+                return self_inner
+            def __exit__(self_inner, *a, **kw):
+                return False
+            def __iter__(self_inner):
+                return iter([])
+            def get_final_message(self_inner):
+                class _Msg:
+                    content = []
+                    stop_reason = "end_turn"
+                    usage = type("U", (), {"input_tokens": 0, "output_tokens": 0})()
+                return _Msg()
+
+        class _FakeMessages:
+            def stream(self_inner, **kwargs):
+                captured["messages"] = kwargs["messages"]
+                return _FakeStream()
+
+        class _FakeClient:
+            messages = _FakeMessages()
+
+        from harness.policy import RoleConfig as _RC
+        prov = AnthropicProvider(client=_FakeClient())
+        role = _RC(role="code", provider="anthropic", model="claude-opus-4-7")
+        mixed = [
+            {"role": "user", "content": "hi"},
+            {"role": "assistant", "content": {
+                "role": "assistant", "content": "hey", "tool_calls": [],
+            }},
+        ]
+        h = prov.stream(
+            system=LayeredPrompt(identity="I"),
+            messages=mixed,
+            tools=[],
+            role=role,
+        )
+        _ = h.final()
+        sent = captured["messages"]
+        # The second message must have been rewritten to a block list.
+        self.assertIsInstance(sent[1]["content"], list)
+        self.assertEqual(sent[1]["content"][0]["type"], "text")
 
 
 class TestProviderRegistry(unittest.TestCase):

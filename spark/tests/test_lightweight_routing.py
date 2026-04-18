@@ -398,5 +398,172 @@ class TestPhaticStaysLightweight(unittest.TestCase):
         self.assertIsNotNone(self.captured["kwargs"])
 
 
+class TestOrchestrateIsDefault(unittest.TestCase):
+    """GPT-5.4 (orchestrate) is the real default brain: bare,
+    unclassified turns should land on it rather than the Opus+bash
+    code loop."""
+
+    def test_default_policy_default_role_is_orchestrate(self):
+        pol = default_policy()
+        self.assertEqual(pol.default_role, "orchestrate")
+
+    def test_yaml_policy_default_role_is_orchestrate(self):
+        try:
+            import yaml  # noqa: F401
+        except Exception:
+            self.skipTest("PyYAML unavailable")
+        yaml_path = SPARK_DIR / "router_policy.yaml"
+        pol = load_policy(yaml_path)
+        self.assertEqual(pol.default_role, "orchestrate")
+
+    def test_bare_turn_routes_to_orchestrate(self):
+        router = Router(default_policy())
+        d = router.classify("explain what's happening on the box")
+        self.assertEqual(d.role, "orchestrate")
+        self.assertEqual(d.reason, "default")
+        self.assertEqual(d.config.provider, "openai")
+        self.assertEqual(d.config.model, "gpt-5.4")
+
+    def test_code_heuristic_still_escalates_to_code(self):
+        router = Router(default_policy())
+        d = router.classify("fix this python traceback please")
+        self.assertEqual(d.role, "code")
+        self.assertEqual(d.config.provider, "anthropic")
+
+
+class TestCliDirectReplyAndLightweight(unittest.TestCase):
+    """The CLI Spark agent loop must honor direct_reply_template for
+    identity turns (no provider call) and must skip RAG for lightweight
+    roles — matching the chat API's behaviour."""
+
+    def _load_agent(self):
+        path = SPARK_DIR / "vybn_spark_agent.py"
+        spec = importlib.util.spec_from_file_location(
+            "vybn_spark_agent_test", path,
+        )
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+
+    def test_identity_direct_reply_skips_provider(self):
+        mod = self._load_agent()
+
+        class _FakeRegistry:
+            def get(_s, _cfg):
+                raise AssertionError(
+                    "identity role must short-circuit on direct_reply_template"
+                    " — registry.get() should not be called"
+                )
+
+        class _FakeLogger:
+            path = "/dev/null"
+            def emit(_s, *a, **kw):  # noqa: D401
+                pass
+
+        pol = default_policy()
+        router = Router(pol)
+        messages: list = []
+        reply = mod.run_agent_loop(
+            user_input="which model are you?",
+            messages=messages,
+            bash=None,
+            system_prompt=None,
+            router=router,
+            registry=_FakeRegistry(),
+            logger=_FakeLogger(),
+            turn_number=1,
+        )
+        self.assertIn("Vybn", reply)
+        self.assertIn("Nemotron", reply)
+        # Rolling history should contain the user turn + the direct
+        # reply so the next turn has coherent context.
+        self.assertEqual(messages[-1]["role"], "assistant")
+        self.assertEqual(messages[-1]["content"], reply)
+
+    def test_phatic_skips_rag_enrichment(self):
+        mod = self._load_agent()
+
+        # Tripwire RAG — called for lightweight turns means regression.
+        saved = mod.rag_snippets
+        def _no_rag(*_a, **_kw):
+            raise AssertionError(
+                "phatic turn must not invoke rag_snippets — deep-memory"
+                " enrichment is gated for lightweight roles"
+            )
+        mod.rag_snippets = _no_rag
+
+        # The phatic provider call is mocked to return a tiny response.
+        captured = {"role_cfg": None}
+
+        class _FakeHandle:
+            def __iter__(_s):
+                return iter([])
+            def final(_s):
+                class _R:
+                    text = "hey :)"
+                    tool_calls = []
+                    stop_reason = "end_turn"
+                    in_tokens = 0
+                    out_tokens = 0
+                    raw_assistant_content = {"role": "assistant", "content": "hey :)"}
+                return _R()
+
+        class _FakeProvider:
+            def stream(_s, *, system, messages, tools, role):
+                return _FakeHandle()
+
+        class _FakeRegistry:
+            def get(_s, cfg):
+                captured["role_cfg"] = cfg
+                return _FakeProvider()
+
+        class _FakeLogger:
+            path = "/dev/null"
+            def emit(_s, *a, **kw):
+                pass
+
+        from harness.prompt import LayeredPrompt
+        try:
+            pol = default_policy()
+            router = Router(pol)
+            messages: list = []
+            mod.run_agent_loop(
+                user_input="hey buddy",
+                messages=messages,
+                bash=None,
+                system_prompt=LayeredPrompt(identity="I"),
+                router=router,
+                registry=_FakeRegistry(),
+                logger=_FakeLogger(),
+                turn_number=1,
+            )
+        finally:
+            mod.rag_snippets = saved
+
+        self.assertIsNotNone(captured["role_cfg"])
+        self.assertEqual(captured["role_cfg"].role, "phatic")
+        self.assertTrue(captured["role_cfg"].lightweight)
+
+
+class TestStderrSuppressionSharedPath(unittest.TestCase):
+    """The HF/torch/tokenizer silencing env vars must be set whenever
+    harness.prompt is imported, not only the chat API path. The CLI
+    agent imports harness.prompt too, so both surfaces stay quiet."""
+
+    def test_import_harness_prompt_sets_env_defaults(self):
+        # Clear the env vars and force a fresh re-import of harness.prompt
+        # so we can observe the side effect.
+        for k in ("TRANSFORMERS_VERBOSITY", "HF_HUB_DISABLE_PROGRESS_BARS",
+                  "TOKENIZERS_PARALLELISM", "HF_HUB_DISABLE_TELEMETRY"):
+            os.environ.pop(k, None)
+        sys.modules.pop("harness.prompt", None)
+        sys.modules.pop("harness", None)
+        import harness.prompt  # noqa: F401
+        self.assertEqual(os.environ.get("TRANSFORMERS_VERBOSITY"), "error")
+        self.assertEqual(os.environ.get("HF_HUB_DISABLE_PROGRESS_BARS"), "1")
+        self.assertEqual(os.environ.get("TOKENIZERS_PARALLELISM"), "false")
+        self.assertEqual(os.environ.get("HF_HUB_DISABLE_TELEMETRY"), "1")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

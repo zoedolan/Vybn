@@ -171,7 +171,6 @@ def run_agent_loop(
 ) -> str:
     decision = router.classify(user_input, forced_role=forced_role)
     role_cfg = decision.config
-    provider = registry.get(role_cfg)
 
     logger.emit(
         "route_decision",
@@ -183,9 +182,36 @@ def run_agent_loop(
     )
     _dim(f"[route: {decision.role} -> {role_cfg.provider}:{role_cfg.model} ({decision.reason})]")
 
+    # Direct-reply short-circuit. When the resolved role ships a
+    # direct_reply_template (identity role), render it against runtime
+    # metadata and skip the provider call entirely. Identity questions
+    # ("which model are you?") answer correctly from the live route,
+    # not a hallucinated string.
+    template = getattr(role_cfg, "direct_reply_template", None)
+    if template and not role_cfg.tools:
+        reply = template.format(
+            role=role_cfg.role,
+            provider=role_cfg.provider,
+            model=role_cfg.model,
+            base_url=role_cfg.base_url or "",
+        )
+        messages.append({"role": "user", "content": decision.cleaned_input})
+        messages.append({"role": "assistant", "content": reply})
+        print(reply, flush=True)
+        logger.emit(
+            "direct_reply",
+            turn=turn_number,
+            role=decision.role,
+            model=role_cfg.model,
+        )
+        return reply
+
+    provider = registry.get(role_cfg)
+
     # Optional deep-memory enrichment — only for roles that declare rag=true
     # and only when the retrieval actually returns something. No overclaim.
-    if role_cfg.rag:
+    # Lightweight roles (phatic, identity) skip RAG regardless.
+    if role_cfg.rag and not getattr(role_cfg, "lightweight", False):
         enrichment = rag_snippets(decision.cleaned_input[:500], k=4)
         if enrichment:
             system_prompt = LayeredPrompt(
@@ -337,6 +363,22 @@ def main() -> None:
         sys.exit(1)
 
     policy = load_policy()
+
+    # The policy's default role is orchestrate (GPT-5.4). If OPENAI_API_KEY
+    # is missing, GPT-5.4 can't be reached — fall back to `code` as the
+    # default so the agent still starts. Code work still routes to `code`
+    # via heuristics; this only changes what a bare, unclassified turn
+    # does. We mutate the policy in-place (rather than at load) so
+    # operators editing router_policy.yaml see their choice respected
+    # whenever credentials are present.
+    if (
+        policy.default_role == "orchestrate"
+        and not os.environ.get("OPENAI_API_KEY")
+        and "code" in policy.roles
+    ):
+        print("  \u2014 OPENAI_API_KEY missing; default role falls back to `code`")
+        policy.default_role = "code"
+
     router = Router(policy)
     registry = ProviderRegistry()
     logger = EventLogger()

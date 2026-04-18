@@ -102,12 +102,16 @@ _DEFAULT_ROLES: dict[str, RoleConfig] = {
         tools=["bash"],
         rag=False,
     ),
+    # GPT-5.4 is the orchestrator brain. Default role falls through to
+    # this when no heuristic matches, so normal turns hit GPT-5.4
+    # instead of the full Opus+bash loop. Code work still escalates to
+    # the `code` role (Claude Opus 4.7) via heuristics below.
     "orchestrate": RoleConfig(
         role="orchestrate",
         provider="openai",
         model="gpt-5.4",
         thinking="off",
-        max_tokens=2048,
+        max_tokens=4096,
         max_iterations=1,
         tools=[],
         rag=False,
@@ -235,6 +239,7 @@ def default_policy() -> Policy:
         directives=dict(_DEFAULT_DIRECTIVES),
         fallback_chain=dict(_DEFAULT_FALLBACK),
         budgets=dict(_DEFAULT_BUDGETS),
+        default_role="orchestrate",
     )
 
 

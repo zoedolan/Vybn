@@ -7,7 +7,13 @@
 # Heuristics are regex patterns applied to the raw user input.
 # Directives are /-prefixed keywords that force a role deterministically.
 
-default_role: code
+# GPT-5.4 is the orchestrator brain: short, stateless routing/answering
+# for turns that don't trip a specific heuristic. Code work still
+# escalates via the `code` heuristic (git/python/traceback/etc.) to
+# Claude Opus 4.7 with bash + adaptive thinking. Greetings go to
+# `phatic`, identity questions to `identity`. This keeps normal chat
+# cheap and fast without the full Opus+bash loop firing on every turn.
+default_role: orchestrate
 
 roles:
   code:
@@ -46,7 +52,7 @@ roles:
     provider: openai
     model: gpt-5.4
     thinking: off
-    max_tokens: 2048
+    max_tokens: 4096
     max_iterations: 1
     tools: []
     rag: false
