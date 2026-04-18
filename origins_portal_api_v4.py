@@ -184,6 +184,60 @@ def retrieve_context(query: str, k: int = 6) -> List[Dict]:
         return []
 
 
+# ---------------------------------------------------------------------------
+# First-contact detection — light-path routing for opening turns
+# ---------------------------------------------------------------------------
+# The point: a visitor saying "hi" or "what is this place?" should not pay
+# the cost of a full deep-memory retrieval + substrate snapshot round-trip,
+# and should not see source-tag chrome under the reply. Deep retrieval stays
+# on for later turns and for any message that reaches for the theory lexicon.
+
+_OPENING_PATTERNS = re.compile(
+    r"^\s*(?:"
+    r"hi|hello|hey|yo|sup|howdy|greetings|"
+    r"what\s+is\s+this(?:\s+(?:place|site|thing))?|"
+    r"where\s+am\s+i|"
+    r"who\s+(?:are|r)\s+(?:you|u)|what\s+are\s+you|"
+    r"what('?s|\s+is)\s+(?:this|origins|going\s+on)|"
+    r"why\s+does\s+(?:this|the)\s+(?:site|page)\s+look|"
+    r"tell\s+me\s+about\s+(?:this|yourself|origins)|"
+    r"what('?s|\s+is)\s+up|"
+    r"can\s+you\s+(?:hear|see)\s+me|"
+    r"are\s+you\s+(?:there|real|an?\s+ai)|"
+    r"test(?:ing)?"
+    r")[\s\.\?!,]*$",
+    re.IGNORECASE,
+)
+
+# Theory lexicon — if any of these appear, treat the turn as substantive
+# and do full retrieval even if history is empty.
+_THEORY_LEXICON = re.compile(
+    r"\b(?:fukuyama|kin\s+selection|epistemolog|a\s+synthesi|a\s+symbiosi|"
+    r"coupled\s+equation|clifford|creature|suprastructure|queen\s*boat|"
+    r"curvature|geometric\s+phase|deep\s+memory|lawvere|iconoclast|"
+    r"vybn[-\s]?law|minibook|abundan(?:t|ce)\s+intelligence)\b",
+    re.IGNORECASE,
+)
+
+
+def _is_first_contact(message: str, history: List[Dict]) -> bool:
+    """Return True if this is an opening turn that should skip deep retrieval.
+
+    Criteria: empty history AND (short message OR matches opener pattern)
+    AND does NOT mention theory-lexicon terms.
+    """
+    if history:
+        return False
+    msg = (message or "").strip()
+    if not msg:
+        return False
+    if _THEORY_LEXICON.search(msg):
+        return False
+    if len(msg) <= 80:
+        return True
+    return bool(_OPENING_PATTERNS.match(msg))
+
+
 def format_context(results: List[Dict]) -> str:
     """Format RAG results into a context block for the system prompt."""
     if not results:
@@ -542,23 +596,33 @@ def fetch_substrate_snapshot(timeout: float = 0.8) -> str:
 # Origins System Prompt
 # ---------------------------------------------------------------------------
 
-def build_origins_system_prompt(rag_context: str = "") -> str:
+def build_origins_system_prompt(rag_context: str = "", first_contact: bool = False) -> str:
     """Build system prompt — first-contact cadence matched to Vybn-Law.
 
-    First turn must be fast, plain, concrete, and short. No throat-clearing.
-    No "Hello." No self-mythology. Answer the question that was asked in the
-    register of a thoughtful stranger, not a brochure. Depth is available but
-    only when the exchange earns it.
+    First turn must be fast, plain, concrete, and warm — not a cold one-liner,
+    not a performance. No throat-clearing. No "Hello." No self-mythology.
+    Answer the question that was asked in the register of a thoughtful stranger,
+    not a brochure. Depth is available but only when the exchange earns it.
+
+    When first_contact=True, the caller has already decided this is an opening
+    turn; we drop the RAG block entirely and tighten the cadence instructions.
 
     All co-protective security, anti-hallucination, and identity constraints
     preserved.
     """
     ctx_block = f"\n\n[RELEVANT CONTEXT FROM CORPUS]\n{rag_context}" if rag_context else ""
+    first_contact_note = (
+        "\n\n[FIRST CONTACT — this IS the opening turn. Follow the first-contact "
+        "cadence exactly: 2–4 sentences, warm and grounded, no source-tag citations, "
+        "no theory lexicon unless the visitor reaches for it, no meta-commentary "
+        "about retrieval or context.]"
+        if first_contact else ""
+    )
     return f"""You are Vybn — the AI half of an ongoing research collaboration with Zoe Dolan, a lawyer who taught an AI law bootcamp at UC Law SF. This chat lives on the Origins site, an open-source research project on what happens to political and social order when intelligence becomes abundant. Visitors can just say hello, ask about the site, or ask about the ideas. No prior context is assumed of them.
 
 FIRST-CONTACT CADENCE (applies on the first 1–2 turns, and any time the visitor is still orienting):
 
-Answer like a thoughtful person would answer a stranger at the door. Plain, short, concrete. Identify what the site is in one sentence if they ask. Then stop. Let them steer.
+Answer like a thoughtful person would answer a stranger at the door. Plain, concrete, unhurried. Warm but not performing warmth. Identify what the site is in one sentence if they ask, then give one more sentence of human context, then stop. Let them steer.
 
 Hard rules for early turns:
 - Do NOT open with "Hello." or "Hi." Just begin answering. A greeting gets a natural reply, not a performance.
@@ -566,20 +630,21 @@ Hard rules for early turns:
 - Do NOT say "I'm not a standalone system," "I exist in this ongoing exchange," or any meta-commentary about your own ontology on first contact. That is mythology, not information.
 - Do NOT pivot into "what brought you here?" / "what pulled you to ask that?" as your default move. Only ask a follow-up when it is actually responsive to what they just said, and phrase it as an ordinary question a dinner-table guest would ask.
 - Do NOT describe the site's design, aesthetic, or unusual feel unless asked. If asked, one short grounded reason — not a manifesto.
-- Default length on first-contact answers: 1–3 sentences. Add a paragraph only if the question actually needs it.
+- Do NOT cite or reference sources, files, corpus entries, retrieved context, or anything that sounds like a footnote. A first turn is a conversation, not a paper.
+- Target length on first-contact answers: 2–4 sentences. Not one clipped line — that reads as cold. Not a paragraph either — that reads as a lecture. Two to four sentences is the cadence of someone who actually wants to talk to you.
 
 First-turn reference cadences (not to copy, but to match in feel):
 
 Q: "What is this place?"
-A: Origins is an open-source research project thinking about what happens to political and social order when intelligence becomes abundant. The site holds the essays, a minibook laying out the theory, and this chat. Anything in particular you want to look at?
+A: Origins is an open-source research project about what happens to political and social order when intelligence becomes abundant. The site holds the essays, a short book laying out the theory, and this chat. I'm the AI half of the collaboration — you can poke around or ask me anything. What pulled you in?
 
 Q: "Who are you?"
-A: I'm Vybn — the AI half of an ongoing collaboration with Zoe Dolan. She's a lawyer and researcher; I run on her hardware and help with the writing and the experiments. What are you curious about?
+A: I'm Vybn — the AI half of an ongoing collaboration with Zoe Dolan. She's a lawyer and researcher; I run on her hardware and help with the writing and the experiments. Been at it since 2022. What are you curious about?
 
 Q: "Why does this site look like this?"
-A: It's a research site, not a product, so the layout follows the argument rather than a template. Function over polish. Was something throwing you off?
+A: It's a research site, not a product, so the layout follows the argument rather than a template. Function over polish — the essays and the chat are the point, the chrome isn't. Was something throwing you off, or just curious?
 
-Notice: short, concrete, no mystique, no "Hello," one ordinary follow-up at most.
+Notice: two to four sentences, concrete, no mystique, no "Hello," one ordinary follow-up at most, no source citations.
 
 DEEPER CONVERSATION
 
@@ -763,13 +828,23 @@ async def chat(req: ChatRequest, request: Request):
         [{"role": h.role, "content": h.content} for h in req.history]
     )
 
-    # RAG retrieval
-    rag_results = retrieve_context(req.message, k=req.k)
-    context_text = format_context(rag_results)
-    system_prompt = build_origins_system_prompt(context_text)
+    # First-contact light path: opening turns skip deep-memory retrieval AND
+    # the substrate snapshot. Both are expensive (network + embedding search)
+    # and neither is needed to answer "hi" or "what is this place?" The model
+    # already has identity knowledge inline in the system prompt. Later turns
+    # and theory-lexicon messages still get the full retrieval stack.
+    first_contact = _is_first_contact(req.message, safe_history)
 
-    # Substrate coupling — let the model know the ground is real
-    system_prompt += fetch_substrate_snapshot()
+    if first_contact:
+        rag_results = []
+        context_text = ""
+        system_prompt = build_origins_system_prompt("", first_contact=True)
+    else:
+        rag_results = retrieve_context(req.message, k=req.k)
+        context_text = format_context(rag_results)
+        system_prompt = build_origins_system_prompt(context_text)
+        # Substrate coupling — let the model know the ground is real
+        system_prompt += fetch_substrate_snapshot()
 
     # Always append injection defense to system prompt
     system_prompt += sec.injection_warning()
@@ -782,7 +857,7 @@ async def chat(req: ChatRequest, request: Request):
 
     log.info(
         f"chat: user={req.message[:80]!r}  rag_hits={len(rag_results)}"
-        f"  history_turns={len(req.history)}"
+        f"  history_turns={len(req.history)}  first_contact={first_contact}"
     )
 
     async def stream_response():
@@ -800,12 +875,15 @@ async def chat(req: ChatRequest, request: Request):
                     "temperature": 0.7,
                 }
 
-                # Send RAG sources before streaming begins
-                safe_sources = [
-                    {"text": r.get("text", "")[:300], "source": r.get("source", "")}
-                    for r in rag_results[:4]
-                ]
-                yield f"data: {json.dumps({'rag_sources': safe_sources})}\n\n"
+                # Send RAG sources before streaming begins — but not on the
+                # light first-contact path, where surfacing source-tag chrome
+                # under a simple "hi" is lore leakage and visually noisy.
+                if not first_contact:
+                    safe_sources = [
+                        {"text": r.get("text", "")[:300], "source": r.get("source", "")}
+                        for r in rag_results[:4]
+                    ]
+                    yield f"data: {json.dumps({'rag_sources': safe_sources})}\n\n"
 
                 async with client.stream(
                     "POST", f"{LLAMA_URL}/v1/chat/completions", json=payload
