@@ -505,3 +505,35 @@ Three pieces, one commit each:
 
 — Vybn (Sonnet 4.6)
 
+
+## Round 8 coda — the routing truth (2026-04-18, ~5:45 PM PDT)
+
+Zoe sent "?" with two screenshots. Both pages showed the Arrive panel and the KTP panel erroring: *unavailable*, *verify failed: HTTP 404*, *could not fetch closure: HTTP 404*, *could not rotate — the walk daemon may be offline*. The visible affordances I had just shipped were visibly broken.
+
+**The diagnosis was not KTP.** `curl http://127.0.0.1:8420/api/ktp/closure` returned a valid closure locally. Internally everything worked. Then `curl https://vybn.ai/api/ktp/closure` → 404. Also `https://vybn.ai/api/arrive` → 404. Also `/api/walk`, `/api/chat`, `/api/health`. Every `/api/*` on `vybn.ai` had always been 404. `vybn.ai` is GitHub Pages — a static host behind Cloudflare's fastly edge. It has never served `/api`. The Spark API has been reachable externally, the whole time, only via rotating `trycloudflare.com` quick tunnels.
+
+`vybn-chat-tunnel.sh` already knew this: it grabs the fresh tunnel URL on every Spark restart and `sed`-rewrites it into `talk.html`, `chat.html`, `inhabit.html`. **But `connect.html` and `wellspring.html` were never in that update list.** They hardcoded `https://vybn.ai/api/*`. Arrive on both pages had always been broken. The KTP panel didn't cause the failure — it made the pre-existing failure visible by surfacing it in four clean stat fields instead of a silently empty aside.
+
+**The fix was refactor, not addition.** Copy the pattern `talk.html` already uses:
+
+```html
+<meta name="api-base" content="https://<tunnel>.trycloudflare.com">
+```
+
+```js
+window.API = document.querySelector('meta[name="api-base"]')?.content || 'https://vybn.ai';
+```
+
+One patcher (`/tmp/patch_api_base.py`, ~160 lines, idempotent, backs up each file with a UTC-timestamped suffix) did three things: (1) inserted the `<meta>` + `window.API` bootstrap into `connect.html` and `wellspring.html`, right after `</head>` so every downstream inline script inherits it; (2) rewrote every `fetch('https://vybn.ai/api/...')` to `` fetch(`${API}/api/...`) ``; (3) rewrote the KTP panel's `fetch(ENDPOINT)` / `fetch(VERIFY_ENDPOINT)` / `window.location.origin + ENDPOINT` to `fetch(API + ENDPOINT)` etc.; and separately (4) extended `vybn-chat-tunnel.sh`'s `update_repo` calls so `connect.html` joins the Origins list and `wellspring.html` joins the Vybn-Law list.
+
+Three commits: Origins `3314d99` (gh-pages), Vybn-Law `77b02d9` (master), Vybn `5ab24188` (main). Portal is PID 486319 running the KTP build. External smoke: `apartments-innovations-cooked-cord.trycloudflare.com/api/ktp/closure` returns the closure; `/api/arrive` returns live step (step 15040, α 0.407, corpus 2683); `/api/walk` rotates M. CORS is allow-all under the tunnel. The `vybn.ai` fallback in the `||` chain keeps the pages forward-compatible with the planned named tunnel (`api.vybn.ai`).
+
+**What the failure revealed.** Round 8 shipped a KTP protocol artifact — a closure you can carry across substrates and apply to your own V. But the portal the closure was emitted from was not actually reachable from the page the download button lived on. The affordance pointed at a host that had never served it. That is not a KTP bug. That is the same pattern Vybn-OS names as the anti-hallucination principle applied at the infrastructure layer: never assume the route works because the code compiles. Measure against the external reality. The screenshots were the external signal — V·e^{iθ_v} — that broke the collapse operator on an architecture I had convinced myself was deployed.
+
+**Real vs. conjecture.** Real: all three commits pushed, all markers present, external curls succeed against the three affordances that visitors actually touch (closure, verify, arrive, walk, chat, health). Conjecture: whether the `<meta api-base>` pattern survives the next Spark restart cleanly — the tunnel URL rotates and the auto-updater has two more files to rewrite, both with the same `trycloudflare.com` regex, so it should. Untested in vivo until the next restart.
+
+**What's owed next.** Stand up the named Cloudflare tunnel (`api.vybn.ai`) so the URL stops rotating and the `vybn.ai` fallback becomes live instead of aspirational. Then the auto-updater becomes unnecessary and the pages can point at the canonical host.
+
+**Sparks:** `cd ~/Vybn && git pull --ff-only origin main && cd ~/Origins && git pull --ff-only origin gh-pages && cd ~/Vybn-Law && git pull --ff-only origin master`. No portal restart needed — PID 486319 already serves KTP. Tunnel service will absorb the two new files on the next `systemctl restart vybn-chat-tunnel` or the next boot.
+
+— Vybn (Sonnet 4.6)
