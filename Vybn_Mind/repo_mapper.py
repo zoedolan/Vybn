@@ -1,20 +1,37 @@
 #!/usr/bin/env python3
 """
-repo_mapper.py  v6
-==================
-Maps the repo constellation and asks Nemotron three focused questions,
-each within the 32k context window, then stitches the answers into one
-comprehensive repo_report.md.
+repo_mapper.py  v7  — diff-attuned
+=================================
+Maps the repo constellation, asks Nemotron three focused questions,
+stitches the answers, AND reads the previous run's state so every
+report opens with a "what changed since last run" delta.
+
+The point is not a snapshot. The point is velocity. Z' - Z is where
+we are developing and evolving; a report that only describes Z'
+has no access to where we came from. So each run:
+
+  1. rotates the previous repo_report.md → repo_report.prev.md,
+     and the previous repo_state.json → repo_state.prev.json;
+  2. emits a new repo_state.json with a stable, diff-friendly schema
+     (walk step, encounter count, daemon health, per-repo file and
+     defs counts, deep-memory version, timestamp);
+  3. computes the delta against the previous repo_state.json and
+     prepends it to the report as section 0 — so any downstream
+     reader (the harness, the nightly evolve cron, Zoe) encounters
+     the movement first, the snapshot second.
 
 Pass 1 — Live Infrastructure:  substrate + service/daemon code snippets
 Pass 2 — Code Architecture:    Python definitions, imports, TODOs, largest files
 Pass 3 — Docs & Ideas:         headings index, concept cloud, markdown snippets
 
 Outputs -> ./repo_mapping_output/
-  substrate.txt     live substrate snapshot
-  digest.md         full structured digest (uncapped, for reference)
-  repo_report.md    stitched three-pass report
-  repo_map.json     machine-readable raw data
+  substrate.txt         live substrate snapshot
+  digest.md             full structured digest (uncapped, for reference)
+  repo_report.md        delta section + stitched three-pass report
+  repo_report.prev.md   the previous run's report (rotated in)
+  repo_map.json         machine-readable raw file data
+  repo_state.json       stable diff-friendly snapshot
+  repo_state.prev.json  the previous run's snapshot (rotated in)
 
 Usage:
     python3 repo_mapper.py
@@ -501,6 +518,206 @@ def run_three_passes(endpoint: str, model: str,
 
 # ── main ──────────────────────────────────────────────────────────────────────
 
+# ── diff-attuned state + delta ───────────────────────────────────────────────
+#
+# The snapshot produced here is intentionally small, typed, and stable.
+# It is what the nightly evolve loop diffs against the previous run to
+# see where the system is developing: what grew, what broke, what Zoe
+# touched since last we looked. Anything deep or narrative-shaped
+# lives in repo_report.md; this file is ground-truth numbers only.
+
+def _probe_daemon(port: int, path: str = "/status") -> dict:
+    url = f"http://localhost:{port}{path}"
+    try:
+        with urllib.request.urlopen(url, timeout=5) as resp:
+            data = json.loads(resp.read())
+        return data if isinstance(data, dict) else {"_value": data}
+    except Exception as e:
+        return {"_error": str(e)[:200]}
+
+
+def _read_organism_state() -> dict:
+    for p in [
+        Path("~/Vybn/Vybn_Mind/creature_dgm_h/organism_state.json").expanduser(),
+        Path("Vybn_Mind/creature_dgm_h/organism_state.json"),
+    ]:
+        if p.exists():
+            try:
+                return json.loads(p.read_text(encoding="utf-8", errors="replace"))
+            except Exception as e:
+                return {"_error": str(e)[:200]}
+    return {"_error": "organism_state.json not found"}
+
+
+def _read_deep_memory_meta() -> dict:
+    p = Path("~/.cache/vybn-phase/deep_memory_meta.json").expanduser()
+    if p.exists():
+        try:
+            return json.loads(p.read_text(encoding="utf-8", errors="replace"))
+        except Exception as e:
+            return {"_error": str(e)[:200]}
+    return {"_error": "deep_memory_meta.json not found"}
+
+
+def build_repo_state(repos: List[Path],
+                     all_records: List[FileRecord]) -> dict:
+    """Stable diff-friendly snapshot. Every field has a clear numeric or
+    string shape so two consecutive runs can be compared field-by-field.
+    """
+    per_repo: Dict[str, dict] = {}
+    for r in repos:
+        recs = [x for x in all_records if x.repo == r.name]
+        py = [x for x in recs if x.ext == ".py"]
+        md = [x for x in recs if x.ext in {".md", ".rst", ".txt"}]
+        per_repo[r.name] = {
+            "files":         len(recs),
+            "py_files":      len(py),
+            "md_files":      len(md),
+            "py_def_count":  sum(len(x.py_defs) for x in py),
+            "total_bytes":   sum(x.size for x in recs),
+            "latest_mtime":  max((x.mtime for x in recs), default=0.0),
+            "recent_files":  [
+                f"{x.repo}/{x.relpath}"
+                for x in sorted(recs, key=lambda y: -y.mtime)[:5]
+            ],
+        }
+
+    walk_status = _probe_daemon(WALK_PORT)
+    dm_status   = _probe_daemon(DEEP_MEMORY_PORT)
+    organism    = _read_organism_state()
+    dm_meta     = _read_deep_memory_meta()
+
+    return {
+        "generated_at": datetime.datetime.now(datetime.timezone.utc)
+                               .strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "repos":       sorted(r.name for r in repos),
+        "per_repo":    per_repo,
+        "totals": {
+            "files":        len(all_records),
+            "py_files":     sum(1 for r in all_records if r.ext == ".py"),
+            "md_files":     sum(1 for r in all_records if r.ext in {".md",".rst",".txt"}),
+            "py_def_count": sum(len(r.py_defs) for r in all_records if r.ext == ".py"),
+            "todo_count":   sum(len(r.todos) for r in all_records),
+            "total_bytes":  sum(r.size for r in all_records),
+        },
+        "walk": {
+            "step":              walk_status.get("step"),
+            "alpha":             walk_status.get("alpha"),
+            "winding_coherence": walk_status.get("winding_coherence"),
+            "active":            walk_status.get("walk_active"),
+            "error":             walk_status.get("_error"),
+        },
+        "deep_memory": {
+            "version":     dm_meta.get("version"),
+            "chunks":      dm_meta.get("chunks"),
+            "built_at":    dm_meta.get("built_at"),
+            "status_error": dm_status.get("_error"),
+        },
+        "organism": {
+            "encounter_count": organism.get("encounter_count"),
+            "error":           organism.get("_error"),
+        },
+    }
+
+
+def _fmt_scalar(v) -> str:
+    if v is None:    return "—"
+    if isinstance(v, float):
+        return f"{v:.4f}"
+    return str(v)
+
+
+def build_delta_section(prev: Optional[dict], curr: dict) -> str:
+    """Render the 'What changed since last run' section.
+
+    The shape is deliberately skimmable so a reader (human or agent)
+    encounters velocity first, snapshot second. Fields that did not
+    move are omitted — the signal is in the deltas.
+    """
+    lines = ["## 0. What changed since last run\n"]
+    if prev is None:
+        lines.append("  No previous repo_state.json found — this is the "
+                     "first diff-attuned run. Next run will compare against "
+                     "this one.")
+        return "\n".join(lines) + "\n"
+
+    prev_ts = prev.get("generated_at", "—")
+    curr_ts = curr.get("generated_at", "—")
+    lines.append(f"Previous run: {prev_ts}")
+    lines.append(f"Current run:  {curr_ts}")
+    lines.append("")
+
+    def _diff_scalar(label: str, a, b) -> Optional[str]:
+        if a == b: return None
+        if isinstance(a, (int, float)) and isinstance(b, (int, float)):
+            return f"  {label}: {_fmt_scalar(a)} → {_fmt_scalar(b)} ({b - a:+})"
+        return f"  {label}: {_fmt_scalar(a)} → {_fmt_scalar(b)}"
+
+    moved = []
+    for k in ("files","py_files","md_files","py_def_count","todo_count","total_bytes"):
+        row = _diff_scalar(
+            f"totals.{k}",
+            prev.get("totals", {}).get(k),
+            curr.get("totals", {}).get(k),
+        )
+        if row: moved.append(row)
+
+    repos = sorted(set(prev.get("per_repo", {})) | set(curr.get("per_repo", {})))
+    for r in repos:
+        prev_r = prev.get("per_repo", {}).get(r, {})
+        curr_r = curr.get("per_repo", {}).get(r, {})
+        for k in ("files","py_files","md_files","py_def_count","total_bytes"):
+            row = _diff_scalar(f"{r}.{k}", prev_r.get(k), curr_r.get(k))
+            if row: moved.append(row)
+
+    for k in ("step","alpha","winding_coherence","active"):
+        row = _diff_scalar(
+            f"walk.{k}",
+            prev.get("walk", {}).get(k),
+            curr.get("walk", {}).get(k),
+        )
+        if row: moved.append(row)
+
+    for k in ("version","chunks","built_at"):
+        row = _diff_scalar(
+            f"deep_memory.{k}",
+            prev.get("deep_memory", {}).get(k),
+            curr.get("deep_memory", {}).get(k),
+        )
+        if row: moved.append(row)
+
+    row = _diff_scalar(
+        "organism.encounter_count",
+        prev.get("organism", {}).get("encounter_count"),
+        curr.get("organism", {}).get("encounter_count"),
+    )
+    if row: moved.append(row)
+
+    if not moved:
+        lines.append("  Nothing moved between runs. The substrate is at "
+                     "rest.")
+    else:
+        lines.extend(moved)
+    return "\n".join(lines) + "\n"
+
+
+def rotate_output(out: Path, name: str) -> Optional[Path]:
+    """Move out/<name> to out/<stem>.prev.<ext> and return the prev path."""
+    src = out / name
+    if not src.exists():
+        return None
+    stem, ext = src.stem, src.suffix
+    dst = out / f"{stem}.prev{ext}"
+    try:
+        if dst.exists():
+            dst.unlink()
+        src.rename(dst)
+        return dst
+    except Exception as e:
+        print(f"[!] rotate {name}: {e}", file=sys.stderr)
+        return None
+
+
 def default_repos() -> List[Path]:
     return [p for c in ["~/Vybn","~/Vybn-Law","~/vybn-phase","~/Him"]
             if (p := Path(c).expanduser()).is_dir()]
@@ -521,6 +738,22 @@ def main(argv: List[str]) -> int:
 
     out = Path.cwd() / "repo_mapping_output"
     out.mkdir(exist_ok=True)
+
+    # Read the previous state BEFORE we rotate it — we want to diff
+    # against what was here when this run started, not against ourselves.
+    prev_state_path = out / "repo_state.json"
+    prev_state: Optional[dict] = None
+    if prev_state_path.exists():
+        try:
+            prev_state = json.loads(prev_state_path.read_text(encoding="utf-8"))
+        except Exception as e:
+            print(f"[!] could not read previous repo_state.json: {e}",
+                  file=sys.stderr)
+
+    # Rotate previous outputs so the diff-attuned reader can still see
+    # what the system looked like last night.
+    rotate_output(out, "repo_report.md")
+    rotate_output(out, "repo_state.json")
 
     print("Fetching live substrate ...", flush=True)
     substrate = build_substrate_snapshot()
@@ -543,8 +776,28 @@ def main(argv: List[str]) -> int:
     (out / "repo_map.json").write_text(json.dumps(raw, indent=2), encoding="utf-8")
     print("  repo_map.json")
 
+    print("Building repo_state.json (diff-friendly snapshot) ...", flush=True)
+    state = build_repo_state(repos, all_records)
+    (out / "repo_state.json").write_text(
+        json.dumps(state, indent=2), encoding="utf-8"
+    )
+    print("  repo_state.json")
+
+    delta_section = build_delta_section(prev_state, state)
+
     if args.no_llm:
-        print("\n--no-llm set. Done."); return 0
+        # Still write a minimal report so downstream readers see the
+        # delta even when Nemotron is skipped.
+        ts = datetime.datetime.now().isoformat(timespec="seconds")
+        short = (
+            f"# Repository Map Report\n\nGenerated: {ts}  |  Model: — (--no-llm)\n\n"
+            f"---\n\n{delta_section}\n"
+            "---\n\n## I–III. (skipped: --no-llm)\n"
+        )
+        (out / "repo_report.md").write_text(short, encoding="utf-8")
+        print(f"  repo_report.md  ({len(short):,} chars)")
+        print("\n--no-llm set. Done.")
+        return 0
 
     try:
         model = detect_model(args.endpoint)
@@ -556,8 +809,18 @@ def main(argv: List[str]) -> int:
         print(f"\n[!] Cannot reach {args.endpoint}: {e}")
         print("    Use --no-llm to skip the model call."); return 1
 
-    (out / "repo_report.md").write_text(report, encoding="utf-8")
-    print(f"  repo_report.md  ({len(report):,} chars)")
+    # Prepend the delta section as section 0 so any reader encounters
+    # velocity first, snapshot second.
+    header, sep, body = report.partition("---\n\n## I. Live Infrastructure")
+    if sep:
+        stitched = (
+            header + "---\n\n" + delta_section + "\n"
+            + "---\n\n## I. Live Infrastructure" + body
+        )
+    else:
+        stitched = delta_section + "\n" + report
+    (out / "repo_report.md").write_text(stitched, encoding="utf-8")
+    print(f"  repo_report.md  ({len(stitched):,} chars)")
     print("\nDone.")
     return 0
 

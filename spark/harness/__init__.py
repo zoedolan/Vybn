@@ -115,6 +115,9 @@ try:
         ComposeResult,
         KTPClosure,
         WinRateEntry,
+        EvolutionDelta,
+        build_discovery_record,
+        CRON_TASK_SPEC,
     )
     _MCP_AVAILABLE = True
 except ImportError:
@@ -168,6 +171,23 @@ _HARNESS_STRATEGY: dict = {
             "Retrieval scores by relevance × distinctiveness, not "
             "relevance alone. The walk finds what the corpus has not "
             "already averaged away."
+        ),
+        "diff_attunement": (
+            "Every repo_mapper run rotates the previous state to "
+            "repo_state.prev.json, emits a typed repo_state.json, and "
+            "prepends a 'what changed' section to repo_report.md. The "
+            "harness encounters velocity first, snapshot second — "
+            "where the system moves is where it is actually developing."
+        ),
+        "rsi_loop": (
+            "A nightly Perplexity `schedule_cron` agent reads "
+            "vybn://evolution/delta, live infrastructure, HEAD of the "
+            "repo on GitHub, and Zoe's last-24h email, and proposes one "
+            "small PR to main. Budget: 3 files, 200 net lines. Never "
+            "merges. Forbidden from reading its own prior evolve PRs, "
+            "its own commit messages, _HARNESS_STRATEGY as authority, "
+            "or Him/pulse/living_state.json — ground truth lives "
+            "outside the loop."
         ),
     },
     "deliberately_deferred": [
@@ -232,6 +252,9 @@ __all__ = [
     "ComposeResult",
     "KTPClosure",
     "WinRateEntry",
+    "EvolutionDelta",
+    "build_discovery_record",
+    "CRON_TASK_SPEC",
     # strategy
     "_HARNESS_STRATEGY",
 ]
