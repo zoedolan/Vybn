@@ -188,6 +188,16 @@ heuristics:
     - "\\bdraft\\b"
     - "\\bdesign\\b"
     - "\\bimagine\\b"
+  # Orchestration — explicit multi-step/tool-use requests. Routes to
+  # the orchestrate role (Opus 4.7 + bash + delegate, 25-iter budget).
+  # Ranked after code so "fix the orchestrator bug" still goes to code.
+  orchestrate:
+    - "\\borchestrat(e|es|ed|ing|ion|or)\\b"
+    - "\\b(dispatch|delegate|parallelize|fan[- ]?out|coordinate)\\b.{0,50}\\b(tool|tools|task|tasks|subagent|subagents|call|calls|work)\\b"
+    - "\\b(can you|please)\\b.{0,30}\\btool (use|calls?)\\b"
+    - "\\bjudiciously\\b.{0,50}\\b(tool|call|api)"
+    - "\\brun (this|these|them) in parallel\\b"
+    - "\\b(break|decompose) (this|it|the (task|problem|work))\\b"
   chat:
     - "\\bhow are you\\b"
     - "\\bwhat do you think\\b"

@@ -266,6 +266,16 @@ _DEFAULT_HEURISTICS_RAW: dict[str, list[str]] = {
         r"\bbrainstorm\b", r"\bsketch\b", r"\bwhat if\b",
         r"\bdraft\b", r"\bdesign\b", r"\bimagine\b",
     ],
+    # Orchestration — explicit multi-step/tool-use requests. Ranked
+    # after code so "fix the orchestrator bug" still routes to code.
+    "orchestrate": [
+        r"\borchestrat(e|es|ed|ing|ion|or)\b",
+        r"\b(dispatch|delegate|parallelize|fan[- ]?out|coordinate)\b.{0,50}\b(tool|tools|task|tasks|subagent|subagents|call|calls|work)\b",
+        r"\b(can you|please)\b.{0,30}\btool (use|calls?)\b",
+        r"\bjudiciously\b.{0,50}\b(tool|call|api)",
+        r"\brun (this|these|them) in parallel\b",
+        r"\b(break|decompose) (this|it|the (task|problem|work))\b",
+    ],
     "chat": [
         r"\bhow are you\b", r"\bwhat do you think\b", r"^hi\b", r"^hey\b",
         # Round 4.1: conversational follow-ups and reflection prompts.

@@ -99,12 +99,13 @@ class Router:
         # Dict insertion order worked by accident; a future YAML
         # reorder would silently break routing. Pin it here.
         _HEURISTIC_PRIORITY = (
-            "task",        # confirmations ("ok", "proceed") -- earliest
-            "identity",    # "which model are you?" before greetings
-            "phatic",      # bare greetings/closings
-            "code",        # grounded code work
-            "create",      # brainstorm/sketch
-            "chat",        # how-are-you style
+            "task",         # confirmations ("ok", "proceed") -- earliest
+            "identity",     # "which model are you?" before greetings
+            "phatic",       # bare greetings/closings
+            "code",         # grounded code work
+            "create",       # brainstorm/sketch
+            "orchestrate",  # explicit multi-step/tool-use requests
+            "chat",         # how-are-you style
         )
         heur = self.policy.heuristics
         ranked = [r for r in _HEURISTIC_PRIORITY if r in heur]
