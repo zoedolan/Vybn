@@ -154,6 +154,90 @@ def _preview(result: str) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Assistant-content sanitizer.
+#
+# Anthropic rejects any request whose message history contains an assistant
+# turn with an empty text content block ("messages: text content blocks must
+# be non-empty"). This happens in rare cases where the model returns
+# end_turn with a zero-length text block (observed 2026-04-18 with Opus 4.6
+# on chat role). If we append the raw content verbatim, the poisoned history
+# 400s every subsequent turn until the REPL is restarted.
+#
+# Sanitize before appending: drop zero-length text blocks, drop tool_result
+# blocks with empty content, and if *nothing* survives, substitute a
+# one-character placeholder so the shape stays valid. For OpenAI-style
+# string content, coerce empty strings to a placeholder.
+# ---------------------------------------------------------------------------
+
+_EMPTY_PLACEHOLDER = "\u200b"  # zero-width space — visible nowhere, non-empty to validators
+
+
+def _sanitize_assistant_content(content):
+    """Strip empty text blocks from assistant content before storing in history.
+
+    Returns a content value safe to re-send to Anthropic / OpenAI. Never
+    returns an empty list or empty string — substitutes a zero-width-space
+    placeholder when all blocks would be dropped.
+    """
+    if content is None:
+        return _EMPTY_PLACEHOLDER
+
+    # OpenAI-style: plain string.
+    if isinstance(content, str):
+        return content if content else _EMPTY_PLACEHOLDER
+
+    # Anthropic-style: list of content blocks. Each block may be an SDK
+    # object (attribute access) or a dict (from replayed history).
+    if isinstance(content, list):
+        cleaned: list = []
+        for block in content:
+            btype = getattr(block, "type", None) or (
+                block.get("type") if isinstance(block, dict) else None
+            )
+            if btype == "text":
+                text = getattr(block, "text", None)
+                if text is None and isinstance(block, dict):
+                    text = block.get("text", "")
+                if text:  # non-empty only
+                    cleaned.append(block)
+                # else: drop the empty text block entirely
+            elif btype == "tool_use":
+                # Always keep — required to pair with tool_result follow-ups.
+                cleaned.append(block)
+            elif btype in ("thinking", "redacted_thinking"):
+                # Preserve — Anthropic requires these adjacent to tool_use on
+                # adaptive-thinking turns. Dropping them poisons the next turn.
+                cleaned.append(block)
+            elif btype == "tool_result":
+                # Empty tool_result content also fails validation.
+                tr_content = getattr(block, "content", None)
+                if tr_content is None and isinstance(block, dict):
+                    tr_content = block.get("content")
+                if tr_content:
+                    cleaned.append(block)
+                else:
+                    # Substitute a non-empty placeholder rather than drop —
+                    # tool_result must match its tool_use id.
+                    if isinstance(block, dict):
+                        patched = dict(block)
+                        patched["content"] = "(no output)"
+                        cleaned.append(patched)
+                    else:
+                        cleaned.append(block)
+            else:
+                cleaned.append(block)
+
+        if not cleaned:
+            # Everything dropped — substitute a minimal non-empty text block
+            # so the turn survives but carries no false content.
+            return [{"type": "text", "text": _EMPTY_PLACEHOLDER}]
+        return cleaned
+
+    # Unknown shape — pass through unchanged rather than mangle.
+    return content
+
+
+# ---------------------------------------------------------------------------
 # Tool-call execution — provider-agnostic.
 # ---------------------------------------------------------------------------
 
@@ -701,10 +785,25 @@ def run_agent_loop(
             bag["out_tokens"] += response.out_tokens
             final_text = response.text or final_text
 
+            # Sanitize before storing — an empty text block in the raw
+            # content would 400 every subsequent turn.
+            safe_content = _sanitize_assistant_content(response.raw_assistant_content)
             messages.append({
                 "role": "assistant",
-                "content": response.raw_assistant_content,
+                "content": safe_content,
             })
+
+            # Round 7 regression guard: if the model returned end_turn with
+            # no visible text, tell Zoe rather than leave a silent prompt.
+            # Common cause: Opus 4.6 occasionally emits a single empty text
+            # block on chat-role turns. The sanitizer keeps the history
+            # valid; this message keeps the REPL honest.
+            if (
+                response.stop_reason == "end_turn"
+                and not (response.text or "").strip()
+                and not response.tool_calls
+            ):
+                _dim(f"[empty response from {role_cfg.provider}:{role_cfg.model} — try rephrasing or pin a different model with @sonnet/@opus4.7]")
 
             if response.stop_reason == "end_turn":
                 bag["stop_reason"] = "end_turn"
