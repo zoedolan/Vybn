@@ -67,8 +67,8 @@ update_repo() {
 
 # Only update if git is configured
 if command -v git &>/dev/null && git config --global user.name &>/dev/null; then
-    update_repo "$HOME/Vybn-Law" "master" "chat.html"
-    update_repo "$HOME/Origins" "gh-pages" "talk.html" "inhabit.html"
+    update_repo "$HOME/Vybn-Law" "master" "chat.html" "wellspring.html"
+    update_repo "$HOME/Origins" "gh-pages" "talk.html" "inhabit.html" "connect.html"
 fi
 
 # Keep running (systemd expects foreground)
