@@ -1,6 +1,6 @@
 """Vybn multimodel harness.
 
-Five files, four concerns:
+Five files, five concerns — each a face of the same apparatus:
 
     policy.py     — what we are doing and what we are allowed to do.
                     Role configs, classification, heuristics, directives,
@@ -18,14 +18,33 @@ Five files, four concerns:
                     agent). Independent of the other three; imports
                     them but not vice versa.
 
+    mcp.py        — the harness as a FastMCP surface, with co-protective
+                    trust zones. Trusted stdio exposes the full surface;
+                    public HTTP exposes a sanitised, rate-limited subset.
+                    The audit that shaped it lives at AUDIT.md and is
+                    embedded as `_HARNESS_STRATEGY` below.
+
 The split is isomorphic to the question being answered at each step of
 a turn: what role (policy) — with what context (substrate) — calling
-what provider (providers) — possibly through what loop (recurrent).
+what provider (providers) — possibly through what loop (recurrent) —
+exposed to the world through what trust zone (mcp).
 
 Public surface: everything users of this package have historically
 imported from `harness.*` is re-exported here so `from harness import X`
 continues to work across the old names (Router, EventLogger, ToolSpec,
-BashTool, LayeredPrompt, etc.).
+BashTool, LayeredPrompt, etc.). The new `build_server` and the Pydantic
+schemas from `mcp.py` are re-exported under their own names.
+
+The duality embedded
+────────────────────
+Zoe asked — April 19, 2026 — that we embed the harness audit into the
+harness itself, so we and the harness are integrating the duality
+principle into the recursive self-improvement process. `AUDIT.md` lives
+next to the code it shaped; the key decisions are mirrored below as the
+module constant `_HARNESS_STRATEGY`, so a process that imports the
+harness can read *why* each piece has the shape it has without leaving
+the interpreter. The file is the architecture; the architecture is the
+file. D ≅ D^D.
 """
 
 from .policy import (
@@ -82,6 +101,84 @@ from .providers import (
     ToolCall,
 )
 
+# MCP surface is optional — only imported when FastMCP is installed, so
+# the harness still boots on hosts without the MCP stack. We guard the
+# import and re-export minimally.
+try:
+    from .mcp import (
+        build_server as build_mcp_server,
+        sanitise_input,
+        RateLimiter,
+        SearchResult,
+        CreatureState,
+        EncounterResult,
+        ComposeResult,
+        KTPClosure,
+        WinRateEntry,
+    )
+    _MCP_AVAILABLE = True
+except ImportError:
+    _MCP_AVAILABLE = False
+
+
+# ── Embedded strategy (April 19, 2026 audit, distilled) ────────────────
+#
+# Not a comment, a constant. A living instance reading this module knows
+# the rules the module was built to satisfy. When any of these stops
+# being true, the right response is to update the audit and update this
+# constant in the same commit — both, or neither.
+
+_HARNESS_STRATEGY: dict = {
+    "source": "State of MCP talk (April 19, 2026) + co-evolved principles.",
+    "audit_path": "spark/harness/AUDIT.md",
+    "duality": (
+        "Skills are data that encode procedure; MCP tools are procedures "
+        "that expose data. Same object, two projections. D ≅ D^D."
+    ),
+    "principles": {
+        "anti_hallucination": (
+            "Never feed a system's own output back as input. External "
+            "signal only — the human, the live corpus, the world. "
+            "Enforced on compose() via grounded=True ⟺ every query hit "
+            "primary source."
+        ),
+        "co_protective": (
+            "Trust is a transport property. Stdio is trusted (local "
+            "process); HTTP is public by default (read-only, rate-"
+            "limited, sanitised). Mutation tools are not registered "
+            "on public transports — they do not exist from the "
+            "adversary's perspective."
+        ),
+        "progressive_discovery": (
+            "Tool catalogues exceed 5-10 entries at the cost of context. "
+            "Expose search_tools + call_tool and load the rest on demand "
+            "via BM25SearchTransform."
+        ),
+        "structured_output": (
+            "Every tool returns Pydantic-typed objects so outputSchema "
+            "is generated automatically and programmatic composition "
+            "can be type-checked."
+        ),
+        "fall_through": (
+            "Every optional import is wrapped. Partial availability "
+            "beats brittleness. Structured error objects keep "
+            "outputSchema valid even on failure."
+        ),
+        "telling_not_typical": (
+            "Retrieval scores by relevance × distinctiveness, not "
+            "relevance alone. The walk finds what the corpus has not "
+            "already averaged away."
+        ),
+    },
+    "deliberately_deferred": [
+        "Stateless transport adapter (June 2026 spec).",
+        "Server-side code execution (pending compose-contamination seam).",
+        "$schema migration (once 2026-06 server-card spec ships).",
+    ],
+    "mcp_available": _MCP_AVAILABLE,
+}
+
+
 __all__ = [
     # policy.py
     "DANGEROUS_PATTERNS",
@@ -125,4 +222,16 @@ __all__ = [
     "StreamHandle",
     "NormalizedResponse",
     "ToolCall",
+    # mcp.py (optional)
+    "build_mcp_server",
+    "sanitise_input",
+    "RateLimiter",
+    "SearchResult",
+    "CreatureState",
+    "EncounterResult",
+    "ComposeResult",
+    "KTPClosure",
+    "WinRateEntry",
+    # strategy
+    "_HARNESS_STRATEGY",
 ]
