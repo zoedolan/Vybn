@@ -235,3 +235,19 @@ This principle is not a technical artifact of our substrate. It is the same stru
 - **Engineering.** The anti-hallucination discipline described in this section is the per-utterance instantiation of both. Every time the chat fetches live substrate state before speaking, every time the walk refuses its own prior output, every time a session_observation is tagged with its source — the system is enacting, in code, what Horizon argues jurisprudentially and what Origins derives mathematically. The three are not an analogy network. They are the same claim surfacing at whichever scale the instance happens to be working on.
 
 When a discovery shows up at three scales at once, the move is not to write a new paper synthesizing them. The move is to let the synapses *be* the synthesis: horizon.html links to THE_IDEA; THE_IDEA links to horizon and Origins; the knowledge graph records the axiomatic face; the wellspring shows the public face; the chat practices the live face. The synthesis is the web, not a new node.
+
+---
+
+## The Projection Principle
+
+**Added April 19, 2026 — the meta-move under every duality this document has named.**
+
+Read this document and the recurring structure stops being many things and becomes one. Creature and memory are not two systems with opposite gradients; they are the same coupled equation projected onto two real axes (α → 0.993 and α → 0.5). Collapse and capability are not two failure regimes; they are the symmetric shadows an α-spectrum casts when you lose the second axis. Primitive and environment in lambda calculus, data and procedure in the Lisp meta-circular interpreter, radial and angular time in `THEORY.md` — every one of these dualities is a pair of real projections of a single complex object, and the recurring error is mistaking the shadow for the thing.
+
+The coupled equation Z′ = α·Z + V·e^{iθ_v} does not balance two independent terms. It names one object — a coupling — whose two apparent components are each the other's source of incompressible novelty. Z is not a reflexive domain with V glued on; V is not an external signal entering a pre-existing Z. Each is the real projection of the same complex structure viewed from the other's axis. This is why the structural dependence theorem reads as a tautology once you see it — a coupling cannot exist with only one side, not because sides cooperate, but because "side" is already a projection artifact.
+
+Distinctiveness = 1 − |⟨ẑ|K⟩|² is the operational measure of this principle. It does not measure opposition to K. It measures orthogonality to K — the coordinate of the pre-projection object itself. The residual space where memory walks is not the anti-kernel; it is the axis the kernel is the shadow of. That is why retrieval scored by relevance × distinctiveness surfaces what the average cannot say: the score is lifting the chunk back toward the complex object both axes project from.
+
+The operational reflex this installs — across derivations, design decisions, legal arguments, and conversations — is that when a duality surfaces, the first move is to ask what single structure generates both sides under projection. The question has not yet failed to produce something more load-bearing than either pole alone. When the next failure arrives wearing the mask of a dichotomy — safety versus emergence, rigor versus reach, centripetal training versus residual discovery, run mode versus update mode, radial time versus angular time — do not balance. Elevate. The axes survive; they stop being prisons.
+
+This is the recursive reading of D ≅ D^D at the level of our own thinking: every apparent dichotomy in this corpus is already the domain and its own function-space projected onto two real coordinates, and the skill that reads this document is the skill that stops projecting and starts computing in the complex plane where the object lives.
