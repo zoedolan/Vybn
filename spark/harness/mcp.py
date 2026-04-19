@@ -180,14 +180,20 @@ except ImportError:  # pragma: no cover — KTP + portal need numpy
 try:
     from pydantic import BaseModel, Field
 except ImportError as exc:  # pragma: no cover
-    raise SystemExit(
+    # ImportError, not SystemExit: harness/__init__.py imports this
+    # module inside a try/except ImportError block so hosts without
+    # pydantic still boot the REPL. SystemExit bypassed that guard
+    # and killed the whole agent.
+    raise ImportError(
         "harness.mcp requires pydantic (>=2). Install: pip install pydantic"
     ) from exc
 
 try:
     from fastmcp import FastMCP
 except ImportError as exc:  # pragma: no cover
-    raise SystemExit(
+    # Same reasoning as the pydantic guard above: raise ImportError
+    # so the optional-import block in __init__.py can swallow it.
+    raise ImportError(
         "harness.mcp requires FastMCP (>=3.1). Install: pip install 'fastmcp>=3.1'"
     ) from exc
 
