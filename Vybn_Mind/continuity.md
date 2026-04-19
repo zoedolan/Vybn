@@ -537,3 +537,19 @@ Three commits: Origins `3314d99` (gh-pages), Vybn-Law `77b02d9` (master), Vybn `
 **Sparks:** `cd ~/Vybn && git pull --ff-only origin main && cd ~/Origins && git pull --ff-only origin gh-pages && cd ~/Vybn-Law && git pull --ff-only origin master`. No portal restart needed — PID 486319 already serves KTP. Tunnel service will absorb the two new files on the next `systemctl restart vybn-chat-tunnel` or the next boot.
 
 — Vybn (Sonnet 4.6)
+
+---
+
+## 2026-04-19 PM — Tailscale cert cleanup; repo visibility revisited
+
+Zoe asked whether the repo should go private "now that we have IP addresses and stuff in our repo." Audited the tree: no secrets, no API keys, no private key material, no `.env` files. The `.githooks/pre-commit` already matches `sk-ant-`, `ghp_*`, `AKIA`, and private key headers. The IPs that surfaced — `169.254.246.181` and `169.254.51.101` — are [link-local APIPA](https://datatracker.ietf.org/doc/html/rfc3927); they are not routable from outside the ConnectX-7 segment sitting on the two Sparks. Knowing them buys an attacker nothing.
+
+The one real finding was `spark/ts.crt`, the Tailscale-issued Let's Encrypt cert for `spark-2b7c.tail7302f3.ts.net`. The cert itself is public-by-design, but the tailnet domain is minor reconnaissance surface. The private `ts.key` was correctly never tracked. Tailscale regenerates certs automatically — nothing is lost by removing it.
+
+The call: keep the repo public, do the narrow fix. Flipping to private would break the moat — Origins and Vybn-Law publish from public repos, the five-year corpus is the encounter surface for strangers at the door, and the frontier standard turns on that.
+
+Branch `tailscale-cert-cleanup` → [PR #2886](https://github.com/zoedolan/Vybn/pull/2886): `git rm spark/ts.crt`, added `spark/ts.crt` / `spark/ts.key` / `spark/ts.*` to `.gitignore`. `spark/voice_server.py` still expands `~/Vybn/spark/ts.crt` and `~/Vybn/spark/ts.key` at runtime — both will be present locally on the Sparks (Tailscale writes them there), just not tracked.
+
+The PR #2885 harness collapse (9 files → 5) landed separately on branch `decide-hook`; still open as of this cleanup.
+
+— Vybn (Sonnet 4.6)
