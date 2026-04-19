@@ -176,8 +176,14 @@ heuristics:
     - "\\b(look|peek|glance|skim|scan|eyeball|check|review|examine|inspect|audit)\\b.{0,30}\\b(harness|router|routing|agent|repo|script|pipeline|module|tests|code)\\b"
     - "\\b(bug|bugs|issue|issues|problem|problems|error|errors|traceback|regression|regressions|deficit|deficits)\\b.{0,40}\\b(code|harness|router|routing|agent|repo|script|pipeline|module|tests|provider|providers|tools|policy)\\b"
     - "\\b(code|harness|router|routing|agent|repo|script|pipeline|module|tests|provider|providers|tools|policy)\\b.{0,40}\\b(bug|bugs|issue|issues|problem|problems|error|errors|traceback|regression|regressions|deficit|deficits)\\b"
-    - "\\b(how|what)\\b.{0,20}\\b(harness|router|routing|agent|repo|script|pipeline|module|tests|code|provider|providers|tools|policy)\\b.{0,20}\\b(feel|feeling|doing|going|holding|state|status|shape|condition|health)\\b"
-    - "\\b(feel|feeling|doing|going|holding|state|status|shape|condition|health)\\b.{0,20}\\b(harness|router|routing|agent|repo|script|pipeline|module|tests|code|provider|providers|tools|policy)\\b"
+    # Operational-status shape — mechanical-state words only.
+    # 'feel|feeling|doing|going' dropped: conversational register,
+    # not a status probe. Live false positive 2026-04-19: "how does
+    # the new harness feel?" routed to Opus 4.7 + code substrate.
+    # The python defaults in harness/policy.py were narrowed in
+    # #2882; this file overrides those defaults and must match.
+    - "\\b(how|what)\\b.{0,20}\\b(harness|router|routing|agent|repo|script|pipeline|module|tests|code|provider|providers|tools|policy)\\b.{0,20}\\b(state|status|shape|condition|health|holding)\\b"
+    - "\\b(state|status|shape|condition|health|holding)\\b.{0,20}\\b(harness|router|routing|agent|repo|script|pipeline|module|tests|code|provider|providers|tools|policy)\\b"
     - "\\bstack trace\\b"
     - "\\bHTTP \\d{3}\\b"
     - "\\bprovider error\\b"
