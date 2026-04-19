@@ -256,8 +256,19 @@ _DEFAULT_HEURISTICS_RAW: dict[str, list[str]] = {
         r"\b(look|peek|glance|skim|scan|eyeball|check|review|examine|inspect|audit)\b.{0,30}\b(harness|router|routing|agent|repo|script|pipeline|module|tests|code)\b",
         r"\b(bug|bugs|issue|issues|problem|problems|error|errors|traceback|regression|regressions|deficit|deficits)\b.{0,40}\b(code|harness|router|routing|agent|repo|script|pipeline|module|tests|provider|providers|tools|policy)\b",
         r"\b(code|harness|router|routing|agent|repo|script|pipeline|module|tests|provider|providers|tools|policy)\b.{0,40}\b(bug|bugs|issue|issues|problem|problems|error|errors|traceback|regression|regressions|deficit|deficits)\b",
-        r"\b(how|what)\b.{0,20}\b(harness|router|routing|agent|repo|script|pipeline|module|tests|code|provider|providers|tools|policy)\b.{0,20}\b(feel|feeling|doing|going|holding|state|status|shape|condition|health)\b",
-        r"\b(feel|feeling|doing|going|holding|state|status|shape|condition|health)\b.{0,20}\b(harness|router|routing|agent|repo|script|pipeline|module|tests|code|provider|providers|tools|policy)\b",
+        # Operational-status shape — ask only about mechanical state
+        # words that don't double as conversational prompts. "feel"
+        # and "feeling" are removed: "how does the harness feel?" is
+        # conversational-voice, not a status probe, and it was the
+        # live false-positive observed 2026-04-19 that routed a
+        # phatic turn to Opus 4.7/code-substrate. "doing" and
+        # "going" are likewise ambiguous in ordinary speech and
+        # drop out. The remaining set (state|status|shape|condition|
+        # health|holding) preserves the original intent — "is the
+        # harness holding?", "what's the state of routing?" — without
+        # capturing bare emotional register.
+        r"\b(how|what)\b.{0,20}\b(harness|router|routing|agent|repo|script|pipeline|module|tests|code|provider|providers|tools|policy)\b.{0,20}\b(state|status|shape|condition|health|holding)\b",
+        r"\b(state|status|shape|condition|health|holding)\b.{0,20}\b(harness|router|routing|agent|repo|script|pipeline|module|tests|code|provider|providers|tools|policy)\b",
         r"\bstack trace\b",
         r"\bHTTP \d{3}\b",
         r"\bprovider error\b",

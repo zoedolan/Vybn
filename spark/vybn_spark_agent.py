@@ -118,10 +118,104 @@ def _fit_probe_output(out: str) -> str:
 # prints the output to Zoe, and appends a synthetic user-turn with the
 # result so the model sees it on the NEXT turn. One-shot: only the
 # first match is executed.
-_PROBE_RE = _re.compile(
-    r'\[NEEDS-EXEC:\s*(.+?)\]',
-    _re.IGNORECASE | _re.DOTALL,
+#
+# The opener regex matches only the START of a probe block. We find the
+# closing ']' with a bracket-depth scanner (see _find_probe_match) so
+# commands containing ']' (Python slicing [:2000], shell arrays ${a[0]},
+# awk actions '{print $1}') survive intact. The original pattern
+#   r'\[NEEDS-EXEC:\s*(.+?)\]'
+# non-greedy-terminated at the first ']' it found, which truncated every
+# probe command containing an internal bracket — the 2026-04-19 failure
+# mode.
+_PROBE_OPEN_RE = _re.compile(
+    r'\[NEEDS-EXEC:\s*',
+    _re.IGNORECASE,
 )
+# Back-compat alias. External callers that only use _PROBE_RE.search /
+# .sub for whole-string matches continue to work; we override .search
+# and .sub on a small wrapper so bracket-balanced scanning is used.
+
+
+class _BracketBalancedProbe:
+    """Bracket-depth-aware replacement for the old _PROBE_RE.
+
+    - .search(text) returns a match-like object with .group(0) (full span
+      including the closing ']') and .group(1) (the command body).
+    - .sub(repl, text) returns text with every balanced probe removed.
+    Quotes ('...' and "...") are respected so a ']' inside a quoted string
+    inside the command does not close the probe.
+    """
+
+    class _Match:
+        def __init__(self, whole: str, body: str, start: int, end: int):
+            self._whole = whole
+            self._body = body
+            self._start = start
+            self._end = end
+        def group(self, idx: int = 0) -> str:
+            return self._whole if idx == 0 else self._body
+        def start(self) -> int:
+            return self._start
+        def end(self) -> int:
+            return self._end
+
+    @staticmethod
+    def _scan(text: str, from_idx: int = 0):
+        m = _PROBE_OPEN_RE.search(text, from_idx)
+        if not m:
+            return None
+        body_start = m.end()
+        depth = 1  # the opening '[' of [NEEDS-EXEC: counts
+        i = body_start
+        quote = None
+        escape = False
+        while i < len(text):
+            c = text[i]
+            if escape:
+                escape = False
+            elif c == '\\':
+                escape = True
+            elif quote:
+                if c == quote:
+                    quote = None
+            elif c in ('"', "'"):
+                quote = c
+            elif c == '[':
+                depth += 1
+            elif c == ']':
+                depth -= 1
+                if depth == 0:
+                    body = text[body_start:i]
+                    whole = text[m.start():i+1]
+                    return _BracketBalancedProbe._Match(
+                        whole, body, m.start(), i + 1,
+                    )
+            i += 1
+        # Unterminated — no match. The live stream splitter handles
+        # the "opening seen, not closed" case separately.
+        return None
+
+    def search(self, text: str):
+        return self._scan(text)
+
+    def sub(self, repl, text: str) -> str:
+        if not isinstance(repl, str):
+            # Callables are not used by this codebase; keep it simple.
+            raise TypeError("_BracketBalancedProbe.sub expects a string replacement")
+        out = []
+        i = 0
+        while True:
+            m = self._scan(text, i)
+            if m is None:
+                out.append(text[i:])
+                break
+            out.append(text[i:m.start()])
+            out.append(repl)
+            i = m.end()
+        return "".join(out)
+
+
+_PROBE_RE = _BracketBalancedProbe()
 
 # Round 9: NEEDS-ROLE escalation. A no-tool role may embed
 # [NEEDS-ROLE: <role>] <task text> to hand off to a specialist once.
@@ -217,13 +311,24 @@ def _sanitize_assistant_content(content):
     Returns a content value safe to re-send to Anthropic / OpenAI. Never
     returns an empty list or empty string — substitutes a zero-width-space
     placeholder when all blocks would be dropped.
+
+    Also scrubs literal <thinking>...</thinking> XML-ish tag text from
+    stored text blocks. These are token-space chain-of-thought leaks
+    (distinct from Anthropic's adaptive-thinking content blocks, which
+    carry btype == 'thinking' and are preserved as-is above). Scrubbing
+    here — at store time, not just display time — prevents the next turn
+    from replaying the leaked scaffold out of its own history and
+    reinforcing the pattern.
     """
     if content is None:
         return _EMPTY_PLACEHOLDER
 
     # OpenAI-style: plain string.
     if isinstance(content, str):
-        return content if content else _EMPTY_PLACEHOLDER
+        if not content:
+            return _EMPTY_PLACEHOLDER
+        scrubbed = _strip_thinking_tags(content)
+        return scrubbed if scrubbed else _EMPTY_PLACEHOLDER
 
     # Anthropic-style: list of content blocks. Each block may be an SDK
     # object (attribute access) or a dict (from replayed history).
@@ -237,8 +342,23 @@ def _sanitize_assistant_content(content):
                 text = getattr(block, "text", None)
                 if text is None and isinstance(block, dict):
                     text = block.get("text", "")
-                if text:  # non-empty only
-                    cleaned.append(block)
+                if text:
+                    scrubbed = _strip_thinking_tags(text)
+                    if scrubbed:
+                        # Rewrite the block with scrubbed text. Preserve
+                        # dict vs. SDK-object shape so callers that
+                        # attribute-access the original still work.
+                        if isinstance(block, dict):
+                            patched = dict(block)
+                            patched["text"] = scrubbed
+                            cleaned.append(patched)
+                        elif scrubbed == text:
+                            cleaned.append(block)
+                        else:
+                            # SDK object with mutated text — fall back to
+                            # a dict so we don't mutate the caller's object.
+                            cleaned.append({"type": "text", "text": scrubbed})
+                    # else: entire text was thinking-tag leak — drop the block
                 # else: drop the empty text block entirely
             elif btype == "tool_use":
                 # Always keep — required to pair with tool_result follow-ups.
@@ -500,17 +620,60 @@ def _execute_tool_calls(
     return results, interrupted
 
 
+# Models on no-tool roles occasionally wrap visible reasoning in literal
+# <thinking>...</thinking> XML-ish tags, independent of Anthropic's
+# adaptive-thinking content blocks (which we handle via kind=="thinking"
+# in the provider stream). The tags are a chain-of-thought leak into
+# token-space output — the substrate asks the model to decide whether to
+# probe, and the model sometimes scaffolds that decision out loud. We
+# scrub them in-band so Zoe never sees the leak, and we also scrub the
+# stored assistant content so the NEXT turn can't reinforce the pattern
+# from its own history.
+_THINK_COMPLETE_RE = _re.compile(
+    r'<thinking\b[^>]*>.*?</thinking\s*>',
+    _re.IGNORECASE | _re.DOTALL,
+)
+_THINK_OPEN_RE = _re.compile(r'<thinking\b', _re.IGNORECASE)
+
+
+def _strip_thinking_tags(text: str) -> str:
+    """Remove complete <thinking>...</thinking> blocks.
+    Leaves incomplete openings alone — the stream splitter holds those
+    back from display until the closing tag arrives.
+    """
+    if not text:
+        return text
+    return _THINK_COMPLETE_RE.sub("", text)
+
+
 def _split_before_probe(text: str):
     """Return (safe_to_print, remainder).
     If a complete [NEEDS-EXEC: ...] is present, strip it.
     If one is opening but not closed, hold back from [ onward.
+    If a <thinking> block is opening but not closed, hold back from
+    that tag onward. Complete <thinking>...</thinking> blocks are
+    scrubbed in-place.
     """
-    if _PROBE_RE.search(text):
-        return _PROBE_RE.sub("", text), ""
-    idx = text.rfind("[NEEDS-EXEC")
-    if idx != -1:
-        return text[:idx], text[idx:]
-    return text, ""
+    # Scrub complete thinking blocks first — cheapest case.
+    text = _strip_thinking_tags(text)
+
+    # Probe handling (bracket-balanced).
+    m_probe = _PROBE_RE.search(text)
+    if m_probe:
+        text = _PROBE_RE.sub("", text)
+    probe_idx = text.rfind("[NEEDS-EXEC")
+    if probe_idx != -1:
+        safe, remainder = text[:probe_idx], text[probe_idx:]
+    else:
+        safe, remainder = text, ""
+
+    # If an unterminated <thinking> opens inside `safe`, hold it back.
+    m_open = _THINK_OPEN_RE.search(safe)
+    if m_open:
+        remainder = safe[m_open.start():] + remainder
+        safe = safe[:m_open.start()]
+
+    return safe, remainder
 
 
 def _stream_and_print(handle) -> None:
@@ -533,7 +696,15 @@ def _stream_and_print(handle) -> None:
             if safe:
                 print(safe, end="", flush=True)
     if pending:
-        cleaned = _PROBE_RE.sub("", pending).strip("\n")
+        # Final flush: scrub any complete thinking blocks, then drop an
+        # unterminated opening (the model never closed it before the
+        # stream ended — better to swallow than to leak), then scrub
+        # any lingering probe tag.
+        cleaned = _strip_thinking_tags(pending)
+        m_open = _THINK_OPEN_RE.search(cleaned)
+        if m_open:
+            cleaned = cleaned[: m_open.start()]
+        cleaned = _PROBE_RE.sub("", cleaned).strip("\n")
         if cleaned:
             print(cleaned, end="", flush=True)
     print()
