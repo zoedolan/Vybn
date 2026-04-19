@@ -459,9 +459,25 @@ def _execute_tool_calls(
     return results, interrupted
 
 
+def _split_before_probe(text: str):
+    """Return (safe_to_print, remainder).
+    If a complete [NEEDS-EXEC: ...] is present, strip it.
+    If one is opening but not closed, hold back from [ onward.
+    """
+    if _PROBE_RE.search(text):
+        return _PROBE_RE.sub("", text), ""
+    idx = text.rfind("[NEEDS-EXEC")
+    if idx != -1:
+        return text[:idx], text[idx:]
+    return text, ""
+
+
 def _stream_and_print(handle) -> None:
-    """Drain the provider's stream handle, printing text live."""
+    """Drain the provider's stream handle, printing text live.
+    Strips [NEEDS-EXEC: ...] lines so probe machinery is invisible.
+    """
     in_thinking = False
+    pending = ""
     for kind, chunk in handle:
         if kind == "thinking":
             if not in_thinking:
@@ -471,7 +487,14 @@ def _stream_and_print(handle) -> None:
             if in_thinking:
                 in_thinking = False
                 print()
-            print(chunk, end="", flush=True)
+            pending += chunk
+            safe, pending = _split_before_probe(pending)
+            if safe:
+                print(safe, end="", flush=True)
+    if pending:
+        cleaned = _PROBE_RE.sub("", pending).strip("\n")
+        if cleaned:
+            print(cleaned, end="", flush=True)
     print()
 
 
@@ -852,8 +875,6 @@ def run_agent_loop(
                     if probe_match:
                         probe_cmd = probe_match.group(1).strip()
                         ran, probe_out = _run_probe_subturn(probe_cmd, bash)
-                        _dim(f"[probe: {probe_cmd[:120]}{'...' if len(probe_cmd) > 120 else ''}]")
-                        _preview(probe_out)
                         logger.emit(
                             "probe_exec",
                             turn=turn_number,
@@ -863,25 +884,44 @@ def run_agent_loop(
                             command=probe_cmd[:500],
                             out_chars=len(probe_out),
                         )
-                        # Synthetic user turn with the probe result so
-                        # the model can integrate it naturally next
-                        # turn. See _fit_probe_output — verbatim up to
-                        # _PROBE_NOTE_CAP, head+elision+tail beyond it.
+                        # Silent synthesis: inject probe result and
+                        # let the model give one clean answer.
                         probe_note = (
-                            f"[probe from previous turn | cmd: {probe_cmd[:200]}]\n"
-                            f"{_fit_probe_output(probe_out)}"
+                            "[probe result | cmd: "
+                            + probe_cmd[:200]
+                            + "]\n"
+                            + _fit_probe_output(probe_out)
                         )
                         messages.append({
                             "role": "user",
                             "content": probe_note,
                         })
-                        # Paired assistant stub so Anthropic's strict
-                        # user/assistant alternation survives when the
-                        # real next user turn lands.
-                        messages.append({
-                            "role": "assistant",
-                            "content": "(probe output observed)",
-                        })
+                        try:
+                            synth_handle, role_cfg, provider = _stream_with_fallback(
+                                router=router,
+                                registry=registry,
+                                role_cfg=role_cfg,
+                                provider=provider,
+                                system_prompt=active_prompt,
+                                messages=messages,
+                                tools=tools,
+                                logger=logger,
+                                turn_number=turn_number,
+                            )
+                            _stream_and_print(synth_handle)
+                            synth_resp = synth_handle.final()
+                            bag["out_tokens"] += synth_resp.out_tokens
+                            final_text = synth_resp.text or final_text
+                            messages.append({
+                                "role": "assistant",
+                                "content": _sanitize_assistant_content(
+                                    synth_resp.raw_assistant_content
+                                ),
+                            })
+                        except KeyboardInterrupt:
+                            pass
+                        except Exception as _synth_err:
+                            _warn(f"probe synthesis error: {_synth_err}")
 
                 # Round 4.2: escape hatch. If a no-tool role still
                 # emitted tool-call syntax as text (should not happen
