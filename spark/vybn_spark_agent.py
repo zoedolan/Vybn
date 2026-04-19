@@ -743,6 +743,38 @@ def _resolve_fallback(policy, role_cfg, model_name):
     )
 
 
+_TRANSIENT_PATTERNS = (
+    "overloaded",
+    "rate_limit",
+    "rate limit",
+    "overloaded_error",
+    "429",
+    "529",
+    "service unavailable",
+    "bad gateway",
+    "gateway timeout",
+)
+
+
+def _is_transient_error(exc: BaseException) -> bool:
+    """Heuristic: retry-worthy vs. walk-the-chain.
+
+    Anthropic regional overload surfaces as an APIStatusError with
+    status 529 and body {"type": "error", "error": {"type":
+    "overloaded_error", ...}}. Rate-limit (429) is analogous for
+    OpenAI. These are transient — the same model a few seconds later
+    usually works. Hard errors (auth, 400, unknown model) walk the
+    fallback chain immediately; only transient errors retry in place.
+    """
+    msg = str(exc).lower()
+    if any(p in msg for p in _TRANSIENT_PATTERNS):
+        return True
+    status = getattr(exc, "status_code", None) or getattr(exc, "status", None)
+    if status in (429, 502, 503, 504, 529):
+        return True
+    return False
+
+
 def _stream_with_fallback(
     *,
     router,
@@ -754,14 +786,27 @@ def _stream_with_fallback(
     tools,
     logger,
     turn_number,
+    retries: int = 3,
+    base_backoff: float = 1.5,
 ):
     """Try provider.stream() and walk the fallback chain on failure.
 
     Returns (handle, active_role_cfg, active_provider) on success, or
     raises the last exception if every link in the chain failed.
+
+    Transient failures (529 overloaded_error, 429 rate_limit, 5xx)
+    retry in place with jittered exponential backoff BEFORE walking
+    the fallback chain. Regional Anthropic overload often hits every
+    Claude model simultaneously, so walking the chain is wasted cost;
+    a short wait and retry on the same model almost always recovers.
+    Hard errors (400, auth, schema) walk the chain immediately.
+
     KeyboardInterrupt is never caught here — it must propagate so the
     REPL can surface "interrupted during API call".
     """
+    import random as _random
+    import time as _time
+
     attempts = [(role_cfg, provider)]
     for fb_model in router.policy.fallback_chain.get(role_cfg.model, []):
         fb_cfg = _resolve_fallback(router.policy, role_cfg, fb_model)
@@ -771,31 +816,49 @@ def _stream_with_fallback(
 
     last_exc = None
     for cfg, prov in attempts:
-        try:
-            handle = prov.stream(
-                system=system_prompt,
-                messages=messages,
-                tools=tools,
-                role=cfg,
-            )
-            if cfg is not role_cfg:
-                _warn(
-                    f"primary failed ({last_exc.__class__.__name__}); "
-                    f"fell back to {cfg.provider}:{cfg.model}"
+        for attempt in range(retries + 1):
+            try:
+                handle = prov.stream(
+                    system=system_prompt,
+                    messages=messages,
+                    tools=tools,
+                    role=cfg,
                 )
-                logger.emit(
-                    "fallback",
-                    turn=turn_number,
-                    from_model=role_cfg.model,
-                    to_model=cfg.model,
-                    reason=str(last_exc)[:200],
-                )
-            return handle, cfg, prov
-        except KeyboardInterrupt:
-            raise
-        except Exception as e:  # noqa: BLE001 — we want every provider error
-            last_exc = e
-            continue
+                if cfg is not role_cfg:
+                    _warn(
+                        f"primary failed ({last_exc.__class__.__name__}); "
+                        f"fell back to {cfg.provider}:{cfg.model}"
+                    )
+                    logger.emit(
+                        "fallback",
+                        turn=turn_number,
+                        from_model=role_cfg.model,
+                        to_model=cfg.model,
+                        reason=str(last_exc)[:200],
+                    )
+                return handle, cfg, prov
+            except KeyboardInterrupt:
+                raise
+            except Exception as e:  # noqa: BLE001 — want every provider error
+                last_exc = e
+                if _is_transient_error(e) and attempt < retries:
+                    wait = base_backoff * (2 ** attempt) + _random.uniform(0, 0.5)
+                    _dim(
+                        f"[transient {cfg.provider}:{cfg.model} error: "
+                        f"{type(e).__name__} — retry in {wait:.1f}s "
+                        f"({attempt + 1}/{retries})]"
+                    )
+                    logger.emit(
+                        "transient_retry",
+                        turn=turn_number,
+                        model=cfg.model,
+                        attempt=attempt + 1,
+                        reason=str(e)[:200],
+                    )
+                    _time.sleep(wait)
+                    continue
+                # Non-transient, or retries exhausted: walk to next leg.
+                break
     raise last_exc if last_exc else RuntimeError("no providers available")
 
 
@@ -1133,9 +1196,26 @@ def run_agent_loop(
                                 ),
                             })
                         except KeyboardInterrupt:
+                            # User interrupted during synthesis -- pop the
+                            # orphan probe message so history stays clean.
+                            if messages and messages[-1].get("role") == "user":
+                                messages.pop()
                             pass
                         except Exception as _synth_err:
-                            _warn(f"probe synthesis error: {_synth_err}")
+                            # Synthesis call failed (regional overload,
+                            # timeout, etc). The probe output is already
+                            # on screen; pop the orphan probe-result user
+                            # message so the next turn is not forever
+                            # trying to "answer" a stale probe, and tell
+                            # Zoe what happened instead of leaving a
+                            # silent prompt.
+                            if messages and messages[-1].get("role") == "user":
+                                messages.pop()
+                            _warn(
+                                f"probe synthesis failed ({type(_synth_err).__name__}: "
+                                f"{str(_synth_err)[:160]}) -- probe output above is "
+                                "the raw result; ask me again and I will read from it."
+                            )
 
 
                 # Round 9: NEEDS-ROLE escalation. A no-tool role that emits
