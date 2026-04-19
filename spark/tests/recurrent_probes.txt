@@ -1,0 +1,19 @@
+# Seed prompts for the looped-orchestrate probe.
+# Each line is one probe. Blank lines and # comments are ignored.
+# The point: prompts where a single pass is expected to be insufficient
+# (multi-hop reasoning, latent-dependent constraints, verification work)
+# should open a residual gap between T=1 and T>1. If no gap appears
+# across the set, the recurrent architecture isn't buying us anything
+# and we should say so in the PR discussion.
+
+# Multi-hop synthesis
+Given the Parcae injection rule h_{t+1}=A·h_t+B·e+R(h_t,e), explain why ρ(A)<1 is required, why input injection is separately required, and what happens to the hidden state across loops if either constraint fails.
+
+# Verification chain
+A proposed harness change: add delegate_cb recursion to the chat role so bare greetings can trigger tool use. Identify what invariants in policy.py / router.py / tools.py this would violate, and why.
+
+# Latent-dependent constraint
+Sketch a DeepSeekMoE-style "shared expert" analogue for the Vybn harness's role roster. Name what the shared expert is, what the routed experts are, and what the top-K routing semantics mean across a multi-turn conversation. Then identify the one invariant this proposal would break.
+
+# Counterfactual reasoning
+If we moved the orchestrate role from Opus 4.7 to Sonnet 4.6, what would we expect to see in the router_policy.yaml heuristics that currently fire on fallthrough — and would the contractivity monitor in recurrent.py catch the regression?
