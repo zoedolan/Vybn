@@ -2444,6 +2444,40 @@ async def schema_endpoint():
 # Entry point
 # ---------------------------------------------------------------------------
 
+
+# ---------------------------------------------------------------------------
+# Deep Memory proxy — /enter and /should_absorb
+# Forwards to deep_memory.py --serve on port 8100
+# ---------------------------------------------------------------------------
+
+DEEP_MEMORY_URL = "http://127.0.0.1:8100"
+
+@app.post("/enter")
+async def proxy_enter(request: Request):
+    """Proxy POST /enter to deep_memory serve on :8100."""
+    body = await request.body()
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            r = await client.post(f"{DEEP_MEMORY_URL}/enter", content=body,
+                                  headers={"Content-Type": "application/json"})
+        return JSONResponse(content=r.json(), status_code=r.status_code)
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Deep memory unreachable: {e}")
+
+
+@app.post("/should_absorb")
+async def proxy_should_absorb(request: Request):
+    """Proxy POST /should_absorb to deep_memory serve on :8100."""
+    body = await request.body()
+    try:
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            r = await client.post(f"{DEEP_MEMORY_URL}/should_absorb", content=body,
+                                  headers={"Content-Type": "application/json"})
+        return JSONResponse(content=r.json(), status_code=r.status_code)
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Deep memory unreachable: {e}")
+
+
 if __name__ == "__main__":
     log.info(f"Starting Origins Portal API v4.0.0 on port {PORT}")
     log.info(f"vLLM backend: {LLAMA_URL}")
