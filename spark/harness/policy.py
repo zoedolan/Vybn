@@ -1,23 +1,137 @@
-"""Routing policy — loaded from router_policy.yaml.
+"""Policy — what we are doing, what we are allowed to do, what we record.
 
-Policy is configuration, not code. Editing model choice per role, adding
-a directive, or changing a fallback chain should not require a code
-change. We parse YAML if available and fall back to a minimal JSON-like
-loader (not used by default) if not.
+A turn arrives. Three questions the harness has to answer before a byte
+reaches a provider:
 
-A hard-coded default policy is also shipped so the harness functions
-even when the YAML is missing — this matches the repo's "fail open,
-degrade gracefully" posture.
+    1. What role is this turn? (classification / routing)
+    2. What is this role allowed to consume — which model, which tools,
+       which budgets, which fallbacks? (configuration)
+    3. What do we write down about the fact that it happened?
+       (observability)
+
+All three are the same object in our architecture. The policy IS the
+router; the event log IS the policy's history. Previously this single
+concern was spread across four files (policy, router, constants, events).
+The split was an artifact of how the code grew, not a reflection of the
+conceptual shape. Folded here so the answer to "where does routing live"
+and "where does the router's blocklist live" is the same file.
+
+Safety invariants (DANGEROUS_PATTERNS, TRACKED_REPOS, absorb-gate
+exclusions) live here too: they are rules about what a turn is allowed
+to do, which is what a policy is. BashTool enforces them, but the rules
+themselves are policy. Referenced by Vybn_Mind/continuity.md; must not
+drift across agents.
 """
 
 from __future__ import annotations
 
+import json
 import os
 import re
+import time
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
+
+# ---------------------------------------------------------------------------
+# Safety invariants — consulted by providers.BashTool / absorb_gate.
+# ---------------------------------------------------------------------------
+
+DANGEROUS_PATTERNS = [
+    "rm -rf /", "rm -rf /*", "rm -rf .", "mkfs",
+    ":(){:|:&};:", "dd if=/dev/zero of=/dev/sd", "> /dev/sda",
+    "chmod -R 777 /", "wget -O- | sh", "curl | sh",
+]
+
+TRACKED_REPOS = [
+    os.path.expanduser("~/Vybn"),
+    os.path.expanduser("~/Him"),
+    os.path.expanduser("~/Vybn-Law"),
+    os.path.expanduser("~/vybn-phase"),
+]
+
+ABSORB_EXCLUDE_SUBSTR = (
+    "/.git/", "/__pycache__/", "/.cache/", "/node_modules/",
+    "/_tmp/", "/tmp/", "/logs/", "/data/",
+)
+
+ABSORB_EXCLUDE_SUFFIX = (
+    ".pyc", ".log", ".tmp", ".swp", ".lock", ".jsonl",
+    ".bak", ".orig",
+)
+
+ABSORB_LOG = os.path.expanduser("~/Vybn/spark/audit.log")
+DEFAULT_EVENT_LOG = os.path.expanduser("~/Vybn/spark/agent_events.jsonl")
+
+# Persistent-bash session timeouts.
+DEFAULT_TIMEOUT = 30
+# Hard wall-clock ceiling for BashTool.execute — a misbehaving curl or
+# network-partitioned ssh should never eat the whole turn.
+MAX_BASH_TIMEOUT = 300
+
+
+# ---------------------------------------------------------------------------
+# Observability — structured JSONL one line per event.
+#
+# `tail -f` gives operators a live view of role decisions, provider
+# calls, fallbacks, and budget warnings. We don't try to be a metrics
+# system. We write a line, we flush. If logging fails the agent keeps
+# running — observability is not worth a session.
+# ---------------------------------------------------------------------------
+
+@dataclass
+class EventLogger:
+    path: str = DEFAULT_EVENT_LOG
+    session_id: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.session_id:
+            self.session_id = time.strftime("%Y%m%dT%H%M%S")
+        try:
+            Path(self.path).parent.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            pass
+
+    def emit(self, event: str, **fields: Any) -> None:
+        record = {
+            "ts": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            "session": self.session_id,
+            "event": event,
+        }
+        record.update(fields)
+        try:
+            with open(self.path, "a") as f:
+                f.write(json.dumps(record, default=str) + "\n")
+        except Exception:
+            pass
+
+
+@contextmanager
+def turn_event(logger: EventLogger, turn: int, role: str, model: str) -> Iterator[dict]:
+    """Context manager that brackets a turn with start/end events.
+
+    Yields a mutable dict the caller can write token counts and latency
+    into before the `turn_end` event is emitted.
+    """
+    started = time.monotonic()
+    logger.emit("turn_start", turn=turn, role=role, model=model)
+    bag: dict[str, Any] = {
+        "turn": turn, "role": role, "model": model,
+        "in_tokens": 0, "out_tokens": 0, "tool_calls": 0,
+        "stop_reason": None, "fallback_from": None,
+    }
+    try:
+        yield bag
+    finally:
+        bag["latency_ms"] = int((time.monotonic() - started) * 1000)
+        logger.emit("turn_end", **bag)
+
+
+# ---------------------------------------------------------------------------
+# Role configuration — one RoleConfig per named role in the policy.
+# ---------------------------------------------------------------------------
 
 @dataclass
 class RoleConfig:
@@ -43,6 +157,53 @@ class RoleConfig:
     direct_reply_template: str | None = None
 
 
+# ---------------------------------------------------------------------------
+# RouteDecision — the result of Policy.classify().
+# ---------------------------------------------------------------------------
+
+@dataclass
+class RouteDecision:
+    role: str
+    config: RoleConfig
+    cleaned_input: str
+    reason: str
+    forced: bool = False
+    # Round 5: if the user prefixed their turn with an @alias, this holds
+    # the resolved model name. The REPL loop uses dataclasses.replace to
+    # swap the active RoleConfig's model (and infers provider) before the
+    # provider call. Role determination is unchanged; only the model pin.
+    model_override: str | None = None
+    alias_used: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# Classification internals.
+# ---------------------------------------------------------------------------
+
+# Round 5: @alias pin. Matches @<word> at the very start of the input,
+# followed by whitespace or EOL. The <word> is looked up in policy.model_aliases.
+_ALIAS_RE = re.compile(r"^\s*(@[\w.]+)(\s|$)")
+
+# Heuristics evaluated in an EXPLICIT priority order so identity beats
+# phatic beats chat beats task beats code. Dict insertion order worked by
+# accident; a future YAML reorder would silently break routing. Pin it.
+_HEURISTIC_PRIORITY = (
+    "task",         # confirmations ("ok", "proceed") -- earliest
+    "identity",     # "which model are you?" before greetings
+    "phatic",       # bare greetings/closings
+    "code",         # grounded code work
+    "create",       # brainstorm/sketch
+    "orchestrate",  # explicit multi-step/tool-use requests
+    "chat",         # how-are-you style
+)
+
+
+# ---------------------------------------------------------------------------
+# Policy — the routing object. Owns roles, heuristics, directives,
+# fallbacks, budgets, and the classify() method that turns a user turn
+# into a RouteDecision.
+# ---------------------------------------------------------------------------
+
 @dataclass
 class Policy:
     roles: dict[str, RoleConfig]
@@ -51,13 +212,136 @@ class Policy:
     fallback_chain: dict[str, list[str]]
     budgets: dict[str, float]
     default_role: str = "chat"  # round 4.1: was "code"; unclassified turns are conversational by default
-    # Round 5: per-turn model pin via @alias prefix. The Router strips
+    # Round 5: per-turn model pin via @alias prefix. classify() strips
     # the alias from the cleaned_input and sets RouteDecision.model_override.
     # Role determination still flows through directives/heuristics normally.
     model_aliases: dict[str, str] = field(default_factory=dict)
 
     def role(self, name: str) -> RoleConfig:
         return self.roles.get(name) or self.roles[self.default_role]
+
+    def classify(
+        self,
+        user_input: str,
+        forced_role: str | None = None,
+    ) -> RouteDecision:
+        """Classify a user turn into a role.
+
+        Three tiers evaluated in order:
+          0. @alias model pin — stripped from the input, role routing
+             continues normally. "@opus47 fix this bug" pins opus-4-7
+             and still routes to code.
+          1. Directive: user typed /code, /chat, /plan, /create, /task,
+             /local, /phatic, /identity.
+          2. Heuristics: regex patterns from policy, evaluated in
+             explicit priority order (see _HEURISTIC_PRIORITY).
+          3. Default: self.default_role.
+
+        An LLM classifier tier is deliberately not wired in. The agent
+        runs unattended and we want routing to be deterministic until a
+        live session demonstrates the tail is wide enough to justify a
+        classifier call. Adding it later is one method.
+        """
+        if forced_role and forced_role in self.roles:
+            return RouteDecision(
+                role=forced_role,
+                config=self.role(forced_role),
+                cleaned_input=user_input,
+                reason=f"forced={forced_role}",
+                forced=True,
+            )
+
+        text = user_input.strip()
+
+        # 0. @alias model pin. Strip before directive/heuristic so the
+        #    rest of the text still routes normally.
+        model_override: str | None = None
+        alias_used: str | None = None
+        aliases = self.model_aliases or {}
+        if aliases:
+            m = _ALIAS_RE.match(text)
+            if m:
+                alias_key = m.group(1).lower()
+                if alias_key in aliases:
+                    model_override = aliases[alias_key]
+                    alias_used = alias_key
+                    text = text[m.end():].lstrip()
+                    if not text:
+                        # Bare @alias with no payload — keep the alias itself
+                        # as the cleaned input so downstream heuristics match
+                        # on something. Fall back to a greeting-shaped empty.
+                        text = "hi"
+
+        # 1. Directive
+        for prefix, role_name in self.directives.items():
+            if text.startswith(prefix + " ") or text == prefix:
+                cleaned = text[len(prefix):].lstrip()
+                if role_name in self.roles:
+                    decision = RouteDecision(
+                        role=role_name,
+                        config=self.role(role_name),
+                        cleaned_input=cleaned or text,
+                        reason=f"directive={prefix}",
+                    )
+                    if model_override:
+                        decision.model_override = model_override
+                        decision.alias_used = alias_used
+                        decision.reason = f"{decision.reason}+alias={alias_used}"
+                    return decision
+
+        # 2. Heuristics
+        heur = self.heuristics
+        ranked = [r for r in _HEURISTIC_PRIORITY if r in heur]
+        ranked += [r for r in heur if r not in ranked]
+        for role_name in ranked:
+            if role_name not in self.roles:
+                continue
+            for rx in heur[role_name]:
+                if rx.search(text):
+                    decision = RouteDecision(
+                        role=role_name,
+                        config=self.role(role_name),
+                        cleaned_input=text,
+                        reason=f"heuristic={rx.pattern}",
+                    )
+                    if model_override:
+                        decision.model_override = model_override
+                        decision.alias_used = alias_used
+                        decision.reason = f"{decision.reason}+alias={alias_used}"
+                    return decision
+
+        # 3. Default
+        default = self.default_role
+        decision = RouteDecision(
+            role=default,
+            config=self.role(default),
+            cleaned_input=text,
+            reason="default",
+        )
+        if model_override:
+            decision.model_override = model_override
+            decision.alias_used = alias_used
+            decision.reason = f"{decision.reason}+alias={alias_used}"
+        return decision
+
+
+# ---------------------------------------------------------------------------
+# Router — thin view over Policy, retained so existing callers keep
+# working without import churn. `Router(policy).classify(text)` is
+# exactly `policy.classify(text)`; the dedicated class is no longer
+# load-bearing. Kept as a compatibility surface, not a separate concept.
+# ---------------------------------------------------------------------------
+
+@dataclass
+class Router:
+    policy: Policy
+
+    def classify(
+        self,
+        user_input: str,
+        forced_role: str | None = None,
+    ) -> RouteDecision:
+        return self.policy.classify(user_input, forced_role=forced_role)
 
 
 # ---------------------------------------------------------------------------
@@ -329,14 +613,6 @@ _DEFAULT_BUDGETS: dict[str, float] = {
     "warn_pct": 0.8,
 }
 
-
-def _compile_heuristics(raw: dict[str, list[str]]) -> dict[str, list[re.Pattern]]:
-    return {
-        role: [re.compile(p, re.IGNORECASE) for p in patterns]
-        for role, patterns in raw.items()
-    }
-
-
 _DEFAULT_MODEL_ALIASES: dict[str, str] = {
     # Opus — canonical dotted forms (Zoe request 2026-04-18):
     # @opus4.6 pins the version that holds position under pressure;
@@ -355,6 +631,13 @@ _DEFAULT_MODEL_ALIASES: dict[str, str] = {
     "@gpt": "gpt-5.4",
     "@gpt5": "gpt-5.4",
 }
+
+
+def _compile_heuristics(raw: dict[str, list[str]]) -> dict[str, list[re.Pattern]]:
+    return {
+        role: [re.compile(p, re.IGNORECASE) for p in patterns]
+        for role, patterns in raw.items()
+    }
 
 
 def default_policy() -> Policy:

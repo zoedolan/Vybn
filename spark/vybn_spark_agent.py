@@ -48,9 +48,9 @@ from harness import (  # noqa: E402
     turn_event,
     validate_command,
 )
-from harness.tools import BASH_TOOL_SPEC, DELEGATE_TOOL_SPEC, INTROSPECT_TOOL_SPEC  # noqa: E402
-from harness.tools import execute_readonly, is_parallel_safe  # noqa: E402
-from harness.prompt import rag_snippets  # noqa: E402
+from harness.providers import BASH_TOOL_SPEC, DELEGATE_TOOL_SPEC, INTROSPECT_TOOL_SPEC  # noqa: E402
+from harness.providers import execute_readonly, is_parallel_safe  # noqa: E402
+from harness.substrate import rag_snippets  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Learn-from-exchange loop closure (round 4).
