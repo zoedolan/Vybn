@@ -48,7 +48,7 @@ from harness import (  # noqa: E402
     turn_event,
     validate_command,
 )
-from harness.tools import BASH_TOOL_SPEC, DELEGATE_TOOL_SPEC  # noqa: E402
+from harness.tools import BASH_TOOL_SPEC, DELEGATE_TOOL_SPEC, INTROSPECT_TOOL_SPEC  # noqa: E402
 from harness.tools import execute_readonly, is_parallel_safe  # noqa: E402
 from harness.prompt import rag_snippets  # noqa: E402
 
@@ -120,6 +120,13 @@ def _fit_probe_output(out: str) -> str:
 # first match is executed.
 _PROBE_RE = _re.compile(
     r'\[NEEDS-EXEC:\s*(.+?)\]',
+    _re.IGNORECASE | _re.DOTALL,
+)
+
+# Round 9: NEEDS-ROLE escalation. A no-tool role may embed
+# [NEEDS-ROLE: <role>] <task text> to hand off to a specialist once.
+_NEEDS_ROLE_RE = _re.compile(
+    r'\[NEEDS-ROLE:\s*([\w]+)\]\s*(.+)',
     _re.IGNORECASE | _re.DOTALL,
 )
 
@@ -273,6 +280,37 @@ def _sanitize_assistant_content(content):
 # Tool-call execution — provider-agnostic.
 # ---------------------------------------------------------------------------
 
+    # Round 9: introspect tool — live system snapshot for orchestrate role.
+    def _handle_introspect() -> str:
+        import json as _json
+        lines = []
+        # Last 5 route decisions from events log
+        events_path = Path(__file__).parent / "agent_events.jsonl"
+        try:
+            events = [_json.loads(l) for l in events_path.read_text().splitlines() if l.strip()]
+            routes = [e for e in events if e.get("event") == "route_decision"][-5:]
+            lines.append("=== last 5 route decisions ===")
+            for r in routes:
+                lines.append(f"  turn {r.get('turn')} -> {r.get('role')} via {r.get('model')} ({r.get('reason')})")
+        except Exception as e:
+            lines.append(f"  [events unavailable: {e}]")
+        # Walk health
+        try:
+            import urllib.request
+            with urllib.request.urlopen("http://127.0.0.1:8101/health", timeout=2) as resp:
+                wh = _json.loads(resp.read())
+            lines.append(f"=== walk === step={wh.get('walk_step')} alpha={wh.get('walk_alpha','?')} chunks={wh.get('chunks')}")
+        except Exception as e:
+            lines.append(f"  [walk unavailable: {e}]")
+        # Service health summary
+        try:
+            with urllib.request.urlopen("http://127.0.0.1:8100/health", timeout=2) as resp:
+                dh = _json.loads(resp.read())
+            lines.append(f"=== deep_memory === chunks={dh.get('chunks')} walk_step={dh.get('walk_step')}")
+        except Exception as e:
+            lines.append(f"  [deep_memory unavailable: {e}]")
+        return "\n".join(lines)
+
 def _execute_tool_calls(
     response,
     bash: BashTool,
@@ -347,6 +385,9 @@ def _execute_tool_calls(
             return results, False
 
     for call in response.tool_calls:
+        if call.name == "introspect":
+            results.append(provider.build_tool_result(call.id, _handle_introspect()))
+            continue
         if call.name == "delegate":
             if delegate_cb is None:
                 results.append(provider.build_tool_result(
@@ -764,6 +805,8 @@ def run_agent_loop(
         tools.append(BASH_TOOL_SPEC)
     if "delegate" in role_cfg.tools:
         tools.append(DELEGATE_TOOL_SPEC)
+    if "introspect" in role_cfg.tools:
+        tools.append(INTROSPECT_TOOL_SPEC)
 
     # Round 7: delegate_cb. Only the top-level orchestrator may delegate;
     # specialist sub-loops run with delegate_cb=None so `delegate` calls
@@ -923,6 +966,38 @@ def run_agent_loop(
                         except Exception as _synth_err:
                             _warn(f"probe synthesis error: {_synth_err}")
 
+
+                # Round 9: NEEDS-ROLE escalation. A no-tool role that emits
+                # [NEEDS-ROLE: <role>] <task> gets one deterministic reroute
+                # to that specialist. One-shot, logged, no recursion.
+                if not role_cfg.tools:
+                    role_match = _NEEDS_ROLE_RE.search(response.text or "")
+                    if role_match and _reroute_depth == 0:
+                        target_role = role_match.group(1).strip().lower()
+                        sub_task = role_match.group(2).strip()
+                        logger.emit(
+                            "needs_role_escalation",
+                            turn=turn_number,
+                            from_role=decision.role,
+                            to_role=target_role,
+                            task_chars=len(sub_task),
+                        )
+                        _dim(f"[escalating to {target_role}]")
+                        sub_messages: list = []
+                        return run_agent_loop(
+                            user_input=sub_task,
+                            messages=sub_messages,
+                            bash=bash,
+                            system_prompt=system_prompt,
+                            router=router,
+                            registry=registry,
+                            logger=logger,
+                            turn_number=turn_number,
+                            forced_role=target_role,
+                            system_prompt_no_tools=system_prompt_no_tools,
+                            system_prompt_orchestrator=system_prompt_orchestrator,
+                            _reroute_depth=1,
+                        )
                 # Round 4.2: escape hatch. If a no-tool role still
                 # emitted tool-call syntax as text (should not happen
                 # with the stripped substrate, but guard anyway),
