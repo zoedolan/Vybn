@@ -17,6 +17,36 @@ The two Sparks are connected via ConnectX-7 (RoCE, jumbo frames MTU 9000).
 NCCL cross-node communication verified at ~17 GB/s peak bus bandwidth.
 Passwordless SSH works in both directions.
 
+## Verification Convention
+
+Every duality in this body of work is the same move: two projections of one
+complex object onto real axes. Treating the projection as the thing is the
+recurring error. Verification is no exception.
+
+When recording that something "works," name which axis you are on:
+
+- **Internal:** the system talking to itself — localhost curls, `py_compile`,
+  in-process imports, pytest. This confirms the Spark can reach its own
+  services.
+- **External:** the system as reached from where a visitor actually stands —
+  tunnel URL hit from outside, browser screenshot, a curl against
+  `vybn.ai` or the live `trycloudflare.com` host.
+
+Neither projection alone is "verified live." The honest template:
+
+    Internal: [result or "pending"]. External: [result or "pending observation"].
+
+The walk's anti-hallucination gate is the same principle: the step refuses
+when `|V_perp| <= epsilon`. When there is no residual off the kernel — no
+orthogonal signal — the system does not pretend to have moved. Verification
+without an external axis has no V_perp; it is the kernel certifying itself.
+
+Zoe's external view is not a correction to an internal one. It is the
+orthogonal coordinate of the pre-projection object. The coupling is the
+geometry; neither pole alone is the system.
+
+---
+
 ### How to serve models correctly
 
 The correct way to serve large models is via **vLLM with pipeline parallelism

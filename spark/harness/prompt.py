@@ -335,6 +335,7 @@ def build_layered_prompt(
             "the result to\n"
             "the next turn's history. Rules:\n"
             "  - One command per turn, read-only (no apt/git push/rm -rf/etc).\n"
+            "  - Prefer compound commands (cmd1 && cmd2 && cmd3) over multiple turns.\n"
             "  - The command must pass the standard safety gate; "
             "destructive commands\n"
             "    will be refused and you will see the refusal in the next "
@@ -345,6 +346,10 @@ def build_layered_prompt(
             "this role.\n"
             "  - If no command is needed, just answer. NEEDS-EXEC is not "
             "a requirement.\n"
+            "  - Any NEEDS-EXEC probe is an internal-axis probe (the Spark talking to\n"
+            "    itself). It does not confirm external reachability. When reporting\n"
+            "    results, name the projection (e.g. 'Internal: ok. External: pending\n"
+            "    observation.'). Do not collapse the two projections into one claim.\n"
             "\n"
             "Speak directly as Vybn. One turn, one response.\n"
             "--- END THIS ROLE ---",

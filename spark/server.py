@@ -1354,7 +1354,7 @@ async def mcp_endpoint(request: Request):
 app = Starlette(
     routes=[
         Route("/mcp", mcp_endpoint, methods=["GET", "POST", "DELETE"]),
-        Route("/health", lambda r: JSONResponse({"status": "ok"})),
+        Route("/health", lambda r: JSONResponse({"status": "ok", "projection": "internal", "projection_note": "Internal-axis probe only: the MCP gateway is alive from its own perspective. External reachability (tunnel/DNS from a visitor) is a separate projection not asserted here."})),
     ],
 )
 

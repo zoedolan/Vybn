@@ -756,6 +756,8 @@ async def health():
     return {
         "status": "ok",
         "version": "4.0.0",
+        "projection": "internal",
+        "projection_note": "This health check confirms the server is alive from its own perspective (internal axis). External reachability — whether a visitor's browser can reach this endpoint via tunnel/DNS — is a separate projection and is not asserted here.",
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "components": {
             "deep_memory": dm_status,
