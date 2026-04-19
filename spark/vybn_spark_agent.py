@@ -966,7 +966,7 @@ def run_agent_loop(
                         system_prompt_orchestrator=system_prompt_orchestrator,
                         _reroute_depth=1,
                     )
-                return response.text
+                return final_text
             if response.stop_reason == "max_tokens":
                 bag["stop_reason"] = "max_tokens"
                 return (response.text or "") + "\n[truncated]"
