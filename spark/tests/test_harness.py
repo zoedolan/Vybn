@@ -40,8 +40,8 @@ from harness.providers import (  # noqa: E402
     ProviderRegistry,
     ToolCall,
 )
-from harness.tools import BASH_TOOL_SPEC  # noqa: E402
-from harness.prompt import build_layered_prompt  # noqa: E402
+from harness.providers import BASH_TOOL_SPEC  # noqa: E402
+from harness.substrate import build_layered_prompt  # noqa: E402
 
 
 class TestAbsorbGate(unittest.TestCase):

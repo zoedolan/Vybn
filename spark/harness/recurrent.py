@@ -64,7 +64,7 @@ from dataclasses import dataclass, field, asdict
 from typing import Any, Callable, Sequence
 
 from .policy import Policy, RoleConfig
-from .prompt import LayeredPrompt
+from .substrate import LayeredPrompt
 from .providers import Provider, ProviderRegistry, NormalizedResponse
 
 

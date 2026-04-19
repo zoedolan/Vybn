@@ -26,10 +26,10 @@ Covers three distinct bugs observed in the terminal session
 
 Run: python3 spark/tests/test_live_repl_fixes.py
 
-Note: spark/vybn_spark_agent.py pre-dates this branch with a stale
-import of INTROSPECT_TOOL_SPEC that is not exported by harness.tools
-on main. To keep this test runnable in isolation, we inject a stub
-into harness.tools before importing the agent module.
+Note: spark/vybn_spark_agent.py depends on INTROSPECT_TOOL_SPEC
+exported from harness.providers (post-refactor, harness/tools.py was
+folded into harness/providers.py). This test imports the agent module
+directly and relies on that export being present.
 """
 
 from __future__ import annotations
@@ -43,13 +43,6 @@ from pathlib import Path
 THIS = Path(__file__).resolve()
 SPARK_DIR = THIS.parent.parent
 sys.path.insert(0, str(SPARK_DIR))
-
-# Pre-existing import shim — unrelated to the bugs under test. Leave
-# the real fix for a separate PR that owns the introspect tool.
-import harness.tools as _htools  # noqa: E402
-
-if not hasattr(_htools, "INTROSPECT_TOOL_SPEC"):
-    _htools.INTROSPECT_TOOL_SPEC = _htools.BASH_TOOL_SPEC  # type: ignore[attr-defined]
 
 import importlib.util  # noqa: E402
 

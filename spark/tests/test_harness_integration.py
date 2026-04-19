@@ -26,7 +26,7 @@ SPARK_DIR = THIS.parent.parent
 sys.path.insert(0, str(SPARK_DIR))
 
 from harness.policy import RoleConfig  # noqa: E402
-from harness.prompt import LayeredPrompt, rag_snippets  # noqa: E402
+from harness.substrate import LayeredPrompt, rag_snippets  # noqa: E402
 from harness.providers import OpenAIProvider  # noqa: E402
 
 

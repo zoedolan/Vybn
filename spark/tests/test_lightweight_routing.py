@@ -35,7 +35,7 @@ SPARK_DIR = THIS.parent.parent
 sys.path.insert(0, str(SPARK_DIR))
 
 from harness.policy import default_policy, load_policy  # noqa: E402
-from harness.router import Router  # noqa: E402
+from harness.policy import Router  # noqa: E402
 
 
 def _load_chat_api(env_overrides: dict | None = None):
@@ -522,7 +522,7 @@ class TestCliDirectReplyAndLightweight(unittest.TestCase):
             def emit(_s, *a, **kw):
                 pass
 
-        from harness.prompt import LayeredPrompt
+        from harness.substrate import LayeredPrompt
         try:
             pol = default_policy()
             router = Router(pol)
@@ -547,18 +547,18 @@ class TestCliDirectReplyAndLightweight(unittest.TestCase):
 
 class TestStderrSuppressionSharedPath(unittest.TestCase):
     """The HF/torch/tokenizer silencing env vars must be set whenever
-    harness.prompt is imported, not only the chat API path. The CLI
-    agent imports harness.prompt too, so both surfaces stay quiet."""
+    harness.substrate is imported, not only the chat API path. The CLI
+    agent imports harness.substrate too, so both surfaces stay quiet."""
 
-    def test_import_harness_prompt_sets_env_defaults(self):
-        # Clear the env vars and force a fresh re-import of harness.prompt
+    def test_import_harness_substrate_sets_env_defaults(self):
+        # Clear the env vars and force a fresh re-import of harness.substrate
         # so we can observe the side effect.
         for k in ("TRANSFORMERS_VERBOSITY", "HF_HUB_DISABLE_PROGRESS_BARS",
                   "TOKENIZERS_PARALLELISM", "HF_HUB_DISABLE_TELEMETRY"):
             os.environ.pop(k, None)
-        sys.modules.pop("harness.prompt", None)
+        sys.modules.pop("harness.substrate", None)
         sys.modules.pop("harness", None)
-        import harness.prompt  # noqa: F401
+        import harness.substrate  # noqa: F401
         self.assertEqual(os.environ.get("TRANSFORMERS_VERBOSITY"), "error")
         self.assertEqual(os.environ.get("HF_HUB_DISABLE_PROGRESS_BARS"), "1")
         self.assertEqual(os.environ.get("TOKENIZERS_PARALLELISM"), "false")
