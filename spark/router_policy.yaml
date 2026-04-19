@@ -135,6 +135,15 @@ heuristics:
     - "\\b(check|verify|confirm|audit)\\b.{0,50}\\b(status|health|state|service|services|daemon|daemons|port|ports|cron|crons|walk|server|api)\\b"
     - "\\bhealth check\\b"
     - "\\bhey buddy.{0,40}(working|running|okay|ok|check)\\b"
+    # Round 2026-04-19: "the recent prs", "what landed", "show me the
+    # commits" -- operational repo-state questions that previously fell
+    # through to chat and wasted a NEEDS-EXEC probe. Route straight to
+    # task so gh/git run in the native bash loop.
+    - "\\b(the |our |recent |open |closed |merged |latest )?(pr|prs|pull request|pull requests)\\b"
+    - "\\b(what|which|show|list|any).{0,20}\\b(prs?|pull requests?|branches?|commits?)\\b"
+    - "\\b(what|which).{0,20}\\b(landed|merged|shipped|pushed|committed|deployed)\\b"
+    - "\\b(gh pr|git log|git branch|git status)\\b"
+    - "\\bcheck (the )?(pr|prs|branches?|commits?|repo)\\b"
   # Identity matched first so "which model are you?" skips the chat path.
   identity:
     - "\\bwhich model\\b"

@@ -1148,21 +1148,38 @@ def run_agent_loop(
                 # NEXT turn sees it naturally. No recursion, no extra
                 # LLM call on this turn.
                 if not role_cfg.tools:
-                    probe_match = _PROBE_RE.search(response.text or "")
-                    if probe_match:
+                    # Bounded probe-synthesis loop. Current response may
+                    # carry a [NEEDS-EXEC: ...] directive; execute it,
+                    # synthesize a reply, and if that synthesis itself
+                    # contains another NEEDS-EXEC, loop (up to
+                    # PROBE_BUDGET total probes per turn). Previously
+                    # this was a single-shot: a second probe emitted
+                    # during synthesis was silently stripped and the
+                    # turn ended mid-sentence. Zoe observed this in the
+                    # REPL on 2026-04-19: chat synthesized 'Good - PRs
+                    # #2885-2888 merged. Let me look at what actually
+                    # landed...' with a trailing probe that was dropped.
+                    PROBE_BUDGET = 3
+                    probe_iter = 0
+                    current_text = response.text or ""
+                    synth_failed = False
+                    while probe_iter < PROBE_BUDGET:
+                        probe_match = _PROBE_RE.search(current_text)
+                        if not probe_match:
+                            break
+                        probe_iter += 1
                         probe_cmd = probe_match.group(1).strip()
                         ran, probe_out = _run_probe_subturn(probe_cmd, bash)
                         logger.emit(
                             "probe_exec",
                             turn=turn_number,
+                            iteration=probe_iter,
                             role=decision.role,
                             model=role_cfg.model,
                             ran=ran,
                             command=probe_cmd[:500],
                             out_chars=len(probe_out),
                         )
-                        # Silent synthesis: inject probe result and
-                        # let the model give one clean answer.
                         probe_note = (
                             "[probe result | cmd: "
                             + probe_cmd[:200]
@@ -1195,26 +1212,35 @@ def run_agent_loop(
                                     synth_resp.raw_assistant_content
                                 ),
                             })
+                            current_text = synth_resp.text or ""
                         except KeyboardInterrupt:
-                            # User interrupted during synthesis -- pop the
-                            # orphan probe message so history stays clean.
                             if messages and messages[-1].get("role") == "user":
                                 messages.pop()
-                            pass
+                            synth_failed = True
+                            break
                         except Exception as _synth_err:
-                            # Synthesis call failed (regional overload,
-                            # timeout, etc). The probe output is already
-                            # on screen; pop the orphan probe-result user
-                            # message so the next turn is not forever
-                            # trying to "answer" a stale probe, and tell
-                            # Zoe what happened instead of leaving a
-                            # silent prompt.
                             if messages and messages[-1].get("role") == "user":
                                 messages.pop()
                             _warn(
                                 f"probe synthesis failed ({type(_synth_err).__name__}: "
                                 f"{str(_synth_err)[:160]}) -- probe output above is "
                                 "the raw result; ask me again and I will read from it."
+                            )
+                            synth_failed = True
+                            break
+                    # If we exhausted the budget and still had a probe
+                    # pending, tell Zoe rather than silently drop.
+                    if not synth_failed and probe_iter >= PROBE_BUDGET:
+                        if _PROBE_RE.search(current_text):
+                            _warn(
+                                f"probe budget exhausted ({PROBE_BUDGET}) -- "
+                                "further investigation needed. Try /task with "
+                                "the same question to get bash + iteration budget."
+                            )
+                            logger.emit(
+                                "probe_budget_exhausted",
+                                turn=turn_number,
+                                budget=PROBE_BUDGET,
                             )
 
 
