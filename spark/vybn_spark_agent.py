@@ -198,6 +198,29 @@ class _BracketBalancedProbe:
     def search(self, text: str):
         return self._scan(text)
 
+    def search_lenient(self, text: str):
+        """Graceful-recovery variant. If a `[NEEDS-EXEC:` opener is present
+        but the bracket never closes, treat end-of-line (or end-of-text) as
+        an implicit close and return the recovered command. This is the
+        harness's self-healing path: the model's malformed probe is
+        silently repaired, logged as `probe_recovered`, and executed — the
+        alternative (what we were doing before 2026-04-20) was to drop the
+        probe entirely, stranding the turn with no signal to either side.
+        Strict .search is always tried first; this is the fallback.
+        """
+        m = _PROBE_OPEN_RE.search(text)
+        if m is None:
+            return None
+        body_start = m.end()
+        # find first newline OR end-of-text as the implicit close
+        nl = text.find("\n", body_start)
+        end = nl if nl != -1 else len(text)
+        body = text[body_start:end].rstrip(" \t\r]")
+        if not body:
+            return None
+        whole = text[m.start():end]
+        return _BracketBalancedProbe._Match(whole, body, m.start(), end)
+
     def sub(self, repl, text: str) -> str:
         if not isinstance(repl, str):
             # Callables are not used by this codebase; keep it simple.
@@ -1165,8 +1188,30 @@ def run_agent_loop(
                     synth_failed = False
                     while probe_iter < PROBE_BUDGET:
                         probe_match = _PROBE_RE.search(current_text)
+                        probe_recovered = False
                         if not probe_match:
-                            break
+                            # Self-healing: try lenient recovery before
+                            # giving up. If the model emitted an unclosed
+                            # `[NEEDS-EXEC:` (2026-04-20 failure mode), we
+                            # close at end-of-line and log the repair.
+                            probe_match = _PROBE_RE.search_lenient(current_text)
+                            if probe_match:
+                                probe_recovered = True
+                                logger.emit(
+                                    "probe_recovered",
+                                    turn=turn_number,
+                                    iteration=probe_iter + 1,
+                                    role=decision.role,
+                                    model=role_cfg.model,
+                                    command=probe_match.group(1)[:500],
+                                    reason="unterminated_bracket",
+                                )
+                                _dim(
+                                    "[harness repaired malformed probe: "
+                                    "unclosed `]` — closed at EOL]"
+                                )
+                            else:
+                                break
                         probe_iter += 1
                         probe_cmd = probe_match.group(1).strip()
                         ran, probe_out = _run_probe_subturn(probe_cmd, bash)
