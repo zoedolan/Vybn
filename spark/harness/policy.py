@@ -576,6 +576,11 @@ _DEFAULT_HEURISTICS_RAW: dict[str, list[str]] = {
         r"\bthe fix is structural\b",
         r"\b(escalate|route|dispatch)\b.{0,20}\b/?task\b",
         r"\bisolate the (underlying|root|real) (problem|issue|bug|cause)s?\b",
+        r"\bisolate the fundamental (problem|issue|bug|cause)s?\b",
+        r"\bthe fundamental problem\b",
+        r"\bresolve as you see fit\b",
+        r"\bupdate yourself( accordingly)?\b",
+        r"\bremove (the|this|that) wall\b",
         r"\bsolve whatever (problem|issue|bug) caused that\b",
     ],
     "create": [
@@ -632,6 +637,12 @@ _DEFAULT_BUDGETS: dict[str, float] = {
     "per_turn_usd": 2.00,
     "per_session_usd": 25.00,
     "warn_pct": 0.8,
+    # # PROBE_BUDGET_AUTO_ESCALATE_v1
+    # Probe sub-turn budget for no-tool roles. Raised from 3 to 8:
+    # a real investigation arc (inspect, grep, read, patch, verify,
+    # commit, push) runs 6-8 probes. On exhaust the harness
+    # auto-escalates to task role instead of printing a warning.
+    "probe_per_turn": 8,
 }
 
 _DEFAULT_MODEL_ALIASES: dict[str, str] = {

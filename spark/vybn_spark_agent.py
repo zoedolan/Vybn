@@ -1256,7 +1256,17 @@ def run_agent_loop(
                     # REPL on 2026-04-19: chat synthesized 'Good - PRs
                     # #2885-2888 merged. Let me look at what actually
                     # landed...' with a trailing probe that was dropped.
-                    PROBE_BUDGET = 3
+                    # # PROBE_BUDGET_AUTO_ESCALATE_v1
+                    # Probe budget now comes from policy.budgets.
+                    # Default raised from 3 to 8 — a real debug arc
+                    # needs roughly inspect+grep+read+patch+test+
+                    # commit+push, not three peeks. On exhaust the
+                    # harness auto-escalates to task role (bash +
+                    # 10-iter budget) carrying the pending probe as
+                    # the task, instead of asking Zoe to retype.
+                    PROBE_BUDGET = int(
+                        router.policy.budgets.get("probe_per_turn", 8)
+                    )
                     probe_iter = 0
                     current_text = response.text or ""
                     synth_failed = False
@@ -1348,7 +1358,66 @@ def run_agent_loop(
                             synth_failed = True
                             break
                     # If we exhausted the budget and still had a probe
-                    # pending, tell Zoe rather than silently drop.
+                    # pending, auto-escalate to task role (bash + 10-iter)
+                    # carrying the pending command and the original user
+                    # question as context. Previously we just printed a
+                    # warning and told Zoe to retype with /task. That
+                    # dead-end was the wall she kept hitting 2026-04-20.
+                    if (
+                        not synth_failed
+                        and probe_iter >= PROBE_BUDGET
+                        and _reroute_depth == 0
+                        and not forced_role
+                    ):
+                        pending = _PROBE_RE.search(current_text)
+                        if pending:
+                            pending_cmd = pending.group(1).strip()
+                            logger.emit(
+                                "probe_budget_auto_escalate",
+                                turn=turn_number,
+                                budget=PROBE_BUDGET,
+                                probes_used=probe_iter,
+                                from_role=decision.role,
+                                to_role="task",
+                                pending_cmd=pending_cmd[:500],
+                            )
+                            _dim(
+                                f"[probe budget reached ({PROBE_BUDGET}); "
+                                "escalating to task with bash+iteration "
+                                "budget to finish the investigation]"
+                            )
+                            # Compose a task prompt that carries the
+                            # original question and the pending probe so
+                            # the task-role instance has full context.
+                            escalation_task = (
+                                f"Original question: {decision.cleaned_input}"
+                                f"\n\nChat-role probe budget was "
+                                f"exhausted after {probe_iter} probes. "
+                                "The pending next command was:\n"
+                                f"    {pending_cmd}\n\n"
+                                "Please continue the investigation with "
+                                "bash access and answer the original "
+                                "question fully. You have a 10-iteration "
+                                "budget."
+                            )
+                            sub_messages: list = []
+                            return run_agent_loop(
+                                user_input=escalation_task,
+                                messages=sub_messages,
+                                bash=bash,
+                                system_prompt=system_prompt,
+                                router=router,
+                                registry=registry,
+                                logger=logger,
+                                turn_number=turn_number,
+                                forced_role="task",
+                                system_prompt_no_tools=system_prompt_no_tools,
+                                system_prompt_orchestrator=system_prompt_orchestrator,
+                                _reroute_depth=1,
+                            )
+                    # Reroute guard tripped (nested depth / forced role /
+                    # no pending probe) — fall back to the warn path so Zoe
+                    # at least sees the exhaust signal.
                     if not synth_failed and probe_iter >= PROBE_BUDGET:
                         if _PROBE_RE.search(current_text):
                             _warn(
