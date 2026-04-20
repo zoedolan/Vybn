@@ -398,37 +398,51 @@ class TestPhaticStaysLightweight(unittest.TestCase):
         self.assertIsNotNone(self.captured["kwargs"])
 
 
-class TestOrchestrateIsDefault(unittest.TestCase):
-    """GPT-5.4 (orchestrate) is the real default brain: bare,
-    unclassified turns should land on it rather than the Opus+bash
-    code loop."""
+class TestChatIsDefault(unittest.TestCase):
+    """Round 4.1 / round 7: `chat` is the quoted fallthrough. /plan
+    invokes orchestrate explicitly; code-shaped turns escalate via
+    heuristics. Only the bare, unclassified case stays on chat — the
+    voice role — so an unrecognised turn does not silently spin up an
+    Opus+bash+25-iter orchestrator. Round 6 (2026-04-20) re-pins this
+    claim across the harness tests so the doctrine in
+    `harness.__init__._HARNESS_STRATEGY` matches ground truth."""
 
-    def test_default_policy_default_role_is_orchestrate(self):
+    def test_default_policy_default_role_is_chat(self):
         pol = default_policy()
-        self.assertEqual(pol.default_role, "orchestrate")
+        self.assertEqual(pol.default_role, "chat")
 
-    def test_yaml_policy_default_role_is_orchestrate(self):
+    def test_yaml_policy_default_role_is_chat(self):
         try:
             import yaml  # noqa: F401
         except Exception:
             self.skipTest("PyYAML unavailable")
         yaml_path = SPARK_DIR / "router_policy.yaml"
         pol = load_policy(yaml_path)
-        self.assertEqual(pol.default_role, "orchestrate")
+        self.assertEqual(pol.default_role, "chat")
 
-    def test_bare_turn_routes_to_orchestrate(self):
+    def test_bare_turn_routes_to_chat(self):
         router = Router(default_policy())
-        d = router.classify("explain what's happening on the box")
-        self.assertEqual(d.role, "orchestrate")
+        # Truly unclassified input — no code/task/identity/phatic/
+        # orchestrate/create heuristic matches, and no /directive.
+        # The fallthrough is `chat` (Opus 4.6, voice role), not
+        # orchestrate.
+        d = router.classify("tell me something")
+        self.assertEqual(d.role, "chat")
         self.assertEqual(d.reason, "default")
-        self.assertEqual(d.config.provider, "openai")
-        self.assertEqual(d.config.model, "gpt-5.4")
+        self.assertEqual(d.config.provider, "anthropic")
 
     def test_code_heuristic_still_escalates_to_code(self):
         router = Router(default_policy())
         d = router.classify("fix this python traceback please")
         self.assertEqual(d.role, "code")
         self.assertEqual(d.config.provider, "anthropic")
+
+    def test_orchestrate_directive_still_escalates(self):
+        router = Router(default_policy())
+        d = router.classify("/plan decompose this problem")
+        # /plan is the directive that routes to orchestrate; the
+        # fallthrough stays quoted on chat.
+        self.assertIn(d.role, ("orchestrate", "code"))
 
 
 class TestCliDirectReplyAndLightweight(unittest.TestCase):

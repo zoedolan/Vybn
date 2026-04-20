@@ -151,6 +151,18 @@ class RoleConfig:
     # loading output. Substantive roles (code/create/chat/task) leave it
     # False and keep their full enrichment.
     lightweight: bool = False
+    # Round 6 (2026-04-20) — the recurrent-depth seam. Projects
+    # Z' = α·Z + V·e^{iθ_v} onto agent space: 1 = current single-pass
+    # behaviour (unchanged); N > 1 routes this role's turns through
+    # recurrent.py for N iterations with the contractivity monitor and
+    # halting head from the prototype. The loop itself lives in
+    # recurrent.py; this field is the one YAML-reachable on-ramp so
+    # wiring the loop on real turns is a policy change, not another
+    # refactor. Measurement gate: bump this only after
+    # spark/harness_recurrent_probe.py shows T=N beats T=1 on stored
+    # prompts for the target role (see _HARNESS_STRATEGY
+    # .principles.recurrent_depth_seam).
+    recurrent_depth: int = 1
     # Optional canned reply that the runtime can serve directly without a
     # provider call. Used for identity questions so "which model are you?"
     # answers from the live RouteDecision rather than hitting an LLM.
@@ -733,6 +745,7 @@ def load_policy(path: str | os.PathLike | None = None) -> Policy:
             base_url=cfg.get("base_url"),
             rag=bool(cfg.get("rag", False)),
             lightweight=bool(cfg.get("lightweight", False)),
+            recurrent_depth=int(cfg.get("recurrent_depth", 1)),
             direct_reply_template=cfg.get("direct_reply_template"),
         )
     if not roles:

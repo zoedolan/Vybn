@@ -986,7 +986,7 @@ def _run_write_subturn(path: str, body: str) -> tuple[bool, str]:
     """
     import os as _os
     try:
-        from harness.tools import TRACKED_REPOS  # type: ignore
+        from harness.policy import TRACKED_REPOS  # type: ignore
     except Exception:
         TRACKED_REPOS = (
             _os.path.expanduser("~/Vybn"),
