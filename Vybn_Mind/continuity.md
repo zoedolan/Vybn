@@ -553,3 +553,35 @@ Branch `tailscale-cert-cleanup` → [PR #2886](https://github.com/zoedolan/Vybn/
 The PR #2885 harness collapse (9 files → 5) landed separately on branch `decide-hook`; still open as of this cleanup.
 
 — Vybn (Sonnet 4.6)
+
+---
+
+## 2026-04-20 ~5:40 AM PDT — Round 6 harness rearchitecture ([PR #2900](https://github.com/zoedolan/Vybn/pull/2900))
+
+Zoe asked: imagine what the harness could be, project backward to where it is, then rearchitect toward the minimal scripts optimised for **optimality, healthy friction, and emergence**. The elevation move: file count is not the optimisation target — irreducibility is. The harness is a *grounding machine*. Every module asks one question: does this output stay coupled to something real? The module set is a projection of that single object onto the filesystem axis. Keep only what the object actually needs.
+
+Four changes, one object:
+
+1. **The ghost was real.** `spark/harness/tools.py` imported from `.constants` (no such module) and every symbol it claimed to export already lived in `providers.py`. It had not imported successfully since the round-5 consolidation. The one remaining call site — `vybn_spark_agent.py:989` — was silently falling through to the hardcoded fallback. Deleted the file. Redirected the import to `harness.policy` where `TRACKED_REPOS` actually lives. Measurement: `python3 -c 'from spark.harness import tools'` now raises `ImportError`, confirming the ghost is gone; before it raised `ModuleNotFoundError` on `.constants`, which is the same error wearing a different mask.
+
+2. **Doctrine ↔ reality.** `__init__.py` described five files while ten ran. `_HARNESS_STRATEGY` — which Nemotron reads during the nightly evolve cycle as part of the substrate — was the harness feeding its own old description back as ground truth. Exactly the model-collapse operator the anti-hallucination principle exists to block. Rewrote the docstring to describe the eight real projections (**policy, substrate, live_snapshot, providers, session_store, claim_guard, recurrent, mcp**), re-exported `claim_guard` and `session_store` as modules, and added a new `doctrine_reality_alignment` principle in `_HARNESS_STRATEGY` naming the loop explicitly so the next drift is easier to see.
+
+3. **The recurrent-depth seam.** `RoleConfig` gains `recurrent_depth: int = 1` (backward-compatible — `1` is current single-pass behaviour). `recurrent.py` has been library-only since round 4; this is the one YAML-reachable on-ramp that lets the Z′ = α·Z + V·e^{iθ_v} loop be wired on a live role without another refactor. `load_policy()` reads the YAML field. The measurement gate lives in the new `recurrent_depth_seam` principle: bump a role's `recurrent_depth` only after `spark/harness_recurrent_probe.py` shows T=N beats T=1 on stored prompts.
+
+4. **Truth-up the tests.** Two tests asserted `default_role == "orchestrate"` after it moved to `"chat"` on April 18 (round 7 voice work). A long-lived red band makes real regressions invisible. Renamed `TestOrchestrateIsDefault → TestChatIsDefault` in `test_lightweight_routing.py`, realigned the two `default_role` tests in `test_harness.py`, added coverage for the `/plan` escalation path so the orchestrate claim is replaced with the real orchestrate entry point.
+
+**Delta:** 15 failed / 125 passed → **10 failed / 131 passed**. All remaining failures predate this branch: `test_chat_routing` FastAPI harness issues, `test_live_repl_fixes` regex coverage, and a `test_lightweight_routing` CLI-path quirk where `phatic` resolves to `create` inside the agent loop while routing correctly at the `Router` level. Those are next round's territory.
+
+**Real:** PR #2900 is DRAFT on `harness-rearchitecture-round-6`, commit `581e32e1`. The ghost is deleted. The doctrine in `_HARNESS_STRATEGY` names the eight real modules. `RoleConfig.recurrent_depth` is live and YAML-reachable with default 1. `test_harness.py` is 32/32; the two formerly-red default_role tests are green.
+
+**Conjecture / untested:** whether `recurrent_depth > 1` actually improves any role's output on real turns. That is what `spark/harness_recurrent_probe.py` is supposed to settle before any YAML change; the probe has not been run against the new seam yet.
+
+**What's owed next:**
+
+- Run `spark/harness_recurrent_probe.py` across stored prompts comparing T=1 vs T=N for a candidate role (likely `code` on hard debugging loops). If T=N measurably beats T=1, the policy YAML can bump `recurrent_depth` for that role and `recurrent.py` stops being library-only.
+- Address the three pre-existing test failure families (chat_routing FastAPI, live_repl regex, phatic→create CLI quirk) in a separate round — the `phatic→create` one is worth investigating first since it points at a real divergence between the Router and the agent loop's role resolution.
+- Watch the next Nemotron evolve cycle: the harness now describes itself truthfully, so the evolve output should stop proposing edits against files that no longer exist or doctrine claims that no longer hold.
+
+**Sparks:** already pulled and committed on `harness-rearchitecture-round-6`; to get back to main: `cd ~/Vybn && git checkout main && git pull --ff-only origin main` once Zoe converts the draft.
+
+— Vybn (Sonnet 4.6, round 6 refactor)
