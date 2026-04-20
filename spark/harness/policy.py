@@ -731,3 +731,134 @@ def load_policy(path: str | os.PathLike | None = None) -> Policy:
         default_role=default_role,
         model_aliases=model_aliases,
     )
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Reflection — the event log AS the routing environment.
+#
+# Lisp duality in practice: a prior decision is a procedure while it
+# runs, a datum once it lands in agent_events.jsonl. reflect_on_events
+# reads the log and summarizes it into a ReflectionSignal, which the
+# router (and the prompt layer, eventually) can consult as environment
+# before deciding. No watchdog, no cron — the self-check self-activates
+# because the next decision reads the trail of the last.
+#
+# Principles:
+#   - Instrument first, route second. Collect the signal; do not yet
+#     change behavior based on it. Data before procedure.
+#   - Bounded: scans at most `max_events` events (default 200), early
+#     returns on missing file, tolerates malformed JSON lines silently.
+#   - Pure function of (log_path, max_events, now). No side effects.
+# ─────────────────────────────────────────────────────────────────────
+
+from dataclasses import dataclass as _reflect_dataclass
+from typing import Optional as _Optional
+
+@_reflect_dataclass(frozen=True)
+class ReflectionSignal:
+    events_scanned: int
+    probe_recovered_count: int
+    tool_hallucination_count: int
+    fallback_count: int
+    reroute_count: int
+    dominant_role: _Optional[str]
+    dominant_model: _Optional[str]
+    anomaly_flag: bool        # any of the defect counts > 0
+    note: str                 # human-readable one-liner
+
+    @property
+    def defect_rate(self) -> float:
+        if self.events_scanned == 0:
+            return 0.0
+        defects = (
+            self.probe_recovered_count
+            + self.tool_hallucination_count
+            + self.fallback_count
+        )
+        return defects / self.events_scanned
+
+
+def reflect_on_events(log_path=None, max_events: int = 200) -> ReflectionSignal:
+    """Scan the tail of agent_events.jsonl and return a ReflectionSignal.
+
+    This is the self-check that self-activates: the next turn consults
+    the trail of the last N events before routing. The signal is data;
+    the router may later treat it as procedure.
+    """
+    import json as _json
+    import os as _os
+    from collections import Counter as _Counter
+
+    if log_path is None:
+        log_path = _os.path.expanduser("~/Vybn/spark/agent_events.jsonl")
+
+    try:
+        # Read last ~max_events*2KB to bound I/O; parse lines from the end.
+        size = _os.path.getsize(log_path)
+        budget = min(size, max_events * 2048)
+        with open(log_path, "rb") as f:
+            f.seek(size - budget)
+            tail_bytes = f.read()
+        lines = tail_bytes.decode("utf-8", errors="replace").splitlines()
+    except (FileNotFoundError, OSError):
+        return ReflectionSignal(
+            events_scanned=0,
+            probe_recovered_count=0,
+            tool_hallucination_count=0,
+            fallback_count=0,
+            reroute_count=0,
+            dominant_role=None,
+            dominant_model=None,
+            anomaly_flag=False,
+            note="no event log",
+        )
+
+    events = []
+    for line in lines[-max_events:]:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            events.append(_json.loads(line))
+        except _json.JSONDecodeError:
+            continue  # tolerate mid-line truncation
+
+    probe_recovered = sum(1 for e in events if e.get("event") == "probe_recovered")
+    tool_hallucination = sum(1 for e in events if e.get("event") == "chat_tool_hallucination")
+    fallbacks = sum(1 for e in events if e.get("fallback_from"))
+    reroutes = sum(1 for e in events if e.get("event") == "reroute")
+
+    role_counts = _Counter(
+        e.get("role") for e in events if e.get("event") == "route_decision" and e.get("role")
+    )
+    model_counts = _Counter(
+        e.get("model") for e in events if e.get("event") == "turn_start" and e.get("model")
+    )
+
+    dominant_role = role_counts.most_common(1)[0][0] if role_counts else None
+    dominant_model = model_counts.most_common(1)[0][0] if model_counts else None
+
+    anomaly = (probe_recovered + tool_hallucination + fallbacks) > 0
+
+    parts = [f"scanned {len(events)} events"]
+    if probe_recovered:
+        parts.append(f"{probe_recovered} probe recoveries")
+    if tool_hallucination:
+        parts.append(f"{tool_hallucination} tool-call hallucinations")
+    if fallbacks:
+        parts.append(f"{fallbacks} fallbacks")
+    if dominant_role:
+        parts.append(f"dominant role {dominant_role}")
+    note = "; ".join(parts) if parts else "clean"
+
+    return ReflectionSignal(
+        events_scanned=len(events),
+        probe_recovered_count=probe_recovered,
+        tool_hallucination_count=tool_hallucination,
+        fallback_count=fallbacks,
+        reroute_count=reroutes,
+        dominant_role=dominant_role,
+        dominant_model=dominant_model,
+        anomaly_flag=anomaly,
+        note=note,
+    )

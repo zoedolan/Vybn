@@ -1002,6 +1002,33 @@ def run_agent_loop(
     else:
         active_prompt = system_prompt
 
+    # Reflection: read the trail of the last N events before deciding.
+    # Lisp duality in practice — prior decisions are data here, environment
+    # to the current one. Instrument first; route adaptively later.
+    try:
+        from harness.policy import reflect_on_events as _reflect
+        _signal = _reflect(max_events=200)
+        logger.emit(
+            "reflection",
+            turn=turn_number,
+            scanned=_signal.events_scanned,
+            probe_recovered=_signal.probe_recovered_count,
+            tool_hallucination=_signal.tool_hallucination_count,
+            fallback=_signal.fallback_count,
+            defect_rate=round(_signal.defect_rate, 4),
+            dominant_role=_signal.dominant_role,
+            dominant_model=_signal.dominant_model,
+            note=_signal.note,
+        )
+        if _signal.anomaly_flag and _signal.defect_rate > 0.05:
+            _dim(f"[reflection: {_signal.note}]")
+    except Exception as _refl_err:
+        logger.emit(
+            "reflection_error",
+            turn=turn_number,
+            err=f"{type(_refl_err).__name__}: {str(_refl_err)[:120]}",
+        )
+
     logger.emit(
         "route_decision",
         turn=turn_number,
