@@ -48,6 +48,7 @@ from harness import (  # noqa: E402
     turn_event,
     validate_command,
 )
+from harness.session_store import SessionStore  # noqa: E402
 from harness.providers import BASH_TOOL_SPEC, DELEGATE_TOOL_SPEC, INTROSPECT_TOOL_SPEC  # noqa: E402
 from harness.providers import execute_readonly, is_parallel_safe  # noqa: E402
 from harness.substrate import rag_snippets  # noqa: E402
@@ -1600,6 +1601,7 @@ def main() -> None:
         _build_prompts(default_cfg.max_iterations, orchestrator_max_iters=_orch_iters)
     )
     messages: list = []
+    session_store = SessionStore()
 
     soul_ok = os.path.exists(SOUL_PATH_STR)
     cont_ok = load_file(CONTINUITY_PATH) is not None
@@ -1626,10 +1628,36 @@ def main() -> None:
           f"{os.environ.get('USER', 'unknown')}")
     print(f"  \u2713 events: {logger.path}")
     print()
+    # Offer to resume the most recent session if it is fresh
+    _fresh = session_store.latest_fresh()
+    if _fresh is not None:
+        print(f"  \u25cf last session: {_fresh.session_id} "
+              f"({_fresh.turn_count} msgs, {session_store.format_age(_fresh.mtime)})")
+        print(f"    preview: {_fresh.preview}")
+        try:
+            _ans = input("    resume? [Y/n/list]: ").strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            _ans = "n"
+        if _ans in ("", "y", "yes"):
+            session_store.adopt_session(_fresh.session_id)
+            messages = session_store.load(_fresh.session_id)
+            print(f"  \u2713 resumed {len(messages)} messages from {_fresh.session_id}\n")
+        elif _ans in ("l", "list"):
+            for info in session_store.list_sessions(limit=10):
+                print(f"    {info.session_id}  turns={info.turn_count}  "
+                      f"{session_store.format_age(info.mtime)}  {info.preview}")
+            print("    (starting new session — use /resume <id> to load a specific one)\n")
+            session_store.new_session()
+        else:
+            session_store.new_session()
+            print("  \u2713 new session\n")
+    else:
+        session_store.new_session()
+
     print("  Type naturally. Prefix with /chat, /create, /plan, /task, /local "
           "to force a role,")
     print("  or with @opus4.6/@opus4.7/@sonnet/@nemotron/@gpt to pin a model for one turn.")
-    print("  REPL commands: exit | clear | reload | history | policy")
+    print("  REPL commands: exit | clear | reload | history | policy | /resume | /sessions | /newsession")
     print()
 
     turn_number = 0
@@ -1649,7 +1677,8 @@ def main() -> None:
         if low == "clear":
             messages.clear()
             bash.restart()
-            print("  Cleared.\n")
+            session_store.new_session()
+            print("  Cleared (new session started).\n")
             continue
         if low == "reload":
             _orch_iters = (
@@ -1709,6 +1738,35 @@ def main() -> None:
                     print(f"  selfcheck unavailable: {_e} / {_e2}")
             print()
             continue
+        if low in ("/sessions", "sessions"):
+            for info in session_store.list_sessions(limit=15):
+                marker = " *" if info.session_id == session_store.current_id else "  "
+                print(f"  {marker}{info.session_id}  turns={info.turn_count}  "
+                      f"{session_store.format_age(info.mtime)}  {info.preview}")
+            print()
+            continue
+        if low == "/newsession":
+            session_store.new_session()
+            messages.clear()
+            print(f"  \u2713 new session: {session_store.current_id}\n")
+            continue
+        if low.startswith("/resume"):
+            parts = user_input.split(maxsplit=1)
+            if len(parts) == 1:
+                # resume most recent fresh
+                _fresh = session_store.latest_fresh(window_sec=7*24*3600)
+                if _fresh is None:
+                    print("  no recent session to resume\n")
+                    continue
+                target_id = _fresh.session_id
+            else:
+                target_id = parts[1].strip()
+            if session_store.adopt_session(target_id):
+                messages = session_store.load(target_id)
+                print(f"  \u2713 resumed {len(messages)} messages from {target_id}\n")
+            else:
+                print(f"  session not found: {target_id}\n")
+            continue
         if low == "history":
             for msg in messages:
                 role = msg["role"]
@@ -1737,6 +1795,11 @@ def main() -> None:
                 logger=logger,
                 turn_number=turn_number,
             )
+            # Persist messages after each turn so ctrl-c does not lose the thread
+            try:
+                session_store.append_new(messages)
+            except Exception as _pe:
+                pass
             if text:
                 # Text has already been streamed; no need to reprint.
                 pass
