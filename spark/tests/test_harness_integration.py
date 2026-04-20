@@ -288,11 +288,21 @@ class TestRagSnippetsDefensive(unittest.TestCase):
     def test_returns_empty_when_deep_memory_missing(self):
         # Point vybn_phase_dir at a directory that does not contain
         # deep_memory.py — the function must silently return "".
-        out = rag_snippets(
-            "anything",
-            vybn_phase_dir="/no/such/path",
-            timeout=1.0,
-        )
+        # Mask the HTTP tier (live daemon on :8100 would otherwise
+        # answer regardless of the local path) so we exercise the
+        # defensive fallback path under test.
+        with mock.patch(
+            "harness.substrate._rag_http",
+            side_effect=Exception("no daemon"),
+        ), mock.patch(
+            "harness.substrate._load_deep_memory",
+            return_value=None,
+        ):
+            out = rag_snippets(
+                "anything",
+                vybn_phase_dir="/no/such/path",
+                timeout=1.0,
+            )
         self.assertEqual(out, "")
 
 

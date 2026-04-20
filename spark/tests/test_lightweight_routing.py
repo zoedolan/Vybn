@@ -50,6 +50,11 @@ def _load_chat_api(env_overrides: dict | None = None):
     except Exception:
         return None
     path = SPARK_DIR / "vybn_chat_api.py"
+    # spark/vybn_chat_api.py was archived 2026-04-18 (see _archive/README.md).
+    # The chat-api-coupled tests apply to the archived surface only; when the
+    # file is absent, skip cleanly rather than raising FileNotFoundError.
+    if not path.exists():
+        return None
 
     saved: dict[str, str | None] = {}
     if env_overrides:
@@ -524,11 +529,11 @@ class TestCliDirectReplyAndLightweight(unittest.TestCase):
 
         class _FakeProvider:
             def stream(_s, *, system, messages, tools, role):
+                captured["role_cfg"] = role
                 return _FakeHandle()
 
         class _FakeRegistry:
             def get(_s, cfg):
-                captured["role_cfg"] = cfg
                 return _FakeProvider()
 
         class _FakeLogger:

@@ -396,7 +396,7 @@ def _sanitize_assistant_content(content):
     if isinstance(content, str):
         if _is_effectively_empty_text(content):
             return _EMPTY_PLACEHOLDER
-        scrubbed = _strip_thinking_tags(content)
+        scrubbed = _strip_thinking_tags(content, allow_unwrap=False)
         return scrubbed if not _is_effectively_empty_text(scrubbed) else _EMPTY_PLACEHOLDER
 
     # Anthropic-style: list of content blocks. Each block may be an SDK
@@ -412,7 +412,7 @@ def _sanitize_assistant_content(content):
                 if text is None and isinstance(block, dict):
                     text = block.get("text", "")
                 if not _is_effectively_empty_text(text or ""):
-                    scrubbed = _strip_thinking_tags(text)
+                    scrubbed = _strip_thinking_tags(text, allow_unwrap=False)
                     if scrubbed and not _is_effectively_empty_text(scrubbed):
                         # Rewrite the block with scrubbed text. Preserve
                         # dict vs. SDK-object shape so callers that
@@ -712,7 +712,7 @@ _THINK_OPEN_CLOSE_RE = _re.compile(
 )
 
 
-def _strip_thinking_tags(text: str) -> str:
+def _strip_thinking_tags(text: str, allow_unwrap: bool = True) -> str:
     """Remove complete <thinking>...</thinking> blocks.
     Leaves incomplete openings alone — the stream splitter holds those
     back from display until the closing tag arrives.
@@ -727,9 +727,18 @@ def _strip_thinking_tags(text: str) -> str:
     if not text:
         return text
     stripped = _THINK_COMPLETE_RE.sub("", text)
-    # If we removed everything but the original had substance, the
-    # <thinking> wrapping IS the answer — unwrap rather than drop.
-    if not stripped.strip() and text.strip():
+    # If we removed everything but the original had substance AND there
+    # was exactly one <thinking> block, the model wrapped its entire
+    # answer in <thinking> tags — unwrap rather than drop. Only fires on
+    # the display path (allow_unwrap=True); the store path passes
+    # allow_unwrap=False so multi-block or fully-thinking payloads drop
+    # cleanly out of history instead of replaying as prose.
+    if (
+        allow_unwrap
+        and not stripped.strip()
+        and text.strip()
+        and len(_THINK_COMPLETE_RE.findall(text)) == 1
+    ):
         unwrapped = _THINK_OPEN_CLOSE_RE.sub("", text)
         if unwrapped.strip():
             return unwrapped
