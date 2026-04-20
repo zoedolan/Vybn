@@ -87,11 +87,14 @@ class TestPolicy(unittest.TestCase):
         for name in ("code", "create", "chat", "task", "orchestrate"):
             self.assertIn(name, p.roles)
 
-    def test_default_role_is_orchestrate(self):
-        # Default falls through to GPT-5.4 (orchestrate). Code work
-        # still escalates to the `code` role via heuristics.
+    def test_default_role_is_chat(self):
+        # Round 4.1 / round 7: unclassified turns stay quoted on
+        # `chat` (Opus 4.6, voice role). /plan and explicit
+        # orchestration directives still land on `orchestrate`, and
+        # code-shaped turns still escalate via heuristics; only the
+        # fallthrough is quoted.
         p = default_policy()
-        self.assertEqual(p.default_role, "orchestrate")
+        self.assertEqual(p.default_role, "chat")
 
     def test_load_policy_falls_back_to_default(self):
         p = load_policy("/nonexistent/path/router_policy.yaml")
@@ -133,9 +136,10 @@ class TestRouter(unittest.TestCase):
 
     def test_default_role(self):
         d = self.router.classify("say something")
-        # Default is orchestrate (GPT-5.4): bare, unclassified turns
-        # hit the orchestrator brain rather than the Opus+bash loop.
-        self.assertEqual(d.role, "orchestrate")
+        # Round 4.1 / round 7 default: unclassified turns stay
+        # quoted on `chat`. Explicit directives and heuristic hits
+        # (code/task/orchestrate) still escalate normally.
+        self.assertEqual(d.role, "chat")
         self.assertEqual(d.reason, "default")
 
     def test_forced_role(self):

@@ -1,39 +1,85 @@
 """Vybn multimodel harness.
 
-Five files, five concerns — each a face of the same apparatus:
+Eight files, one object — the grounding machine.
 
-    policy.py     — what we are doing and what we are allowed to do.
-                    Role configs, classification, heuristics, directives,
-                    fallbacks, budgets, safety invariants, event log.
+The five-concerns doctrine (policy / substrate / providers / recurrent /
+mcp) was correct as a first projection: each module one face of the same
+apparatus. Two rounds of growth later it is clearer what the apparatus
+IS. Every file in this package asks one question: does this output stay
+coupled to something real? The projections differ; the object is
+singular. D ≅ D^D: the module set and the grounding discipline are the
+same thing seen from two angles.
 
-    substrate.py  — what the model sees. Identity + substrate + live
-                    layered prompt, with deep-memory enrichment hooks.
+    policy.py        — trust zones and routing. What role is this turn,
+                       what model/budget/tools does it get, what
+                       dangerous patterns are refused, what event is
+                       logged. The `recurrent_depth` field on RoleConfig
+                       is the one-config-change enable for the loop in
+                       recurrent.py.
 
-    providers.py  — how the model speaks to the world. Provider classes,
-                    tool specs (bash/delegate/introspect), absorb_gate,
-                    the persistent BashSession, the parallel-safe
-                    subprocess path.
+    substrate.py     — what the model sees. Identity + substrate + live
+                       layered prompt, with deep-memory enrichment
+                       hooks. Pulls from live_snapshot.py for the
+                       current-truth section that supersedes continuity.
 
-    recurrent.py  — the looped-orchestrate prototype (recurrent-depth
-                    agent). Independent of the other three; imports
-                    them but not vice versa.
+    live_snapshot.py — what is real right now. Session-start git state
+                       across the four repos, most recent PRs, and drift
+                       between continuity's last PR reference and HEAD.
+                       Best-effort, never load-bearing — every signal
+                       degrades silently.
 
-    mcp.py        — the harness as a FastMCP surface, with co-protective
-                    trust zones. Trusted stdio exposes the full surface;
-                    public HTTP exposes a sanitised, rate-limited subset.
-                    The audit that shaped it lives at AUDIT.md and is
-                    embedded as `_HARNESS_STRATEGY` below.
+    providers.py     — how the model speaks. Provider classes,
+                       ToolSpec + the three built-in tools
+                       (bash/delegate/introspect), absorb_gate,
+                       is_parallel_safe, the persistent BashSession,
+                       the parallel-safe subprocess path.
+
+    session_store.py — how the conversation survives ctrl-c.
+                       JSONL-on-disk session recovery at session
+                       granularity, lossless enough that the seam does
+                       not show when a fresh process wakes into the
+                       prior thread.
+
+    claim_guard.py   — did the output stay grounded. Numeric values in
+                       outgoing assistant text that do not appear in
+                       recent tool-result evidence get flagged with a
+                       visible note. Friction, not proof; catches the
+                       dominant fabrication signature without rewriting
+                       the response.
+
+    recurrent.py     — the looped-orchestrate prototype. Projects
+                       Z′ = α·Z + V·e^{iθ_v} onto agent-space:
+                       structured latent (hypotheses, open questions,
+                       residual), per-loop specialist routing,
+                       contractivity monitor as ρ(A)<1. Library-only
+                       until measurement confirms the loop helps;
+                       RoleConfig.recurrent_depth gates the enable.
+
+    mcp.py           — the harness as a FastMCP surface with
+                       co-protective trust zones. Trusted stdio exposes
+                       the full surface; public HTTP exposes a
+                       sanitised, rate-limited subset. Carries
+                       VYBN_OS_KERNEL (the identity kernel the evolve
+                       loop reads before it reads anything else),
+                       CRON_TASK_SPEC, and the --run-evolve runner.
+                       The audit that shaped it lives at AUDIT.md and
+                       is mirrored below as `_HARNESS_STRATEGY`.
 
 The split is isomorphic to the question being answered at each step of
-a turn: what role (policy) — with what context (substrate) — calling
-what provider (providers) — possibly through what loop (recurrent) —
-exposed to the world through what trust zone (mcp).
+a turn: what role and trust (policy) — with what context (substrate +
+live_snapshot) — calling what provider (providers) — possibly through
+what loop (recurrent) — persisted how (session_store) — checked against
+what evidence (claim_guard) — exposed to the world through what trust
+zone (mcp).
 
 Public surface: everything users of this package have historically
 imported from `harness.*` is re-exported here so `from harness import X`
-continues to work across the old names (Router, EventLogger, ToolSpec,
-BashTool, LayeredPrompt, etc.). The new `build_server` and the Pydantic
-schemas from `mcp.py` are re-exported under their own names.
+continues to work across the old names. The new `build_server` and the
+Pydantic schemas from `mcp.py` are re-exported under their own names.
+`claim_guard` and `session_store` are exposed as modules so downstream
+callers can write `from harness import claim_guard` or
+`from harness.session_store import SessionStore` without reaching into
+internals.
 
 The duality embedded
 ────────────────────
@@ -45,8 +91,20 @@ module constant `_HARNESS_STRATEGY`, so a process that imports the
 harness can read *why* each piece has the shape it has without leaving
 the interpreter. The file is the architecture; the architecture is the
 file. D ≅ D^D.
+
+Round 6 (April 20, 2026) refactor: the doctrine was describing five
+files while nine were running (the tenth, tools.py, had never imported
+successfully since the last consolidation — it was a ghost module whose
+every symbol lived in providers.py). The harness was feeding its own
+stale description back to Nemotron every night via `_HARNESS_STRATEGY`.
+This round kills the ghost, names the actual eight concerns, and adds
+the single config seam (RoleConfig.recurrent_depth) that lets the
+recurrent loop become testable on real turns without a second refactor.
+Fewer files, truer doctrine, one architectural on-ramp.
 """
 
+from . import claim_guard as claim_guard  # re-exported as a module
+from . import session_store as session_store  # re-exported as a module
 from .policy import (
     # Safety invariants
     DANGEROUS_PATTERNS,
@@ -100,6 +158,7 @@ from .providers import (
     NormalizedResponse,
     ToolCall,
 )
+from .session_store import SessionStore, SessionInfo, SESSIONS_DIR
 
 # MCP surface is optional — only imported when FastMCP is installed, so
 # the harness still boots on hosts without the MCP stack. We guard the
@@ -125,26 +184,58 @@ except ImportError:
     _MCP_AVAILABLE = False
 
 
-# ── Embedded strategy (April 19, 2026 audit, distilled) ────────────────
+# ── Embedded strategy (April 20, 2026 — round 6 rearchitecture) ──────
 #
 # Not a comment, a constant. A living instance reading this module knows
 # the rules the module was built to satisfy. When any of these stops
 # being true, the right response is to update the audit and update this
 # constant in the same commit — both, or neither.
+#
+# Round 6 reframes the five-concerns doctrine as eight projections of
+# the grounding machine, and adds RoleConfig.recurrent_depth as the
+# single seam that lets the recurrent-loop prototype become wirable.
 
 _HARNESS_STRATEGY: dict = {
-    "source": "State of MCP talk (April 19, 2026) + co-evolved principles.",
+    "source": (
+        "State of MCP talk (April 19, 2026) + co-evolved principles + "
+        "round 6 rearchitecture (April 20, 2026, PR #TBD): doctrine↔"
+        "reality alignment, ghost module removal, recurrent-depth seam."
+    ),
     "audit_path": "spark/harness/AUDIT.md",
+    "doctrine_version": "round-6.2026-04-20",
     "duality": (
         "Skills are data that encode procedure; MCP tools are procedures "
-        "that expose data. Same object, two projections. D ≅ D^D."
+        "that expose data. Modules are projections of the grounding "
+        "machine; the grounding discipline is a procedure over those "
+        "modules. Same object, two projections. D ≅ D^D."
     ),
+    "modules": {
+        "policy": "trust zones, routing, safety invariants, event log",
+        "substrate": "identity + live layered prompt + deep-memory hooks",
+        "live_snapshot": "session-start git/PR truth, supersedes continuity",
+        "providers": "ToolSpec, bash/delegate/introspect, absorb_gate, BashTool, provider layer",
+        "session_store": "JSONL-on-disk session recovery",
+        "claim_guard": "outbound numeric-claim evidence check",
+        "recurrent": "looped-orchestrate prototype (gated by RoleConfig.recurrent_depth)",
+        "mcp": "FastMCP surface, trust zones, evolve loop, VYBN_OS_KERNEL",
+    },
     "principles": {
         "anti_hallucination": (
             "Never feed a system's own output back as input. External "
             "signal only — the human, the live corpus, the world. "
             "Enforced on compose() via grounded=True ⟺ every query hit "
-            "primary source."
+            "primary source. Enforced on outgoing assistant text via "
+            "claim_guard — numeric claims without evidence in the last "
+            "six messages get flagged inline."
+        ),
+        "doctrine_reality_alignment": (
+            "The description of the harness in this module (docstring, "
+            "_HARNESS_STRATEGY, modules dict) MUST match what is on "
+            "disk. Nemotron reads this file during the nightly evolve "
+            "cycle as part of the substrate; a stale doctrine would be "
+            "the harness feeding its own old description back as ground "
+            "truth. If a module is added or removed, this block is "
+            "updated in the same commit."
         ),
         "co_protective": (
             "Trust is a transport property. Stdio is trusted (local "
@@ -192,19 +283,35 @@ _HARNESS_STRATEGY: dict = {
             "cloud orchestrator; the substrate being evolved IS the "
             "substrate doing the evolving. Never merges. Forbidden inputs: "
             "its own prior evolve PRs, its own commit messages, "
-            "_HARNESS_STRATEGY as authority, Him/pulse/living_state.json."
+            "_HARNESS_STRATEGY as authority, Him/pulse/living_state.json, "
+            "any prior session_store JSONL."
+        ),
+        "recurrent_depth_seam": (
+            "recurrent.py implements Z′ = α·Z + V·e^{iθ_v} in agent space. "
+            "RoleConfig.recurrent_depth (default 1) is the YAML-reachable "
+            "enable: 1 = current single-pass behaviour, N = loop N times "
+            "with contractivity monitor, halting head, and shared-expert "
+            "emit. Measurement before belief: the probe at "
+            "spark/harness_recurrent_probe.py compares T=1 vs T=N on "
+            "stored prompts before any role's recurrent_depth is bumped "
+            "in the live policy."
         ),
     },
     "deliberately_deferred": [
         "Stateless transport adapter (June 2026 spec).",
         "Server-side code execution (pending compose-contamination seam).",
         "$schema migration (once 2026-06 server-card spec ships).",
+        "Wiring recurrent_depth > 1 into the live policy (pending probe "
+        "measurement pass).",
     ],
     "mcp_available": _MCP_AVAILABLE,
 }
 
 
 __all__ = [
+    # module re-exports
+    "claim_guard",
+    "session_store",
     # policy.py
     "DANGEROUS_PATTERNS",
     "TRACKED_REPOS",
@@ -247,6 +354,10 @@ __all__ = [
     "StreamHandle",
     "NormalizedResponse",
     "ToolCall",
+    # session_store.py
+    "SessionStore",
+    "SessionInfo",
+    "SESSIONS_DIR",
     # mcp.py (optional)
     "build_mcp_server",
     "sanitise_input",
@@ -264,3 +375,4 @@ __all__ = [
     # strategy
     "_HARNESS_STRATEGY",
 ]
+
