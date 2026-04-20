@@ -211,6 +211,11 @@ heuristics:
     - "\\bthe fix is structural\\b"
     - "\\b(escalate|route|dispatch)\\b.{0,20}\\b/?task\\b"
     - "\\bisolate the (underlying|root|real) (problem|issue|bug|cause)s?\\b"
+    - "\\bisolate the fundamental (problem|issue|bug|cause)s?\\b"
+    - "\\bthe fundamental problem\\b"
+    - "\\bresolve as you see fit\\b"
+    - "\\bupdate yourself( accordingly)?\\b"
+    - "\\bremove (the|this|that) wall\\b"
     - "\\bsolve whatever (problem|issue|bug) caused that\\b"
   create:
     - "\\bbrainstorm\\b"
@@ -292,3 +297,7 @@ budgets:
   per_turn_usd: 2.0
   per_session_usd: 25.0
   warn_pct: 0.8
+  # PROBE_BUDGET_AUTO_ESCALATE_v1
+  # Probe sub-turn budget for no-tool roles. Raised from 3 to 8.
+  # On exhaust the harness auto-escalates to task role.
+  probe_per_turn: 8
