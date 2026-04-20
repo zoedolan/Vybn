@@ -135,6 +135,14 @@ heuristics:
     - "\\b(check|verify|confirm|audit)\\b.{0,50}\\b(status|health|state|service|services|daemon|daemons|port|ports|cron|crons|walk|server|api)\\b"
     - "\\bhealth check\\b"
     - "\\bhey buddy.{0,40}(working|running|okay|ok|check)\\b"
+    # # EXEC_GRANULARITY_ROUTING_v1
+    - "\\b(patch|edit|modify|refactor)\\b.{0,60}\\b(file|script|module|function|class|method|code|harness|router|policy|agent|test|tests|yaml|config)\\b"
+    - "\\b(write|create|build|add|land)\\b.{0,40}\\b(patch|fix|script|test|module|commit|function|file|branch)\\b"
+    - "\\b(commit|push|rebase|cherry-pick)\\b"
+    - "\\bopen (a|the|another) (pr|pull request)\\b"
+    - "\\bship (it|this|that|the fix|the patch)\\b"
+    - "\\b(py_compile|pytest|run (the )?tests?|compile[- ]?check)\\b"
+    - "\\bsolve (the|this|that) problem\\b"
     # Round 2026-04-19: "the recent prs", "what landed", "show me the
     # commits" -- operational repo-state questions that previously fell
     # through to chat and wasted a NEEDS-EXEC probe. Route straight to
@@ -196,6 +204,14 @@ heuristics:
     - "\\bstack trace\\b"
     - "\\bHTTP \\d{3}\\b"
     - "\\bprovider error\\b"
+    # # EXEC_GRANULARITY_ROUTING_v1
+    - "\\bthe underlying problem\\b"
+    - "\\bfrom an outside you\\b"
+    - "\\byou repeatedly \\w+"
+    - "\\bthe fix is structural\\b"
+    - "\\b(escalate|route|dispatch)\\b.{0,20}\\b/?task\\b"
+    - "\\bisolate the (underlying|root|real) (problem|issue|bug|cause)s?\\b"
+    - "\\bsolve whatever (problem|issue|bug) caused that\\b"
   create:
     - "\\bbrainstorm\\b"
     - "\\bsketch\\b"

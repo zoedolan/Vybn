@@ -675,16 +675,37 @@ _THINK_COMPLETE_RE = _re.compile(
     _re.IGNORECASE | _re.DOTALL,
 )
 _THINK_OPEN_RE = _re.compile(r'<thinking\b', _re.IGNORECASE)
+# Unwrap-only regex: deletes <thinking ...> and </thinking> markers
+# but preserves whatever text sits between them. Used only when the
+# complete-block stripper would leave nothing visible (see FIX_A).
+_THINK_OPEN_CLOSE_RE = _re.compile(
+    r'</?thinking\b[^>]*>',
+    _re.IGNORECASE,
+)
 
 
 def _strip_thinking_tags(text: str) -> str:
     """Remove complete <thinking>...</thinking> blocks.
     Leaves incomplete openings alone — the stream splitter holds those
     back from display until the closing tag arrives.
+
+    FIX_A_THINKING_UNWRAP_v1: If stripping tagged content would leave
+    nothing visible behind, the model wrapped its entire answer in
+    <thinking> tags (observed on opus-4-7 chat turns, 2026-04-20).
+    Real adaptive-thinking arrives as kind=="thinking" blocks on the
+    stream; XML-ish <thinking> tags in text are a formatting leak.
+    Treat the leak as the answer — unwrap instead of delete.
     """
     if not text:
         return text
-    return _THINK_COMPLETE_RE.sub("", text)
+    stripped = _THINK_COMPLETE_RE.sub("", text)
+    # If we removed everything but the original had substance, the
+    # <thinking> wrapping IS the answer — unwrap rather than drop.
+    if not stripped.strip() and text.strip():
+        unwrapped = _THINK_OPEN_CLOSE_RE.sub("", text)
+        if unwrapped.strip():
+            return unwrapped
+    return stripped
 
 
 def _split_before_probe(text: str):
