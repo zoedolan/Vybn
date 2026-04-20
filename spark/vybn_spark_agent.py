@@ -52,6 +52,7 @@ from harness.session_store import SessionStore  # noqa: E402
 from harness.providers import BASH_TOOL_SPEC, DELEGATE_TOOL_SPEC, INTROSPECT_TOOL_SPEC  # noqa: E402
 from harness.providers import execute_readonly, is_parallel_safe  # noqa: E402
 from harness.substrate import rag_snippets  # noqa: E402
+from harness import claim_guard  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Learn-from-exchange loop closure (round 4).
@@ -64,6 +65,7 @@ from harness.substrate import rag_snippets  # noqa: E402
 # ---------------------------------------------------------------------------
 
 import re as _re
+# NEEDS_WRITE_AND_CLAIM_GUARD_v1
 import threading as _threading
 
 _LEARN_PENDING: dict = {"rag": "", "response": ""}
@@ -240,6 +242,32 @@ class _BracketBalancedProbe:
 
 
 _PROBE_RE = _BracketBalancedProbe()
+
+# 2026-04-20: NEEDS-WRITE directive. A no-tool role may embed
+#   [NEEDS-WRITE: <path>]
+#   <file contents verbatim>
+#   [/NEEDS-WRITE]
+# to land a file on disk without going through the bash session.
+#
+# This exists because the probe channel (NEEDS-EXEC) is read-only by
+# construction — validate_command / absorb_gate / is_parallel_safe all
+# block writing commands, and the persistent bash session's sentinel
+# protocol chokes on multi-line heredocs (quote mismatches wedge the
+# shell, file never lands). Models then loop: emit heredoc, heredoc
+# fails silently, model re-emits a different heredoc variant, etc.
+#
+# NEEDS-WRITE is the surgical fix: a structured directive the harness
+# parses and executes via Python I/O, not bash. Path must lie under
+# one of TRACKED_REPOS (same gate as absorb). New files still require
+# VYBN_ABSORB_REASON as a prefix comment (first 200 chars searched)
+# to keep the absorb discipline from leaking.
+_WRITE_BLOCK_RE = _re.compile(
+    r'\[NEEDS-WRITE:\s*(?P<path>[^\]]+?)\s*\]\s*\n'
+    r'(?P<body>.*?)'
+    r'\n\s*\[/NEEDS-WRITE\]',
+    _re.DOTALL | _re.IGNORECASE,
+)
+
 
 # Round 9: NEEDS-ROLE escalation. A no-tool role may embed
 # [NEEDS-ROLE: <role>] <task text> to hand off to a specialist once.
@@ -723,7 +751,13 @@ def _split_before_probe(text: str):
     m_probe = _PROBE_RE.search(text)
     if m_probe:
         text = _PROBE_RE.sub("", text)
+    # NEEDS-WRITE: strip complete blocks; hold back an opening that has
+    # no closing [/NEEDS-WRITE] yet so the body doesn't stream verbatim.
+    text = _WRITE_BLOCK_RE.sub("", text)
+    _w_open_idx = text.rfind("[NEEDS-WRITE")
     probe_idx = text.rfind("[NEEDS-EXEC")
+    if _w_open_idx != -1 and (probe_idx == -1 or _w_open_idx < probe_idx):
+        probe_idx = _w_open_idx
     if probe_idx != -1:
         safe, remainder = text[:probe_idx], text[probe_idx:]
     else:
@@ -766,7 +800,8 @@ def _stream_and_print(handle) -> None:
         m_open = _THINK_OPEN_RE.search(cleaned)
         if m_open:
             cleaned = cleaned[: m_open.start()]
-        cleaned = _PROBE_RE.sub("", cleaned).strip("\n")
+        cleaned = _PROBE_RE.sub("", cleaned)
+        cleaned = _WRITE_BLOCK_RE.sub("", cleaned).strip("\n")
         if cleaned:
             print(cleaned, end="", flush=True)
     print()
@@ -935,6 +970,62 @@ def _stream_with_fallback(
 # ---------------------------------------------------------------------------
 # Round 5: positive-signal probe sub-turn.
 # ---------------------------------------------------------------------------
+
+def _run_write_subturn(path: str, body: str) -> tuple[bool, str]:
+    """Execute one NEEDS-WRITE directive from a no-tool role.
+
+    Writes `body` to `path` via Python I/O, bypassing the bash session
+    entirely. Path must lie under a tracked repo; otherwise refused
+    with a message that flows back through the same synthetic-user
+    channel as probe output.
+
+    Absorb discipline: if the target does not yet exist on disk, the
+    body must begin (within its first 200 chars) with a
+    VYBN_ABSORB_REASON= declaration. Existing files are always
+    overwritten — that is the point of this channel.
+    """
+    import os as _os
+    try:
+        from harness.tools import TRACKED_REPOS  # type: ignore
+    except Exception:
+        TRACKED_REPOS = (
+            _os.path.expanduser("~/Vybn"),
+            _os.path.expanduser("~/Him"),
+            _os.path.expanduser("~/Vybn-Law"),
+            _os.path.expanduser("~/vybn-phase"),
+        )
+    tgt = _os.path.expanduser((path or "").strip())
+    if not tgt:
+        return False, "(NEEDS-WRITE refused: empty path)"
+    tgt_abs = _os.path.abspath(tgt)
+    if not any(
+        tgt_abs == r or tgt_abs.startswith(r.rstrip("/") + "/")
+        for r in TRACKED_REPOS
+    ):
+        return False, (
+            f"(NEEDS-WRITE refused: {tgt_abs} is outside tracked repos. "
+            f"Allowed roots: {', '.join(TRACKED_REPOS)})"
+        )
+    # Absorb check for new files.
+    if not _os.path.exists(tgt_abs):
+        head = (body or "")[:200]
+        if "VYBN_ABSORB_REASON=" not in head:
+            return False, (
+                "(NEEDS-WRITE refused by absorb_gate: new file " + tgt_abs
+                + " requires a VYBN_ABSORB_REASON declaration in the "
+                "first 200 chars of body, e.g.:\n"
+                "    # VYBN_ABSORB_REASON='does not fold into X because...'\n"
+                "Fold, do not pile.)"
+            )
+    try:
+        _os.makedirs(_os.path.dirname(tgt_abs), exist_ok=True)
+        with open(tgt_abs, "w") as f:
+            f.write(body or "")
+        nbytes = _os.path.getsize(tgt_abs)
+        return True, f"(wrote {nbytes} bytes to {tgt_abs})"
+    except Exception as e:  # noqa: BLE001
+        return False, f"(NEEDS-WRITE exec error: {type(e).__name__}: {e})"
+
 
 def _run_probe_subturn(command: str, bash: BashTool) -> tuple[bool, str]:
     """Execute one read-only probe emitted by a no-tool role.
@@ -1213,6 +1304,19 @@ def run_agent_loop(
             bag["in_tokens"] += response.in_tokens
             bag["out_tokens"] += response.out_tokens
             final_text = response.text or final_text
+            # 2026-04-20: numeric-claim guard. If response asserts
+            # numbers that don't appear in the last 6 messages of
+            # context, append a visible warning. Friction, not proof.
+            _cg_note = claim_guard.check(final_text, messages)
+            if _cg_note:
+                final_text = (final_text or "") + _cg_note
+                logger.emit(
+                    "claim_guard_fired",
+                    turn=turn_number,
+                    role=decision.role,
+                    model=role_cfg.model,
+                    site="single_response",
+                )
 
             # Sanitize before storing — an empty text block in the raw
             # content would 400 every subsequent turn.
@@ -1272,6 +1376,13 @@ def run_agent_loop(
                     synth_failed = False
                     while probe_iter < PROBE_BUDGET:
                         probe_match = _PROBE_RE.search(current_text)
+                        # 2026-04-20: also check for NEEDS-WRITE directive.
+                        # If present and no NEEDS-EXEC, execute the write
+                        # as this iteration's work. Shares the same
+                        # probe budget.
+                        write_match = None
+                        if not probe_match:
+                            write_match = _WRITE_BLOCK_RE.search(current_text)
                         probe_recovered = False
                         if not probe_match:
                             # Self-healing: try lenient recovery before
@@ -1295,8 +1406,73 @@ def run_agent_loop(
                                     "unclosed `]` — closed at EOL]"
                                 )
                             else:
-                                break
+                                if write_match is None:
+                                    break
                         probe_iter += 1
+                        if write_match is not None and probe_match is None:
+                            w_path = write_match.group("path").strip()
+                            w_body = write_match.group("body")
+                            ran_w, out_w = _run_write_subturn(w_path, w_body)
+                            logger.emit(
+                                "needs_write",
+                                turn=turn_number,
+                                iteration=probe_iter,
+                                role=decision.role,
+                                model=role_cfg.model,
+                                ran=ran_w,
+                                path=w_path[:500],
+                                body_chars=len(w_body or ""),
+                            )
+                            probe_note = (
+                                "[needs-write result | path: "
+                                + w_path[:200]
+                                + " | bytes: "
+                                + str(len(w_body or ""))
+                                + "]\n"
+                                + _fit_probe_output(out_w)
+                            )
+                            messages.append({
+                                "role": "user",
+                                "content": probe_note,
+                            })
+                            try:
+                                synth_handle, role_cfg, provider = _stream_with_fallback(
+                                    router=router,
+                                    registry=registry,
+                                    role_cfg=role_cfg,
+                                    provider=provider,
+                                    system_prompt=active_prompt,
+                                    messages=messages,
+                                    tools=tools,
+                                    logger=logger,
+                                    turn_number=turn_number,
+                                )
+                                _stream_and_print(synth_handle)
+                                synth_resp = synth_handle.final()
+                                bag["out_tokens"] += synth_resp.out_tokens
+                                final_text = synth_resp.text or final_text
+                                messages.append({
+                                    "role": "assistant",
+                                    "content": _sanitize_assistant_content(
+                                        synth_resp.raw_assistant_content
+                                    ),
+                                })
+                                current_text = synth_resp.text or ""
+                                continue
+                            except KeyboardInterrupt:
+                                if messages and messages[-1].get("role") == "user":
+                                    messages.pop()
+                                synth_failed = True
+                                break
+                            except Exception as _w_synth_err:
+                                if messages and messages[-1].get("role") == "user":
+                                    messages.pop()
+                                _warn(
+                                    f"write synthesis failed ({type(_w_synth_err).__name__}: "
+                                    f"{str(_w_synth_err)[:160]})"
+                                )
+                                synth_failed = True
+                                break
                         probe_cmd = probe_match.group(1).strip()
                         ran, probe_out = _run_probe_subturn(probe_cmd, bash)
                         logger.emit(
@@ -1335,6 +1511,17 @@ def run_agent_loop(
                             synth_resp = synth_handle.final()
                             bag["out_tokens"] += synth_resp.out_tokens
                             final_text = synth_resp.text or final_text
+                            # 2026-04-20: claim-guard on synth too.
+                            _cg_note = claim_guard.check(final_text, messages)
+                            if _cg_note:
+                                final_text = (final_text or "") + _cg_note
+                                logger.emit(
+                                    "claim_guard_fired",
+                                    turn=turn_number,
+                                    role=decision.role,
+                                    model=role_cfg.model,
+                                    site="probe_synth",
+                                )
                             messages.append({
                                 "role": "assistant",
                                 "content": _sanitize_assistant_content(
