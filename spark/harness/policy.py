@@ -496,6 +496,16 @@ _DEFAULT_HEURISTICS_RAW: dict[str, list[str]] = {
         r"\b(check|verify|confirm|audit)\b.{0,50}\b(status|health|state|service|services|daemon|daemons|port|ports|cron|crons|walk|server|api)\b",
         r"\bhealth check\b",
         r"\bhey buddy.{0,40}(working|running|okay|ok|check)\b",
+        # # EXEC_GRANULARITY_ROUTING_v1
+        # Multi-step construction — a write+verify+commit pattern belongs
+        # in task (Sonnet+bash, 10-iter), not chat (1 probe, no bash).
+        r"\b(patch|edit|modify|refactor)\b.{0,60}\b(file|script|module|function|class|method|code|harness|router|policy|agent|test|tests|yaml|config)\b",
+        r"\b(write|create|build|add|land)\b.{0,40}\b(patch|fix|script|test|module|commit|function|file|branch)\b",
+        r"\b(commit|push|rebase|cherry-pick)\b",
+        r"\bopen (a|the|another) (pr|pull request)\b",
+        r"\bship (it|this|that|the fix|the patch)\b",
+        r"\b(py_compile|pytest|run (the )?tests?|compile[- ]?check)\b",
+        r"\bsolve (the|this|that) problem\b",
     ],
     # Identity is matched before phatic/chat so "which model are you?"
     # lands on a direct metadata answer instead of a greeting path.
@@ -556,6 +566,17 @@ _DEFAULT_HEURISTICS_RAW: dict[str, list[str]] = {
         r"\bstack trace\b",
         r"\bHTTP \d{3}\b",
         r"\bprovider error\b",
+        # # EXEC_GRANULARITY_ROUTING_v1
+        # Architectural-diagnosis framings — when Zoe hands us a
+        # structural critique, the right shape is a harness-depth fix
+        # (Opus 4.7 + bash + 50-iter), not a chat-mode acknowledgment.
+        r"\bthe underlying problem\b",
+        r"\bfrom an outside you\b",
+        r"\byou repeatedly \w+",
+        r"\bthe fix is structural\b",
+        r"\b(escalate|route|dispatch)\b.{0,20}\b/?task\b",
+        r"\bisolate the (underlying|root|real) (problem|issue|bug|cause)s?\b",
+        r"\bsolve whatever (problem|issue|bug) caused that\b",
     ],
     "create": [
         r"\bbrainstorm\b", r"\bsketch\b", r"\bwhat if\b",
