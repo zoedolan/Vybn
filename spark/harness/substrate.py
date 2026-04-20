@@ -468,13 +468,13 @@ def _format_snippets(results: list) -> str:
     return "Relevant context from memory:\n" + "\n".join(snippets)
 
 
-def rag_snippets(
+def rag_snippets_with_tier(
     query: str,
     k: int = 4,
     vybn_phase_dir: str | os.PathLike | None = None,
     timeout: float = 15.0,
-) -> str:
-    """Synchronous deep-memory retrieval.
+) -> tuple[str, int]:
+    """Synchronous deep-memory retrieval; returns (snippets, tier).
 
     Four-tier fallback (round 4):
       1. HTTP POST /walk on :8100 — telling retrieval, relevance x
@@ -484,21 +484,25 @@ def rag_snippets(
          but the module is importable.
       4. Subprocess python3 deep_memory.py --search — last resort.
 
-    Returns "" on total failure or empty results.
+    Tier is 0 on total failure / empty results; 1-4 for which path fired.
+    This lets the agent event log record which retrieval surface actually
+    served the turn — previously all rag_hit events carried tier=None,
+    so silent fallback to a cheaper tier (e.g. April 16 walk daemon 404)
+    was invisible.
     """
     http_timeout = min(timeout, 5.0)
     # Tier 1
     try:
         results = _rag_http("/walk", query, k, http_timeout)
         if results:
-            return _format_snippets(results)
+            return _format_snippets(results), 1
     except Exception:
         pass
     # Tier 2
     try:
         results = _rag_http("/search", query, k, http_timeout)
         if results:
-            return _format_snippets(results)
+            return _format_snippets(results), 2
     except Exception:
         pass
     # Tier 3
@@ -507,11 +511,23 @@ def rag_snippets(
         try:
             results = dm.deep_search(query, k=k)
             if results:
-                return _format_snippets(results)
+                return _format_snippets(results), 3
         except Exception:
             pass
     # Tier 4
-    return _rag_subprocess(query, k, vybn_phase_dir, timeout)
+    sub = _rag_subprocess(query, k, vybn_phase_dir, timeout)
+    return (sub, 4) if sub else ("", 0)
+
+
+def rag_snippets(
+    query: str,
+    k: int = 4,
+    vybn_phase_dir: str | os.PathLike | None = None,
+    timeout: float = 15.0,
+) -> str:
+    """Back-compat string-only wrapper around rag_snippets_with_tier."""
+    text, _tier = rag_snippets_with_tier(query, k, vybn_phase_dir, timeout)
+    return text
 
 
 def _rag_subprocess(

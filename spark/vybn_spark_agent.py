@@ -51,7 +51,7 @@ from harness import (  # noqa: E402
 from harness.session_store import SessionStore  # noqa: E402
 from harness.providers import BASH_TOOL_SPEC, DELEGATE_TOOL_SPEC, INTROSPECT_TOOL_SPEC  # noqa: E402
 from harness.providers import execute_readonly, is_parallel_safe  # noqa: E402
-from harness.substrate import rag_snippets  # noqa: E402
+from harness.substrate import rag_snippets, rag_snippets_with_tier  # noqa: E402
 from harness import claim_guard  # noqa: E402
 
 # ---------------------------------------------------------------------------
@@ -1216,15 +1216,15 @@ def run_agent_loop(
     # and only when the retrieval actually returns something. No overclaim.
     # Lightweight roles (phatic, identity) skip RAG regardless.
     if role_cfg.rag and not getattr(role_cfg, "lightweight", False):
-        enrichment = rag_snippets(decision.cleaned_input[:500], k=4)
+        enrichment, rag_tier = rag_snippets_with_tier(decision.cleaned_input[:500], k=4)
         if enrichment:
             active_prompt = LayeredPrompt(
                 identity=active_prompt.identity,
                 substrate=active_prompt.substrate,
                 live=enrichment,
             )
-            _dim("[deep-memory: enriched prompt]")
-            logger.emit("rag_hit", turn=turn_number, chars=len(enrichment))
+            _dim(f"[deep-memory: enriched prompt, tier={rag_tier}]")
+            logger.emit("rag_hit", turn=turn_number, chars=len(enrichment), tier=rag_tier)
             # Record what we retrieved; used by learn_from_exchange at
             # the NEXT turn boundary (when we have a followup).
             _LEARN_PENDING["rag"] = enrichment[:2000]
