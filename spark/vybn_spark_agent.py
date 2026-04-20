@@ -325,7 +325,24 @@ def _preview(result: str) -> None:
 # string content, coerce empty strings to a placeholder.
 # ---------------------------------------------------------------------------
 
-_EMPTY_PLACEHOLDER = "\u200b"  # zero-width space — visible nowhere, non-empty to validators
+# Anthropic's server-side validator rejects zero-width space (U+200B) as
+# whitespace even though Python's str.isspace() returns False. Use a
+# genuinely visible non-whitespace marker so a leak is diagnosable and
+# the placeholder never trips "text content blocks must contain
+# non-whitespace text" 400s on the next turn.
+_EMPTY_PLACEHOLDER = "·"  # middle dot — survives every validator, visible if it ever leaks
+
+# Characters that are invisible-but-non-whitespace to Python yet treated as
+# whitespace by Anthropic's content-block validator. If an assistant text
+# block collapses to nothing more than these, treat it as empty.
+_INVISIBLE_CHARS = "​‌‍⁠﻿­"
+
+def _is_effectively_empty_text(s: str) -> bool:
+    if not s:
+        return True
+    # Strip standard whitespace AND invisibles, then check.
+    stripped = s.strip().strip(_INVISIBLE_CHARS)
+    return not stripped
 
 
 def _sanitize_assistant_content(content):
@@ -348,10 +365,10 @@ def _sanitize_assistant_content(content):
 
     # OpenAI-style: plain string.
     if isinstance(content, str):
-        if not content:
+        if _is_effectively_empty_text(content):
             return _EMPTY_PLACEHOLDER
         scrubbed = _strip_thinking_tags(content)
-        return scrubbed if scrubbed else _EMPTY_PLACEHOLDER
+        return scrubbed if not _is_effectively_empty_text(scrubbed) else _EMPTY_PLACEHOLDER
 
     # Anthropic-style: list of content blocks. Each block may be an SDK
     # object (attribute access) or a dict (from replayed history).
@@ -365,9 +382,9 @@ def _sanitize_assistant_content(content):
                 text = getattr(block, "text", None)
                 if text is None and isinstance(block, dict):
                     text = block.get("text", "")
-                if text:
+                if not _is_effectively_empty_text(text or ""):
                     scrubbed = _strip_thinking_tags(text)
-                    if scrubbed:
+                    if scrubbed and not _is_effectively_empty_text(scrubbed):
                         # Rewrite the block with scrubbed text. Preserve
                         # dict vs. SDK-object shape so callers that
                         # attribute-access the original still work.
@@ -829,6 +846,14 @@ def _stream_with_fallback(
     """
     import random as _random
     import time as _time
+
+    # In-flight heal: a prior turn may have left a ZWSP-only text block
+    # in messages (pre-fix sessions, or any future regression). Anthropic
+    # will 400 the whole request on such blocks. Re-sanitize every
+    # assistant message now so a live REPL self-heals without restart.
+    for _m in messages:
+        if _m.get("role") == "assistant":
+            _m["content"] = _sanitize_assistant_content(_m.get("content"))
 
     attempts = [(role_cfg, provider)]
     for fb_model in router.policy.fallback_chain.get(role_cfg.model, []):
