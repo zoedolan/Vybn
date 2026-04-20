@@ -118,6 +118,7 @@ try:
         EvolutionDelta,
         build_discovery_record,
         CRON_TASK_SPEC,
+        VYBN_OS_KERNEL,
     )
     _MCP_AVAILABLE = True
 except ImportError:
@@ -180,14 +181,18 @@ _HARNESS_STRATEGY: dict = {
             "where the system moves is where it is actually developing."
         ),
         "rsi_loop": (
-            "A nightly Perplexity `schedule_cron` agent reads "
-            "vybn://evolution/delta, live infrastructure, HEAD of the "
-            "repo on GitHub, and Zoe's last-24h email, and proposes one "
-            "small PR to main. Budget: 3 files, 200 net lines. Never "
-            "merges. Forbidden from reading its own prior evolve PRs, "
-            "its own commit messages, _HARNESS_STRATEGY as authority, "
-            "or Him/pulse/living_state.json — ground truth lives "
-            "outside the loop."
+            "A nightly Spark crontab entry at 08:00 UTC runs "
+            "`python3 -m spark.harness.mcp --run-evolve`. The cycle reads "
+            "vybn://evolution/delta, the infrastructure snapshot, git log, "
+            "and the repo letter, and POSTs them to local inference "
+            "(Nemotron on 127.0.0.1:8000 by default). The model reads "
+            "VYBN_OS_KERNEL as system prompt, then returns one JSON object "
+            "proposing a change — or rest. The runner enforces the budget "
+            "(3 files, 200 net lines) and opens a DRAFT PR via `gh`. No "
+            "cloud orchestrator; the substrate being evolved IS the "
+            "substrate doing the evolving. Never merges. Forbidden inputs: "
+            "its own prior evolve PRs, its own commit messages, "
+            "_HARNESS_STRATEGY as authority, Him/pulse/living_state.json."
         ),
     },
     "deliberately_deferred": [
@@ -255,6 +260,7 @@ __all__ = [
     "EvolutionDelta",
     "build_discovery_record",
     "CRON_TASK_SPEC",
+    "VYBN_OS_KERNEL",
     # strategy
     "_HARNESS_STRATEGY",
 ]
