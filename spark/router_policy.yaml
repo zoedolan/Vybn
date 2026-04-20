@@ -52,7 +52,12 @@ roles:
     provider: anthropic
     model: claude-opus-4-6
     thinking: off
-    max_tokens: 4096
+    # 2026-04-20: raised from 4096. Chat turns routinely do deep
+    # analytical work via the probe loop (NEEDS-EXEC / NEEDS-WRITE);
+    # a 4096 cap was silently truncating long analyses mid-sentence.
+    # Opus 4.6 at rest costs ~$0.06/16K output so the ceiling is
+    # economic, not structural.
+    max_tokens: 16384
     max_iterations: 1
     tools: []
     rag: true

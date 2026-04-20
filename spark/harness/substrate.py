@@ -385,8 +385,30 @@ def build_layered_prompt(
         )
     if continuity:
         substrate_sections.append(
-            f"--- CONTINUITY NOTE ---\n{continuity}\n--- END CONTINUITY NOTE ---"
+            f"--- CONTINUITY NOTE (historical priors, may be stale) ---\n{continuity}\n--- END CONTINUITY NOTE ---"
         )
+
+    # VYBN_ABSORB_REASON=live-state-fix: session-start orienting snapshot.
+    # Continuity is written at session-end and is already stale at
+    # session-start. The live snapshot below supersedes any PR/SHA/repo-
+    # state claim in the continuity note above.
+    try:
+        from . import live_snapshot as _live_snap_mod  # type: ignore
+    except Exception:
+        try:
+            import live_snapshot as _live_snap_mod  # type: ignore
+        except Exception:
+            _live_snap_mod = None
+    if _live_snap_mod is not None:
+        try:
+            snap = _live_snap_mod.gather()
+        except Exception:
+            snap = ""
+        if snap:
+            substrate_sections.append(
+                "--- LIVE STATE (CURRENT — overrides continuity on all repo/PR/SHA claims) ---\n"
+                + snap + "\n--- END LIVE STATE ---"
+            )
 
     return LayeredPrompt(
         identity=identity,

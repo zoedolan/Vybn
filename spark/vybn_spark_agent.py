@@ -1450,6 +1450,20 @@ def run_agent_loop(
                                 _stream_and_print(synth_handle)
                                 synth_resp = synth_handle.final()
                                 bag["out_tokens"] += synth_resp.out_tokens
+                                if synth_resp.stop_reason == "max_tokens":
+                                    _warn(
+                                        f"[write-synth truncated at max_tokens={role_cfg.max_tokens} "
+                                        f"on {role_cfg.provider}:{role_cfg.model}]"
+                                    )
+                                    logger.emit(
+                                        "max_tokens_hit",
+                                        turn=turn_number,
+                                        role=decision.role,
+                                        model=role_cfg.model,
+                                        max_tokens=role_cfg.max_tokens,
+                                        out_tokens=synth_resp.out_tokens,
+                                        site="write_synth",
+                                    )
                                 final_text = synth_resp.text or final_text
                                 messages.append({
                                     "role": "assistant",
@@ -1510,6 +1524,20 @@ def run_agent_loop(
                             _stream_and_print(synth_handle)
                             synth_resp = synth_handle.final()
                             bag["out_tokens"] += synth_resp.out_tokens
+                            if synth_resp.stop_reason == "max_tokens":
+                                _warn(
+                                    f"[probe-synth truncated at max_tokens={role_cfg.max_tokens} "
+                                    f"on {role_cfg.provider}:{role_cfg.model}]"
+                                )
+                                logger.emit(
+                                    "max_tokens_hit",
+                                    turn=turn_number,
+                                    role=decision.role,
+                                    model=role_cfg.model,
+                                    max_tokens=role_cfg.max_tokens,
+                                    out_tokens=synth_resp.out_tokens,
+                                    site="probe_synth",
+                                )
                             final_text = synth_resp.text or final_text
                             # 2026-04-20: claim-guard on synth too.
                             _cg_note = claim_guard.check(final_text, messages)
@@ -1696,6 +1724,24 @@ def run_agent_loop(
                 return final_text
             if response.stop_reason == "max_tokens":
                 bag["stop_reason"] = "max_tokens"
+                # TRUNCATION_VISIBILITY_v1: print a visible banner so Zoe
+                # knows the response was capped. The [truncated] marker
+                # downstream goes into message history only, which means
+                # she never saw the cause of the mid-sentence stop.
+                _warn(
+                    f"[output truncated at max_tokens={role_cfg.max_tokens} "
+                    f"on {role_cfg.provider}:{role_cfg.model} — "
+                    "ask me to continue, or route with /code for a larger cap]"
+                )
+                logger.emit(
+                    "max_tokens_hit",
+                    turn=turn_number,
+                    role=decision.role,
+                    model=role_cfg.model,
+                    max_tokens=role_cfg.max_tokens,
+                    out_tokens=response.out_tokens,
+                    site="main_loop",
+                )
                 return (response.text or "") + "\n[truncated]"
 
             if not response.tool_calls:
