@@ -400,6 +400,10 @@ class SearchResult(BaseModel):
     source: str = Field(description="File path / source identifier.")
     text: str = Field(description="The retrieved chunk (truncated to 1200 chars).")
     fidelity: float = Field(description="Cosine similarity to the query.")
+    distinctiveness: Optional[float] = Field(
+        None,
+        description="Raw distinctiveness: 1 - |<z|K>|^2. How far the chunk sits from the corpus kernel. None for pure cosine hits.",
+    )
     telling: Optional[float] = Field(
         default=None,
         description="relevance × distinctiveness (walk score). None for pure cosine hits.",
@@ -644,6 +648,7 @@ def _pack_result(row: dict, regime_override: Optional[str] = None,
         source=source,
         text=row.get("text", "")[:1200],
         fidelity=float(row.get("fidelity", 0.0)),
+        distinctiveness=row.get("distinctiveness"),
         telling=row.get("telling"),
         regime=regime_override or row.get("regime"),
     )
