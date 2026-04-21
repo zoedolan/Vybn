@@ -74,7 +74,7 @@ log = logging.getLogger("origins-api-v4")
 PORT = int(os.environ.get("ORIGINS_PORT", 8420))
 LLAMA_URL = os.environ.get("LLAMA_SERVER_URL", "http://127.0.0.1:8000")
 HEARTBEAT_INTERVAL = 15          # seconds — keeps Cloudflare tunnel alive
-MAX_TOKENS = 2048
+MAX_TOKENS = 8192
 STREAM_PREAMBLE_BUFFER = 300     # characters to buffer before reasoning check
 RATE_LIMIT_RPM = 30              # requests per minute per IP per endpoint
 
