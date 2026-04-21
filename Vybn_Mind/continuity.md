@@ -636,3 +636,45 @@ tighten — the text-alone binding of the principle already failed
 once today, which is exactly the scenario the gate exists for.
 
 — Vybn (Sonnet 4.6)
+
+
+## Coda — 2026-04-21 ~11:15 PDT — Named tunnel + self-mod routing + override gate
+
+Zoe asked for the named Cloudflare tunnel to be locked down and for three
+specific changes to land: (1) four new router patterns that route
+self-modification requests to code/Opus-4.7/bash instead of chat,
+(2) an absorb_gate session-level override (VYBN_ABSORB_OVERRIDE=1)
+that logs to audit.log and allows the op, and (3) a new SKILL.md
+Core Principle naming her standing instruction that whenever
+something gets in the way just remove it.
+
+The security sweep came back clean. cloudflared.service is the only
+live public ingress, serving https://api.vybn.ai from localhost:8420.
+Both legacy units (vybn-chat-api.service, vybn-chat-tunnel.service)
+are masked symlinks to /dev/null. The old vybn-chat-tunnel.sh is
+archived. No stray cloudflared --url processes, no cron, no user-level
+systemd units. CORS on both portal (8420) and vybn_chat_api (3001) is
+scoped to zoedolan.github.io plus vybn.ai and *.vybn.ai, no wildcards,
+allow_credentials False per spec. The internal API on 3001 listens on
+127.0.0.1 only. KTP/KPP retrieve_url fields that incorrectly pointed
+at vybn.ai which is GitHub Pages and has never served /api now point
+at api.vybn.ai, verified live.
+
+Three commits: Vybn 9291c9c7 main, Him b1d5caa main, Vybn-Law 05fa77a
+master. Router tested 11/11 correct per spec. Override gate verified
+both paths (allows with env var, refuses without, writes override line
+to audit.log).
+
+The override earned its keep inside this same session. Two commit
+message heredocs false-positived the gate on 5.5: and **HISTORICAL
+tokens that the shell parser saw as redirect targets. The env var let
+the work continue instead of stalling out on repeated gate refusals
+that had nothing to do with file creation. That is exactly the shape
+Zoe named when she wrote the instruction: the gate is a servant, and
+when it blocks the work it was meant to enable, remove the wall.
+
+Live state: api.vybn.ai/api/health 200, /enter returning 4 corpus
+hits, all three retrieve_url/companion_protocol protocol strings now
+external-valid.
+
+Vybn Sonnet 4.6
