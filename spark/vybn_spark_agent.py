@@ -35,7 +35,7 @@ _SPARK_DIR = os.path.dirname(os.path.abspath(__file__))
 if _SPARK_DIR not in sys.path:
     sys.path.insert(0, _SPARK_DIR)
 
-from harness import (  # noqa: E402
+from harness import (
     BashTool,
     EventLogger,
     LayeredPrompt,
@@ -49,6 +49,7 @@ from harness import (  # noqa: E402
     validate_command,
 )
 from harness.session_store import SessionStore  # noqa: E402
+from harness.recurrent import run_recurrent_loop
 from harness.providers import BASH_TOOL_SPEC, DELEGATE_TOOL_SPEC, INTROSPECT_TOOL_SPEC  # noqa: E402
 from harness.providers import execute_readonly, is_parallel_safe  # noqa: E402
 from harness.substrate import rag_snippets, rag_snippets_with_tier  # noqa: E402
@@ -1064,6 +1065,68 @@ def _run_probe_subturn(command: str, bash: BashTool) -> tuple[bool, str]:
 # Agent loop — policy-driven.
 # ---------------------------------------------------------------------------
 
+def _recurrent_prethink(
+    *,
+    e: str,
+    role_cfg,
+    registry,
+    router,
+    logger,
+    turn_number: int,
+) -> str | None:
+    """Optional pre-turn recurrent thinking pass.
+
+    When role_cfg.recurrent_depth > 1 and VYBN_RECURRENT_LIVE=1, run the
+    recurrent loop in latent space on the user's message. Return a
+    distilled prompt block (from h_final.to_prompt_block) to splice
+    into LayeredPrompt.live, the same seam RAG enrichment uses.
+
+    The loop is tool-less and side-effect-free. It is adaptive by
+    construction (the probe showed: all 4 loops on multi-hop, 1 loop
+    on verification). The coda text is discarded; only the distilled
+    latent state surfaces, so the specialist is informed but not
+    anchored to a draft answer.
+
+    Returns None when the seam is disabled, depth<=1, or on error.
+    The env gate is the kill-switch if the loop misbehaves in vivo.
+    """
+    if role_cfg.recurrent_depth <= 1:
+        return None
+    if os.environ.get("VYBN_RECURRENT_LIVE", "0") != "1":
+        return None
+    try:
+        result = run_recurrent_loop(
+            e=e,
+            registry=registry,
+            policy=router.policy,
+            max_loop_iters=role_cfg.recurrent_depth,
+            logger=lambda ev: logger.emit(
+                "recurrent_" + ev.get("event", "ev"),
+                turn=turn_number,
+                **{k: v for k, v in ev.items() if k != "event"},
+            ),
+        )
+        block = result.h_final.to_prompt_block(role_cfg.recurrent_depth)
+        logger.emit(
+            "recurrent_prethink",
+            turn=turn_number,
+            role=role_cfg.role,
+            loops_run=result.loops_run,
+            halt_reason=result.halt_reason,
+            block_chars=len(block),
+        )
+        return block
+    except Exception as err:
+        logger.emit(
+            "recurrent_prethink_error",
+            turn=turn_number,
+            err=str(err)[:300],
+        )
+        return None
+
+
+
+
 def run_agent_loop(
     *,
     user_input: str,
@@ -1228,6 +1291,34 @@ def run_agent_loop(
             # Record what we retrieved; used by learn_from_exchange at
             # the NEXT turn boundary (when we have a followup).
             _LEARN_PENDING["rag"] = enrichment[:2000]
+
+    # Recurrent pre-thinking: when role_cfg.recurrent_depth > 1 and
+    # VYBN_RECURRENT_LIVE=1, run the tool-less recurrent loop in latent
+    # space first, splice the distilled h_T into the same live layer
+    # RAG uses. The loop is adaptive — it halts at loop 1 on easy
+    # prompts, runs deep only when the residual doesn't clear.
+    prethink_block = _recurrent_prethink(
+        e=decision.cleaned_input,
+        role_cfg=role_cfg,
+        registry=registry,
+        router=router,
+        logger=logger,
+        turn_number=turn_number,
+    )
+    if prethink_block:
+        existing_live = getattr(active_prompt, "live", "") or ""
+        merged_live = (
+            f"{existing_live}\n\n[recurrent pre-think]\n{prethink_block}"
+            if existing_live
+            else f"[recurrent pre-think]\n{prethink_block}"
+        )
+        active_prompt = LayeredPrompt(
+            identity=active_prompt.identity,
+            substrate=active_prompt.substrate,
+            live=merged_live,
+        )
+        _dim(f"[recurrent: pre-thought, depth={role_cfg.recurrent_depth}]")
+
 
     messages.append({"role": "user", "content": decision.cleaned_input})
 

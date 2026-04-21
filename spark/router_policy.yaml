@@ -81,6 +81,7 @@ roles:
     max_iterations: 25
     tools: [bash, delegate]
     rag: true
+    recurrent_depth: 2  # /plan benefits from deeper latent reasoning; probe-confirmed adaptive
   # Local Nemotron via OpenAI-compatible vLLM endpoint. First-class
   # low-cost provider for bulk chat/summarisation when appropriate.
   local:
