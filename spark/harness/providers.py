@@ -180,7 +180,14 @@ def _extract_file_targets(command: str) -> list[str]:
             if not t or t.startswith("/dev/") or t.startswith("/proc/"):
                 continue
             if not os.path.isabs(t):
-                continue
+                # Resolve relative paths against the agent's cwd (the
+                # bash session inherits ~/Vybn on launch). Compound
+                # commands like 'mkdir -p X && cat > X/y <<EOF' used
+                # to slip past because the target was relative. Over-
+                # eager is the right failure mode: a false trigger
+                # just prompts VYBN_ABSORB_REASON, a miss creates
+                # bloat silently.
+                t = os.path.abspath(t)
             out.append(os.path.normpath(t))
     return out[:10]
 
