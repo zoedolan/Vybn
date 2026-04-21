@@ -650,7 +650,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],       # Behind Cloudflare tunnel
-    allow_credentials=True,
+    allow_credentials=False,  # wildcard origin requires credentials=false per CORS spec
     allow_methods=["*"],
     allow_headers=["*"],
 )
