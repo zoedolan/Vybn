@@ -109,3 +109,4 @@ repo_mapping_output/
 spark/ts.crt
 spark/ts.key
 spark/ts.*
+spark/agent_events.jsonl

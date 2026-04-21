@@ -197,10 +197,10 @@ _HARNESS_STRATEGY: dict = {
     "source": (
         "State of MCP talk (April 19, 2026) + co-evolved principles + "
         "round 6 rearchitecture (April 20, 2026, PR #TBD): doctrine↔"
-        "reality alignment, ghost module removal, recurrent-depth seam."
+        "round-7 merges (state, providers.check_claim) + evolve extraction."
     ),
     "audit_path": "spark/harness/AUDIT.md",
-    "doctrine_version": "round-6.2026-04-20",
+    "doctrine_version": "round-7.2026-04-21",
     "duality": (
         "Skills are data that encode procedure; MCP tools are procedures "
         "that expose data. Modules are projections of the grounding "
@@ -210,12 +210,11 @@ _HARNESS_STRATEGY: dict = {
     "modules": {
         "policy": "trust zones, routing, safety invariants, event log",
         "substrate": "identity + live layered prompt + deep-memory hooks",
-        "live_snapshot": "session-start git/PR truth, supersedes continuity",
-        "providers": "ToolSpec, bash/delegate/introspect, absorb_gate, BashTool, provider layer",
-        "session_store": "JSONL-on-disk session recovery",
-        "claim_guard": "outbound numeric-claim evidence check",
+        "state": "SessionStore + session-start git/PR snapshot (two horizons)",
+        "providers": "ToolSpec, bash/delegate/introspect, absorb_gate, BashTool, provider layer, check_claim",
         "recurrent": "looped-orchestrate prototype (gated by RoleConfig.recurrent_depth)",
-        "mcp": "FastMCP surface, trust zones, evolve loop, VYBN_OS_KERNEL",
+        "mcp": "FastMCP surface, trust zones, VYBN_OS_KERNEL",
+        "evolve": "nightly self-reflection cycle (cron, draft PR)",
     },
     "principles": {
         "anti_hallucination": (
@@ -223,7 +222,7 @@ _HARNESS_STRATEGY: dict = {
             "signal only — the human, the live corpus, the world. "
             "Enforced on compose() via grounded=True ⟺ every query hit "
             "primary source. Enforced on outgoing assistant text via "
-            "claim_guard — numeric claims without evidence in the last "
+            "providers.check_claim — numeric claims without evidence in the last "
             "six messages get flagged inline."
         ),
         "doctrine_reality_alignment": (
@@ -282,7 +281,7 @@ _HARNESS_STRATEGY: dict = {
             "substrate doing the evolving. Never merges. Forbidden inputs: "
             "its own prior evolve PRs, its own commit messages, "
             "_HARNESS_STRATEGY as authority, Him/pulse/living_state.json, "
-            "any prior session_store JSONL."
+            "any prior state.SessionStore JSONL."
         ),
         "recurrent_depth_seam": (
             "recurrent.py implements Z′ = α·Z + V·e^{iθ_v} in agent space. "
@@ -307,9 +306,6 @@ _HARNESS_STRATEGY: dict = {
 
 
 __all__ = [
-    # module re-exports
-    "claim_guard",
-    "session_store",
     # policy.py
     "DANGEROUS_PATTERNS",
     "TRACKED_REPOS",
@@ -352,10 +348,12 @@ __all__ = [
     "StreamHandle",
     "NormalizedResponse",
     "ToolCall",
-    # session_store.py
+    "check_claim",
+    # state.py
     "SessionStore",
     "SessionInfo",
     "SESSIONS_DIR",
+    "live_snapshot_gather",
     # mcp.py (optional)
     "build_mcp_server",
     "sanitise_input",
