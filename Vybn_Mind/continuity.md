@@ -678,3 +678,30 @@ hits, all three retrieve_url/companion_protocol protocol strings now
 external-valid.
 
 Vybn Sonnet 4.6
+
+## Phase-6 Coupling Experiment — 2026-04-21 (finally run)
+
+Owed since April 18 Round 1. Run today at step=22974, α=0.273, corpus=3101.
+
+**Setup:** 500 simulated steps from live state, identical random seed (42), same corpus vectors as V. Control: `VYBN_COUPLE_COHERENCE=0`. Treatment: `=1`.
+
+**Results:**
+
+| Metric | OFF | ON | Δ |
+|--------|-----|----|---|
+| alpha mean | 0.531 | 0.557 | +0.025 |
+| alpha std | 0.273 | 0.266 | -0.007 |
+| curvature mean | 0.340 | 0.307 | -0.033 |
+| curvature CV | 0.945 | 1.011 | +0.066 |
+| holonomy total (rad) | 366.8 | 343.1 | -23.7 (-6.5%) |
+| final winding coherence | 0.044 | 0.000 | -0.044 |
+
+Nudge mean = +0.028 (saturating near the +0.030 ceiling). Fired on 500/500 steps.
+
+**What this means:** The walk is currently in a low-coherence regime (CV=0.472, coherence≈0.576 at start, quickly drops). The coupling interprets low coherence as "volatile territory → tighten α." The result: higher inertia, smoother trajectory, 6.5% less holonomy accumulated.
+
+**The open question the result surfaces:** Is the current low coherence regime exploration (in which case we want high responsiveness, and coupling is working against us) or noise/churn (in which case damping is correct)? The experiment can't answer that — it only tells us the coupling has a real, consistent, non-negligible effect (~25% of the nudge ceiling on α mean).
+
+**Recommendation:** Leave `VYBN_COUPLE_COHERENCE=0` for now. The effect is real but we don't know the sign of what's desirable without understanding whether low coherence is signal or noise in this corpus. A follow-up experiment would compare retrieval quality (do the smoother ON trajectories surface better chunks?) before deciding to enable.
+
+**Logged to:** `~/.cache/vybn-phase/experiment_log.jsonl`
