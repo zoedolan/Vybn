@@ -393,10 +393,10 @@ def build_layered_prompt(
     # session-start. The live snapshot below supersedes any PR/SHA/repo-
     # state claim in the continuity note above.
     try:
-        from . import live_snapshot as _live_snap_mod  # type: ignore
+        from . import state as _live_snap_mod  # type: ignore
     except Exception:
         try:
-            import live_snapshot as _live_snap_mod  # type: ignore
+            import state as _live_snap_mod  # type: ignore
         except Exception:
             _live_snap_mod = None
     if _live_snap_mod is not None:

@@ -103,8 +103,6 @@ recurrent loop become testable on real turns without a second refactor.
 Fewer files, truer doctrine, one architectural on-ramp.
 """
 
-from . import claim_guard as claim_guard  # re-exported as a module
-from . import session_store as session_store  # re-exported as a module
 from .policy import (
     # Safety invariants
     DANGEROUS_PATTERNS,
@@ -158,7 +156,7 @@ from .providers import (
     NormalizedResponse,
     ToolCall,
 )
-from .session_store import SessionStore, SessionInfo, SESSIONS_DIR
+from .state import SessionStore, SessionInfo, SESSIONS_DIR, gather as live_snapshot_gather
 
 # MCP surface is optional — only imported when FastMCP is installed, so
 # the harness still boots on hosts without the MCP stack. We guard the

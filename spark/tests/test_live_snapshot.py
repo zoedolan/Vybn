@@ -22,7 +22,7 @@ _HARNESS_PARENT = _HERE.parent  # spark/
 if str(_HARNESS_PARENT) not in sys.path:
     sys.path.insert(0, str(_HARNESS_PARENT))
 
-from harness import live_snapshot  # type: ignore  # noqa: E402
+from harness import state as live_snapshot  # type: ignore  # noqa: E402
 
 
 def _mk_run(responses: dict[tuple, str]):

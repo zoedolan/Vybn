@@ -118,15 +118,14 @@ def test_write_subturn_overwrites_existing_file_without_reason():
 
 
 def test_claim_guard_importable_from_harness():
-    from harness import claim_guard
-    assert hasattr(claim_guard, "check")
-    assert callable(claim_guard.check)
+    from harness.providers import check_claim
+    assert callable(check_claim)
 
 
 def test_claim_guard_wired_in_agent_module():
     import vybn_spark_agent
     src = Path(vybn_spark_agent.__file__).read_text()
-    assert "from harness import claim_guard" in src
+    assert "from harness.providers import check_claim" in src
     assert 'site="single_response"' in src
     assert 'site="probe_synth"' in src
 
