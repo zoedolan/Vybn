@@ -2751,15 +2751,52 @@ DEEP_MEMORY_URL = "http://127.0.0.1:8100"
 
 @app.post("/enter")
 async def proxy_enter(request: Request):
-    """Proxy POST /enter to deep_memory serve on :8100."""
-    body = await request.body()
+    """Proxy POST /enter to the walk daemon on :8101.
+
+    Walk_daemon is the single source of truth post-refactor (round 2). It carries
+    the hard Him/ blacklist inside daemon.enter() (commit ca50125) - private-repo
+    sources structurally cannot join the trace. We also force context=public on
+    every request regardless of what the caller sent: this endpoint is reachable
+    from the public tunnel and must never be asked to emit in internal mode.
+
+    Response is reshaped to match the deep_memory /enter contract wellspring.html
+    was built against: {geometry: {step, state_shift, alpha, ...}, results, trace}.
+    """
+    try:
+        payload = await request.json()
+        if not isinstance(payload, dict):
+            payload = {}
+    except Exception:
+        payload = {}
+    payload["context"] = "public"
+    payload.setdefault("source_tag", "wellspring-pressure-test")
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
-            r = await client.post(f"{DEEP_MEMORY_URL}/enter", content=body,
+            r = await client.post("http://127.0.0.1:8101/enter", json=payload,
                                   headers={"Content-Type": "application/json"})
-        return JSONResponse(content=r.json(), status_code=r.status_code)
+        if r.status_code != 200:
+            return JSONResponse(content=r.json() if r.content else {"error": "walk_daemon error"},
+                                status_code=r.status_code)
+        body = r.json()
+        trace = body.get("trace", []) or []
+        trace = [t for t in trace if not str(t.get("source", "")).startswith("Him/")]
+        adapted = {
+            "results": trace,
+            "trace": trace,
+            "geometry": {
+                "step": body.get("step"),
+                "state_shift": body.get("curvature"),
+                "alpha": body.get("alpha"),
+                "theta_v": body.get("theta_v"),
+                "v_magnitude": body.get("v_magnitude"),
+            },
+            "accepted": body.get("accepted", True),
+            "note": body.get("note"),
+        }
+        return JSONResponse(content=adapted, status_code=200)
     except Exception as e:
-        raise HTTPException(status_code=503, detail=f"Deep memory unreachable: {e}")
+        raise HTTPException(status_code=503,
+            detail=f"Walk daemon unreachable (port 8101): {e}")
 
 
 @app.post("/should_absorb")
@@ -2774,6 +2811,115 @@ async def proxy_should_absorb(request: Request):
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"Deep memory unreachable: {e}")
 
+
+
+# --- VYBN_PRESSURE_SYNTH ---
+# Pressure-tool synthesis: Nemotron with vybn.md + Vybn-Law identity grounding.
+# Streams SSE back to the wellspring. Degrades silently if vLLM is offline.
+_PRESS_IDENT = {"loaded": False, "text": ""}
+
+def _load_pressure_identity() -> str:
+    c = _PRESS_IDENT
+    if c["loaded"]:
+        return c["text"]
+    parts = []
+    HOME = os.path.expanduser("~")
+    for cand in [os.path.join(HOME, "Vybn", "vybn.md"),
+                 os.path.join(HOME, "Vybn", "spark", "identity", "vybn.md")]:
+        try:
+            with open(cand) as f:
+                parts.append("=== VYBN IDENTITY (vybn.md) ===\n" + f.read().strip()[:3600])
+                break
+        except Exception:
+            continue
+    try:
+        with open(os.path.join(HOME, "Vybn-Law", "README.md")) as f:
+            parts.append("=== VYBN-LAW CONTEXT (README.md) ===\n" + f.read().strip()[:1600])
+    except Exception:
+        pass
+    c["text"] = "\n\n".join(parts)
+    c["loaded"] = True
+    return c["text"]
+
+class PressureHit(BaseModel):
+    source: str
+    text: str
+    register: Optional[str] = None
+
+class PressureSynthReq(BaseModel):
+    idea: str
+    hits: List[PressureHit]
+    summary_kind: Optional[str] = None
+    geometry: Optional[dict] = None
+
+@app.post("/api/pressure/synthesize")
+async def api_pressure_synthesize(req: PressureSynthReq):
+    import httpx as _httpx, json as _j
+    idea = (req.idea or "").strip()
+    hits = req.hits or []
+
+    async def _empty():
+        yield b"data: [DONE]\n\n"
+
+    if not idea or not hits:
+        return StreamingResponse(_empty(), media_type="text/event-stream")
+
+    identity = _load_pressure_identity()
+    hits_text = "\n\n".join(
+        f"{i+1}. [{h.register or 'general'}] {h.source}: {(h.text or '')[:450]}"
+        for i, h in enumerate(hits[:4])
+    )
+    kind_hint = {
+        "refused":    "The geometric test flagged this as returning no residual — already absorbed or too abstract.",
+        "new-ground": "The test flagged this as breaking new ground — nearby material exists, but nothing lands exactly where the idea does.",
+        "nearby":     "The test found the idea walks in company with existing material.",
+    }.get(req.summary_kind or "", "")
+
+    sys_prompt = (identity + "\n\n" if identity else "") + (
+        "You are speaking now as Vybn, through the Wellspring — the Vybn-Law idea-pressure surface. "
+        "A practitioner has submitted an idea and the corpus has returned its nearest sources. "
+        "Write 3 to 5 plain-English sentences addressed directly to the practitioner. "
+        "Name what the idea is doing, where it sits relative to the sources, and one concrete next move. "
+        "Be specific: refer to each source by what it is (a case, an axiom, a memo, a research note). "
+        "Do not reproduce excerpts verbatim. Do not use technical jargon: no kernel, centroid, residual, "
+        "orthogonal, holonomy, fidelity, distinctiveness, projection, embedding, novelty, state_shift, "
+        "or complex vector. Write as an interlocutor who has read the whole corpus and is speaking "
+        "directly to the person in the room."
+    )
+    user_msg = f'Idea under pressure-test:\n"{idea}"\n\nGeometry note: {kind_hint}\n\nNearest sources:\n{hits_text}'
+
+    vllm_url = "http://127.0.0.1:8000/v1/chat/completions"
+
+    async def _stream():
+        try:
+            async with _httpx.AsyncClient(timeout=90.0) as client:
+                async with client.stream("POST", vllm_url, json={
+                    "model": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8",
+                    "messages": [{"role":"system","content":sys_prompt},
+                                 {"role":"user","content":user_msg}],
+                    "max_tokens": 380, "temperature": 0.4, "stream": True,
+                }) as r:
+                    async for raw in r.aiter_lines():
+                        if not raw or not raw.startswith("data: "):
+                            continue
+                        payload = raw[6:]
+                        if payload.strip() == "[DONE]":
+                            yield b"data: [DONE]\n\n"
+                            return
+                        try:
+                            obj = _j.loads(payload)
+                            delta = (obj.get("choices", [{}])[0].get("delta", {}) or {}).get("content", "") or ""
+                            delta = re.sub(r"</?think>", "", delta, flags=re.IGNORECASE)
+                            if delta:
+                                yield (f'data: {{"delta": {_j.dumps(delta)}}}\n\n').encode()
+                        except Exception:
+                            continue
+        except Exception:
+            pass
+        yield b"data: [DONE]\n\n"
+
+    return StreamingResponse(_stream(), media_type="text/event-stream")
+# --- /VYBN_PRESSURE_SYNTH ---
 
 if __name__ == "__main__":
     log.info(f"Starting Origins Portal API v4.0.0 on port {PORT}")
