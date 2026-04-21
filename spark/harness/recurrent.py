@@ -248,7 +248,7 @@ def reduce_step(
     h: Latent,
     specialist_output: str,
     provider: Provider,
-    role_cfg: RoleConfig,
+    role: RoleConfig,
 ) -> tuple[Latent, bool, str]:
     """Run one reducer pass. Returns (h_{t+1}, converged, rationale).
 
@@ -278,8 +278,8 @@ def reduce_step(
         live="",
     )
     handle = provider.stream(
-        role_cfg=role_cfg,
-        system_prompt=prompt,
+        role=role,
+        system=prompt,
         messages=[{"role": "user", "content": user_payload}],
         tools=[],
     )
@@ -418,8 +418,8 @@ def specialist_step(
         "produce your contribution for this loop."
     )
     handle = provider.stream(
-        role_cfg=role,
-        system_prompt=prompt,
+        role=role,
+        system=prompt,
         messages=[{"role": "user", "content": user_msg}],
         tools=[],  # specialists do not run bash inside the loop; the
                    # prototype keeps every loop side-effect-free so we
@@ -476,8 +476,8 @@ def coda_step(
         live=live_block,
     )
     handle = provider.stream(
-        role_cfg=role,
-        system_prompt=prompt,
+        role=role,
+        system=prompt,
         messages=[{"role": "user", "content": e}],
         tools=[],
     )
@@ -589,7 +589,7 @@ def run_recurrent_loop(
                 h=h,
                 specialist_output=spec_out,
                 provider=reducer_provider,
-                role_cfg=reducer_cfg,
+                role=reducer_cfg,
             )
         except Exception as err:
             halt_reason = f"reducer_error: {err}"
