@@ -60,12 +60,12 @@ class StubProvider:
     queue: list[str] = field(default_factory=list)
     calls: list[dict] = field(default_factory=list)
 
-    def stream(self, *, role_cfg, system_prompt, messages, tools):
+    def stream(self, *, role, system, messages, tools):
         text = self.queue.pop(0) if self.queue else ""
         self.calls.append({
-            "role": role_cfg.role,
-            "model": role_cfg.model,
-            "system_flat": system_prompt.flat(),
+            "role": role.role,
+            "model": role.model,
+            "system_flat": system.flat(),
             "messages": messages,
             "n_tools": len(tools),
         })
@@ -81,7 +81,7 @@ class StubProvider:
             out_tokens=0,
             raw_assistant_content=[{"type": "text", "text": text}],
             provider=self.name,
-            model=role_cfg.model,
+            model=role.model,
         )
         return StreamHandle(iterator=iterator(), finalize=lambda: response)
 
@@ -91,7 +91,7 @@ class StubRegistry:
     def __init__(self, provider: StubProvider):
         self._p = provider
 
-    def get(self, role_cfg):
+    def get(self, role):
         return self._p
 
 
@@ -202,7 +202,7 @@ class TestReducer(unittest.TestCase):
             h=h,
             specialist_output="the specialist said things",
             provider=stub,
-            role_cfg=role,
+            role=role,
         )
         self.assertEqual(len(h_next.hypotheses), 1)
         self.assertAlmostEqual(h_next.hypotheses[0].confidence, 0.8)
@@ -233,7 +233,7 @@ class TestReducer(unittest.TestCase):
             h=Latent(),
             specialist_output="",
             provider=stub,
-            role_cfg=role,
+            role=role,
         )
         texts = [x.text for x in h_next.hypotheses]
         self.assertIn("keep me", texts)
@@ -256,7 +256,7 @@ class TestReducer(unittest.TestCase):
             h=Latent(),
             specialist_output="",
             provider=stub,
-            role_cfg=role,
+            role=role,
         )
         self.assertEqual(h_next.summary, "fenced")
 
@@ -268,7 +268,7 @@ class TestReducer(unittest.TestCase):
             h=Latent(open_questions=["existing"]),
             specialist_output="specialist text here",
             provider=stub,
-            role_cfg=role,
+            role=role,
         )
         # On parse error: h advances one loop, specialist output becomes
         # a new open question, converged stays False, rationale tags the error.
@@ -293,7 +293,7 @@ class TestReducer(unittest.TestCase):
             h=Latent(),
             specialist_output="",
             provider=stub,
-            role_cfg=role,
+            role=role,
         )
         self.assertTrue(converged)
 
