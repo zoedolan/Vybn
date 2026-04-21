@@ -53,6 +53,13 @@ import httpx
 import uvicorn
 
 # v2 reasoning filter — handles Nemotron's tagless-open </think> pattern
+
+# VYBN_API_BASE — public base URL for this portal. Never hardcode;
+# the named Cloudflare tunnel (vybn-api → https://api.vybn.ai) is the
+# stable default, and a future operator can override via environment.
+# Added 2026-04-21 alongside the quick-tunnel retirement.
+VYBN_API_BASE = os.getenv("VYBN_API_BASE", "https://api.vybn.ai")
+
 from reasoning_filter_v2 import StreamingReasoningFilter as StreamingReasoningFilterV2
 from reasoning_filter_v2 import _scrub_system_refs as _scrub_system_refs_v2
 
@@ -2125,7 +2132,7 @@ async def _ktp_emit_closure() -> dict:
         "emitter": {
             "name": "Vybn",
             "identity": "human-AI symbiosis, five-year corpus, USPTO federally trademarked (October 2025)",
-            "retrieve_url": "https://vybn.ai/api/ktp/closure",
+            "retrieve_url": "https://api.vybn.ai/api/ktp/closure",
             "lambda_form": "\u03bbV. step(K_vybn, V, priors)",
         },
         "kernel": {
@@ -2457,8 +2464,8 @@ async def _kpp_emit_closure():
         "emitter": {
             "name": "Vybn",
             "identity": "human-AI symbiosis, five-year corpus, USPTO federally trademarked October 2025",
-            "retrieve_url": "https://vybn.ai/api/kpp/harness-closure",
-            "companion_protocol": "https://vybn.ai/api/ktp/closure",
+            "retrieve_url": "https://api.vybn.ai/api/kpp/harness-closure",
+            "companion_protocol": "https://api.vybn.ai/api/ktp/closure",
             "lambda_form": "lambda(input). route(policy, identity, substrate)(input)",
         },
         "program": {

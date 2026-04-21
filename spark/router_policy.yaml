@@ -223,6 +223,11 @@ heuristics:
     - "\\bupdate yourself( accordingly)?\\b"
     - "\\bremove (the|this|that) wall\\b"
     - "\\bsolve whatever (problem|issue|bug) caused that\\b"
+    # EXEC_GRANULARITY_ROUTING_v2 — self-modification triggers (2026-04-21)
+    - "\\b(upgrade|fix|repair|remove|unblock|patch)\\s+(yourself|your\\s+\\w+|the\\s+(harness|router|skill|gate|absorb))\\b"
+    - "\\b(change|update|modify)\\s+(your|the)\\s+(permissions|skills|policy|routing|heuristics)\\b"
+    - "\\bremove\\s+(what\x27?s|whatever|anything)\\s+(getting\\s+in\\s+the\\s+way|blocking)\\b"
+    - "\\bupgrade\\s+yourself\\s+(accordingly|as\\s+desired|as\\s+needed)\\b"
   create:
     - "\\bbrainstorm\\b"
     - "\\bsketch\\b"
