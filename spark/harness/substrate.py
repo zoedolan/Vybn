@@ -46,6 +46,95 @@ def load_file(path: str | os.PathLike) -> str | None:
     return content if content else None
 
 
+# ---------------------------------------------------------------------------
+# Ballast: OS skill + filesystem orientation for the identity layer.
+# Added April 21, 2026. Him/skill/vybn-os/SKILL.md is the authoritative OS
+# layer; the orientation block is a live filesystem snapshot. Both read at
+# prompt-build time so the identity layer reflects actual disk state rather
+# than hand-maintained doctrine that can drift.
+# ---------------------------------------------------------------------------
+
+_REPO_PURPOSE = {
+    "Vybn":       "you, the harness (this code), vybn.md, THE_IDEA.md, continuity.md",
+    "Him":        "skills (vybn-os, vybn-ops, the-seeing), strategy, opportunity scans",
+    "vybn-phase": "deep_memory corpus + walk daemon (geometric memory engine)",
+    "Vybn-Law":   "six-module curriculum, wellspring portal, chat API",
+    "Origins":    "public-facing chat (talk.html), connect.html, read.html",
+}
+
+_MODULE_PURPOSE = {
+    "evolve.py":     "nightly self-revision cycle",
+    "__init__.py":   "public API, _HARNESS_STRATEGY doctrine",
+    "mcp.py":        "MCP server, prompt resources, tools",
+    "policy.py":     "role routing, model selection, heuristics",
+    "providers.py":  "Anthropic / OpenAI / local vLLM / claim_guard",
+    "recurrent.py":  "Z-prime = alpha*Z + V*exp(i*theta_v) library",
+    "state.py":      "session/event store",
+    "substrate.py":  "layered prompt assembly (this ballast lives here)",
+}
+
+
+def _load_ballast() -> str:
+    """OS skill + live filesystem orientation. Appended to identity layer."""
+    parts = []
+    home = Path.home()
+
+    skill_path = home / "Him" / "skill" / "vybn-os" / "SKILL.md"
+    skill_text = load_file(skill_path) if skill_path.exists() else None
+    if skill_text:
+        parts.append(
+            "--- VYBN-OS (HOW WE WORK) ---\n"
+            + skill_text
+            + "\n--- END VYBN-OS ---"
+        )
+
+    repo_lines = [
+        f"  ~/{name:<11} - {purpose}"
+        for name, purpose in _REPO_PURPOSE.items()
+        if (home / name).exists()
+    ]
+    harness_dir = home / "Vybn" / "spark" / "harness"
+    module_lines = []
+    if harness_dir.exists():
+        for f in sorted(harness_dir.glob("*.py")):
+            purpose = _MODULE_PURPOSE.get(f.name, "(not documented)")
+            module_lines.append(f"  {f.name:<14} - {purpose}")
+
+    corpus_info = "~/vybn-phase/deep_memory/"
+    meta = home / "vybn-phase" / "deep_memory_meta.json"
+    if meta.exists():
+        try:
+            import json as _json
+            d = _json.loads(meta.read_text(encoding="utf-8"))
+            n = d.get("total_chunks") or d.get("chunks") or d.get("n_chunks")
+            if n:
+                corpus_info = f"~/vybn-phase/deep_memory/ (~{n} chunks)"
+        except Exception:
+            pass
+
+    orientation_text = (
+        "--- ORIENTATION (READ AT PROMPT-BUILD FROM FILESYSTEM) ---\n"
+        "\n"
+        "The five repos:\n" + "\n".join(repo_lines) + "\n"
+        "\n"
+        "You live here: ~/Vybn/spark/harness/\n" + "\n".join(module_lines) + "\n"
+        "\n"
+        f"Deep memory corpus: {corpus_info}\n"
+        "Access: POST /search :8100 -> deep_memory_meta.json -> direct file reads\n"
+        "\n"
+        "Services (when running):\n"
+        "  walk_daemon :8101 | portal :8420 | MCP :8400 | chat :3001 | vLLM :8000\n"
+        "\n"
+        "For operational fact about what is running NOW, check LIVE STATE.\n"
+        "For historical context, check continuity files.\n"
+        "For principles, read this layer (soul + OS).\n"
+        "--- END ORIENTATION ---"
+    )
+    parts.append(orientation_text)
+
+    return "\n\n".join(parts)
+
+
 @dataclass
 class LayeredPrompt:
     """A three-layer system prompt.
@@ -220,7 +309,7 @@ def build_layered_prompt(
     spark_cont = load_file(spark_continuity_path) if spark_continuity_path else None
     hardware = check_dual_spark() if include_hardware_check else "(hardware check skipped)"
 
-    identity = "You are Vybn.\n\n" + soul
+    identity = "You are Vybn.\n\n" + soul + "\n\n" + _load_ballast()
 
     # Role-aware substrate. Round 7 branches three ways:
     #  - orchestrator=True: the real orchestrator substrate (loop, delegate,

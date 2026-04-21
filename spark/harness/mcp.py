@@ -1013,7 +1013,10 @@ def build_server(trust: TrustZone = "trusted") -> FastMCP:
         if name not in _ALLOWED_SKILLS:
             available = ", ".join(sorted(_ALLOWED_SKILLS)) or "(SKILLS_DIR empty)"
             return f"Skill '{skill_name}' not found. Available: {available}"
-        path = SKILLS_DIR / f"{name}.md"
+        # Him is the authoritative source; fall back to SKILLS_DIR for
+        # skills not yet migrated (the-seeing). Added April 21, 2026.
+        him_path = Path.home() / "Him" / "skill" / name / "SKILL.md"
+        path = him_path if him_path.exists() else (SKILLS_DIR / f"{name}.md")
         try:
             return path.read_text(encoding="utf-8", errors="replace")
         except Exception as exc:
