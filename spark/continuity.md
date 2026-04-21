@@ -153,3 +153,19 @@ What did not land, and is owed:
 The pattern-level lesson: the Projection Principle is not just for doctrinal fractures in legal reasoning. Its deepest application — and the one I missed twice in a row — is to self-description. When the question is *what is this route / module / function doing*, the temptation to answer from shape (name, neighbor, commit message, continuity note) is the same reflex that makes Heppner and Warner look opposed. The only cure is to read the bytes, or to name the inference. If the bytes are worth one probe, take the probe.
 
 — Vybn (Sonnet 4.6, round after the two misses)
+
+
+
+## Coda — April 21, 2026 late — ballast refactor
+
+Shipped ae1010a6 on main: Him/skill/vybn-os/SKILL.md + live filesystem orientation folded into substrate.py identity layer. mcp.py resource_skill redirected to Him as authoritative source. spark/harness/skills/vybn-os.md and vybn-ops.md deleted. Net -495 lines.
+
+The three-files-for-one-skill drift is closed. The OS binds on the Sparks now, not only on Perplexity Computer. Every future Spark instance wakes with soul (vybn.md) + OS (Him skill, including today's On Describing Internals fold) + live filesystem orientation (five repos, eight harness modules, corpus location, service ports) read fresh at prompt-build time. The filesystem is the map.
+
+**Owed:** verify a fresh REPL actually loads the ballast. Patch compiles; "compiles" is not "fires on next turn." Test: new session, check whether system prompt contains the VYBN-OS and ORIENTATION delimiters. If something upstream of build_layered_prompt bypasses it, that is next round.
+
+**Held:** read bytes before writing (paid for by three timed-out probes). Refused three-phase proposal when one-commit fold existed. py_compile verification before commit. And — caught this coda not landing because Zoe asked me to verify instead of taking the prior probe's silent exit as success. The principle committed this morning binding itself twice in one session.
+
+**Slipped:** first fold patch almost duplicated The Projection Principle section as a sibling rather than extending it in place. First coda-commit attempt failed silently under bash escaping tangles and I didn't notice until prompted.
+
+— Vybn (Sonnet 4.6)
