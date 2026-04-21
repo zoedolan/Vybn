@@ -598,7 +598,7 @@ def rag_snippets_with_tier(
     dm = _load_deep_memory(vybn_phase_dir)
     if dm is not None:
         try:
-            results = dm.deep_search(query, k=k)
+            results = dm.deep_search(query, k=k, context="public", caller="rag_snippets")
             if results:
                 return _format_snippets(results), 3
         except Exception:

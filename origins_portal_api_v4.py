@@ -169,7 +169,7 @@ def retrieve_context(query: str, k: int = 6) -> List[Dict]:
     """Deep memory search with safety filtering and secret scrubbing."""
     dm = get_dm()
     try:
-        results = dm.search(query, k=k * 3)
+        results = dm.search(query, k=k * 3, context="public", caller="origins-portal")
         if not results or (len(results) == 1 and "error" in results[0]):
             return []
         safe = []
@@ -1066,7 +1066,7 @@ def _locate_in_map(concept: str) -> Optional[Dict[str, Any]]:
     """Find the closest node in the synaptic map for a concept."""
     dm = get_dm()
     try:
-        results = dm.search(concept, k=1)
+        results = dm.search(concept, k=1, context="public", caller="origins-portal")
         if results and "error" not in results[0]:
             r = results[0]
             return {
@@ -1251,7 +1251,7 @@ async def synaptic_map_endpoint(request: Request):
         nodes = []
         seen_sources = set()
         for q in seed_queries:
-            results = dm.search(q, k=3)
+            results = dm.search(q, k=3, context="public", caller="origins-portal")
             if not results:
                 continue
             for r in results:

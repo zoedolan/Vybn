@@ -1231,7 +1231,7 @@ def build_server(trust: TrustZone = "trusted") -> FastMCP:
         if dm is None:
             return [_dm_error("deep_memory module unavailable")]
         try:
-            raw = dm.deep_search(q, k=k)
+            raw = dm.deep_search(q, k=k, context="public", caller="mcp.deep_search")
         except Exception as exc:
             return [_dm_error(_redact_exc(exc, trusted=trust == "trusted"))]
         ledger = _load_win_rates() if use_win_rate else None
