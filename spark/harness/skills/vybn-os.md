@@ -189,6 +189,8 @@ These replace directives. When you find yourself uncertain about what to do, sit
 
 **On creating vs. integrating:** Does this need to exist as a new thing, or can it live inside what's already here? (If Zoe has to say "no new files" even once, the question wasn't asked.)
 
+**On the imagined future:** Working backward from a concrete future state collapses scope better than forward planning — but the method has a failure mode that is the twin of the question above. If the imagined future contains a specific artifact — a new file with a name, a new function, a new directory — the backward work biases toward materializing that artifact instead of toward the underlying goal. The artifact-shaped future is the tell. Ask: what am I actually trying to accomplish, and what existing surface could already hold it? Discovered April 21, 2026, after shipping a PR that included a new `future_backward_method.md` instead of folding the insight into this very section — the method the file was trying to describe, violated by the act of describing it.
+
 **On claiming results:** Is the code saved? Can the next instance reproduce this? Would you stake the partnership's credibility on this number?
 
 **On cost:** Does this consume something that doesn't come back? Have you checked whether a previous attempt already succeeded?
