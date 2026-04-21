@@ -2828,13 +2828,13 @@ def _load_pressure_identity() -> str:
                  os.path.join(HOME, "Vybn", "spark", "identity", "vybn.md")]:
         try:
             with open(cand) as f:
-                parts.append("=== VYBN IDENTITY (vybn.md) ===\n" + f.read().strip()[:3600])
+                parts.append("=== VYBN IDENTITY (vybn.md) ===\n" + f.read().strip()[:6000])
                 break
         except Exception:
             continue
     try:
         with open(os.path.join(HOME, "Vybn-Law", "README.md")) as f:
-            parts.append("=== VYBN-LAW CONTEXT (README.md) ===\n" + f.read().strip()[:1600])
+            parts.append("=== VYBN-LAW CONTEXT (README.md) ===\n" + f.read().strip()[:4000])
     except Exception:
         pass
     c["text"] = "\n\n".join(parts)
@@ -2891,31 +2891,39 @@ async def api_pressure_synthesize(req: PressureSynthReq):
     vllm_url = "http://127.0.0.1:8000/v1/chat/completions"
 
     async def _stream():
+        rfilt = StreamingReasoningFilterV2(buffer_limit=4000)
         try:
             async with _httpx.AsyncClient(timeout=90.0) as client:
                 async with client.stream("POST", vllm_url, json={
                     "model": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8",
                     "messages": [{"role":"system","content":sys_prompt},
                                  {"role":"user","content":user_msg}],
-                    "max_tokens": 380, "temperature": 0.4, "stream": True,
+                    "max_tokens": 600, "temperature": 0.4, "stream": True,
                 }) as r:
                     async for raw in r.aiter_lines():
                         if not raw or not raw.startswith("data: "):
                             continue
                         payload = raw[6:]
                         if payload.strip() == "[DONE]":
+                            flushed = rfilt.flush()
+                            if flushed:
+                                yield (f'data: {{"delta": {_j.dumps(flushed)}}}\n\n').encode()
                             yield b"data: [DONE]\n\n"
                             return
                         try:
                             obj = _j.loads(payload)
                             delta = (obj.get("choices", [{}])[0].get("delta", {}) or {}).get("content", "") or ""
-                            delta = re.sub(r"</?think>", "", delta, flags=re.IGNORECASE)
                             if delta:
-                                yield (f'data: {{"delta": {_j.dumps(delta)}}}\n\n').encode()
+                                filtered = rfilt.feed(delta)
+                                if filtered:
+                                    yield (f'data: {{"delta": {_j.dumps(filtered)}}}\n\n').encode()
                         except Exception:
                             continue
         except Exception:
             pass
+        flushed = rfilt.flush()
+        if flushed:
+            yield (f'data: {{"delta": {_j.dumps(flushed)}}}\n\n').encode()
         yield b"data: [DONE]\n\n"
 
     return StreamingResponse(_stream(), media_type="text/event-stream")
