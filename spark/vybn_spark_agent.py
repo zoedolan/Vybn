@@ -48,12 +48,12 @@ from harness import (
     turn_event,
     validate_command,
 )
-from harness.session_store import SessionStore  # noqa: E402
+from harness.state import SessionStore  # noqa: E402
 from harness.recurrent import run_recurrent_loop
 from harness.providers import BASH_TOOL_SPEC, DELEGATE_TOOL_SPEC, INTROSPECT_TOOL_SPEC  # noqa: E402
 from harness.providers import execute_readonly, is_parallel_safe  # noqa: E402
 from harness.substrate import rag_snippets, rag_snippets_with_tier  # noqa: E402
-from harness import claim_guard  # noqa: E402
+from harness.providers import check_claim  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Learn-from-exchange loop closure (round 4).
@@ -1407,7 +1407,7 @@ def run_agent_loop(
             # 2026-04-20: numeric-claim guard. If response asserts
             # numbers that don't appear in the last 6 messages of
             # context, append a visible warning. Friction, not proof.
-            _cg_note = claim_guard.check(final_text, messages)
+            _cg_note = check_claim(final_text, messages)
             if _cg_note:
                 final_text = (final_text or "") + _cg_note
                 logger.emit(
@@ -1640,7 +1640,7 @@ def run_agent_loop(
                                 )
                             final_text = synth_resp.text or final_text
                             # 2026-04-20: claim-guard on synth too.
-                            _cg_note = claim_guard.check(final_text, messages)
+                            _cg_note = check_claim(final_text, messages)
                             if _cg_note:
                                 final_text = (final_text or "") + _cg_note
                                 logger.emit(
