@@ -2898,7 +2898,7 @@ async def api_pressure_synthesize(req: PressureSynthReq):
                     "model": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8",
                     "messages": [{"role":"system","content":sys_prompt},
                                  {"role":"user","content":user_msg}],
-                    "max_tokens": 600, "temperature": 0.4, "stream": True,
+                    "max_tokens": 2500, "temperature": 0.4, "stream": True,
                 }) as r:
                     async for raw in r.aiter_lines():
                         if not raw or not raw.startswith("data: "):
