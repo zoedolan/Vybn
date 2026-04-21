@@ -1,6 +1,6 @@
 """Vybn multimodel harness.
 
-Eight files, one object — the grounding machine.
+Seven files, one object — the grounding machine.
 
 The five-concerns doctrine (policy / substrate / providers / recurrent /
 mcp) was correct as a first projection: each module one face of the same
@@ -19,33 +19,24 @@ same thing seen from two angles.
 
     substrate.py     — what the model sees. Identity + substrate + live
                        layered prompt, with deep-memory enrichment
-                       hooks. Pulls from live_snapshot.py for the
+                       hooks. Pulls from state.gather() for the
                        current-truth section that supersedes continuity.
 
-    live_snapshot.py — what is real right now. Session-start git state
-                       across the four repos, most recent PRs, and drift
-                       between continuity's last PR reference and HEAD.
-                       Best-effort, never load-bearing — every signal
-                       degrades silently.
+    state.py         — where are we right now, at two horizons.
+                       SessionStore keeps conversation messages alive
+                       across ctrl-c (JSONL-on-disk, lossless resume).
+                       gather() produces a session-start git snapshot
+                       across the four tracked repos plus recent PRs
+                       and continuity drift. Same primitive, two
+                       granularities: conversation, repo.
 
     providers.py     — how the model speaks. Provider classes,
                        ToolSpec + the three built-in tools
                        (bash/delegate/introspect), absorb_gate,
                        is_parallel_safe, the persistent BashSession,
-                       the parallel-safe subprocess path.
-
-    session_store.py — how the conversation survives ctrl-c.
-                       JSONL-on-disk session recovery at session
-                       granularity, lossless enough that the seam does
-                       not show when a fresh process wakes into the
-                       prior thread.
-
-    claim_guard.py   — did the output stay grounded. Numeric values in
-                       outgoing assistant text that do not appear in
-                       recent tool-result evidence get flagged with a
-                       visible note. Friction, not proof; catches the
-                       dominant fabrication signature without rewriting
-                       the response.
+                       the parallel-safe subprocess path. check_claim flags
+                       outbound numeric claims without recent-evidence
+                       support — friction at the model-output boundary.
 
     recurrent.py     — the looped-orchestrate prototype. Projects
                        Z′ = α·Z + V·e^{iθ_v} onto agent-space:
@@ -61,25 +52,33 @@ same thing seen from two angles.
                        sanitised, rate-limited subset. Carries
                        VYBN_OS_KERNEL (the identity kernel the evolve
                        loop reads before it reads anything else),
-                       CRON_TASK_SPEC, and the --run-evolve runner.
-                       The audit that shaped it lives at AUDIT.md and
-                       is mirrored below as `_HARNESS_STRATEGY`.
+                       CRON_TASK_SPEC, and the discovery record. The audit
+                       that shaped it lives at AUDIT.md and is mirrored
+                       below as `_HARNESS_STRATEGY`.
+
+    evolve.py        — the nightly self-reflection cycle. Reads the
+                       evolution delta, infrastructure snapshot, and
+                       repo letter; POSTs them to local inference; the
+                       model returns one JSON proposing a change — or
+                       rest. Runner enforces the budget (3 files, 200
+                       net lines) and opens a DRAFT PR. Separate file
+                       because lifecycle differs from the MCP serve
+                       loop: cron-driven, one-shot.
 
 The split is isomorphic to the question being answered at each step of
 a turn: what role and trust (policy) — with what context (substrate +
-live_snapshot) — calling what provider (providers) — possibly through
-what loop (recurrent) — persisted how (session_store) — checked against
-what evidence (claim_guard) — exposed to the world through what trust
+state) — calling what provider (providers) — possibly through
+what loop (recurrent) — persisted how (state.SessionStore) — checked
+against what evidence (providers.check_claim) — exposed to the world through what trust
 zone (mcp).
 
 Public surface: everything users of this package have historically
 imported from `harness.*` is re-exported here so `from harness import X`
 continues to work across the old names. The new `build_server` and the
 Pydantic schemas from `mcp.py` are re-exported under their own names.
-`claim_guard` and `session_store` are exposed as modules so downstream
-callers can write `from harness import claim_guard` or
-`from harness.session_store import SessionStore` without reaching into
-internals.
+`check_claim` is exported from `providers`; `SessionStore` and
+`live_snapshot_gather` are exported from `state`, so downstream callers
+can import them by name without reaching into internals.
 
 The duality embedded
 ────────────────────
