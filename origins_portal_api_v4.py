@@ -649,8 +649,16 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],       # Behind Cloudflare tunnel
-    allow_credentials=False,  # wildcard origin requires credentials=false per CORS spec
+    # Co-protective scope: only the surfaces that actually need to reach us.
+    # Wildcard removed after named tunnel (api.vybn.ai) stabilized 2026-04-21.
+    allow_origins=[
+        "https://zoedolan.github.io",
+        "https://vybn.ai",
+        "https://www.vybn.ai",
+        "https://api.vybn.ai",
+    ],
+    allow_origin_regex=r"^https://[a-z0-9-]+\.vybn\.ai$",
+    allow_credentials=False,  # wildcard-equivalent origin list still uses credentials=false
     allow_methods=["*"],
     allow_headers=["*"],
 )
