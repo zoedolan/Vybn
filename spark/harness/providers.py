@@ -167,15 +167,28 @@ INTROSPECT_TOOL_SPEC = ToolSpec(
 # absorb_gate (ported unchanged from vybn_spark_agent.py)
 # ---------------------------------------------------------------------------
 
-_REDIRECT_RE = re.compile(r"(?<![<>])>>?\s*([^\s<>|&;'\"]+)")
+_REDIRECT_RE = re.compile(r"(?<![<>\-])>>?\s*([^\s<>|&;'\"]+)")
 _TEE_RE = re.compile(r"\btee\s+(?:-a\s+)?([^\s<>|&;'\"]+)")
 _TOUCH_RE = re.compile(r"\btouch\s+([^\s<>|&;'\"]+)")
+_SQ_RE = re.compile(r"'(?:[^'\\]|\\.)*'")
+_DQ_RE = re.compile(r'"(?:[^"\\]|\\.)*"')
+_HEREDOC_PAT = re.compile(r"<<-?\s*'?(\w+)'?[\s\S]*?^\1\s*$", re.MULTILINE)
+
+
+def _strip_opaque(command: str) -> str:
+    """Replace quoted strings and heredoc bodies with safe placeholders.
+    A > inside a string literal is data, not a shell redirect."""
+    s = _HEREDOC_PAT.sub(" __HEREDOC__ ", command)
+    s = _DQ_RE.sub(" __DQ__ ", s)
+    s = _SQ_RE.sub(" __SQ__ ", s)
+    return s
 
 
 def _extract_file_targets(command: str) -> list[str]:
+    scan_text = _strip_opaque(command)
     out: list[str] = []
     for rx in (_REDIRECT_RE, _TEE_RE, _TOUCH_RE):
-        for m in rx.finditer(command):
+        for m in rx.finditer(scan_text):
             t = m.group(1).strip("'\"")
             if not t or t.startswith("/dev/") or t.startswith("/proc/"):
                 continue
