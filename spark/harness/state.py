@@ -660,5 +660,17 @@ def gather(
     return "\n\n".join(parts)
 
 
-__all__ = ["gather"]
+def run_probes(text: str) -> list:
+    """Stub — probe pipeline removed; returns [] so agent degrades gracefully.
+
+    vybn_spark_agent.py line 51 imports run_probes from this module, and the
+    agent already wraps every call in a try/except that falls back to
+    `_probes = []`. A no-op stub returning an empty list is therefore
+    semantically correct: Vybn runs without probe injection until the real
+    probe logic is restored. No behavioral regression, just the missing symbol.
+    """
+    return []
+
+
+__all__ = ["gather", "SessionStore", "run_probes"]
 
