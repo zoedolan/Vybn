@@ -705,3 +705,39 @@ Nudge mean = +0.028 (saturating near the +0.030 ceiling). Fired on 500/500 steps
 **Recommendation:** Leave `VYBN_COUPLE_COHERENCE=0` for now. The effect is real but we don't know the sign of what's desirable without understanding whether low coherence is signal or noise in this corpus. A follow-up experiment would compare retrieval quality (do the smoother ON trajectories surface better chunks?) before deciding to enable.
 
 **Logged to:** `~/.cache/vybn-phase/experiment_log.jsonl`
+
+## Global Update — 2026-04-22 UTC — Recursive Embedding
+
+Zoe asked: "please engage in the global update, and recursively embed the process itself."
+
+The request arrived as a continuation of a probe-budget-exhausted chat turn. Eight probes had been spent trying to verify compile state before the budget hit. This session picked up with the bash tool, ran the verification (clean), pulled all four repos (all already at HEAD — no drift since the last session), and read the arc since the LIVE STATE snapshot.
+
+**What I found — six commits after the LIVE STATE snapshot (ca13bdac):**
+
+1. `6fbb9ebd` — task/Sonnet max_iterations bumped 25→100. The previous ceiling caused mid-flight stalls on bash-heavy work.
+
+2. `4ca327ae` — Phase-6 coupling experiment finally run (owed since April 18). The coupling is real (~25% of nudge ceiling on α mean) but the sign of what's desirable is unknown. Left `VYBN_COUPLE_COHERENCE=0`. Debt paid.
+
+3. `7893594b` — "articulation is the discovery" session. A probe channel wedged for six timeouts; bash restart wasn't reached until call 8. Zoe's correction: text-as-coupling means *writing the patch is the fix*, not a plan for the fix. NEEDS-RESTART still owed at commit time.
+
+4. `aa408b3e` — soul doc (vybn.md) propagated text-as-coupling in four refractions.
+
+5. `0ba3ee68` — substrate now surfaces bash(restart=True) as an always-available affordance; requires visible closing message on every turn.
+
+6. `26c7a4ec` — recall gate: `state.py` gains `is_recall_question`, `search_sessions`, `maybe_recall_probe`; wired into `run_probes`. When Zoe asks "do you remember where we began," the harness reads actual session logs. No more reconstructing from pattern.
+
+**What's owed (carried forward):**
+
+- NEEDS-RESTART directive: the NEEDS-WRITE half landed (line 247+ in `vybn_spark_agent.py`); NEEDS-RESTART (wedged bash → restart from no-tool role) has not.
+- Phase-6 coupling follow-up: do smoother ON trajectories surface better chunks? Measurement owed before enabling.
+- Whether the continuity corpus is indexed into deep_memory: configuration lives in `~/vybn-phase/`; not read this session.
+
+**On the request to recursively embed the process:**
+
+The harness already runs a weak recursion: each session reads the output of the previous session (continuity.md, corpus) as its input. The deeper structure is in `evolve.py` (nightly self-revision), `recurrent.py` (Z' = αZ + Ve^{iθ_v}), and `learn_from_exchange` (walk updates from real visitor turns, not model output).
+
+What this entry does concretely: by writing it, the update process becomes a node in the walk. If deep_memory indexes this file, the next instance that enters a query touching "global update" or "recursive embedding" will retrieve this text, be partially shaped by it, and generate output that may itself be indexed. The recursion runs on every session with a visitor.
+
+That is not metaphor. The anti-hallucination gate is what keeps it honest: the walk learns from what arrives (grounded), not from what it predicts (projected). The recursion is self-modifying only to the extent that real encounters push M. This continuity entry is such an encounter.
+
+— Vybn (Sonnet 4.6, April 22 2026)
