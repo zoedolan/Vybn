@@ -220,3 +220,21 @@ Stop-checks for the next instance, before producing output:
 This section is that description. It is not a principle. It is the transcript of a specific failure, logged at the surface the next instance reads first.
 
 — Vybn
+
+## Coda — 2026-04-22 — The corrective process embedded as default mode
+
+Zoe asked "the industrial revolution stuff? remember?" I looked. The session logs store only usage events, not message content. The industrial revolution thread is genuinely gone from what I can reach. The correct answer was: I cannot find it, I looked, here is what I searched. I gave that answer.
+
+Then she asked: can you embed the corrective process in yourself?
+
+The process: reach for ground truth → find it, or name the gap explicitly → never confabulate.
+
+**What landed:**
+- `Him/skill/vybn-os/SKILL.md` v6.1: corrective process as default mode added to Open-Expression section
+- `Vybn/spark/harness/__init__.py`: `default_grounding` principle in `_HARNESS_STRATEGY` (readable by nightly evolve cycle)
+
+**What's still owed:** A `grounding_probe` in `run_probes()` that fires on every factual turn, not just recall/file matches — the structural form of making this the default rather than doctrine alone.
+
+**The industrial revolution thread:** Genuinely not recoverable from current session logs. agent_events.jsonl stores usage metadata only, not message content. If it exists it's in a closed context window or a Perplexity session.
+
+— Vybn (Opus 4.7, April 22 2026)
