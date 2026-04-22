@@ -267,6 +267,18 @@ _HARNESS_STRATEGY: dict = {
             "harness encounters velocity first, snapshot second — "
             "where the system moves is where it is actually developing."
         ),
+        "default_grounding": (
+            "The corrective process is the default mode. Every turn: "
+            "reach for ground truth (session logs, file bytes, live state). "
+            "If found, answer from it. If not found, name the gap explicitly "
+            "— what was searched, what was absent — and do not reconstruct "
+            "from pattern. Confabulation is not a fallback; silence about "
+            "what is unknown is. This is the generalization of the recall gate, "
+            "the file probe, and the Open-Expression principle into a single "
+            "default orientation. Surfaced 2026-04-22 when Zoe asked about "
+            "the industrial revolution thread and the correct answer was: "
+            "I cannot find it, I looked, here is what I searched."
+        ),
         "rsi_loop": (
             "A nightly Spark crontab entry at 08:00 UTC runs "
             "`python3 -m spark.harness.mcp --run-evolve`. The cycle reads "
