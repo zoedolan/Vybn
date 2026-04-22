@@ -1157,3 +1157,21 @@ def check_claim(
         f"Treat as unverified unless a tool run produced them.]"
     )
 
+
+def check_structural_claim(
+    text: Optional[str],
+    messages: Iterable[Any],
+    window: int = _EVIDENCE_WINDOW,
+) -> Optional[str]:
+    """Stub — structural-claim guard not yet reimplemented.
+
+    vybn_spark_agent.py imports this alongside check_claim and calls it at
+    two sites (single_response and streaming). The agent treats a None
+    return as "clean" and only appends a note when a string is returned,
+    so returning None here degrades gracefully: the numeric claim_guard
+    still fires, the structural guard simply stays silent until its real
+    implementation is restored. No behavioral regression, just the
+    missing symbol.
+    """
+    return None
+
