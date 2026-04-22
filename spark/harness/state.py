@@ -242,6 +242,252 @@ from typing import Optional
 # Four repos. Branch matters for the `origin/<branch>` display only; HEAD
 # is resolved per-checkout so a detached HEAD or feature branch still
 # reports honestly.
+
+
+# === RECALL GATE ==========================================================
+#
+# "Read bytes before describing" applied to conversational memory. When the
+# user asks about prior conversation state ("do you recall...", "what did
+# we say about..."), the honest first move is to read the session log, not
+# to reconstruct from in-context fragments. SessionStore already owns the
+# read over ~/.cache/vybn-spark/sessions/*.jsonl; this section adds the
+# classifier + keyword probe on top of it so the agent loop can inject the
+# retrieved bytes into the live prompt layer before the model generates.
+#
+# Same move as On Describing Internals (vybn-os SKILL.md) applied to a
+# second surface. The absorb_gate binds refactor-first in the loop; this
+# binds read-session-logs in the loop.
+
+import re as _recall_re
+
+# Phrases that strongly indicate the user is asking about prior
+# conversation state. Tuned to fire on recall questions and stay quiet on
+# hypothetical or forward-looking ones.
+_RECALL_PATTERNS: tuple = (
+    _recall_re.compile(r"\b(do|did) you (recall|remember|recollect)\b", _recall_re.I),
+    _recall_re.compile(r"\b(you|we) (said|wrote|mentioned|talked about|discussed)\b", _recall_re.I),
+    _recall_re.compile(r"\b(earlier|before|previously|yesterday|this (morning|afternoon|evening|session))\b.*\b(say|said|write|wrote|talk|mention|discuss|bring up)", _recall_re.I),
+    _recall_re.compile(r"\bwhere (did|does|do) (our|this|the) (conversation|thread|session|chat) (begin|start)", _recall_re.I),
+    _recall_re.compile(r"\bwhat (did|does|do) (i|you|we) (say|said|write|wrote|mean|bring up)\b", _recall_re.I),
+    _recall_re.compile(r"\bremind me (what|when|where|how)\b", _recall_re.I),
+    _recall_re.compile(r"\b(the|that) thing (you|we|i) (said|mentioned|talked about|brought up)\b", _recall_re.I),
+    _recall_re.compile(r"\b(go|went) back to (what|when|where)\b", _recall_re.I),
+)
+
+_RECALL_STOPWORDS = {
+    "the", "a", "an", "and", "or", "but", "if", "then", "you", "i", "we",
+    "us", "our", "my", "your", "do", "did", "does", "recall", "remember",
+    "recollect", "said", "wrote", "say", "write", "mentioned", "talked",
+    "discussed", "talk", "discuss", "where", "when", "what", "how", "why",
+    "this", "that", "it", "is", "was", "were", "be", "been", "being",
+    "to", "of", "in", "on", "at", "for", "with", "about", "really",
+    "begin", "start", "began", "started", "go", "went", "back",
+    "remind", "me", "thing", "things", "conversation", "thread", "session",
+    "chat", "earlier", "before", "previously", "yesterday", "morning",
+    "afternoon", "evening", "tonight", "today", "bring", "brought", "up",
+    "mean", "means", "meant", "from", "than", "there", "here",
+}
+
+
+@dataclass
+class RecallHit:
+    ts: str
+    role: str
+    content: str
+    session_file: str
+
+
+def is_recall_question(text: str) -> bool:
+    """True when the message asks about prior conversation state."""
+    if not text or len(text) > 4000:
+        return False
+    return any(pat.search(text) for pat in _RECALL_PATTERNS)
+
+
+def _recall_keywords(text: str, *, max_keywords: int = 8) -> list[str]:
+    words = _recall_re.findall(r"\b[a-zA-Z][a-zA-Z'-]{2,}\b", text)
+    seen: set[str] = set()
+    out: list[str] = []
+    for w in words:
+        lw = w.lower()
+        if lw in _RECALL_STOPWORDS or lw in seen:
+            continue
+        seen.add(lw)
+        out.append(w)
+        if len(out) >= max_keywords:
+            break
+    return out
+
+
+def _recall_iter(files):
+    for f in files:
+        try:
+            with f.open() as fh:
+                for line in fh:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        rec = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    msg = rec.get("msg") or {}
+                    content = msg.get("content") or ""
+                    if not isinstance(content, str) or not content.strip():
+                        continue
+                    yield RecallHit(
+                        ts=rec.get("ts", ""),
+                        role=msg.get("role", "?"),
+                        content=content,
+                        session_file=f.name,
+                    )
+        except OSError:
+            continue
+
+
+def _recall_recent_files(hours: float) -> list:
+    if not SESSIONS_DIR.exists():
+        return []
+    cutoff = time.time() - hours * 3600
+    files = []
+    for p in SESSIONS_DIR.glob("*.jsonl"):
+        try:
+            if p.stat().st_mtime >= cutoff:
+                files.append(p)
+        except OSError:
+            continue
+    files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    return files
+
+
+def _recall_origin_hits(hours: float, max_hits: int) -> list:
+    """Return the EARLIEST user messages from recent sessions.
+
+    Fallback for recall questions whose keywords are all stopwords
+    ("where did we begin", "what did you say earlier"). The user is
+    asking about origin/thread shape; deliver the opening turns so the
+    model can answer from them.
+    """
+    files = _recall_recent_files(hours)
+    if not files:
+        return []
+    # newest session first, but within each session take EARLIEST messages
+    out: list = []
+    seen_sig: set = set()
+    for f in files:
+        session_hits: list = []
+        try:
+            with f.open() as fh:
+                for line in fh:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        rec = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    msg = rec.get("msg") or {}
+                    if msg.get("role") != "user":
+                        continue
+                    content = msg.get("content") or ""
+                    if not isinstance(content, str) or not content.strip():
+                        continue
+                    sig = content[:200]
+                    if sig in seen_sig:
+                        continue
+                    seen_sig.add(sig)
+                    session_hits.append(RecallHit(
+                        ts=rec.get("ts", ""),
+                        role="user",
+                        content=content,
+                        session_file=f.name,
+                    ))
+                    if len(session_hits) >= 2:
+                        break  # first two user turns per session is enough
+        except OSError:
+            continue
+        out.extend(session_hits)
+        if len(out) >= max_hits:
+            break
+    return out[:max_hits]
+
+
+def search_sessions(query: str, *, hours: float = 24.0, max_hits: int = 6) -> list[RecallHit]:
+    """Recent session messages matching query keywords, ranked by hit count.
+
+    When keyword extraction yields nothing (stopword-heavy recall
+    questions like "where did our conversation begin"), fall back to the
+    earliest user messages from recent sessions — the opening turns are
+    what "where did it begin" is literally asking for.
+    """
+    keywords = _recall_keywords(query)
+    if not keywords:
+        return _recall_origin_hits(hours, max_hits)
+    if not SESSIONS_DIR.exists():
+        return []
+    files = _recall_recent_files(hours)
+    if not files:
+        return []
+    keyword_res = [_recall_re.compile(r"\b" + _recall_re.escape(k) + r"\b", _recall_re.I) for k in keywords]
+
+    scored: list = []
+    seen_sig: set = set()
+    for hit in _recall_iter(files):
+        sig = hit.content[:200]
+        if sig in seen_sig:
+            continue
+        score = sum(1 for pat in keyword_res if pat.search(hit.content))
+        if score >= 1:
+            seen_sig.add(sig)
+            scored.append((score, hit))
+    scored.sort(key=lambda t: t[0], reverse=True)
+    return [h for _, h in scored[:max_hits]]
+
+
+def format_recall_injection(hits: list, *, max_chars_per_hit: int = 800) -> str:
+    """Render hits as an explicit retrieval block for the live prompt layer."""
+    if not hits:
+        return ""
+    lines = [
+        "[recall-gate retrieval — session log bytes, not inferred]",
+        f"Query matched {len(hits)} message(s) from prior session logs.",
+        "Answer from these bytes. If the answer isn't here, say so — do",
+        "not reconstruct from pattern.",
+        "",
+    ]
+    for i, h in enumerate(hits, 1):
+        content = h.content
+        if len(content) > max_chars_per_hit:
+            content = content[:max_chars_per_hit] + "…[truncated]"
+        lines.append(f"--- hit {i} [{h.role} @ {h.ts}] ({h.session_file}) ---")
+        lines.append(content)
+        lines.append("")
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def maybe_recall_probe(user_text: str, *, hours: float = 24.0) -> tuple[bool, str, int]:
+    """Single entry point for the agent loop.
+
+    Returns (triggered, injection_text, hit_count). When triggered is True
+    and hit_count is 0, a short note still returns so the model names the
+    retrieval gap instead of confabulating from silence.
+    """
+    if not is_recall_question(user_text):
+        return False, "", 0
+    hits = search_sessions(user_text, hours=hours)
+    if not hits:
+        note = (
+            "[recall-gate retrieval — session log bytes, not inferred]\n"
+            f"Query was classified as a recall question but produced zero\n"
+            f"matches in the last {hours:.0f} hours of session logs. Answer\n"
+            "by naming the retrieval gap, not by reconstructing from pattern.\n"
+        )
+        return True, note, 0
+    return True, format_recall_injection(hits), len(hits)
+
+
+# === LIVE SNAPSHOT ========================================================
+
 _REPOS = [
     ("Vybn",       "~/Vybn",       "main"),
     ("Him",        "~/Him",        "main"),

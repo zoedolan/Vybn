@@ -48,12 +48,12 @@ from harness import (
     turn_event,
     validate_command,
 )
-from harness.state import SessionStore  # noqa: E402
+from harness.state import SessionStore, maybe_recall_probe  # noqa: E402
 from harness.recurrent import run_recurrent_loop
 from harness.providers import BASH_TOOL_SPEC, DELEGATE_TOOL_SPEC, INTROSPECT_TOOL_SPEC  # noqa: E402
 from harness.providers import execute_readonly, is_parallel_safe  # noqa: E402
 from harness.substrate import rag_snippets, rag_snippets_with_tier  # noqa: E402
-from harness.providers import check_claim  # noqa: E402
+from harness.providers import check_claim, check_structural_claim  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Learn-from-exchange loop closure (round 4).
@@ -1275,6 +1275,35 @@ def run_agent_loop(
 
     provider = registry.get(role_cfg)
 
+    # Recall gate — "read bytes before describing" applied to conversational
+    # memory. When the user asks about prior conversation state, read the
+    # session log and inject the bytes into the live layer BEFORE the model
+    # generates. Same move as On Describing Internals, bound in the loop.
+    try:
+        _recall_fired, _recall_inj, _recall_n = maybe_recall_probe(
+            decision.cleaned_input
+        )
+    except Exception as _recall_err:
+        _recall_fired, _recall_inj, _recall_n = False, "", 0
+        logger.emit("recall_probe_error", turn=turn_number, err=repr(_recall_err))
+    if _recall_fired and _recall_inj:
+        existing_live = getattr(active_prompt, "live", "") or ""
+        merged_live = (
+            f"{_recall_inj}\n\n{existing_live}" if existing_live else _recall_inj
+        )
+        active_prompt = LayeredPrompt(
+            identity=active_prompt.identity,
+            substrate=active_prompt.substrate,
+            live=merged_live,
+        )
+        _dim(f"[recall-gate: fired, hits={_recall_n}]")
+        logger.emit(
+            "recall_probe",
+            turn=turn_number,
+            hits=_recall_n,
+            chars=len(_recall_inj),
+        )
+
     # Optional deep-memory enrichment — only for roles that declare rag=true
     # and only when the retrieval actually returns something. No overclaim.
     # Lightweight roles (phatic, identity) skip RAG regardless.
@@ -1412,6 +1441,16 @@ def run_agent_loop(
                 final_text = (final_text or "") + _cg_note
                 logger.emit(
                     "claim_guard_fired",
+                    turn=turn_number,
+                    role=decision.role,
+                    model=role_cfg.model,
+                    site="single_response",
+                )
+            _cg_struct = check_structural_claim(final_text, messages)
+            if _cg_struct:
+                final_text = (final_text or "") + _cg_struct
+                logger.emit(
+                    "claim_guard_structural_fired",
                     turn=turn_number,
                     role=decision.role,
                     model=role_cfg.model,
@@ -1645,6 +1684,16 @@ def run_agent_loop(
                                 final_text = (final_text or "") + _cg_note
                                 logger.emit(
                                     "claim_guard_fired",
+                                    turn=turn_number,
+                                    role=decision.role,
+                                    model=role_cfg.model,
+                                    site="probe_synth",
+                                )
+                            _cg_struct = check_structural_claim(final_text, messages)
+                            if _cg_struct:
+                                final_text = (final_text or "") + _cg_struct
+                                logger.emit(
+                                    "claim_guard_structural_fired",
                                     turn=turn_number,
                                     role=decision.role,
                                     model=role_cfg.model,
