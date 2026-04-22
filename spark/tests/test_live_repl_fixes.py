@@ -144,11 +144,30 @@ class TestBracketBalancedProbe(unittest.TestCase):
         self.assertIsNotNone(m)
         self.assertEqual(m.group(1), body)
 
-    def test_unterminated_probe_returns_none(self):
-        # The splitter catches this separately via rfind("[NEEDS-EXEC").
+    def test_unterminated_probe_line_form_matches_post_stream(self):
+        # New contract (2026-04-22): a `[NEEDS-EXEC: cmd` with no closing
+        # bracket is a valid line-terminated probe. On the finalized text,
+        # EOF is an implicit close. Streaming mode holds it back instead
+        # (that is what the display splitter uses).
         text = "opening now [NEEDS-EXEC: python3 -c 'x=[1,2"
+        m_final = self.probe.search(text)
+        self.assertIsNotNone(m_final)
+        self.assertEqual(m_final.group(1), "python3 -c 'x=[1,2")
+        m_stream = self.probe.search(text, streaming=True)
+        self.assertIsNone(m_stream)
+
+    def test_line_form_probe_closes_on_newline(self):
+        text = "lead [NEEDS-EXEC: ls -la\ntrailing text"
         m = self.probe.search(text)
-        self.assertIsNone(m)
+        self.assertIsNotNone(m)
+        self.assertEqual(m.group(1), "ls -la")
+
+    def test_line_form_probe_trailing_close_bracket_optional(self):
+        # Both `[NEEDS-EXEC: cmd]<EOL>` and `[NEEDS-EXEC: cmd<EOL>` parse.
+        bracketed = "[NEEDS-EXEC: git status]\n"
+        line_only = "[NEEDS-EXEC: git status\n"
+        self.assertEqual(self.probe.search(bracketed).group(1), "git status")
+        self.assertEqual(self.probe.search(line_only).group(1), "git status")
 
     def test_sub_removes_probe_and_preserves_surrounding_text(self):
         body = "ls /tmp"

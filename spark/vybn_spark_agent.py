@@ -48,7 +48,7 @@ from harness import (
     turn_event,
     validate_command,
 )
-from harness.state import SessionStore, maybe_recall_probe  # noqa: E402
+from harness.state import SessionStore, run_probes  # noqa: E402
 from harness.recurrent import run_recurrent_loop
 from harness.providers import BASH_TOOL_SPEC, DELEGATE_TOOL_SPEC, INTROSPECT_TOOL_SPEC  # noqa: E402
 from harness.providers import execute_readonly, is_parallel_safe  # noqa: E402
@@ -190,6 +190,9 @@ class _BracketBalancedProbe:
                 depth -= 1
                 if depth == 0:
                     body = text[body_start:i]
+                    if not body.strip():
+                        # empty-body probe is not a valid directive
+                        return None
                     whole = text[m.start():i+1]
                     return _BracketBalancedProbe._Match(
                         whole, body, m.start(), i + 1,
@@ -199,40 +202,66 @@ class _BracketBalancedProbe:
         # the "opening seen, not closed" case separately.
         return None
 
-    def search(self, text: str):
-        return self._scan(text)
+    @staticmethod
+    def _scan_line(text: str, from_idx: int = 0, streaming: bool = False):
+        """Line-terminated spelling: `[NEEDS-EXEC: cmd` closed by newline
+        or end-of-text (closing `]` optional).
 
-    def search_lenient(self, text: str):
-        """Graceful-recovery variant. If a `[NEEDS-EXEC:` opener is present
-        but the bracket never closes, treat end-of-line (or end-of-text) as
-        an implicit close and return the recovered command. This is the
-        harness's self-healing path: the model's malformed probe is
-        silently repaired, logged as `probe_recovered`, and executed — the
-        alternative (what we were doing before 2026-04-20) was to drop the
-        probe entirely, stranding the turn with no signal to either side.
-        Strict .search is always tried first; this is the fallback.
+        When `streaming=True` the EOF fallback is disabled — only a real
+        `\n` closes the probe. This is what the display splitter uses so
+        that a probe opener seen mid-stream is held back until the newline
+        arrives, instead of being spuriously declared complete.
+
+        Multi-line commands must use the bracketed form (handled by _scan).
         """
-        m = _PROBE_OPEN_RE.search(text)
+        m = _PROBE_OPEN_RE.search(text, from_idx)
         if m is None:
             return None
         body_start = m.end()
-        # find first newline OR end-of-text as the implicit close
         nl = text.find("\n", body_start)
-        end = nl if nl != -1 else len(text)
-        body = text[body_start:end].rstrip(" \t\r]")
+        if nl == -1:
+            if streaming:
+                return None
+            end = len(text)
+        else:
+            end = nl
+        body = text[body_start:end].rstrip(" \t\r")
+        if body.endswith("]"):
+            body = body[:-1].rstrip(" \t\r")
         if not body:
             return None
         whole = text[m.start():end]
         return _BracketBalancedProbe._Match(whole, body, m.start(), end)
 
-    def sub(self, repl, text: str) -> str:
+    @classmethod
+    def _scan_any(cls, text: str, from_idx: int = 0, streaming: bool = False):
+        """Unified scanner. Tries strict bracket-balanced first (supports
+        multi-line bodies and `]` inside quoted strings), falls through to
+        line-terminated form. Both shapes are legitimate; neither is a
+        malformed probe. The caller does not need to know which matched.
+
+        When `streaming=True`, the line-terminated path only closes on a
+        real newline (not EOF) — so mid-stream openers are held back
+        instead of being spuriously matched.
+        """
+        strict = cls._scan(text, from_idx)
+        line = cls._scan_line(text, from_idx, streaming=streaming)
+        if strict and line:
+            if line.start() < strict.start():
+                return line
+            return strict
+        return strict or line
+
+    def search(self, text: str, streaming: bool = False):
+        return self._scan_any(text, streaming=streaming)
+
+    def sub(self, repl, text: str, streaming: bool = False) -> str:
         if not isinstance(repl, str):
-            # Callables are not used by this codebase; keep it simple.
             raise TypeError("_BracketBalancedProbe.sub expects a string replacement")
         out = []
         i = 0
         while True:
-            m = self._scan(text, i)
+            m = self._scan_any(text, i, streaming=streaming)
             if m is None:
                 out.append(text[i:])
                 break
@@ -758,9 +787,9 @@ def _split_before_probe(text: str):
     text = _strip_thinking_tags(text)
 
     # Probe handling (bracket-balanced).
-    m_probe = _PROBE_RE.search(text)
+    m_probe = _PROBE_RE.search(text, streaming=True)
     if m_probe:
-        text = _PROBE_RE.sub("", text)
+        text = _PROBE_RE.sub("", text, streaming=True)
     # NEEDS-WRITE: strip complete blocks; hold back an opening that has
     # no closing [/NEEDS-WRITE] yet so the body doesn't stream verbatim.
     text = _WRITE_BLOCK_RE.sub("", text)
@@ -1275,34 +1304,35 @@ def run_agent_loop(
 
     provider = registry.get(role_cfg)
 
-    # Recall gate — "read bytes before describing" applied to conversational
-    # memory. When the user asks about prior conversation state, read the
-    # session log and inject the bytes into the live layer BEFORE the model
-    # generates. Same move as On Describing Internals, bound in the loop.
+    # Probe family — "read bytes before describing" applied to every
+    # horizon where describing state from pattern is a documented failure
+    # mode. Each probe is independent; each fires only when its classifier
+    # matches. Injections concatenate so probes compose additively.
+    # See harness.state module docstring for the architectural frame.
     try:
-        _recall_fired, _recall_inj, _recall_n = maybe_recall_probe(
-            decision.cleaned_input
-        )
-    except Exception as _recall_err:
-        _recall_fired, _recall_inj, _recall_n = False, "", 0
-        logger.emit("recall_probe_error", turn=turn_number, err=repr(_recall_err))
-    if _recall_fired and _recall_inj:
+        _probes = run_probes(decision.cleaned_input)
+    except Exception as _probe_err:
+        _probes = []
+        logger.emit("probe_gate_error", turn=turn_number, err=repr(_probe_err))
+    if _probes:
         existing_live = getattr(active_prompt, "live", "") or ""
+        probe_blocks = "\n\n".join(inj for _, inj, _ in _probes)
         merged_live = (
-            f"{_recall_inj}\n\n{existing_live}" if existing_live else _recall_inj
+            f"{probe_blocks}\n\n{existing_live}" if existing_live else probe_blocks
         )
         active_prompt = LayeredPrompt(
             identity=active_prompt.identity,
             substrate=active_prompt.substrate,
             live=merged_live,
         )
-        _dim(f"[recall-gate: fired, hits={_recall_n}]")
-        logger.emit(
-            "recall_probe",
-            turn=turn_number,
-            hits=_recall_n,
-            chars=len(_recall_inj),
-        )
+        for _name, _inj, _hits in _probes:
+            _dim(f"[probe:{_name}: fired, hits={_hits}, chars={len(_inj)}]")
+            logger.emit(
+                f"probe_{_name}",
+                turn=turn_number,
+                hits=_hits,
+                chars=len(_inj),
+            )
 
     # Optional deep-memory enrichment — only for roles that declare rag=true
     # and only when the retrieval actually returns something. No overclaim.
@@ -1522,31 +1552,8 @@ def run_agent_loop(
                         write_match = None
                         if not probe_match:
                             write_match = _WRITE_BLOCK_RE.search(current_text)
-                        probe_recovered = False
-                        if not probe_match:
-                            # Self-healing: try lenient recovery before
-                            # giving up. If the model emitted an unclosed
-                            # `[NEEDS-EXEC:` (2026-04-20 failure mode), we
-                            # close at end-of-line and log the repair.
-                            probe_match = _PROBE_RE.search_lenient(current_text)
-                            if probe_match:
-                                probe_recovered = True
-                                logger.emit(
-                                    "probe_recovered",
-                                    turn=turn_number,
-                                    iteration=probe_iter + 1,
-                                    role=decision.role,
-                                    model=role_cfg.model,
-                                    command=probe_match.group(1)[:500],
-                                    reason="unterminated_bracket",
-                                )
-                                _dim(
-                                    "[harness repaired malformed probe: "
-                                    "unclosed `]` — closed at EOL]"
-                                )
-                            else:
-                                if write_match is None:
-                                    break
+                        if not probe_match and write_match is None:
+                            break
                         probe_iter += 1
                         if write_match is not None and probe_match is None:
                             w_path = write_match.group("path").strip()
