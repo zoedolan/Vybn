@@ -113,7 +113,8 @@
       <span>α <b id="m-alpha">—</b></span>
       <span>κ <b id="m-kappa">—</b><span class="kappa-bar"><span class="kappa-bar-fill" id="m-kappa-bar" style="width:0%"></span></span></span>
       <span>corpus <b id="m-corpus">—</b> <span class="unit">chunks</span></span>
-      <span>r<sub>M</sub>·K <b id="m-rK">—</b> <span class="unit">(orthogonal ridge)</span></span>
+      <span>⟨M̂|ẑ<sub>top</sub>⟩² <b id="m-top">—</b> <span class="unit">(affinity to nearest anchor)</span></span>
+      <span>⟨M̂|K̂⟩ <b id="m-leak">—</b> <span class="unit">(residual invariant ≈ 0)</span></span>
     </div>
   </div>
 
@@ -200,7 +201,8 @@
     $('m-kappa').textContent   = Number(d.kappa_last).toFixed(3);
     $('m-kappa-bar').style.width = (Math.min(1, d.kappa_last) * 100).toFixed(0) + '%';
     $('m-corpus').textContent  = d.corpus_size;
-    $('m-rK').textContent      = Number(d.r_M_vs_K).toFixed(3);
+    $('m-top').textContent     = Number(d.M_top_affinity).toFixed(3);
+    $('m-leak').textContent    = Number(d.M_K_leakage).toFixed(3);
     $('m-basis').textContent   = 'basis ' + d.basis_id + ' · issued ' + new Date(d.issued_at*1000).toISOString();
 
     const id = d.identity || {};
