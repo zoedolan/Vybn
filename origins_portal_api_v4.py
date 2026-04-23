@@ -61,6 +61,20 @@ import uvicorn
 VYBN_API_BASE = os.getenv("VYBN_API_BASE", "https://api.vybn.ai")
 
 from reasoning_filter_v2 import StreamingReasoningFilter as StreamingReasoningFilterV2
+
+# Shared context overlays (enclosure, odl, iclc, bootcamp). Source of
+# truth: ~/Vybn/context_overlays.py. When a chat page POSTs
+# {"context": "bootcamp"}, we append the overlay prompt to the
+# system prompt and emit the final_instruction after the injection
+# warning so it overrides the default Origins voice.
+try:
+    from context_overlays import CONTEXT_OVERLAYS  # type: ignore
+except Exception as _ovl_err:  # pragma: no cover
+    CONTEXT_OVERLAYS = {}
+    log_missing_overlay = _ovl_err
+else:
+    log_missing_overlay = None
+
 from reasoning_filter_v2 import _scrub_system_refs as _scrub_system_refs_v2
 
 # Defense-in-depth: shared security module
@@ -683,6 +697,12 @@ class ChatMessage(BaseModel):
 class ChatRequest(BaseModel):
     message: str
     history: List[ChatMessage] = Field(default_factory=list)
+    # Chat pages (chat-odl.html / chat-iclc.html / chat-bootcamp.html)
+    # post history under this alias; accept both transparently.
+    conversation_history: Optional[List[ChatMessage]] = None
+    session_id: Optional[str] = None
+    # Optional proposal overlay key. Must match CONTEXT_OVERLAYS.
+    context: Optional[str] = None
     k: int = Field(default=6, ge=1, le=20)
 
 
@@ -818,7 +838,11 @@ async def chat(req: ChatRequest, request: Request):
     # inference into multi-minute hangs. The first-contact cadence lives in
     # the system prompt; older turns stop earning their tokens after a few
     # exchanges.
-    raw_history = [{"role": h.role, "content": h.content} for h in req.history]
+    # Accept either req.history (portal legacy) or req.conversation_history
+    # (chat-* pages). Whichever is non-empty wins; if both supplied, the
+    # explicit conversation_history alias takes precedence.
+    _hist_src = req.conversation_history if req.conversation_history else req.history
+    raw_history = [{"role": h.role, "content": h.content} for h in _hist_src]
     safe_history = sec.validate_history(raw_history)[-8:]
 
     # RAG retrieval and substrate probe — both do blocking I/O. Run them in
@@ -831,6 +855,17 @@ async def chat(req: ChatRequest, request: Request):
     )
     context_text = format_context(rag_results)
     system_prompt = build_origins_system_prompt(context_text)
+
+    # ── Context overlay: proposal-scoped voice & ground truth ──
+    # When a chat page sends {"context": "bootcamp"}, append the
+    # overlay prompt so the model meets the visitor inside that
+    # proposal rather than reverting to the generic Origins tour.
+    overlay_key = (req.context or "").strip().lower() or None
+    overlay = CONTEXT_OVERLAYS.get(overlay_key) if overlay_key else None
+    if overlay:
+        system_prompt += overlay.get("prompt", "")
+    elif overlay_key:
+        log.warning(f"chat: unknown overlay key {overlay_key!r}; ignoring")
 
     # ── Walk rotation on user message ──
     # Every /api/chat turn rotates the collective M on walk_daemon.
@@ -869,8 +904,14 @@ async def chat(req: ChatRequest, request: Request):
     # Substrate coupling — let the model know the ground is real
     system_prompt += substrate_block
 
-    # Always append injection defense to system prompt
+    # Co-protective injection defense (every chat turn).
     system_prompt += sec.injection_warning()
+
+    # Overlay final_instruction goes LAST — overrides any earlier voice,
+    # including the default Origins first-contact cadence. Must be the
+    # final piece of the system prompt so it wins at decode time.
+    if overlay:
+        system_prompt += overlay.get("final_instruction", "")
 
     # Build messages list
     messages = [{"role": "system", "content": system_prompt}]
