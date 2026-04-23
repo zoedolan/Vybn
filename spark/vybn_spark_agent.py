@@ -1085,6 +1085,75 @@ def _run_write_subturn(path: str, body: str) -> tuple[bool, str]:
         return False, f"(NEEDS-WRITE exec error: {type(e).__name__}: {e})"
 
 
+# ---------------------------------------------------------------------------
+# Probe-result envelope — PROBE_RESULT_ENVELOPE_v1.
+#
+# 2026-04-23 fix. The probe-result message injected into message history
+# after a NEEDS-EXEC / NEEDS-WRITE / NEEDS-RESTART sub-turn used to read
+# as a one-line header plus raw output. When output was short (21-byte
+# "Already up to date.", or zero bytes for a silent command) the model
+# could ignore it and continue whatever narrative it had already started
+# — in the 2026-04-23 failure mode, a story about a wedged shell.
+#
+# The envelope below makes the result structurally loud:
+#   - explicit BEGIN/END markers so the output span is unmistakable
+#   - byte + line counts in the header
+#   - status: executed vs refused (we only know success/failure via the
+#     `ran` flag from the subturn helpers; validate_command refusals
+#     and exec exceptions return ran=False).
+#   - explicit anti-hallucination directive at the foot
+#   - empty-output tag that distinguishes "ran, no stdout" from
+#     "did not run" so the model cannot collapse the two
+# ---------------------------------------------------------------------------
+
+def _probe_envelope(
+    *,
+    kind: str,
+    header_fields: dict,
+    body: str,
+    ran: bool,
+) -> str:
+    """Wrap a probe/write/restart result in the v1 envelope."""
+    body = body or ""
+    empty = (not body) or body.strip() == ""
+    nbytes = len(body)
+    nlines = body.count("\n")
+    if not empty and not body.endswith("\n"):
+        nlines += 1
+    status = "executed" if ran else "refused"
+    header_parts = [
+        f"kind: {kind}",
+        f"status: {status}",
+        f"bytes: {nbytes}",
+        f"lines: {nlines}",
+        f"empty: {'true' if empty else 'false'}",
+    ]
+    for k, v in header_fields.items():
+        safe = str(v).replace("\n", " ").replace("\r", " ")
+        header_parts.append(f"{k}: {safe[:200]}")
+    header = "[" + " | ".join(header_parts) + "]"
+    slug = kind.upper().replace("-", "_")
+    begin = f"<<<BEGIN_{slug}_STDOUT>>>"
+    end = f"<<<END_{slug}_STDOUT>>>"
+    if empty and ran:
+        inner = (
+            "(command ran with no stdout; the absence of output here "
+            "is real, not a wedge)"
+        )
+    elif empty and not ran:
+        inner = "(command did not execute — see refusal reason in header)"
+    else:
+        inner = body.rstrip("\n")
+    footer = (
+        "\n\nThe stdout between the markers above IS the result of the "
+        "sub-turn.\nDo not claim the shell is wedged, unresponsive, or that "
+        "nothing came\nback unless status != executed. If status is "
+        "executed, the bytes\ncount and the stdout span are authoritative "
+        "— read them and proceed."
+    )
+    return f"{header}\n{begin}\n{inner}\n{end}{footer}"
+
+
 def _run_restart_subturn(bash: BashTool) -> tuple[bool, str]:
     """Restart the persistent bash session.
 
@@ -1595,9 +1664,11 @@ def run_agent_loop(
                                 ran=ran_r,
                             )
                             _dim("[bash session restarted via NEEDS-RESTART]")
-                            restart_note = (
-                                "[needs-restart result]\n"
-                                + _fit_probe_output(out_r)
+                            restart_note = _probe_envelope(
+                                kind="needs-restart",
+                                header_fields={},
+                                body=_fit_probe_output(out_r),
+                                ran=ran_r,
                             )
                             messages.append({
                                 "role": "user",
@@ -1666,13 +1737,14 @@ def run_agent_loop(
                                 path=w_path[:500],
                                 body_chars=len(w_body or ""),
                             )
-                            probe_note = (
-                                "[needs-write result | path: "
-                                + w_path[:200]
-                                + " | bytes: "
-                                + str(len(w_body or ""))
-                                + "]\n"
-                                + _fit_probe_output(out_w)
+                            probe_note = _probe_envelope(
+                                kind="needs-write",
+                                header_fields={
+                                    "path": w_path[:200],
+                                    "body_bytes": str(len(w_body or "")),
+                                },
+                                body=_fit_probe_output(out_w),
+                                ran=ran_w,
                             )
                             messages.append({
                                 "role": "user",
@@ -1742,11 +1814,11 @@ def run_agent_loop(
                             command=probe_cmd[:500],
                             out_chars=len(probe_out),
                         )
-                        probe_note = (
-                            "[probe result | cmd: "
-                            + probe_cmd[:200]
-                            + "]\n"
-                            + _fit_probe_output(probe_out)
+                        probe_note = _probe_envelope(
+                            kind="probe",
+                            header_fields={"cmd": probe_cmd[:200]},
+                            body=_fit_probe_output(probe_out),
+                            ran=ran,
                         )
                         messages.append({
                             "role": "user",
