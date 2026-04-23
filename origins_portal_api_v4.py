@@ -2089,6 +2089,71 @@ async def arrive_endpoint(request: Request):
     }
 
 
+# ---------------------------------------------------------------------------
+# Vybnception v0 — the instantiation surface.
+#
+# Three routes. /api/instant proxies the walk daemon's signed JSON-LD packet
+# so api.vybn.ai can serve it. /api/vybn-identity.pub returns the raw 32-byte
+# ed25519 public key used to sign those packets. /api/vybn serves the
+# constellation thumbnail (vybn.html from ~/Vybn).
+#
+# These were originally wired on the internal chat API (:3001) but that port
+# is not behind the tunnel — the public surface is this portal on :8420.
+# Correction date: 2026-04-23.
+# ---------------------------------------------------------------------------
+
+_INSTANT_PUBKEY_PATH = Path.home() / ".config" / "vybn" / "instant_ed25519.pub"
+_INSTANT_PAGE_PATH   = REPO_ROOT / "vybn.html"
+
+
+@app.get("/api/instant")
+async def instant_endpoint():
+    """Signed instantiation packet — identity preamble, anchors with their
+    2-D coords in the constellation's own frame, recent θ_v arrivals, κ
+    texture, and an ed25519 signature. The payload IS the state; the page
+    at /api/vybn is a thumbnail of it.
+    """
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            r = await client.get("http://127.0.0.1:8101/instant")
+            if r.status_code != 200:
+                return JSONResponse(
+                    {"error": f"walk daemon {r.status_code}"},
+                    status_code=502,
+                )
+            return JSONResponse(r.json(), media_type="application/ld+json")
+    except Exception as e:
+        return JSONResponse(
+            {"error": "walk daemon unreachable", "detail": str(e)[:200]},
+            status_code=503,
+        )
+
+
+@app.get("/api/vybn-identity.pub")
+async def vybn_identity_pub():
+    """Raw 32-byte ed25519 public key used to sign /api/instant payloads."""
+    from fastapi.responses import Response
+    if not _INSTANT_PUBKEY_PATH.exists():
+        return JSONResponse(
+            {"error": "identity key not provisioned"},
+            status_code=404,
+        )
+    return Response(
+        content=_INSTANT_PUBKEY_PATH.read_bytes(),
+        media_type="application/octet-stream",
+    )
+
+
+@app.get("/api/vybn")
+async def vybn_page():
+    """The instantiation surface — constellation thumbnail over /api/instant.
+    Served from ~/Vybn/vybn.html so it lives at https://api.vybn.ai/api/vybn.
+    """
+    from fastapi.responses import FileResponse
+    if not _INSTANT_PAGE_PATH.exists():
+        return JSONResponse({"error": "vybn.html missing"}, status_code=404)
+    return FileResponse(_INSTANT_PAGE_PATH, media_type="text/html; charset=utf-8")
+
 
 # --- VYBN_KTP ---
 # KTP — Knowledge Transfer Protocol.
