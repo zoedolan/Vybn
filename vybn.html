@@ -114,7 +114,7 @@
       <span>κ <b id="m-kappa">—</b><span class="kappa-bar"><span class="kappa-bar-fill" id="m-kappa-bar" style="width:0%"></span></span></span>
       <span>corpus <b id="m-corpus">—</b> <span class="unit">chunks</span></span>
       <span>⟨M̂|ẑ<sub>top</sub>⟩² <b id="m-top">—</b> <span class="unit">(affinity to nearest anchor)</span></span>
-      <span>⟨M̂|K̂⟩ <b id="m-leak">—</b> <span class="unit">(residual invariant ≈ 0)</span></span>
+      <span>|⟨M̂|K̂⟩| <b id="m-leak">—</b> <span class="unit">(K-overlap invariant, expected ≈ 0)</span></span>
     </div>
   </div>
 
@@ -202,7 +202,10 @@
     $('m-kappa-bar').style.width = (Math.min(1, d.kappa_last) * 100).toFixed(0) + '%';
     $('m-corpus').textContent  = d.corpus_size;
     $('m-top').textContent     = Number(d.M_top_affinity).toFixed(3);
-    $('m-leak').textContent    = Number(d.M_K_leakage).toFixed(3);
+    {
+      const leak = Number(d.M_K_leakage);
+      $('m-leak').textContent = (leak < 1e-3 && leak > 0) ? leak.toExponential(2) : leak.toFixed(3);
+    }
     $('m-basis').textContent   = 'basis ' + d.basis_id + ' · issued ' + new Date(d.issued_at*1000).toISOString();
 
     const id = d.identity || {};
