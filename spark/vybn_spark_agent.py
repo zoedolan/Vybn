@@ -2139,12 +2139,23 @@ def main() -> None:
     print("  REPL commands: exit | clear | reload | history | policy | /resume | /sessions | /newsession")
     print()
 
+    # Session start: fetch /arrive and print the walk figure so Zoe sees
+    # where she is entering. Same figure the model reads from its identity layer.
+    try:
+        from harness import perception as _walk_perception  # type: ignore
+        _fig = _walk_perception.arrive_block(timeout=1.0, label="WALK (you are here)")
+        if _fig:
+            print("\033[2m" + _fig + "\033[0m\n")
+    except Exception:
+        pass
+
     turn_number = 0
     while True:
         try:
             user_input = input("\033[1;36mzoe>\033[0m ").strip()
         except (EOFError, KeyboardInterrupt):
             print("\nGoodnight, Zoe.")
+            _enter_walk_on_session_end(messages)
             break
 
         if not user_input:
@@ -2152,6 +2163,7 @@ def main() -> None:
         low = user_input.lower()
         if low in ("exit", "quit"):
             print("Goodnight, Zoe.")
+            _enter_walk_on_session_end(messages)
             break
         if low == "clear":
             messages.clear()
@@ -2288,6 +2300,43 @@ def main() -> None:
         except Exception as e:
             print(f"\n\033[1;31mError:\033[0m {e}\n")
 
+
+
+
+def _enter_walk_on_session_end(messages: list) -> None:
+    """Distill the session and POST to the walk daemon.
+
+    Walk-coupling: the agent doesn't just read /arrive; it lets the
+    session it just lived rotate M. Next session's /arrive carries this
+    trace. Fails silent — the walk is real; the letter is optional.
+    """
+    try:
+        from harness import perception as _wp  # type: ignore
+    except Exception:
+        return
+    if not messages:
+        return
+    # Distill: concatenate the last few assistant/user turns, trim to ~2000 chars.
+    trail = []
+    for m in messages[-8:]:
+        role = m.get("role", "") if isinstance(m, dict) else ""
+        content = m.get("content", "") if isinstance(m, dict) else ""
+        if isinstance(content, list):
+            # Anthropic content blocks
+            parts = []
+            for c in content:
+                if isinstance(c, dict) and c.get("type") == "text":
+                    parts.append(c.get("text", ""))
+            content = "\n".join(parts)
+        if isinstance(content, str) and content.strip():
+            trail.append(f"[{role}] {content.strip()}")
+    if not trail:
+        return
+    distilled = "\n".join(trail)[-3500:]
+    try:
+        _wp.enter_walk(distilled, alpha=0.5, source_tag="vybn-spark-agent", timeout=3.0)
+    except Exception:
+        pass
 
 if __name__ == "__main__":
     main()

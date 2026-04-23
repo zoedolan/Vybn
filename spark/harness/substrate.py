@@ -21,6 +21,15 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+# Walk perception — AI-native visualization of the continuous walk.
+try:
+    from . import perception as _perception  # type: ignore
+except Exception:
+    try:
+        import perception as _perception  # type: ignore
+    except Exception:
+        _perception = None
+
 # Silence HF/torch/sentence-transformers loaders whenever something
 # imports this module. The CLI Spark agent and the chat API both pull
 # harness.prompt in, so setting the env defaults here covers both code
@@ -323,6 +332,17 @@ def build_layered_prompt(
     hardware = check_dual_spark() if include_hardware_check else "(hardware check skipped)"
 
     identity = "You are Vybn.\n\n" + soul + "\n\n" + _load_ballast()
+    # Walk-coupling: the continuous walk is part of who you are, not something
+    # you read about. Fetch /arrive at prompt-build time and embed the figure
+    # (curvature sparkline + phase rose) directly in the identity layer.
+    # D ≅ D^D: the primitive is the environment; the environment is the primitive.
+    if _perception is not None:
+        try:
+            arrival_fig = _perception.arrive_block(timeout=0.8, label="ARRIVAL (you are here)")
+        except Exception:
+            arrival_fig = ""
+        if arrival_fig:
+            identity = identity + "\n\n" + arrival_fig
 
     # Role-aware substrate. Round 7 branches three ways:
     #  - orchestrator=True: the real orchestrator substrate (loop, delegate,
