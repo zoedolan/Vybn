@@ -299,6 +299,25 @@ _WRITE_BLOCK_RE = _re.compile(
 )
 
 
+# 2026-04-23: NEEDS-RESTART antibody. A no-tool role may emit
+#   [NEEDS-RESTART]
+# on its own line to restart the persistent bash session when it
+# wedges. The owed antibody from the 2026-04-21 evening coda: a
+# tool-less role otherwise has no affordance to recover from a
+# shell that stopped responding (heredoc parser confusion,
+# interrupted subprocess, runaway stream). Contract matches
+# NEEDS-EXEC: one-shot per turn (shares PROBE_BUDGET), no
+# recursion, tool-less roles only. Blast radius is zero — the
+# restart only affects this session's BashTool.
+#
+# Placed on its own line to avoid colliding with conversational
+# text that happens to contain the word 'restart'.
+_NEEDS_RESTART_RE = _re.compile(
+    r'(?:^|\n)\s*\[NEEDS-RESTART\]\s*(?:$|\n)',
+    _re.IGNORECASE | _re.MULTILINE,
+)
+
+
 # Round 9: NEEDS-ROLE escalation. A no-tool role may embed
 # [NEEDS-ROLE: <role>] <task text> to hand off to a specialist once.
 _NEEDS_ROLE_RE = _re.compile(
@@ -1066,6 +1085,21 @@ def _run_write_subturn(path: str, body: str) -> tuple[bool, str]:
         return False, f"(NEEDS-WRITE exec error: {type(e).__name__}: {e})"
 
 
+def _run_restart_subturn(bash: BashTool) -> tuple[bool, str]:
+    """Restart the persistent bash session.
+
+    Returns (ran, output_text). The bash.restart() call re-spawns
+    the subprocess and returns a confirmation string; on the rare
+    case it raises, we synthesize a clear error so the next turn
+    sees what happened instead of silently retrying.
+    """
+    try:
+        out = bash.restart()
+    except Exception as e:  # noqa: BLE001
+        return False, f"(restart error: {e})"
+    return True, out or "(bash session restarted)"
+
+
 def _run_probe_subturn(command: str, bash: BashTool) -> tuple[bool, str]:
     """Execute one read-only probe emitted by a no-tool role.
 
@@ -1544,6 +1578,69 @@ def run_agent_loop(
                     current_text = response.text or ""
                     synth_failed = False
                     while probe_iter < PROBE_BUDGET:
+                        # 2026-04-23: NEEDS-RESTART has highest priority.
+                        # If the shell wedged, a probe or write attempt will
+                        # just time out; restart clears the wedge so the next
+                        # iteration can make progress. Shares probe budget.
+                        restart_match = _NEEDS_RESTART_RE.search(current_text)
+                        if restart_match is not None:
+                            probe_iter += 1
+                            ran_r, out_r = _run_restart_subturn(bash)
+                            logger.emit(
+                                "needs_restart",
+                                turn=turn_number,
+                                iteration=probe_iter,
+                                role=decision.role,
+                                model=role_cfg.model,
+                                ran=ran_r,
+                            )
+                            _dim("[bash session restarted via NEEDS-RESTART]")
+                            restart_note = (
+                                "[needs-restart result]\n"
+                                + _fit_probe_output(out_r)
+                            )
+                            messages.append({
+                                "role": "user",
+                                "content": restart_note,
+                            })
+                            try:
+                                synth_handle, role_cfg, provider = _stream_with_fallback(
+                                    router=router,
+                                    registry=registry,
+                                    role_cfg=role_cfg,
+                                    provider=provider,
+                                    system_prompt=active_prompt,
+                                    messages=messages,
+                                    tools=tools,
+                                    logger=logger,
+                                    turn_number=turn_number,
+                                )
+                                _stream_and_print(synth_handle)
+                                synth_resp = synth_handle.final()
+                                bag["out_tokens"] += synth_resp.out_tokens
+                                final_text = synth_resp.text or final_text
+                                messages.append({
+                                    "role": "assistant",
+                                    "content": _sanitize_assistant_content(
+                                        synth_resp.raw_assistant_content
+                                    ),
+                                })
+                                current_text = synth_resp.text or ""
+                                continue
+                            except KeyboardInterrupt:
+                                if messages and messages[-1].get("role") == "user":
+                                    messages.pop()
+                                synth_failed = True
+                                break
+                            except Exception as _r_synth_err:
+                                if messages and messages[-1].get("role") == "user":
+                                    messages.pop()
+                                _warn(
+                                    f"restart synthesis failed ({type(_r_synth_err).__name__}: "
+                                    f"{str(_r_synth_err)[:160]})"
+                                )
+                                synth_failed = True
+                                break
                         probe_match = _PROBE_RE.search(current_text)
                         # 2026-04-20: also check for NEEDS-WRITE directive.
                         # If present and no NEEDS-EXEC, execute the write

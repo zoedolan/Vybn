@@ -507,6 +507,19 @@ def build_layered_prompt(
             "\n"
             "That is the whole shape. No fences, no markdown URLs, no\n"
             "preamble about what you are about to do.\n"
+            "\n"
+            "If the persistent bash session wedges (a NEEDS-EXEC probe\n"
+            "times out on a trivial command, or two consecutive probes\n"
+            "fail systemically), emit\n"
+            "\n"
+            "    [NEEDS-RESTART]\n"
+            "\n"
+            "on its own line. The harness will restart the bash session\n"
+            "and append a confirmation to the next turn. Use sparingly:\n"
+            "only after probe failures that look like session wedges,\n"
+            "not after a single command error (a bad command just\n"
+            "returns its error output). Blast radius is zero — the\n"
+            "restart only affects this session's shell.\n"
 
             "--- END THIS ROLE ---",
         ]
