@@ -4,9 +4,11 @@
 # Source of truth: ~/Vybn/spark/systemd/.
 [Unit]
 Description=Vybn vLLM cluster (Nemotron 120B, 2 Sparks via Ray)
-After=network-online.target docker.service
+After=network-online.target
 Wants=network-online.target
-Requires=docker.service
+# Docker is a system-level unit and invisible from user systemd; the daemon
+# is always running, so we depend on the binary instead via ConditionPath.
+ConditionPathExists=/var/run/docker.sock
 StartLimitIntervalSec=600
 StartLimitBurst=5
 
