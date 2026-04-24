@@ -90,6 +90,52 @@ logging.basicConfig(
 log = logging.getLogger("origins-api-v4")
 
 # ---------------------------------------------------------------------------
+# Self-healing signal capture
+# ---------------------------------------------------------------------------
+# Every vLLM failure that the portal would otherwise swallow as a generic
+# httpx error writes one JSONL entry to ~/logs/self_healing.log. The whole
+# point is to stop discarding the signal: the actual vLLM response body
+# (e.g. "maximum context length exceeded") carries the diagnostic we need
+# to eventually heal in-flight. This module ONLY captures — it does not
+# retry or degrade. Recovery strategy follows from accumulated data.
+
+SELF_HEALING_LOG_PATH = Path(os.path.expanduser("~/logs/self_healing.log"))
+
+def _record_vllm_failure(
+    route: str,
+    status_code: Optional[int],
+    error_body: Optional[str],
+    exception_type: str,
+    exception_str: str,
+    request_context: Dict[str, Any],
+) -> None:
+    """Write one structured JSONL entry. Never raises."""
+    try:
+        SELF_HEALING_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+        entry = {
+            "ts": datetime.now(timezone.utc).isoformat(),
+            "route": route,
+            "status_code": status_code,
+            "exception_type": exception_type,
+            "exception_str": exception_str[:2000],
+            "error_body": (error_body or "")[:4000],
+            "request_context": request_context,
+        }
+        with SELF_HEALING_LOG_PATH.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(entry, default=str) + "\n")
+        log.warning(
+            f"self-healing: captured vLLM failure route={route} "
+            f"status={status_code} type={exception_type}"
+        )
+    except Exception as _log_err:  # pragma: no cover
+        # Never let logging failures cascade into the request path.
+        try:
+            log.error(f"self-healing: record failed: {_log_err}")
+        except Exception:
+            pass
+
+
+# ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
 PORT = int(os.environ.get("ORIGINS_PORT", 8420))
@@ -1080,9 +1126,76 @@ async def chat(req: ChatRequest, request: Request):
                         last_heartbeat = time.monotonic()
 
         except (httpx.ConnectError, httpx.TimeoutException) as e:
+            # Connection-level failure — no response body exists yet.
+            _record_vllm_failure(
+                route="/api/chat",
+                status_code=None,
+                error_body=None,
+                exception_type=type(e).__name__,
+                exception_str=str(e),
+                request_context={
+                    "overlay_key": overlay_key,
+                    "overlay_chars": _overlay_chars,
+                    "suppress_rag": _suppress_rag,
+                    "max_tokens": _max_tokens,
+                    "history_turns": len(safe_history),
+                    "system_prompt_chars": len(system_prompt),
+                    "user_message_preview": req.message[:200],
+                    "session_id": req.session_id,
+                },
+            )
             log.warning(f"chat: vLLM connection error: {e}")
             yield f"data: {json.dumps({'error': 'Model server unavailable. Please try again shortly.'})}\n\n"
+        except httpx.HTTPStatusError as e:
+            # vLLM returned a 4xx/5xx. On a streaming response the body has
+            # NOT been read yet; aread() pulls the actual error message so
+            # we can finally see what vLLM is telling us.
+            _body: Optional[str] = None
+            try:
+                _raw = await e.response.aread()
+                _body = _raw.decode("utf-8", errors="replace")
+            except Exception as _read_err:
+                _body = f"[body read failed: {_read_err}]"
+            _record_vllm_failure(
+                route="/api/chat",
+                status_code=e.response.status_code,
+                error_body=_body,
+                exception_type=type(e).__name__,
+                exception_str=str(e),
+                request_context={
+                    "overlay_key": overlay_key,
+                    "overlay_chars": _overlay_chars,
+                    "suppress_rag": _suppress_rag,
+                    "max_tokens": _max_tokens,
+                    "history_turns": len(safe_history),
+                    "system_prompt_chars": len(system_prompt),
+                    "user_message_preview": req.message[:200],
+                    "session_id": req.session_id,
+                },
+            )
+            log.error(
+                f"chat: vLLM {e.response.status_code} error — body captured to "
+                f"self_healing.log; body[:200]={(_body or '')[:200]!r}"
+            )
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
         except Exception as e:
+            _record_vllm_failure(
+                route="/api/chat",
+                status_code=None,
+                error_body=None,
+                exception_type=type(e).__name__,
+                exception_str=str(e),
+                request_context={
+                    "overlay_key": overlay_key,
+                    "overlay_chars": _overlay_chars,
+                    "suppress_rag": _suppress_rag,
+                    "max_tokens": _max_tokens,
+                    "history_turns": len(safe_history),
+                    "system_prompt_chars": len(system_prompt),
+                    "user_message_preview": req.message[:200],
+                    "session_id": req.session_id,
+                },
+            )
             log.error(f"chat: unexpected error: {e}")
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
 
