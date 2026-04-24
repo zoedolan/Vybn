@@ -639,7 +639,7 @@ _DEFAULT_FALLBACK: dict[str, list[str]] = {
     "claude-opus-4-7": ["claude-opus-4-6", "claude-sonnet-4-6"],
     "claude-opus-4-6": ["claude-sonnet-4-6"],
     "claude-sonnet-4-6": ["claude-opus-4-6"],
-    "gpt-5.4": ["claude-sonnet-4-6", "claude-opus-4-6"],
+    "gpt-5.5": ["claude-sonnet-4-6", "claude-opus-4-6"],
     # Local Nemotron roles fall to Sonnet if vLLM is down so a
     # bare "hi" or "which model are you?" never hard-fails.
     "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8": ["claude-sonnet-4-6"],
@@ -672,8 +672,8 @@ _DEFAULT_MODEL_ALIASES: dict[str, str] = {
     "@sonnet46": "claude-sonnet-4-6",
     "@nemotron": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8",
     "@local": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8",
-    "@gpt": "gpt-5.4",
-    "@gpt5": "gpt-5.4",
+    "@gpt": "gpt-5.5",
+    "@gpt5": "gpt-5.5",
 }
 
 

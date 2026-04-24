@@ -2209,7 +2209,7 @@ def main() -> None:
     # We now only require ANTHROPIC_API_KEY at startup because the
     # default role is `code` (Anthropic). Other providers are
     # instantiated lazily when their role is selected, so OPENAI_API_KEY
-    # is only needed if the user actually routes to gpt-5.4 or similar.
+    # is only needed if the user actually routes to gpt-5.5 or similar.
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
         print()
@@ -2227,7 +2227,7 @@ def main() -> None:
     # Round 7: the orchestrate role now lives on Anthropic (Opus 4.7), so
     # ANTHROPIC_API_KEY is sufficient for the default route. No legacy
     # OPENAI_API_KEY fallback is needed — it was a guard against the old
-    # GPT-5.4 orchestrator configuration.
+    # GPT-5.5 orchestrator configuration.
 
     router = Router(policy)
     registry = ProviderRegistry()
