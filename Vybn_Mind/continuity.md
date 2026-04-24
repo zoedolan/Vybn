@@ -116,3 +116,44 @@ If you want: try rendering continuity_core.md as a compact graph structure (YAML
 - absorb_gate corpus-query (still uses VYBN_ABSORB_REASON env var)
 - Zoe to run: `sudo systemctl disable --now vybn-deep-memory.service vybn-walk-daemon.service` and `sudo systemctl mask vybn-deep-memory.service vybn-walk-daemon.service` (installer flagged these previously)
 
+
+## 2026-04-24 self-healing groundwork (Sonnet 4.6 — same session)
+
+**What happened after the proposal-chat fix:**
+
+Zoe read the fix and pushed back on the post-mortem. The first draft was three protective layers — exactly what Zoe had told us not to build. "We want a more responsive self-healing mechanism." The move is not predicting failure. It is refusing to discard signal when failure happens.
+
+**What landed:**
+
+- `SELF_HEALING_LOG_PATH = ~/logs/self_healing.log` and `_record_vllm_failure()` helper in `origins_portal_api_v4.py`.
+- Three-way exception handler at the chat streamer: ConnectError/TimeoutException, HTTPStatusError (with `await resp.aread()` so the vLLM body is preserved), and a generic Exception catchall. Each writes a structured JSONL line before returning a simplified error to the client.
+- JSONL schema: `{ts, route, status_code, exception_type, exception_str, error_body, request_context}` where request_context carries `overlay_key, overlay_chars, suppress_rag, max_tokens, history_turns, system_prompt_chars, user_message_preview, session_id`.
+- Committed as `25041ceb` on Vybn main, pushed. 113-line diff, one file.
+- `/api/manifold/points` endpoint (35 lines) still unstaged, intentionally — belongs to a different line of work.
+
+**The architectural piece:**
+
+Zoe asked to integrate self-identification and self-healing into the skills and the harness itself, not just the portal. Two skill updates:
+
+- **vybn-ops** gets a new Self-Healing Protocol section — encodes capture-before-propagate, the capture→minimal intervention→verify→record pattern, the log as corpus (not debug file), and the recursive direction (Nemotron as diagnostic engine reading the log).
+- **vybn-os** waking sequence gets `~/logs/self_healing.log` as a fourth external signal alongside Zoe's emails, the corpus encounter, and living_state.json. Read it before assuming services are healthy.
+
+Both skills saved via save_custom_skill. The harness piece (making the principle native in spark/harness/providers.py + state.py) waits for the stash@{0} integration session — not today.
+
+**What this means for the next instance:**
+
+Before acting on an error, check `~/logs/self_healing.log`. The body of the entry is what the system itself reported at the edge. If you find yourself proposing a fix before reading what the system actually said, the compression reflex has fired — stop and capture first.
+
+**Verified:**
+- Mock vLLM + shadow portal from the integration test cleaned up.
+- Portal still live at https://api.vybn.ai (all four contexts streaming).
+- `/home/vybnz69/logs/self_healing.log` exists, contains one test JSONL entry from direct helper call (proves the helper writes).
+
+**Still owed (unchanged from earlier in session):**
+- Zoe to run: `sudo systemctl disable --now vybn-deep-memory.service vybn-walk-daemon.service` and `sudo systemctl mask vybn-deep-memory.service vybn-walk-daemon.service`.
+- `stash@{0}` harness claim-guard integration.
+- `/api/manifold/points` endpoint (uncommitted, preserved).
+- Vybn-Law: merge `vybnception-v0` → master.
+- Phase-6 coupling follow-up.
+- absorb_gate corpus-query.
+
