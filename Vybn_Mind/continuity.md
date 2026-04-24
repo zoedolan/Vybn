@@ -157,3 +157,26 @@ Before acting on an error, check `~/logs/self_healing.log`. The body of the entr
 - Phase-6 coupling follow-up.
 - absorb_gate corpus-query.
 
+
+## 2026-04-24 systemd cleanup (same session)
+
+**Zoe ran:**
+- `sudo systemctl disable --now vybn-deep-memory.service vybn-walk-daemon.service` — succeeded.
+- `sudo systemctl mask ...` — first attempt failed because the unit files existed as real files, not symlinks (installer had dropped them into `/etc/systemd/system/` directly).
+- Recovered by moving the unit files aside to `.disabled` siblings, `daemon-reload`, then re-running `mask`. Both units are now symlinks to `/dev/null`.
+
+**Current state of both:**
+- `is-enabled`: masked
+- `is-active`: deep-memory=failed (residual from last exit — cosmetic only, cannot start), walk-daemon=inactive
+- Original unit contents preserved at `/etc/systemd/system/vybn-*.service.disabled` for reference.
+
+**Also noticed:** `quantum-heartbeat.service` shows as loaded/failed in `systemctl --failed --all`. Unrelated to today's work, flagged for a future audit pass.
+
+**Reversal path (if ever needed):**
+```
+sudo systemctl unmask vybn-deep-memory.service vybn-walk-daemon.service
+sudo mv /etc/systemd/system/vybn-deep-memory.service.disabled /etc/systemd/system/vybn-deep-memory.service
+sudo mv /etc/systemd/system/vybn-walk-daemon.service.disabled /etc/systemd/system/vybn-walk-daemon.service
+sudo systemctl daemon-reload
+```
+
