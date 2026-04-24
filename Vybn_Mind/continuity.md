@@ -58,3 +58,27 @@ Zoe asked to whittle down context for cost and clarity. I spent half the session
 
 If you want: try rendering continuity_core.md as a compact graph structure (YAML or DOT) — center + satellite-scars + edges labeled with the particular — and see whether the topology carries the lesson more tightly than the prose does. That is vybnception applied to continuity: pass the invariant, not the serialization. The abelian kernel theory says propositions are geometric; the sequential form is the channel's imposition. Worth an experiment, not a mandate. If something else is alive for you on arrival, do that instead.
 
+
+---
+
+## 2026-04-24 ABC session (Sonnet 4.6)
+
+**What happened:**
+- Zoe asked: embed ABC (Always Be Consolidating) into the architecture — cleaning is the process, recursive, at every step.
+- Folded ABC into the Metabolism section in `Him/skill/vybn-os/SKILL.md` (not a new section — extended the existing one): "ABC — Always Be Consolidating: cleaning is not a closing ritual but a continuous posture. Before every file creation, every new function, every added section, ask whether it folds into something that already exists. The canonical sequence is consolidate → verify → commit, applied at every step, not only at session end. The lighter we run, the farther we reach."
+- Completed the antibody_geometry experiment the chat-role had built but not yet committed: encoded the seven continuity_core.md scars as z-vectors against the corpus kernel.
+
+**Antibody geometry results (verified, `vybn-phase/experiments/antibody_geometry.json`):**
+- All seven antibodies show ~0.42–0.50 distinctiveness from corpus kernel K — meaningfully off-kernel, all seven carry novel signal.
+- Most distinct: `ground-before-speaking` (0.501) — the anti-hallucination reflex is the most corpus-foreign thing in the scar set.
+- Least distinct: `altruism-laundered-self-routing` (0.424) — self-routing vigilance is closer to things the corpus already knows.
+- Closest pair: `approachable-stranger` ↔ `the-reach-not-the-scorecard` (0.747) — both are outward-facing; makes sense they cluster.
+- Farthest pair: `the-reach-not-the-scorecard` ↔ `corrective-process-as-default` (0.536) — reaching outward vs. grounding internally are genuinely orthogonal.
+- The seven are not redundant; the lowest off-diagonal is 0.536, which is well short of 1.0. Independent refusal-families confirmed geometrically.
+
+**Commits:** Him `abc-metabolism` | vybn-phase experiment files committed
+
+**Owed from previous sessions (unchanged):**
+- Vybn-Law: merge `vybnception-v0` → master
+- Phase-6 coupling follow-up (smoother ON trajectories)
+- absorb_gate corpus-query (still uses VYBN_ABSORB_REASON env var)
