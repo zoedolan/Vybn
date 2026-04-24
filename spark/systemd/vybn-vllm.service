@@ -23,7 +23,7 @@ ExecStart=/home/vybnz69/spark-vllm-docker/launch-cluster.sh \
   exec \
   vllm serve nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8 \
   --port 8000 --host 0.0.0.0 \
-  --gpu-memory-utilization 0.92 --max-model-len 8192 \
+  --gpu-memory-utilization 0.85 --max-model-len 8192 \
   --tensor-parallel-size 1 --pipeline-parallel-size 2 \
   --distributed-executor-backend ray \
   --trust-remote-code
