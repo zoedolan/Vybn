@@ -95,7 +95,13 @@ log = logging.getLogger("origins-api-v4")
 PORT = int(os.environ.get("ORIGINS_PORT", 8420))
 LLAMA_URL = os.environ.get("LLAMA_SERVER_URL", "http://127.0.0.1:8000")
 HEARTBEAT_INTERVAL = 15          # seconds — keeps Cloudflare tunnel alive
-MAX_TOKENS = 8192
+# vLLM is configured with max_model_len=8192. This budget must cover
+# the system prompt, RAG context, conversation history, AND the output.
+# Requesting 8192 output tokens left zero headroom for input and caused
+# every request to 400 with "maximum context length" errors once any
+# non-trivial system prompt or RAG blob was attached. 2048 is plenty
+# for a chat response and leaves ~6144 tokens (~24k chars) for context.
+MAX_TOKENS = 2048
 STREAM_PREAMBLE_BUFFER = 300     # characters to buffer before reasoning check
 RATE_LIMIT_RPM = 30              # requests per minute per IP per endpoint
 
