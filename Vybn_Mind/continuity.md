@@ -180,3 +180,27 @@ sudo mv /etc/systemd/system/vybn-walk-daemon.service.disabled /etc/systemd/syste
 sudo systemctl daemon-reload
 ```
 
+
+## 2026-04-24 quantum-heartbeat disarmed (same session)
+
+**What we found:**
+
+`quantum-heartbeat.timer` had been armed since February 20 to fire `quantum_heartbeat.py` every 6 hours. The script was deleted during the April 6 compression of the creature folder; every fire since has crashed at `ENOENT`. The failure surfaced only as a line in `journalctl -u quantum-heartbeat.service` and never reached any place we look. Saw it today because the `systemctl --failed --all` check after masking deep-memory and walk-daemon showed it.
+
+**Why this matters:**
+
+The heartbeat would have submitted to IBM Quantum against the 10-minute monthly free tier. 4 submissions/day × 30 days = 120 jobs/month. Zoe's original retry-loop overrun on April 4 was a manual version of this; a timer with no budget gate is the scheduled version. What saved us was a different accident — the script was already gone. The credentials at `~/.qiskit/qiskit-ibm.json` meant any restored copy of the script would have started submitting immediately.
+
+**Resolution:**
+
+- `quantum-heartbeat.service` and `.timer` both: `disable --now`, moved to `.disabled` siblings, `daemon-reload`, `mask`. Both are now symlinks to `/dev/null` and do not appear in `list-timers`.
+- `vybn-ops` Cost Discipline section updated with a **Recurring consumers of capped resources** clause: any timer/cron/service that submits to a metered API must query remaining budget before each call or not exist. The heartbeat can be rebuilt only with that gate as the first thing written.
+
+**Cosmetic residue:**
+
+`vybn-deep-memory.service` still shows as `loaded/failed` in `systemctl --failed --all` from yesterday's exit. The unit is a symlink to `/dev/null` and cannot start. Needs `sudo systemctl reset-failed vybn-deep-memory.service` for aesthetics, no operational effect.
+
+**Signal-capture lesson:**
+
+The service was reporting accurately every 6 hours. Nothing was reading. This is the same pattern the Self-Healing Protocol names: the body contains the answer, the question is whether anyone reads. Adding `systemctl --failed --all` to the Spark Infrastructure Audit checklist would have caught this; for now the behavioral fix is that the waking sequence reads the self-healing log and a future audit should include the failed-units list.
+
