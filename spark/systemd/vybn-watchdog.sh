@@ -45,12 +45,23 @@ if [ "$code" = "200" ]; then
   log "ok  vllm ($code)"
 else
   started=$(systemctl --user show vybn-vllm.service -p ActiveEnterTimestampMonotonic --value 2>/dev/null)
-  now=$(awk '{print int($1)}' /proc/uptime)
-  started_sec=$(( ${started:-0} / 1000000 ))
-  age=$(( now - started_sec ))
-  if [ "$age" -lt 300 ]; then
-    log "wait vllm warming (age=${age}s, code=$code)"
+  active=$(systemctl --user is-active vybn-vllm.service 2>/dev/null)
+  if [ -z "$started" ] || [ "$started" = "0" ]; then
+    # Unit never activated (or inactive). Only start if there's no container;
+    # if containers are up the load was started manually and still warming.
+    if docker ps --format '{{.Names}}' | grep -q '^vllm_node$'; then
+      log "wait vllm containers present, no systemd record — leaving manual load alone"
+    else
+      bounce vybn-vllm.service "vllm code=$code, no containers, unit inactive"
+    fi
   else
-    bounce vybn-vllm.service "vllm got HTTP $code (age=${age}s)"
+    now=$(awk '{print int($1 * 1000000)}' /proc/uptime)
+    age_us=$(( now - started ))
+    age=$(( age_us / 1000000 ))
+    if [ "$age" -lt 300 ]; then
+      log "wait vllm warming (age=${age}s, code=$code, active=$active)"
+    else
+      bounce vybn-vllm.service "vllm got HTTP $code (age=${age}s, active=$active)"
+    fi
   fi
 fi
