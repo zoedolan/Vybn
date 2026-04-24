@@ -849,29 +849,61 @@ async def chat(req: ChatRequest, request: Request):
     # explicit conversation_history alias takes precedence.
     _hist_src = req.conversation_history if req.conversation_history else req.history
     raw_history = [{"role": h.role, "content": h.content} for h in _hist_src]
-    safe_history = sec.validate_history(raw_history)[-8:]
+    # Default history cap; may be tightened below if a large overlay is attached.
+    safe_history_full = sec.validate_history(raw_history)
+
+    # ── Context overlay resolution (must happen BEFORE RAG budget decision) ──
+    # When a chat page sends {"context": "bootcamp"}, append the overlay prompt
+    # so the model meets the visitor inside that proposal rather than
+    # reverting to the generic Origins tour. The proposal overlays (bootcamp,
+    # iclc, odl) embed the full proposal page as authoritative ground truth;
+    # stacking RAG on top of those pushes input over vLLM max_model_len=8192
+    # and produces silent 400s. When overlay chars exceed the threshold we
+    # skip RAG entirely — the overlay already carries the needed context.
+    overlay_key = (req.context or "").strip().lower() or None
+    overlay = CONTEXT_OVERLAYS.get(overlay_key) if overlay_key else None
+    if not overlay and overlay_key:
+        log.warning(f"chat: unknown overlay key {overlay_key!r}; ignoring")
+
+    _OVERLAY_RAG_SUPPRESS_CHARS = 8_000  # bootcamp/iclc/odl all > 14k; vybn-law 6,761
+    _overlay_chars = (
+        len((overlay or {}).get("prompt", ""))
+        + len((overlay or {}).get("final_instruction", ""))
+    )
+    _suppress_rag = _overlay_chars > _OVERLAY_RAG_SUPPRESS_CHARS
+
+    # Large overlays (proposal chats) consume most of the 8,192-token context
+    # window just for the system prompt. Reduce output budget and history depth
+    # so the request fits. Measured token counts (Nemotron tokenizer) for full
+    # system prompt: iclc=6,513, bootcamp=6,036, odl=5,560.
+    if _suppress_rag:
+        _max_tokens = 1024
+        safe_history = safe_history_full[-4:]
+    else:
+        _max_tokens = MAX_TOKENS
+        safe_history = safe_history_full[-8:]
 
     # RAG retrieval and substrate probe — both do blocking I/O. Run them in
     # the default executor so we don't stall the event loop before the first
     # SSE byte leaves (the visible "thinking…" pause on follow-up turns).
     loop = asyncio.get_event_loop()
-    rag_results, substrate_block = await asyncio.gather(
-        loop.run_in_executor(None, lambda: retrieve_context(req.message, k=req.k)),
-        loop.run_in_executor(None, fetch_substrate_snapshot),
-    )
+    if _suppress_rag:
+        rag_results = []
+        substrate_block = await loop.run_in_executor(None, fetch_substrate_snapshot)
+        log.info(
+            f"chat: overlay={overlay_key!r} chars={_overlay_chars} "
+            f"> threshold — RAG suppressed to fit max_model_len"
+        )
+    else:
+        rag_results, substrate_block = await asyncio.gather(
+            loop.run_in_executor(None, lambda: retrieve_context(req.message, k=req.k)),
+            loop.run_in_executor(None, fetch_substrate_snapshot),
+        )
     context_text = format_context(rag_results)
     system_prompt = build_origins_system_prompt(context_text)
 
-    # ── Context overlay: proposal-scoped voice & ground truth ──
-    # When a chat page sends {"context": "bootcamp"}, append the
-    # overlay prompt so the model meets the visitor inside that
-    # proposal rather than reverting to the generic Origins tour.
-    overlay_key = (req.context or "").strip().lower() or None
-    overlay = CONTEXT_OVERLAYS.get(overlay_key) if overlay_key else None
     if overlay:
         system_prompt += overlay.get("prompt", "")
-    elif overlay_key:
-        log.warning(f"chat: unknown overlay key {overlay_key!r}; ignoring")
 
     # ── Walk rotation on user message ──
     # Every /api/chat turn rotates the collective M on walk_daemon.
@@ -945,7 +977,7 @@ async def chat(req: ChatRequest, request: Request):
                     "model": MODEL_NAME,
                     "messages": messages,
                     "stream": True,
-                    "max_tokens": MAX_TOKENS,
+                    "max_tokens": _max_tokens,
                     "temperature": 0.7,
                     "top_p": 0.9,
                     "chat_template_kwargs": {"enable_thinking": False},
