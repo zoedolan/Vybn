@@ -936,13 +936,26 @@ class OpenAIProvider:
         # speaks the legacy key. Branch on transport rather than model
         # name so new OpenAI-compatible models don't need a code change.
         max_key = "max_tokens" if base else "max_completion_tokens"
+
+        # OpenAI reasoning models (gpt-5.x base, o1, o3, o4-mini) only
+        # accept temperature=1 and do not support the temperature param
+        # at all in some variants. Detect by model name and omit temp.
+        _m = role.model.lower()
+        _is_reasoning = (
+            _m.startswith("o1") or _m.startswith("o3") or _m.startswith("o4")
+            or (_m.startswith("gpt-5.") and not _m.endswith("-mini"))
+        )
+
         payload: dict[str, Any] = {
             "model": role.model,
             "messages": openai_messages,
             max_key: role.max_tokens,
-            "temperature": role.temperature,
             "stream": False,
         }
+        if _is_reasoning:
+            payload["temperature"] = 1
+        else:
+            payload["temperature"] = role.temperature
         if tools:
             payload["tools"] = self._translate_tools(tools)
 
