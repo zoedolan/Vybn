@@ -1,0 +1,16 @@
+# /home/vybnz69/.config/systemd/user/vybn-self-check.service
+# Structural canary: runs the phase-space self-check every 15 minutes
+# (timer below). Catches silent-failure modes in deep_memory that a
+# simple HTTP ping would miss (holonomy collapse, degenerate fuse,
+# missing kernel). Source of truth: ~/Vybn/spark/systemd/.
+[Unit]
+Description=Vybn phase-space structural self-check (canary against silent failure)
+After=network.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/vybn-phase
+ExecStart=/usr/bin/python3 %h/vybn-phase/deep_memory.py --self-check
+StandardOutput=append:%h/.cache/vybn-phase/self_check.stdout.log
+StandardError=append:%h/.cache/vybn-phase/self_check.stderr.log
+

@@ -19,8 +19,9 @@ USER_DIR="$HOME/.config/systemd/user"
 mkdir -p "$USER_DIR" "$HOME/logs"
 
 echo "== Symlinking units from $SRC → $USER_DIR =="
-for f in vybn-deep-memory.service vybn-walk-daemon.service vybn-vllm.service \
-         vybn-watchdog.service vybn-watchdog.timer; do
+for f in vybn-deep-memory.service vybn-walk-daemon.service vybn-portal.service vybn-vllm.service \
+         vybn-watchdog.service vybn-watchdog.timer \
+         vybn-self-check.service vybn-self-check.timer; do
   ln -sf "$SRC/$f" "$USER_DIR/$f"
   echo "  $f"
 done
@@ -57,7 +58,8 @@ systemctl --user daemon-reload
 
 echo
 echo "== Enabling units =="
-systemctl --user enable vybn-deep-memory.service vybn-walk-daemon.service \
+systemctl --user enable vybn-deep-memory.service vybn-walk-daemon.service vybn-portal.service \
+                        vybn-self-check.timer \
                         vybn-vllm.service vybn-watchdog.timer
 
 echo

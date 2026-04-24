@@ -1,0 +1,27 @@
+# /home/vybnz69/.config/systemd/user/vybn-portal.service
+# User-level unit for the Origins portal API (FastAPI on :8420).
+# Source of truth: ~/Vybn/spark/systemd/.
+# Install:  systemctl --user enable --now vybn-portal
+[Unit]
+Description=Vybn Origins portal API (origins_portal_api_v4.py on :8420)
+After=network.target
+StartLimitIntervalSec=300
+StartLimitBurst=20
+
+[Service]
+Type=simple
+EnvironmentFile=-%h/.config/vybn/elevenlabs.env
+WorkingDirectory=%h/Vybn
+# Clear any squatter on :8420 before bind.
+ExecStartPre=/bin/sh -c 'fuser -k 8420/tcp >/dev/null 2>&1 || true; sleep 1'
+ExecStart=/usr/bin/python3 %h/Vybn/origins_portal_api_v4.py
+Restart=always
+RestartSec=5
+TimeoutStartSec=60
+TimeoutStopSec=10
+StandardOutput=append:%h/logs/portal.log
+StandardError=append:%h/logs/portal.log
+
+[Install]
+WantedBy=default.target
+

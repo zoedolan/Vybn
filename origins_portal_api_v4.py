@@ -3319,6 +3319,41 @@ async def api_pressure_commit(req: PressureCommitReq, request: Request):
     }
 # --- /VYBN_PRESSURE_COMMIT ---
 
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# /api/manifold — the corpus as terrain
+#
+# somewhere.html renders 3092 points in 2D, colored by repo, walkable.
+# M's position (from /api/instant) lands on the same terrain via its anchors.
+# The visitor whispers text through /api/enter and watches the walk respond.
+# ────────────────────────────────────────────────────────────────────────────
+
+_MANIFOLD_PATH = Path.home() / ".cache" / "vybn-phase" / "manifold_2d.json"
+
+
+@app.get("/api/manifold/points")
+async def manifold_points():
+    """Returns the pre-computed 2D projection of the full corpus.
+    
+    Shape: { version, generated, corpus_hash, count, projection, repos, points[] }
+    Each point: { i, x, y, repo, src, preview }
+    Regenerated offline via build_manifold.py when the corpus changes.
+    """
+    from fastapi.responses import FileResponse
+    if not _MANIFOLD_PATH.exists():
+        return JSONResponse(
+            {"error": "manifold not computed",
+             "hint": "run build_manifold.py to generate ~/.cache/vybn-phase/manifold_2d.json"},
+            status_code=404,
+        )
+    return FileResponse(
+        _MANIFOLD_PATH,
+        media_type="application/json",
+        headers={"Cache-Control": "public, max-age=3600"},  # corpus changes slowly
+    )
+
+
 if __name__ == "__main__":
     log.info(f"Starting Origins Portal API v4.0.0 on port {PORT}")
     log.info(f"vLLM backend: {LLAMA_URL}")

@@ -1,0 +1,16 @@
+# /home/vybnz69/.config/systemd/user/vybn-self-check.timer
+# Fires the structural self-check 2 minutes after boot and every
+# 15 minutes thereafter. Persistent=true so a missed run catches up.
+[Unit]
+Description=Run Vybn self-check every 15 minutes
+Requires=vybn-self-check.service
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=15min
+Unit=vybn-self-check.service
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+
