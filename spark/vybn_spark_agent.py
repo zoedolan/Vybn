@@ -911,6 +911,23 @@ _TRANSIENT_PATTERNS = (
 )
 
 
+def _sanitize_provider_error(exc: BaseException, limit: int = 160) -> str:
+    """Return a short, safe excerpt of a provider error.
+
+    Strips long bearer tokens / api keys that sometimes appear in
+    echoed request bodies or URLs. Collapses whitespace. Truncates to
+    `limit` chars. Never includes the exception traceback.
+    """
+    msg = str(exc)
+    # Redact anything that looks like an API key/token.
+    msg = _re.sub(r"sk-[A-Za-z0-9_\-]{10,}", "sk-***", msg)
+    msg = _re.sub(r"Bearer\s+[A-Za-z0-9_\-\.]+", "Bearer ***", msg, flags=_re.IGNORECASE)
+    msg = _re.sub(r"\s+", " ", msg).strip()
+    if len(msg) > limit:
+        msg = msg[: limit - 1] + "…"
+    return msg or exc.__class__.__name__
+
+
 def _is_transient_error(exc: BaseException) -> bool:
     """Heuristic: retry-worthy vs. walk-the-chain.
 
@@ -988,8 +1005,9 @@ def _stream_with_fallback(
                     role=cfg,
                 )
                 if cfg is not role_cfg:
+                    _snippet = _sanitize_provider_error(last_exc) if last_exc else ""
                     _warn(
-                        f"primary failed ({last_exc.__class__.__name__}); "
+                        f"primary failed ({last_exc.__class__.__name__}: {_snippet}); "
                         f"fell back to {cfg.provider}:{cfg.model}"
                     )
                     logger.emit(
@@ -1560,8 +1578,9 @@ def run_agent_loop(
             except Exception as e:
                 bag["stop_reason"] = "error"
                 logger.emit("provider_error", turn=turn_number, error=str(e))
-                _warn(f"provider error: {e}")
-                return f"(provider error: {e})"
+                _msg = _sanitize_provider_error(e)
+                _warn(f"provider error ({e.__class__.__name__}): {_msg}")
+                return f"(provider error: {e.__class__.__name__}: {_msg})"
 
             bag["in_tokens"] += response.in_tokens
             bag["out_tokens"] += response.out_tokens
@@ -2206,6 +2225,18 @@ def _build_prompts(
 
 
 def main() -> None:
+    # After reboot / service hardening the interactive vybn process can
+    # lose the PAM-populated environment even though secrets still live
+    # at ~/.config/vybn/llm.env. Load them before any provider client
+    # reads os.environ. Existing env vars win; no values are printed.
+    try:
+        from harness.env_loader import load_env_files, describe  # noqa: E402
+        _applied = load_env_files()
+        if _applied:
+            print(f"  [env] {describe(_applied)}")
+    except Exception:  # noqa: BLE001 — loader must never block startup
+        pass
+
     # We now only require ANTHROPIC_API_KEY at startup because the
     # default role is `code` (Anthropic). Other providers are
     # instantiated lazily when their role is selected, so OPENAI_API_KEY
