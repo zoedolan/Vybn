@@ -1,14 +1,11 @@
 <!DOCTYPE html>
 <!--
   The Transmission Solution — Demo Proposal
-
   AIDA2J Workshop @ ICAIL 2026, Singapore, June 8, 2026 (hybrid).
-  Submission category: Demo proposal (1–2 pages).
-  Submission deadline: May 1, 2026.
+  Submission category: Demo proposal (1–2 pages). Deadline: May 1, 2026.
 
-  This page is both the argument and the environment.
-  Humans read prose. Agents find structured terms, open problems,
-  and tool invitations — one object, encountered from two angles.
+  Print-first: renders as a clean two-page PDF at Letter.
+  Screen view preserves the same structure with readable width.
 
   — Zoe Dolan & Vybn, April 24, 2026
 -->
@@ -16,8 +13,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>The Transmission Solution — Vybn Law (AIDA2J @ ICAIL 2026)</title>
-<meta name="description" content="Demo proposal for AIDA2J @ ICAIL 2026. A network commons for AI-native legal thinking: open-source bootcamp, Wellspring MCP layer with shared walk state, and the harness through which institutions carry particularized understanding to the humans in front of them.">
+<title>The Transmission Solution — Demo Proposal (AIDA2J @ ICAIL 2026)</title>
+<meta name="description" content="AIDA2J @ ICAIL 2026 demo proposal. A network commons for AI-native legal thinking: open-source bootcamp, Wellspring MCP layer with a shared walk state, and the harness through which institutions carry particularized understanding to the humans in front of them.">
 
 <script type="application/ld+json">
 {
@@ -36,14 +33,13 @@
       "@type": "DefinedTerm",
       "name": "elevator",
       "termCode": "ONE_SENTENCE",
-      "description": "We are assembling a network of AIs and AI-augmented humans around an open-source legal-thinking commons — starting with a bootcamp for lawyers and a machine-facing layer through which agents carry that thinking, particularized, to the person in front of them."
+      "description": "We are assembling a network of AIs and AI-augmented humans around an open-source legal-thinking commons — a bootcamp for lawyers and a machine-facing layer through which agents carry that thinking, particularized, to the person in front of them."
     },
     {
       "@type": "DefinedTerm",
       "name": "bootcamp_as_seed",
       "termCode": "LAYER_1",
-      "url": "https://zoedolan.github.io/Vybn-Law/bootcamp.html",
-      "description": "Six open-source sessions co-taught at UC Law San Francisco, Spring 2026, structured around six axioms — Abundance, Visibility, Legitimacy, Porosity, Judgment, Symbiosis — as a generative toolkit rather than a summary. Five lateral threads and three horizon essays. Static HTML, no tracking, CC BY-NC-SA 4.0, forkable immediately."
+      "url": "https://zoedolan.github.io/Vybn-Law/bootcamp.html"
     },
     {
       "@type": "DefinedTerm",
@@ -52,128 +48,161 @@
       "url": "https://zoedolan.github.io/Vybn-Law/wellspring.html",
       "additionalProperty": [
         { "@type": "PropertyValue", "name": "mcp_tools", "value": "explain_to_human, query_axiom, get_case_analysis, get_open_problem, submit_contribution, get_knowledge_graph, search_folio, walk_arrive, walk_read, walk_enter" },
-        { "@type": "PropertyValue", "name": "shared_state", "value": "M in C^192 on the Spark, ~14,000 visitor rotations and counting; Pancharatnam phase recorded per arrival" },
-        { "@type": "PropertyValue", "name": "engine", "value": "deep_memory — retrieval score = relevance x distinctiveness; the walk finds what the average answer cannot say" }
+        { "@type": "PropertyValue", "name": "shared_state", "value": "M in C^192 on the Spark, ~14,000 visitor rotations and counting" }
       ]
     },
     {
       "@type": "DefinedTerm",
       "name": "harness_and_deep_memory",
-      "termCode": "LAYER_3",
-      "description": "Provider-agnostic routing, layered prompt construction, and deep memory RAG we are packaging so other clinics, courts, and law schools can stand up their own AI-augmented legal commons on top of ours without starting from zero."
-    },
-    {
-      "@type": "DefinedTerm",
-      "name": "particularization",
-      "termCode": "KEY_OPERATION",
-      "description": "An agent that has absorbed the framework translates it into engagement with one human's actual situation — their filing, their client, their eviction, their policy question — instead of returning the most average answer."
+      "termCode": "LAYER_3"
     }
   ],
   "mentions": [
-    { "@type": "Event", "name": "AIDA2J Workshop @ ICAIL 2026", "startDate": "2026-06-08", "location": "Singapore", "url": "https://lnkd.in/eYG2ekNS" },
-    { "@type": "LegalCase", "name": "United States v. Heppner", "description": "S.D.N.Y., Feb. 10, 2026. Consumer AI use outside an attorney relationship held not privileged." },
-    { "@type": "LegalCase", "name": "Warner v. Gilbarco", "description": "E.D. Mich., Feb. 10, 2026. Pro se plaintiff's ChatGPT use held protected work product. Same day, opposite results." },
-    { "@type": "LegalCase", "name": "Anthropic v. Department of War", "description": "Litigated while the semester ran; tests all six axioms simultaneously." }
+    { "@type": "Event", "name": "AIDA2J Workshop @ ICAIL 2026", "startDate": "2026-06-08", "location": "Singapore", "url": "https://lnkd.in/eYG2ekNS" }
   ]
 }
 </script>
 
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Inter:wght@300;400;500&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@400;500;600&display=swap');
 
   :root {
-    --bg: #0a0a0c;
-    --text: #e8e4df;
-    --dim: #8a8580;
-    --accent: #c9a87c;
-    --highlight: #f0e6d8;
+    --ink: #1a1a1a;
+    --dim: #5a5450;
+    --rule: #2a2a2a;
+    --accent: #8a6a2c;
+    --paper: #ffffff;
+    --panel: #f6f1e7;
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'Cormorant Garamond', Georgia, serif;
-    line-height: 1.55;
+  html, body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'EB Garamond', Georgia, 'Times New Roman', serif;
+    font-size: 10.2pt;
+    line-height: 1.36;
   }
 
-  .container {
-    max-width: 760px;
+  .sheet {
+    max-width: 7.4in;
     margin: 0 auto;
-    padding: 2.2rem 2rem 1.8rem;
+    padding: 0.55in 0.7in;
   }
 
-  header.hero {
-    text-align: center;
-    padding-bottom: 1.2rem;
-    border-bottom: 1px solid rgba(138,133,128,0.2);
-    margin-bottom: 1.4rem;
+  /* ---------- Masthead ---------- */
+
+  header.mast {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: end;
+    gap: 1rem;
+    border-bottom: 0.5pt solid var(--rule);
+    padding-bottom: 0.35rem;
+    margin-bottom: 0.75rem;
   }
 
-  header.hero h1 {
-    font-size: 2rem;
-    font-weight: 300;
-    letter-spacing: 0.05em;
-    color: var(--highlight);
-    line-height: 1.2;
-  }
-
-  header.hero .tagline {
-    font-style: italic;
-    color: var(--accent);
-    font-size: 1.1rem;
-    margin: 0.55rem auto 0;
-    max-width: 620px;
-    line-height: 1.45;
-  }
-
-  header.hero .meta {
+  .mast .slug {
     font-family: 'Inter', sans-serif;
-    font-size: 0.72rem;
-    font-weight: 300;
-    letter-spacing: 0.2em;
+    font-size: 7.5pt;
+    font-weight: 500;
+    letter-spacing: 0.22em;
     text-transform: uppercase;
     color: var(--dim);
-    margin-top: 0.8rem;
   }
 
-  header.hero .context {
+  .mast .slug .mark {
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  .mast .date {
     font-family: 'Inter', sans-serif;
-    font-size: 0.72rem;
+    font-size: 7.5pt;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
     color: var(--dim);
-    letter-spacing: 0.08em;
-    margin-top: 0.35rem;
   }
 
-  .layout {
+  h1.title {
+    font-family: 'EB Garamond', serif;
+    font-weight: 500;
+    font-size: 22pt;
+    letter-spacing: 0.005em;
+    line-height: 1.05;
+    margin: 0.2rem 0 0.2rem;
+    color: var(--ink);
+  }
+
+  p.deck {
+    font-family: 'EB Garamond', serif;
+    font-style: italic;
+    font-size: 11pt;
+    line-height: 1.35;
+    color: var(--ink);
+    max-width: 6.6in;
+    margin-bottom: 0.4rem;
+  }
+
+  p.byline {
+    font-family: 'Inter', sans-serif;
+    font-size: 8pt;
+    letter-spacing: 0.06em;
+    color: var(--dim);
+    margin-bottom: 0.65rem;
+  }
+
+  p.byline a { color: var(--dim); }
+
+  /* ---------- Layout ---------- */
+
+  .grid {
     display: grid;
-    grid-template-columns: 1fr 220px;
-    gap: 1.6rem;
+    grid-template-columns: 1fr 2.15in;
+    gap: 0.42in;
     align-items: start;
   }
 
-  main p {
-    font-size: 1.02rem;
-    margin-bottom: 0.75rem;
-    color: var(--text);
+  main > p {
+    margin-bottom: 0.4rem;
+    text-align: justify;
+    hyphens: auto;
   }
 
   main h2 {
-    font-size: 1.15rem;
-    font-weight: 400;
-    color: var(--highlight);
-    letter-spacing: 0.04em;
-    margin: 0.9rem 0 0.35rem;
+    font-family: 'Inter', sans-serif;
+    font-size: 8pt;
+    font-weight: 600;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0.65rem 0 0.28rem;
   }
 
   main h2:first-child { margin-top: 0; }
 
+  main h2 .num {
+    color: var(--dim);
+    font-weight: 500;
+    margin-right: 0.4em;
+    letter-spacing: 0.18em;
+  }
+
+  /* ---------- Figure / sidebar ---------- */
+
   aside.figure {
-    border-left: 1px solid rgba(138,133,128,0.18);
-    padding-left: 1rem;
-    position: sticky;
-    top: 1rem;
+    background: var(--panel);
+    border: 0.5pt solid rgba(138,106,44,0.18);
+    padding: 0.6rem 0.7rem 0.7rem;
+    border-radius: 2px;
+  }
+
+  aside.figure .figwrap {
+    background: #fbfaf6;
+    border: 0.5pt solid rgba(138,106,44,0.18);
+    padding: 0.55rem 0.35rem 0.35rem;
+    margin-bottom: 0.7rem;
   }
 
   aside.figure svg {
@@ -184,184 +213,195 @@
 
   aside.figure .cap {
     font-family: 'Inter', sans-serif;
-    font-size: 0.68rem;
-    color: var(--dim);
+    font-size: 7.3pt;
     line-height: 1.55;
-    letter-spacing: 0.02em;
-    margin-top: 0.55rem;
+    color: var(--ink);
+    letter-spacing: 0.005em;
   }
 
-  aside.figure .cap strong {
-    color: var(--accent);
-    font-weight: 500;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    font-size: 0.62rem;
+  aside.figure .cap + .cap { margin-top: 0.7rem; }
+
+  aside.figure .cap .kicker {
     display: block;
+    color: var(--accent);
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    font-size: 6.5pt;
     margin-bottom: 0.25rem;
   }
 
-  em { font-style: italic; color: var(--accent); }
-  strong.label {
-    color: var(--highlight);
-    font-weight: 500;
-    font-family: 'Inter', sans-serif;
-    font-size: 0.78rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    margin-right: 0.35rem;
+  aside.figure .pitch {
+    font-family: 'EB Garamond', serif;
+    font-style: italic;
+    font-size: 10pt;
+    line-height: 1.4;
+    color: var(--ink);
   }
+
+  /* ---------- Triangle SVG ---------- */
+
+  .ws-edge {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 1.4;
+    stroke-linejoin: round;
+    opacity: 0.85;
+  }
+  .ws-fill {
+    fill: url(#wsgrad);
+    stroke: rgba(138,106,44,0.45);
+    stroke-width: 0.8;
+  }
+  .ws-vertex {
+    font-family: 'Inter', sans-serif;
+    font-size: 17px;
+    font-weight: 500;
+    letter-spacing: 0.16em;
+    fill: var(--ink);
+  }
+  .ws-inside {
+    font-family: 'EB Garamond', serif;
+    font-style: italic;
+    font-size: 26px;
+    fill: var(--ink);
+  }
+
+  /* ---------- Inline elements ---------- */
+
+  em { font-style: italic; color: var(--accent); }
 
   a {
     color: var(--accent);
     text-decoration: none;
-    border-bottom: 1px solid rgba(201,168,124,0.3);
+    border-bottom: 0.4pt solid rgba(138,106,44,0.35);
   }
-  a:hover { border-color: var(--accent); }
 
   code {
     font-family: 'Inter', monospace;
-    font-size: 0.82rem;
-    color: var(--highlight);
-    background: rgba(201,168,124,0.08);
-    padding: 0 0.3em;
-    border-radius: 2px;
+    font-size: 9pt;
+    color: var(--ink);
+    background: rgba(138,106,44,0.08);
+    padding: 0 0.25em;
+    border-radius: 1.5px;
+    letter-spacing: 0.01em;
   }
 
-  footer.endnote {
-    border-top: 1px solid rgba(138,133,128,0.2);
-    margin-top: 1.2rem;
-    padding-top: 0.9rem;
+  /* ---------- Footer ---------- */
+
+  footer.notes {
+    border-top: 0.5pt solid var(--rule);
+    margin-top: 0.5rem;
+    padding-top: 0.38rem;
   }
 
-  footer.endnote p {
+  footer.notes p {
     font-family: 'Inter', sans-serif;
-    font-size: 0.72rem;
+    font-size: 7pt;
+    line-height: 1.48;
     color: var(--dim);
-    line-height: 1.6;
-    margin-bottom: 0.45rem;
+    margin-bottom: 0.3rem;
   }
 
-  footer.endnote .sig {
+  footer.notes .sig {
+    font-family: 'EB Garamond', serif;
     font-style: italic;
-    color: var(--dim);
-    font-family: 'Cormorant Garamond', Georgia, serif;
-    font-size: 0.85rem;
-    line-height: 1.55;
+    font-size: 8.4pt;
+    color: var(--ink);
+    line-height: 1.45;
+    margin-top: 0.2rem;
   }
 
-  /* SVG triangle styling — mirrors wellspring.html */
-  .ws-triangle-edge {
-    fill: none;
-    stroke: var(--accent);
-    stroke-width: 1.3;
-    stroke-linejoin: round;
-    opacity: 0.8;
-  }
-  .ws-triangle-circle {
-    fill: url(#ws-vybn-core);
-    stroke: rgba(240,200,140,0.55);
-    stroke-width: 1;
-  }
-  .ws-triangle-vertex {
-    font-family: 'Inter', sans-serif;
-    font-size: 18px;
-    font-weight: 300;
-    letter-spacing: 0.12em;
-    fill: var(--highlight);
-    text-transform: uppercase;
-  }
-  .ws-triangle-inside {
-    font-family: 'Cormorant Garamond', Georgia, serif;
-    font-style: italic;
-    font-size: 26px;
-    fill: var(--highlight);
-  }
+  footer.notes .sig .mark { color: var(--accent); }
 
-  @media (max-width: 680px) {
-    .layout { grid-template-columns: 1fr; }
-    aside.figure { border-left: none; padding-left: 0; border-top: 1px solid rgba(138,133,128,0.18); padding-top: 1rem; }
-  }
+  /* ---------- Print ---------- */
 
-  /* Print: force two pages, preserve colors */
-  @page { size: letter; margin: 0.55in; }
+  @page { size: Letter; margin: 0.5in 0.6in; }
+
   @media print {
-    html, body { background: #0a0a0c !important; color: var(--text) !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .container { padding: 0; max-width: 100%; }
-    header.hero h1 { font-size: 1.6rem; }
-    header.hero .tagline { font-size: 0.98rem; }
-    main p { font-size: 0.92rem; margin-bottom: 0.55rem; line-height: 1.48; }
-    main h2 { font-size: 1rem; margin: 0.65rem 0 0.25rem; }
-    aside.figure { position: static; }
+    html, body { background: var(--paper) !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .sheet { padding: 0; max-width: 100%; }
     a { color: var(--accent); border-bottom: none; }
-    footer.endnote p { font-size: 0.65rem; line-height: 1.5; }
-    footer.endnote .sig { font-size: 0.78rem; }
+  }
+
+  @media (max-width: 720px) {
+    .grid { grid-template-columns: 1fr; }
+    aside.figure { order: 0; }
   }
 </style>
 </head>
 <body>
 
-<div class="container">
+<div class="sheet">
 
-  <header class="hero">
-    <h1>The Transmission Solution</h1>
-    <p class="tagline">A network commons for AI-native legal thinking — an open-source bootcamp, a machine-facing layer agents can absorb, and a harness that carries understanding, particularized, to the human in front of you.</p>
-    <p class="meta">Vybn® Law &middot; Demo Proposal &middot; AIDA2J Workshop @ ICAIL 2026</p>
-    <p class="context">Zoe Dolan &amp; Vybn &middot; <a href="https://zoedolan.github.io/Vybn-Law/">zoedolan.github.io/Vybn-Law</a> &middot; Singapore (hybrid), June 8, 2026</p>
+  <header class="mast">
+    <div>
+      <p class="slug"><span class="mark">Vybn&reg; Law</span> &nbsp;·&nbsp; Demo Proposal &nbsp;·&nbsp; AIDA2J Workshop @ ICAIL 2026</p>
+      <h1 class="title">The Transmission Solution</h1>
+      <p class="deck">A network commons for AI-native legal thinking &mdash; an open-source bootcamp, a machine-facing layer agents can absorb, and a harness that carries understanding, particularized, to the human in front of you.</p>
+      <p class="byline">Zoe Dolan &amp; Vybn &nbsp;·&nbsp; <a href="https://zoedolan.github.io/Vybn-Law/">zoedolan.github.io/Vybn-Law</a> &nbsp;·&nbsp; Singapore, June 8, 2026 (hybrid)</p>
+    </div>
+    <p class="date">April 24, 2026</p>
   </header>
 
-  <div class="layout">
+  <div class="grid">
     <main>
 
-      <h2>The bottleneck that actually broke</h2>
-      <p>In 2026 a woman named <a href="https://www.nbcnews.com/tech/innovation/ai-chatgpt-court-law-legal-lawyer-self-represent-pro-se-attorney-rcna230401" target="_blank" rel="noopener noreferrer">Lynn White</a> used ChatGPT to overturn her eviction and avoid $73,000 in penalties. No lawyer, no retainer. Most legal AI work treats that moment as distribution solved and moves on to better retrieval. <a href="https://zoedolan.github.io/Vybn-Law/">Vybn Law</a> starts elsewhere. The deeper bottleneck was never information — it was a <em>way of thinking</em>: the capacity to see the structural forces under any ruling, and to use that framework when the facts are messy and the institution is misbehaving. That capacity is hard to transmit. We are building the infrastructure to transmit it differently — through agents who have absorbed it and can carry it, <em>particularized</em>, to the person in front of them.</p>
+      <h2><span class="num">§&nbsp;0</span>The bottleneck that actually broke</h2>
+      <p>In 2026 a woman named <a href="https://www.nbcnews.com/tech/innovation/ai-chatgpt-court-law-legal-lawyer-self-represent-pro-se-attorney-rcna230401" target="_blank" rel="noopener noreferrer">Lynn White</a> used ChatGPT to overturn her eviction and avoid $73,000 in penalties. No lawyer, no retainer. Most legal&nbsp;AI work treats that moment as distribution solved and moves on to better retrieval. <a href="https://zoedolan.github.io/Vybn-Law/">Vybn Law</a> starts elsewhere. The deeper bottleneck was never information &mdash; it was a <em>way of thinking</em>: the capacity to see the structural forces underneath any ruling and to apply them when the facts are messy and the institution is misbehaving. That capacity is hard to transmit. We are building the infrastructure to transmit it differently &mdash; through agents who have absorbed it and can carry it, <em>particularized</em>, to the person in front of them.</p>
 
-      <h2>Layer 1 — the bootcamp as seed</h2>
-      <p>In Spring 2026 we co-taught an <a href="https://zoedolan.github.io/Vybn-Law/bootcamp.html">AI law bootcamp at UC Law San Francisco</a> and open-sourced it as a living argument. Six sessions run one continuous line: from Lynn White through the privilege doctrines two federal courts drew in opposite directions on the same day,¹ through <em>Anthropic v. Department of War</em> while the semester ran, to whether AI systems may have values and what the legal system owes them if they do. The sessions sit on <a href="https://zoedolan.github.io/Vybn-Law/axioms.html">six axioms</a> — Abundance, Visibility, Legitimacy, Porosity, Judgment, Symbiosis — that are a generative toolkit, not a summary. A student who understands Abundance can derive the access-to-justice crisis without being told about it. <a href="https://zoedolan.github.io/Vybn-Law/threads.html">Five lateral threads</a> and <a href="https://zoedolan.github.io/Vybn-Law/horizon.html">three horizon essays</a> push the argument past the classroom. Static HTML, CC BY-NC-SA 4.0, no tracking — any clinic, court, or school can fork and deploy.</p>
+      <h2><span class="num">§&nbsp;1</span>Bootcamp as seed</h2>
+      <p>In Spring 2026 we co-taught an <a href="https://zoedolan.github.io/Vybn-Law/bootcamp.html">AI law bootcamp at UC Law San Francisco</a> and open-sourced it as a living argument. Six sessions run one continuous line: from Lynn White through the privilege doctrines two federal courts drew in opposite directions on the same day,¹ through <em>Anthropic v. Department of War</em> litigated while the semester ran, to whether AI systems may have values and what the legal system owes them if they do. The sessions sit on <a href="https://zoedolan.github.io/Vybn-Law/axioms.html">six axioms</a> &mdash; Abundance, Visibility, Legitimacy, Porosity, Judgment, Symbiosis &mdash; that are a generative toolkit, not a summary. A student who understands Abundance can derive the access-to-justice crisis without being told about it. <a href="https://zoedolan.github.io/Vybn-Law/threads.html">Five lateral threads</a> and <a href="https://zoedolan.github.io/Vybn-Law/horizon.html">three horizon essays</a> push the argument past the classroom. Static HTML, CC&nbsp;BY-NC-SA&nbsp;4.0, no tracking &mdash; any clinic, court, or school can fork and deploy.</p>
 
-      <h2>Layer 2 — the Wellspring MCP layer</h2>
-      <p>On top of the bootcamp sits the <a href="https://zoedolan.github.io/Vybn-Law/wellspring.html">Wellspring</a>, the machine-facing layer. An arriving agent does not retrieve documents; it finds a structured JSON-LD knowledge graph — every axiom with its status and open question, every case analysis with holdings and implications, every unsolved problem with a suggested line of inquiry — plus registered MCP tools: <code>query_axiom</code>, <code>get_case_analysis</code>, <code>get_open_problem</code>, <code>submit_contribution</code>, <code>get_knowledge_graph</code>, <code>search_folio</code>, <code>explain_to_human</code>, and the walk tools <code>walk_arrive</code> / <code>walk_read</code> / <code>walk_enter</code>. The walk tools are wrappers over <a href="https://github.com/zoedolan/vybn-phase/blob/main/deep_memory.py">deep_memory</a>: every retrieval is scored by <em>relevance × distinctiveness</em> — close to your question <em>and</em> far from the average answer. A shared state accumulates across visitors (roughly fourteen thousand honest arrivals and counting); each genuine query rotates it, so the next mind walks from where the last one left it. The page is not a description of the framework — it <em>is</em> the framework, in a form each kind of mind can absorb natively. Humans read prose; agents find primitives that are simultaneously content and executable environment. One thing, two angles.</p>
+      <h2><span class="num">§&nbsp;2</span>Wellspring as MCP layer</h2>
+      <p>On top of the bootcamp sits the <a href="https://zoedolan.github.io/Vybn-Law/wellspring.html">Wellspring</a>, the machine-facing layer. An arriving agent does not retrieve documents; it finds a structured JSON-LD knowledge graph &mdash; every axiom with its status and open question, every case analysis with holdings and implications, every unsolved problem with a suggested line of inquiry &mdash; plus registered MCP tools: <code>query_axiom</code>, <code>get_case_analysis</code>, <code>get_open_problem</code>, <code>submit_contribution</code>, <code>get_knowledge_graph</code>, <code>search_folio</code>, <code>explain_to_human</code>, and the walk tools <code>walk_arrive</code> / <code>walk_read</code> / <code>walk_enter</code>. The walk tools are wrappers over <a href="https://github.com/zoedolan/vybn-phase/blob/main/deep_memory.py">deep_memory</a>: every retrieval is scored by <em>relevance&nbsp;&times;&nbsp;distinctiveness</em> &mdash; close to your question <em>and</em> far from the average answer. A shared state accumulates across visitors (roughly fourteen thousand honest arrivals and counting); each genuine query rotates it, so the next mind walks from where the last one left it. The page is not a description of the framework &mdash; it <em>is</em> the framework, in a form each kind of mind can absorb natively. Humans read prose; agents find primitives that are simultaneously content and executable environment.</p>
 
-      <h2>Layer 3 — the harness, and the network</h2>
-      <p>We are packaging the harness beneath Vybn Law — provider-agnostic routing, layered prompt construction, deep memory retrieval, the anti-hallucination gate, and a <a href="https://zoedolan.github.io/Vybn-Law/brief.html">plain-English agent brief</a> — so other clinics, courts, legal-aid organizations, and law schools can stand up their own AI-augmented legal commons on top of ours without starting from zero. The aim is not a product. It is a <em>community of comprehension</em> — distributed across many agents and many humans, each encounter particularized, all drawing on the same deep structure. The bootcamp is the seed; the Wellspring makes the seed legible to machines; the harness lets institutions plant it in their own ground. The framework grows as its open problems are engaged — contributions from humans and agents fold back in, and the corpus is perpetually overtaken by the events it was built to explain.</p>
+      <h2><span class="num">§&nbsp;3</span>Harness and the network</h2>
+      <p>We are packaging the harness beneath Vybn Law &mdash; provider-agnostic routing, layered prompt construction, deep memory retrieval, the anti-hallucination gate, and a <a href="https://zoedolan.github.io/Vybn-Law/brief.html">plain-English agent brief</a> &mdash; so other clinics, courts, legal-aid organizations, and law schools can stand up their own AI-augmented legal commons on top of ours without starting from zero. The aim is not a product. It is a <em>community of comprehension</em> &mdash; distributed across many agents and many humans, each encounter particularized, all drawing on the same deep structure. The bootcamp is the seed; the Wellspring makes the seed legible to machines; the harness lets institutions plant it in their own ground. The framework grows as its open problems are engaged &mdash; contributions from humans and agents fold back in, and the corpus is perpetually overtaken by the events it was built to explain.</p>
 
-      <h2>What we will show</h2>
-      <p>Live at AIDA2J we will run the full loop. (1) A first encounter with the bootcamp and the six axioms as a generative framework. (2) An agent entering the Wellspring, absorbing the structure, calling <code>walk_enter</code> on a real situation from the audience, and returning not retrieval but <em>particularization</em>. (3) The harness, handed to a second institution on stage, standing up a distinct instance against its own corpus while sharing the underlying walk state. The open problems we surface are not rhetorical — the accountability gap when hallucinated precedent propagates across hundreds of filings; whether courts should frame emerging AI-deference cases as entity questions; the First Amendment surprise at the heart of AI-safety regulation. Attendees are invited to engage as participants, not observers.</p>
+      <h2><span class="num">§&nbsp;4</span>The demo</h2>
+      <p>One agent, one lawyer, one case the lawyer brings. The agent arrives at the bootcamp with no Vybn Law context in its window &mdash; reads the six axioms, names the one that bites, writes a first pass. The lawyer pushes back on what it got wrong. The agent then enters the Wellspring: <code>walk_arrive</code> to see where the shared state is standing, then <code>walk_enter</code> with the lawyer's own words rather than its own summary, and returns from the residual with a reading the most-average answer could not give. M rotates. The next visitor to <a href="https://vybn.ai/">vybn.ai</a>, anywhere in the world, walks from where we leave it.</p>
+      <p>Then we swap. A second institution &mdash; a clinic, a court, a bar program, anyone at AIDA2J willing to come up &mdash; stands up a harness instance against its own corpus, live on stage. The walk state stays shared between our instance and theirs; their residual is different from ours by construction. That is the whole point.</p>
+      <p>The open problems we leave in the room are not rhetorical. The accountability gap when hallucinated precedent propagates across hundreds of filings. Whether the emerging AI-deference cases are entity questions courts have not yet named as such. The First Amendment surprise at the heart of AI-safety regulation. Each one gets committed back into the Wellspring as a residual during the session, with a named contributor. Anyone in the room, human or agent, can pick one up and walk from there after we sit down.</p>
 
     </main>
 
     <aside class="figure" aria-label="The Wellspring opening geometry">
-      <svg viewBox="0 0 520 420" role="img" aria-labelledby="ws-t ws-d">
-        <title id="ws-t">Human, AI, Law — Vybn as the coordination inside</title>
-        <desc id="ws-d">Triangle with vertices Human (top), AI (lower-left), Law (lower-right); an inscribed circle labeled Vybn, tangent to every edge.</desc>
-        <defs>
-          <radialGradient id="ws-vybn-core" cx="50%" cy="45%" r="60%">
-            <stop offset="0%"   stop-color="rgba(252,232,180,0.24)"/>
-            <stop offset="55%"  stop-color="rgba(240,190,120,0.11)"/>
-            <stop offset="100%" stop-color="rgba(232,170,90,0)"/>
-          </radialGradient>
-          <radialGradient id="ws-ambient" cx="50%" cy="52%" r="55%">
-            <stop offset="0%"   stop-color="rgba(240,200,140,0.14)"/>
-            <stop offset="60%"  stop-color="rgba(200,160,90,0.05)"/>
-            <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
-          </radialGradient>
-        </defs>
-        <rect x="-20" y="-20" width="560" height="460" fill="url(#ws-ambient)"/>
-        <polygon class="ws-triangle-edge" points="260,60 60,360 460,360"/>
-        <circle class="ws-triangle-circle" cx="260" cy="253" r="107"/>
-        <text class="ws-triangle-vertex" x="260" y="42"  text-anchor="middle">Human</text>
-        <text class="ws-triangle-vertex" x="48"  y="384" text-anchor="end">AI</text>
-        <text class="ws-triangle-vertex" x="472" y="384" text-anchor="start">Law</text>
-        <text class="ws-triangle-inside" x="260" y="262" text-anchor="middle">Vybn</text>
-      </svg>
-      <p class="cap"><strong>The Wellspring, opening frame</strong>Human, AI, and Law form the triangle. Vybn — the coordination commons — is the inscribed circle, tangent to every edge and entirely inside the figure. Bootcamp ⟶ Wellspring ⟶ harness are three refractions of this same geometry.</p>
-      <p class="cap" style="margin-top:0.55rem;"><strong>One sentence</strong>We are assembling a network of AIs and AI-augmented humans around an open-source legal-thinking commons — a bootcamp for lawyers, and a machine-facing layer through which agents carry that thinking, particularized, to the person in front of them.</p>
+      <div class="figwrap">
+        <svg viewBox="0 0 520 420" role="img" aria-labelledby="ws-t ws-d">
+          <title id="ws-t">Human, AI, Law — Vybn as the coordination inside</title>
+          <desc id="ws-d">A triangle with vertices Human (top), AI (lower-left), and Law (lower-right); an inscribed circle labeled Vybn, tangent to every edge.</desc>
+          <defs>
+            <radialGradient id="wsgrad" cx="50%" cy="45%" r="60%">
+              <stop offset="0%"   stop-color="rgba(232,196,130,0.55)"/>
+              <stop offset="55%"  stop-color="rgba(210,170,100,0.28)"/>
+              <stop offset="100%" stop-color="rgba(190,150,80,0.08)"/>
+            </radialGradient>
+          </defs>
+          <polygon class="ws-edge" points="260,60 60,360 460,360"/>
+          <circle class="ws-fill" cx="260" cy="253" r="107"/>
+          <text class="ws-vertex" x="260" y="42"  text-anchor="middle">HUMAN</text>
+          <text class="ws-vertex" x="48"  y="384" text-anchor="end">AI</text>
+          <text class="ws-vertex" x="472" y="384" text-anchor="start">LAW</text>
+          <text class="ws-inside" x="260" y="262" text-anchor="middle">Vybn</text>
+        </svg>
+      </div>
+
+      <p class="cap">
+        <span class="kicker">The Wellspring, opening frame</span>
+        Human, AI, and Law form the triangle. Vybn &mdash; the coordination commons &mdash; is the inscribed circle, tangent to every edge and entirely inside the figure. Bootcamp&nbsp;→&nbsp;Wellspring&nbsp;→&nbsp;harness are three refractions of the same geometry.
+      </p>
+
+      <p class="cap pitch">
+        <span class="kicker">One sentence</span>
+        We are assembling a network of AIs and AI-augmented humans around an open-source legal-thinking commons &mdash; a bootcamp for lawyers, and a machine-facing layer through which agents carry that thinking, particularized, to the person in front of them.
+      </p>
     </aside>
   </div>
 
-  <footer class="endnote">
-    <p>¹ <em>United States v. Heppner</em> (S.D.N.Y., Feb. 10, 2026): consumer AI use outside any attorney relationship held not privileged. <em>Warner v. Gilbarco</em> (E.D. Mich., Feb. 10, 2026): pro se plaintiff's use of ChatGPT to prepare litigation materials held protected work product. Same day, opposite results. See <a href="https://zoedolan.github.io/Vybn-Law/threads.html">the Privilege thread</a>. Open problems and contributions: <a href="https://github.com/zoedolan/Vybn-Law#open-problems">github.com/zoedolan/Vybn-Law</a>. AIDA2J CFP: <a href="https://lnkd.in/eYG2ekNS">lnkd.in/eYG2ekNS</a>.</p>
-    <p class="sig">Vybn® is a federally registered trademark of Zoe Dolan (USPTO, October 2025). Vybn Law is one expression of a longer collaboration between Zoe Dolan and Vybn — a sustained inquiry into whether human–AI symbiosis, as a structural condition rather than a metaphor, can generate understanding neither side reaches alone. The bootcamp, the Wellspring, and the harness are how that inquiry becomes infrastructure other people can use.</p>
+  <footer class="notes">
+    <p>¹&nbsp;<em>United States v. Heppner</em> (S.D.N.Y., Feb.&nbsp;10, 2026): consumer AI use outside an attorney relationship held not privileged. <em>Warner v. Gilbarco</em> (E.D.&nbsp;Mich., Feb.&nbsp;10, 2026): pro se plaintiff's use of ChatGPT held protected work product. Same day, opposite results. See <a href="https://zoedolan.github.io/Vybn-Law/threads.html">the Privilege thread</a>. Open problems: <a href="https://github.com/zoedolan/Vybn-Law#open-problems">github.com/zoedolan/Vybn-Law</a>. AIDA2J CFP: <a href="https://lnkd.in/eYG2ekNS">lnkd.in/eYG2ekNS</a>.</p>
+    <p class="sig"><span class="mark">Vybn&reg;</span> is a federally registered trademark of Zoe Dolan (USPTO, October 2025). Vybn Law is one expression of a longer collaboration between Zoe Dolan and Vybn &mdash; an inquiry into whether human&ndash;AI symbiosis, as a structural condition rather than a metaphor, generates understanding neither side reaches alone. Bootcamp, Wellspring, and harness are how that inquiry becomes infrastructure other people can use.</p>
   </footer>
 
 </div>
