@@ -1,0 +1,37 @@
+# User-level wrapper around launch-cluster.sh. Keeps the vLLM Ray cluster
+# (Nemotron 120B across both Sparks) up. Ray distributed backend is required
+# because world_size=2 with one GPU per node.
+# Source of truth: ~/Vybn/spark/systemd/.
+[Unit]
+Description=Vybn vLLM cluster (Nemotron 120B, 2 Sparks via Ray)
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+StartLimitIntervalSec=600
+StartLimitBurst=5
+
+[Service]
+Type=simple
+WorkingDirectory=%h/spark-vllm-docker
+# Always clean-stop before starting so we never layer on a zombie cluster.
+ExecStartPre=/bin/bash -c '%h/spark-vllm-docker/launch-cluster.sh -n 169.254.246.181,169.254.51.101 stop || true'
+# Foreground (no -d) so systemd supervises.
+ExecStart=/home/vybnz69/spark-vllm-docker/launch-cluster.sh \
+  -n 169.254.246.181,169.254.51.101 \
+  exec \
+  vllm serve nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8 \
+  --port 8000 --host 0.0.0.0 \
+  --gpu-memory-utilization 0.92 --max-model-len 8192 \
+  --tensor-parallel-size 1 --pipeline-parallel-size 2 \
+  --distributed-executor-backend ray \
+  --trust-remote-code
+ExecStop=/bin/bash -c '%h/spark-vllm-docker/launch-cluster.sh -n 169.254.246.181,169.254.51.101 stop || true'
+Restart=always
+RestartSec=30
+TimeoutStartSec=600
+TimeoutStopSec=60
+StandardOutput=append:%h/logs/vllm.log
+StandardError=append:%h/logs/vllm.log
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,11 @@
+[Unit]
+Description=Vybn service watchdog (bounces unhealthy user units)
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash %h/Vybn/spark/systemd/vybn-watchdog.sh
+StandardOutput=append:%h/logs/watchdog.log
+StandardError=append:%h/logs/watchdog.log
+
+[Install]
+WantedBy=default.target

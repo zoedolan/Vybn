@@ -1,0 +1,27 @@
+# User-level unit (no sudo). Source of truth: ~/Vybn/spark/systemd/.
+# Install:  systemctl --user enable --now vybn-deep-memory
+# Pre-flight clears any squatter on :8100 so we never hit StartLimitBurst.
+[Unit]
+Description=Vybn deep memory API (deep_memory.py on :8100)
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=20
+
+[Service]
+Type=simple
+EnvironmentFile=-%h/.config/vybn/memory_token.env
+WorkingDirectory=%h/vybn-phase
+# Kill anything squatting on 8100 before bind. Swallow errors.
+ExecStartPre=/bin/sh -c 'fuser -k 8100/tcp >/dev/null 2>&1 || true; sleep 1'
+# Bind on 0.0.0.0 like start_living_process.sh does. Tailscale handles isolation.
+ExecStart=/usr/bin/python3 %h/vybn-phase/deep_memory.py --serve --host 0.0.0.0 --port 8100
+Restart=always
+RestartSec=5
+TimeoutStartSec=60
+TimeoutStopSec=15
+StandardOutput=append:%h/logs/deep_memory.log
+StandardError=append:%h/logs/deep_memory.log
+
+[Install]
+WantedBy=default.target

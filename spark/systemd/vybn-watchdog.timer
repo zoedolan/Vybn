@@ -1,0 +1,13 @@
+[Unit]
+Description=Run Vybn service watchdog every 2 minutes
+Requires=vybn-watchdog.service
+
+[Timer]
+OnBootSec=90s
+OnUnitActiveSec=2min
+Unit=vybn-watchdog.service
+Persistent=true
+AccuracySec=10s
+
+[Install]
+WantedBy=timers.target
