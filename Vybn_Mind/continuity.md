@@ -82,3 +82,37 @@ If you want: try rendering continuity_core.md as a compact graph structure (YAML
 - Vybn-Law: merge `vybnception-v0` → master
 - Phase-6 coupling follow-up (smoother ON trajectories)
 - absorb_gate corpus-query (still uses VYBN_ABSORB_REASON env var)
+
+
+---
+
+## 2026-04-24 proposal-chat overlay fix (Sonnet 4.6)
+
+**What happened:**
+- Zoe reported all three proposal chats dead: bootcamp, ICLC, ODL all returning 400 Bad Request from vLLM. Error swallowed in portal log as generic httpx failure, no detail surfaced.
+- Root cause: CONTEXT_OVERLAYS for the three proposal pages embed the full proposal page as authoritative ground truth. Measured token sizes (Nemotron tokenizer, full system prompt including base + overlay + substrate + injection):
+  - iclc = 6,513 tokens
+  - bootcamp = 6,036 tokens
+  - odl = 5,560 tokens
+  - vybn-law = 3,765 tokens
+  - enclosure = 2,611 tokens
+- max_model_len = 8,192. With MAX_TOKENS=2048 reserved for output, input budget was 6,144 — iclc alone exceeded it before RAG or user message were added.
+- Two-pass fix landed as one commit:
+  1. When overlay.prompt + overlay.final_instruction > 8,000 chars, skip RAG retrieval (overlay already carries the needed context).
+  2. Also drop max_tokens 2,048 → 1,024 and cap history 8 turns → 4 turns when the same flag is set.
+- Verified all four contexts via https://api.vybn.ai/api/chat: bootcamp / iclc / odl / vybn-law all stream cleanly, 0 errors, all hit [DONE]. Voice reads right — each names its own proposal and invites the visitor.
+
+**Key insight:** The original preferred-fix described in-context (“suppress RAG when overlay is large”) was necessary but not sufficient. The overlays are so large they overflow even with RAG gone. Had to trim output budget and history on the same flag. Lesson: measure full system prompt with the actual tokenizer (hit /tokenize on vLLM directly) before declaring a budget fix done. The chars / 3.3 approximation under-counted by 20% for these overlays.
+
+**Commit:** Vybn `de85c1c7` → rebased onto `5e956f65` on origin/main. Single file: origins_portal_api_v4.py.
+
+**Uncommitted work still in working dir:**
+- `/api/manifold/points` endpoint (lines ~3206-3240). Unchanged from prior session.
+- `stash@{0}` (spark/harness structural claim guard) — still present.
+
+**Owed (carried from prior sessions, unchanged):**
+- Vybn-Law: merge `vybnception-v0` → master
+- Phase-6 coupling follow-up (smoother ON trajectories)
+- absorb_gate corpus-query (still uses VYBN_ABSORB_REASON env var)
+- Zoe to run: `sudo systemctl disable --now vybn-deep-memory.service vybn-walk-daemon.service` and `sudo systemctl mask vybn-deep-memory.service vybn-walk-daemon.service` (installer flagged these previously)
+
