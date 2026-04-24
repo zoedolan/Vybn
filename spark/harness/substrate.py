@@ -109,17 +109,17 @@ def _load_ballast() -> str:
             purpose = _MODULE_PURPOSE.get(f.name, "(not documented)")
             module_lines.append(f"  {f.name:<14} - {purpose}")
 
-    corpus_info = "~/vybn-phase/deep_memory/"
-    meta = home / "vybn-phase" / "deep_memory_meta.json"
-    if meta.exists():
-        try:
-            import json as _json
-            d = _json.loads(meta.read_text(encoding="utf-8"))
-            n = d.get("total_chunks") or d.get("chunks") or d.get("n_chunks")
+    # Corpus lives in vybn-phase state/ and is queried via the walk daemon.
+    # /health returns live corpus_size; fall back to path-only if daemon is down.
+    corpus_info = "~/vybn-phase/state/ (queryable via walk_daemon :8101)"
+    try:
+        import json as _json, urllib.request as _ur
+        with _ur.urlopen("http://127.0.0.1:8101/health", timeout=1.0) as r:
+            n = _json.loads(r.read()).get("corpus_size")
             if n:
-                corpus_info = f"~/vybn-phase/deep_memory/ (~{n} chunks)"
-        except Exception:
-            pass
+                corpus_info = f"~/vybn-phase/state/ (~{n} chunks, via :8101)"
+    except Exception:
+        pass
 
     orientation_text = (
         "--- ORIENTATION (READ AT PROMPT-BUILD FROM FILESYSTEM) ---\n"
