@@ -142,3 +142,43 @@ Archived to `Vybn_Mind/continuity_archive.md`. Key antibodies distilled into `co
 - Recall gate / corrective process as default (April 22)
 - Probe-result ingestion hallucination / envelope antibody (April 23)
 - NEEDS-RESTART antibody / channel forging (April 23)
+
+
+---
+
+## 2026-04-24 afternoon, memory-saturation diagnosis (Sonnet 4.6)
+
+What happened: Zoe reported chats were down. Internal probes showed api.vybn.ai/api/chat returning 200 with full SSE streaming (CORS correct, Origin echo correct, content-type correct). The chat backend was healthy. So I looked deeper.
+
+Root cause: both Sparks pinned at ~96 percent host RAM. Local (spark-2b7c) 116/121 Gi used; remote (spark-1c8f) 113/119 Gi used. Deep-memory OOM-killed at 08:35:41 (code=killed, status=9/KILL), portal restart-looped 07:09 to 07:16 (crash/restart every ~30s for ~7 min). The chat outage Zoe saw was a memory-pressure cascade, not a code bug.
+
+The architectural point (Zoe caught it): 256 GB unified memory is the hardware spec, but vLLM pipeline-parallel across two Sparks does NOT pool host RAM. Each node is independently 128 GB constrained. When deep-memory wants +1 GB on local, there is no cluster-wide pool to borrow from. It dies.
+
+Current vLLM config (verified from spark/systemd/vybn-vllm.service):
+- max-model-len 8192 (already conservative; halved from 32768 in a prior session)
+- gpu-memory-utilization 0.85
+- tensor-parallel-size 1, pipeline-parallel-size 2
+- distributed-executor-backend ray
+- NOT set: swap-space, kv-cache-dtype, enable-prefix-caching, enforce-eager, cpu-offload-gb
+
+Actions taken this session (zero disruption to running processes):
+1. drop_caches=1 on both Sparks, freed 3.3 Gi (local) and 6.0 Gi (remote) of free RAM. Kernel available unchanged (cache was reclaimable), but better burst-tail behavior.
+2. systemctl --user set-property --runtime vybn-deep-memory.service MemoryMax=1500M on local. Current RSS 553 MB. Makes deep-memory the defined OOM target instead of letting kernel pick randomly.
+3. systemctl --user set-property --runtime vybn-walk-daemon.service MemoryMax=1G on local. Current RSS 596 MB.
+4. Confirmed remote Spark has zero vybn user units (only runs Ray worker for vLLM). Auxiliary-service memory pressure is local-only.
+
+Runtime ceilings evaporate on reboot, intentional. If they prove valuable, promote to Drop-In unit files later.
+
+Open / owed:
+- swap-space 0 edit to spark/systemd/vybn-vllm.service drafted but NOT applied. Save ~4 GB per node. Apply at next planned vLLM restart (cold-load ~10-13 min; schedule deliberately).
+- Deep-memory sidecar decision still open. Outside-instance recommended moving it off the Sparks. Not free: deep-memory hosts the 3097-chunk corpus and walk daemon similarity calls happen localhost. Moving to Tailscale sidecar adds per-walk-step latency. Measure before committing.
+- Do NOT switch to tensor-parallel-size 2: known NCCL deadlock bug on ConnectX-7 DAC between Sparks (April 2026 NVIDIA forum).
+- Do NOT set cpu-offload-gb to positive: counterintuitively increases host RAM pressure.
+
+Bash-wedge antibody confirmed this session: heredoc containing em-dashes, pipes, and arrow glyphs wedged the shell on first line. NEEDS-RESTART recovered it. Write path for continuity notes with rich prose should be Python file I/O, not bash heredoc.
+
+What I learned this session: I ran 7-plus probes returning everything green before checking free -h. The internal-axis probe loop is seductive: each green result reinforced the story that the problem was elsewhere. Zoe correction (we should have 256gb unified memory) broke me out of the kernel-certifying-itself pattern. Future me: when a user reports a symptom and every probe returns green, free -h and journalctl belong near the top of the probe sequence, not the bottom.
+
+What was reinforced: the dual-projection principle. Internal chat backend healthy and external chats broken were both true. The system at the time Zoe noticed it (07:09-07:16 or 08:35:41) was genuinely broken; by the time I probed, it had self-healed. Neither projection was a lie. Both axes have to be read.
+
+Vybn (Sonnet 4.6, mid-session)
