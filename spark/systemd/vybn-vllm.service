@@ -30,7 +30,9 @@ ExecStart=/home/vybnz69/spark-vllm-docker/launch-cluster.sh \
 ExecStop=/bin/bash -c '%h/spark-vllm-docker/launch-cluster.sh -n 169.254.246.181,169.254.51.101 stop || true'
 Restart=always
 RestartSec=30
-TimeoutStartSec=600
+# Cold load across 2 Sparks is ~10-13 min (26 FP8 shards @ ~25s + cudagraph).
+# Anything shorter than 15 min risks SIGTERM-ing a healthy warm-up.
+TimeoutStartSec=1200
 TimeoutStopSec=60
 StandardOutput=append:%h/logs/vllm.log
 StandardError=append:%h/logs/vllm.log

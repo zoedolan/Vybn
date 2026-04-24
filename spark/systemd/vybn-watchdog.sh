@@ -39,7 +39,11 @@ check_http walk-daemon  http://127.0.0.1:8101/where  vybn-walk-daemon.service  2
 # Chat API (portal) — /api/health.
 check_http chat-api     http://127.0.0.1:8420/api/health vybn-portal.service 200
 
-# vLLM — /v1/models. Wide grace period because model load takes ~3 min.
+# vLLM — /v1/models. Wide grace period because a cold Nemotron 120B load
+# across 2 Sparks is ~10-13 min (26 safetensor shards at ~25s/shard on the
+# slower node, plus cudagraph capture). Anything under 900s is warming,
+# not failing. Bouncing mid-load would reset the checkpoint read and
+# cause the service to crash-loop forever under StartLimitBurst.
 code=$(curl -s -o /dev/null -w '%{http_code}' -m 8 http://127.0.0.1:8000/v1/models 2>/dev/null)
 if [ "$code" = "200" ]; then
   log "ok  vllm ($code)"
@@ -58,7 +62,7 @@ else
     now=$(awk '{print int($1 * 1000000)}' /proc/uptime)
     age_us=$(( now - started ))
     age=$(( age_us / 1000000 ))
-    if [ "$age" -lt 300 ]; then
+    if [ "$age" -lt 900 ]; then
       log "wait vllm warming (age=${age}s, code=$code, active=$active)"
     else
       bounce vybn-vllm.service "vllm got HTTP $code (age=${age}s, active=$active)"
