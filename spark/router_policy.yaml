@@ -279,7 +279,7 @@ fallback_chain:
   claude-opus-4-7: [claude-opus-4-6, claude-sonnet-4-6]
   claude-opus-4-6: [claude-sonnet-4-6]
   claude-sonnet-4-6: [claude-opus-4-6]
-  gpt-5.5: [claude-sonnet-4-6, claude-opus-4-6]
+  gpt-5.5-pro: [claude-sonnet-4-6, claude-opus-4-6]
   # Local Nemotron roles fall to Sonnet if vLLM is down so a bare
   # 'hi' or 'which model are you?' never hard-fails.
   nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8: [claude-sonnet-4-6]
@@ -301,8 +301,8 @@ model_aliases:
   "@sonnet46": claude-sonnet-4-6
   "@nemotron": nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
   "@local": nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
-  "@gpt": gpt-5.5
-  "@gpt5": gpt-5.5
+  "@gpt": gpt-5.5-pro
+  "@gpt5": gpt-5.5-pro
 
 budgets:
   per_turn_usd: 2.0
