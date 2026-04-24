@@ -284,6 +284,7 @@ fallback_chain:
   # 'hi' or 'which model are you?' never hard-fails.
   nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8: [claude-sonnet-4-6]
 
+  gpt-5.5-pro: [gpt-5.5]
 # Round 5: @alias model pin. Prefix any turn with @<alias> to force a
 # specific model for that turn. Role determination is unchanged — only
 # the model is swapped. Useful for quick A/B on voice/vibe or for pinning
@@ -303,6 +304,7 @@ model_aliases:
   "@local": nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
   "@gpt": gpt-5.5
   "@gpt5": gpt-5.5
+      "@gpro": gpt-5.5-pro
 
 budgets:
   per_turn_usd: 2.0
