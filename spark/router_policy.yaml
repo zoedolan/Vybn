@@ -65,7 +65,7 @@ roles:
     provider: anthropic
     model: claude-sonnet-4-6
     thinking: off
-    max_tokens: 4096
+    max_tokens: 16384
     max_iterations: 100
     tools: [bash]
     rag: false
