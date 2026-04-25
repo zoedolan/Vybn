@@ -245,14 +245,17 @@ class TestOpenAIProviderHardening(unittest.TestCase):
         self.assertEqual(data["choices"][0]["message"]["content"], "from-requests")
 
     def test_http_error_text_includes_status(self):
-        # Force ImportError on openai so provider goes straight to requests
-        sys.modules["openai"] = types.ModuleType("openai")  # no OpenAI attr
-        # Remove the attribute lookup for OpenAI
-        del sys.modules["openai"]
+        # Force ImportError on openai so provider goes straight to requests.
+        # We inject a sentinel module whose attribute access raises ImportError,
+        # which is what `from openai import OpenAI` triggers when the package
+        # is present but we want to simulate its absence.
+        class _ImportErrorModule:
+            def __getattr__(self, name):
+                raise ImportError("mocked ImportError for openai")
 
-        # Insert a stub that raises ImportError on `from openai import OpenAI`
-        # by simply not creating the module at all; the import inside the
-        # provider will fail — which is the code path we want.
+        _real_openai = sys.modules.get("openai")
+        sys.modules["openai"] = _ImportErrorModule()
+
         requests_mod = types.ModuleType("requests")
 
         def fake_post(url, json=None, headers=None, timeout=None):
