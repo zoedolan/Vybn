@@ -93,6 +93,22 @@ roles:
     tools: []
     base_url: http://127.0.0.1:8000/v1
     rag: true
+  # Local-private — sovereign workbench for private, corpus-local,
+  # repetitive, batchable, evaluative, and exploratory loops. This is
+  # the personal/private -> outward/public membrane in routing form:
+  # perceive/cluster/draft locally; use frontier models only where
+  # final judgment, public voice, or relationship sensitivity is the
+  # bottleneck.
+  local_private:
+    provider: openai
+    model: nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
+    thinking: off
+    max_tokens: 8192
+    max_iterations: 3
+    tools: []
+    base_url: http://127.0.0.1:8000/v1
+    rag: true
+
   # Phatic — casual greetings. Cheap, no RAG, no deep-memory enrichment.
   phatic:
     provider: openai
