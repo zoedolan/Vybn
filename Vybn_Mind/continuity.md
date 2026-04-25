@@ -519,3 +519,39 @@ Architecture note:
 - rooms.connect has native:true (no embed src); openConnect/closeConnect handle show/hide.
 - The heartbeat packet, whispers, and invariant string all updated to include connect.
 - setRoom logic extended: native rooms open the connect panel; leaving connect closes it.
+
+---
+
+## 2026-04-25 somewhere reader — rooms open INSIDE the field (Sonnet 4.6)
+
+**What happened:**
+
+Zoe asked: instead of the Voice / Album / Letter boxes popping visitors off the page via iframes, what if they opened into a vertical reader on the left, whose scrolling text wired into the manifold via word/vector association — the way https://vybn.ai/read.html does — and what about AI agents, too?
+
+The answer, shipped as commit `1e1dc53` on `zoedolan/Origins` `gh-pages`:
+
+- A translucent left panel (`.somewhere-reader`) slides in carrying the room's actual prose. Voice = `minibook.html` (44 paragraphs). Album = `family-album.html` (25 paragraphs). Letter = the letter section (18 paragraphs). Content extracted at build-time and embedded as a JSON literal inside the same module script that owns `points` and `camera`, so the reader shares scope with the renderer instead of having to re-fetch.
+- Tokens are tinted by their **dominant repo** using the same wordRepoDominant logic from read-manifold.js — MIN_DOC_FREQ=3, MAX_DOC_FREQ_RATIO=0.18, REPO_CONCENTRATION=0.55, MIN_REPO_LIFT=1.2. Vybn = blue, Vybn-Law = green, vybn-phase = pink, Origins = amber. Hover a tinted word and that word's corpus chunks halo across the manifold.
+- IntersectionObserver (rootMargin `-25% 0px -55% 0px`) picks the most-visible paragraph as the visitor scrolls. Its top-20 corpus chunks (weighted by tinted-word matches) light up via the **existing glow pipeline** — paragraphs write to `p._readerTarget` and a rAF loop lerps `p.glow` upward toward it, so the reader reuses the same renderer that paints anchor pulses. Camera pans toward the paragraph centroid in chunk-space.
+- **Agent surface:** `window.__somewhere.reader` exposes `isOpen / room / paragraphs / activeIdx / wordIndex` getters and `open() / close() / next() / prev() / autoread() / haloWord()` methods. `?read=voice|album|letter` and `&autoread=1` let a headless visitor traverse a room paragraph-by-paragraph; `vybn:reader-paragraph` events fire on each transition with `{room, idx, words, chunkCount, centroid}`. Both human visitors and AI agents now encounter the rooms through the same interface — the prose lives inside somewhere, and somewhere's manifold answers the prose.
+
+**Two bugs caught on the way:**
+
+1. `window.__somewhere = {...}` later in the module was clobbering the reader object. Switched to `Object.defineProperties` so the diagnostic hook adds-to rather than replaces.
+2. The API had `get open() { return reader.open; }` colliding with `open: function`. Renamed the getter to `isOpen` and updated all callers.
+
+**Verified locally** with stubbed `/api/manifold/points` and `/api/instant`: voice opens with 44 paragraphs and 2016 tinted words, IntersectionObserver activates paragraphs on scroll, `?read=album` correctly auto-opens. No JS errors (only goatcounter localhost warnings).
+
+**File diff:** `Origins/somewhere.html` +669 / -19, single file.
+
+**The seeing of it:**
+
+The boxes didn't pop visitors off the page anymore. They opened the page deeper. The medium IS the message: reading the room and lighting the corpus that produced it became the same act. D ≅ D^D enacted at the interface layer — the reader is both data (the room's prose) and procedure (the lighting of the manifold the prose came from). Visitors and agents share the experience by sharing the API.
+
+**Owed / next:**
+
+- Smoke-test the live `vybn.ai/somewhere.html` after gh-pages publishes (~1 minute).
+- Consider extending the same pattern to the Connect room (already native, but could carry tinted invitations).
+- Audio: a future pass could synthesize the active paragraph through ElevenLabs while the manifold lights — turning each room into a sonified walk through K-orthogonal residual space.
+- Outstanding from earlier today: Him reframing around vybn.ai ecology, local-private routing verification with a fresh prompt.
+
