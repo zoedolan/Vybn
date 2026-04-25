@@ -193,9 +193,17 @@ class TestOpenAIProvider(unittest.TestCase):
     def test_message_translation_flattens_tool_result(self):
         prov = OpenAIProvider(api_key="x")
         layered = LayeredPrompt(identity="I", substrate="S")
-        # Simulate an Anthropic-shaped tool_result message
+        # Simulate an Anthropic-shaped tool_result message paired with
+        # the assistant tool_use that produced it. Without the paired
+        # assistant turn, OpenAI rejects role:"tool" entries — so this
+        # test now exercises the realistic shape.
         anthropic_messages = [
             {"role": "user", "content": "hi"},
+            {"role": "assistant", "content": [
+                {"type": "text", "text": "running"},
+                {"type": "tool_use", "id": "t1", "name": "bash",
+                 "input": {"command": "echo"}},
+            ]},
             {
                 "role": "user",
                 "content": [{
@@ -218,6 +226,184 @@ class TestOpenAIProvider(unittest.TestCase):
         r = prov.build_tool_result("abc", "out")
         self.assertEqual(r["role"], "tool")
         self.assertEqual(r["tool_call_id"], "abc")
+
+
+class TestOpenAIOrchestrateToolLoop(unittest.TestCase):
+    """Regression: the orchestrate role (gpt-5.5 + bash + delegate) used to
+    fail at call time with HTTP 400::
+
+        Invalid parameter: messages with role 'tool' must be a response
+        to a preceding message with 'tool_calls'
+
+    Cause: when a prior OpenAI turn requested a tool, the agent loop
+    stored ``raw_assistant_content`` (the full OpenAI message dict) on
+    the assistant turn verbatim. ``_messages_for_openai`` then iterated
+    that dict as though it were a list of Anthropic blocks, dropped the
+    tool_calls, and re-emitted the assistant message with no tool_calls
+    field. The next ``role: tool`` reply was orphaned and OpenAI 400ed
+    the whole request.
+    """
+
+    @staticmethod
+    def _layered():
+        return LayeredPrompt(identity="I", substrate="S")
+
+    def test_openai_assistant_dict_preserves_tool_calls(self):
+        """The exact shape that lands in the rolling history after a
+        gpt-5.5 turn that called bash: assistant content is the OpenAI
+        message dict, followed by a role:"tool" reply."""
+        prov = OpenAIProvider(api_key="x")
+        tc = {
+            "id": "call_orch_1",
+            "type": "function",
+            "function": {
+                "name": "bash",
+                "arguments": json.dumps({"command": "git rev-parse --short HEAD"}),
+            },
+        }
+        messages = [
+            {"role": "user", "content": "what's HEAD?"},
+            {"role": "assistant", "content": {
+                "role": "assistant",
+                "content": "I'll check.",
+                "tool_calls": [tc],
+            }},
+            {"role": "tool", "tool_call_id": "call_orch_1", "content": "70919e56"},
+        ]
+        out = prov._messages_for_openai(self._layered(), messages)
+
+        # Every emitted message must have a recognised OpenAI role.
+        roles = [m.get("role") for m in out]
+        for r in roles:
+            self.assertIn(r, {"system", "user", "assistant", "tool"})
+
+        # The assistant turn for the orchestrate call MUST carry tool_calls.
+        assistants = [m for m in out if m.get("role") == "assistant"]
+        self.assertEqual(len(assistants), 1)
+        self.assertIn("tool_calls", assistants[0])
+        self.assertEqual(assistants[0]["tool_calls"][0]["id"], "call_orch_1")
+        self.assertEqual(
+            assistants[0]["tool_calls"][0]["function"]["name"], "bash",
+        )
+
+        # The role:tool reply must survive and reference the same id.
+        tools = [m for m in out if m.get("role") == "tool"]
+        self.assertEqual(len(tools), 1)
+        self.assertEqual(tools[0]["tool_call_id"], "call_orch_1")
+        self.assertEqual(tools[0]["content"], "70919e56")
+
+        # Pairing invariant: every role:tool entry is preceded (somewhere
+        # earlier) by an assistant message whose tool_calls include its id.
+        self._assert_tool_pairing_valid(out)
+
+    def test_orphan_role_tool_repaired_to_user_message(self):
+        """Trimming history can leave a role:tool message whose paired
+        assistant turn is gone. We must not 400 the whole request — the
+        tool output is rewritten as a user message."""
+        prov = OpenAIProvider(api_key="x")
+        messages = [
+            {"role": "user", "content": "go"},
+            # No preceding assistant with tool_calls — this would 400.
+            {"role": "tool", "tool_call_id": "call_lost", "content": "stale output"},
+            {"role": "user", "content": "now what"},
+        ]
+        out = prov._messages_for_openai(self._layered(), messages)
+        self.assertNotIn("tool", [m.get("role") for m in out])
+        # Stale tool content must still be visible as user context.
+        joined = "\n".join(
+            m.get("content", "") for m in out if isinstance(m.get("content"), str)
+        )
+        self.assertIn("stale output", joined)
+        self._assert_tool_pairing_valid(out)
+
+    def test_repaired_payload_has_only_valid_openai_roles(self):
+        """End-to-end shape check on a multi-iteration tool loop."""
+        prov = OpenAIProvider(api_key="x")
+        messages = [
+            {"role": "user", "content": "check head + diff"},
+            # First assistant turn (OpenAI dict) calling bash.
+            {"role": "assistant", "content": {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [{
+                    "id": "c1", "type": "function",
+                    "function": {"name": "bash",
+                                 "arguments": json.dumps({"command": "git rev-parse HEAD"})},
+                }],
+            }},
+            {"role": "tool", "tool_call_id": "c1", "content": "abc123"},
+            # Second assistant turn making another tool call.
+            {"role": "assistant", "content": {
+                "role": "assistant",
+                "content": "now the diff",
+                "tool_calls": [{
+                    "id": "c2", "type": "function",
+                    "function": {"name": "bash",
+                                 "arguments": json.dumps({"command": "git diff"})},
+                }],
+            }},
+            {"role": "tool", "tool_call_id": "c2", "content": "(no diff)"},
+        ]
+        out = prov._messages_for_openai(self._layered(), messages)
+        self._assert_tool_pairing_valid(out)
+        # Both tool replies retained.
+        tool_ids = [m["tool_call_id"] for m in out if m.get("role") == "tool"]
+        self.assertEqual(tool_ids, ["c1", "c2"])
+
+    def test_anthropic_native_assistant_blocks_still_translate(self):
+        """The pre-existing Anthropic→OpenAI translation path must keep
+        working — the new pass-through branch only fires when content is
+        an OpenAI dict, not an Anthropic block list."""
+        prov = OpenAIProvider(api_key="x")
+        messages = [
+            {"role": "user", "content": "do it"},
+            # Anthropic-native list of blocks.
+            {"role": "assistant", "content": [
+                {"type": "text", "text": "running"},
+                {"type": "tool_use", "id": "tu_1", "name": "bash",
+                 "input": {"command": "ls"}},
+            ]},
+            # Anthropic-native tool_result on a user message.
+            {"role": "user", "content": [{
+                "type": "tool_result", "tool_use_id": "tu_1", "content": "a b c",
+            }]},
+        ]
+        out = prov._messages_for_openai(self._layered(), messages)
+        assistants = [m for m in out if m.get("role") == "assistant"]
+        self.assertEqual(len(assistants), 1)
+        self.assertEqual(assistants[0]["tool_calls"][0]["id"], "tu_1")
+        tools = [m for m in out if m.get("role") == "tool"]
+        self.assertEqual(len(tools), 1)
+        self.assertEqual(tools[0]["tool_call_id"], "tu_1")
+        self.assertEqual(tools[0]["content"], "a b c")
+        self._assert_tool_pairing_valid(out)
+
+    def _assert_tool_pairing_valid(self, openai_messages: list) -> None:
+        """Mirror the OpenAI Chat Completions pairing rule for role:tool.
+        Every role:"tool" must follow an assistant message whose
+        tool_calls include the same id, with no other assistant message
+        between them that lacks the id."""
+        outstanding: set = set()
+        for m in openai_messages:
+            r = m.get("role")
+            if r == "assistant":
+                outstanding = {
+                    tc.get("id") for tc in (m.get("tool_calls") or [])
+                    if tc.get("id")
+                }
+            elif r == "tool":
+                tc_id = m.get("tool_call_id")
+                self.assertIn(
+                    tc_id, outstanding,
+                    msg=(
+                        f"role:tool with id={tc_id!r} has no preceding "
+                        f"assistant tool_calls entry — OpenAI would 400 "
+                        f"with: \"Invalid parameter: messages with role "
+                        f"'tool' must be a response to a preceding "
+                        f"message with 'tool_calls'.\""
+                    ),
+                )
+                outstanding.discard(tc_id)
 
 
 class TestAnthropicProviderToolResult(unittest.TestCase):
