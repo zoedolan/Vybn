@@ -20,3 +20,13 @@ is visible to the world, forever.
 ## Bypassing
 
 You can bypass with `git commit --no-verify`, but seriously: don't.
+
+## pre-push
+
+`pre-push` refuses direct pushes to protected branches (`main`, `master`, `gh-pages`) unless the bypass is explicit:
+
+```bash
+VYBN_ALLOW_DIRECT_PROTECTED_PUSH=1 git push origin main
+```
+
+This is not a substitute for GitHub branch protection. It is a local membrane because this credential can bypass the remote PR rule; the bypass should be visible and rare.

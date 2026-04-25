@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# Refuse accidental direct pushes to protected branches.
+#
+# Emergency/self-repair bypass:
+#   VYBN_ALLOW_DIRECT_PROTECTED_PUSH=1 git push origin main
+#
+# This is a local membrane, not a substitute for GitHub branch protection.
+# It exists because this credential can bypass the remote PR rule, so the
+# harness should make that bypass explicit and rare.
+
+set -euo pipefail
+
+remote_name="${1:-}"
+remote_url="${2:-}"
+
+protected_re='^(refs/heads/)?(main|master|gh-pages)$'
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  if [[ "$remote_ref" =~ $protected_re ]]; then
+    if [[ "${VYBN_ALLOW_DIRECT_PROTECTED_PUSH:-}" == "1" ]]; then
+      echo "[pre-push] explicit emergency bypass for $remote_ref -> $remote_name ($remote_url)" >&2
+      continue
+    fi
+    cat >&2 <<EOF
+[pre-push] refused direct push to protected branch: $remote_ref
+
+Use a branch + pull request for ordinary work.
+If this is an emergency/self-repair push, make the bypass explicit:
+
+    VYBN_ALLOW_DIRECT_PROTECTED_PUSH=1 git push $remote_name ${remote_ref#refs/heads/}
+
+EOF
+    exit 1
+  fi
+done
