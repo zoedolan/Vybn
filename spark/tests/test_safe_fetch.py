@@ -1,4 +1,5 @@
 import unittest
+from pathlib import Path
 
 from spark.harness.safe_fetch import extract_text, validate_url
 
@@ -21,6 +22,12 @@ class SafeFetchTests(unittest.TestCase):
         self.assertIn("Head", text)
         self.assertIn("Body text", text)
         self.assertNotIn("evil", text)
+
+    def test_cli_source_mentions_untrusted_output_mode(self):
+        source = Path("spark/harness/safe_fetch.py").read_text()
+        self.assertIn("UNTRUSTED_TEXT_WRITTEN", source)
+        self.assertIn("Path(ns.out).expanduser()", source)
+
 
 if __name__ == "__main__":
     unittest.main()
