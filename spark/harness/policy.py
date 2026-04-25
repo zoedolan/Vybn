@@ -306,6 +306,41 @@ class Policy:
         heur = self.heuristics
         ranked = [r for r in _HEURISTIC_PRIORITY if r in heur]
         ranked += [r for r in heur if r not in ranked]
+
+        # 2a. Orchestrator-mention override.
+        # 2026-04-25 — Zoe surfaced: "hey buddy - is the orchestrator
+        # working?" matched the casual `\bhey buddy.{0,40}(working|...)\b`
+        # task heuristic before the orchestrate `\borchestrat(...)\b`
+        # pattern got a chance, and the turn ran under task (Sonnet+bash)
+        # instead of orchestrate (GPT-5.5). When the user explicitly names
+        # the orchestrator, the orchestrate heuristic must outrank the
+        # generic casual health-check task heuristic. We do NOT touch
+        # code-shaped framings ("fix the orchestrator bug" still belongs
+        # in code) — if any code heuristic also matches, fall through to
+        # normal priority. /plan and other directives are unaffected (this
+        # block runs after directive resolution).
+        if "orchestrate" in heur and "orchestrate" in self.roles:
+            orch_match = next(
+                (rx for rx in heur["orchestrate"] if rx.search(text)),
+                None,
+            )
+            if orch_match is not None:
+                code_match = any(
+                    rx.search(text) for rx in heur.get("code", [])
+                )
+                if not code_match:
+                    decision = RouteDecision(
+                        role="orchestrate",
+                        config=self.role("orchestrate"),
+                        cleaned_input=text,
+                        reason=f"heuristic={orch_match.pattern}",
+                    )
+                    if model_override:
+                        decision.model_override = model_override
+                        decision.alias_used = alias_used
+                        decision.reason = f"{decision.reason}+alias={alias_used}"
+                    return decision
+
         for role_name in ranked:
             if role_name not in self.roles:
                 continue
