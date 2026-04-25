@@ -511,6 +511,78 @@ class TestChatIsDefault(unittest.TestCase):
         self.assertIn(d.role, ("orchestrate", "code"))
 
 
+class TestOrchestratorMentionPrecedence(unittest.TestCase):
+    """Regression: 2026-04-25.
+
+    Live behaviour after PR #2914 / Spark@69a3efd5: a casual
+    orchestrator-status probe ("hey buddy - is the orchestrator
+    working?") matched the generic ``\\bhey buddy.{0,40}working\\b``
+    task heuristic before the orchestrate ``\\borchestrat(...)\\b``
+    pattern got a chance, and the turn ran under task (Sonnet+bash)
+    instead of orchestrate (GPT-5.5). That is semantically wrong —
+    when the user explicitly names the orchestrator, the orchestrate
+    heuristic must outrank the casual-health-check task heuristic.
+
+    These tests pin the corrected precedence with both the in-code
+    default policy and the YAML-loaded policy:
+      1. /plan still routes to orchestrate by directive.
+      2. "hey buddy - is the orchestrator working?" routes to
+         orchestrate, not task.
+      3. Bare "hey buddy" still routes to phatic.
+      4. Generic "hey buddy is everything working?" — no orchestrator
+         mention — keeps the prior task-route.
+      5. Code-shaped framings ("fix the orchestrator bug") still
+         route to code, not orchestrate.
+    """
+
+    def setUp(self):
+        self.router = Router(default_policy())
+        self.yaml_router = Router(load_policy(SPARK_DIR / "router_policy.yaml"))
+
+    def _classify_both(self, text):
+        return (
+            self.router.classify(text),
+            self.yaml_router.classify(text),
+        )
+
+    def test_plan_directive_routes_to_orchestrate(self):
+        for d in self._classify_both("/plan run `git rev-parse --short HEAD` and tell me what's there"):
+            self.assertEqual(d.role, "orchestrate")
+            self.assertEqual(d.reason, "directive=/plan")
+
+    def test_orchestrator_status_probe_routes_to_orchestrate(self):
+        for d in self._classify_both("hey buddy - is the orchestrator working?"):
+            self.assertEqual(
+                d.role, "orchestrate",
+                msg=f"expected orchestrate, got {d.role!r} (reason={d.reason!r})",
+            )
+            self.assertIn("orchestrat", d.reason)
+
+    def test_bare_hey_buddy_still_phatic(self):
+        for d in self._classify_both("hey buddy"):
+            self.assertEqual(d.role, "phatic")
+
+    def test_generic_health_check_without_orchestrator_keeps_task(self):
+        # No "orchestrat" mention -> override does not fire, falls
+        # through to the existing task heuristic.
+        for d in self._classify_both("hey buddy is everything working?"):
+            self.assertEqual(
+                d.role, "task",
+                msg=f"expected task, got {d.role!r} (reason={d.reason!r})",
+            )
+
+    def test_code_shaped_orchestrator_framing_still_code(self):
+        # "fix the orchestrator bug" matches both the orchestrate
+        # noun pattern AND a code heuristic -> code wins (per the
+        # YAML's documented intent that orchestrate is ranked after
+        # code so structural-fix framings still escalate).
+        for d in self._classify_both("fix the orchestrator bug"):
+            self.assertEqual(
+                d.role, "code",
+                msg=f"expected code, got {d.role!r} (reason={d.reason!r})",
+            )
+
+
 class TestCliDirectReplyAndLightweight(unittest.TestCase):
     """The CLI Spark agent loop must honor direct_reply_template for
     identity turns (no provider call) and must skip RAG for lightweight
