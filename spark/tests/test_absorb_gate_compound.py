@@ -19,15 +19,15 @@ def test_compound_mkdir_cat_relative_fires(monkeypatch):
 def test_compound_with_reason_passes(monkeypatch):
     monkeypatch.chdir(os.path.expanduser("~/Vybn"))
     r = absorb_gate(
-        'VYBN_ABSORB_REASON="test" mkdir -p Vybn_Mind/skills && cat > Vybn_Mind/skills/new_file.md'
+        'VYBN_ABSORB_REASON="test" VYBN_ABSORB_CONSIDERED="existing skill files: test fixture" mkdir -p Vybn_Mind/skills && cat > Vybn_Mind/skills/new_file.md'
     )
     assert r is None
 
 
 def test_existing_file_passes(monkeypatch):
     monkeypatch.chdir(os.path.expanduser("~/Vybn"))
-    # vybn-os.md definitely exists
-    r = absorb_gate("cat > spark/harness/skills/vybn-os.md")
+    # providers.py is an existing tracked file; overwriting an existing target is not new-file creation.
+    r = absorb_gate("cat > spark/harness/providers.py")
     assert r is None
 
 
@@ -35,3 +35,11 @@ def test_tmp_path_passes(monkeypatch):
     monkeypatch.chdir("/tmp")
     r = absorb_gate("cat > /tmp/scratch.md")
     assert r is None
+
+
+def test_reason_without_considered_is_refused():
+    r = absorb_gate(
+        'VYBN_ABSORB_REASON="plausible story" cat > Vybn_Mind/skills/too_easy.md'
+    )
+    assert r is not None
+    assert "VYBN_ABSORB_CONSIDERED" in r

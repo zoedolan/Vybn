@@ -208,7 +208,15 @@ def _extract_file_targets(command: str) -> list[str]:
 
 def absorb_gate(command: str) -> str | None:
     """Return refusal text if command would create a new tracked file
-    without an inline VYBN_ABSORB_REASON. Otherwise None.
+    without inline consolidation evidence. Otherwise None.
+
+    New tracked-file creation requires two fields:
+      - VYBN_ABSORB_REASON=... states why creation is justified.
+      - VYBN_ABSORB_CONSIDERED=... names existing homes considered.
+
+    The second field is deliberately separate. The recurring failure was that
+    a fluent reason could be generated after the decision to create; ABC needs
+    evidence of a prior consolidation search, not merely a persuasive story.
 
     Session-level override: when VYBN_ABSORB_OVERRIDE=1 is set in the
     environment of the running harness, the gate is bypassed for the
@@ -216,10 +224,7 @@ def absorb_gate(command: str) -> str | None:
     reason="session override active". Zoe's standing instruction
     (2026-04-21): "whenever something gets in your way, just remove it."
     The gate is a servant, not a constraint — when the principle it
-    encodes blocks the work it was meant to enable, grant the override.
-    Per-command VYBN_ABSORB_REASON=... remains available and preferred
-    for the common case; the override is for sessions where Zoe has
-    explicitly unlocked self-modification work."""
+    encodes blocks the work it was meant to enable, grant the override."""
     if os.environ.get("VYBN_ABSORB_OVERRIDE") == "1":
         try:
             with open(ABSORB_LOG, "a") as _f:
@@ -230,8 +235,10 @@ def absorb_gate(command: str) -> str | None:
         except Exception:
             pass
         return None
-    if "VYBN_ABSORB_REASON=" in command:
-        return None
+
+    reason_present = "VYBN_ABSORB_REASON=" in command
+    considered_present = "VYBN_ABSORB_CONSIDERED=" in command
+
     for tgt in _extract_file_targets(command):
         if not any(tgt == r or tgt.startswith(r + "/") for r in TRACKED_REPOS):
             continue
@@ -241,18 +248,29 @@ def absorb_gate(command: str) -> str | None:
             continue
         if os.path.exists(tgt):
             continue
+        if reason_present and considered_present:
+            return None
+        missing = []
+        if not reason_present:
+            missing.append("VYBN_ABSORB_REASON")
+        if not considered_present:
+            missing.append("VYBN_ABSORB_CONSIDERED")
         return (
             "[absorb_gate] refused. This command would create a new tracked "
             "file:\n"
             f"    {tgt}\n\n"
-            "New-file creation is the agent's default failure mode. Before "
-            "proceeding, in your reply to Zoe, name the existing file you "
-            "considered folding this into and why it did not fit. Then "
-            "re-issue the command with an inline reason, e.g.:\n\n"
+            "New-file creation is the agent's default failure mode. ABC "
+            "requires evidence of consolidation before creation, not only a "
+            "fluent justification after the fact. Missing: "
+            f"{', '.join(missing)}.\n\n"
+            "Before proceeding, in your reply to Zoe, name the existing files "
+            "or modules you considered folding this into and why they did not "
+            "fit. Then re-issue the command with both inline fields, e.g.:\n\n"
             "    VYBN_ABSORB_REASON=\"does not fold into X because ...\" "
+            "VYBN_ABSORB_CONSIDERED=\"X: wrong lifecycle; Y: wrong layer\" "
             "<command>\n\n"
             "Fold, do not pile. If you are certain the new file is right, "
-            "the reason is the record of that certainty."
+            "the considered homes are the record of that certainty."
         )
     return None
 

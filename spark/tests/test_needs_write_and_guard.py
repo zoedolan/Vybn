@@ -88,7 +88,7 @@ def test_write_subturn_allows_new_file_with_absorb_reason():
     parent = Path(target).parent
     try:
         body = (
-            "# VYBN_ABSORB_REASON='integration test; gets removed after run'\n"
+            "# VYBN_ABSORB_REASON='integration test; gets removed after run'\n# VYBN_ABSORB_CONSIDERED='existing test fixture: needs temporary new target'\n"
             "real contents\n"
         )
         ran, out = _run_write_subturn(target, body)

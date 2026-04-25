@@ -54,7 +54,7 @@ class TestAbsorbGate(unittest.TestCase):
         self.assertIsNone(absorb_gate("echo hi > /tmp/existing.txt"))
 
     def test_allow_with_reason(self):
-        cmd = 'VYBN_ABSORB_REASON="new module" echo x > /home/vybnz69/Vybn/new_file.py'
+        cmd = 'VYBN_ABSORB_REASON="new module" VYBN_ABSORB_CONSIDERED="providers.py: wrong layer" echo x > /home/vybnz69/Vybn/new_file.py'
         self.assertIsNone(absorb_gate(cmd))
 
     def test_refuse_new_tracked_file(self):
