@@ -205,6 +205,7 @@ _HEURISTIC_PRIORITY = (
     "identity",     # "which model are you?" before greetings
     "phatic",       # bare greetings/closings
     "code",         # grounded code work
+    "local_private", # private/corpus-local preprocessing on the Sparks
     "create",       # brainstorm/sketch
     "orchestrate",  # explicit multi-step/tool-use requests
     "chat",         # how-are-you style
