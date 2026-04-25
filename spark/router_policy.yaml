@@ -24,20 +24,20 @@ default_role: chat
 
 roles:
   code:
-    provider: openai
+    provider: anthropic
     # Opus 4.7 -- the right substrate for `code`. The 2026-04-18
     # buckling was a CHAT failure (conversational capitulation
     # gradient). Code runs agentic debug loops where 4.7's
     # push-through is an asset. Chat stays on 4.6. @opus /
     # @opus4.6 are still available as per-turn pins.
-    model: gpt-5.5
+    model: claude-opus-4-7
     thinking: adaptive
     max_tokens: 32768
     max_iterations: 50
     tools: [bash]
     rag: false
   create:
-    provider: openai
+    provider: anthropic
     model: claude-sonnet-4-6
     thinking: off
     max_tokens: 8192
@@ -49,7 +49,7 @@ roles:
     # capped at max_iterations: 1 and tools: []; one provider call
     # per turn. Opus 4.6 holds position better than Sonnet under
     # conversational pressure (the 2026-04-18 substrate concern).
-    provider: openai
+    provider: anthropic
     model: claude-opus-4-6
     thinking: off
     # 2026-04-20: raised from 4096. Chat turns routinely do deep
@@ -62,7 +62,7 @@ roles:
     tools: []
     rag: true
   task:
-    provider: openai
+    provider: anthropic
     model: claude-sonnet-4-6
     thinking: off
     max_tokens: 16384
@@ -304,7 +304,7 @@ model_aliases:
   "@local": nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
   "@gpt": gpt-5.5
   "@gpt5": gpt-5.5
-      "@gpro": gpt-5.5-pro
+  "@gpro": gpt-5.5-pro
 
 budgets:
   per_turn_usd: 2.0

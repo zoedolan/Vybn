@@ -127,6 +127,67 @@ class TestPolicyHasLightweightRoles(unittest.TestCase):
         self.assertTrue(pol.roles["phatic"].lightweight)
         self.assertIsNotNone(pol.roles["identity"].direct_reply_template)
 
+    def test_router_policy_yaml_parses_cleanly(self):
+        # 2026-04-25 regression: the @gpro alias landed with a 6-space
+        # indent under a 2-space mapping, making router_policy.yaml
+        # unparseable. load_policy() silently fell back to the in-code
+        # defaults, masking every operator edit (orchestrate=GPT-5.5
+        # in particular). Parse the YAML directly so a future indent
+        # slip is caught here, not at boot time.
+        yaml_path = SPARK_DIR / "router_policy.yaml"
+        try:
+            import yaml
+        except Exception:
+            self.skipTest("PyYAML unavailable")
+        # safe_load must not raise — bare assertion gives a useful
+        # ScannerError traceback in the test output.
+        data = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
+        self.assertIsInstance(data, dict)
+        # And aliases must include @gpro (the line that broke the file).
+        self.assertEqual(
+            (data.get("model_aliases") or {}).get("@gpro"),
+            "gpt-5.5-pro",
+        )
+
+    def test_orchestrate_role_is_gpt55(self):
+        # 2026-04-25 regression: even after the YAML was fixed, the
+        # in-code defaults still pinned orchestrate to claude-opus-4-7,
+        # so a YAML parse failure (or a missing file) silently demoted
+        # the orchestrator. Both tracks — YAML + defaults — must route
+        # orchestrate to GPT-5.5 on OpenAI.
+        for label, pol in (
+            ("default_policy", default_policy()),
+            ("yaml", load_policy(SPARK_DIR / "router_policy.yaml")),
+        ):
+            with self.subTest(track=label):
+                role = pol.role("orchestrate")
+                self.assertEqual(
+                    role.provider, "openai",
+                    f"{label}: orchestrate provider should be openai",
+                )
+                self.assertEqual(
+                    role.model, "gpt-5.5",
+                    f"{label}: orchestrate model should be gpt-5.5",
+                )
+                self.assertIn("delegate", role.tools)
+                self.assertIn("bash", role.tools)
+
+    def test_plan_directive_routes_to_gpt55(self):
+        # /plan is the EVAL primitive — it must land on the orchestrate
+        # role (GPT-5.5). Validates the full directive→role→model chain
+        # the user sees in the startup banner and the @-alias listing.
+        pol = load_policy(SPARK_DIR / "router_policy.yaml")
+        router = Router(pol)
+        d = router.classify("/plan refactor the harness", forced_role=None)
+        self.assertEqual(d.role, "orchestrate")
+        resolved = pol.role(d.role)
+        self.assertEqual(resolved.provider, "openai")
+        self.assertEqual(resolved.model, "gpt-5.5")
+        # Aliases generated from policy must surface the GPT-5.5 entries.
+        self.assertEqual(pol.model_aliases.get("@gpt"), "gpt-5.5")
+        self.assertEqual(pol.model_aliases.get("@gpt5"), "gpt-5.5")
+        self.assertEqual(pol.model_aliases.get("@gpro"), "gpt-5.5-pro")
+
 
 class TestRouterLightweightClassification(unittest.TestCase):
     """The router picks up greetings and identity questions via the new
