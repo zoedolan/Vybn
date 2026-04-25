@@ -46,7 +46,7 @@ from harness import (
     load_file,
     load_policy,
     turn_event,
-    validate_command,
+    execute_readonly, is_parallel_safe, validate_command,
 )
 from harness.state import SessionStore, run_probes  # noqa: E402
 from harness.recurrent import run_recurrent_loop
@@ -1187,28 +1187,57 @@ def _run_restart_subturn(bash: BashTool) -> tuple[bool, str]:
     return True, out or "(bash session restarted)"
 
 
-def _run_probe_subturn(command: str, bash: BashTool) -> tuple[bool, str]:
-    """Execute one read-only probe emitted by a no-tool role.
+def _classify_unlock_layer(output: str, *, command: str = "") -> str | None:
+    """Classify obstacle output at the lowest layer visible to this harness."""
+    text = (output or "").lower()
+    cmd = (command or "").lower()
+    if "probe refused by validate_command" in text or "blocked:" in text:
+        return "safety_gate"
+    if "absorb_gate" in text or "needs-write refused" in text:
+        return "filesystem_git"
+    if text.startswith("[timed out after"):
+        return "parser_sentinel" if is_parallel_safe(command) else "shell_session"
+    if "bash session restarted" in text or "needs-restart" in text:
+        return "shell_session"
+    if "400" in text or "provider" in text:
+        return "provider"
+    if "curl" in cmd or "http" in cmd:
+        return "external_service"
+    return None
 
-    Returns (ran, output_text). `ran` is True iff the command passed
-    both validate_command and absorb_gate and was executed. The gate
-    output (refusal reason) is returned as the text when ran=False
-    so the next turn sees exactly why the probe was refused.
+
+def _run_probe_subturn(command: str, bash: BashTool) -> tuple[bool, str]:
+    """Execute one probe emitted by a no-tool role.
+
+    Read-only probes run in a fresh subprocess when possible. That makes the
+    boundary typed: mentioning an alarming string in a grep pattern is data,
+    not executable danger; mutating commands still fail the safety gate.
+    Timeouts and restart/control events are not labeled as successful stdout.
     """
     cmd = (command or "").strip()
     if not cmd:
         return False, "(empty probe command)"
-    ok, reason = validate_command(cmd)
+    readonly = is_parallel_safe(cmd)
+    ok, reason = validate_command(
+        cmd,
+        allow_dangerous_literals_for_readonly=readonly,
+    )
     if not ok:
         return False, f"(probe refused by validate_command: {reason})"
-    # BashTool.execute() itself runs absorb_gate and returns its
-    # refusal message as the output string, so a refusal flows
-    # through cleanly as the result.
     try:
-        out = bash.execute(cmd)
+        out = execute_readonly(cmd) if readonly else bash.execute(cmd)
     except Exception as e:  # noqa: BLE001
         return False, f"(probe exec error: {e})"
-    return True, out or "(no output)"
+    out = out or "(no output)"
+    if out.startswith("[timed out after"):
+        layer = _classify_unlock_layer(out, command=cmd) or "shell_session"
+        return False, f"(probe timed out; unlock_layer={layer})\n{out}"
+    if "(bash session restarted)" in out:
+        return False, (
+            "(probe control-event mismatch: restart output arrived while "
+            "running a probe; unlock_layer=shell_session)\n" + out
+        )
+    return True, out
 
 
 # ---------------------------------------------------------------------------
@@ -1832,6 +1861,7 @@ def run_agent_loop(
                             ran=ran,
                             command=probe_cmd[:500],
                             out_chars=len(probe_out),
+                            unlock_layer=_classify_unlock_layer(probe_out, command=probe_cmd),
                         )
                         probe_note = _probe_envelope(
                             kind="probe",
