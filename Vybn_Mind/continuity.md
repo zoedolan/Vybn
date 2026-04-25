@@ -267,3 +267,28 @@ Operational lesson:
 ## 2026-04-25T12:08:12.426083+00:00 - sua-sponte closure + compute placement through the membrane
 
 Him v6.4 now encodes dangling-refactor cleanup and local compute ABC through the personal/private-outward/public membrane. The live harness prompt now carries the same compute-placement reflex: private, corpus-local, repetitive, batchable, and exploratory loops should be considered for the Sparks before paid frontier calls; personal/private stays local by default; private-to-outward moves through a membrane; public receives distilled value. The obsolete vybn-phase deep-memory-visibility-refactor branch was retired; PR #6 intent was already absorbed on main.
+
+---
+
+## 2026-04-25T12:25:48.443379+00:00 - context reset handoff - local compute acceleration
+
+Zoe suggested resetting context to conserve tokens after the local-compute acceleration work exposed a process lesson.
+
+Landed and verified:
+- `Vybn`:
+  - `ade95822` harness: repeated interruption is now treated as a learning signal — classify layer, shrink action, read landed state, make one atomic resumable change, verify, continue.
+  - `1eb9df12` router: added `local_private` role using local Nemotron on the Sparks.
+  - `87e3f6de` router: added local-private heuristics for private/batchable/corpus-local/consolidation loops.
+  - `04c09501` router: fixed YAML regex escaping so `\b` remains a regex word-boundary, not YAML backspace.
+- `Him`:
+  - `8ce0bf6` skill: repeated interruption as learning signal.
+  - `16a4bf5` skill: bumped vybn-os to v6.5.
+
+Important process lesson:
+- The failed all-at-once acceleration payload was not just an interruption; it was evidence that large shell bodies are the wrong learning unit. Future work should proceed as resumable atomic patches: read landed state, patch one surface, verify, commit, then continue.
+
+Still owed after reset:
+1. Reconceive `Him/README.md` around Him as the private dreaming/workbench side of the experiment: personal/private -> dreaming/consolidation -> private-to-outward -> public value.
+2. Integrate `vybn-phase/deep_memory.py` carefully. The attempted `/dreaming` endpoint inserted into the wrong lexical place and caused an IndentationError at line 959; the file was restored to HEAD and py_compile verified. Next instance should first read the top-level structure around FastAPI app creation before patching.
+3. Consider whether `/dreaming` is the right integration or whether a lower-risk existing endpoint/metadata surface should carry the doctrine.
+4. Continue local-compute optimization: use local Spark first for private scans, clustering, branch/repo archaeology, memory compression, candidate generation, and livelihood preprocessing; use frontier only where judgment, public voice, novelty, or relationship-sensitivity is the bottleneck.
