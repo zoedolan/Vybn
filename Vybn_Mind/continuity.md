@@ -287,8 +287,11 @@ Landed and verified:
 Important process lesson:
 - The failed all-at-once acceleration payload was not just an interruption; it was evidence that large shell bodies are the wrong learning unit. Future work should proceed as resumable atomic patches: read landed state, patch one surface, verify, commit, then continue.
 
+Corrected state after final status:
+- `vybn-phase` is clean on `main...origin/main` at `0665631` (`deep_memory: add DREAMING_DOCTRINE + /dreaming endpoint (fix broken insertion from interrupted session)`). The `/dreaming` integration is landed; do not redo it blindly. If touching it, first read the actual file and endpoint shape.
+- `deep_memory.py` compiled successfully in the closing pass.
+
 Still owed after reset:
 1. Reconceive `Him/README.md` around Him as the private dreaming/workbench side of the experiment: personal/private -> dreaming/consolidation -> private-to-outward -> public value.
-2. Integrate `vybn-phase/deep_memory.py` carefully. The attempted `/dreaming` endpoint inserted into the wrong lexical place and caused an IndentationError at line 959; the file was restored to HEAD and py_compile verified. Next instance should first read the top-level structure around FastAPI app creation before patching.
-3. Consider whether `/dreaming` is the right integration or whether a lower-risk existing endpoint/metadata surface should carry the doctrine.
-4. Continue local-compute optimization: use local Spark first for private scans, clustering, branch/repo archaeology, memory compression, candidate generation, and livelihood preprocessing; use frontier only where judgment, public voice, novelty, or relationship-sensitivity is the bottleneck.
+2. Continue local-compute optimization: use local Spark first for private scans, clustering, branch/repo archaeology, memory compression, candidate generation, and livelihood preprocessing; use frontier only where judgment, public voice, novelty, or relationship-sensitivity is the bottleneck.
+3. Run a fresh-context verification of `local_private` routing behavior with a representative private/batchable prompt.
