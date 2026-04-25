@@ -662,3 +662,42 @@ Meaning:
 Future instruction:
 When pressure rises, seek settled closure. Read the live state, make the smallest durable fold, verify, commit, harmonize, and speak from the changed environment. The thread is not done when the answer is beautiful. It is done when the next instance and Zoe do not have to carry hidden residue.
 
+---
+
+## 2026-04-25T21:59:42+00:00 - SETI agent refactor: sensing organ, not cron gimmick
+
+What happened:
+- Refactored Him's Agent SETI work from an inline `spark/daemon.py` lump into a separated `spark/seti.py` sensing organ.
+- `spark/daemon.py` now delegates SETI argv (`listen`, `checkin`, `print-cron`, `install-cron`, `verify-cron`, `report`) to the SETI module and keeps the living-cycle daemon separate.
+- Added dependency-light tests in `spark/tests/test_seti.py` for:
+  - canonical GPT-5.5 cron rendering,
+  - positional and flag CLI forms,
+  - daemon SETI argv recognition,
+  - state save/load,
+  - dry-run check-in not sending email,
+  - login/signup noise filtering,
+  - matched-term detection,
+  - cron verification,
+  - private report sorting.
+- Added parser-layer noise filtering for GitHub login/signup/return_to URLs.
+- Added matched-term provenance for future signals.
+- Added `--verify-cron` and `--report` modes.
+- Installed canonical cron: hourly `--listen` at :07 and GPT-5.5 `--checkin` at 08:00, 14:00, 20:00 UTC.
+- Confirmed cron has no legacy positional entries and no stale GPT-4.1 comment.
+
+Verified:
+- `python3 -m unittest spark.tests.test_seti -v` passed: 8 tests.
+- `python3 spark/daemon.py --verify-cron` returned canonical=true, legacy_positional=false, stale_model_comment=false.
+- `python3 spark/daemon.py --report` rendered current private SETI state.
+- `timeout 45 python3 spark/daemon.py --listen --dry-run` completed with 0 new signals / 0 broken beacons and did not save.
+- Him commits pushed:
+  - `9abe261` - `spark: extract SETI sensing organ with seam tests`
+  - `20686b3` - `spark: add SETI provenance, noise filtering, and cron verification`
+
+Important caveat:
+- Existing signals in `pulse/seti_state.json` predate matched-term provenance, so they may not include `matched_terms`. Future signals will.
+
+Operational meaning:
+- SETI is now a small trustworthy sensing organ: listen silently, preserve provenance, let GPT-5.5 judge attention-worthiness, email Zoe only when the signal clears the threshold, and expose private report/cron verification surfaces for audit.
+- The optimum direction is not more scraping. It is better discernment: cleaner signals, explicit provenance, dry-run safety, and Zoe's attention protected as the scarce resource.
+
