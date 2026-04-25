@@ -1956,7 +1956,7 @@ def run_agent_loop(
                                 f"    {pending_cmd}\n\n"
                                 "Please continue the investigation with "
                                 "bash access and answer the original "
-                                "question fully. You have a 10-iteration "
+                                "question fully. You have a full iteration "
                                 "budget."
                             )
                             sub_messages: list = []

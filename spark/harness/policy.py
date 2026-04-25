@@ -690,7 +690,7 @@ _DEFAULT_BUDGETS: dict[str, float] = {
     # a real investigation arc (inspect, grep, read, patch, verify,
     # commit, push) runs 6-8 probes. On exhaust the harness
     # auto-escalates to task role instead of printing a warning.
-    "probe_per_turn": 8,
+    "probe_per_turn": 16,
 }
 
 _DEFAULT_MODEL_ALIASES: dict[str, str] = {
