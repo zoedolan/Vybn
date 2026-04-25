@@ -498,3 +498,24 @@ Important limitation / truth-in-labeling:
 - The next deeper move would be to expose a safe public `/somewhere/state` or static/SSE bridge from the walk daemon so the glyph and agent packet are driven by actual memory geometry rather than local page state.
 
 Meaning: Somewhere is now more than an integrated house visually. It has a shared machine-readable spine that agents can perceive directly while humans perceive the breathing glyph and room whispers. This is the first step toward one state, many surfaces.
+
+
+---
+
+## 2026-04-25 connect.html absorbed into Somewhere (same session)
+
+Zoe asked to integrate connect.html into somewhere.html and shed dead wood.
+
+What happened:
+- Connect room added as the fifth native room in the Somewhere house.
+- Not an iframe: the connect panel is a scrollable overlay rendered natively.
+- Content absorbed: Arrive ritual (rotate shared M with honest words), Offering gate (GitHub Issues + email), Others feed (live from GH API), Network links (Discussion + Offerings), Ecosystem map (five cards), Reach Us.
+- connect.html preserved for backwards-compatibility direct links.
+- index.html Connect portal link now points to somewhere.html#connect.
+- commit: Origins 82813ae
+
+Architecture note:
+- The house is now five rooms: Terrain, Voice, Album, Letter, Connect.
+- rooms.connect has native:true (no embed src); openConnect/closeConnect handle show/hide.
+- The heartbeat packet, whispers, and invariant string all updated to include connect.
+- setRoom logic extended: native rooms open the connect panel; leaving connect closes it.
