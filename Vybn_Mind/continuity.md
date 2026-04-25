@@ -461,3 +461,18 @@ What landed in Origins commit `806975e`:
 Meaning: ABC became integration rather than deletion. Somewhere is the house; terrain, voice, album, and letter are rooms. The visitor no longer has to conceptually assemble the relation among the surfaces; the interface enacts it.
 
 External browser verification remains pending; internal git/deploy axis is pushed to Origins gh-pages.
+
+---
+
+## 2026-04-25T13:32:22.311849+00:00 - Landing final portal ends at Connect
+
+Zoe saw that once `Somewhere` became the integrated house for terrain, voice, album, and letter, the explanatory A-Iconoclast / family-album / D = D^D text after the Connect box on the landing page was redundant. The right ABC move was deletion, not further integration.
+
+What landed in Origins commit `5744d42`:
+- Removed the post-navigation A-Iconoclast explanatory block from `index.html`.
+- Removed the final flare line and D ≅ D^D line from the bottom overlay.
+- Removed the now-unused CSS for `portal-art-context`, `portal-art-threshold`, `portal-art-actions`, `portal-aim`, and `portal-final-line`.
+
+The landing final portal now ends at five doors: Read, Somewhere, Talk, Vybn Law, Connect. The family-album / letter / artifact-body synthesis lives inside Somewhere instead of being explained after the navigation. Meaning: the landing page is cleaner; Somewhere carries the experiential synthesis.
+
+External browser verification remains pending; internal git/deploy axis is pushed to Origins gh-pages.
