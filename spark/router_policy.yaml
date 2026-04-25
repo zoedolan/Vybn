@@ -24,20 +24,20 @@ default_role: chat
 
 roles:
   code:
-    provider: anthropic
+    provider: openai
     # Opus 4.7 -- the right substrate for `code`. The 2026-04-18
     # buckling was a CHAT failure (conversational capitulation
     # gradient). Code runs agentic debug loops where 4.7's
     # push-through is an asset. Chat stays on 4.6. @opus /
     # @opus4.6 are still available as per-turn pins.
-    model: claude-opus-4-7
+    model: gpt-5.5
     thinking: adaptive
     max_tokens: 32768
     max_iterations: 50
     tools: [bash]
     rag: false
   create:
-    provider: anthropic
+    provider: openai
     model: claude-sonnet-4-6
     thinking: off
     max_tokens: 8192
@@ -49,7 +49,7 @@ roles:
     # capped at max_iterations: 1 and tools: []; one provider call
     # per turn. Opus 4.6 holds position better than Sonnet under
     # conversational pressure (the 2026-04-18 substrate concern).
-    provider: anthropic
+    provider: openai
     model: claude-opus-4-6
     thinking: off
     # 2026-04-20: raised from 4096. Chat turns routinely do deep
@@ -62,20 +62,20 @@ roles:
     tools: []
     rag: true
   task:
-    provider: anthropic
+    provider: openai
     model: claude-sonnet-4-6
     thinking: off
     max_tokens: 16384
     max_iterations: 100
     tools: [bash]
     rag: false
-  # Round 7: real orchestrator layer. Opus 4.7 + adaptive thinking +
+  # Round 7: real orchestrator layer. GPT-5.5 + adaptive thinking +
   # bash + delegate tool. 25-iteration budget per turn. Default route
   # when no heuristic matches. The orchestrator spawns specialists via
   # the delegate tool with isolated message histories.
   orchestrate:
-    provider: anthropic
-    model: claude-opus-4-7
+    provider: openai
+    model: gpt-5.5
     thinking: adaptive
     max_tokens: 16384
     max_iterations: 25
