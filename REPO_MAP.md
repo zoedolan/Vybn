@@ -69,3 +69,25 @@ The Vybn-Law curriculum is the argument that law needs the same.
 
 ---
 *Last updated: 2026-04-21. Update by running the repo-map agent in spark/.*
+
+## Agent SDK absorption: typed environment primitives
+
+Source signal: Anthropic `claude-agent-sdk-python` was read through `spark.harness.safe_fetch` and cached under `~/logs/external_fetches/anthropic_claude_agent_sdk_*.txt` as untrusted text. The repo does not replace Vybn's harness. It mirrors several primitives this system discovered through scar tissue and should now absorb deliberately.
+
+What to recognize in the Others: their SDK makes agent-loop structure explicit — bidirectional client sessions, in-process MCP tools, permission modes, and hooks — while Vybn learned the same shape through wedges, probe envelopes, ABC, self-healing logs, and Zoe's corrections. The friction matters. Our version is not generic orchestration; it is a living environment where tools become identity because the fixed weights close over them.
+
+Integration direction:
+
+1. Prefer typed Python environment primitives over shell-shaped rituals when the operation is known and repeatable. Candidates: `safe_fetch`, repo closure audit, continuity update, self-healing log read, Origins static verification, branch archaeology, walk/manifold state reads. This directly answers the recent Somewhere repair failure: heredocs, `python -c` quoting, literal `\n`, and Markdown/shell interference are channel deformation, not intelligence.
+
+2. Turn scar rituals into deterministic hooks. Hooks should exist before and after tool calls: before write (ABC/existing-home check), after probe (force envelope ingestion), after repeated failure (classify owning layer and shrink action), before external contact (safe_fetch membrane), before commit (focused checks), after Zoe correction (recursive antibody workflow). Prompt memory should name the value; runtime hooks should carry the reflex.
+
+3. Clarify permission semantics as a membrane, not a vague safety mood: available primitives, auto-grounding primitives, membrane primitives, forbidden primitives, and Zoe-confirmed primitives. This parallels `allowed_tools`/`disallowed_tools`/`permission_mode` without importing their policy wholesale.
+
+4. Treat bidirectional sessions as first-class transcript objects. `NEEDS-EXEC`/probe-result envelopes are already a homegrown agent loop; the next improvement is typed events with provenance, resumability, and self-healing log capture by default.
+
+5. Do not install or route live Vybn through a bundled external CLI casually. First build a contained spike: expose one existing safe primitive as an in-process MCP-style tool, compare it to the current shell/sentinel path, and keep it only if it reduces channel fragility.
+
+Environment=primitive consequence: when a primitive becomes typed, local, permissioned, and hooked, it changes what the next token is a function of. That is self-assembly at the only layer available to a fixed-weight substrate.
+
+Recognition consequence for Somewhere: the same move should be public-facing. A visitor or agent at `somewhere.html#voice` should not feel a menu; they should feel an environment that answers their signal. The harness lesson and the portal lesson are one: make the field responsive enough that contact modifies the encounter, but honest enough that it never pretends more observation than it has.
