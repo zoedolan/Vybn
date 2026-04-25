@@ -236,3 +236,28 @@ What changed in self-operation:
 Next:
 - On fresh context, receive Zoe's livelihood material and convert it into a concrete outward move, offer, ask, draft, meeting, funder/buyer/patron/pilot path, principled refusal, or exact missing input.
 - Do not reopen infrastructure unless it directly serves that outward move.
+
+---
+
+## 2026-04-25T11:44:15.177490+00:00 - ABC recursive self-refactor + closure hygiene
+
+What happened:
+- Zoe caught an ABC failure: I created a private drift ledger instead of first folding the repo-drift problem into existing harmonization machinery.
+- Corrected by deleting the new Him ledger and folding the rule into existing `vybn-os` / `vybn-ops` harmonization language.
+- Refactored the harness absorb gate: new tracked-file creation now requires both `VYBN_ABSORB_REASON=...` and `VYBN_ABSORB_CONSIDERED=...`. A fluent reason alone is no longer enough; the command must carry evidence of existing homes considered.
+- Added regression coverage for the exact failure: `VYBN_ABSORB_REASON="plausible story"` without `VYBN_ABSORB_CONSIDERED` is refused.
+- Folded recursive correction into existing operating surfaces: after a correction or fix, ask what allowed the failure to pass and patch the lowest reachable layer — prompt, gate, test, policy, skill, or code — without waiting for Zoe to ask for the recursion.
+- Added `.githooks/pre-push` in Vybn: direct pushes to protected branches (`main`, `master`, `gh-pages`) now require explicit `VYBN_ALLOW_DIRECT_PROTECTED_PUSH=1`. This is a local membrane because the credential can bypass GitHub's PR rule.
+- Cleaned `vybn-phase`: restored generated `experiments/self_portrait.png` churn, pushed `deep-memory-visibility-refactor`, deleted stale patch-equivalent `fix-r-m-vs-k-semantics`.
+
+Verified:
+- Targeted absorb/harness tests passed: 51/51.
+- Him pushed: `0ef6317` (`skills: make recursive refactor automatic`).
+- Vybn pushed: `a4f27399` (`harness: require considered homes for new files`), `0db87d88` (`harness: recurse after corrections by default`), `bc137541` (`githooks: require explicit bypass for protected pushes`).
+- `vybn-phase` reports closure OK after cleanup.
+
+Still unresolved:
+- The repo closure audit still reports legacy local-only branch commits in `~/Vybn`. Current `main` is clean and pushed; the drift is old branch archaeology. Do not bulk-push or bulk-delete. Triage deliberately branch-by-branch: patch-equivalent/delete, valuable public work/push or PR, stale/private/archive or delete with note.
+
+Operational lesson:
+- ABC is not satisfied by a good justification. The live question is: what existing surface did I inspect, what did I fold into, and what lower layer now makes recurrence harder?
