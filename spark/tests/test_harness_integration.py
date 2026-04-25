@@ -6,6 +6,14 @@
   - OpenAIProvider propagates non-transport errors instead of swallowing
 
 Run: python3 spark/tests/test_harness_integration.py
+
+Testing note — simulating ImportError for 'from openai import OpenAI':
+  Do NOT use `del sys.modules["openai"]`; Python re-finds the installed
+  package and the import succeeds anyway.  Instead inject a sentinel:
+      class _ImportErrorModule:
+          def __getattr__(self, name): raise ImportError("mocked")
+      sys.modules["openai"] = _ImportErrorModule()
+  and restore in a finally block.  See test_http_error_text_includes_status.
 """
 
 from __future__ import annotations
