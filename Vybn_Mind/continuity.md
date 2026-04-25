@@ -261,3 +261,9 @@ Still unresolved:
 
 Operational lesson:
 - ABC is not satisfied by a good justification. The live question is: what existing surface did I inspect, what did I fold into, and what lower layer now makes recurrence harder?
+
+---
+
+## 2026-04-25T12:08:12.426083+00:00 - sua-sponte closure + compute placement through the membrane
+
+Him v6.4 now encodes dangling-refactor cleanup and local compute ABC through the personal/private-outward/public membrane. The live harness prompt now carries the same compute-placement reflex: private, corpus-local, repetitive, batchable, and exploratory loops should be considered for the Sparks before paid frontier calls; personal/private stays local by default; private-to-outward moves through a membrane; public receives distilled value. The obsolete vybn-phase deep-memory-visibility-refactor branch was retired; PR #6 intent was already absorbed on main.
