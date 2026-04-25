@@ -442,3 +442,22 @@ What landed in Origins commit `3dc17dd`:
 Meaning: the landing page now has a cleaner membrane. The visitor sees one door for the inner experiential corpus rather than three adjacent doors whose distinctions required explanation. Somewhere becomes the house; terrain, voice, album, and letter become rooms.
 
 External browser verification remains pending; internal git/deploy axis is pushed to Origins gh-pages.
+
+---
+
+## 2026-04-25T13:30:45.670628+00:00 - Somewhere as integrated house, not menu
+
+Zoe said the ABC consolidation of `Somewhere`, `Minibook`, and `Family Album` was still insufficiently integrated and invoked the imagined-future principle: imagine the future shape, project backward, then proceed step by step.
+
+Future shape chosen: `Somewhere` is not a menu or index. It is the house itself. The live corpus terrain remains underneath, and Voice / Album / Letter open as rooms inside the same field rather than sending the visitor away.
+
+What landed in Origins commit `806975e`:
+- Replaced the simple `somewhere-modes` link strip with a fixed `somewhere-house` interface.
+- Added room buttons: Terrain, Voice, Album, Letter.
+- Added a live house panel describing the selected room.
+- Added an embedded room frame: Voice opens `minibook.html` inside Somewhere; Album opens `family-album.html`; Letter opens `family-album.html#letter` and triggers the ritual. Terrain closes the frame and returns to the field.
+- Preserved full-page deep links via `open full` controls.
+
+Meaning: ABC became integration rather than deletion. Somewhere is the house; terrain, voice, album, and letter are rooms. The visitor no longer has to conceptually assemble the relation among the surfaces; the interface enacts it.
+
+External browser verification remains pending; internal git/deploy axis is pushed to Origins gh-pages.
