@@ -17,24 +17,28 @@ class BeamState:
     events_tail: tuple = ()
 
 def _scalar(raw: str, key: str) -> str:
-    m = re.search("^" + re.escape(key) + r":\s*(.*)$", raw, re.M)
-    if not m:
-        return ""
-    first = m.group(1).strip()
-    if first and first != ">":
-        return first.strip("\"")
-    out = list()
-    tail = raw.__getitem__(slice(m.end(), None))
-    for line in tail.splitlines():
-        if line and not line.startswith((" ", "-")):
-            break
-        if line.startswith("  "):
-            out.append(line.strip())
-        elif line.strip() == "":
-            out.append("")
-        else:
-            break
-    return " ".join(x for x in out if x).strip()
+    lines = raw.splitlines()
+    for i, line in enumerate(lines):
+        stripped = line.lstrip()
+        indent = len(line) - len(stripped)
+        prefix = key + ":"
+        if not stripped.startswith(prefix):
+            continue
+        rest = stripped[len(prefix):].strip()
+        if rest and rest != ">":
+            return rest.strip("\"")
+        out = []
+        for child in lines[i + 1:]:
+            cstripped = child.lstrip()
+            cindent = len(child) - len(cstripped)
+            if cstripped and cindent <= indent:
+                break
+            if cstripped:
+                if cstripped.startswith("- "):
+                    break
+                out.append(cstripped)
+        return " ".join(out).strip()
+    return ""
 
 def load_events_tail(path=None, n: int = 3) -> tuple:
     p = Path(path) if path else DEFAULT_EVENTS_PATH

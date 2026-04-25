@@ -17,6 +17,13 @@ class BeamKeeperTests(unittest.TestCase):
             self.assertIn("Keep the main objective alive.", capsule)
             self.assertIn("recent_beam_events", capsule)
 
+    def test_nested_return_question_is_preserved(self):
+        with tempfile.TemporaryDirectory() as td:
+            beam = Path(td) / "beam.yaml"
+            beam.write_text("beam_id: test_beam\ninvariant: alive\nanti_drift:\n  return_question: How does this advance financial sustainability or continuity?\n")
+            capsule = render_beam_capsule(load_beam(beam))
+            self.assertIn("How does this advance financial sustainability or continuity?", capsule)
+
     def test_external_value_scores_above_generic_infra(self):
         external = classify_action_text("draft an advisory offer for a funder meeting")
         infra = classify_action_text("refactor the provider route for elegance")
