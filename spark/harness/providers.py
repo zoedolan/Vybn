@@ -804,6 +804,58 @@ _THINK_BLOCK = re.compile(r"^\s*(?:<think>)?\s*.*?</think>\s*", re.DOTALL | re.I
 _THINK_OPEN_ONLY = re.compile(r"<think>.*", re.DOTALL | re.IGNORECASE)
 
 
+def _repair_unpaired_tool_messages(messages: list[dict]) -> list[dict]:
+    """Convert orphan {"role":"tool",...} messages to user messages.
+
+    OpenAI's chat.completions API requires every role:"tool" entry to be
+    a response to a preceding assistant message that carries a matching
+    tool_call id under tool_calls. Mixed-provider sessions or message
+    trimming can leave a tool reply whose call id is no longer present
+    upstream — sending it raw triggers HTTP 400 "Invalid parameter:
+    messages with role 'tool' …".
+
+    Rather than drop the tool output (it usually contains the only
+    record of what a bash command produced), we re-emit it as a user
+    message tagged with the orphan call id. Loses the structured
+    pairing but preserves the information and lets the request succeed.
+    """
+    valid_ids: set[str] = set()
+    out: list[dict] = []
+    for m in messages:
+        role = m.get("role")
+        if role == "assistant":
+            valid_ids.clear()
+            for tc in m.get("tool_calls") or []:
+                tc_id = tc.get("id")
+                if tc_id:
+                    valid_ids.add(tc_id)
+            out.append(m)
+            continue
+        if role == "tool":
+            tc_id = m.get("tool_call_id") or ""
+            if tc_id and tc_id in valid_ids:
+                valid_ids.discard(tc_id)
+                out.append(m)
+                continue
+            # Orphan: re-emit as a user message so the payload is valid.
+            content = m.get("content")
+            if not isinstance(content, str):
+                content = str(content or "")
+            label = (
+                f"[orphan tool result for call {tc_id}]\n{content}"
+                if tc_id else f"[orphan tool result]\n{content}"
+            )
+            out.append({"role": "user", "content": label})
+            continue
+        # Any non-assistant, non-tool message resets the pairing window
+        # — a stray user/system in the middle means the next assistant
+        # turn would re-establish its own tool_calls.
+        if role not in (None, "assistant", "tool"):
+            valid_ids.clear()
+        out.append(m)
+    return out
+
+
 def _strip_reasoning(text: str) -> str:
     if not text:
         return text
@@ -857,13 +909,36 @@ class OpenAIProvider:
         """Flatten the layered prompt and normalize Anthropic-shaped
         assistant / tool_result messages into OpenAI shape.
 
-        This is the translation boundary. Tool calls coming in are
-        already in neutral `ToolCall` shape (they were produced by a
-        provider); tool_result messages arrive as Anthropic-native
-        dicts because that's what the agent loop emits today. We map:
+        This is the translation boundary. Three message shapes can land
+        in the rolling history depending on which provider produced the
+        turn:
 
+          1. Anthropic-native: assistant content is a list of block
+             objects ({"type":"text"...} / {"type":"tool_use"...}); a
+             tool_result lives on a user message as a content block.
+          2. OpenAI-native: assistant content is the raw OpenAI message
+             dict ({"role":"assistant","content":str,"tool_calls":[…]});
+             a tool_result is its own {"role":"tool", ...} entry.
+          3. Plain string content (either provider).
+
+        Anthropic→OpenAI:
             {"role":"user","content":[{"type":"tool_result",...}]} →
                 {"role":"tool","tool_call_id":...,"content":...}
+
+        OpenAI dict pass-through: when the assistant content is already
+        the OpenAI message dict (raw_assistant_content from a previous
+        OpenAI turn, stored verbatim by the agent loop), preserve its
+        tool_calls verbatim. Without this, iterating the dict treats
+        its keys as block objects and emits an empty assistant turn —
+        which then orphans the following role:"tool" message and
+        triggers HTTP 400 "Invalid parameter: messages with role 'tool'
+        must be a response to a preceding message with 'tool_calls'".
+
+        Final guard: any role:"tool" entry that is NOT preceded by an
+        assistant message carrying tool_calls is converted to a user
+        message. OpenAI rejects unpaired tool roles, but the underlying
+        information (a tool's text output) is still useful as plain
+        context — better than a 400 that fails the whole turn.
         """
         out: list[dict] = [{"role": "system", "content": system.flat()}]
         for m in messages:
@@ -877,6 +952,19 @@ class OpenAIProvider:
                         "tool_call_id": item.get("tool_use_id", ""),
                         "content": item.get("content", ""),
                     })
+            elif role == "assistant" and isinstance(content, dict) and \
+                    content.get("role") == "assistant":
+                # OpenAI-native message dict stored verbatim by the agent
+                # loop (raw_assistant_content from a prior OpenAI turn).
+                # Pass through, preserving tool_calls.
+                msg: dict[str, Any] = {
+                    "role": "assistant",
+                    "content": content.get("content") or "",
+                }
+                tcs = content.get("tool_calls")
+                if tcs:
+                    msg["tool_calls"] = tcs
+                out.append(msg)
             elif role == "assistant" and not isinstance(content, str):
                 text_parts: list[str] = []
                 tool_calls: list[dict] = []
@@ -912,13 +1000,22 @@ class OpenAIProvider:
                                 "arguments": json.dumps(tc_args or {}),
                             },
                         })
-                msg: dict[str, Any] = {"role": "assistant", "content": "\n".join(text_parts)}
+                msg = {"role": "assistant", "content": "\n".join(text_parts)}
                 if tool_calls:
                     msg["tool_calls"] = tool_calls
                 out.append(msg)
+            elif role == "tool":
+                # Preserve tool_call_id — without it OpenAI cannot pair
+                # the reply to the assistant turn that emitted the call.
+                out.append({
+                    "role": "tool",
+                    "tool_call_id": m.get("tool_call_id", ""),
+                    "content": content,
+                })
             else:
                 out.append({"role": role, "content": content})
-        return out
+
+        return _repair_unpaired_tool_messages(out)
 
     def _call(
         self, role: RoleConfig, openai_messages: list[dict], tools: list[ToolSpec]
