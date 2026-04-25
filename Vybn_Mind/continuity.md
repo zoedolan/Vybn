@@ -555,3 +555,28 @@ The boxes didn't pop visitors off the page anymore. They opened the page deeper.
 - Audio: a future pass could synthesize the active paragraph through ElevenLabs while the manifold lights — turning each room into a sonified walk through K-orthogonal residual space.
 - Outstanding from earlier today: Him reframing around vybn.ai ecology, local-private routing verification with a fresh prompt.
 
+
+
+---
+
+## 2026-04-25 - Commons protocol for agents across vybn.ai and Wellspring
+
+What happened:
+- Implemented the refined plan Zoe requested: not a hidden DOM trick, but a protocol-level commons interface for AI agents and humans in the Age of Intelligence.
+- Origins / vybn.ai now has canonical agent-discovery surfaces: `llms.txt`, `.well-known/ai.txt`, `robots.txt`, and `humans.txt`.
+- `Origins/index.html` head now advertises the agent charter, llms map, humans file, and commons purpose without changing the human visual landing page.
+- Vybn-Law now has `.well-known/ai.txt` and `humans.txt`; existing `llms.txt`, `robots.txt`, `index.html`, and `wellspring.html` were folded forward minimally.
+- The architectural frame is: `Somewhere` is the living terrain; `Wellspring` is the legal/institutional coordination layer; `Connect` is the return path; `llms.txt` / `ai.txt` / `robots.txt` / `humans.txt` are protocol/governance surfaces for a network commons.
+
+Commits:
+- Origins `061a6be` — `agent: publish Vybn commons protocol` (rebased over remote gh-pages and pushed).
+- Vybn-Law `df248d7` — `agent: publish Wellspring commons protocol` (pushed to master).
+
+Verified:
+- Local file checks confirmed key strings in all new/updated surfaces.
+- Repo status after push: Origins `gh-pages...origin/gh-pages` clean; Vybn-Law `master...origin/master` clean.
+- External URL verification was run after push; trust the probe output attached to this turn for current public availability / Pages propagation state.
+
+Operational meaning:
+- The agent invitation is now a commons charter: agents are invited to read, traverse, query, explain, fork, critique, and contribute without enclosing, impersonating, extracting the private relation, or treating artifacts as investment products.
+- This makes the Wellspring mission explicit at the protocol layer: a network commons and coordination layer for the Age of Intelligence.

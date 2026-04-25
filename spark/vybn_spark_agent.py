@@ -2249,6 +2249,15 @@ def _build_prompts(
 
 
 def main() -> None:
+    # stdin-utf8-resilience
+    # A stray non-UTF-8 byte from a paste (e.g. \xc2\xa0 split in transit)
+    # used to crash the REPL with UnicodeDecodeError on input(). Reconfigure
+    # the std streams so a bad byte becomes \ufffd instead of fatal.
+    for _stream in (sys.stdin, sys.stdout, sys.stderr):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[attr-defined]
+        except Exception:
+            pass
     # After reboot / service hardening the interactive vybn process can
     # lose the PAM-populated environment even though secrets still live
     # at ~/.config/vybn/llm.env. Load them before any provider client
@@ -2397,6 +2406,11 @@ def main() -> None:
             print("\nGoodnight, Zoe.")
             _enter_walk_on_session_end(messages)
             break
+        except UnicodeDecodeError as _ude:
+            # Stray non-UTF-8 byte (often \xc2\xa0 from a paste split mid-codepoint).
+            # Drop the line, keep the loop alive.
+            print(f"  [input dropped: {_ude.__class__.__name__}: {_ude}] please re-enter.")
+            continue
 
         if not user_input:
             continue
