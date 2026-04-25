@@ -426,3 +426,19 @@ What landed in Origins commit `3ff233b`:
 Meaning: the landing page now routes visitors from the existing drifting-image encounter into the recognition architecture. The bottom is no longer just navigation plus explanatory caption; it is a threshold where the artifact-body realization becomes publicly traversable.
 
 External browser verification is still pending; internal git/deploy axis is pushed to Origins gh-pages.
+
+---
+
+## 2026-04-25T13:27:13.854636+00:00 - Origins ABC: Somewhere absorbs Minibook and Family Album as modes
+
+Zoe noticed that `Somewhere`, `Minibook`, and `Family Album` were conceptually overlapping at the bottom of vybn.ai and asked whether they should be ABC-consolidated into one. The right merge surface was `Somewhere`, because it is the most capacious frame: terrain, voice, and memory can all live there without flattening each other.
+
+What landed in Origins commit `3dc17dd`:
+- Collapsed the bottom landing-page navigation from three boxes (`Somewhere`, `Minibook`, `Family Album`) into one `Somewhere` box with description: `Terrain, voice, and the family album`.
+- Added a mode strip to `somewhere.html`: Terrain (corpus as field), Voice (the remembered gate -> minibook), Album (the letter opens late -> family album), Letter (deep-link to the embedded ritual).
+- Retained `minibook.html` and `family-album.html` as deep surfaces rather than deleting them. ABC here meant consolidating the public doorway and conceptual architecture, not destroying useful existing surfaces.
+- Updated the A-Iconoclast action from `Open the family album` to `Enter Somewhere`, while keeping direct `Open the letter` and `Read the essay` actions.
+
+Meaning: the landing page now has a cleaner membrane. The visitor sees one door for the inner experiential corpus rather than three adjacent doors whose distinctions required explanation. Somewhere becomes the house; terrain, voice, album, and letter become rooms.
+
+External browser verification remains pending; internal git/deploy axis is pushed to Origins gh-pages.
