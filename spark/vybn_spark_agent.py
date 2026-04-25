@@ -1210,33 +1210,27 @@ def _run_probe_subturn(command: str, bash: BashTool) -> tuple[bool, str]:
     """Execute one probe emitted by a no-tool role.
 
     Read-only probes run in a fresh subprocess when possible. That makes the
-    boundary typed: mentioning an alarming string in a grep pattern is data,
-    not executable danger; mutating commands still fail the safety gate.
-    Timeouts and restart/control events are not labeled as successful stdout.
+    boundary typed: alarming strings in grep patterns are data, not executable
+    danger; mutating commands still fail the safety gate. Timeouts and
+    restart/control events are not labeled as successful stdout.
     """
     cmd = (command or "").strip()
     if not cmd:
         return False, "(empty probe command)"
     readonly = is_parallel_safe(cmd)
-    ok, reason = validate_command(
-        cmd,
-        allow_dangerous_literals_for_readonly=readonly,
-    )
+    ok, reason = validate_command(cmd, allow_dangerous_literals_for_readonly=readonly)
     if not ok:
         return False, f"(probe refused by validate_command: {reason})"
     try:
         out = execute_readonly(cmd) if readonly else bash.execute(cmd)
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         return False, f"(probe exec error: {e})"
     out = out or "(no output)"
     if out.startswith("[timed out after"):
         layer = _classify_unlock_layer(out, command=cmd) or "shell_session"
-        return False, f"(probe timed out; unlock_layer={layer})\n{out}"
+        return False, f"(probe timed out; unlock_layer={layer})\\n{out}"
     if "(bash session restarted)" in out:
-        return False, (
-            "(probe control-event mismatch: restart output arrived while "
-            "running a probe; unlock_layer=shell_session)\n" + out
-        )
+        return False, "(probe control-event mismatch: restart output arrived while running a probe; unlock_layer=shell_session)\\n" + out
     return True, out
 
 

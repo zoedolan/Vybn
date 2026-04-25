@@ -39,6 +39,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shlex
 import subprocess
 import time
 from dataclasses import dataclass, field
@@ -266,10 +267,24 @@ def log_absorb(command: str) -> None:
         pass
 
 
-def validate_command(command: str) -> tuple[bool, str | None]:
+def validate_command(
+    command: str,
+    *,
+    allow_dangerous_literals_for_readonly: bool = False,
+) -> tuple[bool, str | None]:
+    """Return whether a shell command may execute.
+
+    The blocklist protects against executable destructive intent. A harness
+    that repairs itself must also inspect the strings that define its own
+    guards. When the caller has already classified the command as read-only,
+    dangerous-looking text inside grep/sed/cat/nl/git-grep arguments is data,
+    not intent. Mutating commands remain blocked.
+    """
     lower = command.lower().strip()
     for pattern in DANGEROUS_PATTERNS:
         if pattern in lower:
+            if allow_dangerous_literals_for_readonly and is_parallel_safe(command):
+                continue
             return False, f"Blocked: '{pattern}'"
     return True, None
 
@@ -314,26 +329,119 @@ _NON_READONLY_TOKENS = (
 )
 
 
-def is_parallel_safe(command: str) -> bool:
-    """True if `command` can run in a fresh subprocess without mutating
-    shell state or the filesystem. Conservative by design — a false
-    negative just routes through the persistent shell."""
-    if not command or not command.strip():
-        return False
+def _strip_leading_cd(command: str) -> str | None:
+    """Strip one simple leading `cd PATH &&` used as environment setup."""
     c = command.strip()
-    for tok in _NON_READONLY_TOKENS:
-        if tok in c:
+    if not c.startswith("cd ") or "&&" not in c:
+        return c
+    prefix, rest = c.split("&&", 1)
+    target = prefix[3:].strip().strip('"\'')
+    if not target or any(ch in target for ch in ";&|<>`$(){}[]\n\r"):
+        return None
+    return rest.strip() or None
+
+
+def _split_shell_segments(command: str) -> list[str]:
+    """Split shell control operators outside quotes.
+
+    This is intentionally smaller than a full shell parser. Its job is to
+    classify executable heads while preserving quoted data as data.
+    """
+    segments: list[str] = []
+    buf: list[str] = []
+    quote: str | None = None
+    escape = False
+    i = 0
+    while i < len(command):
+        ch = command[i]
+        if escape:
+            buf.append(ch); escape = False; i += 1; continue
+        if ch == "\\":
+            buf.append(ch); escape = True; i += 1; continue
+        if quote:
+            buf.append(ch)
+            if ch == quote:
+                quote = None
+            i += 1; continue
+        if ch in ('"', "'"):
+            quote = ch; buf.append(ch); i += 1; continue
+        if ch == ";":
+            seg = "".join(buf).strip()
+            if seg: segments.append(seg)
+            buf = []; i += 1; continue
+        if command.startswith("&&", i) or command.startswith("||", i):
+            seg = "".join(buf).strip()
+            if seg: segments.append(seg)
+            buf = []; i += 2; continue
+        if ch == "|":
+            seg = "".join(buf).strip()
+            if seg: segments.append(seg)
+            buf = []; i += 1; continue
+        buf.append(ch); i += 1
+    seg = "".join(buf).strip()
+    if seg: segments.append(seg)
+    return segments
+
+
+def _readonly_head(tokens: list[str], segment: str) -> bool:
+    if not tokens:
+        return False
+    if tokens[0] in {"cat", "ls", "ll", "grep", "rg", "fgrep", "egrep",
+                     "head", "tail", "sed", "awk", "wc", "find", "locate",
+                     "stat", "file", "tree", "echo", "printf", "date",
+                     "whoami", "pwd", "env", "jq", "yq", "md5sum", "sha1sum",
+                     "sha256sum", "diff", "cmp", "nl"}:
+        return True
+    if tokens[0] == "git" and len(tokens) >= 2 and tokens[1] in {
+        "log", "status", "diff", "show", "rev-parse", "blame", "branch",
+        "remote", "grep",
+    }:
+        return True
+    if tokens[0] == "curl" and any(t.startswith("-s") or t.startswith("-fs") for t in tokens[1:]):
+        return True
+    if tokens[0] in {"python3", "python"} and len(tokens) >= 2:
+        if tokens[1] == "-c":
+            return True
+        if len(tokens) >= 4 and tokens[1:3] == ["-m", "py_compile"]:
+            return True
+    return any(segment.startswith(h) for h in _READONLY_HEADS)
+
+
+def is_parallel_safe(command: str) -> bool:
+    """True when `command` can run in a fresh subprocess as read-only.
+
+    This classifier is token-semantic rather than raw-text-semantic: mutating
+    executable heads are refused, while alarming strings inside arguments to
+    read-only inspection tools remain inspectable data.
+    """
+    work = _strip_leading_cd(command or "")
+    if not work:
+        return False
+    for segment in _split_shell_segments(work):
+        try:
+            tokens = shlex.split(segment)
+        except ValueError:
             return False
-    # Split by pipeline / logical separators; every segment must START
-    # with a known read verb. We do not try to parse quoting precisely;
-    # if a segment has a quoted separator it will just be treated as one
-    # segment and still needs to start with a readonly head.
-    work = c
-    for sep in ("&&", "||", ";", "|"):
-        work = work.replace(sep, "\x01")
-    segments = [seg.strip() for seg in work.split("\x01") if seg.strip()]
-    for seg in segments:
-        if not any(seg.startswith(h) for h in _READONLY_HEADS):
+        if not tokens:
+            return False
+        executable = tokens[0]
+        if executable in {"cd", "pushd", "popd", "export", "unset", "source", ".",
+                          "mv", "cp", "rm", "rmdir", "mkdir", "touch", "chmod",
+                          "chown", "ln", "kill", "pkill", "killall", "systemctl",
+                          "service", "docker"}:
+            return False
+        if executable in {"pip", "npm", "apt", "apt-get"}:
+            return False
+        if executable == "git" and len(tokens) >= 2 and tokens[1] in {
+            "commit", "push", "pull", "merge", "rebase", "add", "reset",
+            "checkout", "stash", "clone",
+        }:
+            return False
+        if any(tok in {">", ">>", "<"} for tok in tokens):
+            return False
+        if "VYBN_ABSORB_REASON=" in segment:
+            return False
+        if not _readonly_head(tokens, segment):
             return False
     return True
 
@@ -357,7 +465,11 @@ def execute_readonly(command: str, timeout: int = DEFAULT_TIMEOUT) -> str:
             env={**os.environ, "TERM": "dumb"},
         )
     except subprocess.TimeoutExpired:
-        return f"[timed out after {timeout}s]"
+        return (
+            f"[timed out after {timeout}s]\n"
+            "[control event: fresh-subprocess-timeout; no persistent shell "
+            "state was changed. Narrow the command or escalate to a tool role.]"
+        )
     except Exception as e:
         return f"[exec error: {e}]"
     out = (proc.stdout or "") + (proc.stderr or "")

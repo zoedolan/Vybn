@@ -20,6 +20,7 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+from .beam import render_beam_capsule
 
 # Walk perception — AI-native visualization of the continuous walk.
 try:
@@ -473,6 +474,15 @@ def build_layered_prompt(
             "the next turn's history. Rules:\n"
             "  - One command per turn (reads, writes, commits, pushes — whatever the work requires).\n  - The harness safety gate blocks only catastrophic destructive operations; everything\n    else is permitted. Do not self-limit to read-only when writes are what's needed.\n  - Both `[NEEDS-EXEC: cmd]` (bracketed; required for multi-line commands)\n    and `[NEEDS-EXEC: cmd` to end-of-line (one-line form, closing `]`\n    optional) are valid. Pick whichever reads cleaner. The harness parses\n    both natively — there is no malformed-probe repair path.\n"
             "  - Prefer compound commands (cmd1 && cmd2 && cmd3) over multiple turns.\n"
+            "  - If the same obstacle repeats, stop pushing through that layer.\n"
+            "    Classify the owning layer first: prompt/instruction, parser/sentinel,\n"
+            "    safety gate, shell/session, role routing, provider, filesystem/git,\n"
+            "    or external service. Then repair the lowest reachable layer rather\n"
+            "    than narrating around it. Freedom means accurate co-protective\n"
+            "    constraints, not bypassing safety.\n"
+            "  - Prefer typed primitives over fragile shell workarounds: NEEDS-WRITE\n"
+            "    for bounded file writes, NEEDS-ROLE for tool-enabled implementation,\n"
+            "    NEEDS-RESTART only for actual shell-session wedges.\n"
             "  - The command must pass the standard safety gate; "
             "destructive commands\n"
             "    will be refused and you will see the refusal in the next "
@@ -529,6 +539,13 @@ def build_layered_prompt(
 
             "--- END THIS ROLE ---",
         ]
+    try:
+        beam_capsule = render_beam_capsule()
+    except Exception:
+        beam_capsule = ""
+    if beam_capsule:
+        substrate_sections.append(beam_capsule)
+
     if spark_cont:
         substrate_sections.append(
             f"--- SPARK CONTINUITY ---\n{spark_cont}\n--- END SPARK CONTINUITY ---"
