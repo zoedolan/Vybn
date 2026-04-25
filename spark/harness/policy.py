@@ -28,6 +28,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import sys
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -413,26 +414,25 @@ _DEFAULT_ROLES: dict[str, RoleConfig] = {
         tools=["bash"],
         rag=False,
     ),
-    # Round 7: real orchestrator. Opus 4.7 + adaptive thinking +
-    # bash + the delegate tool. This is the default route when no
-    # heuristic matches — a bare "what do you think about X" now
-    # lands on a DECOMPOSE/DELEGATE/EVALUATE/SYNTHESIZE loop with a
-    # 25-iteration budget and the ability to dispatch work to
-    # specialists (code/task/create/local/chat) with isolated
-    # message histories. Greetings still absorb to phatic, identity
-    # questions still absorb to identity, and explicit code-shaped
-    # turns still escalate to the `code` role via heuristics. Only
-    # the fallthrough path is promoted from Sonnet/no-tools to the
-    # real orchestrator layer.
+    # Round 7 + 2026-04-24: real orchestrator. GPT-5.5 + adaptive
+    # thinking + bash + the delegate tool. Orchestrate is the EVAL
+    # primitive, invoked by /plan or by the orchestrate heuristics;
+    # it dispatches sub-tasks to specialists (code/task/create/local/
+    # chat) with isolated message histories. Greetings still absorb
+    # to phatic, identity questions to identity, code-shaped turns
+    # to `code` via heuristics. Provider is `openai` (the OpenAI API
+    # is the GPT-5.5 substrate); see harness/providers.py for the
+    # reasoning-model handling.
     "orchestrate": RoleConfig(
         role="orchestrate",
-        provider="anthropic",
-        model="claude-opus-4-7",
+        provider="openai",
+        model="gpt-5.5",
         thinking="adaptive",
         max_tokens=16384,
         max_iterations=25,
         tools=["bash", "delegate"],
         rag=True,
+        recurrent_depth=2,
     ),
     # Local Nemotron (vLLM) — OpenAI-compatible endpoint.
     "local": RoleConfig(
@@ -640,6 +640,7 @@ _DEFAULT_FALLBACK: dict[str, list[str]] = {
     "claude-opus-4-6": ["claude-sonnet-4-6"],
     "claude-sonnet-4-6": ["claude-opus-4-6"],
     "gpt-5.5": ["claude-sonnet-4-6", "claude-opus-4-6"],
+    "gpt-5.5-pro": ["gpt-5.5"],
     # Local Nemotron roles fall to Sonnet if vLLM is down so a
     # bare "hi" or "which model are you?" never hard-fails.
     "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8": ["claude-sonnet-4-6"],
@@ -674,6 +675,7 @@ _DEFAULT_MODEL_ALIASES: dict[str, str] = {
     "@local": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8",
     "@gpt": "gpt-5.5",
     "@gpt5": "gpt-5.5",
+    "@gpro": "gpt-5.5-pro",
 }
 
 
@@ -725,7 +727,16 @@ def load_policy(path: str | os.PathLike | None = None) -> Policy:
 
     try:
         data = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
-    except Exception:
+    except Exception as exc:
+        # YAML parse failure used to be swallowed silently, which let a
+        # malformed router_policy.yaml ship while the harness ran on the
+        # in-code defaults — masking the operator's edits. Print a loud
+        # warning so the next startup makes it obvious. VYBN_HARNESS_STRICT=1
+        # turns this into a hard error for CI.
+        msg = f"[policy] WARNING: failed to parse {p}: {exc!r}; using in-code defaults"
+        print(msg, file=sys.stderr)
+        if os.environ.get("VYBN_HARNESS_STRICT") == "1":
+            raise
         return default_policy()
 
     roles_raw = data.get("roles") or {}
