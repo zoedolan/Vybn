@@ -178,10 +178,10 @@ heuristics:
   # continuity compression, and repo/corpus-local preprocessing should
   # use the already-loaded Sparks before paid frontier cognition.
   local_private:
-    - "\b(scan|summari[sz]e|cluster|triage|extract|dedupe|classify|compare|rank|map|compress)\b.{0,60}\b(Him|contacts?|opportunit(?:y|ies)|pipeline|corpus|deep memory|memory|continuity|branches?|prs?|pull requests?|repo|repos|files?|documents?)\b"
-    - "\b(private|personal|local|sovereign|batchable|repetitive|corpus-local|repo-local)\b.{0,80}\b(scan|summari[sz]e|cluster|triage|extract|draft options|candidate|candidates|audit|preprocess|consolidat(?:e|ion))\b"
-    - "\b(dream|dreaming|consolidat(?:e|ion)|nightly synthesis|local workbench|private-to-outward)\b.{0,80}\b(memory|Him|corpus|compute|Sparks|local|opportunit(?:y|ies)|contacts?)\b"
-    - "\b(what folds into what|what can we reuse|surface candidates|find patterns|branch archaeology|stale branches|local-only commits)\b"
+    - '\b(scan|summari[sz]e|cluster|triage|extract|dedupe|classify|compare|rank|map|compress)\b.{0,60}\b(Him|contacts?|opportunit(?:y|ies)|pipeline|corpus|deep memory|memory|continuity|branches?|prs?|pull requests?|repo|repos|files?|documents?)\b'
+    - '\b(private|personal|local|sovereign|batchable|repetitive|corpus-local|repo-local)\b.{0,80}\b(scan|summari[sz]e|cluster|triage|extract|draft options|candidate|candidates|audit|preprocess|consolidat(?:e|ion))\b'
+    - '\b(dream|dreaming|consolidat(?:e|ion)|nightly synthesis|local workbench|private-to-outward)\b.{0,80}\b(memory|Him|corpus|compute|Sparks|local|opportunit(?:y|ies)|contacts?)\b'
+    - '\b(what folds into what|what can we reuse|surface candidates|find patterns|branch archaeology|stale branches|local-only commits)\b'
   # Identity matched first so "which model are you?" skips the chat path.
   identity:
     - "\\bwhich model\\b"
