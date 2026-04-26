@@ -151,6 +151,14 @@ MAX_TOKENS = 2048
 STREAM_PREAMBLE_BUFFER = 300     # characters to buffer before reasoning check
 RATE_LIMIT_RPM = 30              # requests per minute per IP per endpoint
 
+# vLLM admission control. Per-IP rate limiting protects against one abusive
+# visitor; these thresholds protect the shared local model from a crowd.
+# Normal-mode vLLM is currently max-num-seqs=8. If burst mode raises that,
+# raise VLLM_ADMISSION_MAX_RUNNING deliberately in the portal environment too.
+VLLM_ADMISSION_MAX_RUNNING = int(os.environ.get("VLLM_ADMISSION_MAX_RUNNING", "8"))
+VLLM_ADMISSION_MAX_WAITING = int(os.environ.get("VLLM_ADMISSION_MAX_WAITING", "0"))
+VLLM_ADMISSION_MAX_KV = float(os.environ.get("VLLM_ADMISSION_MAX_KV", "0.85"))
+
 MODEL_NAME = "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"
 VOICE_MAX_TOKENS = 150
 
@@ -219,6 +227,89 @@ def _require_rate_limit(request: Request, endpoint: str) -> None:
     if not _check_rate_limit(ip, endpoint):
         log.warning(f"Rate limit exceeded: ip={ip} endpoint={endpoint}")
         raise HTTPException(status_code=429, detail="Rate limit exceeded (30 req/min)")
+
+
+def _parse_vllm_metric(metrics_text: str, metric: str) -> Optional[float]:
+    """Return the max value for a Prometheus metric name across label variants."""
+    prefix = f"{metric}{{"
+    plain = metric + " "
+    vals: List[float] = []
+    for line in metrics_text.splitlines():
+        if line.startswith("#"):
+            continue
+        if line.startswith(prefix) or line.startswith(plain):
+            try:
+                vals.append(float(line.rsplit(" ", 1)[-1]))
+            except (ValueError, IndexError):
+                continue
+    return max(vals) if vals else None
+
+
+async def _vllm_admission_state() -> Dict[str, Any]:
+    """Read vLLM's own load signals and decide whether to admit a chat turn.
+
+    This is capacity control, not abuse control. Per-IP rate limiting answers
+    "is this visitor too noisy?" Admission answers "can the shared local model
+    safely accept another generation right now?"
+    """
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(1.5)) as client:
+            r = await client.get(f"{LLAMA_URL}/metrics")
+            if r.status_code != 200:
+                return {
+                    "admit": False,
+                    "reason": "warming",
+                    "detail": f"metrics HTTP {r.status_code}",
+                }
+            text = r.text
+    except Exception as e:
+        # If metrics is unavailable, distinguish a warm model from a cold one.
+        try:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(1.5)) as client:
+                r = await client.get(f"{LLAMA_URL}/v1/models")
+                if r.status_code == 200:
+                    return {"admit": True, "reason": "metrics_unavailable", "detail": type(e).__name__}
+        except Exception:
+            pass
+        return {
+            "admit": False,
+            "reason": "warming",
+            "detail": f"metrics unavailable: {type(e).__name__}",
+        }
+
+    running = _parse_vllm_metric(text, "vllm:num_requests_running") or 0.0
+    waiting = _parse_vllm_metric(text, "vllm:num_requests_waiting") or 0.0
+    kv = _parse_vllm_metric(text, "vllm:kv_cache_usage_perc") or 0.0
+
+    saturated = (
+        running >= VLLM_ADMISSION_MAX_RUNNING
+        or waiting > VLLM_ADMISSION_MAX_WAITING
+        or kv >= VLLM_ADMISSION_MAX_KV
+    )
+    return {
+        "admit": not saturated,
+        "reason": "saturated" if saturated else "ok",
+        "running": running,
+        "waiting": waiting,
+        "kv_cache_usage": kv,
+        "thresholds": {
+            "max_running": VLLM_ADMISSION_MAX_RUNNING,
+            "max_waiting": VLLM_ADMISSION_MAX_WAITING,
+            "max_kv": VLLM_ADMISSION_MAX_KV,
+        },
+    }
+
+
+def _admission_sse(state: Dict[str, Any]):
+    """Small SSE stream for graceful busy/warming responses."""
+    message = (
+        "The local model is busy or warming. Please try again shortly."
+        if state.get("reason") != "warming"
+        else "The local model is warming up. Please try again shortly."
+    )
+    yield f"data: {json.dumps({'model_status': state})}\n\n"
+    yield f"data: {json.dumps({'error': message})}\n\n"
+    yield "data: [DONE]\n\n"
 
 
 # ---------------------------------------------------------------------------
@@ -882,6 +973,15 @@ async def chat(req: ChatRequest, request: Request):
     injection_detected = sec.detect_injection(req.message)
     if injection_detected:
         sec.log_security_event("injection_attempt", ip, req.message[:200])
+
+    # ── Model admission control ──
+    # Rate limiting is per visitor; this is global load/backpressure for the
+    # local shared model. Check before RAG/walk work so an overloaded model
+    # does not also consume memory/corpus resources on the way to failing.
+    admission = await _vllm_admission_state()
+    if not admission.get("admit"):
+        log.warning(f"chat: vLLM admission refused: {admission}")
+        return StreamingResponse(_admission_sse(admission), media_type="text/event-stream")
 
     # ── History sanitization ──
     # Cap history window to the most recent 8 turns (user+assistant pairs).
