@@ -46,6 +46,9 @@ class CommonsWalkTests(unittest.TestCase):
         self.assertIn("repoState", packet["observed"]["Vybn"])
         self.assertEqual(packet["blockedActions"][0]["authority"], "private_local_only")
         self.assertIn("traceCandidate", packet)
+        phase_blocks = [a for a in packet["blockedActions"] if a["node"] == "vybn-phase"]
+        self.assertTrue(phase_blocks)
+        self.assertTrue(all(a["authority"] == "private_local_only" for a in phase_blocks))
 
     def test_target_classification_and_authority(self):
         self.assertEqual(classify_target("https://vybn.ai/somewhere.html"), "public_url")

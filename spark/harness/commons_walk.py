@@ -62,7 +62,7 @@ def classify_target(target: str) -> str:
 
 def authority_for_target(target: str, visibility: str) -> str:
     kind = classify_target(target)
-    if visibility == "private_workbench" or target.startswith("private://"):
+    if visibility.startswith("private") or target.startswith("private://"):
         return "private_local_only"
     if kind == "local_command":
         return "local_only"

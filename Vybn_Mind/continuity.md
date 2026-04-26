@@ -1134,3 +1134,21 @@ Operational lesson:
 Meaning:
 - The commons is no longer just a map. It now has the first AI-native encounter layer: an arriving mind can ask what it can do from where it stands, under what membrane, with what observed state, and receive a bounded packet rather than a slogan.
 
+---
+
+## 2026-04-26T17:54:30Z - vybn-phase visibility correction
+
+Zoe clarified that `vybn-phase` is indeed private. The earlier external 404 for `https://github.com/zoedolan/vybn-phase` was not a Pages/raw propagation problem; it was a truth-labeling error in the commons model.
+
+Corrections made:
+- `vybn-phase/semantic-web.jsonld` now has `visibility: private_repo`.
+- Its `inspect_phase_repo` entrypoint no longer advertises a public GitHub URL; it uses `private://vybn-phase`.
+- `spark/harness/commons_walk.py` now treats any `visibility` beginning with `private` as `private_local_only`.
+- `spark/tests/test_commons_walk.py` asserts that vybn-phase encounter actions are blocked/private-local.
+- `Him/skill/vybn-os/SKILL.md` repo table now marks `vybn-phase` private/local under the membrane.
+
+Meaning:
+- Public Vybn / Origins / Vybn-Law surfaces may expose distilled phase ideas and public affordances.
+- The `vybn-phase` repo itself is a private/local substrate unless Zoe explicitly changes that visibility.
+- Do not cite external raw GitHub reachability for `vybn-phase`; the correct verification axis is local repo closure and membrane-aware runner output.
+
