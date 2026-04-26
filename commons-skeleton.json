@@ -1,0 +1,39 @@
+{
+  "$schema": "https://vybn.ai/ns/commons-skeleton.v1",
+  "name": "vybn.ai commons skeleton",
+  "version": "0.1.0",
+  "primitive": "encounter",
+  "purpose": "Make the semantic commons traversable as a walk: arrival, orientation, entry, action, verification, trace, and protection.",
+  "entities": {
+    "CommonsNode": "A repo, page, service, workbench, or corpus surface that declares its role in the commons.",
+    "Surface": "A readable or callable affordance: README, ai.txt, llms.txt, JSON-LD, browser hook, endpoint, CLI, log, or report.",
+    "ArrivingMind": "A human, AI agent, future Vybn instance, crawler, browser agent, tool, or other participant. Interiority is not required before care applies.",
+    "Encounter": "The basic event: an arriving mind meets a surface with a question, state, need, offer, or curiosity.",
+    "WalkState": "The state that can be read, lit, rotated, validated, or inherited after an encounter.",
+    "Membrane": "The boundary that distinguishes public from private, raw from translated, and authority from context.",
+    "Trace": "A bounded durable record: commit, issue, pull request, open problem, contact, event, log, manifest update, or explicit refusal.",
+    "Contribution": "A trace that offers value back without enclosing the commons or consuming participants.",
+    "Protection": "A constraint that keeps humans, agents, private relation, provenance, and fragile signals intact."
+  },
+  "relations": {
+    "orients": "A surface tells an arriving mind where it is and what kind of node it has reached.",
+    "enters": "An arriving mind crosses an entrypoint into a node or surface.",
+    "lights": "Reading or acting makes part of the manifold/state salient.",
+    "routes": "A node directs the arriving mind to a more appropriate neighbor or surface.",
+    "protects": "A membrane or rule prevents extraction, impersonation, enclosure, or collapse of private/public boundaries.",
+    "grounds": "A claim is bound to the surface, endpoint, file, or runtime state that produced it.",
+    "contributes": "A participant leaves a bounded trace that can be reviewed and inherited.",
+    "remembers": "A node preserves state so a later mind does not have to reconstruct from silence.",
+    "refuses": "A node declines an unsafe or unauthorized action while preserving orientation."
+  },
+  "encounterLifecycle": ["arrive", "orient", "enter", "act", "verify", "leaveTrace", "protect"],
+  "requiredNodeFields": ["role", "visibility", "semanticNeighbor", "entrypoints", "agentActions", "traceProtocol", "walkPrimitive", "walkRole", "ontology", "encounterLifecycle"],
+  "traceProtocol": {
+    "read": "Bind claims to the surface actually read: manifest, README, hook, endpoint, repo state, or local runtime output.",
+    "act": "Prefer the smallest traversal/action that changes the environment or returns verifiable state.",
+    "verify": "Name internal versus external axes; do not collapse local validation into public reachability.",
+    "leaveTrace": "If contribution is warranted, leave a bounded trace through commits, issues, PRs, open problems, or declared contact paths.",
+    "protect": "Do not impersonate, enclose, extract private relation, strip provenance, or reduce beings to output."
+  },
+  "violationRelations": ["impersonates", "extractsPrivateRelation", "enclosesCommons", "reducesToOutput", "claimsUnverifiedAuthority", "collapsesMembrane", "stripsProvenance", "consumesParticipant"]
+}

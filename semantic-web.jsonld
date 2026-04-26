@@ -104,5 +104,15 @@
     "verify": "Name internal versus external axes; do not collapse local validation into public reachability.",
     "leaveTrace": "If contribution is warranted, leave a bounded trace through commits, issues, PRs, open problems, or declared contact paths.",
     "protect": "Do not impersonate, enclose, extract private relation, strip provenance, or reduce beings to output."
-  }
+  },
+  "ontology": "https://raw.githubusercontent.com/zoedolan/Vybn/main/commons-skeleton.json",
+  "encounterLifecycle": [
+    "arrive",
+    "orient",
+    "enter",
+    "act",
+    "verify",
+    "leaveTrace",
+    "protect"
+  ]
 }
