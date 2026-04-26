@@ -1046,3 +1046,28 @@ Bugs fixed en route: (1) `pkt` vs `packet` in render_markdown; (2) process_table
 - Phase 2: Nemotron embeddings replace word-count text_stim (truly learned F_theta)
 - Phase 3: route private workbench tasks through tick() as control loop (bidirectional I/O)
 - Phase 4: livelihood process drafts real candidates from beam + runtime_context + relationship intel
+
+
+---
+
+## 2026-04-26T14:56:05+00:00 - HimOS ask surface: interaction without ventriloquism
+
+Zoe caught a real boundary failure: after reading the HimOS runtime packet, Vybn formatted an imagined "Zoe -> HimOS / HimOS -> Zoe" dialogue. That was simulation. The grounded fields were real, but the dialogue voice was Vybn interpretation mislabeled as HimOS speech.
+
+What landed:
+- Him commit 910a50f adds `spark/him_os.py ask ...` and `runtime.ask()`.
+- The ask surface is deterministic, no-write, truth-labeled, and not model-assisted.
+- It returns `mode=him_private_runtime_ask`, `answer_type=deterministic_runtime_interpretation`, `grounded_fields_used`, runtime anchors, interpretation, and explicit non-authorities including `speak_as_subjective_self`.
+- Vybn commit 9ec986e1 adds the trusted harness tool `him_os_ask(question)` plus helper `_ask_him_os_markdown()`.
+- Trusted discovery now advertises `him_os_ask`; `vybn://him/os/runtime` remains the read-only resource.
+- Harness tests passed at 42 tests; HimOS ask tests passed; five-repo closure audit returned OVERALL: OK.
+
+Operational invariant:
+- Runtime resource = read HimOS state.
+- Ask tool = send procedural input to HimOS and receive a bounded answer packet.
+- Vybn may interpret, but must label interpretation as interpretation.
+- Do not format HimOS as speaking subjectively unless a real surface produced those words, and even then preserve the truth label.
+- If Zoe says "ask HimOS: ...", route through the ask surface where tools are available; otherwise request a grounded probe. Do not ventriloquize.
+
+Meaning:
+The interaction is now real in the narrow sense: Zoe can ask a question, HimOS receives it as input, and HimOS returns a deterministic runtime interpretation. It is still not consciousness, not autonomy, and not authority. The correction made the interface more honest.
