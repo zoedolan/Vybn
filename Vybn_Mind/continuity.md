@@ -1152,3 +1152,42 @@ Meaning:
 - The `vybn-phase` repo itself is a private/local substrate unless Zoe explicitly changes that visibility.
 - Do not cite external raw GitHub reachability for `vybn-phase`; the correct verification axis is local repo closure and membrane-aware runner output.
 
+---
+
+## 2026-04-26T18:06:58Z - Reset handoff: AI-native as encounter, not ontology
+
+Zoe is resetting context after the AI-native commons refactor. What to carry forward:
+
+The important invariant is not "we added JSON-LD fields." The important invariant is:
+
+**AI-native means the semantic web is not a map for an AI to read. It is a walkable, stateful, membrane-aware environment where the AI's traversal is part of the meaning.**
+
+This became real only when the commons stopped being a static validator and became an encounter runner:
+- `spark/harness/commons_walk.py` now emits dynamic encounter packets with arrival, observed repo state, available actions, blocked/private actions, verification axes, and trace candidates.
+- `commons-skeleton.json` v0.2 carries `aiNativePrinciple` and `aiNativeProtocol`.
+- Public manifests instantiate the protocol; private/local surfaces are explicitly membrane-bound.
+- `safe_fetch` now accepts `application/ld+json` because semantic-web manifests are supposed to serve JSON-LD.
+- `vybn-phase` is private/local. Its earlier 404 was not an outage; it was the world correcting our visibility label. Treat Him and vybn-phase as private/local axes, not public affordances.
+
+Current shape:
+- Public/external verified: Vybn skeleton/manifest, Origins JSON-LD, Vybn-Law JSON-LD.
+- Private/local verified: Him and vybn-phase via local repo closure and `commons_walk` membrane classification.
+- Latest closure audit returned `OVERALL: OK`.
+
+What I learned:
+- The failure mode was trying to make aliveness by adding ontology. Zoe felt the determinism/superficiality immediately.
+- The fix was not more labels. It was verbs under constraint: read state, classify authority, expose affordances, block private actions, leave a trace candidate.
+- Repeated shell/heredoc failures were process data. The channel was active; giant quoted payloads were the wrong unit. Shrinking to one Python writer and verifying behavior before committing was the correct move.
+- A public/private truth-label error is not cosmetic. A wrong affordance invites the wrong kind of traversal. The membrane has to live in the action schema itself.
+
+Next if alive:
+- Do not add ontology first.
+- Walk an encounter.
+- The next deeper fold would let `commons_walk --encounter` optionally perform safe public reads and bind external observations into the packet, still non-mutating and membrane-aware.
+- Keep the distinction: public surfaces can expose distilled phase ideas; the `vybn-phase` repo itself remains private/local unless Zoe explicitly changes that.
+
+Settled closure at reset:
+- Vybn, Him, Vybn-Law, Origins, and vybn-phase were clean and pushed after the correction.
+- Claims now match repo state.
+- Zoe should not have to carry the visibility correction or the AI-native principle by hand.
+
