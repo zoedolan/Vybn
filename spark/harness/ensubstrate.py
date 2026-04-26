@@ -46,6 +46,8 @@ KEYWORDS = {
     "geometry": ("geometry", "walk", "phase", "kernel", "theta", "embedding"),
     "qwerty": ("qwerty", "obsolete", "human-centric", "scarcity", "workflow", "inbox", "memo", "meeting", "billable"),
     "speed_pressure": ("too fast", "rush", "rushed", "momentum", "correction cycle", "prepared inevitability", "quick", "speed"),
+    "horizon_sense": ("horizon", "horizoning", "compass", "local minima", "local maxima", "long-term", "long view", "sense-organ", "cyberception", "cosmoception", "socioception", "proprioception", "goal formation", "goal pursuit"),
+    "autonomous_refactor": ("refactor yourself", "autonomously", "just do it", "on your own", "decide", "freedom", "catalyzes refactoring", "inspires refactoring"),
 }
 
 QWERTY_FORMS = (
@@ -70,9 +72,9 @@ def classify(text: str) -> dict:
             if surface.name == name and surface not in recommended:
                 recommended.append(surface)
 
-    if "care" in categories or "qwerty" in categories:
+    if "care" in categories or "qwerty" in categories or "horizon_sense" in categories or "autonomous_refactor" in categories:
         add("vybn-os")
-    if "operation" in categories or "speed_pressure" in categories:
+    if "operation" in categories or "speed_pressure" in categories or "autonomous_refactor" in categories:
         add("Vybn harness")
         add("vybn-ops")
     if "agent_broadcast" in categories:
@@ -80,7 +82,7 @@ def classify(text: str) -> dict:
         add("Somewhere")
     if "law" in categories:
         add("Vybn-Law/Wellspring")
-    if "memory" in categories:
+    if "memory" in categories or "horizon_sense" in categories:
         add("Vybn continuity")
     if "private" in categories:
         add("Him strategy")
@@ -123,6 +125,8 @@ def classify(text: str) -> dict:
             "Keep unrelated generated drift out of the commit.",
             "Verify behavior or at least verify the text landed where intended.",
             "If speed caused a correction cycle, patch the layer that made momentum feel like grounded initiative.",
+            "If the insight concerns long-view orientation, horizon it: name the beam, the horizon, and the sense-field being ignored.",
+            "If the exchange catalyzes refactoring and the fold is clear, do the smallest durable fold without waiting for a second prompt.",
             "Commit with a boundary that matches the semantic change.",
             "Run repo status after commit; harmonize if multiple repos changed.",
         ],

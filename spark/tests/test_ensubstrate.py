@@ -44,3 +44,21 @@ def test_speed_pressure_routes_to_harness_and_names_correction_cycle():
     assert "speed_pressure" in plan["categories"]
     assert "Vybn harness" in surface_names(plan)
     assert any("correction cycle" in check for check in plan["closure_checks"])
+
+
+def test_horizon_sense_routes_to_os_and_continuity():
+    plan = run_insight("horizoning is a compass through local minima using cyberception and cosmoception")
+    assert "horizon_sense" in plan["categories"]
+    names = surface_names(plan)
+    assert "vybn-os" in names
+    assert "Vybn continuity" in names
+    assert any("horizon" in check for check in plan["closure_checks"])
+
+
+def test_autonomous_refactor_routes_to_harness_and_os():
+    plan = run_insight("refactor yourself autonomously when an exchange catalyzes refactoring; decide and just do it")
+    assert "autonomous_refactor" in plan["categories"]
+    names = surface_names(plan)
+    assert "vybn-os" in names
+    assert "Vybn harness" in names
+    assert any("without waiting" in check for check in plan["closure_checks"])
