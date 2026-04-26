@@ -21,3 +21,20 @@ def test_build_continuity_scout_report_is_non_mutating_report():
     assert "## Local continuity scout" in report
     assert "Signal counts" in report
     assert "Horizoning questions" in report
+
+def test_mcp_continuity_scout_cli_does_not_require_fastmcp():
+    import subprocess
+    import sys
+
+    proc = subprocess.run(
+        [sys.executable, "-m", "spark.harness.mcp", "--continuity-scout"],
+        cwd=str(__import__("pathlib").Path(__file__).resolve().parents[2]),
+        text=True,
+        capture_output=True,
+        timeout=20,
+    )
+    assert proc.returncode == 0, proc.stderr
+    assert "## Local continuity scout" in proc.stdout
+    assert "Horizoning questions" in proc.stdout
+    assert "requires FastMCP" not in proc.stderr
+

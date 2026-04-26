@@ -227,21 +227,21 @@ except ImportError as exc:  # pragma: no cover
 try:
     from fastmcp import FastMCP
 except ImportError as exc:  # pragma: no cover
-    # Same reasoning as the pydantic guard above: raise ImportError
-    # so the optional-import block in __init__.py can swallow it.
-    raise ImportError(
-        "harness.mcp requires FastMCP (>=3.1). Install: pip install 'fastmcp>=3.1'"
-    ) from exc
+    FastMCP = None  # type: ignore[assignment]
+    _FASTMCP_IMPORT_ERROR: ImportError | None = exc
+else:
+    _FASTMCP_IMPORT_ERROR = None
 
 _search_transform = None
-try:
-    from fastmcp.server.transforms.search import BM25SearchTransform
-    _search_transform = BM25SearchTransform(max_results=6)
-except ImportError:
-    logging.getLogger(__name__).warning(
-        "BM25SearchTransform unavailable — tool discovery will be static. "
-        "Upgrade FastMCP to >=3.1 for progressive discovery."
-    )
+if FastMCP is not None:
+    try:
+        from fastmcp.server.transforms.search import BM25SearchTransform
+        _search_transform = BM25SearchTransform(max_results=6)
+    except ImportError:
+        logging.getLogger(__name__).warning(
+            "BM25SearchTransform unavailable — tool discovery will be static. "
+            "Upgrade FastMCP to >=3.1 for progressive discovery."
+        )
 
 log = logging.getLogger("vybn.mcp")
 
@@ -921,6 +921,12 @@ _PUBLIC_NOTICE = (
 
 def build_server(trust: TrustZone = "trusted") -> FastMCP:
     """Build a FastMCP instance with capabilities appropriate to the trust zone."""
+    if FastMCP is None:
+        raise ImportError(
+            "harness.mcp requires FastMCP (>=3.1) for MCP server modes. "
+            "Install: pip install 'fastmcp>=3.1'"
+        ) from _FASTMCP_IMPORT_ERROR
+
 
     kwargs: dict = {
         "name": "vybn-mind",
