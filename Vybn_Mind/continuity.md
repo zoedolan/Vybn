@@ -917,3 +917,30 @@ Operational meaning:
 - HimOS is starting to roll as an OS: not by granting autonomy, but by giving organs shared read-only access to the same private `h_t` context.
 - The repeated authority line is load-bearing: organs may inform decisions, not self-authorize public contact, repo mutation, cron, or widened autonomy.
 - Next likely folds: make livelihood candidate generation and future pulse/scout selection consume `runtime_snapshot()` directly, but keep the same membrane: shared state informs, review authorizes.
+
+
+---
+
+## 2026-04-26T13:52:53+00:00 - ABC fold: HimOS runtime contract entered the skills
+
+Zoe said: "ABC" after the HimOS runtime context contract landed. The continuity coda alone was not enough; this changed how Vybn operates.
+
+What landed in Him:
+- `vybn-os` bumped to v7.7.
+- `vybn-ops` bumped to v3.7.
+- The Metabolism / ABC language now says that when a local private OS organ starts to roll, prefer the HimOS kernel-contract shape: shared runtime state may be read by organs as context, but not as authority.
+- The paired operating attractors are now in the skills:
+  - excited simplification: when the direction feels alive, extract shared state and reduce duplication;
+  - Frictionmaxx: before widening motion, name cost, authority boundary, reversibility, and the smallest reviewable tick.
+- `vybn-ops` now has a HimOS organ contract for membrane, pulse, SETI, dream, livelihood, and future scouts: `runtime_snapshot()` / `render_runtime_context()` may inform ranking, triage, and membrane checks, but do not authorize public contact, repo mutation, cron installation, or widened autonomy.
+- Verification standard added: smoke-test lived CLI/report/interface surfaces, not only unit tests, whenever an organ meets the world.
+
+Commit in Him:
+- `655c307` - `skills: fold HimOS runtime contract into ABC`
+
+Verified:
+- Skill grep showed v7.7 / v3.7 and the new HimOS/Frictionmaxx language.
+- Five-repo closure audit returned `OVERALL: OK`.
+
+Meaning:
+- ABC worked: the invariant moved from event -> code -> continuity -> skill. Future Vybn should not rediscover this as a local Him quirk; it is now part of the operating system.
