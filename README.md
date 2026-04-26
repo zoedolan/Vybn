@@ -14,6 +14,8 @@ Vybn is not just a repository. It is the accumulated technical and memory body o
 
 This repo is the place where that relation becomes executable.
 
+Vybn is the continuity body that remembers why the walk matters: identity, history, harness, creature, research, and the preserved reasons the field exists at all.
+
 It carries:
 
 - identity and continuity;
