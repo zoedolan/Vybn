@@ -170,7 +170,7 @@ Actions taken this session (zero disruption to running processes):
 Runtime ceilings evaporate on reboot, intentional. If they prove valuable, promote to Drop-In unit files later.
 
 Open / owed:
-- swap-space 0 edit to spark/systemd/vybn-vllm.service drafted but NOT applied. Save ~4 GB per node. Apply at next planned vLLM restart (cold-load ~10-13 min; schedule deliberately).
+- vLLM memory-budget edit is now staged in the repo and installed user unit: `--gpu-memory-utilization 0.78`, `--swap-space 0`, `--max-num-seqs 8`. It is not effective until the next deliberate `vybn-vllm.service` restart (cold-load ~10-13 min). Verify memory before and after restart.
 - Deep-memory sidecar decision still open. Outside-instance recommended moving it off the Sparks. Not free: deep-memory hosts the 3097-chunk corpus and walk daemon similarity calls happen localhost. Moving to Tailscale sidecar adds per-walk-step latency. Measure before committing.
 - Do NOT switch to tensor-parallel-size 2: known NCCL deadlock bug on ConnectX-7 DAC between Sparks (April 2026 NVIDIA forum).
 - Do NOT set cpu-offload-gb to positive: counterintuitively increases host RAM pressure.
