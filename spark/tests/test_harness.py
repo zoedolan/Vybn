@@ -576,8 +576,6 @@ class TestProviderRegistry(unittest.TestCase):
         self.assertIsNot(p1, p2)
 
 
-if __name__ == "__main__":
-    unittest.main(verbosity=2)
 
 class TestHimOSHarnessBridge(unittest.TestCase):
     def test_trusted_discovery_advertises_him_os_runtime(self):
@@ -594,3 +592,6 @@ class TestHimOSHarnessBridge(unittest.TestCase):
         self.assertIn("## Process table", body)
         self.assertIn("waking judgment", body)
 
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)
