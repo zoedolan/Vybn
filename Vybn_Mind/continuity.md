@@ -992,3 +992,25 @@ Process scar:
 State at handoff:
 - After the Origins commit, `python3 ~/Vybn/spark/harness/repo_closure_audit.py` returned `OVERALL: OK`.
 - This coda closes the loose thread named before reset.
+
+---
+
+## 2026-04-26 - External verification of Somewhere Shape room
+
+After recording the Somewhere Shape room, an external safe-fetch check against `https://vybn.ai/somewhere.html` initially looked like failure because raw HTML/script markers such as `data-room="shape"` and `vybn:somewhere-shape` were not present in the sanitized `safe_fetch` text output.
+
+Inspection showed the opposite: public fetch reached the live page.
+
+Verified external/public text axis:
+- FINAL_URL: `https://vybn.ai/somewhere.html`
+- CONTENT_TYPE: `text/html; charset=utf-8`
+- BYTES_READ: `161260`
+- The sanitized text included:
+  - "The rolling ratchet of HimOS: one true motion changes the environment the next motion closes over."
+  - "Zoe signal"
+  - the active readout text for the first Shape node
+  - the compressed invariant: "curiosity without sprawl · movement without self-authorization · private state without hidden power · continuity without Zoe carrying it alone"
+
+Meaning:
+- External visitor-facing text for the Shape room is live.
+- `safe_fetch` is not the right tool for verifying raw DOM/script hooks because it frames and extracts untrusted readable text. Use raw source fetch or browser/DOM probing for markers like `window.__somewhere.shape` or `vybn:somewhere-shape`.
