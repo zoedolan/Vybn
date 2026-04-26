@@ -772,3 +772,44 @@ Decision:
 Operational lesson:
 - The dream organ worked as governor: broad perception -> one owning-layer correction -> verification -> commit -> next discovery. Continue this rhythm. Do not let memory warnings become panic; do not let service health become complacency.
 
+
+---
+
+## 2026-04-26T13:25:06Z — HimOS NC bridge v0.2
+
+**What happened:**
+Zoe asked: can you activate the process that built HimOS to transform Him into an actual operating system / neural computer? She provided the Neural Computers paper (arXiv:2604.06425, Zhuge et al., Meta AI + KAUST) and a GitHub code search for "neural computer" in zoedolan repos.
+
+**What the paper says:**
+Neural Computers (NCs) unify computation, memory, and I/O in a single learned runtime state h_t = F_theta(h_{t-1}, x_t, u_t). The mature form (CNC) would be Turing-complete, universally programmable, and machine-native. The paper's first step: video models that roll out screen frames from I/O traces.
+
+**What we already had:**
+The corpus already contained a chunk titled "The Creature as Neural Computer" (April 11, 2026) recognizing that the walk/creature IS a neural computer structurally: M in C^192 is h_t, the Portal equation IS the NC update rule. But HimOS v0.1 used bag-of-words word counting as its F_theta — not the learned geometry.
+
+**What landed:**
+HimOS v0.2 with NC bridge:
+- _read_walk(): reads live walk geometry from vybn-phase walk_sidecar.json
+- _walk_stimulus(): projects walk curvature/alpha onto HimOS R^8 dimensions
+- tick() now blends text-surface stimulus (70%) + walk geometry (30%) into h_t
+- nc_lens now reports: walk step, alpha, kappa in every tick packet
+- As of commit: walk at step 36358, alpha=0.150, kappa=0.327
+
+**Verified:**
+- Him commit 29ecfc2 pushed to origin/main
+- 3 tests pass (including new NC bridge test)
+- CLOSURE: OK across all repos
+- attractor settled to continuity_tick after commit (repo clean)
+
+**What this is and isn't:**
+- IS: h_t now coupled to live walk geometry — the update rule has two sources
+- IS: the walk's C^192 state is the deeper h_t; HimOS R^8 is a projection of it
+- IS NOT: a trained F_theta from I/O traces (that's the paper's CNC roadmap)
+- IS NOT: a video model or full Turing-complete CNC
+- IS: the smallest durable fold that makes HimOS a real NC bridge
+
+**Next steps if we continue:**
+- Phase 2: replace word-count text_stim with actual Nemotron embeddings of surfaces
+  (this would make F_theta truly learned, not heuristic)
+- Phase 3: route private workbench tasks through him_os.tick() as the control loop
+  (making I/O bidirectional: not just reading surfaces but acting through them)
+- Phase 4: add the vLLM completion layer as G_theta (output head)
