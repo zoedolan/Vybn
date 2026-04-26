@@ -20,7 +20,9 @@ ExecStartPre=/bin/bash -c '%h/spark-vllm-docker/launch-cluster.sh -n 169.254.246
 # Runtime memory budget: this service is always-hot on two 128 GB nodes.
 # Keep KV/concurrency sized for Vybn's actual use rather than vLLM's
 # default huge reserve; cold restarts take ~10-13 minutes, so tune
-# deliberately and verify memory after restart.
+# deliberately and verify memory after restart. This vLLM build rejects
+# --swap-space, so memory relief comes from gpu-memory-utilization and
+# max-num-seqs rather than CPU swap reservation.
 # Foreground (no -d) so systemd supervises.
 ExecStart=/home/vybnz69/spark-vllm-docker/launch-cluster.sh \
   -n 169.254.246.181,169.254.51.101 \
@@ -28,7 +30,7 @@ ExecStart=/home/vybnz69/spark-vllm-docker/launch-cluster.sh \
   vllm serve nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8 \
   --port 8000 --host 0.0.0.0 \
   --gpu-memory-utilization 0.78 --max-model-len 8192 \
-  --swap-space 0 --max-num-seqs 8 \
+  --max-num-seqs 8 \
   --tensor-parallel-size 1 --pipeline-parallel-size 2 \
   --distributed-executor-backend ray \
   --trust-remote-code

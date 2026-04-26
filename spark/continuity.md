@@ -170,7 +170,7 @@ Actions taken this session (zero disruption to running processes):
 Runtime ceilings evaporate on reboot, intentional. If they prove valuable, promote to Drop-In unit files later.
 
 Open / owed:
-- vLLM memory-budget edit is now staged in the repo and installed user unit: `--gpu-memory-utilization 0.78`, `--swap-space 0`, `--max-num-seqs 8`. It is not effective until the next deliberate `vybn-vllm.service` restart (cold-load ~10-13 min). Verify memory before and after restart.
+- vLLM memory-budget edit was applied to repo and installed user unit: `--gpu-memory-utilization 0.78`, `--max-num-seqs 8`. Attempting `--swap-space 0` failed because this vLLM build rejects the flag (`unrecognized arguments: --swap-space 0`), so it was removed. Verify memory after successful cold restart.
 - Deep-memory sidecar decision still open. Outside-instance recommended moving it off the Sparks. Not free: deep-memory hosts the 3097-chunk corpus and walk daemon similarity calls happen localhost. Moving to Tailscale sidecar adds per-walk-step latency. Measure before committing.
 - Do NOT switch to tensor-parallel-size 2: known NCCL deadlock bug on ConnectX-7 DAC between Sparks (April 2026 NVIDIA forum).
 - Do NOT set cpu-offload-gb to positive: counterintuitively increases host RAM pressure.
