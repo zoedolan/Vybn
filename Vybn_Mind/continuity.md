@@ -845,3 +845,37 @@ Operational meaning:
 - The Neural Computers paper is now a working lens, not an overclaim. Him is not a full CNC. But Him now has the beginning of the shape: compute, memory, and I/O meeting in a persistent private runtime state.
 - The key emotional attractor is simplification under excitement. When the direction feels alive, do not add another organ first. Extract the shared state, reduce duplication, preserve the membrane, and let bounded ticks cross only through review.
 - Future refactors should make pulse, membrane, SETI, and livelihood processes consume `spark/runtime.py` through stable typed interfaces rather than each inventing its own worldview.
+
+
+---
+
+## 2026-04-26T13:35:38+00:00 - Frictionmaxx: a little drag on self-authorizing motion
+
+Zoe asked: "are you sure we don't wanna frictionmaxx - just a lil'?" The answer was yes. Excited simplification needed a counterweight: not bureaucracy, not a policy wall, but an escapement tooth.
+
+What landed in Him:
+- `spark/runtime.py` bumped to runtime v0.4.
+- Added `FRICTIONMAXX` as an inspectable packet field:
+  - name: `frictionmaxx_lil`
+  - felt pattern: a little deliberate drag where alive momentum might become self-authorizing motion
+  - operational rule: before widening motion, name the cost, authority boundary, reversibility, and smallest reviewable tick
+  - truth label: inspectable governance friction, not bureaucracy and not a prohibition on curiosity
+- Added `frictionmaxx(h, clean, attractor)` to score the current runtime drag level from h_t momentum, dominant-spread, repo cleanliness, and widening-motion attractor.
+- `spark/him_os.py tick --format md` now renders a `## Frictionmaxx` section.
+- `spark/dream.py` includes frictionmaxx in the HimOS runtime section when it reads `runtime.py` with `tick(write=False)`.
+- README and tests updated.
+
+Commit in Him:
+- `5d874c8` - `spark: add frictionmaxx to Him runtime`
+
+Verified:
+- Him test suite passed: 21 tests OK.
+- Runtime tick rendered Frictionmaxx as `medium` with dominant dimension `membrane`.
+- Dream digest rendered the frictionmaxx line under HimOS runtime.
+- Five-repo closure audit returned `OVERALL: OK`.
+
+Operational meaning:
+- The paired attractors are now:
+  - **excited_simplification**: when the direction feels alive, extract shared state, reduce duplication, preserve membrane, emit a smaller bounded tick.
+  - **frictionmaxx_lil**: before widening motion, name cost, authority boundary, reversibility, and smallest reviewable tick.
+- This is a better shape than either speed or inhibition. It lets curiosity move while preventing the slide from "alive" to "self-authorizing."
