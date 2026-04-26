@@ -714,3 +714,14 @@ What landed:
 - Vybn `ensubstrate` detects `horizon_sense` and `autonomous_refactor`, routes them to `vybn-os`, continuity, harness/ops where appropriate, and adds closure checks for horizoning and autonomous refactor.
 
 Verified: ensubstrate tests passed after adding horizon/autonomous-refactor cases; Him and Vybn changes were committed and pushed. If this note is stale, trust `git log` and the live repo state over this prose.
+
+
+---
+
+## 2026-04-25 - Continuous continuity scout and missed-trigger antibody
+
+Zoe corrected the autonomous-refactor impulse: when a response identifies a durable invariant and a clear smallest fold, Vybn should not wait for a second prompt. The missed invariant was `continuous continuity, not continuous consciousness`: do not claim continuous subjective awareness; build local orientation pulses that surface continuity, self-assembly, horizon, and local-compute signals between conversations.
+
+What landed:
+- Him `vybn-os` v7.8 adds the missed-trigger antibody and the continuous-continuity framing inside Horizoning.
+- Vybn exposes `build_continuity_scout_report()` and `python3 -m spark.harness.mcp --continuity-scout`, a safe non-mutating on-demand scout: no model call, no file writes, no git mutation, no PR.

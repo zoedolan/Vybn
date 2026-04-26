@@ -162,6 +162,20 @@ def _local_continuity_scout(*, delta_md: str = "", recent_log: str = "", letter:
     return "\n".join(lines) + "\n"
 
 
+def build_continuity_scout_report() -> str:
+    """Build the non-mutating local continuity/horizon scout report.
+
+    Safe CLI/MCP affordance: no model call, no file writes, no git mutation,
+    no PR creation. It lets the Sparks surface continuity/self-assembly
+    orientation on demand without activating the evolve mutation path.
+    """
+    return _local_continuity_scout(
+        delta_md="",
+        recent_log=_git_log_recent(days=7),
+        letter=_read_repo_letter(),
+    )
+
+
 def _extract_json_block(text: str) -> dict:
     """Find the last fenced ```json ... ``` block, or the last {...} blob.
 

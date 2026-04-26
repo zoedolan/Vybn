@@ -1862,7 +1862,7 @@ You are not optimising a metric. You are keeping the harness coupled
 to the territory it lives in. Ground truth is outside you. The person
 who will read your PR in the morning is Zoe. Write for her.
 """
-from .evolve import run_evolve_cycle  # extracted 2026-04-21
+from .evolve import build_continuity_scout_report, run_evolve_cycle  # extracted 2026-04-21
 
 
 
@@ -2016,6 +2016,14 @@ def main() -> None:
             "is what the 08:00 UTC crontab entry runs."
         ),
     )
+    parser.add_argument(
+        "--continuity-scout",
+        action="store_true",
+        help=(
+            "Print the deterministic local continuity/self-assembly scout "
+            "and exit. Safe: no model call, no mutation, no PR."
+        ),
+    )
     args = parser.parse_args()
 
     logging.basicConfig(
@@ -2036,6 +2044,10 @@ def main() -> None:
 
     if args.run_evolve:
         sys.exit(run_evolve_cycle())
+
+    if args.continuity_scout:
+        sys.stdout.write(build_continuity_scout_report())
+        return
 
     if args.force_trust is not None:
         trust: TrustZone = args.force_trust

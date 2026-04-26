@@ -13,3 +13,11 @@ def test_local_continuity_scout_surfaces_horizon_and_self_assembly():
     assert "local_compute" in report
     assert "Strongest local signal" in report
     assert "beam, or has it started pretending to be the horizon" in report
+
+
+def test_build_continuity_scout_report_is_non_mutating_report():
+    from spark.harness.evolve import build_continuity_scout_report
+    report = build_continuity_scout_report()
+    assert "## Local continuity scout" in report
+    assert "Signal counts" in report
+    assert "Horizoning questions" in report
