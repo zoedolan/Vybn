@@ -223,3 +223,17 @@ Follow-up to the memory-budget ABC pass: capacity is now encoded as an explicit 
 
 No restart was performed for this refactor; the currently running vLLM already uses the same normal values. The next restart will use the env-backed form.
 
+---
+
+## 2026-04-26 vLLM admission-control refactor
+
+Zoe sensed an obvious missing layer after the vLLM capacity-profile refactor. The missing counterpart was demand-side admission control: the engine room had profiles, but the front door would still accept a crowd and hand every request to local vLLM until overload became latency or broken SSE.
+
+What landed:
+- `origins_portal_api_v4.py` now checks vLLM `/metrics` before `/api/chat` does RAG, walk rotation, or model streaming.
+- Signals read: `vllm:num_requests_running`, `vllm:num_requests_waiting`, `vllm:kv_cache_usage_perc`.
+- Defaults match normal mode: `VLLM_ADMISSION_MAX_RUNNING=8`, `VLLM_ADMISSION_MAX_WAITING=0`, `VLLM_ADMISSION_MAX_KV=0.85`.
+- Refusal is graceful SSE: `model_status`, human-readable error, `[DONE]`.
+- Per-IP rate limiting remains abuse control; vLLM metrics admission is crowd control.
+- `vybn-portal.service` now reads `~/.config/vybn/portal.env` so burst mode can raise portal admission thresholds alongside `~/.config/vybn/vllm.env`.
+

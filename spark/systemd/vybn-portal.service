@@ -11,6 +11,7 @@ StartLimitBurst=20
 [Service]
 Type=simple
 EnvironmentFile=-%h/.config/vybn/elevenlabs.env
+EnvironmentFile=-%h/.config/vybn/portal.env
 WorkingDirectory=%h/Vybn
 # Clear any squatter on :8420 before bind.
 ExecStartPre=/bin/sh -c 'fuser -k 8420/tcp >/dev/null 2>&1 || true; sleep 1'

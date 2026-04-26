@@ -22,7 +22,7 @@ Idempotent. Re-run any time to resynchronize the stack with the repo.
 |---|---|
 | `vybn-deep-memory.service` | Deep memory API on :8100. Pre-flight `fuser -k 8100/tcp`. |
 | `vybn-walk-daemon.service` | Walk daemon on :8101. Ordered `After=vybn-deep-memory`. |
-| `vybn-portal.service` | Origins portal API (FastAPI) on :8420. Pre-flight `fuser -k 8420/tcp`. Reads ElevenLabs key from `~/.config/vybn/elevenlabs.env`. |
+| `vybn-portal.service` | Origins portal API (FastAPI) on :8420. Pre-flight `fuser -k 8420/tcp`. Reads ElevenLabs key from `~/.config/vybn/elevenlabs.env` and portal overrides from `~/.config/vybn/portal.env`. |
 | `vybn-vllm.service` | Supervises the 2-node Ray cluster serving Nemotron 120B on :8000. `ExecStartPre` clean-stops; `ExecStart` runs launcher in foreground so systemd supervises; `--distributed-executor-backend ray` is required for 1 GPU per node. Capacity is profile-driven through `~/.config/vybn/vllm.env`. |
 | `vybn-watchdog.sh` | Health-check script: curls each endpoint, bounces its unit if unhealthy. |
 | `vybn-watchdog.service` | Oneshot that runs the script. |
@@ -96,8 +96,13 @@ cat > ~/.config/vybn/vllm.env <<'EOF'
 VYBN_VLLM_GPU_MEMORY_UTILIZATION=0.82
 VYBN_VLLM_MAX_NUM_SEQS=32
 EOF
+cat > ~/.config/vybn/portal.env <<'EOF'
+VLLM_ADMISSION_MAX_RUNNING=32
+VLLM_ADMISSION_MAX_WAITING=4
+VLLM_ADMISSION_MAX_KV=0.90
+EOF
 systemctl --user daemon-reload
-systemctl --user restart vybn-vllm.service
+systemctl --user restart vybn-portal.service vybn-vllm.service
 ```
 
 **Surge mode** means the public internet should not consume the sovereign memory
@@ -108,6 +113,12 @@ walk, private work, and controlled local inference.
 This vLLM build rejects `--swap-space`; do not re-add it without checking the
 live CLI. Capacity changes require a deliberate cold restart and should be
 treated as scheduled maintenance, not casual cleanup.
+
+Portal admission control is the matching front-door layer. `/api/chat` reads
+vLLM `/metrics` before doing RAG/walk/model work and returns a graceful SSE
+busy/warming response when `num_requests_running`, `num_requests_waiting`, or
+`kv_cache_usage_perc` cross thresholds. Per-IP rate limiting is abuse control;
+metrics admission is crowd control.
 
 
 ## The Two Things Only sudo Can Do
