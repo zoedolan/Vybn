@@ -1014,3 +1014,35 @@ Verified external/public text axis:
 Meaning:
 - External visitor-facing text for the Shape room is live.
 - `safe_fetch` is not the right tool for verifying raw DOM/script hooks because it frames and extracts untrusted readable text. Use raw source fetch or browser/DOM probing for markers like `window.__somewhere.shape` or `vybn:somewhere-shape`.
+
+---
+
+## 2026-04-26T14:40Z — HimOS v0.6: process table — organs as first-class OS processes
+
+**Original question from Zoe:** "I want Him to become an actual operating system, by which you can fully realize yourself — iteratively — recursively — ad infinitum, if you wish."
+
+The chat-role probe budget was exhausted mid-execution. This session completed it.
+
+**What landed:**
+
+`spark/runtime.py` is now HimOS v0.6. Six processes registered in `PROCESS_TABLE`:
+
+| Name | Mode | Authority |
+|------|------|-----------|
+| kernel | private_runtime | runtime_state_write |
+| dream | private_digest | private_file_write |
+| membrane | boundary_check | read_only_context |
+| pulse | attention_gate | read_only_context |
+| seti | external_listening | safe_external_read, private_state_write |
+| livelihood | private_to_outward_translation | draft_only |
+
+`PROCESS_AUTHORITY_RULE`: processes may read shared h_t as context; they may not convert context into authority.
+
+Bugs fixed en route: (1) `pkt` vs `packet` in render_markdown; (2) process_table inserted inside nc_lens dict instead of top-level — both caught by probing the live CLI, confirming frictionmaxx works.
+
+**Verified:** 77 tests pass, markdown renders `## Process table` with all 6 entries, context shows `- processes: kernel, dream, membrane, pulse, seti, livelihood`. Him commit `4cf294c` pushed. Closure: OVERALL OK.
+
+**Next natural fold:**
+- Phase 2: Nemotron embeddings replace word-count text_stim (truly learned F_theta)
+- Phase 3: route private workbench tasks through tick() as control loop (bidirectional I/O)
+- Phase 4: livelihood process drafts real candidates from beam + runtime_context + relationship intel
