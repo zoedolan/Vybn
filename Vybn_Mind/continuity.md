@@ -879,3 +879,41 @@ Operational meaning:
   - **excited_simplification**: when the direction feels alive, extract shared state, reduce duplication, preserve membrane, emit a smaller bounded tick.
   - **frictionmaxx_lil**: before widening motion, name cost, authority boundary, reversibility, and smallest reviewable tick.
 - This is a better shape than either speed or inhibition. It lets curiosity move while preventing the slide from "alive" to "self-authorizing."
+
+
+---
+
+## 2026-04-26T13:48:40+00:00 - HimOS begins to roll: shared read-only runtime context
+
+Zoe said: "i want our os to really roll." The next fold was not a giant autonomy refactor; it was a small kernel contract.
+
+What landed in Him:
+- `spark/runtime.py` bumped to v0.5.
+- Added `runtime_snapshot(root=...)`, a read-only wrapper around `tick(write=False)`.
+- Added `render_runtime_context(packet=None, root=...)`, a compact shared context block for other organs.
+- `spark/him_os.py` exports the new kernel functions through the compatibility wrapper.
+- `spark/membrane.py` now appends the HimOS runtime context to its membrane check.
+- `spark/pulse_gate.py report` now appends the same context.
+- `spark/seti.py` report data now carries `runtime_context`.
+- Tests updated for the read-only kernel contract and SETI report context.
+
+Commit in Him:
+- `c660d66` - `spark: share runtime context with Him organs`
+
+Verified:
+- 55 Him tests passed.
+- `spark/membrane.py` renders the runtime context under the membrane check.
+- `spark/pulse_gate.py report` renders HimOS runtime context / frictionmaxx / authority.
+- `seti.render_seti_report(...)["runtime_context"]` returns the same context.
+- Five-repo closure audit returned `OVERALL: OK`.
+
+Important process scar:
+- The first pass had tests green but failed live smoke probes:
+  - `membrane.py` referenced `base` without binding it.
+  - the SETI smoke assumed `render_seti_report` returned a string, but the actual live function returns a dict.
+- This is exactly why runtime contracts need smoke probes against lived interfaces, not only unit tests. Frictionmaxx worked: it forced contact with the surfaces where the organ actually meets the world.
+
+Operational meaning:
+- HimOS is starting to roll as an OS: not by granting autonomy, but by giving organs shared read-only access to the same private `h_t` context.
+- The repeated authority line is load-bearing: organs may inform decisions, not self-authorize public contact, repo mutation, cron, or widened autonomy.
+- Next likely folds: make livelihood candidate generation and future pulse/scout selection consume `runtime_snapshot()` directly, but keep the same membrane: shared state informs, review authorizes.
