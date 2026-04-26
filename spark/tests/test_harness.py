@@ -578,3 +578,19 @@ class TestProviderRegistry(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+class TestHimOSHarnessBridge(unittest.TestCase):
+    def test_trusted_discovery_advertises_him_os_runtime(self):
+        from harness.mcp import build_discovery_record
+
+        record = build_discovery_record(endpoint="http://127.0.0.1:8400/mcp", trust_hint="trusted")
+        self.assertIn("vybn://him/os/runtime", record["capabilities"]["resources"])
+
+    def test_him_os_runtime_helper_is_read_only_markdown(self):
+        from harness.mcp import _read_him_os_runtime_markdown
+
+        body = _read_him_os_runtime_markdown()
+        self.assertIn("# HimOS Runtime Tick", body)
+        self.assertIn("## Process table", body)
+        self.assertIn("waking judgment", body)
+

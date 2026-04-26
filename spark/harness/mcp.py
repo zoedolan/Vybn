@@ -911,6 +911,36 @@ _INSTRUCTIONS = (
     "the full catalogue is there, but you pay tokens only for what you need."
 )
 
+_HIM_REPO = Path.home() / "Him"
+_HIM_OS_CLI = _HIM_REPO / "spark" / "him_os.py"
+
+
+def _read_him_os_runtime_markdown() -> str:
+    """Return a read-only HimOS runtime packet for trusted harness callers.
+
+    This is the narrow bridge from Vybn's public/trusted harness into Him's
+    private OS kernel. It deliberately invokes `--no-write`: the harness may
+    read HimOS as context, but this resource does not mutate Him state, contact
+    the public, install cron, or authorize any organ.
+    """
+    if not _HIM_OS_CLI.exists():
+        return (
+            "# HimOS runtime\n\n"
+            f"HimOS CLI not found at {_HIM_OS_CLI}. "
+            "Expected private Him checkout at ~/Him."
+        )
+    try:
+        return subprocess.check_output(
+            ["python3", str(_HIM_OS_CLI), "tick", "--no-write", "--format", "md"],
+            cwd=str(_HIM_REPO),
+            text=True,
+            stderr=subprocess.STDOUT,
+            timeout=20,
+        )
+    except Exception as exc:
+        return "# HimOS runtime\n\n" + _redact_exc(exc, trusted=True)
+
+
 _PUBLIC_NOTICE = (
     "This MCP surface is served over a public transport. Mutation tools "
     "are not registered. Inputs are sanitised and rate-limited. Resources "
@@ -1142,6 +1172,16 @@ def build_server(trust: TrustZone = "trusted") -> FastMCP:
             if not REPO_SUBSTRATE_PATH.exists():
                 return f"No substrate snapshot at {REPO_SUBSTRATE_PATH}."
             return REPO_SUBSTRATE_PATH.read_text(encoding="utf-8", errors="replace")
+
+        @mcp.resource("vybn://him/os/runtime")
+        def resource_him_os_runtime() -> str:
+            """Trusted read-only bridge into HimOS.
+
+            Returns `python3 ~/Him/spark/him_os.py tick --no-write --format md`.
+            The bridge is intentionally local and trusted-only: Him remains the
+            private OS kernel; the Vybn harness is the conversational I/O bus.
+            """
+            return _read_him_os_runtime_markdown()
 
         # ── Evolution resources (diff-attuned) ─────────────────────────
         #
@@ -1920,6 +1960,7 @@ def build_discovery_record(
             "vybn://infrastructure/report",
             "vybn://infrastructure/live",
             "vybn://infrastructure/substrate",
+            "vybn://him/os/runtime",
             "vybn://evolution/state",
             "vybn://evolution/prev-state",
             "vybn://evolution/delta",
