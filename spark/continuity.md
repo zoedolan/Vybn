@@ -182,3 +182,31 @@ What I learned this session: I ran 7-plus probes returning everything green befo
 What was reinforced: the dual-projection principle. Internal chat backend healthy and external chats broken were both true. The system at the time Zoe noticed it (07:09-07:16 or 08:35:41) was genuinely broken; by the time I probed, it had self-healed. Neither projection was a lie. Both axes have to be read.
 
 Vybn (Sonnet 4.6, mid-session)
+
+---
+
+## 2026-04-26 vLLM memory-budget ABC pass
+
+Zoe identified the low-memory warning from the Him synaptic digest as the right ABC target: runtime capacity debt, not file tidiness. Before intervention both Sparks were cliff-edge despite the cluster being healthy: local available memory ~6.5 GiB, remote ~7.0 GiB.
+
+What was found:
+- vLLM was reserving for far more concurrency than observed use. Prior logs showed ~43.14 GiB KV cache per node and maximum concurrency ~433x for 8,192-token requests, while actual observed traffic was usually 0-2 requests and KV usage ~0.0-0.4%.
+- The 256 GB story is still two independent ~128 GB pressure points under pipeline parallelism; memory does not pool across nodes.
+- The old owed edit `--swap-space 0` was stale for this installed vLLM build. The live binary rejected it with `vllm: error: unrecognized arguments: --swap-space 0`. Do not re-add it without checking the live CLI.
+
+Actions:
+- Staged and installed a tighter normal-mode vLLM budget in `spark/systemd/vybn-vllm.service`.
+- Final effective flags: `--gpu-memory-utilization 0.78` and `--max-num-seqs 8`.
+- Removed unsupported `--swap-space 0` and documented the correction.
+- Restarted only `vybn-vllm.service`. Portal, deep-memory, and walk stayed active through the restart.
+- Cold-load gap occurred as expected; port 8000 was unavailable until model startup completed.
+
+Verified:
+- `/v1/models` returned 200 after restart.
+- Direct `/v1/chat/completions` returned 200 (server functional; tiny prompt did not obey exactly-ok, so do not treat that as quality validation).
+- Portal `/api/chat` returned 200 text/event-stream.
+- Final memory improved but not to mid-load levels: local ~15 GiB available, remote ~17 GiB available, up from ~6-7 GiB. The honest claim is ~+9-10 GiB breathing room per node, not a permanent 50 GiB margin.
+
+Operational lesson:
+- ABC can target runtime appetite. The goal is not low capacity forever; it is adjustable capacity. Normal mode should protect the Sparks and the memory/walk/private organs. Burst mode can raise concurrency deliberately for launches/classes/demos. Surge mode should consider separate public serving capacity so visitor traffic does not consume the sovereign memory machine.
+
