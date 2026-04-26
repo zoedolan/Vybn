@@ -10,7 +10,7 @@ from urllib.error import HTTPError
 from urllib.parse import urljoin, urlparse
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
-ALLOWED_CONTENT_PREFIXES = ("text/", "application/json", "application/xml")
+ALLOWED_CONTENT_PREFIXES = ("text/", "application/json", "application/ld+json", "application/xml")
 
 @dataclass(frozen=True)
 class FetchResult:

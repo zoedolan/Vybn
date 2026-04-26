@@ -31,3 +31,9 @@ class SafeFetchTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SemanticWebContentTypeTests(unittest.TestCase):
+    def test_json_ld_is_allowed_content_prefix(self):
+        from spark.harness.safe_fetch import ALLOWED_CONTENT_PREFIXES
+        self.assertTrue(any("application/ld+json".startswith(p) for p in ALLOWED_CONTENT_PREFIXES))
