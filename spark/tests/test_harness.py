@@ -577,6 +577,7 @@ class TestProviderRegistry(unittest.TestCase):
 
 
 
+
 class TestHimOSHarnessBridge(unittest.TestCase):
     def test_trusted_discovery_advertises_him_os_runtime(self):
         from harness.mcp import build_discovery_record
