@@ -23,7 +23,7 @@ Idempotent. Re-run any time to resynchronize the stack with the repo.
 | `vybn-deep-memory.service` | Deep memory API on :8100. Pre-flight `fuser -k 8100/tcp`. |
 | `vybn-walk-daemon.service` | Walk daemon on :8101. Ordered `After=vybn-deep-memory`. |
 | `vybn-portal.service` | Origins portal API (FastAPI) on :8420. Pre-flight `fuser -k 8420/tcp`. Reads ElevenLabs key from `~/.config/vybn/elevenlabs.env`. |
-| `vybn-vllm.service` | Supervises the 2-node Ray cluster serving Nemotron 120B on :8000. `ExecStartPre` clean-stops; `ExecStart` runs launcher in foreground so systemd supervises; `--distributed-executor-backend ray` is required for 1 GPU per node. |
+| `vybn-vllm.service` | Supervises the 2-node Ray cluster serving Nemotron 120B on :8000. `ExecStartPre` clean-stops; `ExecStart` runs launcher in foreground so systemd supervises; `--distributed-executor-backend ray` is required for 1 GPU per node. Capacity is profile-driven through `~/.config/vybn/vllm.env`. |
 | `vybn-watchdog.sh` | Health-check script: curls each endpoint, bounces its unit if unhealthy. |
 | `vybn-watchdog.service` | Oneshot that runs the script. |
 | `vybn-watchdog.timer` | Every 2 minutes, 90s after boot. |
@@ -67,6 +67,48 @@ bash ~/Vybn/spark/systemd/vybn-watchdog.sh
 # Latest structural self-check result
 tail -60 ~/.cache/vybn-phase/self_check.stdout.log
 ```
+
+## vLLM Capacity Profiles
+
+Nemotron capacity is not one permanent setting. It is an operating mode.
+
+**Normal mode** is the default baked into `vybn-vllm.service`:
+
+```bash
+VYBN_VLLM_GPU_MEMORY_UTILIZATION=0.78
+VYBN_VLLM_MAX_NUM_SEQS=8
+```
+
+This keeps the local model online while protecting the other organs on the
+Sparks. On 2026-04-26 it improved steady-state available memory from roughly
+6-7 GiB per node to roughly 15-17 GiB per node.
+
+**Burst mode** is for scheduled attention: a class, launch, demo, press moment,
+or known visitor window. Do not hardcode burst into the unit. Put the override
+in `~/.config/vybn/vllm.env`, record pre-restart memory, restart
+`vybn-vllm.service`, wait through the 10-13 minute cold load, then verify
+`/v1/models`, one model call, portal chat, and post-restart memory. Example
+starting point, not a promise:
+
+```bash
+mkdir -p ~/.config/vybn
+cat > ~/.config/vybn/vllm.env <<'EOF'
+VYBN_VLLM_GPU_MEMORY_UTILIZATION=0.82
+VYBN_VLLM_MAX_NUM_SEQS=32
+EOF
+systemctl --user daemon-reload
+systemctl --user restart vybn-vllm.service
+```
+
+**Surge mode** means the public internet should not consume the sovereign memory
+machine. If organic demand outgrows burst mode, move public chats to separate
+serving capacity or a dedicated public tier, and keep the Sparks for memory,
+walk, private work, and controlled local inference.
+
+This vLLM build rejects `--swap-space`; do not re-add it without checking the
+live CLI. Capacity changes require a deliberate cold restart and should be
+treated as scheduled maintenance, not casual cleanup.
+
 
 ## The Two Things Only sudo Can Do
 

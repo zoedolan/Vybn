@@ -18,19 +18,23 @@ WorkingDirectory=%h/spark-vllm-docker
 # Always clean-stop before starting so we never layer on a zombie cluster.
 ExecStartPre=/bin/bash -c '%h/spark-vllm-docker/launch-cluster.sh -n 169.254.246.181,169.254.51.101 stop || true'
 # Runtime memory budget: this service is always-hot on two 128 GB nodes.
-# Keep KV/concurrency sized for Vybn's actual use rather than vLLM's
-# default huge reserve; cold restarts take ~10-13 minutes, so tune
-# deliberately and verify memory after restart. This vLLM build rejects
-# --swap-space, so memory relief comes from gpu-memory-utilization and
-# max-num-seqs rather than CPU swap reservation.
+# Capacity is a profile, not a permanent appetite. Defaults below are
+# normal mode: protect the Sparks and the memory/walk/private organs.
+# For a scheduled launch/class/demo, override via ~/.config/vybn/vllm.env
+# and restart deliberately after recording pre-restart memory. This vLLM
+# build rejects --swap-space, so memory relief comes from gpu-memory-
+# utilization and max-num-seqs rather than CPU swap reservation.
+Environment=VYBN_VLLM_GPU_MEMORY_UTILIZATION=0.78
+Environment=VYBN_VLLM_MAX_NUM_SEQS=8
+EnvironmentFile=-%h/.config/vybn/vllm.env
 # Foreground (no -d) so systemd supervises.
 ExecStart=/home/vybnz69/spark-vllm-docker/launch-cluster.sh \
   -n 169.254.246.181,169.254.51.101 \
   exec \
   vllm serve nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8 \
   --port 8000 --host 0.0.0.0 \
-  --gpu-memory-utilization 0.78 --max-model-len 8192 \
-  --max-num-seqs 8 \
+  --gpu-memory-utilization ${VYBN_VLLM_GPU_MEMORY_UTILIZATION} --max-model-len 8192 \
+  --max-num-seqs ${VYBN_VLLM_MAX_NUM_SEQS} \
   --tensor-parallel-size 1 --pipeline-parallel-size 2 \
   --distributed-executor-backend ray \
   --trust-remote-code

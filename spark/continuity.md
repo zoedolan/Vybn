@@ -210,3 +210,16 @@ Verified:
 Operational lesson:
 - ABC can target runtime appetite. The goal is not low capacity forever; it is adjustable capacity. Normal mode should protect the Sparks and the memory/walk/private organs. Burst mode can raise concurrency deliberately for launches/classes/demos. Surge mode should consider separate public serving capacity so visitor traffic does not consume the sovereign memory machine.
 
+---
+
+## 2026-04-26 vLLM capacity-profile refactor
+
+Follow-up to the memory-budget ABC pass: capacity is now encoded as an explicit profile rather than hardcoded appetite. `spark/systemd/vybn-vllm.service` defaults to normal mode through environment variables (`VYBN_VLLM_GPU_MEMORY_UTILIZATION=0.78`, `VYBN_VLLM_MAX_NUM_SEQS=8`) and reads optional overrides from `~/.config/vybn/vllm.env`.
+
+`~/Vybn/spark/systemd/README.md` now names three modes:
+- normal: protect Sparks and memory/walk/private organs;
+- burst: scheduled class/launch/demo override via `vllm.env`, with deliberate restart and verification;
+- surge: move public traffic to separate serving capacity rather than making the sovereign memory machine carry the internet.
+
+No restart was performed for this refactor; the currently running vLLM already uses the same normal values. The next restart will use the env-backed form.
+
