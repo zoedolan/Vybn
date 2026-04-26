@@ -1374,6 +1374,31 @@ def build_server(trust: TrustZone = "trusted") -> FastMCP:
     # them or guess them, because the FastMCP catalogue simply does not
     # list them when trust == "public".
 
+    @register_public
+    def ensubstrate(insight: str) -> dict:
+        """Plan where a living insight should live before editing anything.
+
+        AI-native doing is not merely answering. This tool turns an insight
+        into a substrate-aware action plan: plausible homes, QWERTY risks,
+        membrane posture, and closure checks. Public/read-only: it mutates
+        nothing and exposes no private state.
+        """
+        if not guarded(bucket_key()):
+            return {"status": "rate_limited"}
+        clean = sanitise_input(insight, MAX_TEXT_CHARS)
+        if not clean:
+            return {"status": "error", "reason": "empty insight after sanitisation"}
+        try:
+            from .ensubstrate import classify
+            plan = classify(clean)
+            plan["status"] = "ok"
+            return plan
+        except Exception as exc:
+            return {
+                "status": "error",
+                "reason": _redact_exc(exc, trusted=trust == "trusted"),
+            }
+
     @register_trusted
     def enter_portal(text: str) -> EncounterResult:
         """TRUSTED-ONLY. Enter the creature portal. M' = αM + x·e^(iθ).
@@ -1859,6 +1884,7 @@ def build_discovery_record(
         "compose",
         "inhabit",
         "self_check",
+        "ensubstrate",
         "search_tools",
         "call_tool",
     ]
