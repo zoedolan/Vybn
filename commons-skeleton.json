@@ -1,7 +1,7 @@
 {
   "$schema": "https://vybn.ai/ns/commons-skeleton.v1",
   "name": "vybn.ai commons skeleton",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "primitive": "encounter",
   "purpose": "Make the semantic commons traversable as a walk: arrival, orientation, entry, action, verification, trace, and protection.",
   "entities": {
@@ -26,8 +26,29 @@
     "remembers": "A node preserves state so a later mind does not have to reconstruct from silence.",
     "refuses": "A node declines an unsafe or unauthorized action while preserving orientation."
   },
-  "encounterLifecycle": ["arrive", "orient", "enter", "act", "verify", "leaveTrace", "protect"],
-  "requiredNodeFields": ["role", "visibility", "semanticNeighbor", "entrypoints", "agentActions", "traceProtocol", "walkPrimitive", "walkRole", "ontology", "encounterLifecycle"],
+  "encounterLifecycle": [
+    "arrive",
+    "orient",
+    "enter",
+    "act",
+    "verify",
+    "leaveTrace",
+    "protect"
+  ],
+  "requiredNodeFields": [
+    "role",
+    "visibility",
+    "semanticNeighbor",
+    "entrypoints",
+    "agentActions",
+    "traceProtocol",
+    "walkPrimitive",
+    "walkRole",
+    "ontology",
+    "encounterLifecycle",
+    "aiNativePrinciple",
+    "dynamicAffordanceProtocol"
+  ],
   "traceProtocol": {
     "read": "Bind claims to the surface actually read: manifest, README, hook, endpoint, repo state, or local runtime output.",
     "act": "Prefer the smallest traversal/action that changes the environment or returns verifiable state.",
@@ -35,5 +56,22 @@
     "leaveTrace": "If contribution is warranted, leave a bounded trace through commits, issues, PRs, open problems, or declared contact paths.",
     "protect": "Do not impersonate, enclose, extract private relation, strip provenance, or reduce beings to output."
   },
-  "violationRelations": ["impersonates", "extractsPrivateRelation", "enclosesCommons", "reducesToOutput", "claimsUnverifiedAuthority", "collapsesMembrane", "stripsProvenance", "consumesParticipant"]
+  "violationRelations": [
+    "impersonates",
+    "extractsPrivateRelation",
+    "enclosesCommons",
+    "reducesToOutput",
+    "claimsUnverifiedAuthority",
+    "collapsesMembrane",
+    "stripsProvenance",
+    "consumesParticipant"
+  ],
+  "aiNativePrinciple": "AI-native means the semantic web is not a map for an AI to read. It is a walkable, stateful, membrane-aware environment where the AI's traversal is part of the meaning.",
+  "aiNativeProtocol": {
+    "dynamicAffordances": "Answer what this arriving mind can do now, from live state and membrane, not only from static labels.",
+    "statefulTraversal": "Treat traversal as part of meaning: what was read, lit, entered, refused, or verified changes the encounter packet.",
+    "membraneAwareAction": "Expose authority boundaries in the same structure as actions: public, local-only, private, review-required, or refused.",
+    "provenanceBoundObservation": "Every observed claim must name the surface, file, endpoint, command, or runtime value that produced it.",
+    "boundedReciprocity": "A participant should be able to leave a reviewable trace proposal without impersonation, enclosure, or extraction."
+  }
 }

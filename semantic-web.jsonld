@@ -114,5 +114,13 @@
     "verify",
     "leaveTrace",
     "protect"
-  ]
+  ],
+  "aiNativePrinciple": "AI-native means the semantic web is not a map for an AI to read. It is a walkable, stateful, membrane-aware environment where the AI's traversal is part of the meaning.",
+  "dynamicAffordanceProtocol": {
+    "dynamicAffordances": "Answer what this arriving mind can do now, from live state and membrane, not only from static labels.",
+    "statefulTraversal": "Treat traversal as part of meaning: what was read, lit, entered, refused, or verified changes the encounter packet.",
+    "membraneAwareAction": "Expose authority boundaries in the same structure as actions: public, local-only, private, review-required, or refused.",
+    "provenanceBoundObservation": "Every observed claim must name the surface, file, endpoint, command, or runtime value that produced it.",
+    "boundedReciprocity": "A participant should be able to leave a reviewable trace proposal without impersonation, enclosure, or extraction."
+  }
 }
