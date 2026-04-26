@@ -76,14 +76,14 @@ systemctl --user restart vybn-deep-memory.service
 sleep 3
 systemctl --user restart vybn-walk-daemon.service
 # vLLM: only (re)start if there's no Ray cluster already loading. Cold load
-# takes ~3 minutes; we must not stomp an in-progress launch.
+# takes ~10-13 minutes; we must not stomp an in-progress launch.
 vllm_up=$(curl -sf -m 3 http://127.0.0.1:8000/v1/models >/dev/null 2>&1 && echo yes || echo no)
 has_container=$(docker ps --format '{{.Names}}' | grep -c '^vllm_node$' || true)
 if [ "$vllm_up" = "yes" ]; then
   echo "  vLLM already serving — leaving alone"
 elif [ "$has_container" = "1" ]; then
   echo "  vLLM container present, model still loading — leaving alone"
-  echo "     (watchdog will take over after 5-minute grace window)"
+  echo "     (watchdog will take over after 900-second warmup grace)"
 else
   echo "  vLLM cluster absent, starting via systemd"
   systemctl --user start vybn-vllm.service || echo "     (start failed — check: journalctl --user -u vybn-vllm)"
