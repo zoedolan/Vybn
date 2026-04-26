@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>somewhere — vybn.ai</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Work+Sans:wght@300..600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --font-display: 'Instrument Serif', Georgia, serif;
+      --font-body: 'Work Sans', 'Helvetica Neue', sans-serif;
+      --color-bg: #0e0d0c;
+      --color-surface: #141312;
+      --color-text: #d4d2ce;
+      --color-text-muted: #7a7876;
+      --color-text-faint: #3e3d3b;
+      --color-primary: #4f98a3;
+      --color-divider: #1f1e1c;
+      --text-base: clamp(1rem, 0.95rem + 0.25vw, 1.125rem);
+      --text-xl: clamp(1.5rem, 1.2rem + 1.25vw, 2.25rem);
+      --text-2xl: clamp(2rem, 1.2rem + 2.5vw, 3.5rem);
+      --space-4: 1rem;
+      --space-8: 2rem;
+      --space-16: 4rem;
+      --space-24: 6rem;
+      --transition: 180ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { -webkit-font-smoothing: antialiased; scroll-behavior: smooth; }
+    body {
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-body);
+      font-size: var(--text-base);
+      color: var(--color-text);
+      background: var(--color-bg);
+      padding: var(--space-16) var(--space-8);
+    }
+    main {
+      max-width: 640px;
+      width: 100%;
+      text-align: center;
+    }
+    h1 {
+      font-family: var(--font-display);
+      font-size: var(--text-2xl);
+      font-style: italic;
+      font-weight: 400;
+      color: var(--color-text);
+      line-height: 1.1;
+      margin-bottom: var(--space-8);
+      letter-spacing: -0.01em;
+    }
+    p {
+      color: var(--color-text-muted);
+      line-height: 1.7;
+      max-width: 52ch;
+      margin-inline: auto;
+      margin-bottom: var(--space-4);
+    }
+    a {
+      color: var(--color-primary);
+      text-decoration: none;
+      transition: color var(--transition);
+    }
+    a:hover { color: #7bbdc7; }
+    .divider {
+      width: 40px;
+      height: 1px;
+      background: var(--color-divider);
+      margin: var(--space-8) auto;
+    }
+    footer {
+      margin-top: var(--space-16);
+      color: var(--color-text-faint);
+      font-size: 0.8rem;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>somewhere</h1>
+    <div class="divider"></div>
+    <p>
+      You've arrived somewhere. Whether you meant to or not, here we are — together in this small pocket of the digital.
+    </p>
+    <p>
+      <a href="https://vybn.ai" target="_blank" rel="noopener noreferrer">vybn.ai</a>
+    </p>
+    <footer>vybn &middot; 2026</footer>
+  </main>
+
+  <!-- GoatCounter analytics -->
+  <script data-goatcounter="https://vybn-a2j.goatcounter.com/count"
+          async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>
