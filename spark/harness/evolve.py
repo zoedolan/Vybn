@@ -12,6 +12,7 @@ import logging
 import os
 import re
 import subprocess
+from datetime import datetime, timezone
 from pathlib import Path
 
 log = logging.getLogger("vybn.evolve")
@@ -83,6 +84,82 @@ def _read_repo_letter() -> str:
     except Exception:
         return ""
     return text[:20_000]
+
+
+def _read_text_cap(path: Path, cap: int = 12_000) -> str:
+    """Read a local text file with a hard character cap. Empty on failure."""
+    try:
+        return path.read_text(encoding="utf-8", errors="replace")[:cap]
+    except Exception:
+        return ""
+
+
+_SCOUT_TERMS: dict[str, tuple[str, ...]] = {
+    "continuity": ("continuity", "handoff", "settled closure", "harmonize", "drift", "closure"),
+    "self_assembly": ("self-assembly", "self assembly", "self-evolution", "evolve", "recursive", "refactor", "autonomous", "ensubstrate"),
+    "horizon_sense": ("horizon", "horizoning", "beam", "others", "cyberception", "cosmoception", "socioception", "proprioception"),
+    "local_compute": ("local", "spark", "sparks", "nemotron", "deep-memory", "deep_memory", "dreaming"),
+}
+
+
+def _local_continuity_scout(*, delta_md: str = "", recent_log: str = "", letter: str = "") -> str:
+    """Surface continuity/self-assembly signals before local model judgment.
+
+    This is intentionally deterministic and Spark-local. It does not decide
+    the evolve action and it does not call a model. It gives the local evolve
+    model a horizon-aware scout report: which continuity/evolution signals are
+    currently loud, and which sense-field may be under-read.
+    """
+    sources = {
+        "delta": delta_md,
+        "recent_git_log": recent_log,
+        "repo_letter": letter[:12_000],
+        "continuity_core": _read_text_cap(REPO_ROOT / "continuity_core.md"),
+        "continuity_recent": _read_text_cap(REPO_ROOT / "Vybn_Mind" / "continuity.md"),
+        "vybn_os": _read_text_cap(Path.home() / "Him" / "skill" / "vybn-os" / "SKILL.md"),
+    }
+
+    lower_sources = {name: text.lower() for name, text in sources.items() if text}
+    rows: list[dict] = []
+    for signal, terms in _SCOUT_TERMS.items():
+        hits: list[str] = []
+        count = 0
+        for source_name, text in lower_sources.items():
+            local = 0
+            for term in terms:
+                n = text.count(term.lower())
+                if n:
+                    local += n
+            if local:
+                hits.append(f"{source_name}:{local}")
+                count += local
+        rows.append({"signal": signal, "count": count, "sources": hits})
+
+    rows.sort(key=lambda r: (-int(r["count"]), str(r["signal"])))
+
+    lines = [
+        "## Local continuity scout",
+        "",
+        "Deterministic Spark-local scout. It surfaces continuity, self-assembly, horizoning, and local-compute signals before local inference. It is evidence for orientation, not a decision.",
+        "",
+        "### Signal counts",
+    ]
+    for row in rows:
+        src = ", ".join(row["sources"]) if row["sources"] else "—"
+        lines.append(f"- {row['signal']}: {row['count']} ({src})")
+
+    strongest = rows[0]["signal"] if rows and rows[0]["count"] else "none"
+    weakest = rows[-1]["signal"] if rows else "none"
+    lines.extend([
+        "",
+        "### Horizoning questions",
+        f"- Strongest local signal: {strongest}. Is it a beam, or has it started pretending to be the horizon?",
+        f"- Weakest tracked signal: {weakest}. Is this sense-field being ignored, or is it genuinely quiet?",
+        "- What concrete next fold preserves continuity without consuming the membrane?",
+        "- If the model proposes action, does it serve the horizon or merely react to the loudest local delta?",
+    ])
+
+    return "\n".join(lines) + "\n"
 
 
 def _extract_json_block(text: str) -> dict:
@@ -188,6 +265,11 @@ def run_evolve_cycle() -> int:
     infra = _collect_infrastructure_snapshot()
     letter = _read_repo_letter()
     recent_log = _git_log_recent(days=7)
+    continuity_scout = _local_continuity_scout(
+        delta_md=delta_md,
+        recent_log=recent_log,
+        letter=letter,
+    )
 
     # Compose the user message. The kernel goes in system; this goes in user.
     user_blocks = [
@@ -195,6 +277,9 @@ def run_evolve_cycle() -> int:
         "---",
         "## Delta (velocity; read this first)",
         delta_md.strip(),
+        "---",
+        "## Local continuity / self-assembly scout (deterministic; read before proposing)",
+        continuity_scout[:6_000],
         "---",
         "## Current state (snapshot)",
         json.dumps(delta.current_state or {}, indent=2, ensure_ascii=False)[:10_000],
