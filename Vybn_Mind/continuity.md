@@ -736,3 +736,39 @@ Zoe proposed that the AI-subconscious / dreaming coordination layer may be the p
 Durable invariant: `spark/harness` is the public/trusted grounding machine; Him is its private dreaming counterpart. Do not absorb Him into the public harness and do not make the harness depend on private state. Keep the interface narrow, local, typed, and non-mutating by default. Harness surfaces ground; Him decides what private dreaming can become.
 
 Also fixed a doctrine/reality mismatch: `spark/harness/AUDIT.md` still said `evolve.py` did not exist, but the live harness has `evolve.py` again. The audit now explains why the extraction is correct: MCP serves; evolve runs one cron/local-inference cycle.
+
+---
+
+## 2026-04-26T11:56:25+00:00 - comprehensive refactor pass: dream organ as governor
+
+What happened:
+- Zoe asked for a comprehensive multistep refactor to discover whatever the system could discover, with horizon view activated rather than an all-at-once rewrite.
+- Stage 1 closed Him SETI drift: `research/seti-handshakes.md` and `README.md` now agree that SETI state is ephemeral at `/tmp/vybn_seti_state.json`. Him commit `955a98f`.
+- Stage 2 widened `Him/spark/dream.py` into a non-mutating ecology digest: repo cleanliness, walk/deep-memory loopback health, and warnings. Him commit `1f64ad8`.
+- Stage 3 followed the dream warning and found a real vybn-phase bug: deep-memory cached `_load()` forever while walk_daemon updated the shared index on disk. Patched deep_memory to reload when `META_PATH` mtime changes. vybn-phase commit `41dbe75`.
+- Stage 4 labeled projection differences: external walk daemon vs deep-memory NC bridge, and local memory pressure. Him commit `8b6dc1f`.
+- Stage 5/6 added two-Spark node-local memory pressure to the dream digest. Him commit `43b720e`.
+
+Verified:
+- Five-repo closure was OK at the beginning of the pass.
+- SETI tests passed before commit.
+- dream tests passed at each stage, ending at 6 OK.
+- Disk cache, walk daemon, and deep-memory server all converged at 3323/3324 chunks after the mtime-cache fix.
+- vLLM source unit and installed user unit are identical.
+- vLLM is healthy and serving `nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8` with `max_model_len=8192`.
+
+Discovered / current warnings:
+- Memory pressure is real on both Sparks and now visible in the Him dream digest:
+  - local around 6.3-6.5 GiB available / 121.69 GiB, swap ~3.87 GiB used.
+  - remote around 7.0 GiB available / 119.67 GiB, swap ~0.83 GiB used.
+- Ordinary `ps` RSS and user-systemd `MemoryCurrent` underexplain the pressure; this is a projection issue involving vLLM/Ray/NVIDIA unified memory, not an obvious duplicate Python process.
+- The earlier continuity note about masked deep-memory/walk system units was about system-level units; live running services are user-level units in `~/.config/systemd/user/`, with source of truth in `~/Vybn/spark/systemd/`.
+- The previously discussed `--swap-space 0` mitigation was NOT applied. A probe of `vllm serve --help` did not confirm the flag in this environment, so applying it now would be prediction, not grounding.
+
+Decision:
+- Do not restart or tune vLLM blindly. It is healthy, and restart is outage-class (~10-13 min cold load).
+- Next memory mitigation must be a deliberate pass: verify exact vLLM 0.17.0rc1 supported flags inside the container, understand unified-memory accounting, then stage a config change and planned restart only if grounded.
+
+Operational lesson:
+- The dream organ worked as governor: broad perception -> one owning-layer correction -> verification -> commit -> next discovery. Continue this rhythm. Do not let memory warnings become panic; do not let service health become complacency.
+
