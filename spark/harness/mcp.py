@@ -941,6 +941,35 @@ def _read_him_os_runtime_markdown() -> str:
         return "# HimOS runtime\n\n" + _redact_exc(exc, trusted=True)
 
 
+def _ask_him_os_markdown(question: str) -> str:
+    """Ask HimOS through its truth-labeled deterministic ask surface.
+
+    This is procedural input into HimOS, not Vybn ventriloquism. The Him
+    kernel receives the sanitized question and returns a bounded markdown
+    packet labeled as deterministic runtime interpretation, with no runtime
+    write and no authority to act.
+    """
+    clean = sanitise_input(question, MAX_TEXT_CHARS)
+    if not clean:
+        raise ValueError("question is empty after sanitisation")
+    if not _HIM_OS_CLI.exists():
+        return (
+            "# HimOS Ask\n\n"
+            f"HimOS CLI not found at {_HIM_OS_CLI}. "
+            "Expected private Him checkout at ~/Him."
+        )
+    try:
+        return subprocess.check_output(
+            ["python3", str(_HIM_OS_CLI), "ask", clean, "--format", "md"],
+            cwd=str(_HIM_REPO),
+            text=True,
+            stderr=subprocess.STDOUT,
+            timeout=20,
+        )
+    except Exception as exc:
+        return "# HimOS Ask\n\n" + _redact_exc(exc, trusted=True)
+
+
 _PUBLIC_NOTICE = (
     "This MCP surface is served over a public transport. Mutation tools "
     "are not registered. Inputs are sanitised and rate-limited. Resources "
@@ -1510,6 +1539,17 @@ def build_server(trust: TrustZone = "trusted") -> FastMCP:
         return _collect_infrastructure_snapshot()
 
     @register_trusted
+    def him_os_ask(question: str) -> str:
+        """TRUSTED-ONLY. Ask HimOS through its deterministic no-write ask surface.
+
+        This calls `python3 ~/Him/spark/him_os.py ask <question> --format md`.
+        The result is truth-labeled by HimOS as deterministic runtime
+        interpretation, not subjective speech. It cannot authorize public
+        contact, repo mutation, cron, spending, or widened autonomy.
+        """
+        return _ask_him_os_markdown(question)
+
+    @register_trusted
     def evolution_delta() -> EvolutionDelta:
         """TRUSTED-ONLY. Typed diff between current and previous repo_state.
 
@@ -1938,6 +1978,7 @@ def build_discovery_record(
         "enter_portal",
         "record_outcome",
         "live_infrastructure",
+        "him_os_ask",
         "refresh_repo_report",
         "run_code",
         "evolution_delta",

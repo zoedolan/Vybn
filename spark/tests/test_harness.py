@@ -593,6 +593,20 @@ class TestHimOSHarnessBridge(unittest.TestCase):
         self.assertIn("## Process table", body)
         self.assertIn("waking judgment", body)
 
+    def test_trusted_discovery_advertises_him_os_ask_tool(self):
+        from harness.mcp import build_discovery_record
+
+        record = build_discovery_record(endpoint="http://127.0.0.1:8400/mcp", trust_hint="trusted")
+        self.assertIn("him_os_ask", record["capabilities"]["tools"])
+
+    def test_him_os_ask_helper_returns_truth_labeled_packet(self):
+        from harness.mcp import _ask_him_os_markdown
+
+        body = _ask_him_os_markdown("What are you?")
+        self.assertIn("# HimOS Ask", body)
+        self.assertIn("deterministic_runtime_interpretation", body)
+        self.assertIn("not HimOS subjective speech", body)
+
 
 
 class TestProviderRetryClassifier(unittest.TestCase):
