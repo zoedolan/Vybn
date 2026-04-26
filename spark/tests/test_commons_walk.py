@@ -6,6 +6,7 @@ from spark.harness.commons_walk import (
     load_manifests,
     load_skeleton,
     validate_commons_walk,
+    render_traversal_plan,
 )
 
 
@@ -22,6 +23,12 @@ class CommonsWalkTests(unittest.TestCase):
             self.assertTrue(manifest["traceProtocol"], name)
             self.assertEqual(manifest["ontology"], "https://raw.githubusercontent.com/zoedolan/Vybn/main/commons-skeleton.json")
             self.assertEqual(manifest["encounterLifecycle"], skeleton["encounterLifecycle"])
+
+    def test_render_traversal_plan_executes(self):
+        rendered = render_traversal_plan(load_manifests())
+        self.assertIn("primitive: encounter", rendered)
+        self.assertIn("validation: OK", rendered)
+        self.assertIn("## executable nodes", rendered)
 
     def test_target_classification(self):
         self.assertEqual(classify_target("https://vybn.ai/somewhere.html"), "public_url")

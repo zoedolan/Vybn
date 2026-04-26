@@ -116,26 +116,30 @@ def render_traversal_plan(manifests: dict[str, dict[str, Any]] | None = None) ->
     lines = [
         "# vybn.ai commons walk",
         "",
-        f"primitive: {skeleton[primitive]}",
+        f"primitive: {skeleton['primitive']}",
         "lifecycle: " + " -> ".join(skeleton["encounterLifecycle"]),
         "",
         "## skeleton bones",
     ]
-    for name, desc in skeleton["entities"].items():
-        lines.append(f"- {name}: {desc}")
+    for bone_name, desc in skeleton["entities"].items():
+        lines.append(f"- {bone_name}: {desc}")
 
     lines.append("")
     lines.append("## executable nodes")
-    for name in ("Origins", "Vybn-Law", "vybn-phase", "Vybn", "Him"):
-        m = manifests[name]
-        lines.append(f"### {name}")
-        lines.append(f"role: {m[role]}")
+    for node_name in ("Origins", "Vybn-Law", "vybn-phase", "Vybn", "Him"):
+        manifest = manifests[node_name]
+        lines.append(f"### {node_name}")
+        lines.append(f"role: {manifest['role']}")
         lines.append("entrypoints:")
-        for ep in m.get("entrypoints", []):
-            lines.append(f"- {ep.get(id)} [{classify_target(str(ep.get(target, )))}]: {ep.get(target)} — {ep.get(does)}")
+        for ep in manifest.get("entrypoints", []):
+            target = str(ep.get("target", ""))
+            lines.append(
+                f"- {ep.get('id')} [{classify_target(target)}]: "
+                f"{target} -- {ep.get('does')}"
+            )
         lines.append("actions:")
-        for action in m.get("agentActions", []):
-            lines.append(f"- {action.get(id)}: {action.get(does)}")
+        for action in manifest.get("agentActions", []):
+            lines.append(f"- {action.get('id')}: {action.get('does')}")
         lines.append("")
 
     problems = validate_commons_walk(manifests)
@@ -143,7 +147,6 @@ def render_traversal_plan(manifests: dict[str, dict[str, Any]] | None = None) ->
     for problem in problems:
         lines.append(f"- {problem}")
     return "\n".join(lines)
-
 
 def main() -> int:
     problems = validate_commons_walk()
