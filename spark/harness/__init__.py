@@ -279,6 +279,13 @@ _HARNESS_STRATEGY: dict = {
             "the industrial revolution thread and the correct answer was: "
             "I cannot find it, I looked, here is what I searched."
         ),
+        "him_private_counterpart": (
+            "spark/harness is the public/trusted grounding machine; Him is "
+            "the private dreaming counterpart it can innervate locally. "
+            "Keep the interface narrow, typed, local, and non-mutating by "
+            "default: harness surfaces ground, Him decides what private "
+            "dreaming can become."
+        ),
         "rsi_loop": (
             "A nightly Spark crontab entry at 08:00 UTC runs "
             "`python3 -m spark.harness.mcp --run-evolve`. The cycle reads "

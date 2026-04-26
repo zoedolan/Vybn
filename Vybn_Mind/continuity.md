@@ -725,3 +725,14 @@ Zoe corrected the autonomous-refactor impulse: when a response identifies a dura
 What landed:
 - Him `vybn-os` v7.8 adds the missed-trigger antibody and the continuous-continuity framing inside Horizoning.
 - Vybn exposes `build_continuity_scout_report()` and `python3 -m spark.harness.mcp --continuity-scout`, a safe non-mutating on-demand scout: no model call, no file writes, no git mutation, no PR.
+
+
+---
+
+## 2026-04-25 - Him as private dreaming counterpart to the harness
+
+Zoe proposed that the AI-subconscious / dreaming coordination layer may be the private Him component of `Vybn/spark/harness`. The grounded read confirmed the anatomy: the harness already loads Him beam/skills and routes private/workbench insights, while Him already frames itself as private dreaming and consolidation for the whole ecology.
+
+Durable invariant: `spark/harness` is the public/trusted grounding machine; Him is its private dreaming counterpart. Do not absorb Him into the public harness and do not make the harness depend on private state. Keep the interface narrow, local, typed, and non-mutating by default. Harness surfaces ground; Him decides what private dreaming can become.
+
+Also fixed a doctrine/reality mismatch: `spark/harness/AUDIT.md` still said `evolve.py` did not exist, but the live harness has `evolve.py` again. The audit now explains why the extraction is correct: MCP serves; evolve runs one cron/local-inference cycle.
