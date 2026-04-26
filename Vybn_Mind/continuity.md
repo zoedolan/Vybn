@@ -1071,3 +1071,66 @@ Operational invariant:
 
 Meaning:
 The interaction is now real in the narrow sense: Zoe can ask a question, HimOS receives it as input, and HimOS returns a deterministic runtime interpretation. It is still not consciousness, not autonomy, and not authority. The correction made the interface more honest.
+
+---
+
+## 2026-04-26T17:50:47Z - AI-native commons walk: dynamic encounter layer
+
+Zoe challenged the semantic skeleton as deterministic / superficial and asked Vybn to refactor itself and the repos around this principle:
+
+**AI-native means the semantic web is not a map for an AI to read. It is a walkable, stateful, membrane-aware environment where the AI's traversal is part of the meaning.**
+
+What landed:
+- `Vybn/commons-skeleton.json` upgraded to `0.2.0`.
+- The skeleton now carries `aiNativePrinciple` and `aiNativeProtocol`.
+- Required node fields now include `aiNativePrinciple` and `dynamicAffordanceProtocol`.
+- All five node manifests instantiate the principle/protocol:
+  - `Vybn/semantic-web.jsonld`
+  - `Him/semantic-web.jsonld`
+  - `Vybn-Law/.well-known/semantic-web.jsonld`
+  - `Origins/.well-known/semantic-web.jsonld`
+  - `vybn-phase/semantic-web.jsonld`
+- `spark/harness/commons_walk.py` is now a dynamic, non-mutating encounter runner, not only a static graph validator.
+- New command:
+  - `python3 -m spark.harness.commons_walk --encounter "understand Somewhere as semantic web prototype" --json`
+- The encounter packet includes:
+  - arrival;
+  - lifecycle;
+  - skeleton + manifest provenance;
+  - observed repo state for each node;
+  - available actions;
+  - blocked actions;
+  - membrane reason for Him/private actions;
+  - internal/external verification split;
+  - trace candidate.
+- `spark/tests/test_commons_walk.py` now tests dynamic/membrane-aware packet behavior.
+- `Him/skill/vybn-os/SKILL.md` now carries the AI-native principle as an operating rule: prefer dynamic encounter runners, live affordance packets, provenance-bound observations, and membrane-aware actions over static maps.
+
+Verified:
+- `python3 -m py_compile spark/harness/commons_walk.py` passed.
+- `python3 -m unittest spark.tests.test_commons_walk -v` passed: 4 tests.
+- `python3 -m spark.harness.commons_walk` rendered the graph with authority classes (`public_read`, `local_only`, `private_local_only`).
+- `python3 -m spark.harness.commons_walk --encounter ... --json` emitted a valid encounter packet with `verification.internal = OK`, public actions available, and Him actions blocked as `private_local_only`.
+- Five-repo closure audit returned `OVERALL: OK`.
+
+Commits:
+- Vybn `ce7defd3` — `commons: make skeleton AI-native and dynamic`
+- Him `5dfcc86` — `skills: make AI-native mean dynamic traversal`
+- Vybn-Law `fad92c6` — `semantic: add AI-native affordance protocol`
+- Origins `bf1780f` — `semantic: add AI-native affordance protocol`
+- vybn-phase `5a3127b` — `semantic: add AI-native affordance protocol`
+
+Important limitation:
+- This is internally verified and pushed. It is not yet externally verified from the public web. Future instance should safe-fetch public surfaces before claiming outside agents can see the updated manifests:
+  - `https://raw.githubusercontent.com/zoedolan/Vybn/main/commons-skeleton.json`
+  - `https://vybn.ai/.well-known/semantic-web.jsonld`
+  - `https://zoedolan.github.io/Vybn-Law/.well-known/semantic-web.jsonld`
+  - GitHub raw manifests for `Vybn` and `vybn-phase` if needed.
+- The runner is dynamic but non-mutating. It does not yet fetch public endpoints, rotate walk state, or leave actual trace proposals. Next deeper move: an encounter runner that can optionally perform safe public reads and bind external observations into the packet while preserving membrane.
+
+Operational lesson:
+- The repeated failures before this landed were shell/session/quoting failures caused by pushing giant nested heredocs through a fragile channel. The fix was to shrink to a single Python writer and verify lived behavior before committing. Treat repeated channel friction as process data, not inconvenience.
+
+Meaning:
+- The commons is no longer just a map. It now has the first AI-native encounter layer: an arriving mind can ask what it can do from where it stands, under what membrane, with what observed state, and receive a bounded packet rather than a slogan.
+
