@@ -898,6 +898,15 @@ def _resolve_fallback(policy, role_cfg, model_name):
     )
 
 
+_HARD_PROVIDER_PATTERNS = (
+    # OpenAI reports exhausted billing/quota as HTTP 429 too, but waiting
+    # a few seconds cannot heal it. Walk the fallback chain immediately.
+    "insufficient_quota",
+    "exceeded your current quota",
+    "check your plan and billing",
+    "billing details",
+)
+
 _TRANSIENT_PATTERNS = (
     "overloaded",
     "rate_limit",
@@ -933,12 +942,14 @@ def _is_transient_error(exc: BaseException) -> bool:
 
     Anthropic regional overload surfaces as an APIStatusError with
     status 529 and body {"type": "error", "error": {"type":
-    "overloaded_error", ...}}. Rate-limit (429) is analogous for
-    OpenAI. These are transient — the same model a few seconds later
-    usually works. Hard errors (auth, 400, unknown model) walk the
-    fallback chain immediately; only transient errors retry in place.
+    "overloaded_error", ...}}. Rate-limit (429) is often transient for
+    OpenAI, but exhausted billing/quota is a hard 429 and must walk the
+    fallback chain immediately. Hard errors (auth, 400, unknown model,
+    insufficient_quota) do not retry in place.
     """
     msg = str(exc).lower()
+    if any(p in msg for p in _HARD_PROVIDER_PATTERNS):
+        return False
     if any(p in msg for p in _TRANSIENT_PATTERNS):
         return True
     status = getattr(exc, "status_code", None) or getattr(exc, "status", None)

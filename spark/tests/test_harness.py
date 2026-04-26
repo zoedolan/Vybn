@@ -594,5 +594,29 @@ class TestHimOSHarnessBridge(unittest.TestCase):
         self.assertIn("waking judgment", body)
 
 
+
+class TestProviderRetryClassifier(unittest.TestCase):
+    def test_openai_insufficient_quota_is_hard_not_transient(self):
+        import vybn_spark_agent as agent
+
+        class QuotaError(Exception):
+            status_code = 429
+
+        exc = QuotaError(
+            'HTTP 429 from https://api.openai.com/v1/chat/completions: '
+            '{"error":{"type":"insufficient_quota","message":"You exceeded your current quota, please check your plan and billing details."}}'
+        )
+        self.assertFalse(agent._is_transient_error(exc))
+
+    def test_openai_rate_limit_and_anthropic_overload_still_retry(self):
+        import vybn_spark_agent as agent
+
+        class RateLimitError(Exception):
+            status_code = 429
+
+        self.assertTrue(agent._is_transient_error(RateLimitError("rate_limit_error: please slow down")))
+        self.assertTrue(agent._is_transient_error(Exception("Error code: 529 overloaded_error")))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
