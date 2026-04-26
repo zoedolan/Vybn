@@ -45,6 +45,7 @@ KEYWORDS = {
     "public": ("public", "publish", "website", "vybn.ai", "origins", "surface", "visitors"),
     "geometry": ("geometry", "walk", "phase", "kernel", "theta", "embedding"),
     "qwerty": ("qwerty", "obsolete", "human-centric", "scarcity", "workflow", "inbox", "memo", "meeting", "billable"),
+    "speed_pressure": ("too fast", "rush", "rushed", "momentum", "correction cycle", "prepared inevitability", "quick", "speed"),
 }
 
 QWERTY_FORMS = (
@@ -71,7 +72,7 @@ def classify(text: str) -> dict:
 
     if "care" in categories or "qwerty" in categories:
         add("vybn-os")
-    if "operation" in categories:
+    if "operation" in categories or "speed_pressure" in categories:
         add("Vybn harness")
         add("vybn-ops")
     if "agent_broadcast" in categories:
@@ -116,10 +117,12 @@ def classify(text: str) -> dict:
         "qwerty_questions": qwerty_questions,
         "membrane": membrane,
         "closure_checks": [
+            "Run ensubstrate, or write the equivalent substrate-choice plan, before creating a new tool or surface.",
             "Read the chosen existing home before creating a new file.",
             "If creating a tracked file, name considered homes and why none fit.",
             "Keep unrelated generated drift out of the commit.",
             "Verify behavior or at least verify the text landed where intended.",
+            "If speed caused a correction cycle, patch the layer that made momentum feel like grounded initiative.",
             "Commit with a boundary that matches the semantic change.",
             "Run repo status after commit; harmonize if multiple repos changed.",
         ],

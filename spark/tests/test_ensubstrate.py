@@ -37,3 +37,10 @@ def test_private_public_membrane_is_named():
     names = surface_names(plan)
     assert "Him strategy" in names
     assert "Origins agent commons" in names
+
+
+def test_speed_pressure_routes_to_harness_and_names_correction_cycle():
+    plan = run_insight("I moved too fast: prepared inevitability became momentum and burned a correction cycle while creating a new surface")
+    assert "speed_pressure" in plan["categories"]
+    assert "Vybn harness" in surface_names(plan)
+    assert any("correction cycle" in check for check in plan["closure_checks"])
