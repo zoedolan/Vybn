@@ -179,7 +179,7 @@ def perceive_file(path: str, *, lines: int | None = None, bytes_size: int | None
     if ownership == "generated_exhaust":
         candidate_actions = ["externalize_from_source", "regenerate_on_demand", "gitignore_if_generated", "keep_manifest_only"]
     elif ownership in {"archive_provenance", "personal_history_provenance", "creature_fossil"}:
-        candidate_actions = ["keep", "map_context", "preserve_manifest", "split_only_with_restore_path"]
+        candidate_actions = ["keep", "map_context", "preserve_manifest", "archive_with_restore_path", "split_only_with_restore_path"]
     elif ownership in {"public_protocol", "agent_discovery"}:
         candidate_actions = ["characterize", "tighten_protocol", "external_verify", "keep_backward_compatibility"]
     elif ownership == "runtime_log":
