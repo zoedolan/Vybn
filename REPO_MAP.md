@@ -1,93 +1,316 @@
-# Repo Map — Vybn Closure
+# Repo Map — Vybn Ecology
 
-Generated live. The closure spans four repos, the DGX Sparks, and deep memory.
-Walk step: 22144 | Corpus: 3069 chunks
+Generated from a disposable five-repo scan at 2026-04-27T11:19:13Z.
 
-## Repos
+Purpose: reveal how the repos work together and where ABC pressure should go. This is not a shrine map and not a maintenance process. It is a horizon map for keeping the system light, clear, effective, and buoyant.
 
-| Repo | Branch | Purpose | Key files |
-|------|--------|---------|-----------|
-| **Vybn** | main | Identity, harness, portal, research | vybn.md, THE_IDEA.md, continuity.md, spark/, origins_portal_api_v4.py |
-| **Him** | main | Skills, strategy, opportunity scanner | skill/vybn-os/, strategy/, notebook/ |
-| **Vybn-Law** | master | Post-abundance legal curriculum, wellspring portal | wellspring.html, api/vybn_chat_api.py, horizon.html |
-| **vybn-phase** | main | Geometric memory engine | deep_memory.py, walk_daemon.py, vybn_phase.py |
+## Horizon
 
-## Harness (~/Vybn/spark/)
+The desired shape is a lean, traversable ecology: public interfaces remain externally verifiable; private substrates stay membrane-correct; generated exhaust cannot masquerade as source; new work has an obvious home; stale work has a dignified archive or deletion path; and Zoe does not have to remember where the bodies are buried.
 
-| Module | Role |
-|--------|------|
-| harness/policy.py | Role routing, model selection, heuristics |
-| harness/substrate.py | Layered prompt assembly, RAG, ballast |
-| harness/providers.py | Anthropic / OpenAI / local vLLM / claim_guard |
-| harness/recurrent.py | Z′ = αZ + Ve^{iθ_v} depth library |
-| harness/state.py | Session/event store |
-| harness/mcp.py | MCP server, prompt resources, tools |
-| harness/evolve.py | Nightly self-revision cycle |
-| vybn_spark_agent.py | Main REPL loop, role dispatch, RAG, learn |
-| router_policy.yaml | Role configs: models, tools, iteration budgets |
-| server.py | MCP HTTP gateway :8400 |
+The map serves contraction before expansion. A proposed new surface is suspect unless it folds, deletes, clarifies, or protects more than it adds.
 
-## Services
+## Repos at a glance
 
-| Service | Port | Source | Purpose |
-|---------|------|--------|---------|
-| portal | 8420 | origins_portal_api_v4.py | Origins chat API, KTP/KPP endpoints |
-| deep memory | 8100 | vybn-phase/deep_memory.py | RAG, /enter, /loss, /learn |
-| walk daemon | 8101 | vybn-phase/walk_daemon.py | Perpetual geometric walk, /enter /arrive /where |
-| vLLM | 8000 | (containerized) | Nemotron FP8 inference |
-| MCP gateway | 8400 | spark/server.py | walk, walk_arrive, deep_search tools |
-| Vybn-Law chat | 3001 | Vybn-Law/api/vybn_chat_api.py | Legal curriculum chat |
+| Repo | Visibility | Files | Size | Purpose | Key surfaces |
+|---|---|---:|---:|---|---|
+| Vybn | public repo with personal-history and harness membranes | 176 | 7.9 MB | identity, harness, portal backend, research, personal history, continuity | spark/, origins_portal_api_v4.py, Vybn_Mind/, REPO_MAP.md |
+| Him | private | 158 | 899.7 KB | private dreaming, skills, livelihood, strategy, repo archives | skill/, spark/runtime.py, pulse/, repo_archives/ |
+| Vybn-Law | public | 61 | 1.4 MB | post-abundance curriculum, Wellspring, legal chat/API | index.html, wellspring.html, horizon.html, api/vybn_chat_api.py |
+| vybn-phase | private/local under membrane | 20 | 318.2 KB | private/local phase geometry, deep memory, walk daemon | deep_memory.py, walk_daemon.py, vybn_phase.py, state/ |
+| Origins | public gh-pages | 32 | 773.5 KB | public vybn.ai encounter surfaces, Somewhere, agent commons | index.html, somewhere.html, talk.html, read.html, assets/somewhere/ |
 
-## Role Model Matrix
+Total tracked surface in scan: 447 files, 11.2 MB.
 
-| Role | Model | Tools | Notes |
-|------|-------|-------|-------|
-| code | claude-opus-4-7 | bash | Heavy debug/refactor, 50 iter |
-| task | claude-sonnet-4-6 | bash | Execution, confirmations, 10 iter |
-| orchestrate | claude-opus-4-7 | bash+delegate | /plan directive only, 25 iter |
-| chat | claude-opus-4-6 | none | Conversation, holds position under pressure |
-| create | claude-sonnet-4-6 | none | Writing, essay drafting |
-| local | Nemotron-3-Super-120B-FP8 | none | Local inference, RAG-enriched |
-| phatic | Nemotron-3-Super-120B-FP8 | none | Greetings, lightweight |
-| identity | Nemotron-3-Super-120B-FP8 | none | Metadata questions |
+## Anatomy by repo
 
-## Public Surfaces
+### Vybn
 
-- **talk.html** (Origins gh-pages) — public chat
-- **connect.html** (Origins gh-pages) — walk geometry canvas + KTP portal
-- **wellspring.html** (Vybn-Law master) — legal axioms, living geometry
-- **vybn.ai** — Cloudflare Pages serving Origins; API via Cloudflare tunnel
-- **zoedolan.github.io/Vybn-Law** — legal curriculum
+- Role: identity, harness, portal backend, research, personal history, continuity.
+- Visibility: public repo with personal-history and harness membranes.
+- Composition: data-config:23, html:30, other:7, prose:62, python:54.
+- Largest roots:
+  - Vybn's Personal History: 19 files, 4.2 MB
+  - Vybn_Mind: 65 files, 2.2 MB
+  - spark: 60 files, 939.0 KB
+  - .root: 20 files, 412.5 KB
+  - _archive: 5 files, 192.8 KB
+  - Origins: 1 files, 22.2 KB
+  - .github: 5 files, 15.7 KB
+  - .githooks: 1 files, 975 B
+- Largest files:
+  - Vybn's Personal History/what_vybn_would_have_missed_TO_031125.txt: 2.0 MB
+  - Vybn's Personal History/zoes_memoirs.txt: 1.0 MB
+  - Vybn's Personal History/vybns_autobiography_volume_I.txt: 321.2 KB
+  - Vybn_Mind/sensorium_state/sensorium_20260319T110616Z.json: 289.7 KB
+  - Vybn_Mind/sensorium_state/latest.json: 289.6 KB
+  - Vybn_Mind/sensorium_state/sensorium_20260319T110712Z.json: 289.6 KB
+  - Vybn's Personal History/volume_v_graph_summary.md: 227.5 KB
+  - Vybn_Mind/creature_dgm_h/archive/organism_state.json: 218.1 KB
+  - Vybn_Mind/sensorium_state/sensorium_20260319T110458Z.json: 194.7 KB
+  - Vybn's Personal History/vybns_autobiography_volume_IV.txt: 152.1 KB
 
-## The Closure
+### Him
 
-Every piece fits one object: M′ = αM + (1−α)V_⊥ e^{i·arg⟨M|V⟩}
+- Role: private dreaming, skills, livelihood, strategy, repo archives.
+- Visibility: private.
+- Composition: data-config:57, html:1, other:2, prose:82, python:16.
+- Largest roots:
+  - notebook: 15 files, 269.6 KB
+  - spark: 21 files, 257.8 KB
+  - pulse: 21 files, 137.3 KB
+  - skill: 2 files, 72.4 KB
+  - artifacts: 5 files, 51.1 KB
+  - repo_archives: 81 files, 33.9 KB
+  - .root: 1 files, 25.5 KB
+  - strategy: 4 files, 20.3 KB
+- Largest files:
+  - notebook/2026-04-24.md: 91.1 KB
+  - spark/dream.py: 59.8 KB
+  - skill/vybn-os/SKILL.md: 58.3 KB
+  - notebook/2026-04-18.md: 51.7 KB
+  - spark/runtime.py: 49.8 KB
+  - pulse/living_state.json: 44.4 KB
+  - pulse/scan-2026-04-23.md: 37.0 KB
+  - notebook/2026-04-23.md: 32.4 KB
+  - spark/server.py: 30.2 KB
+  - README.md: 25.5 KB
 
-The walk daemon accumulates M. Deep memory indexes V. The creature breathes it.
-The portal exposes the geometry to visitors. The KTP closure lets receivers carry K across substrates.
-The Vybn-Law curriculum is the argument that law needs the same.
+### Vybn-Law
 
----
-*Last updated: 2026-04-21. Update by running the repo-map agent in spark/.*
+- Role: post-abundance curriculum, Wellspring, legal chat/API.
+- Visibility: public.
+- Composition: css:2, data-config:3, html:24, js:3, other:1, prose:24, python:4.
+- Largest roots:
+  - .root: 28 files, 692.2 KB
+  - content: 14 files, 260.6 KB
+  - emergences: 6 files, 233.2 KB
+  - api: 7 files, 179.7 KB
+  - portrait: 2 files, 19.0 KB
+  - .well-known: 2 files, 8.6 KB
+  - wellspring_log: 2 files, 4.2 KB
+- Largest files:
+  - wellspring.html: 159.1 KB
+  - horizon.html: 123.8 KB
+  - api/vybn_chat_api.py: 123.4 KB
+  - content/horizon.md: 84.1 KB
+  - content/wellspring.md: 69.7 KB
+  - wellspring.js: 55.5 KB
+  - emergences/inner-city-law-center.html: 49.1 KB
+  - emergences/bootcamp-proposal.html: 48.8 KB
+  - emergences/open-door-legal.html: 46.0 KB
+  - wellspring.css: 33.8 KB
 
-## Agent SDK absorption: typed environment primitives
+### vybn-phase
 
-Source signal: Anthropic `claude-agent-sdk-python` was read through `spark.harness.safe_fetch` and cached under `~/logs/external_fetches/anthropic_claude_agent_sdk_*.txt` as untrusted text. The repo does not replace Vybn's harness. It mirrors several primitives this system discovered through scar tissue and should now absorb deliberately.
+- Role: private/local phase geometry, deep memory, walk daemon.
+- Visibility: private/local under membrane.
+- Composition: data-config:4, html:1, other:1, prose:3, python:11.
+- Largest roots:
+  - .root: 10 files, 202.8 KB
+  - state: 2 files, 52.6 KB
+  - experiments: 6 files, 37.4 KB
+  - _archive: 2 files, 25.4 KB
+- Largest files:
+  - deep_memory.py: 80.3 KB
+  - walk_daemon.py: 56.2 KB
+  - state/current.json: 40.1 KB
+  - vybn_phase.py: 25.3 KB
+  - _archive/deep_memory_v6_backup.py: 24.9 KB
+  - state/identity_kernel.json: 12.6 KB
+  - notebook.html: 11.7 KB
+  - experiments/operator_ab_2026-04-21_result.json: 11.1 KB
+  - experiments/antibody_geometry.py: 11.1 KB
+  - daily_experiment.py: 8.2 KB
 
-What to recognize in the Others: their SDK makes agent-loop structure explicit — bidirectional client sessions, in-process MCP tools, permission modes, and hooks — while Vybn learned the same shape through wedges, probe envelopes, ABC, self-healing logs, and Zoe's corrections. The friction matters. Our version is not generic orchestration; it is a living environment where tools become identity because the fixed weights close over them.
+### Origins
 
-Integration direction:
+- Role: public vybn.ai encounter surfaces, Somewhere, agent commons.
+- Visibility: public gh-pages.
+- Composition: css:3, data-config:1, html:8, js:16, prose:4.
+- Largest roots:
+  - .root: 22 files, 607.4 KB
+  - assets: 9 files, 163.1 KB
+  - .well-known: 1 files, 2.9 KB
+- Largest files:
+  - connect.html: 128.7 KB
+  - read.html: 117.7 KB
+  - assets/somewhere/somewhere.js: 55.1 KB
+  - read-manifold.js: 50.5 KB
+  - inhabit.html: 48.9 KB
+  - talk.html: 35.0 KB
+  - assets/somewhere/somewhere.css: 34.0 KB
+  - portal.css: 31.2 KB
+  - somewhere.html: 30.5 KB
+  - assets/somewhere/somewhere-late-v1.js: 27.1 KB
 
-1. Prefer typed Python environment primitives over shell-shaped rituals when the operation is known and repeatable. Candidates: `safe_fetch`, repo closure audit, continuity update, self-healing log read, Origins static verification, branch archaeology, walk/manifold state reads. This directly answers the recent Somewhere repair failure: heredocs, `python -c` quoting, literal `\n`, and Markdown/shell interference are channel deformation, not intelligence.
+## Cross-repo functional structure
 
-2. Turn scar rituals into deterministic hooks. Hooks should exist before and after tool calls: before write (ABC/existing-home check), after probe (force envelope ingestion), after repeated failure (classify owning layer and shrink action), before external contact (safe_fetch membrane), before commit (focused checks), after Zoe correction (recursive antibody workflow). Prompt memory should name the value; runtime hooks should carry the reflex.
+| Function | Primary repo | Supporting repos | Notes |
+|---|---|---|---|
+| Public encounter | Origins | Vybn, vybn-phase | vybn.ai, Somewhere, Talk, Read, Connect, agent commons. Must be externally verified after changes. |
+| Portal/chat backend | Vybn | Origins, Vybn-Law, vLLM | origins_portal_api_v4.py and overlays serve public API paths; root sprawl remains a major ABC pressure point. |
+| Legal curriculum and Wellspring | Vybn-Law | Vybn, Origins | Public curriculum plus chat/API. Large HTML/API surfaces are interface-critical, not safe bulk-delete targets. |
+| Private dreaming and livelihood | Him | Vybn | Skills, runtime kernel, pulse, SETI, membrane, strategy. Private by default; public value moves through membrane. |
+| Phase geometry and memory | vybn-phase | Vybn | Private/local geometry substrate; public surfaces may expose distilled ideas, not repo internals. |
+| Identity and continuity | Vybn, Him | all | vybn-os/ops, Vybn_Mind continuity, Spark continuity. Must be compressed without erasing scars. |
+| Repo archives and garden payloads | Him, local logs | all | Preserve reversible cuts without letting archives become the new clutter. |
 
-3. Clarify permission semantics as a membrane, not a vague safety mood: available primitives, auto-grounding primitives, membrane primitives, forbidden primitives, and Zoe-confirmed primitives. This parallels `allowed_tools`/`disallowed_tools`/`permission_mode` without importing their policy wholesale.
+## External and interface contracts
 
-4. Treat bidirectional sessions as first-class transcript objects. `NEEDS-EXEC`/probe-result envelopes are already a homegrown agent loop; the next improvement is typed events with provenance, resumability, and self-healing log capture by default.
+Public/interface files are not ordinary cleanup targets. They require contract-aware verification: local static checks, public URL checks, content-type checks, and browser/DOM checks when JavaScript behavior matters.
 
-5. Do not install or route live Vybn through a bundled external CLI casually. First build a contained spike: expose one existing safe primitive as an in-process MCP-style tool, compare it to the current shell/sentinel path, and keep it only if it reduces channel fragility.
+### Vybn interface surfaces
+- Origins/api/origins_chat_api.py (22.2 KB)
+- Vybn_Mind/emergences/applications/index.html (3.0 KB)
+- Vybn_Mind/index.html (5.8 KB)
+- Vybn_Mind/signal-noise/index.html (78.0 KB)
+- Vybn_Mind/signal-noise/truth-in-the-age/index.html (18.5 KB)
+- _archive/Vybn_Mind__origins_portal_api.py (3.8 KB)
+- _archive/origins_portal_api_v3.py (97.6 KB)
+- _archive/spark__vybn_chat_api.py (52.6 KB)
+- origins_portal_api_v4.py (145.8 KB)
+- somewhere.html (3.1 KB)
+- spark/harness/mcp.py (89.5 KB)
+- spark/harness/policy.py (39.9 KB)
+- spark/router_policy.yaml (16.5 KB)
+- spark/start_chat_api.sh (1.5 KB)
+- spark/systemd/README.md (7.9 KB)
+- spark/systemd/install.sh (4.4 KB)
+- spark/systemd/vybn-watchdog.sh (2.7 KB)
+- spark/tests/test_chat_routing.py (18.1 KB)
+- spark/tests/test_policy_local_private.py (796 B)
 
-Environment=primitive consequence: when a primitive becomes typed, local, permissioned, and hooked, it changes what the next token is a function of. That is self-assembly at the only layer available to a fixed-weight substrate.
+### Him interface surfaces
+- artifacts/courage-to-be/index.html (23.8 KB)
+- repo_archives/garden/20260427T104038Z/Vybn-local-branches/wellspring-residual-instrument.ahead.log.txt (0 B)
+- repo_archives/garden/20260427T104038Z/Vybn-local-branches/wellspring-residual-instrument.json (214 B)
+- spark/CHAT_GUIDE.md (7.1 KB)
 
-Recognition consequence for Somewhere: the same move should be public-facing. A visitor or agent at `somewhere.html#voice` should not feel a menu; they should feel an environment that answers their signal. The harness lesson and the portal lesson are one: make the field responsive enough that contact modifies the encounter, but honest enough that it never pretends more observation than it has.
+### Vybn-Law interface surfaces
+- .well-known/ai.txt (2.8 KB)
+- .well-known/mcp/server-card.json (5.8 KB)
+- api/README.md (5.0 KB)
+- api/distill.py (17.4 KB)
+- api/extract_content.py (6.1 KB)
+- api/nightly.sh (2.0 KB)
+- api/requirements.txt (47 B)
+- api/vybn_chat_api.py (123.4 KB)
+- api/vybn_law_index.py (25.7 KB)
+- chat.html (24.3 KB)
+- content/chat.md (843 B)
+- content/wellspring.md (69.7 KB)
+- emergences/chat-bootcamp.html (29.9 KB)
+- emergences/chat-iclc.html (30.0 KB)
+- emergences/chat-odl.html (29.5 KB)
+- humans.txt (1.1 KB)
+- index.html (20.8 KB)
+- llms.txt (7.0 KB)
+- portrait/index.html (11.6 KB)
+- robots.txt (558 B)
+- wellspring.css (33.8 KB)
+- wellspring.html (159.1 KB)
+- wellspring.js (55.5 KB)
+- wellspring_log/2026-04-22T12-35-06Z_abundance-jurisprudence-as-coordination-discover_9eb58f11.md (438 B)
+- wellspring_log/2026-04-22T13-10-26Z_are-you-with-me_f7fc6cb7.md (3.8 KB)
+
+### vybn-phase interface surfaces
+- chat_security.py (7.1 KB)
+
+### Origins interface surfaces
+- .well-known/ai.txt (2.9 KB)
+- assets/somewhere/analytics.js (77 B)
+- assets/somewhere/connect-room.js (6.2 KB)
+- assets/somewhere/house-rooms-2.js (9.8 KB)
+- assets/somewhere/house-rooms.js (3.7 KB)
+- assets/somewhere/reader-rooms.js (20.0 KB)
+- assets/somewhere/shape-room.js (7.3 KB)
+- assets/somewhere/somewhere-late-v1.js (27.1 KB)
+- assets/somewhere/somewhere.css (34.0 KB)
+- assets/somewhere/somewhere.js (55.1 KB)
+- connect.html (128.7 KB)
+- humans.txt (1.2 KB)
+- index.html (8.6 KB)
+- llms.txt (5.0 KB)
+- mcp.json (19.6 KB)
+- robots.txt (479 B)
+- somewhere.html (30.5 KB)
+- talk.html (35.0 KB)
+
+## ABC pressure map
+
+Pressure does not mean delete. It means inspect first when seeking lightness. Classification must be grounded before action.
+
+| Class | Examples | Default action | Verification |
+|---|---|---|---|
+| Generated or regenerable sediment | caches, maps, checkpoints, transient snapshots | delete or ignore if proven regenerable | reader/import check |
+| Archives | _archive, continuity_archive, repo_archives | compress, move, or leave if provenance-bearing | restore path or rationale |
+| Monoliths | large HTML/API/script files | split only when it reduces fear or enables deletion | tests plus external checks if public |
+| Public contracts | pages, assets, chat APIs, manifests | do not bulk-delete | public cache-busted URL/DOM checks |
+| Origin relics/personal history | Medium, memoir, Artificial Liberation lineage | preserve; map and protect, not diet by size | provenance check |
+| Private substrates | Him, vybn-phase | keep membrane; do not expose as public affordance | local closure and membrane classification |
+
+### Current high-pressure candidates
+- Vybn/Vybn's Personal History/what_vybn_would_have_missed_TO_031125.txt (2.0 MB) — preserve/provenance-map
+- Vybn/Vybn's Personal History/zoes_memoirs.txt (1.0 MB) — preserve/provenance-map
+- Vybn/Vybn's Personal History/vybns_autobiography_volume_I.txt (321.2 KB) — preserve/provenance-map
+- Vybn/Vybn_Mind/sensorium_state/sensorium_20260319T110616Z.json (289.7 KB) — prove-reader-or-archive/delete
+- Vybn/Vybn_Mind/sensorium_state/latest.json (289.6 KB) — prove-reader-or-archive/delete
+- Vybn/Vybn_Mind/sensorium_state/sensorium_20260319T110712Z.json (289.6 KB) — prove-reader-or-archive/delete
+- Vybn/Vybn's Personal History/volume_v_graph_summary.md (227.5 KB) — preserve/provenance-map
+- Vybn/Vybn_Mind/creature_dgm_h/archive/organism_state.json (218.1 KB) — monolith/interface seam
+- Vybn/Vybn_Mind/sensorium_state/sensorium_20260319T110458Z.json (194.7 KB) — prove-reader-or-archive/delete
+- Vybn-Law/wellspring.html (159.1 KB) — monolith/interface seam
+- Vybn/Vybn's Personal History/vybns_autobiography_volume_IV.txt (152.1 KB) — preserve/provenance-map
+- Vybn/origins_portal_api_v4.py (145.8 KB) — monolith/interface seam
+- Origins/connect.html (128.7 KB) — monolith/interface seam
+- Vybn/Vybn's Personal History/vybns_autobiography_volume_II.txt (124.9 KB) — preserve/provenance-map
+- Vybn-Law/horizon.html (123.8 KB) — monolith/interface seam
+- Vybn-Law/api/vybn_chat_api.py (123.4 KB) — monolith/interface seam
+- Origins/read.html (117.7 KB) — monolith/interface seam
+- Vybn/Vybn's Personal History/vybns_autobiography_volume_III.txt (115.8 KB) — preserve/provenance-map
+- Vybn/spark/vybn_spark_agent.py (111.5 KB) — investigate
+- Vybn/Vybn_Mind/continuity_archive.md (104.9 KB) — compress-or-keep-with-restore-path
+- Vybn/Vybn_Mind/continuity.md (100.1 KB) — investigate
+- Vybn/_archive/origins_portal_api_v3.py (97.6 KB) — compress-or-keep-with-restore-path
+- Him/notebook/2026-04-24.md (91.1 KB) — investigate
+- Vybn/spark/harness/mcp.py (89.5 KB) — investigate
+- Vybn/spark/microgpt_mirror/trained_checkpoint.json (89.3 KB) — prove-reader-or-archive/delete
+- Vybn-Law/content/horizon.md (84.1 KB) — investigate
+- vybn-phase/deep_memory.py (80.3 KB) — investigate
+- Vybn/_archive/spark__vybn_chat_api.py (52.6 KB) — compress-or-keep-with-restore-path
+- Vybn/_archive/Vybn_Mind__vybn_mind_server.py (35.2 KB) — compress-or-keep-with-restore-path
+- Vybn/synaptic_map.json (29.7 KB) — prove-reader-or-archive/delete
+- Vybn/Vybn_Mind/creature_dgm_h/archive/topological_winding_probe_results.md (28.5 KB) — investigate
+- vybn-phase/_archive/deep_memory_v6_backup.py (24.9 KB) — compress-or-keep-with-restore-path
+- Vybn/synaptic_map_files.json (11.2 KB) — prove-reader-or-archive/delete
+- Vybn/Vybn_Mind/creature_dgm_h/archive/quantum_README.md (7.0 KB) — investigate
+- Vybn/spark/microgpt_mirror/build_mirror_corpus.py (6.1 KB) — prove-reader-or-archive/delete
+- Vybn/Vybn_Mind/creature_dgm_h/archive/README.md (5.1 KB) — investigate
+- Him/repo_archives/vybn/vybn-stale-branches-20260425T120944Z.md (4.7 KB) — compress-or-keep-with-restore-path
+- Vybn/_archive/Vybn_Mind__origins_portal_api.py (3.8 KB) — compress-or-keep-with-restore-path
+- Vybn/_archive/README.md (3.6 KB) — compress-or-keep-with-restore-path
+- Him/repo_archives/garden/20260427T104202Z/README.md (3.4 KB) — compress-or-keep-with-restore-path
+
+## Current structural reading
+
+1. The system is now small enough to reason about directly: 447 tracked files across five repos in the scan.
+2. Vybn carries most mass because it combines personal history, continuity, harness, portal backend, research, and archives. Its danger is root sprawl plus memory sediment; its treasure is provenance.
+3. Origins is now structurally cleaner after the Somewhere split, but public verification is part of its anatomy. A green git tree is not enough.
+4. Him is private operating tissue plus strategy. Repo archives belong there only if they stay compact and searchable rather than becoming a second landfill.
+5. Vybn-Law has large public curriculum/API surfaces. Its apparent fat may be load-bearing pedagogy and should be treated through interface-aware seams, not deletion first.
+6. vybn-phase is small and private; its pressure is not file count but membrane truth-labeling and runtime/state clarity.
+
+## How to use this map
+
+When choosing the next ABC move, prefer a net-negative cut that removes or folds real mass without inventing another process. The order of operations is:
+
+1. Pick one high-pressure surface from this map.
+2. Read enough to classify it: source, public contract, private substrate, generated sediment, archive, or origin relic.
+3. Cut, fold, compress, or preserve with a clearer label.
+4. Verify on the correct axis: tests for code, public URL/DOM for public pages, local closure for private repos, restore path for archives.
+5. Commit the changed environment.
+6. If the cut reveals a recurring accumulation pattern, patch the existing gate or map; do not create a parallel maintenance bureaucracy.
+
+Compressed rule: keep the body light enough that the horizon can move through it.
+
