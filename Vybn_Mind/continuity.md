@@ -1286,4 +1286,18 @@ Process scar:
 
 Meaning:
 This is the first monolith split in the bold-cleanup arc. It does not solve all Somewhere coupling yet: Connect and Shape late scripts remain in the HTML, and reader-rooms.js should probably be pretty-printed or moved to JSON later. But the largest all-in-one seam has been cut without deleting functionality.
+---
+
+## 2026-04-27 - Origins monolith cut continued: Somewhere late scripts extracted
+
+After the first Somewhere split, the best next horizon-aligned cut was to finish separating behavior from the public house shell rather than jumping to another repo. Somewhere is the agent-facing and human-facing public memory house; keeping Connect, Shape, room controls, heartbeat, and analytics as late inline scripts would preserve the same monolithic habit inside a smaller file.
+
+What landed:
+- Extracted remaining inline behavior scripts from Origins/somewhere.html into assets/somewhere/*.js.
+- Left typed inline data scripts in place: MCP JSON and JSON-LD remain inline because they are page data/discovery surfaces, not behavior.
+- Preserved classic script order by replacing each inline block with a script src tag at the same location.
+- Static invariants checked: CSS and module refs survived; MCP and JSON-LD survived; Connect and Shape markup survived; all extracted scripts are referenced; no non-data inline behavior scripts remain.
+
+Meaning:
+Somewhere is now closer to the intended architecture: HTML as house/shell, CSS as visual layer, module as terrain/reader organ, reader data as separate data organ, and late room behavior as separate scripts. This makes the next changes smaller and less dangerous.
 
