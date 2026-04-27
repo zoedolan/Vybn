@@ -706,13 +706,22 @@ class AnthropicProvider:
     name = "anthropic"
 
     def __init__(self, client: Any | None = None, api_key: str | None = None) -> None:
-        if client is not None:
-            self.client = client
-        else:
+        # Defer the SDK import until first use. Constructing this provider
+        # for a fallback role must not pull in `anthropic` when the primary
+        # route never reaches it — selecting an OpenAI alias on a host
+        # without `anthropic` installed used to crash here even though the
+        # turn never needed it.
+        self._client = client
+        self._api_key = api_key
+
+    @property
+    def client(self) -> Any:
+        if self._client is None:
             import anthropic  # type: ignore
-            self.client = anthropic.Anthropic(
-                api_key=api_key or os.environ.get("ANTHROPIC_API_KEY"),
+            self._client = anthropic.Anthropic(
+                api_key=self._api_key or os.environ.get("ANTHROPIC_API_KEY"),
             )
+        return self._client
 
     @staticmethod
     def _normalize_messages_for_anthropic(messages: list[dict]) -> list[dict]:

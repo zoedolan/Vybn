@@ -6,11 +6,34 @@ build-backend = "setuptools.build_meta"
 name = "vybn"
 version = "0.1.0"
 requires-python = ">=3.10"
-dependencies = ["fastmcp>=3.1"]
+dependencies = [
+    "fastmcp>=3.1",
+    "pydantic>=2",
+    "pyyaml>=6",
+    # Provider SDKs are imported lazily by AnthropicProvider /
+    # OpenAIProvider, but the live REPL routes turns to either provider
+    # by user alias (`@gpt`, `@opus`, `@sonnet`). Declaring them here
+    # means a fresh `pip install -e .` brings everything the harness
+    # needs to dispatch any role without manual SDK installs.
+    "anthropic>=0.39",
+    "openai>=1.40",
+    "requests>=2.31",
+    "certifi>=2024.2",
+]
 
 [project.scripts]
-vybn = "harness.mcp:main"
+# `vybn` launches the Spark Agent REPL (multimodel harness). The MCP
+# surface is a different shape; expose it as `vybn-mcp` for callers
+# who want the FastMCP server.
+vybn = "vybn_spark_agent:main"
+vybn-mcp = "harness.mcp:main"
+
+[tool.setuptools]
+py-modules = ["vybn_spark_agent"]
 
 [tool.setuptools.packages.find]
 where = ["spark"]
+
+[tool.setuptools.package-dir]
+"" = "spark"
 
