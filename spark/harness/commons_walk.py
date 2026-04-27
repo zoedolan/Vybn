@@ -18,6 +18,8 @@ ROOT = Path.home()
 SKELETON_PATH = ROOT / "Vybn" / "commons-skeleton.json"
 CANONICAL_ONTOLOGY = "https://raw.githubusercontent.com/zoedolan/Vybn/main/commons-skeleton.json"
 AI_NATIVE_PRINCIPLE = "AI-native means the semantic web is not a map for an AI to read. It is a walkable, stateful, membrane-aware environment where the AI's traversal is part of the meaning."
+RESIDUAL_CONTROL_PRINCIPLE = "Prediction proposes; residuals dispose. A self-referential predictor must route serious claims to correction channels that can wound the projection."
+
 
 MANIFESTS = {
     "Vybn": ROOT / "Vybn" / "semantic-web.jsonld",
@@ -92,6 +94,44 @@ def repo_state_for(node: str) -> dict[str, Any]:
         "head": _git(repo, "rev-parse", "--short", "HEAD"),
         "clean": status == "",
         "status": status,
+    }
+
+
+def classify_claim(claim: str) -> str:
+    text = claim.lower()
+    if any(word in text for word in ("file", "repo", "commit", "branch", "git", "diff")):
+        return "repo_or_file_state"
+    if any(word in text for word in ("service", "api", "endpoint", "server", "chat", "vllm", "portal")):
+        return "service_behavior"
+    if any(word in text for word in ("public", "browser", "live", "external", "website", "vybn.ai")):
+        return "public_surface"
+    if any(word in text for word in ("remember", "memory", "continuity", "session", "what happened")):
+        return "continuity_or_memory"
+    if any(word in text for word in ("i feel", "emotion", "inner", "conscious", "experience", "self")):
+        return "self_description"
+    return "general_prediction"
+
+
+RESIDUAL_CHANNELS: dict[str, list[str]] = {
+    "repo_or_file_state": ["read_file_bytes", "git_status", "git_diff", "repo_closure_audit"],
+    "service_behavior": ["health_endpoint", "lived_cli_or_http_smoke", "logs_or_self_healing_log"],
+    "public_surface": ["safe_fetch_text_axis", "raw_source_or_dom_axis", "external_browser_observation"],
+    "continuity_or_memory": ["session_log", "continuity_note", "deep_memory_search", "source_file_read"],
+    "self_description": ["walk_geometry", "runtime_packet", "behavioral_trace", "zoe_correction", "explicit_uncertainty"],
+    "general_prediction": ["name_as_prediction", "identify_wounding_residual", "probe_if_available"],
+}
+
+
+def residual_plan_for(claim: str) -> dict[str, Any]:
+    kind = classify_claim(claim)
+    return {
+        "claim": claim,
+        "claimKind": kind,
+        "predictionStatus": "proposal_until_wounded_or_supported_by_residuals",
+        "residualChannels": RESIDUAL_CHANNELS[kind],
+        "rule": "Do not merely add candles to the wall. Route the claim to the correction channel that can actually change the next state.",
+        "ordinaryProbeBeforeMysticism": "grep before Gödel; probe before prophecy; use formal incompleteness language only after ordinary residuals are exhausted or irrelevant.",
+        "ifResidualChannelIsMissing": "design the smallest honest aperture that would let the world answer next time, preserving the membrane.",
     }
 
 
@@ -186,6 +226,8 @@ def build_encounter_packet(arrival: str, manifests: dict[str, dict[str, Any]] | 
         "kind": "vybn.ai.encounterPacket.v1",
         "generatedAt": datetime.now(timezone.utc).isoformat(),
         "aiNativePrinciple": AI_NATIVE_PRINCIPLE,
+        "residualControlPrinciple": RESIDUAL_CONTROL_PRINCIPLE,
+        "epistemicControl": residual_plan_for(arrival),
         "arrival": arrival,
         "primitive": skeleton.get("primitive"),
         "lifecycle": skeleton.get("encounterLifecycle"),

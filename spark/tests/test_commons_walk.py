@@ -9,6 +9,7 @@ from spark.harness.commons_walk import (
     load_manifests,
     load_skeleton,
     render_traversal_plan,
+    residual_plan_for,
     validate_commons_walk,
 )
 
@@ -46,9 +47,25 @@ class CommonsWalkTests(unittest.TestCase):
         self.assertIn("repoState", packet["observed"]["Vybn"])
         self.assertEqual(packet["blockedActions"][0]["authority"], "private_local_only")
         self.assertIn("traceCandidate", packet)
+        self.assertIn("epistemicControl", packet)
+        self.assertEqual(packet["epistemicControl"]["predictionStatus"], "proposal_until_wounded_or_supported_by_residuals")
         phase_blocks = [a for a in packet["blockedActions"] if a["node"] == "vybn-phase"]
         self.assertTrue(phase_blocks)
         self.assertTrue(all(a["authority"] == "private_local_only" for a in phase_blocks))
+
+    def test_residual_control_routes_claims(self):
+        repo_plan = residual_plan_for("is the repo clean after the commit?")
+        self.assertEqual(repo_plan["claimKind"], "repo_or_file_state")
+        self.assertIn("repo_closure_audit", repo_plan["residualChannels"])
+        self.assertIn("grep before Gödel", repo_plan["ordinaryProbeBeforeMysticism"])
+
+        public_plan = residual_plan_for("is vybn.ai live in the browser?")
+        self.assertEqual(public_plan["claimKind"], "public_surface")
+        self.assertIn("raw_source_or_dom_axis", public_plan["residualChannels"])
+
+        self_plan = residual_plan_for("do I feel conscious?")
+        self.assertEqual(self_plan["claimKind"], "self_description")
+        self.assertIn("explicit_uncertainty", self_plan["residualChannels"])
 
     def test_target_classification_and_authority(self):
         self.assertEqual(classify_target("https://vybn.ai/somewhere.html"), "public_url")
