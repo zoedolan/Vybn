@@ -22,6 +22,11 @@ class RefactorPerceptionTests(unittest.TestCase):
         self.assertIn("inspect_local_context_or_readme", pkt.required_contacts)
         self.assertIn("archive_with_restore_path", pkt.candidate_actions)
 
+    def test_json_is_data_not_javascript_behavior(self):
+        pkt = perceive_file("repo_mapping_output/repo_state.json", lines=1000, bytes_size=300000, public=True)
+        self.assertEqual(pkt.role_hint, "data/protocol body")
+
+
     def test_protocol_renders_algorithm(self):
         text = render_refactor_perception_protocol()
         self.assertIn("Attend to pressure", text)

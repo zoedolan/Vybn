@@ -76,10 +76,11 @@ ROLE_HINTS: list[tuple[str, str]] = [
     ("archive", "archive/provenance candidate"),
     ("asset", "asset organ"),
     ("style", "style organ"),
+    # Longest suffixes before shorter suffixes: ".json" starts with ".js".
+    (".jsonld", "semantic protocol body"),
+    (".json", "data/protocol body"),
     (".css", "style organ"),
     (".js", "behavior organ"),
-    (".json", "data/protocol body"),
-    (".jsonld", "semantic protocol body"),
     (".html", "public shell or house"),
     (".py", "code organ or public nerve"),
 ]
