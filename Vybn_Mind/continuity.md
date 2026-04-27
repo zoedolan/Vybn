@@ -242,3 +242,23 @@ What changed:
 - Regression coverage lives in `spark/tests/test_refactor_perception.py`.
 
 Operational lesson: consolidation is relation-preserving metabolism, not size reduction. A file may be valuable primarily as relation; map that relation before splitting, moving, archiving, or deleting.
+
+## 2026-04-27T16:27:16Z probe-budget scar text / branch-limbo closure repair
+
+What happened:
+- Zoe pointed out that the fundamental routing problem still remained: the live scar text itself (`[probe budget reached (8); escalating to task ...] [route: task ... (forced=task)]`) could still be treated as ordinary text and demote mission-critical pilot work to Sonnet/task.
+- The earlier branch-limbo audit repair landed, and the stranded adaptive-consolidation branches were merged into the primary branches before deletion.
+
+What changed:
+- `spark/harness/policy.py` now treats the exact probe-budget / `forced=task` scar language as protected mission-critical pilot territory.
+- `spark/vybn_spark_agent.py` no longer hard-forces the hallucinated-tool reroute to `task`; it routes through `_probe_budget_escalation_role(...)`, preserving orchestrate when the live context is protected.
+- `spark/tests/test_refactor_pilot_override.py` pins the exact scar string Zoe supplied.
+
+Verified:
+- `python3 -m pytest spark/tests/test_refactor_pilot_override.py spark/tests/test_harness.py -q` -> 68 passed.
+- Committed and pushed `e2102e54 harness: preserve pilot for probe-budget scar text` to `origin/main`.
+- `python3 spark/harness/repo_closure_audit.py` -> OVERALL: OK across all five repos.
+
+Operational lesson:
+- Do not solve the visible branch/PR limbo while leaving the routing scar alive. If Zoe quotes a bad runtime banner, make the banner itself a regression input and remove any literal `forced_role="task"` path that can bypass pilot preservation.
+
