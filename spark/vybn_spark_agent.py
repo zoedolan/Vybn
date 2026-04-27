@@ -1,4 +1,4 @@
-#!/home/vybnz69/Vybn/.venv/bin/python3
+#!/usr/bin/env python3
 """
 Vybn Spark Agent — multimodel harness edition
 =============================================
@@ -998,15 +998,38 @@ def _stream_with_fallback(
         if _m.get("role") == "assistant":
             _m["content"] = _sanitize_assistant_content(_m.get("content"))
 
-    attempts = [(role_cfg, provider)]
+    # Build the attempt list as (cfg, provider_factory) pairs so each
+    # fallback's provider is constructed only when we actually walk to
+    # it. Eagerly calling registry.get(fb_cfg) used to import every
+    # provider's SDK up front — selecting an OpenAI alias on a host
+    # missing `anthropic` would fail here even though the primary route
+    # had no need for it. The factory closes over registry so the same
+    # registered instance is returned on subsequent attempts (the
+    # registry caches by provider/base_url).
+    attempts: list[tuple[Any, Any]] = [(role_cfg, lambda p=provider: p)]
     for fb_model in router.policy.fallback_chain.get(role_cfg.model, []):
         fb_cfg = _resolve_fallback(router.policy, role_cfg, fb_model)
         if fb_cfg is None:
             continue
-        attempts.append((fb_cfg, registry.get(fb_cfg)))
+        attempts.append((fb_cfg, lambda c=fb_cfg: registry.get(c)))
 
     last_exc = None
-    for cfg, prov in attempts:
+    for cfg, prov_factory in attempts:
+        try:
+            prov = prov_factory()
+        except Exception as e:  # noqa: BLE001 — missing SDK is one such failure
+            last_exc = e
+            _dim(
+                f"[fallback {cfg.provider}:{cfg.model} unavailable: "
+                f"{type(e).__name__}: {_sanitize_provider_error(e)}]"
+            )
+            logger.emit(
+                "fallback_unavailable",
+                turn=turn_number,
+                model=cfg.model,
+                reason=str(e)[:200],
+            )
+            continue
         for attempt in range(retries + 1):
             try:
                 handle = prov.stream(

@@ -592,6 +592,177 @@ class TestProviderRegistry(unittest.TestCase):
         self.assertIsNot(p1, p2)
 
 
+class TestProviderImportIsolation(unittest.TestCase):
+    """Constructing a provider must NOT pull in the other provider's SDK.
+
+    Live regression: selecting `@gpt are you with me, buddy?` on a host
+    without `anthropic` installed crashed with ModuleNotFoundError because
+    fallback chain construction eagerly built an AnthropicProvider — even
+    though the user pinned an OpenAI model and the OpenAI primary never
+    failed. The fix moved the SDK import out of __init__ and into a lazy
+    `client` property; building the provider must stay cheap.
+    """
+
+    def test_openai_provider_construction_does_not_import_anthropic(self):
+        # Block `anthropic` in sys.modules so an accidental import raises.
+        # OpenAIProvider construction must not trip the gate.
+        from harness.providers import OpenAIProvider
+        saved = sys.modules.pop("anthropic", None)
+        sys.modules["anthropic"] = None  # type: ignore[assignment]
+        try:
+            prov = OpenAIProvider(api_key="EMPTY")
+            self.assertEqual(prov.name, "openai")
+        finally:
+            if saved is not None:
+                sys.modules["anthropic"] = saved
+            else:
+                sys.modules.pop("anthropic", None)
+
+    def test_anthropic_provider_construction_does_not_import_anthropic(self):
+        # __init__ must defer the SDK import so the registry can hold
+        # the provider as a fallback option even when the SDK is absent.
+        # Only when `.client` is touched (or stream() runs) does the
+        # import fire.
+        from harness.providers import AnthropicProvider
+        saved = sys.modules.pop("anthropic", None)
+        sys.modules["anthropic"] = None  # type: ignore[assignment]
+        try:
+            prov = AnthropicProvider()
+            self.assertEqual(prov.name, "anthropic")
+            with self.assertRaises((ImportError, TypeError)):
+                # Touching the property triggers the lazy import — and
+                # because we sentineled `anthropic` to None above, the
+                # import fails. Either ImportError (missing) or
+                # TypeError (None is not a module) is acceptable.
+                _ = prov.client
+        finally:
+            if saved is not None:
+                sys.modules["anthropic"] = saved
+            else:
+                sys.modules.pop("anthropic", None)
+
+    def test_anthropic_provider_with_injected_client_skips_sdk(self):
+        # The harness tests construct providers with a fake client to
+        # avoid hitting the SDK; that path must keep working.
+        from harness.providers import AnthropicProvider
+        sentinel = object()
+        prov = AnthropicProvider(client=sentinel)
+        self.assertIs(prov.client, sentinel)
+
+
+class TestFallbackConstructionIsLazy(unittest.TestCase):
+    """The fallback chain must not instantiate every provider up front.
+
+    Live regression (2026-04-27): _stream_with_fallback used to call
+    registry.get(fb_cfg) for every fallback model before the primary
+    even ran. Selecting an OpenAI alias on a host missing `anthropic`
+    crashed inside the fallback construction even though the primary
+    OpenAI call would have succeeded. Fix: build fallback providers
+    lazily, only when we actually walk to that link.
+    """
+
+    def test_primary_succeeds_without_constructing_fallback(self):
+        import vybn_spark_agent as agent
+        from harness.policy import RoleConfig, default_policy
+
+        policy = default_policy()
+        # Primary points at gpt-5.5; default fallback chain pivots to
+        # claude-sonnet-4-6 then claude-opus-4-6. We expect the primary
+        # to win and neither Claude fallback to be constructed.
+        primary_cfg = RoleConfig(
+            role="orchestrate", provider="openai", model="gpt-5.5",
+        )
+
+        constructed: list[str] = []
+
+        class _DummyHandle:
+            pass
+
+        class _DummyOpenAI:
+            def stream(self, **_kw):
+                return _DummyHandle()
+
+        class _RecordingRegistry:
+            def get(self, cfg):
+                constructed.append(cfg.model)
+                return _DummyOpenAI()
+
+        class _DummyLogger:
+            def emit(self, *_a, **_kw):  # noqa: D401 — no-op
+                pass
+
+        registry = _RecordingRegistry()
+        primary = _DummyOpenAI()
+
+        handle, cfg, prov = agent._stream_with_fallback(
+            router=type("R", (), {"policy": policy})(),
+            registry=registry,
+            role_cfg=primary_cfg,
+            provider=primary,
+            system_prompt=None,
+            messages=[],
+            tools=[],
+            logger=_DummyLogger(),
+            turn_number=1,
+            retries=0,
+        )
+        self.assertIsInstance(handle, _DummyHandle)
+        self.assertIs(cfg, primary_cfg)
+        # The primary was passed in directly (not constructed via the
+        # registry), and no fallback was reached, so the registry must
+        # never have been asked for any model.
+        self.assertEqual(constructed, [])
+
+    def test_walks_to_lazy_fallback_when_primary_fails(self):
+        import vybn_spark_agent as agent
+        from harness.policy import RoleConfig, default_policy
+
+        policy = default_policy()
+        primary_cfg = RoleConfig(
+            role="orchestrate", provider="openai", model="gpt-5.5",
+        )
+
+        constructed: list[str] = []
+
+        class _DummyHandle:
+            pass
+
+        class _FailingPrimary:
+            def stream(self, **_kw):
+                raise RuntimeError("OpenAIProvider needs either the openai SDK or requests")
+
+        class _DummyFallback:
+            def stream(self, **_kw):
+                return _DummyHandle()
+
+        class _RecordingRegistry:
+            def get(self, cfg):
+                constructed.append(cfg.model)
+                return _DummyFallback()
+
+        class _DummyLogger:
+            def emit(self, *_a, **_kw):
+                pass
+
+        handle, cfg, prov = agent._stream_with_fallback(
+            router=type("R", (), {"policy": policy})(),
+            registry=_RecordingRegistry(),
+            role_cfg=primary_cfg,
+            provider=_FailingPrimary(),
+            system_prompt=None,
+            messages=[],
+            tools=[],
+            logger=_DummyLogger(),
+            turn_number=1,
+            retries=0,
+        )
+        self.assertIsInstance(handle, _DummyHandle)
+        # First fallback (claude-sonnet-4-6) was constructed lazily
+        # only after the primary failed. Subsequent fallback models in
+        # the chain may also have been constructed; what matters is
+        # the registry was not touched before the primary call.
+        self.assertGreaterEqual(len(constructed), 1)
+        self.assertEqual(constructed[0], "claude-sonnet-4-6")
 
 
 class TestHimOSHarnessBridge(unittest.TestCase):
