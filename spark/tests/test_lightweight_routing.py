@@ -733,3 +733,25 @@ class TestStderrSuppressionSharedPath(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+class TestLocalPrivateRouting(unittest.TestCase):
+    """Private, batchable/corpus-local work routes to the local Nemotron role."""
+
+    def test_local_private_routes_private_batchable_scan(self):
+        p = load_policy()
+        d = p.classify("Scan Him for candidate funders and cluster the opportunities locally.")
+        self.assertEqual(d.role, "local_private")
+        self.assertEqual(d.config.provider, "openai")
+        self.assertIn("Nemotron", d.config.model)
+        self.assertEqual(d.config.base_url, "http://127.0.0.1:8000/v1")
+
+    def test_local_private_routes_branch_archaeology(self):
+        p = load_policy()
+        d = p.classify("Do branch archaeology on stale branches and local-only commits.")
+        self.assertEqual(d.role, "local_private")
+
+    def test_local_private_routes_memory_compression(self):
+        p = load_policy()
+        d = p.classify("Use the local workbench for dreaming consolidation over Him memory.")
+        self.assertEqual(d.role, "local_private")
+

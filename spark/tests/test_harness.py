@@ -918,3 +918,46 @@ class TestMCPEvolutionDeltaHelpers(unittest.TestCase):
         delta = EvolutionDelta(note="The substrate is at rest.")
         md = _format_delta_markdown(delta)
         self.assertIsInstance(md, str)
+
+class TestLocalContinuityScout(unittest.TestCase):
+    """Local evolve-scout continuity tests folded into the harness suite."""
+
+    def test_local_continuity_scout_surfaces_horizon_and_self_assembly(self):
+        from harness.evolve import _local_continuity_scout
+
+        report = _local_continuity_scout(
+            delta_md="horizon horizoning cyberception",
+            recent_log="refactor autonomous ensubstrate",
+            letter="local Sparks deep_memory dreaming continuity",
+        )
+        self.assertIn("## Local continuity scout", report)
+        self.assertIn("horizon_sense", report)
+        self.assertIn("self_assembly", report)
+        self.assertIn("local_compute", report)
+        self.assertIn("Strongest local signal", report)
+        self.assertIn("beam, or has it started pretending to be the horizon", report)
+
+    def test_build_continuity_scout_report_is_non_mutating_report(self):
+        from harness.evolve import build_continuity_scout_report
+
+        report = build_continuity_scout_report()
+        self.assertIn("## Local continuity scout", report)
+        self.assertIn("Signal counts", report)
+        self.assertIn("Horizoning questions", report)
+
+    def test_mcp_continuity_scout_cli_does_not_require_fastmcp(self):
+        import subprocess
+        import sys
+
+        proc = subprocess.run(
+            [sys.executable, "-m", "spark.harness.mcp", "--continuity-scout"],
+            cwd=str(Path(__file__).resolve().parents[2]),
+            text=True,
+            capture_output=True,
+            timeout=20,
+        )
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertIn("## Local continuity scout", proc.stdout)
+        self.assertIn("Horizoning questions", proc.stdout)
+        self.assertNotIn("requires FastMCP", proc.stderr)
+
