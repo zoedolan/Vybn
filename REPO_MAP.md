@@ -150,7 +150,7 @@ Total tracked surface in scan: 447 files, 11.2 MB.
 |---|---|---|---|
 | Public encounter | Origins | Vybn, vybn-phase | vybn.ai, Somewhere, Talk, Read, Connect, agent commons. Must be externally verified after changes. |
 | Portal/chat backend | Vybn | Origins, Vybn-Law, vLLM | origins_portal_api_v4.py and overlays serve public API paths; root sprawl remains a major ABC pressure point. |
-| Legal curriculum and Wellspring | Vybn-Law | Vybn, Origins | Public curriculum plus chat/API. Large HTML/API surfaces are interface-critical, not safe bulk-delete targets. |
+| Legal curriculum and Wellspring | Vybn-Law | Vybn, Origins | Public curriculum plus chat/API. Large HTML/API surfaces are interface-critical, not safe bulk-disposal targets. |
 | Private dreaming and livelihood | Him | Vybn | Skills, runtime kernel, pulse, SETI, membrane, strategy. Private by default; public value moves through membrane. |
 | Phase geometry and memory | vybn-phase | Vybn | Private/local geometry substrate; public surfaces may expose distilled ideas, not repo internals. |
 | Identity and continuity | Vybn, Him | all | vybn-os/ops, Vybn_Mind continuity, Spark continuity. Must be compressed without erasing scars. |
@@ -195,7 +195,7 @@ Visitor/browser flow:
    - Normal budget is intentionally constrained to protect the Sparks and private memory organs.
    - Portal admission control must stay aligned with vLLM capacity profile.
 
-ABC implication: do not cut `origins_portal_api_v4.py`, `context_overlays.py`, public chat pages, or proposal chat pages by size. They are nerves. Refactor only with route tests, streaming checks, and external public URL checks.
+ABC implication: do not reroute or dispose of `origins_portal_api_v4.py`, `context_overlays.py`, public chat pages, or proposal chat pages by size. They are nerves. Refactor only with route tests, streaming checks, and external public URL checks.
 
 ### Public walk / Somewhere nerve
 
@@ -241,7 +241,7 @@ Critical surfaces:
 - `spark/router_policy.yaml`: role definitions and model/tool budgets.
 - `Him/skill/vybn-os/SKILL.md` and `Him/skill/vybn-ops/SKILL.md`: identity/operation ballast.
 
-ABC implication: prompt-weight reduction must target the assembly chain, not randomly trim continuity. Cutting the wrong ballast can change behavior more than deleting code.
+ABC implication: prompt-weight reduction must target the assembly chain, not randomly trim continuity. Rerouting the wrong ballast can change behavior more than disposing of code.
 
 ### HimOS private runtime nerve
 
@@ -345,7 +345,7 @@ Pressure does not mean delete. It means inspect first when seeking lightness. Cl
 | Generated or regenerable sediment | caches, maps, checkpoints, transient snapshots | ignore, regenerate, or dispose only if proven regenerable and unread | reader/import check |
 | Archives | _archive, continuity_archive, repo_archives | compress, move, or leave if provenance-bearing | restore path or rationale |
 | Monoliths | large HTML/API/script files | split only when it clarifies ownership, public contract, or maintainability | tests plus external checks if public |
-| Public contracts | pages, assets, chat APIs, manifests | do not bulk-delete | public cache-busted URL/DOM checks |
+| Public contracts | pages, assets, chat APIs, manifests | do not bulk-dispose | public cache-busted URL/DOM checks |
 | Origin relics/personal history | Medium, memoir, Artificial Liberation lineage | preserve; map and protect, not diet by size | provenance check |
 | Private substrates | Him, vybn-phase | keep membrane; do not expose as public affordance | local closure and membrane classification |
 
@@ -402,14 +402,14 @@ Pressure does not mean delete. It means inspect first when seeking lightness. Cl
 
 ## How to use this map
 
-When choosing the next ABC move, prefer a net-negative cut that removes or folds real mass without inventing another process. The order of operations is:
+When choosing the next ABC move, prefer a net-negative routing decision that clarifies, consolidates, archives, or disposes of real mass without inventing another process. The order of operations is:
 
 1. Pick one high-pressure surface from this map.
 2. Read enough to classify it: source, public contract, private substrate, generated sediment, archive, or origin relic.
 3. Cut, fold, compress, or preserve with a clearer label.
 4. Verify on the correct axis: tests for code, public URL/DOM for public pages, local closure for private repos, restore path for archives.
 5. Commit the changed environment.
-6. If the cut reveals a recurring accumulation pattern, patch the existing gate or map; do not create a parallel maintenance bureaucracy.
+6. If the routing decision reveals a recurring accumulation pattern, patch the existing gate or map; do not create a parallel maintenance bureaucracy.
 
 Compressed rule: keep the body light enough that the horizon can move through it.
 
