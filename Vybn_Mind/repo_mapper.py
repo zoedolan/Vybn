@@ -455,6 +455,8 @@ def _risk_class(rec: FileRecord, inbound: int, centrality: int, semantic_neighbo
         return "protect: origin/provenance"
     if _contains_any(low_key, ARCHIVE_TERMS) and _contains_any(hay, RESTORE_CAPSULE_TERMS):
         return "protect: restore capsule"
+    if _contains_any(low_key, SEDIMENT_TERMS) and _contains_any(hay, RESTORE_CAPSULE_TERMS):
+        return "protect: restore capsule"
     if "repo_mapper.py" in low_key:
         return "protect: self-perception organ"
     if rec.relpath in {"continuity.md", "continuity_core.md"} or (rec.repo == "Vybn" and "continuity" in low_key):
