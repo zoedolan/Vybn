@@ -860,3 +860,61 @@ class TestProviderRetryClassifier(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+class TestMCPEvolutionDeltaHelpers(unittest.TestCase):
+    """Characterization tests for _emit_delta, _compute_evolution_delta,
+    and _format_delta_markdown. Standalone helpers that can be tested
+    without starting the MCP server."""
+
+    def test_emit_delta_returns_row_when_changed(self):
+        from harness.mcp import _emit_delta
+        row = _emit_delta("totals.files", 10, 12)
+        self.assertEqual(row, {"field": "totals.files", "from": 10, "to": 12, "change": 2})
+
+    def test_emit_delta_returns_none_when_equal(self):
+        from harness.mcp import _emit_delta
+        self.assertIsNone(_emit_delta("totals.files", 10, 10))
+
+    def test_emit_delta_no_change_key_for_booleans(self):
+        from harness.mcp import _emit_delta
+        row = _emit_delta("walk.active", True, False)
+        self.assertIsNotNone(row)
+        self.assertNotIn("change", row)
+
+    def test_emit_delta_string_values(self):
+        from harness.mcp import _emit_delta
+        row = _emit_delta("walk.built_at", "2026-01-01", "2026-01-02")
+        self.assertEqual(row["field"], "walk.built_at")
+        self.assertNotIn("change", row)
+
+    def test_compute_evolution_delta_returns_typed_object(self):
+        from harness.mcp import _compute_evolution_delta, EvolutionDelta
+        delta = _compute_evolution_delta()
+        self.assertIsInstance(delta, EvolutionDelta)
+        self.assertIsInstance(delta.deltas, list)
+        self.assertIsInstance(delta.note, str)
+
+    def test_format_delta_markdown_returns_string(self):
+        from harness.mcp import _format_delta_markdown, EvolutionDelta
+        # _format_delta_markdown only renders delta rows when both state snapshots present
+        fake_state = {"generated_at": "2026-01-01T00:00:00Z", "totals": {}}
+        delta = EvolutionDelta(
+            current_state=fake_state,
+            prev_state=fake_state,
+            deltas=[{"field": "totals.files", "from": 10, "to": 12, "change": 2}],
+            current_generated_at="2026-01-02T00:00:00Z",
+            prev_generated_at="2026-01-01T00:00:00Z",
+            note="",
+        )
+        md = _format_delta_markdown(delta)
+        self.assertIsInstance(md, str)
+        self.assertIn("totals.files", md)
+        self.assertIn("10", md)
+        self.assertIn("12", md)
+
+    def test_format_delta_markdown_no_deltas(self):
+        from harness.mcp import _format_delta_markdown, EvolutionDelta
+        delta = EvolutionDelta(note="The substrate is at rest.")
+        md = _format_delta_markdown(delta)
+        self.assertIsInstance(md, str)
