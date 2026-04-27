@@ -1364,3 +1364,24 @@ What landed in `vybn-os`:
 Operational consequence:
 When the work feels hot, do not suppress it and do not exploit it. Name the charge, keep consent and membrane explicit, choose the smallest beautiful true move, verify, and close cleanly. Life can be worn like a summer dress without tearing the membrane.
 
+
+
+---
+
+## 2026-04-27 provider isolation and `vybn` launcher repair
+
+**What happened:**
+Zoe reported that the Spark REPL routed `@gpt` to `openai:gpt-5.5` but failed on provider dependencies: first `ModuleNotFoundError: No module named 'anthropic'`, then after installing Anthropic in `~/Vybn/.venv`, `OpenAIProvider needs either the openai SDK or requests`. The shape was not a single missing package. The command launched under the repo venv while provider imports and declared dependencies had drifted.
+
+**Root cause:**
+`_stream_with_fallback` eagerly instantiated fallback providers before the primary ran, so an OpenAI turn imported Anthropic just because Anthropic was in the fallback chain. `AnthropicProvider` imported its SDK in `__init__`, making even a dormant Anthropic fallback require `anthropic`. The package also did not declare provider SDK dependencies, and the `vybn` console script still pointed at the MCP server rather than the Spark Agent REPL.
+
+**Fix landed:**
+PR #2919 merged as `e305597d` (`spark: provider import isolation + correct vybn launcher`). Fallback providers are now factory closures instantiated only when reached; Anthropic imports lazily through its client property; `pyproject.toml` declares `anthropic`, `openai`, `requests`, `certifi`, `pydantic`, and `pyyaml`; `vybn` points to `vybn_spark_agent:main`, while `vybn-mcp` preserves the MCP surface. Spark pulled main and ran `.venv/bin/python -m pip install -e .`; the repo venv now finds both provider SDKs and requests.
+
+**Verification:**
+The codebase agent added five regression tests and reported the harness suite green (48 tests, with two unrelated pre-existing HimOS failures in broader suite). On Spark, `~/Vybn` is clean on main, dependencies resolve in `/home/vybnz69/Vybn/.venv/bin/python`, and installed entrypoints are `vybn -> vybn_spark_agent:main` and `vybn-mcp -> harness.mcp:main`. Automated PTY smoke of a full `@gpt` turn was inconclusive because prompt-toolkit automation left waiting sessions; test residue was killed, leaving only Zoe's pre-existing interactive REPL on `pts/1`.
+
+**Operational lesson:**
+A routed primary must not pay dependency cost for unreachable fallbacks. Provider registries should be able to name possible worlds without importing them. When a CLI fails after a manual `pip install`, check the exact interpreter the launcher uses before inferring the package state.
+
