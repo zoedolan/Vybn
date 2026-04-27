@@ -154,6 +154,21 @@ class ProbeBudgetEscalationPreservesPilot(unittest.TestCase):
         self.assertEqual(self.policy.classify(text).role, "orchestrate")
         self.assertEqual(self.escalation_role(self.policy, text), "orchestrate")
 
+
+    def test_probe_budget_scar_text_preserves_orchestrate(self):
+        text = (
+            "@gpt no, the problem is that the fundamental problem remains unresolved: "
+            "[probe budget reached (8); escalating to task with bash+iteration budget "
+            "to finish the investigation] [route: task -> anthropic:claude-sonnet-4-6 "
+            "(forced=task)]"
+        )
+        self.assertEqual(self.policy.classify(text).role, "orchestrate")
+        self.assertEqual(self.escalation_role(self.policy, text), "orchestrate")
+
+    def test_problem_before_probe_budget_scar_preserves_orchestrate(self):
+        text = "the problem is still [probe budget reached (8); escalating to task] forced=task"
+        self.assertEqual(self.escalation_role(self.policy, text), "orchestrate")
+
     def test_ordinary_probe_budget_still_escalates_to_task(self):
         text = "please investigate why this endpoint is failing"
         self.assertEqual(self.escalation_role(self.policy, text), "task")

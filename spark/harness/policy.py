@@ -239,6 +239,10 @@ _MISSION_CRITICAL_PILOT_RE = re.compile(
     r"problem|routing|route|default|mission[- ]critical|"
     r"once and for all|pilot|orchestrat(?:e|or)"
     r")\b"
+    r"|\bproblem\b.{0,240}\b(sonnet|probe|default)\b.{0,240}\b("
+    r"task|forced=task|escalat(?:e|ing)|pilot|orchestrat(?:e|or))\b"
+    r"|\bprobe budget reached\b.{0,240}\b(escalat(?:e|ing) to task|forced=task|sonnet|pilot)\b"
+    r"|\bforced=task\b.{0,240}\b(probe|budget|sonnet|pilot|orchestrat(?:e|or))\b"
     r"|\brecursive self[- ]improvement loop\b"
     r"|\bpick up where\b.{0,160}\bsonnet\b.{0,160}\bleft off\b",
     re.IGNORECASE,

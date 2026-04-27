@@ -1982,6 +1982,11 @@ def run_agent_loop(
                         messages.pop()
                     if messages and messages[-1].get("role") == "user":
                         messages.pop()
+                    reroute_role = _probe_budget_escalation_role(
+                        router,
+                        user_input,
+                        messages,
+                    )
                     return run_agent_loop(
                         user_input=user_input,
                         messages=messages,
@@ -1991,7 +1996,7 @@ def run_agent_loop(
                         registry=registry,
                         logger=logger,
                         turn_number=turn_number,
-                        forced_role="task",
+                        forced_role=reroute_role,
                         system_prompt_no_tools=system_prompt_no_tools,
                         system_prompt_orchestrator=system_prompt_orchestrator,
                         _reroute_depth=1,
