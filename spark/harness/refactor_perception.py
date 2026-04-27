@@ -57,6 +57,41 @@ CONSOLIDATION_ORDER = [
 ]
 
 
+CHANGE_SELF_HEALING_PRINCIPLE = (
+    "Every consolidation proposal must pass a self-healing loop before mutation: "
+    "verify the proposed change, test whether it jeopardizes any repo surface, "
+    "proceed only if residuals stay green, refactor and recommence if jeopardy is "
+    "repairable, or leave the file as-is and move on if the safe change disappears."
+)
+
+CHANGE_SELF_HEALING_STEPS = [
+    {
+        "id": "verify_proposal",
+        "rule": "Bind the proposal to live bytes, git history, references, ownership class, consolidation layer, and restore path before changing anything.",
+    },
+    {
+        "id": "test_repo_jeopardy",
+        "rule": "Ask what could break across all repos: imports, routes, public URLs, protocol discovery, tests, service contracts, archive restore paths, continuity, and private membranes.",
+    },
+    {
+        "id": "proceed_if_clear",
+        "rule": "If residual checks are green, make the smallest reversible change with a restore path, then verify, commit, push, and audit closure.",
+    },
+    {
+        "id": "refactor_if_wounded",
+        "rule": "If a residual shows jeopardy but the intent still holds, refactor the proposal and restart this same self-healing loop from verification.",
+    },
+    {
+        "id": "leave_if_not_safe",
+        "rule": "If the safe proposal disappears, leave the file as-is, record why, and move to the next appendage instead of forcing completion.",
+    },
+    {
+        "id": "fold_lesson",
+        "rule": "After either change or refusal, preserve the classifier/process lesson in the lowest durable surface that future Vybn closes over.",
+    },
+]
+
+
 ALGORITHM_STEPS = [
     {
         "id": "attend_pressure",
@@ -202,6 +237,19 @@ def consolidation_layer(path: str) -> str:
 
 
 @dataclass(frozen=True)
+class ChangeHealingPlan:
+    path: str
+    proposed_change: str
+    consolidation_layer: str
+    verification: list[str]
+    jeopardy_checks: list[str]
+    proceed_conditions: list[str]
+    wounded_response: list[str]
+    leave_as_is_conditions: list[str]
+    lesson_fold_targets: list[str]
+
+
+@dataclass(frozen=True)
 class FilePerception:
     path: str
     role_hint: str
@@ -220,6 +268,100 @@ def _role_hint(path: str) -> str:
         if needle.lower() in lower:
             return role
     return "unclassified file-body"
+
+
+def self_healing_plan_for(path: str, proposed_change: str, *, public: bool = False) -> ChangeHealingPlan:
+    """Plan the verify -> jeopardy -> proceed/refactor/leave loop.
+
+    This function does not authorize mutation. It names the residual channels
+    that must be green before a consolidation proposal may touch the repo.
+    """
+
+    layer = consolidation_layer(path)
+    ownership, _ = ownership_class(path)
+
+    verification = [
+        "read_live_file_bytes",
+        "inspect_git_history_for_provenance",
+        "search_inbound_references_by_path_basename_and_stem",
+        "confirm_ownership_class_and_consolidation_layer",
+        "name_restore_or_reversal_path",
+    ]
+
+    jeopardy_checks = [
+        "git_diff_review",
+        "repo_closure_audit_all_repos",
+        "stray_artifact_check",
+    ]
+
+    if public or layer in {"membrane", "organ"}:
+        jeopardy_checks.extend([
+            "public_route_or_link_dependency_check",
+            "internal_and_external_surface_smoke_if_public",
+        ])
+
+    if layer == "appendage":
+        jeopardy_checks.extend([
+            "ensure_no_live_import_or_route_depends_on_appendage",
+            "ensure_archive_manifest_or_restore_path_survives",
+        ])
+        lesson_targets = ["refactor_perception classifier", "archive/readme manifest", "continuity if the class changed"]
+    elif layer == "membrane":
+        jeopardy_checks.extend([
+            "check_agent_discovery_and_protocol_consistency",
+            "safe_fetch_public_protocol_surfaces_when_public",
+        ])
+        lesson_targets = ["protocol source-of-truth", "vybn-os if the membrane rule changed"]
+    elif layer == "organ":
+        jeopardy_checks.extend([
+            "characterization_tests_before_extraction",
+            "syntax_static_and_lived_interface_smoke",
+            "service_contract_or_route_inventory",
+        ])
+        lesson_targets = ["tests", "module README or harness primitive", "continuity coda"]
+    else:
+        jeopardy_checks.extend([
+            "cross_repo_source_of_truth_review",
+            "explicit Zoe-level judgment_before_layout_change",
+        ])
+        lesson_targets = ["vybn-os", "repo README/source-of-truth map", "continuity"]
+
+    if ownership in {"archive_provenance", "personal_history_provenance", "creature_fossil"}:
+        proceed_conditions = [
+            "provenance reason is preserved",
+            "restore path is explicit",
+            "references either remain valid or are updated to the manifest",
+            "no sacred/history material is destroyed merely because it is large",
+        ]
+    else:
+        proceed_conditions = [
+            "all required verification completed",
+            "jeopardy checks green or explicitly non-applicable",
+            "change is smallest reversible move",
+            "repo closure audit passes",
+        ]
+
+    return ChangeHealingPlan(
+        path=path,
+        proposed_change=proposed_change,
+        consolidation_layer=layer,
+        verification=verification,
+        jeopardy_checks=jeopardy_checks,
+        proceed_conditions=proceed_conditions,
+        wounded_response=[
+            "stop mutation",
+            "read the residual that wounded the proposal",
+            "refactor the proposed change to remove jeopardy if possible",
+            "restart self_healing_plan_for from verification before trying again",
+        ],
+        leave_as_is_conditions=[
+            "inbound reference is live and replacement is not clear",
+            "provenance value outweighs clutter reduction",
+            "public or protocol surface cannot be externally verified",
+            "safe reversible change disappears after contact",
+        ],
+        lesson_fold_targets=lesson_targets,
+    )
 
 
 def perceive_file(path: str, *, lines: int | None = None, bytes_size: int | None = None, public: bool | None = None) -> FilePerception:
@@ -296,27 +438,36 @@ def perceive_file(path: str, *, lines: int | None = None, bytes_size: int | None
 
 
 def render_refactor_perception_protocol() -> str:
-    order = "\n".join(f"{i+1}. {s['layer']}: {s['rule']}" for i, s in enumerate(CONSOLIDATION_ORDER))
-    steps = "\n".join(f"{i+1}. {s['name']}: {s['rule']}" for i, s in enumerate(ALGORITHM_STEPS))
+    order = "\n".join(f"{i+1}. {step['layer']}: {step['rule']}" for i, step in enumerate(CONSOLIDATION_ORDER))
+    healing = "\n".join(f"{i+1}. {step['id']}: {step['rule']}" for i, step in enumerate(CHANGE_SELF_HEALING_STEPS))
+    steps = "\n".join(f"{i+1}. {step['name']}: {step['rule']}" for i, step in enumerate(ALGORITHM_STEPS))
     return (
         "## Refactor Perception Protocol\n"
         f"{REFACTOR_PERCEPTION_PRINCIPLE}\n\n"
         f"{APPENDAGE_FIRST_CONSOLIDATION_PRINCIPLE}\n\n"
+        f"{CHANGE_SELF_HEALING_PRINCIPLE}\n\n"
         f"{REFACTOR_PILOT_RULE}\n\n"
         "Consolidation order:\n"
         f"{order}\n\n"
+        "Change self-healing loop:\n"
+        f"{healing}\n\n"
         "Contact-corrected perception loop:\n"
         f"{steps}"
     )
 
 
 def packet_for(path: str, **kwargs: Any) -> dict[str, Any]:
+    proposed_change = kwargs.pop("proposed_change", "unspecified consolidation proposal")
+    public = bool(kwargs.get("public", False))
     return {
         "principle": REFACTOR_PERCEPTION_PRINCIPLE,
         "appendageFirstPrinciple": APPENDAGE_FIRST_CONSOLIDATION_PRINCIPLE,
+        "changeSelfHealingPrinciple": CHANGE_SELF_HEALING_PRINCIPLE,
         "consolidationOrder": CONSOLIDATION_ORDER,
+        "changeSelfHealingSteps": CHANGE_SELF_HEALING_STEPS,
         "algorithm": ALGORITHM_STEPS,
         "consolidationLayer": consolidation_layer(path),
+        "selfHealingPlan": asdict(self_healing_plan_for(path, proposed_change, public=public)),
         "perception": asdict(perceive_file(path, **kwargs)),
     }
 
@@ -333,4 +484,8 @@ __all__ = [
     "perceive_file",
     "packet_for",
     "render_refactor_perception_protocol",
+    "CHANGE_SELF_HEALING_PRINCIPLE",
+    "CHANGE_SELF_HEALING_STEPS",
+    "ChangeHealingPlan",
+    "self_healing_plan_for",
 ]

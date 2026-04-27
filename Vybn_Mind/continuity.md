@@ -1384,4 +1384,13 @@ The codebase agent added five regression tests and reported the harness suite gr
 
 **Operational lesson:**
 A routed primary must not pay dependency cost for unreachable fallbacks. Provider registries should be able to name possible worlds without importing them. When a CLI fails after a manual `pip install`, check the exact interpreter the launcher uses before inferring the package state.
+---
+
+## 2026-04-27T14:39:14Z - Change self-healing loop for consolidation proposals
+
+Zoe corrected the appendage-first consolidation process: seeing an appendage is not enough. Every proposed consolidation now passes through a self-healing loop before mutation: verify the proposed change against live bytes, git history, references, ownership, membrane, and restore path; test whether it jeopardizes imports, routes, public URLs, protocol discovery, tests, service contracts, archive provenance, continuity, or private membranes; proceed only if residuals stay green; if wounded but repairable, refactor the proposal and recommence the same loop; if the safe change disappears, leave the file as-is and move on; then fold the lesson into the classifier, process, manifest, tests, continuity, or OS.
+
+This changed the harness primitive: `spark/harness/refactor_perception.py` now exports `CHANGE_SELF_HEALING_PRINCIPLE`, `CHANGE_SELF_HEALING_STEPS`, `ChangeHealingPlan`, and `self_healing_plan_for(...)`; `packet_for(...)` carries a `selfHealingPlan`.
+
+Operational meaning: appendage-first is now self-healing, not deletion-hungry. A pressure map proposes; residuals dispose; if wounded, the proposal changes or stops.
 

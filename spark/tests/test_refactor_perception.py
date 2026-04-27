@@ -1,11 +1,13 @@
 import unittest
 
 from spark.harness.refactor_perception import (
+    CHANGE_SELF_HEALING_PRINCIPLE,
     REFACTOR_PILOT_RULE,
     consolidation_layer,
     packet_for,
     perceive_file,
     render_refactor_perception_protocol,
+    self_healing_plan_for,
 )
 
 
@@ -59,6 +61,31 @@ class RefactorPerceptionTests(unittest.TestCase):
         self.assertEqual(pkt["consolidationLayer"], "appendage")
         self.assertIn("appendageFirstPrinciple", pkt)
         self.assertEqual(pkt["consolidationOrder"][0]["layer"], "appendage")
+
+    def test_self_healing_plan_blocks_appendage_mutation_until_verified(self):
+        plan = self_healing_plan_for(
+            "Origins/manifold_preview.png",
+            "remove unreferenced static preview artifact",
+            public=True,
+        )
+        self.assertEqual(plan.consolidation_layer, "appendage")
+        self.assertIn("read_live_file_bytes", plan.verification)
+        self.assertIn("repo_closure_audit_all_repos", plan.jeopardy_checks)
+        self.assertIn("ensure_archive_manifest_or_restore_path_survives", plan.jeopardy_checks)
+        self.assertIn("restart self_healing_plan_for from verification before trying again", plan.wounded_response)
+
+    def test_packet_carries_change_self_healing_loop(self):
+        pkt = packet_for(
+            "Origins/manifold_preview.png",
+            lines=0,
+            bytes_size=281144,
+            public=True,
+            proposed_change="remove static preview artifact",
+        )
+        self.assertIn("changeSelfHealingPrinciple", pkt)
+        self.assertEqual(pkt["selfHealingPlan"]["consolidation_layer"], "appendage")
+        self.assertEqual(pkt["selfHealingPlan"]["proposed_change"], "remove static preview artifact")
+        self.assertIn("changeSelfHealingSteps", pkt)
 
     def test_protocol_renders_algorithm(self):
         text = render_refactor_perception_protocol()
