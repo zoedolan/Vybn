@@ -611,6 +611,8 @@ def _abc_attention_rows(classified: List[tuple], by_key: Dict[str, FileRecord]) 
             continue
         phase = _abc_phase(rec, rclass)
         score = _attention_score(rec, rclass, inn, out, neigh)
+        if rclass == "ordinary" and rec.git_state not in {"ignored", "untracked-local"} and score < 3.0:
+            continue
         observed, inference, routing = _routing_evidence(rec, rclass, inn, out, neigh, _record_text(rec))
         rows.append((phase_rank.get(phase, 99), -score, phase, score, key, rclass, observed, inference, routing))
     rows.sort()
@@ -692,7 +694,7 @@ def build_semantic_anatomy(all_records: List[FileRecord]) -> str:
 
     attention_rows = _abc_attention_rows(classified, by_key)
     a("### Recursive ABC attention frontier")
-    a("Attention order is edge → interface → organ → core. Re-run the mapper after each ABC move; the next frontier is computed from the changed body, not from a static todo list.")
+    a("Attention order is edge → interface → organ → core. Re-run the mapper after each ABC move; the next frontier is computed from the changed body, not from a static todo list. Ordinary tracked files stay quiet unless they cross a high attention threshold or become live friction.")
     for phase in ABC_PHASE_ORDER:
         rows = [row for row in attention_rows if row[2] == phase]
         if not rows:
