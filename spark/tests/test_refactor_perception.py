@@ -6,7 +6,9 @@ import warnings
 from spark.harness.refactor_perception import (
     CHANGE_SELF_HEALING_PRINCIPLE,
     CONNECTIVE_TISSUE_PRINCIPLE,
+    ADAPTIVE_CONSOLIDATION_PRINCIPLE,
     REFACTOR_PILOT_RULE,
+    adaptive_consolidation_plan_for,
     consolidation_layer,
     packet_for,
     perceive_file,
@@ -175,12 +177,39 @@ class RefactorPerceptionTests(unittest.TestCase):
         self.assertIn("connective tissue", text)
         self.assertIn(CONNECTIVE_TISSUE_PRINCIPLE, text)
         self.assertIn("Let contact revise category", text)
+        self.assertIn("Adaptive consolidation recursion", text)
+        self.assertIn(ADAPTIVE_CONSOLIDATION_PRINCIPLE, text)
         self.assertIn(REFACTOR_PILOT_RULE, text)
 
     def test_packet_carries_algorithm_and_perception(self):
         pkt = packet_for("origins_portal_api_v4.py", lines=3461, public=True)
         self.assertEqual(pkt["perception"]["path"], "origins_portal_api_v4.py")
         self.assertGreaterEqual(len(pkt["algorithm"]), 7)
+
+    def test_adaptive_consolidation_plan_regenerates_after_contact(self):
+        plan = adaptive_consolidation_plan_for(
+            "_archive/origins_portal_api_v3.py",
+            "replace archive source body with manifest restore path",
+            public=True,
+        )
+        self.assertIn("revise_plan_from_contact", plan.recursive_loop)
+        self.assertIn("fold_lesson_into_planner", plan.recursive_loop)
+        self.assertIn("regenerate_next_plan", plan.recursive_loop)
+        self.assertIn("read_live_file_bytes", plan.expected_wound_channels)
+        self.assertIn("regenerate the next plan", plan.regeneration_rule)
+        self.assertIn("refactor_perception adaptive planner", plan.planner_fold_targets)
+
+    def test_packet_carries_adaptive_consolidation_recursion(self):
+        pkt = packet_for(
+            "_archive/origins_portal_api_v3.py",
+            lines=2410,
+            public=True,
+            proposed_change="replace archive source body with manifest restore path",
+        )
+        self.assertIn("adaptiveConsolidationPrinciple", pkt)
+        self.assertIn("adaptiveConsolidationSteps", pkt)
+        self.assertEqual(pkt["adaptivePlan"]["candidate_path"], "_archive/origins_portal_api_v3.py")
+        self.assertIn("regenerate_next_plan", pkt["adaptivePlan"]["recursive_loop"])
 
 
 if __name__ == "__main__":

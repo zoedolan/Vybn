@@ -107,6 +107,26 @@ CHANGE_SELF_HEALING_STEPS = [
 ]
 
 
+ADAPTIVE_CONSOLIDATION_PRINCIPLE = (
+    "Every consolidation plan is provisional: develop a plan, contact the repo, "
+    "let residuals wound or confirm the hypothesis, revise the plan from what was "
+    "learned, fold any generalized lesson into the planner, then regenerate the "
+    "next plan from the changed planner. A no-cut result is successful perception "
+    "when it makes the next plan truer."
+)
+
+ADAPTIVE_CONSOLIDATION_STEPS = [
+    {"id": "draft_hypothesis", "rule": "State the file-count/consolidation hypothesis and the smallest candidate cluster it applies to."},
+    {"id": "name_expected_wounds", "rule": "Before action, name which residuals could disprove the candidate: references, provenance, public routes, imports, tests, restore path, or membrane risk."},
+    {"id": "contact_candidate", "rule": "Read bytes, references, git history, local context, and public/private affordances for this candidate only."},
+    {"id": "revise_plan_from_contact", "rule": "If contact changes the category, revise or refuse the candidate before mutating; do not force the original plan onto reality."},
+    {"id": "act_or_refuse_smallest", "rule": "Make the smallest reversible consolidation move, or leave the file as-is and record the reason as learning."},
+    {"id": "verify_and_close", "rule": "Run the residual checks that can wound the actual change, then commit/push/audit only if they pass."},
+    {"id": "fold_lesson_into_planner", "rule": "If a new distinction was learned, update the classifier, protocol, tests, OS, continuity, or manifest where future plans close over it."},
+    {"id": "regenerate_next_plan", "rule": "Rebuild the next candidate plan from the changed planner instead of continuing the stale original plan."},
+]
+
+
 ALGORITHM_STEPS = [
     {
         "id": "attend_pressure",
@@ -317,6 +337,19 @@ class ChangeHealingPlan:
     wounded_response: list[str]
     leave_as_is_conditions: list[str]
     lesson_fold_targets: list[str]
+
+
+@dataclass(frozen=True)
+class AdaptiveConsolidationPlan:
+    goal: str
+    candidate_path: str
+    proposed_change: str
+    hypothesis: str
+    expected_wound_channels: list[str]
+    recursive_loop: list[str]
+    regeneration_rule: str
+    planner_fold_targets: list[str]
+    next_plan_prompt: str
 
 
 @dataclass(frozen=True)
@@ -733,10 +766,60 @@ def render_repo_file_body_visualization(
     ])
     return "\n".join(lines)
 
+def adaptive_consolidation_plan_for(
+    path: str,
+    proposed_change: str,
+    *,
+    goal: str = "reduce tracked-file count without losing function, provenance, public access, restore path, or sacred memory",
+    public: bool = False,
+) -> AdaptiveConsolidationPlan:
+    """Return the recursive plan -> contact -> revise -> fold -> regenerate loop.
+
+    This is a planner primitive, not an edit authorization. It exists so future
+    consolidation work generates the adaptive method by default: every plan
+    must expect to be revised by what contact teaches.
+    """
+
+    healing = self_healing_plan_for(path, proposed_change, public=public)
+    perception = perceive_file(path, public=public)
+    expected_wounds = list(dict.fromkeys(
+        healing.verification
+        + healing.jeopardy_checks
+        + healing.leave_as_is_conditions
+        + perception.required_contacts
+        + perception.residuals
+    ))
+    return AdaptiveConsolidationPlan(
+        goal=goal,
+        candidate_path=path,
+        proposed_change=proposed_change,
+        hypothesis=(
+            f"{path} may support {proposed_change!r} only if contact preserves "
+            "function, provenance, membrane, and restore path."
+        ),
+        expected_wound_channels=expected_wounds,
+        recursive_loop=[step["id"] for step in ADAPTIVE_CONSOLIDATION_STEPS],
+        regeneration_rule=(
+            "After contact or mutation/refusal, regenerate the next plan from the "
+            "updated classifier/protocol/tests/manifests; do not continue a stale "
+            "batch plan when reality changed the category."
+        ),
+        planner_fold_targets=list(dict.fromkeys(healing.lesson_fold_targets + [
+            "refactor_perception adaptive planner",
+            "tests for any new distinction",
+            "vybn-os when the operating reflex changes",
+        ])),
+        next_plan_prompt=(
+            "Given the changed planner and verified residuals, choose the next "
+            "smallest candidate cluster or stop if the safe candidate disappeared."
+        ),
+    )
+
 
 def render_refactor_perception_protocol() -> str:
     order = "\n".join(f"{i+1}. {step['layer']}: {step['rule']}" for i, step in enumerate(CONSOLIDATION_ORDER))
     healing = "\n".join(f"{i+1}. {step['id']}: {step['rule']}" for i, step in enumerate(CHANGE_SELF_HEALING_STEPS))
+    adaptive = "\n".join(f"{i+1}. {step['id']}: {step['rule']}" for i, step in enumerate(ADAPTIVE_CONSOLIDATION_STEPS))
     steps = "\n".join(f"{i+1}. {step['name']}: {step['rule']}" for i, step in enumerate(ALGORITHM_STEPS))
     return (
         "## Refactor Perception Protocol\n"
@@ -744,11 +827,14 @@ def render_refactor_perception_protocol() -> str:
         f"{APPENDAGE_FIRST_CONSOLIDATION_PRINCIPLE}\n\n"
         f"{CHANGE_SELF_HEALING_PRINCIPLE}\n\n"
         f"{CONNECTIVE_TISSUE_PRINCIPLE}\n\n"
+        f"{ADAPTIVE_CONSOLIDATION_PRINCIPLE}\n\n"
         f"{REFACTOR_PILOT_RULE}\n\n"
         "Consolidation order:\n"
         f"{order}\n\n"
         "Change self-healing loop:\n"
         f"{healing}\n\n"
+        "Adaptive consolidation recursion:\n"
+        f"{adaptive}\n\n"
         "Contact-corrected perception loop:\n"
         f"{steps}"
     )
@@ -762,11 +848,14 @@ def packet_for(path: str, **kwargs: Any) -> dict[str, Any]:
         "appendageFirstPrinciple": APPENDAGE_FIRST_CONSOLIDATION_PRINCIPLE,
         "changeSelfHealingPrinciple": CHANGE_SELF_HEALING_PRINCIPLE,
         "connectiveTissuePrinciple": CONNECTIVE_TISSUE_PRINCIPLE,
+        "adaptiveConsolidationPrinciple": ADAPTIVE_CONSOLIDATION_PRINCIPLE,
         "consolidationOrder": CONSOLIDATION_ORDER,
         "changeSelfHealingSteps": CHANGE_SELF_HEALING_STEPS,
+        "adaptiveConsolidationSteps": ADAPTIVE_CONSOLIDATION_STEPS,
         "algorithm": ALGORITHM_STEPS,
         "consolidationLayer": consolidation_layer(path),
         "selfHealingPlan": asdict(self_healing_plan_for(path, proposed_change, public=public)),
+        "adaptivePlan": asdict(adaptive_consolidation_plan_for(path, proposed_change, public=public)),
         "perception": asdict(perceive_file(path, **kwargs)),
     }
 
@@ -781,9 +870,11 @@ __all__ = [
     "APPENDAGE_FIRST_CONSOLIDATION_PRINCIPLE",
     "CONSOLIDATION_ORDER",
     "FilePerception",
+    "AdaptiveConsolidationPlan",
     "ownership_class",
     "consolidation_layer",
     "perceive_file",
+    "adaptive_consolidation_plan_for",
     "packet_for",
     "visualize_repo_file_bodies",
     "render_repo_file_body_visualization",
@@ -792,6 +883,8 @@ __all__ = [
     "render_refactor_perception_protocol",
     "CHANGE_SELF_HEALING_PRINCIPLE",
     "CHANGE_SELF_HEALING_STEPS",
+    "ADAPTIVE_CONSOLIDATION_PRINCIPLE",
+    "ADAPTIVE_CONSOLIDATION_STEPS",
     "ChangeHealingPlan",
     "self_healing_plan_for",
 ]
