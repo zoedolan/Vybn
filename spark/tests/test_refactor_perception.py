@@ -1,4 +1,7 @@
+import tempfile
 import unittest
+from pathlib import Path
+import warnings
 
 from spark.harness.refactor_perception import (
     CHANGE_SELF_HEALING_PRINCIPLE,
@@ -8,6 +11,8 @@ from spark.harness.refactor_perception import (
     packet_for,
     perceive_file,
     render_refactor_perception_protocol,
+    render_repo_file_body_visualization,
+    visualize_repo_file_bodies,
     self_healing_plan_for,
 )
 
@@ -123,6 +128,42 @@ class RefactorPerceptionTests(unittest.TestCase):
             "ensure_connective_tissue_preserved_or_strengthened",
             pkt["selfHealingPlan"]["jeopardy_checks"],
         )
+
+
+    def test_repo_file_body_visualization_renders_real_newlines(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            sample = root / "large_module.py"
+            sample.write_text("import os\n" + "\n".join(f"x{i} = {i}" for i in range(750)))
+            text = render_repo_file_body_visualization(
+                root,
+                tracked_paths=["large_module.py"],
+                top_n=5,
+            )
+        self.assertIn("\nrole counts:\n", text)
+        self.assertIn("\npressure field, top 5:\n", text)
+        self.assertNotIn("\\nrole counts", text)
+        self.assertNotIn("\\npressure field", text)
+
+    def test_repo_file_body_visualization_suppresses_ast_escape_warnings(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            bad = root / "bad_escape.py"
+            bad.write_text('pattern = "\\["\n' + "\n".join(f"x{i} = {i}" for i in range(750)))
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always")
+                viz = visualize_repo_file_bodies(
+                    root,
+                    tracked_paths=["bad_escape.py"],
+                    top_n=5,
+                )
+        self.assertEqual(viz.tracked_count, 1)
+        self.assertTrue(viz.pressure_rows)
+        self.assertFalse(
+            [w for w in caught if issubclass(w.category, SyntaxWarning)],
+            "visualization should not leak SyntaxWarning noise into the output channel",
+        )
+
 
     def test_protocol_renders_algorithm(self):
         text = render_refactor_perception_protocol()

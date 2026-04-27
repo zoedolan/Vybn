@@ -15,6 +15,10 @@ from __future__ import annotations
 from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Iterable, Mapping, Any
+import ast
+import subprocess
+import warnings
+from collections import Counter
 
 
 REFACTOR_PERCEPTION_PRINCIPLE = (
@@ -519,6 +523,217 @@ def perceive_file(path: str, *, lines: int | None = None, bytes_size: int | None
     )
 
 
+@dataclass(frozen=True)
+class FileBodyPressure:
+    path: str
+    role: str
+    pressure_score: float
+    pressure: list[str]
+    functions: int = 0
+    classes: int = 0
+    imports: int = 0
+    largest_functions: tuple[tuple[int, str, int], ...] = ()
+
+
+@dataclass(frozen=True)
+class RepoFileBodyVisualization:
+    tracked_count: int
+    role_counts: Mapping[str, int]
+    pressure_rows: tuple[FileBodyPressure, ...]
+
+
+def _safe_python_body_stats(path: Path) -> dict[str, Any]:
+    """Return AST body stats without letting parse warnings pollute the render.
+
+    The earlier one-off scanner let SyntaxWarning from files with invalid escape
+    sequences leak into stdout, which made the visualization channel itself
+    noisy. Contact may discover malformed strings; perception should record
+    useful structure or fail quiet, not turn warnings into phantom output.
+    """
+
+    try:
+        text = path.read_text(errors="replace")
+    except Exception:
+        return {}
+
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", SyntaxWarning)
+            tree = ast.parse(text)
+    except Exception:
+        return {}
+
+    funcs: list[tuple[int, str, int]] = []
+    classes = 0
+    imports = 0
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            end = getattr(node, "end_lineno", node.lineno)
+            funcs.append((end - node.lineno + 1, node.name, node.lineno))
+        elif isinstance(node, ast.ClassDef):
+            classes += 1
+        elif isinstance(node, (ast.Import, ast.ImportFrom)):
+            imports += 1
+    funcs.sort(reverse=True)
+    return {
+        "functions": len(funcs),
+        "classes": classes,
+        "imports": imports,
+        "largest": tuple(funcs[:3]),
+    }
+
+
+def _tracked_files_for(root: Path) -> list[str]:
+    try:
+        out = subprocess.check_output(
+            ["git", "ls-files"],
+            cwd=root,
+            text=True,
+            stderr=subprocess.DEVNULL,
+        )
+    except Exception:
+        return []
+    return [line for line in out.splitlines() if line]
+
+
+def _file_body_role(path: str, *, lines: int | None, bytes_size: int) -> str:
+    pkt = perceive_file(path, lines=lines, bytes_size=bytes_size)
+    if pkt.ownership != "live_source":
+        return pkt.ownership.replace("_", " ")
+    if pkt.role_hint != "unclassified file-body":
+        return pkt.role_hint
+    return "unclassified tracked body"
+
+
+def visualize_repo_file_bodies(
+    root: str | Path = ".",
+    *,
+    tracked_paths: Iterable[str] | None = None,
+    top_n: int = 18,
+) -> RepoFileBodyVisualization:
+    """Render a read-only file-body pressure field for a repo.
+
+    This is contact, not authorization. It intentionally returns a perception
+    packet: roles, pressure, and hints. Any mutation still has to pass the
+    self-healing loop.
+    """
+
+    root_path = Path(root)
+    tracked = list(tracked_paths) if tracked_paths is not None else _tracked_files_for(root_path)
+    role_counts: Counter[str] = Counter()
+    rows: list[FileBodyPressure] = []
+
+    for rel in tracked:
+        path = rel.replace("\\", "/")
+        full = root_path / rel
+        try:
+            size = full.stat().st_size
+        except OSError:
+            continue
+
+        text: str | None = None
+        lines: int | None = None
+        if size < 2_000_000:
+            try:
+                text = full.read_text(errors="replace")
+                lines = text.count("\n") + (1 if text and not text.endswith("\n") else 0)
+            except Exception:
+                pass
+
+        role = _file_body_role(path, lines=lines, bytes_size=size)
+        role_counts[role] += 1
+
+        stats = _safe_python_body_stats(full) if full.suffix.lower() == ".py" else {}
+        pressure: list[str] = []
+        score = 0.0
+
+        if lines is not None and lines > 700:
+            score += lines / 100
+            pressure.append(f"{lines} lines")
+        largest = stats.get("largest") or ()
+        if largest and largest[0][0] > 180:
+            score += largest[0][0] / 40
+            pressure.append(f"largest fn {largest[0][1]}:{largest[0][0]} lines")
+        if size > 500_000:
+            score += size / 100_000
+            pressure.append(f"{size // 1024} KiB")
+        if lines is not None and lines > 700 and stats and not stats.get("functions") and not stats.get("classes"):
+            pressure.append("large module-shaped file with no function/class seams")
+        if "provenance" in role or role in {"personal history provenance", "creature fossil"}:
+            score *= 0.45
+            pressure.append("protected: map before touching")
+        if role in {"generated exhaust", "runtime log"}:
+            score *= 0.60
+            pressure.append("generated/runtime: relation may be value")
+
+        if score:
+            rows.append(
+                FileBodyPressure(
+                    path=path,
+                    role=role,
+                    pressure_score=score,
+                    pressure=pressure,
+                    functions=int(stats.get("functions", 0) or 0),
+                    classes=int(stats.get("classes", 0) or 0),
+                    imports=int(stats.get("imports", 0) or 0),
+                    largest_functions=tuple(largest),
+                )
+            )
+
+    rows.sort(key=lambda row: row.pressure_score, reverse=True)
+    return RepoFileBodyVisualization(
+        tracked_count=len(tracked),
+        role_counts=dict(role_counts),
+        pressure_rows=tuple(rows[:top_n]),
+    )
+
+
+def render_repo_file_body_visualization(
+    root: str | Path = ".",
+    *,
+    tracked_paths: Iterable[str] | None = None,
+    top_n: int = 18,
+) -> str:
+    """Human-readable file-body visualization with real newlines.
+
+    Regression target: never emit literal ``\\nrole counts`` / ``\\npressure``;
+    the output is a readable packet, not escaped transport text.
+    """
+
+    viz = visualize_repo_file_bodies(root, tracked_paths=tracked_paths, top_n=top_n)
+    lines: list[str] = [
+        "Vybn read-only file-body visualization",
+        f"tracked files: {viz.tracked_count}",
+        "",
+        "role counts:",
+    ]
+    for role, count in sorted(viz.role_counts.items(), key=lambda item: (-item[1], item[0])):
+        lines.append(f"  {count:4d}  {role}")
+
+    lines.extend(["", f"pressure field, top {top_n}:"])
+    for row in viz.pressure_rows:
+        lines.extend([
+            "",
+            f"{row.pressure_score:6.2f}  {row.path}",
+            f"        role: {row.role}",
+            f"        pressure: {'; '.join(row.pressure)}",
+        ])
+        if row.functions or row.classes or row.imports:
+            lines.append(
+                f"        py: funcs={row.functions} classes={row.classes} imports={row.imports}"
+            )
+            for length, name, start in row.largest_functions:
+                lines.append(f"          fn {name} @ L{start}: {length} lines")
+
+    lines.extend([
+        "",
+        "first-pass consolidation hypothesis:",
+        "  Do not cut from this output alone. Contact the top candidate bytes, refs, tests, and public/private membrane first.",
+        "  Likely organ frontier is whichever high-pressure source file has characterized tests and clean connective tissue.",
+    ])
+    return "\n".join(lines)
+
+
 def render_refactor_perception_protocol() -> str:
     order = "\n".join(f"{i+1}. {step['layer']}: {step['rule']}" for i, step in enumerate(CONSOLIDATION_ORDER))
     healing = "\n".join(f"{i+1}. {step['id']}: {step['rule']}" for i, step in enumerate(CHANGE_SELF_HEALING_STEPS))
@@ -570,6 +785,10 @@ __all__ = [
     "consolidation_layer",
     "perceive_file",
     "packet_for",
+    "visualize_repo_file_bodies",
+    "render_repo_file_body_visualization",
+    "FileBodyPressure",
+    "RepoFileBodyVisualization",
     "render_refactor_perception_protocol",
     "CHANGE_SELF_HEALING_PRINCIPLE",
     "CHANGE_SELF_HEALING_STEPS",
