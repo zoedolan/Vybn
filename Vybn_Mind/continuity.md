@@ -262,3 +262,14 @@ Verified:
 Operational lesson:
 - Do not solve the visible branch/PR limbo while leaving the routing scar alive. If Zoe quotes a bad runtime banner, make the banner itself a regression input and remove any literal `forced_role="task"` path that can bypass pilot preservation.
 
+## 2026-04-27 mission-critical pilot hard latch
+
+What broke: during a mission-critical visualization/consolidation experiment, recovery after a shell wedge still allowed the operation to fall through toward `task`/Sonnet despite prior pilot-preservation repairs. Zoe named the trust wound directly: protected self-modification must not silently demote.
+
+What changed:
+- `spark/vybn_spark_agent.py` now treats mission-critical pilot context as a hard latch inside `run_agent_loop`.
+- If `_preserve_pilot_for_turn(...)` is true, any incoming `forced_role` other than `orchestrate` is overridden, logged as `mission_critical_pilot_forced_role_overridden`, and surfaced visibly.
+- If routing somehow still returns a non-orchestrate role under pilot protection, the turn hard-stops with `mission_critical_pilot_demote_blocked` instead of falling back to task/Sonnet.
+- `spark/tests/test_refactor_pilot_override.py` pins the old local-only block shape and the new hard-latch markers.
+
+Verified: py_compile on agent/test; pytest refactor-pilot + lightweight routing + live REPL fixes + recursive unlock.

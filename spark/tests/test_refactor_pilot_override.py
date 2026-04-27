@@ -192,3 +192,27 @@ class ProbeBudgetEscalationPreservesPilot(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+def test_mission_critical_pilot_overrides_forced_task_in_agent_loop_source():
+    """A protected refactor turn must not silently honor forced_role='task'.
+
+    This pins the scar where probe-budget / restart / continuation recovery
+    tried to demote mission-critical pilot work to Sonnet/task.
+    """
+    import inspect
+    import spark.vybn_spark_agent as agent
+
+    source = inspect.getsource(agent.run_agent_loop)
+    assert "mission_critical_pilot_forced_role_overridden" in source
+    assert "mission_critical_pilot_demote_blocked" in source
+
+    old_shape = "\n".join([
+        "if (",
+        "        forced_role is None",
+        "        and \"orchestrate\" in getattr(policy_obj, \"roles\", {})",
+        "        and _preserve_pilot_for_turn(user_input, messages)",
+        "    ):",
+        "        forced_role = \"orchestrate\"",
+    ])
+    assert old_shape not in source
+    assert "if pilot_protected:" in source
+    assert "forced_role = \"orchestrate\"" in source

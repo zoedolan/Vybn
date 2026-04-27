@@ -1050,14 +1050,35 @@ def run_agent_loop(
         _LEARN_PENDING["response"] = ""
 
     policy_obj = getattr(router, "policy", router)
-    if (
-        forced_role is None
-        and "orchestrate" in getattr(policy_obj, "roles", {})
+    pilot_protected = (
+        "orchestrate" in getattr(policy_obj, "roles", {})
         and _preserve_pilot_for_turn(user_input, messages)
-    ):
+    )
+    if pilot_protected:
+        if forced_role not in (None, "orchestrate"):
+            logger.emit(
+                "mission_critical_pilot_forced_role_overridden",
+                turn=turn_number,
+                attempted_forced_role=forced_role,
+            )
+            _warn(
+                "[mission-critical pilot preserved: overriding "
+                f"forced_role={forced_role!r} -> 'orchestrate']"
+            )
         forced_role = "orchestrate"
 
     decision = router.classify(user_input, forced_role=forced_role)
+    if pilot_protected and getattr(decision, "role", None) != "orchestrate":
+        logger.emit(
+            "mission_critical_pilot_demote_blocked",
+            turn=turn_number,
+            routed_role=getattr(decision, "role", None),
+        )
+        return (
+            "[mission-critical pilot protection stopped this turn: "
+            f"router returned {getattr(decision, 'role', None)!r} instead of "
+            "'orchestrate'. No fallback to task/Sonnet was allowed.]"
+        )
     role_cfg = decision.config
 
     # Round 5: @alias model pin. If the user prefixed with @sonnet/@opus47/etc,
