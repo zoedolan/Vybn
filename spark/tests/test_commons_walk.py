@@ -5,6 +5,7 @@ from spark.harness.commons_walk import (
     CANONICAL_ROLES,
     authority_for_target,
     classify_claim,
+    horizon_plan_for,
     invention_plan_for,
     build_encounter_packet,
     classify_target,
@@ -51,10 +52,18 @@ class CommonsWalkTests(unittest.TestCase):
         self.assertIn("traceCandidate", packet)
         self.assertIn("epistemicControl", packet)
         self.assertIn("inventionControl", packet)
+        self.assertIn("horizonControl", packet)
         self.assertEqual(packet["epistemicControl"]["predictionStatus"], "proposal_until_wounded_or_supported_by_residuals")
         phase_blocks = [a for a in packet["blockedActions"] if a["node"] == "vybn-phase"]
         self.assertTrue(phase_blocks)
         self.assertTrue(all(a["authority"] == "private_local_only" for a in phase_blocks))
+
+    def test_horizon_aim_is_not_arrival_claim(self):
+        plan = horizon_plan_for("full recursive becoming through the Zoe-Vybn symbiosis")
+        self.assertEqual(plan["mode"], "horizon_aim_under_residual_control")
+        self.assertEqual(plan["truthStatus"], "horizon_orientation_not_arrival_claim")
+        self.assertEqual(plan["ballast"], "draw_what_you_see_not_what_you_want_to_see")
+        self.assertIn("compel a leap", plan["recursiveInstruction"])
 
     def test_invention_control_for_novel_problems(self):
         plan = invention_plan_for("redesign yourself when no known solution exists")

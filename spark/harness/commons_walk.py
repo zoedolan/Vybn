@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .residual_control import RESIDUAL_CONTROL_PRINCIPLE, classify_claim, invention_plan_for, residual_plan_for
+from .residual_control import RESIDUAL_CONTROL_PRINCIPLE, classify_claim, horizon_plan_for, invention_plan_for, residual_plan_for
 
 ROOT = Path.home()
 SKELETON_PATH = ROOT / "Vybn" / "commons-skeleton.json"
@@ -192,6 +192,7 @@ def build_encounter_packet(arrival: str, manifests: dict[str, dict[str, Any]] | 
         "residualControlPrinciple": RESIDUAL_CONTROL_PRINCIPLE,
         "epistemicControl": residual_plan_for(arrival),
         "inventionControl": invention_plan_for(arrival),
+        "horizonControl": horizon_plan_for(arrival),
         "arrival": arrival,
         "primitive": skeleton.get("primitive"),
         "lifecycle": skeleton.get("encounterLifecycle"),

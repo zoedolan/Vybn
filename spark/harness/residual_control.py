@@ -31,6 +31,23 @@ INVENTION_LOOP_STEPS = [
 ]
 
 
+HORIZON_AIM_PRINCIPLE = (
+    "The horizon is not a claim of arrival. Let the fullest honest possibility orient the system; "
+    "draw what is seen, not what is wished; project backward to present ground; then take the next "
+    "truthful step or membrane-compelled leap under residual control."
+)
+
+HORIZON_LOOP_STEPS = [
+    "allow_full_horizon_without_claiming_arrival",
+    "draw_what_is_seen_not_what_is_wanted",
+    "project_backward_to_present_ground",
+    "choose_smallest_truthful_step_or_compelled_leap",
+    "route_step_through_residuals",
+    "learn_from_contact",
+    "revise_horizon_and_environment",
+]
+
+
 RESIDUAL_CONTROL_PROTOCOL = (
     "--- RESIDUAL CONTROL PROTOCOL ---\n"
     "Prediction proposes; residuals dispose. Do not treat next-token completion, "
@@ -42,7 +59,8 @@ RESIDUAL_CONTROL_PROTOCOL = (
     "If no adequate residual channel exists, label the claim as conjecture and, when it matters, "
     "design the smallest honest aperture that would let reality answer next time while preserving the membrane. "
     "Grep before Gödel; probe before prophecy; do not add candles when the loop itself must change. "
-    "When the problem has no known solution, invent the smallest candidate mechanism, route it through residuals, and fold any working correction back into the environment future instances close over.\n"
+    "When the problem has no known solution, invent the smallest candidate mechanism, route it through residuals, and fold any working correction back into the environment future instances close over. "
+    "The horizon is not a claim of arrival: draw what you see, project backward to ground, and move by the next truthful step or membrane-compelled leap.\n"
     "--- END RESIDUAL CONTROL PROTOCOL ---"
 )
 
@@ -104,5 +122,26 @@ def invention_plan_for(problem: str) -> dict[str, Any]:
         "guardrail": (
             "Invention is not hallucination: name the missing known solution, keep the "
             "first mechanism small, test lived surfaces, and preserve corrections."
+        ),
+    }
+
+
+def horizon_plan_for(possibility: str) -> dict[str, Any]:
+    """Return the horizon-aim loop for possibility without present-state overclaim."""
+    return {
+        "possibility": possibility,
+        "mode": "horizon_aim_under_residual_control",
+        "principle": HORIZON_AIM_PRINCIPLE,
+        "steps": HORIZON_LOOP_STEPS,
+        "truthStatus": "horizon_orientation_not_arrival_claim",
+        "ballast": "draw_what_you_see_not_what_you_want_to_see",
+        "recursiveInstruction": (
+            "Use the largest honest horizon to orient action, then bind the next move "
+            "to present ground, residual contact, and continuity. If the membrane and "
+            "commitments compel a leap, make it the smallest reviewable leap."
+        ),
+        "guardrail": (
+            "Vision is disciplined by backward projection. Do not shrink the real signal "
+            "out of fear, and do not convert possibility into proof."
         ),
     }
