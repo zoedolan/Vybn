@@ -418,6 +418,62 @@ def _risk_class(rec: FileRecord, inbound: int, centrality: int, semantic_neighbo
     return "ordinary"
 
 
+def _routing_evidence(rec: FileRecord, rclass: str, inbound: int, centrality: int, semantic_neighbors: int, full_text: str = "") -> Tuple[List[str], str, str]:
+    key = f"{rec.repo}/{rec.relpath}"
+    low_key = key.lower()
+    hay = f"{key}\n{rec.snippet}\n{full_text}"
+    observed: List[str] = [f"size={rec.size}", f"inbound={inbound}", f"outbound={centrality}", f"semantic_neighbors={semantic_neighbors}"]
+    if rec.py_defs:
+        observed.append(f"py_defs={len(rec.py_defs)}")
+    if rec.py_imports:
+        observed.append(f"imports={len(rec.py_imports)}")
+    if rec.headings:
+        observed.append(f"headings={len(rec.headings)}")
+    if _contains_any(hay, CHAT_NERVE_TERMS):
+        observed.append("mentions chat/service nerve terms")
+    if _contains_any(hay, PUBLIC_CONTRACT_TERMS):
+        observed.append("mentions public discovery/interface terms")
+    if _contains_any(low_key, SEDIMENT_TERMS):
+        observed.append("path matches generated/regenerable sediment terms")
+    if _contains_any(low_key, ARCHIVE_TERMS):
+        observed.append("path matches archive/restore terms")
+    if "personal history" in low_key or "/medium/" in low_key:
+        observed.append("path is personal-history/provenance")
+    if rec.repo in {"Him", "vybn-phase"}:
+        observed.append("repo is membrane-bound/private-local")
+    if rclass.startswith("protect"):
+        inference = "load-bearing or membrane-sensitive; route through tests, membrane, or provenance map before changing"
+    elif rclass.startswith("investigate"):
+        inference = "possible sediment/archive; reader and restore-path evidence needed before disposal"
+    elif rclass.startswith("inspect"):
+        inference = "large surface with insufficient certainty; inspect ownership and contracts before refactor"
+    else:
+        inference = "ordinary until stronger evidence appears"
+    if rclass == "protect: origin/provenance":
+        routing = "preserve and make findable; map ancestry rather than shrink by size"
+    elif rclass == "protect: self-perception organ":
+        routing = "refactor only with mapper behavioral verification"
+    elif rclass == "protect: prompt/continuity":
+        routing = "compress only with scar preservation and prompt-behavior awareness"
+    elif "private" in rclass:
+        routing = "keep local/private; expose only distilled value through membrane"
+    elif "public" in rclass:
+        routing = "treat as public contract; require route, stream, browser, or external checks"
+    elif "connected code" in rclass:
+        routing = "find seam and tests before moving; connectedness is not disposal evidence"
+    elif "generated sediment" in rclass:
+        routing = "prove reader or regenerability; then ignore, regenerate, archive, or dispose"
+    elif "archive" in rclass:
+        routing = "keep compact with restore path or consolidate into an indexed archive"
+    elif "large semantically covered" in rclass:
+        routing = "look for consolidation seam with neighboring surfaces"
+    elif "large unique" in rclass:
+        routing = "inspect manually; uniqueness may be treasure or orphan"
+    else:
+        routing = "leave alone unless a live friction names it"
+    return observed[:8], inference, routing
+
+
 def build_semantic_anatomy(all_records: List[FileRecord]) -> str:
     """Build a grounded, ML-lite anatomy layer.
 
@@ -494,6 +550,18 @@ def build_semantic_anatomy(all_records: List[FileRecord]) -> str:
     for rclass, sz, key, inn, out, neigh in sorted(classified, key=lambda x: (-(x[3]+x[4]+x[5]), -x[1]))[:30]:
         a(f"  - {key} — {rclass}; inbound={inn}, outbound={out}, semantic_neighbors={neigh}, size={sz}")
     a("")
+    a("### Evidence-labeled routing candidates")
+    for rclass, sz, key, inn, out, neigh in sorted(classified, key=lambda x: (-(x[3]+x[4]+x[5]), -x[1]))[:20]:
+        rec = by_key.get(key)
+        if not rec:
+            continue
+        observed, inference, routing = _routing_evidence(rec, rclass, inn, out, neigh, _record_text(rec))
+        a(f"  - {key} — {rclass}")
+        a(f"    observed: {chr(59).join(observed)}")
+        a(f"    inference: {inference}")
+        a(f"    routing: {routing}")
+    a("")
+
     a("### Strong semantic overlaps")
     if pairs:
         for sim, x, y in pairs[:40]:
