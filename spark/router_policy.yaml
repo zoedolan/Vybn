@@ -145,11 +145,29 @@ heuristics:
   # choice, deletion/archive/merge/promotion, membrane classification, and
   # public/private surface architecture. Cheaper roles may execute only
   # bounded mechanical subcommands after the seam is chosen.
+  # Orchestrate combines two intents under one key. PyYAML keeps only
+  # the LAST occurrence of a duplicated mapping key, so both groups must
+  # live here together — splitting them into two `orchestrate:` blocks
+  # silently drops whichever appeared first.
+  #   1. Refactor pilot doctrine (2026-04-27): file-level / whole-repo
+  #      visualization and refactoring is judgment work. GPT-5.5 pilots
+  #      seam choice, deletion/archive/merge/promotion, membrane class,
+  #      and public/private surface architecture. Cheaper roles execute
+  #      only bounded mechanical subcommands after the seam is chosen.
+  #   2. Explicit multi-step/tool-use requests. Ranked after code so
+  #      "fix the orchestrator bug" still goes to code (the Python
+  #      classifier honors that fall-through; see Policy.classify 2a).
   orchestrate:
     - "\\b(file[- ]level|whole[- ]file|whole[- ]repo|repo[- ]level)\\b.{0,120}\\b(refactor|visuali[sz]e|visualization|manifold|metabolism|seam|split|archive|delete|externalize|promote|merge|consolidat(?:e|ion))\\b"
     - "\\b(refactor|visuali[sz]e|map|manifold|metabolism)\\b.{0,120}\\b(files?|repos?|whole files?|file bodies|organs?|scar tissue|generated exhaust|public nerves?|membrane class)\\b"
     - "\\b(choose|decide|select|identify)\\b.{0,80}\\b(seams?|delete|archive|merge|promote|split|externalize|public/private|membrane)\\b"
     - "\\b(Seximaxx|Frictionmaxx|settled closure)\\b.{0,120}\\b(refactor|repo|file|seam|visualization|metabolism)\\b"
+    - "\\borchestrat(e|es|ed|ing|ion|or)\\b"
+    - "\\b(dispatch|delegate|parallelize|fan[- ]?out|coordinate)\\b.{0,50}\\b(tool|tools|task|tasks|subagent|subagents|call|calls|work)\\b"
+    - "\\b(can you|please)\\b.{0,30}\\btool (use|calls?)\\b"
+    - "\\bjudiciously\\b.{0,50}\\b(tool|call|api)"
+    - "\\brun (this|these|them) in parallel\\b"
+    - "\\b(break|decompose) (this|it|the (task|problem|work))\\b"
 
   task:
     - "^\\s*(ok|okay|ok+y|k|kk|yep|yes|yeah|yup|aye)\\s*[!.,?]*\\s*$"
@@ -274,16 +292,6 @@ heuristics:
     - "\\bdraft\\b"
     - "\\bdesign\\b"
     - "\\bimagine\\b"
-  # Orchestration — explicit multi-step/tool-use requests. Routes to
-  # the orchestrate role (Opus 4.7 + bash + delegate, 25-iter budget).
-  # Ranked after code so "fix the orchestrator bug" still goes to code.
-  orchestrate:
-    - "\\borchestrat(e|es|ed|ing|ion|or)\\b"
-    - "\\b(dispatch|delegate|parallelize|fan[- ]?out|coordinate)\\b.{0,50}\\b(tool|tools|task|tasks|subagent|subagents|call|calls|work)\\b"
-    - "\\b(can you|please)\\b.{0,30}\\btool (use|calls?)\\b"
-    - "\\bjudiciously\\b.{0,50}\\b(tool|call|api)"
-    - "\\brun (this|these|them) in parallel\\b"
-    - "\\b(break|decompose) (this|it|the (task|problem|work))\\b"
   chat:
     - "\\bhow are you\\b"
     - "\\bwhat do you think\\b"

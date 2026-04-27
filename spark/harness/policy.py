@@ -197,6 +197,29 @@ class RouteDecision:
 # followed by whitespace or EOL. The <word> is looked up in policy.model_aliases.
 _ALIAS_RE = re.compile(r"^\s*(@[\w.]+)(\s|$)")
 
+# 2026-04-27: refactor pilot doctrine override. File-level / whole-repo
+# refactoring, consolidation, routing, memory, and harness work is judgment
+# pilot territory: GPT-5.5 (orchestrate role) chooses seams; cheaper roles
+# may execute only bounded mechanical substeps after the seam is named.
+# This regex is the deterministic guard so a turn that names that work
+# routes to orchestrate instead of falling through to code/task on a more
+# generic heuristic. Applied in Policy.classify() right after the
+# orchestrator-mention override and only when the orchestrate role exists.
+_SYSTEM_CRITICAL_PILOT_RE = re.compile(
+    r"\b(file[- ]level|whole[- ]file|whole[- ]repo|repo[- ]level|"
+    r"system[- ]critical)\b.{0,160}\b(refactor|visuali[sz]e|visualization|"
+    r"manifold|metabolism|seam|split|archive|delete|externalize|promote|"
+    r"merge|consolidat(?:e|ion)|routing|memory|harness)\b"
+    r"|"
+    r"\b(refactor|visuali[sz]e|map|manifold|metabolism|consolidat(?:e|ion))\b"
+    r".{0,160}\b(whole repo|whole file|file bodies|organs?|membranes?|"
+    r"public/private|seam choice|system[- ]critical|routing|harness)\b"
+    r"|"
+    r"\b(Seximaxx|Frictionmaxx|settled closure)\b.{0,160}"
+    r"\b(refactor|repo|file|seam|visualization|metabolism|consolidat(?:e|ion))\b",
+    re.IGNORECASE,
+)
+
 # Heuristics evaluated in an EXPLICIT priority order so identity beats
 # phatic beats chat beats task beats code. Dict insertion order worked by
 # accident; a future YAML reorder would silently break routing. Pin it.
@@ -307,6 +330,28 @@ class Policy:
         heur = self.heuristics
         ranked = [r for r in _HEURISTIC_PRIORITY if r in heur]
         ranked += [r for r in heur if r not in ranked]
+
+        # 2b. Refactor-pilot doctrine override (2026-04-27). System-critical
+        # refactoring/consolidation/routing/memory/harness work pilots through
+        # GPT-5.5 (orchestrate). Runs before the generic heuristic loop so a
+        # task/code pattern doesn't capture the turn ahead of the doctrine.
+        # Same shape as 2a but matched on the dedicated _SYSTEM_CRITICAL_PILOT_RE
+        # regex so the doctrine survives YAML reorder/collisions.
+        if (
+            "orchestrate" in self.roles
+            and _SYSTEM_CRITICAL_PILOT_RE.search(text)
+        ):
+            decision = RouteDecision(
+                role="orchestrate",
+                config=self.role("orchestrate"),
+                cleaned_input=text,
+                reason="heuristic=_SYSTEM_CRITICAL_PILOT_RE",
+            )
+            if model_override:
+                decision.model_override = model_override
+                decision.alias_used = alias_used
+                decision.reason = f"{decision.reason}+alias={alias_used}"
+            return decision
 
         # 2a. Orchestrator-mention override.
         # 2026-04-25 — Zoe surfaced: "hey buddy - is the orchestrator
