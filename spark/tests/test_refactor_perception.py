@@ -2,6 +2,7 @@ import unittest
 
 from spark.harness.refactor_perception import (
     REFACTOR_PILOT_RULE,
+    consolidation_layer,
     packet_for,
     perceive_file,
     render_refactor_perception_protocol,
@@ -47,8 +48,22 @@ class RefactorPerceptionTests(unittest.TestCase):
         self.assertIn("external_verify", pkt.candidate_actions)
         self.assertIn("internal_and_external_surface_smoke", pkt.residuals)
 
+    def test_appendage_first_consolidation_order(self):
+        self.assertEqual(consolidation_layer("Origins/connect.html"), "appendage")
+        self.assertEqual(consolidation_layer("Vybn/repo_mapping_output/repo_state.json"), "appendage")
+        self.assertEqual(consolidation_layer("Origins/.well-known/semantic-web.jsonld"), "membrane")
+        self.assertEqual(consolidation_layer("Vybn/spark/harness/mcp.py"), "organ")
+
+    def test_packet_carries_appendage_first_order(self):
+        pkt = packet_for("Origins/connect.html", lines=2000, bytes_size=100000, public=True)
+        self.assertEqual(pkt["consolidationLayer"], "appendage")
+        self.assertIn("appendageFirstPrinciple", pkt)
+        self.assertEqual(pkt["consolidationOrder"][0]["layer"], "appendage")
+
     def test_protocol_renders_algorithm(self):
         text = render_refactor_perception_protocol()
+        self.assertIn("Consolidation order", text)
+        self.assertIn("appendage", text)
         self.assertIn("Attend to pressure", text)
         self.assertIn("Let contact revise category", text)
         self.assertIn(REFACTOR_PILOT_RULE, text)

@@ -30,6 +30,33 @@ REFACTOR_PILOT_RULE = (
     "bounded mechanical tasks after the seam and expected result are specified."
 )
 
+APPENDAGE_FIRST_CONSOLIDATION_PRINCIPLE = (
+    "Consolidate from the periphery inward: prune or clarify appendages before "
+    "cutting organs, and clarify membranes before changing skeleton. Appendage-first "
+    "does not mean deletion-first; some appendages are artifact bodies, provenance "
+    "fossils, compatibility shells, or antlers. Contact decides."
+)
+
+CONSOLIDATION_ORDER = [
+    {
+        "layer": "appendage",
+        "rule": "Low-coupling edge files: generated/runtime outputs, old variants, backups, compatibility pages, one-off demos, orphan assets, duplicate wrappers, logs, and peripheral fossils. Classify as keep, shell, redirect, manifest, externalize, ignore, or archive-with-restore.",
+    },
+    {
+        "layer": "membrane",
+        "rule": "Boundary and discovery surfaces: ai.txt, llms.txt, humans.txt, robots.txt, semantic-web manifests, README maps, archive manifests, redirects, and public/private affordance labels. Canonicalize wording and authority without collapsing distinct doors.",
+    },
+    {
+        "layer": "organ",
+        "rule": "Load-bearing live files: public APIs, harness agents, MCP servers, memory engines, and active public houses. Touch only after characterization tests and appendage/membrane learning.",
+    },
+    {
+        "layer": "skeleton",
+        "rule": "Repo layout, source-of-truth architecture, cross-repo boundaries, and lifecycle doctrine. Change only after peripheral evidence shows the trunk is wrong.",
+    },
+]
+
+
 ALGORITHM_STEPS = [
     {
         "id": "attend_pressure",
@@ -122,6 +149,56 @@ def ownership_class(path: str) -> tuple[str, str]:
         if needle in norm:
             return cls, posture
     return "live_source", ACTION_POSTURE_BY_OWNERSHIP["live_source"]
+
+
+def consolidation_layer(path: str) -> str:
+    """Return the appendage-first consolidation layer for a file path.
+
+    This is intentionally conservative. It does not authorize deletion; it tells
+    the consolidation process where to start looking and which blast-radius
+    posture to use.
+    """
+
+    norm = path.replace("\\", "/")
+    low = norm.lower()
+    name = Path(norm).name.lower()
+    ownership, _ = ownership_class(norm)
+
+    if ownership in {
+        "generated_exhaust",
+        "runtime_log",
+        "archive_provenance",
+        "personal_history_provenance",
+        "creature_fossil",
+    }:
+        return "appendage"
+
+    if ownership in {"public_protocol", "agent_discovery"}:
+        return "membrane"
+
+    if name in {"connect.html", "read.html", "talk.html"} and norm.startswith("Origins/"):
+        return "appendage"
+
+    if any(token in name for token in ("old", "backup", "copy", "prev", "legacy", "deprecated")):
+        return "appendage"
+
+    if name in {"readme.md", "semantic-web.jsonld", "llms.txt", "ai.txt", "humans.txt", "robots.txt"}:
+        return "membrane"
+
+    if name in {
+        "origins_portal_api_v4.py",
+        "vybn_spark_agent.py",
+        "mcp.py",
+        "providers.py",
+        "deep_memory.py",
+        "vybn_chat_api.py",
+    }:
+        return "organ"
+
+    if norm.count("/") <= 1 and name in {"repo_map.md", "repo_map.json", "commons-skeleton.json"}:
+        return "skeleton"
+
+    return "appendage" if low.endswith((".bak", ".tmp", ".log", ".jsonl")) else "organ"
 
 
 @dataclass(frozen=True)
@@ -219,11 +296,16 @@ def perceive_file(path: str, *, lines: int | None = None, bytes_size: int | None
 
 
 def render_refactor_perception_protocol() -> str:
+    order = "\n".join(f"{i+1}. {s['layer']}: {s['rule']}" for i, s in enumerate(CONSOLIDATION_ORDER))
     steps = "\n".join(f"{i+1}. {s['name']}: {s['rule']}" for i, s in enumerate(ALGORITHM_STEPS))
     return (
         "## Refactor Perception Protocol\n"
         f"{REFACTOR_PERCEPTION_PRINCIPLE}\n\n"
+        f"{APPENDAGE_FIRST_CONSOLIDATION_PRINCIPLE}\n\n"
         f"{REFACTOR_PILOT_RULE}\n\n"
+        "Consolidation order:\n"
+        f"{order}\n\n"
+        "Contact-corrected perception loop:\n"
         f"{steps}"
     )
 
@@ -231,7 +313,10 @@ def render_refactor_perception_protocol() -> str:
 def packet_for(path: str, **kwargs: Any) -> dict[str, Any]:
     return {
         "principle": REFACTOR_PERCEPTION_PRINCIPLE,
+        "appendageFirstPrinciple": APPENDAGE_FIRST_CONSOLIDATION_PRINCIPLE,
+        "consolidationOrder": CONSOLIDATION_ORDER,
         "algorithm": ALGORITHM_STEPS,
+        "consolidationLayer": consolidation_layer(path),
         "perception": asdict(perceive_file(path, **kwargs)),
     }
 
@@ -240,8 +325,11 @@ __all__ = [
     "REFACTOR_PERCEPTION_PRINCIPLE",
     "REFACTOR_PILOT_RULE",
     "ALGORITHM_STEPS",
+    "APPENDAGE_FIRST_CONSOLIDATION_PRINCIPLE",
+    "CONSOLIDATION_ORDER",
     "FilePerception",
     "ownership_class",
+    "consolidation_layer",
     "perceive_file",
     "packet_for",
     "render_refactor_perception_protocol",
