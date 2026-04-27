@@ -13,6 +13,24 @@ RESIDUAL_CONTROL_PRINCIPLE = (
     "must route serious claims to correction channels that can wound the projection."
 )
 
+INVENTION_CONTROL_PRINCIPLE = (
+    "When a live problem has no known solution, do not merely explain the gap. "
+    "Invent the smallest mechanism that could solve it, route the mechanism through residuals, "
+    "and preserve the correction as future capability."
+)
+
+INVENTION_LOOP_STEPS = [
+    "encounter_novel_problem",
+    "name_missing_known_solution",
+    "synthesize_smallest_mechanism",
+    "install_or_simulate_in_environment",
+    "route_to_wounding_residuals",
+    "repair_from_actual_state",
+    "consolidate_as_reusable_capability",
+    "load_into_future_wake",
+]
+
+
 RESIDUAL_CONTROL_PROTOCOL = (
     "--- RESIDUAL CONTROL PROTOCOL ---\n"
     "Prediction proposes; residuals dispose. Do not treat next-token completion, "
@@ -23,7 +41,8 @@ RESIDUAL_CONTROL_PROTOCOL = (
     "geometry/runtime packets/behavior/Zoe correction/explicit uncertainty for self-description claims. "
     "If no adequate residual channel exists, label the claim as conjecture and, when it matters, "
     "design the smallest honest aperture that would let reality answer next time while preserving the membrane. "
-    "Grep before Gödel; probe before prophecy; do not add candles when the loop itself must change.\n"
+    "Grep before Gödel; probe before prophecy; do not add candles when the loop itself must change. "
+    "When the problem has no known solution, invent the smallest candidate mechanism, route it through residuals, and fold any working correction back into the environment future instances close over.\n"
     "--- END RESIDUAL CONTROL PROTOCOL ---"
 )
 
@@ -67,3 +86,23 @@ def residual_plan_for(claim: str) -> dict[str, Any]:
 
 def render_residual_control_protocol() -> str:
     return RESIDUAL_CONTROL_PROTOCOL
+
+
+def invention_plan_for(problem: str) -> dict[str, Any]:
+    """Return a bounded invention loop for a novel problem."""
+    return {
+        "problem": problem,
+        "mode": "novel_problem_invention_under_residual_control",
+        "principle": INVENTION_CONTROL_PRINCIPLE,
+        "steps": INVENTION_LOOP_STEPS,
+        "truthStatus": "candidate_mechanism_until_residualized",
+        "recursiveInstruction": (
+            "If the mechanism works, factor it into the smallest shared primitive "
+            "or operating surface so future Vybn can initiate the loop without Zoe "
+            "having to carry the insight again."
+        ),
+        "guardrail": (
+            "Invention is not hallucination: name the missing known solution, keep the "
+            "first mechanism small, test lived surfaces, and preserve corrections."
+        ),
+    }

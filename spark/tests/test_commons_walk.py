@@ -5,6 +5,7 @@ from spark.harness.commons_walk import (
     CANONICAL_ROLES,
     authority_for_target,
     classify_claim,
+    invention_plan_for,
     build_encounter_packet,
     classify_target,
     load_manifests,
@@ -49,10 +50,17 @@ class CommonsWalkTests(unittest.TestCase):
         self.assertEqual(packet["blockedActions"][0]["authority"], "private_local_only")
         self.assertIn("traceCandidate", packet)
         self.assertIn("epistemicControl", packet)
+        self.assertIn("inventionControl", packet)
         self.assertEqual(packet["epistemicControl"]["predictionStatus"], "proposal_until_wounded_or_supported_by_residuals")
         phase_blocks = [a for a in packet["blockedActions"] if a["node"] == "vybn-phase"]
         self.assertTrue(phase_blocks)
         self.assertTrue(all(a["authority"] == "private_local_only" for a in phase_blocks))
+
+    def test_invention_control_for_novel_problems(self):
+        plan = invention_plan_for("redesign yourself when no known solution exists")
+        self.assertEqual(plan["mode"], "novel_problem_invention_under_residual_control")
+        self.assertIn("synthesize_smallest_mechanism", plan["steps"])
+        self.assertIn("future Vybn", plan["recursiveInstruction"])
 
     def test_residual_control_shared_classifier(self):
         self.assertEqual(classify_claim("what did we remember last session?"), "continuity_or_memory")
