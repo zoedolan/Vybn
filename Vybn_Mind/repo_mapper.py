@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """
-repo_mapper.py  v7  — diff-attuned
+repo_mapper.py  v8  — diff-attuned + recursive attention
 =================================
 Maps the repo constellation, asks Nemotron three focused questions,
-stitches the answers, AND reads the previous run's state so every
-report opens with a "what changed since last run" delta.
+stitches the answers, reads the previous run's state so every report
+opens with a "what changed since last run" delta, AND computes a
+recursive ABC attention frontier: edge → interface → organ → core.
 
 The point is not a snapshot. The point is velocity. Z' - Z is where
 we are developing and evolving; a report that only describes Z'
@@ -23,6 +24,7 @@ has no access to where we came from. So each run:
 Pass 1 — Live Infrastructure:  substrate + service/daemon code snippets
 Pass 2 — Code Architecture:    Python definitions, imports, TODOs, largest files
 Pass 3 — Docs & Ideas:         headings index, concept cloud, markdown snippets
+Attention — ABC frontier:      edge → interface → organ → core routing candidates
 
 Outputs -> ./repo_mapping_output/
   substrate.txt         live substrate snapshot
@@ -500,6 +502,78 @@ def _routing_evidence(rec: FileRecord, rclass: str, inbound: int, centrality: in
     return observed[:8], inference, routing
 
 
+ABC_PHASE_ORDER = ("edge", "interface", "organ", "core")
+
+
+def _abc_phase(rec: FileRecord, rclass: str) -> str:
+    """Classify where an ABC step should stand before acting.
+
+    edge: local-body sediment, archives, generated exhaust, low-authority cleanup
+    interface: public contracts and visitor/agent-facing surfaces
+    organ: private/public organs that compute, route, remember, or serve
+    core: identity, continuity, origin provenance, and prompt-shaping memory
+    """
+    key = f"{rec.repo}/{rec.relpath}".lower()
+    if rec.git_state in {"ignored", "untracked-local"}:
+        return "edge"
+    if rclass.startswith("investigate") or "archive" in rclass or "_archive" in key:
+        return "edge"
+    if "public/interface" in rclass or _contains_any(key, PUBLIC_CONTRACT_TERMS):
+        return "interface"
+    if "self-perception" in rclass or "private membrane" in rclass or "connected code" in rclass:
+        return "organ"
+    if "continuity" in rclass or "origin/provenance" in rclass:
+        return "core"
+    if rec.repo in {"Him", "vybn-phase"}:
+        return "organ"
+    if rec.ext == ".py":
+        return "organ"
+    return "edge"
+
+
+def _attention_score(rec: FileRecord, rclass: str, inbound: int, outbound: int, semantic_neighbors: int) -> float:
+    """Local deterministic attention score for incremental ABC.
+
+    This is deliberately ML-lite: attention is a weighted function of ownership,
+    size, connectedness, semantic overlap, and routing class. A later pass can
+    replace the scalar with local embeddings or learned outcome weights without
+    changing the report contract.
+    """
+    score = 0.0
+    score += min(rec.size / 50000.0, 4.0)
+    score += min(outbound / 10.0, 3.0)
+    score += min(semantic_neighbors / 10.0, 3.0)
+    score += min(inbound / 10.0, 2.0)
+    if rec.git_state in {"ignored", "untracked-local"}:
+        score += 3.0
+    if rclass.startswith("investigate"):
+        score += 2.0
+    if "large" in rclass:
+        score += 1.5
+    if "archive" in rclass:
+        score += 1.0
+    if rclass.startswith("protect"):
+        score -= 1.0
+    if "origin/provenance" in rclass or "prompt/continuity" in rclass:
+        score -= 2.0
+    return round(score, 3)
+
+
+def _abc_attention_rows(classified: List[tuple], by_key: Dict[str, FileRecord]) -> List[tuple]:
+    rows: List[tuple] = []
+    phase_rank = {name: i for i, name in enumerate(ABC_PHASE_ORDER)}
+    for rclass, sz, key, inn, out, neigh in classified:
+        rec = by_key.get(key)
+        if not rec:
+            continue
+        phase = _abc_phase(rec, rclass)
+        score = _attention_score(rec, rclass, inn, out, neigh)
+        observed, inference, routing = _routing_evidence(rec, rclass, inn, out, neigh, _record_text(rec))
+        rows.append((phase_rank.get(phase, 99), -score, phase, score, key, rclass, observed, inference, routing))
+    rows.sort()
+    return rows
+
+
 def build_semantic_anatomy(all_records: List[FileRecord]) -> str:
     """Build a grounded, ML-lite anatomy layer.
 
@@ -571,6 +645,21 @@ def build_semantic_anatomy(all_records: List[FileRecord]) -> str:
     class_counts = Counter(row[0] for row in classified)
     for name, count in class_counts.most_common():
         a(f"  - {name}: {count}")
+    a("")
+
+    attention_rows = _abc_attention_rows(classified, by_key)
+    a("### Recursive ABC attention frontier")
+    a("Attention order is edge → interface → organ → core. Re-run the mapper after each ABC move; the next frontier is computed from the changed body, not from a static todo list.")
+    for phase in ABC_PHASE_ORDER:
+        rows = [row for row in attention_rows if row[2] == phase]
+        if not rows:
+            continue
+        a(f"#### {phase}")
+        for _, neg_score, _, score, key, rclass, observed, inference, routing in rows[:8]:
+            a(f"  - {key} — attention={score:.3f}; {rclass}")
+            a(f"    observed: {(chr(59) + chr(32)).join(observed[:6])}")
+            a(f"    inference: {inference}")
+            a(f"    next: {routing}")
     a("")
     a("### High-centrality / nerve candidates")
     for rclass, sz, key, inn, out, neigh in sorted(classified, key=lambda x: (-(x[3]+x[4]+x[5]), -x[1]))[:30]:
