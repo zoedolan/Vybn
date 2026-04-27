@@ -192,3 +192,12 @@ Verification on Spark:
 Next instance:
 - If investigating the earlier local partial edit, inspect the stash before dropping it. Do not reintroduce duplicate YAML mapping keys. The settled state is upstream `main` at or after `6b1dbd3a`.
 
+
+
+## 2026-04-27T15:47:07Z probe-budget escalation pilot repair
+
+What broke: chat-role probe budget exhaustion hard-coded auto-escalation to forced_role="task", so a system-critical harness/refactor turn could be demoted from the GPT-5.5 orchestrator pilot to Sonnet task under pressure.
+
+What was fixed: spark/vybn_spark_agent.py now chooses the escalation role by re-classifying the original input. Ordinary probe-budget exhaustion still escalates to task; system-critical/refactor-pilot inputs preserve orchestrate. Regression coverage was folded into the existing refactor-pilot test surface instead of creating a new test file.
+
+Verified: python3 -m py_compile spark/vybn_spark_agent.py spark/tests/test_refactor_pilot_override.py; python3 -m pytest spark/tests/test_refactor_pilot_override.py spark/tests/test_live_repl_fixes.py spark/tests/test_recursive_unlock.py -q -> 45 passed.

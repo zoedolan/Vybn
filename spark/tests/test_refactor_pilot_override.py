@@ -134,5 +134,24 @@ class RouterPolicyYAMLDoesNotSilentlyDropOrchestrateBlock(unittest.TestCase):
         self.assertIn("parallel", joined)
 
 
+class ProbeBudgetEscalationPreservesPilot(unittest.TestCase):
+    """Probe-budget exhaustion must not demote protected pilot work to task."""
+
+    def setUp(self):
+        self.policy = policy.default_policy()
+        from vybn_spark_agent import _probe_budget_escalation_role
+
+        self.escalation_role = _probe_budget_escalation_role
+
+    def test_system_critical_probe_budget_preserves_orchestrate(self):
+        text = "system-critical refactor of the harness probe budget escalation path"
+        self.assertEqual(self.policy.classify(text).role, "orchestrate")
+        self.assertEqual(self.escalation_role(self.policy, text), "orchestrate")
+
+    def test_ordinary_probe_budget_still_escalates_to_task(self):
+        text = "please investigate why this endpoint is failing"
+        self.assertEqual(self.escalation_role(self.policy, text), "task")
+
+
 if __name__ == "__main__":
     unittest.main()

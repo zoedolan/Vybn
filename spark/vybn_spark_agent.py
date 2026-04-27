@@ -83,6 +83,23 @@ _HALLUCINATED_TOOL_RE = _re.compile(
     _re.IGNORECASE | _re.DOTALL,
 )
 
+def _probe_budget_escalation_role(router, original_input: str) -> str:
+    """Choose the role for chat-role probe-budget exhaustion.
+
+    Ordinary exhausted probe loops still escalate to ``task`` for bash +
+    iteration budget. System-critical/refactor-pilot turns must not be
+    demoted to task/Sonnet under pressure; the router already knows those
+    turns belong to ``orchestrate`` (GPT-5.5 pilot), so preserve that pilot.
+    """
+    try:
+        routed = router.classify(original_input)
+    except Exception:
+        return "task"
+    if getattr(routed, "role", None) == "orchestrate":
+        return "orchestrate"
+    return "task"
+
+
 # Probe-note budget. Raised from 4 KB (Round 5) to 48 KB on 2026-04-18
 # after a 326-line / ~13 KB portal diff was invisibly truncated at 4 KB
 # and the chat role loop-emitted probes because it couldn't actually see
@@ -1793,33 +1810,44 @@ def run_agent_loop(
                         pending = _PROBE_RE.search(current_text)
                         if pending:
                             pending_cmd = pending.group(1).strip()
+                            escalation_role = _probe_budget_escalation_role(
+                                router,
+                                decision.cleaned_input,
+                            )
                             logger.emit(
                                 "probe_budget_auto_escalate",
                                 turn=turn_number,
                                 budget=PROBE_BUDGET,
                                 probes_used=probe_iter,
                                 from_role=decision.role,
-                                to_role="task",
+                                to_role=escalation_role,
                                 pending_cmd=pending_cmd[:500],
                             )
-                            _dim(
-                                f"[probe budget reached ({PROBE_BUDGET}); "
-                                "escalating to task with bash+iteration "
-                                "budget to finish the investigation]"
-                            )
-                            # Compose a task prompt that carries the
-                            # original question and the pending probe so
-                            # the task-role instance has full context.
+                            if escalation_role == "orchestrate":
+                                _dim(
+                                    f"[probe budget reached ({PROBE_BUDGET}); "
+                                    "preserving GPT-5.5 orchestrator pilot "
+                                    "for system-critical/refactor work]"
+                                )
+                            else:
+                                _dim(
+                                    f"[probe budget reached ({PROBE_BUDGET}); "
+                                    "escalating to task with bash+iteration "
+                                    "budget to finish the investigation]"
+                                )
+                            # Compose a continuation prompt that carries the
+                            # original question and the pending probe so the
+                            # routed instance has full context.
                             escalation_task = (
                                 f"Original question: {decision.cleaned_input}"
                                 f"\n\nChat-role probe budget was "
                                 f"exhausted after {probe_iter} probes. "
                                 "The pending next command was:\n"
                                 f"    {pending_cmd}\n\n"
-                                "Please continue the investigation with "
-                                "bash access and answer the original "
-                                "question fully. You have a full iteration "
-                                "budget."
+                                "Please continue the investigation while "
+                                "preserving the correct pilot/substrate for "
+                                "the original question. Answer fully. You "
+                                "have a full iteration budget."
                             )
                             sub_messages: list = []
                             return run_agent_loop(
@@ -1831,7 +1859,7 @@ def run_agent_loop(
                                 registry=registry,
                                 logger=logger,
                                 turn_number=turn_number,
-                                forced_role="task",
+                                forced_role=escalation_role,
                                 system_prompt_no_tools=system_prompt_no_tools,
                                 system_prompt_orchestrator=system_prompt_orchestrator,
                                 _reroute_depth=1,
