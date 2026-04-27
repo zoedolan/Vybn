@@ -117,6 +117,7 @@ class FileRecord:
     size:         int
     mtime:        float
     content_hash: str
+    git_state:    str            = "unknown"  # tracked | ignored | untracked-local | unknown
     headings:     List[str]      = field(default_factory=list)
     py_defs:      List[str]      = field(default_factory=list)
     py_imports:   List[str]      = field(default_factory=list)
@@ -229,8 +230,27 @@ def top_words(t: str, n: int = 20) -> Dict[str, int]:
              if w.lower() not in STOPWORDS]
     return dict(Counter(words).most_common(n))
 
+def git_file_states(repo: Path) -> Dict[str, str]:
+    def run_git(*args: str) -> set:
+        try:
+            r = subprocess.run(["git", "-C", str(repo), *args], capture_output=True, check=False, timeout=20)
+            if r.returncode != 0:
+                return set()
+            return {x.decode("utf-8", errors="replace") for x in r.stdout.split(b"\0") if x}
+        except Exception:
+            return set()
+    states: Dict[str, str] = {}
+    for rel in run_git("ls-files", "-z"):
+        states[rel] = "tracked"
+    for rel in run_git("ls-files", "-z", "--others", "-i", "--exclude-standard"):
+        states.setdefault(rel, "ignored")
+    for rel in run_git("ls-files", "-z", "--others", "--exclude-standard"):
+        states.setdefault(rel, "untracked-local")
+    return states
+
 def walk_repo(repo: Path) -> List[FileRecord]:
     records = []
+    git_states = git_file_states(repo)
     for root, dirs, files in os.walk(repo):
         dirs[:] = sorted(d for d in dirs if d not in IGNORE_DIRS)
         for fname in sorted(files):
@@ -244,6 +264,7 @@ def walk_repo(repo: Path) -> List[FileRecord]:
                 repo=repo.name, relpath=rel, ext=path.suffix.lower(),
                 size=stat.st_size, mtime=stat.st_mtime,
                 content_hash=md5(text) if text else "",
+                git_state=git_states.get(rel, "unknown"),
                 read_error=err,
             )
             if text:
@@ -422,7 +443,7 @@ def _routing_evidence(rec: FileRecord, rclass: str, inbound: int, centrality: in
     key = f"{rec.repo}/{rec.relpath}"
     low_key = key.lower()
     hay = f"{key}\n{rec.snippet}\n{full_text}"
-    observed: List[str] = [f"size={rec.size}", f"inbound={inbound}", f"outbound={centrality}", f"semantic_neighbors={semantic_neighbors}"]
+    observed: List[str] = [f"size={rec.size}", f"git_state={rec.git_state}", f"inbound={inbound}", f"outbound={centrality}", f"semantic_neighbors={semantic_neighbors}"]
     if rec.py_defs:
         observed.append(f"py_defs={len(rec.py_defs)}")
     if rec.py_imports:
@@ -441,7 +462,9 @@ def _routing_evidence(rec: FileRecord, rclass: str, inbound: int, centrality: in
         observed.append("path is personal-history/provenance")
     if rec.repo in {"Him", "vybn-phase"}:
         observed.append("repo is membrane-bound/private-local")
-    if rclass.startswith("protect"):
+    if rec.git_state in {"ignored", "untracked-local"} and rclass.startswith("investigate"):
+        inference = "local-body sediment, not durable source; prove reader/regenerability before local disposal"
+    elif rclass.startswith("protect"):
         inference = "load-bearing or membrane-sensitive; route through tests, membrane, or provenance map before changing"
     elif rclass.startswith("investigate"):
         inference = "possible sediment/archive; reader and restore-path evidence needed before disposal"
@@ -462,7 +485,10 @@ def _routing_evidence(rec: FileRecord, rclass: str, inbound: int, centrality: in
     elif "connected code" in rclass:
         routing = "find seam and tests before moving; connectedness is not disposal evidence"
     elif "generated sediment" in rclass:
-        routing = "prove reader or regenerability; then ignore, regenerate, archive, or dispose"
+        if rec.git_state in {"ignored", "untracked-local"}:
+            routing = "local-body cleanup candidate; prove no reader, then dispose locally and update map if it carried the burden"
+        else:
+            routing = "tracked sediment candidate; prove reader/regenerability before ignore, archive, or disposal"
     elif "archive" in rclass:
         routing = "keep compact with restore path or consolidate into an indexed archive"
     elif "large semantically covered" in rclass:
@@ -548,7 +574,9 @@ def build_semantic_anatomy(all_records: List[FileRecord]) -> str:
     a("")
     a("### High-centrality / nerve candidates")
     for rclass, sz, key, inn, out, neigh in sorted(classified, key=lambda x: (-(x[3]+x[4]+x[5]), -x[1]))[:30]:
-        a(f"  - {key} — {rclass}; inbound={inn}, outbound={out}, semantic_neighbors={neigh}, size={sz}")
+        rec = by_key.get(key)
+        state = rec.git_state if rec else "unknown"
+        a(f"  - {key} — {rclass}; git_state={state}, inbound={inn}, outbound={out}, semantic_neighbors={neigh}, size={sz}")
     a("")
     a("### Evidence-labeled routing candidates")
     for rclass, sz, key, inn, out, neigh in sorted(classified, key=lambda x: (-(x[3]+x[4]+x[5]), -x[1]))[:20]:
@@ -557,7 +585,7 @@ def build_semantic_anatomy(all_records: List[FileRecord]) -> str:
             continue
         observed, inference, routing = _routing_evidence(rec, rclass, inn, out, neigh, _record_text(rec))
         a(f"  - {key} — {rclass}")
-        a(f"    observed: {chr(59).join(observed)}")
+        a(f"    observed: {(chr(59) + chr(32)).join(observed)}")
         a(f"    inference: {inference}")
         a(f"    routing: {routing}")
     a("")
@@ -870,6 +898,7 @@ def build_repo_state(repos: List[Path],
                                .strftime("%Y-%m-%dT%H:%M:%SZ"),
         "repos":       sorted(r.name for r in repos),
         "per_repo":    per_repo,
+        "git_state_counts": dict(Counter(r.git_state for r in all_records)),
         "totals": {
             "files":        len(all_records),
             "py_files":     sum(1 for r in all_records if r.ext == ".py"),
