@@ -98,6 +98,12 @@ class RefactorPilotRoutingOverride(unittest.TestCase):
         )
         self.assertEqual(d.role, "orchestrate")
 
+    def test_mission_critical_sonnet_probe_default_routes_to_orchestrate(self):
+        d = self.policy.classify(
+            "please resolve the sonnet/probe/default problem for mission-critical work once and for all"
+        )
+        self.assertEqual(d.role, "orchestrate")
+
     def test_ordinary_git_turn_still_routes_to_code(self):
         d = self.policy.classify("can you do a git pull pls")
         self.assertEqual(d.role, "code")
@@ -151,6 +157,22 @@ class ProbeBudgetEscalationPreservesPilot(unittest.TestCase):
     def test_ordinary_probe_budget_still_escalates_to_task(self):
         text = "please investigate why this endpoint is failing"
         self.assertEqual(self.escalation_role(self.policy, text), "task")
+
+    def test_probe_budget_continuation_context_preserves_orchestrate(self):
+        messages = [{
+            "role": "user",
+            "content": "please resolve the sonnet/probe/default problem for mission-critical work once and for all",
+        }]
+        self.assertEqual(
+            self.escalation_role(self.policy, "please fix it", messages),
+            "orchestrate",
+        )
+
+    def test_repl_continuation_context_preserves_pilot(self):
+        from vybn_spark_agent import _preserve_pilot_for_turn
+        messages = [{"role": "user", "content": "system-critical refactor of the harness routing memory layer"}]
+        self.assertTrue(_preserve_pilot_for_turn("please fix it", messages))
+        self.assertFalse(_preserve_pilot_for_turn("please fix it", []))
 
 
 if __name__ == "__main__":

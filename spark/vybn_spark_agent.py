@@ -54,6 +54,7 @@ from harness.providers import BASH_TOOL_SPEC, DELEGATE_TOOL_SPEC, INTROSPECT_TOO
 from harness.providers import execute_readonly, is_parallel_safe  # noqa: E402
 from harness.substrate import rag_snippets, rag_snippets_with_tier  # noqa: E402
 from harness.providers import check_claim, check_structural_claim  # noqa: E402
+from harness.policy import is_system_critical_pilot_turn  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Learn-from-exchange loop closure (round 4).
@@ -83,14 +84,14 @@ _HALLUCINATED_TOOL_RE = _re.compile(
     _re.IGNORECASE | _re.DOTALL,
 )
 
-def _probe_budget_escalation_role(router, original_input: str) -> str:
-    """Choose the role for chat-role probe-budget exhaustion.
-
-    Ordinary exhausted probe loops still escalate to ``task`` for bash +
-    iteration budget. System-critical/refactor-pilot turns must not be
-    demoted to task/Sonnet under pressure; the router already knows those
-    turns belong to ``orchestrate`` (GPT-5.5 pilot), so preserve that pilot.
-    """
+def _probe_budget_escalation_role(
+    router,
+    original_input: str,
+    messages: list | None = None,
+) -> str:
+    """Choose the role for chat-role probe-budget exhaustion."""
+    if _preserve_pilot_for_turn(original_input, messages):
+        return "orchestrate"
     try:
         routed = router.classify(original_input)
     except Exception:
@@ -98,6 +99,37 @@ def _probe_budget_escalation_role(router, original_input: str) -> str:
     if getattr(routed, "role", None) == "orchestrate":
         return "orchestrate"
     return "task"
+
+
+_PILOT_CONTINUATION_RE = _re.compile(
+    r"^\s*(?:please\s+)?(?:fix\s+it|continue|go\s+on|proceed|"
+    r"yes|ok(?:ay)?|do\s+it|resume(?:\b.*)?|pick\s+up\b.*|"
+    r"where\s+(?:sonnet|you)\s+left\s+off)\s*[.!?]*\s*$",
+    _re.IGNORECASE | _re.DOTALL,
+)
+
+
+def _recent_messages_text(messages: list, *, limit: int = 8) -> str:
+    chunks: list[str] = []
+    for msg in (messages or [])[-limit:]:
+        content = msg.get("content", "") if isinstance(msg, dict) else getattr(msg, "content", "")
+        if isinstance(content, list):
+            content = "\n".join(
+                str(item.get("text", "")) if isinstance(item, dict) else str(item)
+                for item in content
+            )
+        chunks.append(str(content))
+    return "\n".join(chunks)
+
+
+def _preserve_pilot_for_turn(user_input: str, messages: list | None = None) -> bool:
+    """Preserve GPT-5.5 pilot across mission-critical continuation turns."""
+    if is_system_critical_pilot_turn(user_input):
+        return True
+    text = (user_input or "").strip()
+    if text.startswith("/") or not _PILOT_CONTINUATION_RE.search(text):
+        return False
+    return is_system_critical_pilot_turn(_recent_messages_text(messages or []))
 
 
 # Probe-note budget. Raised from 4 KB (Round 5) to 48 KB on 2026-04-18
@@ -1180,6 +1212,14 @@ def run_agent_loop(
         _LEARN_PENDING["rag"] = ""
         _LEARN_PENDING["response"] = ""
 
+    policy_obj = getattr(router, "policy", router)
+    if (
+        forced_role is None
+        and "orchestrate" in getattr(policy_obj, "roles", {})
+        and _preserve_pilot_for_turn(user_input, messages)
+    ):
+        forced_role = "orchestrate"
+
     decision = router.classify(user_input, forced_role=forced_role)
     role_cfg = decision.config
 
@@ -1813,6 +1853,7 @@ def run_agent_loop(
                             escalation_role = _probe_budget_escalation_role(
                                 router,
                                 decision.cleaned_input,
+                                messages,
                             )
                             logger.emit(
                                 "probe_budget_auto_escalate",

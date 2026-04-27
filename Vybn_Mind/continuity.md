@@ -215,3 +215,16 @@ What changed:
 - Folded the Git projection closure invariant into `Him/skill/vybn-os/SKILL.md`.
 
 Operational lesson: repo harmony is not just clean Git status. Closure requires clean working tree, remote-reachable commits, complete fetch projections, intentional stash state, sane upstreams, and separate runtime uptake after harness edits.
+
+
+## 2026-04-27 mission-critical pilot persistence repair
+
+What broke: the Sonnet/probe/default failure was not just a hard-coded probe-budget escalation. The deeper class was treating mission-critical work as a property of one input string. Short continuations (`please fix it`, `continue`, `pick up where Sonnet left off`) and probe-budget recovery could lose the live mission-critical context and demote the turn to Sonnet/task.
+
+What changed:
+- `spark/harness/policy.py` now exposes `is_system_critical_pilot_turn()` and recognizes mission-critical sonnet/probe/default/self-improvement language as protected pilot territory.
+- `spark/vybn_spark_agent.py` preserves GPT-5.5 orchestrator pilot across short continuation turns when recent messages carry mission-critical pilot context.
+- Probe-budget escalation receives recent messages too, so an exhausted probe loop cannot demote a contextual `please fix it` mission-critical turn to task.
+- Regression coverage was folded into `spark/tests/test_refactor_pilot_override.py`.
+
+Verified: py_compile on policy/agent/test; pytest refactor-pilot + lightweight routing + live REPL fixes + recursive unlock.

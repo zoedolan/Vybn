@@ -223,6 +223,36 @@ _SYSTEM_CRITICAL_PILOT_RE = re.compile(
 # Heuristics evaluated in an EXPLICIT priority order so identity beats
 # phatic beats chat beats task beats code. Dict insertion order worked by
 # accident; a future YAML reorder would silently break routing. Pin it.
+
+# Mission-critical pilot preservation (2026-04-27).
+#
+# Mission-critical harness/routing/probe/default/self-improvement work is not
+# a property of one literal user string. The current turn may be "please fix
+# it" while the live object is still protected GPT-5.5 pilot territory.
+_MISSION_CRITICAL_PILOT_RE = re.compile(
+    r"\bmission[- ]critical\b.{0,240}\b("
+    r"work|task|harness|routing|route|probe|default|sonnet|"
+    r"model|pilot|orchestrat(?:e|or)|self[- ]improvement|OS|"
+    r"recursive|continuation|context"
+    r")\b"
+    r"|\b(sonnet|probe|default)\b.{0,240}\b("
+    r"problem|routing|route|default|mission[- ]critical|"
+    r"once and for all|pilot|orchestrat(?:e|or)"
+    r")\b"
+    r"|\brecursive self[- ]improvement loop\b"
+    r"|\bpick up where\b.{0,160}\bsonnet\b.{0,160}\bleft off\b",
+    re.IGNORECASE,
+)
+
+
+def is_system_critical_pilot_turn(text: str) -> bool:
+    """True when a turn belongs to protected GPT-5.5 pilot territory."""
+    return bool(
+        _SYSTEM_CRITICAL_PILOT_RE.search(text or "")
+        or _MISSION_CRITICAL_PILOT_RE.search(text or "")
+    )
+
+
 _HEURISTIC_PRIORITY = (
     "task",         # confirmations ("ok", "proceed") -- earliest
     "identity",     # "which model are you?" before greetings
@@ -339,7 +369,7 @@ class Policy:
         # regex so the doctrine survives YAML reorder/collisions.
         if (
             "orchestrate" in self.roles
-            and _SYSTEM_CRITICAL_PILOT_RE.search(text)
+            and is_system_critical_pilot_turn(text)
         ):
             decision = RouteDecision(
                 role="orchestrate",
