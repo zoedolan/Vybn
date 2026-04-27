@@ -44,12 +44,8 @@ Total tracked surface in scan: 447 files, 11.2 MB.
   - Vybn's Personal History/what_vybn_would_have_missed_TO_031125.txt: 2.0 MB
   - Vybn's Personal History/zoes_memoirs.txt: 1.0 MB
   - Vybn's Personal History/vybns_autobiography_volume_I.txt: 321.2 KB
-  - Vybn_Mind/sensorium_state/sensorium_20260319T110616Z.json: 289.7 KB
-  - Vybn_Mind/sensorium_state/latest.json: 289.6 KB
-  - Vybn_Mind/sensorium_state/sensorium_20260319T110712Z.json: 289.6 KB
   - Vybn's Personal History/volume_v_graph_summary.md: 227.5 KB
   - Vybn_Mind/creature_dgm_h/archive/organism_state.json: 218.1 KB
-  - Vybn_Mind/sensorium_state/sensorium_20260319T110458Z.json: 194.7 KB
   - Vybn's Personal History/vybns_autobiography_volume_IV.txt: 152.1 KB
 
 ### Him
@@ -355,12 +351,8 @@ Pressure does not mean disposal. It means inspect first when seeking lightness. 
 - Vybn/Vybn's Personal History/what_vybn_would_have_missed_TO_031125.txt (2.0 MB) — preserve/provenance-map
 - Vybn/Vybn's Personal History/zoes_memoirs.txt (1.0 MB) — preserve/provenance-map
 - Vybn/Vybn's Personal History/vybns_autobiography_volume_I.txt (321.2 KB) — preserve/provenance-map
-- Vybn/Vybn_Mind/sensorium_state/sensorium_20260319T110616Z.json (289.7 KB) — prove-reader-or-route
-- Vybn/Vybn_Mind/sensorium_state/latest.json (289.6 KB) — prove-reader-or-route
-- Vybn/Vybn_Mind/sensorium_state/sensorium_20260319T110712Z.json (289.6 KB) — prove-reader-or-route
 - Vybn/Vybn's Personal History/volume_v_graph_summary.md (227.5 KB) — preserve/provenance-map
 - Vybn/Vybn_Mind/creature_dgm_h/archive/organism_state.json (218.1 KB) — monolith/interface seam
-- Vybn/Vybn_Mind/sensorium_state/sensorium_20260319T110458Z.json (194.7 KB) — prove-reader-or-route
 - Vybn-Law/wellspring.html (159.1 KB) — monolith/interface seam
 - Vybn/Vybn's Personal History/vybns_autobiography_volume_IV.txt (152.1 KB) — preserve/provenance-map
 - Vybn/origins_portal_api_v4.py (145.8 KB) — monolith/interface seam
@@ -392,6 +384,9 @@ Pressure does not mean disposal. It means inspect first when seeking lightness. 
 - Vybn/_archive/Vybn_Mind__origins_portal_api.py (3.8 KB) — compress-or-keep-with-restore-path
 - Vybn/_archive/README.md (3.6 KB) — compress-or-keep-with-restore-path
 - Him/repo_archives/garden/20260427T104202Z/README.md (3.4 KB) — compress-or-keep-with-restore-path
+
+### Resolved routing decisions
+- Vybn_Mind/sensorium_state/*.json — verified ignored/untracked stale sensorium snapshots; no live reader found; latest.json duplicated sensorium_20260319T110712Z.json; locally disposed 2026-04-27.
 
 ## Current structural reading
 
