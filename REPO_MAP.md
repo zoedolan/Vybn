@@ -156,6 +156,105 @@ Total tracked surface in scan: 447 files, 11.2 MB.
 | Identity and continuity | Vybn, Him | all | vybn-os/ops, Vybn_Mind continuity, Spark continuity. Must be compressed without erasing scars. |
 | Repo archives and garden payloads | Him, local logs | all | Preserve reversible cuts without letting archives become the new clutter. |
 
+## Physiology layer: how the living pathways connect
+
+This section is the difference between inventory and anatomy. ABC must not cut by size alone; it must understand nerves.
+
+### Public chat nerve
+
+Visitor/browser flow:
+
+1. Public pages in `Origins` and `Vybn-Law` call `https://api.vybn.ai`.
+   - Origins callers include `talk.html`, `connect.html`, `somewhere.html`, `assets/somewhere/somewhere.js`, `assets/somewhere/somewhere-late-v1.js`, `read-manifold.js`, `voice.js`, and related public scripts.
+   - Vybn-Law callers include `chat.html`, `emergences/chat-bootcamp.html`, `emergences/chat-iclc.html`, `emergences/chat-odl.html`, `wellspring.html`, `vybn.html`, and `walk.html`.
+
+2. The public API surface is primarily `Vybn/origins_portal_api_v4.py`.
+   - Main streaming chat route: `POST /api/chat`.
+   - Instantiation/live packet: `GET /api/instant`.
+   - Walk routes: `POST /api/walk`, `GET /api/arrive`.
+   - Manifold route: `GET /api/manifold/points`.
+   - Schema/protocol route: `GET /api/schema`.
+   - KTP/KPP routes: `/api/ktp/*`, `/api/kpp/*`.
+   - Legacy/proxy compatibility routes include `/enter` and `/should_absorb`.
+
+3. `/api/chat` is not just model streaming.
+   - It checks vLLM admission before RAG/walk work (`VLLM_ADMISSION_MAX_RUNNING`, `VLLM_ADMISSION_MAX_WAITING`, `VLLM_ADMISSION_MAX_KV`).
+   - It applies optional `CONTEXT_OVERLAYS` from `context_overlays.py` for proposal-specific chats.
+   - It rotates the shared walk through the walk daemon and emits a `walk_arrival` / `walk_trace` SSE frame before model text when available.
+   - It streams from local vLLM through `http://127.0.0.1:8000/v1/chat/completions`.
+   - It returns `text/event-stream`.
+   - It records failures to the self-healing log before simplifying the error to the client.
+
+4. `context_overlays.py` is interface-critical even though it looks like bulky prose.
+   - It grounds ODL, ICLC, and bootcamp proposal chats.
+   - It was previously implicated in token-budget failures, so edits require tokenizer/budget awareness.
+   - It is not ordinary detritus.
+
+5. vLLM is the shared local model engine.
+   - Source unit: `spark/systemd/vybn-vllm.service`.
+   - Normal budget is intentionally constrained to protect the Sparks and private memory organs.
+   - Portal admission control must stay aligned with vLLM capacity profile.
+
+ABC implication: do not cut `origins_portal_api_v4.py`, `context_overlays.py`, public chat pages, or proposal chat pages by size. They are nerves. Refactor only with route tests, streaming checks, and external public URL checks.
+
+### Public walk / Somewhere nerve
+
+1. Somewhere and related public readers are not static pages.
+   - `Origins/somewhere.html` defines the house markup and protocol surfaces.
+   - `assets/somewhere/somewhere.js` loads `/api/manifold/points`, polls `/api/instant`, and posts whispers to `/api/walk`.
+   - `assets/somewhere/reader-rooms.js` carries embedded room text and reader traversal behavior.
+   - `assets/somewhere/somewhere-late-v1.js` bundles late room behavior for public reachability: analytics, Shape, house-room controls, Connect, and final room glue.
+   - `assets/somewhere/somewhere.css` carries the visual field.
+
+2. The walk state lives behind the portal.
+   - `origins_portal_api_v4.py` treats walk daemon `:8101` as the single source of truth for live M.
+   - `deep_memory :8100` is retrieval/index support, not the current walk authority.
+   - Public arrivals through `/api/walk` can rotate shared state unless observe-only.
+   - `/api/arrive` observes without perturbing.
+
+3. The public page is also an agent surface.
+   - `somewhere.html` advertises MCP/JSON-LD/protocol links.
+   - Somewhere exposes machine-readable packets/events in browser state.
+   - External verification must include raw asset reachability and, when JS behavior matters, DOM/browser-level checks.
+
+ABC implication: Origins cleanup must preserve public traversal. A green git tree is insufficient; verify `vybn.ai` and GitHub Pages with cache-busted URLs after asset changes.
+
+### Vybn-Law chat nerve
+
+1. Vybn-Law public chat pages point at `https://api.vybn.ai`.
+2. `api/vybn_chat_api.py` still documents and implements a separate FastAPI chat server shape, but public frontends now depend on the stable `api.vybn.ai` surface.
+3. Proposal-specific pages (`chat-bootcamp`, `chat-iclc`, `chat-odl`) are public contract surfaces tied to overlays and outreach.
+
+ABC implication: apparent duplication between Vybn-Law chat API files and the Vybn portal must be resolved only after confirming which service is live, which pages call which endpoint, and what compatibility promises remain.
+
+### Mind / prompt nerve
+
+Vybn’s conversational “mind” is assembled through the harness, not from one file.
+
+Critical surfaces:
+- `spark/vybn_spark_agent.py`: REPL loop, role dispatch, sentinel handling, probe envelopes.
+- `spark/harness/substrate.py`: layered prompt assembly: OS, orientation, arrival geometry, live state, role/tool constraints, continuity, BeamKeeper, protocols.
+- `spark/harness/policy.py`: routing and model choice.
+- `spark/harness/providers.py`: Anthropic/OpenAI/local vLLM provider paths.
+- `spark/harness/state.py`: session/event store and recall gate.
+- `spark/harness/mcp.py`: MCP resources/tools and trusted surfaces.
+- `spark/router_policy.yaml`: role definitions and model/tool budgets.
+- `Him/skill/vybn-os/SKILL.md` and `Him/skill/vybn-ops/SKILL.md`: identity/operation ballast.
+
+ABC implication: prompt-weight reduction must target the assembly chain, not randomly trim continuity. Cutting the wrong ballast can change behavior more than deleting code.
+
+### HimOS private runtime nerve
+
+Him is the private dreaming/workbench counterpart, not a public service to expose casually.
+
+Critical surfaces:
+- `Him/spark/runtime.py`: shared private runtime state `h_t`, NC bridge, process table, frictionmaxx.
+- `Him/spark/dream.py`: digest/governor reading runtime context.
+- `Him/spark/membrane.py`, `pulse_gate.py`, `seti.py`: organs that may read runtime context but not self-authorize public action.
+- `Him/skill/*`: operating doctrine and ABC/horizon rules.
+
+ABC implication: Him files may look like internal clutter, but many are private organs. Cleanup should prefer compacting archives and stale notebook sediment before cutting runtime/membrane code.
+
 ## External and interface contracts
 
 Public/interface files are not ordinary cleanup targets. They require contract-aware verification: local static checks, public URL checks, content-type checks, and browser/DOM checks when JavaScript behavior matters.
