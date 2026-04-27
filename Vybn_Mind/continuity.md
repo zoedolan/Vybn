@@ -228,3 +228,17 @@ What changed:
 - Regression coverage was folded into `spark/tests/test_refactor_pilot_override.py`.
 
 Verified: py_compile on policy/agent/test; pytest refactor-pilot + lightweight routing + live REPL fixes + recursive unlock.
+
+
+## 2026-04-27T16:08:58Z connective-tissue consolidation embodiment
+
+Zoe named the true aim: apply refactor-perception to consolidate existing files without losing connective tissue, indeed fortifying it. The refactor-perception organ now treats connective tissue as a first-class residual dimension.
+
+What changed:
+- `spark/harness/refactor_perception.py` defines `CONNECTIVE_TISSUE_PRINCIPLE`.
+- `FilePerception` packets now carry `connective_tissue`.
+- `connective_tissue_for()` identifies relation-bearing roles such as context maps, archive restore context, tests, public affordance surfaces, semantic manifests, compatibility shells, provider contracts, route spines, and REPL orchestration spines.
+- `self_healing_plan_for()` now requires mapping connective tissue and checking that it is preserved, redirected, manifested, or strengthened before mutation.
+- Regression coverage lives in `spark/tests/test_refactor_perception.py`.
+
+Operational lesson: consolidation is relation-preserving metabolism, not size reduction. A file may be valuable primarily as relation; map that relation before splitting, moving, archiving, or deleting.

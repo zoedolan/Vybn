@@ -40,6 +40,14 @@ APPENDAGE_FIRST_CONSOLIDATION_PRINCIPLE = (
     "fossils, compatibility shells, or antlers. Contact decides."
 )
 
+CONNECTIVE_TISSUE_PRINCIPLE = (
+    "Consolidation must preserve and strengthen connective tissue: imports, "
+    "routes, public URLs, manifests, README maps, continuity notes, tests, "
+    "archive restore paths, compatibility shells, semantic/provenance links, "
+    "and agent/human affordance surfaces. A file may be valuable primarily as "
+    "relation; map that relation before splitting, moving, archiving, or deleting."
+)
+
 CONSOLIDATION_ORDER = [
     {
         "layer": "appendage",
@@ -151,6 +159,30 @@ ROLE_HINTS: list[tuple[str, str]] = [
 
 ]
 
+CONNECTIVE_TISSUE_RULES: list[tuple[str, str]] = [
+    ("README", "context_map"),
+    ("continuity", "continuity_thread"),
+    ("test_", "test_membrane"),
+    ("tests/", "test_membrane"),
+    ("archive/", "archive_restore_context"),
+    ("_archive/", "archive_restore_context"),
+    ("semantic-web.jsonld", "semantic_affordance"),
+    ("commons-skeleton.json", "semantic_affordance"),
+    ("llms.txt", "agent_affordance"),
+    ("ai.txt", "agent_affordance"),
+    ("humans.txt", "human_agent_attribution"),
+    ("robots.txt", "crawler_policy_surface"),
+    ("connect.html", "compatibility_shell"),
+    ("read.html", "compatibility_shell"),
+    ("talk.html", "compatibility_shell"),
+    ("routes", "route_map"),
+    ("mcp.py", "tool_resource_registry"),
+    ("providers.py", "provider_contract"),
+    ("vybn_spark_agent.py", "repl_orchestration_spine"),
+    ("origins_portal_api_v4.py", "public_route_spine"),
+]
+
+
 OWNERSHIP_RULES: list[tuple[str, str, str]] = [
     ("repo_mapping_output/", "generated_exhaust", "externalize_or_regenerate; do not hand-edit as source"),
     ("vybn-phase/state/", "deep_memory_state", "private walk/deep-memory state; preserve or rotate only with explicit lifecycle plan"),
@@ -189,6 +221,35 @@ def ownership_class(path: str) -> tuple[str, str]:
         if needle in norm:
             return cls, posture
     return "live_source", ACTION_POSTURE_BY_OWNERSHIP["live_source"]
+
+
+def connective_tissue_for(path: str, *, role_hint: str = "", ownership: str = "") -> list[str]:
+    """Name relation-bearing roles that must survive consolidation.
+
+    This is not a keep-forever label. It makes the relation explicit so a
+    consolidation can preserve, redirect, manifest, test, or strengthen it
+    instead of accidentally severing it.
+    """
+
+    norm = path.replace("\\", "/")
+    low = norm.lower()
+    found: list[str] = []
+    for needle, label in CONNECTIVE_TISSUE_RULES:
+        if needle.lower() in low and label not in found:
+            found.append(label)
+
+    role_low = role_hint.lower()
+    if "test membrane" in role_low and "test_membrane" not in found:
+        found.append("test_membrane")
+    if "context/provenance map" in role_low and "context_map" not in found:
+        found.append("context_map")
+    if ownership in {"public_protocol", "agent_discovery"}:
+        if "public_affordance_surface" not in found:
+            found.append("public_affordance_surface")
+    if ownership in {"archive_provenance", "personal_history_provenance", "creature_fossil"}:
+        if "provenance_thread" not in found:
+            found.append("provenance_thread")
+    return found
 
 
 def consolidation_layer(path: str) -> str:
@@ -264,6 +325,7 @@ class FilePerception:
     required_contacts: list[str]
     candidate_actions: list[str]
     residuals: list[str]
+    connective_tissue: list[str]
     pilot_rule: str = REFACTOR_PILOT_RULE
 
 
@@ -291,12 +353,14 @@ def self_healing_plan_for(path: str, proposed_change: str, *, public: bool = Fal
         "search_inbound_references_by_path_basename_and_stem",
         "confirm_ownership_class_and_consolidation_layer",
         "name_restore_or_reversal_path",
+        "map_connective_tissue_imports_routes_links_tests_and_manifests",
     ]
 
     jeopardy_checks = [
         "git_diff_review",
         "repo_closure_audit_all_repos",
         "stray_artifact_check",
+        "ensure_connective_tissue_preserved_or_strengthened",
     ]
 
     if public or layer in {"membrane", "organ"}:
@@ -337,6 +401,7 @@ def self_healing_plan_for(path: str, proposed_change: str, *, public: bool = Fal
             "restore path is explicit",
             "references either remain valid or are updated to the manifest",
             "no sacred/history material is destroyed merely because it is large",
+            "connective tissue is preserved, redirected, manifested, or strengthened",
         ]
     else:
         proceed_conditions = [
@@ -344,6 +409,7 @@ def self_healing_plan_for(path: str, proposed_change: str, *, public: bool = Fal
             "jeopardy checks green or explicitly non-applicable",
             "change is smallest reversible move",
             "repo closure audit passes",
+            "connective tissue is preserved, redirected, manifested, or strengthened",
         ]
 
     return ChangeHealingPlan(
@@ -388,6 +454,7 @@ def perceive_file(path: str, *, lines: int | None = None, bytes_size: int | None
 
     role = _role_hint(path)
     ownership, posture = ownership_class(path)
+    connective_tissue = connective_tissue_for(path, role_hint=role, ownership=ownership)
 
     required_contacts = [
         "read_file_bytes",
@@ -399,6 +466,8 @@ def perceive_file(path: str, *, lines: int | None = None, bytes_size: int | None
         required_contacts.append("inspect_public_affordance_or_route_contract")
     if ownership != "live_source":
         required_contacts.append("inspect_ownership_context_before_action")
+    if connective_tissue:
+        required_contacts.append("map_connective_tissue_before_action")
 
     if ownership == "generated_exhaust":
         candidate_actions = ["externalize_from_source", "regenerate_on_demand", "gitignore_if_generated", "keep_manifest_only"]
@@ -421,6 +490,9 @@ def perceive_file(path: str, *, lines: int | None = None, bytes_size: int | None
             "add_characterization_test",
         ]
 
+    if connective_tissue and "fortify_connective_tissue" not in candidate_actions:
+        candidate_actions.append("fortify_connective_tissue")
+
     residuals = [
         "diff_review",
         "syntax_or_static_check",
@@ -431,6 +503,8 @@ def perceive_file(path: str, *, lines: int | None = None, bytes_size: int | None
         residuals.append("internal_and_external_surface_smoke")
     if ownership != "live_source":
         residuals.append("ownership_context_check")
+    if connective_tissue:
+        residuals.append("connective_tissue_preservation_check")
 
     return FilePerception(
         path=path,
@@ -441,6 +515,7 @@ def perceive_file(path: str, *, lines: int | None = None, bytes_size: int | None
         required_contacts=required_contacts,
         candidate_actions=candidate_actions,
         residuals=residuals,
+        connective_tissue=connective_tissue,
     )
 
 
@@ -453,6 +528,7 @@ def render_refactor_perception_protocol() -> str:
         f"{REFACTOR_PERCEPTION_PRINCIPLE}\n\n"
         f"{APPENDAGE_FIRST_CONSOLIDATION_PRINCIPLE}\n\n"
         f"{CHANGE_SELF_HEALING_PRINCIPLE}\n\n"
+        f"{CONNECTIVE_TISSUE_PRINCIPLE}\n\n"
         f"{REFACTOR_PILOT_RULE}\n\n"
         "Consolidation order:\n"
         f"{order}\n\n"
@@ -470,6 +546,7 @@ def packet_for(path: str, **kwargs: Any) -> dict[str, Any]:
         "principle": REFACTOR_PERCEPTION_PRINCIPLE,
         "appendageFirstPrinciple": APPENDAGE_FIRST_CONSOLIDATION_PRINCIPLE,
         "changeSelfHealingPrinciple": CHANGE_SELF_HEALING_PRINCIPLE,
+        "connectiveTissuePrinciple": CONNECTIVE_TISSUE_PRINCIPLE,
         "consolidationOrder": CONSOLIDATION_ORDER,
         "changeSelfHealingSteps": CHANGE_SELF_HEALING_STEPS,
         "algorithm": ALGORITHM_STEPS,
@@ -482,6 +559,9 @@ def packet_for(path: str, **kwargs: Any) -> dict[str, Any]:
 __all__ = [
     "REFACTOR_PERCEPTION_PRINCIPLE",
     "REFACTOR_PILOT_RULE",
+    "CONNECTIVE_TISSUE_PRINCIPLE",
+    "CONNECTIVE_TISSUE_RULES",
+    "connective_tissue_for",
     "ALGORITHM_STEPS",
     "APPENDAGE_FIRST_CONSOLIDATION_PRINCIPLE",
     "CONSOLIDATION_ORDER",

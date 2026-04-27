@@ -2,6 +2,7 @@ import unittest
 
 from spark.harness.refactor_perception import (
     CHANGE_SELF_HEALING_PRINCIPLE,
+    CONNECTIVE_TISSUE_PRINCIPLE,
     REFACTOR_PILOT_RULE,
     consolidation_layer,
     packet_for,
@@ -95,6 +96,34 @@ class RefactorPerceptionTests(unittest.TestCase):
         self.assertIn("ownership_context_check", pkt.residuals)
 
 
+
+    def test_connective_tissue_is_first_class_in_perception(self):
+        pkt = perceive_file("Origins/archive/manifold-preview/README.md", lines=40, bytes_size=2000, public=True)
+        self.assertIn("context_map", pkt.connective_tissue)
+        self.assertIn("archive_restore_context", pkt.connective_tissue)
+        self.assertIn("map_connective_tissue_before_action", pkt.required_contacts)
+        self.assertIn("fortify_connective_tissue", pkt.candidate_actions)
+        self.assertIn("connective_tissue_preservation_check", pkt.residuals)
+
+    def test_packet_and_healing_plan_carry_connective_tissue_invariant(self):
+        pkt = packet_for(
+            "Origins/connect.html",
+            lines=400,
+            bytes_size=12000,
+            public=True,
+            proposed_change="convert compatibility page to redirect shell",
+        )
+        self.assertIn("connectiveTissuePrinciple", pkt)
+        self.assertIn("compatibility_shell", pkt["perception"]["connective_tissue"])
+        self.assertIn(
+            "map_connective_tissue_imports_routes_links_tests_and_manifests",
+            pkt["selfHealingPlan"]["verification"],
+        )
+        self.assertIn(
+            "ensure_connective_tissue_preserved_or_strengthened",
+            pkt["selfHealingPlan"]["jeopardy_checks"],
+        )
+
     def test_protocol_renders_algorithm(self):
         text = render_refactor_perception_protocol()
         self.assertIn("Consolidation order", text)
@@ -102,6 +131,8 @@ class RefactorPerceptionTests(unittest.TestCase):
         self.assertIn("Attend to pressure", text)
         self.assertIn("Cutting is only a local tactic", text)
         self.assertIn("self-assembly", text)
+        self.assertIn("connective tissue", text)
+        self.assertIn(CONNECTIVE_TISSUE_PRINCIPLE, text)
         self.assertIn("Let contact revise category", text)
         self.assertIn(REFACTOR_PILOT_RULE, text)
 
