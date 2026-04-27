@@ -92,11 +92,11 @@ Current frontier:
   - probe/write/restart subturn execution helpers;
   - provider orchestration/fallback;
   - REPL/session loop.
-- Do not jump to `run_agent_loop` extraction first. Keep extracting small characterized organs with residual tests.
+- Do not jump to `run_agent_loop` refactoring first. Keep consolidating/refactoring small characterized organs with residual tests.
 
 Operating lesson:
 - The process worked when it allowed refusal to count as learning. No-cut passes improved the classifier.
-- The first safe organ cut was not a heroic monolith split; it was a small seam whose behavior was already characterized.
+- The first safe organ refactor was not a heroic monolith split; it was a small seam whose behavior was already characterized.
 
 ## Live consolidation frontier
 

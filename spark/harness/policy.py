@@ -526,8 +526,11 @@ _DEFAULT_ROLES: dict[str, RoleConfig] = {
 }
 
 _DEFAULT_HEURISTICS_RAW: dict[str, list[str]] = {
-    # Confirm -- bare execution signals after a plan. Must route
-    # to task (Sonnet+bash), never orchestrate (no tools).
+    # Confirm -- bare execution signals after a plan.
+    # Ordinary concrete shell follow-through may route to task (Sonnet+bash).
+    # System-critical refactoring/consolidation/routing/memory work must stay
+    # with orchestrate/GPT-5.5 as pilot; cheaper roles may only execute bounded
+    # mechanical substeps after GPT-5.5 specifies the seam and expected result.
     "task": [
         r'^\s*(ok|okay|ok+y|k|kk|yep|yes|yeah|yup|aye)\s*[!.,?]*\s*$',
         r'^\s*(proceed|go ahead|do it|continue|execute|go for it|ship it)\s*[!.,?]*\s*$',
@@ -546,7 +549,8 @@ _DEFAULT_HEURISTICS_RAW: dict[str, list[str]] = {
         r"\bhey buddy.{0,40}(working|running|okay|ok|check)\b",
         # # EXEC_GRANULARITY_ROUTING_v1
         # Multi-step construction — a write+verify+commit pattern belongs
-        # in task (Sonnet+bash, 10-iter), not chat (1 probe, no bash).
+        # in the appropriate execution role, not chat (1 probe, no bash).
+        # For system-critical refactoring/consolidation, keep GPT-5.5 as pilot.
         r"\b(patch|edit|modify|refactor)\b.{0,60}\b(file|script|module|function|class|method|code|harness|router|policy|agent|test|tests|yaml|config)\b",
         r"\b(write|create|build|add|land)\b.{0,40}\b(patch|fix|script|test|module|commit|function|file|branch)\b",
         r"\b(commit|push|rebase|cherry-pick)\b",
@@ -692,11 +696,13 @@ _DEFAULT_BUDGETS: dict[str, float] = {
     "per_turn_usd": 2.00,
     "per_session_usd": 25.00,
     "warn_pct": 0.8,
-    # # PROBE_BUDGET_AUTO_ESCALATE_v1
-    # Probe sub-turn budget for no-tool roles. Raised from 3 to 8:
-    # a real investigation arc (inspect, grep, read, patch, verify,
-    # commit, push) runs 6-8 probes. On exhaust the harness
-    # auto-escalates to task role instead of printing a warning.
+    # PROBE_BUDGET_SYSTEM_CRITICAL_v2
+    # Probe sub-turn budget for no-tool/orchestrator roles. Refactoring,
+    # consolidation, routing, memory, and other system-critical exercises
+    # must remain under the GPT-5.5 judgment pilot rather than degrading to
+    # Sonnet/task when an old 8-probe arc is exceeded. Mechanical bounded
+    # substeps may still be delegated only after GPT-5.5 specifies the seam
+    # and expected result.
     "probe_per_turn": 16,
 }
 

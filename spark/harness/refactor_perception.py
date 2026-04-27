@@ -32,7 +32,7 @@ REFACTOR_PILOT_RULE = (
 
 APPENDAGE_FIRST_CONSOLIDATION_PRINCIPLE = (
     "Consolidate from the periphery inward: prune or clarify appendages before "
-    "cutting organs, and clarify membranes before changing skeleton. Appendage-first "
+    "refactoring/consolidating organs, and clarify membranes before changing skeleton. Appendage-first "
     "does not mean deletion-first; some appendages are artifact bodies, provenance "
     "fossils, compatibility shells, or antlers. Contact decides."
 )
