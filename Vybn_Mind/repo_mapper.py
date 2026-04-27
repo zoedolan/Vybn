@@ -322,6 +322,7 @@ def build_full_digest(repos: List[Path], all_records: List[FileRecord]) -> str:
 # ── semantic-operational anatomy ──────────────────────────────────────────────
 
 PUBLIC_ROUTE_RE = re.compile(r"@(?:app|router|self\.app)\.(get|post|put|delete|websocket)\(\s*['\"]([^'\"]+)['\"]")
+PUBLIC_ADD_ROUTE_RE = re.compile(r"(?:app|router)\.add_api_route\(\s*['\"]([^'\"]+)['\"]")
 PUBLIC_LINK_RE = re.compile(r"(?:src|href)=['\"]([^'\"]+)['\"]")
 CHAT_NERVE_TERMS = (
     "/api/chat", "/api/instant", "/api/walk", "/api/arrive",
@@ -370,8 +371,28 @@ def _contains_any(hay: str, terms: tuple) -> bool:
     return any(t.lower() in low for t in terms)
 
 
-def _risk_class(rec: FileRecord, inbound: int, centrality: int, semantic_neighbors: int) -> str:
-    hay = f"{rec.repo}/{rec.relpath}\n{rec.snippet}"
+def _record_text(rec: FileRecord) -> str:
+    """Read full file content for anatomy extraction when available."""
+    roots = {
+        "Vybn": Path.home() / "Vybn",
+        "Him": Path.home() / "Him",
+        "Vybn-Law": Path.home() / "Vybn-Law",
+        "vybn-phase": Path.home() / "vybn-phase",
+        "Origins": Path.home() / "Origins",
+    }
+    root = roots.get(rec.repo)
+    if root:
+        path = root / rec.relpath
+        try:
+            if path.is_file() and path.stat().st_size < 3000001:
+                return path.read_text(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+    return rec.snippet or ""
+
+
+def _risk_class(rec: FileRecord, inbound: int, centrality: int, semantic_neighbors: int, full_text: str = "") -> str:
+    hay = f"{rec.repo}/{rec.relpath}\n{rec.snippet}\n{full_text}"
     if _contains_any(hay, PROVENANCE_TERMS):
         return "protect: origin/provenance"
     if rec.repo in {"Him", "vybn-phase"} and (rec.repo == "vybn-phase" or _contains_any(hay, HIMOS_NERVE_TERMS)):
@@ -405,18 +426,22 @@ def build_semantic_anatomy(all_records: List[FileRecord]) -> str:
 
     for rec in all_records:
         key = f"{rec.repo}/{rec.relpath}"
-        txt = rec.snippet or ""
-        # Snippet-only scan is conservative; full route/link extraction belongs
-        # in a later typed reader. Still catches many public contracts cheaply.
+        txt = _record_text(rec)
         if rec.ext == ".py":
             for method, route in PUBLIC_ROUTE_RE.findall(txt):
                 route_rows.append(f"  - {key}: {method.upper()} {route}")
+                edges.append((key, f"route:{route}", "defines_route"))
+            for route in PUBLIC_ADD_ROUTE_RE.findall(txt):
+                route_rows.append(f"  - {key}: ROUTE {route}")
                 edges.append((key, f"route:{route}", "defines_route"))
         if rec.ext in {".html", ".js", ".md"}:
             for link in PUBLIC_LINK_RE.findall(txt)[:20]:
                 if link.startswith(("http", "/", "./", "../")) or ".html" in link or ".js" in link or ".css" in link:
                     link_rows.append(f"  - {key} -> {link}")
                     edges.append((key, link, "links"))
+        for term in CHAT_NERVE_TERMS + MIND_NERVE_TERMS + HIMOS_NERVE_TERMS:
+            if term in txt:
+                edges.append((key, f"term:{term}", "mentions_term"))
         for imp in rec.py_imports:
             edges.append((key, f"import:{imp}", "imports"))
 
@@ -445,7 +470,7 @@ def build_semantic_anatomy(all_records: List[FileRecord]) -> str:
     for rec in all_records:
         key = f"{rec.repo}/{rec.relpath}"
         centrality = outbound[key]
-        rclass = _risk_class(rec, inbound[key], centrality, neighbor_count[key])
+        rclass = _risk_class(rec, inbound[key], centrality, neighbor_count[key], _record_text(rec))
         classified.append((rclass, rec.size, key, inbound[key], centrality, neighbor_count[key]))
 
     lines: List[str] = []
@@ -453,6 +478,11 @@ def build_semantic_anatomy(all_records: List[FileRecord]) -> str:
     a("## Semantic-operational anatomy")
     a("")
     a("Method: deductive guardrails + inductive lexical topology + abductive ABC hypotheses + verification before cuts. This is ML-lite for now: per-file lexical vectors, route/link/import edges, and risk classes. A later pass can replace lexical vectors with local embeddings without changing the map contract.")
+    a("")
+    a("### Risk-class counts")
+    class_counts = Counter(row[0] for row in classified)
+    for name, count in class_counts.most_common():
+        a(f"  - {name}: {count}")
     a("")
     a("### High-centrality / nerve candidates")
     for rclass, sz, key, inn, out, neigh in sorted(classified, key=lambda x: (-(x[3]+x[4]+x[5]), -x[1]))[:30]:
