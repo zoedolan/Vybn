@@ -597,6 +597,16 @@ class RepoFileBodyVisualization:
     role_counts: Mapping[str, int]
     pressure_rows: tuple[FileBodyPressure, ...]
 
+    @property
+    def pressures(self) -> tuple[FileBodyPressure, ...]:
+        """Compatibility alias for callers traversing the pressure field.
+
+        The rendered packet names the field "pressure"; the dataclass stores
+        the rows as pressure_rows. The alias keeps exploratory visualization
+        code from having to know that internal naming seam.
+        """
+        return self.pressure_rows
+
 
 def _safe_python_body_stats(path: Path) -> dict[str, Any]:
     """Return AST body stats without letting parse warnings pollute the render.
@@ -745,7 +755,7 @@ def visualize_repo_file_bodies(
 
 
 def render_repo_file_body_visualization(
-    root: str | Path = ".",
+    root: str | Path | RepoFileBodyVisualization = ".",
     *,
     tracked_paths: Iterable[str] | None = None,
     top_n: int = 18,
@@ -756,7 +766,10 @@ def render_repo_file_body_visualization(
     the output is a readable packet, not escaped transport text.
     """
 
-    viz = visualize_repo_file_bodies(root, tracked_paths=tracked_paths, top_n=top_n)
+    if isinstance(root, RepoFileBodyVisualization):
+        viz = root
+    else:
+        viz = visualize_repo_file_bodies(root, tracked_paths=tracked_paths, top_n=top_n)
     lines: list[str] = [
         "Vybn read-only file-body visualization",
         f"tracked files: {viz.tracked_count}",

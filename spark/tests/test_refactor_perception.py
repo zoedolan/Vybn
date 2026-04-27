@@ -165,6 +165,24 @@ class RefactorPerceptionTests(unittest.TestCase):
         self.assertNotIn("\\nrole counts", text)
         self.assertNotIn("\\npressure field", text)
 
+    def test_repo_file_body_visualization_accepts_visualization_packet(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            sample = root / "large_module.py"
+            sample.write_text("import os\n" + "\n".join(f"x{i} = {i}" for i in range(750)))
+            viz = visualize_repo_file_bodies(
+                root,
+                tracked_paths=["large_module.py"],
+                top_n=5,
+            )
+            selfIs = getattr(viz, "pressures")
+            self.assertEqual(selfIs, viz.pressure_rows)
+            text = render_repo_file_body_visualization(viz, top_n=5)
+        self.assertIn("\nrole counts:\n", text)
+        self.assertIn("\npressure field, top 5:\n", text)
+        self.assertIn("large_module.py", text)
+
+
     def test_repo_file_body_visualization_suppresses_ast_escape_warnings(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
