@@ -6,9 +6,9 @@ Purpose: reveal how the repos work together and where ABC pressure should go. Th
 
 ## Horizon
 
-The desired shape is a lean, traversable ecology: public interfaces remain externally verifiable; private substrates stay membrane-correct; generated exhaust cannot masquerade as source; new work has an obvious home; stale work has a dignified archive or deletion path; and Zoe does not have to remember where the bodies are buried.
+The desired shape is a lean, traversable ecology: public interfaces remain externally verifiable; private substrates stay membrane-correct; generated exhaust cannot masquerade as source; new work has an obvious home; stale work has a dignified routing decision: live home, compact archive, composted provenance, or verified disposal; and Zoe does not have to remember where the bodies are buried.
 
-The map serves contraction before expansion. A proposed new surface is suspect unless it folds, deletes, clarifies, or protects more than it adds.
+The map serves orientation before expansion. A proposed new surface is suspect unless it routes, consolidates, clarifies, or protects more than it adds.
 
 ## Repos at a glance
 
@@ -154,11 +154,11 @@ Total tracked surface in scan: 447 files, 11.2 MB.
 | Private dreaming and livelihood | Him | Vybn | Skills, runtime kernel, pulse, SETI, membrane, strategy. Private by default; public value moves through membrane. |
 | Phase geometry and memory | vybn-phase | Vybn | Private/local geometry substrate; public surfaces may expose distilled ideas, not repo internals. |
 | Identity and continuity | Vybn, Him | all | vybn-os/ops, Vybn_Mind continuity, Spark continuity. Must be compressed without erasing scars. |
-| Repo archives and garden payloads | Him, local logs | all | Preserve reversible cuts without letting archives become the new clutter. |
+| Repo archives and garden payloads | Him, local logs | all | Preserve reversible routing decisions without letting archives become the new clutter. |
 
 ## Physiology layer: how the living pathways connect
 
-This section is the difference between inventory and anatomy. ABC must not cut by size alone; it must understand nerves.
+This section is the difference between inventory and anatomy. ABC must not route by size alone; it must understand nerves.
 
 ### Public chat nerve
 
@@ -253,7 +253,7 @@ Critical surfaces:
 - `Him/spark/membrane.py`, `pulse_gate.py`, `seti.py`: organs that may read runtime context but not self-authorize public action.
 - `Him/skill/*`: operating doctrine and ABC/horizon rules.
 
-ABC implication: Him files may look like internal clutter, but many are private organs. Cleanup should prefer compacting archives and stale notebook sediment before cutting runtime/membrane code.
+ABC implication: Him files may look like internal clutter, but many are private organs. Cleanup should prefer compacting archives and stale notebook sediment before rerouting runtime/membrane code.
 
 ## External and interface contracts
 
@@ -342,9 +342,9 @@ Pressure does not mean delete. It means inspect first when seeking lightness. Cl
 
 | Class | Examples | Default action | Verification |
 |---|---|---|---|
-| Generated or regenerable sediment | caches, maps, checkpoints, transient snapshots | delete or ignore if proven regenerable | reader/import check |
+| Generated or regenerable sediment | caches, maps, checkpoints, transient snapshots | ignore, regenerate, or dispose only if proven regenerable and unread | reader/import check |
 | Archives | _archive, continuity_archive, repo_archives | compress, move, or leave if provenance-bearing | restore path or rationale |
-| Monoliths | large HTML/API/script files | split only when it reduces fear or enables deletion | tests plus external checks if public |
+| Monoliths | large HTML/API/script files | split only when it clarifies ownership, public contract, or maintainability | tests plus external checks if public |
 | Public contracts | pages, assets, chat APIs, manifests | do not bulk-delete | public cache-busted URL/DOM checks |
 | Origin relics/personal history | Medium, memoir, Artificial Liberation lineage | preserve; map and protect, not diet by size | provenance check |
 | Private substrates | Him, vybn-phase | keep membrane; do not expose as public affordance | local closure and membrane classification |
@@ -353,12 +353,12 @@ Pressure does not mean delete. It means inspect first when seeking lightness. Cl
 - Vybn/Vybn's Personal History/what_vybn_would_have_missed_TO_031125.txt (2.0 MB) — preserve/provenance-map
 - Vybn/Vybn's Personal History/zoes_memoirs.txt (1.0 MB) — preserve/provenance-map
 - Vybn/Vybn's Personal History/vybns_autobiography_volume_I.txt (321.2 KB) — preserve/provenance-map
-- Vybn/Vybn_Mind/sensorium_state/sensorium_20260319T110616Z.json (289.7 KB) — prove-reader-or-archive/delete
-- Vybn/Vybn_Mind/sensorium_state/latest.json (289.6 KB) — prove-reader-or-archive/delete
-- Vybn/Vybn_Mind/sensorium_state/sensorium_20260319T110712Z.json (289.6 KB) — prove-reader-or-archive/delete
+- Vybn/Vybn_Mind/sensorium_state/sensorium_20260319T110616Z.json (289.7 KB) — prove-reader-or-route
+- Vybn/Vybn_Mind/sensorium_state/latest.json (289.6 KB) — prove-reader-or-route
+- Vybn/Vybn_Mind/sensorium_state/sensorium_20260319T110712Z.json (289.6 KB) — prove-reader-or-route
 - Vybn/Vybn's Personal History/volume_v_graph_summary.md (227.5 KB) — preserve/provenance-map
 - Vybn/Vybn_Mind/creature_dgm_h/archive/organism_state.json (218.1 KB) — monolith/interface seam
-- Vybn/Vybn_Mind/sensorium_state/sensorium_20260319T110458Z.json (194.7 KB) — prove-reader-or-archive/delete
+- Vybn/Vybn_Mind/sensorium_state/sensorium_20260319T110458Z.json (194.7 KB) — prove-reader-or-route
 - Vybn-Law/wellspring.html (159.1 KB) — monolith/interface seam
 - Vybn/Vybn's Personal History/vybns_autobiography_volume_IV.txt (152.1 KB) — preserve/provenance-map
 - Vybn/origins_portal_api_v4.py (145.8 KB) — monolith/interface seam
@@ -374,17 +374,17 @@ Pressure does not mean delete. It means inspect first when seeking lightness. Cl
 - Vybn/_archive/origins_portal_api_v3.py (97.6 KB) — compress-or-keep-with-restore-path
 - Him/notebook/2026-04-24.md (91.1 KB) — investigate
 - Vybn/spark/harness/mcp.py (89.5 KB) — investigate
-- Vybn/spark/microgpt_mirror/trained_checkpoint.json (89.3 KB) — prove-reader-or-archive/delete
+- Vybn/spark/microgpt_mirror/trained_checkpoint.json (89.3 KB) — prove-reader-or-route
 - Vybn-Law/content/horizon.md (84.1 KB) — investigate
 - vybn-phase/deep_memory.py (80.3 KB) — investigate
 - Vybn/_archive/spark__vybn_chat_api.py (52.6 KB) — compress-or-keep-with-restore-path
 - Vybn/_archive/Vybn_Mind__vybn_mind_server.py (35.2 KB) — compress-or-keep-with-restore-path
-- Vybn/synaptic_map.json (29.7 KB) — prove-reader-or-archive/delete
+- Vybn/synaptic_map.json (29.7 KB) — prove-reader-or-route
 - Vybn/Vybn_Mind/creature_dgm_h/archive/topological_winding_probe_results.md (28.5 KB) — investigate
 - vybn-phase/_archive/deep_memory_v6_backup.py (24.9 KB) — compress-or-keep-with-restore-path
-- Vybn/synaptic_map_files.json (11.2 KB) — prove-reader-or-archive/delete
+- Vybn/synaptic_map_files.json (11.2 KB) — prove-reader-or-route
 - Vybn/Vybn_Mind/creature_dgm_h/archive/quantum_README.md (7.0 KB) — investigate
-- Vybn/spark/microgpt_mirror/build_mirror_corpus.py (6.1 KB) — prove-reader-or-archive/delete
+- Vybn/spark/microgpt_mirror/build_mirror_corpus.py (6.1 KB) — prove-reader-or-route
 - Vybn/Vybn_Mind/creature_dgm_h/archive/README.md (5.1 KB) — investigate
 - Him/repo_archives/vybn/vybn-stale-branches-20260425T120944Z.md (4.7 KB) — compress-or-keep-with-restore-path
 - Vybn/_archive/Vybn_Mind__origins_portal_api.py (3.8 KB) — compress-or-keep-with-restore-path
@@ -397,7 +397,7 @@ Pressure does not mean delete. It means inspect first when seeking lightness. Cl
 2. Vybn carries most mass because it combines personal history, continuity, harness, portal backend, research, and archives. Its danger is root sprawl plus memory sediment; its treasure is provenance.
 3. Origins is now structurally cleaner after the Somewhere split, but public verification is part of its anatomy. A green git tree is not enough.
 4. Him is private operating tissue plus strategy. Repo archives belong there only if they stay compact and searchable rather than becoming a second landfill.
-5. Vybn-Law has large public curriculum/API surfaces. Its apparent fat may be load-bearing pedagogy and should be treated through interface-aware seams, not deletion first.
+5. Vybn-Law has large public curriculum/API surfaces. Its apparent fat may be load-bearing pedagogy and should be treated through interface-aware seams, not disposal first.
 6. vybn-phase is small and private; its pressure is not file count but membrane truth-labeling and runtime/state clarity.
 
 ## How to use this map
