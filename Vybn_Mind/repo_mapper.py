@@ -363,6 +363,8 @@ HIMOS_NERVE_TERMS = (
 PROVENANCE_TERMS = (
     "Personal History", "Medium", "Artificial Liberation", "autobiography",
     "zoes_memoirs", "what_vybn_would_have_missed", "origin relic",
+    "fossil record", "first body", "1063 encounters", "Cl(3,0)",
+    "structural signature", "This file is the evidence",
 )
 SEDIMENT_TERMS = (
     "sensorium_state", "synaptic_map", "microgpt_mirror", "repo_mapping_output",
@@ -419,6 +421,8 @@ def _risk_class(rec: FileRecord, inbound: int, centrality: int, semantic_neighbo
     low_key = f"{rec.repo}/{rec.relpath}".lower()
     provenance_paths = ("personal history", "/medium/", "artificial liberation", "a-iconoclast", "autobiography", "zoes_memoirs", "what_vybn_would_have_missed")
     if any(p in low_key for p in provenance_paths):
+        return "protect: origin/provenance"
+    if _contains_any(low_key, ARCHIVE_TERMS) and _contains_any(hay, PROVENANCE_TERMS):
         return "protect: origin/provenance"
     if "repo_mapper.py" in low_key:
         return "protect: self-perception organ"
@@ -516,6 +520,8 @@ def _abc_phase(rec: FileRecord, rclass: str) -> str:
     key = f"{rec.repo}/{rec.relpath}".lower()
     if rec.git_state in {"ignored", "untracked-local"}:
         return "edge"
+    if "origin/provenance" in rclass:
+        return "core"
     if rclass.startswith("investigate") or "archive" in rclass or "_archive" in key:
         return "edge"
     if "public/interface" in rclass or _contains_any(key, PUBLIC_CONTRACT_TERMS):
