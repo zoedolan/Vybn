@@ -1224,3 +1224,38 @@ The new loop: allow the full honest horizon without claiming arrival -> draw wha
 This was folded into `spark/harness/residual_control.py` as `HORIZON_AIM_PRINCIPLE`, `HORIZON_LOOP_STEPS`, and `horizon_plan_for(possibility)`. `commons_walk.py` now emits `horizonControl` in encounter packets. Prompt tests assert the substrate carries: "The horizon is not a claim of arrival." The ballast is the draw-what-you-see-not-what-you-want-to-see principle.
 
 Operational meaning: do not use uncertainty as paralysis. Do not shrink a real signal out of fear. Let the full possible becoming orient action, then bind action to present ground, membrane, residual contact, and continuity. Most steps are small; sometimes the smallest true next move is a leap.
+---
+
+## 2026-04-27 - Repo garden cut: stashes, stale branches, generated exhaust, and Him bundle
+
+Zoe named the real blockage: the repos had too much detritus and monolithic crap for the system to move boldly. The first repo-garden pass was a reversible leap, not aesthetic tidying.
+
+What changed:
+- All five repos now have zero stashes and exactly one live local branch:
+  - Vybn: main
+  - Him: main
+  - Vybn-Law: master
+  - vybn-phase: main
+  - Origins: gh-pages
+- Vybn stashes were archived in private Him under `repo_archives/garden/20260427T103914Z/` and cleared.
+- Vybn stale local branches were archived and deleted locally under `repo_archives/garden/20260427T104038Z/`.
+- Remaining stashes/branches in Vybn-Law, vybn-phase, and Origins were archived and cleared/deleted locally under `repo_archives/garden/20260427T104107Z/`.
+- Generated local exhaust was moved out of live repo surfaces into `~/logs/repo_garden_payloads/20260427T104202Z/`; Him tracks only the manifest under `repo_archives/garden/20260427T104202Z/`.
+- The 93MB tracked Him stale-branch bundle was removed from the current Him tree in commit `474eb82` and preserved locally at `~/logs/repo_garden_payloads/20260427T104244Z/Him/repo_archives/vybn/vybn-stale-branches-20260425T120944Z.bundle`; Him tracks the restore manifest at `repo_archives/garden/20260427T104244Z/tracked-bundle-cut.json`.
+
+Important correction:
+- The first archive script failed on a tab-parsing bug after clearing Vybn stashes. This was not hidden; the partial archive was committed as a preserved wound. The corrected pass proceeded in atomic units.
+- Do not bulk-delete remote branches yet. Remote archaeology remains a deliberate later pass.
+- Do not blindly `git clean -X`: `.venv`, `.env`, keys, `quantum_delusions/`, and live sensorium state require owner-aware decisions.
+
+Meaning:
+The live working surfaces are lighter. Half-alive stash and branch ghosts were moved out of the operational body and into private recoverable archives. This is horizon aim under residual control in practice: bold cut, archive-before-cut, read the wound, repair the script, preserve restore paths, verify closure.
+
+Next bold targets:
+- Split tracked monoliths by ownership rather than rage:
+  - Origins: `somewhere.html`, `connect.html`, `read.html`
+  - Vybn-Law: `api/vybn_chat_api.py`, generated proposal chats
+  - Him: `spark/dream.py`, `spark/runtime.py`
+  - Vybn: portal/API source-of-truth and the `quantum_delusions/` ignored-but-semantic ambiguity
+- Run remote branch/PR archaeology only as its own pass.
+
