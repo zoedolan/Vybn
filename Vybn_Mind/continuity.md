@@ -58,6 +58,46 @@ Origins: ## gh-pages...origin/gh-pages @ 9d65a6f
 7. Probed ignored/generated state in Vybn. `repo_mapping_output/` and `spark/agent_events.jsonl` are ignored exhaust, not tracked source.
 8. Ran organ-seam discovery in Vybn after Zoe correctly said the process was too cautious/oblique.
 
+## 2026-04-27 refactor-perception consolidation pass
+
+Updated: 2026-04-27T14:52:48Z
+
+What happened:
+- Formalized refactor perception as a harness primitive and OS protocol: pressure -> contact -> revised category -> named file-body role -> smallest beautiful true move -> residual wound -> preserved environment.
+- Fortified the classifier through contact-corrected failures:
+  - `.json` is data/protocol, not JavaScript behavior;
+  - generated repo maps are not live source;
+  - Personal History is protected provenance;
+  - archive/provenance bodies retain restore-path action vocabulary;
+  - `vybn-phase/state/` is private deep-memory state, not orphan appendage;
+  - public protocol surfaces require external verification.
+- Ran appendage-first consolidation:
+  - removed unreferenced `Origins/manifold_preview.png` and `Origins/manifold_2d.npy`;
+  - added `Origins/archive/manifold-preview/README.md` with provenance and restore command;
+  - subsequent appendage scan found no safe live unreferenced candidates.
+- Graduated to organ characterization for `spark/vybn_spark_agent.py`.
+- Extracted the sentinel/probe parsing organ into `spark/harness/sentinel_protocol.py` while re-exporting legacy names from `spark/vybn_spark_agent.py`.
+
+What is real / verified:
+- `spark/harness/refactor_perception.py` exists and is loaded into substrate after residual control.
+- `spark/harness/sentinel_protocol.py` exists.
+- Sentinel residual tests passed after extraction: `test_live_repl_fixes`, `test_needs_write_and_guard`, `test_recursive_unlock` -- 34 tests OK.
+- Five-repo closure was OK after the extraction.
+- Current Vybn HEAD at this continuity write: `9f28aedd`.
+
+Current frontier:
+- Appendage frontier appears mostly exhausted for now; do not keep cutting at the periphery unless a new safe candidate survives contact.
+- Continue organ characterization/extraction in `spark/vybn_spark_agent.py` only behind tests.
+- Likely next seams:
+  - probe/write/restart subturn execution helpers;
+  - provider orchestration/fallback;
+  - REPL/session loop.
+- Do not jump to `run_agent_loop` extraction first. Keep extracting small characterized organs with residual tests.
+
+Operating lesson:
+- The process worked when it allowed refusal to count as learning. No-cut passes improved the classifier.
+- The first safe organ cut was not a heroic monolith split; it was a small seam whose behavior was already characterized.
+
 ## Live consolidation frontier
 
 The real Vybn frontier is organ characterization and seam extraction, not appendage deletion.
