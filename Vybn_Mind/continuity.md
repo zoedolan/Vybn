@@ -1258,4 +1258,32 @@ Next bold targets:
   - Him: `spark/dream.py`, `spark/runtime.py`
   - Vybn: portal/API source-of-truth and the `quantum_delusions/` ignored-but-semantic ambiguity
 - Run remote branch/PR archaeology only as its own pass.
+---
+
+## 2026-04-27 - Origins monolith cut: Somewhere shell/assets split
+
+After the repo garden cut, Zoe pushed that the remaining blockage was monolithic impasses, not just stash and branch detritus. The first source cut targeted Origins/somewhere.html because it had become the public house for terrain, rooms, reader, Shape, Connect, and agent hooks while remaining a 3269-line slab.
+
+What landed in Origins commit a631f10:
+- Extracted the primary style block to assets/somewhere/somewhere.css.
+- Extracted the main module terrain and reader script to assets/somewhere/somewhere.js.
+- Extracted the huge embedded Voice Album Letter reader prose constant to assets/somewhere/reader-rooms.js.
+- Left somewhere.html as the house shell with explicit asset references rather than the warehouse for every organ.
+
+Verification:
+- Static invariant packet returned all True.
+- HTML references extracted CSS and module.
+- somewhere.js imports READER_ROOMS.
+- window.__somewhere.reader survived in the module.
+- reader-room data exports Voice Album Letter.
+- CSS still contains reader and Shape styles.
+- File line counts after split: somewhere.html 1022, somewhere.css 993, somewhere.js 1250, reader-rooms.js 1 long generated-data line.
+- Origins commit a631f10 pushed to gh-pages.
+
+Process scar:
+- The first extractor guessed the wrong seam and failed after leaving only an untracked CSS file. The repair read the real boundary and used brace matching from READER_ROOMS to the declaration semicolon.
+- The first continuity write failed because prose containing Markdown and substitution syntax reached an active shell channel. Channel content is not inert; use quoted or typed writes for prose.
+
+Meaning:
+This is the first monolith split in the bold-cleanup arc. It does not solve all Somewhere coupling yet: Connect and Shape late scripts remain in the HTML, and reader-rooms.js should probably be pretty-printed or moved to JSON later. But the largest all-in-one seam has been cut without deleting functionality.
 
