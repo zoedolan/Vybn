@@ -87,6 +87,14 @@ class RefactorPerceptionTests(unittest.TestCase):
         self.assertEqual(pkt["selfHealingPlan"]["proposed_change"], "remove static preview artifact")
         self.assertIn("changeSelfHealingSteps", pkt)
 
+    def test_vybn_phase_state_is_private_memory_state_not_orphan_appendage(self):
+        pkt = perceive_file("vybn-phase/state/history.jsonl", lines=1000, bytes_size=68061, public=False)
+        self.assertEqual(pkt.ownership, "deep_memory_state")
+        self.assertEqual(pkt.action_posture, "private walk/deep-memory state; preserve or rotate only with explicit lifecycle plan")
+        self.assertIn("rotate_with_manifest", pkt.candidate_actions)
+        self.assertIn("ownership_context_check", pkt.residuals)
+
+
     def test_protocol_renders_algorithm(self):
         text = render_refactor_perception_protocol()
         self.assertIn("Consolidation order", text)

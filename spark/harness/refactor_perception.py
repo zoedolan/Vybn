@@ -150,6 +150,7 @@ ROLE_HINTS: list[tuple[str, str]] = [
 
 OWNERSHIP_RULES: list[tuple[str, str, str]] = [
     ("repo_mapping_output/", "generated_exhaust", "externalize_or_regenerate; do not hand-edit as source"),
+    ("vybn-phase/state/", "deep_memory_state", "private walk/deep-memory state; preserve or rotate only with explicit lifecycle plan"),
     ("agent_events.jsonl", "runtime_log", "externalize_or_rotate; preserve only if explicitly serving continuity"),
     ("logs/", "runtime_log", "keep out of source unless distilled"),
     ("_archive/", "archive_provenance", "preserve_or_manifest; do not delete from pressure alone"),
@@ -167,6 +168,7 @@ OWNERSHIP_RULES: list[tuple[str, str, str]] = [
 ACTION_POSTURE_BY_OWNERSHIP = {
     "generated_exhaust": "externalize_or_regenerate",
     "runtime_log": "externalize_rotate_or_ignore",
+    "deep_memory_state": "preserve_or_rotate_with_explicit_lifecycle_plan",
     "archive_provenance": "preserve_manifest_or_contextualize",
     "personal_history_provenance": "protect_and_map_before_touching",
     "creature_fossil": "protect_and_preserve_provenance",
@@ -403,6 +405,8 @@ def perceive_file(path: str, *, lines: int | None = None, bytes_size: int | None
         candidate_actions = ["characterize", "tighten_protocol", "external_verify", "keep_backward_compatibility"]
     elif ownership == "runtime_log":
         candidate_actions = ["rotate", "externalize_from_source", "distill_to_continuity", "gitignore_if_runtime"]
+    elif ownership == "deep_memory_state":
+        candidate_actions = ["keep", "rotate_with_manifest", "externalize_only_with_lifecycle_plan", "distill_only_if_replacing_source"]
     else:
         candidate_actions = [
             "keep",
