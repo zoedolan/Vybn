@@ -67,6 +67,28 @@ class TestAbsorbGate(unittest.TestCase):
             self.assertIn("absorb_gate", result)
 
 
+class TestRepoClosureAuditProjectionState(unittest.TestCase):
+    def test_fetch_refspec_complete_only_for_all_branch_projection(self):
+        from harness import repo_closure_audit as audit
+
+        self.assertTrue(
+            audit.fetch_refspec_is_complete([audit.EXPECTED_FETCH_REFSPEC])
+        )
+        self.assertFalse(
+            audit.fetch_refspec_is_complete([
+                "+refs/heads/main:refs/remotes/origin/main"
+            ])
+        )
+
+    def test_expected_fetch_refspec_is_all_heads_to_origin_remotes(self):
+        from harness import repo_closure_audit as audit
+
+        self.assertEqual(
+            audit.EXPECTED_FETCH_REFSPEC,
+            "+refs/heads/*:refs/remotes/origin/*",
+        )
+
+
 class TestValidateCommand(unittest.TestCase):
     def test_blocks_dangerous(self):
         ok, reason = validate_command("rm -rf /")

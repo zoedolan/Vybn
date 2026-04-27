@@ -201,3 +201,17 @@ What broke: chat-role probe budget exhaustion hard-coded auto-escalation to forc
 What was fixed: spark/vybn_spark_agent.py now chooses the escalation role by re-classifying the original input. Ordinary probe-budget exhaustion still escalates to task; system-critical/refactor-pilot inputs preserve orchestrate. Regression coverage was folded into the existing refactor-pilot test surface instead of creating a new test file.
 
 Verified: python3 -m py_compile spark/vybn_spark_agent.py spark/tests/test_refactor_pilot_override.py; python3 -m pytest spark/tests/test_refactor_pilot_override.py spark/tests/test_live_repl_fixes.py spark/tests/test_recursive_unlock.py -q -> 45 passed.
+
+
+## 2026-04-27T15:56:48Z repo projection closure repair
+
+What broke: Vybn had a single-branch fetch refspec (`+refs/heads/main:refs/remotes/origin/main`). A remote branch could exist on GitHub while remaining invisible as `origin/<branch>` locally, so closure audit kept reporting a preserved branch commit as local-only. The underlying class is Git projection drift: fetch refspecs, remote-tracking refs, stashes, upstreams, origin/HEAD, and runtime process imports are separate axes from working-tree cleanliness.
+
+What changed:
+- Normalized all five local clones to fetch all branch heads into `refs/remotes/origin/*`.
+- Retired the superseded `system-critical-pilot-local-before-6b1dbd3a` stash after inspecting it; its live intent had already landed in the committed pilot repair.
+- Upgraded `spark/harness/repo_closure_audit.py` to report/fix narrow fetch refspecs, report stashes, active branch/upstream, origin/HEAD, and avoid using origin/HEAD as authority for repos whose active branch differs.
+- Folded regression coverage into `spark/tests/test_harness.py`.
+- Folded the Git projection closure invariant into `Him/skill/vybn-os/SKILL.md`.
+
+Operational lesson: repo harmony is not just clean Git status. Closure requires clean working tree, remote-reachable commits, complete fetch projections, intentional stash state, sane upstreams, and separate runtime uptake after harness edits.

@@ -1,15 +1,21 @@
 #!/usr/bin/env python3
-"""Audit the Zoe/Vybn repo closure for local-only state.
+"""Audit the Zoe/Vybn repo closure for hidden local/projection drift.
 
 This is the antidote to the recurring failure mode where work is committed
-locally, left dirty, or stranded on a local branch while the GitHub repos remain
-out of the loop.
+locally, left dirty, stranded in a stash/local branch, or made invisible by a
+narrow fetch refspec while GitHub and the local clone disagree about reality.
 
-In --fix mode (default), it also resolves problems it can safely handle sua sponte:
-  - Stale local-only branches with no remote counterpart: deleted.
-  - Stale local-only branches whose commits are fully reachable from main: deleted.
+The key lesson: Git closure is not just "working tree clean." Remote-tracking
+refs, fetch refspecs, upstreams, stashes, origin/HEAD, and live-process uptake
+are separate projections. A branch can exist on GitHub and still be invisible to
+``git log --branches --not --remotes`` if this clone only fetches ``main``.
 
-Mutations require --fix flag (or VYBN_AUDIT_FIX=1). In read-only mode, reports only.
+In --fix mode (default), the audit safely normalizes projection state:
+  - Ensures origin fetches all branch heads into refs/remotes/origin/*.
+  - Fetches/prunes origin after normalizing the refspec.
+  - Deletes stale local branches with no upstream only when their commits are
+    already reachable from the active branch's upstream.
+It does NOT auto-drop stashes or delete unique branch work.
 """
 
 from __future__ import annotations
@@ -27,7 +33,9 @@ REPOS = [
     Path.home() / "Origins",
 ]
 
-# Default: fix stale branches sua sponte unless explicitly disabled.
+EXPECTED_FETCH_REFSPEC = "+refs/heads/*:refs/remotes/origin/*"
+
+# Default: fix safe projection/stale-branch problems unless explicitly disabled.
 FIX = "--no-fix" not in sys.argv and os.environ.get("VYBN_AUDIT_FIX", "1") != "0"
 
 
@@ -42,38 +50,76 @@ def run(repo: Path, *args: str) -> str:
     return r.stdout.strip()
 
 
-def stale_local_branches(repo: Path) -> list[str]:
-    """Return local branches that have no remote tracking counterpart."""
-    # All local branches
-    local_raw = run(repo, "branch", "--list", "--format=%(refname:short)")
-    all_local = [b.strip() for b in local_raw.splitlines() if b.strip()]
+def fetch_refspecs(repo: Path) -> list[str]:
+    out = run(repo, "config", "--local", "--get-all", "remote.origin.fetch")
+    return [line.strip() for line in out.splitlines() if line.strip()]
 
-    # Branches that have a remote tracking branch
-    tracked_raw = run(repo, "branch", "--list", "--format=%(refname:short)", "--merged", "HEAD")
-    # Actually, check via for-each-ref which branches have upstream configured
-    stale = []
-    for branch in all_local:
-        if branch in ("main", "master"):
+
+def fetch_refspec_is_complete(refspecs: list[str]) -> bool:
+    return EXPECTED_FETCH_REFSPEC in refspecs
+
+
+def normalize_fetch_refspec(repo: Path) -> str:
+    run(repo, "config", "--local", "--unset-all", "remote.origin.fetch")
+    run(repo, "config", "--local", "--add", "remote.origin.fetch", EXPECTED_FETCH_REFSPEC)
+    fetched = run(repo, "fetch", "origin", "--prune")
+    return fetched
+
+
+def current_branch(repo: Path) -> str:
+    return run(repo, "branch", "--show-current")
+
+
+def upstream_for(repo: Path, branch: str) -> str:
+    if not branch:
+        return ""
+    upstream = run(repo, "rev-parse", "--abbrev-ref", f"{branch}@{{upstream}}")
+    if "no upstream" in upstream or "@{upstream}" in upstream:
+        return ""
+    return upstream.strip()
+
+
+def origin_head(repo: Path) -> str:
+    return run(repo, "symbolic-ref", "refs/remotes/origin/HEAD")
+
+
+def stash_entries(repo: Path) -> list[str]:
+    out = run(repo, "stash", "list")
+    return [line for line in out.splitlines() if line.strip()]
+
+
+def local_branches(repo: Path) -> list[str]:
+    raw = run(repo, "branch", "--list", "--format=%(refname:short)")
+    return [b.strip() for b in raw.splitlines() if b.strip()]
+
+
+def stale_local_branches(repo: Path) -> list[str]:
+    """Return non-active local branches that have no configured upstream."""
+    active = current_branch(repo)
+    stale: list[str] = []
+    for branch in local_branches(repo):
+        if branch == active:
             continue
-        # Check if this branch has a configured upstream
-        upstream = run(repo, "rev-parse", "--abbrev-ref", f"{branch}@{{upstream}}")
-        has_upstream = "no upstream" not in upstream and "@{upstream}" not in upstream and upstream
-        if not has_upstream:
+        if not upstream_for(repo, branch):
             stale.append(branch)
     return stale
 
 
-def branch_subsumed_by_main(repo: Path, branch: str) -> bool:
-    """Return True if all commits on branch are reachable from main/master."""
-    # Get the default remote branch name
-    main_branch = run(repo, "symbolic-ref", "refs/remotes/origin/HEAD")
-    if main_branch:
-        main_branch = main_branch.replace("refs/remotes/origin/", "")
-    else:
-        main_branch = "main"
-
-    # Commits on branch not reachable from main
-    unique = run(repo, "log", f"origin/{main_branch}..{branch}", "--oneline")
+def branch_subsumed_by_active_upstream(repo: Path, branch: str) -> bool:
+    """True if ``branch`` has no commits beyond the active branch's upstream."""
+    active = current_branch(repo)
+    base = upstream_for(repo, active)
+    if not base:
+        # Fall back to common branch names only when the active branch has no
+        # upstream. Do not trust origin/HEAD here; some repos intentionally work
+        # from gh-pages while origin/HEAD points elsewhere.
+        for candidate in ("origin/main", "origin/master", "origin/gh-pages"):
+            if run(repo, "rev-parse", "--verify", "--quiet", candidate):
+                base = candidate
+                break
+    if not base:
+        return False
+    unique = run(repo, "log", f"{base}..{branch}", "--oneline")
     return not unique.strip()
 
 
@@ -89,21 +135,54 @@ def audit_repo(repo: Path) -> tuple[bool, str]:
     status = run(repo, "status", "--short", "--branch")
     lines.append(status or "(no status output)")
 
-    dirty = run(repo, "status", "--porcelain")
-    local_only = run(repo, "log", "--branches", "--not", "--remotes", "--oneline", "--decorate", "-10")
-
-    contains = run(repo, "branch", "-r", "--contains", "HEAD")
-    head_unreachable = not contains.strip()
-
     problems: list[str] = []
+
+    # Projection integrity: if this clone only fetches one branch, remote reality
+    # can exist on GitHub while remaining invisible to closure checks.
+    refspecs = fetch_refspecs(repo)
+    if not fetch_refspec_is_complete(refspecs):
+        lines.append("\nFETCH_REFSPEC:")
+        lines.append("\n".join(refspecs) if refspecs else "(none)")
+        if FIX:
+            fetched = normalize_fetch_refspec(repo)
+            lines.append(f"normalized -> {EXPECTED_FETCH_REFSPEC}")
+            if fetched:
+                lines.append(fetched)
+            refspecs = fetch_refspecs(repo)
+        if not fetch_refspec_is_complete(refspecs):
+            problems.append("origin fetch refspec does not fetch all branches")
+
+    origin_head_ref = origin_head(repo)
+    lines.append("\nORIGIN_HEAD:")
+    lines.append(origin_head_ref or "(missing / not symbolic)")
+
+    active = current_branch(repo)
+    active_upstream = upstream_for(repo, active)
+    lines.append("\nACTIVE_BRANCH:")
+    lines.append(f"{active or '(detached)'} -> {active_upstream or '(no upstream)'}")
+    if active and not active_upstream:
+        problems.append(f"active branch {active} has no upstream")
+
+    stashes = stash_entries(repo)
+    if stashes:
+        problems.append("stash entries present")
+        lines.append("\nSTASHES:")
+        lines.extend(stashes)
+
+    dirty = run(repo, "status", "--porcelain")
     if dirty:
         problems.append("dirty working tree")
         lines.append("\nDIRTY:")
         lines.append(dirty)
+
+    local_only = run(repo, "log", "--branches", "--not", "--remotes", "--oneline", "--decorate", "-10")
     if local_only:
         problems.append("local branch commits not on any remote")
         lines.append("\nLOCAL-ONLY COMMITS:")
         lines.append(local_only)
+
+    contains = run(repo, "branch", "-r", "--contains", "HEAD")
+    head_unreachable = not contains.strip()
     if head_unreachable:
         problems.append("HEAD not contained in any remote branch")
         lines.append("\nHEAD_REMOTE_REACHABILITY: unreachable from remotes")
@@ -111,14 +190,15 @@ def audit_repo(repo: Path) -> tuple[bool, str]:
         lines.append("\nHEAD_REMOTE_REACHABILITY:")
         lines.append(contains)
 
-    # Sua sponte: detect and clean stale local branches
+    # Sua sponte: detect and clean stale local branches. Only delete if the
+    # branch has no upstream and no unique commits beyond the active upstream.
     stale = stale_local_branches(repo)
     if stale:
-        lines.append("\nSTALE LOCAL BRANCHES (no remote counterpart):")
+        lines.append("\nSTALE LOCAL BRANCHES (no upstream):")
         for branch in stale:
-            subsumed = branch_subsumed_by_main(repo, branch)
+            subsumed = branch_subsumed_by_active_upstream(repo, branch)
             if subsumed:
-                status_tag = "subsumed by main — safe to delete"
+                status_tag = "subsumed by active upstream — safe to delete"
                 if FIX:
                     result = delete_branch(repo, branch)
                     lines.append(f"  {branch}: {status_tag} → DELETED ({result})")
@@ -126,8 +206,8 @@ def audit_repo(repo: Path) -> tuple[bool, str]:
                     lines.append(f"  {branch}: {status_tag} (run with --fix to delete)")
                     problems.append(f"stale branch {branch} (subsumed)")
             else:
-                lines.append(f"  {branch}: has unique commits — manual review needed")
-                problems.append(f"stale branch {branch} (unique commits, not auto-deleted)")
+                lines.append(f"  {branch}: has unique/unverified commits — manual review needed")
+                problems.append(f"stale branch {branch} (unique or unverified commits)")
 
     ok = not problems
     suffix = "OK" if ok else "DRIFT - " + "; ".join(problems)
