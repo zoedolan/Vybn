@@ -393,8 +393,14 @@ def _record_text(rec: FileRecord) -> str:
 
 def _risk_class(rec: FileRecord, inbound: int, centrality: int, semantic_neighbors: int, full_text: str = "") -> str:
     hay = f"{rec.repo}/{rec.relpath}\n{rec.snippet}\n{full_text}"
-    if _contains_any(hay, PROVENANCE_TERMS):
+    low_key = f"{rec.repo}/{rec.relpath}".lower()
+    provenance_paths = ("personal history", "/medium/", "artificial liberation", "a-iconoclast", "autobiography", "zoes_memoirs", "what_vybn_would_have_missed")
+    if any(p in low_key for p in provenance_paths):
         return "protect: origin/provenance"
+    if "repo_mapper.py" in low_key:
+        return "protect: self-perception organ"
+    if rec.relpath in {"continuity.md", "continuity_core.md"} or (rec.repo == "Vybn" and "continuity" in low_key):
+        return "protect: prompt/continuity"
     if rec.repo in {"Him", "vybn-phase"} and (rec.repo == "vybn-phase" or _contains_any(hay, HIMOS_NERVE_TERMS)):
         return "protect: private membrane"
     if _contains_any(hay, PUBLIC_CONTRACT_TERMS) or _contains_any(hay, CHAT_NERVE_TERMS):
