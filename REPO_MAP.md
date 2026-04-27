@@ -338,7 +338,7 @@ Public/interface files are not ordinary cleanup targets. They require contract-a
 
 ## ABC pressure map
 
-Pressure does not mean delete. It means inspect first when seeking lightness. Classification must be grounded before action.
+Pressure does not mean disposal. It means inspect first when seeking lightness. Classification must be grounded before action.
 
 | Class | Examples | Default action | Verification |
 |---|---|---|---|
@@ -406,7 +406,7 @@ When choosing the next ABC move, prefer a net-negative routing decision that cla
 
 1. Pick one high-pressure surface from this map.
 2. Read enough to classify it: source, public contract, private substrate, generated sediment, archive, or origin relic.
-3. Cut, fold, compress, or preserve with a clearer label.
+3. Route, fold, compress, preserve, or dispose only with a clearer label and verification path.
 4. Verify on the correct axis: tests for code, public URL/DOM for public pages, local closure for private repos, restore path for archives.
 5. Commit the changed environment.
 6. If the routing decision reveals a recurring accumulation pattern, patch the existing gate or map; do not create a parallel maintenance bureaucracy.
