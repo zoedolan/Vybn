@@ -47,6 +47,7 @@ import ast
 import datetime
 import hashlib
 import json
+import math
 import os
 import re
 import subprocess
@@ -309,10 +310,183 @@ def build_full_digest(repos: List[Path], all_records: List[FileRecord]) -> str:
     for rec in sorted(all_records, key=lambda r: -r.size)[:20]:
         a(f"  {rec.size:>10,}  {rec.repo}/{rec.relpath}")
     a("")
+    a(build_semantic_anatomy(all_records))
+    a("")
     a("## All snippets")
     for rec in sorted(all_records, key=lambda r: (0 if r.ext==".md" else 1 if r.ext==".py" else 2, -r.size)):
         if rec.snippet:
             a(f"\n### {rec.repo}/{rec.relpath}\n{rec.snippet}\n")
+    return "\n".join(lines)
+
+
+# ── semantic-operational anatomy ──────────────────────────────────────────────
+
+PUBLIC_ROUTE_RE = re.compile(r"@(?:app|router|self\.app)\.(get|post|put|delete|websocket)\(\s*['\"]([^'\"]+)['\"]")
+PUBLIC_LINK_RE = re.compile(r"(?:src|href)=['\"]([^'\"]+)['\"]")
+CHAT_NERVE_TERMS = (
+    "/api/chat", "/api/instant", "/api/walk", "/api/arrive",
+    "/api/manifold/points", "text/event-stream", "chat/completions",
+    "CONTEXT_OVERLAYS", "VLLM", "vllm", "EventSource",
+)
+MIND_NERVE_TERMS = (
+    "build_layered_prompt", "continuity", "BeamKeeper", "router_policy",
+    "NEEDS-EXEC", "NEEDS-RESTART", "probe_envelope", "recall", "substrate",
+)
+HIMOS_NERVE_TERMS = (
+    "runtime_snapshot", "render_runtime_context", "PROCESS_TABLE",
+    "frictionmaxx", "him_os", "HimOS", "membrane", "seti", "dream",
+)
+PROVENANCE_TERMS = (
+    "Personal History", "Medium", "Artificial Liberation", "autobiography",
+    "zoes_memoirs", "what_vybn_would_have_missed", "origin relic",
+)
+SEDIMENT_TERMS = (
+    "sensorium_state", "synaptic_map", "microgpt_mirror", "repo_mapping_output",
+    "__pycache__", ".pytest_cache", "trained_checkpoint", "latest.json",
+)
+ARCHIVE_TERMS = ("_archive", "continuity_archive", "repo_archives", "archive/")
+PUBLIC_CONTRACT_TERMS = (
+    "llms.txt", "humans.txt", "robots.txt", "ai.txt", "semantic-web",
+    "somewhere.html", "talk.html", "connect.html", "read.html", "wellspring.html",
+    "chat.html", "vybn.html", "mcp.json",
+)
+
+
+def _vec(rec: FileRecord) -> Counter:
+    return Counter(rec.top_words)
+
+
+def _cosine(a: Counter, b: Counter) -> float:
+    if not a or not b:
+        return 0.0
+    dot = sum(v * b.get(k, 0) for k, v in a.items())
+    na = math.sqrt(sum(v * v for v in a.values()))
+    nb = math.sqrt(sum(v * v for v in b.values()))
+    return float(dot / (na * nb)) if na and nb else 0.0
+
+
+def _contains_any(hay: str, terms: tuple) -> bool:
+    low = hay.lower()
+    return any(t.lower() in low for t in terms)
+
+
+def _risk_class(rec: FileRecord, inbound: int, centrality: int, semantic_neighbors: int) -> str:
+    hay = f"{rec.repo}/{rec.relpath}\n{rec.snippet}"
+    if _contains_any(hay, PROVENANCE_TERMS):
+        return "protect: origin/provenance"
+    if rec.repo in {"Him", "vybn-phase"} and (rec.repo == "vybn-phase" or _contains_any(hay, HIMOS_NERVE_TERMS)):
+        return "protect: private membrane"
+    if _contains_any(hay, PUBLIC_CONTRACT_TERMS) or _contains_any(hay, CHAT_NERVE_TERMS):
+        return "protect: public/interface nerve"
+    if inbound > 0 or centrality >= 4:
+        return "protect/refactor: connected code"
+    if _contains_any(hay, SEDIMENT_TERMS):
+        return "investigate: generated sediment"
+    if _contains_any(hay, ARCHIVE_TERMS):
+        return "investigate: archive/restore path"
+    if rec.size > 80000 and semantic_neighbors >= 3:
+        return "inspect: large semantically covered"
+    if rec.size > 80000:
+        return "inspect: large unique"
+    return "ordinary"
+
+
+def build_semantic_anatomy(all_records: List[FileRecord]) -> str:
+    """Build a grounded, ML-lite anatomy layer.
+
+    This is intentionally local and deterministic: lexical vectors stand in for
+    embeddings until a local embedding pass is added. The point is the coupled
+    method: deductive guardrails + inductive topology + abductive ABC hints.
+    """
+    by_key = {f"{r.repo}/{r.relpath}": r for r in all_records}
+    edges: List[tuple] = []
+    route_rows: List[str] = []
+    link_rows: List[str] = []
+
+    for rec in all_records:
+        key = f"{rec.repo}/{rec.relpath}"
+        txt = rec.snippet or ""
+        # Snippet-only scan is conservative; full route/link extraction belongs
+        # in a later typed reader. Still catches many public contracts cheaply.
+        if rec.ext == ".py":
+            for method, route in PUBLIC_ROUTE_RE.findall(txt):
+                route_rows.append(f"  - {key}: {method.upper()} {route}")
+                edges.append((key, f"route:{route}", "defines_route"))
+        if rec.ext in {".html", ".js", ".md"}:
+            for link in PUBLIC_LINK_RE.findall(txt)[:20]:
+                if link.startswith(("http", "/", "./", "../")) or ".html" in link or ".js" in link or ".css" in link:
+                    link_rows.append(f"  - {key} -> {link}")
+                    edges.append((key, link, "links"))
+        for imp in rec.py_imports:
+            edges.append((key, f"import:{imp}", "imports"))
+
+    inbound: Counter = Counter()
+    outbound: Counter = Counter()
+    for src, dst, kind in edges:
+        outbound[src] += 1
+        inbound[dst] += 1
+
+    # Lexical semantic neighborhoods.
+    vecs = {f"{r.repo}/{r.relpath}": _vec(r) for r in all_records if r.top_words}
+    pairs: List[tuple] = []
+    keys = list(vecs)
+    for i, a in enumerate(keys):
+        for b in keys[i+1:]:
+            sim = _cosine(vecs[a], vecs[b])
+            if sim >= 0.55:
+                pairs.append((sim, a, b))
+    pairs.sort(reverse=True)
+    neighbor_count: Counter = Counter()
+    for sim, a, b in pairs:
+        neighbor_count[a] += 1
+        neighbor_count[b] += 1
+
+    classified = []
+    for rec in all_records:
+        key = f"{rec.repo}/{rec.relpath}"
+        centrality = outbound[key]
+        rclass = _risk_class(rec, inbound[key], centrality, neighbor_count[key])
+        classified.append((rclass, rec.size, key, inbound[key], centrality, neighbor_count[key]))
+
+    lines: List[str] = []
+    a = lines.append
+    a("## Semantic-operational anatomy")
+    a("")
+    a("Method: deductive guardrails + inductive lexical topology + abductive ABC hypotheses + verification before cuts. This is ML-lite for now: per-file lexical vectors, route/link/import edges, and risk classes. A later pass can replace lexical vectors with local embeddings without changing the map contract.")
+    a("")
+    a("### High-centrality / nerve candidates")
+    for rclass, sz, key, inn, out, neigh in sorted(classified, key=lambda x: (-(x[3]+x[4]+x[5]), -x[1]))[:30]:
+        a(f"  - {key} — {rclass}; inbound={inn}, outbound={out}, semantic_neighbors={neigh}, size={sz}")
+    a("")
+    a("### Strong semantic overlaps")
+    if pairs:
+        for sim, x, y in pairs[:40]:
+            a(f"  - {sim:.2f}: {x} ↔ {y}")
+    else:
+        a("  none above threshold")
+    a("")
+    a("### ABC pressure hypotheses")
+    for wanted in [
+        "investigate: generated sediment",
+        "investigate: archive/restore path",
+        "inspect: large semantically covered",
+        "inspect: large unique",
+    ]:
+        rows = [row for row in classified if row[0] == wanted]
+        if not rows:
+            continue
+        a(f"#### {wanted}")
+        for rclass, sz, key, inn, out, neigh in sorted(rows, key=lambda x: -x[1])[:25]:
+            a(f"  - {key} — inbound={inn}, outbound={out}, semantic_neighbors={neigh}, size={sz}")
+        a("")
+    a("### Public/API route and link edges sampled")
+    if route_rows:
+        a("Routes:")
+        a("\n".join(route_rows[:80]))
+    if link_rows:
+        a("Links/assets:")
+        a("\n".join(link_rows[:80]))
+    a("")
     return "\n".join(lines)
 
 
