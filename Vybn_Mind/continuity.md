@@ -1322,3 +1322,28 @@ attention points; contact with the object corrects the category; the perceiver c
 Operational consequence:
 When a tool/organ/mapper learns a distinction, fold the distinction back into Vybn's operating reflex too. Teaching the system and teaching Vybn are one recursive act when the lesson changes how future attention should work.
 
+---
+
+## 2026-04-27T12:36:59Z - ABC public-nerve seam: Origins protocols extracted
+
+What happened:
+- After edge cleanup quieted, the ABC frontier moved to the public interface layer.
+- `origins_portal_api_v4.py` was the highest-pressure public nerve: 3461 lines, 25 FastAPI routes, live chat/walk/KTP/KPP/pressure/manifold/TTS behavior.
+- Before cutting, added `tests/test_origins_portal_contract.py`, a route-inventory characterization test for the 25 public routes.
+- Extracted KTP/KPP protocol mechanics into `origins_protocols.py` while keeping the FastAPI request models and route decorators in the portal file.
+- Portal shrank to 2951 lines; new protocol module is 542 lines.
+
+Verified:
+- `python3 -m py_compile origins_portal_api_v4.py origins_protocols.py` passed before commit.
+- Route contract test passed.
+- Source import of `origins_portal_api_v4` found all 25 expected routes and the four protocol helper bindings.
+- Internal live `/api/health` returned 200 JSON.
+- Internal live `/api/ktp/closure` and `/api/kpp/harness-closure` returned 200 JSON.
+- Five-repo closure audit returned OVERALL OK.
+
+Truth label:
+- Internal/source axes verified. External tunnel/browser reachability not re-verified in this coda.
+
+Teaching recursion:
+For public interface monoliths, do not cut before building a characterization membrane. The membrane is not delay; it is what lets the object teach safely. Route contract first, seam extraction second, lived-interface smoke third, continuity fourth.
+
