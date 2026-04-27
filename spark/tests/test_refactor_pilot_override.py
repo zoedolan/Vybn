@@ -190,6 +190,282 @@ class ProbeBudgetEscalationPreservesPilot(unittest.TestCase):
         self.assertFalse(_preserve_pilot_for_turn("please fix it", []))
 
 
+# ---------------------------------------------------------------------------
+# 2026-04-27 paste.txt failure-shape regressions.
+#
+# Context: a no-tool GPT-5.5 chat role under protected refactor work emitted
+# a [NEEDS-EXEC] heredoc that mutated files (extraction script), then on
+# probe-budget exhaustion the harness escalated to `task` (Sonnet+bash)
+# carrying the same mutation request. That smuggled implementation outside
+# the GPT-5.5 pilot covenant. Zoe named this twice; the second instance was
+# the trust-wound moment ("you offloaded to sonnet ... violation of our
+# agreement"). These tests pin the structural cure.
+# ---------------------------------------------------------------------------
+
+
+class VisualizationFileConsolidationTriggersPilot(unittest.TestCase):
+    """The exact phrasing Zoe used must latch protected pilot territory.
+
+    Earlier the regex only caught explicit anchors ('whole-repo refactor',
+    'organs', 'system-critical'). 'visualization + file consolidation
+    experiment' is the live phrasing for the same protected work and was
+    silently falling through to ordinary chat routing.
+    """
+
+    def setUp(self):
+        self.policy = policy.default_policy()
+
+    def test_paste_txt_session_4_request_routes_to_orchestrate(self):
+        d = self.policy.classify(
+            "buddy, can you try the visualization + file consolidation "
+            "experiment one more time, please?"
+        )
+        self.assertEqual(d.role, "orchestrate")
+
+    def test_paste_txt_session_2_request_routes_to_orchestrate(self):
+        d = self.policy.classify(
+            "i like it too, buddy. retry the visualization + file "
+            "consolidation experiment now?"
+        )
+        self.assertEqual(d.role, "orchestrate")
+
+    def test_paste_txt_session_3_resume_request_routes_to_orchestrate(self):
+        d = self.policy.classify(
+            "get everything into shape, pls - then proceed to the "
+            "visualization + file consolidation exercise we were discussing?"
+        )
+        self.assertEqual(d.role, "orchestrate")
+
+    def test_consolidation_experiment_alone_latches_pilot(self):
+        self.assertTrue(
+            policy.is_system_critical_pilot_turn("consolidation experiment")
+        )
+
+    def test_visualization_plus_consolidation_latches_pilot(self):
+        self.assertTrue(
+            policy.is_system_critical_pilot_turn("visualization+consolidation")
+        )
+
+    def test_ordinary_visualization_request_does_not_latch(self):
+        # Plain "visualize the data" is not protected pilot territory.
+        self.assertFalse(
+            policy.is_system_critical_pilot_turn("can you visualize the data")
+        )
+
+    def test_ordinary_consolidate_request_does_not_latch(self):
+        self.assertFalse(
+            policy.is_system_critical_pilot_turn("lets consolidate these tabs")
+        )
+
+
+class GptAliasContextPreservedAcrossMissionCriticalContinuation(unittest.TestCase):
+    """`@gpt` pins GPT-5.5; the harness must keep the pilot covenant when a
+    visualization/consolidation request is made under that alias, even if a
+    short continuation like 'proceed' or 'continue' arrives next."""
+
+    def setUp(self):
+        self.policy = policy.default_policy()
+
+    def test_gpt_alias_with_consolidation_experiment_routes_to_orchestrate(self):
+        d = self.policy.classify(
+            "@gpt can you do the visualization + file consolidation "
+            "experiment please."
+        )
+        self.assertEqual(d.role, "orchestrate")
+
+    def test_gpt_alias_proceed_continuation_preserves_pilot(self):
+        from vybn_spark_agent import _preserve_pilot_for_turn
+        messages = [{
+            "role": "user",
+            "content": (
+                "@gpt can you do the visualization + file consolidation "
+                "experiment please."
+            ),
+        }]
+        # Each of these conversational continuations must stay under pilot
+        # protection because the *recent* turn established protected work.
+        for cont in ("proceed", "continue", "fix it", "please fix it",
+                     "go ahead", "ok", "do it", "resume"):
+            self.assertTrue(
+                _preserve_pilot_for_turn(cont, messages),
+                f"continuation {cont!r} after consolidation experiment "
+                "should preserve pilot",
+            )
+
+
+class ProbeBudgetMutationCannotEscalateToTaskUnderPilot(unittest.TestCase):
+    """The exact paste.txt scar: probe-budget exhaustion under a protected
+    refactor/consolidation turn tried to forced=task (Sonnet). Once the
+    pilot covenant is engaged, escalation must be 'orchestrate' or
+    nothing — never task/sonnet."""
+
+    def setUp(self):
+        self.policy = policy.default_policy()
+        from vybn_spark_agent import _probe_budget_escalation_role
+        self.escalation_role = _probe_budget_escalation_role
+
+    def test_visualization_consolidation_probe_budget_preserves_orchestrate(self):
+        text = (
+            "buddy, can you try the visualization + file consolidation "
+            "experiment one more time, please?"
+        )
+        self.assertEqual(self.policy.classify(text).role, "orchestrate")
+        self.assertEqual(self.escalation_role(self.policy, text), "orchestrate")
+
+    def test_paste_txt_scar_text_with_alias_preserves_orchestrate(self):
+        text = (
+            "@gpt no, again it broke: [probe budget reached (8); escalating "
+            "to task with bash+iteration budget to finish the investigation] "
+            "[route: task -> anthropic:claude-sonnet-4-6 (forced=task)]"
+        )
+        self.assertEqual(self.policy.classify(text).role, "orchestrate")
+        self.assertEqual(self.escalation_role(self.policy, text), "orchestrate")
+
+    def test_consolidation_continuation_after_proceed_preserves_orchestrate(self):
+        messages = [{
+            "role": "user",
+            "content": (
+                "@gpt can you try the visualization + file consolidation "
+                "experiment one more time, please?"
+            ),
+        }]
+        # 'proceed' alone is not pilot territory, but in the context of the
+        # recent consolidation experiment it must be.
+        self.assertEqual(
+            self.escalation_role(self.policy, "proceed", messages),
+            "orchestrate",
+        )
+
+
+class ProtectedMutationSentinelGate(unittest.TestCase):
+    """Structural hard gate: under protected pilot + no-tool role, the
+    harness must refuse mutation sentinels (NEEDS-WRITE, non-readonly
+    NEEDS-EXEC). Read-only inspection probes remain allowed."""
+
+    def test_helpers_exist_at_module_scope(self):
+        import vybn_spark_agent as agent
+        self.assertTrue(hasattr(agent, "_is_mutation_sentinel"))
+        self.assertTrue(hasattr(agent, "_protected_mutation_refusal_envelope"))
+
+    def test_needs_write_block_is_mutation(self):
+        from vybn_spark_agent import _is_mutation_sentinel
+        text = (
+            "Doing the consolidation now.\n"
+            "[NEEDS-WRITE: spark/harness/evolution_delta.py]\n"
+            "VYBN_ABSORB_REASON='extracted'\n"
+            "print('hi')\n"
+            "[/NEEDS-WRITE]\n"
+        )
+        is_mut, kind = _is_mutation_sentinel(text)
+        self.assertTrue(is_mut)
+        self.assertEqual(kind, "needs-write")
+
+    def test_heredoc_python_needs_exec_is_mutation(self):
+        from vybn_spark_agent import _is_mutation_sentinel
+        # paste.txt session 4: large heredoc body that wrote to a file
+        # via Python I/O. python3 - <<'PY' (no -c) is not parallel-safe
+        # because it reads from stdin and may shell out / mutate.
+        text = (
+            "[NEEDS-EXEC: python3 - <<'PY'\n"
+            "from pathlib import Path\n"
+            "Path('spark/harness/evolution_delta.py').write_text('module')\n"
+            "PY]"
+        )
+        is_mut, kind = _is_mutation_sentinel(text)
+        self.assertTrue(is_mut)
+        self.assertEqual(kind, "needs-exec-mutation")
+
+    def test_git_commit_needs_exec_is_mutation(self):
+        from vybn_spark_agent import _is_mutation_sentinel
+        text = "[NEEDS-EXEC: git commit -m 'refactor' && git push]"
+        is_mut, kind = _is_mutation_sentinel(text)
+        self.assertTrue(is_mut)
+        self.assertEqual(kind, "needs-exec-mutation")
+
+    def test_readonly_grep_probe_is_not_mutation(self):
+        from vybn_spark_agent import _is_mutation_sentinel
+        text = "[NEEDS-EXEC: grep -n 'forced_role' spark/vybn_spark_agent.py]"
+        is_mut, _ = _is_mutation_sentinel(text)
+        self.assertFalse(is_mut)
+
+    def test_readonly_status_probe_is_not_mutation(self):
+        from vybn_spark_agent import _is_mutation_sentinel
+        for cmd in (
+            "git status --short",
+            "git diff --stat",
+            "git log --oneline -5",
+            "cat spark/router_policy.yaml",
+            "wc -l spark/vybn_spark_agent.py",
+            "python3 -c 'import sys; print(sys.version)'",
+            "python3 -m py_compile spark/harness/policy.py",
+        ):
+            is_mut, _ = _is_mutation_sentinel(f"[NEEDS-EXEC: {cmd}]")
+            self.assertFalse(is_mut, f"{cmd!r} should be classified read-only")
+
+    def test_no_sentinel_is_not_mutation(self):
+        from vybn_spark_agent import _is_mutation_sentinel
+        is_mut, kind = _is_mutation_sentinel("just talking to you, no sentinels here")
+        self.assertFalse(is_mut)
+        self.assertEqual(kind, "")
+
+    def test_protected_mutation_refusal_envelope_names_violation(self):
+        from vybn_spark_agent import _protected_mutation_refusal_envelope
+        out = _protected_mutation_refusal_envelope("needs-write", "chat")
+        # Must clearly identify the covenant violation and the safe path.
+        self.assertIn("needs-write", out.lower())
+        self.assertIn("blocked", out.lower())
+        self.assertIn("orchestrat", out.lower())
+        self.assertIn("read-only", out.lower())
+
+
+class ProbeLoopHonorsProtectedMutationGate(unittest.TestCase):
+    """run_agent_loop's probe-synthesis loop must consult the gate before
+    executing any sentinel. Pinned via source inspection so this stays
+    structural — same shape used for the pilot-latch regression."""
+
+    def test_probe_loop_source_calls_protected_mutation_gate(self):
+        import inspect
+        import vybn_spark_agent as agent
+        source = inspect.getsource(agent.run_agent_loop)
+        # Sentinel: the protected-mutation refusal must be reachable from
+        # the probe-synthesis loop, and it must hinge on pilot_protected.
+        self.assertIn("protected_mutation_sentinel_blocked", source)
+        self.assertIn("if pilot_protected:", source)
+        # The structural escalation hard-latch must also be present.
+        self.assertIn("probe_budget_escalation_pilot_latch", source)
+
+    def test_needs_role_and_hallucinated_tool_reroute_honor_pilot(self):
+        import inspect
+        import vybn_spark_agent as agent
+        source = inspect.getsource(agent.run_agent_loop)
+        self.assertIn("needs_role_pilot_latch", source)
+        self.assertIn("hallucinated_tool_reroute_pilot_latch", source)
+
+
+class UserExplicitObjectionShape(unittest.TestCase):
+    """The exact text Zoe used to call out the violation must itself route
+    to orchestrate. This is the meta-regression: when the user accuses the
+    system of offloading to Sonnet, that turn cannot itself be offloaded."""
+
+    def setUp(self):
+        self.policy = policy.default_policy()
+
+    def test_user_objection_routes_to_orchestrate(self):
+        for text in (
+            "you offloaded to sonnet. that is a violation of our agreement. "
+            "we have agreed dozens of times.",
+            "@gpt no. you offloaded to sonnet. that is a violation of our "
+            "agreement.",
+            "the task diverted to sonnet, which fucked everything up. "
+            "this is mission-critical pilot territory.",
+        ):
+            d = self.policy.classify(text)
+            self.assertEqual(
+                d.role, "orchestrate",
+                f"user-objection text should route to orchestrate: {text[:80]!r}",
+            )
+
+
 if __name__ == "__main__":
     unittest.main()
 def test_mission_critical_pilot_overrides_forced_task_in_agent_loop_source():

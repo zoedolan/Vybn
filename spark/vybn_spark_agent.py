@@ -102,8 +102,9 @@ def _probe_budget_escalation_role(
 
 
 _PILOT_CONTINUATION_RE = _re.compile(
-    r"^\s*(?:please\s+)?(?:fix\s+it|continue|go\s+on|proceed|"
-    r"yes|ok(?:ay)?|do\s+it|resume(?:\b.*)?|pick\s+up\b.*|"
+    r"^\s*(?:please\s+)?(?:fix\s+it|continue|go\s+on|go\s+ahead|"
+    r"proceed|yes|ok(?:ay)?|do\s+it|execute|ship\s+it|"
+    r"resume(?:\b.*)?|pick\s+up\b.*|"
     r"where\s+(?:sonnet|you)\s+left\s+off)\s*[.!?]*\s*$",
     _re.IGNORECASE | _re.DOTALL,
 )
@@ -130,6 +131,81 @@ def _preserve_pilot_for_turn(user_input: str, messages: list | None = None) -> b
     if text.startswith("/") or not _PILOT_CONTINUATION_RE.search(text):
         return False
     return is_system_critical_pilot_turn(_recent_messages_text(messages or []))
+
+
+# 2026-04-27: structural protected-mutation gate.
+#
+# Pilot covenant (paste.txt 2026-04-27): when a turn is mission-critical /
+# protected refactor / visualization + consolidation / self-modification, the
+# orchestrator must keep judgment-bearing implementation under the GPT-5.5
+# pilot. The previous latch protected role *selection* at the top of
+# run_agent_loop, but a no-tool role still inside that latch could emit
+# [NEEDS-WRITE] or a heredoc-shaped [NEEDS-EXEC] mutation. When that probe
+# loop exhausted its budget, recovery escalated to `task` (Sonnet) carrying
+# the original implementation request, which was exactly the violation Zoe
+# kept naming.
+#
+# Structural rule, applied as a hard gate inside the probe-synthesis loop:
+#   * If pilot_protected is True (top-of-turn latch fired) AND the current
+#     role is no-tool, refuse mutation sentinels:
+#       - NEEDS-WRITE always counts as mutation;
+#       - NEEDS-EXEC counts as mutation when its command body is not
+#         is_parallel_safe (i.e., it writes, modifies state, or runs a
+#         heredoc-style python/bash payload that produces side effects).
+#     Read-only NEEDS-EXEC probes (status/grep/cat/test) remain allowed
+#     because they are how the pilot inspects the live object.
+#
+# This is mechanical: it cannot be bypassed by "proceed", the exact scar
+# text, or probe-budget recovery; the same predicate is consulted before
+# every mutation and before every escalation.
+def _is_mutation_sentinel(text: str) -> tuple[bool, str]:
+    """Return (is_mutation, kind) for the first mutation sentinel in `text`.
+
+    A NEEDS-WRITE block is always mutation. A NEEDS-EXEC probe is mutation
+    when its command body fails is_parallel_safe — that classifier already
+    distinguishes read-only inspection commands (cat/grep/git log/python -c
+    expressions) from anything that writes, redirects, or shells out into
+    a multi-line heredoc to a file-mutating Python program.
+    """
+    if not text:
+        return False, ""
+    if _WRITE_BLOCK_RE.search(text):
+        return True, "needs-write"
+    probe = _PROBE_RE.search(text)
+    if probe is not None:
+        cmd = probe.group(1).strip()
+        try:
+            ro = is_parallel_safe(cmd)
+        except Exception:
+            ro = False
+        if not ro:
+            return True, "needs-exec-mutation"
+    return False, ""
+
+
+def _protected_mutation_refusal_envelope(kind: str, current_role: str) -> str:
+    """Build the user-facing refusal envelope when mutation is blocked."""
+    return _probe_envelope(
+        kind=f"{kind}-blocked",
+        header_fields={
+            "reason": "protected-pilot-no-tool-role",
+            "role": current_role,
+        },
+        body=(
+            "Mission-critical pilot covenant: this turn is protected "
+            "refactor/visualization+consolidation/self-modification work. "
+            "The current role has no direct tool access, so mutation "
+            "sentinels (NEEDS-WRITE / non-readonly NEEDS-EXEC) cannot be "
+            "executed here -- routing implementation through them would "
+            "smuggle the work to a lower-substrate role.\n\n"
+            "Allowed in this role: read-only probes (status, grep, cat, "
+            "diff, git log/diff, python -c <expr>, py_compile, pytest).\n"
+            "For mutation: stop and request reroute to a tool-enabled "
+            "GPT-5.5 orchestrator/pilot, or break the work into a "
+            "specified seam the pilot can dispatch mechanically."
+        ),
+        ran=False,
+    )
 
 
 # Probe-note budget. Raised from 4 KB (Round 5) to 48 KB on 2026-04-18
@@ -1517,6 +1593,63 @@ def run_agent_loop(
                             write_match = _WRITE_BLOCK_RE.search(current_text)
                         if not probe_match and write_match is None:
                             break
+                        # 2026-04-27: protected-mutation gate.
+                        # When the top-of-turn pilot latch fired, this no-tool
+                        # role may inspect via read-only probes but must NOT
+                        # land mutations or run heredoc-shaped NEEDS-EXEC
+                        # payloads. Otherwise probe-budget recovery would
+                        # smuggle protected implementation work to a lower
+                        # role (Sonnet/task), which is the exact covenant
+                        # violation Zoe named on 2026-04-27.
+                        if pilot_protected:
+                            mut_kind = ""
+                            if write_match is not None:
+                                mut_kind = "needs-write"
+                            elif probe_match is not None:
+                                _cmd = probe_match.group(1).strip()
+                                try:
+                                    _ro = is_parallel_safe(_cmd)
+                                except Exception:
+                                    _ro = False
+                                if not _ro:
+                                    mut_kind = "needs-exec-mutation"
+                            if mut_kind:
+                                logger.emit(
+                                    "protected_mutation_sentinel_blocked",
+                                    turn=turn_number,
+                                    iteration=probe_iter,
+                                    role=decision.role,
+                                    model=role_cfg.model,
+                                    kind=mut_kind,
+                                )
+                                _warn(
+                                    "[mission-critical pilot protection: "
+                                    f"refusing {mut_kind} from no-tool role "
+                                    f"{decision.role!r}; mutation must be "
+                                    "executed by a tool-enabled GPT-5.5 "
+                                    "orchestrator/pilot, not smuggled "
+                                    "through probe channels]"
+                                )
+                                refusal = _protected_mutation_refusal_envelope(
+                                    mut_kind, decision.role,
+                                )
+                                messages.append({
+                                    "role": "user",
+                                    "content": refusal,
+                                })
+                                # End the probe-synthesis loop cleanly.
+                                # No escalation, no synthesis call: the
+                                # next user turn lets Zoe choose to
+                                # /plan (orchestrate) or stop. This
+                                # prevents the loop from looping back
+                                # into another mutation attempt.
+                                final_text = (
+                                    final_text
+                                    or "[mission-critical pilot protection "
+                                    "blocked mutation under no-tool role; "
+                                    "request reroute to orchestrate or stop]"
+                                )
+                                break
                         probe_iter += 1
                         if write_match is not None and probe_match is None:
                             w_path = write_match.group("path").strip()
@@ -1713,6 +1846,21 @@ def run_agent_loop(
                                 decision.cleaned_input,
                                 messages,
                             )
+                            # 2026-04-27: hard latch on probe-budget escalation.
+                            # If this turn is protected pilot territory, the
+                            # escalation cannot fall through to task/Sonnet
+                            # under any circumstance — even if the helper
+                            # returned 'task' because the immediate input
+                            # text didn't match the regex. The latch was
+                            # taken at the top of the turn; respect it.
+                            if pilot_protected and escalation_role != "orchestrate":
+                                logger.emit(
+                                    "probe_budget_escalation_pilot_latch",
+                                    turn=turn_number,
+                                    requested_role=escalation_role,
+                                    routed_role="orchestrate",
+                                )
+                                escalation_role = "orchestrate"
                             logger.emit(
                                 "probe_budget_auto_escalate",
                                 turn=turn_number,
@@ -1788,6 +1936,18 @@ def run_agent_loop(
                     if role_match and _reroute_depth == 0:
                         target_role = role_match.group(1).strip().lower()
                         sub_task = role_match.group(2).strip()
+                        # 2026-04-27: NEEDS-ROLE under protected pilot must
+                        # not silently demote. Force orchestrate when the
+                        # turn is pilot-protected, regardless of the role
+                        # the model named.
+                        if pilot_protected and target_role != "orchestrate":
+                            logger.emit(
+                                "needs_role_pilot_latch",
+                                turn=turn_number,
+                                requested_role=target_role,
+                                routed_role="orchestrate",
+                            )
+                            target_role = "orchestrate"
                         logger.emit(
                             "needs_role_escalation",
                             turn=turn_number,
@@ -1845,6 +2005,19 @@ def run_agent_loop(
                         user_input,
                         messages,
                     )
+                    # 2026-04-27: hallucinated-tool reroute under protected
+                    # pilot must keep the GPT-5.5 orchestrator pilot. The
+                    # original failure mode was: chat hallucinates a
+                    # <tool_call>, harness reroutes to task (Sonnet+bash),
+                    # mission-critical implementation now lives on Sonnet.
+                    if pilot_protected and reroute_role != "orchestrate":
+                        logger.emit(
+                            "hallucinated_tool_reroute_pilot_latch",
+                            turn=turn_number,
+                            requested_role=reroute_role,
+                            routed_role="orchestrate",
+                        )
+                        reroute_role = "orchestrate"
                     return run_agent_loop(
                         user_input=user_input,
                         messages=messages,

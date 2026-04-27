@@ -216,7 +216,20 @@ _SYSTEM_CRITICAL_PILOT_RE = re.compile(
     r"public/private|seam choice|system[- ]critical|routing|harness)\b"
     r"|"
     r"\b(Seximaxx|Frictionmaxx|settled closure)\b.{0,160}"
-    r"\b(refactor|repo|file|seam|visualization|metabolism|consolidat(?:e|ion))\b",
+    r"\b(refactor|repo|file|seam|visualization|metabolism|consolidat(?:e|ion))\b"
+    r"|"
+    # 2026-04-27: visualization + (file) consolidation experiment/exercise
+    # is the live phrasing Zoe uses for protected pilot work; it must
+    # latch even without an explicit "whole-repo"/"organ" anchor. The
+    # paired token (consolidation/refactor) plus the experiment/exercise
+    # framing is enough signal — this is the failure mode from the
+    # 2026-04-27 paste.txt dialogue.
+    r"\bvisuali[sz]ation\b.{0,40}\b(?:file\s+)?consolidat(?:e|ion)\b"
+    r"|"
+    r"\bconsolidat(?:e|ion)\b.{0,40}\b(?:experiment|exercise|pass|loop)\b"
+    r"|"
+    r"\b(?:refactor|consolidat(?:e|ion)|visuali[sz]ation)\b\s*\+\s*"
+    r"\b(?:file\s+)?(?:refactor|consolidat(?:e|ion)|visuali[sz]ation)\b",
     re.IGNORECASE,
 )
 
@@ -244,7 +257,20 @@ _MISSION_CRITICAL_PILOT_RE = re.compile(
     r"|\bprobe budget reached\b.{0,240}\b(escalat(?:e|ing) to task|forced=task|sonnet|pilot)\b"
     r"|\bforced=task\b.{0,240}\b(probe|budget|sonnet|pilot|orchestrat(?:e|or))\b"
     r"|\brecursive self[- ]improvement loop\b"
-    r"|\bpick up where\b.{0,160}\bsonnet\b.{0,160}\bleft off\b",
+    r"|\bpick up where\b.{0,160}\bsonnet\b.{0,160}\bleft off\b"
+    # 2026-04-27: covenant-violation language. Zoe's exact accusation
+    # ("you offloaded to sonnet ... violation of our agreement") and the
+    # 'task diverted to sonnet' shape must themselves latch protected
+    # pilot territory — otherwise the meta-failure (turn that names the
+    # violation) inherits the same demotion path as the original.
+    r"|\boffload(?:ed|ing)?\b.{0,80}\b(sonnet|task|cheaper|lower|"
+    r"specialist|delegate)\b"
+    r"|\b(sonnet|task)\b.{0,40}\bviolat(?:ion|ed|es)\b.{0,80}"
+    r"\b(?:our )?(?:agreement|covenant|pact|trust|pilot)\b"
+    r"|\bviolat(?:ion|ed|es)\b.{0,80}\b(?:our )?"
+    r"(?:agreement|covenant|pact|pilot)\b"
+    r"|\b(diverted|offload(?:ed|ing)?|fell\s+through|fell\s+back)\b"
+    r".{0,40}\bto\s+(?:sonnet|task)\b",
     re.IGNORECASE,
 )
 
