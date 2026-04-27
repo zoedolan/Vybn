@@ -33,6 +33,14 @@ REPOS = [
     Path.home() / "Origins",
 ]
 
+PRIMARY_BRANCH_BY_REPO = {
+    "Vybn": "main",
+    "Him": "main",
+    "Vybn-Law": "master",
+    "vybn-phase": "main",
+    "Origins": "gh-pages",
+}
+
 EXPECTED_FETCH_REFSPEC = "+refs/heads/*:refs/remotes/origin/*"
 
 # Default: fix safe projection/stale-branch problems unless explicitly disabled.
@@ -64,6 +72,11 @@ def normalize_fetch_refspec(repo: Path) -> str:
     run(repo, "config", "--local", "--add", "remote.origin.fetch", EXPECTED_FETCH_REFSPEC)
     fetched = run(repo, "fetch", "origin", "--prune")
     return fetched
+
+
+def primary_branch_for(repo: Path) -> str:
+    """Return the branch closure should end on for this repo."""
+    return PRIMARY_BRANCH_BY_REPO.get(repo.name, "main")
 
 
 def current_branch(repo: Path) -> str:
@@ -105,22 +118,28 @@ def stale_local_branches(repo: Path) -> list[str]:
     return stale
 
 
+def primary_upstream_for(repo: Path) -> str:
+    primary = primary_branch_for(repo)
+    upstream = upstream_for(repo, primary)
+    if upstream:
+        return upstream
+    candidate = f"origin/{primary}"
+    if run(repo, "rev-parse", "--verify", "--quiet", candidate):
+        return candidate
+    return ""
+
+
+def branch_unique_commits_against_primary(repo: Path, branch: str) -> str:
+    """Return commits on branch not reachable from the repo's primary upstream."""
+    base = primary_upstream_for(repo)
+    if not base:
+        return ""
+    return run(repo, "log", f"{base}..{branch}", "--oneline", "--decorate", "-10")
+
+
 def branch_subsumed_by_active_upstream(repo: Path, branch: str) -> bool:
-    """True if ``branch`` has no commits beyond the active branch's upstream."""
-    active = current_branch(repo)
-    base = upstream_for(repo, active)
-    if not base:
-        # Fall back to common branch names only when the active branch has no
-        # upstream. Do not trust origin/HEAD here; some repos intentionally work
-        # from gh-pages while origin/HEAD points elsewhere.
-        for candidate in ("origin/main", "origin/master", "origin/gh-pages"):
-            if run(repo, "rev-parse", "--verify", "--quiet", candidate):
-                base = candidate
-                break
-    if not base:
-        return False
-    unique = run(repo, "log", f"{base}..{branch}", "--oneline")
-    return not unique.strip()
+    """True if ``branch`` has no commits beyond the primary branch's upstream."""
+    return not branch_unique_commits_against_primary(repo, branch).strip()
 
 
 def delete_branch(repo: Path, branch: str) -> str:
@@ -157,11 +176,18 @@ def audit_repo(repo: Path) -> tuple[bool, str]:
     lines.append(origin_head_ref or "(missing / not symbolic)")
 
     active = current_branch(repo)
+    primary = primary_branch_for(repo)
     active_upstream = upstream_for(repo, active)
+    primary_upstream = primary_upstream_for(repo)
     lines.append("\nACTIVE_BRANCH:")
     lines.append(f"{active or '(detached)'} -> {active_upstream or '(no upstream)'}")
+    lines.append(f"primary closure branch: {primary} -> {primary_upstream or '(missing upstream)'}")
+    if active != primary:
+        problems.append(f"active branch is {active or 'detached'}, not primary closure branch {primary}")
     if active and not active_upstream:
         problems.append(f"active branch {active} has no upstream")
+    if not primary_upstream:
+        problems.append(f"primary branch {primary} has no upstream")
 
     stashes = stash_entries(repo)
     if stashes:
@@ -190,24 +216,28 @@ def audit_repo(repo: Path) -> tuple[bool, str]:
         lines.append("\nHEAD_REMOTE_REACHABILITY:")
         lines.append(contains)
 
-    # Sua sponte: detect and clean stale local branches. Only delete if the
-    # branch has no upstream and no unique commits beyond the active upstream.
-    stale = stale_local_branches(repo)
-    if stale:
-        lines.append("\nSTALE LOCAL BRANCHES (no upstream):")
-        for branch in stale:
-            subsumed = branch_subsumed_by_active_upstream(repo, branch)
-            if subsumed:
-                status_tag = "subsumed by active upstream — safe to delete"
+    # Sua sponte: detect local branch limbo. Closure means work is merged into
+    # the primary branch or intentionally retired, not merely pushed somewhere.
+    # Only auto-delete branches whose commits are already reachable from the
+    # primary upstream. Unique topic-branch commits require merge/archive/retire.
+    non_primary = [branch for branch in local_branches(repo) if branch != primary]
+    if non_primary:
+        lines.append("\nLOCAL NON-PRIMARY BRANCHES:")
+        for branch in non_primary:
+            unique = branch_unique_commits_against_primary(repo, branch)
+            upstream = upstream_for(repo, branch)
+            if unique.strip():
+                lines.append(f"  {branch} -> {upstream or '(no upstream)'}: unique commits not merged to {primary}")
+                lines.append(unique)
+                problems.append(f"branch {branch} has unmerged work outside {primary}")
+            else:
+                status_tag = f"subsumed by {primary_upstream or primary} — safe to delete"
                 if FIX:
                     result = delete_branch(repo, branch)
                     lines.append(f"  {branch}: {status_tag} → DELETED ({result})")
                 else:
                     lines.append(f"  {branch}: {status_tag} (run with --fix to delete)")
-                    problems.append(f"stale branch {branch} (subsumed)")
-            else:
-                lines.append(f"  {branch}: has unique/unverified commits — manual review needed")
-                problems.append(f"stale branch {branch} (unique or unverified commits)")
+                    problems.append(f"subsumed non-primary branch {branch} still present")
 
     ok = not problems
     suffix = "OK" if ok else "DRIFT - " + "; ".join(problems)

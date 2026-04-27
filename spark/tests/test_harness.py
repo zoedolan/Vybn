@@ -89,6 +89,23 @@ class TestRepoClosureAuditProjectionState(unittest.TestCase):
         )
 
 
+
+    def test_primary_branch_for_known_repos(self):
+        from harness import repo_closure_audit as audit
+
+        self.assertEqual(audit.primary_branch_for(Path("/tmp/Vybn")), "main")
+        self.assertEqual(audit.primary_branch_for(Path("/tmp/Him")), "main")
+        self.assertEqual(audit.primary_branch_for(Path("/tmp/Vybn-Law")), "master")
+        self.assertEqual(audit.primary_branch_for(Path("/tmp/Origins")), "gh-pages")
+
+    def test_branch_limbo_language_is_encoded_in_audit(self):
+        text = Path(SPARK_DIR / "harness" / "repo_closure_audit.py").read_text()
+        self.assertIn("active branch is", text)
+        self.assertIn("not primary closure branch", text)
+        self.assertIn("has unmerged work outside", text)
+        self.assertIn("Closure means work is merged into", text)
+
+
 class TestValidateCommand(unittest.TestCase):
     def test_blocks_dangerous(self):
         ok, reason = validate_command("rm -rf /")
