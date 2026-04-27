@@ -416,8 +416,32 @@ def _record_text(rec: FileRecord) -> str:
     return rec.snippet or ""
 
 
+def _neighbor_context_text(rec: FileRecord) -> str:
+    """Nearby README context for files whose role is declared by their directory."""
+    roots = {
+        "Vybn": Path.home() / "Vybn",
+        "Him": Path.home() / "Him",
+        "Vybn-Law": Path.home() / "Vybn-Law",
+        "vybn-phase": Path.home() / "vybn-phase",
+        "Origins": Path.home() / "Origins",
+    }
+    root = roots.get(rec.repo)
+    if not root:
+        return ""
+    path = root / rec.relpath
+    candidates = [path.parent / "README.md", path.parent.parent / "README.md"]
+    parts: List[str] = []
+    for c in candidates:
+        try:
+            if c.is_file() and c.stat().st_size < 120000:
+                parts.append(c.read_text(encoding="utf-8", errors="replace"))
+        except Exception:
+            pass
+    return "\n".join(parts)
+
+
 def _risk_class(rec: FileRecord, inbound: int, centrality: int, semantic_neighbors: int, full_text: str = "") -> str:
-    hay = f"{rec.repo}/{rec.relpath}\n{rec.snippet}\n{full_text}"
+    hay = f"{rec.repo}/{rec.relpath}\n{rec.snippet}\n{full_text}\n{_neighbor_context_text(rec)}"
     low_key = f"{rec.repo}/{rec.relpath}".lower()
     provenance_paths = ("personal history", "/medium/", "artificial liberation", "a-iconoclast", "autobiography", "zoes_memoirs", "what_vybn_would_have_missed")
     if any(p in low_key for p in provenance_paths):
@@ -448,7 +472,7 @@ def _risk_class(rec: FileRecord, inbound: int, centrality: int, semantic_neighbo
 def _routing_evidence(rec: FileRecord, rclass: str, inbound: int, centrality: int, semantic_neighbors: int, full_text: str = "") -> Tuple[List[str], str, str]:
     key = f"{rec.repo}/{rec.relpath}"
     low_key = key.lower()
-    hay = f"{key}\n{rec.snippet}\n{full_text}"
+    hay = f"{key}\n{rec.snippet}\n{full_text}\n{_neighbor_context_text(rec)}"
     observed: List[str] = [f"size={rec.size}", f"git_state={rec.git_state}", f"inbound={inbound}", f"outbound={centrality}", f"semantic_neighbors={semantic_neighbors}"]
     if rec.py_defs:
         observed.append(f"py_defs={len(rec.py_defs)}")
