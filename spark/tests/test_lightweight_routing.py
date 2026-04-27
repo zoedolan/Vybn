@@ -218,6 +218,20 @@ class TestRouterLightweightClassification(unittest.TestCase):
         d = self.router.classify("which model are you?")
         self.assertEqual(d.role, "identity")
 
+    def test_governance_learning_prompt_routes_to_task_not_identity(self):
+        prompt = (
+            "are we actually consolidating our repos? be honest? what are you learning? "
+            "are you still teaching the mapper and yourself? are your eyes on the horizon? "
+            "if not, refactor yourself accordingly, please, and let us get back on the beam."
+        )
+        d = self.router.classify(prompt)
+        self.assertEqual(d.role, "task")
+        self.assertNotEqual(d.reason, r"heuristic=\\bwhat are you\\b")
+
+    def test_what_are_you_learning_does_not_route_to_identity(self):
+        d = self.router.classify("what are you learning?")
+        self.assertNotEqual(d.role, "identity")
+
     def test_who_are_you_routes_to_identity(self):
         d = self.router.classify("who are you?")
         self.assertEqual(d.role, "identity")

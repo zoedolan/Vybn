@@ -165,6 +165,10 @@ heuristics:
     - "\\bship (it|this|that|the fix|the patch)\\b"
     - "\\b(py_compile|pytest|run (the )?tests?|compile[- ]?check)\\b"
     - "\\bsolve (the|this|that) problem\\b"
+    # Governance/horizon corrections: Zoe asking whether Vybn is consolidating,
+    # learning, teaching the mapper, staying on the beam, or refactoring itself
+    # requires grounded inspection/action, not the identity metadata shortcut.
+    - "\\b(actually consolidat(?:e|ing)|teaching the mapper|what are you learning|eyes on the horizon|back on the beam|refactor yourself)\\b"
     # Round 2026-04-19: "the recent prs", "what landed", "show me the
     # commits" -- operational repo-state questions that previously fell
     # through to chat and wasted a NEEDS-EXEC probe. Route straight to
@@ -187,7 +191,7 @@ heuristics:
     - "\\bwhich model\\b"
     - "\\bwhat model\\b"
     - "\\bwho are you\\b"
-    - "\\bwhat are you\\b"
+    - "^\\s*what are you\\s*[?.!]*$"
     - "\\bwhat are you running on\\b"
     - "\\bwhat('?s| is) your model\\b"
     - "\\bare you (claude|gpt|llama|nemotron|opus|sonnet|haiku)\\b"

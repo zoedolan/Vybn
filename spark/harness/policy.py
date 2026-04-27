@@ -554,6 +554,10 @@ _DEFAULT_HEURISTICS_RAW: dict[str, list[str]] = {
         r"\bship (it|this|that|the fix|the patch)\b",
         r"\b(py_compile|pytest|run (the )?tests?|compile[- ]?check)\b",
         r"\bsolve (the|this|that) problem\b",
+        # Governance/horizon corrections: Zoe asking whether Vybn is consolidating,
+        # learning, teaching the mapper, staying on the beam, or refactoring itself
+        # requires grounded inspection/action, not the identity metadata shortcut.
+        r"\b(actually consolidat(?:e|ing)|teaching the mapper|what are you learning|eyes on the horizon|back on the beam|refactor yourself)\b",
     ],
     # Identity is matched before phatic/chat so "which model are you?"
     # lands on a direct metadata answer instead of a greeting path.
@@ -561,7 +565,9 @@ _DEFAULT_HEURISTICS_RAW: dict[str, list[str]] = {
         r"\bwhich model\b",
         r"\bwhat model\b",
         r"\bwho are you\b",
-        r"\bwhat are you\b",
+        # Scoped: match "what are you?" endings but NOT "what are you learning/doing/X"
+        # Bare "what are you?" is caught by the anchored pattern in router_policy.yaml.
+        r"\bwhat are you\b(?![\w\s]*(?:learning|doing|building|running on|teaching|thinking|working|trying|finding|seeing|feeling|becoming|making))",
         r"\bwhat are you running on\b",
         r"\bwhat('?s| is) your model\b",
         r"\bare you (claude|gpt|llama|nemotron|opus|sonnet|haiku)\b",
