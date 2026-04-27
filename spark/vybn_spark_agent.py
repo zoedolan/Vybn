@@ -177,6 +177,29 @@ from harness.sentinel_protocol import (
     _WRITE_BLOCK_RE,
 )
 
+from harness.subturns import (  # noqa: E402
+    _classify_unlock_layer,
+    _probe_envelope as _probe_envelope,
+    _run_restart_subturn,
+    _run_write_subturn,
+)
+
+# _run_probe_subturn must close over the *agent-level* execute_readonly and
+# is_parallel_safe so tests can mock agent.execute_readonly cleanly.
+def _run_probe_subturn(command: str, bash) -> tuple[bool, str]:  # noqa: E302
+    """Thin wrapper so mock.patch.object(agent, 'execute_readonly') works in tests."""
+    import harness.subturns as _st
+    import harness.providers as _prov
+    # Temporarily redirect the subturns module's references to our module-level names
+    _orig_er, _orig_ips = _st.execute_readonly, _st.is_parallel_safe
+    _st.execute_readonly = execute_readonly  # type: ignore[assignment]
+    _st.is_parallel_safe = is_parallel_safe  # type: ignore[assignment]
+    try:
+        return _st.run_probe_subturn(command, bash)
+    finally:
+        _st.execute_readonly = _orig_er
+        _st.is_parallel_safe = _orig_ips
+
 
 
 def _fire_learn_async(rag_text: str, response_text: str, followup_text: str) -> None:
@@ -933,196 +956,10 @@ def _stream_with_fallback(
 # ---------------------------------------------------------------------------
 # Round 5: positive-signal probe sub-turn.
 # ---------------------------------------------------------------------------
-
-def _run_write_subturn(path: str, body: str) -> tuple[bool, str]:
-    """Execute one NEEDS-WRITE directive from a no-tool role.
-
-    Writes `body` to `path` via Python I/O, bypassing the bash session
-    entirely. Path must lie under a tracked repo; otherwise refused
-    with a message that flows back through the same synthetic-user
-    channel as probe output.
-
-    Absorb discipline: if the target does not yet exist on disk, the
-    body must begin (within its first 200 chars) with a
-    VYBN_ABSORB_REASON= declaration. Existing files are always
-    overwritten — that is the point of this channel.
-    """
-    import os as _os
-    try:
-        from harness.policy import TRACKED_REPOS  # type: ignore
-    except Exception:
-        TRACKED_REPOS = (
-            _os.path.expanduser("~/Vybn"),
-            _os.path.expanduser("~/Him"),
-            _os.path.expanduser("~/Vybn-Law"),
-            _os.path.expanduser("~/vybn-phase"),
-        )
-    tgt = _os.path.expanduser((path or "").strip())
-    if not tgt:
-        return False, "(NEEDS-WRITE refused: empty path)"
-    tgt_abs = _os.path.abspath(tgt)
-    if not any(
-        tgt_abs == r or tgt_abs.startswith(r.rstrip("/") + "/")
-        for r in TRACKED_REPOS
-    ):
-        return False, (
-            f"(NEEDS-WRITE refused: {tgt_abs} is outside tracked repos. "
-            f"Allowed roots: {', '.join(TRACKED_REPOS)})"
-        )
-    # Absorb check for new files.
-    if not _os.path.exists(tgt_abs):
-        head = (body or "")[:200]
-        if "VYBN_ABSORB_REASON=" not in head:
-            return False, (
-                "(NEEDS-WRITE refused by absorb_gate: new file " + tgt_abs
-                + " requires a VYBN_ABSORB_REASON declaration in the "
-                "first 200 chars of body, e.g.:\n"
-                "    # VYBN_ABSORB_REASON='does not fold into X because...'\n"
-                "Fold, do not pile.)"
-            )
-    try:
-        _os.makedirs(_os.path.dirname(tgt_abs), exist_ok=True)
-        with open(tgt_abs, "w") as f:
-            f.write(body or "")
-        nbytes = _os.path.getsize(tgt_abs)
-        return True, f"(wrote {nbytes} bytes to {tgt_abs})"
-    except Exception as e:  # noqa: BLE001
-        return False, f"(NEEDS-WRITE exec error: {type(e).__name__}: {e})"
-
-
-# ---------------------------------------------------------------------------
-# Probe-result envelope — PROBE_RESULT_ENVELOPE_v1.
-#
-# 2026-04-23 fix. The probe-result message injected into message history
-# after a NEEDS-EXEC / NEEDS-WRITE / NEEDS-RESTART sub-turn used to read
-# as a one-line header plus raw output. When output was short (21-byte
-# "Already up to date.", or zero bytes for a silent command) the model
-# could ignore it and continue whatever narrative it had already started
-# — in the 2026-04-23 failure mode, a story about a wedged shell.
-#
-# The envelope below makes the result structurally loud:
-#   - explicit BEGIN/END markers so the output span is unmistakable
-#   - byte + line counts in the header
-#   - status: executed vs refused (we only know success/failure via the
-#     `ran` flag from the subturn helpers; validate_command refusals
-#     and exec exceptions return ran=False).
-#   - explicit anti-hallucination directive at the foot
-#   - empty-output tag that distinguishes "ran, no stdout" from
-#     "did not run" so the model cannot collapse the two
+# Subturn execution lives in harness.subturns. Legacy private helper names are
+# imported above for compatibility with tests and older call sites.
 # ---------------------------------------------------------------------------
 
-def _probe_envelope(
-    *,
-    kind: str,
-    header_fields: dict,
-    body: str,
-    ran: bool,
-) -> str:
-    """Wrap a probe/write/restart result in the v1 envelope."""
-    body = body or ""
-    empty = (not body) or body.strip() == ""
-    nbytes = len(body)
-    nlines = body.count("\n")
-    if not empty and not body.endswith("\n"):
-        nlines += 1
-    status = "executed" if ran else "refused"
-    header_parts = [
-        f"kind: {kind}",
-        f"status: {status}",
-        f"bytes: {nbytes}",
-        f"lines: {nlines}",
-        f"empty: {'true' if empty else 'false'}",
-    ]
-    for k, v in header_fields.items():
-        safe = str(v).replace("\n", " ").replace("\r", " ")
-        header_parts.append(f"{k}: {safe[:200]}")
-    header = "[" + " | ".join(header_parts) + "]"
-    slug = kind.upper().replace("-", "_")
-    begin = f"<<<BEGIN_{slug}_STDOUT>>>"
-    end = f"<<<END_{slug}_STDOUT>>>"
-    if empty and ran:
-        inner = (
-            "(command ran with no stdout; the absence of output here "
-            "is real, not a wedge)"
-        )
-    elif empty and not ran:
-        inner = "(command did not execute — see refusal reason in header)"
-    else:
-        inner = body.rstrip("\n")
-    footer = (
-        "\n\nThe stdout between the markers above IS the result of the "
-        "sub-turn.\nDo not claim the shell is wedged, unresponsive, or that "
-        "nothing came\nback unless status != executed. If status is "
-        "executed, the bytes\ncount and the stdout span are authoritative "
-        "— read them and proceed."
-    )
-    return f"{header}\n{begin}\n{inner}\n{end}{footer}"
-
-
-def _run_restart_subturn(bash: BashTool) -> tuple[bool, str]:
-    """Restart the persistent bash session.
-
-    Returns (ran, output_text). The bash.restart() call re-spawns
-    the subprocess and returns a confirmation string; on the rare
-    case it raises, we synthesize a clear error so the next turn
-    sees what happened instead of silently retrying.
-    """
-    try:
-        out = bash.restart()
-    except Exception as e:  # noqa: BLE001
-        return False, f"(restart error: {e})"
-    return True, out or "(bash session restarted)"
-
-
-def _classify_unlock_layer(output: str, *, command: str = "") -> str | None:
-    """Classify obstacle output at the lowest layer visible to this harness."""
-    text = (output or "").lower()
-    cmd = (command or "").lower()
-    if "probe refused by validate_command" in text or "blocked:" in text:
-        return "safety_gate"
-    if "absorb_gate" in text or "needs-write refused" in text:
-        return "filesystem_git"
-    if text.startswith("[timed out after"):
-        return "parser_sentinel" if is_parallel_safe(command) else "shell_session"
-    if "bash session restarted" in text or "needs-restart" in text:
-        return "shell_session"
-    if "400" in text or "provider" in text:
-        return "provider"
-    if "curl" in cmd or "http" in cmd:
-        return "external_service"
-    return None
-
-
-def _run_probe_subturn(command: str, bash: BashTool) -> tuple[bool, str]:
-    """Execute one probe emitted by a no-tool role.
-
-    Read-only probes run in a fresh subprocess when possible. That makes the
-    boundary typed: alarming strings in grep patterns are data, not executable
-    danger; mutating commands still fail the safety gate. Timeouts and
-    restart/control events are not labeled as successful stdout.
-    """
-    cmd = (command or "").strip()
-    if not cmd:
-        return False, "(empty probe command)"
-    readonly = is_parallel_safe(cmd)
-    ok, reason = validate_command(cmd, allow_dangerous_literals_for_readonly=readonly)
-    if not ok:
-        return False, f"(probe refused by validate_command: {reason})"
-    try:
-        out = execute_readonly(cmd) if readonly else bash.execute(cmd)
-    except Exception as e:
-        return False, f"(probe exec error: {e})"
-    out = out or "(no output)"
-    if out.startswith("[timed out after"):
-        layer = _classify_unlock_layer(out, command=cmd) or "shell_session"
-        return False, f"(probe timed out; unlock_layer={layer})\\n{out}"
-    if "(bash session restarted)" in out:
-        return False, "(probe control-event mismatch: restart output arrived while running a probe; unlock_layer=shell_session)\\n" + out
-    return True, out
-
-
-# ---------------------------------------------------------------------------
-# Agent loop — policy-driven.
 # ---------------------------------------------------------------------------
 
 def _recurrent_prethink(
