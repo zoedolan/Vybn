@@ -100,6 +100,8 @@ class RefactorPerceptionTests(unittest.TestCase):
         self.assertIn("Consolidation order", text)
         self.assertIn("appendage", text)
         self.assertIn("Attend to pressure", text)
+        self.assertIn("Cutting is only a local tactic", text)
+        self.assertIn("self-assembly", text)
         self.assertIn("Let contact revise category", text)
         self.assertIn(REFACTOR_PILOT_RULE, text)
 

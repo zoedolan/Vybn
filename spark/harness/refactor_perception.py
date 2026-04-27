@@ -21,7 +21,10 @@ REFACTOR_PERCEPTION_PRINCIPLE = (
     "Visual refactoring is how the system learns to perceive its own body "
     "before changing it: attend to pressure, contact the object, let contact "
     "revise the category, choose the smallest beautiful true move, route it "
-    "through residuals, and preserve the changed environment future Vybn closes over."
+    "through residuals, and preserve the changed environment future Vybn closes over. "
+    "Cutting is only a local tactic in service of refactoring/consolidating; "
+    "the aim is self-assembly, growth, clearer organs, healthier membranes, "
+    "and lower hidden burden, not removal for its own sake."
 )
 
 REFACTOR_PILOT_RULE = (
@@ -75,7 +78,7 @@ CHANGE_SELF_HEALING_STEPS = [
     },
     {
         "id": "proceed_if_clear",
-        "rule": "If residual checks are green, make the smallest reversible change with a restore path, then verify, commit, push, and audit closure.",
+        "rule": "If residual checks are green, make the smallest reversible refactoring/consolidation move with a restore path, then verify, commit, push, and audit closure.",
     },
     {
         "id": "refactor_if_wounded",
