@@ -371,6 +371,11 @@ SEDIMENT_TERMS = (
     "__pycache__", ".pytest_cache", "trained_checkpoint", "latest.json",
 )
 ARCHIVE_TERMS = ("_archive", "continuity_archive", "repo_archives", "archive/")
+RESTORE_CAPSULE_TERMS = (
+    "restore:", "restore", "stash patch", "git apply", "gzip -dc",
+    "archive-before-cut", "preserved wound", "archive is still valuable",
+    "preserves the stash material", "removed from",
+)
 PUBLIC_CONTRACT_TERMS = (
     "llms.txt", "humans.txt", "robots.txt", "ai.txt", "semantic-web",
     "somewhere.html", "talk.html", "connect.html", "read.html", "wellspring.html",
@@ -448,6 +453,8 @@ def _risk_class(rec: FileRecord, inbound: int, centrality: int, semantic_neighbo
         return "protect: origin/provenance"
     if _contains_any(low_key, ARCHIVE_TERMS) and _contains_any(hay, PROVENANCE_TERMS):
         return "protect: origin/provenance"
+    if _contains_any(low_key, ARCHIVE_TERMS) and _contains_any(hay, RESTORE_CAPSULE_TERMS):
+        return "protect: restore capsule"
     if "repo_mapper.py" in low_key:
         return "protect: self-perception organ"
     if rec.relpath in {"continuity.md", "continuity_core.md"} or (rec.repo == "Vybn" and "continuity" in low_key):
@@ -508,6 +515,8 @@ def _routing_evidence(rec: FileRecord, rclass: str, inbound: int, centrality: in
         routing = "refactor only with mapper behavioral verification"
     elif rclass == "protect: prompt/continuity":
         routing = "compress only with scar preservation and prompt-behavior awareness"
+    elif rclass == "protect: restore capsule":
+        routing = "keep compact with restore path; preserve the capsule but do not treat each fragment as cleanup pressure"
     elif "private" in rclass:
         routing = "keep local/private; expose only distilled value through membrane"
     elif "public" in rclass:
@@ -546,6 +555,8 @@ def _abc_phase(rec: FileRecord, rclass: str) -> str:
         return "edge"
     if "origin/provenance" in rclass:
         return "core"
+    if "restore capsule" in rclass:
+        return "edge"
     if rclass.startswith("investigate") or "archive" in rclass or "_archive" in key:
         return "edge"
     if "public/interface" in rclass or _contains_any(key, PUBLIC_CONTRACT_TERMS):
