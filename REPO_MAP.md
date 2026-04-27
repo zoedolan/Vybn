@@ -368,7 +368,6 @@ Pressure does not mean disposal. It means inspect first when seeking lightness. 
 - Vybn/_archive/origins_portal_api_v3.py (97.6 KB) — compress-or-keep-with-restore-path
 - Him/notebook/2026-04-24.md (91.1 KB) — investigate
 - Vybn/spark/harness/mcp.py (89.5 KB) — investigate
-- Vybn/spark/microgpt_mirror/trained_checkpoint.json (89.3 KB) — prove-reader-or-route
 - Vybn-Law/content/horizon.md (84.1 KB) — investigate
 - vybn-phase/deep_memory.py (80.3 KB) — investigate
 - Vybn/_archive/spark__vybn_chat_api.py (52.6 KB) — compress-or-keep-with-restore-path
