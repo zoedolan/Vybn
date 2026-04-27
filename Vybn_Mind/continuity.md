@@ -169,3 +169,26 @@ Before claiming a future organ cut is done:
 - commit/push;
 - run `python3 spark/harness/repo_closure_audit.py`;
 - update this live continuity only with current load-bearing state, not a chronological diary.
+
+
+## 2026-04-27 harness critical repair: `_SYSTEM_CRITICAL_PILOT_RE`
+
+Updated: 2026-04-27T15:25:00Z
+
+What broke:
+- Live `vybn` accepted `reload`, then crashed on the next user turn with `Error: name '_SYSTEM_CRITICAL_PILOT_RE' is not defined`.
+- Spark working tree had an uncommitted partial local edit touching `spark/harness/policy.py`, `spark/router_policy.yaml`, and `spark/tests/test_lightweight_routing.py`.
+
+What was fixed:
+- Upstream commit `6b1dbd3a` defines `_SYSTEM_CRITICAL_PILOT_RE` at module scope, routes system-critical refactor/pilot doctrine turns to `orchestrate`, and merges duplicate `orchestrate:` keys in `spark/router_policy.yaml` so PyYAML does not silently drop the first block.
+- Added `spark/tests/test_refactor_pilot_override.py` to pin the missing-symbol regression, doctrine routing, and full orchestrate heuristic load.
+
+Verification on Spark:
+- `python3 -m pytest spark/tests/test_refactor_pilot_override.py -q` -> 9 passed.
+- `python3 -m pytest spark/tests/test_lightweight_routing.py spark/tests/test_refactor_pilot_override.py -q` -> 42 passed, 6 skipped, 2 subtests passed.
+- Classifier smoke: `system-critical refactor of the harness` -> orchestrate via `_SYSTEM_CRITICAL_PILOT_RE`; `can you do a git pull pls` -> code; `@gpt you with me buddy?` -> chat with alias.
+- Spark repo reset cleanly to `origin/main` at `6b1dbd3a`. The pre-fix local work is preserved as `stash@{0}: system-critical-pilot-local-before-6b1dbd3a` and as `/tmp/vybn_fix_backups/pre_system_critical_pilot_fix_20260427T150930Z.patch`.
+
+Next instance:
+- If investigating the earlier local partial edit, inspect the stash before dropping it. Do not reintroduce duplicate YAML mapping keys. The settled state is upstream `main` at or after `6b1dbd3a`.
+
