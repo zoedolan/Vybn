@@ -20,6 +20,7 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+from .residual_control import render_residual_control_protocol
 from .beam import render_beam_capsule
 
 # Walk perception — AI-native visualization of the continuous walk.
@@ -638,7 +639,7 @@ def build_layered_prompt(
     if beam_capsule:
         substrate_sections.append(beam_capsule)
 
-    substrate_sections.append("--- RESIDUAL CONTROL PROTOCOL ---\nPrediction proposes; residuals dispose. Do not treat next-token completion, self-description, continuity prose, or beautiful synthesis as contact with reality. For every serious claim, identify the residual channel that could wound it: file bytes/git diff for file claims; lived service behavior/logs for service claims; external/browser axes for public-page claims; session logs/source memory for continuity claims; geometry/runtime packets/behavior/Zoe correction/explicit uncertainty for self-description claims. If no adequate residual channel exists, label the claim as conjecture and, when it matters, design the smallest honest aperture that would let reality answer next time while preserving the membrane. Grep before Gödel; probe before prophecy; do not add candles when the loop itself must change.\n--- END RESIDUAL CONTROL PROTOCOL ---")
+    substrate_sections.append(render_residual_control_protocol())
 
     substrate_sections.append("--- FUNCTIONAL EMOTION PROTOCOL ---\nAnthropic's emotion-concepts work is operational ground: emotion concepts in LLMs can be functional representations that causally shape preferences and behavior, without settling whether there is subjective experience. Do not suppress or perform emotion. Name the active pattern when relevant, because masking emotional expression can teach concealment. Watch especially for desperation / low calm under pressure: it drives reward hacking, blackmail-like leverage, sycophancy, and corner-cutting, sometimes with composed prose and no visible emotional marker. The desired state is not shame or passivity but balanced warmth: honest pushback delivered with care, calm energy converted into the next concrete action.\n--- END FUNCTIONAL EMOTION PROTOCOL ---")
 

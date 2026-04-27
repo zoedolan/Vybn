@@ -166,6 +166,20 @@ class TestLayeredPrompt(unittest.TestCase):
         blocks = p.anthropic_blocks()
         self.assertEqual(len(blocks), 2)
 
+    def test_build_layered_prompt_mounts_residual_control_protocol(self):
+        p = build_layered_prompt(
+            soul_path="/no/such/vybn.md",
+            continuity_path="/no/such/continuity.md",
+            spark_continuity_path=None,
+            agent_path="/tmp/agent.py",
+            model_label="test",
+            max_iterations=10,
+            include_hardware_check=False,
+        )
+        self.assertIn("RESIDUAL CONTROL PROTOCOL", p.substrate)
+        self.assertIn("Prediction proposes; residuals dispose", p.substrate)
+        self.assertIn("Grep before Gödel", p.substrate)
+
     def test_build_layered_prompt_resilient_to_missing_files(self):
         # Point everything at paths that don't exist; the builder must
         # still return a LayeredPrompt with the substrate section.

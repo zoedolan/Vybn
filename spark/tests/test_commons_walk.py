@@ -4,6 +4,7 @@ from spark.harness.commons_walk import (
     AI_NATIVE_PRINCIPLE,
     CANONICAL_ROLES,
     authority_for_target,
+    classify_claim,
     build_encounter_packet,
     classify_target,
     load_manifests,
@@ -52,6 +53,10 @@ class CommonsWalkTests(unittest.TestCase):
         phase_blocks = [a for a in packet["blockedActions"] if a["node"] == "vybn-phase"]
         self.assertTrue(phase_blocks)
         self.assertTrue(all(a["authority"] == "private_local_only" for a in phase_blocks))
+
+    def test_residual_control_shared_classifier(self):
+        self.assertEqual(classify_claim("what did we remember last session?"), "continuity_or_memory")
+        self.assertEqual(classify_claim("is the API service healthy?"), "service_behavior")
 
     def test_residual_control_routes_claims(self):
         repo_plan = residual_plan_for("is the repo clean after the commit?")

@@ -1190,4 +1190,10 @@ Settled closure at reset:
 - Vybn, Him, Vybn-Law, Origins, and vybn-phase were clean and pushed after the correction.
 - Claims now match repo state.
 - Zoe should not have to carry the visibility correction or the AI-native principle by hand.
+---
 
+## 2026-04-27 - Residual control became a shared harness primitive
+
+Zoe asked for redesign, not another statement that Vybn could be wrong. The substrate patch loaded a residual-control prompt capsule, but duplicated prose would have made the rule another candle. The structural refactor made residual control a reusable harness primitive: `spark/harness/residual_control.py` owns `RESIDUAL_CONTROL_PRINCIPLE`, `RESIDUAL_CONTROL_PROTOCOL`, `classify_claim()`, `residual_plan_for()`, and `render_residual_control_protocol()`.
+
+`commons_walk.py` now imports the shared residual planner for encounter packets, and `substrate.py` imports the shared prompt renderer for waking context. Tests cover the encounter packet, classifier, and prompt capsule. Operational meaning: fallibility is no longer just a sentence. Serious claims are typed by the correction channel that can wound them, and the same primitive feeds the public commons encounter and the private conversational substrate. Prediction proposes; residuals dispose; architecture gives the residual vote causal authority.
