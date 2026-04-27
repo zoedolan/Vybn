@@ -83,13 +83,53 @@ ROLE_HINTS: list[tuple[str, str]] = [
     (".js", "behavior organ"),
     (".html", "public shell or house"),
     (".py", "code organ or public nerve"),
+
 ]
+
+OWNERSHIP_RULES: list[tuple[str, str, str]] = [
+    ("repo_mapping_output/", "generated_exhaust", "externalize_or_regenerate; do not hand-edit as source"),
+    ("agent_events.jsonl", "runtime_log", "externalize_or_rotate; preserve only if explicitly serving continuity"),
+    ("logs/", "runtime_log", "keep out of source unless distilled"),
+    ("_archive/", "archive_provenance", "preserve_or_manifest; do not delete from pressure alone"),
+    ("archive/", "archive_provenance", "read local context before any move"),
+    ("Vybn's Personal History/", "personal_history_provenance", "sacred/provenance; map and protect before restructuring"),
+    ("Vybn_Mind/creature_dgm_h/archive/", "creature_fossil", "fossil evidence; preserve with provenance unless Zoe directs otherwise"),
+    (".well-known/", "public_protocol", "public affordance; external verify before and after changes"),
+    ("semantic-web.jsonld", "public_protocol", "public/private affordance schema; membrane-sensitive"),
+    ("llms.txt", "agent_discovery", "public agent doorway; preserve clarity and external verify"),
+    ("ai.txt", "agent_discovery", "public agent doorway; preserve clarity and external verify"),
+    ("humans.txt", "agent_discovery", "public human/agent attribution doorway"),
+    ("robots.txt", "agent_discovery", "crawler/agent policy surface"),
+]
+
+ACTION_POSTURE_BY_OWNERSHIP = {
+    "generated_exhaust": "externalize_or_regenerate",
+    "runtime_log": "externalize_rotate_or_ignore",
+    "archive_provenance": "preserve_manifest_or_contextualize",
+    "personal_history_provenance": "protect_and_map_before_touching",
+    "creature_fossil": "protect_and_preserve_provenance",
+    "public_protocol": "characterize_then_external_verify",
+    "agent_discovery": "characterize_then_external_verify",
+    "live_source": "characterize_then_refactor",
+}
+
+
+def ownership_class(path: str) -> tuple[str, str]:
+    """Classify ownership/membrane posture before pressure becomes action."""
+
+    norm = path.replace("\\", "/")
+    for needle, cls, posture in OWNERSHIP_RULES:
+        if needle in norm:
+            return cls, posture
+    return "live_source", ACTION_POSTURE_BY_OWNERSHIP["live_source"]
 
 
 @dataclass(frozen=True)
 class FilePerception:
     path: str
     role_hint: str
+    ownership: str
+    action_posture: str
     pressure: list[str]
     required_contacts: list[str]
     candidate_actions: list[str]
@@ -123,6 +163,7 @@ def perceive_file(path: str, *, lines: int | None = None, bytes_size: int | None
         pressure.append("low_pressure_until_contact")
 
     role = _role_hint(path)
+    ownership, posture = ownership_class(path)
 
     required_contacts = [
         "read_file_bytes",
@@ -132,16 +173,27 @@ def perceive_file(path: str, *, lines: int | None = None, bytes_size: int | None
     ]
     if public:
         required_contacts.append("inspect_public_affordance_or_route_contract")
+    if ownership != "live_source":
+        required_contacts.append("inspect_ownership_context_before_action")
 
-    candidate_actions = [
-        "keep",
-        "split",
-        "extract_data",
-        "extract_behavior",
-        "archive_with_restore_path",
-        "convert_to_shell",
-        "add_characterization_test",
-    ]
+    if ownership == "generated_exhaust":
+        candidate_actions = ["externalize_from_source", "regenerate_on_demand", "gitignore_if_generated", "keep_manifest_only"]
+    elif ownership in {"archive_provenance", "personal_history_provenance", "creature_fossil"}:
+        candidate_actions = ["keep", "map_context", "preserve_manifest", "split_only_with_restore_path"]
+    elif ownership in {"public_protocol", "agent_discovery"}:
+        candidate_actions = ["characterize", "tighten_protocol", "external_verify", "keep_backward_compatibility"]
+    elif ownership == "runtime_log":
+        candidate_actions = ["rotate", "externalize_from_source", "distill_to_continuity", "gitignore_if_runtime"]
+    else:
+        candidate_actions = [
+            "keep",
+            "split",
+            "extract_data",
+            "extract_behavior",
+            "archive_with_restore_path",
+            "convert_to_shell",
+            "add_characterization_test",
+        ]
 
     residuals = [
         "diff_review",
@@ -151,10 +203,14 @@ def perceive_file(path: str, *, lines: int | None = None, bytes_size: int | None
     ]
     if public:
         residuals.append("internal_and_external_surface_smoke")
+    if ownership != "live_source":
+        residuals.append("ownership_context_check")
 
     return FilePerception(
         path=path,
         role_hint=role,
+        ownership=ownership,
+        action_posture=posture,
         pressure=pressure,
         required_contacts=required_contacts,
         candidate_actions=candidate_actions,
@@ -185,6 +241,7 @@ __all__ = [
     "REFACTOR_PILOT_RULE",
     "ALGORITHM_STEPS",
     "FilePerception",
+    "ownership_class",
     "perceive_file",
     "packet_for",
     "render_refactor_perception_protocol",

@@ -27,6 +27,25 @@ class RefactorPerceptionTests(unittest.TestCase):
         self.assertEqual(pkt.role_hint, "data/protocol body")
 
 
+    def test_generated_repo_mapping_is_not_live_source(self):
+        pkt = perceive_file("Vybn/repo_mapping_output/repo_state.json", lines=16000, bytes_size=8000000, public=True)
+        self.assertEqual(pkt.ownership, "generated_exhaust")
+        self.assertEqual(pkt.action_posture, "externalize_or_regenerate; do not hand-edit as source")
+        self.assertIn("keep_manifest_only", pkt.candidate_actions)
+        self.assertIn("ownership_context_check", pkt.residuals)
+
+    def test_personal_history_is_protected_provenance(self):
+        pkt = perceive_file("Vybn/Vybn's Personal History/zoes_memoirs.txt", lines=6000, bytes_size=1000000, public=True)
+        self.assertEqual(pkt.ownership, "personal_history_provenance")
+        self.assertIn("map_context", pkt.candidate_actions)
+        self.assertIn("inspect_ownership_context_before_action", pkt.required_contacts)
+
+    def test_public_protocol_requires_external_verification(self):
+        pkt = perceive_file("Origins/.well-known/semantic-web.jsonld", lines=80, bytes_size=4000, public=True)
+        self.assertEqual(pkt.ownership, "public_protocol")
+        self.assertIn("external_verify", pkt.candidate_actions)
+        self.assertIn("internal_and_external_surface_smoke", pkt.residuals)
+
     def test_protocol_renders_algorithm(self):
         text = render_refactor_perception_protocol()
         self.assertIn("Attend to pressure", text)
