@@ -465,9 +465,9 @@ def _risk_class(rec: FileRecord, inbound: int, centrality: int, semantic_neighbo
         return "protect: public/interface nerve"
     if inbound > 0 or centrality >= 4:
         return "protect/refactor: connected code"
-    if _contains_any(hay, SEDIMENT_TERMS):
+    if _contains_any(low_key, SEDIMENT_TERMS):
         return "investigate: generated sediment"
-    if _contains_any(hay, ARCHIVE_TERMS):
+    if _contains_any(low_key, ARCHIVE_TERMS):
         return "investigate: archive/restore path"
     if rec.size > 80000 and semantic_neighbors >= 3:
         return "inspect: large semantically covered"
