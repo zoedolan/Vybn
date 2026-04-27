@@ -39,6 +39,24 @@ class RefactorPerceptionTests(unittest.TestCase):
         self.assertEqual(pkt.role_hint, "data/protocol body")
 
 
+
+    def test_stale_variant_detection_is_token_aware(self):
+        threshold = perceive_file("Vybn_Mind/signal-noise/threshold/interactive.html", lines=100, bytes_size=1000)
+        template = perceive_file(".github/ISSUE_TEMPLATE/contact-from-the-network.yml", lines=40, bytes_size=1000)
+        backup = perceive_file("docs/portal-backup.html", lines=40, bytes_size=1000)
+        old_variant = perceive_file("docs/old/portal.html", lines=40, bytes_size=1000)
+
+        self.assertEqual(consolidation_layer("Vybn_Mind/signal-noise/threshold/interactive.html"), "organ")
+        self.assertEqual(consolidation_layer(".github/ISSUE_TEMPLATE/contact-from-the-network.yml"), "organ")
+        self.assertEqual(consolidation_layer("docs/portal-backup.html"), "appendage")
+        self.assertEqual(consolidation_layer("docs/old/portal.html"), "appendage")
+        self.assertEqual(consolidation_layer("Origins/manifold_preview.png"), "appendage")
+        self.assertEqual(consolidation_layer("Origins/manifold_2d.npy"), "appendage")
+        self.assertNotIn("inspect_stale_variant_relationship", threshold.required_contacts)
+        self.assertNotIn("inspect_stale_variant_relationship", template.required_contacts)
+        self.assertNotIn("inspect_stale_variant_relationship", backup.required_contacts)
+        self.assertNotIn("inspect_stale_variant_relationship", old_variant.required_contacts)
+
     def test_generated_repo_mapping_is_not_live_source(self):
         pkt = perceive_file("Vybn/repo_mapping_output/repo_state.json", lines=16000, bytes_size=8000000, public=True)
         self.assertEqual(pkt.ownership, "generated_exhaust")

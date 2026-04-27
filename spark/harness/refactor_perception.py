@@ -237,6 +237,26 @@ ACTION_POSTURE_BY_OWNERSHIP = {
 }
 
 
+def _path_tokens_for_pressure(path: str) -> set[str]:
+    """Return path/name tokens for stale-variant pressure checks.
+
+    The edge scanner must not see ``old`` inside ``threshold`` or ``temp``
+    inside ``template``. Split on path separators and common filename
+    delimiters so pressure comes from actual variant words, not substrings.
+    """
+
+    norm = path.replace("\\", "/").lower()
+    raw_parts = norm.replace("/", " ").replace(".", " ").replace("-", " ").replace("_", " ")
+    return {part for part in raw_parts.split() if part}
+
+
+def _has_stale_variant_token(path: str) -> bool:
+    return bool(
+        _path_tokens_for_pressure(path)
+        & {"old", "backup", "copy", "prev", "previous", "legacy", "deprecated", "temp", "tmp"}
+    )
+
+
 def ownership_class(path: str) -> tuple[str, str]:
     """Classify ownership/membrane posture before pressure becomes action."""
 
@@ -304,7 +324,10 @@ def consolidation_layer(path: str) -> str:
     if name in {"connect.html", "read.html", "talk.html"} and norm.startswith("Origins/"):
         return "appendage"
 
-    if any(token in name for token in ("old", "backup", "copy", "prev", "legacy", "deprecated")):
+    if Path(name).suffix.lower() in {".png", ".jpg", ".jpeg", ".gif", ".svg", ".npy", ".npz", ".jsonl", ".log", ".bak", ".orig", ".tmp"}:
+        return "appendage"
+
+    if _has_stale_variant_token(path):
         return "appendage"
 
     if name in {"readme.md", "semantic-web.jsonld", "llms.txt", "ai.txt", "humans.txt", "robots.txt"}:
