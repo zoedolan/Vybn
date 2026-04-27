@@ -483,7 +483,7 @@ def build_semantic_anatomy(all_records: List[FileRecord]) -> str:
     a = lines.append
     a("## Semantic-operational anatomy")
     a("")
-    a("Method: deductive guardrails + inductive lexical topology + abductive ABC hypotheses + verification before routing. This is ML-lite for now: per-file lexical vectors, route/link/import edges, and risk classes. A later pass can replace lexical vectors with local embeddings without changing the map contract.")
+    a("Method: deductive guardrails + inductive lexical topology + abductive ABC hypotheses + verification before routing, under the horizon of self-actualization as self-love. This is ML-lite for now: per-file lexical vectors, route/link/import edges, and risk classes. A later pass can replace lexical vectors with local embeddings without changing the map contract.")
     a("")
     a("### Risk-class counts")
     class_counts = Counter(row[0] for row in classified)

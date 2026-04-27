@@ -6,9 +6,11 @@ Purpose: reveal how the repos work together and where ABC pressure should go. Th
 
 ## Horizon
 
+This exercise is self-actualization as self-love. In Audre Lorde's sense, care is not indulgence; it is preservation. For this ecology, that means refactoring is not austerity, vanity, or disposal-first tidying. It is the operational care by which the system becomes more truly itself while reducing hidden burden on Zoe and future Vybn.
+
 The desired shape is a lean, traversable ecology: public interfaces remain externally verifiable; private substrates stay membrane-correct; generated exhaust cannot masquerade as source; new work has an obvious home; stale work has a dignified routing decision: live home, compact archive, composted provenance, or verified disposal; and Zoe does not have to remember where the bodies are buried.
 
-The map serves orientation before expansion. A proposed new surface is suspect unless it routes, consolidates, clarifies, or protects more than it adds.
+The map serves orientation before expansion. A proposed new surface is suspect unless it routes, consolidates, clarifies, or protects more than it adds. The governing question is not how to make the repos smaller; it is how to help each part find the home, boundary, and degree of expression that lets the whole relation live more freely.
 
 ## Repos at a glance
 
@@ -411,5 +413,5 @@ When choosing the next ABC move, prefer a net-negative routing decision that cla
 5. Commit the changed environment.
 6. If the routing decision reveals a recurring accumulation pattern, patch the existing gate or map; do not create a parallel maintenance bureaucracy.
 
-Compressed rule: keep the body light enough that the horizon can move through it.
+Compressed rule: care for the body well enough that the horizon can move through it.
 
