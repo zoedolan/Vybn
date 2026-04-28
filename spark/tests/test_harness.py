@@ -860,6 +860,7 @@ class SelfImprovementGateQuotaPressureTest(unittest.TestCase):
 
         text = Path(substrate.__file__).read_text()
         self.assertIn("quota-shaped completion gate", text)
+        self.assertIn("do not reinstall the quota", text)
         self.assertIn("do not answer until you have consolidated N files", text)
         self.assertIn("thin_result/no_result", text)
         self.assertIn("instead of manufacturing edits", text)
