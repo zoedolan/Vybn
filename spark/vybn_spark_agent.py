@@ -53,6 +53,7 @@ from harness.recurrent import run_recurrent_loop
 from harness.providers import BASH_TOOL_SPEC, DELEGATE_TOOL_SPEC, INTROSPECT_TOOL_SPEC  # noqa: E402
 from harness.providers import execute_readonly, is_parallel_safe  # noqa: E402
 from harness.substrate import rag_snippets, rag_snippets_with_tier  # noqa: E402
+from harness.tool_calls import execute_tool_calls  # noqa: E402
 from harness.providers import check_claim, check_structural_claim  # noqa: E402
 from harness.policy import is_system_critical_pilot_turn  # noqa: E402
 
@@ -507,187 +508,16 @@ def _execute_tool_calls(
     provider,
     delegate_cb=None,
 ) -> tuple[list, bool]:
-    """Run tool calls in the response; return provider-native tool_result
-    messages plus an `interrupted` flag.
-
-    The loop speaks the neutral `ToolCall` shape. Each provider knows how
-    to render a tool_result back into its native message shape.
-
-    Parallel path: when the assistant emits 2+ bash calls that all pass
-    is_parallel_safe, dispatch them to fresh subprocesses via a thread
-    pool. Serial path (persistent shell) is used for everything else so
-    state-mutating commands keep their cd/export/assignment semantics.
-
-    Round 7: `delegate` calls are dispatched via `delegate_cb(role, task)`
-    which spawns a nested agent loop against a specialist role with an
-    isolated message history. If `delegate_cb` is None the tool is
-    reported as unsupported (specialist sub-loops pass None to prevent
-    recursive delegation).
-    """
-    results: list[dict] = []
-    interrupted = False
-
-    # Gather bash calls first so we can decide serial vs parallel.
-    bash_calls = [c for c in response.tool_calls if c.name == "bash"]
-    parallel_candidates = []
-    if len(bash_calls) >= 2:
-        ok = True
-        for call in bash_calls:
-            args = call.arguments or {}
-            if args.get("restart") or "__parse_error__" in args:
-                ok = False
-                break
-            cmd = args.get("command", "") or ""
-            valid, _ = validate_command(cmd)
-            if not valid or not is_parallel_safe(cmd):
-                ok = False
-                break
-            parallel_candidates.append((call, cmd))
-        if ok and parallel_candidates:
-            # Fan out: fresh subprocess per call, preserve assistant order.
-            from concurrent.futures import ThreadPoolExecutor
-            _dim(f"[parallel: {len(parallel_candidates)} read-only bash calls]")
-            out_by_id: dict[str, str] = {}
-            with ThreadPoolExecutor(max_workers=min(8, len(parallel_candidates))) as ex:
-                future_to_call = {
-                    ex.submit(execute_readonly, cmd): call
-                    for call, cmd in parallel_candidates
-                }
-                for fut in future_to_call:
-                    c = future_to_call[fut]
-                    try:
-                        out_by_id[c.id] = fut.result()
-                    except Exception as e:
-                        out_by_id[c.id] = f"(parallel exec error: {e})"
-            # Preview the first one only — avoids flooding the REPL.
-            first_cmd = parallel_candidates[0][1]
-            _dim(f"$ {first_cmd[:200]}{'...' if len(first_cmd) > 200 else ''}")
-            _preview(out_by_id[parallel_candidates[0][0].id])
-            # Emit results in the original tool_calls order so we hit
-            # the assistant's intended shape.
-            for call in response.tool_calls:
-                if call.id in out_by_id:
-                    results.append(provider.build_tool_result(call.id, out_by_id[call.id]))
-                elif call.name != "bash":
-                    results.append(provider.build_tool_result(
-                        call.id, f"(unsupported tool: {call.name})"
-                    ))
-            return results, False
-
-    for call in response.tool_calls:
-        if call.name == "introspect":
-            results.append(provider.build_tool_result(call.id, _handle_introspect()))
-            continue
-        if call.name == "delegate":
-            if delegate_cb is None:
-                results.append(provider.build_tool_result(
-                    call.id,
-                    "(delegate unavailable: specialists cannot themselves "
-                    "delegate; only the orchestrator role may dispatch)",
-                ))
-                continue
-            if interrupted:
-                results.append(provider.build_tool_result(
-                    call.id, "(skipped — interrupted)"
-                ))
-                continue
-            try:
-                args = call.arguments or {}
-                if "__parse_error__" in args:
-                    err = args["__parse_error__"]
-                    raw = args.get("__raw_arguments__", "")
-                    out = (
-                        f"(delegate error: malformed JSON arguments — {err}; "
-                        f"raw={raw!r})"
-                    )
-                    _warn(out)
-                    results.append(provider.build_tool_result(call.id, out))
-                    continue
-                sub_role = (args.get("role") or "").strip()
-                sub_task = (args.get("task") or "").strip()
-                if not sub_role or not sub_task:
-                    out = "(delegate error: both `role` and `task` are required)"
-                    _warn(out)
-                    results.append(provider.build_tool_result(call.id, out))
-                    continue
-                if sub_role not in ("code", "task", "create", "local", "chat"):
-                    out = (
-                        f"(delegate error: unknown role {sub_role!r}; must be "
-                        "one of code/task/create/local/chat)"
-                    )
-                    _warn(out)
-                    results.append(provider.build_tool_result(call.id, out))
-                    continue
-                _dim(
-                    f"[delegate -> {sub_role}] "
-                    f"{sub_task[:160]}{'...' if len(sub_task) > 160 else ''}"
-                )
-                try:
-                    sub_out = delegate_cb(sub_role, sub_task)
-                except KeyboardInterrupt:
-                    interrupted = True
-                    results.append(provider.build_tool_result(
-                        call.id, "(delegate interrupted by user)"
-                    ))
-                    continue
-                except Exception as e:  # noqa: BLE001
-                    sub_out = f"(delegate error: {e})"
-                    _warn(sub_out)
-                results.append(provider.build_tool_result(
-                    call.id, sub_out or "(delegate returned no text)"
-                ))
-            except KeyboardInterrupt:
-                interrupted = True
-                results.append(provider.build_tool_result(
-                    call.id, "(interrupted by user)"
-                ))
-            continue
-
-        if call.name != "bash":
-            results.append(provider.build_tool_result(
-                call.id, f"(unsupported tool: {call.name})"
-            ))
-            continue
-        if interrupted:
-            results.append(provider.build_tool_result(
-                call.id, "(skipped — interrupted)"
-            ))
-            continue
-        try:
-            args = call.arguments or {}
-            if "__parse_error__" in args:
-                # OpenAIProvider flagged malformed tool-call JSON.
-                # Hand the error back to the model so it can retry
-                # with valid arguments instead of us running nothing.
-                err = args["__parse_error__"]
-                raw = args.get("__raw_arguments__", "")
-                out = (
-                    f"(tool-call error: malformed JSON arguments — {err}; "
-                    f"raw={raw!r})"
-                )
-                _warn(out)
-                results.append(provider.build_tool_result(call.id, out))
-                continue
-            if args.get("restart"):
-                out = bash.restart()
-                _dim("[bash session restarted]")
-            else:
-                command = args.get("command", "") or ""
-                ok, reason = validate_command(command)
-                if ok:
-                    _dim(f"$ {command[:200]}{'...' if len(command) > 200 else ''}")
-                    out = bash.execute(command)
-                    _preview(out)
-                else:
-                    out = reason or "(blocked)"
-                    _warn(out)
-            results.append(provider.build_tool_result(call.id, out))
-        except KeyboardInterrupt:
-            interrupted = True
-            results.append(provider.build_tool_result(call.id, "(interrupted by user)"))
-            _warn("interrupted")
-
-    return results, interrupted
+    return execute_tool_calls(
+        response,
+        bash,
+        provider,
+        delegate_cb=delegate_cb,
+        dim=_dim,
+        warn=_warn,
+        preview=_preview,
+        introspect=_handle_introspect,
+    )
 
 
 # Models on no-tool roles occasionally wrap visible reasoning in literal
