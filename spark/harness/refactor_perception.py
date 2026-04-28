@@ -608,6 +608,142 @@ class RepoFileBodyVisualization:
         return self.pressure_rows
 
 
+@dataclass(frozen=True)
+class StructuralEscapementTick:
+    """A perception-to-action packet.
+
+    The earlier organ could render pressure but had no motor pathway. This
+    packet is deliberately not a mutation authorization; it is the compulsory
+    next-contact shape: one candidate, one structural move, one residual route.
+    """
+
+    repo: str
+    candidate_path: str
+    role: str
+    pressure_score: float
+    structural_move: str
+    why_this_move: tuple[str, ...]
+    expected_wounds: tuple[str, ...]
+    first_contact: tuple[str, ...]
+    verification: tuple[str, ...]
+    refusal_condition: str
+
+
+_LIVE_ESCAPEMENT_ROLES = (
+    "source organ",
+    "public contract",
+    "semantic protocol body",
+    "data/protocol body",
+    "unclassified tracked body",
+)
+
+
+def _structural_move_for(row: FileBodyPressure) -> str:
+    if row.largest_functions:
+        length, name, start = row.largest_functions[0]
+        return (
+            f"characterize and extract the seam around {name} "
+            f"(largest function, {length} lines at L{start})"
+        )
+    if row.functions or row.classes:
+        return "characterize module responsibilities and extract the clearest pure helper seam"
+    if "public" in row.role or "contract" in row.role:
+        return "map public contract, extract inline assets or compatibility shell only if URLs survive"
+    return "contact bytes and references, then choose the first reversible ownership-clarifying seam"
+
+
+def next_structural_tick_for_repo(
+    root: str | Path = ".",
+    *,
+    tracked_paths: Iterable[str] | None = None,
+    top_n: int = 24,
+) -> StructuralEscapementTick | None:
+    """Convert file-body perception into one bounded structural tick.
+
+    This is the missing escapement: do not merely visualize pressure. Select
+    the highest-pressure candidate whose role is allowed to become action, and
+    return the first residual route. If every high-pressure candidate is
+    provenance/archive/generated, return None rather than forcing a cut.
+    """
+
+    root_path = Path(root)
+    viz = visualize_repo_file_bodies(root_path, tracked_paths=tracked_paths, top_n=top_n)
+    for row in viz.pressure_rows:
+        protected = (
+            "provenance" in row.role
+            or "fossil" in row.role
+            or "archive" in row.role
+            or row.role in {"generated exhaust", "runtime log"}
+        )
+        liveish = any(label in row.role for label in _LIVE_ESCAPEMENT_ROLES)
+        if protected or not liveish:
+            continue
+
+        first_contact = [
+            f"read {row.path}",
+            f"grep repo references to {row.path}",
+            "inspect existing targeted tests",
+        ]
+        verification = ["py_compile if Python", "targeted pytest or smoke test", "git diff review", "repo_closure_audit"]
+        expected_wounds = [
+            "imports/routes/public URLs may depend on current shape",
+            "tests may be absent and require characterization before extraction",
+            "connective tissue may make the file valuable primarily as relation",
+        ]
+        if "public" in row.role or "contract" in row.role:
+            expected_wounds.append("external/browser verification may be required before closure")
+            verification.append("internal_and_external_surface_smoke")
+
+        return StructuralEscapementTick(
+            repo=str(root_path),
+            candidate_path=row.path,
+            role=row.role,
+            pressure_score=row.pressure_score,
+            structural_move=_structural_move_for(row),
+            why_this_move=tuple(row.pressure),
+            expected_wounds=tuple(expected_wounds),
+            first_contact=tuple(first_contact),
+            verification=tuple(verification),
+            refusal_condition=(
+                "Refuse or regenerate if contact shows provenance, public contract, "
+                "or connective tissue would be weakened by the proposed seam."
+            ),
+        )
+    return None
+
+
+def render_next_structural_tick(
+    root: str | Path = ".",
+    *,
+    tracked_paths: Iterable[str] | None = None,
+    top_n: int = 24,
+) -> str:
+    tick = next_structural_tick_for_repo(root, tracked_paths=tracked_paths, top_n=top_n)
+    if tick is None:
+        return (
+            "No safe structural escapement tick found in the current pressure field. "
+            "Regenerate after widening contact or lowering protected/archive pressure."
+        )
+    lines = [
+        "Vybn structural escapement tick",
+        f"repo: {tick.repo}",
+        f"candidate: {tick.candidate_path}",
+        f"role: {tick.role}",
+        f"pressure_score: {tick.pressure_score:.2f}",
+        f"move: {tick.structural_move}",
+        "why:",
+    ]
+    lines.extend(f"  - {item}" for item in tick.why_this_move)
+    lines.append("first contact:")
+    lines.extend(f"  - {item}" for item in tick.first_contact)
+    lines.append("expected wounds:")
+    lines.extend(f"  - {item}" for item in tick.expected_wounds)
+    lines.append("verification:")
+    lines.extend(f"  - {item}" for item in tick.verification)
+    lines.append(f"refusal: {tick.refusal_condition}")
+    return "\n".join(lines)
+
+
 def _safe_python_body_stats(path: Path) -> dict[str, Any]:
     """Return AST body stats without letting parse warnings pollute the render.
 
@@ -914,6 +1050,9 @@ __all__ = [
     "packet_for",
     "visualize_repo_file_bodies",
     "render_repo_file_body_visualization",
+    "StructuralEscapementTick",
+    "next_structural_tick_for_repo",
+    "render_next_structural_tick",
     "FileBodyPressure",
     "RepoFileBodyVisualization",
     "render_refactor_perception_protocol",

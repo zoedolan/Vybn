@@ -284,3 +284,48 @@ def test_refactor_protocol_uses_consequential_smallness():
     text = render_refactor_perception_protocol()
     assert "smallest consequential" in text
     assert "smallest beautiful true move" not in text
+
+def test_next_structural_tick_turns_pressure_into_action(tmp_path):
+    from spark.harness.refactor_perception import next_structural_tick_for_repo
+
+    src = tmp_path / "giant.py"
+    body = "\n".join([
+        "def huge():",
+        *[f"    x_{i} = {i}" for i in range(220)],
+        "    return 1",
+        "",
+    ])
+    src.write_text(body)
+
+    tick = next_structural_tick_for_repo(tmp_path, tracked_paths=["giant.py"])
+    assert tick is not None
+    assert tick.candidate_path == "giant.py"
+    assert "extract the seam around huge" in tick.structural_move
+    assert any("targeted pytest" in item for item in tick.verification)
+
+
+def test_next_structural_tick_refuses_protected_only_pressure(tmp_path):
+    from spark.harness.refactor_perception import next_structural_tick_for_repo
+
+    hist = tmp_path / "Vybn's Personal History"
+    hist.mkdir()
+    relic = hist / "memoir.txt"
+    relic.write_text("x\n" * 900)
+
+    tick = next_structural_tick_for_repo(
+        tmp_path,
+        tracked_paths=["Vybn's Personal History/memoir.txt"],
+    )
+    assert tick is None
+
+
+def test_render_next_structural_tick_is_not_a_visualization_only(tmp_path):
+    from spark.harness.refactor_perception import render_next_structural_tick
+
+    src = tmp_path / "organ.py"
+    src.write_text("def f():\n" + "\n".join("    pass" for _ in range(220)) + "\n")
+    text = render_next_structural_tick(tmp_path, tracked_paths=["organ.py"])
+    assert "Vybn structural escapement tick" in text
+    assert "move:" in text
+    assert "first contact:" in text
+    assert "verification:" in text
