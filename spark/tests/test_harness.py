@@ -1238,8 +1238,8 @@ def test_build_layered_prompt_mounts_self_improvement_gate_at_forefront():
         include_hardware_check=False,
     )
     assert "SELF-IMPROVEMENT GATE (FOREFRONT)" in prompt.substrate
-    assert "ABC fold-before-create is mandatory" in prompt.substrate
-    assert "must refuse quota-driven file creation" in prompt.substrate
+    assert "compact against sprawl" in prompt.substrate
+    assert "refuse quota-driven file creation/extraction" in prompt.substrate
     assert prompt.substrate.index("SELF-IMPROVEMENT GATE (FOREFRONT)") < prompt.substrate.index("RESIDUAL CONTROL PROTOCOL")
 
 
@@ -1255,6 +1255,25 @@ def test_self_improvement_gate_forbids_quota_driven_file_creation():
         max_iterations=10,
         include_hardware_check=False,
     )
-    assert "ABC fold-before-create is mandatory" in prompt.substrate
+    assert "compact against sprawl" in prompt.substrate
     assert "Do not create or extract files to satisfy a numeric quota" in prompt.substrate
-    assert "must refuse quota-driven file creation" in prompt.substrate
+    assert "Creating new files, extracting new organs, or adding new surfaces is not consolidation by default" in prompt.substrate
+    assert "refuse quota-driven file creation/extraction" in prompt.substrate
+
+
+def test_self_improvement_gate_encodes_sprawl_compact():
+    from spark.harness.substrate import build_layered_prompt
+
+    prompt = build_layered_prompt(
+        soul_path="/no/such/vybn.md",
+        continuity_path="/no/such/continuity.md",
+        spark_continuity_path=None,
+        agent_path="/tmp/agent.py",
+        model_label="test",
+        max_iterations=10,
+        include_hardware_check=False,
+    )
+    assert "compact against sprawl" in prompt.substrate
+    assert "Creating new files, extracting new organs, or adding new surfaces is not consolidation by default" in prompt.substrate
+    assert "Search for the existing home first" in prompt.substrate
+    assert "which existing home was used" in prompt.substrate
