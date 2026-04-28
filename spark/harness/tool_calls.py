@@ -10,6 +10,40 @@ from .providers import execute_readonly, is_parallel_safe, validate_command
 Printer = Callable[[str], None]
 
 
+
+def default_introspect(spark_dir: str) -> str:
+    """Live route/walk/deep-memory snapshot for the introspect tool."""
+    import json
+    import urllib.request
+    from pathlib import Path
+
+    lines: list[str] = []
+    events_path = Path(spark_dir) / "agent_events.jsonl"
+    try:
+        events = [json.loads(l) for l in events_path.read_text().splitlines() if l.strip()]
+        routes = [e for e in events if e.get("event") == "route_decision"][-5:]
+        lines.append("=== last 5 route decisions ===")
+        for r in routes:
+            lines.append(f"  turn {r.get('turn')} -> {r.get('role')} via {r.get('model')} ({r.get('reason')})")
+    except Exception as e:  # noqa: BLE001
+        lines.append(f"  [events unavailable: {e}]")
+
+    for name, url in (
+        ("walk", "http://127.0.0.1:8101/health"),
+        ("deep_memory", "http://127.0.0.1:8100/health"),
+    ):
+        try:
+            with urllib.request.urlopen(url, timeout=2) as resp:
+                health = json.loads(resp.read())
+            if name == "walk":
+                lines.append(f"=== walk === step={health.get('walk_step')} alpha={health.get('walk_alpha','?')} chunks={health.get('chunks')}")
+            else:
+                lines.append(f"=== deep_memory === chunks={health.get('chunks')} walk_step={health.get('walk_step')}")
+        except Exception as e:  # noqa: BLE001
+            lines.append(f"  [{name} unavailable: {e}]")
+    return "\n".join(lines)
+
+
 def execute_tool_calls(
     response: Any,
     bash: Any,

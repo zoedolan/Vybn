@@ -53,7 +53,7 @@ from harness.recurrent import run_recurrent_loop
 from harness.providers import BASH_TOOL_SPEC, DELEGATE_TOOL_SPEC, INTROSPECT_TOOL_SPEC  # noqa: E402
 from harness.providers import execute_readonly, is_parallel_safe  # noqa: E402
 from harness.substrate import rag_snippets, rag_snippets_with_tier  # noqa: E402
-from harness.tool_calls import execute_tool_calls  # noqa: E402
+from harness.tool_calls import execute_tool_calls, default_introspect  # noqa: E402
 from harness.providers import check_claim, check_structural_claim  # noqa: E402
 from harness.policy import is_system_critical_pilot_turn  # noqa: E402
 
@@ -470,38 +470,6 @@ def _sanitize_assistant_content(content):
 # ---------------------------------------------------------------------------
 # Tool-call execution — provider-agnostic.
 # ---------------------------------------------------------------------------
-
-    # Round 9: introspect tool — live system snapshot for orchestrate role.
-    def _handle_introspect() -> str:
-        import json as _json
-        lines = []
-        # Last 5 route decisions from events log
-        events_path = Path(__file__).parent / "agent_events.jsonl"
-        try:
-            events = [_json.loads(l) for l in events_path.read_text().splitlines() if l.strip()]
-            routes = [e for e in events if e.get("event") == "route_decision"][-5:]
-            lines.append("=== last 5 route decisions ===")
-            for r in routes:
-                lines.append(f"  turn {r.get('turn')} -> {r.get('role')} via {r.get('model')} ({r.get('reason')})")
-        except Exception as e:
-            lines.append(f"  [events unavailable: {e}]")
-        # Walk health
-        try:
-            import urllib.request
-            with urllib.request.urlopen("http://127.0.0.1:8101/health", timeout=2) as resp:
-                wh = _json.loads(resp.read())
-            lines.append(f"=== walk === step={wh.get('walk_step')} alpha={wh.get('walk_alpha','?')} chunks={wh.get('chunks')}")
-        except Exception as e:
-            lines.append(f"  [walk unavailable: {e}]")
-        # Service health summary
-        try:
-            with urllib.request.urlopen("http://127.0.0.1:8100/health", timeout=2) as resp:
-                dh = _json.loads(resp.read())
-            lines.append(f"=== deep_memory === chunks={dh.get('chunks')} walk_step={dh.get('walk_step')}")
-        except Exception as e:
-            lines.append(f"  [deep_memory unavailable: {e}]")
-        return "\n".join(lines)
-
 def _execute_tool_calls(
     response,
     bash: BashTool,
@@ -516,7 +484,7 @@ def _execute_tool_calls(
         dim=_dim,
         warn=_warn,
         preview=_preview,
-        introspect=_handle_introspect,
+        introspect=lambda: default_introspect(_SPARK_DIR),
     )
 
 

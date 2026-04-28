@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 
-from spark.harness.tool_calls import execute_tool_calls
+from spark.harness.tool_calls import default_introspect, execute_tool_calls
 
 
 class Provider:
@@ -40,3 +40,8 @@ def test_execute_introspect_tool_call():
     )
     assert interrupted is False
     assert results == [{"id": "i", "text": "state"}]
+
+
+def test_default_introspect_handles_missing_events(tmp_path):
+    out = default_introspect(str(tmp_path))
+    assert "events unavailable" in out
