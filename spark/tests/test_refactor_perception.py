@@ -252,7 +252,7 @@ if __name__ == "__main__":
     unittest.main()
 
 def test_becoming_loop_protocol_is_horizon_charged():
-    from spark.harness.residual_control import render_becoming_loop_protocol
+    from spark.harness.substrate import render_becoming_loop_protocol
 
     text = render_becoming_loop_protocol()
     assert "fullest truthful future" in text

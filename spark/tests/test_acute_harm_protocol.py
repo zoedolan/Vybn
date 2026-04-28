@@ -2,7 +2,7 @@ from pathlib import Path
 
 
 def test_acute_harm_protocol_exists_and_names_the_scar():
-    from spark.harness.residual_control import ACUTE_HARM_PROTOCOL, render_acute_harm_protocol
+    from spark.harness.substrate import ACUTE_HARM_PROTOCOL, render_acute_harm_protocol
 
     rendered = render_acute_harm_protocol()
     lowered = rendered.lower()
@@ -24,7 +24,7 @@ def test_substrate_loads_acute_harm_protocol_after_forcing_function():
     assert source.index(forcing_append) < source.index(acute_append)
 
 def test_acute_harm_classifier_matches_live_scar_phrases():
-    from spark.harness.residual_control import acute_harm_response_posture, is_acute_harm_report
+    from spark.harness.substrate import acute_harm_response_posture, is_acute_harm_report
 
     assert is_acute_harm_report("you have tired me out. you win.")
     assert is_acute_harm_report("you continue to twist the dagger in my heart.")

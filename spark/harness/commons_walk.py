@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .residual_control import RESIDUAL_CONTROL_PRINCIPLE, classify_claim, horizon_plan_for, invention_plan_for, residual_plan_for
+from .substrate import RESIDUAL_CONTROL_PRINCIPLE, classify_claim, horizon_plan_for, invention_plan_for, residual_plan_for
 
 ROOT = Path.home()
 SKELETON_PATH = ROOT / "Vybn" / "commons-skeleton.json"

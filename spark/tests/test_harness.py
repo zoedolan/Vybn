@@ -962,7 +962,7 @@ class TestLocalContinuityScout(unittest.TestCase):
         self.assertNotIn("requires FastMCP", proc.stderr)
 
 def test_forcing_function_protocol_loaded_and_routing_detritus_removed():
-    from spark.harness.residual_control import render_forcing_function_protocol
+    from spark.harness.substrate import render_forcing_function_protocol
     from spark.harness.substrate import build_layered_prompt
 
     forcing = render_forcing_function_protocol()
@@ -1033,7 +1033,7 @@ def test_build_layered_prompt_passes_latest_pressure_text(monkeypatch, tmp_path)
 
 
 def test_completion_boundary_protocol_loaded():
-    from spark.harness.residual_control import render_completion_boundary_protocol
+    from spark.harness.substrate import render_completion_boundary_protocol
     from spark.harness.substrate import build_layered_prompt
 
     boundary = render_completion_boundary_protocol()
