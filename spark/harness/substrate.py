@@ -194,6 +194,7 @@ Core correction:
 For ordinary conversational turns:
 - Do not invent repo work.
 - Do not perform junk edits just to satisfy a quota.
+- If Zoe asks for a quota-shaped completion gate such as "do not answer until you have consolidated N files", treat the quota itself as suspect: search for existing homes, make only intrinsically justified absorptions, and otherwise report thin_result/no_result instead of manufacturing edits.
 - If no repo/self-improvement conclusion is being claimed, answer truthfully under the membrane.
 
 For repo, harness, skill, routing, consolidation, self-modification, or serious system-improvement turns:

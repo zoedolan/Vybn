@@ -852,6 +852,19 @@ class TestProviderRetryClassifier(unittest.TestCase):
         self.assertTrue(agent._is_transient_error(Exception("Error code: 529 overloaded_error")))
 
 
+
+class SelfImprovementGateQuotaPressureTest(unittest.TestCase):
+    def test_rejects_file_quota_completion_pressure(self):
+        from pathlib import Path
+        from spark.harness import substrate
+
+        text = Path(substrate.__file__).read_text()
+        self.assertIn("quota-shaped completion gate", text)
+        self.assertIn("do not answer until you have consolidated N files", text)
+        self.assertIn("thin_result/no_result", text)
+        self.assertIn("instead of manufacturing edits", text)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
 
