@@ -31,7 +31,7 @@ import re
 import sys
 import time
 from contextlib import contextmanager
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Iterator
 
@@ -82,6 +82,46 @@ MAX_BASH_TIMEOUT = 300
 # running — observability is not worth a session.
 # ---------------------------------------------------------------------------
 
+TURN_EVENT_REQUIRED_FIELDS = (
+    "turn",
+    "role",
+    "provider",
+    "model",
+    "tools",
+    "latency_ms",
+    "state_touched",
+    "contracts_implicated",
+    "verification_gaps",
+)
+
+
+@dataclass
+class TurnEventContract:
+    """Typed minimum debug facts for a completed harness turn."""
+
+    turn: int
+    role: str
+    provider: str
+    model: str
+    tools: list[str] = field(default_factory=list)
+    latency_ms: int = 0
+    state_touched: list[str] = field(default_factory=list)
+    contracts_implicated: list[str] = field(default_factory=list)
+    verification_gaps: list[str] = field(default_factory=list)
+    in_tokens: int = 0
+    out_tokens: int = 0
+    tool_calls: int = 0
+    stop_reason: str | None = None
+    fallback_from: str | None = None
+
+    def to_record(self) -> dict[str, Any]:
+        record = asdict(self)
+        missing = [k for k in TURN_EVENT_REQUIRED_FIELDS if k not in record]
+        if missing:  # pragma: no cover - dataclass/tests pin this invariant
+            raise ValueError(f"turn event contract missing fields: {missing}")
+        return record
+
+
 @dataclass
 class EventLogger:
     path: str = DEFAULT_EVENT_LOG
@@ -110,24 +150,54 @@ class EventLogger:
 
 
 @contextmanager
-def turn_event(logger: EventLogger, turn: int, role: str, model: str) -> Iterator[dict]:
-    """Context manager that brackets a turn with start/end events.
+def turn_event(
+    logger: EventLogger,
+    turn: int,
+    role: str,
+    model: str,
+    *,
+    provider: str = "unknown",
+    tools: list[str] | None = None,
+    state_touched: list[str] | None = None,
+    contracts_implicated: list[str] | None = None,
+    verification_gaps: list[str] | None = None,
+) -> Iterator[dict]:
+    """Bracket a turn and emit a typed turn_end contract.
 
-    Yields a mutable dict the caller can write token counts and latency
-    into before the `turn_end` event is emitted.
+    The log is not a vibe diary. It carries the minimum facts needed to
+    debug routing and drift: role, provider/model, tools, latency, state
+    touched, implicated contracts, and known verification gaps.
     """
     started = time.monotonic()
-    logger.emit("turn_start", turn=turn, role=role, model=model)
-    bag: dict[str, Any] = {
-        "turn": turn, "role": role, "model": model,
-        "in_tokens": 0, "out_tokens": 0, "tool_calls": 0,
-        "stop_reason": None, "fallback_from": None,
-    }
+    logger.emit(
+        "turn_start",
+        turn=turn,
+        role=role,
+        provider=provider,
+        model=model,
+        tools=list(tools or []),
+        state_touched=list(state_touched or []),
+        contracts_implicated=list(contracts_implicated or []),
+        verification_gaps=list(verification_gaps or []),
+    )
+    bag: dict[str, Any] = TurnEventContract(
+        turn=turn,
+        role=role,
+        provider=provider,
+        model=model,
+        tools=list(tools or []),
+        state_touched=list(state_touched or []),
+        contracts_implicated=list(contracts_implicated or []),
+        verification_gaps=list(verification_gaps or []),
+    ).to_record()
     try:
         yield bag
     finally:
         bag["latency_ms"] = int((time.monotonic() - started) * 1000)
-        logger.emit("turn_end", **bag)
+        contract = TurnEventContract(**{
+            k: bag.get(k) for k in TurnEventContract.__dataclass_fields__
+        })
+        logger.emit("turn_end", **contract.to_record())
 
 
 # ---------------------------------------------------------------------------

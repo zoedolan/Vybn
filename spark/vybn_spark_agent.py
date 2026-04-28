@@ -1156,7 +1156,7 @@ def run_agent_loop(
                 live=enrichment,
             )
             _dim(f"[deep-memory: enriched prompt, tier={rag_tier}]")
-            logger.emit("rag_hit", turn=turn_number, chars=len(enrichment), tier=rag_tier)
+            logger.emit("rag_hit", turn=turn_number, chars=len(enrichment), tier=rag_tier, structured=True)
             # Record what we retrieved; used by learn_from_exchange at
             # the NEXT turn boundary (when we have a followup).
             _LEARN_PENDING["rag"] = enrichment[:2000]
@@ -1230,7 +1230,28 @@ def run_agent_loop(
 
     iterations = 0
     final_text = ""
-    with turn_event(logger, turn_number, decision.role, role_cfg.model) as bag:
+    contracts_implicated = [
+        "router_policy",
+        *("rag_structured_evidence" for _ in [0] if role_cfg.rag and not getattr(role_cfg, "lightweight", False)),
+        *("tool_contract" for _ in [0] if tools),
+    ]
+    state_touched = ["session_messages"]
+    if role_cfg.rag and not getattr(role_cfg, "lightweight", False):
+        state_touched.append("deep_memory")
+    if tools:
+        state_touched.append("tool_surface")
+
+    with turn_event(
+        logger,
+        turn_number,
+        decision.role,
+        role_cfg.model,
+        provider=role_cfg.provider,
+        tools=[t.name for t in tools],
+        state_touched=state_touched,
+        contracts_implicated=contracts_implicated,
+        verification_gaps=["external_axis_unchecked"],
+    ) as bag:
         while iterations < role_cfg.max_iterations:
             iterations += 1
             try:

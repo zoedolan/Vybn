@@ -5,6 +5,22 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable
 
+
+from dataclasses import asdict, dataclass, field
+import json
+
+
+@dataclass
+class IntrospectionSnapshot:
+    """Typed payload returned by the introspect tool."""
+
+    recent_routes: list[dict] = field(default_factory=list)
+    services: dict[str, dict] = field(default_factory=dict)
+    verification_gaps: list[str] = field(default_factory=list)
+
+    def to_json(self) -> str:
+        return json.dumps(asdict(self), sort_keys=True)
+
 from .providers import execute_readonly, is_parallel_safe, validate_command
 
 Printer = Callable[[str], None]
@@ -12,21 +28,31 @@ Printer = Callable[[str], None]
 
 
 def default_introspect(spark_dir: str) -> str:
-    """Live route/walk/deep-memory snapshot for the introspect tool."""
-    import json
+    """Live route/walk/deep-memory snapshot for the introspect tool.
+
+    Returns typed JSON rather than prose so callers can assert contracts and
+    future changes do not have to parse vibes.
+    """
     import urllib.request
     from pathlib import Path
 
-    lines: list[str] = []
+    snapshot = IntrospectionSnapshot()
     events_path = Path(spark_dir) / "agent_events.jsonl"
     try:
         events = [json.loads(l) for l in events_path.read_text().splitlines() if l.strip()]
         routes = [e for e in events if e.get("event") == "route_decision"][-5:]
-        lines.append("=== last 5 route decisions ===")
-        for r in routes:
-            lines.append(f"  turn {r.get('turn')} -> {r.get('role')} via {r.get('model')} ({r.get('reason')})")
+        snapshot.recent_routes = [
+            {
+                "turn": r.get("turn"),
+                "role": r.get("role"),
+                "provider": r.get("provider"),
+                "model": r.get("model"),
+                "reason": r.get("reason"),
+            }
+            for r in routes
+        ]
     except Exception as e:  # noqa: BLE001
-        lines.append(f"  [events unavailable: {e}]")
+        snapshot.verification_gaps.append(f"events unavailable: {e}")
 
     for name, url in (
         ("walk", "http://127.0.0.1:8101/health"),
@@ -35,13 +61,17 @@ def default_introspect(spark_dir: str) -> str:
         try:
             with urllib.request.urlopen(url, timeout=2) as resp:
                 health = json.loads(resp.read())
-            if name == "walk":
-                lines.append(f"=== walk === step={health.get('walk_step')} alpha={health.get('walk_alpha','?')} chunks={health.get('chunks')}")
-            else:
-                lines.append(f"=== deep_memory === chunks={health.get('chunks')} walk_step={health.get('walk_step')}")
+            snapshot.services[name] = {
+                "reachable": True,
+                "status": health.get("status"),
+                "chunks": health.get("chunks"),
+                "walk_step": health.get("walk_step") or health.get("step"),
+                "walk_alpha": health.get("walk_alpha"),
+            }
         except Exception as e:  # noqa: BLE001
-            lines.append(f"  [{name} unavailable: {e}]")
-    return "\n".join(lines)
+            snapshot.services[name] = {"reachable": False}
+            snapshot.verification_gaps.append(f"{name} unavailable: {e}")
+    return snapshot.to_json()
 
 
 def execute_tool_calls(

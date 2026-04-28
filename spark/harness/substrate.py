@@ -981,13 +981,27 @@ def _rag_http(endpoint: str, query: str, k: int, timeout: float) -> list:
 
 
 def _format_snippets(results: list) -> str:
-    snippets = [
-        f"[{r.get('source', '')}] {r.get('text', '')[:300]}"
-        for r in results if r.get("text")
-    ]
-    if not snippets:
+    """Render retrieval as structured evidence, not flattened vibes."""
+    items = []
+    for idx, r in enumerate(results):
+        text = (r.get("text") or "")[:300]
+        if not text:
+            continue
+        item = {
+            "i": idx,
+            "source": r.get("source", ""),
+            "text": text,
+        }
+        for key in ("score", "fidelity", "telling", "distinctiveness", "curvature"):
+            if key in r:
+                item[key] = r.get(key)
+        items.append(item)
+    if not items:
         return ""
-    return "Relevant context from memory:\n" + "\n".join(snippets)
+    return (
+        "Relevant context from memory (structured evidence):\n"
+        + json.dumps(items, ensure_ascii=False, sort_keys=True, indent=2)
+    )
 
 
 def rag_snippets_with_tier(

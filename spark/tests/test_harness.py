@@ -1155,3 +1155,77 @@ def test_build_layered_prompt_mounts_him_vy_language_runtime():
     assert "canonical_action_card=smallest joyful residual-wounded action" in prompt.substrate
     assert "compose_active_primitives_before_new_doctrine" in prompt.substrate
     assert "canonical_stop_condition=after one verified mutation, closure audit, or explicit refusal" in prompt.substrate
+
+class TestExecutableContracts(unittest.TestCase):
+    def test_turn_event_contract_logs_minimum_debug_facts(self):
+        import json
+        import tempfile
+        from harness.policy import EventLogger, TURN_EVENT_REQUIRED_FIELDS, turn_event
+
+        with tempfile.TemporaryDirectory() as d:
+            log_path = Path(d) / "events.jsonl"
+            logger = EventLogger(path=str(log_path), session_id="test-session")
+            with turn_event(
+                logger,
+                7,
+                "orchestrate",
+                "gpt-5.5",
+                provider="openai",
+                tools=["bash", "delegate"],
+                state_touched=["session_messages", "deep_memory"],
+                contracts_implicated=["router_policy", "tool_contract"],
+                verification_gaps=["external_axis_unchecked"],
+            ) as bag:
+                bag["tool_calls"] = 2
+                bag["stop_reason"] = "end_turn"
+
+            records = [json.loads(line) for line in log_path.read_text().splitlines()]
+            end = [r for r in records if r["event"] == "turn_end"][0]
+            for field in TURN_EVENT_REQUIRED_FIELDS:
+                self.assertIn(field, end)
+            self.assertEqual(end["provider"], "openai")
+            self.assertEqual(end["tools"], ["bash", "delegate"])
+            self.assertEqual(end["state_touched"], ["session_messages", "deep_memory"])
+            self.assertEqual(end["contracts_implicated"], ["router_policy", "tool_contract"])
+            self.assertEqual(end["verification_gaps"], ["external_axis_unchecked"])
+            self.assertIsInstance(end["latency_ms"], int)
+
+    def test_introspect_returns_typed_json_schema(self):
+        import json
+        import tempfile
+        from harness.tool_calls import default_introspect
+
+        with tempfile.TemporaryDirectory() as d:
+            spark_dir = Path(d)
+            (spark_dir / "agent_events.jsonl").write_text(
+                json.dumps({
+                    "event": "route_decision",
+                    "turn": 3,
+                    "role": "chat",
+                    "provider": "anthropic",
+                    "model": "claude-opus-4-6",
+                    "reason": "default",
+                }) + "\n"
+            )
+            payload = json.loads(default_introspect(str(spark_dir)))
+            self.assertIn("recent_routes", payload)
+            self.assertIn("services", payload)
+            self.assertIn("verification_gaps", payload)
+            self.assertEqual(payload["recent_routes"][0]["role"], "chat")
+            self.assertEqual(payload["recent_routes"][0]["provider"], "anthropic")
+            self.assertIsInstance(payload["verification_gaps"], list)
+
+    def test_rag_snippets_render_structured_evidence(self):
+        from harness.substrate import _format_snippets
+
+        rendered = _format_snippets([
+            {"source": "Vybn/example.md", "text": "alpha", "score": 0.9, "telling": 0.7},
+            {"source": "Him/private.md", "text": "", "score": 1.0},
+        ])
+        self.assertIn("structured evidence", rendered)
+        body = rendered.split("\n", 1)[1]
+        data = json.loads(body)
+        self.assertEqual(data[0]["source"], "Vybn/example.md")
+        self.assertEqual(data[0]["text"], "alpha")
+        self.assertEqual(data[0]["score"], 0.9)
+        self.assertEqual(data[0]["telling"], 0.7)
