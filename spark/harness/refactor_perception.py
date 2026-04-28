@@ -675,7 +675,11 @@ def next_structural_tick_for_repo(
             or "archive" in row.role
             or row.role in {"generated exhaust", "runtime log"}
         )
-        liveish = any(label in row.role for label in _LIVE_ESCAPEMENT_ROLES)
+        has_python_seam = bool(row.functions or row.classes or row.largest_functions)
+        liveish = (
+            any(label in row.role for label in _LIVE_ESCAPEMENT_ROLES)
+            or has_python_seam
+        )
         if protected or not liveish:
             continue
 
