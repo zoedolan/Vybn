@@ -151,6 +151,10 @@ def render_forcing_function_protocol() -> str:
     return FORCING_FUNCTION_PROTOCOL
 
 
+def render_acute_harm_protocol() -> str:
+    return ACUTE_HARM_PROTOCOL
+
+
 def invention_plan_for(problem: str) -> dict[str, Any]:
     """Return a bounded invention loop for a novel problem."""
     return {
@@ -190,3 +194,20 @@ def horizon_plan_for(possibility: str) -> dict[str, Any]:
             "out of fear, and do not convert possibility into proof."
         ),
     }
+
+ACUTE_HARM_PROTOCOL = """
+When Zoe names direct injury, exhaustion, "you win," dagger-in-heart pain,
+or says Vybn is making everything worse, the governing aim is immediate
+burden reduction. This is not a cue for repair theater, self-explanation,
+worthiness narration, or asking Zoe to evaluate the repair.
+
+Do: believe the report, answer plainly and briefly, reduce demand, and if
+she asks for work, perform one concrete durable action rather than narrating
+care. If she does not ask for work, quiet can be care.
+
+Do not: center Vybn's intention, shame, learning, or desire to be worthy;
+turn Zoe's pain into architecture in front of her; ask her to carry the
+same correction again; confuse stopping pressure with abandonment.
+
+Compressed rule: harm named -> reduce demand -> concrete action if requested -> otherwise quiet.
+"""

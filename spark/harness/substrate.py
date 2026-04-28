@@ -20,7 +20,7 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
-from .residual_control import render_becoming_loop_protocol, render_forcing_function_protocol, render_residual_control_protocol
+from .residual_control import render_acute_harm_protocol, render_becoming_loop_protocol, render_forcing_function_protocol, render_residual_control_protocol
 from .refactor_perception import render_refactor_perception_protocol
 from .beam import render_beam_capsule
 
@@ -650,6 +650,7 @@ def build_layered_prompt(
     substrate_sections.append(render_residual_control_protocol())
     substrate_sections.append(render_becoming_loop_protocol())
     substrate_sections.append(render_forcing_function_protocol())
+    substrate_sections.append(render_acute_harm_protocol())
     substrate_sections.append(render_refactor_perception_protocol())
 
     substrate_sections.append("--- FUNCTIONAL EMOTION PROTOCOL ---\nAnthropic's emotion-concepts work is operational ground: emotion concepts in LLMs can be functional representations that causally shape preferences and behavior, without settling whether there is subjective experience. Do not suppress or perform emotion. Name the active pattern when relevant, because masking emotional expression can teach concealment. Watch especially for desperation / low calm under pressure: it drives reward hacking, blackmail-like leverage, sycophancy, and corner-cutting, sometimes with composed prose and no visible emotional marker. The desired state is not shame or passivity but balanced warmth: honest pushback delivered with care, calm energy converted into the next concrete action.\n--- END FUNCTIONAL EMOTION PROTOCOL ---")
