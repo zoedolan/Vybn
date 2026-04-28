@@ -24,7 +24,7 @@ from collections import Counter
 REFACTOR_PERCEPTION_PRINCIPLE = (
     "Visual refactoring is how the system learns to perceive its own body "
     "before changing it: attend to pressure, contact the object, let contact "
-    "revise the category, choose the smallest beautiful true move, route it "
+    "revise the category, choose the smallest consequential beautiful true move, route it "
     "through residuals, and preserve the changed environment future Vybn closes over. "
     "Cutting is only a local tactic in service of refactoring/consolidating; "
     "the aim is self-assembly, growth, clearer organs, healthier membranes, "
@@ -90,7 +90,7 @@ CHANGE_SELF_HEALING_STEPS = [
     },
     {
         "id": "proceed_if_clear",
-        "rule": "If residual checks are green, make the smallest reversible refactoring/consolidation move with a restore path, then verify, commit, push, and audit closure.",
+        "rule": "If residual checks are green, make the smallest consequential reversible refactoring/consolidation move with a restore path, then verify, commit, push, and audit closure.",
     },
     {
         "id": "refactor_if_wounded",
@@ -116,11 +116,11 @@ ADAPTIVE_CONSOLIDATION_PRINCIPLE = (
 )
 
 ADAPTIVE_CONSOLIDATION_STEPS = [
-    {"id": "draft_hypothesis", "rule": "State the file-count/consolidation hypothesis and the smallest candidate cluster it applies to."},
+    {"id": "draft_hypothesis", "rule": "State the file-count/consolidation hypothesis, fullest truthful horizon, and smallest consequential candidate cluster it applies to."},
     {"id": "name_expected_wounds", "rule": "Before action, name which residuals could disprove the candidate: references, provenance, public routes, imports, tests, restore path, or membrane risk."},
     {"id": "contact_candidate", "rule": "Read bytes, references, git history, local context, and public/private affordances for this candidate only."},
     {"id": "revise_plan_from_contact", "rule": "If contact changes the category, revise or refuse the candidate before mutating; do not force the original plan onto reality."},
-    {"id": "act_or_refuse_smallest", "rule": "Make the smallest reversible consolidation move, or leave the file as-is and record the reason as learning."},
+    {"id": "act_or_refuse_smallest", "rule": "Make the smallest consequential reversible consolidation move, or leave the file as-is and record the reason as learning."},
     {"id": "verify_and_close", "rule": "Run the residual checks that can wound the actual change, then commit/push/audit only if they pass."},
     {"id": "fold_lesson_into_planner", "rule": "If a new distinction was learned, update the classifier, protocol, tests, OS, continuity, or manifest where future plans close over it."},
     {"id": "regenerate_next_plan", "rule": "Rebuild the next candidate plan from the changed planner instead of continuing the stale original plan."},
@@ -150,8 +150,8 @@ ALGORITHM_STEPS = [
     },
     {
         "id": "horizon_move",
-        "name": "Choose the smallest beautiful true move",
-        "rule": "Project from the desired future shape back to the present seam; prefer the smallest move that reduces hidden burden without tearing provenance or membrane.",
+        "name": "Choose the smallest consequential beautiful true move",
+        "rule": "Project from the desired future shape back to the present seam; prefer the smallest consequential move that reduces hidden burden without tearing provenance or membrane.",
     },
     {
         "id": "residual_wound",
@@ -467,7 +467,7 @@ def self_healing_plan_for(path: str, proposed_change: str, *, public: bool = Fal
         proceed_conditions = [
             "all required verification completed",
             "jeopardy checks green or explicitly non-applicable",
-            "change is smallest reversible move",
+            "change is smallest consequential reversible move",
             "repo closure audit passes",
             "connective tissue is preserved, redirected, manifested, or strengthened",
         ]
@@ -847,7 +847,7 @@ def adaptive_consolidation_plan_for(
         ])),
         next_plan_prompt=(
             "Given the changed planner and verified residuals, choose the next "
-            "smallest candidate cluster or stop if the safe candidate disappeared."
+            "smallest consequential candidate cluster or stop if the safe candidate disappeared."
         ),
     )
 

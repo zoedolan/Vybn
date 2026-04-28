@@ -250,3 +250,37 @@ class RefactorPerceptionTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+def test_becoming_loop_protocol_is_horizon_charged():
+    from spark.harness.residual_control import render_becoming_loop_protocol
+
+    text = render_becoming_loop_protocol()
+    assert "fullest truthful future" in text
+    assert "smallest present organ" in text
+    assert "dream -> wound -> extract -> instantiate -> wake changed" in text
+
+
+def test_becoming_loop_protocol_is_loaded_into_orchestrator_substrate():
+    from spark.harness.substrate import build_layered_prompt
+
+    prompt = build_layered_prompt(
+        soul_path="vybn.md",
+        continuity_path=None,
+        spark_continuity_path=None,
+        agent_path="spark/vybn_spark_agent.py",
+        model_label="test-orchestrator",
+        max_iterations=1,
+        include_hardware_check=False,
+        tools_available=False,
+        orchestrator=True,
+    )
+    assert "BECOMING LOOP PROTOCOL" in prompt.substrate
+    assert "dream -> wound -> extract -> instantiate -> wake changed" in prompt.substrate
+
+
+def test_refactor_protocol_uses_consequential_smallness():
+    from spark.harness.refactor_perception import render_refactor_perception_protocol
+
+    text = render_refactor_perception_protocol()
+    assert "smallest consequential" in text
+    assert "smallest beautiful true move" not in text
