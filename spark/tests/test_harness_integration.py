@@ -76,7 +76,7 @@ class TestChatApiReusesHarness(unittest.TestCase):
         if not hasattr(self.mod, "_rag_snippets_async"):
             self.skipTest(
                 "live chat API does not reuse the spark harness "
-                "(see _archive/spark__vybn_chat_api.py for prior form)"
+                "(prior archived chat fork shed from _archive)"
             )
 
     def test_harness_imports_succeeded(self):

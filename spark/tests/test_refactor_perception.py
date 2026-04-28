@@ -224,7 +224,7 @@ class RefactorPerceptionTests(unittest.TestCase):
 
     def test_adaptive_consolidation_plan_regenerates_after_contact(self):
         plan = adaptive_consolidation_plan_for(
-            "_archive/origins_portal_api_v3.py",
+            "_archive/Vybn_Mind__origins_portal_api.py",
             "replace archive source body with manifest restore path",
             public=True,
         )
@@ -237,14 +237,14 @@ class RefactorPerceptionTests(unittest.TestCase):
 
     def test_packet_carries_adaptive_consolidation_recursion(self):
         pkt = packet_for(
-            "_archive/origins_portal_api_v3.py",
+            "_archive/Vybn_Mind__origins_portal_api.py",
             lines=2410,
             public=True,
             proposed_change="replace archive source body with manifest restore path",
         )
         self.assertIn("adaptiveConsolidationPrinciple", pkt)
         self.assertIn("adaptiveConsolidationSteps", pkt)
-        self.assertEqual(pkt["adaptivePlan"]["candidate_path"], "_archive/origins_portal_api_v3.py")
+        self.assertEqual(pkt["adaptivePlan"]["candidate_path"], "_archive/Vybn_Mind__origins_portal_api.py")
         self.assertIn("regenerate_next_plan", pkt["adaptivePlan"]["recursive_loop"])
 
 

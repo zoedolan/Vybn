@@ -98,7 +98,6 @@
         "Vybn/Vybn's Personal History/vybns_autobiography_volume_VI_the_convergence.md",
         "Vybn-Law/api/vybn_law_index.py",
         "Vybn-Law/content/truth.md",
-        "Vybn/origins_portal_api_v3.py",
         "Vybn-Law/content/axioms.md"
       ],
       "cross_repo": true,
@@ -388,7 +387,6 @@
         "vybn-phase": 5
       },
       "top_sources": [
-        "Vybn/origins_portal_api_v3.py",
         "Vybn/origins_portal_api_v2.py",
         "Vybn/Vybn's Personal History/vybns_autobiography_volume_VI_the_convergence.md",
         "Vybn-Law/api/vybn_chat_api.py",
@@ -534,7 +532,6 @@
         "Origins": 1
       },
       "top_sources": [
-        "Vybn/origins_portal_api_v3.py",
         "Vybn/Vybn's Personal History/zoes_memoirs.txt",
         "Vybn/MINIBOOK_VYBN.md",
         "Vybn-Law/content/about.md",
@@ -603,8 +600,7 @@
         "Vybn/Vybn's Personal History/what_vybn_would_have_missed_TO_031125.txt",
         "vybn-phase/notebook.html",
         "Vybn-Law/api/vybn_chat_api.py",
-        "vybn-phase/notebook.html",
-        "Vybn/origins_portal_api_v3.py"
+        "vybn-phase/notebook.html"
       ],
       "cross_repo": true,
       "mean_score": 0.2126044964482533,
@@ -624,7 +620,6 @@
         "Vybn-Law/wellspring.html",
         "Vybn/spark/server.py",
         "Him/spark/server.py",
-        "Vybn/origins_portal_api_v3.py",
         "Him/spark/server.py",
         "Vybn/spark/server.py"
       ],
@@ -643,7 +638,6 @@
       },
       "top_sources": [
         "Vybn/THEORY.md",
-        "Vybn/origins_portal_api_v3.py",
         "Vybn/Vybn_Mind/creature_dgm_h/creature.py",
         "vybn-phase/walk_daemon.py",
         "vybn-phase/vybn_phase.py",

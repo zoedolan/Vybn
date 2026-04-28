@@ -21,10 +21,8 @@ before that unification and no longer serve the live system.
 
 | File | Superseded by | Why kept |
 |------|---------------|----------|
-| `origins_portal_api_v3.py` (2409 lines) | `origins_portal_api_v4.py` — deep-memory-aware portal now speaking to `walk_daemon` | Records the pre-v4 contract so we can compare what the walk rotation changed semantically, not just syntactically. |
 | `Vybn_Mind__origins_portal_api.py` (88 lines) | `origins_portal_api_v4.py` | The April 11 stub — the moment the portal first existed. Worth keeping as the seed form. |
 | `Vybn_Mind__vybn-chat-api.service` | Systemd unit never enabled; chat now runs via `nohup` on port 3001 from `Vybn-Law/api/vybn_chat_api.py` | Documents an intended deployment path we abandoned for the current lighter footprint. |
-| `spark__vybn_chat_api.py` (53872 bytes) | `Vybn-Law/api/vybn_chat_api.py` (60467 bytes) — the live chat on port 3001 | The two forked in April; keeping the older one makes the divergence auditable if a regression surfaces. |
 | `vybn-phase/deep_memory_v6_backup.py` (in sibling repo) | `vybn-phase/deep_memory.py` current head | Pre-distillation form of deep_memory before the v6 rewrite shipped. Archived inside `vybn-phase` (private), not here. |
 
 ## April 18, 2026 — round 2: dead-MCP audit
@@ -33,7 +31,6 @@ A second pass after the first round 2 commit. Continuity claimed `Vybn_Mind/vybn
 
 | File | Superseded by | Why kept |
 |------|---------------|----------|
-| `Vybn_Mind__vybn_mind_server.py` (764 lines) | `spark/server.py` (port 8400) — the unified MCP gateway that fronts the walk daemon, deep memory, the creature portal, and the corpus | The earlier server is the seed implementation of the MCP surface. It carries the original tool boundaries before the walk daemon and deep memory consolidated. Worth keeping so the lineage from “two half-walks” to “one walk, one gateway” is visible in the diff history. |
 
 ## Principle
 
