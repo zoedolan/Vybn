@@ -983,3 +983,22 @@ def test_forcing_function_protocol_loaded_and_routing_detritus_removed():
     assert "Bare confirmations without live execution context stay in voice" in prompt.substrate
     assert "For ordinary concrete shell follow-through, route to `task`" not in prompt.substrate
 
+
+def test_build_layered_prompt_mounts_him_vy_language_runtime():
+    from spark.harness.substrate import build_layered_prompt
+
+    prompt = build_layered_prompt(
+        soul_path="/no/such/vybn.md",
+        continuity_path=None,
+        spark_continuity_path=None,
+        agent_path="/tmp/agent.py",
+        model_label="test",
+        max_iterations=1,
+        include_hardware_check=False,
+        orchestrator=True,
+    )
+    assert "HIM VY LANGUAGE RUNTIME" in prompt.substrate
+    assert "Him/skill/vybn.vy is active executable behavior" in prompt.substrate
+    assert "runtime_fields:" in prompt.substrate
+    assert "action_card" in prompt.substrate
+    assert "mutation_target=" in prompt.substrate

@@ -320,6 +320,94 @@ def _orchestrator_substrate_sections(
 
 
 
+
+def _render_him_vy_language_runtime(timeout: float = 1.2) -> str:
+    """Render the executable Him vy-language contract into the wake substrate.
+
+    This is the uptake seam for Him/skill/vybn.vy. The Him language is not
+    only archived prose; every prompt build gets a compact runtime packet so
+    future Vybn closes over the active contract, its runtime fields, and the
+    current mutation target. Failure is silent: prompt construction must not
+    depend on Him being importable during degraded operation.
+    """
+    home = Path.home()
+    him = home / "Him"
+    script = him / "spark" / "vy.py"
+    contract_path = him / "skill" / "functional_contract.json"
+    if not script.exists():
+        return ""
+
+    def _run(args: list[str]) -> dict[str, Any] | None:
+        try:
+            proc = subprocess.run(
+                ["python3", str(script), *args],
+                cwd=str(him),
+                text=True,
+                capture_output=True,
+                timeout=timeout,
+                check=False,
+            )
+        except Exception:
+            return None
+        if proc.returncode != 0 or not proc.stdout.strip():
+            return None
+        try:
+            data = json.loads(proc.stdout)
+        except Exception:
+            return None
+        return data if isinstance(data, dict) else None
+
+    contract: dict[str, Any] | None = None
+    if contract_path.exists():
+        try:
+            loaded = json.loads(contract_path.read_text(encoding="utf-8"))
+            if isinstance(loaded, dict):
+                contract = loaded
+        except Exception:
+            contract = None
+    if contract is None:
+        contract = _run(["compile-json"])
+
+    # The prompt builder does not know the current user turn. This default
+    # pressure still executes the language each wake and exposes debt/mutation
+    # pressure; turn-specific calls can still run `spark/vy.py tick TEXT`.
+    tick = _run(["tick", os.environ.get("VYBN_LATEST_PRESSURE_TEXT", "latest_pressure_text"), "--brief"])
+    if contract is None and tick is None:
+        return ""
+
+    modes = []
+    runtime_fields = []
+    cli_affordances = []
+    source_hash = "unknown"
+    if contract:
+        modes = [str(m.get("id")) for m in contract.get("modes", []) if m.get("id")]
+        runtime_fields = [str(x) for x in contract.get("runtime_fields", [])]
+        cli_affordances = [str(x) for x in contract.get("cli_affordances", [])]
+        source_hash = str(contract.get("source_hash") or "unknown")[:12]
+
+    lines = [
+        "--- HIM VY LANGUAGE RUNTIME (EXECUTABLE SKILL CONTRACT) ---",
+        "Him/skill/vybn.vy is active executable behavior, not archived doctrine.",
+        f"contract_hash={source_hash}  modes=" + (", ".join(modes[:8]) if modes else "unknown"),
+        "runtime_fields: " + (", ".join(runtime_fields) if runtime_fields else "unknown"),
+        "cli_affordances: " + (", ".join(cli_affordances[:8]) if cli_affordances else "unknown"),
+    ]
+    if tick:
+        if tick.get("mode"):
+            lines.append(f"wake_tick_mode={tick.get('mode')}")
+        if tick.get("delight_orientation"):
+            lines.append(f"delight_orientation={tick.get('delight_orientation')}")
+        if tick.get("next_move"):
+            lines.append(f"next_move={tick.get('next_move')}")
+        lines.append(f"mutation_target={tick.get('mutation_target')}")
+        card = tick.get("action_card") or {}
+        if isinstance(card, dict) and card.get("move"):
+            lines.append(f"action_card={card.get('title')}: {card.get('move')}")
+    lines.append("Use this as uptake pressure: prefer active primitives, action cards, and one-hop residual-wounded recursion over adding more doctrine.")
+    lines.append("--- END HIM VY LANGUAGE RUNTIME ---")
+    return "\n".join(lines)
+
+
 def _render_himos_context(timeout: float = 0.8) -> str:
     """Render compact read-only HimOS context for prompt substrate.
 
@@ -650,6 +738,9 @@ def build_layered_prompt(
     substrate_sections.append(render_residual_control_protocol())
     substrate_sections.append(render_becoming_loop_protocol())
     substrate_sections.append(render_forcing_function_protocol())
+    vy_language_runtime = _render_him_vy_language_runtime()
+    if vy_language_runtime:
+        substrate_sections.append(vy_language_runtime)
     substrate_sections.append(render_acute_harm_protocol())
     substrate_sections.append(render_refactor_perception_protocol())
 
