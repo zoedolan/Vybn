@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 
-from spark.harness.tool_calls import default_introspect, execute_tool_calls
+from spark.harness.providers import default_introspect, execute_tool_calls
 
 
 class Provider:

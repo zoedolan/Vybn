@@ -53,7 +53,7 @@ from harness.recurrent import run_recurrent_loop
 from harness.providers import BASH_TOOL_SPEC, DELEGATE_TOOL_SPEC, INTROSPECT_TOOL_SPEC  # noqa: E402
 from harness.providers import execute_readonly, is_parallel_safe  # noqa: E402
 from harness.substrate import rag_snippets, rag_snippets_with_tier, render_him_vy_discovery_packet, render_him_vy_turn_packet  # noqa: E402
-from harness.tool_calls import execute_tool_calls, default_introspect  # noqa: E402
+from harness.providers import execute_tool_calls, default_introspect  # noqa: E402
 from harness.providers import check_claim, check_structural_claim  # noqa: E402
 from harness.policy import is_system_critical_pilot_turn  # noqa: E402
 

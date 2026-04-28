@@ -1193,7 +1193,7 @@ class TestExecutableContracts(unittest.TestCase):
     def test_introspect_returns_typed_json_schema(self):
         import json
         import tempfile
-        from harness.tool_calls import default_introspect
+        from harness.providers import default_introspect
 
         with tempfile.TemporaryDirectory() as d:
             spark_dir = Path(d)
