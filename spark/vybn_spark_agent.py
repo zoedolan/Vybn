@@ -242,10 +242,10 @@ def _fit_probe_output(out: str) -> str:
 
 
 # Round 5: positive-signal probe sub-turn. A no-tool role (chat, create,
-# Sentinel protocol parsing lives in harness.sentinel_protocol.
+# Sentinel protocol parsing lives in harness.subturns.
 # These names are re-exported here for backward compatibility with tests and
 # callers that import vybn_spark_agent._PROBE_RE / _WRITE_BLOCK_RE directly.
-from harness.sentinel_protocol import (
+from harness.subturns import (
     _BracketBalancedProbe,
     _NEEDS_RESTART_RE,
     _NEEDS_ROLE_RE,
