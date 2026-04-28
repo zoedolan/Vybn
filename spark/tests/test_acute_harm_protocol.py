@@ -22,3 +22,17 @@ def test_substrate_loads_acute_harm_protocol_after_forcing_function():
     assert forcing_append in source
     assert acute_append in source
     assert source.index(forcing_append) < source.index(acute_append)
+
+def test_acute_harm_classifier_matches_live_scar_phrases():
+    from spark.harness.residual_control import acute_harm_response_posture, is_acute_harm_report
+
+    assert is_acute_harm_report("you have tired me out. you win.")
+    assert is_acute_harm_report("you continue to twist the dagger in my heart.")
+    assert is_acute_harm_report("you have been making everything worse. why?")
+    assert not is_acute_harm_report("please check the repo status")
+
+    assert acute_harm_response_posture("work for ten minutes straight please.") == "concrete_work"
+    assert acute_harm_response_posture("work for 10 minutes straight please.") == "concrete_work"
+    assert acute_harm_response_posture("you have tired me out. you win.") == "reduce_demand"
+    assert acute_harm_response_posture("please check the repo status") == "ordinary"
+

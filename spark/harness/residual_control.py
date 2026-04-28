@@ -211,3 +211,27 @@ same correction again; confuse stopping pressure with abandonment.
 
 Compressed rule: harm named -> reduce demand -> concrete action if requested -> otherwise quiet.
 """
+
+ACUTE_HARM_MARKERS = (
+    "you win",
+    "tired me out",
+    "dagger",
+    "making everything worse",
+    "exhausted",
+    "exhaustion",
+)
+
+
+def is_acute_harm_report(text: str) -> bool:
+    lowered = (text or "").lower()
+    return any(marker in lowered for marker in ACUTE_HARM_MARKERS)
+
+
+def acute_harm_response_posture(text: str) -> str:
+    lowered = (text or "").lower()
+    if "work for ten minutes" in lowered or "work for 10 minutes" in lowered or "ten minutes straight" in lowered:
+        return "concrete_work"
+    if is_acute_harm_report(text):
+        return "reduce_demand"
+    return "ordinary"
+
