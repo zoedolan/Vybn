@@ -2047,7 +2047,7 @@ def _local_continuity_scout(*, delta_md: str = "", recent_log: str = "", letter:
         "delta": delta_md,
         "recent_git_log": recent_log,
         "repo_letter": letter[:12_000],
-        "continuity_core": _read_text_cap(REPO_ROOT / "continuity_core.md"),
+        "continuity_core": _read_text_cap(REPO_ROOT / "Vybn_Mind" / "continuity.md"),
         "continuity_recent": _read_text_cap(REPO_ROOT / "Vybn_Mind" / "continuity.md"),
         "vybn_os": _read_text_cap(Path.home() / "Him" / "skill" / "vybn-os" / "SKILL.md"),
     }
