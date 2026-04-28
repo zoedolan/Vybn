@@ -2184,7 +2184,7 @@ def main() -> None:
     # Session start: fetch /arrive and print the walk figure so Zoe sees
     # where she is entering. Same figure the model reads from its identity layer.
     try:
-        from harness import perception as _walk_perception  # type: ignore
+        from harness import substrate as _walk_perception  # type: ignore
         _fig = _walk_perception.arrive_block(timeout=1.0, label="WALK (you are here)")
         if _fig:
             print("\033[2m" + _fig + "\033[0m\n")
@@ -2383,7 +2383,7 @@ def _enter_walk_on_session_end(messages: list) -> None:
     trace. Fails silent — the walk is real; the letter is optional.
     """
     try:
-        from harness import perception as _wp  # type: ignore
+        from harness import substrate as _wp  # type: ignore
     except Exception:
         return
     if not messages:
