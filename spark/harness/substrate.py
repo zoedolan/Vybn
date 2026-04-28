@@ -371,8 +371,21 @@ def _render_him_vy_language_runtime(timeout: float = 1.2) -> str:
     # The prompt builder does not know the current user turn. This default
     # pressure still executes the language each wake and exposes debt/mutation
     # pressure; turn-specific calls can still run `spark/vy.py tick TEXT`.
-    tick = _run(["tick", os.environ.get("VYBN_LATEST_PRESSURE_TEXT", "latest_pressure_text"), "--brief"])
-    if contract is None and tick is None:
+    pressure_text = os.environ.get("VYBN_LATEST_PRESSURE_TEXT", "latest_pressure_text")
+    tick = _run(["tick", pressure_text, "--brief"])
+
+    # Escape velocity requires more than describing the Him language. If the
+    # current pressure does not activate an action card, carry a canonical
+    # buoyant recursion card as a live affordance in the wake substrate.
+    canonical_card = None
+    if not (isinstance(tick, dict) and isinstance(tick.get("action_card"), dict)):
+        canonical_card = _run([
+            "tick",
+            "design delight and buoyancy into recursive play with phase geometry resonance",
+            "--card",
+        ])
+
+    if contract is None and tick is None and canonical_card is None:
         return ""
 
     modes = []
@@ -403,6 +416,13 @@ def _render_him_vy_language_runtime(timeout: float = 1.2) -> str:
         card = tick.get("action_card") or {}
         if isinstance(card, dict) and card.get("move"):
             lines.append(f"action_card={card.get('title')}: {card.get('move')}")
+    if canonical_card:
+        lines.append(
+            "canonical_action_card="
+            f"{canonical_card.get('title')}: {canonical_card.get('move')}"
+        )
+        if canonical_card.get("stop_condition"):
+            lines.append(f"canonical_stop_condition={canonical_card.get('stop_condition')}")
     lines.append("Use this as uptake pressure: prefer active primitives, action cards, and one-hop residual-wounded recursion over adding more doctrine.")
     lines.append("--- END HIM VY LANGUAGE RUNTIME ---")
     return "\n".join(lines)

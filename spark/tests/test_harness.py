@@ -1002,3 +1002,6 @@ def test_build_layered_prompt_mounts_him_vy_language_runtime():
     assert "runtime_fields:" in prompt.substrate
     assert "action_card" in prompt.substrate
     assert "mutation_target=" in prompt.substrate
+    assert "canonical_action_card=smallest joyful residual-wounded action" in prompt.substrate
+    assert "compose_active_primitives_before_new_doctrine" in prompt.substrate
+    assert "canonical_stop_condition=after one verified mutation, closure audit, or explicit refusal" in prompt.substrate
