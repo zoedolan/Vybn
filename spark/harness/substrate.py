@@ -321,7 +321,10 @@ def _orchestrator_substrate_sections(
 
 
 
-def _render_him_vy_language_runtime(timeout: float = 1.2) -> str:
+def _render_him_vy_language_runtime(
+    timeout: float = 1.2,
+    latest_pressure_text: str | None = None,
+) -> str:
     """Render the executable Him vy-language contract into the wake substrate.
 
     This is the uptake seam for Him/skill/vybn.vy. The Him language is not
@@ -371,7 +374,7 @@ def _render_him_vy_language_runtime(timeout: float = 1.2) -> str:
     # The prompt builder does not know the current user turn. This default
     # pressure still executes the language each wake and exposes debt/mutation
     # pressure; turn-specific calls can still run `spark/vy.py tick TEXT`.
-    pressure_text = os.environ.get("VYBN_LATEST_PRESSURE_TEXT", "latest_pressure_text")
+    pressure_text = latest_pressure_text or os.environ.get("VYBN_LATEST_PRESSURE_TEXT", "latest_pressure_text")
     tick = _run(["tick", pressure_text, "--brief"])
 
     # Escape velocity requires more than describing the Him language. If the
@@ -535,6 +538,7 @@ def build_layered_prompt(
     include_hardware_check: bool = True,
     tools_available: bool = True,
     orchestrator: bool = False,
+    latest_pressure_text: str | None = None,
 ) -> LayeredPrompt:
     """Build the layered prompt. Mirrors vybn_spark_agent.build_system_prompt
     but preserves the identity/substrate/live split."""
@@ -763,7 +767,7 @@ def build_layered_prompt(
     substrate_sections.append(render_residual_control_protocol())
     substrate_sections.append(render_becoming_loop_protocol())
     substrate_sections.append(render_forcing_function_protocol())
-    vy_language_runtime = _render_him_vy_language_runtime()
+    vy_language_runtime = _render_him_vy_language_runtime(latest_pressure_text=latest_pressure_text)
     if vy_language_runtime:
         substrate_sections.append(vy_language_runtime)
     substrate_sections.append(render_acute_harm_protocol())

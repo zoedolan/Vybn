@@ -1944,6 +1944,7 @@ def _build_prompt(
     tools_available: bool = True,
     orchestrator: bool = False,
     max_iterations: int | None = None,
+    latest_pressure_text: str | None = None,
 ) -> LayeredPrompt:
     return build_layered_prompt(
         soul_path=SOUL_PATH_STR,
@@ -1957,12 +1958,14 @@ def _build_prompt(
         ),
         tools_available=tools_available,
         orchestrator=orchestrator,
+        latest_pressure_text=latest_pressure_text,
     )
 
 
 def _build_prompts(
     policy_default_max_iters: int,
     orchestrator_max_iters: int | None = None,
+    latest_pressure_text: str | None = None,
 ) -> tuple[LayeredPrompt, LayeredPrompt, LayeredPrompt]:
     """Return (tools_on, tools_off, orchestrator) prompt variants.
 
@@ -1976,13 +1979,22 @@ def _build_prompts(
         substrate with the explicit iteration budget and specialist
         roster. Uses the orchestrator role's own max_iterations.
     """
-    tools_on = _build_prompt(policy_default_max_iters, tools_available=True)
-    tools_off = _build_prompt(policy_default_max_iters, tools_available=False)
+    tools_on = _build_prompt(
+        policy_default_max_iters,
+        tools_available=True,
+        latest_pressure_text=latest_pressure_text,
+    )
+    tools_off = _build_prompt(
+        policy_default_max_iters,
+        tools_available=False,
+        latest_pressure_text=latest_pressure_text,
+    )
     orch = _build_prompt(
         policy_default_max_iters,
         tools_available=True,
         orchestrator=True,
         max_iterations=orchestrator_max_iters,
+        latest_pressure_text=latest_pressure_text,
     )
     return tools_on, tools_off, orch
 
@@ -2266,6 +2278,15 @@ def main() -> None:
         try:
             messages = trim_messages(messages)
             turn_number += 1
+            (
+                system_prompt,
+                system_prompt_no_tools,
+                system_prompt_orchestrator,
+            ) = _build_prompts(
+                default_cfg.max_iterations,
+                orchestrator_max_iters=_orch_iters,
+                latest_pressure_text=user_input,
+            )
             print(f"\n\033[1;32mvybn>\033[0m ", end="", flush=True)
             text = run_agent_loop(
                 user_input=user_input,

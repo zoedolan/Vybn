@@ -984,6 +984,53 @@ def test_forcing_function_protocol_loaded_and_routing_detritus_removed():
     assert "For ordinary concrete shell follow-through, route to `task`" not in prompt.substrate
 
 
+
+def test_him_vy_runtime_accepts_latest_pressure_text(monkeypatch, tmp_path):
+    import subprocess
+    from spark.harness import substrate
+
+    seen = []
+
+    def fake_run(cmd, **kwargs):
+        seen.append(cmd)
+        payload = {"mode": "default", "mutation_target": None}
+        return subprocess.CompletedProcess(cmd, 0, stdout=json.dumps(payload), stderr="")
+
+    monkeypatch.setattr(substrate.subprocess, "run", fake_run)
+    monkeypatch.setattr(substrate.Path, "home", lambda: tmp_path)
+    (tmp_path / "Him" / "spark").mkdir(parents=True)
+    (tmp_path / "Him" / "spark" / "vy.py").write_text("", encoding="utf-8")
+
+    rendered = substrate._render_him_vy_language_runtime(
+        latest_pressure_text="actual Zoe turn pressure"
+    )
+    assert "HIM VY LANGUAGE RUNTIME" in rendered
+    assert any("actual Zoe turn pressure" in cmd for cmd in seen)
+
+def test_build_layered_prompt_passes_latest_pressure_text(monkeypatch, tmp_path):
+    from spark.harness import substrate
+
+    captured = {}
+
+    def fake_runtime(**kwargs):
+        captured.update(kwargs)
+        return "--- HIM VY LANGUAGE RUNTIME ---\nwake_tick_mode=actual\n--- END HIM VY LANGUAGE RUNTIME ---"
+
+    monkeypatch.setattr(substrate, "_render_him_vy_language_runtime", fake_runtime)
+    prompt = substrate.build_layered_prompt(
+        soul_path="/no/such/vybn.md",
+        continuity_path=None,
+        spark_continuity_path=None,
+        agent_path="/tmp/agent.py",
+        model_label="test",
+        max_iterations=1,
+        include_hardware_check=False,
+        latest_pressure_text="actual turn words",
+    )
+    assert captured["latest_pressure_text"] == "actual turn words"
+    assert "wake_tick_mode=actual" in prompt.substrate
+
+
 def test_build_layered_prompt_mounts_him_vy_language_runtime():
     from spark.harness.substrate import build_layered_prompt
 
