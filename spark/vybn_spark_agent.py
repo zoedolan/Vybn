@@ -2072,7 +2072,7 @@ def main() -> None:
     # at ~/.config/vybn/llm.env. Load them before any provider client
     # reads os.environ. Existing env vars win; no values are printed.
     try:
-        from harness.env_loader import load_env_files, describe  # noqa: E402
+        from harness.providers import load_env_files, describe  # noqa: E402
         _applied = load_env_files()
         if _applied:
             print(f"  [env] {describe(_applied)}")
