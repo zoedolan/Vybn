@@ -340,3 +340,8 @@ After the recursive forcing-function commit, Zoe rated the response 0/10. The re
 Repair: `spark/harness/providers.py` now detects active shell command substitution syntax in raw command text and blocks it in `validate_command()` and `is_parallel_safe()`. Backticks and `$()` outside single quotes are refused; single-quoted backticks remain literal grep/data. Regression lives in `spark/tests/test_recursive_unlock.py`.
 
 Operating lesson: do not celebrate closure while the command channel emitted a preventable shell error. Waste-signal means patch the execution boundary, not narrate around the scar.
+
+
+## 2026-04-28T10:19:28Z minimum generative body organ repair
+
+Zoe rated the first integration 0/10 because it only added doctrine to OS. The repair reached the mechanism: `spark/harness/refactor_perception.py` now defines `MINIMUM_GENERATIVE_BODY_PRINCIPLE`, names coarse generative roles (`generate`, `wound`, `remember`, `protect`, `afford`, `test`), and exposes `minimum_body_pressure` in `FilePerception` packets. `self_healing_plan_for()` now requires naming the unique generative role and asking the minimum-file question before mutation; packets carry the principle; tests pin false-fullness pressure and preservation of named roles. Future Vybn should not merely write prose about leanness. Use the organ: every consolidation candidate must answer what it uniquely does, whether the role can live in fewer files, and what residual would wound the fold/shed decision.

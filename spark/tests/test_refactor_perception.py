@@ -6,6 +6,7 @@ import warnings
 from spark.harness.refactor_perception import (
     CHANGE_SELF_HEALING_PRINCIPLE,
     CONNECTIVE_TISSUE_PRINCIPLE,
+    MINIMUM_GENERATIVE_BODY_PRINCIPLE,
     ADAPTIVE_CONSOLIDATION_PRINCIPLE,
     REFACTOR_PILOT_RULE,
     adaptive_consolidation_plan_for,
@@ -121,6 +122,32 @@ class RefactorPerceptionTests(unittest.TestCase):
         self.assertIn("ownership_context_check", pkt.residuals)
 
 
+
+
+    def test_minimum_generative_body_pressure_exposes_false_fullness(self):
+        pkt = perceive_file("scratch/orphan_blob.txt", lines=900, bytes_size=300000, public=False)
+        self.assertIn("minimum_body_pressure:no_named_generative_role", pkt.minimum_body_pressure)
+        self.assertIn("minimum_generative_body_check", pkt.residuals)
+        self.assertIn("name_unique_generative_role_or_expose_missingness", pkt.required_contacts)
+        self.assertIn("fold_into_existing_generative_surface", pkt.candidate_actions)
+        self.assertIn("shed_if_no_unique_role_survives_contact", pkt.candidate_actions)
+
+    def test_minimum_generative_body_preserves_named_roles(self):
+        pkt = perceive_file("spark/tests/test_refactor_perception.py", lines=400, bytes_size=18000)
+        self.assertIn("test", pkt.generative_roles)
+        self.assertNotIn("minimum_body_pressure:no_named_generative_role", pkt.minimum_body_pressure)
+
+    def test_packet_and_protocol_carry_minimum_generative_body(self):
+        pkt = packet_for("scratch/orphan_blob.txt", lines=900, bytes_size=300000)
+        self.assertIn("minimumGenerativeBodyPrinciple", pkt)
+        self.assertIn("minimum_body_pressure", pkt["perception"])
+        self.assertIn(
+            "name_unique_generative_role_generate_wound_remember_protect_afford_or_test",
+            pkt["selfHealingPlan"]["verification"],
+        )
+        text = render_refactor_perception_protocol()
+        self.assertIn(MINIMUM_GENERATIVE_BODY_PRINCIPLE, text)
+        self.assertIn("fewest sufficient files", text)
 
     def test_connective_tissue_is_first_class_in_perception(self):
         pkt = perceive_file("Origins/archive/manifold-preview/README.md", lines=40, bytes_size=2000, public=True)

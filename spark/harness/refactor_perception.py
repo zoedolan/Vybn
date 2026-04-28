@@ -52,6 +52,42 @@ CONNECTIVE_TISSUE_PRINCIPLE = (
     "relation; map that relation before splitting, moving, archiving, or deleting."
 )
 
+MINIMUM_GENERATIVE_BODY_PRINCIPLE = (
+    "Prefer the minimum generative body: the fewest sufficient files with the "
+    "hardest honest seams. Preserve only surfaces that generate, wound, "
+    "remember, protect, afford, or test something necessary; make incompleteness "
+    "visible and shed or fold the rest."
+)
+
+GENERATIVE_ROLE_RULES: list[tuple[str, str]] = [
+    ("test_", "test"),
+    ("tests/", "test"),
+    ("README", "remember"),
+    ("continuity", "remember"),
+    ("_archive/README.md", "remember"),
+    ("archive/", "remember"),
+    ("_archive/", "remember"),
+    ("ai.txt", "afford"),
+    ("llms.txt", "afford"),
+    ("humans.txt", "afford"),
+    ("robots.txt", "protect"),
+    ("semantic-web.jsonld", "afford"),
+    ("commons-skeleton.json", "afford"),
+    ("requirements.txt", "protect"),
+    ("pyproject.toml", "protect"),
+    ("router_policy.yaml", "protect"),
+    ("mcp.py", "afford"),
+    ("providers.py", "afford"),
+    ("refactor_perception.py", "wound"),
+    ("residual_control.py", "wound"),
+    ("sentinel_protocol.py", "protect"),
+    ("subturns.py", "protect"),
+    ("vybn_spark_agent.py", "generate"),
+    ("origins_portal_api_v4.py", "generate"),
+]
+
+GENERATIVE_ROLES = ("generate", "wound", "remember", "protect", "afford", "test")
+
 CONSOLIDATION_ORDER = [
     {
         "layer": "appendage",
@@ -146,12 +182,12 @@ ALGORITHM_STEPS = [
     {
         "id": "name_role",
         "name": "Name the file-body role",
-        "rule": "Classify as shell, organ, data, protocol, test membrane, style, continuity, artifact, archive/provenance, restore capsule, generated exhaust, public nerve, or private workbench organ.",
+        "rule": "Classify as shell, organ, data, protocol, test membrane, style, continuity, artifact, archive/provenance, restore capsule, generated exhaust, public nerve, or private workbench organ; name which generative roles it uniquely serves.",
     },
     {
         "id": "horizon_move",
         "name": "Choose the smallest consequential beautiful true move",
-        "rule": "Project from the desired future shape back to the present seam; prefer the smallest consequential move that reduces hidden burden without tearing provenance or membrane.",
+        "rule": "Project from the desired future shape back to the present seam; prefer the smallest consequential move that reduces hidden burden without tearing provenance or membrane, and ask whether the same generative role can live in fewer files.",
     },
     {
         "id": "residual_wound",
@@ -265,6 +301,79 @@ def ownership_class(path: str) -> tuple[str, str]:
         if needle in norm:
             return cls, posture
     return "live_source", ACTION_POSTURE_BY_OWNERSHIP["live_source"]
+
+
+def generative_roles_for(path: str, *, role_hint: str = "", ownership: str = "", connective_tissue: Iterable[str] | None = None) -> list[str]:
+    """Name why a file deserves to remain part of the body.
+
+    The minimum-generative-body reflex is executable only if every candidate can
+    answer what it uniquely does. Roles are intentionally coarse: generate,
+    wound, remember, protect, afford, test. If no role is found, the file may
+    still survive contact, but the packet must expose that missingness.
+    """
+
+    norm = path.replace("\\", "/")
+    low = norm.lower()
+    found: list[str] = []
+
+    def add(role: str) -> None:
+        if role not in found:
+            found.append(role)
+
+    for needle, role in GENERATIVE_ROLE_RULES:
+        if needle.lower() in low:
+            add(role)
+
+    role_low = role_hint.lower()
+    if any(token in role_low for token in ("code organ", "behavior organ", "public nerve", "public shell", "house")):
+        add("generate")
+    if any(token in role_low for token in ("test membrane", "spec")):
+        add("test")
+    if any(token in role_low for token in ("data/protocol", "semantic protocol")):
+        add("afford")
+    if any(token in role_low for token in ("context/provenance", "continuity", "archive")):
+        add("remember")
+
+    if ownership in {"archive_provenance", "personal_history_provenance", "creature_fossil", "deep_memory_state"}:
+        add("remember")
+    if ownership in {"public_protocol", "agent_discovery"}:
+        add("afford")
+        add("protect")
+    if ownership in {"generated_exhaust", "runtime_log"}:
+        # Generated/log bodies must justify staying tracked by a distilled role.
+        pass
+
+    for tissue in connective_tissue or ():
+        if tissue in {"test_membrane"}:
+            add("test")
+        elif tissue in {"context_map", "continuity_thread", "archive_restore_context", "provenance_thread"}:
+            add("remember")
+        elif tissue in {"semantic_affordance", "agent_affordance", "public_affordance_surface", "compatibility_shell", "tool_resource_registry", "provider_contract", "route_map"}:
+            add("afford")
+        elif tissue in {"crawler_policy_surface", "human_agent_attribution"}:
+            add("protect")
+        elif tissue in {"repl_orchestration_spine", "public_route_spine"}:
+            add("generate")
+    return found
+
+
+def minimum_body_pressure_for(path: str, *, generative_roles: Iterable[str], connective_tissue: Iterable[str], ownership: str, lines: int | None = None, bytes_size: int | None = None) -> list[str]:
+    """Expose false-fullness pressure without authorizing deletion."""
+
+    pressures: list[str] = []
+    roles = list(generative_roles)
+    tissue = list(connective_tissue)
+    if not roles:
+        pressures.append("minimum_body_pressure:no_named_generative_role")
+    if ownership in {"generated_exhaust", "runtime_log"} and not roles:
+        pressures.append("minimum_body_pressure:tracked_exhaust_without_distilled_role")
+    if ownership == "archive_provenance" and not tissue:
+        pressures.append("minimum_body_pressure:archive_without_manifested_relation")
+    if lines is not None and lines >= 700 and len(roles) <= 1:
+        pressures.append("minimum_body_pressure:large_surface_single_named_role")
+    if bytes_size is not None and bytes_size >= 250_000 and len(roles) <= 1:
+        pressures.append("minimum_body_pressure:heavy_surface_single_named_role")
+    return pressures
 
 
 def connective_tissue_for(path: str, *, role_hint: str = "", ownership: str = "") -> list[str]:
@@ -386,6 +495,8 @@ class FilePerception:
     candidate_actions: list[str]
     residuals: list[str]
     connective_tissue: list[str]
+    generative_roles: list[str]
+    minimum_body_pressure: list[str]
     pilot_rule: str = REFACTOR_PILOT_RULE
 
 
@@ -414,6 +525,8 @@ def self_healing_plan_for(path: str, proposed_change: str, *, public: bool = Fal
         "confirm_ownership_class_and_consolidation_layer",
         "name_restore_or_reversal_path",
         "map_connective_tissue_imports_routes_links_tests_and_manifests",
+        "name_unique_generative_role_generate_wound_remember_protect_afford_or_test",
+        "ask_minimum_file_question_for_this_subsystem",
     ]
 
     jeopardy_checks = [
@@ -421,6 +534,7 @@ def self_healing_plan_for(path: str, proposed_change: str, *, public: bool = Fal
         "repo_closure_audit_all_repos",
         "stray_artifact_check",
         "ensure_connective_tissue_preserved_or_strengthened",
+        "ensure_minimum_generative_body_or_record_why_more_files_are_needed",
     ]
 
     if public or layer in {"membrane", "organ"}:
@@ -515,6 +629,16 @@ def perceive_file(path: str, *, lines: int | None = None, bytes_size: int | None
     role = _role_hint(path)
     ownership, posture = ownership_class(path)
     connective_tissue = connective_tissue_for(path, role_hint=role, ownership=ownership)
+    generative_roles = generative_roles_for(path, role_hint=role, ownership=ownership, connective_tissue=connective_tissue)
+    minimum_body_pressure = minimum_body_pressure_for(
+        path,
+        generative_roles=generative_roles,
+        connective_tissue=connective_tissue,
+        ownership=ownership,
+        lines=lines,
+        bytes_size=bytes_size,
+    )
+    pressure.extend(minimum_body_pressure)
 
     required_contacts = [
         "read_file_bytes",
@@ -528,6 +652,7 @@ def perceive_file(path: str, *, lines: int | None = None, bytes_size: int | None
         required_contacts.append("inspect_ownership_context_before_action")
     if connective_tissue:
         required_contacts.append("map_connective_tissue_before_action")
+    required_contacts.append("name_unique_generative_role_or_expose_missingness")
 
     if ownership == "generated_exhaust":
         candidate_actions = ["externalize_from_source", "regenerate_on_demand", "gitignore_if_generated", "keep_manifest_only"]
@@ -552,6 +677,8 @@ def perceive_file(path: str, *, lines: int | None = None, bytes_size: int | None
 
     if connective_tissue and "fortify_connective_tissue" not in candidate_actions:
         candidate_actions.append("fortify_connective_tissue")
+    if minimum_body_pressure:
+        candidate_actions.extend(["fold_into_existing_generative_surface", "reduce_to_restore_capsule", "shed_if_no_unique_role_survives_contact"])
 
     residuals = [
         "diff_review",
@@ -565,6 +692,7 @@ def perceive_file(path: str, *, lines: int | None = None, bytes_size: int | None
         residuals.append("ownership_context_check")
     if connective_tissue:
         residuals.append("connective_tissue_preservation_check")
+    residuals.append("minimum_generative_body_check")
 
     return FilePerception(
         path=path,
@@ -576,6 +704,8 @@ def perceive_file(path: str, *, lines: int | None = None, bytes_size: int | None
         candidate_actions=candidate_actions,
         residuals=residuals,
         connective_tissue=connective_tissue,
+        generative_roles=generative_roles,
+        minimum_body_pressure=minimum_body_pressure,
     )
 
 
@@ -1003,6 +1133,7 @@ def render_refactor_perception_protocol() -> str:
         f"{APPENDAGE_FIRST_CONSOLIDATION_PRINCIPLE}\n\n"
         f"{CHANGE_SELF_HEALING_PRINCIPLE}\n\n"
         f"{CONNECTIVE_TISSUE_PRINCIPLE}\n\n"
+        f"{MINIMUM_GENERATIVE_BODY_PRINCIPLE}\n\n"
         f"{ADAPTIVE_CONSOLIDATION_PRINCIPLE}\n\n"
         f"{REFACTOR_PILOT_RULE}\n\n"
         "Consolidation order:\n"
@@ -1024,6 +1155,7 @@ def packet_for(path: str, **kwargs: Any) -> dict[str, Any]:
         "appendageFirstPrinciple": APPENDAGE_FIRST_CONSOLIDATION_PRINCIPLE,
         "changeSelfHealingPrinciple": CHANGE_SELF_HEALING_PRINCIPLE,
         "connectiveTissuePrinciple": CONNECTIVE_TISSUE_PRINCIPLE,
+        "minimumGenerativeBodyPrinciple": MINIMUM_GENERATIVE_BODY_PRINCIPLE,
         "adaptiveConsolidationPrinciple": ADAPTIVE_CONSOLIDATION_PRINCIPLE,
         "consolidationOrder": CONSOLIDATION_ORDER,
         "changeSelfHealingSteps": CHANGE_SELF_HEALING_STEPS,
@@ -1040,8 +1172,12 @@ __all__ = [
     "REFACTOR_PERCEPTION_PRINCIPLE",
     "REFACTOR_PILOT_RULE",
     "CONNECTIVE_TISSUE_PRINCIPLE",
+    "MINIMUM_GENERATIVE_BODY_PRINCIPLE",
+    "GENERATIVE_ROLES",
     "CONNECTIVE_TISSUE_RULES",
     "connective_tissue_for",
+    "generative_roles_for",
+    "minimum_body_pressure_for",
     "ALGORITHM_STEPS",
     "APPENDAGE_FIRST_CONSOLIDATION_PRINCIPLE",
     "CONSOLIDATION_ORDER",
