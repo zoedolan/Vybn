@@ -259,6 +259,7 @@ from harness.subturns import (  # noqa: E402
     probe_envelope,
     run_restart_subturn,
     run_write_subturn,
+    protected_mutation_kind_for_sentinel,
 )
 
 # _run_probe_subturn must close over the *agent-level* execute_readonly and
@@ -1400,17 +1401,15 @@ def run_agent_loop(
                         # role (Sonnet/task), which is the exact covenant
                         # violation Zoe named on 2026-04-27.
                         if pilot_protected:
-                            mut_kind = ""
-                            if write_match is not None:
-                                mut_kind = "needs-write"
-                            elif probe_match is not None:
-                                _cmd = probe_match.group(1).strip()
-                                try:
-                                    _ro = is_parallel_safe(_cmd)
-                                except Exception:
-                                    _ro = False
-                                if not _ro:
-                                    mut_kind = "needs-exec-mutation"
+                            probe_cmd_for_gate = (
+                                probe_match.group(1).strip()
+                                if probe_match is not None
+                                else None
+                            )
+                            mut_kind = protected_mutation_kind_for_sentinel(
+                                write_match_present=write_match is not None,
+                                probe_command=probe_cmd_for_gate,
+                            )
                             if mut_kind:
                                 logger.emit(
                                     "protected_mutation_sentinel_blocked",

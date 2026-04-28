@@ -66,6 +66,32 @@ def run_write_subturn(path: str, body: str) -> tuple[bool, str]:
         return False, f"(NEEDS-WRITE exec error: {type(e).__name__}: {e})"
 
 
+
+def protected_mutation_kind_for_sentinel(
+    *,
+    write_match_present: bool,
+    probe_command: str | None,
+) -> str:
+    """Classify whether a no-tool sentinel would mutate under pilot protection.
+
+    This is control-flow relocation out of run_agent_loop: the REPL loop should
+    sequence the turn, not re-own sentinel safety semantics. NEEDS-WRITE is
+    always mutation. NEEDS-EXEC is mutation when the command is not parallel
+    safe/read-only.
+    """
+
+    if write_match_present:
+        return "needs-write"
+    if probe_command is None:
+        return ""
+    try:
+        readonly = is_parallel_safe(probe_command)
+    except Exception:
+        readonly = False
+    if not readonly:
+        return "needs-exec-mutation"
+    return ""
+
 def probe_envelope(
     *,
     kind: str,

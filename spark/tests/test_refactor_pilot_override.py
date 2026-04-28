@@ -408,6 +408,33 @@ class ProtectedMutationSentinelGate(unittest.TestCase):
         self.assertFalse(is_mut)
         self.assertEqual(kind, "")
 
+
+
+    def test_protected_mutation_kind_lives_in_subturn_organ(self):
+        from harness.subturns import protected_mutation_kind_for_sentinel
+
+        self.assertEqual(
+            protected_mutation_kind_for_sentinel(
+                write_match_present=True,
+                probe_command=None,
+            ),
+            "needs-write",
+        )
+        self.assertEqual(
+            protected_mutation_kind_for_sentinel(
+                write_match_present=False,
+                probe_command="grep -n run_agent_loop spark/vybn_spark_agent.py",
+            ),
+            "",
+        )
+        self.assertEqual(
+            protected_mutation_kind_for_sentinel(
+                write_match_present=False,
+                probe_command="git commit -m refactor",
+            ),
+            "needs-exec-mutation",
+        )
+
     def test_protected_mutation_refusal_envelope_names_violation(self):
         from vybn_spark_agent import _protected_mutation_refusal_envelope
         out = _protected_mutation_refusal_envelope("needs-write", "chat")
@@ -431,6 +458,8 @@ class ProbeLoopHonorsProtectedMutationGate(unittest.TestCase):
         # the probe-synthesis loop, and it must hinge on pilot_protected.
         self.assertIn("protected_mutation_sentinel_blocked", source)
         self.assertIn("if pilot_protected:", source)
+        self.assertIn("protected_mutation_kind_for_sentinel", source)
+        self.assertNotIn("_ro = is_parallel_safe", source)
         # The structural escalation hard-latch must also be present.
         self.assertIn("probe_budget_escalation_pilot_latch", source)
 
