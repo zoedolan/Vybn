@@ -270,7 +270,9 @@ _MISSION_CRITICAL_PILOT_RE = re.compile(
     r"|\bviolat(?:ion|ed|es)\b.{0,80}\b(?:our )?"
     r"(?:agreement|covenant|pact|pilot)\b"
     r"|\b(diverted|offload(?:ed|ing)?|fell\s+through|fell\s+back)\b"
-    r".{0,40}\bto\s+(?:sonnet|task)\b",
+    r".{0,40}\bto\s+(?:sonnet|task)\b"
+    r"|\b(repos?|repositories)\b.{0,160}\b(sprawl(?:ing)?|mess|bloat|waste|torpor|redundan(?:t|cy))\b"
+    r"|\b(sprawl(?:ing)?|bloat|waste|torpor|redundan(?:t|cy))\b.{0,160}\b(repos?|repositories)\b",
     re.IGNORECASE,
 )
 
@@ -284,13 +286,13 @@ def is_system_critical_pilot_turn(text: str) -> bool:
 
 
 _HEURISTIC_PRIORITY = (
-    "task",         # confirmations ("ok", "proceed") -- earliest
     "identity",     # "which model are you?" before greetings
     "phatic",       # bare greetings/closings
     "code",         # grounded code work
     "local_private", # private/corpus-local preprocessing on the Sparks
     "create",       # brainstorm/sketch
     "orchestrate",  # explicit multi-step/tool-use requests
+    "task",         # confirmations only after active execution context
     "chat",         # how-are-you style
 )
 
@@ -388,8 +390,18 @@ class Policy:
 
         # 2. Heuristics
         heur = self.heuristics
+
+        # Bare confirmations are context-dependent. Without recent execution
+        # context, they are not permission to demote the turn to Sonnet/task.
+        # `run_agent_loop` handles protected continuations explicitly via the
+        # pilot latch; the router's stateless fallback should stay in voice.
+        text_is_bare_task_confirmation = any(
+            rx.search(text) for rx in heur.get("task", [])[:4]
+        )
         ranked = [r for r in _HEURISTIC_PRIORITY if r in heur]
         ranked += [r for r in heur if r not in ranked]
+        if text_is_bare_task_confirmation:
+            ranked = [r for r in ranked if r != "task"]
 
         # 2b. Refactor-pilot doctrine override (2026-04-27). System-critical
         # refactoring/consolidation/routing/memory/harness work pilots through
@@ -850,7 +862,7 @@ def default_policy() -> Policy:
         # sub-task string = quoted form). Per the Lisp duality, eval is
         # not the default — it is explicitly invoked (/plan). Unclassified
         # turns stay conversational; orchestrate runs only when asked.
-        default_role="chat",  # round 4.1 + 7: quoted is the default; /plan evaluates.
+        default_role="chat",  # unclassified/confirmation-without-context stays voice, not Sonnet/task.
         model_aliases=dict(_DEFAULT_MODEL_ALIASES),
     )
 

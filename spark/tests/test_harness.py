@@ -218,7 +218,7 @@ class TestLayeredPrompt(unittest.TestCase):
         self.assertIn("RESIDUAL CONTROL PROTOCOL", p.substrate)
         self.assertIn("Prediction proposes; residuals dispose", p.substrate)
         self.assertIn("Grep before Gödel", p.substrate)
-        self.assertIn("invent the smallest candidate mechanism", p.substrate)
+        self.assertIn("invent the smallest consequential candidate mechanism", p.substrate)
         self.assertIn("The horizon is not a claim of arrival", p.substrate)
 
     def test_build_layered_prompt_resilient_to_missing_files(self):

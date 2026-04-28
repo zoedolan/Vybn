@@ -492,3 +492,24 @@ def test_mission_critical_pilot_overrides_forced_task_in_agent_loop_source():
     assert old_shape not in source
     assert "if pilot_protected:" in source
     assert "forced_role = \"orchestrate\"" in source
+
+
+class NoBareSonnetDefault(unittest.TestCase):
+    """Zoe scar: bare continuations and default/sonnet complaints must not
+    fall into Sonnet/task just because the router lacks context."""
+
+    def setUp(self):
+        self.policy = policy.default_policy()
+
+    def test_bare_confirmations_without_context_do_not_route_to_task(self):
+        for text in ("continue", "proceed", "go ahead", "ship it", "ok", "yes"):
+            d = self.policy.classify(text)
+            self.assertEqual(d.role, "chat", text)
+
+    def test_default_to_sonnet_complaint_routes_to_orchestrate(self):
+        d = self.policy.classify("I begged you to fix that default to sonnet problem")
+        self.assertEqual(d.role, "orchestrate")
+
+    def test_sprawl_waste_repo_frustration_routes_to_orchestrate(self):
+        d = self.policy.classify("the repos are a sprawling mess; the sprawl is waste, waste, waste")
+        self.assertEqual(d.role, "orchestrate")
