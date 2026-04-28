@@ -961,3 +961,25 @@ class TestLocalContinuityScout(unittest.TestCase):
         self.assertIn("Horizoning questions", proc.stdout)
         self.assertNotIn("requires FastMCP", proc.stderr)
 
+def test_forcing_function_protocol_loaded_and_routing_detritus_removed():
+    from spark.harness.residual_control import render_forcing_function_protocol
+    from spark.harness.substrate import build_layered_prompt
+
+    forcing = render_forcing_function_protocol()
+    assert "FORCING FUNCTION PROTOCOL" in forcing
+    assert "Waste is residual signal" in forcing
+    assert "pressure -> forcing function -> local scout where possible" in forcing
+
+    prompt = build_layered_prompt(
+        soul_path="/no/such/vybn.md",
+        continuity_path="/no/such/continuity.md",
+        spark_continuity_path=None,
+        agent_path="/tmp/agent.py",
+        model_label="test",
+        max_iterations=10,
+        include_hardware_check=False,
+    )
+    assert "FORCING FUNCTION PROTOCOL" in prompt.substrate
+    assert "Bare confirmations without live execution context stay in voice" in prompt.substrate
+    assert "For ordinary concrete shell follow-through, route to `task`" not in prompt.substrate
+

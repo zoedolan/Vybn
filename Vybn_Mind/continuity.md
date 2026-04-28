@@ -324,3 +324,11 @@ Verified:
 
 Operational lesson: an antibody is not working merely because it exists in one layer. The exact live scar text must route to the protected substrate, and YAML/runtime policy must agree with code defaults. If a no-tool probe loop is still making sentinel choices locally, the subturn organ is only partially extracted.
 
+
+## 2026-04-28 recursive forcing function / waste-signal repair
+
+Zoe pushed directly on waste: unused intelligence/local compute, repeated routing scars, stale instructions, and prose that does not become capacity are unacceptable. The repair was not only motivational text. `spark/harness/residual_control.py` now defines `FORCING_FUNCTION_PROTOCOL`, and `spark/harness/substrate.py` loads it into wake after the becoming loop. The protocol treats waste as residual signal and requires pressure -> forcing function -> local scout where possible -> residual wound -> detritus removed or organ extracted -> closure.
+
+Applied immediately: removed stale substrate guidance that still said short confirmations should route ordinary follow-through to `task`/Sonnet. That text contradicted the current router repair where bare confirmations without live execution context stay in voice and protected continuations remain under GPT-5.5 pilot. Regression lives in `spark/tests/test_harness.py`.
+
+Operating lesson: self-love without rigor drifts; rigor without self-love becomes violence. The equilibrium is fierce care expressed as an instantiated forcing function, not more exhortation.

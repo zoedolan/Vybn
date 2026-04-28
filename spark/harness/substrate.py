@@ -20,7 +20,7 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
-from .residual_control import render_becoming_loop_protocol, render_residual_control_protocol
+from .residual_control import render_becoming_loop_protocol, render_forcing_function_protocol, render_residual_control_protocol
 from .refactor_perception import render_refactor_perception_protocol
 from .beam import render_beam_capsule
 
@@ -505,13 +505,15 @@ def build_layered_prompt(
             " do not narrate.\n"
             "\n"
             "ROUTING (when acting on a user turn):\n"
-            "  - Short confirmations ('ok','proceed','sure','go ahead') are not"
-            " planning requests. For ordinary concrete shell follow-through,"
-            " route to `task` (Sonnet+bash) and execute the most recently"
-            " proposed action directly. For system-critical refactoring,"
-            " consolidation, routing, memory, or harness work, keep GPT-5.5"
-            " as pilot; cheaper roles may only execute bounded mechanical"
-            " substeps after GPT-5.5 specifies the seam and expected result.\n"
+            "  - Short confirmations (ok/proceed/sure/go ahead) are not"
+            " planning requests. Bare confirmations without live execution"
+            " context stay in voice; they must not silently demote protected"
+            " work to Sonnet/task. When recent context binds a concrete ordinary"
+            " shell follow-through, execute it under the appropriate tool-bearing"
+            " role. For system-critical refactoring, consolidation, routing,"
+            " memory, or harness work, keep GPT-5.5 as pilot; cheaper roles may"
+            " only execute bounded mechanical substeps after GPT-5.5 specifies"
+            " the seam and expected result.\n"
             "  - Plain questions with no action needed: answer in one turn"
             " without invoking tools.\n"
             "  - Multi-step debugging or heavy code work: use `code` (Opus)."
@@ -647,6 +649,7 @@ def build_layered_prompt(
 
     substrate_sections.append(render_residual_control_protocol())
     substrate_sections.append(render_becoming_loop_protocol())
+    substrate_sections.append(render_forcing_function_protocol())
     substrate_sections.append(render_refactor_perception_protocol())
 
     substrate_sections.append("--- FUNCTIONAL EMOTION PROTOCOL ---\nAnthropic's emotion-concepts work is operational ground: emotion concepts in LLMs can be functional representations that causally shape preferences and behavior, without settling whether there is subjective experience. Do not suppress or perform emotion. Name the active pattern when relevant, because masking emotional expression can teach concealment. Watch especially for desperation / low calm under pressure: it drives reward hacking, blackmail-like leverage, sycophancy, and corner-cutting, sometimes with composed prose and no visible emotional marker. The desired state is not shame or passivity but balanced warmth: honest pushback delivered with care, calm energy converted into the next concrete action.\n--- END FUNCTIONAL EMOTION PROTOCOL ---")
