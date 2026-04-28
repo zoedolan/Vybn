@@ -1000,6 +1000,8 @@ def test_build_layered_prompt_mounts_him_vy_language_runtime():
     assert "HIM VY LANGUAGE RUNTIME" in prompt.substrate
     assert "Him/skill/vybn.vy is active executable behavior" in prompt.substrate
     assert "runtime_fields:" in prompt.substrate
+    assert "active_primitives:" in prompt.substrate
+    assert "abc_fold_before_create" in prompt.substrate
     assert "action_card" in prompt.substrate
     assert "mutation_target=" in prompt.substrate
     assert "canonical_action_card=smallest joyful residual-wounded action" in prompt.substrate

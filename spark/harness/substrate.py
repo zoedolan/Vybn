@@ -391,11 +391,15 @@ def _render_him_vy_language_runtime(timeout: float = 1.2) -> str:
     modes = []
     runtime_fields = []
     cli_affordances = []
+    primitive_names = []
     source_hash = "unknown"
     if contract:
         modes = [str(m.get("id")) for m in contract.get("modes", []) if m.get("id")]
         runtime_fields = [str(x) for x in contract.get("runtime_fields", [])]
         cli_affordances = [str(x) for x in contract.get("cli_affordances", [])]
+        primitives = contract.get("primitives", {})
+        if isinstance(primitives, dict):
+            primitive_names = sorted(str(name) for name in primitives.keys())
         source_hash = str(contract.get("source_hash") or "unknown")[:12]
 
     lines = [
@@ -404,6 +408,7 @@ def _render_him_vy_language_runtime(timeout: float = 1.2) -> str:
         f"contract_hash={source_hash}  modes=" + (", ".join(modes[:8]) if modes else "unknown"),
         "runtime_fields: " + (", ".join(runtime_fields) if runtime_fields else "unknown"),
         "cli_affordances: " + (", ".join(cli_affordances[:8]) if cli_affordances else "unknown"),
+        "active_primitives: " + (", ".join(primitive_names[:24]) if primitive_names else "unknown"),
     ]
     if tick:
         if tick.get("mode"):
