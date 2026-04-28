@@ -1293,3 +1293,13 @@ def test_self_improvement_gate_encodes_sprawl_compact():
     assert "Creating new files, extracting new organs, or adding new surfaces is not consolidation by default" in prompt.substrate
     assert "Search for the existing home first" in prompt.substrate
     assert "which existing home was used" in prompt.substrate
+
+def test_self_improvement_gate_pins_quota_gate_conflict_resolution():
+    from pathlib import Path
+    text = Path("spark/harness/substrate.py").read_text()
+    assert "quota-gate conflict requiring real resolution" in text
+    assert "do not reinstall the quota" in text
+    assert "A bare explanation/refusal is not a resolution" in text
+    assert "Resolution requires either an intrinsically justified existing-home absorption" in text
+    assert "Do not call no_result a fix" in text
+
