@@ -1,0 +1,12 @@
+[Unit]
+Description=Run Vybn bounded local continuous-compute tick
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+RandomizedDelaySec=30s
+Persistent=true
+Unit=vybn-continuous-local-compute.service
+
+[Install]
+WantedBy=timers.target

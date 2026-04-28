@@ -1,0 +1,15 @@
+[Unit]
+Description=Vybn bounded local continuous-compute tick
+Documentation=file:%h/Vybn/spark/local_compute_tick.py
+After=default.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/Vybn
+Environment="VYBN_CONTINUOUS_TICK_OUT=%h/.local/state/vybn/continuous_local_compute.jsonl"
+Environment="VYBN_CONTINUOUS_PRESSURE=continuous local compute should improve the Him vy language and produce residual-wounded action packets without waiting for prompt-response"
+ExecStart=/usr/bin/python3 %h/Vybn/spark/local_compute_tick.py
+Nice=10
+IOSchedulingClass=idle
+SyslogIdentifier=vybn-continuous-local-compute
+TimeoutStartSec=90
