@@ -9,6 +9,7 @@ sys.path.insert(0, str(REPO / "spark"))
 
 from harness.providers import is_parallel_safe, validate_command
 import vybn_spark_agent as agent
+from spark.harness.subturns import probe_envelope
 
 BAD = "rm" + " -rf" + " /"
 
@@ -55,8 +56,8 @@ class RecursiveUnlockTests(unittest.TestCase):
         self.assertIn("control-event mismatch", out)
 
     def test_envelopes_distinguish_restart_and_probe(self):
-        probe = agent._probe_envelope(kind="probe", header_fields={"cmd": "echo ok"}, body="ok", ran=True)
-        restart = agent._probe_envelope(kind="needs-restart", header_fields={}, body="(bash session restarted)", ran=True)
+        probe = probe_envelope(kind="probe", header_fields={"cmd": "echo ok"}, body="ok", ran=True)
+        restart = probe_envelope(kind="needs-restart", header_fields={}, body="(bash session restarted)", ran=True)
         self.assertIn("kind: probe", probe)
         self.assertIn("BEGIN_PROBE_STDOUT", probe)
         self.assertIn("kind: needs-restart", restart)

@@ -186,7 +186,7 @@ def _is_mutation_sentinel(text: str) -> tuple[bool, str]:
 
 def _protected_mutation_refusal_envelope(kind: str, current_role: str) -> str:
     """Build the user-facing refusal envelope when mutation is blocked."""
-    return _probe_envelope(
+    return probe_envelope(
         kind=f"{kind}-blocked",
         header_fields={
             "reason": "protected-pilot-no-tool-role",
@@ -255,10 +255,10 @@ from harness.sentinel_protocol import (
 )
 
 from harness.subturns import (  # noqa: E402
-    _classify_unlock_layer,
-    _probe_envelope as _probe_envelope,
-    _run_restart_subturn,
-    _run_write_subturn,
+    classify_unlock_layer,
+    probe_envelope,
+    run_restart_subturn,
+    run_write_subturn,
 )
 
 # _run_probe_subturn must close over the *agent-level* execute_readonly and
@@ -1323,7 +1323,7 @@ def run_agent_loop(
                         restart_match = _NEEDS_RESTART_RE.search(current_text)
                         if restart_match is not None:
                             probe_iter += 1
-                            ran_r, out_r = _run_restart_subturn(bash)
+                            ran_r, out_r = run_restart_subturn(bash)
                             logger.emit(
                                 "needs_restart",
                                 turn=turn_number,
@@ -1333,7 +1333,7 @@ def run_agent_loop(
                                 ran=ran_r,
                             )
                             _dim("[bash session restarted via NEEDS-RESTART]")
-                            restart_note = _probe_envelope(
+                            restart_note = probe_envelope(
                                 kind="needs-restart",
                                 header_fields={},
                                 body=_fit_probe_output(out_r),
@@ -1452,7 +1452,7 @@ def run_agent_loop(
                         if write_match is not None and probe_match is None:
                             w_path = write_match.group("path").strip()
                             w_body = write_match.group("body")
-                            ran_w, out_w = _run_write_subturn(w_path, w_body)
+                            ran_w, out_w = run_write_subturn(w_path, w_body)
                             logger.emit(
                                 "needs_write",
                                 turn=turn_number,
@@ -1463,7 +1463,7 @@ def run_agent_loop(
                                 path=w_path[:500],
                                 body_chars=len(w_body or ""),
                             )
-                            probe_note = _probe_envelope(
+                            probe_note = probe_envelope(
                                 kind="needs-write",
                                 header_fields={
                                     "path": w_path[:200],
@@ -1539,9 +1539,9 @@ def run_agent_loop(
                             ran=ran,
                             command=probe_cmd[:500],
                             out_chars=len(probe_out),
-                            unlock_layer=_classify_unlock_layer(probe_out, command=probe_cmd),
+                            unlock_layer=classify_unlock_layer(probe_out, command=probe_cmd),
                         )
-                        probe_note = _probe_envelope(
+                        probe_note = probe_envelope(
                             kind="probe",
                             header_fields={"cmd": probe_cmd[:200]},
                             body=_fit_probe_output(probe_out),

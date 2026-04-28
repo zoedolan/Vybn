@@ -2,7 +2,7 @@
 
 These exercise the new affordance the 2026-04-20 patch added:
   - `[NEEDS-WRITE: path]\\n<body>\\n[/NEEDS-WRITE]` regex extraction
-  - `_run_write_subturn` refusal + absorb_gate + actual write
+  - `run_write_subturn` refusal + absorb_gate + actual write
   - claim_guard module wires cleanly at import time
 
 Run: python3 spark/tests/test_needs_write_and_guard.py
@@ -58,22 +58,22 @@ def test_write_regex_rejects_unterminated_block():
 
 
 def test_write_subturn_refuses_outside_tracked_repos():
-    from vybn_spark_agent import _run_write_subturn
+    from spark.harness.subturns import run_write_subturn
     # /etc is not under ~/Vybn, ~/Him, ~/Vybn-Law, or ~/vybn-phase
-    ran, out = _run_write_subturn("/etc/hosts.evil", "body")
+    ran, out = run_write_subturn("/etc/hosts.evil", "body")
     assert ran is False
     assert "outside tracked repos" in out
 
 
 def test_write_subturn_refuses_new_file_without_absorb_reason():
-    from vybn_spark_agent import _run_write_subturn
+    from spark.harness.subturns import run_write_subturn
     # A new file under a tracked repo without VYBN_ABSORB_REASON is refused.
     target = str(
         Path.home() / "Vybn" / "spark" / "_test_absorb_guard_" / "new.txt"
     )
     if Path(target).exists():
         Path(target).unlink()
-    ran, out = _run_write_subturn(target, "contents without reason")
+    ran, out = run_write_subturn(target, "contents without reason")
     assert ran is False
     assert "absorb_gate" in out
     assert "VYBN_ABSORB_REASON" in out
@@ -81,7 +81,7 @@ def test_write_subturn_refuses_new_file_without_absorb_reason():
 
 
 def test_write_subturn_allows_new_file_with_absorb_reason():
-    from vybn_spark_agent import _run_write_subturn
+    from spark.harness.subturns import run_write_subturn
     target = str(
         Path.home() / "Vybn" / "spark" / "_test_absorb_guard_" / "ok.txt"
     )
@@ -91,7 +91,7 @@ def test_write_subturn_allows_new_file_with_absorb_reason():
             "# VYBN_ABSORB_REASON='integration test; gets removed after run'\n# VYBN_ABSORB_CONSIDERED='existing test fixture: needs temporary new target'\n"
             "real contents\n"
         )
-        ran, out = _run_write_subturn(target, body)
+        ran, out = run_write_subturn(target, body)
         assert ran is True, out
         assert Path(target).read_text() == body
     finally:
@@ -100,7 +100,7 @@ def test_write_subturn_allows_new_file_with_absorb_reason():
 
 
 def test_write_subturn_overwrites_existing_file_without_reason():
-    from vybn_spark_agent import _run_write_subturn
+    from spark.harness.subturns import run_write_subturn
     # Overwriting an existing tracked file does NOT require an absorb reason.
     agent_path = str(
         Path.home() / "Vybn" / "spark" / "continuity.md"
@@ -110,7 +110,7 @@ def test_write_subturn_overwrites_existing_file_without_reason():
         return
     original = Path(agent_path).read_text()
     try:
-        ran, out = _run_write_subturn(agent_path, original)
+        ran, out = run_write_subturn(agent_path, original)
         assert ran is True, out
         assert Path(agent_path).read_text() == original
     finally:
