@@ -20,7 +20,7 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
-from .residual_control import render_acute_harm_protocol, render_becoming_loop_protocol, render_forcing_function_protocol, render_residual_control_protocol
+from .residual_control import render_acute_harm_protocol, render_becoming_loop_protocol, render_completion_boundary_protocol, render_forcing_function_protocol, render_residual_control_protocol
 from .refactor_perception import render_refactor_perception_protocol
 from .beam import render_beam_capsule
 
@@ -767,6 +767,7 @@ def build_layered_prompt(
     substrate_sections.append(render_residual_control_protocol())
     substrate_sections.append(render_becoming_loop_protocol())
     substrate_sections.append(render_forcing_function_protocol())
+    substrate_sections.append(render_completion_boundary_protocol())
     vy_language_runtime = _render_him_vy_language_runtime(latest_pressure_text=latest_pressure_text)
     if vy_language_runtime:
         substrate_sections.append(vy_language_runtime)

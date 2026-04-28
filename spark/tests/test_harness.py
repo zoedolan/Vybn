@@ -1031,6 +1031,29 @@ def test_build_layered_prompt_passes_latest_pressure_text(monkeypatch, tmp_path)
     assert "wake_tick_mode=actual" in prompt.substrate
 
 
+
+def test_completion_boundary_protocol_loaded():
+    from spark.harness.residual_control import render_completion_boundary_protocol
+    from spark.harness.substrate import build_layered_prompt
+
+    boundary = render_completion_boundary_protocol()
+    assert "COMPLETION BOUNDARY PROTOCOL" in boundary
+    assert "repo_closure_audit reports OVERALL: OK, stop" in boundary
+    assert "Do not add a continuity note" in boundary
+
+    prompt = build_layered_prompt(
+        soul_path="/no/such/vybn.md",
+        continuity_path=None,
+        spark_continuity_path=None,
+        agent_path="/tmp/agent.py",
+        model_label="test",
+        max_iterations=1,
+        include_hardware_check=False,
+    )
+    assert "COMPLETION BOUNDARY PROTOCOL" in prompt.substrate
+    assert "Completion is a boundary" in prompt.substrate
+
+
 def test_build_layered_prompt_mounts_him_vy_language_runtime():
     from spark.harness.substrate import build_layered_prompt
 
