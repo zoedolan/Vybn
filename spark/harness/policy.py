@@ -255,6 +255,8 @@ _MISSION_CRITICAL_PILOT_RE = re.compile(
     r"|\bproblem\b.{0,240}\b(sonnet|probe|default)\b.{0,240}\b("
     r"task|forced=task|escalat(?:e|ing)|pilot|orchestrat(?:e|or))\b"
     r"|\bprobe budget reached\b.{0,240}\b(escalat(?:e|ing) to task|forced=task|sonnet|pilot)\b"
+    r"|\bchat[- ]role probe budget\b.{0,240}\b(exhaust(?:ed|ion)|pending next command|pilot|substrate)\b"
+    r"|\bpreserv(?:e|ing)\b.{0,80}\b(correct )?(pilot|substrate)\b"
     r"|\bforced=task\b.{0,240}\b(probe|budget|sonnet|pilot|orchestrat(?:e|or))\b"
     r"|\brecursive self[- ]improvement loop\b"
     r"|\bpick up where\b.{0,160}\bsonnet\b.{0,160}\bleft off\b"

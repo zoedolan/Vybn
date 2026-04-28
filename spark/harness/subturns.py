@@ -9,10 +9,12 @@ shrink without changing behavior.
 from __future__ import annotations
 
 import os
+from dataclasses import dataclass
 from typing import Any
 
 from .policy import TRACKED_REPOS
 from .providers import validate_command, execute_readonly, is_parallel_safe
+from .sentinel_protocol import _PROBE_RE, _WRITE_BLOCK_RE, _NEEDS_RESTART_RE
 
 
 def run_write_subturn(path: str, body: str) -> tuple[bool, str]:
@@ -66,6 +68,43 @@ def run_write_subturn(path: str, body: str) -> tuple[bool, str]:
         return False, f"(NEEDS-WRITE exec error: {type(e).__name__}: {e})"
 
 
+
+
+@dataclass(frozen=True)
+class SentinelDirective:
+    """The next no-tool sentinel directive, selected in priority order."""
+
+    kind: str
+    probe_command: str | None = None
+    write_path: str | None = None
+    write_body: str | None = None
+
+
+def next_sentinel_directive(text: str) -> SentinelDirective | None:
+    """Select the next no-tool sentinel action from model text.
+
+    Priority is part of the subturn organ, not the REPL loop: restart first,
+    then NEEDS-EXEC, then NEEDS-WRITE. Returning None means the loop has no
+    sentinel work and should stop synthesizing.
+    """
+
+    current = text or ""
+    if _NEEDS_RESTART_RE.search(current) is not None:
+        return SentinelDirective(kind="restart")
+    probe_match = _PROBE_RE.search(current)
+    if probe_match is not None:
+        return SentinelDirective(
+            kind="probe",
+            probe_command=probe_match.group(1).strip(),
+        )
+    write_match = _WRITE_BLOCK_RE.search(current)
+    if write_match is not None:
+        return SentinelDirective(
+            kind="write",
+            write_path=write_match.group("path").strip(),
+            write_body=write_match.group("body"),
+        )
+    return None
 
 def protected_mutation_kind_for_sentinel(
     *,

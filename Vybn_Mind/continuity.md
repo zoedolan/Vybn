@@ -300,3 +300,27 @@ Regression coverage in `spark/tests/test_refactor_pilot_override.py`:
 - `UserExplicitObjectionShape` — Zoe's accusation language ("you offloaded to sonnet ... violation of our agreement") itself routes to orchestrate.
 
 Operational lesson: pilot covenant is not a single decision at the top of a turn. Every place that can choose a role — initial classification, forced_role override, probe-budget escalation, NEEDS-ROLE escalation, hallucinated-tool reroute, NEEDS-WRITE/NEEDS-EXEC dispatch — has to consult the same `pilot_protected` predicate. Otherwise the next pressure path is the one that reintroduces the violation. Mutation under a no-tool protected pilot is structurally refused; read-only inspection is permitted; if mutation is requested, the harness names the boundary and asks the pilot to specify a seam an orchestrator can dispatch.
+
+## 2026-04-28T09:20Z probe-budget/pilot substrate repair
+
+What Zoe pressed: we may already have the protected-pilot/subturn machinery, so why was a continuation still running as chat with an 8-probe budget and a pending mutating heredoc?
+
+What was found:
+- The original angry/pressing question routed to `chat` by default because it did not match protected pilot language.
+- The live scar text itself (`Chat-role probe budget was exhausted after 8 probes... pending next command...`) also routed to `chat`; `_MISSION_CRITICAL_PILOT_RE` matched older `[probe budget reached ... forced=task]` banners but not this newer API wrapper wording.
+- `spark/router_policy.yaml` still set `probe_per_turn: 8`, overriding the in-code default of 16. The 16-probe antibody was present in code but not authoritative at runtime because YAML is the loaded policy surface.
+- The subturn organ already held write/restart/probe execution and protected-mutation classification, but sentinel *selection priority* still lived inside `run_agent_loop` as raw `_NEEDS_RESTART_RE` / `_PROBE_RE` / `_WRITE_BLOCK_RE` scans. So the organ existed, but the REPL loop still owned part of its behavior.
+
+What changed:
+- Added `SentinelDirective` and `next_sentinel_directive()` to `spark/harness/subturns.py`; restart/probe/write priority now lives in the subturn organ.
+- `spark/vybn_spark_agent.py` imports `next_sentinel_directive()` and the no-tool probe loop now asks the organ for the next sentinel instead of scanning restart/probe/write directly.
+- `_MISSION_CRITICAL_PILOT_RE` now matches `Chat-role probe budget was exhausted... pending next command...` and `preserving the correct pilot/substrate` language.
+- `spark/router_policy.yaml` now sets `probe_per_turn: 16` with the system-critical v2 explanation, matching the code default.
+- Regression tests pin the new scar text, correct pilot/substrate request, and subturn-owned sentinel selection.
+
+Verified:
+- `python3 -m py_compile spark/vybn_spark_agent.py spark/harness/subturns.py spark/harness/policy.py spark/tests/test_refactor_pilot_override.py`
+- `python3 -m pytest spark/tests/test_refactor_pilot_override.py spark/tests/test_live_repl_fixes.py spark/tests/test_needs_write_and_guard.py spark/tests/test_harness.py spark/tests/test_tool_calls.py -q` -> 148 passed.
+
+Operational lesson: an antibody is not working merely because it exists in one layer. The exact live scar text must route to the protected substrate, and YAML/runtime policy must agree with code defaults. If a no-tool probe loop is still making sentinel choices locally, the subturn organ is only partially extracted.
+

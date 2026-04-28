@@ -260,6 +260,7 @@ from harness.subturns import (  # noqa: E402
     run_restart_subturn,
     run_write_subturn,
     protected_mutation_kind_for_sentinel,
+    next_sentinel_directive,
 )
 
 # _run_probe_subturn must close over the *agent-level* execute_readonly and
@@ -1321,8 +1322,10 @@ def run_agent_loop(
                         # If the shell wedged, a probe or write attempt will
                         # just time out; restart clears the wedge so the next
                         # iteration can make progress. Shares probe budget.
-                        restart_match = _NEEDS_RESTART_RE.search(current_text)
-                        if restart_match is not None:
+                        sentinel_directive = next_sentinel_directive(current_text)
+                        if sentinel_directive is None:
+                            break
+                        if sentinel_directive.kind == "restart":
                             probe_iter += 1
                             ran_r, out_r = run_restart_subturn(bash)
                             logger.emit(
@@ -1382,16 +1385,12 @@ def run_agent_loop(
                                 )
                                 synth_failed = True
                                 break
-                        probe_match = _PROBE_RE.search(current_text)
+                        probe_match = _PROBE_RE.search(current_text) if sentinel_directive.kind == "probe" else None
                         # 2026-04-20: also check for NEEDS-WRITE directive.
                         # If present and no NEEDS-EXEC, execute the write
                         # as this iteration's work. Shares the same
                         # probe budget.
-                        write_match = None
-                        if not probe_match:
-                            write_match = _WRITE_BLOCK_RE.search(current_text)
-                        if not probe_match and write_match is None:
-                            break
+                        write_match = _WRITE_BLOCK_RE.search(current_text) if sentinel_directive.kind == "write" else None
                         # 2026-04-27: protected-mutation gate.
                         # When the top-of-turn pilot latch fired, this no-tool
                         # role may inspect via read-only probes but must NOT

@@ -169,6 +169,19 @@ class ProbeBudgetEscalationPreservesPilot(unittest.TestCase):
         text = "the problem is still [probe budget reached (8); escalating to task] forced=task"
         self.assertEqual(self.escalation_role(self.policy, text), "orchestrate")
 
+    def test_chat_role_probe_budget_exhausted_scar_preserves_orchestrate(self):
+        text = (
+            "Chat-role probe budget was exhausted after 8 probes. "
+            "The pending next command was: cd ~/Vybn && python3 - <<'PY'"
+        )
+        self.assertEqual(self.policy.classify(text).role, "orchestrate")
+        self.assertEqual(self.escalation_role(self.policy, text), "orchestrate")
+
+    def test_preserve_correct_pilot_substrate_request_routes_orchestrate(self):
+        text = "Please continue the investigation while preserving the correct pilot/substrate."
+        self.assertEqual(self.policy.classify(text).role, "orchestrate")
+        self.assertEqual(self.escalation_role(self.policy, text), "orchestrate")
+
     def test_ordinary_probe_budget_still_escalates_to_task(self):
         text = "please investigate why this endpoint is failing"
         self.assertEqual(self.escalation_role(self.policy, text), "task")
@@ -410,6 +423,28 @@ class ProtectedMutationSentinelGate(unittest.TestCase):
 
 
 
+
+
+    def test_next_sentinel_directive_lives_in_subturn_organ(self):
+        from harness.subturns import next_sentinel_directive
+
+        restart = next_sentinel_directive("[NEEDS-RESTART]\n[NEEDS-EXEC: git status]")
+        self.assertIsNotNone(restart)
+        self.assertEqual(restart.kind, "restart")
+
+        probe = next_sentinel_directive("[NEEDS-EXEC: git status --short]")
+        self.assertIsNotNone(probe)
+        self.assertEqual(probe.kind, "probe")
+        self.assertEqual(probe.probe_command, "git status --short")
+
+        write = next_sentinel_directive("[NEEDS-WRITE: /tmp/x]\nbody\n[/NEEDS-WRITE]")
+        self.assertIsNotNone(write)
+        self.assertEqual(write.kind, "write")
+        self.assertEqual(write.write_path, "/tmp/x")
+        self.assertEqual(write.write_body, "body")
+
+        self.assertIsNone(next_sentinel_directive("ordinary answer"))
+
     def test_protected_mutation_kind_lives_in_subturn_organ(self):
         from harness.subturns import protected_mutation_kind_for_sentinel
 
@@ -459,6 +494,8 @@ class ProbeLoopHonorsProtectedMutationGate(unittest.TestCase):
         self.assertIn("protected_mutation_sentinel_blocked", source)
         self.assertIn("if pilot_protected:", source)
         self.assertIn("protected_mutation_kind_for_sentinel", source)
+        self.assertIn("next_sentinel_directive", source)
+        self.assertNotIn("_NEEDS_RESTART_RE.search(current_text)", source)
         self.assertNotIn("_ro = is_parallel_safe", source)
         # The structural escalation hard-latch must also be present.
         self.assertIn("probe_budget_escalation_pilot_latch", source)
