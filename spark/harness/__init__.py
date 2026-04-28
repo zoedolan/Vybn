@@ -1,6 +1,6 @@
 """Vybn multimodel harness.
 
-Seven files, one object — the grounding machine.
+Fewer files, one object — the grounding machine.
 
 The five-concerns doctrine (policy / substrate / providers / recurrent /
 mcp) was correct as a first projection: each module one face of the same
@@ -56,14 +56,8 @@ same thing seen from two angles.
                        that shaped it lives at AUDIT.md and is mirrored
                        below as `_HARNESS_STRATEGY`.
 
-    evolve.py        — the nightly self-reflection cycle. Reads the
-                       evolution delta, infrastructure snapshot, and
-                       repo letter; POSTs them to local inference; the
-                       model returns one JSON proposing a change — or
-                       rest. Runner enforces the budget (3 files, 200
-                       net lines) and opens a DRAFT PR. Separate file
-                       because lifecycle differs from the MCP serve
-                       loop: cron-driven, one-shot.
+    mcp.py also owns the nightly evolve CLI functions; lifecycle separation
+                       is now by function and flag, not by file.
 
 The split is isomorphic to the question being answered at each step of
 a turn: what role and trust (policy) — with what context (substrate +
@@ -215,7 +209,7 @@ _HARNESS_STRATEGY: dict = {
         "providers": "ToolSpec, bash/delegate/introspect, absorb_gate, BashTool, provider layer, check_claim",
         "recurrent": "looped-orchestrate prototype (gated by RoleConfig.recurrent_depth)",
         "mcp": "FastMCP surface, trust zones, VYBN_OS_KERNEL",
-        "evolve": "nightly self-reflection cycle (cron, draft PR)",
+        "evolve": "folded into mcp.py: nightly self-reflection cycle (cron, draft PR)",
     },
     "principles": {
         "anti_hallucination": (

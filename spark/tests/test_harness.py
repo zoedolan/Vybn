@@ -923,7 +923,7 @@ class TestLocalContinuityScout(unittest.TestCase):
     """Local evolve-scout continuity tests folded into the harness suite."""
 
     def test_local_continuity_scout_surfaces_horizon_and_self_assembly(self):
-        from harness.evolve import _local_continuity_scout
+        from harness.mcp import _local_continuity_scout
 
         report = _local_continuity_scout(
             delta_md="horizon horizoning cyberception",
@@ -938,7 +938,7 @@ class TestLocalContinuityScout(unittest.TestCase):
         self.assertIn("beam, or has it started pretending to be the horizon", report)
 
     def test_build_continuity_scout_report_is_non_mutating_report(self):
-        from harness.evolve import build_continuity_scout_report
+        from harness.mcp import build_continuity_scout_report
 
         report = build_continuity_scout_report()
         self.assertIn("## Local continuity scout", report)
