@@ -110,3 +110,6 @@ spark/ts.crt
 spark/ts.key
 spark/ts.*
 spark/agent_events.jsonl
+
+# Generated threshold pattern runtime state; do not track empty session counters.
+Vybn_Mind/signal-noise/threshold/.patterns_state.json
