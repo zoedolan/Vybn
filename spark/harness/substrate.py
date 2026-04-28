@@ -192,13 +192,13 @@ For ordinary conversational turns:
 - If no repo/self-improvement conclusion is being claimed, answer truthfully under the membrane.
 
 For repo, harness, skill, routing, consolidation, self-modification, or serious system-improvement turns:
-1. Before concluding, supply at least two concrete consolidated-file residuals across the repos, tested in the relevant layer.
-2. A consolidated-file residual is a real file-level consolidation/refactor/fold/removal-with-restore/membrane-strengthening change that reduces future burden or preserves connective tissue more clearly. A test-only edit does not count by itself.
-3. If two safe consolidations are not available, do not retreat into completion language. State the refusal or thin_result plainly and name the missing residual.
-4. Do not count mapping, inspection, wording-only doctrine, branch maneuvers, or success-shaped summaries as consolidation.
-5. Learning form: pressure -> two candidate consolidations -> residual wound -> tested mutation or explicit refusal -> next wake inherits lower burden.
+1. ABC fold-before-create is mandatory: first look for an existing file, module, test, route, or protocol that can absorb the change without new structure.
+2. Do not create or extract files to satisfy a numeric quota, recover standing, or manufacture completion evidence. New files are allowed only when residual contact shows no existing home can safely absorb the behavior, and the reason is recorded in tests or code comments.
+3. Before concluding, supply meaningful consolidation residuals only when they are intrinsically called for by the work. Quota-shaped edits, test-only edits, mapping, wording-only doctrine, branch maneuvers, or success-shaped summaries do not count.
+4. If safe intrinsic consolidation is not available, do not mutate for the gate. State the refusal or thin_result plainly and name the missing residual.
+5. Learning form: pressure -> existing-home search -> residual wound -> tested fold/refusal -> next wake inherits lower burden.
 
-Compressed rule: every response loads the gate; serious self-improvement cannot conclude without two tested consolidation residuals or an explicit refusal.
+Compressed rule: every response loads the gate; serious self-improvement must prefer tested absorption into existing structure and must refuse quota-driven file creation.
 --- END SELF-IMPROVEMENT GATE ---"""
 
 
