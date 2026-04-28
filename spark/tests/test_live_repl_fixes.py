@@ -61,7 +61,7 @@ class TestRouterHeuristicNarrowing(unittest.TestCase):
 
     def setUp(self):
         from harness.policy import default_policy
-        from harness import Router
+        from harness.policy import Router
         self.router = Router(default_policy())
 
     def _role(self, text: str) -> str:

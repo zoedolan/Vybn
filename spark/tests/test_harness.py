@@ -24,15 +24,9 @@ THIS = Path(__file__).resolve()
 SPARK_DIR = THIS.parent.parent
 sys.path.insert(0, str(SPARK_DIR))
 
-from harness import (  # noqa: E402
-    LayeredPrompt,
-    Policy,
-    Router,
-    ToolSpec,
-    absorb_gate,
-    load_policy,
-    validate_command,
-)
+from harness.policy import Policy, Router, load_policy  # noqa: E402
+from harness.providers import ToolSpec, absorb_gate, validate_command  # noqa: E402
+from harness.substrate import LayeredPrompt  # noqa: E402
 from harness.policy import default_policy  # noqa: E402
 from harness.providers import (  # noqa: E402
     AnthropicProvider,
@@ -69,7 +63,7 @@ class TestAbsorbGate(unittest.TestCase):
 
 class TestRepoClosureAuditProjectionState(unittest.TestCase):
     def test_fetch_refspec_complete_only_for_all_branch_projection(self):
-        from harness import repo_closure_audit as audit
+        import harness.repo_closure_audit as audit
 
         self.assertTrue(
             audit.fetch_refspec_is_complete([audit.EXPECTED_FETCH_REFSPEC])
@@ -81,7 +75,7 @@ class TestRepoClosureAuditProjectionState(unittest.TestCase):
         )
 
     def test_expected_fetch_refspec_is_all_heads_to_origin_remotes(self):
-        from harness import repo_closure_audit as audit
+        import harness.repo_closure_audit as audit
 
         self.assertEqual(
             audit.EXPECTED_FETCH_REFSPEC,
@@ -91,7 +85,7 @@ class TestRepoClosureAuditProjectionState(unittest.TestCase):
 
 
     def test_primary_branch_for_known_repos(self):
-        from harness import repo_closure_audit as audit
+        import harness.repo_closure_audit as audit
 
         self.assertEqual(audit.primary_branch_for(Path("/tmp/Vybn")), "main")
         self.assertEqual(audit.primary_branch_for(Path("/tmp/Him")), "main")
@@ -987,7 +981,7 @@ def test_forcing_function_protocol_loaded_and_routing_detritus_removed():
 
 def test_him_vy_runtime_accepts_latest_pressure_text(monkeypatch, tmp_path):
     import subprocess
-    from spark.harness import substrate
+    import spark.harness.substrate as substrate
 
     seen = []
 
@@ -1008,7 +1002,7 @@ def test_him_vy_runtime_accepts_latest_pressure_text(monkeypatch, tmp_path):
     assert any("actual Zoe turn pressure" in cmd for cmd in seen)
 
 def test_build_layered_prompt_passes_latest_pressure_text(monkeypatch, tmp_path):
-    from spark.harness import substrate
+    import spark.harness.substrate as substrate
 
     captured = {}
 
@@ -1057,7 +1051,7 @@ def test_completion_boundary_protocol_loaded():
 
 def test_him_vy_discovery_packet_renders_candidate(monkeypatch, tmp_path):
     import subprocess
-    from spark.harness import substrate
+    import spark.harness.substrate as substrate
 
     payload = {
         "schema": "vybn.discovery_packet.v0",
@@ -1095,7 +1089,7 @@ def test_agent_injects_him_vy_discovery_packet_source_hook():
 
 def test_him_vy_turn_packet_renders_applied_primitives(monkeypatch, tmp_path):
     import subprocess
-    from spark.harness import substrate
+    import spark.harness.substrate as substrate
 
     payload = {
         "mode": "default",

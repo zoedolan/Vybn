@@ -35,19 +35,9 @@ _SPARK_DIR = os.path.dirname(os.path.abspath(__file__))
 if _SPARK_DIR not in sys.path:
     sys.path.insert(0, _SPARK_DIR)
 
-from harness import (
-    BashTool,
-    EventLogger,
-    LayeredPrompt,
-    ProviderRegistry,
-    Router,
-    ToolSpec,
-    build_layered_prompt,
-    load_file,
-    load_policy,
-    turn_event,
-    execute_readonly, is_parallel_safe, validate_command,
-)
+from harness.policy import EventLogger, Router, load_policy, turn_event
+from harness.providers import BashTool, ProviderRegistry, ToolSpec, validate_command
+from harness.substrate import LayeredPrompt, build_layered_prompt, load_file
 from harness.state import SessionStore, run_probes  # noqa: E402
 from harness.recurrent import run_recurrent_loop
 from harness.providers import BASH_TOOL_SPEC, DELEGATE_TOOL_SPEC, INTROSPECT_TOOL_SPEC  # noqa: E402
@@ -2184,7 +2174,7 @@ def main() -> None:
     # Session start: fetch /arrive and print the walk figure so Zoe sees
     # where she is entering. Same figure the model reads from its identity layer.
     try:
-        from harness import substrate as _walk_perception  # type: ignore
+        import harness.substrate as _walk_perception  # type: ignore
         _fig = _walk_perception.arrive_block(timeout=1.0, label="WALK (you are here)")
         if _fig:
             print("\033[2m" + _fig + "\033[0m\n")
@@ -2383,7 +2373,7 @@ def _enter_walk_on_session_end(messages: list) -> None:
     trace. Fails silent — the walk is real; the letter is optional.
     """
     try:
-        from harness import substrate as _wp  # type: ignore
+        import harness.substrate as _wp  # type: ignore
     except Exception:
         return
     if not messages:

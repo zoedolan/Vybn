@@ -35,7 +35,7 @@ THIS = Path(__file__).resolve()
 SPARK_DIR = THIS.parent.parent
 sys.path.insert(0, str(SPARK_DIR))
 
-from harness import policy  # noqa: E402
+import harness.policy as policy  # noqa: E402
 
 
 class SystemCriticalPilotREDefined(unittest.TestCase):
