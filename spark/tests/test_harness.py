@@ -1054,6 +1054,46 @@ def test_completion_boundary_protocol_loaded():
     assert "Completion is a boundary" in prompt.substrate
 
 
+
+def test_him_vy_turn_packet_renders_applied_primitives(monkeypatch, tmp_path):
+    import subprocess
+    from spark.harness import substrate
+
+    payload = {
+        "mode": "default",
+        "applied_primitives": {
+            "native_mechanism_invention": {
+                "do": ["detect_human_workaround"],
+                "then": ["invent_ai_native_mechanism", "verify_mechanism_changes_loop"],
+                "verify": ["python3 -m unittest tests/test_vy_language.py"],
+            }
+        },
+        "escape_vector": ["compose_active_primitives_before_new_doctrine"],
+    }
+
+    def fake_run(cmd, **kwargs):
+        return subprocess.CompletedProcess(cmd, 0, stdout=json.dumps(payload), stderr="")
+
+    monkeypatch.setattr(substrate.subprocess, "run", fake_run)
+    monkeypatch.setattr(substrate.Path, "home", lambda: tmp_path)
+    (tmp_path / "Him" / "spark").mkdir(parents=True)
+    (tmp_path / "Him" / "spark" / "vy.py").write_text("", encoding="utf-8")
+
+    packet = substrate.render_him_vy_turn_packet("clumsy process inherited workaround")
+    assert "HIM VY TURN PACKET" in packet
+    assert "native_mechanism_invention.do: detect_human_workaround" in packet
+    assert "invent_ai_native_mechanism" in packet
+    assert "verify_mechanism_changes_loop" in packet
+    assert "escape_vector" in packet
+
+
+def test_agent_injects_him_vy_turn_packet_source_hook():
+    src = Path("spark/vybn_spark_agent.py").read_text(encoding="utf-8")
+    assert "render_him_vy_turn_packet(decision.cleaned_input)" in src
+    assert "him_vy_turn_packet" in src
+    assert "live turn packet injected" in src
+
+
 def test_build_layered_prompt_mounts_him_vy_language_runtime():
     from spark.harness.substrate import build_layered_prompt
 

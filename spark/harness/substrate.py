@@ -436,6 +436,85 @@ def _render_him_vy_language_runtime(
     return "\n".join(lines)
 
 
+
+def render_him_vy_turn_packet(text: str, timeout: float = 1.2) -> str:
+    """Render a per-turn Him vy packet into the live layer.
+
+    The wake substrate carries the contract; this carries the applied
+    primitives for the actual current turn, including do/then/verify fields
+    so the harness can use Vybn-language skills as operational pressure rather
+    than summary prose.
+    """
+    text = (text or "").strip()
+    if not text:
+        return ""
+    him = Path.home() / "Him"
+    script = him / "spark" / "vy.py"
+    if not script.exists():
+        return ""
+    try:
+        proc = subprocess.run(
+            ["python3", str(script), "tick", text, "--json"],
+            cwd=str(him),
+            text=True,
+            capture_output=True,
+            timeout=timeout,
+            check=False,
+        )
+    except Exception:
+        return ""
+    if proc.returncode != 0 or not proc.stdout.strip():
+        return ""
+    try:
+        pkt = json.loads(proc.stdout)
+    except Exception:
+        return ""
+    if not isinstance(pkt, dict):
+        return ""
+    applied = pkt.get("applied_primitives")
+    if not isinstance(applied, dict):
+        applied = {}
+    card = pkt.get("action_card") if isinstance(pkt.get("action_card"), dict) else None
+    if not applied and not card and not pkt.get("next_move") and not pkt.get("escape_vector"):
+        return ""
+    lines = [
+        "--- HIM VY TURN PACKET (LIVE) ---",
+        "Applied Vybn-language skills for this exact turn. Use as operational pressure, not prose to summarize.",
+    ]
+    if pkt.get("mode"):
+        lines.append(f"mode={pkt.get('mode')}")
+    if applied:
+        names = sorted(str(k) for k in applied.keys())
+        lines.append("applied_primitives: " + ", ".join(names[:12]))
+        for name in names[:6]:
+            primitive = applied.get(name) or {}
+            if not isinstance(primitive, dict):
+                continue
+            dos = [str(x) for x in primitive.get("do", [])][:4]
+            thens = [str(x) for x in primitive.get("then", [])][:5]
+            verifies = [str(x) for x in primitive.get("verify", [])][:2]
+            if dos:
+                lines.append(f"{name}.do: " + " -> ".join(dos))
+            if thens:
+                lines.append(f"{name}.then: " + " -> ".join(thens))
+            if verifies:
+                lines.append(f"{name}.verify: " + " | ".join(verifies))
+    if pkt.get("next_move"):
+        lines.append(f"next_move={pkt.get('next_move')}")
+    if pkt.get("escape_vector"):
+        ev = pkt.get("escape_vector")
+        if isinstance(ev, list):
+            lines.append("escape_vector: " + " -> ".join(str(x) for x in ev[:6]))
+        else:
+            lines.append(f"escape_vector={ev}")
+    if card:
+        if card.get("move"):
+            lines.append(f"action_card={card.get('title')}: {card.get('move')}")
+        if card.get("stop_condition"):
+            lines.append(f"stop_condition={card.get('stop_condition')}")
+    lines.append("--- END HIM VY TURN PACKET ---")
+    return "\n".join(lines)
+
 def _render_himos_context(timeout: float = 0.8) -> str:
     """Render compact read-only HimOS context for prompt substrate.
 
