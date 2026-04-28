@@ -266,7 +266,7 @@ def _orchestrator_substrate_sections(
         "using.\n"
         "  4. SYNTHESIZE — final single-voice answer to Zoe.\n"
         "\n"
-        "Specialists: code (Opus 4.7 + bash, 50-iter); task (Sonnet + "
+        "Specialists: code (Opus 4.6 + bash, 50-iter); task (Sonnet + "
         "bash, 10-iter); create (Sonnet writing); local (Nemotron FP8); "
         "chat (Opus 4.6, 1-iter). Specialists cannot themselves "
         "delegate.\n"

@@ -366,7 +366,7 @@ def _select_specialist(
 
     Default policy: first loop uses `task` (Sonnet+bash) for broad
     initial exploration; subsequent loops alternate between `code`
-    (Opus 4.7 adaptive thinking, bash) for verification work and
+    (Opus 4.6 adaptive thinking, bash) for verification work and
     `create` (Sonnet, no tools) for hypothesis refinement. The
     alternation is the agent-space analogue of "router selects
     distinct expert subsets at each depth" in OpenMythos — each loop

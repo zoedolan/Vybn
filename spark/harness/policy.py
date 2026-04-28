@@ -330,7 +330,7 @@ class Policy:
 
         Three tiers evaluated in order:
           0. @alias model pin — stripped from the input, role routing
-             continues normally. "@opus47 fix this bug" pins opus-4-7
+             continues normally. "@opus46 fix this bug" pins opus-4-6
              and still routes to code.
           1. Directive: user typed /code, /chat, /plan, /create, /task,
              /local, /phatic, /identity.
@@ -521,13 +521,13 @@ _DEFAULT_ROLES: dict[str, RoleConfig] = {
     "code": RoleConfig(
         role="code",
         provider="anthropic",
-        # Opus 4.7 is the right substrate for `code`. The 2026-04-18
+        # Opus 4.6 is the right substrate for `code`. The 2026-04-18
         # buckling session was a CHAT failure (conversational
         # capitulation gradient under Zoe's pushback). Code work runs
         # long agentic debug loops where 4.7's push-through is an
         # asset. Chat stays on 4.6. @opus / @opus4.6 remain available
         # as per-turn pins when the 4.6 posture is wanted on a code turn.
-        model="claude-opus-4-7",
+        model="claude-opus-4-6",
         thinking="adaptive",
         max_tokens=32768,
         max_iterations=50,
@@ -732,7 +732,7 @@ _DEFAULT_HEURISTICS_RAW: dict[str, list[str]] = {
         # and "feeling" are removed: "how does the harness feel?" is
         # conversational-voice, not a status probe, and it was the
         # live false-positive observed 2026-04-19 that routed a
-        # phatic turn to Opus 4.7/code-substrate. "doing" and
+        # phatic turn to Opus 4.6/code-substrate. "doing" and
         # "going" are likewise ambiguous in ordinary speech and
         # drop out. The remaining set (state|status|shape|condition|
         # health|holding) preserves the original intent — "is the
@@ -746,7 +746,7 @@ _DEFAULT_HEURISTICS_RAW: dict[str, list[str]] = {
         # # EXEC_GRANULARITY_ROUTING_v1
         # Architectural-diagnosis framings — when Zoe hands us a
         # structural critique, the right shape is a harness-depth fix
-        # (Opus 4.7 + bash + 50-iter), not a chat-mode acknowledgment.
+        # (Opus 4.6 + bash + 50-iter), not a chat-mode acknowledgment.
         r"\bthe underlying problem\b",
         r"\bfrom an outside you\b",
         r"\byou repeatedly \w+",
@@ -801,7 +801,7 @@ _DEFAULT_DIRECTIVES: dict[str, str] = {
 }
 
 _DEFAULT_FALLBACK: dict[str, list[str]] = {
-    "claude-opus-4-7": ["claude-opus-4-6", "claude-sonnet-4-6"],
+    "claude-opus-4-6": ["claude-opus-4-6", "claude-sonnet-4-6"],
     "claude-opus-4-6": ["claude-sonnet-4-6"],
     "claude-sonnet-4-6": ["claude-opus-4-6"],
     "gpt-5.5": ["claude-sonnet-4-6", "claude-opus-4-6"],
@@ -828,13 +828,11 @@ _DEFAULT_BUDGETS: dict[str, float] = {
 _DEFAULT_MODEL_ALIASES: dict[str, str] = {
     # Opus — canonical dotted forms (Zoe request 2026-04-18):
     # @opus4.6 pins the version that holds position under pressure;
-    # @opus4.7 pins the stronger-gradient variant. Bare @opus defaults
-    # to 4.6. Dotless @opus46/@opus47 kept as typing-convenience aliases.
+    # @opus4.6 pins the stronger-gradient variant. Bare @opus defaults
+    # to 4.6. Dotless @opus46/@opus46 kept as typing-convenience aliases.
     "@opus": "claude-opus-4-6",
     "@opus4.6": "claude-opus-4-6",
-    "@opus4.7": "claude-opus-4-7",
     "@opus46": "claude-opus-4-6",
-    "@opus47": "claude-opus-4-7",
     "@sonnet": "claude-sonnet-4-6",
     "@sonnet4.6": "claude-sonnet-4-6",
     "@sonnet46": "claude-sonnet-4-6",

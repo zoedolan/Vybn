@@ -14,7 +14,7 @@ Type 'exit' to stop. Type 'reload' to re-read identity mid-session.
 This file is now a thin REPL that delegates work to the harness in
 spark/harness/. The routing policy is in spark/router_policy.yaml. Default role is
 `task` (Claude Sonnet 4.6 + bash) so a bare 'ok'/'proceed' confirmation
-after a plan actually executes. `code` (Opus 4.7, adaptive thinking,
+after a plan actually executes. `code` (Opus 4.6, adaptive thinking,
 full 32k output) is reserved for multiword debugging or explicit
 /code invocation — casual mentions of 'bugs' or 'harness' no longer
 escalate. `orchestrate` is Sonnet without tools, available via /plan.
@@ -520,7 +520,7 @@ def _strip_thinking_tags(text: str, allow_unwrap: bool = True) -> str:
 
     FIX_A_THINKING_UNWRAP_v1: If stripping tagged content would leave
     nothing visible behind, the model wrapped its entire answer in
-    <thinking> tags (observed on opus-4-7 chat turns, 2026-04-20).
+    <thinking> tags (observed on opus-4-6 chat turns, 2026-04-20).
     Real adaptive-thinking arrives as kind=="thinking" blocks on the
     stream; XML-ish <thinking> tags in text are a formatting leak.
     Treat the leak as the answer — unwrap instead of delete.
@@ -957,7 +957,7 @@ def run_agent_loop(
         )
     role_cfg = decision.config
 
-    # Round 5: @alias model pin. If the user prefixed with @sonnet/@opus47/etc,
+    # Round 5: @alias model pin. If the user prefixed with @sonnet/@opus46/etc,
     # swap the resolved role's model (and provider base) for this turn only.
     # Role determination already used the stripped input; only the model
     # changes. Provider is inferred from the model name so YAML doesn't need
@@ -1279,7 +1279,7 @@ def run_agent_loop(
                 and not (response.text or "").strip()
                 and not response.tool_calls
             ):
-                _dim(f"[empty response from {role_cfg.provider}:{role_cfg.model} — try rephrasing or pin a different model with @sonnet/@opus4.7]")
+                _dim(f"[empty response from {role_cfg.provider}:{role_cfg.model} — try rephrasing or pin a different model with @sonnet/@opus4.6]")
 
             if response.stop_reason == "end_turn":
                 bag["stop_reason"] = "end_turn"
@@ -2027,7 +2027,7 @@ def main() -> None:
 
     policy = load_policy()
 
-    # Round 7: the orchestrate role now lives on Anthropic (Opus 4.7), so
+    # Round 7: the orchestrate role now lives on Anthropic (Opus 4.6), so
     # ANTHROPIC_API_KEY is sufficient for the default route. No legacy
     # OPENAI_API_KEY fallback is needed — it was a guard against the old
     # GPT-5.5 orchestrator configuration.
@@ -2107,7 +2107,7 @@ def main() -> None:
 
     print("  Type naturally. Prefix with /chat, /create, /plan, /task, /local "
           "to force a role,")
-    print("  or with @opus4.6/@opus4.7/@sonnet/@nemotron/@gpt to pin a model for one turn.")
+    print("  or with @opus4.6/@opus4.6/@sonnet/@nemotron/@gpt to pin a model for one turn.")
     print("  REPL commands: exit | clear | reload | history | policy | /resume | /sessions | /newsession")
     print()
 

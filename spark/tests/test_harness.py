@@ -593,7 +593,7 @@ class TestAnthropicMessageNormalization(unittest.TestCase):
 
         from harness.policy import RoleConfig as _RC
         prov = AnthropicProvider(client=_FakeClient())
-        role = _RC(role="code", provider="anthropic", model="claude-opus-4-7")
+        role = _RC(role="code", provider="anthropic", model="claude-opus-4-6")
         mixed = [
             {"role": "user", "content": "hi"},
             {"role": "assistant", "content": {

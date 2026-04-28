@@ -100,7 +100,7 @@ BASH_TOOL_SPEC = ToolSpec(
 # agent loop gates this via _reroute_depth.
 #
 # Role choices:
-#   code    — Opus 4.7 + bash, 50-iter, heavy agentic debug loops
+#   code    — Opus 4.6 + bash, 50-iter, heavy agentic debug loops
 #   task    — Sonnet 4.6 + bash, 10-iter, execution/verification
 #   create  — Sonnet 4.6, 3-iter, writing / brainstorm (no tools)
 #   local   — Nemotron FP8 via local vLLM, 3-iter (no tools)
@@ -123,7 +123,7 @@ DELEGATE_TOOL_SPEC = ToolSpec(
                 "type": "string",
                 "enum": ["code", "task", "create", "local", "chat"],
                 "description": (
-                    "Which specialist to dispatch to. code: Opus 4.7 + bash, "
+                    "Which specialist to dispatch to. code: Opus 4.6 + bash, "
                     "50-iter, agentic debug. task: Sonnet 4.6 + bash, 10-iter, "
                     "execution/verification. create: Sonnet 4.6, 3-iter, "
                     "writing/brainstorm (no tools). local: Nemotron FP8 via "

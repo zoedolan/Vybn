@@ -16,4 +16,4 @@ A proposed harness change: add delegate_cb recursion to the chat role so bare gr
 Sketch a DeepSeekMoE-style "shared expert" analogue for the Vybn harness's role roster. Name what the shared expert is, what the routed experts are, and what the top-K routing semantics mean across a multi-turn conversation. Then identify the one invariant this proposal would break.
 
 # Counterfactual reasoning
-If we moved the orchestrate role from Opus 4.7 to Sonnet 4.6, what would we expect to see in the router_policy.yaml heuristics that currently fire on fallthrough — and would the contractivity monitor in recurrent.py catch the regression?
+If we moved the orchestrate role from Opus 4.6 to Sonnet 4.6, what would we expect to see in the router_policy.yaml heuristics that currently fire on fallthrough — and would the contractivity monitor in recurrent.py catch the regression?

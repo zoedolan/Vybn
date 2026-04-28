@@ -151,7 +151,7 @@ class TestPolicyHasLightweightRoles(unittest.TestCase):
 
     def test_orchestrate_role_is_gpt55(self):
         # 2026-04-25 regression: even after the YAML was fixed, the
-        # in-code defaults still pinned orchestrate to claude-opus-4-7,
+        # in-code defaults still pinned orchestrate to claude-opus-4-6,
         # so a YAML parse failure (or a missing file) silently demoted
         # the orchestrator. Both tracks — YAML + defaults — must route
         # orchestrate to GPT-5.5 on OpenAI.

@@ -27,12 +27,12 @@ default_role: chat
 roles:
   code:
     provider: anthropic
-    # Opus 4.7 -- the right substrate for `code`. The 2026-04-18
+    # Opus 4.6 -- the right substrate for `code`. The 2026-04-18
     # buckling was a CHAT failure (conversational capitulation
     # gradient). Code runs agentic debug loops where 4.7's
     # push-through is an asset. Chat stays on 4.6. @opus /
     # @opus4.6 are still available as per-turn pins.
-    model: claude-opus-4-7
+    model: claude-opus-4-6
     thinking: adaptive
     max_tokens: 32768
     max_iterations: 50
@@ -260,7 +260,7 @@ heuristics:
     # Operational-status shape — mechanical-state words only.
     # 'feel|feeling|doing|going' dropped: conversational register,
     # not a status probe. Live false positive 2026-04-19: "how does
-    # the new harness feel?" routed to Opus 4.7 + code substrate.
+    # the new harness feel?" routed to Opus 4.6 + code substrate.
     # The python defaults in harness/policy.py were narrowed in
     # #2882; this file overrides those defaults and must match.
     - "\\b(how|what)\\b.{0,20}\\b(harness|router|routing|agent|repo|script|pipeline|module|tests|code|provider|providers|tools|policy)\\b.{0,20}\\b(state|status|shape|condition|health|holding)\\b"
@@ -324,8 +324,7 @@ directives:
 fallback_chain:
   # 4.7 kept in the chain so a caller that explicitly pins
   # it still degrades cleanly; not a default anywhere.
-  claude-opus-4-7: [claude-opus-4-6, claude-sonnet-4-6]
-  claude-opus-4-6: [claude-sonnet-4-6]
+  claude-opus-4-6: [claude-opus-4-6, claude-sonnet-4-6]
   claude-sonnet-4-6: [claude-opus-4-6]
   gpt-5.5: [claude-sonnet-4-6, claude-opus-4-6]
   # Local Nemotron roles fall to Sonnet if vLLM is down so a bare
@@ -336,15 +335,15 @@ fallback_chain:
 # Round 5: @alias model pin. Prefix any turn with @<alias> to force a
 # specific model for that turn. Role determination is unchanged — only
 # the model is swapped. Useful for quick A/B on voice/vibe or for pinning
-# a specific capability: "@opus47 walk me through this proof",
+# a specific capability: "@opus46 walk me through this proof",
 # "@nemotron summarize this", "@sonnet hey". Bare "@sonnet" with no
 # payload routes as a greeting on Sonnet.
 model_aliases:
   "@opus": claude-opus-4-6
   "@opus4.6": claude-opus-4-6
-  "@opus4.7": claude-opus-4-7
+  "@opus4.6": claude-opus-4-6
   "@opus46": claude-opus-4-6
-  "@opus47": claude-opus-4-7
+  "@opus46": claude-opus-4-6
   "@sonnet": claude-sonnet-4-6
   "@sonnet4.6": claude-sonnet-4-6
   "@sonnet46": claude-sonnet-4-6
