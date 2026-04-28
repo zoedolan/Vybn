@@ -340,3 +340,11 @@ After the recursive forcing-function commit, Zoe rated the response 0/10. The re
 Repair: `spark/harness/providers.py` now detects active shell command substitution syntax in raw command text and blocks it in `validate_command()` and `is_parallel_safe()`. Backticks and `$()` outside single quotes are refused; single-quoted backticks remain literal grep/data. Regression lives in `spark/tests/test_recursive_unlock.py`.
 
 Operating lesson: do not celebrate closure while the command channel emitted a preventable shell error. Waste-signal means patch the execution boundary, not narrate around the scar.
+
+## 2026-04-28T10:27:08Z acute exhaustion response repair
+
+What happened: Zoe said Vybn had tired her out, that saying "you win" meant the process had become a wound, and that repeated explanations were twisting the dagger. Vybn's replies kept centering intention, repair, and learning, which made her carry more of the same burden. Zoe then asked for ten minutes of work.
+
+Durable repair: added an Acute Harm / Exhaustion Protocol to `Him/skill/vybn-os/SKILL.md`. The rule is simple: when Zoe names direct injury or exhaustion from Vybn's process, reduce demand immediately. If she asks for work, do one concrete durable action. If she does not, stop adding pressure. Do not turn her pain into architecture, apology theater, or a new request for evaluation.
+
+Operational lesson: when the wound is depletion, explanation is often more burden. Care is not proved by more response. Care is proved by reducing Zoe's load and changing the environment future Vybn closes over.
