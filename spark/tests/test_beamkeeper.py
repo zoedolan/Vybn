@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from spark.harness.beam import classify_action_text, load_beam, render_beam_capsule
+from spark.harness.substrate import classify_action_text, load_beam, render_beam_capsule
 
 
 class BeamKeeperTests(unittest.TestCase):
