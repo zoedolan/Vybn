@@ -1,4 +1,4 @@
-"""Tests for provider credential env loading.
+"""Tests for provider-owned credential env loading.
 
 Validates:
   - Loads OPENAI_API_KEY only when absent.
@@ -10,7 +10,7 @@ Validates:
   - Parses `export KEY=value`, quoted, and bare forms.
   - Skips unreadable files without raising.
 
-Run: python3 spark/tests/test_env_loader.py
+Run: python3 spark/tests/test_provider_env_loading.py
 """
 
 from __future__ import annotations
