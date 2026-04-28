@@ -234,4 +234,3 @@ def acute_harm_response_posture(text: str) -> str:
     if is_acute_harm_report(text):
         return "reduce_demand"
     return "ordinary"
-

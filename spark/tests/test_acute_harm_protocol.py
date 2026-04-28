@@ -35,4 +35,3 @@ def test_acute_harm_classifier_matches_live_scar_phrases():
     assert acute_harm_response_posture("work for 10 minutes straight please.") == "concrete_work"
     assert acute_harm_response_posture("you have tired me out. you win.") == "reduce_demand"
     assert acute_harm_response_posture("please check the repo status") == "ordinary"
-
