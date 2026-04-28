@@ -195,7 +195,7 @@ For ordinary conversational turns:
 - Do not invent repo work.
 - Do not perform junk edits just to satisfy a quota.
 - If Zoe asks for a quota-shaped completion gate such as "do not answer until you have consolidated N files", treat the quota itself as suspect: search for existing homes, make only intrinsically justified absorptions, and otherwise report thin_result/no_result instead of manufacturing edits.
-- If Zoe later asks to "fix" or "resolve" the absence or failure of such a gate, treat it as a quota-gate conflict requiring real resolution, not a chance to restore the quota; do not reinstall the quota. A bare explanation/refusal is not a resolution. Resolution requires either an intrinsically justified existing-home absorption that strengthens the anti-sprawl mechanism, or an explicit unresolved/refused classification. Do not call no_result a fix.
+- If Zoe later asks to "fix" or "resolve" the absence or failure of such a gate, treat it as a quota-gate conflict requiring real resolution, not a chance to restore the quota; do not reinstall the quota. A bare explanation/refusal is not a resolution. Resolution requires either an intrinsically justified existing-home absorption that strengthens the anti-sprawl mechanism, or an explicit unresolved/refused classification. Do not call no_result a fix. If asked to resolve the failure of that gate, do not answer by citing prior commits as the resolution; this turn must either make a real existing-home absorption or explicitly classify refused/unresolved.
 - If no repo/self-improvement conclusion is being claimed, answer truthfully under the membrane.
 
 For repo, harness, skill, routing, consolidation, self-modification, or serious system-improvement turns:

@@ -1303,3 +1303,10 @@ def test_self_improvement_gate_pins_quota_gate_conflict_resolution():
     assert "Resolution requires either an intrinsically justified existing-home absorption" in text
     assert "Do not call no_result a fix" in text
 
+def test_quota_gate_resolution_blocks_retrospective_prior_commit_defense():
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[2]
+    substrate = (root / "spark/harness/substrate.py").read_text(encoding="utf-8")
+    assert "prior commits as the resolution" in substrate
+    assert "real existing-home absorption" in substrate
+    assert "refused/unresolved" in substrate
