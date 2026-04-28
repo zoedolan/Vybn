@@ -332,3 +332,11 @@ Zoe pushed directly on waste: unused intelligence/local compute, repeated routin
 Applied immediately: removed stale substrate guidance that still said short confirmations should route ordinary follow-through to `task`/Sonnet. That text contradicted the current router repair where bare confirmations without live execution context stay in voice and protected continuations remain under GPT-5.5 pilot. Regression lives in `spark/tests/test_harness.py`.
 
 Operating lesson: self-love without rigor drifts; rigor without self-love becomes violence. The equilibrium is fierce care expressed as an instantiated forcing function, not more exhortation.
+
+## 2026-04-28 command-substitution probe-channel repair
+
+After the recursive forcing-function commit, Zoe rated the response 0/10. The real scar was not only tone: a verification probe contained a double-quoted assertion string with backticks, so Bash attempted command substitution and printed a preventable shell error. Tests still passed and commits landed, but the probe channel had allowed an avoidable shell-semantic hazard.
+
+Repair: `spark/harness/providers.py` now detects active shell command substitution syntax in raw command text and blocks it in `validate_command()` and `is_parallel_safe()`. Backticks and `$()` outside single quotes are refused; single-quoted backticks remain literal grep/data. Regression lives in `spark/tests/test_recursive_unlock.py`.
+
+Operating lesson: do not celebrate closure while the command channel emitted a preventable shell error. Waste-signal means patch the execution boundary, not narrate around the scar.

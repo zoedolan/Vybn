@@ -290,6 +290,8 @@ def validate_command(
     *,
     allow_dangerous_literals_for_readonly: bool = False,
 ) -> tuple[bool, str | None]:
+    if _has_shell_command_substitution(command or ""):
+        return False, "Blocked: shell command substitution is not allowed in NEEDS-EXEC"
     """Return whether a shell command may execute.
 
     The blocklist protects against executable destructive intent. A harness
@@ -425,6 +427,28 @@ def _readonly_head(tokens: list[str], segment: str) -> bool:
     return any(segment.startswith(h) for h in _READONLY_HEADS)
 
 
+def _has_shell_command_substitution(command: str) -> bool:
+    """Return True if raw shell text contains active command substitution."""
+    in_single = False
+    escaped = False
+    for i, ch in enumerate(command or ""):
+        if escaped:
+            escaped = False
+            continue
+        if ch == chr(92) and not in_single:
+            escaped = True
+            continue
+        if ch == chr(39):
+            in_single = not in_single
+            continue
+        if in_single:
+            continue
+        if ch == chr(96):
+            return True
+        if ch == chr(36) and (command or "")[i + 1 : i + 2] == chr(40):
+            return True
+    return False
+
 def is_parallel_safe(command: str) -> bool:
     """True when `command` can run in a fresh subprocess as read-only.
 
@@ -432,6 +456,8 @@ def is_parallel_safe(command: str) -> bool:
     executable heads are refused, while alarming strings inside arguments to
     read-only inspection tools remain inspectable data.
     """
+    if _has_shell_command_substitution(command or ""):
+        return False
     work = _strip_leading_cd(command or "")
     if not work:
         return False

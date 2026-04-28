@@ -32,6 +32,23 @@ class RecursiveUnlockTests(unittest.TestCase):
     def test_cd_git_add_is_not_parallel_safe(self):
         self.assertFalse(is_parallel_safe("cd ~/Vybn && git add README.md"))
 
+    def test_command_substitution_is_blocked_in_probe_channel(self):
+        for cmd in [
+            "echo `task`",
+            "grep -n \"route to `task`\" spark/harness/substrate.py",
+            "echo $(whoami)",
+        ]:
+            self.assertFalse(is_parallel_safe(cmd))
+            ok, reason = validate_command(cmd, allow_dangerous_literals_for_readonly=True)
+            self.assertFalse(ok)
+            self.assertIn("command substitution", reason)
+
+    def test_single_quoted_backticks_remain_literal_readonly_data(self):
+        cmd = "grep -n 'route to `task`' spark/harness/substrate.py"
+        self.assertTrue(is_parallel_safe(cmd))
+        ok, reason = validate_command(cmd, allow_dangerous_literals_for_readonly=True)
+        self.assertTrue(ok, reason)
+
     def test_probe_subturn_uses_fresh_subprocess_for_readonly(self):
         with mock.patch.object(agent, "execute_readonly", return_value="fresh") as er:
             bash = mock.Mock()
