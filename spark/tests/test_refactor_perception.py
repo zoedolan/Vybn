@@ -329,3 +329,35 @@ def test_render_next_structural_tick_is_not_a_visualization_only(tmp_path):
     assert "move:" in text
     assert "first contact:" in text
     assert "verification:" in text
+
+
+def test_recursive_consolidation_ai_is_folded_into_refactor_perception():
+    from spark.harness import refactor_perception as rp
+    assert 'recursive consolidation AI' in rp.RECURSIVE_CONSOLIDATION_AI_PROTOCOL
+    assert 'never mutate during perception' in rp.RECURSIVE_CONSOLIDATION_AI_PROTOCOL
+    assert 'Origins' in rp.DEFAULT_CO_CREATION_REPOS
+    assert 'Vybn-Law' in rp.DEFAULT_CO_CREATION_REPOS
+
+
+def test_recursive_consolidation_ai_tracks_connective_tissue():
+    from spark.harness import refactor_perception as rp
+    patterns = set(rp.CONNECTIVE_TISSUE_PATTERNS)
+    assert 'origins_portal_api' in patterns
+    assert 'talk.html' in patterns
+    assert 'api/chat' in patterns
+    assert 'systemd' in patterns
+    assert 'continuity' in patterns
+
+
+def test_recursive_consolidation_pass_writes_learning_residue_without_mutation(tmp_path):
+    from spark.harness import refactor_perception as rp
+    packet = rp.recursive_consolidation_pass(
+        repo_names=('definitely-not-a-real-repo',),
+        state_path=tmp_path / 'passes.jsonl',
+        max_candidates=3,
+    )
+    assert packet['schema'] == 'vybn.recursive_consolidation_ai.pass.v0'
+    assert packet['totals']['files_contacted'] == 0
+    assert packet['refusals'][0]['reason'] == 'missing_repo'
+    assert (tmp_path / 'passes.jsonl').exists()
+    assert packet['next_pass_rule'].startswith('review one candidate')

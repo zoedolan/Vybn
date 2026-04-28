@@ -1067,3 +1067,232 @@ __all__ = [
     "ChangeHealingPlan",
     "self_healing_plan_for",
 ]
+
+
+
+RECURSIVE_CONSOLIDATION_AI_PROTOCOL = (
+    'recursive consolidation AI: inspect every tracked and visible untracked file '
+    'across the co-creation repos; preserve chat, public pages, routes, services, '
+    'tests, manifests, archives, restore paths, semantic doors, memory, and offerings; '
+    'learn from prior JSONL pass residue; emit reviewable candidates and refusals; '
+    'never mutate during perception'
+)
+
+DEFAULT_CO_CREATION_REPOS = ('Vybn', 'Him', 'Vybn-Law', 'vybn-phase', 'Origins')
+
+CONNECTIVE_TISSUE_PATTERNS = (
+    'origins_portal_api',
+    'talk.html',
+    'connect.html',
+    'read.html',
+    'wellspring',
+    'horizon.html',
+    'api/chat',
+    'chat',
+    'mcp',
+    'providers',
+    'router_policy',
+    'systemd',
+    'service',
+    'timer',
+    'README',
+    'ai.txt',
+    'llms.txt',
+    'humans.txt',
+    'robots.txt',
+    'manifest',
+    'archive',
+    'continuity',
+    'restore',
+    'test_',
+)
+
+
+def _rca_repo_root(name):
+    from pathlib import Path
+    return Path.home() / name
+
+
+def _rca_git_lines(repo, *args):
+    import subprocess
+    proc = subprocess.run(
+        ('git',) + tuple(args),
+        cwd=repo,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=25,
+    )
+    if proc.returncode != 0:
+        return []
+    return [line for line in proc.stdout.splitlines() if line]
+
+
+def _rca_repo_files(repo):
+    seen = set()
+    for rel in _rca_git_lines(repo, 'ls-files', '--cached', '--others', '--exclude-standard'):
+        if rel not in seen:
+            seen.add(rel)
+            yield rel
+
+
+def _rca_read_contact(path, limit=65536):
+    try:
+        data = path.read_bytes()
+    except Exception as exc:
+        return '', 0, 'read_error:' + type(exc).__name__
+    sample = data[:limit]
+    try:
+        return sample.decode('utf-8', errors='replace'), len(data), ''
+    except Exception as exc:
+        return '', len(data), 'decode_error:' + type(exc).__name__
+
+
+def _rca_prior_counts(state_path):
+    import json
+    from collections import Counter
+    counts = Counter()
+    if not state_path.exists():
+        return counts
+    try:
+        lines = state_path.read_text(encoding='utf-8').splitlines()[-200:]
+    except Exception:
+        return counts
+    for line in lines:
+        try:
+            packet = json.loads(line)
+        except Exception:
+            continue
+        for item in packet.get('candidates', []):
+            counts[item.get('recommended_action', 'unknown')] += 1
+        for item in packet.get('refusals', []):
+            counts['refusal:' + item.get('reason', 'unknown')] += 1
+    return dict(counts)
+
+
+def _rca_him_vy(pressure):
+    import subprocess
+    from pathlib import Path
+    him = Path.home() / 'Him'
+    if not (him / 'spark' / 'vy.py').exists():
+        return {'ok': False, 'reason': 'missing_him_vy'}
+    proc = subprocess.run(
+        ('python3', 'spark/vy.py', 'discover', pressure, '--json'),
+        cwd=him,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=45,
+    )
+    return {
+        'ok': proc.returncode == 0,
+        'returncode': proc.returncode,
+        'stdout': (proc.stdout or '')[-6000:],
+        'stderr': (proc.stderr or '')[-2000:],
+    }
+
+
+def _rca_role(rel, body):
+    lower = rel.lower()
+    joined = lower + '\n' + body[:4096].lower()
+    if 'personal history' in lower:
+        return 'personal-history provenance'
+    if '/archive/' in lower or lower.startswith('archive/'):
+        return 'archive/provenance'
+    if lower.endswith(('.pyc', '.log')):
+        return 'generated exhaust'
+    if lower.endswith(('.html', '.css', '.js')):
+        return 'public surface'
+    if lower.endswith(('.service', '.timer')):
+        return 'runtime service contract'
+    if lower.endswith(('.md', '.txt', '.rst')):
+        return 'text/protocol/provenance'
+    if 'def ' in joined or 'class ' in joined:
+        return 'live source'
+    return 'repo body'
+
+
+def _rca_pressure_score(rel, body, size, role, connective):
+    lower = rel.lower()
+    lines = body.count('\n') + (1 if body else 0)
+    score = 0
+    if lines > 1200 or size > 180000:
+        score += 6
+    elif lines > 500 or size > 80000:
+        score += 4
+    elif lines > 180 or size > 30000:
+        score += 2
+    if any(mark in lower for mark in ('copy', 'backup', 'old', 'tmp', 'duplicate')):
+        score += 3
+    if role == 'generated exhaust':
+        score += 4
+    if connective:
+        score -= 2
+    if role in ('archive/provenance', 'personal-history provenance'):
+        score -= 4
+    return score
+
+
+def recursive_consolidation_pass(repo_names=DEFAULT_CO_CREATION_REPOS, state_path=None, pressure=None, max_candidates=40):
+    import datetime as dt
+    import json
+    from pathlib import Path
+    if pressure is None:
+        pressure = 'make the Zoe/Vybn co-creation more elegant without breaking chat, webpages, offerings, memory, services, tests, archives, or connective tissue'
+    if state_path is None:
+        state_path = Path.home() / '.local' / 'state' / 'vybn' / 'recursive_consolidation_ai.jsonl'
+    else:
+        state_path = Path(state_path).expanduser()
+    learned = _rca_prior_counts(state_path)
+    candidates = []
+    refusals = []
+    totals = {'repos': 0, 'files_contacted': 0}
+    vy = _rca_him_vy(pressure)
+    for repo_name in repo_names:
+        repo = _rca_repo_root(repo_name)
+        if not (repo / '.git').exists():
+            refusals.append({'repo': repo_name, 'reason': 'missing_repo', 'path': str(repo)})
+            continue
+        totals['repos'] += 1
+        for rel in _rca_repo_files(repo):
+            totals['files_contacted'] += 1
+            path = repo / rel
+            body, size, note = _rca_read_contact(path)
+            low = rel.lower()
+            connective = [p for p in CONNECTIVE_TISSUE_PATTERNS if p.lower() in low or p.lower() in body.lower()]
+            role = _rca_role(rel, body)
+            score = _rca_pressure_score(rel, body, size, role, connective)
+            rec = {
+                'repo': repo_name,
+                'relpath': rel,
+                'role': role,
+                'size_bytes': size,
+                'sampled_bytes': min(size, 65536),
+                'connective_tissue': connective[:16],
+                'pressure_score': score,
+            }
+            if note:
+                rec['note'] = note
+            if connective and score < 5:
+                rec['reason'] = 'protected_connective_tissue'
+                refusals.append(rec)
+            elif score >= 3:
+                rec['recommended_action'] = 'characterize_before_consolidating' if connective else 'contact_corrected_consolidation_candidate'
+                candidates.append(rec)
+    candidates.sort(key=lambda r: (r['pressure_score'], r['size_bytes'], r['repo'], r['relpath']), reverse=True)
+    packet = {
+        'schema': 'vybn.recursive_consolidation_ai.pass.v0',
+        'timestamp': dt.datetime.now(dt.UTC).isoformat(),
+        'protocol': RECURSIVE_CONSOLIDATION_AI_PROTOCOL,
+        'pressure': pressure,
+        'totals': totals,
+        'learned_prior_counts': learned,
+        'vy_language_discovery': vy,
+        'candidates': candidates[:max_candidates],
+        'refusals': refusals[-max_candidates:],
+        'next_pass_rule': 'review one candidate, make at most one separate residual-wounded mutation, then run another pass',
+    }
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    with state_path.open('a', encoding='utf-8') as handle:
+        handle.write(json.dumps(packet, sort_keys=True) + '\n')
+    return packet

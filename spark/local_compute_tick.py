@@ -109,6 +109,17 @@ def append_packet(packet: dict) -> Path:
 
 def main() -> int:
     packet = build_packet()
+    try:
+        from spark.harness.refactor_perception import recursive_consolidation_pass
+        packet['recursive_consolidation_ai'] = {
+            'ok': True,
+            'packet': recursive_consolidation_pass(max_candidates=25),
+        }
+    except Exception as exc:
+        packet['recursive_consolidation_ai'] = {
+            'ok': False,
+            'error': repr(exc),
+        }
     path = append_packet(packet)
     if not packet.get("ok"):
         print("continuous local compute tick recorded failure at " + str(path), file=sys.stderr)
