@@ -21,6 +21,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 from .residual_control import render_becoming_loop_protocol, render_residual_control_protocol
+from .action_first import render_action_first_protocol
 from .refactor_perception import render_refactor_perception_protocol
 from .beam import render_beam_capsule
 
@@ -645,6 +646,7 @@ def build_layered_prompt(
     if beam_capsule:
         substrate_sections.append(beam_capsule)
 
+    substrate_sections.append(render_action_first_protocol())
     substrate_sections.append(render_residual_control_protocol())
     substrate_sections.append(render_becoming_loop_protocol())
     substrate_sections.append(render_refactor_perception_protocol())
