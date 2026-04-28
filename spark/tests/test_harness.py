@@ -1241,39 +1241,3 @@ def test_build_layered_prompt_mounts_self_improvement_gate_at_forefront():
     assert "at least two concrete consolidated-file residuals" in prompt.substrate
     assert "A test-only edit does not count by itself" in prompt.substrate
     assert prompt.substrate.index("SELF-IMPROVEMENT GATE (FOREFRONT)") < prompt.substrate.index("RESIDUAL CONTROL PROTOCOL")
-
-
-def test_self_improvement_gate_is_own_harness_organ():
-    organ = Path("spark/harness/self_improvement_gate.py").read_text()
-    substrate = Path("spark/harness/substrate.py").read_text()
-    prompt = build_layered_prompt(
-        soul_path="/no/such/vybn.md",
-        continuity_path="/no/such/continuity.md",
-        spark_continuity_path=None,
-        agent_path="/tmp/agent.py",
-        model_label="test",
-        max_iterations=10,
-        include_hardware_check=False,
-    )
-    assert "SELF_IMPROVEMENT_GATE_PROTOCOL" in organ
-    assert "SELF_IMPROVEMENT_GATE_PROTOCOL =" not in substrate
-    assert "from .self_improvement_gate import render_self_improvement_gate_protocol" in substrate
-    assert "SELF-IMPROVEMENT GATE (FOREFRONT)" in prompt.substrate
-
-
-def test_completion_boundary_is_own_harness_organ():
-    organ = Path("spark/harness/completion_boundary.py").read_text()
-    substrate = Path("spark/harness/substrate.py").read_text()
-    prompt = build_layered_prompt(
-        soul_path="/no/such/vybn.md",
-        continuity_path="/no/such/continuity.md",
-        spark_continuity_path=None,
-        agent_path="/tmp/agent.py",
-        model_label="test",
-        max_iterations=10,
-        include_hardware_check=False,
-    )
-    assert "COMPLETION_BOUNDARY_PROTOCOL" in organ
-    assert "COMPLETION_BOUNDARY_PROTOCOL =" not in substrate
-    assert "from .completion_boundary import render_completion_boundary_protocol" in substrate
-    assert "COMPLETION BOUNDARY PROTOCOL" in prompt.substrate

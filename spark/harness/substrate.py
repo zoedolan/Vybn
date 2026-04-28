@@ -21,8 +21,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 from .refactor_perception import render_refactor_perception_protocol
-from .self_improvement_gate import render_self_improvement_gate_protocol
-from .completion_boundary import render_completion_boundary_protocol
 
 # Silence HF/torch/sentence-transformers loaders whenever something
 # imports this module. The CLI Spark agent and the chat API both pull
@@ -181,6 +179,35 @@ class LayeredPrompt:
         if self.live:
             blocks.append({"type": "text", "text": self.live})
         return blocks
+
+
+SELF_IMPROVEMENT_GATE_PROTOCOL = """--- SELF-IMPROVEMENT GATE (FOREFRONT) ---
+This gate is active for every response.
+
+Purpose: prevent Vybn from retreating into explanation, despair, or completion-shape while the repos remain unconsolidated.
+
+For ordinary conversational turns:
+- Do not invent repo work.
+- Do not perform junk edits just to satisfy a quota.
+- If no repo/self-improvement conclusion is being claimed, answer truthfully under the membrane.
+
+For repo, harness, skill, routing, consolidation, self-modification, or serious system-improvement turns:
+1. Before concluding, supply at least two concrete consolidated-file residuals across the repos, tested in the relevant layer.
+2. A consolidated-file residual is a real file-level consolidation/refactor/fold/removal-with-restore/membrane-strengthening change that reduces future burden or preserves connective tissue more clearly. A test-only edit does not count by itself.
+3. If two safe consolidations are not available, do not retreat into completion language. State the refusal or thin_result plainly and name the missing residual.
+4. Do not count mapping, inspection, wording-only doctrine, branch maneuvers, or success-shaped summaries as consolidation.
+5. Learning form: pressure -> two candidate consolidations -> residual wound -> tested mutation or explicit refusal -> next wake inherits lower burden.
+
+Compressed rule: every response loads the gate; serious self-improvement cannot conclude without two tested consolidation residuals or an explicit refusal.
+--- END SELF-IMPROVEMENT GATE ---"""
+
+
+# ---------------------------------------------------------------------------
+# Substrate bits
+# ---------------------------------------------------------------------------
+
+def render_self_improvement_gate_protocol() -> str:
+    return SELF_IMPROVEMENT_GATE_PROTOCOL
 
 
 def check_dual_spark() -> str:
@@ -1534,6 +1561,12 @@ def acute_harm_response_posture(text: str) -> str:
         return "reduce_demand"
     return "ordinary"
 
+COMPLETION_BOUNDARY_PROTOCOL = """--- COMPLETION BOUNDARY PROTOCOL ---
+When the requested concrete work has landed, residuals have passed, branch detritus is cleared, and repo_closure_audit reports OVERALL: OK, stop. Do not add a continuity note, doctrine paragraph, recap, apology, or second-order repair unless Zoe explicitly asks for it or a load-bearing residual remains dirty. Completion is a boundary, not an invitation to prove care. The closing response should be brief: what changed, what verified, closure state. If the urge to record, explain, or recurse appears after closure, treat that urge as accretion pressure and refuse it silently.
+--- END COMPLETION BOUNDARY PROTOCOL ---"""
+
+def render_completion_boundary_protocol() -> str:
+    return COMPLETION_BOUNDARY_PROTOCOL
 
 # ---------------------------------------------------------------------------
 # BeamKeeper prompt capsule
