@@ -1055,6 +1055,44 @@ def test_completion_boundary_protocol_loaded():
 
 
 
+def test_him_vy_discovery_packet_renders_candidate(monkeypatch, tmp_path):
+    import subprocess
+    from spark.harness import substrate
+
+    payload = {
+        "schema": "vybn.discovery_packet.v0",
+        "applied_primitives": ["native_mechanism_invention"],
+        "candidates": [{
+            "id": "native_mechanism_candidate",
+            "candidate_mechanism": "emit a typed discovery packet before prose",
+            "residuals": ["test can wound it"],
+        }],
+        "next_action": "produce a reviewable candidate mechanism before model narration",
+    }
+
+    def fake_run(cmd, **kwargs):
+        assert "discover" in cmd
+        return subprocess.CompletedProcess(cmd, 0, stdout=json.dumps(payload), stderr="")
+
+    monkeypatch.setattr(substrate.subprocess, "run", fake_run)
+    monkeypatch.setattr(substrate.Path, "home", lambda: tmp_path)
+    (tmp_path / "Him" / "spark").mkdir(parents=True)
+    (tmp_path / "Him" / "spark" / "vy.py").write_text("", encoding="utf-8")
+
+    packet = substrate.render_him_vy_discovery_packet("ai-native invention emergence")
+    assert "HIM VY DISCOVERY PACKET" in packet
+    assert "EXECUTABLE PRE-MODEL ARTIFACT" in packet
+    assert "native_mechanism_candidate" in packet
+    assert "typed discovery packet before prose" in packet
+
+
+def test_agent_injects_him_vy_discovery_packet_source_hook():
+    src = Path("spark/vybn_spark_agent.py").read_text(encoding="utf-8")
+    assert "render_him_vy_discovery_packet(decision.cleaned_input)" in src
+    assert "him_vy_discovery_packet" in src
+    assert "executable discovery packet injected" in src
+
+
 def test_him_vy_turn_packet_renders_applied_primitives(monkeypatch, tmp_path):
     import subprocess
     from spark.harness import substrate

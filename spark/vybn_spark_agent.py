@@ -52,7 +52,7 @@ from harness.state import SessionStore, run_probes  # noqa: E402
 from harness.recurrent import run_recurrent_loop
 from harness.providers import BASH_TOOL_SPEC, DELEGATE_TOOL_SPEC, INTROSPECT_TOOL_SPEC  # noqa: E402
 from harness.providers import execute_readonly, is_parallel_safe  # noqa: E402
-from harness.substrate import rag_snippets, rag_snippets_with_tier, render_him_vy_turn_packet  # noqa: E402
+from harness.substrate import rag_snippets, rag_snippets_with_tier, render_him_vy_discovery_packet, render_him_vy_turn_packet  # noqa: E402
 from harness.tool_calls import execute_tool_calls, default_introspect  # noqa: E402
 from harness.providers import check_claim, check_structural_claim  # noqa: E402
 from harness.policy import is_system_critical_pilot_turn  # noqa: E402
@@ -1076,6 +1076,23 @@ def run_agent_loop(
         return reply
 
     provider = registry.get(role_cfg)
+
+    # Executable Him discovery packet. This is generated before provider
+    # narration and carries typed candidate mechanisms plus residuals.
+    try:
+        vy_discovery_packet = render_him_vy_discovery_packet(decision.cleaned_input)
+    except Exception as _vy_discovery_err:
+        vy_discovery_packet = ""
+        logger.emit("him_vy_discovery_packet_error", turn=turn_number, err=repr(_vy_discovery_err)[:200])
+    if vy_discovery_packet:
+        existing_live = getattr(active_prompt, "live", "") or ""
+        active_prompt = LayeredPrompt(
+            identity=active_prompt.identity,
+            substrate=active_prompt.substrate,
+            live=(f"{vy_discovery_packet}\n\n{existing_live}" if existing_live else vy_discovery_packet),
+        )
+        logger.emit("him_vy_discovery_packet", turn=turn_number, chars=len(vy_discovery_packet))
+        _dim("[him-vy: executable discovery packet injected]")
 
     # Him vy-language per-turn uptake. The substrate carries the compiled
     # contract; this live packet carries the primitives that apply to the
