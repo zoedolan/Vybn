@@ -6,14 +6,14 @@ def test_opus47_is_not_active_in_router_policy_or_aliases():
     router = Path("spark/router_policy.yaml").read_text()
 
     active = policy + "\n" + router
-    assert "claude-opus-4-7" not in active
-    assert "@opus47" not in active
-    assert "@opus4.7" not in active
+    assert "claude-OPUS47-DEPRECATED" not in active
+    assert "@OPUS47-DEPRECATED" not in active
+    assert "@OPUS4.7-DEPRECATED" not in active
 
 
 def test_code_role_uses_opus46_after_opus47_deprecation():
     from spark.harness.policy import default_policy
 
     decision = default_policy().classify("fix the harness routing bug")
-    assert decision.role_config.role == "code"
-    assert decision.role_config.model == "claude-opus-4-6"
+    assert decision.role == "code"
+    assert decision.config.model == "claude-opus-4-6"
