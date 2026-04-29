@@ -712,23 +712,6 @@ _DEFAULT_ROLES: dict[str, RoleConfig] = {
             "came from the identity role ({model} on {provider})."
         ),
     ),
-    # Dormant Omni role. The harness does not classify into ``omni``
-    # — there is no heuristic or directive that names it, and no
-    # fallback chain points at it — so an ordinary chat turn cannot
-    # land here. The role exists so that explicit perception-layer
-    # callers (and the ``@omni`` alias) have a named home to dispatch
-    # multimodal packets to. Unreachable by default is the point.
-    "omni": RoleConfig(
-        role="omni",
-        provider="openai",
-        model="nvidia/NVIDIA-Nemotron-Nano-Omni-8B",
-        thinking="off",
-        max_tokens=2048,
-        max_iterations=1,
-        tools=[],
-        base_url="http://127.0.0.1:8000/v1",
-        rag=False,
-    ),
 }
 
 _DEFAULT_HEURISTICS_RAW: dict[str, list[str]] = {
@@ -930,12 +913,6 @@ _DEFAULT_MODEL_ALIASES: dict[str, str] = {
     "@gpt": "gpt-5.5",
     "@gpt5": "gpt-5.5",
     "@gpro": "gpt-5.5-pro",
-    # Dormant pin for the Nemotron Nano Omni perception path. Pinning
-    # the alias does not by itself change role classification — the
-    # ``omni`` role has no heuristic or directive — so prefixing
-    # ``@omni`` to an ordinary chat turn just renames the model on the
-    # role the heuristics chose, exactly as ``@nemotron`` does today.
-    "@omni": "nvidia/NVIDIA-Nemotron-Nano-Omni-8B",
 }
 
 
