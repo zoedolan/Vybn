@@ -263,7 +263,6 @@ Public/interface files are not ordinary cleanup targets. They require contract-a
 - Vybn_Mind/index.html (5.8 KB)
 - Vybn_Mind/signal-noise/index.html (78.0 KB)
 - Vybn_Mind/signal-noise/truth-in-the-age/index.html (18.5 KB)
-- _archive/Vybn_Mind__origins_portal_api.py (3.8 KB)
 - origins_portal_api_v4.py (145.8 KB)
 - somewhere.html (3.1 KB)
 - spark/harness/mcp.py (89.5 KB)
@@ -375,7 +374,6 @@ Pressure does not mean disposal. It means inspect first when seeking lightness. 
 - Vybn/spark/microgpt_mirror/build_mirror_corpus.py (6.1 KB) — prove-reader-or-route
 - Vybn/Vybn_Mind/creature_dgm_h/archive/README.md (5.1 KB) — investigate
 - Him/repo_archives/vybn/vybn-stale-branches-20260425T120944Z.md (4.7 KB) — compress-or-keep-with-restore-path
-- Vybn/_archive/Vybn_Mind__origins_portal_api.py (3.8 KB) — compress-or-keep-with-restore-path
 - Vybn/_archive/README.md (3.6 KB) — compress-or-keep-with-restore-path
 - Him/repo_archives/garden/20260427T104202Z/README.md (3.4 KB) — compress-or-keep-with-restore-path
 
