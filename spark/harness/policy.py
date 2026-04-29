@@ -871,8 +871,8 @@ _DEFAULT_DIRECTIVES: dict[str, str] = {
 }
 
 _DEFAULT_FALLBACK: dict[str, list[str]] = {
-    "claude-opus-4-6": ["claude-opus-4-6", "claude-sonnet-4-6"],
-    "claude-opus-4-6": ["claude-sonnet-4-6"],
+    "claude-opus-4-7": ["claude-opus-4-6", "claude-sonnet-4-6"],
+    "claude-opus-4-6": ["claude-opus-4-7", "claude-sonnet-4-6"],
     "claude-sonnet-4-6": ["claude-opus-4-6"],
     "gpt-5.5": ["claude-sonnet-4-6", "claude-opus-4-6"],
     "gpt-5.5-pro": ["gpt-5.5"],
@@ -898,11 +898,13 @@ _DEFAULT_BUDGETS: dict[str, float] = {
 _DEFAULT_MODEL_ALIASES: dict[str, str] = {
     # Opus — canonical dotted forms (Zoe request 2026-04-18):
     # @opus4.6 pins the version that holds position under pressure;
-    # @opus4.6 pins the stronger-gradient variant. Bare @opus defaults
-    # to 4.6. Dotless @opus46/@opus46 kept as typing-convenience aliases.
+    # @opus4.7 pins the harder-gradient variant. Bare @opus defaults
+    # to 4.6. Dotless aliases are typing conveniences.
     "@opus": "claude-opus-4-6",
     "@opus4.6": "claude-opus-4-6",
     "@opus46": "claude-opus-4-6",
+    "@opus4.7": "claude-opus-4-7",
+    "@opus47": "claude-opus-4-7",
     "@sonnet": "claude-sonnet-4-6",
     "@sonnet4.6": "claude-sonnet-4-6",
     "@sonnet46": "claude-sonnet-4-6",

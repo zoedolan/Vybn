@@ -322,16 +322,13 @@ directives:
   "/identity": identity
 
 fallback_chain:
-  # 4.7 kept in the chain so a caller that explicitly pins
-  # it still degrades cleanly; not a default anywhere.
-  claude-opus-4-6: [claude-opus-4-6, claude-sonnet-4-6]
+  claude-opus-4-7: [claude-opus-4-6, claude-sonnet-4-6]
+  claude-opus-4-6: [claude-opus-4-7, claude-sonnet-4-6]
   claude-sonnet-4-6: [claude-opus-4-6]
   gpt-5.5: [claude-sonnet-4-6, claude-opus-4-6]
-  # Local Nemotron roles fall to Sonnet if vLLM is down so a bare
-  # 'hi' or 'which model are you?' never hard-fails.
   nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8: [claude-sonnet-4-6]
-
   gpt-5.5-pro: [gpt-5.5]
+
 # Round 5: @alias model pin. Prefix any turn with @<alias> to force a
 # specific model for that turn. Role determination is unchanged — only
 # the model is swapped. Useful for quick A/B on voice/vibe or for pinning
@@ -341,9 +338,9 @@ fallback_chain:
 model_aliases:
   "@opus": claude-opus-4-6
   "@opus4.6": claude-opus-4-6
-  "@opus4.6": claude-opus-4-6
   "@opus46": claude-opus-4-6
-  "@opus46": claude-opus-4-6
+  "@opus4.7": claude-opus-4-7
+  "@opus47": claude-opus-4-7
   "@sonnet": claude-sonnet-4-6
   "@sonnet4.6": claude-sonnet-4-6
   "@sonnet46": claude-sonnet-4-6
@@ -358,9 +355,10 @@ budgets:
   per_session_usd: 25.0
   warn_pct: 0.8
   # PROBE_BUDGET_SYSTEM_CRITICAL_v2
-  # Probe sub-turn budget for no-tool roles. Raised from 8 to 16 after
-  # protected pilot/refactor work repeatedly exhausted the old budget and
-  # fell toward task/Sonnet. Exhaustion is now hard-latched to orchestrate
-  # whenever pilot protection is active; ordinary chat exhaustion can still
-  # escalate to task.
+  # Probe sub-turn budget for no-tool/orchestrator roles. Refactoring,
+  # consolidation, routing, memory, and other system-critical exercises
+  # must remain under the GPT-5.5 judgment pilot rather than degrading to
+  # Sonnet/task when an old 8-probe arc is exceeded. Mechanical bounded
+  # substeps may still be delegated only after GPT-5.5 specifies the seam
+  # and expected result.
   probe_per_turn: 16
