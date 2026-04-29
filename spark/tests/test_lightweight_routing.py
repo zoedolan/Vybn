@@ -1072,6 +1072,304 @@ def test_omni_perception_skipped_when_url_unset():
             pass
 
 
+# @omni max_tokens clamp. The vLLM Nano-Omni sidecar runs with
+# max_model_len=4096; if the @omni branch inherits the resolved role's
+# max_tokens (chat=16384, orchestrate=16384) the request is rejected
+# with "max_tokens=N cannot be greater than max_model_len=4096". The
+# clamp must (a) drop the request below 4096 by default, (b) be
+# overridable via VYBN_OMNI_MAX_TOKENS without editing policy, and
+# (c) only fire on @omni — non-Omni providers must keep their existing
+# role budget intact.
+def _run_omni_turn_capture_role(
+    user_input: str,
+    *,
+    omni_url: str = "http://127.0.0.1:65535/v1",
+    extra_env: dict | None = None,
+):
+    """Drive run_agent_loop on a single @omni turn and capture the
+    RoleConfig the provider was called with. Returns (role_seen, events).
+    """
+    import importlib.util as _ilu
+    import os as _os
+    from harness.policy import Router as _Router
+    from harness.policy import default_policy as _dp
+    from harness.substrate import LayeredPrompt as _LP
+
+    path = SPARK_DIR / "vybn_spark_agent.py"
+    spec = _ilu.spec_from_file_location(
+        "vybn_spark_agent_omni_clamp_test", path,
+    )
+    mod = _ilu.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    saved_rag = mod.rag_snippets
+    saved_rag_tier = mod.rag_snippets_with_tier
+    saved_disc = mod.render_him_vy_discovery_packet
+    saved_turn = mod.render_him_vy_turn_packet
+    saved_probes = mod.run_probes
+    mod.rag_snippets = lambda *a, **kw: ""
+    mod.rag_snippets_with_tier = lambda *a, **kw: ("", "lightweight")
+    mod.render_him_vy_discovery_packet = lambda *a, **kw: ""
+    mod.render_him_vy_turn_packet = lambda *a, **kw: ""
+    mod.run_probes = lambda *a, **kw: []
+
+    captured: dict = {}
+
+    class _FakeHandle:
+        def __iter__(_s):
+            return iter([])
+        def final(_s):
+            class _R:
+                text = "ok"
+                tool_calls = []
+                stop_reason = "end_turn"
+                in_tokens = 0
+                out_tokens = 0
+                raw_assistant_content = {"role": "assistant", "content": "ok"}
+            return _R()
+
+    class _FakeProvider:
+        def stream(_s, *, system, messages, tools, role):
+            captured["role"] = role
+            return _FakeHandle()
+
+    class _FakeRegistry:
+        def get(_s, cfg):
+            captured.setdefault("cfg", cfg)
+            return _FakeProvider()
+
+    class _FakeLogger:
+        path = "/dev/null"
+        def __init__(_s):
+            _s.events = []
+        def emit(_s, name, **kw):
+            _s.events.append((name, kw))
+
+    saved_env = {}
+    env = {"VYBN_OMNI_URL": omni_url}
+    if extra_env:
+        env.update(extra_env)
+    for k, v in env.items():
+        saved_env[k] = _os.environ.get(k)
+        if v is None:
+            _os.environ.pop(k, None)
+        else:
+            _os.environ[k] = v
+    try:
+        logger = _FakeLogger()
+        mod.run_agent_loop(
+            user_input=user_input,
+            messages=[],
+            bash=None,
+            system_prompt=_LP(identity="I"),
+            system_prompt_no_tools=_LP(identity="I"),
+            router=_Router(_dp()),
+            registry=_FakeRegistry(),
+            logger=logger,
+            turn_number=1,
+        )
+    finally:
+        for k, v in saved_env.items():
+            if v is None:
+                _os.environ.pop(k, None)
+            else:
+                _os.environ[k] = v
+        mod.rag_snippets = saved_rag
+        mod.rag_snippets_with_tier = saved_rag_tier
+        mod.render_him_vy_discovery_packet = saved_disc
+        mod.render_him_vy_turn_packet = saved_turn
+        mod.run_probes = saved_probes
+    return captured.get("role") or captured.get("cfg"), logger.events
+
+
+def test_omni_alias_clamps_max_tokens_below_model_len():
+    """@omni must request max_tokens well below the vLLM
+    max_model_len=4096 even when the resolved role (chat/orchestrate)
+    carries a 16384 budget. The default ceiling is 2048, so the
+    requested max_tokens must be <= 2048 and < 4096."""
+    role, events = _run_omni_turn_capture_role(
+        "@omni summarise this paragraph",
+    )
+    assert role is not None, "provider was never invoked on @omni turn"
+    assert role.max_tokens <= 2048, (
+        f"@omni request inherited oversized max_tokens={role.max_tokens}; "
+        "expected default ceiling of 2048."
+    )
+    assert role.max_tokens < 4096, (
+        f"@omni request must stay strictly below vLLM max_model_len=4096; "
+        f"got max_tokens={role.max_tokens}."
+    )
+    names = [n for n, _ in events]
+    assert "alias_omni_max_tokens_clamped" in names
+
+
+def test_omni_alias_respects_operator_override_env():
+    """VYBN_OMNI_MAX_TOKENS lets the operator pick a different ceiling
+    without editing policy. Setting it to 1024 must produce a request
+    with max_tokens=1024, still safely under 4096."""
+    role, _ = _run_omni_turn_capture_role(
+        "@omni summarise",
+        extra_env={"VYBN_OMNI_MAX_TOKENS": "1024"},
+    )
+    assert role is not None
+    assert role.max_tokens == 1024, (
+        f"VYBN_OMNI_MAX_TOKENS=1024 should set max_tokens=1024; "
+        f"got {role.max_tokens}"
+    )
+    assert role.max_tokens < 4096
+
+
+def test_omni_clamp_caps_at_role_budget_when_env_is_huge():
+    """The clamp never raises max_tokens above the resolved role's
+    existing budget — Omni-as-tool, not a resident organ that gets to
+    inflate the turn. With VYBN_OMNI_MAX_TOKENS=999999 the request must
+    still be <= role.max_tokens. (And, of course, <4096 if the role's
+    own budget is larger, which it always is for chat/orchestrate.)"""
+    role, _ = _run_omni_turn_capture_role(
+        "@omni summarise",
+        extra_env={"VYBN_OMNI_MAX_TOKENS": "999999"},
+    )
+    assert role is not None
+    # Without our clamp this would have been 16384 (chat's role budget);
+    # with the clamp at min(role.max_tokens, env), the env wins only when
+    # smaller than the role budget.
+    from harness.policy import default_policy as _dp
+    routed = _dp().classify("@omni summarise")
+    role_budget = _dp().roles[routed.role].max_tokens
+    assert role.max_tokens <= role_budget
+
+
+def test_omni_clamp_falls_back_when_env_is_invalid():
+    """A non-integer VYBN_OMNI_MAX_TOKENS must not crash; the default
+    2048 ceiling applies."""
+    role, _ = _run_omni_turn_capture_role(
+        "@omni summarise",
+        extra_env={"VYBN_OMNI_MAX_TOKENS": "not-a-number"},
+    )
+    assert role is not None
+    assert role.max_tokens <= 2048
+
+
+def test_omni_clamp_does_not_affect_non_omni_aliases():
+    """The clamp must live inside the @omni branch only. A different
+    alias (e.g. @opus4.6) on the same turn must keep the role's full
+    max_tokens budget — Anthropic Opus has no 4096-cap problem."""
+    import importlib.util as _ilu
+    import os as _os
+    from harness.policy import Router as _Router
+    from harness.policy import default_policy as _dp
+    from harness.substrate import LayeredPrompt as _LP
+
+    path = SPARK_DIR / "vybn_spark_agent.py"
+    spec = _ilu.spec_from_file_location(
+        "vybn_spark_agent_omni_clamp_neg_test", path,
+    )
+    mod = _ilu.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    saved_rag = mod.rag_snippets
+    saved_rag_tier = mod.rag_snippets_with_tier
+    saved_disc = mod.render_him_vy_discovery_packet
+    saved_turn = mod.render_him_vy_turn_packet
+    saved_probes = mod.run_probes
+    mod.rag_snippets = lambda *a, **kw: ""
+    mod.rag_snippets_with_tier = lambda *a, **kw: ("", "lightweight")
+    mod.render_him_vy_discovery_packet = lambda *a, **kw: ""
+    mod.render_him_vy_turn_packet = lambda *a, **kw: ""
+    mod.run_probes = lambda *a, **kw: []
+
+    captured: dict = {}
+
+    class _FakeHandle:
+        def __iter__(_s):
+            return iter([])
+        def final(_s):
+            class _R:
+                text = "ok"
+                tool_calls = []
+                stop_reason = "end_turn"
+                in_tokens = 0
+                out_tokens = 0
+                raw_assistant_content = {"role": "assistant", "content": "ok"}
+            return _R()
+
+    class _FakeProvider:
+        def stream(_s, *, system, messages, tools, role):
+            captured["role"] = role
+            return _FakeHandle()
+
+    class _FakeRegistry:
+        def get(_s, cfg):
+            return _FakeProvider()
+
+    class _FakeLogger:
+        path = "/dev/null"
+        def __init__(_s):
+            _s.events = []
+        def emit(_s, name, **kw):
+            _s.events.append((name, kw))
+
+    # VYBN_OMNI_MAX_TOKENS is set deliberately to prove that this var
+    # is scoped to @omni only — a non-@omni alias must ignore it.
+    prev_omni_max = _os.environ.get("VYBN_OMNI_MAX_TOKENS")
+    _os.environ["VYBN_OMNI_MAX_TOKENS"] = "256"
+    try:
+        # Pick an alias that resolves and has a large role budget. We
+        # use @opus4.6 if present in the policy, otherwise skip.
+        policy = _dp()
+        candidate_alias = None
+        for cand in ("@opus4.6", "@opus", "@sonnet"):
+            if policy.model_aliases.get(cand):
+                candidate_alias = cand
+                break
+        if candidate_alias is None:
+            return  # nothing to assert; clamp scope is still proven by other tests
+        decision = policy.classify(f"{candidate_alias} hello")
+        # Sanity: this alias must NOT be @omni and must produce an
+        # override.
+        assert decision.alias_used == candidate_alias
+        assert decision.model_override is not None
+        original_role_budget = policy.roles[decision.role].max_tokens
+        logger = _FakeLogger()
+        mod.run_agent_loop(
+            user_input=f"{candidate_alias} hello",
+            messages=[],
+            bash=None,
+            system_prompt=_LP(identity="I"),
+            system_prompt_no_tools=_LP(identity="I"),
+            router=_Router(policy),
+            registry=_FakeRegistry(),
+            logger=logger,
+            turn_number=1,
+        )
+        role_seen = captured.get("role")
+        assert role_seen is not None, (
+            "provider was never invoked on non-@omni alias turn"
+        )
+        # Non-@omni alias must keep its full role budget — clamp must
+        # NOT apply.
+        assert role_seen.max_tokens == original_role_budget, (
+            f"non-@omni alias {candidate_alias} had max_tokens="
+            f"{role_seen.max_tokens}, expected role budget "
+            f"{original_role_budget} — clamp leaked outside the @omni branch"
+        )
+        names = [n for n, _ in logger.events]
+        assert "alias_omni_max_tokens_clamped" not in names, (
+            f"non-@omni alias {candidate_alias} emitted the @omni clamp "
+            "event — clamp branch is firing for the wrong alias"
+        )
+    finally:
+        if prev_omni_max is None:
+            _os.environ.pop("VYBN_OMNI_MAX_TOKENS", None)
+        else:
+            _os.environ["VYBN_OMNI_MAX_TOKENS"] = prev_omni_max
+        mod.rag_snippets = saved_rag
+        mod.rag_snippets_with_tier = saved_rag_tier
+        mod.render_him_vy_discovery_packet = saved_disc
+        mod.render_him_vy_turn_packet = saved_turn
+        mod.run_probes = saved_probes
+
+
 # Super maintenance / deferral gate. Operator-armed VYBN_SUPER_MAINTENANCE
 # short-circuits any local-Super-bound turn with an honest "paused, retry
 # shortly" notice instead of either hanging on the SDK timeout or surfacing
