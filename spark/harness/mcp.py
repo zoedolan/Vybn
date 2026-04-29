@@ -2335,6 +2335,7 @@ def run_evolve_cycle() -> int:
             ],
             check=True, capture_output=True, text=True, timeout=60,
             cwd=str(REPO_ROOT),
+            env=github_cli_env(),
         )
     except subprocess.CalledProcessError as exc:
         log.error("evolve: gh pr create failed — stderr=%s", exc.stderr)

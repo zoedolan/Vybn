@@ -1492,3 +1492,22 @@ class TestSafeFetch(unittest.TestCase):
     def test_json_ld_is_allowed_content_prefix(self):
         from harness.safe_fetch import ALLOWED_CONTENT_PREFIXES
         self.assertTrue(any("application/ld+json".startswith(p) for p in ALLOWED_CONTENT_PREFIXES))
+
+
+def test_github_cli_env_strips_shadowing_github_token(monkeypatch):
+    from spark.harness.providers import github_cli_env
+
+    monkeypatch.setenv("GITHUB_TOKEN", "shadow-token")
+    monkeypatch.setenv("GH_TOKEN", "kept-token")
+    env = github_cli_env()
+    assert "GITHUB_TOKEN" not in env
+    assert env["GH_TOKEN"] == "kept-token"
+
+
+def test_normalize_github_cli_command_unshadows_pr_create():
+    from spark.harness.providers import normalize_github_cli_command
+
+    cmd = "git push -u origin branch && gh pr create --base main --head branch"
+    fixed = normalize_github_cli_command(cmd)
+    assert "env -u GITHUB_TOKEN gh pr create --base main --head branch" in fixed
+    assert normalize_github_cli_command(fixed) == fixed
