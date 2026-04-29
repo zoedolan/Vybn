@@ -845,6 +845,32 @@ def is_parallel_safe(command: str) -> bool:
     return True
 
 
+def github_cli_env(base: dict[str, str] | None = None) -> dict[str, str]:
+    """Return an environment for GitHub CLI calls.
+
+    `gh` gives precedence to GITHUB_TOKEN over the stored hosts.yml
+    credential. On the Sparks that env token can push git refs but lacks
+    GraphQL createPullRequest permission, while the stored gh credential
+    has the repo scope needed for PRs. Strip only this shadowing variable
+    for gh invocations; leave git transport credentials untouched.
+    """
+    env = dict(os.environ if base is None else base)
+    env.pop("GITHUB_TOKEN", None)
+    return env
+
+
+def normalize_github_cli_command(command: str) -> str:
+    """Make shell-authored PR creation use the stored gh credential.
+
+    This is intentionally narrow: only `gh pr create` is rewritten. Other
+    gh calls keep their original environment, and explicit `env -u
+    GITHUB_TOKEN gh pr create` commands are left alone.
+    """
+    if "gh pr create" not in command or "env -u GITHUB_TOKEN gh pr create" in command:
+        return command
+    return re.sub(r"(?<![\w./-])gh\s+pr\s+create\b", "env -u GITHUB_TOKEN gh pr create", command)
+
+
 def execute_readonly(command: str, timeout: int = DEFAULT_TIMEOUT) -> str:
     """Run a parallel-safe command in a fresh subprocess.
 
@@ -861,7 +887,7 @@ def execute_readonly(command: str, timeout: int = DEFAULT_TIMEOUT) -> str:
             ["/bin/bash", "-c", command],
             capture_output=True, text=True,
             timeout=timeout,
-            env={**os.environ, "TERM": "dumb"},
+            env=github_cli_env({**os.environ, "TERM": "dumb"}) if "gh pr create" in command else {**os.environ, "TERM": "dumb"},
         )
     except subprocess.TimeoutExpired:
         return (
@@ -924,6 +950,7 @@ class BashTool:
             return gate
         if "VYBN_ABSORB_REASON=" in command:
             log_absorb(command)
+        command = normalize_github_cli_command(command)
         full_cmd = f"{command}\necho {self._sentinel} $?\n"
         try:
             self.process.stdin.write(full_cmd)
