@@ -490,5 +490,153 @@ class TestLegacyBackwardCompat(unittest.TestCase):
         self.assertTrue(req.stream)
 
 
+class TestOpenAIProviderReasoningFallback(unittest.TestCase):
+    """Dormant Nemotron-Omni response shape: message.content is null and
+    the user-visible reply lands in message.reasoning_content (or
+    message.reasoning). The provider must surface that text without
+    altering Super-style behavior where content is populated."""
+
+    @classmethod
+    def setUpClass(cls):
+        try:
+            from harness.providers import OpenAIProvider  # noqa: F401
+            from harness.substrate import LayeredPrompt  # noqa: F401
+        except Exception:
+            cls.skip = True
+        else:
+            cls.skip = False
+
+    def setUp(self):
+        if self.skip:
+            self.skipTest("harness.providers not importable")
+        from harness.providers import OpenAIProvider
+        from harness.substrate import LayeredPrompt
+        self._OpenAIProvider = OpenAIProvider
+        self._LayeredPrompt = LayeredPrompt
+        self._role = RoleConfig(
+            role="local",
+            provider="openai",
+            model="nvidia/test-omni",
+            thinking="off",
+            max_tokens=64,
+            max_iterations=1,
+            tools=[],
+            base_url="http://127.0.0.1:8000/v1",
+            rag=False,
+        )
+
+    def _provider_with_payload(self, payload: dict):
+        prov = self._OpenAIProvider(api_key="EMPTY", base_url=None)
+        prov._call = lambda role, openai_messages, tools: payload  # type: ignore
+        return prov
+
+    def _drive(self, payload: dict):
+        prov = self._provider_with_payload(payload)
+        handle = prov.stream(
+            system=self._LayeredPrompt(),
+            messages=[{"role": "user", "content": "hi"}],
+            tools=[],
+            role=self._role,
+        )
+        chunks = list(handle.iterator)
+        finalized = handle.finalize()
+        return chunks, finalized
+
+    def test_content_only_super_path_unchanged(self):
+        """Super-style response: content populated, reasoning fields
+        unused. Output must be byte-identical to today's behavior."""
+        payload = {
+            "choices": [{
+                "message": {"content": "hello there", "tool_calls": []},
+                "finish_reason": "stop",
+            }],
+            "usage": {"prompt_tokens": 5, "completion_tokens": 2},
+        }
+        chunks, finalized = self._drive(payload)
+        self.assertEqual(finalized.text, "hello there")
+        self.assertEqual(chunks, [("text", "hello there")])
+
+    def test_content_with_think_block_still_stripped(self):
+        """Existing <think>…</think> stripping path must survive."""
+        payload = {
+            "choices": [{
+                "message": {
+                    "content": "<think>private</think>visible body",
+                    "tool_calls": [],
+                },
+                "finish_reason": "stop",
+            }],
+            "usage": {},
+        }
+        _, finalized = self._drive(payload)
+        self.assertEqual(finalized.text, "visible body")
+
+    def test_reasoning_content_used_when_content_null(self):
+        """Omni-style: content null, reasoning_content carries the reply."""
+        payload = {
+            "choices": [{
+                "message": {
+                    "content": None,
+                    "reasoning_content": "omni reply text",
+                    "tool_calls": [],
+                },
+                "finish_reason": "stop",
+            }],
+            "usage": {"prompt_tokens": 3, "completion_tokens": 4},
+        }
+        chunks, finalized = self._drive(payload)
+        self.assertEqual(finalized.text, "omni reply text")
+        self.assertEqual(chunks, [("text", "omni reply text")])
+
+    def test_reasoning_used_when_content_null_and_no_reasoning_content(self):
+        """Some servers expose only `reasoning` (no _content suffix)."""
+        payload = {
+            "choices": [{
+                "message": {
+                    "content": "",
+                    "reasoning": "alt-key reply",
+                    "tool_calls": [],
+                },
+                "finish_reason": "stop",
+            }],
+            "usage": {},
+        }
+        _, finalized = self._drive(payload)
+        self.assertEqual(finalized.text, "alt-key reply")
+
+    def test_reasoning_content_preferred_over_reasoning(self):
+        payload = {
+            "choices": [{
+                "message": {
+                    "content": "",
+                    "reasoning_content": "primary",
+                    "reasoning": "secondary",
+                    "tool_calls": [],
+                },
+                "finish_reason": "stop",
+            }],
+            "usage": {},
+        }
+        _, finalized = self._drive(payload)
+        self.assertEqual(finalized.text, "primary")
+
+    def test_reasoning_fallback_still_strips_think_tags(self):
+        """If a reasoning field happens to contain <think>…</think>
+        wrapping, the fallback must still strip it before exposing text."""
+        payload = {
+            "choices": [{
+                "message": {
+                    "content": None,
+                    "reasoning_content": "<think>hidden</think>shown",
+                    "tool_calls": [],
+                },
+                "finish_reason": "stop",
+            }],
+            "usage": {},
+        }
+        _, finalized = self._drive(payload)
+        self.assertEqual(finalized.text, "shown")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
