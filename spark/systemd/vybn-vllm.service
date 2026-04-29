@@ -32,7 +32,7 @@ Environment=VYBN_VLLM_MAX_NUM_SEQS=8
 #
 # Sleep mode (controlled Super/Omni interleaving): vLLM exposes /sleep,
 # /wake_up, and /is_sleeping ONLY when the server is launched with both
-#   VLLM_SERVER_DEV_MODE=1   (env var, propagated to the vllm process)
+#   VLLM_SERVER_DEV_MODE=1   (env var, explicitly passed through env to the vllm process)
 #   --enable-sleep-mode      (CLI flag on `vllm serve`)
 # These are internal dev endpoints. They must NOT be publicly exposed:
 # the portal / public tier MUST NOT route to them, and the cluster front
@@ -45,11 +45,13 @@ Environment=VYBN_VLLM_MAX_NUM_SEQS=8
 #   VLLM_SERVER_DEV_MODE=1
 # Then: systemctl --user daemon-reload && systemctl --user restart vybn-vllm.service
 Environment=VYBN_VLLM_EXTRA_ARGS=
+Environment=VLLM_SERVER_DEV_MODE=
 EnvironmentFile=-%h/.config/vybn/vllm.env
 # Foreground (no -d) so systemd supervises.
 ExecStart=/home/vybnz69/spark-vllm-docker/launch-cluster.sh \
   -n 169.254.246.181,169.254.51.101 \
   exec \
+  env VLLM_SERVER_DEV_MODE=${VLLM_SERVER_DEV_MODE} \
   vllm serve nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8 \
   --port 8000 --host 0.0.0.0 \
   --gpu-memory-utilization ${VYBN_VLLM_GPU_MEMORY_UTILIZATION} --max-model-len 8192 \
