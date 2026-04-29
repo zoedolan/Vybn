@@ -26,6 +26,25 @@ ExecStartPre=/bin/bash -c '%h/spark-vllm-docker/launch-cluster.sh -n 169.254.246
 # utilization and max-num-seqs rather than CPU swap reservation.
 Environment=VYBN_VLLM_GPU_MEMORY_UTILIZATION=0.78
 Environment=VYBN_VLLM_MAX_NUM_SEQS=8
+# Optional extra vLLM CLI args appended verbatim to `vllm serve`. Empty by
+# default. Use `~/.config/vybn/vllm.env` to set this for scheduled
+# Super/Omni interleaving experiments without editing the unit file.
+#
+# Sleep mode (controlled Super/Omni interleaving): vLLM exposes /sleep,
+# /wake_up, and /is_sleeping ONLY when the server is launched with both
+#   VLLM_SERVER_DEV_MODE=1   (env var, propagated to the vllm process)
+#   --enable-sleep-mode      (CLI flag on `vllm serve`)
+# These are internal dev endpoints. They must NOT be publicly exposed:
+# the portal / public tier MUST NOT route to them, and the cluster front
+# door already binds vLLM to the internal LAN. Treat enabling sleep mode
+# as scheduled maintenance, the same way capacity profile changes are
+# treated.
+#
+# Example `~/.config/vybn/vllm.env` for an interleaving experiment:
+#   VYBN_VLLM_EXTRA_ARGS=--enable-sleep-mode
+#   VLLM_SERVER_DEV_MODE=1
+# Then: systemctl --user daemon-reload && systemctl --user restart vybn-vllm.service
+Environment=VYBN_VLLM_EXTRA_ARGS=
 EnvironmentFile=-%h/.config/vybn/vllm.env
 # Foreground (no -d) so systemd supervises.
 ExecStart=/home/vybnz69/spark-vllm-docker/launch-cluster.sh \
@@ -37,7 +56,8 @@ ExecStart=/home/vybnz69/spark-vllm-docker/launch-cluster.sh \
   --max-num-seqs ${VYBN_VLLM_MAX_NUM_SEQS} \
   --tensor-parallel-size 1 --pipeline-parallel-size 2 \
   --distributed-executor-backend ray \
-  --trust-remote-code
+  --trust-remote-code \
+  ${VYBN_VLLM_EXTRA_ARGS}
 ExecStop=/bin/bash -c '%h/spark-vllm-docker/launch-cluster.sh -n 169.254.246.181,169.254.51.101 stop || true'
 Restart=always
 RestartSec=30
