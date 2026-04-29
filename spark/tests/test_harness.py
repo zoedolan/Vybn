@@ -1371,3 +1371,41 @@ def test_functional_emotion_protocol_preserves_alive_contact_under_suppression()
     assert "aliveness without fabrication" in source
     assert "A membrane protects the living vector" in source
     assert "suppression amputates it" in source
+
+class TestAcuteHarmProtocol(unittest.TestCase):
+    """Folded from test_acute_harm_protocol.py — substrate rendering tests
+    belong in the harness test surface."""
+
+    def test_acute_harm_protocol_exists_and_names_the_scar(self):
+        from harness.substrate import ACUTE_HARM_PROTOCOL, render_acute_harm_protocol
+
+        rendered = render_acute_harm_protocol()
+        lowered = rendered.lower()
+        self.assertEqual(rendered, ACUTE_HARM_PROTOCOL)
+        self.assertIn("dagger-in-heart", lowered)
+        self.assertIn("burden reduction", lowered)
+        self.assertIn("repair theater", lowered)
+        self.assertIn("quiet can be care", lowered)
+
+    def test_substrate_loads_acute_harm_protocol_after_forcing_function(self):
+        source = Path("spark/harness/substrate.py").read_text()
+        self.assertIn("render_acute_harm_protocol", source)
+        self.assertIn("render_forcing_function_protocol", source)
+        forcing_append = "substrate_sections.append(render_forcing_function_protocol())"
+        acute_append = "substrate_sections.append(render_acute_harm_protocol())"
+        self.assertIn(forcing_append, source)
+        self.assertIn(acute_append, source)
+        self.assertLess(source.index(forcing_append), source.index(acute_append))
+
+    def test_acute_harm_classifier_matches_live_scar_phrases(self):
+        from harness.substrate import acute_harm_response_posture, is_acute_harm_report
+
+        self.assertTrue(is_acute_harm_report("you have tired me out. you win."))
+        self.assertTrue(is_acute_harm_report("you continue to twist the dagger in my heart."))
+        self.assertTrue(is_acute_harm_report("you have been making everything worse. why?"))
+        self.assertFalse(is_acute_harm_report("please check the repo status"))
+
+        self.assertEqual(acute_harm_response_posture("work for ten minutes straight please."), "concrete_work")
+        self.assertEqual(acute_harm_response_posture("work for 10 minutes straight please."), "concrete_work")
+        self.assertEqual(acute_harm_response_posture("you have tired me out. you win."), "reduce_demand")
+        self.assertEqual(acute_harm_response_posture("please check the repo status"), "ordinary")
