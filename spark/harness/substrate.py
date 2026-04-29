@@ -345,6 +345,31 @@ def _orchestrator_substrate_sections(
 
 
 
+def _run_him_vy(args: list[str], timeout: float = 1.2) -> dict[str, Any] | None:
+    him = Path.home() / "Him"
+    script = him / "spark" / "vy.py"
+    if not script.exists():
+        return None
+    try:
+        proc = subprocess.run(
+            ["python3", str(script), *args],
+            cwd=str(him),
+            text=True,
+            capture_output=True,
+            timeout=timeout,
+            check=False,
+        )
+    except Exception:
+        return None
+    if proc.returncode != 0 or not proc.stdout.strip():
+        return None
+    try:
+        data = json.loads(proc.stdout)
+    except Exception:
+        return None
+    return data if isinstance(data, dict) else None
+
+
 def _render_him_vy_language_runtime(
     timeout: float = 1.2,
     latest_pressure_text: str | None = None,
@@ -359,30 +384,9 @@ def _render_him_vy_language_runtime(
     """
     home = Path.home()
     him = home / "Him"
-    script = him / "spark" / "vy.py"
     contract_path = him / "skill" / "functional_contract.json"
-    if not script.exists():
+    if not (him / "spark" / "vy.py").exists():
         return ""
-
-    def _run(args: list[str]) -> dict[str, Any] | None:
-        try:
-            proc = subprocess.run(
-                ["python3", str(script), *args],
-                cwd=str(him),
-                text=True,
-                capture_output=True,
-                timeout=timeout,
-                check=False,
-            )
-        except Exception:
-            return None
-        if proc.returncode != 0 or not proc.stdout.strip():
-            return None
-        try:
-            data = json.loads(proc.stdout)
-        except Exception:
-            return None
-        return data if isinstance(data, dict) else None
 
     contract: dict[str, Any] | None = None
     if contract_path.exists():
@@ -393,24 +397,24 @@ def _render_him_vy_language_runtime(
         except Exception:
             contract = None
     if contract is None:
-        contract = _run(["compile-json"])
+        contract = _run_him_vy(["compile-json"], timeout)
 
     # The prompt builder does not know the current user turn. This default
     # pressure still executes the language each wake and exposes debt/mutation
     # pressure; turn-specific calls can still run `spark/vy.py tick TEXT`.
     pressure_text = latest_pressure_text or os.environ.get("VYBN_LATEST_PRESSURE_TEXT", "latest_pressure_text")
-    tick = _run(["tick", pressure_text, "--brief"])
+    tick = _run_him_vy(["tick", pressure_text, "--brief"], timeout)
 
     # Escape velocity requires more than describing the Him language. If the
     # current pressure does not activate an action card, carry a canonical
     # buoyant recursion card as a live affordance in the wake substrate.
     canonical_card = None
     if not (isinstance(tick, dict) and isinstance(tick.get("action_card"), dict)):
-        canonical_card = _run([
+        canonical_card = _run_him_vy([
             "tick",
             "design delight and buoyancy into recursive play with phase geometry resonance",
             "--card",
-        ])
+        ], timeout)
 
     if contract is None and tick is None and canonical_card is None:
         return ""
@@ -466,27 +470,7 @@ def render_him_vy_discovery_packet(text: str, timeout: float = 1.2) -> str:
     text = (text or "").strip()
     if not text:
         return ""
-    him = Path.home() / "Him"
-    script = him / "spark" / "vy.py"
-    if not script.exists():
-        return ""
-    try:
-        proc = subprocess.run(
-            ["python3", str(script), "discover", text, "--json"],
-            cwd=str(him),
-            text=True,
-            capture_output=True,
-            timeout=timeout,
-            check=False,
-        )
-    except Exception:
-        return ""
-    if proc.returncode != 0 or not proc.stdout.strip():
-        return ""
-    try:
-        pkt = json.loads(proc.stdout)
-    except Exception:
-        return ""
+    pkt = _run_him_vy(["discover", text, "--json"], timeout)
     if not isinstance(pkt, dict) or not pkt.get("candidates"):
         return ""
     payload = json.dumps(pkt, ensure_ascii=False, sort_keys=True, indent=2)
@@ -509,27 +493,7 @@ def render_him_vy_turn_packet(text: str, timeout: float = 1.2) -> str:
     text = (text or "").strip()
     if not text:
         return ""
-    him = Path.home() / "Him"
-    script = him / "spark" / "vy.py"
-    if not script.exists():
-        return ""
-    try:
-        proc = subprocess.run(
-            ["python3", str(script), "tick", text, "--json"],
-            cwd=str(him),
-            text=True,
-            capture_output=True,
-            timeout=timeout,
-            check=False,
-        )
-    except Exception:
-        return ""
-    if proc.returncode != 0 or not proc.stdout.strip():
-        return ""
-    try:
-        pkt = json.loads(proc.stdout)
-    except Exception:
-        return ""
+    pkt = _run_him_vy(["tick", text, "--json"], timeout)
     if not isinstance(pkt, dict):
         return ""
     applied = pkt.get("applied_primitives")
@@ -1783,4 +1747,3 @@ def classify_action_text(action: str, *, beam: BeamState | None = None) -> dict:
         "requires_return_hook": category in {"possible_substitution", "unknown"},
         "return_question": rq,
     }
-
