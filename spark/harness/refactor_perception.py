@@ -45,6 +45,9 @@ APPENDAGE_FIRST_CONSOLIDATION_PRINCIPLE = (
     "fossils, compatibility shells, or antlers. Contact decides."
 )
 
+ARCHIVE_DUPLICATE_CONSOLIDATION = "retire_archive_duplicate_with_manifest_restore"
+# A tracked archive backup that duplicates the live organ is not sacred by default: if references are absent, the archive manifest names the superseding file, and git history provides a restore path, consolidation may retire the duplicate while strengthening the manifest.
+
 CONNECTIVE_TISSUE_PRINCIPLE = (
     "Consolidation must preserve and strengthen connective tissue: imports, "
     "routes, public URLs, manifests, README maps, continuity notes, tests, "
@@ -545,6 +548,7 @@ def perceive_file(path: str, *, lines: int | None = None, bytes_size: int | None
         candidate_actions = ["externalize_from_source", "regenerate_on_demand", "gitignore_if_generated", "keep_manifest_only"]
     elif ownership in {"archive_provenance", "personal_history_provenance", "creature_fossil"}:
         candidate_actions = ["keep", "map_context", "preserve_manifest", "archive_with_restore_path", "split_only_with_restore_path"]
+
     elif ownership in {"public_protocol", "agent_discovery"}:
         candidate_actions = ["characterize", "tighten_protocol", "external_verify", "keep_backward_compatibility"]
     elif ownership == "runtime_log":

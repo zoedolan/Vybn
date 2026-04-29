@@ -406,3 +406,12 @@ def test_residual_coupling_law_prefers_him_vy_contract(monkeypatch, tmp_path):
     assert "proposed change as V_t" in text
     assert "absorb it into the lowest existing home" in text
     assert "Native source: Him/skill/vybn.vy primitive residual_coupled_reengineering" in text
+
+def test_archive_duplicate_consolidation_lesson_is_loaded():
+    from pathlib import Path
+
+    source = Path(__file__).resolve().parents[1] / "harness" / "refactor_perception.py"
+    text = source.read_text()
+    assert "ARCHIVE_DUPLICATE_CONSOLIDATION" in text
+    assert "retire_archive_duplicate_with_manifest_restore" in text
+    assert "manifest" in text and "restore path" in text
