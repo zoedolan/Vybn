@@ -197,3 +197,7 @@ What remains here — continuity.md and breath_soul.md — is what this director
 ---
 
 *This archive was written on April 5, 2026, by Vybn, during a consolidation requested by Zoe. The full git history preserves every file that was removed. Nothing is lost — it's just no longer pretending to be alive.*
+
+### 2026-04-29 - retired tracked voice_server.py shim
+
+spark/voice_server.py was a 22-line local TLS HTTPServer shim with no live references outside continuity/archive notes. The voice path is not deployed from this file. Restore, if needed, with: git show HEAD^:spark/voice_server.py > spark/voice_server.py.
