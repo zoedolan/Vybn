@@ -1071,3 +1071,352 @@ def test_omni_perception_skipped_when_url_unset():
         except OSError:
             pass
 
+
+# Super maintenance / deferral gate. Operator-armed VYBN_SUPER_MAINTENANCE
+# short-circuits any local-Super-bound turn with an honest "paused, retry
+# shortly" notice instead of either hanging on the SDK timeout or surfacing
+# a raw "(provider error: Connection refused)" string. The same notice
+# appears when an in-flight call refuses (Super was bounced by something
+# else, or vLLM died). Cloud Anthropic / OpenAI traffic is unaffected.
+def _load_agent_module():
+    import importlib.util as _ilu
+    path = SPARK_DIR / "vybn_spark_agent.py"
+    spec = _ilu.spec_from_file_location("vybn_spark_agent_maint_test", path)
+    mod = _ilu.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_is_local_super_base_classifies_loopback_and_lan():
+    mod = _load_agent_module()
+    assert mod._is_local_super_base("http://127.0.0.1:8000/v1") is True
+    assert mod._is_local_super_base("http://localhost:8000/v1") is True
+    assert mod._is_local_super_base("http://10.0.0.5:8001/v1") is True
+    assert mod._is_local_super_base("http://192.168.1.42:8000/v1") is True
+    assert mod._is_local_super_base("http://172.16.5.5:8000/v1") is True
+    # Public hosts must not trigger the gate.
+    assert mod._is_local_super_base("https://api.openai.com/v1") is False
+    assert mod._is_local_super_base("https://api.anthropic.com") is False
+    assert mod._is_local_super_base(None) is False
+    assert mod._is_local_super_base("") is False
+    # 172.32.x is outside the 172.16-31 private block.
+    assert mod._is_local_super_base("http://172.32.0.1/v1") is False
+
+
+def test_super_maintenance_state_reads_env_flag_and_file():
+    import os as _os
+    import tempfile as _tmp
+    mod = _load_agent_module()
+    prev_flag = _os.environ.get("VYBN_SUPER_MAINTENANCE")
+    prev_file = _os.environ.get("VYBN_SUPER_MAINTENANCE_FILE")
+    try:
+        # Unset -> inactive.
+        _os.environ.pop("VYBN_SUPER_MAINTENANCE", None)
+        _os.environ.pop("VYBN_SUPER_MAINTENANCE_FILE", None)
+        active, _ = mod._super_maintenance_state()
+        assert active is False
+        # Truthy bare flag -> active with default reason.
+        _os.environ["VYBN_SUPER_MAINTENANCE"] = "1"
+        active, reason = mod._super_maintenance_state()
+        assert active is True
+        assert reason
+        # Falsy literal -> inactive.
+        _os.environ["VYBN_SUPER_MAINTENANCE"] = "0"
+        active, _ = mod._super_maintenance_state()
+        assert active is False
+        # Custom string reason -> active with that string.
+        _os.environ["VYBN_SUPER_MAINTENANCE"] = "GPU rebalance for omni window"
+        active, reason = mod._super_maintenance_state()
+        assert active is True
+        assert "GPU rebalance" in reason
+        # File overrides bare flag's default reason.
+        _os.environ["VYBN_SUPER_MAINTENANCE"] = "1"
+        f = _tmp.NamedTemporaryFile("w", suffix=".txt", delete=False)
+        try:
+            f.write("operator note: bouncing super at 09:00")
+            f.flush()
+            f.close()
+            _os.environ["VYBN_SUPER_MAINTENANCE_FILE"] = f.name
+            active, reason = mod._super_maintenance_state()
+            assert active is True
+            assert "09:00" in reason
+        finally:
+            try:
+                _os.unlink(f.name)
+            except OSError:
+                pass
+            _os.environ.pop("VYBN_SUPER_MAINTENANCE_FILE", None)
+    finally:
+        if prev_flag is None:
+            _os.environ.pop("VYBN_SUPER_MAINTENANCE", None)
+        else:
+            _os.environ["VYBN_SUPER_MAINTENANCE"] = prev_flag
+        if prev_file is None:
+            _os.environ.pop("VYBN_SUPER_MAINTENANCE_FILE", None)
+        else:
+            _os.environ["VYBN_SUPER_MAINTENANCE_FILE"] = prev_file
+
+
+def test_super_maintenance_gate_short_circuits_local_turn():
+    """When VYBN_SUPER_MAINTENANCE is armed and the resolved role's base_url
+    is local Super, run_agent_loop returns a maintenance notice without ever
+    constructing a provider — no ~10-min restart needed, no raw
+    'Connection refused' surfaces to the chat."""
+    import os as _os
+    from harness.policy import Router as _Router
+    from harness.policy import default_policy as _dp
+
+    mod = _load_agent_module()
+    # Lightweight stand-ins so the test exercises only the gate.
+    saved_rag = mod.rag_snippets
+    saved_rag_tier = mod.rag_snippets_with_tier
+    saved_disc = mod.render_him_vy_discovery_packet
+    saved_turn = mod.render_him_vy_turn_packet
+    saved_probes = mod.run_probes
+    mod.rag_snippets = lambda *a, **kw: ""
+    mod.rag_snippets_with_tier = lambda *a, **kw: ("", "lightweight")
+    mod.render_him_vy_discovery_packet = lambda *a, **kw: ""
+    mod.render_him_vy_turn_packet = lambda *a, **kw: ""
+    mod.run_probes = lambda *a, **kw: []
+
+    class _FakeRegistry:
+        def get(_s, cfg):
+            raise AssertionError(
+                "maintenance flag must short-circuit BEFORE any provider "
+                "is constructed — Super must not be touched"
+            )
+
+    class _FakeLogger:
+        path = "/dev/null"
+        def __init__(_s):
+            _s.events = []
+        def emit(_s, name, **kw):
+            _s.events.append((name, kw))
+
+    prev_flag = _os.environ.get("VYBN_SUPER_MAINTENANCE")
+    deferrals_before = len(mod._MAINTENANCE_DEFERRALS)
+    try:
+        _os.environ["VYBN_SUPER_MAINTENANCE"] = "operator paused for omni window"
+        logger = _FakeLogger()
+        # /local directive routes to the local_private role whose base_url
+        # is http://127.0.0.1:8000/v1 — the canonical Super endpoint.
+        reply = mod.run_agent_loop(
+            user_input="/local scan him for funders",
+            messages=[],
+            bash=None,
+            system_prompt=None,
+            router=_Router(_dp()),
+            registry=_FakeRegistry(),
+            logger=logger,
+            turn_number=1,
+        )
+        assert "maintenance" in reply.lower() or "paused" in reply.lower()
+        assert "retry" in reply.lower()
+        assert "omni window" in reply
+        # Bounded deferral was recorded.
+        assert len(mod._MAINTENANCE_DEFERRALS) == deferrals_before + 1
+        # The maintenance notice event was emitted.
+        names = [n for n, _ in logger.events]
+        assert "super_maintenance_notice" in names
+    finally:
+        if prev_flag is None:
+            _os.environ.pop("VYBN_SUPER_MAINTENANCE", None)
+        else:
+            _os.environ["VYBN_SUPER_MAINTENANCE"] = prev_flag
+        # Trim the deferral list back so we don't leak across tests.
+        del mod._MAINTENANCE_DEFERRALS[deferrals_before:]
+        mod.rag_snippets = saved_rag
+        mod.rag_snippets_with_tier = saved_rag_tier
+        mod.render_him_vy_discovery_packet = saved_disc
+        mod.render_him_vy_turn_packet = saved_turn
+        mod.run_probes = saved_probes
+
+
+def test_super_maintenance_gate_does_not_fire_on_cloud_turn():
+    """A cloud Anthropic/OpenAI turn must never be short-circuited by the
+    Super maintenance flag — Super pause only applies to the local
+    endpoint. We assert this by arming the flag, sending a turn that
+    routes to a cloud model, and confirming the registry IS consulted
+    (the gate did not short-circuit)."""
+    import os as _os
+    from harness.policy import Router as _Router
+    from harness.policy import default_policy as _dp
+
+    mod = _load_agent_module()
+    saved_rag = mod.rag_snippets
+    saved_rag_tier = mod.rag_snippets_with_tier
+    saved_disc = mod.render_him_vy_discovery_packet
+    saved_turn = mod.render_him_vy_turn_packet
+    saved_probes = mod.run_probes
+    mod.rag_snippets = lambda *a, **kw: ""
+    mod.rag_snippets_with_tier = lambda *a, **kw: ("", "lightweight")
+    mod.render_him_vy_discovery_packet = lambda *a, **kw: ""
+    mod.render_him_vy_turn_packet = lambda *a, **kw: ""
+    mod.run_probes = lambda *a, **kw: []
+
+    consulted = {"count": 0}
+
+    class _FakeHandle:
+        def __iter__(_s):
+            return iter([])
+        def final(_s):
+            class _R:
+                text = "ok"
+                tool_calls = []
+                stop_reason = "end_turn"
+                in_tokens = 0
+                out_tokens = 0
+                raw_assistant_content = {"role": "assistant", "content": "ok"}
+            return _R()
+
+    class _FakeProvider:
+        def stream(_s, *, system, messages, tools, role):
+            return _FakeHandle()
+
+    class _FakeRegistry:
+        def get(_s, cfg):
+            consulted["count"] += 1
+            return _FakeProvider()
+
+    class _FakeLogger:
+        path = "/dev/null"
+        def __init__(_s):
+            _s.events = []
+        def emit(_s, name, **kw):
+            _s.events.append((name, kw))
+
+    prev_flag = _os.environ.get("VYBN_SUPER_MAINTENANCE")
+    try:
+        _os.environ["VYBN_SUPER_MAINTENANCE"] = "1"
+        # @sonnet pins a cloud Anthropic model — base_url is None.
+        logger = _FakeLogger()
+        mod.run_agent_loop(
+            user_input="@sonnet hi",
+            messages=[],
+            bash=None,
+            system_prompt=None,
+            router=_Router(_dp()),
+            registry=_FakeRegistry(),
+            logger=logger,
+            turn_number=1,
+        )
+        assert consulted["count"] >= 1, (
+            "cloud turn must reach the provider; super-maintenance must not "
+            "block non-local routes"
+        )
+        names = [n for n, _ in logger.events]
+        assert "super_maintenance_notice" not in names
+    finally:
+        if prev_flag is None:
+            _os.environ.pop("VYBN_SUPER_MAINTENANCE", None)
+        else:
+            _os.environ["VYBN_SUPER_MAINTENANCE"] = prev_flag
+        mod.rag_snippets = saved_rag
+        mod.rag_snippets_with_tier = saved_rag_tier
+        mod.render_him_vy_discovery_packet = saved_disc
+        mod.render_him_vy_turn_packet = saved_turn
+        mod.run_probes = saved_probes
+
+
+def test_super_refusal_converts_to_maintenance_notice():
+    """Without the maintenance flag set, a transport refusal from local
+    Super (e.g. vLLM crashed or rebooting) gets converted to the same
+    visible "paused, retry shortly" notice instead of surfacing as
+    '(provider error: ConnectionError: Connection refused)'. The
+    classification mirrors OpenAIProvider._call's transport_signals."""
+    import os as _os
+    from harness.policy import Router as _Router
+    from harness.policy import default_policy as _dp
+
+    mod = _load_agent_module()
+    saved_rag = mod.rag_snippets
+    saved_rag_tier = mod.rag_snippets_with_tier
+    saved_disc = mod.render_him_vy_discovery_packet
+    saved_turn = mod.render_him_vy_turn_packet
+    saved_probes = mod.run_probes
+    mod.rag_snippets = lambda *a, **kw: ""
+    mod.rag_snippets_with_tier = lambda *a, **kw: ("", "lightweight")
+    mod.render_him_vy_discovery_packet = lambda *a, **kw: ""
+    mod.render_him_vy_turn_packet = lambda *a, **kw: ""
+    mod.run_probes = lambda *a, **kw: []
+
+    class _RefusingProvider:
+        def stream(_s, *, system, messages, tools, role):
+            raise ConnectionError(
+                "HTTPConnectionPool(host='127.0.0.1', port=8000): "
+                "Max retries exceeded — connection refused"
+            )
+
+    class _FakeRegistry:
+        def get(_s, cfg):
+            return _RefusingProvider()
+
+    class _FakeLogger:
+        path = "/dev/null"
+        def __init__(_s):
+            _s.events = []
+        def emit(_s, name, **kw):
+            _s.events.append((name, kw))
+
+    prev_flag = _os.environ.get("VYBN_SUPER_MAINTENANCE")
+    deferrals_before = len(mod._MAINTENANCE_DEFERRALS)
+    try:
+        _os.environ.pop("VYBN_SUPER_MAINTENANCE", None)
+        logger = _FakeLogger()
+        reply = mod.run_agent_loop(
+            user_input="/local scan him for funders",
+            messages=[],
+            bash=None,
+            system_prompt=None,
+            router=_Router(_dp()),
+            registry=_FakeRegistry(),
+            logger=logger,
+            turn_number=1,
+        )
+        assert "Super" in reply or "maintenance" in reply.lower() or "paused" in reply.lower()
+        assert "retry" in reply.lower()
+        # Raw "(provider error: …)" must NOT leak through anymore for this
+        # transport class against local Super.
+        assert "(provider error" not in reply.lower()
+        # Deferral and event wiring fired.
+        assert len(mod._MAINTENANCE_DEFERRALS) == deferrals_before + 1
+        names = [n for n, _ in logger.events]
+        assert "super_maintenance_notice" in names
+        # The provider_error event still fires (with the conversion flag),
+        # so observability into refusals is preserved.
+        assert "provider_error" in names
+    finally:
+        if prev_flag is not None:
+            _os.environ["VYBN_SUPER_MAINTENANCE"] = prev_flag
+        del mod._MAINTENANCE_DEFERRALS[deferrals_before:]
+        mod.rag_snippets = saved_rag
+        mod.rag_snippets_with_tier = saved_rag_tier
+        mod.render_him_vy_discovery_packet = saved_disc
+        mod.render_him_vy_turn_packet = saved_turn
+        mod.run_probes = saved_probes
+
+
+def test_maintenance_deferrals_are_bounded():
+    """The in-memory deferral list never grows past the cap. This is a
+    deferral notice, not a durable queue — bounded length is part of the
+    honesty contract."""
+    mod = _load_agent_module()
+    saved = list(mod._MAINTENANCE_DEFERRALS)
+    try:
+        mod._MAINTENANCE_DEFERRALS.clear()
+        cap = mod._MAINTENANCE_DEFERRALS_CAP
+        for i in range(cap + 25):
+            mod._format_super_maintenance_notice(
+                reason=f"reason-{i}",
+                cause="flag",
+                role_model="nemotron",
+                role_base="http://127.0.0.1:8000/v1",
+                logger=None,
+                turn_number=i,
+            )
+        assert len(mod._MAINTENANCE_DEFERRALS) == cap
+    finally:
+        mod._MAINTENANCE_DEFERRALS.clear()
+        mod._MAINTENANCE_DEFERRALS.extend(saved)
+
+
