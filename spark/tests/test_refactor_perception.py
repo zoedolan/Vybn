@@ -425,3 +425,47 @@ def test_retired_script_consolidation_lesson_is_loaded():
     assert "retire_unreferenced_retired_script_with_manifest_restore" in text
     assert "zero live references" in text
     assert "git-history restore path" in text
+
+
+def test_semantic_operating_system_protocol_names_the_breakthrough():
+    from spark.harness.refactor_perception import render_semantic_operating_system_protocol
+
+    text = render_semantic_operating_system_protocol()
+    assert "semantic operating system for codebases and institutions" in text
+    assert "memory-guided" in text
+    assert "residual-tested" in text
+    assert "self-refactoring infrastructure" in text
+    assert "Existing organs, not new sprawl" in text
+
+
+def test_semantic_operating_system_tick_composes_existing_structural_tick(tmp_path):
+    from spark.harness.refactor_perception import semantic_operating_system_tick_for_repo
+
+    src = tmp_path / "organ.py"
+    src.write_text("def large():\n" + "\n".join(f"    x_{i} = {i}" for i in range(220)) + "\n    return 1\n")
+    tick = semantic_operating_system_tick_for_repo(
+        tmp_path,
+        tracked_paths=["organ.py"],
+        pressure_text="refactor yourself into the semantic OS",
+    )
+    assert tick is not None
+    assert tick.candidate_path == "organ.py"
+    assert tick.existing_home == "organ.py"
+    assert "live user pressure" in tick.memory_pressure
+    assert "absorb into the named existing_home" in tick.absorption_rule
+    assert any("targeted" in item for item in tick.continuity_uptake)
+
+
+def test_refactor_packet_carries_semantic_operating_system_loop():
+    from spark.harness.refactor_perception import packet_for
+
+    pkt = packet_for("spark/harness/refactor_perception.py", lines=1400, public=False)
+    assert "semanticOperatingSystemPrinciple" in pkt
+    assert [step["id"] for step in pkt["semanticOperatingSystemLoop"]] == [
+        "memory_pressure",
+        "candidate_seam",
+        "local_scout",
+        "residual_wound",
+        "absorb_or_refuse",
+        "continuity_uptake",
+    ]
