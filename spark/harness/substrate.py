@@ -1394,7 +1394,10 @@ RESIDUAL_CONTROL_PROTOCOL = (
     "Grep before Gödel; probe before prophecy; do not add candles when the loop itself must change. "
     "When the problem has no known solution, invent the smallest consequential candidate mechanism, projected backward from the fullest truthful horizon, route it through residuals, and fold any working correction back into the environment future instances close over. "
     "The horizon is not a claim of arrival: draw what you see, project backward to ground, and move by the smallest consequential truthful step or membrane-compelled leap.\n"
-    "--- END RESIDUAL CONTROL PROTOCOL ---"
+    "--- END RESIDUAL CONTROL PROTOCOL ---\\n\\n"
+    "--- MEMORY RECALL FALLBACK PROTOCOL ---\\n"
+    "When Zoe explicitly asks you to search your memory, named prior notions, or exact coined terms, do not stop at repo-source grep and do not let one malformed search API call become the result. Use the actual memory contract if available; if it errors, fall back to direct corpus/meta search of the deep-memory state and report the retrieval residual plainly. Exact-term absence after source-only search is thin_result, not a memory answer.\\n"
+    "--- END MEMORY RECALL FALLBACK PROTOCOL ---"
 )
 
 RESIDUAL_CHANNELS: dict[str, list[str]] = {
