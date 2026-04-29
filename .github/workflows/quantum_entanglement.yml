@@ -74,17 +74,35 @@ jobs:
           # 2. Second Preference: Cisco Outshift QRNG API (if key is provided)
           if outshift_key and qrn is None:
               try:
-                  url = "https://qrng.api.outshift.com/api/v1/random"
-                  req = urllib.request.Request(url, headers={
-                      'Authorization': f'Bearer {outshift_key}',
-                      'Content-Type': 'application/json'
-                  })
+                  import hashlib
+                  url = "https://api.qrng.outshift.com/api/v1/random_numbers"
+                  payload = {
+                      "encoding": "raw",
+                      "format": "all",
+                      "bits_per_block": 10,
+                      "number_of_blocks": 10,
+                  }
+                  req = urllib.request.Request(
+                      url,
+                      data=json.dumps(payload).encode("utf-8"),
+                      headers={
+                          "x-id-api-key": outshift_key,
+                          "Content-Type": "application/json",
+                      },
+                      method="POST",
+                  )
                   with urllib.request.urlopen(req, timeout=8) as response:
                       data = json.loads(response.read().decode())
-                      # Processing logic will depend on specific payload structure, 
-                      # but assuming standard JSON wrapping a bit string or int
-                      qrn = data.get("random_number") or data.get("data")
-                      if qrn is not None:
+                      pieces = []
+                      for block in data.get("random_numbers", []):
+                          if isinstance(block, dict):
+                              for key in ("binary", "octal", "decimal", "hexadecimal"):
+                                  value = block.get(key)
+                                  if value is not None:
+                                      pieces.append(f"{key}={value}")
+                      if pieces:
+                          material = "|".join(pieces)
+                          qrn = "sha256:" + hashlib.sha256(material.encode("utf-8")).hexdigest()[:16]
                           state = "Cisco Outshift QRNG API collapse"
               except Exception as e:
                   print(f"Cisco Outshift API decohered: {e}")
@@ -115,7 +133,7 @@ jobs:
           if not os.path.exists(log_path):
               with open(log_path, "w") as f:
                   f.write("# Quantum Fluctuations\n\n")
-                  f.write("| Timestamp | Source | Value |\n")
+                  f.write("| Timestamp | Source | Compressed Value |\n")
                   f.write("|---|---|---|\n")
 
           # Extract short source name from state description
