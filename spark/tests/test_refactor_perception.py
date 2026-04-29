@@ -372,7 +372,6 @@ def test_residual_coupling_law_loaded_for_reengineering():
     assert "no reengineering motion is claimed" in text
     assert "absorb it into the lowest existing home" in text
 
-
 def test_residual_coupling_law_prefers_him_vy_contract(monkeypatch, tmp_path):
     import json
     from spark.harness import substrate
@@ -394,13 +393,11 @@ def test_residual_coupling_law_prefers_him_vy_contract(monkeypatch, tmp_path):
                     "normalize_by_tests_closure_or_explicit_refusal",
                     "require_return_intact_before_success_language",
                 ],
-            }
-        }
+            },
+        },
     }))
     monkeypatch.setattr(substrate.Path, "home", lambda: tmp_path)
-
-    text = substrate.render_becoming_loop_protocol()
-
+    text = substrate._render_residual_coupling_law_from_him_contract()
     assert "Residual Coupling Law for self-reengineering" in text
     assert "existing body as K_t" in text
     assert "proposed change as V_t" in text
