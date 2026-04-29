@@ -39,7 +39,11 @@ from harness.recurrent import (  # noqa: E402
     contractivity_ok,
     reduce_step,
     residual_magnitude,
+    outshift_entropy_material,
+    quantum_aperture_payload,
+    quantum_entropy_digest,
     run_recurrent_loop,
+    select_with_external_entropy,
 )
 
 
@@ -171,6 +175,55 @@ class TestContractivity(unittest.TestCase):
         )
         ok, _ = contractivity_ok(h)
         self.assertTrue(ok)
+
+
+
+
+# ---------------------------------------------------------------------------
+# Quantum aperture
+# ---------------------------------------------------------------------------
+
+
+class TestQuantumAperture(unittest.TestCase):
+    def test_quantum_aperture_payload_matches_outshift_contract(self):
+        payload = quantum_aperture_payload()
+        self.assertEqual(payload["encoding"], "raw")
+        self.assertEqual(payload["format"], "all")
+        self.assertEqual(payload["bits_per_block"], 10)
+        self.assertEqual(payload["number_of_blocks"], 10)
+
+    def test_outshift_entropy_material_extracts_stable_fields(self):
+        material = outshift_entropy_material({
+            "random_numbers": [
+                {"binary": "101", "decimal": "5", "hexadecimal": "5", "octal": "5"},
+                {"binary": "010", "decimal": "2"},
+            ]
+        })
+        self.assertEqual(
+            material,
+            "binary=101|octal=5|decimal=5|hexadecimal=5|binary=010|decimal=2",
+        )
+
+    def test_select_with_external_entropy_only_breaks_permitted_ties(self):
+        candidates = ["absorb existing home", "refuse sprawl", "ask missing fact"]
+        packet = select_with_external_entropy(
+            candidates,
+            "binary=101|decimal=5",
+            source="outshift",
+            context="reengineering_tie_break",
+        )
+        self.assertEqual(packet["candidate_count"], 3)
+        self.assertIn(packet["selected"], candidates)
+        self.assertEqual(packet["source"], "outshift")
+        self.assertEqual(packet["context"], "reengineering_tie_break")
+        self.assertEqual(len(packet["entropy_sha256"]), 64)
+        self.assertIn("permitted moves", packet["rule"])
+        self.assertIn("residuals judge", packet["rule"])
+
+    def test_quantum_entropy_digest_is_compressed_not_raw_log(self):
+        digest = quantum_entropy_digest("binary=101|decimal=5")
+        self.assertEqual(len(digest), 64)
+        self.assertNotIn("binary=101", digest)
 
 
 # ---------------------------------------------------------------------------

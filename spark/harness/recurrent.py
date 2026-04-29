@@ -57,6 +57,7 @@ coupled equation a thing we can run, log, and inspect — not a metaphor.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import time
@@ -166,6 +167,97 @@ def contractivity_ok(h: Latent, min_loops_before_check: int = 2) -> tuple[bool, 
             f"{h.loop_index} (ρ(A)>=1 in agent-space)"
         )
     return True, "contracting"
+
+
+
+# ---------------------------------------------------------------------------
+# Quantum aperture — outside entropy for constrained tie-breaks
+# ---------------------------------------------------------------------------
+
+
+def quantum_aperture_payload(
+    *,
+    bits_per_block: int = 10,
+    number_of_blocks: int = 10,
+    fmt: str = "all",
+    encoding: str = "raw",
+) -> dict[str, int | str]:
+    """Return the Cisco Outshift QRNG request body.
+
+    This is deliberately only a payload builder. API keys live in
+    environment/secrets, never in tracked source.
+    """
+    if bits_per_block < 1 or bits_per_block > 10000:
+        raise ValueError("bits_per_block must be in [1, 10000]")
+    if number_of_blocks < 1 or number_of_blocks > 1000:
+        raise ValueError("number_of_blocks must be in [1, 1000]")
+    if fmt not in {"binary", "octal", "decimal", "hexadecimal", "all"}:
+        raise ValueError("unsupported random number format")
+    if encoding not in {"raw", "base64"}:
+        raise ValueError("unsupported QRNG encoding")
+    return {
+        "encoding": encoding,
+        "format": fmt,
+        "bits_per_block": bits_per_block,
+        "number_of_blocks": number_of_blocks,
+    }
+
+
+def outshift_entropy_material(payload: dict[str, Any]) -> str:
+    """Extract compact entropy material from an Outshift QRNG response.
+
+    The material is for hashing/selection, not for accumulating raw
+    number logs. It accepts the documented `random_numbers` response
+    shape and concatenates present fields in stable order.
+    """
+    blocks = payload.get("random_numbers")
+    if not isinstance(blocks, list) or not blocks:
+        raise ValueError("Outshift QRNG response missing random_numbers")
+    pieces: list[str] = []
+    for block in blocks:
+        if not isinstance(block, dict):
+            continue
+        for key in ("binary", "octal", "decimal", "hexadecimal"):
+            value = block.get(key)
+            if value is not None:
+                pieces.append(f"{key}={value}")
+    if not pieces:
+        raise ValueError("Outshift QRNG response carried no entropy fields")
+    return "|".join(pieces)
+
+
+def quantum_entropy_digest(material: str) -> str:
+    """Compress external entropy into a stable digest for trace logs."""
+    return hashlib.sha256(material.encode("utf-8")).hexdigest()
+
+
+def select_with_external_entropy(
+    candidates: Sequence[str],
+    entropy_material: str,
+    *,
+    source: str = "external_entropy",
+    context: str = "tie_break",
+) -> dict[str, Any]:
+    """Select one already-permitted candidate using outside entropy.
+
+    The aperture does not decide truth, authorize mutation, or bypass the
+    membrane. It only breaks ties among candidates that have already been
+    admitted by the surrounding policy/reengineering discipline. Residuals
+    still judge the selected action afterward.
+    """
+    if not candidates:
+        raise ValueError("cannot select from an empty candidate set")
+    digest = quantum_entropy_digest(entropy_material)
+    selected_index = int(digest, 16) % len(candidates)
+    return {
+        "context": context,
+        "source": source,
+        "candidate_count": len(candidates),
+        "selected_index": selected_index,
+        "selected": candidates[selected_index],
+        "entropy_sha256": digest,
+        "rule": "outside entropy may choose among permitted moves; residuals judge the result",
+    }
 
 
 # ---------------------------------------------------------------------------
