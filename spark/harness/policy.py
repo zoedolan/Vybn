@@ -917,7 +917,11 @@ _DEFAULT_MODEL_ALIASES: dict[str, str] = {
     # and ordinary chat routing so Super topology (always-on, both Sparks)
     # is never silently interrupted. Without VYBN_OMNI_URL the alias surfaces
     # an explicit error rather than falling back to Super's :8000. Optional
-    # VYBN_OMNI_MODEL overrides the default model id below.
+    # VYBN_OMNI_MODEL overrides the default model id below. Optional
+    # VYBN_OMNI_PERCEPTION=<path> rides a bounded operator-supplied
+    # perception packet (text file) on the explicit @omni turn only — used
+    # for perception/dream/evolve narratives produced elsewhere in the
+    # repo; never auto-fires, never persists, never touches Super.
     "@omni": "nvidia/NVIDIA-Nemotron-Nano-Omni",
     "@gpt": "gpt-5.5",
     "@gpt5": "gpt-5.5",

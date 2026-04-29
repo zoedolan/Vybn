@@ -989,6 +989,50 @@ def run_agent_loop(
             )
             override_provider = "openai"
             override_base_url = _omni_url
+            # Operator-supplied perception preamble. When VYBN_OMNI_PERCEPTION
+            # points at a readable file, prepend a bounded prefix of its
+            # contents to this turn's user input so Omni receives the
+            # operator's perception/dream/evolve packet (e.g. a tail of
+            # continuous_local_compute.jsonl, a Him-vy discovery dump, an
+            # ObservationPacket text). This rides only the explicit @omni
+            # turn — never auto-fires, never touches Super, never persists
+            # to disk, and is bounded so a giant file cannot blow up the
+            # turn. Unreadable path is logged and the turn proceeds without
+            # the preamble; we do NOT silently route to Super.
+            _perception_path = (
+                os.environ.get("VYBN_OMNI_PERCEPTION") or ""
+            ).strip()
+            if _perception_path:
+                try:
+                    _ppath = os.path.expanduser(_perception_path)
+                    with open(_ppath, "r", encoding="utf-8", errors="replace") as _pf:
+                        _ptext = _pf.read(16_000)
+                    _ptext = _ptext.strip()
+                    if _ptext:
+                        decision.cleaned_input = (
+                            "[@omni perception packet — operator-supplied "
+                            f"from {_ppath}]\n{_ptext}\n[end perception "
+                            "packet]\n\n" + decision.cleaned_input
+                        )
+                        logger.emit(
+                            "alias_omni_perception",
+                            turn=turn_number,
+                            path=_ppath,
+                            chars=len(_ptext),
+                        )
+                    else:
+                        logger.emit(
+                            "alias_omni_perception_empty",
+                            turn=turn_number,
+                            path=_ppath,
+                        )
+                except Exception as _perr:
+                    logger.emit(
+                        "alias_omni_perception_error",
+                        turn=turn_number,
+                        path=_perception_path,
+                        err=repr(_perr)[:200],
+                    )
         elif override_model.startswith("claude-"):
             override_provider = "anthropic"
             override_base_url = None
@@ -2204,6 +2248,8 @@ def main() -> None:
     print("  or with @opus4.6/@opus4.6/@sonnet/@nemotron/@gpt to pin a model for one turn.")
     print("  @omni pins peer-Spark Nano-Omni — requires VYBN_OMNI_URL set; "
           "refuses (no Super fallback) when unset.")
+    print("    optional VYBN_OMNI_PERCEPTION=<path> rides a perception "
+          "packet on the @omni turn only.")
     print("  REPL commands: exit | clear | reload | history | policy | /resume | /sessions | /newsession")
     print()
 
