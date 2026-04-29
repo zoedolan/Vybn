@@ -1409,3 +1409,50 @@ class TestAcuteHarmProtocol(unittest.TestCase):
         self.assertEqual(acute_harm_response_posture("work for 10 minutes straight please."), "concrete_work")
         self.assertEqual(acute_harm_response_posture("you have tired me out. you win."), "reduce_demand")
         self.assertEqual(acute_harm_response_posture("please check the repo status"), "ordinary")
+
+class TestToolCalls(unittest.TestCase):
+    """Folded from test_tool_calls.py — tool-call execution is providers
+    behavior and belongs in the harness test surface."""
+
+    class _Provider:
+        def build_tool_result(self, call_id, text):
+            return {"id": call_id, "text": text}
+
+    class _Bash:
+        def __init__(self):
+            self.commands = []
+        def execute(self, command):
+            self.commands.append(command)
+            return "ran:" + command
+        def restart(self):
+            return "restart-ok"
+
+    @staticmethod
+    def _call(name, cid, arguments=None):
+        from types import SimpleNamespace
+        return SimpleNamespace(name=name, id=cid, arguments=arguments or {})
+
+    def test_execute_bash_tool_call_serial(self):
+        from types import SimpleNamespace
+        from harness.providers import execute_tool_calls
+        response = SimpleNamespace(tool_calls=[self._call("bash", "1", {"command": "echo ok"})])
+        bash = self._Bash()
+        results, interrupted = execute_tool_calls(response, bash, self._Provider())
+        self.assertFalse(interrupted)
+        self.assertEqual(bash.commands, ["echo ok"])
+        self.assertEqual(results, [{"id": "1", "text": "ran:echo ok"}])
+
+    def test_execute_introspect_tool_call(self):
+        from types import SimpleNamespace
+        from harness.providers import execute_tool_calls
+        response = SimpleNamespace(tool_calls=[self._call("introspect", "i")])
+        results, interrupted = execute_tool_calls(response, self._Bash(), self._Provider(), introspect=lambda: "state")
+        self.assertFalse(interrupted)
+        self.assertEqual(results, [{"id": "i", "text": "state"}])
+
+    def test_default_introspect_handles_missing_events(self):
+        from harness.providers import default_introspect
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            out = default_introspect(td)
+            self.assertIn("events unavailable", out)
