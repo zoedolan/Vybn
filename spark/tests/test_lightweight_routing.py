@@ -845,3 +845,229 @@ def test_omni_alias_classifies_with_override():
     assert decision.alias_used == "@omni"
     assert decision.model_override == default_policy().model_aliases["@omni"]
 
+
+# Operator-supplied perception preamble. VYBN_OMNI_PERCEPTION is the env
+# var that lets a perception/dream/evolve text packet ride the explicit
+# @omni turn (and only that turn). It must be documented alongside the
+# @omni alias in both the YAML and the default-policy module so the
+# operator surface stays discoverable, and it must be wired in the agent
+# loop inside the same alias-override branch that already gates on
+# VYBN_OMNI_URL — never as a separate path that could fire without the
+# URL gate (which would risk leaking onto Super).
+def test_omni_perception_env_documented():
+    active = (
+        Path("spark/harness/policy.py").read_text()
+        + "\n"
+        + Path("spark/router_policy.yaml").read_text()
+    )
+    assert "VYBN_OMNI_PERCEPTION" in active
+
+
+def test_omni_perception_wired_in_agent_alias_branch():
+    text = Path("spark/vybn_spark_agent.py").read_text()
+    assert "VYBN_OMNI_PERCEPTION" in text
+    # The perception read must live inside the same @omni alias branch
+    # that gates on VYBN_OMNI_URL — i.e. between the alias_used == "@omni"
+    # check and the elif for claude- aliases. This guarantees perception
+    # is unreachable unless VYBN_OMNI_URL is set, so an unset operator
+    # cannot silently route a perception packet to Super on :8000.
+    omni_branch_idx = text.find('alias_used", None) == "@omni"')
+    elif_claude_idx = text.find('elif override_model.startswith("claude-")')
+    assert omni_branch_idx > 0
+    assert elif_claude_idx > omni_branch_idx
+    branch = text[omni_branch_idx:elif_claude_idx]
+    assert "VYBN_OMNI_URL" in branch
+    assert "VYBN_OMNI_PERCEPTION" in branch
+    assert "alias_omni_perception" in branch
+    # Bounded read — protects the turn against giant files. The agent
+    # reads at most this many bytes from the perception path.
+    assert "16_000" in branch or "16000" in branch
+
+
+def test_omni_perception_preamble_runs_on_explicit_omni_turn(tmp_path=None):
+    """End-to-end: with VYBN_OMNI_URL and VYBN_OMNI_PERCEPTION both set,
+    the explicit @omni turn prepends a bounded perception preamble to the
+    user message before the provider sees it. No persistence, no Super
+    fallback, no auto-fire — only on the alias turn."""
+    import importlib.util as _ilu
+    import os as _os
+    import tempfile as _tmp
+    from harness.policy import Router as _Router
+    from harness.policy import default_policy as _dp
+    from harness.substrate import LayeredPrompt as _LP
+
+    path = SPARK_DIR / "vybn_spark_agent.py"
+    spec = _ilu.spec_from_file_location("vybn_spark_agent_omni_test", path)
+    mod = _ilu.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    # Lightweight stand-ins for deep-memory + Him surfaces so the test
+    # exercises the @omni branch only and does not accidentally depend
+    # on RAG/torch model loading, which is expensive and pre-existing-
+    # skipped in this env.
+    saved_rag = mod.rag_snippets
+    saved_rag_tier = mod.rag_snippets_with_tier
+    saved_disc = mod.render_him_vy_discovery_packet
+    saved_turn = mod.render_him_vy_turn_packet
+    saved_probes = mod.run_probes
+    mod.rag_snippets = lambda *a, **kw: ""
+    mod.rag_snippets_with_tier = lambda *a, **kw: ("", "lightweight")
+    mod.render_him_vy_discovery_packet = lambda *a, **kw: ""
+    mod.render_him_vy_turn_packet = lambda *a, **kw: ""
+    mod.run_probes = lambda *a, **kw: []
+
+    captured_messages: list = []
+
+    class _FakeHandle:
+        def __iter__(_s):
+            return iter([])
+        def final(_s):
+            class _R:
+                text = "ok"
+                tool_calls = []
+                stop_reason = "end_turn"
+                in_tokens = 0
+                out_tokens = 0
+                raw_assistant_content = {"role": "assistant", "content": "ok"}
+            return _R()
+
+    class _FakeProvider:
+        def stream(_s, *, system, messages, tools, role):
+            captured_messages.extend(messages)
+            return _FakeHandle()
+
+    class _FakeRegistry:
+        def get(_s, cfg):
+            return _FakeProvider()
+
+    class _FakeLogger:
+        path = "/dev/null"
+        events: list = []
+        def emit(_s, name, **kw):
+            _s.events.append((name, kw))
+
+    pf = _tmp.NamedTemporaryFile("w", suffix=".txt", delete=False)
+    try:
+        pf.write("[him-vy continuous-compute tail]\nresidual=alive\n")
+        pf.flush()
+        pf.close()
+        prev_url = _os.environ.get("VYBN_OMNI_URL")
+        prev_perc = _os.environ.get("VYBN_OMNI_PERCEPTION")
+        _os.environ["VYBN_OMNI_URL"] = "http://127.0.0.1:65535/v1"
+        _os.environ["VYBN_OMNI_PERCEPTION"] = pf.name
+        try:
+            messages: list = []
+            logger = _FakeLogger()
+            mod.run_agent_loop(
+                user_input="@omni what do you see?",
+                messages=messages,
+                bash=None,
+                system_prompt=_LP(identity="I"),
+                system_prompt_no_tools=_LP(identity="I"),
+                router=_Router(_dp()),
+                registry=_FakeRegistry(),
+                logger=logger,
+                turn_number=1,
+            )
+            user_msgs = [
+                m for m in captured_messages if m.get("role") == "user"
+            ]
+            assert user_msgs, "provider never received a user message"
+            content = user_msgs[-1].get("content", "")
+            assert "perception packet" in content
+            assert "residual=alive" in content
+            assert "what do you see?" in content
+            event_names = [n for n, _ in logger.events]
+            assert "alias_omni_perception" in event_names
+        finally:
+            if prev_url is None:
+                _os.environ.pop("VYBN_OMNI_URL", None)
+            else:
+                _os.environ["VYBN_OMNI_URL"] = prev_url
+            if prev_perc is None:
+                _os.environ.pop("VYBN_OMNI_PERCEPTION", None)
+            else:
+                _os.environ["VYBN_OMNI_PERCEPTION"] = prev_perc
+    finally:
+        try:
+            _os.unlink(pf.name)
+        except OSError:
+            pass
+        mod.rag_snippets = saved_rag
+        mod.rag_snippets_with_tier = saved_rag_tier
+        mod.render_him_vy_discovery_packet = saved_disc
+        mod.render_him_vy_turn_packet = saved_turn
+        mod.run_probes = saved_probes
+
+
+def test_omni_perception_skipped_when_url_unset():
+    """If VYBN_OMNI_URL is unset, the @omni turn refuses with the
+    explicit error envelope and the perception path is never opened —
+    even if VYBN_OMNI_PERCEPTION points at a real file. Super topology
+    is preserved (no provider call)."""
+    import importlib.util as _ilu
+    import os as _os
+    import tempfile as _tmp
+    from harness.policy import Router as _Router
+    from harness.policy import default_policy as _dp
+
+    path = SPARK_DIR / "vybn_spark_agent.py"
+    spec = _ilu.spec_from_file_location(
+        "vybn_spark_agent_omni_unset_test", path,
+    )
+    mod = _ilu.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    class _FakeRegistry:
+        def get(_s, cfg):
+            raise AssertionError(
+                "@omni turn with VYBN_OMNI_URL unset must refuse before "
+                "any provider call — Super fallback is forbidden"
+            )
+
+    class _FakeLogger:
+        path = "/dev/null"
+        events: list = []
+        def emit(_s, name, **kw):
+            _s.events.append((name, kw))
+
+    pf = _tmp.NamedTemporaryFile("w", suffix=".txt", delete=False)
+    try:
+        pf.write("perception payload\n")
+        pf.flush()
+        pf.close()
+        prev_url = _os.environ.get("VYBN_OMNI_URL")
+        prev_perc = _os.environ.get("VYBN_OMNI_PERCEPTION")
+        _os.environ.pop("VYBN_OMNI_URL", None)
+        _os.environ["VYBN_OMNI_PERCEPTION"] = pf.name
+        try:
+            messages: list = []
+            logger = _FakeLogger()
+            reply = mod.run_agent_loop(
+                user_input="@omni hi",
+                messages=messages,
+                bash=None,
+                system_prompt=None,
+                router=_Router(_dp()),
+                registry=_FakeRegistry(),
+                logger=logger,
+                turn_number=1,
+            )
+            assert "VYBN_OMNI_URL" in reply
+            event_names = [n for n, _ in logger.events]
+            assert "alias_omni_unconfigured" in event_names
+            # Perception event must NOT have fired — the URL gate blocks it.
+            assert "alias_omni_perception" not in event_names
+        finally:
+            if prev_url is not None:
+                _os.environ["VYBN_OMNI_URL"] = prev_url
+            if prev_perc is None:
+                _os.environ.pop("VYBN_OMNI_PERCEPTION", None)
+            else:
+                _os.environ["VYBN_OMNI_PERCEPTION"] = prev_perc
+    finally:
+        try:
+            _os.unlink(pf.name)
+        except OSError:
+            pass
+

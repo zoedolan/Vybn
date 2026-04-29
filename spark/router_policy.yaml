@@ -350,7 +350,12 @@ model_aliases:
   # activates when the user types @omni AND the operator has started an
   # Omni endpoint and exported VYBN_OMNI_URL. NOT in fallback_chain, NOT a
   # heuristic target, NOT a directive. Super topology stays untouched.
-  # Optional VYBN_OMNI_MODEL overrides the default model id.
+  # Optional VYBN_OMNI_MODEL overrides the default model id. Optional
+  # VYBN_OMNI_PERCEPTION=<path> rides a bounded operator-supplied
+  # perception packet (text file; e.g. a tail of
+  # continuous_local_compute.jsonl, a Him-vy discovery dump) on the
+  # explicit @omni turn only — never auto-fires, never persists, never
+  # touches Super.
   "@omni": nvidia/NVIDIA-Nemotron-Nano-Omni
   "@gpt": gpt-5.5
   "@gpt5": gpt-5.5
