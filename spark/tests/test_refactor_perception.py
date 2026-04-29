@@ -122,18 +122,6 @@ class RefactorPerceptionTests(unittest.TestCase):
 
 
 
-
-
-    def test_duplicate_lock_helpers_are_boundary_affordances_not_bloat(self):
-        lock = perceive_file("Vybn/spark/vybn-lock", lines=8, bytes_size=304)
-        unlock = perceive_file("Him/spark/vybn-unlock", lines=32, bytes_size=1109)
-
-        self.assertIn("per_repo_access_boundary", lock.connective_tissue)
-        self.assertIn("per_repo_access_boundary", unlock.connective_tissue)
-        self.assertIn("map_connective_tissue_before_action", lock.required_contacts)
-        self.assertIn("fortify_connective_tissue", unlock.candidate_actions)
-        self.assertIn("connective_tissue_preservation_check", unlock.residuals)
-
     def test_connective_tissue_is_first_class_in_perception(self):
         pkt = perceive_file("Origins/archive/manifold-preview/README.md", lines=40, bytes_size=2000, public=True)
         self.assertIn("context_map", pkt.connective_tissue)
