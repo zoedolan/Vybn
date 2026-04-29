@@ -346,6 +346,12 @@ model_aliases:
   "@sonnet46": claude-sonnet-4-6
   "@nemotron": nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
   "@local": nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
+  # @omni — peer-Spark Nano-Omni, operator-gated by VYBN_OMNI_URL. Only
+  # activates when the user types @omni AND the operator has started an
+  # Omni endpoint and exported VYBN_OMNI_URL. NOT in fallback_chain, NOT a
+  # heuristic target, NOT a directive. Super topology stays untouched.
+  # Optional VYBN_OMNI_MODEL overrides the default model id.
+  "@omni": nvidia/NVIDIA-Nemotron-Nano-Omni
   "@gpt": gpt-5.5
   "@gpt5": gpt-5.5
   "@gpro": gpt-5.5-pro

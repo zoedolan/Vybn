@@ -955,7 +955,41 @@ def run_agent_loop(
     if getattr(decision, "model_override", None):
         import dataclasses as _dc
         override_model = decision.model_override
-        if override_model.startswith("claude-"):
+        # @omni is the explicit, operator-gated activation path for the
+        # peer-Spark Nano-Omni endpoint. It is the ONLY way Omni ever
+        # routes — never via heuristic, directive, fallback_chain, or
+        # ordinary chat. The operator must (1) start the Omni endpoint
+        # on the peer Spark and (2) export VYBN_OMNI_URL pointing at it
+        # (e.g. http://10.0.0.X:8001/v1). Optional VYBN_OMNI_MODEL
+        # overrides the policy default model id. Without VYBN_OMNI_URL
+        # this turn refuses with an explicit error rather than silently
+        # falling back to Super on :8000 — Super spans both Sparks and
+        # is always-on; we do not want @omni to disturb that topology
+        # or to start/stop any service. No daemon, cron, or public
+        # route is installed by this code path.
+        if getattr(decision, "alias_used", None) == "@omni":
+            _omni_url = (os.environ.get("VYBN_OMNI_URL") or "").strip()
+            if not _omni_url:
+                logger.emit(
+                    "alias_omni_unconfigured",
+                    turn=turn_number,
+                    alias="@omni",
+                    role=decision.role,
+                )
+                return (
+                    "[@omni unavailable: VYBN_OMNI_URL is not set. "
+                    "Start the Omni endpoint on the peer Spark and "
+                    "export VYBN_OMNI_URL=http://<host>:<port>/v1 "
+                    "before retrying. This turn will not silently "
+                    "fall back to Super (:8000) — Super topology is "
+                    "preserved.]"
+                )
+            override_model = (
+                os.environ.get("VYBN_OMNI_MODEL") or override_model
+            )
+            override_provider = "openai"
+            override_base_url = _omni_url
+        elif override_model.startswith("claude-"):
             override_provider = "anthropic"
             override_base_url = None
         elif override_model.startswith("gpt-"):
@@ -2168,6 +2202,8 @@ def main() -> None:
     print("  Type naturally. Prefix with /chat, /create, /plan, /task, /local "
           "to force a role,")
     print("  or with @opus4.6/@opus4.6/@sonnet/@nemotron/@gpt to pin a model for one turn.")
+    print("  @omni pins peer-Spark Nano-Omni — requires VYBN_OMNI_URL set; "
+          "refuses (no Super fallback) when unset.")
     print("  REPL commands: exit | clear | reload | history | policy | /resume | /sessions | /newsession")
     print()
 
