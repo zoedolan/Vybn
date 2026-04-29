@@ -18,7 +18,6 @@ from fastapi import HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from origins_portal_api_v4 import StreamingReasoningFilter as StreamingReasoningFilterV2
 
 
 # Streams SSE back to the wellspring. Degrades silently if vLLM is offline.
@@ -101,6 +100,7 @@ async def synthesize_pressure(req: PressureSynthReq):
     vllm_url = "http://127.0.0.1:8000/v1/chat/completions"
 
     async def _stream():
+        from origins_portal_api_v4 import StreamingReasoningFilter as StreamingReasoningFilterV2
         rfilt = StreamingReasoningFilterV2(buffer_limit=4000)
         try:
             async with httpx.AsyncClient(timeout=90.0) as client:
