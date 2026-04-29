@@ -688,10 +688,14 @@ _TRANSIENT_PATTERNS = (
 #     not a durable queue, and we do not promise background delivery
 #     because there is no executor for it.
 #
-# vLLM does ship sleep mode (/sleep, /wake_up, /is_sleeping) when launched
-# with VLLM_SERVER_DEV_MODE=1 + --enable-sleep-mode, but this Super does
-# not expose those endpoints today. The gate therefore degrades to
-# explicit operator-controlled maintenance state rather than probing.
+# vLLM does ship sleep mode (GET /is_sleeping, POST /sleep?level=1|2,
+# POST /wake_up) when launched with VLLM_SERVER_DEV_MODE=1 plus
+# --enable-sleep-mode, but this Super does not expose those endpoints
+# today. The gate therefore degrades to explicit operator-controlled
+# maintenance state rather than probing. (Even when sleep mode is
+# armed, those are internal dev endpoints and a sleeping Super does
+# NOT imply Omni is live — Omni activation is a separate, operator-
+# gated concern via the @omni alias / VYBN_OMNI_URL.)
 
 _MAINTENANCE_DEFERRALS_CAP = 32
 _MAINTENANCE_DEFERRALS: list[dict[str, Any]] = []
