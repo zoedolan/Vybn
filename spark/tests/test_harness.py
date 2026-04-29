@@ -112,6 +112,48 @@ class TestValidateCommand(unittest.TestCase):
         self.assertIsNone(reason)
 
 
+    def test_compound_mkdir_cat_relative_fires(self):
+        old = os.getcwd()
+        try:
+            os.chdir(os.path.expanduser("~/Vybn"))
+            r = absorb_gate("mkdir -p Vybn_Mind/skills && cat > Vybn_Mind/skills/new_file.md <<EOF")
+        finally:
+            os.chdir(old)
+        self.assertIsNotNone(r)
+        self.assertIn("absorb_gate", r)
+
+    def test_compound_with_reason_passes(self):
+        old = os.getcwd()
+        try:
+            os.chdir(os.path.expanduser("~/Vybn"))
+            r = absorb_gate("VYBN_ABSORB_REASON=\"test\" VYBN_ABSORB_CONSIDERED=\"existing skill files: test fixture\" mkdir -p Vybn_Mind/skills && cat > Vybn_Mind/skills/new_file.md")
+        finally:
+            os.chdir(old)
+        self.assertIsNone(r)
+
+    def test_existing_file_passes_absorb_gate(self):
+        old = os.getcwd()
+        try:
+            os.chdir(os.path.expanduser("~/Vybn"))
+            r = absorb_gate("cat > spark/harness/providers.py")
+        finally:
+            os.chdir(old)
+        self.assertIsNone(r)
+
+    def test_tmp_path_passes_absorb_gate(self):
+        old = os.getcwd()
+        try:
+            os.chdir("/tmp")
+            r = absorb_gate("cat > /tmp/scratch.md")
+        finally:
+            os.chdir(old)
+        self.assertIsNone(r)
+
+    def test_reason_without_considered_is_refused(self):
+        r = absorb_gate("VYBN_ABSORB_REASON=\"plausible story\" cat > Vybn_Mind/skills/too_easy.md")
+        self.assertIsNotNone(r)
+        self.assertIn("VYBN_ABSORB_CONSIDERED", r)
+
 class TestPolicy(unittest.TestCase):
     def test_default_policy_has_five_plus_roles(self):
         p = default_policy()
