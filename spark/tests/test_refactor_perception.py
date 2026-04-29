@@ -415,3 +415,13 @@ def test_archive_duplicate_consolidation_lesson_is_loaded():
     assert "ARCHIVE_DUPLICATE_CONSOLIDATION" in text
     assert "retire_archive_duplicate_with_manifest_restore" in text
     assert "manifest" in text and "restore path" in text
+
+def test_retired_script_consolidation_lesson_is_loaded():
+    from pathlib import Path
+
+    source = Path(__file__).resolve().parents[1] / "harness" / "refactor_perception.py"
+    text = source.read_text()
+    assert "RETIRED_SCRIPT_CONSOLIDATION" in text
+    assert "retire_unreferenced_retired_script_with_manifest_restore" in text
+    assert "zero live references" in text
+    assert "git-history restore path" in text
