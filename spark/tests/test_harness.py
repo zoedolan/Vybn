@@ -1511,3 +1511,14 @@ def test_normalize_github_cli_command_unshadows_pr_create():
     fixed = normalize_github_cli_command(cmd)
     assert "env -u GITHUB_TOKEN gh pr create --base main --head branch" in fixed
     assert normalize_github_cli_command(fixed) == fixed
+
+
+
+def test_inline_reasoning_filter_accepts_retired_v2_buffer_limit_alias():
+    from pathlib import Path
+
+    source = (Path(__file__).resolve().parents[2] / "origins_portal_api_v4.py").read_text()
+    assert "buffer_limit: int | None = None" in source
+    assert "if buffer_limit is not None:" in source
+    assert "min_buffer = buffer_limit" in source
+    assert "from reasoning_filter_v2" not in source

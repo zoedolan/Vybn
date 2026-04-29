@@ -52,15 +52,13 @@ from pydantic import BaseModel, Field
 import httpx
 import uvicorn
 
-# v2 reasoning filter — handles Nemotron's tagless-open </think> pattern
+# Inline reasoning filter below handles Nemotron tagless-open </think>; standalone reasoning_filter_v2.py retired.
 
 # VYBN_API_BASE — public base URL for this portal. Never hardcode;
 # the named Cloudflare tunnel (vybn-api → https://api.vybn.ai) is the
 # stable default, and a future operator can override via environment.
 # Added 2026-04-21 alongside the quick-tunnel retirement.
 VYBN_API_BASE = os.getenv("VYBN_API_BASE", "https://api.vybn.ai")
-
-from reasoning_filter_v2 import StreamingReasoningFilter as StreamingReasoningFilterV2
 
 # Shared context overlays (enclosure, odl, iclc, bootcamp). Source of
 # truth: ~/Vybn/context_overlays.py. When a chat page POSTs
@@ -75,7 +73,6 @@ except Exception as _ovl_err:  # pragma: no cover
 else:
     log_missing_overlay = None
 
-from reasoning_filter_v2 import _scrub_system_refs as _scrub_system_refs_v2
 
 # Defense-in-depth: shared security module
 import chat_security as sec
@@ -516,7 +513,15 @@ class StreamingReasoningFilter:
     STRIPPING = "stripping"
     STREAMING = "streaming"
 
-    def __init__(self, min_buffer: int = STREAM_PREAMBLE_BUFFER):
+    def __init__(
+        self,
+        min_buffer: int = STREAM_PREAMBLE_BUFFER,
+        buffer_limit: int | None = None,
+    ):
+        # buffer_limit is accepted as a compatibility alias for the retired
+        # standalone reasoning_filter_v2.StreamingReasoningFilter API.
+        if buffer_limit is not None:
+            min_buffer = buffer_limit
         self.min_buffer = min_buffer
         self._buf = ""
         self._state = self.BUFFERING
@@ -1211,7 +1216,7 @@ async def chat(req: ChatRequest, request: Request):
                         # No buffering, no preamble filter: with enable_thinking=False
                         # the model emits the answer directly, so we pass through
                         # like Vybn-Law does.
-                        cleaned = _scrub_system_refs_v2(_scrub_secrets(token))
+                        cleaned = _scrub_system_refs(_scrub_secrets(token))
                         if not cleaned:
                             continue
 
@@ -1454,7 +1459,7 @@ async def perspective_endpoint(req: PerspectiveRequest, request: Request):
     ]
 
     async def stream_perspective():
-        reasoning_filter = StreamingReasoningFilterV2(buffer_limit=4000)
+        reasoning_filter = StreamingReasoningFilter(buffer_limit=4000)
 
         # Send RAG sources and map node
         safe_sources = [
@@ -1905,7 +1910,7 @@ async def voice_endpoint(req: VoiceRequest, request: Request):
         in_thinking = True  # Start in thinking mode
         buffer = ""
         thinking_heartbeat_count = 0
-        reasoning_filter = StreamingReasoningFilterV2(buffer_limit=4000)
+        reasoning_filter = StreamingReasoningFilter(buffer_limit=4000)
 
         # Send RAG sources first
         safe_sources = [
@@ -2005,7 +2010,7 @@ async def voice_endpoint(req: VoiceRequest, request: Request):
                         yield f"data: {json.dumps({'content': _scrub_system_refs(after)})}\n\n"
                 else:
                     # Use the whole buffer through reasoning filter
-                    rf = StreamingReasoningFilterV2(buffer_limit=300)
+                    rf = StreamingReasoningFilter(buffer_limit=300)
                     cleaned = rf.feed(buffer)
                     cleaned += rf.flush()
                     if cleaned.strip():

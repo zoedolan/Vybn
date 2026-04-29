@@ -21,9 +21,10 @@ before that unification and no longer serve the live system.
 
 | File | Superseded by | Why kept |
 |------|---------------|----------|
-| `Vybn_Mind__origins_portal_api.py` (88 lines) | `origins_portal_api_v4.py` | The April 11 stub — the moment the portal first existed. Worth keeping as the seed form. |
 | `Vybn_Mind__vybn-chat-api.service` | Systemd unit never enabled; chat now runs via `nohup` on port 3001 from `Vybn-Law/api/vybn_chat_api.py` | Documents an intended deployment path we abandoned for the current lighter footprint. |
 | `vybn-phase/deep_memory_v6_backup.py` (in sibling repo) | `vybn-phase/deep_memory.py` current head | Pre-distillation form of deep_memory before the v6 rewrite shipped. Archived inside `vybn-phase` (private), not here. |
+
+Retired archive entries now live in git history when reference scans show no live users. Restore the April 11 Origins portal seed with: `git show a8aee3ae^:_archive/Vybn_Mind__origins_portal_api.py > _archive/Vybn_Mind__origins_portal_api.py`. Restore the retired tunnel script with: `git show 78f17bdd^:_archive/vybn-chat-tunnel.sh.RETIRED_2026-04-21 > _archive/vybn-chat-tunnel.sh.RETIRED_2026-04-21`.
 
 ## April 18, 2026 — round 2: dead-MCP audit
 
@@ -38,4 +39,3 @@ Archiving is an act of respect for the code that got us here. Nothing in
 this directory is alive; everything in this directory was once the best
 thing we had. Do not modify. Do not import. Do not resurrect without
 reading the commit that moved it in.
-| vybn-chat-tunnel.sh.RETIRED_2026-04-21 | tunnel process / git history | Retired unreferenced tunnel script removed from tracked source on 2026-04-29 after reference scan found no live users. Restore for archaeology with: git show HEAD^:_archive/vybn-chat-tunnel.sh.RETIRED_2026-04-21 > _archive/vybn-chat-tunnel.sh.RETIRED_2026-04-21 . |
