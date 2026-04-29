@@ -27,11 +27,16 @@ ExecStartPre=/bin/bash -c '%h/spark-vllm-docker/launch-cluster.sh -n 169.254.246
 Environment=VYBN_VLLM_GPU_MEMORY_UTILIZATION=0.78
 Environment=VYBN_VLLM_MAX_NUM_SEQS=8
 # Optional extra vLLM CLI args appended verbatim to `vllm serve`. Empty by
-# default. Use `~/.config/vybn/vllm.env` to set this for scheduled
-# Super/Omni interleaving experiments without editing the unit file.
+# default. Use `~/.config/vybn/vllm.env` to set this for scheduled Super
+# capacity experiments without editing the unit file.
 #
-# Sleep mode (controlled Super/Omni interleaving): vLLM exposes /sleep,
-# /wake_up, and /is_sleeping ONLY when the server is launched with both
+# Sleep mode (Super GPU-memory release for scheduled maintenance windows):
+# vLLM exposes the dev endpoints
+#   GET  /is_sleeping            (read-only status check)
+#   POST /sleep?level=1          (offload weights to CPU, discard kv cache)
+#   POST /sleep?level=2          (discard weights and kv cache)
+#   POST /wake_up                (re-load and resume serving)
+# ONLY when the server is launched with both
 #   VLLM_SERVER_DEV_MODE=1   (env var, explicitly passed through env to the vllm process)
 #   --enable-sleep-mode      (CLI flag on `vllm serve`)
 # These are internal dev endpoints. They must NOT be publicly exposed:
@@ -40,7 +45,12 @@ Environment=VYBN_VLLM_MAX_NUM_SEQS=8
 # as scheduled maintenance, the same way capacity profile changes are
 # treated.
 #
-# Example `~/.config/vybn/vllm.env` for an interleaving experiment:
+# Configuring sleep mode here ONLY frees Super's GPU. It does NOT make
+# Omni live. Omni activation is a separate, operator-gated concern (see
+# the @omni alias and VYBN_OMNI_URL): a sleeping Super does not imply a
+# live Omni, and a configured sleep mode does not imply either is in use.
+#
+# Example `~/.config/vybn/vllm.env` to arm sleep mode for a maintenance window:
 #   VYBN_VLLM_EXTRA_ARGS=--enable-sleep-mode
 #   VLLM_SERVER_DEV_MODE=1
 # Then: systemctl --user daemon-reload && systemctl --user restart vybn-vllm.service

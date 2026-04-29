@@ -1613,3 +1613,26 @@ def test_vllm_sleep_mode_dev_env_is_propagated_into_container_command():
     assert "Environment=VLLM_SERVER_DEV_MODE=" in text
     assert "env VLLM_SERVER_DEV_MODE=${VLLM_SERVER_DEV_MODE}" in text
     assert "--enable-sleep-mode" in text
+    # Pin the documented HTTP methods + level param so the comment can't
+    # silently regress to the ambiguous /sleep, /wake_up, /is_sleeping
+    # listing that misled prior probe attempts.
+    assert "GET  /is_sleeping" in text
+    assert "POST /sleep?level=1" in text
+    assert "POST /sleep?level=2" in text
+    assert "POST /wake_up" in text
+    # Sleep mode is documented as Super-only; configuring it must not
+    # imply Omni is live.
+    assert "does NOT make" in text and "Omni live" in text
+
+
+def test_vllm_sleep_mode_comment_in_agent_does_not_imply_omni_is_live():
+    from pathlib import Path
+
+    text = Path("spark/vybn_spark_agent.py").read_text()
+    # The agent-side comment must spell out methods + levels (no bare
+    # /sleep, /wake_up, /is_sleeping listing) and must not let a reader
+    # conclude that a sleeping Super means Omni is up.
+    assert "GET /is_sleeping" in text
+    assert "POST /sleep?level=1|2" in text
+    assert "POST /wake_up" in text
+    assert "sleeping Super does\n# NOT imply Omni is live" in text
