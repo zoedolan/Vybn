@@ -1121,6 +1121,14 @@ async def chat(req: ChatRequest, request: Request):
         # browser — the cause of the "slow, doesn't feel good" first turn.
         full_response = ""
         clean_response = ""
+        # Dormant Nemotron-Omni fallback: when delta.content is absent the
+        # model may surface its visible reply via delta.reasoning_content /
+        # delta.reasoning. We route only those reasoning tokens through a
+        # StreamingReasoningFilter so any embedded chain-of-thought
+        # paragraphs are stripped before reaching the client. The filter is
+        # only initialised lazily so the Super hot path (content-only) keeps
+        # its byte-identical pass-through behavior.
+        omni_filter: StreamingReasoningFilter | None = None
 
         try:
             async with httpx.AsyncClient(timeout=httpx.Timeout(120.0)) as client:
@@ -1205,11 +1213,33 @@ async def chat(req: ChatRequest, request: Request):
                         delta = chunk.get("choices", [{}])[0].get("delta", {})
                         token = delta.get("content", "")
                         if not token:
-                            now = time.monotonic()
-                            if now - last_heartbeat > HEARTBEAT_INTERVAL:
-                                yield ": heartbeat\n\n"
-                                last_heartbeat = now
-                            continue
+                            # Dormant Omni-style fallback: consume reasoning_*
+                            # only when content is absent, then feed through
+                            # the reasoning filter so any internal preamble
+                            # is stripped before it reaches the client.
+                            reasoning_token = (
+                                delta.get("reasoning_content")
+                                or delta.get("reasoning")
+                                or ""
+                            )
+                            if reasoning_token:
+                                if omni_filter is None:
+                                    omni_filter = StreamingReasoningFilter(
+                                        buffer_limit=4000
+                                    )
+                                token = omni_filter.feed(reasoning_token)
+                                if not token:
+                                    now = time.monotonic()
+                                    if now - last_heartbeat > HEARTBEAT_INTERVAL:
+                                        yield ": heartbeat\n\n"
+                                        last_heartbeat = now
+                                    continue
+                            else:
+                                now = time.monotonic()
+                                if now - last_heartbeat > HEARTBEAT_INTERVAL:
+                                    yield ": heartbeat\n\n"
+                                    last_heartbeat = now
+                                continue
 
                         full_response += token
                         # Per-token scrub for secrets + system-reference phrases.
@@ -1229,6 +1259,21 @@ async def chat(req: ChatRequest, request: Request):
                         yield f"data: {json.dumps({'content': cleaned})}\n\n"
                         clean_response += cleaned
                         last_heartbeat = time.monotonic()
+
+                    # Flush any tail buffered by the dormant Omni filter.
+                    if omni_filter is not None:
+                        flushed = omni_filter.flush()
+                        if flushed:
+                            cleaned = _scrub_system_refs(_scrub_secrets(flushed))
+                            if cleaned:
+                                if len(clean_response) + len(cleaned) > sec.MAX_RESPONSE_LENGTH:
+                                    remaining = sec.MAX_RESPONSE_LENGTH - len(clean_response)
+                                    if remaining > 0:
+                                        yield f"data: {json.dumps({'content': cleaned[:remaining]})}\n\n"
+                                        clean_response += cleaned[:remaining]
+                                else:
+                                    yield f"data: {json.dumps({'content': cleaned})}\n\n"
+                                    clean_response += cleaned
 
         except (httpx.ConnectError, httpx.TimeoutException) as e:
             # Connection-level failure — no response body exists yet.
@@ -1498,6 +1543,16 @@ async def perspective_endpoint(req: PerspectiveRequest, request: Request):
 
                         delta = chunk.get("choices", [{}])[0].get("delta", {})
                         token = delta.get("content", "")
+                        if not token:
+                            # Dormant Omni-style fallback: reasoning fields
+                            # already pass through the StreamingReasoningFilter
+                            # below, which strips internal reasoning paragraphs
+                            # before they leave the server.
+                            token = (
+                                delta.get("reasoning_content")
+                                or delta.get("reasoning")
+                                or ""
+                            )
                         if not token:
                             now = time.monotonic()
                             if now - last_heartbeat > HEARTBEAT_INTERVAL:
@@ -1950,6 +2005,17 @@ async def voice_endpoint(req: VoiceRequest, request: Request):
 
                         delta = chunk.get("choices", [{}])[0].get("delta", {})
                         token = delta.get("content", "")
+                        if not token:
+                            # Dormant Omni-style fallback: voice already
+                            # routes pre-boundary content through both the
+                            # </think> detector and the StreamingReasoningFilter,
+                            # so consuming reasoning_* here keeps hidden
+                            # reasoning gated by the same protections.
+                            token = (
+                                delta.get("reasoning_content")
+                                or delta.get("reasoning")
+                                or ""
+                            )
                         if not token:
                             continue
 

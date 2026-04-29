@@ -1672,7 +1672,17 @@ class OpenAIProvider:
         data = self._call(role, openai_messages, tools)
         choice = (data.get("choices") or [{}])[0]
         msg = choice.get("message") or {}
-        text = _strip_reasoning(msg.get("content") or "").strip()
+        # Some OpenAI-compatible reasoning-style models (e.g. Nemotron Nano
+        # Omni in dormant smoke tests) return message.content = null and
+        # place the user-visible reply in message.reasoning_content or
+        # message.reasoning. When content is present, behavior is unchanged
+        # (Super continues to ship content with embedded <think>…</think>
+        # blocks that _strip_reasoning trims). The fallback only fires when
+        # content is empty so existing role outputs are byte-identical.
+        raw_content = msg.get("content")
+        if not raw_content:
+            raw_content = msg.get("reasoning_content") or msg.get("reasoning") or ""
+        text = _strip_reasoning(raw_content or "").strip()
         tool_calls_raw = msg.get("tool_calls") or []
         calls = []
         for tc in tool_calls_raw:
