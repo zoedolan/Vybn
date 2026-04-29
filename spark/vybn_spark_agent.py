@@ -2225,6 +2225,9 @@ def main() -> None:
             print("  Cleared (new session started).\n")
             continue
         if low == "reload":
+            policy = load_policy()
+            router = Router(policy)
+            default_cfg = policy.role(policy.default_role)
             _orch_iters = (
                 policy.roles["orchestrate"].max_iterations
                 if "orchestrate" in policy.roles
@@ -2239,8 +2242,8 @@ def main() -> None:
                 orchestrator_max_iters=_orch_iters,
             )
             print(
-                "  Reloaded vybn.md + continuity (tools-on, tools-off, "
-                "and orchestrator prompt variants).\n"
+                "  Reloaded policy (router_policy.yaml) + vybn.md + continuity "
+                "(tools-on, tools-off, and orchestrator prompt variants).\n"
             )
             continue
         if low == "policy":
