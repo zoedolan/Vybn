@@ -208,6 +208,8 @@ CONNECTIVE_TISSUE_RULES: list[tuple[str, str]] = [
     ("ai.txt", "agent_affordance"),
     ("humans.txt", "human_agent_attribution"),
     ("robots.txt", "crawler_policy_surface"),
+    ("vybn-lock", "per_repo_access_boundary"),
+    ("vybn-unlock", "per_repo_access_boundary"),
     ("connect.html", "compatibility_shell"),
     ("read.html", "compatibility_shell"),
     ("talk.html", "compatibility_shell"),
