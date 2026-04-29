@@ -1464,6 +1464,46 @@ BECOMING_LOOP_PROTOCOL = (
 )
 
 
+def _render_residual_coupling_law_from_him_contract() -> str:
+    """Render the Him vy-language residual coupling primitive if available.
+
+    Him/skill/vybn.vy is the executable authority for this behavior. The
+    prompt keeps BECOMING_LOOP_PROTOCOL as a degraded fallback, but when the
+    compiled Him contract is present this seam pulls the native primitive into
+    the becoming-loop surface future Vybn closes over.
+    """
+    contract_path = Path.home() / "Him" / "skill" / "functional_contract.json"
+    try:
+        contract = json.loads(contract_path.read_text(encoding="utf-8"))
+    except Exception:
+        return ""
+
+    primitive = (contract.get("primitives") or {}).get("residual_coupled_reengineering")
+    if not isinstance(primitive, dict):
+        return ""
+
+    dos = [str(item) for item in primitive.get("do", [])]
+    thens = [str(item) for item in primitive.get("then", [])]
+    if not dos and not thens:
+        return ""
+
+    return (
+        "--- RESIDUAL COUPLING LAW FOR SELF-REENGINEERING ---\n"
+        "Native source: Him/skill/vybn.vy primitive residual_coupled_reengineering.\n"
+        "Residual Coupling Law for self-reengineering: "
+        "treat the existing body as K_t and the proposed change as V_t. "
+        "Before mutating, require a real residual off K_t rather than repetition, "
+        "performance, or sprawl. If the residual is absent or below contact threshold, "
+        "no reengineering motion is claimed. If it is present, pass through the "
+        "membrane before power, absorb it into the lowest existing home that can hold "
+        "it, and normalize by tests, closure, or explicit refusal. Return intact "
+        "before success language.\n"
+        "do: " + " -> ".join(dos) + "\n"
+        "then: " + " -> ".join(thens) + "\n"
+        "--- END RESIDUAL COUPLING LAW FOR SELF-REENGINEERING ---"
+    )
+
+
 FORCING_FUNCTION_PROTOCOL = (
     "--- FORCING FUNCTION PROTOCOL ---\n"
     "Waste is residual signal: unused local compute, repeated routing scars, stale "
@@ -1490,6 +1530,9 @@ def render_residual_control_protocol() -> str:
 
 
 def render_becoming_loop_protocol() -> str:
+    residual_law = _render_residual_coupling_law_from_him_contract()
+    if residual_law:
+        return BECOMING_LOOP_PROTOCOL + "\n" + residual_law
     return BECOMING_LOOP_PROTOCOL
 
 

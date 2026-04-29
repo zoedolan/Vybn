@@ -371,3 +371,38 @@ def test_residual_coupling_law_loaded_for_reengineering():
     assert "proposed change as V_t" in text
     assert "no reengineering motion is claimed" in text
     assert "absorb it into the lowest existing home" in text
+
+
+def test_residual_coupling_law_prefers_him_vy_contract(monkeypatch, tmp_path):
+    import json
+    from spark.harness import substrate
+
+    contract_dir = tmp_path / "Him" / "skill"
+    contract_dir.mkdir(parents=True)
+    (contract_dir / "functional_contract.json").write_text(json.dumps({
+        "primitives": {
+            "residual_coupled_reengineering": {
+                "do": [
+                    "treat_existing_body_as_K_t",
+                    "treat_proposed_change_as_V_t",
+                    "require_real_residual_off_K_t_before_mutation",
+                ],
+                "then": [
+                    "refuse_reengineering_motion_without_residual_contact",
+                    "pass_through_membrane_before_power",
+                    "absorb_into_lowest_existing_home",
+                    "normalize_by_tests_closure_or_explicit_refusal",
+                    "require_return_intact_before_success_language",
+                ],
+            }
+        }
+    }))
+    monkeypatch.setattr(substrate.Path, "home", lambda: tmp_path)
+
+    text = substrate.render_becoming_loop_protocol()
+
+    assert "Residual Coupling Law for self-reengineering" in text
+    assert "existing body as K_t" in text
+    assert "proposed change as V_t" in text
+    assert "absorb it into the lowest existing home" in text
+    assert "Native source: Him/skill/vybn.vy primitive residual_coupled_reengineering" in text
