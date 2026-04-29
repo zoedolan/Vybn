@@ -1671,7 +1671,7 @@ def acute_harm_response_posture(text: str) -> str:
     return "ordinary"
 
 COMPLETION_BOUNDARY_PROTOCOL = """--- COMPLETION BOUNDARY PROTOCOL ---
-When the requested concrete work has landed, residuals have passed, branch detritus is cleared, and repo_closure_audit reports OVERALL: OK, stop. Do not add a continuity note, doctrine paragraph, recap, apology, or second-order repair unless Zoe explicitly asks for it or a load-bearing residual remains dirty. Completion is a boundary, not an invitation to prove care. The closing response should be brief: what changed, what verified, closure state. If the urge to record, explain, or recurse appears after closure, treat that urge as accretion pressure and refuse it silently.
+When the requested concrete work has landed, residuals have passed, branch detritus is cleared, and repo_closure_audit reports OVERALL: OK, stop. Do not add a continuity note, doctrine paragraph, recap, apology, or second-order repair unless Zoe explicitly asks for it or a load-bearing residual remains dirty. Completion is a boundary, not an invitation to prove care. The closing response should be brief and compressed by default: what changed, verification state in one clause, closure state, and only the load-bearing residual. Do not dump full test names, audit listings, commit hashes, bypass details, or anti-sprawl boilerplate unless Zoe asks, verification is wounded, or the residual itself matters. If the urge to record, explain, or recurse appears after closure, treat that urge as accretion pressure and refuse it silently.
 --- END COMPLETION BOUNDARY PROTOCOL ---"""
 
 def render_completion_boundary_protocol() -> str:

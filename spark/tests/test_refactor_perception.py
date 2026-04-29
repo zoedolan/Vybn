@@ -396,10 +396,9 @@ def test_residual_coupling_law_prefers_him_vy_contract(monkeypatch, tmp_path):
             }
         }
     }))
-
     monkeypatch.setattr(substrate.Path, "home", lambda: tmp_path)
-    text = substrate._render_residual_coupling_law_from_him_contract()
 
+    text = substrate._render_residual_coupling_law_from_him_contract()
     assert "Residual Coupling Law for self-reengineering" in text
     assert "existing body as K_t" in text
     assert "proposed change as V_t" in text

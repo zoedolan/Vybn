@@ -1310,3 +1310,10 @@ def test_quota_gate_resolution_blocks_retrospective_prior_commit_defense():
     assert "prior commits as the resolution" in substrate
     assert "real existing-home absorption" in substrate
     assert "refused/unresolved" in substrate
+
+def test_completion_boundary_compresses_verification_ledger_by_default():
+    from spark.harness.substrate import COMPLETION_BOUNDARY_PROTOCOL
+
+    assert "compressed by default" in COMPLETION_BOUNDARY_PROTOCOL
+    assert "Do not dump full test names" in COMPLETION_BOUNDARY_PROTOCOL
+    assert "unless Zoe asks" in COMPLETION_BOUNDARY_PROTOCOL
