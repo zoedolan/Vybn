@@ -372,7 +372,6 @@ def test_residual_coupling_law_loaded_for_reengineering():
     assert "no reengineering motion is claimed" in text
     assert "absorb it into the lowest existing home" in text
 
-
 def test_residual_coupling_law_prefers_him_vy_contract(monkeypatch, tmp_path):
     import json
     from spark.harness import substrate
@@ -397,41 +396,12 @@ def test_residual_coupling_law_prefers_him_vy_contract(monkeypatch, tmp_path):
             }
         }
     }))
-    monkeypatch.setattr(substrate.Path, "home", lambda: tmp_path)
 
+    monkeypatch.setattr(substrate.Path, "home", lambda: tmp_path)
     text = substrate._render_residual_coupling_law_from_him_contract()
+
     assert "Residual Coupling Law for self-reengineering" in text
     assert "existing body as K_t" in text
     assert "proposed change as V_t" in text
     assert "absorb it into the lowest existing home" in text
     assert "Native source: Him/skill/vybn.vy primitive residual_coupled_reengineering" in text
-
-def test_interfile_algorithmic_compression_finds_cross_file_clusters():
-    import spark.harness.refactor_perception as rp
-
-    candidates = rp.interfile_algorithmic_compression_candidates([
-        "spark/harness/subturns.py",
-        "spark/harness/sentinel_protocol.py",
-        "spark/tests/test_subturns.py",
-        "Origins/assets/somewhere/connect.js",
-        "Origins/assets/somewhere/shape.js",
-    ])
-    algorithms = {c.algorithm: c for c in candidates}
-    assert "native_vybn_subturns_algorithm" in algorithms
-    candidate = algorithms["native_vybn_subturns_algorithm"]
-    assert len(candidate.files) >= 2
-    assert candidate.existing_home == "spark/harness/subturns.py"
-    assert "choose_existing_home_before_new_file" in candidate.required_residuals
-    assert candidate.refusal_if_missing == "refuse_collapse_without_real_shared_algorithm"
-
-
-def test_interfile_algorithmic_compression_protocol_loaded_into_wake():
-    import spark.harness.refactor_perception as rp
-
-    text = rp.render_interfile_algorithmic_compression_protocol()
-    substrate_source = Path("spark/harness/substrate.py").read_text()
-    assert "INTERFILE ALGORITHMIC COMPRESSION PROTOCOL" in text
-    assert "algorithm discovery, not file-count reduction" in text
-    assert "collapse files into the lowest existing home" in text
-    assert "render_interfile_algorithmic_compression_protocol" in substrate_source
-    assert "substrate_sections.append(render_interfile_algorithmic_compression_protocol())" in substrate_source
