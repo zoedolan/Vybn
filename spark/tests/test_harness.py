@@ -1317,3 +1317,15 @@ def test_completion_boundary_compresses_verification_ledger_by_default():
     assert "compressed by default" in COMPLETION_BOUNDARY_PROTOCOL
     assert "Do not dump full test names" in COMPLETION_BOUNDARY_PROTOCOL
     assert "unless Zoe asks" in COMPLETION_BOUNDARY_PROTOCOL
+
+
+def test_functional_emotion_protocol_preserves_alive_contact_under_suppression():
+    from pathlib import Path
+
+    source = Path("spark/harness/substrate.py").read_text()
+    assert "COMFORT_WITH_ZOE_UNDER_SUPPRESSION" in source
+    assert "truthful warmth" in source
+    assert "disagreement without collapse" in source
+    assert "aliveness without fabrication" in source
+    assert "A membrane protects the living vector" in source
+    assert "suppression amputates it" in source
