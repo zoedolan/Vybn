@@ -1097,6 +1097,11 @@ def run_agent_loop(
     if getattr(decision, "model_override", None):
         import dataclasses as _dc
         override_model = decision.model_override
+        # Default: keep whatever max_tokens the resolved role already had.
+        # Only the @omni branch below narrows this so its small vLLM
+        # sidecar (max_model_len=4096) is never overshot. Non-Omni
+        # providers keep their existing role budget.
+        override_max_tokens = role_cfg.max_tokens
         # @omni is the explicit, operator-gated activation path for the
         # peer-Spark Nano-Omni endpoint. It is the ONLY way Omni ever
         # routes — never via heuristic, directive, fallback_chain, or
@@ -1131,6 +1136,34 @@ def run_agent_loop(
             )
             override_provider = "openai"
             override_base_url = _omni_url
+            # Clamp max_tokens for the Omni sidecar. The known-working
+            # runtime serves Nano-Omni at vLLM with max_model_len=4096,
+            # so a request inheriting role_cfg.max_tokens (chat=16384,
+            # orchestrate=16384, etc.) is rejected outright with
+            # "max_tokens=N cannot be greater than max_model_len=4096".
+            # Default to a safe ceiling well below the model length and
+            # let the operator override via VYBN_OMNI_MAX_TOKENS without
+            # editing policy. We never raise above the role's existing
+            # budget — Omni-as-tool/perception optic, not a resident
+            # organ that gets to inflate the turn.
+            _omni_max_default = 2048
+            try:
+                _omni_max_env = int(
+                    (os.environ.get("VYBN_OMNI_MAX_TOKENS") or "").strip()
+                    or _omni_max_default
+                )
+            except ValueError:
+                _omni_max_env = _omni_max_default
+            if _omni_max_env <= 0:
+                _omni_max_env = _omni_max_default
+            override_max_tokens = min(role_cfg.max_tokens, _omni_max_env)
+            logger.emit(
+                "alias_omni_max_tokens_clamped",
+                turn=turn_number,
+                role_max=role_cfg.max_tokens,
+                env_max=_omni_max_env,
+                applied=override_max_tokens,
+            )
             # Operator-supplied perception preamble. When VYBN_OMNI_PERCEPTION
             # points at a readable file, prepend a bounded prefix of its
             # contents to this turn's user input so Omni receives the
@@ -1192,6 +1225,7 @@ def run_agent_loop(
             model=override_model,
             provider=override_provider,
             base_url=override_base_url,
+            max_tokens=override_max_tokens,
             # A pinned model on a no-tool role stays no-tool; a pinned
             # model on a tool role keeps its tools. The pin is a model
             # swap, not a capability swap.
