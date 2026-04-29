@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import os
 import sys
+import time
 
 # Ensure the spark/ directory is importable when this file is run directly.
 _SPARK_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -662,6 +663,143 @@ _TRANSIENT_PATTERNS = (
 )
 
 
+# Local-Super maintenance / deferral gate.
+#
+# Super (the always-on local OpenAI-compatible endpoint, typically vLLM at
+# 127.0.0.1:8000/v1) takes ~10 minutes to restart, so the operator strongly
+# prefers NOT to bounce it. When Super is intentionally paused (operator is
+# running an explicit Omni perception window, doing GPU maintenance, etc.)
+# or when its endpoint refuses connections in-flight, the chat surface used
+# to either hang on the SDK timeout or surface a raw "(provider error: …
+# Connection refused)" string. Both are bad for an interlocutor: the chat
+# does not learn that something is intentionally paused and that it can
+# retry shortly.
+#
+# This block adds a small, honest gate:
+#   * VYBN_SUPER_MAINTENANCE (and optional VYBN_SUPER_MAINTENANCE_FILE)
+#     mark Super as paused before any provider call is made.
+#   * _is_local_super_base() classifies a base_url as Super-local so the
+#     gate only triggers for the local endpoint, never for cloud Anthropic
+#     or OpenAI calls.
+#   * _format_super_maintenance_notice() returns the user-visible text and
+#     records a bounded deferral entry in _MAINTENANCE_DEFERRALS so the
+#     operator can see how many turns landed during the window. The list
+#     is intentionally bounded and in-memory: this is a deferral notice,
+#     not a durable queue, and we do not promise background delivery
+#     because there is no executor for it.
+#
+# vLLM does ship sleep mode (/sleep, /wake_up, /is_sleeping) when launched
+# with VLLM_SERVER_DEV_MODE=1 + --enable-sleep-mode, but this Super does
+# not expose those endpoints today. The gate therefore degrades to
+# explicit operator-controlled maintenance state rather than probing.
+
+_MAINTENANCE_DEFERRALS_CAP = 32
+_MAINTENANCE_DEFERRALS: list[dict[str, Any]] = []
+
+
+def _is_local_super_base(base_url: str | None) -> bool:
+    """True when base_url points at a loopback/private-LAN OpenAI-compatible
+    endpoint (i.e. Super or peer-Spark Omni), false for cloud providers.
+
+    Cloud Anthropic / OpenAI traffic is unaffected by Super maintenance —
+    the gate must never fire on those paths.
+    """
+    if not base_url:
+        return False
+    b = base_url.lower()
+    if "://" not in b:
+        return False
+    host = b.split("://", 1)[1].split("/", 1)[0].split(":", 1)[0]
+    if host in ("localhost", "127.0.0.1", "0.0.0.0", "::1"):
+        return True
+    if host.startswith("10.") or host.startswith("192.168."):
+        return True
+    if host.startswith("172."):
+        try:
+            second = int(host.split(".", 2)[1])
+            if 16 <= second <= 31:
+                return True
+        except (ValueError, IndexError):
+            return False
+    return False
+
+
+def _super_maintenance_state() -> tuple[bool, str]:
+    """Return (active, message). Active when VYBN_SUPER_MAINTENANCE is set
+    to a truthy value, or when VYBN_SUPER_MAINTENANCE_FILE points at a
+    readable file. The file's contents (bounded to 400 chars) become the
+    operator-visible reason; otherwise VYBN_SUPER_MAINTENANCE's value is
+    used verbatim. Empty/whitespace values from the env or file are
+    treated as a generic reason rather than ignored, so the operator
+    cannot accidentally arm the flag without arming the message."""
+    raw = (os.environ.get("VYBN_SUPER_MAINTENANCE") or "").strip()
+    path = (os.environ.get("VYBN_SUPER_MAINTENANCE_FILE") or "").strip()
+    file_msg = ""
+    if path:
+        try:
+            with open(os.path.expanduser(path), "r", encoding="utf-8", errors="replace") as fh:
+                file_msg = fh.read(400).strip()
+        except OSError:
+            file_msg = ""
+    truthy_env = raw and raw.lower() not in ("0", "false", "no", "off")
+    if not truthy_env and not file_msg:
+        return False, ""
+    if file_msg:
+        return True, file_msg
+    if raw and raw not in ("1", "true", "yes", "on"):
+        return True, raw
+    return True, "operator paused Super for maintenance"
+
+
+def _format_super_maintenance_notice(
+    *,
+    reason: str,
+    cause: str,
+    role_model: str | None,
+    role_base: str | None,
+    logger: "EventLogger | None",
+    turn_number: int | None,
+) -> str:
+    """Build the user-visible maintenance reply and record a bounded
+    deferral entry. cause is "flag" (operator armed the env flag) or
+    "refused" (endpoint refused/timed out in-flight)."""
+    entry = {
+        "ts": time.time(),
+        "cause": cause,
+        "reason": reason[:200],
+        "model": role_model,
+    }
+    _MAINTENANCE_DEFERRALS.append(entry)
+    if len(_MAINTENANCE_DEFERRALS) > _MAINTENANCE_DEFERRALS_CAP:
+        del _MAINTENANCE_DEFERRALS[: len(_MAINTENANCE_DEFERRALS) - _MAINTENANCE_DEFERRALS_CAP]
+    deferred = len(_MAINTENANCE_DEFERRALS)
+    if logger is not None:
+        try:
+            logger.emit(
+                "super_maintenance_notice",
+                turn=turn_number,
+                cause=cause,
+                model=role_model,
+                deferred=deferred,
+            )
+        except Exception:
+            pass
+    if cause == "refused":
+        head = (
+            "[Super is briefly unreachable — endpoint refused this turn. "
+            "Resuming shortly; please retry."
+        )
+    else:
+        head = (
+            "[Super is in maintenance — paused by the operator. "
+            "Resuming shortly; please retry."
+        )
+    if reason:
+        head += f" reason: {reason}"
+    head += f" deferred-this-session: {deferred}]"
+    return head
+
+
 def _sanitize_provider_error(exc: BaseException, limit: int = 160) -> str:
     """Return a short, safe excerpt of a provider error.
 
@@ -1143,6 +1281,32 @@ def run_agent_loop(
         )
         return reply
 
+    # Pre-flight Super maintenance gate. Operator-armed VYBN_SUPER_MAINTENANCE
+    # short-circuits any turn whose resolved provider base_url points at a
+    # loopback / private-LAN OpenAI-compatible endpoint (Super on :8000 or
+    # peer-Spark Omni). This avoids the ~10-min restart cost: instead of
+    # stopping the vLLM server, the operator flips a flag, every chat
+    # surface gets an honest "paused, retry shortly" notice, and Super
+    # stays warm. Cloud Anthropic / OpenAI traffic is untouched because
+    # _is_local_super_base only matches loopback / RFC1918 hosts. The
+    # gate runs before registry.get so no provider is constructed and
+    # the local endpoint is not even probed.
+    if _is_local_super_base(role_cfg.base_url):
+        _maint_active, _maint_reason = _super_maintenance_state()
+        if _maint_active:
+            notice = _format_super_maintenance_notice(
+                reason=_maint_reason,
+                cause="flag",
+                role_model=role_cfg.model,
+                role_base=role_cfg.base_url,
+                logger=logger,
+                turn_number=turn_number,
+            )
+            _warn(notice)
+            messages.append({"role": "user", "content": decision.cleaned_input})
+            messages.append({"role": "assistant", "content": notice})
+            return notice
+
     provider = registry.get(role_cfg)
 
     # Executable Him discovery packet. This is generated before provider
@@ -1354,11 +1518,45 @@ def run_agent_loop(
                 bag["stop_reason"] = "interrupted"
                 return "(interrupted during API call)"
             except Exception as e:
+                # In-flight refusal against local Super (or peer-Spark Omni)
+                # is converted to a visible maintenance/resume-shortly
+                # notice instead of a raw "(provider error: …)" string.
+                # The classification below mirrors the transport_signals
+                # used in OpenAIProvider._call so the user-visible behavior
+                # is consistent whether the failure surfaces from the SDK
+                # path or the raw-HTTP fallback. Cloud provider errors and
+                # non-transport local errors continue to surface raw —
+                # those are real bugs and should not be hidden.
+                _err_msg = _sanitize_provider_error(e)
+                _err_lower = str(e).lower()
+                _refusal_signals = (
+                    "connection", "refused", "timed out",
+                    "connect", "name or service", "temporar",
+                    "max retries exceeded",
+                )
+                _is_refusal = any(sig in _err_lower for sig in _refusal_signals)
+                if _is_refusal and _is_local_super_base(role_cfg.base_url):
+                    bag["stop_reason"] = "super_maintenance"
+                    logger.emit(
+                        "provider_error",
+                        turn=turn_number,
+                        error=str(e),
+                        super_maintenance_converted=True,
+                    )
+                    notice = _format_super_maintenance_notice(
+                        reason=_err_msg,
+                        cause="refused",
+                        role_model=role_cfg.model,
+                        role_base=role_cfg.base_url,
+                        logger=logger,
+                        turn_number=turn_number,
+                    )
+                    _warn(notice)
+                    return notice
                 bag["stop_reason"] = "error"
                 logger.emit("provider_error", turn=turn_number, error=str(e))
-                _msg = _sanitize_provider_error(e)
-                _warn(f"provider error ({e.__class__.__name__}): {_msg}")
-                return f"(provider error: {e.__class__.__name__}: {_msg})"
+                _warn(f"provider error ({e.__class__.__name__}): {_err_msg}")
+                return f"(provider error: {e.__class__.__name__}: {_err_msg})"
 
             bag["in_tokens"] += response.in_tokens
             bag["out_tokens"] += response.out_tokens
