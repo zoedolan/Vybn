@@ -1603,3 +1603,13 @@ def test_inline_reasoning_filter_accepts_retired_v2_buffer_limit_alias():
     assert "if buffer_limit is not None:" in source
     assert "min_buffer = buffer_limit" in source
     assert "from reasoning_filter_v2" not in source
+
+
+def test_vllm_sleep_mode_dev_env_is_propagated_into_container_command():
+    from pathlib import Path
+
+    text = Path("spark/systemd/vybn-vllm.service").read_text()
+    assert "EnvironmentFile=-%h/.config/vybn/vllm.env" in text
+    assert "Environment=VLLM_SERVER_DEV_MODE=" in text
+    assert "env VLLM_SERVER_DEV_MODE=${VLLM_SERVER_DEV_MODE}" in text
+    assert "--enable-sleep-mode" in text
