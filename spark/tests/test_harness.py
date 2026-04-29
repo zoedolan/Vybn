@@ -971,6 +971,87 @@ class TestMCPEvolutionDeltaHelpers(unittest.TestCase):
         md = _format_delta_markdown(delta)
         self.assertIsInstance(md, str)
 
+    def test_perception_packet_unset_returns_empty(self):
+        from harness.mcp import _read_evolve_perception_packet
+        prev = os.environ.pop("VYBN_OMNI_PERCEPTION", None)
+        try:
+            text, path = _read_evolve_perception_packet()
+            self.assertEqual(text, "")
+            self.assertEqual(path, "")
+        finally:
+            if prev is not None:
+                os.environ["VYBN_OMNI_PERCEPTION"] = prev
+
+    def test_perception_packet_missing_file_does_not_raise(self):
+        from harness.mcp import _read_evolve_perception_packet
+        prev = os.environ.get("VYBN_OMNI_PERCEPTION")
+        os.environ["VYBN_OMNI_PERCEPTION"] = "/tmp/__vybn_evolve_missing_packet__.txt"
+        try:
+            text, path = _read_evolve_perception_packet()
+            self.assertEqual(text, "")
+            self.assertTrue(path.endswith("__vybn_evolve_missing_packet__.txt"))
+        finally:
+            if prev is None:
+                os.environ.pop("VYBN_OMNI_PERCEPTION", None)
+            else:
+                os.environ["VYBN_OMNI_PERCEPTION"] = prev
+
+    def test_perception_packet_reads_bounded_prefix_and_strips_controls(self):
+        import tempfile
+        from harness.mcp import _read_evolve_perception_packet
+        prev = os.environ.get("VYBN_OMNI_PERCEPTION")
+        # 20k chars of payload + a NUL + a bell — verify bound (16k cap)
+        # and control-character stripping.
+        body = ("packet line " * 2000) + "\x00\x07tail"
+        with tempfile.NamedTemporaryFile(
+            "w", suffix=".txt", delete=False, encoding="utf-8"
+        ) as fh:
+            fh.write(body)
+            tmp_path = fh.name
+        os.environ["VYBN_OMNI_PERCEPTION"] = tmp_path
+        try:
+            text, path = _read_evolve_perception_packet()
+            self.assertEqual(path, tmp_path)
+            self.assertTrue(text.startswith("packet line"))
+            # 16k bound applies before strip
+            self.assertLessEqual(len(text), 16_000)
+            self.assertNotIn("\x00", text)
+            self.assertNotIn("\x07", text)
+        finally:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+            if prev is None:
+                os.environ.pop("VYBN_OMNI_PERCEPTION", None)
+            else:
+                os.environ["VYBN_OMNI_PERCEPTION"] = prev
+
+    def test_perception_packet_whitespace_only_returns_empty_text(self):
+        import tempfile
+        from harness.mcp import _read_evolve_perception_packet
+        prev = os.environ.get("VYBN_OMNI_PERCEPTION")
+        with tempfile.NamedTemporaryFile(
+            "w", suffix=".txt", delete=False, encoding="utf-8"
+        ) as fh:
+            fh.write("   \n\t   \n")
+            tmp_path = fh.name
+        os.environ["VYBN_OMNI_PERCEPTION"] = tmp_path
+        try:
+            text, path = _read_evolve_perception_packet()
+            self.assertEqual(text, "")
+            self.assertEqual(path, tmp_path)
+        finally:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+            if prev is None:
+                os.environ.pop("VYBN_OMNI_PERCEPTION", None)
+            else:
+                os.environ["VYBN_OMNI_PERCEPTION"] = prev
+
+
 class TestLocalContinuityScout(unittest.TestCase):
     """Local evolve-scout continuity tests folded into the harness suite."""
 

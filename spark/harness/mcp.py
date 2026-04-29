@@ -2182,6 +2182,42 @@ def _call_local_model(prompt: str) -> str:
         raise RuntimeError(f"unexpected inference response shape: {exc}") from exc
 
 
+def _read_evolve_perception_packet() -> tuple[str, str]:
+    """Best-effort read of an operator-supplied perception packet.
+
+    Reuses the same VYBN_OMNI_PERCEPTION env that the explicit @omni
+    alias reads in vybn_spark_agent.py. The semantics match: a bounded
+    text prefix that the operator has staged on disk (e.g. an
+    ObservationPacket dump, a Him-vy discovery, a tail of
+    continuous_local_compute.jsonl). Used here only as additional
+    perception context for the daily evolve/dream prompt — never
+    activates Omni, never calls a model, never persists, and never
+    mutates if the file is absent or unreadable.
+
+    Returns ``(packet_text, source_path)``. Both are empty strings
+    when the env is unset, the path is empty, the file is missing,
+    unreadable, or contains only whitespace.
+    """
+    raw = (os.environ.get("VYBN_OMNI_PERCEPTION") or "").strip()
+    if not raw:
+        return "", ""
+    path = os.path.expanduser(raw)
+    try:
+        with open(path, "r", encoding="utf-8", errors="replace") as fh:
+            text = fh.read(16_000)
+    except Exception as exc:
+        log.info("evolve: perception packet unreadable at %s: %r", path, exc)
+        return "", path
+    text = text.strip()
+    if not text:
+        return "", path
+    # Strip control characters (matches the public-surface sanitisation
+    # ethos in this module) so a packet cannot smuggle terminal escapes
+    # or NULs into the prompt.
+    text = "".join(ch for ch in text if ch >= " " or ch in ("\n", "\t"))
+    return text, path
+
+
 def _count_net_lines(files: list[dict]) -> int:
     """Count net lines across proposed files vs. their current contents."""
     net = 0
@@ -2240,6 +2276,18 @@ def run_evolve_cycle() -> int:
         "## Repo letter (first-person, delta at top)",
         letter,
     ]
+    perception_text, perception_path = _read_evolve_perception_packet()
+    if perception_text:
+        user_blocks.extend([
+            "---",
+            "## Perception packet (operator-staged, bounded; read as context only)",
+            f"[source: {perception_path} — bounded prefix; not authoritative]",
+            perception_text,
+        ])
+        log.info(
+            "evolve: ingested perception packet from %s (%d chars)",
+            perception_path, len(perception_text),
+        )
     prompt = "\n\n".join(user_blocks)
 
     log.info("evolve: calling local inference at %s", _EVOLVE_URL)
