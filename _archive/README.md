@@ -38,4 +38,4 @@ Archiving is an act of respect for the code that got us here. Nothing in
 this directory is alive; everything in this directory was once the best
 thing we had. Do not modify. Do not import. Do not resurrect without
 reading the commit that moved it in.
-
+| vybn-chat-tunnel.sh.RETIRED_2026-04-21 | tunnel process / git history | Retired unreferenced tunnel script removed from tracked source on 2026-04-29 after reference scan found no live users. Restore for archaeology with: git show HEAD^:_archive/vybn-chat-tunnel.sh.RETIRED_2026-04-21 > _archive/vybn-chat-tunnel.sh.RETIRED_2026-04-21 . |

@@ -46,6 +46,8 @@ APPENDAGE_FIRST_CONSOLIDATION_PRINCIPLE = (
 )
 
 ARCHIVE_DUPLICATE_CONSOLIDATION = "retire_archive_duplicate_with_manifest_restore"
+RETIRED_SCRIPT_CONSOLIDATION = "retire_unreferenced_retired_script_with_manifest_restore"
+# A retired archive script with zero live references may be removed from tracked source when the existing archive manifest preserves the reason and git-history restore path.
 # A tracked archive backup that duplicates the live organ is not sacred by default: if references are absent, the archive manifest names the superseding file, and git history provides a restore path, consolidation may retire the duplicate while strengthening the manifest.
 
 CONNECTIVE_TISSUE_PRINCIPLE = (
