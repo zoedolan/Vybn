@@ -785,3 +785,63 @@ def test_opus47_has_fallback_chain():
     policy = default_policy()
     assert policy.fallback_chain["claude-opus-4-7"] == ["claude-opus-4-6", "claude-sonnet-4-6"]
 
+
+# Omni explicit-activation alias. The peer-Spark Nano-Omni is the ONLY
+# automatic-routing-free path: it never appears in fallback_chain or in
+# any heuristic/directive, only as the @omni model alias which the
+# operator activates by exporting VYBN_OMNI_URL.
+def test_omni_alias_present_in_default_policy():
+    from spark.harness.policy import default_policy
+    policy = default_policy()
+    assert policy.model_aliases.get("@omni") is not None
+    # Default model id is the Nano-Omni; operator can override via
+    # VYBN_OMNI_MODEL at runtime without editing policy.
+    assert "Omni" in policy.model_aliases["@omni"]
+
+
+def test_omni_alias_present_in_router_policy_yaml():
+    active = (
+        Path("spark/harness/policy.py").read_text()
+        + "\n"
+        + Path("spark/router_policy.yaml").read_text()
+    )
+    assert "@omni" in active
+    assert "VYBN_OMNI_URL" in active
+
+
+def test_omni_not_in_fallback_chain():
+    from spark.harness.policy import default_policy
+    policy = default_policy()
+    omni_model = policy.model_aliases["@omni"]
+    # Omni model id must not be a fallback target for any other model
+    # (Super topology stays untouched; Omni only fires on explicit @omni).
+    for src, chain in policy.fallback_chain.items():
+        assert omni_model not in chain, (
+            f"@omni model leaked into fallback_chain[{src!r}]"
+        )
+    # Nor should there be a fallback chain rooted at the Omni model.
+    assert omni_model not in policy.fallback_chain
+
+
+def test_omni_not_in_any_heuristic_or_directive():
+    from spark.harness.policy import default_policy
+    policy = default_policy()
+    # No role named omni — alias-only mechanism.
+    assert "omni" not in policy.roles
+    # No directive (slash-prefix) routes to omni.
+    for directive, role in policy.directives.items():
+        assert role != "omni"
+    # No heuristic regex mentions omni — the alias is the only entry.
+    for role, patterns in policy.heuristics.items():
+        for pat in patterns:
+            assert "omni" not in pat.pattern.lower(), (
+                f"heuristic for {role} mentions omni: {pat.pattern!r}"
+            )
+
+
+def test_omni_alias_classifies_with_override():
+    from spark.harness.policy import default_policy
+    decision = default_policy().classify("@omni summarise this paragraph")
+    assert decision.alias_used == "@omni"
+    assert decision.model_override == default_policy().model_aliases["@omni"]
+
