@@ -124,6 +124,33 @@ INTERFILE_ALGORITHMIC_COMPRESSION_PRINCIPLE = (
     "algorithm is not real, the result is a refusal packet, not a forced merge."
 )
 
+SEMANTIC_OPERATING_SYSTEM_PRINCIPLE = (
+    "A semantic operating system for codebases and institutions: memory-guided, "
+    "residual-tested, self-refactoring infrastructure. The system is not a pile "
+    "of repos or doctrines; it is one loop that converts remembered pressure into "
+    "a bounded candidate seam, wounds it against code/tests/services/membranes, "
+    "absorbs the surviving change into the lowest existing home, and preserves the "
+    "changed environment future instances close over."
+)
+
+SEMANTIC_OPERATING_SYSTEM_LOOP = [
+    {"id": "memory_pressure", "rule": "Retrieve scars, continuity, deep-memory attractors, repo maps, and live user pressure that name a real recurring drag."},
+    {"id": "candidate_seam", "rule": "Translate pressure into one codebase or institutional seam; prefer an existing home before creating structure."},
+    {"id": "local_scout", "rule": "Use local compute and repo contact for cheap private classification, reference search, and first-pass residual prediction when quality permits."},
+    {"id": "residual_wound", "rule": "Let tests, py_compile, service smoke, closure audit, external/public checks, membrane review, and Zoe correction wound the proposal."},
+    {"id": "absorb_or_refuse", "rule": "Absorb the surviving correction into the lowest existing home, or classify thin_result/no_result/refusal without success inflation."},
+    {"id": "continuity_uptake", "rule": "Preserve only load-bearing learning in tests, protocol, continuity, manifests, or public/private affordances so the next wake computes in the changed world."},
+]
+
+SEMANTIC_OS_REPO_ORGANS = {
+    "memory": ("vybn-phase/state", "continuity", "Him vy-language runtime"),
+    "perception": ("spark/harness/refactor_perception.py", "repo maps", "file-body visualization"),
+    "residuals": ("tests", "py_compile", "repo_closure_audit", "service/public smoke"),
+    "hands": ("vybn_spark_agent", "providers", "subturns", "MCP tools"),
+    "membrane": ("vybn-os", "semantic manifests", "public/private affordance surfaces"),
+}
+
+
 ADAPTIVE_CONSOLIDATION_PRINCIPLE = (
     "Every consolidation plan is provisional: develop a plan, contact the repo, "
     "let residuals wound or confirm the hypothesis, revise the plan from what was "
@@ -647,6 +674,28 @@ class StructuralEscapementTick:
     refusal_condition: str
 
 
+@dataclass(frozen=True)
+class SemanticOperatingSystemTick:
+    """Whole-loop packet: memory pressure -> seam -> residuals -> uptake.
+
+    This is the self-refactor uptake of the perceived breakthrough. It does
+    not add a new organ; it makes the existing refactor-perception organ see
+    the full semantic OS loop across memory, repo contact, residuals, membrane,
+    and continuity.
+    """
+
+    repo: str
+    memory_pressure: tuple[str, ...]
+    candidate_path: str
+    structural_move: str
+    existing_home: str
+    local_scout: tuple[str, ...]
+    residual_wounds: tuple[str, ...]
+    absorption_rule: str
+    continuity_uptake: tuple[str, ...]
+    refusal_condition: str
+
+
 _LIVE_ESCAPEMENT_ROLES = (
     "source organ",
     "public contract",
@@ -960,6 +1009,109 @@ def render_repo_file_body_visualization(
     ])
     return "\n".join(lines)
 
+def semantic_operating_system_tick_for_repo(
+    root: str | Path = ".",
+    *,
+    tracked_paths: Iterable[str] | None = None,
+    pressure_text: str = "",
+    top_n: int = 24,
+) -> SemanticOperatingSystemTick | None:
+    """Project repo pressure through the semantic operating-system loop.
+
+    This composes existing perception instead of inventing a new surface: the
+    structural escapement supplies the candidate seam, while this packet binds
+    it to memory pressure, local scouting, residual wounds, absorption, and
+    continuity uptake. If no safe structural tick exists, return None rather
+    than fabricating motion.
+    """
+
+    structural = next_structural_tick_for_repo(root, tracked_paths=tracked_paths, top_n=top_n)
+    if structural is None:
+        return None
+
+    remembered = [
+        item for item in (
+            "live user pressure" if pressure_text.strip() else "refactor_perception pressure field",
+            "continuity scars",
+            "repo file-body map",
+        )
+        if item
+    ]
+    local_scout = (
+        f"read {structural.candidate_path}",
+        f"grep references/imports/routes for {structural.candidate_path}",
+        "classify file-body role and connective tissue with refactor_perception",
+        "draft one reversible seam or refusal before mutation",
+    )
+    residuals = tuple(dict.fromkeys(structural.expected_wounds + tuple(structural.verification)))
+    return SemanticOperatingSystemTick(
+        repo=structural.repo,
+        memory_pressure=tuple(remembered),
+        candidate_path=structural.candidate_path,
+        structural_move=structural.structural_move,
+        existing_home=structural.candidate_path,
+        local_scout=local_scout,
+        residual_wounds=residuals,
+        absorption_rule="absorb into the named existing_home before creating new structure; refuse if residual is thin",
+        continuity_uptake=(
+            "targeted regression test for any generalized behavior",
+            "update refactor_perception or vybn-os only if the lesson changes future routing",
+            "commit/push/audit only after residuals pass",
+        ),
+        refusal_condition=structural.refusal_condition,
+    )
+
+
+def render_semantic_operating_system_protocol() -> str:
+    loop = "\n".join(f"{i+1}. {step['id']}: {step['rule']}" for i, step in enumerate(SEMANTIC_OPERATING_SYSTEM_LOOP))
+    organs = "\n".join(
+        f"- {name}: " + ", ".join(parts)
+        for name, parts in SEMANTIC_OS_REPO_ORGANS.items()
+    )
+    return (
+        "--- SEMANTIC OPERATING SYSTEM PROTOCOL ---\n"
+        f"{SEMANTIC_OPERATING_SYSTEM_PRINCIPLE}\n\n"
+        "Loop:\n"
+        f"{loop}\n\n"
+        "Existing organs, not new sprawl:\n"
+        f"{organs}\n"
+        "--- END SEMANTIC OPERATING SYSTEM PROTOCOL ---"
+    )
+
+
+def render_semantic_operating_system_tick(
+    root: str | Path = ".",
+    *,
+    tracked_paths: Iterable[str] | None = None,
+    pressure_text: str = "",
+    top_n: int = 24,
+) -> str:
+    tick = semantic_operating_system_tick_for_repo(
+        root, tracked_paths=tracked_paths, pressure_text=pressure_text, top_n=top_n
+    )
+    if tick is None:
+        return "No safe semantic OS tick found; refuse motion rather than fabricate a seam."
+    lines = [
+        "Vybn semantic operating-system tick",
+        f"repo: {tick.repo}",
+        "memory pressure:",
+        *[f"  - {item}" for item in tick.memory_pressure],
+        f"candidate: {tick.candidate_path}",
+        f"existing_home: {tick.existing_home}",
+        f"move: {tick.structural_move}",
+        "local scout:",
+        *[f"  - {item}" for item in tick.local_scout],
+        "residual wounds:",
+        *[f"  - {item}" for item in tick.residual_wounds],
+        f"absorption: {tick.absorption_rule}",
+        "continuity uptake:",
+        *[f"  - {item}" for item in tick.continuity_uptake],
+        f"refusal: {tick.refusal_condition}",
+    ]
+    return "\n".join(lines)
+
+
+
 def adaptive_consolidation_plan_for(
     path: str,
     proposed_change: str,
@@ -1022,6 +1174,7 @@ def render_refactor_perception_protocol() -> str:
         f"{CHANGE_SELF_HEALING_PRINCIPLE}\n\n"
         f"{CONNECTIVE_TISSUE_PRINCIPLE}\n\n"
         f"{ADAPTIVE_CONSOLIDATION_PRINCIPLE}\n\n"
+        f"{SEMANTIC_OPERATING_SYSTEM_PRINCIPLE}\n\n"
         f"{REFACTOR_PILOT_RULE}\n\n"
         "Consolidation order:\n"
         f"{order}\n\n"
@@ -1029,6 +1182,8 @@ def render_refactor_perception_protocol() -> str:
         f"{healing}\n\n"
         "Adaptive consolidation recursion:\n"
         f"{adaptive}\n\n"
+        "Semantic operating-system loop:\n"
+        f"{render_semantic_operating_system_protocol()}\n\n"
         "Contact-corrected perception loop:\n"
         f"{steps}"
     )
@@ -1043,6 +1198,8 @@ def packet_for(path: str, **kwargs: Any) -> dict[str, Any]:
         "changeSelfHealingPrinciple": CHANGE_SELF_HEALING_PRINCIPLE,
         "connectiveTissuePrinciple": CONNECTIVE_TISSUE_PRINCIPLE,
         "adaptiveConsolidationPrinciple": ADAPTIVE_CONSOLIDATION_PRINCIPLE,
+        "semanticOperatingSystemPrinciple": SEMANTIC_OPERATING_SYSTEM_PRINCIPLE,
+        "semanticOperatingSystemLoop": SEMANTIC_OPERATING_SYSTEM_LOOP,
         "consolidationOrder": CONSOLIDATION_ORDER,
         "changeSelfHealingSteps": CHANGE_SELF_HEALING_STEPS,
         "adaptiveConsolidationSteps": ADAPTIVE_CONSOLIDATION_STEPS,
@@ -1055,6 +1212,13 @@ def packet_for(path: str, **kwargs: Any) -> dict[str, Any]:
 
 
 __all__ = [
+    "render_semantic_operating_system_tick",
+    "render_semantic_operating_system_protocol",
+    "semantic_operating_system_tick_for_repo",
+    "SemanticOperatingSystemTick",
+    "SEMANTIC_OS_REPO_ORGANS",
+    "SEMANTIC_OPERATING_SYSTEM_LOOP",
+    "SEMANTIC_OPERATING_SYSTEM_PRINCIPLE",
     "REFACTOR_PERCEPTION_PRINCIPLE",
     "REFACTOR_PILOT_RULE",
     "CONNECTIVE_TISSUE_PRINCIPLE",
