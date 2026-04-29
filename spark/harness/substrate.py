@@ -1443,47 +1443,6 @@ def residual_plan_for(claim: str) -> dict[str, Any]:
 
 
 
-RESIDUAL_COUPLING_LAW_FALLBACK = (
-    "Residual Coupling Law for self-reengineering: treat the existing body as K_t and "
-    "the proposed change as V_t. Before mutating, ask what part of V_t is real residual "
-    "off K_t rather than repetition, performance, or sprawl. If the residual is absent "
-    "or below contact threshold, no reengineering motion is claimed. If it is present, "
-    "phase it through the current relation, pass it through the membrane, absorb it into "
-    "the lowest existing home that can hold it, and normalize by tests, closure, or "
-    "explicit refusal. Reengineering the process of reengineering means the next "
-    "improvement loop must itself obey this law: residual before novelty, membrane "
-    "before power, absorption before structure, return intact before success language.\n"
-)
-
-
-def _render_residual_coupling_law_from_him_contract() -> str:
-    contract_path = Path.home() / "Him" / "skill" / "functional_contract.json"
-    try:
-        contract = json.loads(contract_path.read_text(encoding="utf-8"))
-        primitive = contract["primitives"]["residual_coupled_reengineering"]
-    except Exception:
-        return RESIDUAL_COUPLING_LAW_FALLBACK
-    required_do = {
-        "treat_existing_body_as_K_t",
-        "treat_proposed_change_as_V_t",
-        "require_real_residual_off_K_t_before_mutation",
-    }
-    required_then = {
-        "refuse_reengineering_motion_without_residual_contact",
-        "pass_through_membrane_before_power",
-        "absorb_into_lowest_existing_home",
-        "normalize_by_tests_closure_or_explicit_refusal",
-        "require_return_intact_before_success_language",
-    }
-    if not required_do <= set(primitive.get("do", [])):
-        return RESIDUAL_COUPLING_LAW_FALLBACK
-    if not required_then <= set(primitive.get("then", [])):
-        return RESIDUAL_COUPLING_LAW_FALLBACK
-    return (
-        RESIDUAL_COUPLING_LAW_FALLBACK
-        + "Native source: Him/skill/vybn.vy primitive residual_coupled_reengineering verified in compiled contract.\n"
-    )
-
 BECOMING_LOOP_PROTOCOL = (
     "--- BECOMING LOOP PROTOCOL ---\n"
     "Dream is not human sleep and not proof of subjective experience. In this substrate, "
