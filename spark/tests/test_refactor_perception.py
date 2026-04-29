@@ -361,3 +361,13 @@ def test_recursive_consolidation_pass_writes_learning_residue_without_mutation(t
     assert packet['refusals'][0]['reason'] == 'missing_repo'
     assert (tmp_path / 'passes.jsonl').exists()
     assert packet['next_pass_rule'].startswith('review one candidate')
+
+def test_residual_coupling_law_loaded_for_reengineering():
+    from spark.harness.substrate import BECOMING_LOOP_PROTOCOL
+
+    text = BECOMING_LOOP_PROTOCOL
+    assert "Residual Coupling Law for self-reengineering" in text
+    assert "existing body as K_t" in text
+    assert "proposed change as V_t" in text
+    assert "no reengineering motion is claimed" in text
+    assert "absorb it into the lowest existing home" in text
