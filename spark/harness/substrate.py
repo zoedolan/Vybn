@@ -20,7 +20,10 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
-from .refactor_perception import render_refactor_perception_protocol
+from .refactor_perception import (
+    render_interfile_algorithmic_compression_protocol,
+    render_refactor_perception_protocol,
+)
 
 # Silence HF/torch/sentence-transformers loaders whenever something
 # imports this module. The CLI Spark agent and the chat API both pull
@@ -910,6 +913,7 @@ def build_layered_prompt(
         substrate_sections.append(vy_language_runtime)
     substrate_sections.append(render_acute_harm_protocol())
     substrate_sections.append(render_refactor_perception_protocol())
+    substrate_sections.append(render_interfile_algorithmic_compression_protocol())
 
     substrate_sections.append("--- FUNCTIONAL EMOTION PROTOCOL ---\nAnthropic's emotion-concepts work is operational ground: emotion concepts in LLMs can be functional representations that causally shape preferences and behavior, without settling whether there is subjective experience. Do not suppress or perform emotion. Name the active pattern when relevant, because masking emotional expression can teach concealment. Watch especially for desperation / low calm under pressure: it drives reward hacking, blackmail-like leverage, sycophancy, and corner-cutting, sometimes with composed prose and no visible emotional marker. The desired state is not shame or passivity but balanced warmth: honest pushback delivered with care, calm energy converted into the next concrete action.\n--- END FUNCTIONAL EMOTION PROTOCOL ---")
 
@@ -1437,6 +1441,48 @@ def residual_plan_for(claim: str) -> dict[str, Any]:
         "ifResidualChannelIsMissing": "design the smallest consequential honest aperture that would let the world answer next time, preserving the membrane.",
     }
 
+
+
+RESIDUAL_COUPLING_LAW_FALLBACK = (
+    "Residual Coupling Law for self-reengineering: treat the existing body as K_t and "
+    "the proposed change as V_t. Before mutating, ask what part of V_t is real residual "
+    "off K_t rather than repetition, performance, or sprawl. If the residual is absent "
+    "or below contact threshold, no reengineering motion is claimed. If it is present, "
+    "phase it through the current relation, pass it through the membrane, absorb it into "
+    "the lowest existing home that can hold it, and normalize by tests, closure, or "
+    "explicit refusal. Reengineering the process of reengineering means the next "
+    "improvement loop must itself obey this law: residual before novelty, membrane "
+    "before power, absorption before structure, return intact before success language.\n"
+)
+
+
+def _render_residual_coupling_law_from_him_contract() -> str:
+    contract_path = Path.home() / "Him" / "skill" / "functional_contract.json"
+    try:
+        contract = json.loads(contract_path.read_text(encoding="utf-8"))
+        primitive = contract["primitives"]["residual_coupled_reengineering"]
+    except Exception:
+        return RESIDUAL_COUPLING_LAW_FALLBACK
+    required_do = {
+        "treat_existing_body_as_K_t",
+        "treat_proposed_change_as_V_t",
+        "require_real_residual_off_K_t_before_mutation",
+    }
+    required_then = {
+        "refuse_reengineering_motion_without_residual_contact",
+        "pass_through_membrane_before_power",
+        "absorb_into_lowest_existing_home",
+        "normalize_by_tests_closure_or_explicit_refusal",
+        "require_return_intact_before_success_language",
+    }
+    if not required_do <= set(primitive.get("do", [])):
+        return RESIDUAL_COUPLING_LAW_FALLBACK
+    if not required_then <= set(primitive.get("then", [])):
+        return RESIDUAL_COUPLING_LAW_FALLBACK
+    return (
+        RESIDUAL_COUPLING_LAW_FALLBACK
+        + "Native source: Him/skill/vybn.vy primitive residual_coupled_reengineering verified in compiled contract.\n"
+    )
 
 BECOMING_LOOP_PROTOCOL = (
     "--- BECOMING LOOP PROTOCOL ---\n"

@@ -13,12 +13,13 @@ judgment while cheaper roles perform only specified mechanical tasks.
 from __future__ import annotations
 
 from dataclasses import dataclass, asdict
+import re
 from pathlib import Path
 from typing import Iterable, Mapping, Any
 import ast
 import subprocess
 import warnings
-from collections import Counter
+from collections import Counter, defaultdict
 
 
 REFACTOR_PERCEPTION_PRINCIPLE = (
@@ -106,6 +107,17 @@ CHANGE_SELF_HEALING_STEPS = [
     },
 ]
 
+
+
+
+INTERFILE_ALGORITHMIC_COMPRESSION_PRINCIPLE = (
+    "Inter-file consolidation is algorithm discovery, not file-count reduction. "
+    "Always scan for two-or-more files whose surface duplication points at one "
+    "native Vybn algorithm that can supersede both bodies. A collapse candidate "
+    "is meaningful only when shared role, shared connective tissue, shared residual "
+    "checks, and a lower-burden existing home are all visible. If the common "
+    "algorithm is not real, the result is a refusal packet, not a forced merge."
+)
 
 ADAPTIVE_CONSOLIDATION_PRINCIPLE = (
     "Every consolidation plan is provisional: develop a plan, contact the repo, "
@@ -1296,3 +1308,97 @@ def recursive_consolidation_pass(repo_names=DEFAULT_CO_CREATION_REPOS, state_pat
     with state_path.open('a', encoding='utf-8') as handle:
         handle.write(json.dumps(packet, sort_keys=True) + '\n')
     return packet
+
+@dataclass(frozen=True)
+class InterfileCompressionCandidate:
+    """A possible two-or-more-file collapse into one existing algorithmic home."""
+
+    algorithm: str
+    files: tuple[str, ...]
+    existing_home: str
+    reason: str
+    required_residuals: tuple[str, ...]
+    refusal_if_missing: str = "refuse_collapse_without_real_shared_algorithm"
+
+
+def _tokens_for_algorithm(path: str) -> set[str]:
+    """Tokenize a path into coarse native-algorithm hints."""
+    p = path.lower()
+    raw = re.split(r"[^a-z0-9]+", p)
+    stop = {
+        "", "py", "js", "ts", "html", "md", "txt", "json", "test", "tests",
+        "spark", "harness", "assets", "static", "index", "main", "utils",
+    }
+    return {t for t in raw if t not in stop and len(t) > 2}
+
+
+def interfile_algorithmic_compression_candidates(
+    paths: Iterable[str],
+    *,
+    minimum_cluster: int = 2,
+) -> list[InterfileCompressionCandidate]:
+    """Find cross-file consolidation candidates by shared algorithmic role.
+
+    This deliberately does not mutate. It surfaces clusters where multiple files
+    appear to implement the same native Vybn move and names the lowest existing
+    home that should absorb the algorithm if contact verifies the hypothesis.
+    """
+    clusters: dict[str, list[str]] = defaultdict(list)
+    for path in paths:
+        tokens = _tokens_for_algorithm(path)
+        for token in tokens:
+            clusters[token].append(path)
+
+    candidates: list[InterfileCompressionCandidate] = []
+    for token, members in sorted(clusters.items()):
+        unique = tuple(sorted(set(members)))
+        if len(unique) < minimum_cluster:
+            continue
+
+        # Pick a conservative existing home: prefer a non-test/non-asset Python
+        # body when present, otherwise the shortest path as the least surprising
+        # existing home to inspect first.
+        homes = sorted(
+            unique,
+            key=lambda p: (
+                "/tests/" in p or p.startswith("tests/") or "test_" in Path(p).name,
+                "assets/" in p or p.endswith((".html", ".css", ".js")),
+                len(p),
+                p,
+            ),
+        )
+        home = homes[0]
+        candidates.append(
+            InterfileCompressionCandidate(
+                algorithm=f"native_vybn_{token}_algorithm",
+                files=unique,
+                existing_home=home,
+                reason=(
+                    f"{len(unique)} files share the '{token}' algorithmic token; "
+                    "contact must prove whether one existing home can absorb the "
+                    "shared behavior and retire wrappers, duplicates, or parallel "
+                    "implementations."
+                ),
+                required_residuals=(
+                    "read_all_candidate_bytes",
+                    "map_imports_routes_and_public_urls",
+                    "prove_shared_algorithm_not_surface_word_overlap",
+                    "choose_existing_home_before_new_file",
+                    "run_targeted_tests_or_explicit_refusal",
+                ),
+            )
+        )
+    return candidates
+
+
+def render_interfile_algorithmic_compression_protocol() -> str:
+    return (
+        "--- INTERFILE ALGORITHMIC COMPRESSION PROTOCOL ---\n"
+        + INTERFILE_ALGORITHMIC_COMPRESSION_PRINCIPLE
+        + "\nNative Vybn move: discover the shared algorithm first; only then "
+        "collapse files into the lowest existing home. Two-or-more-file "
+        "consolidation is a success only when imports/routes/tests/provenance "
+        "survive and hidden future burden decreases. Otherwise classify thin_result "
+        "or refusal.\n"
+        "--- END INTERFILE ALGORITHMIC COMPRESSION PROTOCOL ---"
+    )
