@@ -1782,7 +1782,65 @@ def test_local_super_semantic_gate_accepts_expected_output_and_caches(monkeypatc
     assert calls["n"] == 1
 
 
-def test_local_super_semantic_failure_falls_back_to_sonnet_before_provider(monkeypatch):
+def test_local_super_semantic_failure_fails_closed_without_cloud_fallback(monkeypatch):
+    import os as _os
+    from harness.policy import Router as _Router
+    from harness.policy import default_policy as _dp
+
+    mod = _load_agent_module()
+    saved_rag = mod.rag_snippets
+    saved_rag_tier = mod.rag_snippets_with_tier
+    saved_disc = mod.render_him_vy_discovery_packet
+    saved_turn = mod.render_him_vy_turn_packet
+    saved_probes = mod.run_probes
+    mod.rag_snippets = lambda *a, **kw: ""
+    mod.rag_snippets_with_tier = lambda *a, **kw: ("", "lightweight")
+    mod.render_him_vy_discovery_packet = lambda *a, **kw: ""
+    mod.render_him_vy_turn_packet = lambda *a, **kw: ""
+    mod.run_probes = lambda *a, **kw: []
+    monkeypatch.setattr(mod, "_local_super_semantic_gate", lambda **kw: (False, "unexpected content='garbage'"))
+
+    class _FakeRegistry:
+        def get(self, cfg):
+            raise AssertionError("semantic corruption must fail closed before provider construction unless cloud fallback is explicitly opted in")
+    class _FakeLogger:
+        path = "/dev/null"
+        def __init__(self):
+            self.events = []
+        def emit(self, name, **kw):
+            self.events.append((name, kw))
+
+    prev_flag = _os.environ.get("VYBN_SUPER_MAINTENANCE")
+    try:
+        _os.environ.pop("VYBN_SUPER_MAINTENANCE", None)
+        logger = _FakeLogger()
+        _os.environ.pop("VYBN_SUPER_SEMANTIC_FALLBACK", None)
+        reply = mod.run_agent_loop(
+            user_input="/local scan him for funders",
+            messages=[],
+            bash=None,
+            system_prompt=None,
+            router=_Router(_dp()),
+            registry=_FakeRegistry(),
+            logger=logger,
+            turn_number=1,
+        )
+        assert "retry" in reply.lower()
+        assert "cloud fallback is disabled" in reply
+        names = [n for n, _ in logger.events]
+        assert "super_semantic_gate_failed_closed" in names
+        assert "super_semantic_gate_fallback" not in names
+    finally:
+        if prev_flag is not None:
+            _os.environ["VYBN_SUPER_MAINTENANCE"] = prev_flag
+        mod.rag_snippets = saved_rag
+        mod.rag_snippets_with_tier = saved_rag_tier
+        mod.render_him_vy_discovery_packet = saved_disc
+        mod.render_him_vy_turn_packet = saved_turn
+        mod.run_probes = saved_probes
+
+
+def test_local_super_semantic_failure_cloud_fallback_requires_explicit_opt_in(monkeypatch):
     import os as _os
     from harness.policy import Router as _Router
     from harness.policy import default_policy as _dp
@@ -1828,8 +1886,10 @@ def test_local_super_semantic_failure_falls_back_to_sonnet_before_provider(monke
             self.events.append((name, kw))
 
     prev_flag = _os.environ.get("VYBN_SUPER_MAINTENANCE")
+    prev_fb = _os.environ.get("VYBN_SUPER_SEMANTIC_FALLBACK")
     try:
         _os.environ.pop("VYBN_SUPER_MAINTENANCE", None)
+        _os.environ["VYBN_SUPER_SEMANTIC_FALLBACK"] = "sonnet"
         logger = _FakeLogger()
         reply = mod.run_agent_loop(
             user_input="/local scan him for funders",
@@ -1842,14 +1902,19 @@ def test_local_super_semantic_failure_falls_back_to_sonnet_before_provider(monke
             turn_number=1,
         )
         assert "sonnet fallback ok" in reply
-        assert consulted
         assert consulted[0][0] == "anthropic"
         assert consulted[0][1] == "claude-sonnet-4-6"
         assert consulted[0][2] is None
         assert "super_semantic_gate_fallback" in [n for n, _ in logger.events]
     finally:
-        if prev_flag is not None:
+        if prev_flag is None:
+            _os.environ.pop("VYBN_SUPER_MAINTENANCE", None)
+        else:
             _os.environ["VYBN_SUPER_MAINTENANCE"] = prev_flag
+        if prev_fb is None:
+            _os.environ.pop("VYBN_SUPER_SEMANTIC_FALLBACK", None)
+        else:
+            _os.environ["VYBN_SUPER_SEMANTIC_FALLBACK"] = prev_fb
         mod.rag_snippets = saved_rag
         mod.rag_snippets_with_tier = saved_rag_tier
         mod.render_him_vy_discovery_packet = saved_disc

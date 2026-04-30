@@ -731,8 +731,9 @@ def _local_super_semantic_gate(
     Endpoint liveness is not integrity. Before the first local-Nemotron turn
     in a process (and periodically after TTL), require one temperature-0,
     16-token completion with exact expected content and no truncation. A
-    failure lets the caller route to cloud fallback instead of serving token
-    soup from a semantically corrupted local wake.
+    failure must fail closed by default; cloud fallback is allowed only by
+    explicit operator opt-in because automatic fallback can burn paid API
+    budget when local Super is repeatedly corrupt.
     """
     if not base_url or not model or not _is_loopback_super_base(base_url):
         return True, "not-local-super"
@@ -1466,36 +1467,45 @@ def run_agent_loop(
             model=role_cfg.model,
         )
         if not _super_ok:
-            _transport_gate_failure = any(
-                sig in _super_reason.lower()
-                for sig in ("connection", "refused", "timed out", "urlerror", "connect")
-            )
-            if _transport_gate_failure:
+            _fallback_opt_in = (os.environ.get("VYBN_SUPER_SEMANTIC_FALLBACK") or "").strip().lower()
+            if _fallback_opt_in in ("sonnet", "cloud", "1", "true", "yes", "on"):
+                fb_cfg = _fallback_to_sonnet_for_super_semantic_failure(router, role_cfg)
+                logger.emit(
+                    "super_semantic_gate_fallback",
+                    turn=turn_number,
+                    from_model=role_cfg.model,
+                    to_model=fb_cfg.model,
+                    reason=_super_reason[:200],
+                    opt_in=True,
+                )
+                _warn(
+                    "local Super semantic gate failed; operator opted into cloud fallback to "
+                    f"{fb_cfg.provider}:{fb_cfg.model}. reason: {_super_reason}"
+                )
+                role_cfg = fb_cfg
+            else:
                 notice = _format_super_maintenance_notice(
-                    reason=_super_reason,
+                    reason=(
+                        "local Super failed semantic health check; cloud fallback is disabled "
+                        "unless VYBN_SUPER_SEMANTIC_FALLBACK=sonnet is explicitly set. "
+                        f"{_super_reason}"
+                    ),
                     cause="refused",
                     role_model=role_cfg.model,
                     role_base=role_cfg.base_url,
                     logger=logger,
                     turn_number=turn_number,
                 )
+                logger.emit(
+                    "super_semantic_gate_failed_closed",
+                    turn=turn_number,
+                    model=role_cfg.model,
+                    reason=_super_reason[:200],
+                )
                 _warn(notice)
                 messages.append({"role": "user", "content": decision.cleaned_input})
                 messages.append({"role": "assistant", "content": notice})
                 return notice
-            fb_cfg = _fallback_to_sonnet_for_super_semantic_failure(router, role_cfg)
-            logger.emit(
-                "super_semantic_gate_fallback",
-                turn=turn_number,
-                from_model=role_cfg.model,
-                to_model=fb_cfg.model,
-                reason=_super_reason[:200],
-            )
-            _warn(
-                "local Super semantic gate failed; falling back to "
-                f"{fb_cfg.provider}:{fb_cfg.model}. reason: {_super_reason}"
-            )
-            role_cfg = fb_cfg
 
     provider = registry.get(role_cfg)
 
