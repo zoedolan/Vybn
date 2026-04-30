@@ -114,3 +114,17 @@ def test_public_static_surfaces_point_to_machine_readable_api():
     joined = somewhere + "\n" + vybn
     assert "api.vybn.ai" in joined
     assert re.search(r"/api/(instant|walk|arrive|manifold/points|vybn-identity\.pub)", joined)
+
+
+def test_portal_semantic_gate_restarts_super_on_quality_failure():
+    src = _portal_source()
+    assert "VLLM_SEMANTIC_RESTART_COOLDOWN" in src
+    assert "VLLM_SYSTEMD_SERVICE" in src
+    assert "async def _restart_vllm_after_semantic_failure" in src
+    assert "asyncio.create_subprocess_exec" in src
+    assert "\"systemctl\"" in src
+    assert "\"--user\"" in src
+    assert "\"restart\"" in src
+    assert "restart_needed = not ok" in src
+    assert "_schedule_vllm_restart_after_semantic_failure(reason)" in src
+    assert "Transport failures can mean cold start or maintenance" in src

@@ -156,6 +156,12 @@ VLLM_ADMISSION_MAX_RUNNING = int(os.environ.get("VLLM_ADMISSION_MAX_RUNNING", "8
 VLLM_ADMISSION_MAX_WAITING = int(os.environ.get("VLLM_ADMISSION_MAX_WAITING", "0"))
 VLLM_ADMISSION_MAX_KV = float(os.environ.get("VLLM_ADMISSION_MAX_KV", "0.85"))
 
+# Semantic corruption is runtime state, not just a serving condition. If Super
+# is reachable but fails a deterministic quality probe, keep serving maintenance
+# and trigger one rate-limited self-restart of the local vLLM service.
+VLLM_SEMANTIC_RESTART_COOLDOWN = float(os.environ.get("VLLM_SEMANTIC_RESTART_COOLDOWN", "600"))
+VLLM_SYSTEMD_SERVICE = os.environ.get("VLLM_SYSTEMD_SERVICE", "vybn-vllm.service")
+
 MODEL_NAME = "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"
 VOICE_MAX_TOKENS = 150
 
@@ -248,6 +254,82 @@ _VLLM_SEMANTIC_CACHE: Dict[str, Any] = {
     "checked_at": 0.0,
 }
 
+_VLLM_RESTART_STATE: Dict[str, Any] = {
+    "inflight": False,
+    "last_attempt_at": 0.0,
+    "last_reason": "",
+    "last_result": "",
+}
+
+
+async def _restart_vllm_after_semantic_failure(reason: str) -> None:
+    """Restart local Super once when a semantic probe proves corrupt output.
+
+    Transport failures can mean cold start or maintenance; those should fail
+    closed without thrashing. A completed semantic probe with wrong/truncated
+    content means the runtime is corrupt and must be reset.
+    """
+    now = time.time()
+    if _VLLM_RESTART_STATE.get("inflight"):
+        log.warning("vLLM semantic restart already in flight; reason=%s", reason)
+        return
+    last = float(_VLLM_RESTART_STATE.get("last_attempt_at", 0.0) or 0.0)
+    if now - last < VLLM_SEMANTIC_RESTART_COOLDOWN:
+        log.error(
+            "vLLM semantic restart suppressed by cooldown; reason=%s last_result=%s",
+            reason,
+            _VLLM_RESTART_STATE.get("last_result", ""),
+        )
+        return
+
+    _VLLM_RESTART_STATE.update({
+        "inflight": True,
+        "last_attempt_at": now,
+        "last_reason": reason,
+        "last_result": "restart requested",
+    })
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "systemctl",
+            "--user",
+            "restart",
+            VLLM_SYSTEMD_SERVICE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=45.0)
+        out = stdout.decode("utf-8", errors="replace")[:1000]
+        err = stderr.decode("utf-8", errors="replace")[:1000]
+        if proc.returncode == 0:
+            result = f"restart issued for {VLLM_SYSTEMD_SERVICE}"
+            log.error("vLLM semantic restart issued after gate failure: %s", reason)
+        else:
+            result = f"restart failed rc={proc.returncode} stdout={out!r} stderr={err!r}"
+            log.error("vLLM semantic restart failed after gate failure: %s", result)
+        _VLLM_RESTART_STATE["last_result"] = result
+    except Exception as e:
+        result = f"restart exception {type(e).__name__}: {e}"
+        _VLLM_RESTART_STATE["last_result"] = result
+        log.error("vLLM semantic restart exception after gate failure: %s", result)
+    finally:
+        _VLLM_RESTART_STATE["inflight"] = False
+        # Force a fresh semantic probe after restart/cooldown; never preserve a
+        # stale failure or stale pass across runtime reset.
+        _VLLM_SEMANTIC_CACHE.update({
+            "ok": False,
+            "reason": "restart attempted after semantic failure",
+            "checked_at": 0.0,
+        })
+
+
+def _schedule_vllm_restart_after_semantic_failure(reason: str) -> None:
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        log.error("cannot schedule vLLM semantic restart without running event loop: %s", reason)
+        return
+    loop.create_task(_restart_vllm_after_semantic_failure(reason))
+
 
 async def _vllm_semantic_health(*, ttl: float = 60.0) -> Dict[str, Any]:
     """Semantic integrity gate for local Super.
@@ -271,6 +353,7 @@ async def _vllm_semantic_health(*, ttl: float = 60.0) -> Dict[str, Any]:
     }
     ok = False
     reason = "not checked"
+    restart_needed = False
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(20.0)) as client:
             r = await client.post(f"{LLAMA_URL}/v1/chat/completions", json=payload)
@@ -281,11 +364,14 @@ async def _vllm_semantic_health(*, ttl: float = 60.0) -> Dict[str, Any]:
         finish = choice.get("finish_reason")
         ok = content.strip() == "OK" and finish != "length"
         reason = "semantic gate passed" if ok else f"unexpected content={content!r} finish_reason={finish!r}"
+        restart_needed = not ok
     except Exception as e:
         ok = False
         reason = f"{type(e).__name__}: {e}"
 
     _VLLM_SEMANTIC_CACHE.update({"ok": ok, "reason": reason, "checked_at": now})
+    if restart_needed:
+        _schedule_vllm_restart_after_semantic_failure(reason)
     return dict(_VLLM_SEMANTIC_CACHE)
 
 
