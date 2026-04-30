@@ -80,7 +80,7 @@ roles:
     model: gpt-5.5
     thinking: adaptive
     max_tokens: 16384
-    max_iterations: 25
+    max_iterations: 100
     tools: [bash, delegate]
     rag: true
     recurrent_depth: 2  # /plan benefits from deeper latent reasoning; probe-confirmed adaptive
