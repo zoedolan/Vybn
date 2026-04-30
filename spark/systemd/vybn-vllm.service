@@ -15,7 +15,7 @@ Environment=VYBN_VLLM_MAX_NUM_SEQS=8
 Environment=VYBN_VLLM_EXTRA_ARGS=
 Environment=VLLM_SERVER_DEV_MODE=0
 EnvironmentFile=-%h/.config/vybn/vllm.env
-ExecStart=%h/Vybn/spark/systemd/vllm-exec.sh
+ExecStart=/bin/bash %h/Vybn/spark/systemd/vllm-exec.sh
 ExecStop=/bin/bash -c '%h/spark-vllm-docker/launch-cluster.sh -n 169.254.246.181,169.254.51.101 stop || true'
 Restart=always
 RestartSec=30
