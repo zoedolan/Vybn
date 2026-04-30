@@ -108,10 +108,40 @@ log "Super: $SUPER_MODEL"
 $SSH "$PEER" 'echo peer-ok' > /dev/null || die "Peer ${PEER} not reachable via SSH"
 log "Peer SSH: OK"
 
-# Peer: Omni model exists
+# Peer: Omni model exists on host
 $SSH "$PEER" "[[ -d '${OMNI_MODEL_PATH}' ]]" \
-    || die "Omni model not found on peer at ${OMNI_MODEL_PATH}"
-log "Peer Omni model: OK"
+    || die "Omni model not found on peer host at ${OMNI_MODEL_PATH}"
+log "Peer Omni model (host): OK"
+
+# Peer: Omni model accessible INSIDE the vllm_node container
+# The container only mounts ~/.cache/huggingface; ~/models/ is host-only.
+# If the path is absent inside the container, vLLM passes it to the HF hub
+# validator which rejects absolute paths with: "Repo id must be in the form
+# 'repo_name' or 'namespace/repo_name'"
+# Fix: if missing, use nsenter to bind-mount the host path into the running
+# container's mount namespace (requires passwordless sudo for nsenter, or
+# that ~/models/ is already mounted — e.g. via EXTRA_DOCKER_VOLUMES in
+# launch-cluster.sh).
+log "Checking Omni model inside container..."
+OMNI_CTR_OK=$($SSH "$PEER" \
+    "docker exec vllm_node test -d '${OMNI_MODEL_PATH}' && echo yes || echo no" \
+    2>/dev/null || echo no)
+if [[ "$OMNI_CTR_OK" == "yes" ]]; then
+    log "Omni model accessible in container: ${OMNI_MODEL_PATH}"
+    OMNI_CTR_MODEL_PATH="${OMNI_MODEL_PATH}"
+else
+    log "Model not in container — binding via nsenter..."
+    CTR_PID=$($SSH "$PEER" "docker inspect vllm_node --format '{{.State.Pid}}'" 2>/dev/null || echo "")
+    [[ -n "$CTR_PID" && "$CTR_PID" != "0" ]] \
+        || die "Could not get vllm_node PID — is the container running on peer?"
+    $SSH "$PEER" \
+        "sudo -n nsenter -t '${CTR_PID}' -m -- mkdir -p '${OMNI_MODEL_PATH}' && \
+         sudo -n nsenter -t '${CTR_PID}' -m -- mount --bind '${OMNI_MODEL_PATH}' '${OMNI_MODEL_PATH}'" \
+        && log "Model bind-mounted into container namespace at ${OMNI_MODEL_PATH}." \
+        || die "nsenter bind-mount failed (need passwordless sudo for nsenter on peer, or add \
+-v /home/vybnz69/models:/home/vybnz69/models to launch-cluster.sh docker run args)"
+    OMNI_CTR_MODEL_PATH="${OMNI_MODEL_PATH}"
+fi
 
 # Peer: port 8002 free
 if $SSH "$PEER" "curl -sf http://127.0.0.1:${OMNI_PORT}/v1/models > /dev/null 2>&1"; then
@@ -179,14 +209,16 @@ done
 [[ "$SUPER_SLEEPING" == "true" ]] || die "Super never confirmed sleeping — aborting before Omni launch"
 
 # Flush Linux buffer cache on both nodes (unified memory — critical on DGX Spark)
+# Use sudo -n (non-interactive) so we fail immediately rather than hanging
+# forever waiting for a TTY password prompt. Cache flush is best-effort.
 log "Flushing buffer cache on primary..."
-sudo sh -c 'sync; echo 3 > /proc/sys/vm/drop_caches' 2>/dev/null \
+sudo -n sh -c 'sync; echo 3 > /proc/sys/vm/drop_caches' 2>/dev/null \
     && log "Primary buffer cache flushed." \
-    || log "WARNING: primary flush failed (sudo) — continuing"
+    || log "WARNING: primary flush failed (no passwordless sudo) — continuing"
 log "Flushing buffer cache on peer..."
-$SSH "$PEER" "sudo sh -c 'sync; echo 3 > /proc/sys/vm/drop_caches'" 2>/dev/null \
+$SSH "$PEER" "sudo -n sh -c 'sync; echo 3 > /proc/sys/vm/drop_caches'" 2>/dev/null \
     && log "Peer buffer cache flushed." \
-    || log "WARNING: peer flush failed (sudo) — continuing"
+    || log "WARNING: peer flush failed (no passwordless sudo) — continuing"
 
 # Check peer GPU freed
 PEER_GPU_PROCS=$($SSH "$PEER" \
@@ -198,8 +230,9 @@ log "Peer GPU: ${PEER_GPU_PROCS} compute processes, ${FREE_MEM} MiB free"
 # ── LAUNCH OMNI ON PEER ─────────────────────────────────────────────────────────
 log "--- launching Omni on peer ${PEER}:${OMNI_PORT} ---"
 
+# Use OMNI_CTR_MODEL_PATH (verified accessible inside container) not the host path.
 # Build args string (bash arrays can't be passed over SSH)
-OMNI_ARGS="${OMNI_MODEL_PATH}"
+OMNI_ARGS="${OMNI_CTR_MODEL_PATH}"
 OMNI_ARGS+="  --port ${OMNI_PORT}"
 OMNI_ARGS+="  --host 0.0.0.0"
 OMNI_ARGS+="  --trust-remote-code"
@@ -215,7 +248,7 @@ fi
 
 log "vllm serve ${OMNI_ARGS}"
 $SSH "$PEER" \
-    "docker exec -d vllm_node bash -c 'vllm serve ${OMNI_ARGS} > /tmp/omni-server.log 2>&1'" \
+    "docker exec -d vllm_node bash -c 'HF_HUB_OFFLINE=1 vllm serve ${OMNI_ARGS} > /tmp/omni-server.log 2>&1'" \
     && OMNI_LAUNCHED=true \
     || die "Failed to launch Omni on peer"
 
@@ -403,4 +436,3 @@ JOURNAL
 
 log "Journal: $JOURNAL_FILE"
 log "=== Experiment complete ==="
-
