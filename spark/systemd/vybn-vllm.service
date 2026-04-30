@@ -1,13 +1,7 @@
-# User-level wrapper around launch-cluster.sh. Keeps the vLLM Ray cluster
-# (Nemotron 120B across both Sparks) up. Ray distributed backend is required
-# because world_size=2 with one GPU per node.
-# Source of truth: ~/Vybn/spark/systemd/.
 [Unit]
 Description=Vybn vLLM cluster (Nemotron 120B, 2 Sparks via Ray)
 After=network-online.target
 Wants=network-online.target
-# Docker is a system-level unit and invisible from user systemd; the daemon
-# is always running, so we depend on the binary instead via ConditionPath.
 ConditionPathExists=/var/run/docker.sock
 StartLimitIntervalSec=600
 StartLimitBurst=5
@@ -15,59 +9,16 @@ StartLimitBurst=5
 [Service]
 Type=simple
 WorkingDirectory=%h/spark-vllm-docker
-# Always clean-stop before starting so we never layer on a zombie cluster.
 ExecStartPre=/bin/bash -c '%h/spark-vllm-docker/launch-cluster.sh -n 169.254.246.181,169.254.51.101 stop || true'
-# Runtime memory budget: this service is always-hot on two 128 GB nodes.
-# Capacity is a profile, not a permanent appetite. Defaults below are
-# normal mode: protect the Sparks and the memory/walk/private organs.
-# For a scheduled launch/class/demo, override via ~/.config/vybn/vllm.env
-# and restart deliberately after recording pre-restart memory. This vLLM
-# build rejects --swap-space, so memory relief comes from gpu-memory-
-# utilization and max-num-seqs rather than CPU swap reservation.
 Environment=VYBN_VLLM_GPU_MEMORY_UTILIZATION=0.78
 Environment=VYBN_VLLM_MAX_NUM_SEQS=8
-# Optional extra vLLM CLI args appended verbatim to `vllm serve`. Empty by
-# default. Use `~/.config/vybn/vllm.env` to set this for scheduled Super
-# capacity experiments without editing the unit file.
-#
-# Sleep mode (Super GPU-memory release for scheduled maintenance windows):
-# vLLM exposes the dev endpoints
-#   GET  /is_sleeping            (read-only status check)
-#   POST /sleep?level=1          (offload weights to CPU, discard kv cache)
-#   POST /sleep?level=2          (discard weights and kv cache)
-#   POST /wake_up                (re-load and resume serving)
-# ONLY when the server is launched with both
-#   VLLM_SERVER_DEV_MODE=1   (env var, explicitly passed through env to the vllm process)
-#   --enable-sleep-mode      (CLI flag on `vllm serve`)
-# These are internal dev endpoints. They must NOT be publicly exposed:
-# the portal / public tier MUST NOT route to them, and the cluster front
-# door already binds vLLM to the internal LAN. Treat enabling sleep mode
-# as scheduled maintenance, the same way capacity profile changes are
-# treated.
-#
-# Configuring sleep mode here ONLY frees Super's GPU. It does NOT make
-# Omni live. Omni activation is a separate, operator-gated concern (see
-# the @omni alias and VYBN_OMNI_URL): a sleeping Super does not imply a
-# live Omni, and a configured sleep mode does not imply either is in use.
-#
-# Example `~/.config/vybn/vllm.env` to arm sleep mode for a maintenance window:
-#   VYBN_VLLM_EXTRA_ARGS=--enable-sleep-mode
-#   VLLM_SERVER_DEV_MODE=1
-# Then: systemctl --user daemon-reload && systemctl --user restart vybn-vllm.service
-# NOTE: clear/reset vllm.env and restart when the maintenance window closes.
-# SECURITY: VLLM_SERVER_DEV_MODE=1 exposes unauthenticated dev endpoints on
-# --host 0.0.0.0. Never leave it armed in steady state. Use 0 to disable.
 Environment=VYBN_VLLM_EXTRA_ARGS=
 Environment=VLLM_SERVER_DEV_MODE=0
 EnvironmentFile=-%h/.config/vybn/vllm.env
-# vllm-exec.sh handles empty-VYBN_VLLM_EXTRA_ARGS correctly in bash
-# (systemd passes empty vars as '' which vLLM rejects as unrecognized args).
 ExecStart=%h/Vybn/spark/systemd/vllm-exec.sh
 ExecStop=/bin/bash -c '%h/spark-vllm-docker/launch-cluster.sh -n 169.254.246.181,169.254.51.101 stop || true'
 Restart=always
 RestartSec=30
-# Cold load across 2 Sparks is ~10-13 min (26 FP8 shards @ ~25s + cudagraph).
-# Anything shorter than 15 min risks SIGTERM-ing a healthy warm-up.
 TimeoutStartSec=1200
 TimeoutStopSec=60
 StandardOutput=append:%h/logs/vllm.log
