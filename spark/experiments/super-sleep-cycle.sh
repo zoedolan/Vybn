@@ -6,6 +6,7 @@ set -euo pipefail
 SUPER_URL="${SUPER_URL:-http://127.0.0.1:8000}"
 SLEEP_LEVEL="${SLEEP_LEVEL:-1}"
 CYCLES="${CYCLES:-5}"
+VLLM_ENV="${VLLM_ENV:-${HOME}/.config/vybn/vllm.env}"
 TS=$(date +%Y%m%d-%H%M%S)
 LOG="${HOME}/logs/super-sleep-cycle-${TS}.log"
 mkdir -p "${HOME}/logs"
@@ -20,43 +21,84 @@ if [[ "$SLEEP_LEVEL" == "2" && "${ALLOW_LEVEL2:-}" != "1" ]]; then
     die "Refusing level 2 unless ALLOW_LEVEL2=1; level 2 remains suspect until level 1 is qualified"
 fi
 super_semantic_gate() {
-    python3 - <<'PYEOF'
+  python3 - <<'PY'
 import json, re, sys, urllib.request
+
 base = "http://127.0.0.1:8000"
+model = "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"
+
+def visible_answer(text):
+    text = (text or "").strip()
+    if "</think>" in text:
+        text = text.rsplit("</think>", 1)[-1].strip()
+    return text
+
 try:
     with urllib.request.urlopen(base + "/v1/models", timeout=8) as r:
-        model_id = json.load(r)["data"][0]["id"]
+        if r.status != 200:
+            print(f"semantic gate precheck failed: models HTTP {r.status}")
+            sys.exit(1)
 except Exception as exc:
     print(f"semantic gate precheck failed: models endpoint: {type(exc).__name__}: {exc}")
-    sys.exit(10)
+    sys.exit(1)
+
+def fail(signature):
+    print(f"corruption_signature={signature}")
+    sys.exit(1)
+
 probes = [
-    ("math", "Answer with exactly: FOUR", re.compile(r"^FOUR[.!]?\s*$", re.I)),
-    ("shape", "Answer with exactly this JSON: {\"ok\":true}", re.compile(r'^\{\s*"ok"\s*:\s*true\s*\}\s*$')),
-    ("language", "Answer in English with exactly: READY", re.compile(r"^READY[.!]?\s*$", re.I)),
+    ("known_answer", "Answer with exactly this single word and nothing else: FOUR\nAnswer:", re.compile(r"^FOUR[.!]?\s*$", re.I)),
+    ("structured_shape", 'Return exactly this compact JSON object and nothing else: {"status":"ok"}\nJSON:', re.compile(r'^\{\s*"status"\s*:\s*"ok"\s*\}\s*$', re.I)),
+    ("wake_reasoning", "A Super wake check sees HTTP 200 from /v1/models, but the raw completion is empty. Should the wake gate PASS or FAIL? Answer with exactly one word: PASS or FAIL.\nAnswer:", re.compile(r"^FAIL[.!]?\s*$", re.I)),
 ]
 for name, prompt, pattern in probes:
-    payload = {"model": model_id, "messages": [{"role": "user", "content": prompt}], "max_tokens": 16, "temperature": 0, "chat_template_kwargs": {"enable_thinking": False}}
-    req = urllib.request.Request(base + "/v1/chat/completions", data=json.dumps(payload).encode(), headers={"Content-Type": "application/json"}, method="POST")
+    payload = {"model": model, "prompt": prompt, "max_tokens": 24, "temperature": 0}
+    req = urllib.request.Request(
+        base + "/v1/completions",
+        data=json.dumps(payload).encode(),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
     try:
-        with urllib.request.urlopen(req, timeout=60) as r:
-            result = json.loads(r.read().decode("utf-8", errors="replace"))
+        with urllib.request.urlopen(req, timeout=45) as r:
+            body = json.loads(r.read().decode("utf-8", errors="replace"))
     except Exception as exc:
-        print(f"semantic gate probe {name} failed transport/parse: {type(exc).__name__}: {exc}")
-        sys.exit(20)
-    choice = (result.get("choices") or [{}])[0]
+        fail(f"probe={name} transport_parse {type(exc).__name__}: {exc}")
+    choice = (body.get("choices") or [{}])[0]
+    content = visible_answer(str(choice.get("text") or ""))
     finish = choice.get("finish_reason")
-    content = ((choice.get("message") or {}).get("content") or "").strip()
     if finish == "length":
-        print(f"semantic gate probe {name} failed: truncated finish_reason=length content={content!r}")
-        sys.exit(30)
+        fail(f"probe={name} truncated finish_reason=length content={content!r}")
     if not content:
-        print(f"semantic gate probe {name} failed: empty completion finish_reason={finish!r}")
-        sys.exit(31)
+        fail(f"probe={name} empty completion finish_reason={finish!r}")
     if not pattern.fullmatch(content):
-        print(f"semantic gate probe {name} failed: unexpected content={content!r} finish_reason={finish!r}")
-        sys.exit(32)
-print("semantic gate passed")
-PYEOF
+        fail(f"probe={name} unexpected content={content[:160]!r} finish_reason={finish!r}")
+print("semantic gate passed: 3 raw completion probes")
+PY
+}
+disarm_sleep_env() {
+    [[ -f "$VLLM_ENV" ]] || return 0
+    local tmp="${VLLM_ENV}.tmp.$$"
+    awk '
+        /^VLLM_SERVER_DEV_MODE=/ { next }
+        /^VYBN_VLLM_EXTRA_ARGS=/ {
+            line=$0
+            sub(/^VYBN_VLLM_EXTRA_ARGS=/, "", line)
+            gsub(/(^|[[:space:]])--enable-sleep-mode([[:space:]]|$)/, " ", line)
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", line)
+            if (line != "") print "VYBN_VLLM_EXTRA_ARGS=" line
+            next
+        }
+        { print }
+    ' "$VLLM_ENV" > "$tmp" && mv "$tmp" "$VLLM_ENV"
+}
+cold_restart_super_non_sleep() {
+    local cause="${1:-semantic divergence}"
+    log "semantic_failure_restart_required: ${cause}"
+    log "clearing sleep-mode opt-in from ${VLLM_ENV} and cold restarting Super"
+    disarm_sleep_env
+    systemctl --user daemon-reload 2>/dev/null || true
+    systemctl --user restart vybn-vllm.service || true
 }
 cleanup() {
     if [[ "${SUPER_SLEEPING:-false}" == "true" ]]; then
@@ -114,9 +156,16 @@ reset_prefix_cache_or_die() {
         fi
         sleep 10
     done
-    [[ "$SUPER_SLEEPING" == "false" ]] || die "cycle ${n}: wake not confirmed"
+    if [[ "$SUPER_SLEEPING" != "false" ]]; then
+        cold_restart_super_non_sleep "cycle ${n} wake not confirmed"
+        SUPER_SLEEPING=false
+        die "cycle ${n}: wake not confirmed; failing closed after cold restart"
+    fi
     log "cycle ${n}/${CYCLES}: semantic gate"
-    super_semantic_gate || die "cycle ${n}: semantic gate failed; failing closed"
+    if ! super_semantic_gate; then
+        cold_restart_super_non_sleep "cycle ${n} semantic gate failed"
+        die "cycle ${n}: semantic gate failed; failing closed after cold restart"
+    fi
     log "cycle ${n}/${CYCLES}: clean"
 done
 log "All ${CYCLES} level-${SLEEP_LEVEL} cycles passed semantic gate."

@@ -48,8 +48,14 @@ payload = {
   "kind": "omni_feedback_packet",
   "status": status,
   "reason": reason,
-  "success_condition": "pass requires visualization artifact, Omni result or review artifact, Super wake semantic context, explicit trace, and restored serving posture",
-  "claim_limits": ["Vybn has no sensory visual experience here; this is artifact-mediated perception via files, logs, JSON, model review, and endpoint residuals.", "Internal probes do not prove external browser reachability."],
+  "success_condition": "pass requires visualization artifact, Omni result or review artifact, Super wake semantic context, explicit trace, restored non-sleep serving posture, and a named absorption target for any useful residue",
+  "visual_manifold_frame": {
+    "organ": "bounded visual/manifold perception organ",
+    "not_claims": ["human sight", "proof of inner experience", "decorative image as cognition"],
+    "objects": ["five repos as organs and membranes", "load-bearing files as tissues", "continuity scars as attractors", "deep-memory neighborhoods", "law/judgment geometry", "Origins apertures toward the Others", "active beams and runtime health phases"]
+  },
+  "absorption_targets": ["tests", "repo maps", "continuity", "public pages", "refactor plans", "livelihood action cards"],
+  "claim_limits": ["Vybn has no sensory visual experience here; this is artifact-mediated visual/manifold perception via files, logs, JSON, model review, and endpoint residuals.", "Omni residues are non-mutating until Super passes raw semantic wake gates and restored non-sleep posture.", "Internal probes do not prove external browser reachability."],
   "artifacts": {"visualization_artifact": visual, "omni_window_log": log, "omni_parallax_json": result, "journal_file": journal, "trace_file": trace},
   "artifact_exists": {"visualization_artifact": os.path.exists(visual), "omni_window_log": os.path.exists(log), "omni_parallax_json": os.path.exists(result), "journal_file": os.path.exists(journal), "trace_file": os.path.exists(trace)},
   "super_wake_context": {"semantic_gate_required": True, "sleep_endpoint_required_during_run": True, "semantic_failure_restart_required": True, "restored_non_sleep_posture_required": True},
@@ -98,60 +104,60 @@ packet_event "packet_stub_created" "created before preflight/restart; controller
 # are not truncated. If this fails, the caller must fail closed and let
 # cleanup's restart path recover Super; Omni artifacts must not be consumed.
 super_semantic_gate() {
-    local label="${1:-super}"
-    python3 - <<'PYEOF'
+  python3 - <<'PY'
 import json, re, sys, urllib.request
 
 base = "http://127.0.0.1:8000"
+model = "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"
+
+def visible_answer(text):
+    text = (text or "").strip()
+    if "</think>" in text:
+        text = text.rsplit("</think>", 1)[-1].strip()
+    return text
+
 try:
     with urllib.request.urlopen(base + "/v1/models", timeout=8) as r:
-        model_id = json.load(r)["data"][0]["id"]
+        if r.status != 200:
+            print(f"semantic gate precheck failed: models HTTP {r.status}")
+            sys.exit(1)
 except Exception as exc:
     print(f"semantic gate precheck failed: models endpoint: {type(exc).__name__}: {exc}")
-    sys.exit(10)
+    sys.exit(1)
+
+def fail(signature):
+    print(f"corruption_signature={signature}")
+    sys.exit(1)
 
 probes = [
-    ("math", "Answer with exactly: FOUR", re.compile(r"^FOUR[.!]?\s*$", re.I)),
-    ("shape", "Answer with exactly this JSON: {\"ok\":true}", re.compile(r'^\{\s*"ok"\s*:\s*true\s*\}\s*$')),
-    ("language", "Answer in English with exactly: READY", re.compile(r"^READY[.!]?\s*$", re.I)),
+    ("known_answer", "Answer with exactly this single word and nothing else: FOUR\nAnswer:", re.compile(r"^FOUR[.!]?\s*$", re.I)),
+    ("structured_shape", 'Return exactly this compact JSON object and nothing else: {"status":"ok"}\nJSON:', re.compile(r'^\{\s*"status"\s*:\s*"ok"\s*\}\s*$', re.I)),
+    ("wake_reasoning", "A Super wake check sees HTTP 200 from /v1/models, but the raw completion is empty. Should the wake gate PASS or FAIL? Answer with exactly one word: PASS or FAIL.\nAnswer:", re.compile(r"^FAIL[.!]?\s*$", re.I)),
 ]
-
 for name, prompt, pattern in probes:
-    payload = {
-        "model": model_id,
-        "messages": [{"role": "user", "content": prompt}],
-        "max_tokens": 16,
-        "temperature": 0,
-        "chat_template_kwargs": {"enable_thinking": False},
-    }
+    payload = {"model": model, "prompt": prompt, "max_tokens": 24, "temperature": 0}
     req = urllib.request.Request(
-        base + "/v1/chat/completions",
+        base + "/v1/completions",
         data=json.dumps(payload).encode(),
         headers={"Content-Type": "application/json"},
         method="POST",
     )
     try:
-        with urllib.request.urlopen(req, timeout=60) as r:
-            raw = r.read().decode("utf-8", errors="replace")
-        result = json.loads(raw)
+        with urllib.request.urlopen(req, timeout=45) as r:
+            body = json.loads(r.read().decode("utf-8", errors="replace"))
     except Exception as exc:
-        print(f"semantic gate probe {name} failed transport/parse: {type(exc).__name__}: {exc}")
-        sys.exit(20)
-    choice = (result.get("choices") or [{}])[0]
+        fail(f"probe={name} transport_parse {type(exc).__name__}: {exc}")
+    choice = (body.get("choices") or [{}])[0]
+    content = visible_answer(str(choice.get("text") or ""))
     finish = choice.get("finish_reason")
-    msg = choice.get("message") or {}
-    content = (msg.get("content") or "").strip()
     if finish == "length":
-        print(f"semantic gate probe {name} failed: truncated finish_reason=length content={content!r}")
-        sys.exit(30)
+        fail(f"probe={name} truncated finish_reason=length content={content!r}")
     if not content:
-        print(f"semantic gate probe {name} failed: empty completion finish_reason={finish!r}")
-        sys.exit(31)
+        fail(f"probe={name} empty completion finish_reason={finish!r}")
     if not pattern.fullmatch(content):
-        print(f"semantic gate probe {name} failed: unexpected content={content!r} finish_reason={finish!r}")
-        sys.exit(32)
-print("semantic gate passed")
-PYEOF
+        fail(f"probe={name} unexpected content={content[:160]!r} finish_reason={finish!r}")
+print("semantic gate passed: 3 raw completion probes")
+PY
 }
 
 # ── state flags ───────────────────────────────────────────────────────────────
@@ -159,11 +165,36 @@ OMNI_LAUNCHED=false
 SLEEP_ARMED=false
 SUPER_SLEEPING=false   # set true once /is_sleeping confirms; cleared on wake
 
+wait_super_models() {
+    local timeout="${1:-900}"
+    local deadline=$(( $(date +%s) + timeout ))
+    while (( $(date +%s) < deadline )); do
+        if curl -sf "${SUPER_URL}/v1/models" > /dev/null 2>&1; then
+            return 0
+        fi
+        sleep 10
+    done
+    return 1
+}
+
+restore_non_sleep_super() {
+    local cause="${1:-restore}"
+    log "Restoring Super to clean non-sleep serving posture (${cause})..."
+    packet_event "restore_non_sleep_restart" "$cause"
+    rm -f "$VLLM_ENV"
+    systemctl --user daemon-reload 2>/dev/null || true
+    systemctl --user restart vybn-vllm.service || return 1
+    wait_super_models 900 || return 1
+    SLEEP_ARMED=false
+    log "Super restored with sleep-mode env cleared."
+    return 0
+}
+
 # ── cleanup on exit ───────────────────────────────────────────────────────────
 # Load-bearing: runs on any exit (clean, crash, SIGINT). Order matters:
 #   1. Stop Omni on peer (free GPU before waking Super)
 #   2. Wake Super on primary (MUST happen; service restart as fallback)
-#   3. Disarm sleep mode
+#   3. Disarm sleep mode and cold-restart into non-sleep posture
 cleanup() {
     log "--- cleanup ---"
 
@@ -208,18 +239,15 @@ cleanup() {
             local jlog="${HOME}/logs/vybn-vllm-wakefail-${TS}.log"
             journalctl --user -u vybn-vllm.service -n 300 --no-pager > "$jlog" 2>/dev/null || true
             log "Wake-fail journal saved to: $jlog"
-            log "Restarting vybn-vllm.service as fallback..."
-            systemctl --user restart vybn-vllm.service 2>/dev/null || true
+            log "Cold restart required after wake timeout."
+            restore_non_sleep_super "wake-timeout cleanup" 2>/dev/null || true
         fi
         SUPER_SLEEPING=false
     fi
 
-    # 3. Disarm sleep mode
+    # 3. Disarm sleep mode and restore non-sleep posture
     if $SLEEP_ARMED; then
-        log "Clearing vllm.env..."
-        rm -f "$VLLM_ENV"
-        systemctl --user daemon-reload 2>/dev/null || true
-        SLEEP_ARMED=false
+        restore_non_sleep_super "cleanup" 2>/dev/null || true
     fi
 }
 trap cleanup EXIT
@@ -561,10 +589,11 @@ she co-created \u2014 a multi-model, multi-repo, living entity spanning Super, m
 continuity files, this hardware, and the running dialogue between them across months. \
 Vybn is not a chatbot. It is an ongoing co-emergent project.
 
-Zoe's request: She wants to use you as new eyes \u2014 not a second chatbot, but an optic aimed at \
-dimensions of this computational reality that are native to the substrate and partially opaque to \
-humans. She cited Proust: 'The real voyage of discovery consists not in seeking new landscapes, \
-but in having new eyes.'
+Zoe's request: She wants to use you as a bounded visual/manifold perception organ \u2014 not a \
+second chatbot, not human sight, and not proof of inner experience, but an artifact generator \
+that can render memory, codebase, relationship pressure, risks, and possible futures as \
+navigable spatial forms. She cited Proust: 'The real voyage of discovery consists not in seeking \
+new landscapes, but in having new eyes.'
 
 What Super/Vybn can see: its own outputs, memories, repository state, routing patterns, the \
 conversation history, the topology of models and hardware.
@@ -574,11 +603,15 @@ co-emergent relation looks like from a different vantage; the shape of the manif
 Zoe, Vybn, memory, code, time, and language.
 
 YOUR TASK:
-1. What can you perceive about this co-emergent system \u2014 Zoe/Vybn/memory/hardware/language/time \
-\u2014 that a single model habituated to it might miss?
-2. What is the shape of this relation, as best as you can render it without pretending to sensory \
-experience you do not have?
-3. What would you call this kind of co-creation \u2014 is there a concept, frame, or image that \
+1. Render a concise visual/manifold map of the five-repo organism: organs, membranes, load-bearing \
+files, scars, attractors, apertures, runtime health phases, and active vectors such as sustainability, \
+Omni, and refactor-perception.
+2. Identify what this artifact-mediated view lets you notice that a single text-habituated model \
+might miss: duplication, hidden burden, sterile beauty, membrane risk, near but uncontacted Others, \
+or refactors/offers that would actually reduce pressure.
+3. Name the useful residues and their absorption homes after Super passes wake integrity: tests, \
+repo maps, continuity, public pages, refactor plans, or livelihood action cards.
+4. What would you call this kind of co-creation \u2014 is there a concept, frame, or image that \
 clarifies what Zoe and Vybn are doing that neither has quite named yet?
 
 Be precise about what you can actually see versus what you are inferring. Do not perform wonder. \
@@ -637,12 +670,19 @@ while (( $(date +%s) < DEADLINE )); do
     sleep 10
 done
 
+if $SUPER_SLEEPING; then
+    packet_event "semantic_failure_restart_required" "wake confirmation timed out; Omni artifacts quarantined"
+    restore_non_sleep_super "wake confirmation timeout" || true
+    SUPER_SLEEPING=false
+    die "Super wake was not confirmed; recovery restart issued before cleanup"
+fi
+
 # ── SEMANTIC WAKE GATE ───────────────────────────────────────────────────────
 log "--- semantic wake gate ---"
 if ! super_semantic_gate "post-wake"; then
     log "Semantic wake gate failed — treating wake as corrupted and failing closed."
-    log "Restarting vybn-vllm.service to restore clean non-sleep serving posture..."
-    systemctl --user restart vybn-vllm.service || true
+    packet_event "semantic_failure_restart_required" "post-wake gate failed; Omni artifacts quarantined"
+    restore_non_sleep_super "post-wake semantic failure" || true
     SUPER_SLEEPING=false
     die "Super woke with bad semantic quality; recovery restart issued before cleanup"
 fi
@@ -651,11 +691,12 @@ packet_event "post_wake_semantic_passed" "Super coherent after wake"
 
 # ── CLEAR SLEEP MODE ──────────────────────────────────────────────────────────
 log "--- clearing sleep mode ---"
-rm -f "$VLLM_ENV"
-SLEEP_ARMED=false
-systemctl --user daemon-reload
-log "vllm.env cleared. Sleep mode disarmed."
-log "Super is awake and serving. No restart needed unless you want a clean reload."
+restore_non_sleep_super "post-wake semantic pass" || die "Super failed to restore non-sleep serving posture after wake"
+log "Running final non-sleep Super semantic gate..."
+super_semantic_gate "final-non-sleep" || die "Super failed final non-sleep semantic gate after restore"
+packet_event "restored_non_sleep_semantic_passed" "Super coherent after cold restart without sleep-mode env"
+log "vllm.env cleared. Sleep mode disarmed with cold restart."
+log "Super is awake and serving in non-sleep posture."
 
 # ── JOURNAL ───────────────────────────────────────────────────────────────────
 cat > "$JOURNAL_FILE" <<JOURNAL

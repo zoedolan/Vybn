@@ -108,14 +108,19 @@ def test_wake_failure_captures_journal():
 
 
 
-def test_super_semantic_gate_exists_and_uses_deterministic_expected_outputs():
+def test_super_semantic_gate_exists_and_uses_raw_deterministic_expected_outputs():
     src = _src()
     assert "super_semantic_gate()" in src
+    assert 'base + "/v1/completions"' in src
     assert '"temperature": 0' in src
-    assert '"max_tokens": 16' in src
-    assert '"chat_template_kwargs": {"enable_thinking": False}' in src
-    for expected in ["FOUR", "READY", "{\\\"ok\\\":true}"]:
+    assert '"max_tokens": 24' in src
+    assert '"chat_template_kwargs": {"enable_thinking": False}' not in src
+    assert "visible_answer(" in src
+    for expected in ["FOUR", '{"status":"ok"}', "FAIL"]:
         assert expected in src
+    for probe_name in ["known_answer", "structured_shape", "wake_reasoning"]:
+        assert probe_name in src
+    assert "corruption_signature=" in src
     assert 'finish == "length"' in src or 'finish_reason=length' in src
 
 
@@ -130,7 +135,10 @@ def test_semantic_gate_runs_before_sleep_and_after_wake_before_success():
     assert wake < gate < clear
     assert 'failing closed' in src
     assert 'recovery restart issued before cleanup' in src
-    assert 'systemctl --user restart vybn-vllm.service' in src[src.index('--- semantic wake gate ---'):]
+    assert 'restore_non_sleep_super "post-wake semantic failure"' in src[src.index('--- semantic wake gate ---'):]
+    assert 'systemctl --user restart vybn-vllm.service' in src
+    assert "restored_non_sleep_semantic_passed" in src[src.index('--- clearing sleep mode ---'):]
+    assert "final-non-sleep" in src[src.index('--- clearing sleep mode ---'):]
 
 
 def test_super_sleep_cycle_harness_is_isolated_from_omni_and_defaults_level1():
@@ -141,9 +149,17 @@ def test_super_sleep_cycle_harness_is_isolated_from_omni_and_defaults_level1():
     assert 'CYCLES="${CYCLES:-5}"' in src
     assert "ALLOW_LEVEL2" in src
     assert "super_semantic_gate()" in src
+    assert 'base + "/v1/completions"' in src
     assert '"temperature": 0' in src
-    assert '"max_tokens": 16' in src
-    assert '"chat_template_kwargs": {"enable_thinking": False}' in src
+    assert '"max_tokens": 24' in src
+    assert '"chat_template_kwargs": {"enable_thinking": False}' not in src
+    assert "visible_answer(" in src
+    for expected in ["FOUR", '{"status":"ok"}', "FAIL"]:
+        assert expected in src
+    for probe_name in ["known_answer", "structured_shape", "wake_reasoning"]:
+        assert probe_name in src
+    assert "corruption_signature=" in src
+    assert "semantic_failure_restart_required" in src
 
 
 def test_super_sleep_cycle_harness_bash_syntax_clean():
@@ -173,6 +189,10 @@ def test_omni_window_packet_centered_single_controller():
     assert "Peer GPU still has a process using" in src
     assert "super_restart_begin" in src
     assert "post_wake_semantic_passed" in src
+    assert "restore_non_sleep_restart" in src
+    assert "restored_non_sleep_semantic_passed" in src
+    assert "visual/manifold perception organ" in src
+    assert "absorption_targets" in src
     assert "semantic_failure_restart_required" in src
     assert "success_condition" in src
     assert "no sensory visual claim" in src
