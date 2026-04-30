@@ -74,6 +74,21 @@ log "preflight semantic gate"
 super_semantic_gate || die "preflight semantic gate failed; refusing sleep cycle"
 for n in $(seq 1 "$CYCLES"); do
     log "cycle ${n}/${CYCLES}: sleep level=${SLEEP_LEVEL}"
+
+# vLLM sleep/wake cache hygiene.
+# vLLM issue #17103 and ms-swift PR #5143 document a broader class where
+# sleep -> wake_up can produce meaningless outputs if prefix-cache state is
+# left dirty. Reset the prefix cache before every sleep; if reset is not
+# available or fails, refuse sleep. Dreaming without reliable wake semantics is
+# outage, not dreaming.
+reset_prefix_cache_or_die() {
+    local resp
+    resp=$(curl -sf -X POST "${SUPER_URL}/reset_prefix_cache" 2>&1) || \
+        die "reset_prefix_cache failed before sleep; refusing sleep because wake may produce meaningless output: ${resp}"
+    log "prefix cache reset ok before sleep"
+}
+
+    reset_prefix_cache_or_die
     curl -sf -X POST "${SUPER_URL}/sleep?level=${SLEEP_LEVEL}" >/dev/null || die "sleep request failed on cycle ${n}"
     deadline=$(( $(date +%s) + 180 ))
     SUPER_SLEEPING=false
