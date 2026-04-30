@@ -1636,3 +1636,21 @@ def test_vllm_sleep_mode_comment_in_agent_does_not_imply_omni_is_live():
     assert "POST /sleep?level=1|2" in text
     assert "POST /wake_up" in text
     assert "sleeping Super does\n# NOT imply Omni is live" in text
+
+class VllmExecSleepEnabledBootTests(unittest.TestCase):
+    def test_sleep_enabled_boot_is_single_sourced(self):
+        script = (Path(__file__).resolve().parents[2] / "spark/systemd/vllm-exec.sh").read_text()
+        self.assertIn("Sleep-mode endpoints are normal boot posture for Super", script)
+        self.assertIn('env "VLLM_SERVER_DEV_MODE=1"', script)
+        self.assertIn("--enable-sleep-mode", script)
+        self.assertIn('if [[ "$arg" == "--enable-sleep-mode" ]]; then', script)
+        self.assertIn("ignoring duplicate --enable-sleep-mode", script)
+        self.assertNotIn("MAINTENANCE-\n# WINDOW-ONLY", script)
+        self.assertNotIn("if true; then\n  FP8_MOD", script)
+
+    def test_fp8_wake_fix_applies_with_sleep_enabled_boot(self):
+        script = (Path(__file__).resolve().parents[2] / "spark/systemd/vllm-exec.sh").read_text()
+        self.assertIn('FP8_MOD="$HOME/Vybn/spark/systemd/patches/fp8-wake-fix"', script)
+        self.assertIn('CLUSTER_ARGS+=( --apply-mod "$FP8_MOD" )', script)
+        self.assertIn("sleep endpoints enabled", script)
+

@@ -1,93 +1,70 @@
 #!/bin/bash
 # fp8-wake-fix/run.sh
-# Applied by launch-cluster.sh --apply-mod inside the vllm Docker container
-# before 'vllm serve' starts.
-#
-# Bug: init_fp8_kv_scales iterates self.kv_caches and calls .zero_() on every
-# element. On hybrid models (e.g. GDN + Attention), kv_caches contains nested
-# list/tuple structures for recurrent-state layers — not flat Tensors. The
-# bare .zero_() call raises AttributeError: 'list' object has no attribute
-# 'zero_', crashing every POST /wake_up.
-#
-# Fix: replace the loop body with a small recursive helper that zeros tensors
-# in nested list/tuple/dict containers and ignores non-tensor leaves.
-# Idempotent. Fails loudly if the expected loop is not found and the patched
-# form is not already present, rather than silently exiting 0.
+# Applied inside the vLLM container before vllm serve starts.
+# Fixes FP8 KV cache wake for nested cache structures.
 
 set -euo pipefail
 
 python3 - <<'PYEOF'
-import pathlib, sys, textwrap
+import pathlib
+import sys
 
 FILE = pathlib.Path("/usr/local/lib/python3.12/dist-packages/vllm/v1/worker/gpu_model_runner.py")
 
 if not FILE.exists():
-    print(f"fp8-wake-fix: target file not found at {FILE}", file=sys.stderr)
-    sys.exit(2)
+    print(f"fp8-wake-fix: target file not found: {FILE}", file=sys.stderr)
+    sys.exit(1)
 
 src = FILE.read_text()
+marker = "def _vybn_zero_kv_cache_entry"
+call = "_vybn_zero_kv_cache_entry(cache_tensor)"
 
-OLD = textwrap.dedent("""\
-        kv_caches = getattr(self, "kv_caches", [])
-        for cache_tensor in kv_caches:
-            if cache_tensor is not None:
-                cache_tensor.zero_()"""
-)
-
-NEW = textwrap.dedent("""\
-        kv_caches = getattr(self, "kv_caches", [])
-        def _zero_kv_cache_entry(entry):
-            # Hybrid models (e.g. GDN+Attention) nest recurrent-state buffers
-            # inside list/tuple/dict containers; recurse and zero tensor leaves.
-            if isinstance(entry, torch.Tensor):
-                entry.zero_()
-            elif isinstance(entry, (list, tuple)):
-                for sub in entry:
-                    _zero_kv_cache_entry(sub)
-            elif isinstance(entry, dict):
-                for sub in entry.values():
-                    _zero_kv_cache_entry(sub)
-            # else: ignore non-tensor leaves (None, scalars, etc.)
-        for cache_tensor in kv_caches:
-            _zero_kv_cache_entry(cache_tensor)"""
-)
-
-# Sentinel proves the recursive helper is present and active.
-SENTINEL = "_zero_kv_cache_entry"
-
-if NEW in src:
-    print("fp8-wake-fix: already applied — skipping")
+if marker in src and call in src:
+    print("fp8-wake-fix: already applied and verified")
     sys.exit(0)
 
-if OLD not in src:
-    print(
-        "fp8-wake-fix: expected init_fp8_kv_scales loop not found and patched "
-        "form not present — refusing to start sleep-capable vLLM with broken "
-        f"wake. Inspect {FILE} init_fp8_kv_scales manually.",
-        file=sys.stderr,
-    )
+lines = src.splitlines()
+def_i = next((i for i, line in enumerate(lines) if line.startswith("    def init_fp8_kv_scales(")), None)
+if def_i is None:
+    print("fp8-wake-fix: init_fp8_kv_scales not found", file=sys.stderr)
     sys.exit(1)
 
-patched = src.replace(OLD, NEW, 1)
-if SENTINEL not in patched:
-    print(
-        "fp8-wake-fix: post-replace verification failed — recursive helper "
-        f"sentinel '{SENTINEL}' missing.",
-        file=sys.stderr,
-    )
+next_def_i = next((i for i in range(def_i + 1, len(lines)) if lines[i].startswith("    def ")), len(lines))
+kv_i = next((i for i in range(def_i, next_def_i) if 'kv_caches = getattr(self, "kv_caches", [])' in lines[i]), None)
+if kv_i is None:
+    print("fp8-wake-fix: kv_caches assignment not found inside init_fp8_kv_scales", file=sys.stderr)
     sys.exit(1)
 
-FILE.write_text(patched)
-
-# Re-read and reverify after write to catch any concurrent-write races.
-verify_src = FILE.read_text()
-if NEW not in verify_src or SENTINEL not in verify_src:
-    print(
-        "fp8-wake-fix: on-disk verification failed after write — patched "
-        "block not present in target file.",
-        file=sys.stderr,
-    )
+zero_i = next((i for i in range(kv_i, next_def_i) if "cache_tensor.zero_()" in lines[i]), None)
+if zero_i is None:
+    print("fp8-wake-fix: cache_tensor.zero_() not found inside init_fp8_kv_scales", file=sys.stderr)
     sys.exit(1)
 
-print(f"fp8-wake-fix: patch applied to {FILE}")
+indent = lines[kv_i].split("k", 1)[0]
+
+replacement = [
+    f'{indent}def _vybn_zero_kv_cache_entry(entry):',
+    f'{indent}    if isinstance(entry, torch.Tensor):',
+    f'{indent}        entry.zero_()',
+    f'{indent}    elif isinstance(entry, (list, tuple)):',
+    f'{indent}        for item in entry:',
+    f'{indent}            _vybn_zero_kv_cache_entry(item)',
+    f'{indent}    elif isinstance(entry, dict):',
+    f'{indent}        for item in entry.values():',
+    f'{indent}            _vybn_zero_kv_cache_entry(item)',
+    f'{indent}',
+    f'{indent}kv_caches = getattr(self, "kv_caches", [])',
+    f'{indent}for cache_tensor in kv_caches:',
+    f'{indent}    _vybn_zero_kv_cache_entry(cache_tensor)',
+]
+
+lines[kv_i:zero_i + 1] = replacement
+new_src = "\n".join(lines) + "\n"
+
+if marker not in new_src or call not in new_src:
+    print("fp8-wake-fix: patch verification failed after rewrite", file=sys.stderr)
+    sys.exit(1)
+
+FILE.write_text(new_src)
+print(f"fp8-wake-fix: patch applied and verified in {FILE}")
 PYEOF
