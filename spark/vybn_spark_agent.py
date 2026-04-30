@@ -27,9 +27,11 @@ That concern lives inside AnthropicProvider now.
 
 from __future__ import annotations
 
+import json
 import os
 import sys
 import time
+import urllib.request
 
 # Ensure the spark/ directory is importable when this file is run directly.
 _SPARK_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -700,6 +702,102 @@ _TRANSIENT_PATTERNS = (
 _MAINTENANCE_DEFERRALS_CAP = 32
 _MAINTENANCE_DEFERRALS: list[dict[str, Any]] = []
 
+_SUPER_SEMANTIC_GATE_CACHE_TTL = 300.0
+_SUPER_SEMANTIC_GATE_CACHE: dict[str, dict[str, Any]] = {}
+
+
+def _is_loopback_super_base(base_url: str | None) -> bool:
+    """True only for the primary local Super endpoint, not peer @omni.
+
+    _is_local_super_base intentionally includes private-LAN peer endpoints
+    for maintenance notices. The semantic fallback gate below must be
+    narrower: it protects first local-Nemotron/Super turns without changing
+    the explicit @omni route or consuming peer Omni probes.
+    """
+    if not base_url or "://" not in base_url:
+        return False
+    host = base_url.lower().split("://", 1)[1].split("/", 1)[0].split(":", 1)[0]
+    return host in ("localhost", "127.0.0.1", "0.0.0.0", "::1")
+
+
+def _local_super_semantic_gate(
+    *,
+    base_url: str | None,
+    model: str | None,
+    now: float | None = None,
+) -> tuple[bool, str]:
+    """Cached deterministic semantic check for local Super.
+
+    Endpoint liveness is not integrity. Before the first local-Nemotron turn
+    in a process (and periodically after TTL), require one temperature-0,
+    16-token completion with exact expected content and no truncation. A
+    failure lets the caller route to cloud fallback instead of serving token
+    soup from a semantically corrupted local wake.
+    """
+    if not base_url or not model or not _is_loopback_super_base(base_url):
+        return True, "not-local-super"
+    now = time.time() if now is None else now
+    base = base_url.rstrip("/")
+    cached = _SUPER_SEMANTIC_GATE_CACHE.get(base)
+    if cached and now - float(cached.get("ts", 0.0)) < _SUPER_SEMANTIC_GATE_CACHE_TTL:
+        return bool(cached.get("ok")), str(cached.get("reason", "cached"))
+    try:
+        payload = {
+            "model": model,
+            "messages": [{"role": "user", "content": "Answer with exactly: FOUR"}],
+            "max_tokens": 16,
+            "temperature": 0,
+        }
+        req = urllib.request.Request(
+            base + "/chat/completions",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=45) as resp:
+            raw = resp.read().decode("utf-8", errors="replace")
+        result = json.loads(raw)
+        choice = (result.get("choices") or [{}])[0]
+        finish = choice.get("finish_reason")
+        message = choice.get("message") or {}
+        content = str(message.get("content") or "").strip()
+        if finish == "length":
+            ok, reason = False, "semantic gate truncated finish_reason=length"
+        elif not content:
+            ok, reason = False, "semantic gate empty completion"
+        elif not _re.fullmatch(r"FOUR[.!]?", content, flags=_re.IGNORECASE):
+            ok, reason = False, f"semantic gate unexpected content={content[:80]!r}"
+        else:
+            ok, reason = True, "semantic gate passed"
+    except Exception as exc:  # noqa: BLE001 — gate failure should fall back safely
+        ok, reason = False, f"semantic gate exception {exc.__class__.__name__}: {_sanitize_provider_error(exc)}"
+    _SUPER_SEMANTIC_GATE_CACHE[base] = {"ok": ok, "reason": reason, "ts": now}
+    return ok, reason
+
+
+def _fallback_to_sonnet_for_super_semantic_failure(router, role_cfg):
+    """Return a Sonnet fallback RoleConfig preserving tools/turn shape.
+
+    Do not return the policy's first Sonnet role (usually create/task): that
+    changes the active role, RAG/lightweight posture, and tool contract. This
+    fallback is a semantic-health substitution for the same turn shape.
+    """
+    from harness.policy import RoleConfig
+    return RoleConfig(
+        role=f"{role_cfg.role}:super-semantic-fb",
+        provider="anthropic",
+        model="claude-sonnet-4-6",
+        thinking="off",
+        max_tokens=role_cfg.max_tokens,
+        max_iterations=role_cfg.max_iterations,
+        tools=list(role_cfg.tools),
+        temperature=role_cfg.temperature,
+        base_url=None,
+        rag=role_cfg.rag,
+        lightweight=role_cfg.lightweight,
+        recurrent_depth=getattr(role_cfg, "recurrent_depth", 1),
+    )
+
 
 def _is_local_super_base(base_url: str | None) -> bool:
     """True when base_url points at a loopback/private-LAN OpenAI-compatible
@@ -1357,6 +1455,47 @@ def run_agent_loop(
             messages.append({"role": "user", "content": decision.cleaned_input})
             messages.append({"role": "assistant", "content": notice})
             return notice
+
+    if (
+        role_cfg.provider == "openai"
+        and _is_loopback_super_base(role_cfg.base_url)
+        and role_cfg.model == "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"
+    ):
+        _super_ok, _super_reason = _local_super_semantic_gate(
+            base_url=role_cfg.base_url,
+            model=role_cfg.model,
+        )
+        if not _super_ok:
+            _transport_gate_failure = any(
+                sig in _super_reason.lower()
+                for sig in ("connection", "refused", "timed out", "urlerror", "connect")
+            )
+            if _transport_gate_failure:
+                notice = _format_super_maintenance_notice(
+                    reason=_super_reason,
+                    cause="refused",
+                    role_model=role_cfg.model,
+                    role_base=role_cfg.base_url,
+                    logger=logger,
+                    turn_number=turn_number,
+                )
+                _warn(notice)
+                messages.append({"role": "user", "content": decision.cleaned_input})
+                messages.append({"role": "assistant", "content": notice})
+                return notice
+            fb_cfg = _fallback_to_sonnet_for_super_semantic_failure(router, role_cfg)
+            logger.emit(
+                "super_semantic_gate_fallback",
+                turn=turn_number,
+                from_model=role_cfg.model,
+                to_model=fb_cfg.model,
+                reason=_super_reason[:200],
+            )
+            _warn(
+                "local Super semantic gate failed; falling back to "
+                f"{fb_cfg.provider}:{fb_cfg.model}. reason: {_super_reason}"
+            )
+            role_cfg = fb_cfg
 
     provider = registry.get(role_cfg)
 

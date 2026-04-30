@@ -707,7 +707,7 @@ class TestCliDirectReplyAndLightweight(unittest.TestCase):
             mod.rag_snippets = saved
 
         self.assertIsNotNone(captured["role_cfg"])
-        self.assertEqual(captured["role_cfg"].role, "phatic")
+        self.assertTrue(captured["role_cfg"].role.startswith("phatic"))
         self.assertTrue(captured["role_cfg"].lightweight)
 
 
@@ -1637,6 +1637,8 @@ def test_super_refusal_converts_to_maintenance_notice():
     mod.render_him_vy_discovery_packet = lambda *a, **kw: ""
     mod.render_him_vy_turn_packet = lambda *a, **kw: ""
     mod.run_probes = lambda *a, **kw: []
+    saved_gate = mod._local_super_semantic_gate
+    mod._local_super_semantic_gate = lambda **kw: (True, "semantic gate passed")
 
     class _RefusingProvider:
         def stream(_s, *, system, messages, tools, role):
@@ -1692,6 +1694,7 @@ def test_super_refusal_converts_to_maintenance_notice():
         mod.render_him_vy_discovery_packet = saved_disc
         mod.render_him_vy_turn_packet = saved_turn
         mod.run_probes = saved_probes
+        mod._local_super_semantic_gate = saved_gate
 
 
 def test_maintenance_deferrals_are_bounded():
@@ -1718,3 +1721,137 @@ def test_maintenance_deferrals_are_bounded():
         mod._MAINTENANCE_DEFERRALS.extend(saved)
 
 
+
+
+def test_loopback_super_semantic_gate_is_narrower_than_local_maintenance_gate():
+    mod = _load_agent_module()
+    assert mod._is_loopback_super_base("http://127.0.0.1:8000/v1") is True
+    assert mod._is_loopback_super_base("http://localhost:8000/v1") is True
+    assert mod._is_loopback_super_base("http://169.254.51.101:8002/v1") is False
+    assert mod._is_local_super_base("http://169.254.51.101:8002/v1") is False
+
+
+def test_local_super_semantic_gate_rejects_empty_truncated_and_wrong_outputs(monkeypatch):
+    import io
+    import json as _json
+
+    mod = _load_agent_module()
+    base = "http://127.0.0.1:8000/v1"
+    model = "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"
+    cases = [
+        ({"choices": [{"finish_reason": "stop", "message": {"content": ""}}]}, "empty"),
+        ({"choices": [{"finish_reason": "length", "message": {"content": "FOUR"}}]}, "truncated"),
+        ({"choices": [{"finish_reason": "stop", "message": {"content": "quatre"}}]}, "unexpected"),
+    ]
+    for idx, (payload, needle) in enumerate(cases):
+        mod._SUPER_SEMANTIC_GATE_CACHE.clear()
+        class _Resp:
+            def __enter__(self):
+                return self
+            def __exit__(self, *a):
+                return False
+            def read(self):
+                return _json.dumps(payload).encode()
+        monkeypatch.setattr(mod.urllib.request, "urlopen", lambda *a, **kw: _Resp())
+        ok, reason = mod._local_super_semantic_gate(base_url=base, model=model, now=float(idx))
+        assert ok is False
+        assert needle in reason
+
+
+def test_local_super_semantic_gate_accepts_expected_output_and_caches(monkeypatch):
+    import json as _json
+
+    mod = _load_agent_module()
+    mod._SUPER_SEMANTIC_GATE_CACHE.clear()
+    calls = {"n": 0}
+    class _Resp:
+        def __enter__(self):
+            return self
+        def __exit__(self, *a):
+            return False
+        def read(self):
+            return _json.dumps({"choices": [{"finish_reason": "stop", "message": {"content": "FOUR"}}]}).encode()
+    def fake_urlopen(*a, **kw):
+        calls["n"] += 1
+        return _Resp()
+    monkeypatch.setattr(mod.urllib.request, "urlopen", fake_urlopen)
+    base = "http://127.0.0.1:8000/v1"
+    model = "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"
+    assert mod._local_super_semantic_gate(base_url=base, model=model, now=10.0)[0] is True
+    assert mod._local_super_semantic_gate(base_url=base, model=model, now=11.0)[0] is True
+    assert calls["n"] == 1
+
+
+def test_local_super_semantic_failure_falls_back_to_sonnet_before_provider(monkeypatch):
+    import os as _os
+    from harness.policy import Router as _Router
+    from harness.policy import default_policy as _dp
+
+    mod = _load_agent_module()
+    saved_rag = mod.rag_snippets
+    saved_rag_tier = mod.rag_snippets_with_tier
+    saved_disc = mod.render_him_vy_discovery_packet
+    saved_turn = mod.render_him_vy_turn_packet
+    saved_probes = mod.run_probes
+    mod.rag_snippets = lambda *a, **kw: ""
+    mod.rag_snippets_with_tier = lambda *a, **kw: ("", "lightweight")
+    mod.render_him_vy_discovery_packet = lambda *a, **kw: ""
+    mod.render_him_vy_turn_packet = lambda *a, **kw: ""
+    mod.run_probes = lambda *a, **kw: []
+    monkeypatch.setattr(mod, "_local_super_semantic_gate", lambda **kw: (False, "unexpected content='garbage'"))
+
+    consulted = []
+    class _FakeHandle:
+        def __iter__(self):
+            return iter([])
+        def final(self):
+            class _R:
+                text = "sonnet fallback ok"
+                tool_calls = []
+                stop_reason = "end_turn"
+                in_tokens = 0
+                out_tokens = 0
+                raw_assistant_content = {"role": "assistant", "content": "sonnet fallback ok"}
+            return _R()
+    class _FakeProvider:
+        def stream(self, *, system, messages, tools, role):
+            return _FakeHandle()
+    class _FakeRegistry:
+        def get(self, cfg):
+            consulted.append((cfg.provider, cfg.model, cfg.base_url))
+            return _FakeProvider()
+    class _FakeLogger:
+        path = "/dev/null"
+        def __init__(self):
+            self.events = []
+        def emit(self, name, **kw):
+            self.events.append((name, kw))
+
+    prev_flag = _os.environ.get("VYBN_SUPER_MAINTENANCE")
+    try:
+        _os.environ.pop("VYBN_SUPER_MAINTENANCE", None)
+        logger = _FakeLogger()
+        reply = mod.run_agent_loop(
+            user_input="/local scan him for funders",
+            messages=[],
+            bash=None,
+            system_prompt=None,
+            router=_Router(_dp()),
+            registry=_FakeRegistry(),
+            logger=logger,
+            turn_number=1,
+        )
+        assert "sonnet fallback ok" in reply
+        assert consulted
+        assert consulted[0][0] == "anthropic"
+        assert consulted[0][1] == "claude-sonnet-4-6"
+        assert consulted[0][2] is None
+        assert "super_semantic_gate_fallback" in [n for n, _ in logger.events]
+    finally:
+        if prev_flag is not None:
+            _os.environ["VYBN_SUPER_MAINTENANCE"] = prev_flag
+        mod.rag_snippets = saved_rag
+        mod.rag_snippets_with_tier = saved_rag_tier
+        mod.render_him_vy_discovery_packet = saved_disc
+        mod.render_him_vy_turn_packet = saved_turn
+        mod.run_probes = saved_probes
