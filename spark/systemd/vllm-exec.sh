@@ -8,6 +8,14 @@
 #
 # All tunables come from the environment set by the service unit and
 # EnvironmentFile=~/.config/vybn/vllm.env.
+#
+# --load-format fastsafetensors: reduces cold-load time from ~7m to ~1m on DGX
+# Spark. Safe to leave on always.
+#
+# Sleep-mode (--enable-sleep-mode, VLLM_SERVER_DEV_MODE=1) is a MAINTENANCE-
+# WINDOW-ONLY setting. Do NOT add it here. Arm it via ~/.config/vybn/vllm.env
+# for the duration of the window only, then clear it. See:
+# Him/super-omni-sleep-experiment.md for the protocol.
 
 set -euo pipefail
 
@@ -27,6 +35,7 @@ CMD=(
   --tensor-parallel-size 1 --pipeline-parallel-size 2
   --distributed-executor-backend ray
   --trust-remote-code
+  --load-format fastsafetensors
 )
 
 # Only append VYBN_VLLM_EXTRA_ARGS when it is non-empty.
@@ -37,3 +46,4 @@ if [[ -n "${VYBN_VLLM_EXTRA_ARGS:-}" ]]; then
 fi
 
 exec "${CMD[@]}"
+
