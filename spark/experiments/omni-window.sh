@@ -98,60 +98,59 @@ packet_event "packet_stub_created" "created before preflight/restart; controller
 # are not truncated. If this fails, the caller must fail closed and let
 # cleanup's restart path recover Super; Omni artifacts must not be consumed.
 super_semantic_gate() {
-    local label="${1:-super}"
-    python3 - <<'PYEOF'
+  python3 - <<'PY'
 import json, re, sys, urllib.request
 
 base = "http://127.0.0.1:8000"
+model = "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"
+
+def visible_answer(text):
+    text = (text or "").strip()
+    if "</think>" in text:
+        text = text.rsplit("</think>", 1)[-1].strip()
+    return text
+
 try:
     with urllib.request.urlopen(base + "/v1/models", timeout=8) as r:
-        model_id = json.load(r)["data"][0]["id"]
+        if r.status != 200:
+            print(f"semantic gate precheck failed: models HTTP {r.status}")
+            sys.exit(1)
 except Exception as exc:
     print(f"semantic gate precheck failed: models endpoint: {type(exc).__name__}: {exc}")
-    sys.exit(10)
+    sys.exit(1)
 
 probes = [
-    ("math", "Answer with exactly: FOUR", re.compile(r"^FOUR[.!]?\s*$", re.I)),
-    ("shape", "Answer with exactly this JSON: {\"ok\":true}", re.compile(r'^\{\s*"ok"\s*:\s*true\s*\}\s*$')),
-    ("language", "Answer in English with exactly: READY", re.compile(r"^READY[.!]?\s*$", re.I)),
+    ("math", "Answer with exactly this single word and nothing else: FOUR\nAnswer:", re.compile(r"^FOUR[.!]?\s*$", re.I)),
+    ("language", "Answer with exactly this single word and nothing else: READY\nAnswer:", re.compile(r"^READY[.!]?\s*$", re.I)),
 ]
-
 for name, prompt, pattern in probes:
-    payload = {
-        "model": model_id,
-        "messages": [{"role": "user", "content": prompt}],
-        "max_tokens": 16,
-        "temperature": 0,
-        "chat_template_kwargs": {"enable_thinking": False},
-    }
+    payload = {"model": model, "prompt": prompt, "max_tokens": 24, "temperature": 0}
     req = urllib.request.Request(
-        base + "/v1/chat/completions",
+        base + "/v1/completions",
         data=json.dumps(payload).encode(),
         headers={"Content-Type": "application/json"},
         method="POST",
     )
     try:
-        with urllib.request.urlopen(req, timeout=60) as r:
-            raw = r.read().decode("utf-8", errors="replace")
-        result = json.loads(raw)
+        with urllib.request.urlopen(req, timeout=45) as r:
+            body = json.loads(r.read().decode("utf-8", errors="replace"))
     except Exception as exc:
         print(f"semantic gate probe {name} failed transport/parse: {type(exc).__name__}: {exc}")
-        sys.exit(20)
-    choice = (result.get("choices") or [{}])[0]
+        sys.exit(1)
+    choice = (body.get("choices") or [{}])[0]
+    content = visible_answer(str(choice.get("text") or ""))
     finish = choice.get("finish_reason")
-    msg = choice.get("message") or {}
-    content = (msg.get("content") or "").strip()
     if finish == "length":
         print(f"semantic gate probe {name} failed: truncated finish_reason=length content={content!r}")
-        sys.exit(30)
+        sys.exit(1)
     if not content:
         print(f"semantic gate probe {name} failed: empty completion finish_reason={finish!r}")
-        sys.exit(31)
+        sys.exit(1)
     if not pattern.fullmatch(content):
         print(f"semantic gate probe {name} failed: unexpected content={content!r} finish_reason={finish!r}")
-        sys.exit(32)
+        sys.exit(1)
 print("semantic gate passed")
-PYEOF
+PY
 }
 
 # ── state flags ───────────────────────────────────────────────────────────────

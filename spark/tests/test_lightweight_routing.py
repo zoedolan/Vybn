@@ -1739,9 +1739,9 @@ def test_local_super_semantic_gate_rejects_empty_truncated_and_wrong_outputs(mon
     base = "http://127.0.0.1:8000/v1"
     model = "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"
     cases = [
-        ({"choices": [{"finish_reason": "stop", "message": {"content": ""}}]}, "empty"),
-        ({"choices": [{"finish_reason": "length", "message": {"content": "FOUR"}}]}, "truncated"),
-        ({"choices": [{"finish_reason": "stop", "message": {"content": "quatre"}}]}, "unexpected"),
+        ({"choices": [{"finish_reason": "stop", "text": ""}]}, "empty"),
+        ({"choices": [{"finish_reason": "length", "text": " FOUR"}]}, "truncated"),
+        ({"choices": [{"finish_reason": "stop", "text": " quatre"}]}, "unexpected"),
     ]
     for idx, (payload, needle) in enumerate(cases):
         mod._SUPER_SEMANTIC_GATE_CACHE.clear()
@@ -1770,7 +1770,7 @@ def test_local_super_semantic_gate_accepts_expected_output_and_caches(monkeypatc
         def __exit__(self, *a):
             return False
         def read(self):
-            return _json.dumps({"choices": [{"finish_reason": "stop", "message": {"content": "FOUR"}}]}).encode()
+            return _json.dumps({"choices": [{"finish_reason": "stop", "text": " </think>\\n\\nFOUR"}]}).encode()
     def fake_urlopen(*a, **kw):
         calls["n"] += 1
         return _Resp()
