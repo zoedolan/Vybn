@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Vybn pre-commit hook: secret and surface scanner
-# Prevents accidental commit of credentials, internal IPs, and PII.
+# Vybn pre-commit hook: secret scanner + shrinkage guard + sudo-n lint
+# Prevents accidental commit of credentials, internal IPs, PII,
+# catastrophic file truncations, and non-interactive sudo hangs.
 #
 # Install: git config core.hooksPath .githooks
 # This hook is tracked in the repo so every clone gets it.
@@ -50,6 +51,64 @@ for f in $STAGED; do
             ;;
     esac
 done
+
+# --- 4. Catastrophic shrinkage guard ---
+# Block any staged modification that reduces a previously-committed file
+# by more than 80% of its prior byte count. Catches accidental overwrites
+# (e.g. policy.py 1170→20 lines, ~98% loss on 2026-04-30).
+#
+# Override: VYBN_ALLOW_SHRINK=1 git commit
+SHRINK_THRESHOLD=80   # percent
+
+if [[ "${VYBN_ALLOW_SHRINK:-}" != "1" ]]; then
+    for f in $STAGED; do
+        # Only check files that already exist in HEAD
+        if ! git cat-file -e "HEAD:${f}" 2>/dev/null; then
+            continue
+        fi
+        # Skip binaries
+        case "$f" in *.png|*.jpg|*.gif|*.ico|*.woff*|*.ttf|*.pyc|*.bin) continue ;; esac
+
+        prior_size=$(git cat-file -p "HEAD:${f}" | wc -c)
+        staged_size=$(git show ":${f}" | wc -c)
+
+        if [ "$prior_size" -gt 0 ]; then
+            # reduction_pct = (prior - staged) * 100 / prior
+            reduction=$(( (prior_size - staged_size) * 100 / prior_size ))
+            if [ "$reduction" -ge "$SHRINK_THRESHOLD" ]; then
+                echo -e "${RED}BLOCKED${NC}: ${f} shrank ${reduction}% (${prior_size} → ${staged_size} bytes)."
+                echo "  This looks like an accidental overwrite."
+                echo "  If intentional: VYBN_ALLOW_SHRINK=1 git commit"
+                BLOCKED=1
+            fi
+        fi
+    done
+fi
+
+# --- 5. sudo -n lint for shell scripts ---
+# Bare 'sudo' without -n hangs forever in non-interactive scripts.
+# Catches the class of bug seen in omni-window.sh (2026-04-30).
+#
+# Override: VYBN_ALLOW_SUDO_HANG=1 git commit
+if [[ "${VYBN_ALLOW_SUDO_HANG:-}" != "1" ]]; then
+    for f in $STAGED; do
+        case "$f" in *.sh|*.bash) ;; *) continue ;; esac
+        # Look for added lines containing sudo without -n
+        # Pattern: sudo followed by optional flags that don't include -n,
+        # then a command — simplified: 'sudo ' not followed immediately by '-n'
+        bad_sudo=$(git diff --cached -- "$f" \
+            | grep -P '^\+(?!\+)' \
+            | grep -P '\bsudo\s+(?!(-n\b|-[A-Za-z]*n))' \
+            | grep -v '^+++' \
+            || true)
+        if [ -n "$bad_sudo" ]; then
+            echo -e "${YELLOW}WARNING${NC}: ${f} has sudo call(s) without -n (may hang in non-interactive context):"
+            echo "$bad_sudo" | sed 's/^/  /'
+            echo "  Add -n to sudo, or: VYBN_ALLOW_SUDO_HANG=1 git commit"
+            BLOCKED=1
+        fi
+    done
+fi
 
 if [ "$BLOCKED" -ne 0 ]; then
     echo ""

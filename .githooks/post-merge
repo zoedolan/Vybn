@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Restore exec bit on .sh files after every pull/merge.
+#
+# Git resets file modes to 100644 on checkout. systemd ExecStart
+# requires executable files (fails with status=203/EXEC if missing).
+# This hook restores +x on all .sh files changed by the merge so
+# the deploy side never needs a manual chmod step.
+#
+# Permanent complement to the /bin/bash <path> ExecStart workaround
+# in vybn-vllm.service — belt and suspenders.
+
+set -euo pipefail
+
+changed=$(git diff-tree -r --name-only --no-commit-id ORIG_HEAD HEAD 2>/dev/null \
+    | grep '\.sh$' || true)
+
+if [ -n "$changed" ]; then
+    echo "[post-merge] restoring exec bit on .sh files:"
+    echo "$changed" | while read -r f; do
+        if [ -f "$f" ]; then
+            chmod +x "$f"
+            echo "  +x $f"
+        fi
+    done
+fi
+
+exit 0

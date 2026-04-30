@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# Restore exec bit on .sh files after branch checkout or git pull --rebase.
+#
+# Arguments (per githooks(5)):
+#   $1 = previous HEAD sha
+#   $2 = new HEAD sha
+#   $3 = 1 if branch checkout, 0 if file checkout
+
+set -euo pipefail
+
+prev_head="$1"
+new_head="$2"
+branch_checkout="$3"
+
+# Only act on branch-level checkouts (not single-file restores)
+if [ "$branch_checkout" != "1" ]; then
+    exit 0
+fi
+
+# If no previous HEAD (fresh clone), chmod everything
+if [ "$prev_head" = "0000000000000000000000000000000000000000" ]; then
+    find . -name '*.sh' -not -path './.git/*' | while read -r f; do
+        chmod +x "$f"
+    done
+    exit 0
+fi
+
+changed=$(git diff-tree -r --name-only --no-commit-id "$prev_head" "$new_head" 2>/dev/null \
+    | grep '\.sh$' || true)
+
+if [ -n "$changed" ]; then
+    echo "[post-checkout] restoring exec bit on .sh files:"
+    echo "$changed" | while read -r f; do
+        if [ -f "$f" ]; then
+            chmod +x "$f"
+            echo "  +x $f"
+        fi
+    done
+fi
+
+exit 0
