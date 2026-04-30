@@ -651,12 +651,14 @@ class TestCliDirectReplyAndLightweight(unittest.TestCase):
 
         # Tripwire RAG — called for lightweight turns means regression.
         saved = mod.rag_snippets
+        saved_gate = mod._local_super_semantic_gate
         def _no_rag(*_a, **_kw):
             raise AssertionError(
                 "phatic turn must not invoke rag_snippets — deep-memory"
                 " enrichment is gated for lightweight roles"
             )
         mod.rag_snippets = _no_rag
+        mod._local_super_semantic_gate = lambda **kw: (True, "semantic gate passed")
 
         # The phatic provider call is mocked to return a tiny response.
         captured = {"role_cfg": None}
@@ -705,6 +707,7 @@ class TestCliDirectReplyAndLightweight(unittest.TestCase):
             )
         finally:
             mod.rag_snippets = saved
+            mod._local_super_semantic_gate = saved_gate
 
         self.assertIsNotNone(captured["role_cfg"])
         self.assertTrue(captured["role_cfg"].role.startswith("phatic"))
@@ -1732,18 +1735,17 @@ def test_loopback_super_semantic_gate_is_narrower_than_local_maintenance_gate():
 
 
 def test_local_super_semantic_gate_rejects_empty_truncated_and_wrong_outputs(monkeypatch):
-    import io
     import json as _json
 
     mod = _load_agent_module()
     base = "http://127.0.0.1:8000/v1"
     model = "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"
     cases = [
-        ({"choices": [{"finish_reason": "stop", "text": ""}]}, "empty"),
-        ({"choices": [{"finish_reason": "length", "text": " FOUR"}]}, "truncated"),
-        ({"choices": [{"finish_reason": "stop", "text": " quatre"}]}, "unexpected"),
+        ({"choices": [{"finish_reason": "stop", "text": ""}]}, "known_answer", "empty"),
+        ({"choices": [{"finish_reason": "length", "text": " FOUR"}]}, "known_answer", "truncated"),
+        ({"choices": [{"finish_reason": "stop", "text": " quatre"}]}, "known_answer", "unexpected"),
     ]
-    for idx, (payload, needle) in enumerate(cases):
+    for idx, (payload, probe_name, needle) in enumerate(cases):
         mod._SUPER_SEMANTIC_GATE_CACHE.clear()
         class _Resp:
             def __enter__(self):
@@ -1755,7 +1757,55 @@ def test_local_super_semantic_gate_rejects_empty_truncated_and_wrong_outputs(mon
         monkeypatch.setattr(mod.urllib.request, "urlopen", lambda *a, **kw: _Resp())
         ok, reason = mod._local_super_semantic_gate(base_url=base, model=model, now=float(idx))
         assert ok is False
+        assert probe_name in reason
         assert needle in reason
+
+
+def test_local_super_semantic_gate_rejects_structured_and_reasoning_corruption(monkeypatch):
+    import json as _json
+
+    mod = _load_agent_module()
+    base = "http://127.0.0.1:8000/v1"
+    model = "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"
+    cases = [
+        (
+            [
+                {"choices": [{"finish_reason": "stop", "text": " FOUR"}]},
+                {"choices": [{"finish_reason": "stop", "text": " status ok"}]},
+            ],
+            "structured_shape",
+        ),
+        (
+            [
+                {"choices": [{"finish_reason": "stop", "text": " FOUR"}]},
+                {"choices": [{"finish_reason": "stop", "text": ' {"status":"ok"}'}]},
+                {"choices": [{"finish_reason": "stop", "text": " PASS"}]},
+            ],
+            "wake_reasoning",
+        ),
+    ]
+    for idx, (payloads, probe_name) in enumerate(cases):
+        mod._SUPER_SEMANTIC_GATE_CACHE.clear()
+        responses = list(payloads)
+
+        class _Resp:
+            def __init__(self, payload):
+                self.payload = payload
+            def __enter__(self):
+                return self
+            def __exit__(self, *a):
+                return False
+            def read(self):
+                return _json.dumps(self.payload).encode()
+
+        def fake_urlopen(*a, **kw):
+            return _Resp(responses.pop(0))
+
+        monkeypatch.setattr(mod.urllib.request, "urlopen", fake_urlopen)
+        ok, reason = mod._local_super_semantic_gate(base_url=base, model=model, now=100.0 + idx)
+        assert ok is False
+        assert probe_name in reason
+        assert "unexpected" in reason
 
 
 def test_local_super_semantic_gate_accepts_expected_output_and_caches(monkeypatch):
@@ -1764,22 +1814,31 @@ def test_local_super_semantic_gate_accepts_expected_output_and_caches(monkeypatc
     mod = _load_agent_module()
     mod._SUPER_SEMANTIC_GATE_CACHE.clear()
     calls = {"n": 0}
+    responses = [
+        {"choices": [{"finish_reason": "stop", "text": " </think>\n\nFOUR"}]},
+        {"choices": [{"finish_reason": "stop", "text": ' {"status":"ok"}'}]},
+        {"choices": [{"finish_reason": "stop", "text": " FAIL"}]},
+    ]
     class _Resp:
+        def __init__(self, payload):
+            self.payload = payload
         def __enter__(self):
             return self
         def __exit__(self, *a):
             return False
         def read(self):
-            return _json.dumps({"choices": [{"finish_reason": "stop", "text": " </think>\\n\\nFOUR"}]}).encode()
+            return _json.dumps(self.payload).encode()
     def fake_urlopen(*a, **kw):
         calls["n"] += 1
-        return _Resp()
+        return _Resp(responses.pop(0))
     monkeypatch.setattr(mod.urllib.request, "urlopen", fake_urlopen)
     base = "http://127.0.0.1:8000/v1"
     model = "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"
-    assert mod._local_super_semantic_gate(base_url=base, model=model, now=10.0)[0] is True
-    assert mod._local_super_semantic_gate(base_url=base, model=model, now=11.0)[0] is True
-    assert calls["n"] == 1
+    first_ok, first_reason = mod._local_super_semantic_gate(base_url=base, model=model, now=10.0)
+    assert first_ok is True, first_reason
+    second_ok, second_reason = mod._local_super_semantic_gate(base_url=base, model=model, now=11.0)
+    assert second_ok is True, second_reason
+    assert calls["n"] == 3
 
 
 def test_local_super_semantic_failure_fails_closed_without_cloud_fallback(monkeypatch):

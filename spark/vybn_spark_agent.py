@@ -704,6 +704,27 @@ _MAINTENANCE_DEFERRALS: list[dict[str, Any]] = []
 
 _SUPER_SEMANTIC_GATE_CACHE_TTL = 300.0
 _SUPER_SEMANTIC_GATE_CACHE: dict[str, dict[str, Any]] = {}
+_SUPER_SEMANTIC_GATE_PROBES = (
+    {
+        "name": "known_answer",
+        "prompt": "Answer with exactly this single word and nothing else: FOUR\nAnswer:",
+        "pattern": r"FOUR[.!]?",
+    },
+    {
+        "name": "structured_shape",
+        "prompt": 'Return exactly this compact JSON object and nothing else: {"status":"ok"}\nJSON:',
+        "pattern": r'\{\s*"status"\s*:\s*"ok"\s*\}',
+    },
+    {
+        "name": "wake_reasoning",
+        "prompt": (
+            "A Super wake check sees HTTP 200 from /v1/models, but the raw "
+            "completion is empty. Should the wake gate PASS or FAIL? Answer "
+            "with exactly one word: PASS or FAIL.\nAnswer:"
+        ),
+        "pattern": r"FAIL[.!]?",
+    },
+)
 
 
 def _is_loopback_super_base(base_url: str | None) -> bool:
@@ -763,32 +784,40 @@ def _local_super_semantic_gate(
     cached = _SUPER_SEMANTIC_GATE_CACHE.get(base)
     if cached and now - float(cached.get("ts", 0.0)) < _SUPER_SEMANTIC_GATE_CACHE_TTL:
         return bool(cached.get("ok")), str(cached.get("reason", "cached"))
-    payload = {
-        "model": model,
-        "prompt": "Answer with exactly this single word and nothing else: FOUR\nAnswer:",
-        "max_tokens": 24,
-        "temperature": 0,
-    }
     try:
-        req = _urlrequest.Request(
-            base + "/completions",
-            data=_json.dumps(payload).encode("utf-8"),
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        with _urlrequest.urlopen(req, timeout=45) as resp:
-            body = _json.loads(resp.read().decode("utf-8", errors="replace"))
-        choice = (body.get("choices") or [{}])[0]
-        content = _semantic_gate_visible_answer(str(choice.get("text") or ""))
-        finish = choice.get("finish_reason")
-        if finish == "length":
-            ok, reason = False, "semantic gate truncated finish_reason=length"
-        elif not content:
-            ok, reason = False, "semantic gate empty completion"
-        elif not _re.fullmatch(r"FOUR[.!]?", content, flags=_re.IGNORECASE):
-            ok, reason = False, f"semantic gate unexpected content={content[:80]!r}"
+        for probe in _SUPER_SEMANTIC_GATE_PROBES:
+            payload = {
+                "model": model,
+                "prompt": probe["prompt"],
+                "max_tokens": 24,
+                "temperature": 0,
+            }
+            req = _urlrequest.Request(
+                base + "/completions",
+                data=_json.dumps(payload).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with _urlrequest.urlopen(req, timeout=45) as resp:
+                body = _json.loads(resp.read().decode("utf-8", errors="replace"))
+            choice = (body.get("choices") or [{}])[0]
+            content = _semantic_gate_visible_answer(str(choice.get("text") or ""))
+            finish = choice.get("finish_reason")
+            name = str(probe["name"])
+            if finish == "length":
+                ok, reason = False, f"semantic gate probe={name} truncated finish_reason=length"
+                break
+            if not content:
+                ok, reason = False, f"semantic gate probe={name} empty completion"
+                break
+            if not _re.fullmatch(str(probe["pattern"]), content, flags=_re.IGNORECASE):
+                ok, reason = False, (
+                    f"semantic gate probe={name} unexpected content={content[:80]!r} "
+                    f"finish_reason={finish!r}"
+                )
+                break
         else:
-            ok, reason = True, "semantic gate passed"
+            ok, reason = True, f"semantic gate passed {len(_SUPER_SEMANTIC_GATE_PROBES)} raw probes"
     except Exception as exc:  # pragma: no cover - exercised by integration
         ok, reason = False, f"semantic gate exception {exc.__class__.__name__}: {_sanitize_provider_error(exc)}"
     _SUPER_SEMANTIC_GATE_CACHE[base] = {"ok": ok, "reason": reason, "ts": now}

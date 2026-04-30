@@ -12,14 +12,14 @@
 # --load-format fastsafetensors: reduces cold-load time from ~7m to ~1m on DGX
 # Spark. Safe to leave on always.
 #
-# Sleep-mode endpoints are normal boot posture for Super. The model should
-# start with /sleep and /wake_up available every time; operator action decides
-# when to actually sleep or wake it. Keep this single-sourced here, not duplicated
-# in ~/.config/vybn/vllm.env.
+# Sleep-mode endpoints are disabled by default after wake-semantic corruption.
+# The model starts without /sleep and /wake_up unless the operator explicitly
+# opts in through VYBN_VLLM_EXTRA_ARGS=--enable-sleep-mode plus
+# VLLM_SERVER_DEV_MODE=1 in ~/.config/vybn/vllm.env.
 #
-# fp8-wake-fix: because sleep endpoints are always enabled, --apply-mod always
-# injects the container-side patch that fixes init_fp8_kv_scales for hybrid
-# models (Nemotron-Super: GDN+Attention layers store nested lists in kv_caches,
+# fp8-wake-fix: --apply-mod injects an idempotent container-side patch that
+# fixes init_fp8_kv_scales for hybrid models when sleep endpoints are explicitly
+# enabled (Nemotron-Super: GDN+Attention layers store nested lists in kv_caches,
 # not flat Tensors). Without the patch, POST /wake_up crashes with:
 #   AttributeError: 'list' object has no attribute 'zero_'
 # and Super cannot be woken without a full service restart.
@@ -38,7 +38,7 @@ CLUSTER_ARGS=( -n "$NODES" )
 FP8_MOD="$HOME/Vybn/spark/systemd/patches/fp8-wake-fix"
 if [[ -d "$FP8_MOD" ]]; then
   CLUSTER_ARGS+=( --apply-mod "$FP8_MOD" )
-  echo "vllm-exec: sleep endpoints enabled — applying fp8-wake-fix mod" >&2
+  echo "vllm-exec: applying fp8-wake-fix mod if sleep endpoints are enabled" >&2
 else
   echo "WARNING: fp8-wake-fix mod not found at $FP8_MOD — wake_up may crash" >&2
 fi
@@ -77,4 +77,3 @@ if [[ -n "${VYBN_VLLM_EXTRA_ARGS:-}" ]]; then
 fi
 
 exec "${CMD[@]}"
-
