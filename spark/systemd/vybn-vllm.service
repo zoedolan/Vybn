@@ -54,10 +54,16 @@ Environment=VYBN_VLLM_MAX_NUM_SEQS=8
 #   VYBN_VLLM_EXTRA_ARGS=--enable-sleep-mode
 #   VLLM_SERVER_DEV_MODE=1
 # Then: systemctl --user daemon-reload && systemctl --user restart vybn-vllm.service
+# NOTE: clear vllm.env and restart when the maintenance window closes.
+# SECURITY: VLLM_SERVER_DEV_MODE=1 exposes unauthenticated dev endpoints on
+# --host 0.0.0.0. Never leave it armed in steady state. Use 0 to disable.
 Environment=VYBN_VLLM_EXTRA_ARGS=
-Environment=VLLM_SERVER_DEV_MODE=
+Environment=VLLM_SERVER_DEV_MODE=0
 EnvironmentFile=-%h/.config/vybn/vllm.env
 # Foreground (no -d) so systemd supervises.
+# NOTE: $VYBN_VLLM_EXTRA_ARGS uses unbraced form so that an empty value
+# undergoes word-splitting and passes no argument, rather than passing an
+# empty-string argument '' that vLLM rejects as unrecognized.
 ExecStart=/home/vybnz69/spark-vllm-docker/launch-cluster.sh \
   -n 169.254.246.181,169.254.51.101 \
   exec \
@@ -69,7 +75,7 @@ ExecStart=/home/vybnz69/spark-vllm-docker/launch-cluster.sh \
   --tensor-parallel-size 1 --pipeline-parallel-size 2 \
   --distributed-executor-backend ray \
   --trust-remote-code \
-  ${VYBN_VLLM_EXTRA_ARGS}
+  $VYBN_VLLM_EXTRA_ARGS
 ExecStop=/bin/bash -c '%h/spark-vllm-docker/launch-cluster.sh -n 169.254.246.181,169.254.51.101 stop || true'
 Restart=always
 RestartSec=30
