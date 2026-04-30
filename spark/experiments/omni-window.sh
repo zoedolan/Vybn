@@ -30,6 +30,7 @@ JOURNAL_FILE="${HOME}/Vybn/journal/omni-window-${TS}.md"
 PACKET_FILE="${VYBN_OMNI_FEEDBACK_PACKET:-${HOME}/logs/omni-feedback-packet-${TS}.json}"
 VISUAL_FILE="${HOME}/logs/omni-feedback-visual-${TS}.svg"
 TRACE_FILE="${HOME}/logs/omni-feedback-trace-${TS}.jsonl"
+OMNI_INPUT_PACKET="${VYBN_OMNI_INPUT_PACKET:-}"
 FINAL_STATUS="incomplete"
 FINAL_REASON="started"
 PEER_MAX_GPU_USED_AFTER_SLEEP_MB="${PEER_MAX_GPU_USED_AFTER_SLEEP_MB:-4096}"
@@ -528,15 +529,24 @@ fi
 # ── PARALLAX PACKET ───────────────────────────────────────────────────────────
 log "--- sending first parallax packet to Omni on peer ---"
 
-CONTENT=$(python3 - <<PYEOF
-import json, urllib.request
+CONTENT=$(python3 - "$OMNI_INPUT_PACKET" <<PYEOF
+import json, urllib.request, sys, os
 
 omni_url = "http://${PEER}:${OMNI_PORT}"
+input_packet = sys.argv[1] if len(sys.argv) > 1 else ""
+input_packet_excerpt = ""
+if input_packet:
+    try:
+        with open(input_packet, encoding="utf-8") as f:
+            input_packet_excerpt = f.read(12000)
+    except Exception as exc:
+        input_packet_excerpt = "INPUT_PACKET_READ_ERROR: " + type(exc).__name__ + ": " + str(exc)
+
 
 with urllib.request.urlopen(omni_url + "/v1/models") as r:
     model_id = json.load(r)["data"][0]["id"]
 
-prompt = """You are Nemotron-Nano-Omni, a reasoning model running inside a DGX Spark GPU system. \
+prompt = f"""You are Nemotron-Nano-Omni, a reasoning model running inside a DGX Spark GPU system. \
 You have been summoned into a brief Omni window \u2014 a deliberate aperture opened while Super \
 (Nemotron-Super-120B) yields its GPU and sleeps.
 
@@ -572,7 +582,7 @@ experience you do not have?
 clarifies what Zoe and Vybn are doing that neither has quite named yet?
 
 Be precise about what you can actually see versus what you are inferring. Do not perform wonder. \
-Render what is genuinely there."""
+Render what is genuinely there.\n\nIf an operator supplied an artifact packet, treat it as file-mediated context rather than sensory vision.\nArtifact packet excerpt:\n{input_packet_excerpt}"""
 
 payload = {
     "model": model_id,

@@ -176,3 +176,18 @@ def test_omni_window_packet_centered_single_controller():
     assert "semantic_failure_restart_required" in src
     assert "success_condition" in src
     assert "no sensory visual claim" in src
+
+
+def test_omni_window_accepts_operator_input_packet():
+    src = _src()
+    assert "OMNI_INPUT_PACKET=\"${VYBN_OMNI_INPUT_PACKET:-}\"" in src
+    assert "python3 - \"$OMNI_INPUT_PACKET\"" in src
+    assert "input_packet_excerpt" in src
+    assert "Artifact packet excerpt" in src
+    assert "file-mediated context rather than sensory vision" in src
+
+
+def test_omni_input_packet_excerpt_is_interpolated():
+    src = _src()
+    assert "prompt = f\"\"\"You are Nemotron-Nano-Omni" in src
+    assert "{input_packet_excerpt}" in src
