@@ -16,6 +16,7 @@ Run: python3 spark/tests/test_recurrent.py
 from __future__ import annotations
 
 import json
+import math
 import sys
 import unittest
 from dataclasses import dataclass, field
@@ -36,10 +37,12 @@ from harness.recurrent import (  # noqa: E402
     Hypothesis,
     Latent,
     LoopResult,
+    complex_state_update,
     contractivity_ok,
     reduce_step,
     residual_magnitude,
     outshift_entropy_material,
+    phase_transition_packet,
     quantum_aperture_payload,
     quantum_entropy_digest,
     run_recurrent_loop,
@@ -130,6 +133,46 @@ class TestLatent(unittest.TestCase):
         self.assertIn("does X hold?", block)
         self.assertIn("resolved so far", block)
         self.assertIn("Y is true", block)
+
+
+# ---------------------------------------------------------------------------
+# Phase transition packet
+# ---------------------------------------------------------------------------
+
+
+class TestPhaseTransition(unittest.TestCase):
+    def test_complex_state_update_projects_governing_equation(self):
+        m_prime = complex_state_update(
+            1 + 0j,
+            alpha=0.5,
+            x_magnitude=1.0,
+            theta=math.pi / 2,
+        )
+        self.assertAlmostEqual(m_prime.real, 0.5, places=7)
+        self.assertAlmostEqual(m_prime.imag, 1.0, places=7)
+
+    def test_phase_transition_packet_is_json_shaped_visualization_data(self):
+        packet = phase_transition_packet(
+            m=1 + 2j,
+            alpha=0.25,
+            x_magnitude=2.0,
+            theta=0.0,
+            residual_magnitude=3,
+            absorption="absorbed",
+            source="dream",
+        )
+        self.assertEqual(packet["equation"], "M' = alpha*M + x*e^{i theta}")
+        self.assertEqual(packet["source"], "dream")
+        self.assertEqual(packet["absorption"], "absorbed")
+        self.assertEqual(packet["residual_magnitude"], 3)
+        self.assertAlmostEqual(packet["m_prime_real"], 2.25, places=7)
+        self.assertAlmostEqual(packet["m_prime_imag"], 0.5, places=7)
+        self.assertIn("delta_real", packet)
+        self.assertIn("delta_imag", packet)
+
+    def test_phase_transition_rejects_non_contracting_alpha_domain(self):
+        with self.assertRaises(ValueError):
+            complex_state_update(0j, alpha=1.5, x_magnitude=1.0, theta=0.0)
 
 
 # ---------------------------------------------------------------------------
