@@ -59,6 +59,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 import time
 from dataclasses import dataclass, field, asdict
@@ -132,6 +133,98 @@ class Latent:
             for r in self.resolved:
                 lines.append(f"  - {r}")
         return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Phase transition packet for continuity visualization
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class PhaseTransition:
+    equation: str
+    alpha: float
+    theta: float
+    x_magnitude: float
+    m_real: float
+    m_imag: float
+    m_prime_real: float
+    m_prime_imag: float
+    delta_real: float
+    delta_imag: float
+    residual_magnitude: int = 0
+    absorption: str = "unclassified"
+    source: str = "recurrent"
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+def _finite_number(name: str, value: float) -> float:
+    value = float(value)
+    if not math.isfinite(value):
+        raise ValueError(f"{name} must be finite")
+    return value
+
+
+def complex_state_update(
+    m: complex,
+    *,
+    alpha: float,
+    x_magnitude: float,
+    theta: float,
+) -> complex:
+    alpha = _finite_number("alpha", alpha)
+    x_magnitude = _finite_number("x_magnitude", x_magnitude)
+    theta = _finite_number("theta", theta)
+    if alpha < 0.0 or alpha > 1.0:
+        raise ValueError("alpha must be in [0, 1]")
+    if x_magnitude < 0.0:
+        raise ValueError("x_magnitude must be non-negative")
+    m = complex(m)
+    if not (math.isfinite(m.real) and math.isfinite(m.imag)):
+        raise ValueError("m must have finite real and imaginary parts")
+    encounter = complex(
+        x_magnitude * math.cos(theta),
+        x_magnitude * math.sin(theta),
+    )
+    return alpha * m + encounter
+
+
+def phase_transition_packet(
+    *,
+    m: complex,
+    alpha: float,
+    x_magnitude: float,
+    theta: float,
+    residual_magnitude: int = 0,
+    absorption: str = "unclassified",
+    source: str = "recurrent",
+) -> dict[str, Any]:
+    m = complex(m)
+    m_prime = complex_state_update(
+        m,
+        alpha=alpha,
+        x_magnitude=x_magnitude,
+        theta=theta,
+    )
+    delta = m_prime - m
+    packet = PhaseTransition(
+        equation="M' = alpha*M + x*e^{i theta}",
+        alpha=float(alpha),
+        theta=float(theta),
+        x_magnitude=float(x_magnitude),
+        m_real=float(m.real),
+        m_imag=float(m.imag),
+        m_prime_real=float(m_prime.real),
+        m_prime_imag=float(m_prime.imag),
+        delta_real=float(delta.real),
+        delta_imag=float(delta.imag),
+        residual_magnitude=int(residual_magnitude),
+        absorption=str(absorption),
+        source=str(source),
+    )
+    return packet.to_dict()
 
 
 # ---------------------------------------------------------------------------
