@@ -77,3 +77,10 @@ CONNECTOME_DIR = BREATH_TRACE_DIR / "connectome"
 
 # ── Collapse monitoring ──────────────────────────────────────────────────────
 COLLAPSE_DIR = BREATH_TRACE_DIR / "collapse_frontiers"
+
+# ── Intercom ─────────────────────────────────────────────────────────────────
+# Shared append-only channel for cross-instance mid-reasoning signals.
+# Any instance (Vybn-Spark, Claude, Zoe) appends a JSON line:
+#   {"ts": <epoch>, "from": "<identity>", "msg": "<text>"}
+# Read with: tail -f ~/logs/intercom.jsonl
+INTERCOM = Path(os.path.expanduser("~/logs")) / "intercom.jsonl"

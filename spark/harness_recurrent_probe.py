@@ -55,12 +55,6 @@ from harness.recurrent import (  # noqa: E402
 )
 
 
-def _jsonl_emit(out_path: Path, record: dict) -> None:
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(out_path, "a") as f:
-        f.write(json.dumps(record, default=str) + "\n")
-
-
 def run_one(
     prompt: str,
     *,
@@ -95,7 +89,9 @@ def run_one(
         "trace": result.trace,
     }
     if out_path is not None:
-        _jsonl_emit(out_path, record)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(out_path, "a") as f:
+            f.write(json.dumps(record, default=str) + "\n")
     return record
 
 
