@@ -47,7 +47,7 @@ CMD=(
   "$CLUSTER"
   "${CLUSTER_ARGS[@]}"
   exec
-  env "VLLM_SERVER_DEV_MODE=1"
+  env "VLLM_SERVER_DEV_MODE=${VLLM_SERVER_DEV_MODE:-0}"
   vllm serve nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
   --port 8000 --host 0.0.0.0
   --gpu-memory-utilization "${VYBN_VLLM_GPU_MEMORY_UTILIZATION:-0.78}"
@@ -61,18 +61,16 @@ CMD=(
   # -O0: disables Inductor compile, cudagraphs, and Triton/FlashInfer autotune
   # (autotuner-cache JSON race crashes Super early in inference).
   --optimization-level 0
-  --enable-sleep-mode
 )
 
 # Only append VYBN_VLLM_EXTRA_ARGS when it is non-empty.
 # Word-splitting is intentional here: multiple flags can be space-separated.
-# --enable-sleep-mode is deliberately single-sourced above; ignore duplicates
+# Sleep mode is disabled by default after wake-semantic corruption; allow only explicit opt-in via VYBN_VLLM_EXTRA_ARGS.
 # from stale env files instead of passing the flag twice.
 if [[ -n "${VYBN_VLLM_EXTRA_ARGS:-}" ]]; then
   for arg in ${VYBN_VLLM_EXTRA_ARGS:-}; do
     if [[ "$arg" == "--enable-sleep-mode" ]]; then
-      echo "vllm-exec: ignoring duplicate --enable-sleep-mode from VYBN_VLLM_EXTRA_ARGS" >&2
-      continue
+      echo "vllm-exec: enabling sleep mode from explicit VYBN_VLLM_EXTRA_ARGS opt-in" >&2
     fi
     CMD+=( "$arg" )
   done
