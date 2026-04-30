@@ -34,6 +34,66 @@ exec > >(tee -a "$LOG") 2>&1
 log() { echo "[$(date '+%H:%M:%S')] $*"; }
 die() { log "FATAL: $*"; exit 1; }
 
+# Semantic wake gate: endpoint liveness is only a precheck. A wake is not
+# clean until deterministic completions have the expected content shape and
+# are not truncated. If this fails, the caller must fail closed and let
+# cleanup's restart path recover Super; Omni artifacts must not be consumed.
+super_semantic_gate() {
+    local label="${1:-super}"
+    python3 - <<'PYEOF'
+import json, re, sys, urllib.request
+
+base = "http://127.0.0.1:8000"
+try:
+    with urllib.request.urlopen(base + "/v1/models", timeout=8) as r:
+        model_id = json.load(r)["data"][0]["id"]
+except Exception as exc:
+    print(f"semantic gate precheck failed: models endpoint: {type(exc).__name__}: {exc}")
+    sys.exit(10)
+
+probes = [
+    ("math", "Answer with exactly: FOUR", re.compile(r"^FOUR[.!]?\s*$", re.I)),
+    ("shape", "Answer with exactly this JSON: {\"ok\":true}", re.compile(r'^\{\s*"ok"\s*:\s*true\s*\}\s*$')),
+    ("language", "Answer in English with exactly: READY", re.compile(r"^READY[.!]?\s*$", re.I)),
+]
+
+for name, prompt, pattern in probes:
+    payload = {
+        "model": model_id,
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": 16,
+        "temperature": 0,
+    }
+    req = urllib.request.Request(
+        base + "/v1/chat/completions",
+        data=json.dumps(payload).encode(),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=60) as r:
+            raw = r.read().decode("utf-8", errors="replace")
+        result = json.loads(raw)
+    except Exception as exc:
+        print(f"semantic gate probe {name} failed transport/parse: {type(exc).__name__}: {exc}")
+        sys.exit(20)
+    choice = (result.get("choices") or [{}])[0]
+    finish = choice.get("finish_reason")
+    msg = choice.get("message") or {}
+    content = (msg.get("content") or "").strip()
+    if finish == "length":
+        print(f"semantic gate probe {name} failed: truncated finish_reason=length content={content!r}")
+        sys.exit(30)
+    if not content:
+        print(f"semantic gate probe {name} failed: empty completion finish_reason={finish!r}")
+        sys.exit(31)
+    if not pattern.fullmatch(content):
+        print(f"semantic gate probe {name} failed: unexpected content={content!r} finish_reason={finish!r}")
+        sys.exit(32)
+print("semantic gate passed")
+PYEOF
+}
+
 # ── state flags ───────────────────────────────────────────────────────────────
 OMNI_LAUNCHED=false
 SLEEP_ARMED=false
@@ -207,6 +267,10 @@ if ! curl -sf "${SUPER_URL}/is_sleeping" > /dev/null 2>&1; then
     die "Super dev-mode endpoint /is_sleeping not reachable — VLLM_SERVER_DEV_MODE/--enable-sleep-mode did not take effect. Check ${VLLM_ENV} and 'systemctl --user show vybn-vllm.service -p Environment'."
 fi
 log "Super dev-mode endpoints OK."
+
+log "Running pre-sleep Super semantic gate..."
+super_semantic_gate "pre-sleep" || die "Super failed semantic gate before sleep — aborting before Omni launch"
+log "Pre-sleep semantic gate passed."
 
 # ── SLEEP SUPER ───────────────────────────────────────────────────────────────
 log "--- sleeping Super (level=2) ---"
@@ -470,28 +534,14 @@ while (( $(date +%s) < DEADLINE )); do
     sleep 10
 done
 
-# ── SMOKE TEST ────────────────────────────────────────────────────────────────
-log "--- smoke test ---"
-SMOKE=$(python3 - <<PYEOF
-import json, urllib.request
-with urllib.request.urlopen("http://127.0.0.1:8000/v1/models") as r:
-    model_id = json.load(r)["data"][0]["id"]
-payload = {
-    "model": model_id,
-    "messages": [{"role": "user", "content": "Reply with exactly: SUPER_AWAKE"}],
-    "max_tokens": 10
-}
-req = urllib.request.Request(
-    "http://127.0.0.1:8000/v1/chat/completions",
-    data=json.dumps(payload).encode(),
-    headers={"Content-Type": "application/json"},
-    method="POST"
-)
-with urllib.request.urlopen(req, timeout=60) as r:
-    print(json.load(r)["choices"][0]["message"]["content"])
-PYEOF
-)
-log "Smoke test: $SMOKE"
+# ── SEMANTIC WAKE GATE ───────────────────────────────────────────────────────
+log "--- semantic wake gate ---"
+if ! super_semantic_gate "post-wake"; then
+    log "Semantic wake gate failed — treating wake as corrupted and failing closed."
+    SUPER_SLEEPING=true
+    die "Super woke with bad semantic quality; cleanup will force recovery restart"
+fi
+log "Semantic wake gate passed."
 
 # ── CLEAR SLEEP MODE ──────────────────────────────────────────────────────────
 log "--- clearing sleep mode ---"

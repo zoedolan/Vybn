@@ -16,6 +16,7 @@ from pathlib import Path
 import pytest
 
 SCRIPT = Path(__file__).resolve().parents[1] / "experiments" / "omni-window.sh"
+SLEEP_CYCLE_SCRIPT = Path(__file__).resolve().parents[1] / "experiments" / "super-sleep-cycle.sh"
 
 
 def _src() -> str:
@@ -105,3 +106,46 @@ def test_wake_failure_captures_journal():
         "wake-timeout path must dump journalctl tail to disk for diagnosis"
     )
 
+
+
+def test_super_semantic_gate_exists_and_uses_deterministic_expected_outputs():
+    src = _src()
+    assert "super_semantic_gate()" in src
+    assert '"temperature": 0' in src
+    assert '"max_tokens": 16' in src
+    for expected in ["FOUR", "READY", "{\\\"ok\\\":true}"]:
+        assert expected in src
+    assert 'finish == "length"' in src or 'finish_reason=length' in src
+
+
+def test_semantic_gate_runs_before_sleep_and_after_wake_before_success():
+    src = _src()
+    pre = src.index('Running pre-sleep Super semantic gate')
+    sleep = src.index('/sleep?level=2')
+    wake = src.index('/wake_up')
+    gate = src.index('--- semantic wake gate ---')
+    clear = src.index('--- clearing sleep mode ---')
+    assert pre < sleep
+    assert wake < gate < clear
+    assert 'failing closed' in src
+    assert 'cleanup will force recovery restart' in src
+
+
+def test_super_sleep_cycle_harness_is_isolated_from_omni_and_defaults_level1():
+    assert SLEEP_CYCLE_SCRIPT.is_file(), f"missing: {SLEEP_CYCLE_SCRIPT}"
+    src = SLEEP_CYCLE_SCRIPT.read_text()
+    assert "OMNI" not in src
+    assert 'SLEEP_LEVEL="${SLEEP_LEVEL:-1}"' in src
+    assert 'CYCLES="${CYCLES:-5}"' in src
+    assert "ALLOW_LEVEL2" in src
+    assert "super_semantic_gate()" in src
+    assert '"temperature": 0' in src
+    assert '"max_tokens": 16' in src
+
+
+def test_super_sleep_cycle_harness_bash_syntax_clean():
+    bash = shutil.which("bash")
+    if bash is None:
+        pytest.skip("bash not on PATH")
+    res = subprocess.run([bash, "-n", str(SLEEP_CYCLE_SCRIPT)], capture_output=True, text=True)
+    assert res.returncode == 0, f"bash -n failed: {res.stderr}"
