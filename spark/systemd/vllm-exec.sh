@@ -35,7 +35,7 @@ CLUSTER_ARGS=( -n "$NODES" )
 # Conditionally apply the fp8 hybrid-wake patch when sleep mode is armed.
 # The patch is idempotent and targets the exact buggy function; it is safe
 # to apply on any build and will self-skip if vLLM has already fixed it.
-if [[ "${VYBN_VLLM_EXTRA_ARGS:-}" == *"--enable-sleep-mode"* ]]; then
+if true; then
   FP8_MOD="$HOME/Vybn/spark/systemd/patches/fp8-wake-fix"
   if [[ -d "$FP8_MOD" ]]; then
     CLUSTER_ARGS+=( --apply-mod "$FP8_MOD" )
@@ -49,7 +49,7 @@ CMD=(
   "$CLUSTER"
   "${CLUSTER_ARGS[@]}"
   exec
-  env "VLLM_SERVER_DEV_MODE=${VLLM_SERVER_DEV_MODE:-0}"
+  env "VLLM_SERVER_DEV_MODE=1"
   vllm serve nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
   --port 8000 --host 0.0.0.0
   --gpu-memory-utilization "${VYBN_VLLM_GPU_MEMORY_UTILIZATION:-0.78}"
@@ -59,6 +59,11 @@ CMD=(
   --distributed-executor-backend ray
   --trust-remote-code
   --load-format fastsafetensors
+  --no-enable-flashinfer-autotune
+  # -O0: disables Inductor compile, cudagraphs, and Triton/FlashInfer autotune
+  # (autotuner-cache JSON race crashes Super early in inference).
+  --optimization-level 0
+  --enable-sleep-mode
 )
 
 # Only append VYBN_VLLM_EXTRA_ARGS when it is non-empty.
@@ -69,3 +74,4 @@ if [[ -n "${VYBN_VLLM_EXTRA_ARGS:-}" ]]; then
 fi
 
 exec "${CMD[@]}"
+
