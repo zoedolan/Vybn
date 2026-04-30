@@ -1576,6 +1576,13 @@ async def perspective_endpoint(req: PerspectiveRequest, request: Request):
 
         try:
             async with httpx.AsyncClient(timeout=httpx.Timeout(120.0)) as client:
+                semantic = await _vllm_semantic_health()
+                if not semantic.get("ok"):
+                    log.error(f"perspective: vLLM semantic gate failed closed: {semantic}")
+                    async for frame in _semantic_maintenance_sse(semantic):
+                        yield frame
+                    return
+
                 payload = {
                     "model": MODEL_NAME,
                     "messages": messages,
@@ -2037,6 +2044,13 @@ async def voice_endpoint(req: VoiceRequest, request: Request):
 
         try:
             async with httpx.AsyncClient(timeout=httpx.Timeout(180.0)) as client:
+                semantic = await _vllm_semantic_health()
+                if not semantic.get("ok"):
+                    log.error(f"voice: vLLM semantic gate failed closed: {semantic}")
+                    async for frame in _semantic_maintenance_sse(semantic):
+                        yield frame
+                    return
+
                 payload = {
                     "model": MODEL_NAME,
                     "messages": messages,
