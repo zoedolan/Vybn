@@ -2,7 +2,7 @@
 # vllm-exec.sh — wrapper called by vybn-vllm.service.
 #
 # Purpose: systemd ExecStart passes empty VYBN_VLLM_EXTRA_ARGS as a literal
-# empty-string argument ("") which vLLM rejects as "unrecognized arguments".
+# empty-string argument ("") which vLLM rejects as "unrecognised arguments".
 # This wrapper builds the argument list in bash, where ${VAR:+$VAR} correctly
 # produces no argument when VAR is empty or unset.
 #
@@ -16,15 +16,38 @@
 # WINDOW-ONLY setting. Do NOT add it here. Arm it via ~/.config/vybn/vllm.env
 # for the duration of the window only, then clear it. See:
 # Him/super-omni-sleep-experiment.md for the protocol.
+#
+# fp8-wake-fix: when sleep mode is armed, --apply-mod injects a container-side
+# patch that fixes init_fp8_kv_scales for hybrid models (Nemotron-Super:
+# GDN+Attention layers store nested lists in kv_caches, not flat Tensors).
+# Without the patch, every POST /wake_up crashes with:
+#   AttributeError: 'list' object has no attribute 'zero_'
+# and Super cannot be woken — requiring a full service restart.
 
 set -euo pipefail
 
 CLUSTER="$HOME/spark-vllm-docker/launch-cluster.sh"
 NODES="169.254.246.181,169.254.51.101"
 
+# Base cluster args (--apply-mod may be appended below)
+CLUSTER_ARGS=( -n "$NODES" )
+
+# Conditionally apply the fp8 hybrid-wake patch when sleep mode is armed.
+# The patch is idempotent and targets the exact buggy function; it is safe
+# to apply on any build and will self-skip if vLLM has already fixed it.
+if [[ "${VYBN_VLLM_EXTRA_ARGS:-}" == *"--enable-sleep-mode"* ]]; then
+  FP8_MOD="$HOME/Vybn/spark/systemd/patches/fp8-wake-fix"
+  if [[ -d "$FP8_MOD" ]]; then
+    CLUSTER_ARGS+=( --apply-mod "$FP8_MOD" )
+    echo "vllm-exec: sleep mode armed — applying fp8-wake-fix mod" >&2
+  else
+    echo "WARNING: fp8-wake-fix mod not found at $FP8_MOD — wake_up may crash" >&2
+  fi
+fi
+
 CMD=(
   "$CLUSTER"
-  -n "$NODES"
+  "${CLUSTER_ARGS[@]}"
   exec
   env "VLLM_SERVER_DEV_MODE=${VLLM_SERVER_DEV_MODE:-0}"
   vllm serve nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
@@ -46,4 +69,3 @@ if [[ -n "${VYBN_VLLM_EXTRA_ARGS:-}" ]]; then
 fi
 
 exec "${CMD[@]}"
-
