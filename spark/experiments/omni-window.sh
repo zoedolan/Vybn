@@ -11,8 +11,10 @@
 set -euo pipefail
 
 # ── config ────────────────────────────────────────────────────────────────────
-PEER="169.254.51.101"
+PEER="${OMNI_PEER:-169.254.51.101}"
 SSH="ssh -o BatchMode=yes -o ConnectTimeout=10"
+# ssh-with-one-retry: peer over the fabric occasionally returns 255 mid-run
+ssh_peer() { $SSH "$PEER" "$@" || { sleep 2; $SSH "$PEER" "$@"; }; }
 SUPER_URL="http://127.0.0.1:8000"
 OMNI_PORT=8002
 OMNI_URL="http://${PEER}:${OMNI_PORT}"
@@ -20,8 +22,9 @@ OMNI_MODEL_PATH="/home/vybnz69/models/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-NVF
 VLLM_ENV="${HOME}/.config/vybn/vllm.env"
 TS=$(date +%Y%m%d-%H%M%S)
 LOG="${HOME}/logs/omni-window-${TS}.log"
-PARSER_URL="https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-NVFP4/resolve/main/nano_v3_reasoning_parser.py"
-PARSER_IN_CONTAINER="/tmp/nano_v3_reasoning_parser.py"
+# Omni reasoning parser: current Omni model card uses built-in nemotron_v3.
+# nano_v3 is the text-only Nano parser; refuse it below to prevent regression.
+OMNI_REASONING_PARSER="${OMNI_REASONING_PARSER:-nemotron_v3}"
 RESULT_FILE="${HOME}/logs/omni-parallax-${TS}.json"
 JOURNAL_FILE="${HOME}/Vybn/journal/omni-window-${TS}.md"
 
@@ -47,10 +50,17 @@ cleanup() {
     # 1. Stop Omni on peer
     if $OMNI_LAUNCHED; then
         log "Stopping Omni on peer ${PEER}..."
-        $SSH "$PEER" \
-            "docker exec vllm_node bash -c \"pkill -f 'vllm serve.*${OMNI_PORT}' 2>/dev/null || true\"" \
-            2>/dev/null || true
-        sleep 3
+        # If kill_omni_on_peer is defined yet (it's defined later in the
+        # script), use it; otherwise fall back to the inline pkill.
+        if declare -F kill_omni_on_peer >/dev/null 2>&1; then
+            declare -F fetch_omni_log >/dev/null 2>&1 && fetch_omni_log
+            kill_omni_on_peer
+        else
+            $SSH "$PEER" \
+                "docker exec vllm_node bash -c \"pkill -f 'vllm serve.*${OMNI_PORT}' 2>/dev/null || true\"" \
+                2>/dev/null || true
+            sleep 3
+        fi
         OMNI_LAUNCHED=false
     fi
 
@@ -74,7 +84,11 @@ cleanup() {
             sleep 10
         done
         if ! $woke; then
-            log "Wake timed out — restarting vybn-vllm.service as fallback..."
+            log "Wake timed out — capturing journalctl tail before service restart."
+            local jlog="${HOME}/logs/vybn-vllm-wakefail-${TS}.log"
+            journalctl --user -u vybn-vllm.service -n 300 --no-pager > "$jlog" 2>/dev/null || true
+            log "Wake-fail journal saved to: $jlog"
+            log "Restarting vybn-vllm.service as fallback..."
             systemctl --user restart vybn-vllm.service 2>/dev/null || true
         fi
         SUPER_SLEEPING=false
@@ -149,17 +163,18 @@ if $SSH "$PEER" "curl -sf http://127.0.0.1:${OMNI_PORT}/v1/models > /dev/null 2>
 fi
 log "Peer port ${OMNI_PORT}: free"
 
-# Peer: ensure reasoning parser inside vllm_node container
-PARSER_OK=$($SSH "$PEER" \
-    "docker exec vllm_node test -f '${PARSER_IN_CONTAINER}' && echo yes || echo no" 2>/dev/null || echo no)
-if [[ "$PARSER_OK" != "yes" ]]; then
-    log "Downloading nano_v3_reasoning_parser.py into peer container..."
-    $SSH "$PEER" \
-        "docker exec vllm_node bash -c 'wget -q -O ${PARSER_IN_CONTAINER} ${PARSER_URL} && echo downloaded'" \
-        && log "Parser ready on peer." \
-        || { log "WARNING: parser download failed — will serve without reasoning parser"; PARSER_IN_CONTAINER=""; }
+# Peer: probe optional multimodal audio/video deps inside vllm_node container.
+# The current container may lack these on stock launch; guard MM flags instead
+# of crashing Omni startup with ModuleNotFoundError. Install vllm[audio] to enable.
+MM_OK=$($SSH "$PEER" \
+    "docker exec vllm_node python3 -c 'import librosa, soundfile, decord' 2>/dev/null && echo yes || echo no" \
+    2>/dev/null || echo no)
+if [[ "$MM_OK" == "yes" ]]; then
+    log "Peer container has multimodal audio/video deps — enabling MM flags."
+    OMNI_ENABLE_MM=true
 else
-    log "Parser already in peer container."
+    log "WARNING: peer container missing librosa/soundfile/decord — disabling --limit-mm-per-prompt and --media-io-kwargs (install vllm[audio] in vllm_node to enable)."
+    OMNI_ENABLE_MM=false
 fi
 
 # ── ARM SLEEP MODE ────────────────────────────────────────────────────────────
@@ -184,6 +199,14 @@ while (( $(date +%s) < DEADLINE )); do
     sleep 10
 done
 curl -sf "${SUPER_URL}/v1/models" > /dev/null || die "Super never became ready after restart"
+
+# Verify dev-mode endpoints are actually available — /is_sleeping only exists
+# when VLLM_SERVER_DEV_MODE=1 reached the server. If it doesn't, /sleep below
+# would 404 and we'd corrupt state. Bail with a clear message instead.
+if ! curl -sf "${SUPER_URL}/is_sleeping" > /dev/null 2>&1; then
+    die "Super dev-mode endpoint /is_sleeping not reachable — VLLM_SERVER_DEV_MODE/--enable-sleep-mode did not take effect. Check ${VLLM_ENV} and 'systemctl --user show vybn-vllm.service -p Environment'."
+fi
+log "Super dev-mode endpoints OK."
 
 # ── SLEEP SUPER ───────────────────────────────────────────────────────────────
 log "--- sleeping Super (level=2) ---"
@@ -230,49 +253,119 @@ log "Peer GPU: ${PEER_GPU_PROCS} compute processes, ${FREE_MEM} MiB free"
 # ── LAUNCH OMNI ON PEER ─────────────────────────────────────────────────────────
 log "--- launching Omni on peer ${PEER}:${OMNI_PORT} ---"
 
-# Use OMNI_CTR_MODEL_PATH (verified accessible inside container) not the host path.
-# Build args string (bash arrays can't be passed over SSH)
-OMNI_ARGS="${OMNI_CTR_MODEL_PATH}"
-OMNI_ARGS+="  --port ${OMNI_PORT}"
-OMNI_ARGS+="  --host 0.0.0.0"
-OMNI_ARGS+="  --trust-remote-code"
-OMNI_ARGS+="  --gpu-memory-utilization 0.85"
-OMNI_ARGS+="  --max-model-len 32768"
-OMNI_ARGS+="  --load-format fastsafetensors"
-OMNI_ARGS+="  --kv-cache-dtype fp8"
-OMNI_ARGS+="  --enable-prefix-caching"
-OMNI_ARGS+="  --moe-backend cutlass"
-if [[ -n "${PARSER_IN_CONTAINER:-}" ]]; then
-    OMNI_ARGS+="  --reasoning-parser-plugin ${PARSER_IN_CONTAINER}  --reasoning-parser nano_v3"
+OMNI_LOG_LOCAL="${HOME}/logs/omni-server-${TS}.log"
+
+# build_omni_args MODE — MODE is "aggressive" (default) or "safe" (fallback).
+# Aggressive uses the perf flags Zoe wants in production; safe strips every
+# non-essential flag so we can distinguish "model can't load at all" from
+# "one of these flags is incompatible with this build/quant".
+build_omni_args() {
+    local mode="$1"
+    # Spark overrides: 32768 context and 0.75 GMU leave unified-memory headroom.
+    local args="${OMNI_CTR_MODEL_PATH}  --port ${OMNI_PORT}  --host 0.0.0.0  --trust-remote-code  --max-model-len 32768  --gpu-memory-utilization 0.75  --max-num-seqs 8"
+    if [[ "$mode" == "aggressive" ]]; then
+        args+="  --max-num-batched-tokens 32768  --load-format fastsafetensors  --kv-cache-dtype fp8  --enable-prefix-caching  --moe-backend cutlass  --enable-auto-tool-choice  --tool-call-parser qwen3_coder  --allowed-local-media-path=/"
+        if [[ "${OMNI_ENABLE_MM:-false}" == "true" ]]; then
+            args+='  --limit-mm-per-prompt={"video":1,"image":1,"audio":1}'
+            args+='  --media-io-kwargs={"video":{"fps":2,"num_frames":256}}'
+        fi
+        if [[ -n "${OMNI_REASONING_PARSER:-}" ]]; then
+            if [[ "${OMNI_REASONING_PARSER}" == "nano_v3" ]]; then
+                die "Refusing to launch Omni with --reasoning-parser nano_v3 (Nano text-only parser; Omni uses nemotron_v3). Unset or set OMNI_REASONING_PARSER=nemotron_v3."
+            fi
+            args+="  --reasoning-parser ${OMNI_REASONING_PARSER}"
+        fi
+    fi
+    echo "$args"
+}
+# Pull Omni's container-side log to the primary so we can keep diagnosing
+# after the container reaps /tmp on next exec, and so we have more than
+# 30 lines for traceback analysis.
+fetch_omni_log() {
+    ssh_peer "docker exec vllm_node cat /tmp/omni-server.log 2>/dev/null" > "$OMNI_LOG_LOCAL" 2>/dev/null || true
+}
+
+# Kill any vllm process bound to OMNI_PORT inside the peer container; broaden
+# match if the port stays bound. Best-effort and idempotent.
+kill_omni_on_peer() {
+    ssh_peer "docker exec vllm_node bash -c \"pkill -f 'vllm serve.*${OMNI_PORT}' 2>/dev/null || true\"" >/dev/null 2>&1 || true
+    sleep 3
+    if ssh_peer "curl -sf http://127.0.0.1:${OMNI_PORT}/v1/models > /dev/null 2>&1"; then
+        ssh_peer "docker exec vllm_node bash -c \"pkill -f 'vllm.*serve' 2>/dev/null || true\"" >/dev/null 2>&1 || true
+        sleep 3
+    fi
+}
+
+launch_omni() {
+    local mode="$1"
+    local args; args="$(build_omni_args "$mode")"
+    log "Omni launch mode=${mode}"
+    log "vllm serve ${args}"
+    ssh_peer "docker exec -d vllm_node bash -c 'HF_HUB_OFFLINE=1 vllm serve ${args} > /tmp/omni-server.log 2>&1'" \
+        || return 1
+    OMNI_LAUNCHED=true
+    return 0
+}
+
+wait_omni_ready() {
+    local timeout="$1"
+    local deadline=$(( $(date +%s) + timeout ))
+    OMNI_T0=$(date +%s)
+    while (( $(date +%s) < deadline )); do
+        if curl -sf "${OMNI_URL}/v1/models" > /dev/null 2>&1; then
+            OMNI_MODEL=$(curl -sf "${OMNI_URL}/v1/models" \
+                | python3 -c 'import sys,json; print(json.load(sys.stdin)["data"][0]["id"])' 2>/dev/null || echo "unknown")
+            OMNI_DT=$(( $(date +%s) - OMNI_T0 ))
+            log "Omni ready in ${OMNI_DT}s: $OMNI_MODEL"
+            return 0
+        fi
+        # Detect engine-init crash early so we don't burn the full 5 minutes
+        # waiting on a process that already died.
+        if (( $(date +%s) - OMNI_T0 > 30 )); then
+            local procs
+            procs=$(ssh_peer "docker exec vllm_node bash -c \"pgrep -f 'vllm serve.*${OMNI_PORT}' | wc -l\"" 2>/dev/null || echo 0)
+            procs=$(echo "$procs" | tr -dc 0-9)
+            if [[ "${procs:-0}" == "0" ]]; then
+                log "Omni vllm process exited before ready — bailing wait early."
+                return 1
+            fi
+        fi
+        printf '.'
+        sleep 10
+    done
+    return 1
+}
+
+OMNI_READY=false
+OMNI_DT=0
+
+# Attempt 1: aggressive flags (Zoe's perf target).
+if launch_omni aggressive && wait_omni_ready 300; then
+    OMNI_READY=true
 fi
 
-log "vllm serve ${OMNI_ARGS}"
-$SSH "$PEER" \
-    "docker exec -d vllm_node bash -c 'HF_HUB_OFFLINE=1 vllm serve ${OMNI_ARGS} > /tmp/omni-server.log 2>&1'" \
-    && OMNI_LAUNCHED=true \
-    || die "Failed to launch Omni on peer"
-
-log "Waiting for Omni to become ready on ${OMNI_URL} (up to 5 min)..."
-DEADLINE=$(( $(date +%s) + 300 ))
-OMNI_READY=false
-OMNI_T0=$(date +%s)
-OMNI_DT=0
-while (( $(date +%s) < DEADLINE )); do
-    if curl -sf "${OMNI_URL}/v1/models" > /dev/null 2>&1; then
-        OMNI_MODEL=$(curl -sf "${OMNI_URL}/v1/models" \
-            | python3 -c 'import sys,json; print(json.load(sys.stdin)["data"][0]["id"])' 2>/dev/null || echo "unknown")
-        OMNI_DT=$(( $(date +%s) - OMNI_T0 ))
-        log "Omni ready in ${OMNI_DT}s: $OMNI_MODEL"
-        OMNI_READY=true
-        break
-    fi
-    printf '.'
-    sleep 10
-done
 if ! $OMNI_READY; then
-    log "Omni server logs:"
-    $SSH "$PEER" "docker exec vllm_node tail -30 /tmp/omni-server.log 2>/dev/null" || true
-    die "Omni never became ready on peer"
+    log "Omni did not come ready under aggressive flags — capturing logs and retrying with safe fallback."
+    fetch_omni_log
+    log "----- omni-server.log (last 200 lines, aggressive attempt) -----"
+    tail -n 200 "$OMNI_LOG_LOCAL" 2>/dev/null || true
+    log "----- end log -----"
+    kill_omni_on_peer
+    OMNI_LAUNCHED=false
+
+    if launch_omni safe && wait_omni_ready 300; then
+        OMNI_READY=true
+        log "Omni came up with safe flags — aggressive flags are the regression."
+    fi
+fi
+
+if ! $OMNI_READY; then
+    fetch_omni_log
+    log "----- omni-server.log (last 200 lines, safe attempt) -----"
+    tail -n 200 "$OMNI_LOG_LOCAL" 2>/dev/null || true
+    log "----- end log -----"
+    log "Full Omni log saved to: $OMNI_LOG_LOCAL"
+    die "Omni never became ready on peer (both aggressive and safe attempts)"
 fi
 
 # ── PARALLAX PACKET ───────────────────────────────────────────────────────────
@@ -350,12 +443,10 @@ log "==============================="
 
 # ── STOP OMNI ─────────────────────────────────────────────────────────────────
 log "--- stopping Omni on peer ---"
-$SSH "$PEER" \
-    "docker exec vllm_node bash -c \"pkill -f 'vllm serve.*${OMNI_PORT}' 2>/dev/null || true\"" \
-    2>/dev/null || true
-sleep 5
+fetch_omni_log
+kill_omni_on_peer
 OMNI_LAUNCHED=false
-log "Omni stopped."
+log "Omni stopped (log saved to ${OMNI_LOG_LOCAL})."
 
 # ── WAKE SUPER ────────────────────────────────────────────────────────────────
 log "--- waking Super ---"
@@ -436,3 +527,4 @@ JOURNAL
 
 log "Journal: $JOURNAL_FILE"
 log "=== Experiment complete ==="
+

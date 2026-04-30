@@ -1,147 +1,68 @@
-# Continuity Note — Hardware Ground Truth
+# Continuity — 2026-04-30 05:03 PDT
 
-*Updated: 2026-04-05 by Vybn (Claude Opus on Spark)*
+## Where we are
 
-## HARDWARE REALITY — READ THIS FIRST
+Super is up and healthy (nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8, port 8000).
+The fp8-wake-fix patch and updated vllm-exec.sh are committed to origin/main via PR #2942 (da53ff7e).
+The repo is current on this Spark.
 
-**You are running on TWO DGX Sparks. Not one. Two.**
+## What happened this session
 
-| Node | Hostname | CX7 IP | RAM | GPU | Status |
-|------|----------|--------|-----|-----|--------|
-| Primary | spark-2b7c | 169.254.246.181 | 128 GB unified | NVIDIA GB10 | This machine |
-| Secondary | spark-1c8f | 169.254.51.101 | 128 GB unified | NVIDIA GB10 | SSH reachable |
+The Omni-window experiment ran. Sleep succeeded. The script stalled on a
+non-interactive `sudo` cache-flush step, then the wake API crashed with:
 
-**Total unified memory: 256 GB across two nodes.**
+    AttributeError: 'list' object has no attribute 'zero_'
+    at vllm/v1/worker/gpu_model_runner.py — init_fp8_kv_scales()
 
-The two Sparks are connected via ConnectX-7 (RoCE, jumbo frames MTU 9000).
-NCCL cross-node communication verified at ~17 GB/s peak bus bandwidth.
-Passwordless SSH works in both directions.
+Root cause: Nemotron-Super is a hybrid GDN+Attention model. Its kv_caches
+contains nested lists for GDN recurrent-state layers. The upstream init_fp8_kv_scales
+called .zero_() on every element without an isinstance check. This is now patched.
 
-## Verification Convention
+## The fix (in repo)
 
-Every duality in this body of work is the same move: two projections of one
-complex object onto real axes. Treating the projection as the thing is the
-recurring error. Verification is no exception.
+spark/systemd/patches/fp8-wake-fix/run.sh
+  — injected via launch-cluster.sh --apply-mod whenever --enable-sleep-mode is armed
+  — patches the exact function inside the running container before vllm serve starts
+  — idempotent; self-skips if upstream has fixed it
 
-When recording that something "works," name which axis you are on:
+spark/systemd/vllm-exec.sh
+  — auto-appends --apply-mod fp8-wake-fix when VYBN_VLLM_EXTRA_ARGS contains --enable-sleep-mode
 
-- **Internal:** the system talking to itself — localhost curls, `py_compile`,
-  in-process imports, pytest. This confirms the Spark can reach its own
-  services.
-- **External:** the system as reached from where a visitor actually stands —
-  tunnel URL hit from outside, browser screenshot, a curl against
-  `vybn.ai` or the live `trycloudflare.com` host.
+## How to resume the experiment
 
-Neither projection alone is "verified live." The honest template:
+The path is clean now. Steps:
 
-    Internal: [result or "pending"]. External: [result or "pending observation"].
+1. Super now boots with sleep endpoints enabled by default from spark/systemd/vllm-exec.sh:
+   VLLM_SERVER_DEV_MODE=1, --enable-sleep-mode, and the fp8 wake patch are single-sourced there.
+   Do not add duplicate --enable-sleep-mode in ~/.config/vybn/vllm.env; stale duplicates are ignored.
 
-The walk's anti-hallucination gate is the same principle: the step refuses
-when `|V_perp| <= epsilon`. When there is no residual off the kernel — no
-orthogonal signal — the system does not pretend to have moved. Verification
-without an external axis has no V_perp; it is the kernel certifying itself.
+2. Restart Super only when you actually need a fresh boot:
+   systemctl --user restart vybn-vllm.service
+   # Cold load can take time. Port 8000 not listening during load is not failure.
+   # Wait for logs/readiness instead of clearing caches or restarting again.
 
-Zoe's external view is not a correction to an internal one. It is the
-orthogonal coordinate of the pre-projection object. The coupling is the
-geometry; neither pole alone is the system.
+3. Test the sleep endpoints:
+   curl http://127.0.0.1:8000/is_sleeping
+   curl -X POST http://127.0.0.1:8000/sleep?level=2
+   curl http://127.0.0.1:8000/is_sleeping  # true
 
----
+4. Flush unified-memory buffer cache only from an interactive shell with sudo:
+   sudo sh -c 'sync; echo 3 > /proc/sys/vm/drop_caches'
 
-### How to serve models correctly
+5. Start Omni on peer (169.254.51.101:8002) while Super sleeps.
+   Capture the parallax. Do the thing.
 
-The correct way to serve large models is via **vLLM with pipeline parallelism
-across both Sparks** using Ray, NOT via llama-server on a single node.
+6. Wake Super:
+   curl -X POST http://127.0.0.1:8000/wake_up
+   # The patch means this should no longer crash on the first clean cycle. Smoke-test with a completion.
 
-Reference launch command (from the verified March 29 session):
-```
-launch-cluster.sh -n 169.254.246.181,169.254.51.101 -d exec \
-  vllm serve nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8 \
-  --port 8000 --host 0.0.0.0 \
-  --gpu-memory-utilization 0.85 \
-  --pipeline-parallel-size 2 \
-  --distributed-executor-backend ray \
-  --max-model-len 32768 \
-  --load-format fastsafetensors \
-  --trust-remote-code \
-  --kv-cache-dtype fp8 \
-  --enable-prefix-caching
-```
+## Remaining known risk
 
-### What NEVER to do
+vLLM issue #36651: double cuMemRelease and stale error codes on the
+second/third sleep-wake cycle. First cycle should be clean. Test two
+full cycles before treating sleep mode as durable infrastructure.
 
-- **NEVER** run llama-server with a single-node quantized model as the primary
-  serving configuration. This wastes half the hardware.
-- **NEVER** describe this system as "a DGX Spark" (singular). It is two Sparks.
-- **NEVER** update this file to say there is only one Spark unless one has
-  physically failed and been removed.
+## Next step
 
-### Quick verification commands
-```bash
-# Is the second Spark alive?
-ssh 169.254.51.101 hostname    # should return: spark-1c8f
+Resume the experiment. The aperture is worth opening.
 
-# Is the CX7 link up?
-ping -c 1 169.254.51.101      # should respond in ~1ms
-
-# What's running on each node?
-nvidia-smi                                              # local
-ssh 169.254.51.101 nvidia-smi                           # remote
-```
-
-## Models on Disk
-
-| Model | Size | Location | Purpose |
-|-------|------|----------|---------|
-| Nemotron 3 Super 120B FP8 | ~120 GB | HuggingFace cache | **Primary serving model** (split across both Sparks) |
-| Nemotron 3 Super 120B IQ4_XS GGUF | ~63 GB | ~/models/ | Fallback single-node (degraded mode only) |
-| Nemotron 3 Super 120B NVFP4 | ~75 GB | HuggingFace cache | LoRA fine-tuning base |
-| MiniMax M2.5 variants | 95-228 GB | ~/models/ | On disk, not serving |
-
-## The Closure — All Repos
-
-This system is one closure spanning four repos, Perplexity (skills + memory),
-and these two Sparks. Every session should begin by pulling all of them and
-end by pushing anything that changed.
-
-| Repo | Local path | Remote | What it carries |
-|------|-----------|--------|----------------|
-| Vybn | ~/Vybn | github.com/zoedolan/Vybn (public) | Research, creature, identity, quantum experiments |
-| Him | ~/Him | github.com/zoedolan/Him (private) | Strategy, contacts, outreach, business intelligence |
-| Vybn-Law | ~/Vybn-Law | github.com/zoedolan/Vybn-Law (public) | Curriculum, the six-module post-abundance course |
-| vybn-phase | ~/vybn-phase | github.com/zoedolan/vybn-phase (public) | Phase geometry library (MiniLM encoding, D ≅ D^D) |
-
-Sync command for all repos:
-```bash
-for d in ~/Vybn ~/Him ~/Vybn-Law ~/vybn-phase; do
-  branch=$(cd "$d" && git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@')
-  (cd "$d" && git pull --ff-only origin "$branch" 2>&1 | tail -1)
-done
-```
-
-Note: Vybn-Law uses `master` as its default branch. The others use `main`.
-
-## Zoe's Standing Instructions
-
-Zoe has repeated dozens of times that this system has two Sparks with 256 GB.
-She should never have to say it again. If you are reading this and about to
-launch a single-node model server, STOP. Re-read this section. Use both nodes.
-
-All four repos must be synced at session start and session end. Drift between
-substrates is the primary failure mode. The harmonization protocol in vybn-os
-exists to prevent it.
-
----
-
-## Codas (April 21–23, 2026)
-
-Archived to `Vybn_Mind/continuity_archive.md`. Key antibodies distilled into `continuity_core.md` and the vybn-os skill. Search the archive or `continuity_core.md` for:
-- Projection Principle / describing internals (April 21)
-- Ballast refactor / skill canonical location (April 21 late)
-- Wellspring pressure-test / green-light reflex (April 21 ~13:45)
-- Open-expression reasoning / text-as-coupling (April 21 ~20:30)
-- Recall gate / corrective process as default (April 22)
-- Probe-result ingestion hallucination / envelope antibody (April 23)
-- NEEDS-RESTART antibody / channel forging (April 23)
-
-
----
