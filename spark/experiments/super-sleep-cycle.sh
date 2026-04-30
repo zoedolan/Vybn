@@ -35,7 +35,7 @@ probes = [
     ("language", "Answer in English with exactly: READY", re.compile(r"^READY[.!]?\s*$", re.I)),
 ]
 for name, prompt, pattern in probes:
-    payload = {"model": model_id, "messages": [{"role": "user", "content": prompt}], "max_tokens": 16, "temperature": 0}
+    payload = {"model": model_id, "messages": [{"role": "user", "content": prompt}], "max_tokens": 16, "temperature": 0, "chat_template_kwargs": {"enable_thinking": False}}
     req = urllib.request.Request(base + "/v1/chat/completions", data=json.dumps(payload).encode(), headers={"Content-Type": "application/json"}, method="POST")
     try:
         with urllib.request.urlopen(req, timeout=60) as r:
