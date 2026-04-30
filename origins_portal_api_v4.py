@@ -242,6 +242,62 @@ def _parse_vllm_metric(metrics_text: str, metric: str) -> Optional[float]:
     return max(vals) if vals else None
 
 
+_VLLM_SEMANTIC_CACHE: Dict[str, Any] = {
+    "ok": False,
+    "reason": "not checked",
+    "checked_at": 0.0,
+}
+
+
+async def _vllm_semantic_health(*, ttl: float = 60.0) -> Dict[str, Any]:
+    """Semantic integrity gate for local Super.
+
+    /v1/models and /metrics prove transport liveness, not that the model is
+    safe to serve. After the sleep/wake corruption incident, HTTP 200 responses
+    still produced empty or garbage completions. The public portal must fail
+    closed unless a deterministic non-streaming completion returns exactly OK.
+    """
+    now = time.time()
+    if now - float(_VLLM_SEMANTIC_CACHE.get("checked_at", 0.0) or 0.0) < ttl:
+        return dict(_VLLM_SEMANTIC_CACHE)
+
+    payload = {
+        "model": MODEL_NAME,
+        "messages": [{"role": "user", "content": "Reply with exactly: OK"}],
+        "stream": False,
+        "temperature": 0,
+        "max_tokens": 4,
+        "chat_template_kwargs": {"enable_thinking": False},
+    }
+    ok = False
+    reason = "not checked"
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(20.0)) as client:
+            r = await client.post(f"{LLAMA_URL}/v1/chat/completions", json=payload)
+            r.raise_for_status()
+            data = r.json()
+        choice = data["choices"][0]
+        content = (choice.get("message", {}) or {}).get("content", "")
+        finish = choice.get("finish_reason")
+        ok = content.strip() == "OK" and finish != "length"
+        reason = "semantic gate passed" if ok else f"unexpected content={content!r} finish_reason={finish!r}"
+    except Exception as e:
+        ok = False
+        reason = f"{type(e).__name__}: {e}"
+
+    _VLLM_SEMANTIC_CACHE.update({"ok": ok, "reason": reason, "checked_at": now})
+    return dict(_VLLM_SEMANTIC_CACHE)
+
+
+async def _semantic_maintenance_sse(semantic: Dict[str, Any]):
+    msg = (
+        "Vybn is temporarily in maintenance because the local inference engine "
+        "is reachable but failed a semantic health check. Please try again later."
+    )
+    yield f"data: {json.dumps({'model_status': 'maintenance', 'content': msg})}\n\n"
+    yield "data: [DONE]\n\n"
+
+
 async def _vllm_admission_state() -> Dict[str, Any]:
     """Read vLLM's own load signals and decide whether to admit a chat turn.
 
@@ -946,6 +1002,7 @@ async def health():
             "deep_memory": dm_status,
             "creature": creature_status,
             "vllm": LLAMA_URL,
+            "vllm_semantic": await _vllm_semantic_health(),
         },
     }
 
@@ -987,6 +1044,10 @@ async def chat(req: ChatRequest, request: Request):
     if not admission.get("admit"):
         log.warning(f"chat: vLLM admission refused: {admission}")
         return StreamingResponse(_admission_sse(admission), media_type="text/event-stream")
+    semantic = await _vllm_semantic_health()
+    if not semantic.get("ok"):
+        log.error(f"chat: vLLM semantic gate failed closed: {semantic}")
+        return StreamingResponse(_semantic_maintenance_sse(semantic), media_type="text/event-stream")
 
     # ── History sanitization ──
     # Cap history window to the most recent 8 turns (user+assistant pairs).
