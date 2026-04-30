@@ -113,6 +113,7 @@ def test_super_semantic_gate_exists_and_uses_deterministic_expected_outputs():
     assert "super_semantic_gate()" in src
     assert '"temperature": 0' in src
     assert '"max_tokens": 16' in src
+    assert '"chat_template_kwargs": {"enable_thinking": False}' in src
     for expected in ["FOUR", "READY", "{\\\"ok\\\":true}"]:
         assert expected in src
     assert 'finish == "length"' in src or 'finish_reason=length' in src
@@ -128,7 +129,8 @@ def test_semantic_gate_runs_before_sleep_and_after_wake_before_success():
     assert pre < sleep
     assert wake < gate < clear
     assert 'failing closed' in src
-    assert 'cleanup will force recovery restart' in src
+    assert 'recovery restart issued before cleanup' in src
+    assert 'systemctl --user restart vybn-vllm.service' in src[src.index('--- semantic wake gate ---'):]
 
 
 def test_super_sleep_cycle_harness_is_isolated_from_omni_and_defaults_level1():
@@ -141,6 +143,7 @@ def test_super_sleep_cycle_harness_is_isolated_from_omni_and_defaults_level1():
     assert "super_semantic_gate()" in src
     assert '"temperature": 0' in src
     assert '"max_tokens": 16' in src
+    assert '"chat_template_kwargs": {"enable_thinking": False}' in src
 
 
 def test_super_sleep_cycle_harness_bash_syntax_clean():
@@ -149,3 +152,27 @@ def test_super_sleep_cycle_harness_bash_syntax_clean():
         pytest.skip("bash not on PATH")
     res = subprocess.run([bash, "-n", str(SLEEP_CYCLE_SCRIPT)], capture_output=True, text=True)
     assert res.returncode == 0, f"bash -n failed: {res.stderr}"
+
+
+def test_peer_gpu_memory_check_runs_after_confirmed_sleep_before_omni_launch():
+    src = _src()
+    sleep_confirmed = src.index('Super confirmed sleeping')
+    peer_gpu_check = src.index('peer_gpu_memory_check_passed')
+    launch = src.index('--- launching Omni on peer')
+    assert sleep_confirmed < peer_gpu_check < launch
+
+
+
+def test_omni_window_packet_centered_single_controller():
+    src = _src()
+    assert "PACKET_FILE=" in src
+    assert "packet_stub_created" in src
+    assert "finalize_packet" in src
+    assert "PEER_MAX_GPU_USED_AFTER_SLEEP_MB" in src
+    assert "peer_gpu_memory_check_passed" in src
+    assert "Peer GPU still has a process using" in src
+    assert "super_restart_begin" in src
+    assert "post_wake_semantic_passed" in src
+    assert "semantic_failure_restart_required" in src
+    assert "success_condition" in src
+    assert "no sensory visual claim" in src

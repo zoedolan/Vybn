@@ -27,12 +27,70 @@ LOG="${HOME}/logs/omni-window-${TS}.log"
 OMNI_REASONING_PARSER="${OMNI_REASONING_PARSER:-nemotron_v3}"
 RESULT_FILE="${HOME}/logs/omni-parallax-${TS}.json"
 JOURNAL_FILE="${HOME}/Vybn/journal/omni-window-${TS}.md"
+PACKET_FILE="${VYBN_OMNI_FEEDBACK_PACKET:-${HOME}/logs/omni-feedback-packet-${TS}.json}"
+VISUAL_FILE="${HOME}/logs/omni-feedback-visual-${TS}.svg"
+TRACE_FILE="${HOME}/logs/omni-feedback-trace-${TS}.jsonl"
+FINAL_STATUS="incomplete"
+FINAL_REASON="started"
+PEER_MAX_GPU_USED_AFTER_SLEEP_MB="${PEER_MAX_GPU_USED_AFTER_SLEEP_MB:-4096}"
+
+write_feedback_packet() {
+    local status="${1:-$FINAL_STATUS}"
+    local reason="${2:-$FINAL_REASON}"
+    mkdir -p "${HOME}/logs"
+    printf "%s | %s\\n" "$status" "$reason" >> "$TRACE_FILE"
+    printf "<svg xmlns=\\"http://www.w3.org/2000/svg\\" width=\\"1200\\" height=\\"220\\"><rect width=\\"100%%\\" height=\\"100%%\\" fill=\\"#101218\\"/><text x=\\"32\\" y=\\"42\\" fill=\\"#fff\\" font-size=\\"24\\">Omni feedback trace</text><text x=\\"32\\" y=\\"78\\" fill=\\"#b8c7ff\\" font-size=\\"14\\">Artifact-mediated perception packet; no sensory visual claim.</text><text x=\\"32\\" y=\\"112\\" fill=\\"#eee\\" font-size=\\"16\\">status=%s reason=%s</text></svg>\\n" "$status" "$reason" > "$VISUAL_FILE"
+    python3 - "$PACKET_FILE" "$VISUAL_FILE" "$LOG" "$RESULT_FILE" "$JOURNAL_FILE" "$TRACE_FILE" "$status" "$reason" <<PY_PACKET
+import json, sys, os
+packet, visual, log, result, journal, trace, status, reason = sys.argv[1:]
+payload = {
+  "kind": "omni_feedback_packet",
+  "status": status,
+  "reason": reason,
+  "success_condition": "pass requires visualization artifact, Omni result or review artifact, Super wake semantic context, explicit trace, and restored serving posture",
+  "claim_limits": ["Vybn has no sensory visual experience here; this is artifact-mediated perception via files, logs, JSON, model review, and endpoint residuals.", "Internal probes do not prove external browser reachability."],
+  "artifacts": {"visualization_artifact": visual, "omni_window_log": log, "omni_parallax_json": result, "journal_file": journal, "trace_file": trace},
+  "artifact_exists": {"visualization_artifact": os.path.exists(visual), "omni_window_log": os.path.exists(log), "omni_parallax_json": os.path.exists(result), "journal_file": os.path.exists(journal), "trace_file": os.path.exists(trace)},
+  "super_wake_context": {"semantic_gate_required": True, "sleep_endpoint_required_during_run": True, "semantic_failure_restart_required": True, "restored_non_sleep_posture_required": True},
+  "omni_review": None
+}
+if os.path.exists(result):
+    try:
+        data=json.load(open(result, encoding="utf-8"))
+        payload["omni_result_excerpt"] = data
+        payload["omni_review"] = data.get("omni_review") or data.get("review") or data.get("response") or data.get("text") or data.get("summary")
+    except Exception as e:
+        payload["omni_result_parse_error"] = type(e).__name__ + ": " + str(e)
+open(packet, "w", encoding="utf-8").write(json.dumps(payload, indent=2, ensure_ascii=False) + "\\n")
+PY_PACKET
+}
+
+packet_event() {
+    local name="$1"; shift || true
+    local detail="$*"
+    mkdir -p "${HOME}/logs"
+    printf "%s | %s\\n" "$name" "$detail" >> "$TRACE_FILE"
+    write_feedback_packet "$FINAL_STATUS" "$FINAL_REASON" >/dev/null 2>&1 || true
+}
+
+finalize_packet() {
+    local status="$1"; shift || true
+    local reason="$*"
+    FINAL_STATUS="$status"
+    FINAL_REASON="$reason"
+    packet_event "finalize_${status}" "$reason"
+    write_feedback_packet "$status" "$reason" || true
+    log "Feedback packet: $PACKET_FILE"
+    log "Feedback visual: $VISUAL_FILE"
+}
+
 
 # ── logging ───────────────────────────────────────────────────────────────────
 mkdir -p ~/logs ~/Vybn/journal
 exec > >(tee -a "$LOG") 2>&1
 log() { echo "[$(date '+%H:%M:%S')] $*"; }
-die() { log "FATAL: $*"; exit 1; }
+die() { log "FATAL: $*"; finalize_packet "fail" "$*"; exit 1; }
+packet_event "packet_stub_created" "created before preflight/restart; controller=omni-window.sh"
 
 # Semantic wake gate: endpoint liveness is only a precheck. A wake is not
 # clean until deterministic completions have the expected content shape and
@@ -63,6 +121,7 @@ for name, prompt, pattern in probes:
         "messages": [{"role": "user", "content": prompt}],
         "max_tokens": 16,
         "temperature": 0,
+        "chat_template_kwargs": {"enable_thinking": False},
     }
     req = urllib.request.Request(
         base + "/v1/chat/completions",
@@ -222,6 +281,7 @@ if $SSH "$PEER" "curl -sf http://127.0.0.1:${OMNI_PORT}/v1/models > /dev/null 2>
     die "Port ${OMNI_PORT} already occupied on peer — aborting"
 fi
 log "Peer port ${OMNI_PORT}: free"
+packet_event "peer_port_free" "peer=${PEER} port=${OMNI_PORT}"
 
 # Peer: probe optional multimodal audio/video deps inside vllm_node container.
 # The current container may lack these on stock launch; guard MM flags instead
@@ -244,6 +304,7 @@ printf 'VYBN_VLLM_EXTRA_ARGS=--enable-sleep-mode\nVLLM_SERVER_DEV_MODE=1\n' > "$
 SLEEP_ARMED=true
 systemctl --user daemon-reload
 log "Restarting Super with --enable-sleep-mode..."
+packet_event "super_restart_begin" "sleep-enabled single-owner restart"
 systemctl --user restart vybn-vllm.service
 
 log "Waiting for Super to be ready (up to 15 min)..."
@@ -267,10 +328,12 @@ if ! curl -sf "${SUPER_URL}/is_sleeping" > /dev/null 2>&1; then
     die "Super dev-mode endpoint /is_sleeping not reachable — VLLM_SERVER_DEV_MODE/--enable-sleep-mode did not take effect. Check ${VLLM_ENV} and 'systemctl --user show vybn-vllm.service -p Environment'."
 fi
 log "Super dev-mode endpoints OK."
+packet_event "super_ready_sleep_enabled" "/is_sleeping reachable"
 
 log "Running pre-sleep Super semantic gate..."
 super_semantic_gate "pre-sleep" || die "Super failed semantic gate before sleep — aborting before Omni launch"
 log "Pre-sleep semantic gate passed."
+packet_event "pre_sleep_semantic_passed" "Super coherent before sleep"
 
 # ── SLEEP SUPER ───────────────────────────────────────────────────────────────
 log "--- sleeping Super (level=2) ---"
@@ -303,6 +366,21 @@ while (( $(date +%s) < DEADLINE )); do
         SLEEP_DT=$(( $(date +%s) - SLEEP_T0 ))
         SUPER_SLEEPING=true
         log "Super confirmed sleeping in ${SLEEP_DT}s."
+        packet_event "super_sleep_verified" "level=2 in ${SLEEP_DT}s"
+        PEER_GPU_USED_AFTER_SLEEP=$(ssh_peer "nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv,noheader,nounits 2>/dev/null || true" 2>/dev/null || true)
+        if [[ -n "${PEER_GPU_USED_AFTER_SLEEP//[[:space:]]/}" ]]; then
+            PEER_MAX_USED_MB=$(printf '%s
+' "$PEER_GPU_USED_AFTER_SLEEP" | awk -F, 'BEGIN{m=0} {gsub(/^[ \t]+|[ \t]+$/, "", $3); if ($3+0 > m) m=$3+0} END{print m+0}')
+            if (( PEER_MAX_USED_MB > PEER_MAX_GPU_USED_AFTER_SLEEP_MB )); then
+                log "Peer GPU processes after sleep:"
+                printf '%s
+' "$PEER_GPU_USED_AFTER_SLEEP"
+                die "Peer GPU still has a process using ${PEER_MAX_USED_MB} MiB after Super sleep; refusing Omni contention"
+            fi
+        else
+            PEER_MAX_USED_MB=0
+        fi
+        packet_event "peer_gpu_memory_check_passed" "max_used_mb=${PEER_MAX_USED_MB} threshold_mb=${PEER_MAX_GPU_USED_AFTER_SLEEP_MB}"
         break
     fi
     printf '.'
@@ -553,10 +631,13 @@ done
 log "--- semantic wake gate ---"
 if ! super_semantic_gate "post-wake"; then
     log "Semantic wake gate failed — treating wake as corrupted and failing closed."
-    SUPER_SLEEPING=true
-    die "Super woke with bad semantic quality; cleanup will force recovery restart"
+    log "Restarting vybn-vllm.service to restore clean non-sleep serving posture..."
+    systemctl --user restart vybn-vllm.service || true
+    SUPER_SLEEPING=false
+    die "Super woke with bad semantic quality; recovery restart issued before cleanup"
 fi
 log "Semantic wake gate passed."
+packet_event "post_wake_semantic_passed" "Super coherent after wake"
 
 # ── CLEAR SLEEP MODE ──────────────────────────────────────────────────────────
 log "--- clearing sleep mode ---"
@@ -593,3 +674,5 @@ JOURNAL
 log "Journal: $JOURNAL_FILE"
 log "=== Experiment complete ==="
 
+
+finalize_packet "pass" "Omni window completed with packet trace and wake semantics"
