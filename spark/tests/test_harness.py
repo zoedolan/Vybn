@@ -99,6 +99,19 @@ class TestRepoClosureAuditProjectionState(unittest.TestCase):
         self.assertIn("has unmerged work outside", text)
         self.assertIn("Closure means work is merged into", text)
 
+    def test_primary_commit_membrane_hook_refuses_primary_branch_commits(self):
+        import harness.repo_closure_audit as audit
+
+        self.assertIn("Refusing direct commit on a primary branch", audit.PRIMARY_COMMIT_MEMBRANE_HOOK)
+        self.assertIn("branch -> PR -> review -> merge by default", audit.PRIMARY_COMMIT_MEMBRANE_HOOK)
+        self.assertIn("VYBN_ALLOW_DIRECT_PRIMARY_COMMIT=1", audit.PRIMARY_COMMIT_MEMBRANE_HOOK)
+
+    def test_repo_closure_audit_installs_primary_commit_membrane(self):
+        text = Path(SPARK_DIR / "harness" / "repo_closure_audit.py").read_text()
+        self.assertIn("primary_commit_membrane_installed", text)
+        self.assertIn("install_primary_commit_membrane", text)
+        self.assertIn("PRIMARY_COMMIT_MEMBRANE", text)
+
 
 class TestValidateCommand(unittest.TestCase):
     def test_blocks_dangerous(self):
