@@ -103,8 +103,12 @@ class TestRepoClosureAuditProjectionState(unittest.TestCase):
         import harness.repo_closure_audit as audit
 
         self.assertIn("Refusing direct commit on a primary branch", audit.PRIMARY_COMMIT_MEMBRANE_HOOK)
-        self.assertIn("Refusing net-positive non-Personal-History commit", audit.PRIMARY_COMMIT_MEMBRANE_HOOK)
+        self.assertIn("Refusing net-positive commit (excluding provenance + skill/vybn.vy law)", audit.PRIMARY_COMMIT_MEMBRANE_HOOK)
         self.assertIn("--numstat", audit.PRIMARY_COMMIT_MEMBRANE_HOOK)
+        self.assertIn("Refusing net-new files (excluding provenance + skill/vybn.vy law)", audit.PRIMARY_COMMIT_MEMBRANE_HOOK)
+        self.assertIn("CONSOLIDATION CONSTITUTION", audit.PRIMARY_COMMIT_MEMBRANE_HOOK)
+        self.assertIn("skill/vybn.vy", audit.PRIMARY_COMMIT_MEMBRANE_HOOK)
+        self.assertIn("constitutional law file", audit.PRIMARY_COMMIT_MEMBRANE_HOOK)
 
     def test_repo_closure_audit_installs_primary_commit_membrane(self):
         text = Path(SPARK_DIR / "harness" / "repo_closure_audit.py").read_text()
@@ -914,13 +918,12 @@ class SelfImprovementGateQuotaPressureTest(unittest.TestCase):
         from spark.harness import substrate
 
         text = Path(substrate.__file__).read_text()
-        self.assertIn("quota-shaped completion gate", text)
+        self.assertIn("no quota-shaped creation", text)
         self.assertIn("A bare explanation/refusal is not a resolution", text)
         self.assertIn("Do not call no_result a fix", text)
         self.assertIn("do not reinstall the quota", text)
-        self.assertIn("do not answer until you have consolidated N files", text)
-        self.assertIn("thin_result/no_result", text)
-        self.assertIn("instead of manufacturing edits", text)
+        self.assertIn("N-file gate", text)
+        self.assertIn("intrinsic absorption or explicit unresolved/refused classification", text)
 
 
 if __name__ == "__main__":
@@ -1390,8 +1393,8 @@ def test_build_layered_prompt_mounts_self_improvement_gate_at_forefront():
         include_hardware_check=False,
     )
     assert "SELF-IMPROVEMENT GATE (FOREFRONT)" in prompt.substrate
-    assert "compact against sprawl" in prompt.substrate
-    assert "refuse quota-driven file creation/extraction" in prompt.substrate
+    assert "compact against sprawl and false consolidation" in prompt.substrate
+    assert "distill toward one algorithm" in prompt.substrate
     assert prompt.substrate.index("SELF-IMPROVEMENT GATE (FOREFRONT)") < prompt.substrate.index("RESIDUAL CONTROL PROTOCOL")
 
 
@@ -1407,10 +1410,9 @@ def test_self_improvement_gate_forbids_quota_driven_file_creation():
         max_iterations=10,
         include_hardware_check=False,
     )
-    assert "compact against sprawl" in prompt.substrate
-    assert "Do not create or extract files to satisfy a numeric quota" in prompt.substrate
-    assert "Creating new files, extracting new organs, or adding new surfaces is not consolidation by default" in prompt.substrate
-    assert "refuse quota-driven file creation/extraction" in prompt.substrate
+    assert "no quota-shaped creation" in prompt.substrate
+    assert "New structure is not consolidation by default" in prompt.substrate
+    assert "existing-home absorption" in prompt.substrate
 
 
 def test_self_improvement_gate_encodes_sprawl_compact():
@@ -1425,27 +1427,29 @@ def test_self_improvement_gate_encodes_sprawl_compact():
         max_iterations=10,
         include_hardware_check=False,
     )
-    assert "compact against sprawl" in prompt.substrate
-    assert "Creating new files, extracting new organs, or adding new surfaces is not consolidation by default" in prompt.substrate
+    assert "Distillation / Anti-sprawl / absorption-first compact" in prompt.substrate
+    assert "subtractive distillation toward one algorithm" in prompt.substrate
+    assert "Zoe/Vybn relation as lambda" in prompt.substrate
+    assert "Personal History is protected provenance" in prompt.substrate
     assert "Search for the existing home first" in prompt.substrate
-    assert "which existing home was used" in prompt.substrate
+    assert "anti-sprawl residual and diff-shape residual" in prompt.substrate
 
 def test_self_improvement_gate_pins_quota_gate_conflict_resolution():
     from pathlib import Path
     text = Path("spark/harness/substrate.py").read_text()
-    assert "quota-gate conflict requiring real resolution" in text
+    assert "failed quota gates resolve by intrinsic absorption or explicit unresolved/refused classification" in text
     assert "do not reinstall the quota" in text
     assert "A bare explanation/refusal is not a resolution" in text
-    assert "Resolution requires either an intrinsically justified existing-home absorption" in text
+    assert "Resolution requires intrinsic existing-home absorption or explicit unresolved/refused classification" in text
     assert "Do not call no_result a fix" in text
 
 def test_quota_gate_resolution_blocks_retrospective_prior_commit_defense():
     from pathlib import Path
     root = Path(__file__).resolve().parents[2]
     substrate = (root / "spark/harness/substrate.py").read_text(encoding="utf-8")
-    assert "prior commits as the resolution" in substrate
-    assert "real existing-home absorption" in substrate
-    assert "refused/unresolved" in substrate
+    assert "never rhetorical closure" in substrate
+    assert "intrinsic existing-home absorption" in substrate
+    assert "unresolved/refused" in substrate
 
 def test_completion_boundary_compresses_verification_ledger_by_default():
     from spark.harness.substrate import COMPLETION_BOUNDARY_PROTOCOL
