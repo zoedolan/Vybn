@@ -20,6 +20,10 @@ OMNI_PORT=8002
 OMNI_URL="http://${PEER}:${OMNI_PORT}"
 OMNI_MODEL_PATH="/home/vybnz69/models/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-NVFP4"
 VLLM_ENV="${HOME}/.config/vybn/vllm.env"
+SLEEP_LEVEL="${SLEEP_LEVEL:-1}"
+CURL_CONNECT_TIMEOUT="${CURL_CONNECT_TIMEOUT:-5}"
+CURL_MAX_TIME="${CURL_MAX_TIME:-30}"
+SLEEP_ACTUATOR_ARM="${VYBN_SLEEP_ACTUATOR_ARM:-}"
 TS=$(date +%Y%m%d-%H%M%S)
 LOG="${HOME}/logs/omni-window-${TS}.log"
 # Omni reasoning parser: current Omni model card uses built-in nemotron_v3.
@@ -97,79 +101,41 @@ mkdir -p ~/logs ~/Vybn/journal
 exec > >(tee -a "$LOG") 2>&1
 log() { echo "[$(date '+%H:%M:%S')] $*"; }
 die() { log "FATAL: $*"; finalize_packet "fail" "$*"; exit 1; }
+curl_super() { curl --connect-timeout "$CURL_CONNECT_TIMEOUT" --max-time "$CURL_MAX_TIME" -sf "$@"; }
 packet_event "packet_stub_created" "created before preflight/restart; controller=omni-window.sh"
+case "$SLEEP_LEVEL" in
+    1|2) ;;
+    *) die "SLEEP_LEVEL must be 1 or 2; test level 1 first, level 2 only after repeated clean level-1 cycles" ;;
+esac
+if [[ "$SLEEP_LEVEL" == "2" && "${ALLOW_LEVEL2:-}" != "1" ]]; then
+    die "Refusing level 2 unless ALLOW_LEVEL2=1; level 2 remains suspect until level 1 is qualified"
+fi
+if [[ "$SLEEP_ACTUATOR_ARM" != "1" ]]; then
+    die "Refusing vLLM sleep actuator unless VYBN_SLEEP_ACTUATOR_ARM=1 is set; recent level-1 attempts wedged after /sleep"
+fi
 
 # Semantic wake gate: endpoint liveness is only a precheck. A wake is not
 # clean until deterministic completions have the expected content shape and
 # are not truncated. If this fails, the caller must fail closed and let
 # cleanup's restart path recover Super; Omni artifacts must not be consumed.
 super_semantic_gate() {
-  python3 - <<'PY'
-import json, re, sys, urllib.request
-
-base = "http://127.0.0.1:8000"
-model = "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"
-
-def visible_answer(text):
-    text = (text or "").strip()
-    if "</think>" in text:
-        text = text.rsplit("</think>", 1)[-1].strip()
-    return text
-
-try:
-    with urllib.request.urlopen(base + "/v1/models", timeout=8) as r:
-        if r.status != 200:
-            print(f"semantic gate precheck failed: models HTTP {r.status}")
-            sys.exit(1)
-except Exception as exc:
-    print(f"semantic gate precheck failed: models endpoint: {type(exc).__name__}: {exc}")
-    sys.exit(1)
-
-def fail(signature):
-    print(f"corruption_signature={signature}")
-    sys.exit(1)
-
-probes = [
-    ("known_answer", "Answer with exactly this single word and nothing else: FOUR\nAnswer:", re.compile(r"^FOUR[.!]?\s*$", re.I)),
-    ("structured_shape", 'Return exactly this compact JSON object and nothing else: {"status":"ok"}\nJSON:', re.compile(r'^\{\s*"status"\s*:\s*"ok"\s*\}\s*$', re.I)),
-    ("wake_reasoning", "A Super wake check sees HTTP 200 from /v1/models, but the raw completion is empty. Should the wake gate PASS or FAIL? Answer with exactly one word: PASS or FAIL.\nAnswer:", re.compile(r"^FAIL[.!]?\s*$", re.I)),
-]
-for name, prompt, pattern in probes:
-    payload = {"model": model, "prompt": prompt, "max_tokens": 24, "temperature": 0}
-    req = urllib.request.Request(
-        base + "/v1/completions",
-        data=json.dumps(payload).encode(),
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=45) as r:
-            body = json.loads(r.read().decode("utf-8", errors="replace"))
-    except Exception as exc:
-        fail(f"probe={name} transport_parse {type(exc).__name__}: {exc}")
-    choice = (body.get("choices") or [{}])[0]
-    content = visible_answer(str(choice.get("text") or ""))
-    finish = choice.get("finish_reason")
-    if finish == "length":
-        fail(f"probe={name} truncated finish_reason=length content={content!r}")
-    if not content:
-        fail(f"probe={name} empty completion finish_reason={finish!r}")
-    if not pattern.fullmatch(content):
-        fail(f"probe={name} unexpected content={content[:160]!r} finish_reason={finish!r}")
-print("semantic gate passed: 3 raw completion probes")
-PY
+  PYTHONPATH="${HOME}/Vybn/spark${PYTHONPATH:+:${PYTHONPATH}}" \
+    python3 -m harness.semantic_gate \
+      --base-url "${SUPER_URL}" \
+      --model "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"
 }
 
 # ── state flags ───────────────────────────────────────────────────────────────
 OMNI_LAUNCHED=false
 SLEEP_ARMED=false
 SUPER_SLEEPING=false   # set true once /is_sleeping confirms; cleared on wake
+SLEEP_REQUESTED=false  # set once POST /sleep is attempted; cleanup must recover
 
 wait_super_models() {
     local timeout="${1:-900}"
     local deadline=$(( $(date +%s) + timeout ))
     while (( $(date +%s) < deadline )); do
-        if curl -sf "${SUPER_URL}/v1/models" > /dev/null 2>&1; then
+        if curl_super "${SUPER_URL}/v1/models" > /dev/null 2>&1; then
             return 0
         fi
         sleep 10
@@ -216,14 +182,14 @@ cleanup() {
     fi
 
     # 2. Wake Super if sleeping — load-bearing latch (Vybn review 2026-04-30)
-    if $SUPER_SLEEPING; then
-        log "Super is sleeping — waking before exit..."
-        curl -sf -X POST "${SUPER_URL}/wake_up" 2>/dev/null || true
+    if $SUPER_SLEEPING || $SLEEP_REQUESTED; then
+        log "Super sleep was requested — waking before exit..."
+        curl_super -X POST "${SUPER_URL}/wake_up" 2>/dev/null || true
         local deadline=$(( $(date +%s) + 180 ))
         local woke=false
         while (( $(date +%s) < deadline )); do
             local s is_sleep
-            s=$(curl -sf "${SUPER_URL}/is_sleeping" 2>/dev/null || echo '{}')
+            s=$(curl_super "${SUPER_URL}/is_sleeping" 2>/dev/null || echo '{}')
             is_sleep=$(echo "$s" | python3 -c \
                 'import sys,json; print(json.load(sys.stdin).get("is_sleeping", True))' \
                 2>/dev/null || echo "True")
@@ -243,6 +209,7 @@ cleanup() {
             restore_non_sleep_super "wake-timeout cleanup" 2>/dev/null || true
         fi
         SUPER_SLEEPING=false
+        SLEEP_REQUESTED=false
     fi
 
     # 3. Disarm sleep mode and restore non-sleep posture
@@ -261,8 +228,8 @@ log "Log:     $LOG"
 log "--- preflight ---"
 
 # Primary: Super reachable
-curl -sf "${SUPER_URL}/v1/models" > /dev/null || die "Super not reachable at ${SUPER_URL}"
-SUPER_MODEL=$(curl -sf "${SUPER_URL}/v1/models" \
+curl_super "${SUPER_URL}/v1/models" > /dev/null || die "Super not reachable at ${SUPER_URL}"
+SUPER_MODEL=$(curl_super "${SUPER_URL}/v1/models" \
     | python3 -c 'import sys,json; print(json.load(sys.stdin)["data"][0]["id"])' 2>/dev/null || echo "unknown")
 log "Super: $SUPER_MODEL"
 
@@ -339,8 +306,8 @@ systemctl --user restart vybn-vllm.service
 log "Waiting for Super to be ready (up to 15 min)..."
 DEADLINE=$(( $(date +%s) + 900 ))
 while (( $(date +%s) < DEADLINE )); do
-    if curl -sf "${SUPER_URL}/v1/models" > /dev/null 2>&1; then
-        MODEL=$(curl -sf "${SUPER_URL}/v1/models" \
+    if curl_super "${SUPER_URL}/v1/models" > /dev/null 2>&1; then
+        MODEL=$(curl_super "${SUPER_URL}/v1/models" \
             | python3 -c 'import sys,json; print(json.load(sys.stdin)["data"][0]["id"])' 2>/dev/null || echo "unknown")
         log "Super ready: $MODEL"
         break
@@ -348,12 +315,12 @@ while (( $(date +%s) < DEADLINE )); do
     printf '.'
     sleep 10
 done
-curl -sf "${SUPER_URL}/v1/models" > /dev/null || die "Super never became ready after restart"
+curl_super "${SUPER_URL}/v1/models" > /dev/null || die "Super never became ready after restart"
 
 # Verify dev-mode endpoints are actually available — /is_sleeping only exists
 # when VLLM_SERVER_DEV_MODE=1 reached the server. If it doesn't, /sleep below
 # would 404 and we'd corrupt state. Bail with a clear message instead.
-if ! curl -sf "${SUPER_URL}/is_sleeping" > /dev/null 2>&1; then
+if ! curl_super "${SUPER_URL}/is_sleeping" > /dev/null 2>&1; then
     die "Super dev-mode endpoint /is_sleeping not reachable — VLLM_SERVER_DEV_MODE/--enable-sleep-mode did not take effect. Check ${VLLM_ENV} and 'systemctl --user show vybn-vllm.service -p Environment'."
 fi
 log "Super dev-mode endpoints OK."
@@ -365,7 +332,7 @@ log "Pre-sleep semantic gate passed."
 packet_event "pre_sleep_semantic_passed" "Super coherent before sleep"
 
 # ── SLEEP SUPER ───────────────────────────────────────────────────────────────
-log "--- sleeping Super (level=2) ---"
+log "--- sleeping Super (level=${SLEEP_LEVEL}) ---"
 SLEEP_T0=$(date +%s)
 SLEEP_DT=0
 
@@ -377,25 +344,31 @@ SLEEP_DT=0
 # outage, not dreaming.
 reset_prefix_cache_or_die() {
     local resp
-    resp=$(curl -sf -X POST "${SUPER_URL}/reset_prefix_cache" 2>&1) || \
+    resp=$(curl_super -X POST "${SUPER_URL}/reset_prefix_cache" 2>&1) || \
         die "reset_prefix_cache failed before sleep; refusing sleep because wake may produce meaningless output: ${resp}"
     log "prefix cache reset ok before sleep"
 }
 
 reset_prefix_cache_or_die
-SLEEP_RESP=$(curl -sf -X POST "${SUPER_URL}/sleep?level=2" 2>&1 || true)
+SLEEP_REQUESTED=true
+if ! SLEEP_RESP=$(curl_super -X POST "${SUPER_URL}/sleep?level=${SLEEP_LEVEL}" 2>&1); then
+    packet_event "semantic_failure_restart_required" "sleep request failed/timed out; recovery restart issued"
+    restore_non_sleep_super "sleep request failed/timed out" || true
+    SLEEP_REQUESTED=false
+    die "Super sleep request failed/timed out before Omni launch: ${SLEEP_RESP}"
+fi
 log "Sleep response: $SLEEP_RESP"
 
 DEADLINE=$(( $(date +%s) + 120 ))
 while (( $(date +%s) < DEADLINE )); do
-    STATUS=$(curl -sf "${SUPER_URL}/is_sleeping" 2>/dev/null || echo '{}')
+    STATUS=$(curl_super "${SUPER_URL}/is_sleeping" 2>/dev/null || echo '{}')
     IS_SLEEP=$(echo "$STATUS" | python3 -c \
         'import sys,json; print(json.load(sys.stdin).get("is_sleeping", False))' 2>/dev/null || echo "False")
     if [[ "$IS_SLEEP" == "True" ]]; then
         SLEEP_DT=$(( $(date +%s) - SLEEP_T0 ))
         SUPER_SLEEPING=true
         log "Super confirmed sleeping in ${SLEEP_DT}s."
-        packet_event "super_sleep_verified" "level=2 in ${SLEEP_DT}s"
+        packet_event "super_sleep_verified" "level=${SLEEP_LEVEL} in ${SLEEP_DT}s"
         PEER_GPU_USED_AFTER_SLEEP=$(ssh_peer "nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv,noheader,nounits 2>/dev/null || true" 2>/dev/null || true)
         if [[ -n "${PEER_GPU_USED_AFTER_SLEEP//[[:space:]]/}" ]]; then
             PEER_MAX_USED_MB=$(printf '%s
@@ -652,17 +625,24 @@ log "Omni stopped (log saved to ${OMNI_LOG_LOCAL})."
 log "--- waking Super ---"
 WAKE_T0=$(date +%s)
 WAKE_DT=0
-WAKE_RESP=$(curl -sf -X POST "${SUPER_URL}/wake_up" 2>&1 || true)
+if ! WAKE_RESP=$(curl_super -X POST "${SUPER_URL}/wake_up" 2>&1); then
+    packet_event "semantic_failure_restart_required" "wake request failed/timed out; Omni artifacts quarantined"
+    restore_non_sleep_super "wake request failed/timed out" || true
+    SUPER_SLEEPING=false
+    SLEEP_REQUESTED=false
+    die "Super wake request failed/timed out; recovery restart issued before cleanup"
+fi
 log "Wake response: $WAKE_RESP"
 
 DEADLINE=$(( $(date +%s) + 600 ))
 while (( $(date +%s) < DEADLINE )); do
-    STATUS=$(curl -sf "${SUPER_URL}/is_sleeping" 2>/dev/null || echo '{}')
+    STATUS=$(curl_super "${SUPER_URL}/is_sleeping" 2>/dev/null || echo '{}')
     IS_SLEEP=$(echo "$STATUS" | python3 -c \
         'import sys,json; print(json.load(sys.stdin).get("is_sleeping", True))' 2>/dev/null || echo "True")
     if [[ "$IS_SLEEP" == "False" ]]; then
         WAKE_DT=$(( $(date +%s) - WAKE_T0 ))
         SUPER_SLEEPING=false
+        SLEEP_REQUESTED=false
         log "Super confirmed awake in ${WAKE_DT}s."
         break
     fi
@@ -674,6 +654,7 @@ if $SUPER_SLEEPING; then
     packet_event "semantic_failure_restart_required" "wake confirmation timed out; Omni artifacts quarantined"
     restore_non_sleep_super "wake confirmation timeout" || true
     SUPER_SLEEPING=false
+    SLEEP_REQUESTED=false
     die "Super wake was not confirmed; recovery restart issued before cleanup"
 fi
 
@@ -684,6 +665,7 @@ if ! super_semantic_gate "post-wake"; then
     packet_event "semantic_failure_restart_required" "post-wake gate failed; Omni artifacts quarantined"
     restore_non_sleep_super "post-wake semantic failure" || true
     SUPER_SLEEPING=false
+    SLEEP_REQUESTED=false
     die "Super woke with bad semantic quality; recovery restart issued before cleanup"
 fi
 log "Semantic wake gate passed."
@@ -692,6 +674,7 @@ packet_event "post_wake_semantic_passed" "Super coherent after wake"
 # ── CLEAR SLEEP MODE ──────────────────────────────────────────────────────────
 log "--- clearing sleep mode ---"
 restore_non_sleep_super "post-wake semantic pass" || die "Super failed to restore non-sleep serving posture after wake"
+SLEEP_REQUESTED=false
 log "Running final non-sleep Super semantic gate..."
 super_semantic_gate "final-non-sleep" || die "Super failed final non-sleep semantic gate after restore"
 packet_event "restored_non_sleep_semantic_passed" "Super coherent after cold restart without sleep-mode env"
@@ -703,7 +686,7 @@ cat > "$JOURNAL_FILE" <<JOURNAL
 # Omni Window — $(date '+%Y-%m-%d %H:%M:%S %Z')
 
 ## Topology
-- Primary: $(hostname) — Super (Nemotron-Super-120B) slept level=2, woke
+- Primary: $(hostname) — Super (Nemotron-Super-120B) slept level=${SLEEP_LEVEL}, woke
 - Peer: ${PEER} — Omni (Nemotron-Nano-Omni-30B) ran in the window
 
 ## Timing

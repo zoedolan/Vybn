@@ -11,8 +11,9 @@ These tests pin invariants we keep getting bitten by:
      --allowed-local-media-path=/.
   3. Spark memory overrides must stay in range:
      --max-model-len 32768, --gpu-memory-utilization in [0.70, 0.80].
-  4. Sleep mode must be armed with VLLM_SERVER_DEV_MODE=1 (the /sleep,
-     /wake_up, /is_sleeping endpoints are dev-mode only).
+  4. Sleep mode must be armed deliberately: VYBN_SLEEP_ACTUATOR_ARM=1,
+     VLLM_SERVER_DEV_MODE=1, and --enable-sleep-mode. Level 1 is the default;
+     level 2 is refused unless explicitly overridden.
   5. A safe fallback must exist for missing multimodal audio/video deps:
      the script should *not* unconditionally pass --limit-mm-per-prompt or
      --media-io-kwargs — those flags must be guarded by a probe.
@@ -168,22 +169,33 @@ class OmniMultimodalFallbackTests(unittest.TestCase):
 
 
 class SuperSleepDevModeTests(unittest.TestCase):
-    def test_dev_mode_armed(self):
-        """The /sleep, /wake_up, /is_sleeping vLLM endpoints only exist when
-        VLLM_SERVER_DEV_MODE=1. The arm-sleep step must set that env var
-        AND --enable-sleep-mode."""
+    def test_sleep_actuator_requires_operator_arm_and_dev_mode(self):
+        """The vLLM sleep actuator must require an explicit operator arm,
+        and the arm-sleep step must set dev mode plus --enable-sleep-mode."""
         text = script_text()
+        self.assertIn("VYBN_SLEEP_ACTUATOR_ARM", text)
+        self.assertIn('SLEEP_LEVEL="${SLEEP_LEVEL:-1}"', text)
+        self.assertIn("ALLOW_LEVEL2", text)
         self.assertIn("VLLM_SERVER_DEV_MODE=1", text)
         self.assertIn("--enable-sleep-mode", text)
+
+    def test_sleep_and_wake_requests_are_bounded_and_fail_closed(self):
+        text = script_text()
+        self.assertIn('CURL_CONNECT_TIMEOUT="${CURL_CONNECT_TIMEOUT:-5}"', text)
+        self.assertIn('CURL_MAX_TIME="${CURL_MAX_TIME:-30}"', text)
+        self.assertIn("curl_super()", text)
+        self.assertIn("sleep request failed/timed out", text)
+        self.assertIn("wake request failed/timed out", text)
 
 
 class CleanupLatchTests(unittest.TestCase):
     def test_cleanup_wakes_super_on_exit(self):
-        """If SUPER_SLEEPING is true at exit, cleanup must POST /wake_up and
-        fall back to systemctl restart of vybn-vllm.service if wake times out."""
+        """If sleep was requested at exit, cleanup must POST /wake_up and fall
+        back to systemctl restart of vybn-vllm.service if wake times out."""
         text = script_text()
         self.assertIn("trap cleanup EXIT", text)
-        self.assertRegex(text, r'if \$SUPER_SLEEPING; then')
+        self.assertIn("SLEEP_REQUESTED=false", text)
+        self.assertRegex(text, r"if \$SUPER_SLEEPING \|\| \$SLEEP_REQUESTED; then")
         self.assertIn("/wake_up", text)
         self.assertIn("vybn-vllm.service", text)
 
@@ -212,4 +224,3 @@ def _assert_script_exists():
 if __name__ == "__main__":
     _assert_script_exists()
     unittest.main(verbosity=2)
-

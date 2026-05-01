@@ -50,9 +50,9 @@ CMD=(
   env "VLLM_SERVER_DEV_MODE=${VLLM_SERVER_DEV_MODE:-0}"
   vllm serve nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
   --port 8000 --host 0.0.0.0
-  --gpu-memory-utilization "${VYBN_VLLM_GPU_MEMORY_UTILIZATION:-0.78}"
+  --gpu-memory-utilization "${VYBN_VLLM_GPU_MEMORY_UTILIZATION:-0.72}"
   --max-model-len 8192
-  --max-num-seqs "${VYBN_VLLM_MAX_NUM_SEQS:-8}"
+  --max-num-seqs "${VYBN_VLLM_MAX_NUM_SEQS:-4}"
   --tensor-parallel-size 1 --pipeline-parallel-size 2
   --distributed-executor-backend ray
   --trust-remote-code

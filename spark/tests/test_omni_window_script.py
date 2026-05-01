@@ -17,6 +17,7 @@ import pytest
 
 SCRIPT = Path(__file__).resolve().parents[1] / "experiments" / "omni-window.sh"
 SLEEP_CYCLE_SCRIPT = Path(__file__).resolve().parents[1] / "experiments" / "super-sleep-cycle.sh"
+SEMANTIC_GATE_MODULE = Path(__file__).resolve().parents[1] / "harness" / "semantic_gate.py"
 
 
 def _src() -> str:
@@ -45,6 +46,8 @@ def test_cleanup_trap_present():
     assert "trap cleanup EXIT" in src, "EXIT trap must be installed"
     assert "SUPER_SLEEPING=true" in src, "sleep latch must be set on confirm"
     assert "SUPER_SLEEPING=false" in src, "sleep latch must be cleared on wake"
+    assert "SLEEP_REQUESTED=true" in src, "sleep request latch must be set before /sleep"
+    assert "SLEEP_REQUESTED=false" in src, "sleep request latch must be cleared on recovery"
 
 
 def test_wake_fallback_restarts_service():
@@ -110,25 +113,29 @@ def test_wake_failure_captures_journal():
 
 def test_super_semantic_gate_exists_and_uses_raw_deterministic_expected_outputs():
     src = _src()
+    gate = SEMANTIC_GATE_MODULE.read_text()
     assert "super_semantic_gate()" in src
-    assert 'base + "/v1/completions"' in src
-    assert '"temperature": 0' in src
-    assert '"max_tokens": 24' in src
+    assert "python3 -m harness.semantic_gate" in src
+    assert 'api_base + "/completions"' in gate
+    assert '"temperature": 0' in gate
+    assert '"max_tokens": 24' in gate
     assert '"chat_template_kwargs": {"enable_thinking": False}' not in src
-    assert "visible_answer(" in src
+    assert "semantic_gate_visible_answer(" in gate
     for expected in ["FOUR", '{"status":"ok"}', "FAIL"]:
-        assert expected in src
+        assert expected in gate
     for probe_name in ["known_answer", "structured_shape", "wake_reasoning"]:
-        assert probe_name in src
-    assert "corruption_signature=" in src
-    assert 'finish == "length"' in src or 'finish_reason=length' in src
+        assert probe_name in gate
+    assert "corruption_signature=" in gate
+    assert 'finish == "length"' in gate or 'finish_reason=length' in gate
+    assert "<<'PY'" not in src, "omni-window must not duplicate the canonical semantic gate heredoc"
 
 
 def test_semantic_gate_runs_before_sleep_and_after_wake_before_success():
     src = _src()
     pre = src.index('Running pre-sleep Super semantic gate')
-    sleep = src.index('/sleep?level=2')
-    wake = src.index('/wake_up')
+    sleep = src.index('/sleep?level=${SLEEP_LEVEL}')
+    wake_section = src.index('--- waking Super ---')
+    wake = src.index('/wake_up', wake_section)
     gate = src.index('--- semantic wake gate ---')
     clear = src.index('--- clearing sleep mode ---')
     assert pre < sleep
@@ -144,22 +151,33 @@ def test_semantic_gate_runs_before_sleep_and_after_wake_before_success():
 def test_super_sleep_cycle_harness_is_isolated_from_omni_and_defaults_level1():
     assert SLEEP_CYCLE_SCRIPT.is_file(), f"missing: {SLEEP_CYCLE_SCRIPT}"
     src = SLEEP_CYCLE_SCRIPT.read_text()
+    gate = SEMANTIC_GATE_MODULE.read_text()
     assert "OMNI" not in src
     assert 'SLEEP_LEVEL="${SLEEP_LEVEL:-1}"' in src
     assert 'CYCLES="${CYCLES:-5}"' in src
     assert "ALLOW_LEVEL2" in src
+    assert "VYBN_SLEEP_ACTUATOR_ARM" in src
+    assert 'CURL_CONNECT_TIMEOUT="${CURL_CONNECT_TIMEOUT:-5}"' in src
+    assert 'CURL_MAX_TIME="${CURL_MAX_TIME:-30}"' in src
+    assert "curl_super()" in src
+    assert "SLEEP_REQUESTED=true" in src
+    assert "sleep request failed/timed out" in src
+    assert "wake request failed/timed out" in src
     assert "super_semantic_gate()" in src
-    assert 'base + "/v1/completions"' in src
-    assert '"temperature": 0' in src
-    assert '"max_tokens": 24' in src
+    assert "python3 -m harness.semantic_gate" in src
+    assert 'api_base + "/completions"' in gate
+    assert '"temperature": 0' in gate
+    assert '"max_tokens": 24' in gate
     assert '"chat_template_kwargs": {"enable_thinking": False}' not in src
-    assert "visible_answer(" in src
+    assert "semantic_gate_visible_answer(" in gate
     for expected in ["FOUR", '{"status":"ok"}', "FAIL"]:
-        assert expected in src
+        assert expected in gate
     for probe_name in ["known_answer", "structured_shape", "wake_reasoning"]:
-        assert probe_name in src
-    assert "corruption_signature=" in src
-    assert "semantic_failure_restart_required" in src
+        assert probe_name in gate
+    assert "corruption_signature=" in gate
+    assert "cold_restart_super_non_sleep" in src
+    assert "failing closed after cold restart" in src
+    assert "<<'PY'" not in src, "sleep-cycle must not duplicate the canonical semantic gate heredoc"
 
 
 def test_super_sleep_cycle_harness_bash_syntax_clean():

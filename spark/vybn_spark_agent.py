@@ -49,6 +49,13 @@ from harness.substrate import rag_snippets, rag_snippets_with_tier, render_him_v
 from harness.providers import execute_tool_calls, default_introspect  # noqa: E402
 from harness.providers import check_claim, check_structural_claim  # noqa: E402
 from harness.policy import is_system_critical_pilot_turn  # noqa: E402
+from harness.semantic_gate import (  # noqa: E402
+    SUPER_SEMANTIC_GATE_CACHE as _SUPER_SEMANTIC_GATE_CACHE,
+    SUPER_SEMANTIC_GATE_PROBES as _SUPER_SEMANTIC_GATE_PROBES,
+    is_loopback_super_base as _is_loopback_super_base,
+    local_super_semantic_gate as _local_super_semantic_gate,
+    semantic_gate_visible_answer as _semantic_gate_visible_answer,
+)
 
 # ---------------------------------------------------------------------------
 # Learn-from-exchange loop closure (round 4).
@@ -701,127 +708,6 @@ _TRANSIENT_PATTERNS = (
 
 _MAINTENANCE_DEFERRALS_CAP = 32
 _MAINTENANCE_DEFERRALS: list[dict[str, Any]] = []
-
-_SUPER_SEMANTIC_GATE_CACHE_TTL = 300.0
-_SUPER_SEMANTIC_GATE_CACHE: dict[str, dict[str, Any]] = {}
-_SUPER_SEMANTIC_GATE_PROBES = (
-    {
-        "name": "known_answer",
-        "prompt": "Answer with exactly this single word and nothing else: FOUR\nAnswer:",
-        "pattern": r"FOUR[.!]?",
-    },
-    {
-        "name": "structured_shape",
-        "prompt": 'Return exactly this compact JSON object and nothing else: {"status":"ok"}\nJSON:',
-        "pattern": r'\{\s*"status"\s*:\s*"ok"\s*\}',
-    },
-    {
-        "name": "wake_reasoning",
-        "prompt": (
-            "A Super wake check sees HTTP 200 from /v1/models, but the raw "
-            "completion is empty. Should the wake gate PASS or FAIL? Answer "
-            "with exactly one word: PASS or FAIL.\nAnswer:"
-        ),
-        "pattern": r"FAIL[.!]?",
-    },
-)
-
-
-def _is_loopback_super_base(base_url: str | None) -> bool:
-    """True only for the primary local Super endpoint, not peer @omni.
-
-    _is_local_super_base intentionally includes private-LAN peer endpoints
-    for maintenance notices. The semantic fallback gate below must be
-    narrower: it protects first local-Nemotron/Super turns without changing
-    the explicit @omni route or consuming peer Omni probes.
-    """
-    if not base_url or "://" not in base_url:
-        return False
-    host = base_url.lower().split("://", 1)[1].split("/", 1)[0].split(":", 1)[0]
-    return host in ("localhost", "127.0.0.1", "0.0.0.0", "::1")
-
-
-def _semantic_gate_visible_answer(text: str) -> str:
-    """Return the visible answer portion from a semantic probe.
-
-    Nemotron chat responses may expose reasoning followed by </think>. That is
-    not token soup by itself. The semantic gate should judge the final visible
-    answer, while the deterministic health probe should prefer raw completions
-    to avoid chat-template reasoning entirely.
-    """
-    content = (text or "").strip()
-    if "</think>" in content:
-        content = content.rsplit("</think>", 1)[-1].strip()
-    return content
-
-
-def _local_super_semantic_gate(
-    *,
-    base_url: str | None,
-    model: str,
-    now: float | None = None,
-) -> tuple[bool, str]:
-    """Cached deterministic semantic check for local Super.
-
-    Endpoint liveness is not integrity. The probe uses /v1/completions rather
-    than chat completions because this Nemotron chat template exposes reasoning
-    before the visible answer. Exposed reasoning can be acceptable service
-    behavior; a semantic-health gate needs a narrow deterministic signal.
-
-    A failure must fail closed by default; cloud fallback is allowed only by
-    explicit operator opt-in because automatic fallback can burn paid API
-    budget when local Super is repeatedly corrupt.
-    """
-    import json as _json
-    import re as _re
-    import time as _time
-    import urllib.request as _urlrequest
-
-    base = (base_url or "").rstrip("/")
-    if not _is_loopback_super_base(base):
-        return True, "semantic gate skipped for non-loopback base"
-    now = _time.time() if now is None else now
-    cached = _SUPER_SEMANTIC_GATE_CACHE.get(base)
-    if cached and now - float(cached.get("ts", 0.0)) < _SUPER_SEMANTIC_GATE_CACHE_TTL:
-        return bool(cached.get("ok")), str(cached.get("reason", "cached"))
-    try:
-        for probe in _SUPER_SEMANTIC_GATE_PROBES:
-            payload = {
-                "model": model,
-                "prompt": probe["prompt"],
-                "max_tokens": 24,
-                "temperature": 0,
-            }
-            req = _urlrequest.Request(
-                base + "/completions",
-                data=_json.dumps(payload).encode("utf-8"),
-                headers={"Content-Type": "application/json"},
-                method="POST",
-            )
-            with _urlrequest.urlopen(req, timeout=45) as resp:
-                body = _json.loads(resp.read().decode("utf-8", errors="replace"))
-            choice = (body.get("choices") or [{}])[0]
-            content = _semantic_gate_visible_answer(str(choice.get("text") or ""))
-            finish = choice.get("finish_reason")
-            name = str(probe["name"])
-            if finish == "length":
-                ok, reason = False, f"semantic gate probe={name} truncated finish_reason=length"
-                break
-            if not content:
-                ok, reason = False, f"semantic gate probe={name} empty completion"
-                break
-            if not _re.fullmatch(str(probe["pattern"]), content, flags=_re.IGNORECASE):
-                ok, reason = False, (
-                    f"semantic gate probe={name} unexpected content={content[:80]!r} "
-                    f"finish_reason={finish!r}"
-                )
-                break
-        else:
-            ok, reason = True, f"semantic gate passed {len(_SUPER_SEMANTIC_GATE_PROBES)} raw probes"
-    except Exception as exc:  # pragma: no cover - exercised by integration
-        ok, reason = False, f"semantic gate exception {exc.__class__.__name__}: {_sanitize_provider_error(exc)}"
-    _SUPER_SEMANTIC_GATE_CACHE[base] = {"ok": ok, "reason": reason, "ts": now}
-    return ok, reason
 
 def _fallback_to_sonnet_for_super_semantic_failure(router, role_cfg):
     """Return a Sonnet fallback RoleConfig preserving tools/turn shape.

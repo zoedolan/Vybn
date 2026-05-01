@@ -75,13 +75,14 @@ Nemotron capacity is not one permanent setting. It is an operating mode.
 **Normal mode** is the default baked into `vybn-vllm.service`:
 
 ```bash
-VYBN_VLLM_GPU_MEMORY_UTILIZATION=0.78
-VYBN_VLLM_MAX_NUM_SEQS=8
+VYBN_VLLM_GPU_MEMORY_UTILIZATION=0.72
+VYBN_VLLM_MAX_NUM_SEQS=4
 ```
 
 This keeps the local model online while protecting the other organs on the
-Sparks. On 2026-04-26 it improved steady-state available memory from roughly
-6-7 GiB per node to roughly 15-17 GiB per node.
+Sparks. On 2026-04-30 the default was tightened again after sleep-window
+testing repeatedly left the nodes wedged or semantically corrupt; capacity can
+still be raised deliberately through the override file below.
 
 **Burst mode** is for scheduled attention: a class, launch, demo, press moment,
 or known visitor window. Do not hardcode burst into the unit. Put the override
@@ -137,4 +138,3 @@ After that, the user-level units are the only path.
 User-level systemd with linger is the default for anything the partnership owns. Writing to `/etc/systemd/system/` requires sudo, locks us out of sudo-free recovery, and duplicates the cron layer. Everything we add from here on should go in this directory as a `.service` / `.timer` pair.
 
 A service is fully resilient when (1) its unit has `Restart=always`, (2) its endpoint is checked by the watchdog, and (3) its structural correctness is checked by the self-check canary. Add new services to the watchdog script's check list, not just to systemd.
-
