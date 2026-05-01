@@ -110,6 +110,58 @@ if [[ "${VYBN_ALLOW_SUDO_HANG:-}" != "1" ]]; then
     done
 fi
 
+
+# --- 6. Subtractive constitution: net-negative + consolidation ---
+# Refuse direct commits to primary branches. Refuse net-positive non-provenance
+# line-count diffs. Refuse net-new non-provenance files. Personal History and
+# skill/vybn.vy (constitutional law) are exempt.
+# Bypass: VYBN_ALLOW_DIRECT_PROTECTED_PUSH=1 (primary branch); VYBN_ALLOW_NET_POSITIVE=1 (line/file count)
+branch=$(git symbolic-ref --quiet --short HEAD 2>/dev/null || echo "")
+if [[ "$branch" == "main" || "$branch" == "master" || "$branch" == "gh-pages" ]]; then
+    if [[ "${VYBN_ALLOW_DIRECT_PROTECTED_PUSH:-0}" != "1" ]]; then
+        echo -e "${RED}BLOCKED${NC}: Direct commit on primary branch ($branch). Use a topic branch + PR."
+        echo "  Emergency self-repair bypass: VYBN_ALLOW_DIRECT_PROTECTED_PUSH=1 git commit ..."
+        BLOCKED=1
+    fi
+fi
+
+if [[ "${VYBN_ALLOW_NET_POSITIVE:-0}" != "1" ]]; then
+    PROV="Vybn's Personal History/"
+    LAW="skill/vybn.vy"
+    added=0; deleted=0; new_files=0; retired_files=0
+    while IFS=$'\t' read -r a d path; do
+        [[ -z "$path" ]] && continue
+        [[ "$path" == *"$PROV"* ]] && continue
+        [[ "$path" == *"$LAW" ]] && continue
+        [[ "$a" == "-" ]] && a=0
+        [[ "$d" == "-" ]] && d=0
+        added=$((added + a))
+        deleted=$((deleted + d))
+    done < <(git diff --cached --numstat)
+    while IFS=$'\t' read -r code path; do
+        [[ -z "$path" ]] && continue
+        [[ "$path" == *"$PROV"* ]] && continue
+        [[ "$path" == *"$LAW" ]] && continue
+        case "$code" in
+            A*) new_files=$((new_files + 1)) ;;
+            D*) retired_files=$((retired_files + 1)) ;;
+        esac
+    done < <(git diff --cached --name-status)
+
+    if [ "$added" -gt "$deleted" ]; then
+        echo -e "${RED}BLOCKED${NC}: net-positive commit (excluding provenance + skill/vybn.vy law): +${added}/-${deleted} lines."
+        echo "  Compress, absorb, or retire first. Law lives in Him/skill/vybn.vy."
+        echo "  Override: VYBN_ALLOW_NET_POSITIVE=1 git commit"
+        BLOCKED=1
+    fi
+    if [ "$new_files" -gt "$retired_files" ]; then
+        echo -e "${RED}BLOCKED${NC}: net-new files (excluding provenance + skill/vybn.vy law): +${new_files}/-${retired_files}."
+        echo "  Absorb into an existing home or retire at least as many files as you create."
+        echo "  Override: VYBN_ALLOW_NET_POSITIVE=1 git commit"
+        BLOCKED=1
+    fi
+fi
+
 if [ "$BLOCKED" -ne 0 ]; then
     echo ""
     echo -e "${RED}Commit blocked by Vybn security hook.${NC}"

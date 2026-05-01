@@ -1,22 +1,11 @@
 #!/usr/bin/env python3
-"""Audit the Zoe/Vybn repo closure for hidden local/projection drift.
+"""Audit Zoe/Vybn repo closure: dirty trees, stashes, local-only commits,
+narrow fetch refspecs, missing upstreams, missing subtractive constitution.
 
-This is the antidote to the recurring failure mode where work is committed
-locally, left dirty, stranded in a stash/local branch, or made invisible by a
-narrow fetch refspec while GitHub and the local clone disagree about reality.
-
-The key lesson: Git closure is not just "working tree clean." Remote-tracking
-refs, fetch refspecs, upstreams, stashes, origin/HEAD, and live-process uptake
-are separate projections. A branch can exist on GitHub and still be invisible to
-``git log --branches --not --remotes`` if this clone only fetches ``main``.
-
-In --fix mode (default), the audit safely normalizes projection state:
-  - Ensures origin fetches all branch heads into refs/remotes/origin/*.
-  - Fetches/prunes origin after normalizing the refspec.
-  - Deletes stale local branches with no upstream only when their commits are
-    already reachable from the active branch's upstream.
-It does NOT auto-drop stashes or delete unique branch work.
-"""
+Closure is not just clean working tree: remote-tracking refs, fetch refspecs,
+upstreams, and stashes are separate projections. In --fix mode (default) the
+audit normalizes safe projection state and deletes stale subsumed branches; it
+does not auto-drop stashes or delete unique branch work."""
 
 from __future__ import annotations
 
@@ -25,7 +14,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-PRIMARY_COMMIT_MEMBRANE_HOOK = '#!/usr/bin/env python3\nimport subprocess, sys\n\ndef run(*args):\n    r = subprocess.run(["git", *args], text=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=False)\n    return r.stdout.strip()\n\nbranch = run("symbolic-ref", "--quiet", "--short", "HEAD")\nif branch in {"main", "master", "gh-pages"}:\n    sys.stderr.write("[VYBN COMMIT MEMBRANE]\\nRefusing direct commit on a primary branch; use branch -> PR -> review -> merge.\\n")\n    sys.exit(1)\n\nPROVENANCE = "Vybn" + chr(39) + "s Personal History/"\nLAW = "skill/vybn.vy"  # constitutional law file; growth here is permitted\n\ndef is_exempt(path):\n    return PROVENANCE in path or path.endswith(LAW) or path == LAW\n\nstatus = run("diff", "--cached", "--name-status")\nnew_files = retired_files = 0\nfor line in status.splitlines():\n    parts = line.split("\\t")\n    if len(parts) < 2: continue\n    code, path = parts[0], parts[-1]\n    if is_exempt(path): continue\n    if code.startswith("A"): new_files += 1\n    elif code.startswith("D"): retired_files += 1\n\nout = run("diff", "--cached", "--numstat")\nadded = deleted = 0\nfor line in out.splitlines():\n    parts = line.split("\\t", 2)\n    if len(parts) != 3: continue\n    a, d, path = parts\n    if is_exempt(path): continue\n    added += 0 if a == "-" else int(a)\n    deleted += 0 if d == "-" else int(d)\n\nif added > deleted:\n    sys.stderr.write(f"[VYBN SUBTRACTIVE CONSTITUTION]\\nRefusing net-positive commit (excluding provenance + skill/vybn.vy law): +{added}/-{deleted} lines.\\nCompress, absorb, or retire first. Law lives in Him/skill/vybn.vy.\\n")\n    sys.exit(1)\n\nif new_files > retired_files:\n    sys.stderr.write(f"[VYBN CONSOLIDATION CONSTITUTION]\\nRefusing net-new files (excluding provenance + skill/vybn.vy law): +{new_files}/-{retired_files}.\\nAbsorb into an existing home or retire at least as many files as you create.\\n")\n    sys.exit(1)\n'
 
 REPOS = [
     Path.home() / "Vybn",
@@ -76,23 +64,20 @@ def normalize_fetch_refspec(repo: Path) -> str:
     return fetched
 
 
-def commit_membrane_hook_path(repo: Path) -> Path:
-    return repo / ".git" / "hooks" / "pre-commit"
+CONSTITUTION_MARKERS = (
+    "Subtractive constitution",
+    "skill/vybn.vy",
+    "VYBN_ALLOW_NET_POSITIVE",
+)
 
 
 def primary_commit_membrane_installed(repo: Path) -> bool:
-    hook = commit_membrane_hook_path(repo)
+    """Tracked .githooks/pre-commit must carry the subtractive constitution."""
     try:
-        return hook.read_text() == PRIMARY_COMMIT_MEMBRANE_HOOK
+        text = (repo / ".githooks" / "pre-commit").read_text()
     except FileNotFoundError:
         return False
-
-
-def install_primary_commit_membrane(repo: Path) -> None:
-    hook = commit_membrane_hook_path(repo)
-    hook.parent.mkdir(parents=True, exist_ok=True)
-    hook.write_text(PRIMARY_COMMIT_MEMBRANE_HOOK)
-    hook.chmod(0o755)
+    return all(m in text for m in CONSTITUTION_MARKERS)
 
 
 def primary_branch_for(repo: Path) -> str:
@@ -193,13 +178,9 @@ def audit_repo(repo: Path) -> tuple[bool, str]:
             problems.append("origin fetch refspec does not fetch all branches")
 
     if not primary_commit_membrane_installed(repo):
-        lines.append("\nPRIMARY_COMMIT_MEMBRANE:")
-        lines.append("missing or stale pre-commit hook guarding direct primary-branch commits")
-        if FIX:
-            install_primary_commit_membrane(repo)
-            lines.append("installed tracked primary-branch commit membrane")
-        if not primary_commit_membrane_installed(repo):
-            problems.append("primary-branch commit membrane missing")
+        lines.append("\nSUBTRACTIVE_CONSTITUTION:")
+        lines.append("tracked .githooks/pre-commit missing or does not carry subtractive constitution markers")
+        problems.append("subtractive constitution not in tracked pre-commit hook")
 
     origin_head_ref = origin_head(repo)
     lines.append("\nORIGIN_HEAD:")

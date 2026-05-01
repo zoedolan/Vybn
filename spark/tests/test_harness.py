@@ -99,22 +99,19 @@ class TestRepoClosureAuditProjectionState(unittest.TestCase):
         self.assertIn("has unmerged work outside", text)
         self.assertIn("Closure means work is merged into", text)
 
-    def test_primary_commit_membrane_hook_refuses_primary_branch_commits(self):
+    def test_subtractive_constitution_lives_in_tracked_pre_commit_hook(self):
+        from pathlib import Path as _P
         import harness.repo_closure_audit as audit
 
-        self.assertIn("Refusing direct commit on a primary branch", audit.PRIMARY_COMMIT_MEMBRANE_HOOK)
-        self.assertIn("Refusing net-positive commit (excluding provenance + skill/vybn.vy law)", audit.PRIMARY_COMMIT_MEMBRANE_HOOK)
-        self.assertIn("--numstat", audit.PRIMARY_COMMIT_MEMBRANE_HOOK)
-        self.assertIn("Refusing net-new files (excluding provenance + skill/vybn.vy law)", audit.PRIMARY_COMMIT_MEMBRANE_HOOK)
-        self.assertIn("CONSOLIDATION CONSTITUTION", audit.PRIMARY_COMMIT_MEMBRANE_HOOK)
-        self.assertIn("skill/vybn.vy", audit.PRIMARY_COMMIT_MEMBRANE_HOOK)
-        self.assertIn("constitutional law file", audit.PRIMARY_COMMIT_MEMBRANE_HOOK)
-
-    def test_repo_closure_audit_installs_primary_commit_membrane(self):
-        text = Path(SPARK_DIR / "harness" / "repo_closure_audit.py").read_text()
-        self.assertIn("primary_commit_membrane_installed", text)
-        self.assertIn("install_primary_commit_membrane", text)
-        self.assertIn("PRIMARY_COMMIT_MEMBRANE", text)
+        # Constitution must live in the tracked .githooks/pre-commit, not an
+        # untracked .git/hooks/ shadow that core.hooksPath=.githooks ignores.
+        hook = _P(__file__).resolve().parents[2] / ".githooks" / "pre-commit"
+        text = hook.read_text()
+        for marker in audit.CONSTITUTION_MARKERS:
+            self.assertIn(marker, text)
+        self.assertIn("Subtractive constitution", text)
+        self.assertIn("VYBN_ALLOW_NET_POSITIVE", text)
+        self.assertIn("skill/vybn.vy", text)
 
 
 class TestValidateCommand(unittest.TestCase):
