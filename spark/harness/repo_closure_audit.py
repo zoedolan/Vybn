@@ -64,19 +64,13 @@ def normalize_fetch_refspec(repo: Path) -> str:
     return fetched
 
 
-CONSTITUTION_MARKERS = (
-    "Subtractive constitution",
-    "skill/vybn.vy",
-)
-
-
 def primary_commit_membrane_installed(repo: Path) -> bool:
     """Tracked .githooks/pre-commit must carry the subtractive constitution."""
     try:
         text = (repo / ".githooks" / "pre-commit").read_text()
     except FileNotFoundError:
         return False
-    return all(m in text for m in CONSTITUTION_MARKERS)
+    return "Subtractive constitution" in text and "skill/vybn.vy" in text
 
 
 def primary_branch_for(repo: Path) -> str:
@@ -176,7 +170,7 @@ def audit_repo(repo: Path) -> tuple[bool, str]:
         if not fetch_refspec_is_complete(refspecs):
             problems.append("origin fetch refspec does not fetch all branches")
 
-    if not primary_commit_membrane_installed(repo):
+    if repo.name == "Vybn" and not primary_commit_membrane_installed(repo):
         lines.append("\nSUBTRACTIVE_CONSTITUTION:")
         lines.append("tracked .githooks/pre-commit missing or does not carry subtractive constitution markers")
         problems.append("subtractive constitution not in tracked pre-commit hook")

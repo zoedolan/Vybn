@@ -107,8 +107,6 @@ class TestRepoClosureAuditProjectionState(unittest.TestCase):
         # untracked .git/hooks/ shadow that core.hooksPath=.githooks ignores.
         hook = _P(__file__).resolve().parents[2] / ".githooks" / "pre-commit"
         text = hook.read_text()
-        for marker in audit.CONSTITUTION_MARKERS:
-            self.assertIn(marker, text)
         self.assertIn("Subtractive constitution", text)
         self.assertIn("skill/vybn.vy", text)
 
