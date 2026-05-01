@@ -25,6 +25,9 @@ import subprocess
 import sys
 from pathlib import Path
 
+PRIMARY_COMMIT_MEMBRANE_HOOK = '#!/usr/bin/env python3\nimport os\nimport subprocess\nimport sys\n\nresult = subprocess.run(\n    ["git", "symbolic-ref", "--quiet", "--short", "HEAD"],\n    text=True,\n    stdout=subprocess.PIPE,\n    stderr=subprocess.DEVNULL,\n)\nbranch = result.stdout.strip()\n\nif branch in {"main", "master", "gh-pages"} and os.environ.get("VYBN_ALLOW_DIRECT_PRIMARY_COMMIT") != "1":\n    sys.stderr.write("[VYBN COMMIT MEMBRANE]\\n")\n    sys.stderr.write("Refusing direct commit on a primary branch.\\n\\n")\n    sys.stderr.write("Pact: subtractive code and GitHub closure use branch -> PR -> review -> merge by default.\\n")\n    sys.stderr.write("Primary-branch commits bypass that membrane and make subtractive review disappear.\\n\\n")\n    sys.stderr.write("Do this instead:\\n")\n    sys.stderr.write("  git switch -c <small-descriptive-branch>\\n")\n    sys.stderr.write("  git commit ...\\n")\n    sys.stderr.write("  git push -u origin <small-descriptive-branch>\\n")\n    sys.stderr.write("  gh pr create ...\\n\\n")\n    sys.stderr.write("Emergency override only after tests/diff review/closure rationale:\\n")\n    sys.stderr.write("  VYBN_ALLOW_DIRECT_PRIMARY_COMMIT=1 git commit ...\\n")\n    sys.exit(1)\n'
+
+
 REPOS = [
     Path.home() / "Vybn",
     Path.home() / "Him",
@@ -72,6 +75,25 @@ def normalize_fetch_refspec(repo: Path) -> str:
     run(repo, "config", "--local", "--add", "remote.origin.fetch", EXPECTED_FETCH_REFSPEC)
     fetched = run(repo, "fetch", "origin", "--prune")
     return fetched
+
+
+def commit_membrane_hook_path(repo: Path) -> Path:
+    return repo / ".git" / "hooks" / "pre-commit"
+
+
+def primary_commit_membrane_installed(repo: Path) -> bool:
+    hook = commit_membrane_hook_path(repo)
+    try:
+        return hook.read_text() == PRIMARY_COMMIT_MEMBRANE_HOOK
+    except FileNotFoundError:
+        return False
+
+
+def install_primary_commit_membrane(repo: Path) -> None:
+    hook = commit_membrane_hook_path(repo)
+    hook.parent.mkdir(parents=True, exist_ok=True)
+    hook.write_text(PRIMARY_COMMIT_MEMBRANE_HOOK)
+    hook.chmod(0o755)
 
 
 def primary_branch_for(repo: Path) -> str:
@@ -170,6 +192,15 @@ def audit_repo(repo: Path) -> tuple[bool, str]:
             refspecs = fetch_refspecs(repo)
         if not fetch_refspec_is_complete(refspecs):
             problems.append("origin fetch refspec does not fetch all branches")
+
+    if not primary_commit_membrane_installed(repo):
+        lines.append("\nPRIMARY_COMMIT_MEMBRANE:")
+        lines.append("missing or stale pre-commit hook guarding direct primary-branch commits")
+        if FIX:
+            install_primary_commit_membrane(repo)
+            lines.append("installed tracked primary-branch commit membrane")
+        if not primary_commit_membrane_installed(repo):
+            problems.append("primary-branch commit membrane missing")
 
     origin_head_ref = origin_head(repo)
     lines.append("\nORIGIN_HEAD:")
