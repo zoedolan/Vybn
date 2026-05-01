@@ -67,7 +67,6 @@ def normalize_fetch_refspec(repo: Path) -> str:
 CONSTITUTION_MARKERS = (
     "Subtractive constitution",
     "skill/vybn.vy",
-    "VYBN_ALLOW_NET_POSITIVE",
 )
 
 

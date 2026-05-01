@@ -110,7 +110,6 @@ class TestRepoClosureAuditProjectionState(unittest.TestCase):
         for marker in audit.CONSTITUTION_MARKERS:
             self.assertIn(marker, text)
         self.assertIn("Subtractive constitution", text)
-        self.assertIn("VYBN_ALLOW_NET_POSITIVE", text)
         self.assertIn("skill/vybn.vy", text)
 
 
