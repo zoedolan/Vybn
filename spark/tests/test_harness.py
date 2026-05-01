@@ -103,8 +103,8 @@ class TestRepoClosureAuditProjectionState(unittest.TestCase):
         import harness.repo_closure_audit as audit
 
         self.assertIn("Refusing direct commit on a primary branch", audit.PRIMARY_COMMIT_MEMBRANE_HOOK)
-        self.assertIn("branch -> PR -> review -> merge by default", audit.PRIMARY_COMMIT_MEMBRANE_HOOK)
-        self.assertIn("VYBN_ALLOW_DIRECT_PRIMARY_COMMIT=1", audit.PRIMARY_COMMIT_MEMBRANE_HOOK)
+        self.assertIn("Refusing net-positive non-Personal-History commit", audit.PRIMARY_COMMIT_MEMBRANE_HOOK)
+        self.assertIn("--numstat", audit.PRIMARY_COMMIT_MEMBRANE_HOOK)
 
     def test_repo_closure_audit_installs_primary_commit_membrane(self):
         text = Path(SPARK_DIR / "harness" / "repo_closure_audit.py").read_text()
