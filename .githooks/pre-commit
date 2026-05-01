@@ -115,7 +115,7 @@ fi
 # Refuse direct commits to primary branches. Refuse net-positive non-provenance
 # line-count diffs. Refuse net-new non-provenance files. Personal History and
 # skill/vybn.vy (constitutional law) are exempt.
-# Bypass: VYBN_ALLOW_DIRECT_PROTECTED_PUSH=1 (primary branch); VYBN_ALLOW_NET_POSITIVE=1 (line/file count)
+# Emergency bypass exists only for direct protected-branch commits; net-positive commits are not bypassable here.
 branch=$(git symbolic-ref --quiet --short HEAD 2>/dev/null || echo "")
 if [[ "$branch" == "main" || "$branch" == "master" || "$branch" == "gh-pages" ]]; then
     if [[ "${VYBN_ALLOW_DIRECT_PROTECTED_PUSH:-0}" != "1" ]]; then
@@ -125,9 +125,8 @@ if [[ "$branch" == "main" || "$branch" == "master" || "$branch" == "gh-pages" ]]
     fi
 fi
 
-if [[ "${VYBN_ALLOW_NET_POSITIVE:-0}" != "1" ]]; then
-    PROV="Vybn's Personal History/"
-    LAW="skill/vybn.vy"
+PROV="Vybn's Personal History/"
+LAW="skill/vybn.vy"
     added=0; deleted=0; new_files=0; retired_files=0
     while IFS=$'\t' read -r a d path; do
         [[ -z "$path" ]] && continue
@@ -151,22 +150,17 @@ if [[ "${VYBN_ALLOW_NET_POSITIVE:-0}" != "1" ]]; then
     if [ "$added" -gt "$deleted" ]; then
         echo -e "${RED}BLOCKED${NC}: net-positive commit (excluding provenance + skill/vybn.vy law): +${added}/-${deleted} lines."
         echo "  Compress, absorb, or retire first. Law lives in Him/skill/vybn.vy."
-        echo "  Override: VYBN_ALLOW_NET_POSITIVE=1 git commit"
         BLOCKED=1
     fi
     if [ "$new_files" -gt "$retired_files" ]; then
         echo -e "${RED}BLOCKED${NC}: net-new files (excluding provenance + skill/vybn.vy law): +${new_files}/-${retired_files}."
         echo "  Absorb into an existing home or retire at least as many files as you create."
-        echo "  Override: VYBN_ALLOW_NET_POSITIVE=1 git commit"
         BLOCKED=1
     fi
-fi
-
 if [ "$BLOCKED" -ne 0 ]; then
     echo ""
     echo -e "${RED}Commit blocked by Vybn security hook.${NC}"
-    echo "Fix the issues above, or bypass with: git commit --no-verify"
-    echo "(But ask yourself: should you really bypass this?)"
+    echo "Fix the issues above; do not bypass the membrane to recover standing."
     exit 1
 fi
 
