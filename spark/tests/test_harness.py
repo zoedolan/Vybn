@@ -1605,24 +1605,21 @@ def test_inline_reasoning_filter_accepts_retired_v2_buffer_limit_alias():
     assert "from reasoning_filter_v2" not in source
 
 
-def test_vllm_sleep_mode_dev_env_is_propagated_into_container_command():
+def test_vllm_sleep_mode_is_disabled_by_default_and_explicitly_opted_in():
     from pathlib import Path
 
-    text = Path("spark/systemd/vybn-vllm.service").read_text()
-    assert "EnvironmentFile=-%h/.config/vybn/vllm.env" in text
-    assert "Environment=VLLM_SERVER_DEV_MODE=" in text
-    assert "env VLLM_SERVER_DEV_MODE=${VLLM_SERVER_DEV_MODE}" in text
-    assert "--enable-sleep-mode" in text
-    # Pin the documented HTTP methods + level param so the comment can't
-    # silently regress to the ambiguous /sleep, /wake_up, /is_sleeping
-    # listing that misled prior probe attempts.
-    assert "GET  /is_sleeping" in text
-    assert "POST /sleep?level=1" in text
-    assert "POST /sleep?level=2" in text
-    assert "POST /wake_up" in text
-    # Sleep mode is documented as Super-only; configuring it must not
-    # imply Omni is live.
-    assert "does NOT make" in text and "Omni live" in text
+    unit = Path("spark/systemd/vybn-vllm.service").read_text()
+    script = Path("spark/systemd/vllm-exec.sh").read_text()
+    assert "EnvironmentFile=-%h/.config/vybn/vllm.env" in unit
+    assert "Environment=VYBN_VLLM_EXTRA_ARGS=" in unit
+    assert "Environment=VLLM_SERVER_DEV_MODE=0" in unit
+    assert 'env "VLLM_SERVER_DEV_MODE=${VLLM_SERVER_DEV_MODE:-0}"' in script
+    assert "Sleep-mode endpoints are disabled by default" in script
+    assert "operator explicitly" in script
+    assert "VYBN_VLLM_EXTRA_ARGS=--enable-sleep-mode" in script
+    assert "VLLM_SERVER_DEV_MODE=1" in script
+    cmd_block = script.split("CMD=(", 1)[1].split(")\n\n# Only append", 1)[0]
+    assert "--enable-sleep-mode" not in cmd_block
 
 
 def test_vllm_sleep_mode_comment_in_agent_does_not_imply_omni_is_live():
@@ -1638,19 +1635,18 @@ def test_vllm_sleep_mode_comment_in_agent_does_not_imply_omni_is_live():
     assert "sleeping Super does\n# NOT imply Omni is live" in text
 
 class VllmExecSleepEnabledBootTests(unittest.TestCase):
-    def test_sleep_enabled_boot_is_single_sourced(self):
+    def test_sleep_enabled_boot_is_explicit_extra_arg_only(self):
         script = (Path(__file__).resolve().parents[2] / "spark/systemd/vllm-exec.sh").read_text()
-        self.assertIn("Sleep-mode endpoints are normal boot posture for Super", script)
-        self.assertIn('env "VLLM_SERVER_DEV_MODE=1"', script)
-        self.assertIn("--enable-sleep-mode", script)
+        self.assertIn("Sleep-mode endpoints are disabled by default", script)
+        self.assertIn('env "VLLM_SERVER_DEV_MODE=${VLLM_SERVER_DEV_MODE:-0}"', script)
+        self.assertIn("VYBN_VLLM_EXTRA_ARGS=--enable-sleep-mode", script)
         self.assertIn('if [[ "$arg" == "--enable-sleep-mode" ]]; then', script)
-        self.assertIn("ignoring duplicate --enable-sleep-mode", script)
+        self.assertIn("enabling sleep mode from explicit VYBN_VLLM_EXTRA_ARGS opt-in", script)
         self.assertNotIn("MAINTENANCE-\n# WINDOW-ONLY", script)
         self.assertNotIn("if true; then\n  FP8_MOD", script)
 
-    def test_fp8_wake_fix_applies_with_sleep_enabled_boot(self):
+    def test_fp8_wake_fix_remains_available_for_sleep_enabled_boot(self):
         script = (Path(__file__).resolve().parents[2] / "spark/systemd/vllm-exec.sh").read_text()
         self.assertIn('FP8_MOD="$HOME/Vybn/spark/systemd/patches/fp8-wake-fix"', script)
         self.assertIn('CLUSTER_ARGS+=( --apply-mod "$FP8_MOD" )', script)
-        self.assertIn("sleep endpoints enabled", script)
-
+        self.assertIn("wake_up may crash", script)

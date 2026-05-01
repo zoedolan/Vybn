@@ -150,9 +150,9 @@ RATE_LIMIT_RPM = 30              # requests per minute per IP per endpoint
 
 # vLLM admission control. Per-IP rate limiting protects against one abusive
 # visitor; these thresholds protect the shared local model from a crowd.
-# Normal-mode vLLM is currently max-num-seqs=8. If burst mode raises that,
+# Normal-mode vLLM is currently max-num-seqs=4. If burst mode raises that,
 # raise VLLM_ADMISSION_MAX_RUNNING deliberately in the portal environment too.
-VLLM_ADMISSION_MAX_RUNNING = int(os.environ.get("VLLM_ADMISSION_MAX_RUNNING", "8"))
+VLLM_ADMISSION_MAX_RUNNING = int(os.environ.get("VLLM_ADMISSION_MAX_RUNNING", "4"))
 VLLM_ADMISSION_MAX_WAITING = int(os.environ.get("VLLM_ADMISSION_MAX_WAITING", "0"))
 VLLM_ADMISSION_MAX_KV = float(os.environ.get("VLLM_ADMISSION_MAX_KV", "0.85"))
 
