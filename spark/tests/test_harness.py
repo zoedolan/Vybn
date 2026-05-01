@@ -1663,3 +1663,14 @@ class VllmExecSleepEnabledBootTests(unittest.TestCase):
         self.assertIn('FP8_MOD="$HOME/Vybn/spark/systemd/patches/fp8-wake-fix"', script)
         self.assertIn('CLUSTER_ARGS+=( --apply-mod "$FP8_MOD" )', script)
         self.assertIn("wake_up may crash", script)
+
+
+def test_zoe_perspective_governor_in_substrate():
+    from spark.harness.substrate import render_zoe_perspective_governor
+    gov = render_zoe_perspective_governor()
+    assert "synthetic burden model" in gov
+    assert "not mind-reading" in gov
+    assert "what will Zoe have to track" in gov
+    assert "residue gate, not a feeling claim" in gov
+    assert "claim ground-up transformation" in gov
+
