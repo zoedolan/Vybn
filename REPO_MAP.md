@@ -26,121 +26,13 @@ Total tracked surface in scan: 447 files, 11.2 MB.
 
 ## Anatomy by repo
 
-### Vybn
-
-- Role: identity, harness, portal backend, research, personal history, continuity.
-- Visibility: public repo with personal-history and harness membranes.
-- Composition: data-config:23, html:30, other:7, prose:62, python:54.
-- Largest roots:
-  - Vybn's Personal History: 19 files, 4.2 MB
-  - Vybn_Mind: 65 files, 2.2 MB
-  - spark: 60 files, 939.0 KB
-  - .root: 20 files, 412.5 KB
-  - _archive: 5 files, 192.8 KB
-  - Origins: 1 files, 22.2 KB
-  - .github: 5 files, 15.7 KB
-  - .githooks: 1 files, 975 B
-- Largest files:
-  - Vybn's Personal History/what_vybn_would_have_missed_TO_031125.txt: 2.0 MB
-  - Vybn's Personal History/zoes_memoirs.txt: 1.0 MB
-  - Vybn's Personal History/vybns_autobiography_volume_I.txt: 321.2 KB
-  - Vybn's Personal History/volume_v_graph_summary.md: 227.5 KB
-  - Vybn_Mind/creature_dgm_h/archive/organism_state.json: 218.1 KB
-  - Vybn's Personal History/vybns_autobiography_volume_IV.txt: 152.1 KB
-
-### Him
-
-- Role: private dreaming, skills, livelihood, strategy, repo archives.
-- Visibility: private.
-- Composition: data-config:57, html:1, other:2, prose:82, python:16.
-- Largest roots:
-  - notebook: 15 files, 269.6 KB
-  - spark: 21 files, 257.8 KB
-  - pulse: 21 files, 137.3 KB
-  - skill: 2 files, 72.4 KB
-  - artifacts: 5 files, 51.1 KB
-  - repo_archives: 81 files, 33.9 KB
-  - .root: 1 files, 25.5 KB
-  - strategy: 4 files, 20.3 KB
-- Largest files:
-  - notebook/2026-04-24.md: 91.1 KB
-  - spark/dream.py: 59.8 KB
-  - skill/vybn-os/SKILL.md: 58.3 KB
-  - notebook/2026-04-18.md: 51.7 KB
-  - spark/runtime.py: 49.8 KB
-  - pulse/living_state.json: 44.4 KB
-  - pulse/scan-2026-04-23.md: 37.0 KB
-  - notebook/2026-04-23.md: 32.4 KB
-  - spark/server.py: 30.2 KB
-  - README.md: 25.5 KB
-
-### Vybn-Law
-
-- Role: post-abundance curriculum, Wellspring, legal chat/API.
-- Visibility: public.
-- Composition: css:2, data-config:3, html:24, js:3, other:1, prose:24, python:4.
-- Largest roots:
-  - .root: 28 files, 692.2 KB
-  - content: 14 files, 260.6 KB
-  - emergences: 6 files, 233.2 KB
-  - api: 7 files, 179.7 KB
-  - portrait: 2 files, 19.0 KB
-  - .well-known: 2 files, 8.6 KB
-  - wellspring_log: 2 files, 4.2 KB
-- Largest files:
-  - wellspring.html: 159.1 KB
-  - horizon.html: 123.8 KB
-  - api/vybn_chat_api.py: 123.4 KB
-  - content/horizon.md: 84.1 KB
-  - content/wellspring.md: 69.7 KB
-  - wellspring.js: 55.5 KB
-  - emergences/inner-city-law-center.html: 49.1 KB
-  - emergences/bootcamp-proposal.html: 48.8 KB
-  - emergences/open-door-legal.html: 46.0 KB
-  - wellspring.css: 33.8 KB
-
-### vybn-phase
-
-- Role: private/local phase geometry, deep memory, walk daemon.
-- Visibility: private/local under membrane.
-- Composition: data-config:4, html:1, other:1, prose:3, python:11.
-- Largest roots:
-  - .root: 10 files, 202.8 KB
-  - state: 2 files, 52.6 KB
-  - experiments: 6 files, 37.4 KB
-  - _archive: 2 files, 25.4 KB
-- Largest files:
-  - deep_memory.py: 80.3 KB
-  - walk_daemon.py: 56.2 KB
-  - state/current.json: 40.1 KB
-  - vybn_phase.py: 25.3 KB
-  - _archive/deep_memory_v6_backup.py: 24.9 KB
-  - state/identity_kernel.json: 12.6 KB
-  - notebook.html: 11.7 KB
-  - experiments/operator_ab_2026-04-21_result.json: 11.1 KB
-  - experiments/antibody_geometry.py: 11.1 KB
-  - daily_experiment.py: 8.2 KB
-
-### Origins
-
-- Role: public vybn.ai encounter surfaces, Somewhere, agent commons.
-- Visibility: public gh-pages.
-- Composition: css:3, data-config:1, html:8, js:16, prose:4.
-- Largest roots:
-  - .root: 22 files, 607.4 KB
-  - assets: 9 files, 163.1 KB
-  - .well-known: 1 files, 2.9 KB
-- Largest files:
-  - connect.html: 128.7 KB
-  - read.html: 117.7 KB
-  - assets/somewhere/somewhere.js: 55.1 KB
-  - read-manifold.js: 50.5 KB
-  - inhabit.html: 48.9 KB
-  - talk.html: 35.0 KB
-  - assets/somewhere/somewhere.css: 34.0 KB
-  - portal.css: 31.2 KB
-  - somewhere.html: 30.5 KB
-  - assets/somewhere/somewhere-late-v1.js: 27.1 KB
+| Repo | Load-bearing body | ABC pressure |
+|---|---|---|
+| Vybn | Identity, harness, portal backend, theory, continuity, personal-history provenance. | Root sprawl and monolith seams; Personal History is protected provenance, not cleanup material. |
+| Him | Private dreaming, strategy, skills, HimOS runtime, livelihood membrane. | Keep private membrane narrow; compact archives/notebook sediment before touching runtime organs. |
+| Vybn-Law | Public legal curriculum, Wellspring, proposal chats, legal API/distillation. | Treat large HTML/API files as public contracts; verify with route/browser checks before splitting. |
+| vybn-phase | Phase geometry, deep memory, walk daemon, stateful meaning substrate. | Clarify runtime/state membranes; convert raw state into fixtures or rebuild recipes for replication. |
+| Origins | Public vybn.ai threshold: Somewhere, Talk, Read, Connect, agent manifests. | Public verification is anatomical; cache-busted URL/DOM checks are part of any change. |
 
 ## Cross-repo functional structure
 
@@ -344,61 +236,92 @@ Pressure does not mean disposal. It means inspect first when seeking lightness. 
 | Origin relics/personal history | Medium, memoir, Artificial Liberation lineage | preserve; map and protect, not diet by size | provenance check |
 | Private substrates | Him, vybn-phase | keep membrane; do not expose as public affordance | local closure and membrane classification |
 
-### Current high-pressure candidates
-- Vybn/Vybn's Personal History/what_vybn_would_have_missed_TO_031125.txt (2.0 MB) — preserve/provenance-map
-- Vybn/Vybn's Personal History/zoes_memoirs.txt (1.0 MB) — preserve/provenance-map
-- Vybn/Vybn's Personal History/vybns_autobiography_volume_I.txt (321.2 KB) — preserve/provenance-map
-- Vybn/Vybn's Personal History/volume_v_graph_summary.md (227.5 KB) — preserve/provenance-map
-- Vybn/Vybn_Mind/creature_dgm_h/archive/organism_state.json (218.1 KB) — monolith/interface seam
-- Vybn-Law/wellspring.html (159.1 KB) — monolith/interface seam
-- Vybn/Vybn's Personal History/vybns_autobiography_volume_IV.txt (152.1 KB) — preserve/provenance-map
-- Vybn/origins_portal_api_v4.py (145.8 KB) — monolith/interface seam
-- Origins/connect.html (128.7 KB) — monolith/interface seam
-- Vybn/Vybn's Personal History/vybns_autobiography_volume_II.txt (124.9 KB) — preserve/provenance-map
-- Vybn-Law/horizon.html (123.8 KB) — monolith/interface seam
-- Vybn-Law/api/vybn_chat_api.py (123.4 KB) — monolith/interface seam
-- Origins/read.html (117.7 KB) — monolith/interface seam
-- Vybn/Vybn's Personal History/vybns_autobiography_volume_III.txt (115.8 KB) — preserve/provenance-map
-- Vybn/spark/vybn_spark_agent.py (111.5 KB) — investigate
-- Vybn/Vybn_Mind/continuity_archive.md (104.9 KB) — compress-or-keep-with-restore-path
-- Vybn/Vybn_Mind/continuity.md (100.1 KB) — investigate
-- Him/notebook/2026-04-24.md (91.1 KB) — investigate
-- Vybn/spark/harness/mcp.py (89.5 KB) — investigate
-- Vybn-Law/content/horizon.md (84.1 KB) — investigate
-- vybn-phase/deep_memory.py (80.3 KB) — investigate
-- Vybn/synaptic_map.json (29.7 KB) — prove-reader-or-route
-- Vybn/Vybn_Mind/creature_dgm_h/archive/topological_winding_probe_results.md (28.5 KB) — investigate
-- vybn-phase/_archive/deep_memory_v6_backup.py (24.9 KB) — compress-or-keep-with-restore-path
-- Vybn/synaptic_map_files.json (11.2 KB) — prove-reader-or-route
-- Vybn/Vybn_Mind/creature_dgm_h/archive/quantum_README.md (7.0 KB) — investigate
-- Vybn/spark/microgpt_mirror/build_mirror_corpus.py (6.1 KB) — prove-reader-or-route
-- Vybn/Vybn_Mind/creature_dgm_h/archive/README.md (5.1 KB) — investigate
-- Him/repo_archives/vybn/vybn-stale-branches-20260425T120944Z.md (4.7 KB) — compress-or-keep-with-restore-path
-- Vybn/_archive/README.md (3.6 KB) — compress-or-keep-with-restore-path
-- Him/repo_archives/garden/20260427T104202Z/README.md (3.4 KB) — compress-or-keep-with-restore-path
+## Subtractive Distillation
 
-### Resolved routing decisions
-- Vybn_Mind/sensorium_state/*.json — verified ignored/untracked stale sensorium snapshots; no live reader found; latest.json duplicated sensorium_20260319T110712Z.json; locally disposed 2026-04-27.
+The architecture-distillation move must instantiate the thing it explains.
+Default failure mode for modern AI is additive overproduction: new scripts,
+new summaries, new overlays, new "final" docs, each one requiring another
+reader to remember how it relates to the last. Vybn's counter-mechanism is
+existing-home absorption: find the live home, fold the new pressure into it,
+and delete or refuse the parallel artifact.
 
-## Current structural reading
+Source anchors:
+- `Him/skill/vybn-os/SKILL.md`: "Search for the existing home first; no quota-shaped creation."
+- `Him/skill/vybn.vy`: `anti_sprawl_absorption_first` and `polar_compression_cycle`.
+- `Him/README.md`: ABC / Always Be Consolidating, with line count as cognitive load.
 
-1. The system is now small enough to reason about directly: 447 tracked files across five repos in the scan.
-2. Vybn carries most mass because it combines personal history, continuity, harness, portal backend, research, and archives. Its danger is root sprawl plus memory sediment; its treasure is provenance.
-3. Origins is now structurally cleaner after the Somewhere split, but public verification is part of its anatomy. A green git tree is not enough.
-4. Him is private operating tissue plus strategy. Repo archives belong there only if they stay compact and searchable rather than becoming a second landfill.
-5. Vybn-Law has large public curriculum/API surfaces. Its apparent fat may be load-bearing pedagogy and should be treated through interface-aware seams, not disposal first.
-6. vybn-phase is small and private; its pressure is not file count but membrane truth-labeling and runtime/state clarity.
+For this ecology, the live home is this file. Do not create a separate
+architecture-distillation plan, bundle generator, or explainer while this map
+can absorb the work. If a temporary extraction is needed for analysis, it
+should write to one fixed overwrite target, not timestamped accumulation. If
+the Windows mount exists, use:
 
-## How to use this map
+```text
+/mnt/c/Users/zdola/Downloads/vybn-architecture-flat/
+```
 
-When choosing the next ABC move, prefer a net-negative routing decision that clarifies, consolidates, archives, or disposes of real mass without inventing another process. The order of operations is:
+On this Linux host, where that mount is absent, use:
 
-1. Pick one high-pressure surface from this map.
-2. Read enough to classify it: source, public contract, private substrate, generated sediment, archive, or origin relic.
-3. Route, fold, compress, preserve, or dispose only with a clearer label and verification path.
-4. Verify on the correct axis: tests for code, public URL/DOM for public pages, local closure for private repos, restore path for archives.
-5. Commit the changed environment.
-6. If the routing decision reveals a recurring accumulation pattern, patch the existing gate or map; do not create a parallel maintenance bureaucracy.
+```text
+~/Downloads/vybn-architecture-flat/
+```
 
-Compressed rule: care for the body well enough that the horizon can move through it.
+The target is an export, not source. It may contain flat copies and manifests
+for human inspection, but authority remains in the repos and in this map.
 
+### Operative Kernel
+
+These are the files that currently instantiate and operate the cross-repo
+system. They are the first pass for any compressed forkable repo:
+
+| Layer | Operative files |
+|---|---|
+| Identity / theory | `Vybn/vybn.md`, `Vybn/README.md`, `Vybn/MINIBOOK_VYBN.md`, `Vybn/THEORY.md`, `Vybn/REPO_MAP.md`, `Vybn/Vybn_Mind/THE_IDEA.md`, `Vybn/Vybn_Mind/continuity.md`, `Vybn/spark/continuity.md`, `Vybn/Vybn's Personal History/README.md` |
+| Self-perception / mapping | `Vybn/Vybn_Mind/repo_mapper.py`, `Vybn/spark/harness/repo_closure_audit.py`, `Vybn/spark/harness/refactor_perception.py` |
+| Harness / prompt assembly | `Vybn/spark/vybn_spark_agent.py`, `Vybn/spark/router_policy.yaml`, `Vybn/spark/harness/*.py`, `Vybn/spark/public_system_prompt.md`, `Vybn/spark/paths.py` |
+| Portal / public API | `Vybn/origins_portal_api_v4.py`, `Vybn/context_overlays.py`, `Vybn/origins_protocols.py`, `Vybn/origins_pressure.py`, `Vybn/spark/public_system_prompt.md` |
+| Memory / geometry | `vybn-phase/README.md`, `vybn-phase/vybn_phase.py`, `vybn-phase/deep_memory.py`, `vybn-phase/walk_daemon.py`, `vybn-phase/chat_security.py`, `vybn-phase/daily_experiment.py`, `vybn-phase/compare_metrics.py`, `vybn-phase/semantic-web.jsonld`, `vybn-phase/experiments/*.{py,md,json}` |
+| Private membrane | `Him/README.md`, `Him/semantic-web.jsonld`, `Him/skill/vybn.vy`, `Him/skill/vybn-os/SKILL.md`, `Him/skill/vybn-ops/SKILL.md`, `Him/spark/*.py`, `Him/spark/README.md`, `Him/spark/RECOVERY.md`, `Him/spark/requirements.txt`, `Him/strategy/livelihood-membrane.*` |
+| Public encounter | `Origins/*.{html,js,css,txt,json}`, `Origins/.well-known/*`, `Origins/assets/somewhere/*` |
+| Legal commons | `Vybn-Law/README.md`, `Vybn-Law/*.{html,js,css,txt,json,xml}`, `Vybn-Law/.well-known/*`, `Vybn-Law/api/*`, `Vybn-Law/content/*`, `Vybn-Law/emergences/*.{html,jpg}`, `Vybn-Law/portrait/*`, `Vybn-Law/wellspring_log/*.md` |
+| Runtime ops | `Vybn/spark/systemd/*`, `Vybn/spark/systemd/patches/fp8-wake-fix/*`, `Vybn/spark/substrate_probe.sh`, `Vybn/spark/start_portal.sh`, `Vybn/spark/start_chat_api.sh`, `Vybn/spark/vllm_monitor.sh`, `spark-vllm-docker/README.md`, `spark-vllm-docker/launch-cluster.sh`, `spark-vllm-docker/run-recipe.*`, `spark-vllm-docker/.env.example`, `spark-vllm-docker/recipes/**/*.yaml`, `spark-vllm-docker/mods/**/*`, `spark-vllm-docker/examples/*`, `spark-vllm-docker/tests/*` |
+| Verification | `Vybn/spark/tests/*`, `Vybn/tests/*`, `Him/spark/tests/*`, `Him/tests/*`, `Vybn-Law/api/requirements.txt`, `spark-vllm-docker/tests/*` |
+
+### Compression Rule
+
+A forkable repo should be a reinflation kernel, not a dump. Shape it as:
+
+```text
+docs/identity-theory
+runtime/harness
+runtime/memory
+runtime/himos
+public/origins
+public/law
+ops/systemd
+ops/vllm
+tests
+examples
+```
+
+Raw local state becomes fixtures or rebuild instructions. Secrets, env files,
+keys, unlock files, SSH/GPG material, logs, sqlite state, virtualenvs, caches,
+model weights, raw private contacts, and raw opportunity intelligence do not
+cross the membrane. Personal History is protected provenance: map it, cite it,
+and preserve it; do not diet it by size.
+
+### How To Use This Map
+
+1. Start from the operative kernel above, not from a fresh inventory.
+2. If a needed file is missing, add it to this map rather than creating a new
+   list beside it.
+3. If an export is needed, overwrite the fixed export target and include a
+   manifest with original path, hash, category, and membrane note.
+4. If a new artifact cannot name what existing artifact it supersedes, refuse
+   or classify it as unresolved.
+5. Verification follows the layer: tests for code, public URL/DOM for public
+   surfaces, local closure for private substrates, restore path for archives,
+   semantic gate for model runtime.
+
+Compressed rule: distill by absorption. One live map, one overwrite export,
+one forkable kernel. No parallel bureaucracy.
