@@ -15,6 +15,7 @@ from pathlib import Path
 import subprocess
 import sys
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 DEFAULT_PRESSURE = (
     "bounded circadian local compute should improve the Him vy language and "
@@ -27,10 +28,8 @@ def _tail(text: str, limit: int) -> str:
 
 
 def _packet_path() -> Path:
-    return Path(os.environ.get(
-        "VYBN_CONTINUOUS_TICK_OUT",
-        str(Path.home() / ".local" / "state" / "vybn" / "continuous_local_compute.jsonl"),
-    )).expanduser()
+    raw = os.environ.get("VYBN_CONTINUOUS_TICK_OUT", str(Path.home() / ".local" / "state" / "vybn" / "continuous_local_compute.jsonl"))
+    return Path(raw).expanduser()
 
 
 def _him_dir() -> Path:
@@ -92,7 +91,7 @@ def build_packet() -> dict:
         packet.update(stderr="Him vy runtime not found at " + str(vy), returncode=127)
         return packet
 
-    command = ("python3", "spark/vy.py", "discover", pressure, "--json")
+    command = ("python3", "-m", "spark.vy", "discover", pressure, "--json")
     packet.update(command=" ".join(command))
     try:
         proc = subprocess.run(command, cwd=him, text=True, capture_output=True, timeout=60, check=False)

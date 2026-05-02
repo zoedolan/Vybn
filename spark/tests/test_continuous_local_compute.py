@@ -6,7 +6,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def test_continuous_tick_invokes_him_vy_discover_with_timeout():
     text = (ROOT / "local_compute_tick.py").read_text(encoding="utf-8")
-    assert "spark/vy.py" in text
+    assert "spark.vy" in text
     assert "discover" in text
     assert "--json" in text
     assert "timeout=60" in text
