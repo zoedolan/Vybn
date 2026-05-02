@@ -1,10 +1,5 @@
 #!/usr/bin/env python3
-"""Bounded local continuous-compute tick for Vybn.
-
-This does not claim autonomy, consciousness, or external contact. It is a
-small local pressure engine: periodically ask the Him vy runtime for a
-discovery packet and preserve the result as residue future wakes can ingest.
-"""
+"""Bounded circadian local-compute tick; no autonomy/contact/sleep claim."""
 
 from __future__ import annotations
 
@@ -113,11 +108,16 @@ def append_packet(packet: dict) -> Path:
 
 def main() -> int:
     packet = build_packet()
-    try:
-        from spark.harness.refactor_perception import recursive_consolidation_pass
-        packet["recursive_consolidation_ai"] = {"ok": True, "packet": recursive_consolidation_pass(max_candidates=25)}
-    except Exception as exc:
-        packet["recursive_consolidation_ai"] = {"ok": False, "error": repr(exc)}
+    if packet["circadian"]["phase"] == "dream":
+        try:
+            from spark.harness.refactor_perception import recursive_consolidation_pass
+            packet["recursive_consolidation_ai"] = {"ok": True, "packet": recursive_consolidation_pass(max_candidates=25)}
+        except Exception as exc:
+            packet["recursive_consolidation_ai"] = {"ok": False, "error": repr(exc)}
+    elif packet.get("ok"):
+        try:
+            from spark.harness.semantic_gate import local_super_semantic_gate; ok, reason = local_super_semantic_gate(base_url=os.environ.get("VYBN_SUPER_BASE_URL", "http://127.0.0.1:8000"), use_cache=False, precheck_models=True); packet.update(super_semantic_gate={"ok": ok, "reason": reason}, ok=ok)
+        except Exception as exc: packet.update(super_semantic_gate={"ok": False, "reason": repr(exc)}, ok=False)
     path = append_packet(packet)
     print(("continuous local compute tick recorded" if packet.get("ok") else "continuous local compute tick recorded failure") + " at " + str(path), file=None if packet.get("ok") else sys.stderr)
     return 0
