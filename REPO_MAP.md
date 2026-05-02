@@ -325,35 +325,3 @@ and preserve it; do not diet it by size.
 
 Compressed rule: distill by absorption. One live map, one overwrite export,
 one forkable kernel. No parallel bureaucracy.
-
-## Living Architecture Packet
-
-Minimal first proprioception, absorbed into the existing perception home.
-From the Spark: `python -m spark.harness.refactor_perception proprioception`.
-
-It scans available siblings of the current parent (Vybn, Him, Vybn-Law,
-vybn-phase, Origins, the-others — missing ones are reported, not invented),
-classifies every non-ignored file by anatomical role using path/name/
-extension evidence, and writes `proprioception.json` + `proprioception.md`
-to `~/Downloads/vybn-architecture-flat/` (or the Windows-mount equivalent).
-Flags: `--parent`, `--repo` (repeatable), `--export-dir`, `--no-export`,
-`--top N`. Generated environments (`.venv*`, `.conda*`, `__pycache__`,
-`.pytest_cache`, `.mypy_cache`, `node_modules`, `dist`, `build`, `.cache`,
-`repo_mapping_output`, `.idea`, `.vscode`) are skipped — not architecture.
-
-Categories (preserve unless noted): **organ** (live source) · **nerve**
-(public/interface contract) · **membrane** (discovery/protocol —
-`.well-known`, `llms.txt`, manifests) · **scar** (archive with restore
-path) · **fossil** (personal history / origin relics) · **scaffold**
-(tests, README, build/CI) · **exhaust** (regenerable sediment —
-*delete-candidate only*) · **unknown** (contact required). Routing per
-category is named in the packet under `routing`; nothing is deleted by
-the scan.
-
-**The packet is overwrite/export, not source.** Authority remains in the
-repos and in this map. Each run replaces the previous JSON and Markdown.
-Drift is corrected by editing the classifier in
-`spark/harness/refactor_perception.py` and re-running, not by hand-editing
-the export. `ArchitecturalProprioceptionTests` in
-`spark/tests/test_refactor_perception.py` hold the classifier and ignore
-rules against drift.
