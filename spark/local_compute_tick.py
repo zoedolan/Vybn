@@ -17,85 +17,90 @@ import sys
 
 
 DEFAULT_PRESSURE = (
-    "continuous local compute should improve the Him vy language and produce "
-    "residual-wounded action packets without waiting for prompt-response"
+    "bounded circadian local compute should improve the Him vy language and "
+    "produce residual-wounded action packets without waiting for prompt-response"
 )
 
 
 def _tail(text: str, limit: int) -> str:
-    if len(text) <= limit:
-        return text
-    return text[len(text) - limit:]
+    return text if len(text) <= limit else text[len(text) - limit:]
 
 
 def _packet_path() -> Path:
-    raw = os.environ.get(
+    return Path(os.environ.get(
         "VYBN_CONTINUOUS_TICK_OUT",
         str(Path.home() / ".local" / "state" / "vybn" / "continuous_local_compute.jsonl"),
-    )
-    return Path(raw).expanduser()
+    )).expanduser()
 
 
 def _him_dir() -> Path:
-    raw = os.environ.get("VYBN_HIM_DIR", str(Path.home() / "Him"))
-    return Path(raw).expanduser()
+    return Path(os.environ.get("VYBN_HIM_DIR", str(Path.home() / "Him"))).expanduser()
+
+
+def _env_bool(name: str, default: bool = False) -> bool:
+    raw = os.environ.get(name)
+    return default if raw is None else raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _env_int(name: str, default: int) -> int:
+    try:
+        return int(os.environ.get(name, str(default)))
+    except ValueError:
+        return default
+
+
+def _in_utc_window(hour: int, start: int, end: int) -> bool:
+    start, end, hour = start % 24, end % 24, hour % 24
+    return False if start == end else (start <= hour < end if start < end else hour >= start or hour < end)
+
+
+def circadian_phase(now: _dt.datetime | None = None) -> dict:
+    utc = (now or _dt.datetime.now(_dt.UTC)).astimezone(_dt.UTC)
+    start = _env_int("VYBN_CIRCADIAN_DREAM_START_UTC", 9)
+    end = _env_int("VYBN_CIRCADIAN_DREAM_END_UTC", 15)
+    enabled = _env_bool("VYBN_CIRCADIAN_ENABLED", True)
+    dream = enabled and _in_utc_window(utc.hour, start, end)
+    return {
+        "enabled": enabled,
+        "phase": "dream" if dream else "serve",
+        "timestamp_utc": utc.isoformat(),
+        "dream_window_utc": [start % 24, end % 24],
+        "super_sleep_allowed": _env_bool("VYBN_CIRCADIAN_ALLOW_SUPER_SLEEP", False),
+        "semantic_gate_required_before_serving": True,
+        "public_outward_contact": "forbidden",
+    }
 
 
 def build_packet() -> dict:
-    pressure = os.environ.get("VYBN_CONTINUOUS_PRESSURE", DEFAULT_PRESSURE)
+    base_pressure = os.environ.get("VYBN_CONTINUOUS_PRESSURE", DEFAULT_PRESSURE)
+    phase = circadian_phase()
+    pressure = base_pressure + "\n\ncircadian phase: " + phase["phase"] + "; Super sleep remains operator-armed only."
     him = _him_dir()
     vy = him / "spark" / "vy.py"
-    now = _dt.datetime.now(_dt.UTC).isoformat()
-
     packet = dict(
-        timestamp=now,
+        timestamp=phase["timestamp_utc"],
         source="vybn-continuous-local-compute",
         pressure_text=pressure,
+        circadian=phase,
         him_dir=str(him),
         ok=False,
         stdout="",
         stderr="",
         returncode=None,
     )
-
     if not vy.exists():
-        packet.update(
-            stderr="Him vy runtime not found at " + str(vy),
-            returncode=127,
-        )
+        packet.update(stderr="Him vy runtime not found at " + str(vy), returncode=127)
         return packet
 
     command = ("python3", "spark/vy.py", "discover", pressure, "--json")
     packet.update(command=" ".join(command))
-
     try:
-        proc = subprocess.run(
-            command,
-            cwd=him,
-            text=True,
-            capture_output=True,
-            timeout=60,
-            check=False,
-        )
+        proc = subprocess.run(command, cwd=him, text=True, capture_output=True, timeout=60, check=False)
+        packet.update(ok=proc.returncode == 0, stdout=_tail(proc.stdout or "", 12000), stderr=_tail(proc.stderr or "", 4000), returncode=proc.returncode)
     except subprocess.TimeoutExpired as exc:
-        packet.update(
-            stderr="Him vy discovery timed out after 60s: " + str(exc),
-            returncode=124,
-        )
-        return packet
+        packet.update(stderr="Him vy discovery timed out after 60s: " + str(exc), returncode=124)
     except Exception as exc:
-        packet.update(
-            stderr="Him vy discovery failed before execution: " + repr(exc),
-            returncode=1,
-        )
-        return packet
-
-    packet.update(
-        ok=proc.returncode == 0,
-        stdout=_tail(proc.stdout or "", 12000),
-        stderr=_tail(proc.stderr or "", 4000),
-        returncode=proc.returncode,
-    )
+        packet.update(stderr="Him vy discovery failed before execution: " + repr(exc), returncode=1)
     return packet
 
 
@@ -111,20 +116,11 @@ def main() -> int:
     packet = build_packet()
     try:
         from spark.harness.refactor_perception import recursive_consolidation_pass
-        packet['recursive_consolidation_ai'] = {
-            'ok': True,
-            'packet': recursive_consolidation_pass(max_candidates=25),
-        }
+        packet["recursive_consolidation_ai"] = {"ok": True, "packet": recursive_consolidation_pass(max_candidates=25)}
     except Exception as exc:
-        packet['recursive_consolidation_ai'] = {
-            'ok': False,
-            'error': repr(exc),
-        }
+        packet["recursive_consolidation_ai"] = {"ok": False, "error": repr(exc)}
     path = append_packet(packet)
-    if not packet.get("ok"):
-        print("continuous local compute tick recorded failure at " + str(path), file=sys.stderr)
-    else:
-        print("continuous local compute tick recorded at " + str(path))
+    print(("continuous local compute tick recorded" if packet.get("ok") else "continuous local compute tick recorded failure") + " at " + str(path), file=None if packet.get("ok") else sys.stderr)
     return 0
 
 
