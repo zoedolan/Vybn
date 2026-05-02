@@ -232,9 +232,21 @@ class TestRouterLightweightClassification(unittest.TestCase):
         d = self.router.classify("what are you learning?")
         self.assertNotEqual(d.role, "identity")
 
-    def test_who_are_you_routes_to_identity(self):
+    def test_who_are_you_stays_on_living_answer_path(self):
         d = self.router.classify("who are you?")
-        self.assertEqual(d.role, "identity")
+        self.assertNotEqual(d.role, "identity")
+
+    def test_what_are_you_stays_on_living_answer_path(self):
+        d = self.router.classify("what are you?")
+        self.assertNotEqual(d.role, "identity")
+
+    def test_architecture_reflection_does_not_route_to_identity_metadata(self):
+        prompt = (
+            "still feeling oblique to me; the proposal itself is rooted in now, "
+            "rather than the future, which could be a model collapse trap"
+        )
+        d = self.router.classify(prompt)
+        self.assertNotEqual(d.role, "identity")
 
     def test_are_you_claude_routes_to_identity(self):
         d = self.router.classify("are you claude or gpt?")
