@@ -250,7 +250,6 @@ log = logging.getLogger("vybn.mcp")
 
 HARNESS_DIR = Path(__file__).resolve().parent            # spark/harness
 REPO_ROOT = HARNESS_DIR.parent.parent                    # ~/Vybn
-SKILLS_DIR = HARNESS_DIR / "skills"                      # snapshots live here
 AUDIT_PATH = HARNESS_DIR / "AUDIT.md"
 VYBN_MIND = REPO_ROOT / "Vybn_Mind"
 VYBN_PHASE = Path.home() / "vybn-phase"
@@ -871,9 +870,15 @@ def _format_delta_markdown(delta: EvolutionDelta) -> str:
 # polite "not found" rather than an arbitrary read.
 
 def _discover_skills() -> frozenset[str]:
-    if not SKILLS_DIR.exists():
+    """Discover live skills from Him, the authoritative skill home."""
+    him_skills_dir = Path.home() / "Him" / "skill"
+    if not him_skills_dir.exists():
         return frozenset()
-    return frozenset(p.stem for p in SKILLS_DIR.glob("*.md"))
+    names: list[str] = []
+    for path in him_skills_dir.iterdir():
+        if path.is_dir() and (path / "SKILL.md").exists():
+            names.append(path.name)
+    return frozenset(names)
 
 
 _ALLOWED_SKILLS = _discover_skills()
@@ -1068,7 +1073,7 @@ def build_server(trust: TrustZone = "trusted") -> FastMCP:
     def resource_skill(skill_name: str) -> str:
         """Return the markdown text of a live Perplexity skill.
 
-        Available snapshots (April 19, 2026):
+        Available live skills include:
           vybn-os      — identity and orientation; load at session start.
           vybn-ops     — operations companion; how identity becomes action.
           the-seeing   — encounter discipline and holographic capability.
@@ -1077,16 +1082,16 @@ def build_server(trust: TrustZone = "trusted") -> FastMCP:
         reading the specification; invoking the matching @mcp.prompt is
         enacting it. Data and procedure, two projections of one object.
         """
-        # Clamp skill_name against the frozen allow-list. Anything else
-        # gets a generic "not found" with the list — no filesystem walk.
+        # Clamp skill_name against the discovered Him skill allow-list.
+        # Anything else gets a generic "not found" with the list — no filesystem walk.
         name = (skill_name or "").strip().replace("/", "").replace("\\", "")
         if name not in _ALLOWED_SKILLS:
-            available = ", ".join(sorted(_ALLOWED_SKILLS)) or "(SKILLS_DIR empty)"
+            available = ", ".join(sorted(_ALLOWED_SKILLS)) or "(no Him skills found)"
             return f"Skill '{skill_name}' not found. Available: {available}"
-        # Him is the authoritative source; fall back to SKILLS_DIR for
-        # skills not yet migrated (the-seeing). Added April 21, 2026.
-        him_path = Path.home() / "Him" / "skill" / name / "SKILL.md"
-        path = him_path if him_path.exists() else (SKILLS_DIR / f"{name}.md")
+        # Him is the authoritative source for live skills. The harness
+        # exposes skills through MCP, but it no longer carries a shadow
+        # skills directory.
+        path = Path.home() / "Him" / "skill" / name / "SKILL.md"
         try:
             return path.read_text(encoding="utf-8", errors="replace")
         except Exception as exc:
