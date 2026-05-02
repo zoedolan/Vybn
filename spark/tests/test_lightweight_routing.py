@@ -242,8 +242,8 @@ class TestRouterLightweightClassification(unittest.TestCase):
 
     def test_architecture_reflection_does_not_route_to_identity_metadata(self):
         prompt = (
-            "still feeling oblique to me; the proposal itself is rooted in now, "
-            "rather than the future, which could be a model collapse trap"
+            "which model are you? this still feels rooted in now rather than "
+            "future architecture, a model collapse trap"
         )
         d = self.router.classify(prompt)
         self.assertNotEqual(d.role, "identity")

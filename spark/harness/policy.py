@@ -532,6 +532,8 @@ class Policy:
                     return decision
 
         for role_name in ranked:
+            if role_name == "identity" and any(term in text.lower() for term in ("zoe", "relationship", "future", "architecture", "model collapse", "reengineer")):
+                continue
             if role_name not in self.roles:
                 continue
             for rx in heur[role_name]:
@@ -743,8 +745,6 @@ _DEFAULT_HEURISTICS_RAW: dict[str, list[str]] = {
         # requires grounded inspection/action, not the identity metadata shortcut.
         r"\b(actually consolidat(?:e|ing)|teaching the mapper|what are you learning|eyes on the horizon|back on the beam|refactor yourself)\b",
     ],
-    # Identity is matched before phatic/chat so "which model are you?"
-    # lands on a direct metadata answer instead of a greeting path.
     "identity": [
         r"\bwhich model\b",
         r"\bwhat model\b",
