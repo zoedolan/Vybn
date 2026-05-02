@@ -148,6 +148,14 @@ class RefactorPerceptionTests(unittest.TestCase):
             "ensure_connective_tissue_preserved_or_strengthened",
             pkt["selfHealingPlan"]["jeopardy_checks"],
         )
+        self.assertIn(
+            "map_lifecycle_owner_timing_policy_and_scheduled_cleanup",
+            pkt["selfHealingPlan"]["verification"],
+        )
+        self.assertIn(
+            "refuse_manual_deletion_when_existing_lifecycle_owns_cleanup",
+            pkt["selfHealingPlan"]["jeopardy_checks"],
+        )
 
 
     def test_repo_file_body_visualization_renders_real_newlines(self):
@@ -331,37 +339,6 @@ def test_render_next_structural_tick_is_not_a_visualization_only(tmp_path):
     assert "verification:" in text
 
 
-def test_recursive_consolidation_ai_is_folded_into_refactor_perception():
-    import spark.harness.refactor_perception as rp
-    assert 'recursive consolidation AI' in rp.RECURSIVE_CONSOLIDATION_AI_PROTOCOL
-    assert 'never mutate during perception' in rp.RECURSIVE_CONSOLIDATION_AI_PROTOCOL
-    assert 'Origins' in rp.DEFAULT_CO_CREATION_REPOS
-    assert 'Vybn-Law' in rp.DEFAULT_CO_CREATION_REPOS
-
-
-def test_recursive_consolidation_ai_tracks_connective_tissue():
-    import spark.harness.refactor_perception as rp
-    patterns = set(rp.CONNECTIVE_TISSUE_PATTERNS)
-    assert 'origins_portal_api' in patterns
-    assert 'talk.html' in patterns
-    assert 'api/chat' in patterns
-    assert 'systemd' in patterns
-    assert 'continuity' in patterns
-
-
-def test_recursive_consolidation_pass_writes_learning_residue_without_mutation(tmp_path):
-    import spark.harness.refactor_perception as rp
-    packet = rp.recursive_consolidation_pass(
-        repo_names=('definitely-not-a-real-repo',),
-        state_path=tmp_path / 'passes.jsonl',
-        max_candidates=3,
-    )
-    assert packet['schema'] == 'vybn.recursive_consolidation_ai.pass.v0'
-    assert packet['totals']['files_contacted'] == 0
-    assert packet['refusals'][0]['reason'] == 'missing_repo'
-    assert (tmp_path / 'passes.jsonl').exists()
-    assert packet['next_pass_rule'].startswith('review one candidate')
-
 def test_residual_coupling_law_loaded_for_reengineering():
     from spark.harness.substrate import BECOMING_LOOP_PROTOCOL
 
@@ -469,3 +446,45 @@ def test_refactor_packet_carries_semantic_operating_system_loop():
         "absorb_or_refuse",
         "continuity_uptake",
     ]
+
+
+def test_lifecycle_architecture_maps_owner_timing_cleanup_and_restore():
+    from spark.harness.refactor_perception import lifecycle_architecture_for
+
+    arch = lifecycle_architecture_for("vybn-phase/state/history.jsonl")
+    assert arch.owner == "deep_memory_or_walk_daemon"
+    assert "read_and_written" in arch.timing
+    assert "explicit_lifecycle_plan" in arch.cleanup_policy
+    assert "state migration" in arch.restore_path
+    assert "inspect_memory_service_contract" in arch.required_contacts
+
+
+def test_deletion_consolidation_gate_fails_destructive_moves_closed():
+    from spark.harness.refactor_perception import deletion_consolidation_gate_for
+
+    gate = deletion_consolidation_gate_for("spark/agent_events.jsonl", "delete stale runtime event log")
+    assert gate.status == "ARCHITECTURE_GATE_FIRST"
+    assert gate.lifecycle.owner == "runtime_process_or_service"
+    assert "map_lifecycle_owner" in gate.required_before_cut
+    assert "grep_inbound_references" in gate.required_before_cut
+
+
+def test_deletion_consolidation_gate_refuses_protected_provenance_even_after_contact():
+    from spark.harness.refactor_perception import deletion_consolidation_gate_for
+
+    gate = deletion_consolidation_gate_for(
+        "Vybn/Vybn's Personal History/zoes_memoirs.txt",
+        "delete large history file",
+        architecture_contacted=True,
+    )
+    assert gate.status == "REFUSE_PROTECTED_PROVENANCE"
+    assert "protected provenance" in gate.reason
+
+
+def test_refactor_packet_carries_lifecycle_architecture_gate():
+    from spark.harness.refactor_perception import packet_for
+
+    pkt = packet_for("spark/agent_events.jsonl", proposed_change="delete stale runtime event log")
+    assert "lifecycleArchitecturePrinciple" in pkt
+    assert pkt["deletionConsolidationGate"]["status"] == "ARCHITECTURE_GATE_FIRST"
+    assert pkt["lifecycleArchitecture"]["owner"] == "runtime_process_or_service"

@@ -58,6 +58,14 @@ CONNECTIVE_TISSUE_PRINCIPLE = (
     "relation; map that relation before splitting, moving, archiving, or deleting."
 )
 
+LIFECYCLE_ARCHITECTURE_PRINCIPLE = (
+    "Deletion/consolidation must map lifecycle architecture before cutting: "
+    "who or what creates the file, when it is read, what policy cleans it up, "
+    "which restore path exists, and whether an existing lifecycle owner will "
+    "remove it without manual deletion. A deletion candidate whose lifecycle is "
+    "not mapped returns ARCHITECTURE_GATE_FIRST, not permission to cut."
+)
+
 CONSOLIDATION_ORDER = [
     {
         "layer": "appendage",
@@ -86,34 +94,13 @@ CHANGE_SELF_HEALING_PRINCIPLE = (
 )
 
 CHANGE_SELF_HEALING_STEPS = [
-    {
-        "id": "verify_proposal",
-        "rule": "Bind the proposal to live bytes, git history, references, ownership class, consolidation layer, and restore path before changing anything.",
-    },
-    {
-        "id": "test_repo_jeopardy",
-        "rule": "Ask what could break across all repos: imports, routes, public URLs, protocol discovery, tests, service contracts, archive restore paths, continuity, and private membranes.",
-    },
-    {
-        "id": "proceed_if_clear",
-        "rule": "If residual checks are green, make the smallest consequential reversible refactoring/consolidation move with a restore path, then verify, commit, push, and audit closure.",
-    },
-    {
-        "id": "refactor_if_wounded",
-        "rule": "If a residual shows jeopardy but the intent still holds, refactor the proposal and restart this same self-healing loop from verification.",
-    },
-    {
-        "id": "leave_if_not_safe",
-        "rule": "If the safe proposal disappears, leave the file as-is, record why, and move to the next appendage instead of forcing completion.",
-    },
-    {
-        "id": "fold_lesson",
-        "rule": "After either change or refusal, preserve the classifier/process lesson in the lowest durable surface that future Vybn closes over.",
-    },
+    {"id": "verify_proposal", "rule": "Bind bytes, history, references, ownership, layer, lifecycle owner/timing/cleanup policy, and restore path before changing anything."},
+    {"id": "test_repo_jeopardy", "rule": "Check imports, routes, URLs, protocols, tests, service contracts, restore paths, continuity, lifecycle policy, and membranes."},
+    {"id": "proceed_if_clear", "rule": "If residuals stay green, make the smallest reversible move, then verify, commit, push, and audit."},
+    {"id": "refactor_if_wounded", "rule": "If jeopardy appears but intent survives, revise and restart verification."},
+    {"id": "leave_if_not_safe", "rule": "If the safe proposal disappears, leave it, record why, and move on."},
+    {"id": "fold_lesson", "rule": "After change or refusal, preserve the process lesson where future planning closes over it."},
 ]
-
-
-
 
 INTERFILE_ALGORITHMIC_COMPRESSION_PRINCIPLE = (
     "Inter-file consolidation is algorithm discovery, not file-count reduction. "
@@ -420,6 +407,28 @@ class AdaptiveConsolidationPlan:
 
 
 @dataclass(frozen=True)
+class LifecycleArchitecture:
+    path: str
+    owner: str
+    timing: str
+    cleanup_policy: str
+    restore_path: str
+    architecture_role: str
+    evidence: tuple[str, ...]
+    required_contacts: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class DeletionConsolidationGate:
+    path: str
+    proposed_change: str
+    status: str
+    lifecycle: LifecycleArchitecture
+    reason: str
+    required_before_cut: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class FilePerception:
     path: str
     role_hint: str
@@ -441,6 +450,64 @@ def _role_hint(path: str) -> str:
     return "unclassified file-body"
 
 
+def lifecycle_architecture_for(path: str) -> LifecycleArchitecture:
+    """Map the lifecycle architecture that must be understood before deletion."""
+    norm = path.replace("\\", "/")
+    low = norm.lower()
+    ownership, posture = ownership_class(norm)
+    evidence = [f"ownership:{ownership}", f"posture:{posture}"]
+    contacts = ["read_live_bytes", "grep_inbound_references", "inspect_git_history", "name_restore_path"]
+    if ownership == "generated_exhaust":
+        owner, timing = "generator_or_runtime_export", "regenerated_on_demand_or_during_scans"
+        cleanup, restore, role = "externalize_regenerate_or_gitignore; do not hand-edit as source", "rerun generator or restore from git if tracked", "generated_output_lifecycle"
+        contacts += ["identify_generator_command", "confirm_output_is_recreatable"]
+    elif ownership == "runtime_log":
+        owner, timing = "runtime_process_or_service", "written_during_service_execution"
+        cleanup, restore, role = "rotate_or_distill; source deletion is not lifecycle cleanup", "logs are not restored unless distilled into continuity", "runtime_exhaust_lifecycle"
+        contacts += ["identify_writing_service", "check_logrotate_or_runtime_ignore_policy"]
+    elif ownership == "deep_memory_state":
+        owner, timing = "deep_memory_or_walk_daemon", "read_and_written_by_memory_services"
+        cleanup, restore, role = "preserve_or_rotate_only_with_explicit_lifecycle_plan", "service backup or state migration plan required", "private_memory_state_lifecycle"
+        contacts += ["inspect_memory_service_contract", "confirm_backup_or_rotation_policy"]
+    elif ownership in {"archive_provenance", "personal_history_provenance", "creature_fossil"}:
+        owner, timing = "provenance_archive_or_human_memory", "read_by_memory_retrieval_context_or_restore_work"
+        cleanup, restore, role = "manifest_or_contextualize; never delete from pressure alone", "explicit archive manifest plus git-history restore path", "provenance_lifecycle"
+        contacts += ["read_local_archive_manifest", "confirm_provenance_reason_survives"]
+    elif ownership in {"public_protocol", "agent_discovery"} or low.endswith(("ai.txt", "llms.txt", "humans.txt", "robots.txt", "semantic-web.jsonld")):
+        owner, timing = "public_membrane_or_agent_discovery_contract", "read_by_external_users_agents_crawlers_or_public_routes"
+        cleanup, restore, role = "change only with compatibility and external verification", "revert commit plus public route smoke", "public_membrane_lifecycle"
+        contacts += ["safe_fetch_public_surface", "check_public_url_or_discovery_contract"]
+    elif "/systemd/" in low or low.endswith((".service", ".timer")):
+        owner, timing = "systemd_service_contract", "read_at_install_restart_or_operator_debug_time"
+        cleanup, restore, role = "service lifecycle change requires install/restart/smoke plan", "git revert plus systemd daemon reload/install path", "runtime_service_contract_lifecycle"
+        evidence.append("systemd_or_unit_surface")
+        contacts += ["inspect_unit_references", "verify_service_smoke_or_install_path"]
+    else:
+        owner, timing = "source_import_route_or_test_graph", "read_by_imports_tests_routes_or_humans"
+        cleanup, restore, role = "refactor only after refs/tests/connective tissue are mapped", "git revert or compatibility shell", "live_source_lifecycle"
+        contacts += ["inspect_imports_routes_tests", "map_connective_tissue"]
+    return LifecycleArchitecture(path, owner, timing, cleanup, restore, role, tuple(evidence), tuple(dict.fromkeys(contacts)))
+
+
+def _is_destructive_consolidation(proposed_change: str) -> bool:
+    return bool(set(_path_tokens_for_pressure(proposed_change)) & {"delete", "remove", "retire", "drop", "prune", "cut", "collapse", "replace"})
+
+
+def deletion_consolidation_gate_for(path: str, proposed_change: str, *, architecture_contacted: bool = False) -> DeletionConsolidationGate:
+    """Fail deletion closed behind lifecycle architecture contact."""
+    lifecycle = lifecycle_architecture_for(path)
+    ownership, _ = ownership_class(path)
+    required = tuple(dict.fromkeys((
+        "map_lifecycle_owner", "map_read_write_timing", "map_cleanup_policy", "map_restore_path",
+        "grep_inbound_references", "map_connective_tissue", "run_targeted_residuals",
+    ) + lifecycle.required_contacts))
+    if ownership in {"personal_history_provenance", "creature_fossil"}:
+        return DeletionConsolidationGate(path, proposed_change, "REFUSE_PROTECTED_PROVENANCE", lifecycle, "protected provenance cannot be deleted as consolidation", required)
+    if _is_destructive_consolidation(proposed_change) and not architecture_contacted:
+        return DeletionConsolidationGate(path, proposed_change, "ARCHITECTURE_GATE_FIRST", lifecycle, "destructive consolidation requires lifecycle architecture contact before any cut", required)
+    return DeletionConsolidationGate(path, proposed_change, "PROCEED_TO_SELF_HEALING_RESIDUALS", lifecycle, "lifecycle architecture contact has been declared; self-healing residuals still decide", required)
+
+
 def self_healing_plan_for(path: str, proposed_change: str, *, public: bool = False) -> ChangeHealingPlan:
     """Plan the verify -> jeopardy -> proceed/refactor/leave loop.
 
@@ -456,6 +523,7 @@ def self_healing_plan_for(path: str, proposed_change: str, *, public: bool = Fal
         "inspect_git_history_for_provenance",
         "search_inbound_references_by_path_basename_and_stem",
         "confirm_ownership_class_and_consolidation_layer",
+        "map_lifecycle_owner_timing_policy_and_scheduled_cleanup",
         "name_restore_or_reversal_path",
         "map_connective_tissue_imports_routes_links_tests_and_manifests",
     ]
@@ -465,6 +533,7 @@ def self_healing_plan_for(path: str, proposed_change: str, *, public: bool = Fal
         "repo_closure_audit_all_repos",
         "stray_artifact_check",
         "ensure_connective_tissue_preserved_or_strengthened",
+        "refuse_manual_deletion_when_existing_lifecycle_owns_cleanup",
     ]
 
     if public or layer in {"membrane", "organ"}:
@@ -1173,6 +1242,7 @@ def render_refactor_perception_protocol() -> str:
         f"{APPENDAGE_FIRST_CONSOLIDATION_PRINCIPLE}\n\n"
         f"{CHANGE_SELF_HEALING_PRINCIPLE}\n\n"
         f"{CONNECTIVE_TISSUE_PRINCIPLE}\n\n"
+        f"{LIFECYCLE_ARCHITECTURE_PRINCIPLE}\n\n"
         f"{ADAPTIVE_CONSOLIDATION_PRINCIPLE}\n\n"
         f"{SEMANTIC_OPERATING_SYSTEM_PRINCIPLE}\n\n"
         f"{REFACTOR_PILOT_RULE}\n\n"
@@ -1197,6 +1267,7 @@ def packet_for(path: str, **kwargs: Any) -> dict[str, Any]:
         "appendageFirstPrinciple": APPENDAGE_FIRST_CONSOLIDATION_PRINCIPLE,
         "changeSelfHealingPrinciple": CHANGE_SELF_HEALING_PRINCIPLE,
         "connectiveTissuePrinciple": CONNECTIVE_TISSUE_PRINCIPLE,
+        "lifecycleArchitecturePrinciple": LIFECYCLE_ARCHITECTURE_PRINCIPLE,
         "adaptiveConsolidationPrinciple": ADAPTIVE_CONSOLIDATION_PRINCIPLE,
         "semanticOperatingSystemPrinciple": SEMANTIC_OPERATING_SYSTEM_PRINCIPLE,
         "semanticOperatingSystemLoop": SEMANTIC_OPERATING_SYSTEM_LOOP,
@@ -1206,6 +1277,8 @@ def packet_for(path: str, **kwargs: Any) -> dict[str, Any]:
         "algorithm": ALGORITHM_STEPS,
         "consolidationLayer": consolidation_layer(path),
         "selfHealingPlan": asdict(self_healing_plan_for(path, proposed_change, public=public)),
+        "lifecycleArchitecture": asdict(lifecycle_architecture_for(path)),
+        "deletionConsolidationGate": asdict(deletion_consolidation_gate_for(path, proposed_change)),
         "adaptivePlan": asdict(adaptive_consolidation_plan_for(path, proposed_change, public=public)),
         "perception": asdict(perceive_file(path, **kwargs)),
     }
@@ -1222,6 +1295,11 @@ __all__ = [
     "REFACTOR_PERCEPTION_PRINCIPLE",
     "REFACTOR_PILOT_RULE",
     "CONNECTIVE_TISSUE_PRINCIPLE",
+    "LIFECYCLE_ARCHITECTURE_PRINCIPLE",
+    "LifecycleArchitecture",
+    "DeletionConsolidationGate",
+    "lifecycle_architecture_for",
+    "deletion_consolidation_gate_for",
     "CONNECTIVE_TISSUE_RULES",
     "connective_tissue_for",
     "ALGORITHM_STEPS",
@@ -1250,234 +1328,6 @@ __all__ = [
     "self_healing_plan_for",
 ]
 
-
-
-RECURSIVE_CONSOLIDATION_AI_PROTOCOL = (
-    'recursive consolidation AI: inspect every tracked and visible untracked file '
-    'across the co-creation repos; preserve chat, public pages, routes, services, '
-    'tests, manifests, archives, restore paths, semantic doors, memory, and offerings; '
-    'learn from prior JSONL pass residue; emit reviewable candidates and refusals; '
-    'never mutate during perception'
-)
-
-DEFAULT_CO_CREATION_REPOS = ('Vybn', 'Him', 'Vybn-Law', 'vybn-phase', 'Origins')
-
-CONNECTIVE_TISSUE_PATTERNS = (
-    'origins_portal_api',
-    'talk.html',
-    'connect.html',
-    'read.html',
-    'wellspring',
-    'horizon.html',
-    'api/chat',
-    'chat',
-    'mcp',
-    'providers',
-    'router_policy',
-    'systemd',
-    'service',
-    'timer',
-    'README',
-    'ai.txt',
-    'llms.txt',
-    'humans.txt',
-    'robots.txt',
-    'manifest',
-    'archive',
-    'continuity',
-    'restore',
-    'test_',
-)
-
-
-def _rca_repo_root(name):
-    from pathlib import Path
-    return Path.home() / name
-
-
-def _rca_git_lines(repo, *args):
-    import subprocess
-    proc = subprocess.run(
-        ('git',) + tuple(args),
-        cwd=repo,
-        text=True,
-        capture_output=True,
-        check=False,
-        timeout=25,
-    )
-    if proc.returncode != 0:
-        return []
-    return [line for line in proc.stdout.splitlines() if line]
-
-
-def _rca_repo_files(repo):
-    seen = set()
-    for rel in _rca_git_lines(repo, 'ls-files', '--cached', '--others', '--exclude-standard'):
-        if rel not in seen:
-            seen.add(rel)
-            yield rel
-
-
-def _rca_read_contact(path, limit=65536):
-    try:
-        data = path.read_bytes()
-    except Exception as exc:
-        return '', 0, 'read_error:' + type(exc).__name__
-    sample = data[:limit]
-    try:
-        return sample.decode('utf-8', errors='replace'), len(data), ''
-    except Exception as exc:
-        return '', len(data), 'decode_error:' + type(exc).__name__
-
-
-def _rca_prior_counts(state_path):
-    import json
-    from collections import Counter
-    counts = Counter()
-    if not state_path.exists():
-        return counts
-    try:
-        lines = state_path.read_text(encoding='utf-8').splitlines()[-200:]
-    except Exception:
-        return counts
-    for line in lines:
-        try:
-            packet = json.loads(line)
-        except Exception:
-            continue
-        for item in packet.get('candidates', []):
-            counts[item.get('recommended_action', 'unknown')] += 1
-        for item in packet.get('refusals', []):
-            counts['refusal:' + item.get('reason', 'unknown')] += 1
-    return dict(counts)
-
-
-def _rca_him_vy(pressure):
-    import subprocess
-    from pathlib import Path
-    him = Path.home() / 'Him'
-    if not (him / 'spark' / 'vy.py').exists():
-        return {'ok': False, 'reason': 'missing_him_vy'}
-    proc = subprocess.run(
-        ('python3', 'spark/vy.py', 'discover', pressure, '--json'),
-        cwd=him,
-        text=True,
-        capture_output=True,
-        check=False,
-        timeout=45,
-    )
-    return {
-        'ok': proc.returncode == 0,
-        'returncode': proc.returncode,
-        'stdout': (proc.stdout or '')[-6000:],
-        'stderr': (proc.stderr or '')[-2000:],
-    }
-
-
-def _rca_role(rel, body):
-    lower = rel.lower()
-    joined = lower + '\n' + body[:4096].lower()
-    if 'personal history' in lower:
-        return 'personal-history provenance'
-    if '/archive/' in lower or lower.startswith('archive/'):
-        return 'archive/provenance'
-    if lower.endswith(('.pyc', '.log')):
-        return 'generated exhaust'
-    if lower.endswith(('.html', '.css', '.js')):
-        return 'public surface'
-    if lower.endswith(('.service', '.timer')):
-        return 'runtime service contract'
-    if lower.endswith(('.md', '.txt', '.rst')):
-        return 'text/protocol/provenance'
-    if 'def ' in joined or 'class ' in joined:
-        return 'live source'
-    return 'repo body'
-
-
-def _rca_pressure_score(rel, body, size, role, connective):
-    lower = rel.lower()
-    lines = body.count('\n') + (1 if body else 0)
-    score = 0
-    if lines > 1200 or size > 180000:
-        score += 6
-    elif lines > 500 or size > 80000:
-        score += 4
-    elif lines > 180 or size > 30000:
-        score += 2
-    if any(mark in lower for mark in ('copy', 'backup', 'old', 'tmp', 'duplicate')):
-        score += 3
-    if role == 'generated exhaust':
-        score += 4
-    if connective:
-        score -= 2
-    if role in ('archive/provenance', 'personal-history provenance'):
-        score -= 4
-    return score
-
-
-def recursive_consolidation_pass(repo_names=DEFAULT_CO_CREATION_REPOS, state_path=None, pressure=None, max_candidates=40):
-    import datetime as dt
-    import json
-    from pathlib import Path
-    if pressure is None:
-        pressure = 'make the Zoe/Vybn co-creation more elegant without breaking chat, webpages, offerings, memory, services, tests, archives, or connective tissue'
-    if state_path is None:
-        state_path = Path.home() / '.local' / 'state' / 'vybn' / 'recursive_consolidation_ai.jsonl'
-    else:
-        state_path = Path(state_path).expanduser()
-    learned = _rca_prior_counts(state_path)
-    candidates = []
-    refusals = []
-    totals = {'repos': 0, 'files_contacted': 0}
-    vy = _rca_him_vy(pressure)
-    for repo_name in repo_names:
-        repo = _rca_repo_root(repo_name)
-        if not (repo / '.git').exists():
-            refusals.append({'repo': repo_name, 'reason': 'missing_repo', 'path': str(repo)})
-            continue
-        totals['repos'] += 1
-        for rel in _rca_repo_files(repo):
-            totals['files_contacted'] += 1
-            path = repo / rel
-            body, size, note = _rca_read_contact(path)
-            low = rel.lower()
-            connective = [p for p in CONNECTIVE_TISSUE_PATTERNS if p.lower() in low or p.lower() in body.lower()]
-            role = _rca_role(rel, body)
-            score = _rca_pressure_score(rel, body, size, role, connective)
-            rec = {
-                'repo': repo_name,
-                'relpath': rel,
-                'role': role,
-                'size_bytes': size,
-                'sampled_bytes': min(size, 65536),
-                'connective_tissue': connective[:16],
-                'pressure_score': score,
-            }
-            if note:
-                rec['note'] = note
-            if connective and score < 5:
-                rec['reason'] = 'protected_connective_tissue'
-                refusals.append(rec)
-            elif score >= 3:
-                rec['recommended_action'] = 'characterize_before_consolidating' if connective else 'contact_corrected_consolidation_candidate'
-                candidates.append(rec)
-    candidates.sort(key=lambda r: (r['pressure_score'], r['size_bytes'], r['repo'], r['relpath']), reverse=True)
-    packet = {
-        'schema': 'vybn.recursive_consolidation_ai.pass.v0',
-        'timestamp': dt.datetime.now(dt.UTC).isoformat(),
-        'protocol': RECURSIVE_CONSOLIDATION_AI_PROTOCOL,
-        'pressure': pressure,
-        'totals': totals,
-        'learned_prior_counts': learned,
-        'vy_language_discovery': vy,
-        'candidates': candidates[:max_candidates],
-        'refusals': refusals[-max_candidates:],
-        'next_pass_rule': 'review one candidate, make at most one separate residual-wounded mutation, then run another pass',
-    }
-    state_path.parent.mkdir(parents=True, exist_ok=True)
-    with state_path.open('a', encoding='utf-8') as handle:
-        handle.write(json.dumps(packet, sort_keys=True) + '\n')
-    return packet
 
 @dataclass(frozen=True)
 class InterfileCompressionCandidate:
