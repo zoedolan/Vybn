@@ -1200,7 +1200,7 @@ def run_agent_loop(
             # points at a readable file, prepend a bounded prefix of its
             # contents to this turn's user input so Omni receives the
             # operator's perception/dream/evolve packet (e.g. a tail of
-            # continuous_local_compute.jsonl, a Him-vy discovery dump, an
+            # local discovery packet, a Him-vy discovery dump, an
             # ObservationPacket text). This rides only the explicit @omni
             # turn — never auto-fires, never touches Super, never persists
             # to disk, and is bounded so a giant file cannot blow up the
