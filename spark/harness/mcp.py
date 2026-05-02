@@ -2189,7 +2189,7 @@ def _read_evolve_perception_packet() -> tuple[str, str]:
     alias reads in vybn_spark_agent.py. The semantics match: a bounded
     text prefix that the operator has staged on disk (e.g. an
     ObservationPacket dump, a Him-vy discovery, a tail of
-    continuous_local_compute.jsonl). Used here only as additional
+    local discovery packet). Used here only as additional
     perception context for the daily evolve/dream prompt — never
     activates Omni, never calls a model, never persists, and never
     mutates if the file is absent or unreadable.

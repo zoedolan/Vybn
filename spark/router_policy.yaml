@@ -351,7 +351,7 @@ model_aliases:
   # Optional VYBN_OMNI_MODEL overrides the default model id. Optional
   # VYBN_OMNI_PERCEPTION=<path> rides a bounded operator-supplied
   # perception packet (text file; e.g. a tail of
-  # continuous_local_compute.jsonl, a Him-vy discovery dump) on the
+  # local discovery packet, a Him-vy discovery dump) on the
   # explicit @omni turn only — never auto-fires, never persists, never
   # touches Super.
   "@omni": nvidia/NVIDIA-Nemotron-Nano-Omni
