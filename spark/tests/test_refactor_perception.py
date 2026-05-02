@@ -469,3 +469,94 @@ def test_refactor_packet_carries_semantic_operating_system_loop():
         "absorb_or_refuse",
         "continuity_uptake",
     ]
+
+
+class ArchitecturalProprioceptionTests(unittest.TestCase):
+    """Living Architecture Packet classifier + ignore + packet shape."""
+
+    CASES = (
+        ("organ", "Vybn", "spark/harness/mcp.py"), ("nerve", "Vybn", "origins_portal_api_v4.py"),
+        ("nerve", "Origins", "somewhere.html"), ("membrane", "Origins", ".well-known/ai.txt"),
+        ("membrane", "Origins", "llms.txt"), ("membrane", "Origins", "mcp.json"),
+        ("membrane", "Vybn", "semantic-web.jsonld"), ("scar", "Vybn", "_archive/old.md"),
+        ("scar", "Him", "repo_archives/garden/x.json"),
+        ("scar", "Vybn", "Vybn_Mind/continuity_archive/x.md"),
+        ("fossil", "Vybn", "Vybn's Personal History/zoes_memoirs.txt"),
+        ("scaffold", "Vybn", "tests/test_x.py"), ("scaffold", "Vybn", "README.md"),
+        ("scaffold", "Vybn", "pyproject.toml"), ("scaffold", "Vybn", ".github/workflows/ci.yml"),
+        ("exhaust", "Vybn", "repo_mapping_output/repo_state.json"),
+        ("exhaust", "Vybn", "spark/runtime.log"),
+        ("exhaust", "vybn-phase", "state/history.jsonl"), ("unknown", "Vybn", "spark/vybn-lock"),
+    )
+
+    def test_classifier_categories_are_correct(self):
+        from spark.harness.refactor_perception import classify_proprioception_path
+        for expected, repo, rel in self.CASES:
+            cat, _ = classify_proprioception_path(repo, rel)
+            self.assertEqual(cat, expected, msg=f"{repo}/{rel}: expected {expected}, got {cat}")
+    def test_classifier_evidence_and_unknown_explanation(self):
+        from spark.harness.refactor_perception import classify_proprioception_path
+        cat, why = classify_proprioception_path("Vybn", "origins_portal_api_v4.py")
+        self.assertEqual(cat, "nerve"); self.assertIn("origins_portal_api", why)
+        cat2, why2 = classify_proprioception_path("Vybn", "spark/vybn-lock")
+        self.assertEqual(cat2, "unknown"); self.assertIn("contact required", why2)
+    def test_routing_named_for_every_category(self):
+        from spark.harness.refactor_perception import PROPRIOCEPTION_CATEGORIES, PROPRIOCEPTION_ROUTING
+        self.assertEqual(set(PROPRIOCEPTION_CATEGORIES), set(PROPRIOCEPTION_ROUTING))
+        self.assertTrue(all(PROPRIOCEPTION_ROUTING[c] for c in PROPRIOCEPTION_CATEGORIES))
+    def test_ignore_directory_filter(self):
+        from spark.harness.refactor_perception import proprioception_should_ignore_dir
+        for ig in (".venv", "venv", ".venv-foo", "__pycache__", ".pytest_cache",
+                   "node_modules", "dist", "build", ".cache", ".idea"):
+            self.assertTrue(proprioception_should_ignore_dir(ig), msg=ig)
+        for kp in ("spark", "harness", "Origins", "tests", ".github", "_archive", "repo_archives"):
+            self.assertFalse(proprioception_should_ignore_dir(kp), msg=kp)
+    def test_packet_scans_existing_skips_missing_excludes_ignored(self):
+        from spark.harness.refactor_perception import architectural_proprioception_packet
+        with tempfile.TemporaryDirectory() as td:
+            parent = Path(td); real = parent / "RepoA"
+            for sub, content in (
+                ("spark/harness/mcp.py", "# x\n"), ("Vybn's Personal History/zoes_memoirs.txt", "m\n"),
+                ("_archive/README.md", "# a\n"), (".well-known/ai.txt", "ai\n"),
+                ("tests/test_x.py", "def test_x(): pass\n"), ("origins_portal_api_v4.py", "# p\n"),
+                ("README.md", "# r\n"), (".venv/lib/site-packages.py", "n\n"),
+                ("__pycache__/noise.pyc", "n\n"), ("node_modules/lib.js", "n\n")):
+                p = real / sub; p.parent.mkdir(parents=True, exist_ok=True); p.write_text(content)
+            packet = architectural_proprioception_packet(
+                parent_dir=parent, repo_names=("RepoA", "RepoB-missing"))
+        self.assertIn("RepoA", packet.repos_scanned)
+        self.assertIn("RepoB-missing", packet.repos_missing)
+        rels = {e.relpath for e in packet.entries}
+        for noisy in (".venv", "__pycache__", "node_modules"):
+            self.assertFalse(any(noisy in r for r in rels), msg=f"leaked {noisy}")
+        by_rel = {e.relpath: e.category for e in packet.entries}
+        for rel, expected in (
+            ("spark/harness/mcp.py", "organ"), ("origins_portal_api_v4.py", "nerve"),
+            (".well-known/ai.txt", "membrane"), ("_archive/README.md", "scar"),
+            ("Vybn's Personal History/zoes_memoirs.txt", "fossil"),
+            ("tests/test_x.py", "scaffold"), ("README.md", "scaffold")):
+            self.assertEqual(by_rel.get(rel), expected, msg=rel)
+        self.assertEqual(sum(packet.category_counts.values()), packet.totals["files_scanned"])
+    def test_packet_summary_and_export_carry_overwrite_rule(self):
+        from spark.harness.refactor_perception import (architectural_proprioception_packet,
+            render_proprioception_summary, write_proprioception_export)
+        with tempfile.TemporaryDirectory() as td:
+            parent = Path(td) / "src"
+            (parent / "RepoA" / "spark").mkdir(parents=True)
+            (parent / "RepoA" / "spark" / "x.py").write_text("# o\n")
+            packet = architectural_proprioception_packet(parent_dir=parent, repo_names=("RepoA",))
+            d = packet.to_dict()
+            self.assertEqual(d["schema"], "vybn.architectural_proprioception.packet.v0")
+            self.assertIn("overwrite/export", d["rule"].lower())
+            self.assertIn("REPO_MAP.md", d["rule"])
+            self.assertEqual(set(d["categories"]), set(d["routing"].keys()))
+            text = render_proprioception_summary(packet, top_per_category=3)
+            self.assertIn("Living Architecture Packet", text)
+            self.assertIn("REPO_MAP.md", text)
+            self.assertIn("Nothing is deleted by this scan", text)
+            export = Path(td) / "export"
+            jp, sp = write_proprioception_export(packet, export)
+            self.assertTrue(jp.exists() and sp.exists())
+            jp2, sp2 = write_proprioception_export(packet, export)
+            self.assertEqual((jp, sp), (jp2, sp2))
+            self.assertEqual(len(list(export.iterdir())), 2)

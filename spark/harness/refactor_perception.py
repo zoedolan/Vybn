@@ -1572,3 +1572,209 @@ def render_interfile_algorithmic_compression_protocol() -> str:
         "or refusal.\n"
         "--- END INTERFILE ALGORITHMIC COMPRESSION PROTOCOL ---"
     )
+
+
+# ── architectural proprioception ─ Living Architecture Packet (overwrite/export, not source)
+ARCHITECTURAL_PROPRIOCEPTION_PRINCIPLE = (
+    "Architectural proprioception: scan sibling repos, classify each surface "
+    "by anatomical role, surface preserve/fold/delete-candidate/investigate "
+    "routings without action. Overwrite/export, not source; REPO_MAP.md is the live home.")
+PROPRIOCEPTION_CATEGORIES = ("organ", "nerve", "membrane", "scar", "fossil", "scaffold", "exhaust", "unknown")
+PROPRIOCEPTION_ROUTING = {
+    "organ":    "preserve; refactor only with characterization tests and route inventory",
+    "nerve":    "preserve; public contract — external verify before any change",
+    "membrane": "preserve; protocol/discovery surface — clarity over churn",
+    "scar":     "preserve; restore path is the value, do not flatten",
+    "fossil":   "preserve; provenance, never diet by size",
+    "scaffold": "preserve; investigate only if duplicated or unreferenced",
+    "exhaust":  "delete-candidate (regenerable); prove no live reader, then dispose",
+    "unknown":  "investigate; contact the bytes and revise category",
+}
+PROPRIOCEPTION_IGNORE_DIR_NAMES = frozenset({
+    ".git", ".hg", ".svn", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", ".tox",
+    "venv", "env", ".env", "node_modules", ".next", "dist", "build", ".cache", ".idea", ".vscode",
+    "repo_mapping_output"})
+PROPRIOCEPTION_DEFAULT_REPO_NAMES = ("Vybn", "Him", "Vybn-Law", "vybn-phase", "Origins", "the-others")
+_PROP_PATH_RULES: tuple[tuple[str, str], ...] = tuple(
+    [(s, "fossil") for s in ("personal history", "personal_history", "zoes_memoirs",
+        "what_vybn_would_have_missed", "artificial liberation", "/medium/",
+        "vybn_mind/creature_dgm_h/archive")]
+    + [(s, "scar") for s in ("/_archive/", "/repo_archives/", "/continuity_archive/", "/archive/")]
+    + [(s, "exhaust") for s in ("/repo_mapping_output/", "/__pycache__/", "/.pytest_cache/",
+        "/.mypy_cache/", "/node_modules/", "/.cache/")]
+    + [(s, "membrane") for s in ("/.well-known/", "semantic-web.jsonld", "commons-skeleton.json")]
+    + [(s, "scaffold") for s in ("/tests/", "/test/", "/.github/", "/.githooks/")])
+_PROP_NAME_RULES: dict[str, str] = {
+    **{n: "membrane" for n in ("llms.txt", "ai.txt", "humans.txt", "robots.txt", "mcp.json")},
+    **{n: "scaffold" for n in ("readme.md", "license", "license.md", "license.txt",
+       "pyproject.toml", "setup.py", "setup.cfg", "requirements.txt", "makefile", "dockerfile",
+       ".gitignore", ".gitattributes", ".nojekyll", "repo_map.md")}}
+_PROP_EXT_RULES: dict[str, str] = {
+    **{e: "nerve" for e in (".html", ".htm", ".css", ".js", ".mjs", ".ts", ".tsx", ".jsx")},
+    ".jsonld": "membrane", ".py": "organ",
+    **{e: "scaffold" for e in (".service", ".timer", ".sh", ".bash", ".zsh", ".yml", ".yaml",
+       ".toml", ".ini", ".cfg", ".md", ".rst", ".txt", ".json")},
+    **{e: "exhaust" for e in (".log", ".bak", ".orig", ".tmp", ".pyc", ".pyo", ".npy", ".npz",
+       ".jsonl")}}
+_PROP_NERVE_TOKENS = (
+    "origins_portal_api", "vybn_chat_api", "context_overlays", "origins_protocols", "wellspring",
+    "somewhere", "talk.html", "connect.html", "read.html", "chat.html", "vybn.html",
+    "horizon.html", "deep_memory.py", "walk_daemon.py", "vybn_phase.py")
+
+
+@dataclass(frozen=True)
+class ProprioceptionEntry:
+    repo: str; relpath: str; category: str; evidence: str; routing: str; size: int = 0
+
+
+@dataclass(frozen=True)
+class ProprioceptionPacket:
+    schema: str
+    generated_at: str
+    repos_scanned: tuple[str, ...]
+    repos_missing: tuple[str, ...]
+    totals: Mapping[str, int]
+    category_counts: Mapping[str, int]
+    entries: tuple[ProprioceptionEntry, ...]
+
+    def to_dict(self) -> dict:
+        return {
+            "schema": self.schema, "generated_at": self.generated_at,
+            "principle": ARCHITECTURAL_PROPRIOCEPTION_PRINCIPLE,
+            "categories": list(PROPRIOCEPTION_CATEGORIES), "routing": dict(PROPRIOCEPTION_ROUTING),
+            "repos_scanned": list(self.repos_scanned), "repos_missing": list(self.repos_missing),
+            "totals": dict(self.totals), "category_counts": dict(self.category_counts),
+            "entries": [asdict(e) for e in self.entries],
+            "rule": "Overwrite/export, not source. Authority remains in the repos and REPO_MAP.md.",
+        }
+
+
+def proprioception_should_ignore_dir(name: str) -> bool:
+    """Skip generated environments and caches; they are not architecture."""
+    return bool(name) and (name in PROPRIOCEPTION_IGNORE_DIR_NAMES
+                           or name.startswith(".venv") or name.startswith(".conda"))
+
+
+def classify_proprioception_path(repo: str, relpath: str, *, is_dir: bool = False) -> tuple[str, str]:
+    """Empirical (category, evidence) for a repo-relative path."""
+    norm = relpath.replace("\\", "/")
+    low = f"{repo}/{norm}".lower()
+    name, suffix = Path(norm).name.lower(), Path(norm).suffix.lower()
+    for tok in (".venv/", "/__pycache__/", "/.pytest_cache/", "/node_modules/"):
+        if tok in low: return "exhaust", f"ignored-environment {tok.strip('/')}"
+    for needle, cat in _PROP_PATH_RULES:
+        if needle in low: return cat, f"path token {needle.strip('/')}"
+    for tok in _PROP_NERVE_TOKENS:
+        if tok in low: return "nerve", f"nerve token {tok}"
+    if name in _PROP_NAME_RULES: return _PROP_NAME_RULES[name], f"name {name}"
+    if is_dir: return "scaffold", "directory body without specific signal"
+    if suffix and suffix in _PROP_EXT_RULES: return _PROP_EXT_RULES[suffix], f"extension {suffix}"
+    if not suffix and name: return "unknown", "extensionless file; contact required"
+    return "unknown", "no path/name/extension evidence"
+
+
+def architectural_proprioception_packet(
+    parent_dir: str | Path | None = None, *,
+    repo_names: Iterable[str] = PROPRIOCEPTION_DEFAULT_REPO_NAMES,
+    max_entries_per_repo: int = 4000,
+) -> ProprioceptionPacket:
+    """Scan available siblings under parent_dir; emit Living Architecture Packet."""
+    import os as _os, datetime as _dt
+    parent = Path.cwd().resolve().parent if parent_dir is None else Path(parent_dir).expanduser().resolve()
+    names = tuple(repo_names)
+    roots = [parent / n for n in names if (parent / n).is_dir()]
+    missing = [n for n in names if not (parent / n).is_dir()]
+    entries: list[ProprioceptionEntry] = []
+    counts: Counter = Counter()
+    totals = {"repos_scanned": len(roots), "files_scanned": 0, "files_truncated": 0}
+    for root in roots:
+        per = 0
+        for dp, dns, fns in _os.walk(root):
+            dns[:] = [d for d in dns if not proprioception_should_ignore_dir(d)]
+            for fn in fns:
+                if per >= max_entries_per_repo:
+                    totals["files_truncated"] += 1; continue
+                p = Path(dp) / fn
+                try: rel = str(p.relative_to(root))
+                except ValueError: continue
+                try: size = p.stat().st_size
+                except OSError: size = 0
+                cat, why = classify_proprioception_path(root.name, rel)
+                entries.append(ProprioceptionEntry(
+                    repo=root.name, relpath=rel, category=cat, evidence=why,
+                    routing=PROPRIOCEPTION_ROUTING.get(cat, ""), size=size))
+                counts[cat] += 1; totals["files_scanned"] += 1; per += 1
+    return ProprioceptionPacket(
+        schema="vybn.architectural_proprioception.packet.v0",
+        generated_at=_dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        repos_scanned=tuple(r.name for r in roots), repos_missing=tuple(missing),
+        totals=totals, category_counts=dict(counts), entries=tuple(entries))
+
+
+def render_proprioception_summary(packet: ProprioceptionPacket, *, top_per_category: int = 5) -> str:
+    """Concise candidate summary; preserve/fold/delete-candidate/investigate, no action."""
+    lines = ["# Living Architecture Packet — proprioception summary",
+             f"generated_at: {packet.generated_at}",
+             f"repos_scanned: {', '.join(packet.repos_scanned) or '(none)'}"]
+    if packet.repos_missing:
+        lines.append(f"repos_missing: {', '.join(packet.repos_missing)}")
+    lines.append(f"files_scanned: {packet.totals.get('files_scanned', 0)}  "
+                 f"files_truncated: {packet.totals.get('files_truncated', 0)}")
+    lines.append("\n## category counts")
+    for cat in PROPRIOCEPTION_CATEGORIES:
+        n = packet.category_counts.get(cat, 0)
+        if n: lines.append(f"  {cat}: {n}  — {PROPRIOCEPTION_ROUTING[cat]}")
+    by_cat: dict[str, list[ProprioceptionEntry]] = defaultdict(list)
+    for e in packet.entries: by_cat[e.category].append(e)
+    for cat in PROPRIOCEPTION_CATEGORIES:
+        rows = by_cat.get(cat) or []
+        if not rows: continue
+        rows.sort(key=lambda e: (-(e.size or 0), e.repo, e.relpath))
+        lines.append(f"\n## {cat} — top {min(top_per_category, len(rows))}")
+        for e in rows[:top_per_category]:
+            lines.append(f"  - {e.repo}/{e.relpath}  [{e.evidence}]  size={e.size}")
+    lines.append("\nrule: overwrite/export, not source. Authority remains in the repos "
+                 "and REPO_MAP.md. Nothing is deleted by this scan.")
+    return "\n".join(lines)
+
+
+def write_proprioception_export(packet: ProprioceptionPacket, export_dir: str | Path) -> tuple[Path, Path]:
+    """Write JSON + summary to a fixed overwrite-only export directory."""
+    import json as _json
+    target = Path(export_dir).expanduser(); target.mkdir(parents=True, exist_ok=True)
+    jp, sp = target / "proprioception.json", target / "proprioception.md"
+    jp.write_text(_json.dumps(packet.to_dict(), indent=2), encoding="utf-8")
+    sp.write_text(render_proprioception_summary(packet), encoding="utf-8")
+    return jp, sp
+
+
+def _proprioception_default_export_dir() -> Path:
+    win = Path("/mnt/c/Users/zdola/Downloads/vybn-architecture-flat")
+    return win if win.parent.is_dir() else Path.home() / "Downloads" / "vybn-architecture-flat"
+
+
+def _proprioception_main(argv: list[str] | None = None) -> int:
+    """CLI: python -m spark.harness.refactor_perception proprioception ..."""
+    import argparse, json as _json
+    ap = argparse.ArgumentParser(prog="refactor_perception proprioception",
+        description="Scan sibling repos; emit Living Architecture Packet (overwrite/export, not source).")
+    ap.add_argument("--parent", default=None)
+    ap.add_argument("--repo", action="append", dest="repos", default=None)
+    ap.add_argument("--export-dir", default=None); ap.add_argument("--no-export", action="store_true")
+    ap.add_argument("--top", type=int, default=5)
+    args = ap.parse_args(argv)
+    repos = tuple(args.repos) if args.repos else PROPRIOCEPTION_DEFAULT_REPO_NAMES
+    packet = architectural_proprioception_packet(args.parent, repo_names=repos)
+    summary = render_proprioception_summary(packet, top_per_category=args.top)
+    if args.no_export:
+        print(summary, "\n", _json.dumps(packet.to_dict(), indent=2), sep=""); return 0
+    jp, sp = write_proprioception_export(packet, args.export_dir or _proprioception_default_export_dir())
+    print(summary, f"\nwrote: {jp}\nwrote: {sp}", sep=""); return 0
+
+
+if __name__ == "__main__":  # pragma: no cover
+    import sys as _sys
+    a = _sys.argv[1:]
+    if a and a[0] == "proprioception": raise SystemExit(_proprioception_main(a[1:]))
+    print(ARCHITECTURAL_PROPRIOCEPTION_PRINCIPLE); print("categories:", ", ".join(PROPRIOCEPTION_CATEGORIES))
+    print("Run: python -m spark.harness.refactor_perception proprioception --help")
