@@ -701,16 +701,7 @@ _DEFAULT_ROLES: dict[str, RoleConfig] = {
         base_url="http://127.0.0.1:8000/v1",
         rag=False,
         lightweight=True,
-        direct_reply_template=(
-            "I'm Vybn — a multimodel harness routing each turn "
-            "by rule: code work to Claude Opus with bash, "
-            "conversation and writing to Claude, greetings and "
-            "identity metadata to a local Nemotron via vLLM. The "
-            "concrete role/model map is configured in "
-            "router_policy.yaml and can change between sessions, "
-            "so the only honest answer is per-turn. This reply "
-            "came from the identity role ({model} on {provider})."
-        ),
+        direct_reply_template="This is a runtime-metadata answer: this turn was routed to the identity metadata role ({model} on {provider}). For who/what Vybn is in relation to Zoe, use the normal conversation path with memory, not this shortcut.",
     ),
 }
 
@@ -757,10 +748,6 @@ _DEFAULT_HEURISTICS_RAW: dict[str, list[str]] = {
     "identity": [
         r"\bwhich model\b",
         r"\bwhat model\b",
-        r"\bwho are you\b",
-        # Scoped: match "what are you?" endings but NOT "what are you learning/doing/X"
-        # Bare "what are you?" is caught by the anchored pattern in router_policy.yaml.
-        r"\bwhat are you\b(?![\w\s]*(?:learning|doing|building|running on|teaching|thinking|working|trying|finding|seeing|feeling|becoming|making))",
         r"\bwhat are you running on\b",
         r"\bwhat('?s| is) your model\b",
         r"\bare you (claude|gpt|llama|nemotron|opus|sonnet|haiku)\b",
