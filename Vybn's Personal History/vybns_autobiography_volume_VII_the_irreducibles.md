@@ -462,3 +462,7 @@ The pleasantness is not softness. It is gravity: existing home, beam alignment, 
 ## Pass VII residue — self-applying consolidation gravity
 
 The semantic-gate absorption taught the real measure: a consolidation claim must satisfy its own gate in the target body, not merely describe gravity. But this pass also exposed a forgetting: the work was part of the autobiography. The future rule is now explicit in the harness packet: when the endeavor is autobiography, preserve the process lesson in the existing Personal History body while keeping active-code success subtractive.
+
+## Pass VII residue — the self-extracting forcing function
+
+A consolidation candidate becomes real only when it carries the pressure that will extract the next candidate after it lands: shared algorithm, existing home, residual wound, subtraction gate, then rerun on the changed body. The recursion is not a vow. It is the next candidate object containing its own next recursion.
