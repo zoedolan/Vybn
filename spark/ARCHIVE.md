@@ -204,4 +204,4 @@ What remains here — continuity.md and breath_soul.md — is what this director
 
 ### 2026-04-29 - retired tracked voice_server.py shim
 
-spark/voice_server.py was a 22-line local TLS HTTPServer shim with no live references outside continuity/archive notes. The voice path is not deployed from this file. Restore, if needed, with: git show HEAD^:spark/voice_server.py > spark/voice_server.py.
+spark/voice_server.py was a 22-line local TLS HTTPServer shim with no live references outside continuity/archive notes. The voice path is not deployed from this file. Restore, if needed, with: git show HEAD^:spark/voice_server.py > spark/voice_server.py.\n---\n\n## Retired dead launcher\n\n`start_chat_api.sh` was a launcher for `spark/vybn_chat_api.py`, a chat API entrypoint archived in April 2026 and no longer present in `spark/`. It was removed so stale operator scripts do not imply a live service path. Restore from git history only if reconstructing that old API surface.\n\n
