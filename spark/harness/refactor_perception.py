@@ -1380,7 +1380,7 @@ def interfile_algorithmic_compression_candidates(
                     "map_imports_routes_and_public_urls",
                     "prove_shared_algorithm_not_surface_word_overlap",
                     "choose_existing_home_before_new_file",
-                    "run_targeted_tests_or_explicit_refusal",
+                    "run_targeted_tests_then_rerun_candidate_extraction_or_refuse",
                 ),
             )
         )
