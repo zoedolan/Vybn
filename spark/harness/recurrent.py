@@ -856,9 +856,7 @@ def run_recurrent_loop(
         trace=trace,
     )
 
-# ---------------------------------------------------------------------------
-# Recurrent probe CLI — absorbed from spark/harness_recurrent_probe.py
-# ---------------------------------------------------------------------------
+# Recurrent probe CLI.
 
 def _probe_load_policy(policy_path: str | None = None):
     try:

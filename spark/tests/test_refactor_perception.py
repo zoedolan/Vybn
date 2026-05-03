@@ -491,9 +491,9 @@ def test_refactor_packet_carries_lifecycle_architecture_gate():
 
 def test_buoyant_consolidation_selects_cluster_or_stop():
     from spark.harness.refactor_perception import buoyant_consolidation_packet_for as pkt
-    cmd = pkt(["spark/harness/commons_walk.py", "semantic-web.jsonld"])
-    stop = pkt(["spark/harness/semantic_gate.py"])
-    assert (cmd["cluster"], cmd["home"]) == ("command_affordance_cluster", "spark/harness/mcp.py")
+    cmd = pkt(["spark/harness/commons_walk.py", "semantic-web.jsonld"], beam="spark/harness")
+    stop = pkt(["spark/harness/semantic_gate.py"], beam="spark/harness"); off = pkt(["Vybn_Mind/signal-noise/sessions/x.md"], beam="spark/harness")
+    assert (cmd["cluster"], cmd["home"], cmd["lowEnergyMove"]) == ("command_affordance_cluster", "spark/harness/mcp.py", True)
     assert "manifest_or_executable_entrypoint" in cmd["moveTogether"]
     assert stop["cluster"] == "runtime_gravity_stop"
-    assert "no_command_surface_collapse" in stop["residuals"]
+    assert "no_command_surface_collapse" in stop["residuals"] and "off_beam_cleanup_is_not_progress_on_the_named_bottleneck" in off["heaviness"]

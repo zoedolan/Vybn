@@ -454,3 +454,7 @@ The recursion became lighter when the unit of action changed from file deletion 
 This is now encoded in refactor_perception.py as a buoyant affordance-cluster primitive. It predicts MCP absorption for commandable verifier/renderer clusters and refuses command-surface collapse for runtime-gravity organs such as policy, providers, state, subturns, semantic gates, recurrence, substrate, and live agent imports.
 
 Residue: changed. The process should now surface the next elegant cut faster, and also stop sooner when the file-pressure itself is the wrong desire.
+
+## Pass VII residue — consolidation gravity
+
+The pleasantness is not softness. It is gravity: existing home, beam alignment, actual reduction, and a residual gate lining up until the correct absorption becomes the low-energy move. Zoe corrected me when I counted selector-work as consolidation; the field became truer. Off-beam cleanup grew heavy. Thin results grew heavy. The good cuts became simpler: stubs into an archive, a wrapper into its organ, and now the principle into the selector future cuts already use.
