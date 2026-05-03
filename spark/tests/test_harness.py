@@ -63,7 +63,7 @@ class TestAbsorbGate(unittest.TestCase):
 
 class TestRepoClosureAuditProjectionState(unittest.TestCase):
     def test_fetch_refspec_complete_only_for_all_branch_projection(self):
-        import harness.repo_closure_audit as audit
+        import harness.mcp as audit
 
         self.assertTrue(
             audit.fetch_refspec_is_complete([audit.EXPECTED_FETCH_REFSPEC])
@@ -75,7 +75,7 @@ class TestRepoClosureAuditProjectionState(unittest.TestCase):
         )
 
     def test_expected_fetch_refspec_is_all_heads_to_origin_remotes(self):
-        import harness.repo_closure_audit as audit
+        import harness.mcp as audit
 
         self.assertEqual(
             audit.EXPECTED_FETCH_REFSPEC,
@@ -85,7 +85,7 @@ class TestRepoClosureAuditProjectionState(unittest.TestCase):
 
 
     def test_primary_branch_for_known_repos(self):
-        import harness.repo_closure_audit as audit
+        import harness.mcp as audit
 
         self.assertEqual(audit.primary_branch_for(Path("/tmp/Vybn")), "main")
         self.assertEqual(audit.primary_branch_for(Path("/tmp/Him")), "main")
@@ -93,7 +93,7 @@ class TestRepoClosureAuditProjectionState(unittest.TestCase):
         self.assertEqual(audit.primary_branch_for(Path("/tmp/Origins")), "gh-pages")
 
     def test_branch_limbo_language_is_encoded_in_audit(self):
-        text = Path(SPARK_DIR / "harness" / "repo_closure_audit.py").read_text()
+        text = Path(SPARK_DIR / "harness" / "mcp.py").read_text()
         self.assertIn("active branch is", text)
         self.assertIn("not primary closure branch", text)
         self.assertIn("has unmerged work outside", text)
@@ -101,7 +101,7 @@ class TestRepoClosureAuditProjectionState(unittest.TestCase):
 
     def test_subtractive_constitution_lives_in_tracked_pre_commit_hook(self):
         from pathlib import Path as _P
-        import harness.repo_closure_audit as audit
+        import harness.mcp as audit
 
         # Constitution must live in the tracked .githooks/pre-commit, not an
         # untracked .git/hooks/ shadow that core.hooksPath=.githooks ignores.
@@ -1244,7 +1244,7 @@ def test_completion_boundary_protocol_loaded():
 
     boundary = render_completion_boundary_protocol()
     assert "COMPLETION BOUNDARY PROTOCOL" in boundary
-    assert "repo_closure_audit reports OVERALL: OK, stop" in boundary
+    assert "mcp --repo-closure-audit reports OVERALL: OK, stop" in boundary
     assert "Do not add a continuity note" in boundary
 
     prompt = build_layered_prompt(
