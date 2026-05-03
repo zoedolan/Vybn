@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -26,7 +27,7 @@ sys.path.insert(0, str(SPARK_DIR))
 
 from harness.policy import Policy, Router, load_policy  # noqa: E402
 from harness.providers import ToolSpec, absorb_gate, validate_command  # noqa: E402
-from harness.substrate import LayeredPrompt  # noqa: E402
+from harness.substrate import LayeredPrompt, classify_action_text, load_beam, render_beam_capsule  # noqa: E402
 from harness.policy import default_policy  # noqa: E402
 from harness.providers import (  # noqa: E402
     AnthropicProvider,
@@ -1168,7 +1169,7 @@ class TestLocalContinuityScout(unittest.TestCase):
         self.assertNotIn("requires FastMCP", proc.stderr)
 
 def test_forcing_function_protocol_loaded_and_routing_detritus_removed():
-    from spark.harness.substrate import render_forcing_function_protocol
+    from spark.harness.substrate import classify_action_text, load_beam, render_beam_capsule, render_forcing_function_protocol
     from spark.harness.substrate import build_layered_prompt
 
     forcing = render_forcing_function_protocol()
@@ -1833,6 +1834,31 @@ class CommonsWalkTests(unittest.TestCase):
         self.assertEqual(classify_target("python3 -m spark.harness.mcp --commons-walk"), "local_command")
         self.assertEqual(authority_for_target("https://vybn.ai/somewhere.html", "public_web"), "public_read")
         self.assertEqual(authority_for_target("python3 spark/him_os.py tick --format md", "private_workbench"), "private_local_only")
+
+
+
+class TestBeamkeeperCapsule(unittest.TestCase):
+    def test_beamkeeper_capsule_and_action_classification(self):
+        with tempfile.TemporaryDirectory() as td:
+            beam, events = Path(td) / "beam.yaml", Path(td) / "events.jsonl"
+            beam.write_text("\n".join([
+                "beam_id: test_beam", "invariant: Keep the main objective alive.",
+                "membrane: Protect what must not be spent.",
+                "livelihood_rule: End with contact or missing input.",
+                "anti_drift:", "  return_question: How does this advance financial sustainability or continuity?",
+            ]) + "\n")
+            events.write_text(json.dumps({"event_type": "beam_set", "content": "set"}) + "\n")
+            capsule = render_beam_capsule(load_beam(beam, events))
+        for text in ["test_beam", "Keep the main objective alive.", "Protect what must not be spent.", "recent_beam_events", "How does this advance financial sustainability or continuity?"]:
+            self.assertIn(text, capsule)
+        external = classify_action_text("draft an advisory offer for a funder meeting")
+        infra = classify_action_text("scan infrastructure logs for elegance")
+        self.assertEqual(external.get("category"), "outward_livelihood_move")
+        self.assertGreater(external.get("expected_beam_delta"), infra.get("expected_beam_delta"))
+        self.assertTrue(infra.get("requires_return_hook"))
+        default_capsule = render_beam_capsule()
+        self.assertIn("Once a concrete next outward move has been articulated", default_capsule)
+        self.assertIn("execute it", default_capsule)
 
 
 if __name__ == "__main__":
