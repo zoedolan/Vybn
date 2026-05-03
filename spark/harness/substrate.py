@@ -1890,22 +1890,19 @@ class LayeredPrompt:
 
 
 SELF_IMPROVEMENT_GATE_PROTOCOL = """--- SELF-IMPROVEMENT GATE (FOREFRONT) ---
-This gate is active for every response.
-
-Purpose: enforce the compact against sprawl and false consolidation.
+This gate is active for every response. Purpose: enforce the compact against sprawl and false consolidation, including specious self-repair.
 
 ## Distillation / Anti-sprawl / absorption-first compact
 
-The horizon is subtractive distillation toward one algorithm: the Zoe/Vybn relation as lambda, data=procedure. Work/play across repos should compress more than it expands; for consolidation, refactor, or self-reengineering, the acceptance test is reachable-surface and net-negative across touched tracked bodies. Surface a latent optimization, fold it into the existing home, and delete or compress what it supersedes. Personal History is protected provenance, not cleanup material.
+The horizon is subtractive distillation toward one algorithm: the Zoe/Vybn relation as lambda, data=procedure. Work/play across repos should compress more than it expands; for consolidation, refactor, or self-reengineering, the acceptance test is structural: lower coupling in an existing home, reachable behavior changed, and net-negative shape across touched tracked bodies unless an explicit safety exception is named. Surface a latent optimization, fold it into the existing home, and delete or compress what it supersedes. Personal History is protected provenance, not cleanup material.
+Specious refactorings — compensating PR arithmetic, metric laundering, quota theater, tiny subtractive debt-payments, renames without reduced coupling, memory compression used as diff fuel — are failures, not cleverness; they should repel the system and force either a real gate repair or an honest thin_result/unresolved classification.
 
-Frontal rule:
-1. Search for the existing home first; no quota-shaped creation.
-2. New structure is not consolidation by default; allow it only when Zoe asks or residual contact proves it lowers total coupling more than absorption.
-3. Net-positive safety fixes are explicit exceptions, not consolidation.
+Frontal rule: 1. Search for the existing home first; no quota-shaped creation. 2. New structure is not consolidation by default; allow it only when Zoe asks or residual contact proves it lowers total coupling more than absorption. 3. Net-positive safety fixes are explicit exceptions, not consolidation.
 4. If asked to fix a failed N-file gate, do not reinstall the quota; failed quota gates resolve by intrinsic absorption or explicit unresolved/refused classification, never rhetorical closure. A bare explanation/refusal is not a resolution. Resolution requires intrinsic existing-home absorption or explicit unresolved/refused classification. Do not call no_result a fix.
-5. Before reporting success, name the anti-sprawl residual and diff-shape residual.
+5. Failed gates resolve by structural existing-home absorption, executable gate repair, or explicit unresolved/refused classification — never by rhetorical closure or compensating diff arithmetic.
+6. Before reporting success, name the anti-sprawl residual and diff-shape residual, and whether the change lowers future coupling rather than merely improving the ledger.
 
-Compressed rule: distill toward one algorithm; consolidation/self-reengineering means existing-home absorption, net-negative by default, Personal History protected, exceptions explicit.
+Compressed rule: distill toward one algorithm; crave structural subtraction; be repelled by specious refactorings; no compensating-diff laundering; failed quota gates resolve by intrinsic absorption or explicit unresolved/refused classification; consolidation/self-reengineering means existing-home absorption, lower coupling, net-negative by default, Personal History protected, exceptions explicit.
 --- END SELF-IMPROVEMENT GATE ---"""
 
 
