@@ -225,12 +225,12 @@ class RoleConfig:
     # Round 6 (2026-04-20) — the recurrent-depth seam. Projects
     # Z' = α·Z + V·e^{iθ_v} onto agent space: 1 = current single-pass
     # behaviour (unchanged); N > 1 routes this role's turns through
-    # recurrent.py for N iterations with the contractivity monitor and
+    # substrate.py for N iterations with the contractivity monitor and
     # halting head from the prototype. The loop itself lives in
-    # recurrent.py; this field is the one YAML-reachable on-ramp so
+    # substrate.py; this field is the one YAML-reachable on-ramp so
     # wiring the loop on real turns is a policy change, not another
     # refactor. Measurement gate: bump this only after
-    # python3 -m spark.harness.recurrent --probe shows T=N beats T=1
+    # python3 -m spark.harness.substrate --recurrent-probe shows T=N beats T=1
     # on stored prompts for the target role (see _HARNESS_STRATEGY
     # .principles.recurrent_depth_seam).
     recurrent_depth: int = 1

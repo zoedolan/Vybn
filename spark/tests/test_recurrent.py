@@ -1,4 +1,4 @@
-"""Unit tests for harness.recurrent — the looped-orchestrate prototype.
+"""Unit tests for harness.substrate — the looped-orchestrate prototype.
 
 Runs with no network. Providers are stubbed; the tests exercise:
 
@@ -10,7 +10,7 @@ Runs with no network. Providers are stubbed; the tests exercise:
   - run_recurrent_loop halts on converged / contractivity / max
   - T=1 runs exactly one specialist + one reducer + one coda
 
-Run: python3 spark/tests/test_recurrent.py
+Run: python3 spark/tests/test_substrate.py
 """
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ from harness.providers import (  # noqa: E402
     ProviderRegistry,
     StreamHandle,
 )
-from harness.recurrent import (  # noqa: E402
+from harness.substrate import (  # noqa: E402
     Hypothesis,
     Latent,
     LoopResult,
@@ -494,11 +494,11 @@ if __name__ == "__main__":
 
 class TestRecurrentProbeCli(unittest.TestCase):
     def test_recurrent_probe_main_help_is_local(self):
-        from harness.recurrent import recurrent_probe_main
+        from harness.substrate import recurrent_probe_main
         self.assertEqual(recurrent_probe_main([]), 0)
 
     def test_recurrent_probe_one_writes_jsonl_with_stub_provider(self):
-        from harness.recurrent import run_recurrent_probe_one
+        from harness.substrate import run_recurrent_probe_one
         provider = StubProvider(queue=[
             '{"summary":"s","hypotheses":[],"open_questions":[],"resolved":["done"],"converged":true,"rationale":"ok"}',
             "coda",

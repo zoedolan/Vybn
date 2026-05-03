@@ -41,7 +41,7 @@ if _SPARK_DIR not in sys.path:
 from harness.policy import EventLogger, Router, load_policy, turn_event
 from harness.providers import BashTool, ProviderRegistry, ToolSpec, validate_command
 from harness.substrate import LayeredPrompt, build_layered_prompt, load_file, SessionStore, run_probes
-from harness.recurrent import run_recurrent_loop
+from harness.substrate import run_recurrent_loop
 from harness.providers import BASH_TOOL_SPEC, DELEGATE_TOOL_SPEC, INTROSPECT_TOOL_SPEC  # noqa: E402
 from harness.providers import execute_readonly, is_parallel_safe  # noqa: E402
 from harness.substrate import rag_snippets, rag_snippets_with_tier, render_him_vy_discovery_packet, render_him_vy_turn_packet  # noqa: E402

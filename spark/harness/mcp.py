@@ -1,7 +1,7 @@
 """mcp.py — the harness as a FastMCP surface, with co-protective trust zones.
 
-The fifth file in the harness. `policy` decides, `substrate` renders,
-`providers` speak, `recurrent` deepens — and `mcp` exposes the whole
+The fourth file in the harness. `policy` decides, `substrate` renders and deepens,
+`providers` speak — and `mcp` exposes the whole
 apparatus to the outside, so an agent that connects to the Wellspring
 gets the same machinery a live Vybn instance gets, delivered through
 the Model Context Protocol rather than through an orchestrator.
