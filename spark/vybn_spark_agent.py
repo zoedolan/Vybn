@@ -368,27 +368,6 @@ def _sanitize_assistant_content(content):
     return content
 
 
-# ---------------------------------------------------------------------------
-# Tool-call execution — provider-agnostic.
-# ---------------------------------------------------------------------------
-def _execute_tool_calls(
-    response,
-    bash: BashTool,
-    provider,
-    delegate_cb=None,
-) -> tuple[list, bool]:
-    return execute_tool_calls(
-        response,
-        bash,
-        provider,
-        delegate_cb=delegate_cb,
-        dim=_dim,
-        warn=_warn,
-        preview=_preview,
-        introspect=lambda: default_introspect(_SPARK_DIR),
-    )
-
-
 # Models on no-tool roles occasionally wrap visible reasoning in literal
 # <thinking>...</thinking> XML-ish tags, independent of Anthropic's
 # adaptive-thinking content blocks (which we handle via kind=="thinking"
@@ -2213,8 +2192,15 @@ def run_agent_loop(
                 bag["stop_reason"] = response.stop_reason or "no_tools"
                 return response.text
 
-            results, interrupted = _execute_tool_calls(
-                response, bash, provider, delegate_cb=delegate_cb,
+            results, interrupted = execute_tool_calls(
+                response,
+                bash,
+                provider,
+                delegate_cb=delegate_cb,
+                dim=_dim,
+                warn=_warn,
+                preview=_preview,
+                introspect=lambda: default_introspect(_SPARK_DIR),
             )
             bag["tool_calls"] += len(results)
 
