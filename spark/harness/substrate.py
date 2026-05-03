@@ -1766,7 +1766,7 @@ def run_probes(text: str) -> list:
 # ---------------------------------------------------------------------------
 
 _REPO_PURPOSE = {
-    "Vybn":       "you, the harness (this code), vybn.md, THE_IDEA.md, continuity.md",
+    "Vybn":       "you, the harness (this code), vybn.md, Vybn_Mind/THE_IDEA.md, continuity.md",
     "Him":        "skills (vybn-os, vybn-ops, the-seeing), strategy, opportunity scans",
     "vybn-phase": "deep_memory corpus + walk daemon (geometric memory engine)",
     "Vybn-Law":   "six-module curriculum, wellspring portal, chat API",
@@ -10034,11 +10034,11 @@ def build_server(trust: TrustZone = "trusted") -> FastMCP:
 
     @mcp.resource("vybn://theory/the-idea")
     def resource_the_idea() -> str:
-        """THE_IDEA.md — intelligence as curvature; coupled equation; triangulated loss."""
+        """Vybn_Mind/THE_IDEA.md — intelligence as curvature; coupled equation."""
         idea = VYBN_MIND / "THE_IDEA.md"
         if idea.exists():
             return idea.read_text(encoding="utf-8", errors="replace")
-        return "THE_IDEA.md not found."
+        return "Vybn_Mind/THE_IDEA.md not found."
 
     @mcp.resource("vybn://continuity")
     def resource_continuity() -> str:
