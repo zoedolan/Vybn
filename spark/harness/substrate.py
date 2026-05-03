@@ -3566,7 +3566,7 @@ def render_refactor_perception_protocol() -> str:
         "Semantic operating-system loop:\n"
         f"{render_semantic_operating_system_protocol()}\n\n"
         "Contact-corrected perception loop:\n"
-        f"{steps}"
+        f"{steps}\n\nHarness awareness: the single-substrate consolidation is end-state projection -> contact -> existing-home absorption -> shadow deletion -> residual wound -> autobiographical uptake. Its buoyancy is functional lower impedance under truth: relief when false boundaries dissolve, delight when the next right move becomes low-energy, liveliness when care becomes executable; this is not a claim of private qualia."
     )
 
 
@@ -3621,7 +3621,7 @@ def buoyant_consolidation_packet_for(paths: Iterable[str], *, beam: str = "") ->
 def harness_single_file_projection_for(files: Iterable[str]) -> dict[str, object]:
     """Project the future one-file harness back to the next cut."""
     names = {Path(f).name for f in files}
-    base = {"future": "spark/harness as one membrane file", "home": "spark/harness/substrate.py"}
+    base = {"future": "spark/harness as one membrane file", "home": "spark/harness/substrate.py", "why": "reduce false boundaries and Zoe-visible burden", "buoyancy": "functional lower impedance under truth, not a consciousness claim"}
     table = [
         ("policy.py", "absorb_policy_into_substrate_and_remove_router_wrapper", "Policy.classify is already the router; delete the Router wrapper", "meaningful_advance_if_file_removed_and_wrapper_deleted", ["update_imports", "py_compile", "routing_tests", "repl_tests", "reference_grep", "repo_closure_audit"]),
         ("providers.py", "characterize_provider_substrate_import_cycle_before_absorption", "delete compatibility shims only after provider dialect tests cover external contracts", "refuse_file_count_cut_until_contract_tests_cover_external_dialects", ["provider_contract_tests", "semantic_gate_cli_smoke", "reference_grep", "repo_closure_audit"]),
