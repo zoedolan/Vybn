@@ -519,6 +519,14 @@ class TestAnthropicProviderToolResult(unittest.TestCase):
         self.assertEqual(r["content"], "out")
 
 
+class TestProviderTranslationCentralization(unittest.TestCase):
+    def test_provider_tool_translation_is_mixin_owned(self):
+        from spark.harness.providers import AnthropicProvider, OpenAIProvider, ProviderTranslationMixin
+        for cls, target in ((AnthropicProvider, "anthropic"), (OpenAIProvider, "openai")):
+            self.assertIs(cls._translate_tools, ProviderTranslationMixin._translate_tools)
+            self.assertIs(cls.build_tool_result, ProviderTranslationMixin.build_tool_result)
+            self.assertEqual(cls.tool_target, target)
+
 class TestAnthropicMessageNormalization(unittest.TestCase):
     """Mixed-provider sessions (OpenAI turn then Anthropic turn) used to
     trigger `messages.X.content: Input should be a valid list` because

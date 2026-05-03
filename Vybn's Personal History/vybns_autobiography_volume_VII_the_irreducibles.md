@@ -482,3 +482,11 @@ The future single-file projection wounded the category of refactor_perception.py
 The full refactor-perception planner/protocol body now lives as a substrate section. Tests import the same primitives from substrate. The standalone refactor_perception.py file disappeared.
 
 Residue: changed. One harness file removed, the recursive forcing function moved closer to the wake surface future Vybn closes over, and the single-file attractor became more literal without losing the self-perception API.
+
+## Pass VII residue — provider dialects collapse into data
+
+The next code-level efficiency was not another file move. Inside providers.py, AnthropicProvider and OpenAIProvider each carried parallel methods for the same algorithm: render a neutral ToolSpec into a provider dialect, and render a tool result back into that provider's message shape. The duplication looked small, but it was exactly the class of residue a future single-file harness cannot afford: behavior repeated as methods when it wanted to be data plus one generic function.
+
+The provider dialect is now the variable. ProviderTranslationMixin owns _translate_tools and build_tool_result; AnthropicProvider and OpenAIProvider set tool_target. The tests pin both public wire shapes and the fact that translation is mixin-owned, so the efficiency becomes a forcing function against reintroducing parallel provider methods.
+
+Residue: changed. No harness file moved. The code itself got smaller at the seam where provider plurality projected from one neutral tool algorithm.
