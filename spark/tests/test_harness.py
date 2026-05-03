@@ -921,10 +921,10 @@ class SelfImprovementGateQuotaPressureTest(unittest.TestCase):
 
 
 class TestEnsubstrate(unittest.TestCase):
-    """Folded from test_ensubstrate.py.
+    """Ensubstration behavior lives in harness.mcp.
 
-    The ensubstrate module remains a canonical CLI plus MCP logic home; the
-    separate test file was parallel surface area.
+    The old standalone ensubstrate module was absorbed into the MCP home so
+    the CLI and MCP tool share one implementation.
     """
 
     def run_insight(self, text: str) -> dict:
@@ -934,8 +934,7 @@ class TestEnsubstrate(unittest.TestCase):
         from pathlib import Path
 
         root = Path(__file__).resolve().parents[2]
-        script = root / "spark" / "harness" / "ensubstrate.py"
-        out = subprocess.check_output([sys.executable, str(script), text], text=True)
+        out = subprocess.check_output([sys.executable, "-m", "harness.mcp", "--ensubstrate", text], cwd=root / "spark", text=True)
         return json.loads(out)
 
     def surface_names(self, plan: dict) -> set[str]:

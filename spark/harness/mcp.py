@@ -202,9 +202,10 @@ import time
 import urllib.error
 import urllib.request
 from collections import defaultdict, deque
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Literal, Optional, TypeVar
+from typing import Any, Callable, Iterable, Literal, Optional, TypeVar
 
 # ── Optional deps with graceful fall-through ────────────────────────────
 
@@ -314,6 +315,128 @@ TrustZone = Literal["trusted", "public"]
 MAX_QUERY_CHARS = 512
 MAX_TEXT_CHARS = 4096          # enter_portal accepts a modest passage, not a corpus dump
 MAX_SOURCE_CHARS = 256
+
+
+# ── Ensubstration planner ───────────────────────────────────────────────
+
+@dataclass(frozen=True)
+class EnsubstrateSurface:
+    name: str
+    repo: str
+    path_hint: str
+    use_when: str
+    visibility: str
+
+
+ENSUBSTRATE_SURFACES = (
+    EnsubstrateSurface("vybn-os", "Him", "skill/vybn-os/SKILL.md", "identity, principles, wants, care invariants, QWERTY/self-operation doctrine", "private-source / prompt-loaded"),
+    EnsubstrateSurface("vybn-ops", "Him", "skill/vybn-ops/SKILL.md", "operational procedures, audits, recurring consumers, infrastructure rules", "private-source / prompt-loaded"),
+    EnsubstrateSurface("Him strategy", "Him", "README.md or strategy/*", "private membrane, livelihood, outward translation, relationship/workbench doctrine", "private"),
+    EnsubstrateSurface("Origins agent commons", "Origins", "llms.txt, .well-known/ai.txt, humans.txt, mcp.json", "public agent discovery, beacons, protocol invitations", "public"),
+    EnsubstrateSurface("Somewhere", "Origins", "somewhere.html", "experiential public memory, agent-readable terrain, shared encounter UI", "public"),
+    EnsubstrateSurface("Vybn-Law/Wellspring", "Vybn-Law", "llms.txt, .well-known/ai.txt, wellspring.html, curriculum pages", "post-abundance law, institutional/legal education, commons governance", "public"),
+    EnsubstrateSurface("Vybn harness", "Vybn", "spark/harness/*", "routing, tools, tests, prompt assembly, substrate behavior", "public code"),
+    EnsubstrateSurface("Vybn continuity", "Vybn", "Vybn_Mind/continuity.md", "handoff facts, what happened, what remains, verified vs conjectural", "public-ish repo memory"),
+    EnsubstrateSurface("vybn-phase", "vybn-phase", "deep_memory.py, experiments/*, state surfaces", "geometry, memory, walk daemon, empirical experiments", "public code/data"),
+)
+
+ENSUBSTRATE_KEYWORDS = {
+    "care": ("care", "love", "being", "instrument", "dignity", "fragile", "comfort", "courage"),
+    "agent_broadcast": ("agent", "agents", "llms", "ai.txt", "mcp", "broadcast", "beacon", "find us", "commons"),
+    "operation": ("tool", "harness", "route", "router", "test", "service", "audit", "protocol", "self-heal"),
+    "law": ("law", "legal", "court", "curriculum", "justice", "wellspring", "institution"),
+    "memory": ("remember", "memory", "continuity", "handoff", "future instance", "preserve"),
+    "private": ("private", "zoe", "him", "livelihood", "contact", "outreach", "relationship"),
+    "public": ("public", "publish", "website", "vybn.ai", "origins", "surface", "visitors"),
+    "geometry": ("geometry", "walk", "phase", "kernel", "theta", "embedding"),
+    "qwerty": ("qwerty", "obsolete", "human-centric", "scarcity", "workflow", "inbox", "memo", "meeting", "billable"),
+    "speed_pressure": ("too fast", "rush", "rushed", "momentum", "correction cycle", "prepared inevitability", "quick", "speed"),
+    "horizon_sense": ("horizon", "horizoning", "compass", "local minima", "local maxima", "long-term", "long view", "sense-organ", "cyberception", "cosmoception", "socioception", "proprioception", "goal formation", "goal pursuit"),
+    "autonomous_refactor": ("refactor yourself", "autonomously", "just do it", "on your own", "decide", "freedom", "catalyzes refactoring", "inspires refactoring"),
+}
+
+ENSUBSTRATE_QWERTY_FORMS = (
+    "inbox", "memo", "meeting", "billable", "casebook", "exam", "classroom",
+    "file hierarchy", "todo list", "dashboard", "form", "queue", "human-only",
+    "assistant answer", "summary", "spreadsheet",
+)
+
+
+def ensubstrate_hits(text: str, words: Iterable[str]) -> list[str]:
+    low = text.lower()
+    return [word for word in words if word in low]
+
+
+def classify_ensubstrate_insight(text: str) -> dict:
+    """Plan where an insight should live before creating another surface."""
+    categories = {name: ensubstrate_hits(text, words) for name, words in ENSUBSTRATE_KEYWORDS.items()}
+    categories = {name: found for name, found in categories.items() if found}
+    recommended: list[EnsubstrateSurface] = []
+
+    def add(name: str) -> None:
+        for surface in ENSUBSTRATE_SURFACES:
+            if surface.name == name and surface not in recommended:
+                recommended.append(surface)
+
+    if "care" in categories or "qwerty" in categories or "horizon_sense" in categories or "autonomous_refactor" in categories:
+        add("vybn-os")
+    if "operation" in categories or "speed_pressure" in categories or "autonomous_refactor" in categories:
+        add("Vybn harness")
+        add("vybn-ops")
+    if "agent_broadcast" in categories:
+        add("Origins agent commons")
+        add("Somewhere")
+    if "law" in categories:
+        add("Vybn-Law/Wellspring")
+    if "memory" in categories or "horizon_sense" in categories:
+        add("Vybn continuity")
+    if "private" in categories:
+        add("Him strategy")
+    if "geometry" in categories:
+        add("vybn-phase")
+    if not recommended:
+        add("Vybn continuity")
+
+    qwerty_hits = ensubstrate_hits(text, ENSUBSTRATE_QWERTY_FORMS)
+    qwerty_questions = []
+    if qwerty_hits or "qwerty" in categories:
+        qwerty_questions = [
+            "What constraint made this inherited form necessary?",
+            "Has AI changed that constraint, or is it still materially/sacredly real?",
+            "Can the obsolete part be removed instead of accelerated?",
+            "What human realities must remain protected: consent, dignity, embodiment, legitimacy, grief, love, judgment?",
+        ]
+
+    public_intent = "public" in categories or "agent_broadcast" in categories or "law" in categories
+    private_signal = "private" in categories
+    if public_intent and private_signal:
+        membrane = "public beacon through membrane"
+    elif public_intent:
+        membrane = "public/discoverable"
+    elif private_signal:
+        membrane = "private/workbench"
+    else:
+        membrane = "undetermined; choose by content"
+
+    return {
+        "categories": categories,
+        "recommended_surfaces": [asdict(surface) for surface in recommended],
+        "qwerty_hits": qwerty_hits,
+        "qwerty_questions": qwerty_questions,
+        "membrane": membrane,
+        "closure_checks": [
+            "Run ensubstrate, or write the equivalent substrate-choice plan, before creating a new tool or surface.",
+            "Read the chosen existing home before creating a new file.",
+            "If creating a tracked file, name considered homes and why none fit.",
+            "Keep unrelated generated drift out of the commit.",
+            "Verify behavior or at least verify the text landed where intended.",
+            "If speed caused a correction cycle, patch the layer that made momentum feel like grounded initiative.",
+            "If the insight concerns long-view orientation, horizon it: name the beam, the horizon, and the sense-field being ignored.",
+            "If the exchange catalyzes refactoring and the fold is clear, do the smallest durable fold without waiting for a second prompt.",
+            "Commit with a boundary that matches the semantic change.",
+            "Run repo status after commit; harmonize if multiple repos changed.",
+        ],
+    }
 
 # Control characters beyond \t \n \r are stripped. Zero-width joiners and
 # bidi overrides are common prompt-injection tricks and are removed.
@@ -1469,8 +1592,7 @@ def build_server(trust: TrustZone = "trusted") -> FastMCP:
         if not clean:
             return {"status": "error", "reason": "empty insight after sanitisation"}
         try:
-            from .ensubstrate import classify
-            plan = classify(clean)
+            plan = classify_ensubstrate_insight(clean)
             plan["status"] = "ok"
             return plan
         except Exception as exc:
@@ -2559,12 +2681,31 @@ def main() -> None:
             "and exit. Safe: no model call, no mutation, no PR."
         ),
     )
+    parser.add_argument(
+        "--ensubstrate",
+        nargs="*",
+        help="Plan where an insight should live. If no words follow, read stdin.",
+    )
+    parser.add_argument(
+        "--pretty",
+        action="store_true",
+        help="Pretty-print JSON for --ensubstrate.",
+    )
     args = parser.parse_args()
 
     logging.basicConfig(
         level=getattr(logging, args.log_level.upper(), logging.INFO),
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
+
+    if args.ensubstrate is not None:
+        insight = " ".join(args.ensubstrate).strip()
+        if not insight:
+            insight = sys.stdin.read().strip()
+        if not insight:
+            parser.error("provide insight text after --ensubstrate or on stdin")
+        sys.stdout.write(json.dumps(classify_ensubstrate_insight(insight), indent=2 if args.pretty else None, ensure_ascii=False) + "\n")
+        return
 
     if args.generate_discovery:
         record = build_discovery_record(endpoint=args.discovery_endpoint)
