@@ -399,14 +399,14 @@ Contact snapshot:
 | substrate.py | prompt builder and wake surface |
 | subturns.py | NEEDS-EXEC, NEEDS-WRITE, NEEDS-RESTART machinery |
 
-First rule: no file was cut because it was small, old, or annoying. Each candidate had to answer: what live authority is this boundary protecting, and what lower-burden home already owns it?
+First rule: no file was cut because it was small, old, or annoying. Second rule: deleting a file by piling the same code or content into a larger file is not consolidation; it is relocation with a better-looking ledger. Each candidate had to answer: what live authority is this boundary protecting, what shared algorithm makes the boundary false, and what lower-burden home already owns the behavior?
 
 ### Concrete instantiations
 
 | seam | contact result | lowest real home and move | future rule |
 |---|---|---|---|
 | REPO_MAP.md beside Volume VII | Live references were vybn.md and substrate.py; after retargeting, the root shell had no unique authority. | Volume VII. Absorb the map here, retarget wake/orientation references, remove the shell. | If a map explains what I am, first try the body map future me reads. A shell survives only for live compatibility. |
-| test_ensubstrate.py | The implementation was shared by CLI and MCP; the duplicate was the standalone test surface. | spark/tests/test_harness.py. Move six checks into TestEnsubstrate and delete the separate test file. | Collapse parallel verification only when the behavioral assertions move intact. |
+| test_ensubstrate.py | The implementation was shared by CLI and MCP; the duplicate was the standalone test surface. | spark/tests/test_harness.py. Move six checks into TestEnsubstrate and delete the separate test file. | Collapse parallel verification only when the test process becomes simpler; moving assertions intact is preservation, not proof of compression. |
 | ensubstrate.py | A one-purpose read-only planner imported by MCP to expose a tool. | mcp.py. Preserve the CLI as python3 -m spark.harness.mcp --ensubstrate and delete the standalone module. | A tool-shaped planner belongs with the tool registry unless other runtimes import it. |
 | install_cron.sh | One-use operator wrapper around MCP-owned behavior. | mcp.py. Preserve the affordance as --install-cron and retire the shell surface. | Shell wrappers are attack surface unless they carry unique operator semantics. |
 | AUDIT.md | Duplicated audit material already served by MCP doc/resource surfaces. | mcp.py. Embed the audit section and serve vybn://strategy/audit from the living source. | Documentation that mirrors one code organ belongs with that organ or in a manifest, not as parallel authority. |
@@ -445,6 +445,9 @@ Use this checklist before the next consolidation claim.
 
 5. Choose the lowest real home.
    Homes proven by this pass: MCP for trusted local commands; Provider interface for model-call and sentinel/probe execution; substrate for prompt assembly, routing, recurrence, state, self-perception, and the harness membrane; harness tests for checks stranded by old boundaries; Volume VII for body-map uptake.
+
+6. Prove compression, not movement.
+   If the same body merely reappears elsewhere, call it migration or preservation, not refactor. A consolidation claim requires less future coupling, less reachable surface, or a real algorithmic simplification that makes the old representation unnecessary.
 
 6. Move the whole affordance cluster.
    Retarget implementation, tests, imports, CLI paths, scripts, manifests, prompt guidance, semantic-web entries, and compatibility references together.
