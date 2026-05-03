@@ -7832,6 +7832,39 @@ def protected_mutation_kind_for_sentinel(
         return "needs-exec-mutation"
     return ""
 
+# Probe-note budget. Raised from 4 KB (Round 5) to 48 KB on 2026-04-18
+# after a 326-line / ~13 KB portal diff was invisibly truncated at 4 KB
+# and the chat role loop-emitted probes because it couldn't actually see
+# what came back. 48 KB is ~12 K tokens — well under any model's turn
+# budget, large enough for real diffs, repo trees, log tails.
+_PROBE_NOTE_CAP = 48_000
+_PROBE_NOTE_HEAD = 32_000  # on overflow, first N chars verbatim
+_PROBE_NOTE_TAIL = 12_000  # ... then last M chars verbatim, elision marker between
+
+
+def fit_probe_output(out: str) -> str:
+    """Fit probe output under _PROBE_NOTE_CAP without silently hiding shape.
+
+    When under cap: verbatim. When over: head + elision marker (with the
+    exact byte count dropped) + tail. This preserves both the prefix (where
+    most diffs, logs, statuses are legible) and the suffix (where shell
+    commands often put their punchline / exit status).
+    """
+    if len(out) <= _PROBE_NOTE_CAP:
+        return out
+    head = out[:_PROBE_NOTE_HEAD]
+    tail = out[-_PROBE_NOTE_TAIL:]
+    dropped = len(out) - len(head) - len(tail)
+    return (
+        f"{head}\n"
+        f"... [elided {dropped} bytes / {out.count(chr(10))} total lines — "
+        f"probe output over {_PROBE_NOTE_CAP} byte cap; rerun with a "
+        f"narrower command or ask for a specific range] ...\n"
+        f"{tail}"
+    )
+
+
+
 def probe_envelope(
     *,
     kind: str,
