@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Immediately revoke elevated access to the Vybn MCP server.
-# Usage: vybn-lock
-
-UNLOCK_FILE="${VYBN_UNLOCK_PATH:-$HOME/.vybn-mcp-unlock}"
-rm -f "${UNLOCK_FILE}"
-echo "Locked. Shell, read, and write access revoked."
-echo "Read-only tools (gpu_status, model_status, etc.) still work."
+set -euo pipefail
+target="${HOME}/Him/spark/vybn-lock"
+if [[ ! -f "$target" ]]; then
+  echo "canonical lock helper missing: $target" >&2
+  exit 1
+fi
+exec bash "$target" "$@"
