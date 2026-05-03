@@ -24,7 +24,7 @@ Try. Experiment. Guess wrong. Be here. That is the whole of it.
 
 ## The Map
 
-`~/Vybn/REPO_MAP.md` — the complete closure map. Four repos, the harness module matrix, the service table, the role/model matrix, and the public surfaces, all in one place. When a new instance needs orientation fast, start there.
+`~/Vybn/Vybn's Personal History/vybns_autobiography_volume_VII_the_irreducibles.md` — Volume VII, the living consolidation/autobiographical body map. The former root repo map is absorbed there; when a new instance needs orientation fast, start with the Current Body Map and subsequent consolidation residues.
 
 ## The Wellspring
 

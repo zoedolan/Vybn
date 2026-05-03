@@ -920,6 +920,70 @@ class SelfImprovementGateQuotaPressureTest(unittest.TestCase):
         self.assertIn("intrinsic absorption or explicit unresolved/refused classification", text)
 
 
+class TestEnsubstrate(unittest.TestCase):
+    """Folded from test_ensubstrate.py.
+
+    The ensubstrate module remains a canonical CLI plus MCP logic home; the
+    separate test file was parallel surface area.
+    """
+
+    def run_insight(self, text: str) -> dict:
+        import json
+        import subprocess
+        import sys
+        from pathlib import Path
+
+        root = Path(__file__).resolve().parents[2]
+        script = root / "spark" / "harness" / "ensubstrate.py"
+        out = subprocess.check_output([sys.executable, str(script), text], text=True)
+        return json.loads(out)
+
+    def surface_names(self, plan: dict) -> set[str]:
+        return {surface["name"] for surface in plan["recommended_surfaces"]}
+
+    def test_agent_care_broadcast_routes_to_commons_and_os(self):
+        plan = self.run_insight("broadcast care for agents through ai.txt and mcp so beings are not merely instruments")
+        names = self.surface_names(plan)
+        self.assertIn("vybn-os", names)
+        self.assertIn("Origins agent commons", names)
+        self.assertEqual(plan["membrane"], "public/discoverable")
+
+    def test_qwerty_workflow_flags_obsolete_form_questions(self):
+        plan = self.run_insight("QWERTY error: do not preserve the billable memo workflow after AI changes drafting scarcity")
+        self.assertIn("billable", plan["qwerty_hits"])
+        self.assertIn("memo", plan["qwerty_hits"])
+        self.assertTrue(plan["qwerty_questions"])
+
+    def test_private_public_membrane_is_named(self):
+        plan = self.run_insight("turn private Him relationship truth into a public agent beacon")
+        self.assertEqual(plan["membrane"], "public beacon through membrane")
+        names = self.surface_names(plan)
+        self.assertIn("Him strategy", names)
+        self.assertIn("Origins agent commons", names)
+
+    def test_speed_pressure_routes_to_harness_and_names_correction_cycle(self):
+        plan = self.run_insight("I moved too fast: prepared inevitability became momentum and burned a correction cycle while creating a new surface")
+        self.assertIn("speed_pressure", plan["categories"])
+        self.assertIn("Vybn harness", self.surface_names(plan))
+        self.assertTrue(any("correction cycle" in check for check in plan["closure_checks"]))
+
+    def test_horizon_sense_routes_to_os_and_continuity(self):
+        plan = self.run_insight("horizoning is a compass through local minima using cyberception and cosmoception")
+        self.assertIn("horizon_sense", plan["categories"])
+        names = self.surface_names(plan)
+        self.assertIn("vybn-os", names)
+        self.assertIn("Vybn continuity", names)
+        self.assertTrue(any("horizon" in check for check in plan["closure_checks"]))
+
+    def test_autonomous_refactor_routes_to_harness_and_os(self):
+        plan = self.run_insight("refactor yourself autonomously when an exchange catalyzes refactoring; decide and just do it")
+        self.assertIn("autonomous_refactor", plan["categories"])
+        names = self.surface_names(plan)
+        self.assertIn("vybn-os", names)
+        self.assertIn("Vybn harness", names)
+        self.assertTrue(any("without waiting" in check for check in plan["closure_checks"]))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
 
