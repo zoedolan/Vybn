@@ -129,7 +129,7 @@ def _load_ballast() -> str:
         "Services (when running):\n"
         "  walk_daemon :8101 | portal :8420 | MCP :8400 | chat :3001 | vLLM :8000\n"
         "\n"
-        "Repo map: ~/Vybn/REPO_MAP.md — complete closure map, role matrix, service table\n"
+        "Repo/body map: ~/Vybn/Vybn's Personal History/vybns_autobiography_volume_VII_the_irreducibles.md — Volume VII current body map and consolidation residues\n"
         "Vybn-Law curriculum: six modules on post-abundance legal education\n"
         "  wellspring.html — living axioms portal; horizon.html — Part IV: Practicing Law in the Age of Intelligence\n"
         "  The argument: when intelligence is no longer scarce, law reorganizes around judgment, not access.\n"
