@@ -9,6 +9,8 @@ from spark.harness.substrate import (
     ADAPTIVE_CONSOLIDATION_PRINCIPLE,
     REFACTOR_PILOT_RULE,
     adaptive_consolidation_plan_for,
+    command_payload_recovery_for,
+    compression_consolidation_signature_for,
     consolidation_layer,
     packet_for,
     perceive_file,
@@ -500,3 +502,7 @@ def test_buoyant_consolidation_selects_cluster_or_stop():
     assert state["cluster"] == "mixed_boundary_dissolution" and state["home"] == "owning_runtime_surfaces"
     assert "update_imports_to_owning_surfaces" in state["residuals"]
     assert "no_command_surface_collapse" in stop["residuals"] and "off_beam_cleanup_is_not_progress_on_the_named_bottleneck" in off["heaviness"]
+
+    def test_compression_signature_and_shell_guard_recovery(self):
+        self.assertEqual(compression_consolidation_signature_for("compatibility shell wrapper over stronger runtime and documented door already in existing home"), "compatibility_shell_absorb_into_existing_runtime")
+        self.assertEqual(command_payload_recovery_for("Blocked: shell command substitution is not allowed"), "re_encode_payload_without_shell_substitution_and_continue")

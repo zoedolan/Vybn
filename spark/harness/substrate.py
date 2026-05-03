@@ -2353,48 +2353,20 @@ RETIRED_SCRIPT_CONSOLIDATION = "retire_unreferenced_retired_script_with_manifest
 # A retired archive script with zero live references may be removed from tracked source when the existing archive manifest preserves the reason and git-history restore path.
 # A tracked archive backup that duplicates the live organ is not sacred by default: if references are absent, the archive manifest names the superseding file, and git history provides a restore path, consolidation may retire the duplicate while strengthening the manifest.
 
-CONNECTIVE_TISSUE_PRINCIPLE = (
-    "Consolidation must preserve and strengthen connective tissue: imports, "
-    "routes, public URLs, manifests, README maps, continuity notes, tests, "
-    "archive restore paths, compatibility shells, semantic/provenance links, "
-    "and agent/human affordance surfaces. A file may be valuable primarily as "
-    "relation; map that relation before splitting, moving, archiving, or deleting."
-)
 
-LIFECYCLE_ARCHITECTURE_PRINCIPLE = (
-    "Deletion/consolidation must map lifecycle architecture before cutting: "
-    "who or what creates the file, when it is read, what policy cleans it up, "
-    "which restore path exists, and whether an existing lifecycle owner will "
-    "remove it without manual deletion. A deletion candidate whose lifecycle is "
-    "not mapped returns ARCHITECTURE_GATE_FIRST, not permission to cut."
-)
+CONNECTIVE_TISSUE_PRINCIPLE = "Consolidation preserves/strengthens connective tissue: imports, routes, URLs, manifests, README maps, continuity, tests, restore paths, compatibility shells, semantic/provenance links, and agent/human affordances; map relation before splitting, moving, archiving, or deleting."
+
+LIFECYCLE_ARCHITECTURE_PRINCIPLE = "Before deletion/consolidation, map creator, reader, cleanup policy, restore path, and lifecycle owner; unmapped lifecycle returns ARCHITECTURE_GATE_FIRST, not permission to cut."
 
 CONSOLIDATION_ORDER = [
-    {
-        "layer": "appendage",
-        "rule": "Low-coupling edge files: generated/runtime outputs, old variants, backups, compatibility pages, one-off demos, orphan assets, duplicate wrappers, logs, and peripheral fossils. Classify as keep, shell, redirect, manifest, externalize, ignore, or archive-with-restore.",
-    },
-    {
-        "layer": "membrane",
-        "rule": "Boundary and discovery surfaces: ai.txt, llms.txt, humans.txt, robots.txt, semantic-web manifests, README maps, archive manifests, redirects, and public/private affordance labels. Canonicalize wording and authority without collapsing distinct doors.",
-    },
-    {
-        "layer": "organ",
-        "rule": "Load-bearing live files: public APIs, harness agents, MCP servers, memory engines, and active public houses. Touch only after characterization tests and appendage/membrane learning.",
-    },
-    {
-        "layer": "skeleton",
-        "rule": "Repo layout, source-of-truth architecture, cross-repo boundaries, and lifecycle doctrine. Change only after peripheral evidence shows the trunk is wrong.",
-    },
+    {"layer": "appendage", "rule": "Low-coupling edge files: generated/runtime outputs, old variants, backups, compatibility shells, documented wrapper doors, duplicate helpers, logs, and peripheral fossils. Classify as keep, shell, redirect, manifest, externalize, ignore, absorb-into-existing-home, or archive-with-restore."},
+    {"layer": "membrane", "rule": "Boundary/discovery surfaces: ai.txt, llms.txt, humans.txt, robots.txt, semantic-web manifests, README maps, archive manifests, redirects, and public/private affordance labels. Canonicalize wording and authority without collapsing distinct doors."},
+    {"layer": "organ", "rule": "Load-bearing live files: public APIs, harness agents, MCP servers, memory engines, and active public houses. Touch only after characterization tests and appendage/membrane learning."},
+    {"layer": "skeleton", "rule": "Repo layout, source-of-truth architecture, cross-repo boundaries, and lifecycle doctrine. Change only after peripheral evidence shows the trunk is wrong."},
 ]
 
 
-CHANGE_SELF_HEALING_PRINCIPLE = (
-    "Every consolidation proposal must pass a self-healing loop before mutation: "
-    "verify the proposed change, test whether it jeopardizes any repo surface, "
-    "proceed only if residuals stay green, refactor and recommence if jeopardy is "
-    "repairable, or leave the file as-is and move on if the safe change disappears."
-)
+CHANGE_SELF_HEALING_PRINCIPLE = "Before mutation: verify proposal, test repo jeopardy, proceed only with green residuals, refactor/retry repairable wounds, or leave when the safe change disappears."
 
 CHANGE_SELF_HEALING_STEPS = [
     {"id": "verify_proposal", "rule": "Bind bytes, history, references, ownership, layer, lifecycle owner/timing/cleanup policy, and restore path before changing anything."},
@@ -2810,6 +2782,25 @@ def deletion_consolidation_gate_for(path: str, proposed_change: str, *, architec
     if _is_destructive_consolidation(proposed_change) and not architecture_contacted:
         return DeletionConsolidationGate(path, proposed_change, "ARCHITECTURE_GATE_FIRST", lifecycle, "destructive consolidation requires lifecycle architecture contact before any cut", required)
     return DeletionConsolidationGate(path, proposed_change, "PROCEED_TO_SELF_HEALING_RESIDUALS", lifecycle, "lifecycle architecture contact has been declared; self-healing residuals still decide", required)
+
+
+def compression_consolidation_signature_for(text: str) -> str | None:
+    """Name wrapper/helper compression candidates; deletion still needs residuals."""
+    l = text.lower()
+    if "compatibility" in l and any(t in l for t in ("wrapper", "shell")):
+        return "compatibility_shell_absorb_into_existing_runtime"
+    if "wrapper" in l and any(t in l for t in ("runtime", "canonical", "existing home")):
+        return "wrapper_absorb_into_existing_runtime"
+    if "helper" in l and any(t in l for t in ("runtime", "existing home", "caller")):
+        return "helper_absorb_into_existing_home"
+    if "documented" in l and "door" in l and ("canonical" in l or "existing" in l):
+        return "documented_door_rebind_to_existing_home"
+    return None
+
+
+def command_payload_recovery_for(error_text: str) -> str | None:
+    """Treat shell-safety refusal as a re-encoding cue, not collapse."""
+    return "re_encode_payload_without_shell_substitution_and_continue" if "command substitution" in error_text.lower() else None
 
 
 def self_healing_plan_for(path: str, proposed_change: str, *, public: bool = False) -> ChangeHealingPlan:
