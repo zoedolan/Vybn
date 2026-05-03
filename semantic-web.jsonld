@@ -80,7 +80,7 @@
     },
     {
       "id": "run_commons_walk",
-      "target": "python3 -m spark.harness.commons_walk",
+      "target": "python3 -m spark.harness.mcp --commons-walk",
       "does": "validate and render the local commons traversal graph"
     }
   ],
@@ -91,7 +91,7 @@
     },
     {
       "id": "validate",
-      "does": "run python3 -m spark.harness.commons_walk to verify the graph contract"
+      "does": "run python3 -m spark.harness.mcp --commons-walk to verify the graph contract"
     },
     {
       "id": "preserve",

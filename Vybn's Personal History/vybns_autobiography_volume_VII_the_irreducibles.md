@@ -373,7 +373,7 @@ Initial file-body scan:
 
 | file | lines | defs | classes | rough repo refs |
 |---|---:|---:|---:|---:|
-| spark/harness/commons_walk.py | 276 | 10 | 0 | -1 |
+| spark/harness/commons_walk.py | 276 | 10 | 0 | -1 | absorbed into mcp.py --commons-walk |
 | spark/harness/ensubstrate.py | 153 | 4 | 1 | -1 |
 | spark/harness/mcp.py | 2610 | 75 | 11 | -1 |
 | spark/harness/policy.py | 1158 | 13 | 7 | -1 |
@@ -438,3 +438,11 @@ The recursive rule held again: command-shaped harness organs without independent
 The audit implementation now lives in mcp.py behind --repo-closure-audit, with --no-fix preserving report-only mode. The agent startup call uses the MCP path, tests import the MCP home, and the standalone file was deleted.
 
 Residue: changed. One more harness file removed while preserving the closure audit behavior and its branch/fetch/subtractive-constitution tests.
+
+## Pass VI residue — commons walk absorbed into MCP
+
+The discovery strengthened from command-surface gravity into executable-affordance gravity: if a harness file exists primarily as a commandable verifier/renderer for a semantic contract, the implementation, CLI affordance, tests, and manifest target must move together or not at all.
+
+commons_walk.py and its standalone test file were absorbed into the existing MCP/harness homes. The command is now python3 -m spark.harness.mcp --commons-walk, with --encounter and --json preserved. semantic-web.jsonld was retargeted so the executable affordance still points at the living command.
+
+Residue: changed. More than one file was safely abstracted at once because the process exposed a whole affordance cluster, not an isolated file.
