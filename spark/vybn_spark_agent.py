@@ -49,7 +49,7 @@ from harness.substrate import rag_snippets, rag_snippets_with_tier, render_him_v
 from harness.providers import execute_tool_calls, default_introspect  # noqa: E402
 from harness.providers import check_claim, check_structural_claim  # noqa: E402
 from harness.policy import is_system_critical_pilot_turn  # noqa: E402
-from harness.semantic_gate import (  # noqa: E402
+from harness.providers import (  # noqa: E402
     SUPER_SEMANTIC_GATE_CACHE as _SUPER_SEMANTIC_GATE_CACHE,
     SUPER_SEMANTIC_GATE_PROBES as _SUPER_SEMANTIC_GATE_PROBES,
     is_loopback_super_base as _is_loopback_super_base,
