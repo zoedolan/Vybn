@@ -31,7 +31,7 @@ THIS = Path(__file__).resolve()
 SPARK_DIR = THIS.parent.parent
 sys.path.insert(0, str(SPARK_DIR))
 
-from harness.policy import RoleConfig, default_policy  # noqa: E402
+from harness.substrate import RoleConfig, default_policy  # noqa: E402
 
 
 def _load_chat_api(env_overrides: dict | None = None):

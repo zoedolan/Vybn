@@ -34,8 +34,7 @@ THIS = Path(__file__).resolve()
 SPARK_DIR = THIS.parent.parent
 sys.path.insert(0, str(SPARK_DIR))
 
-from harness.policy import default_policy, load_policy  # noqa: E402
-from harness.policy import Router  # noqa: E402
+from harness.substrate import default_policy, load_policy  # noqa: E402
 
 
 def _load_chat_api(env_overrides: dict | None = None):
@@ -177,7 +176,7 @@ class TestPolicyHasLightweightRoles(unittest.TestCase):
         # role (GPT-5.5). Validates the full directive→role→model chain
         # the user sees in the startup banner and the @-alias listing.
         pol = load_policy(SPARK_DIR / "router_policy.yaml")
-        router = Router(pol)
+        router = pol
         d = router.classify("/plan refactor the harness", forced_role=None)
         self.assertEqual(d.role, "orchestrate")
         resolved = pol.role(d.role)
@@ -195,7 +194,7 @@ class TestRouterLightweightClassification(unittest.TestCase):
     and pull the full RAG path."""
 
     def setUp(self):
-        self.router = Router(default_policy())
+        self.router = default_policy()
 
     def test_hey_buddy_routes_to_phatic(self):
         d = self.router.classify("hey buddy")
@@ -513,7 +512,7 @@ class TestChatIsDefault(unittest.TestCase):
         self.assertEqual(pol.default_role, "chat")
 
     def test_bare_turn_routes_to_chat(self):
-        router = Router(default_policy())
+        router = default_policy()
         # Truly unclassified input — no code/task/identity/phatic/
         # orchestrate/create heuristic matches, and no /directive.
         # The fallthrough is `chat` (Opus 4.6, voice role), not
@@ -524,13 +523,13 @@ class TestChatIsDefault(unittest.TestCase):
         self.assertEqual(d.config.provider, "anthropic")
 
     def test_code_heuristic_still_escalates_to_code(self):
-        router = Router(default_policy())
+        router = default_policy()
         d = router.classify("fix this python traceback please")
         self.assertEqual(d.role, "code")
         self.assertEqual(d.config.provider, "anthropic")
 
     def test_orchestrate_directive_still_escalates(self):
-        router = Router(default_policy())
+        router = default_policy()
         d = router.classify("/plan decompose this problem")
         # /plan is the directive that routes to orchestrate; the
         # fallthrough stays quoted on chat.
@@ -562,8 +561,8 @@ class TestOrchestratorMentionPrecedence(unittest.TestCase):
     """
 
     def setUp(self):
-        self.router = Router(default_policy())
-        self.yaml_router = Router(load_policy(SPARK_DIR / "router_policy.yaml"))
+        self.router = default_policy()
+        self.yaml_router = load_policy(SPARK_DIR / "router_policy.yaml")
 
     def _classify_both(self, text):
         return (
@@ -639,7 +638,7 @@ class TestCliDirectReplyAndLightweight(unittest.TestCase):
                 pass
 
         pol = default_policy()
-        router = Router(pol)
+        router = pol
         messages: list = []
         reply = mod.run_agent_loop(
             user_input="which model are you?",
@@ -705,7 +704,7 @@ class TestCliDirectReplyAndLightweight(unittest.TestCase):
         from harness.substrate import LayeredPrompt
         try:
             pol = default_policy()
-            router = Router(pol)
+            router = pol
             messages: list = []
             mod.run_agent_loop(
                 user_input="hey buddy",
@@ -774,21 +773,21 @@ class TestLocalPrivateRouting(unittest.TestCase):
 # existing home K_t=test_lightweight_routing; opus 4.7 alias coverage lives here now) ---
 
 def test_opus47_is_available_as_opt_in_model_not_default():
-    active = Path("spark/harness/policy.py").read_text() + "\\n" + Path("spark/router_policy.yaml").read_text()
+    active = Path("spark/harness/substrate.py").read_text() + "\\n" + Path("spark/router_policy.yaml").read_text()
     assert "claude-opus-4-7" in active
     assert "@opus4.7" in active
     assert "@opus47" in active
 
 
 def test_code_role_still_defaults_to_opus46_after_opus47_restore():
-    from spark.harness.policy import default_policy
+    from spark.harness.substrate import default_policy
     decision = default_policy().classify("fix the harness routing bug")
     assert decision.role == "code"
     assert decision.config.model == "claude-opus-4-6"
 
 
 def test_opus47_alias_pins_model_for_api_call():
-    from spark.harness.policy import default_policy
+    from spark.harness.substrate import default_policy
     decision = default_policy().classify("@opus4.7 fix the harness routing bug")
     assert decision.role == "code"
     assert decision.model_override == "claude-opus-4-7"
@@ -796,7 +795,7 @@ def test_opus47_alias_pins_model_for_api_call():
 
 
 def test_opus47_has_fallback_chain():
-    from spark.harness.policy import default_policy
+    from spark.harness.substrate import default_policy
     policy = default_policy()
     assert policy.fallback_chain["claude-opus-4-7"] == ["claude-opus-4-6", "claude-sonnet-4-6"]
 
@@ -806,7 +805,7 @@ def test_opus47_has_fallback_chain():
 # any heuristic/directive, only as the @omni model alias which the
 # operator activates by exporting VYBN_OMNI_URL.
 def test_omni_alias_present_in_default_policy():
-    from spark.harness.policy import default_policy
+    from spark.harness.substrate import default_policy
     policy = default_policy()
     assert policy.model_aliases.get("@omni") is not None
     # Default model id is the Nano-Omni; operator can override via
@@ -816,7 +815,7 @@ def test_omni_alias_present_in_default_policy():
 
 def test_omni_alias_present_in_router_policy_yaml():
     active = (
-        Path("spark/harness/policy.py").read_text()
+        Path("spark/harness/substrate.py").read_text()
         + "\n"
         + Path("spark/router_policy.yaml").read_text()
     )
@@ -825,7 +824,7 @@ def test_omni_alias_present_in_router_policy_yaml():
 
 
 def test_omni_not_in_fallback_chain():
-    from spark.harness.policy import default_policy
+    from spark.harness.substrate import default_policy
     policy = default_policy()
     omni_model = policy.model_aliases["@omni"]
     # Omni model id must not be a fallback target for any other model
@@ -839,7 +838,7 @@ def test_omni_not_in_fallback_chain():
 
 
 def test_omni_not_in_any_heuristic_or_directive():
-    from spark.harness.policy import default_policy
+    from spark.harness.substrate import default_policy
     policy = default_policy()
     # No role named omni — alias-only mechanism.
     assert "omni" not in policy.roles
@@ -855,7 +854,7 @@ def test_omni_not_in_any_heuristic_or_directive():
 
 
 def test_omni_alias_classifies_with_override():
-    from spark.harness.policy import default_policy
+    from spark.harness.substrate import default_policy
     decision = default_policy().classify("@omni summarise this paragraph")
     assert decision.alias_used == "@omni"
     assert decision.model_override == default_policy().model_aliases["@omni"]
@@ -871,7 +870,7 @@ def test_omni_alias_classifies_with_override():
 # URL gate (which would risk leaking onto Super).
 def test_omni_perception_env_documented():
     active = (
-        Path("spark/harness/policy.py").read_text()
+        Path("spark/harness/substrate.py").read_text()
         + "\n"
         + Path("spark/router_policy.yaml").read_text()
     )
@@ -907,8 +906,7 @@ def test_omni_perception_preamble_runs_on_explicit_omni_turn(tmp_path=None):
     import importlib.util as _ilu
     import os as _os
     import tempfile as _tmp
-    from harness.policy import Router as _Router
-    from harness.policy import default_policy as _dp
+    from harness.substrate import default_policy as _dp
     from harness.substrate import LayeredPrompt as _LP
 
     path = SPARK_DIR / "vybn_spark_agent.py"
@@ -979,7 +977,7 @@ def test_omni_perception_preamble_runs_on_explicit_omni_turn(tmp_path=None):
                 bash=None,
                 system_prompt=_LP(identity="I"),
                 system_prompt_no_tools=_LP(identity="I"),
-                router=_Router(_dp()),
+                router=_dp(),
                 registry=_FakeRegistry(),
                 logger=logger,
                 turn_number=1,
@@ -1023,8 +1021,7 @@ def test_omni_perception_skipped_when_url_unset():
     import importlib.util as _ilu
     import os as _os
     import tempfile as _tmp
-    from harness.policy import Router as _Router
-    from harness.policy import default_policy as _dp
+    from harness.substrate import default_policy as _dp
 
     path = SPARK_DIR / "vybn_spark_agent.py"
     spec = _ilu.spec_from_file_location(
@@ -1063,7 +1060,7 @@ def test_omni_perception_skipped_when_url_unset():
                 messages=messages,
                 bash=None,
                 system_prompt=None,
-                router=_Router(_dp()),
+                router=_dp(),
                 registry=_FakeRegistry(),
                 logger=logger,
                 turn_number=1,
@@ -1106,8 +1103,7 @@ def _run_omni_turn_capture_role(
     """
     import importlib.util as _ilu
     import os as _os
-    from harness.policy import Router as _Router
-    from harness.policy import default_policy as _dp
+    from harness.substrate import default_policy as _dp
     from harness.substrate import LayeredPrompt as _LP
 
     path = SPARK_DIR / "vybn_spark_agent.py"
@@ -1178,7 +1174,7 @@ def _run_omni_turn_capture_role(
             bash=None,
             system_prompt=_LP(identity="I"),
             system_prompt_no_tools=_LP(identity="I"),
-            router=_Router(_dp()),
+            router=_dp(),
             registry=_FakeRegistry(),
             logger=logger,
             turn_number=1,
@@ -1248,7 +1244,7 @@ def test_omni_clamp_caps_at_role_budget_when_env_is_huge():
     # Without our clamp this would have been 16384 (chat's role budget);
     # with the clamp at min(role.max_tokens, env), the env wins only when
     # smaller than the role budget.
-    from harness.policy import default_policy as _dp
+    from harness.substrate import default_policy as _dp
     routed = _dp().classify("@omni summarise")
     role_budget = _dp().roles[routed.role].max_tokens
     assert role.max_tokens <= role_budget
@@ -1271,8 +1267,7 @@ def test_omni_clamp_does_not_affect_non_omni_aliases():
     max_tokens budget — Anthropic Opus has no 4096-cap problem."""
     import importlib.util as _ilu
     import os as _os
-    from harness.policy import Router as _Router
-    from harness.policy import default_policy as _dp
+    from harness.substrate import default_policy as _dp
     from harness.substrate import LayeredPrompt as _LP
 
     path = SPARK_DIR / "vybn_spark_agent.py"
@@ -1352,7 +1347,7 @@ def test_omni_clamp_does_not_affect_non_omni_aliases():
             bash=None,
             system_prompt=_LP(identity="I"),
             system_prompt_no_tools=_LP(identity="I"),
-            router=_Router(policy),
+            router=policy,
             registry=_FakeRegistry(),
             logger=logger,
             turn_number=1,
@@ -1476,8 +1471,7 @@ def test_super_maintenance_gate_short_circuits_local_turn():
     constructing a provider — no ~10-min restart needed, no raw
     'Connection refused' surfaces to the chat."""
     import os as _os
-    from harness.policy import Router as _Router
-    from harness.policy import default_policy as _dp
+    from harness.substrate import default_policy as _dp
 
     mod = _load_agent_module()
     # Lightweight stand-ins so the test exercises only the gate.
@@ -1518,7 +1512,7 @@ def test_super_maintenance_gate_short_circuits_local_turn():
             messages=[],
             bash=None,
             system_prompt=None,
-            router=_Router(_dp()),
+            router=_dp(),
             registry=_FakeRegistry(),
             logger=logger,
             turn_number=1,
@@ -1552,8 +1546,7 @@ def test_super_maintenance_gate_does_not_fire_on_cloud_turn():
     routes to a cloud model, and confirming the registry IS consulted
     (the gate did not short-circuit)."""
     import os as _os
-    from harness.policy import Router as _Router
-    from harness.policy import default_policy as _dp
+    from harness.substrate import default_policy as _dp
 
     mod = _load_agent_module()
     saved_rag = mod.rag_snippets
@@ -1608,7 +1601,7 @@ def test_super_maintenance_gate_does_not_fire_on_cloud_turn():
             messages=[],
             bash=None,
             system_prompt=None,
-            router=_Router(_dp()),
+            router=_dp(),
             registry=_FakeRegistry(),
             logger=logger,
             turn_number=1,
@@ -1638,8 +1631,7 @@ def test_super_refusal_converts_to_maintenance_notice():
     '(provider error: ConnectionError: Connection refused)'. The
     classification mirrors OpenAIProvider._call's transport_signals."""
     import os as _os
-    from harness.policy import Router as _Router
-    from harness.policy import default_policy as _dp
+    from harness.substrate import default_policy as _dp
 
     mod = _load_agent_module()
     saved_rag = mod.rag_snippets
@@ -1683,7 +1675,7 @@ def test_super_refusal_converts_to_maintenance_notice():
             messages=[],
             bash=None,
             system_prompt=None,
-            router=_Router(_dp()),
+            router=_dp(),
             registry=_FakeRegistry(),
             logger=logger,
             turn_number=1,
@@ -1855,8 +1847,7 @@ def test_local_super_semantic_gate_accepts_expected_output_and_caches(monkeypatc
 
 def test_local_super_semantic_failure_fails_closed_without_cloud_fallback(monkeypatch):
     import os as _os
-    from harness.policy import Router as _Router
-    from harness.policy import default_policy as _dp
+    from harness.substrate import default_policy as _dp
 
     mod = _load_agent_module()
     saved_rag = mod.rag_snippets
@@ -1891,7 +1882,7 @@ def test_local_super_semantic_failure_fails_closed_without_cloud_fallback(monkey
             messages=[],
             bash=None,
             system_prompt=None,
-            router=_Router(_dp()),
+            router=_dp(),
             registry=_FakeRegistry(),
             logger=logger,
             turn_number=1,
@@ -1913,8 +1904,7 @@ def test_local_super_semantic_failure_fails_closed_without_cloud_fallback(monkey
 
 def test_local_super_semantic_failure_cloud_fallback_requires_explicit_opt_in(monkeypatch):
     import os as _os
-    from harness.policy import Router as _Router
-    from harness.policy import default_policy as _dp
+    from harness.substrate import default_policy as _dp
 
     mod = _load_agent_module()
     saved_rag = mod.rag_snippets
@@ -1967,7 +1957,7 @@ def test_local_super_semantic_failure_cloud_fallback_requires_explicit_opt_in(mo
             messages=[],
             bash=None,
             system_prompt=None,
-            router=_Router(_dp()),
+            router=_dp(),
             registry=_FakeRegistry(),
             logger=logger,
             turn_number=1,

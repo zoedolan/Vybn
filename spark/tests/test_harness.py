@@ -3,7 +3,7 @@
 Runs without external APIs. Exercises:
   - absorb_gate / validate_command correctness invariants
   - Policy loader (defaults + YAML if present)
-  - Router directive + heuristic + default tiers
+  - Policy directive + heuristic + default tiers
   - LayeredPrompt flattening and Anthropic block rendering
   - OpenAIProvider tool-schema + message translation (no network)
   - Tool-result dict shapes from both providers
@@ -25,10 +25,10 @@ THIS = Path(__file__).resolve()
 SPARK_DIR = THIS.parent.parent
 sys.path.insert(0, str(SPARK_DIR))
 
-from harness.policy import Policy, Router, load_policy  # noqa: E402
+from harness.substrate import Policy, load_policy  # noqa: E402
 from harness.providers import ToolSpec, absorb_gate, validate_command  # noqa: E402
 from harness.substrate import LayeredPrompt, classify_action_text, load_beam, render_beam_capsule  # noqa: E402
-from harness.policy import default_policy  # noqa: E402
+from harness.substrate import default_policy  # noqa: E402
 from harness.providers import (  # noqa: E402
     AnthropicProvider,
     OpenAIProvider,
@@ -196,7 +196,7 @@ class TestPolicy(unittest.TestCase):
 class TestRouter(unittest.TestCase):
     def setUp(self):
         self.policy = default_policy()
-        self.router = Router(self.policy)
+        self.router = self.policy
 
     def test_directive_chat(self):
         d = self.router.classify("/chat how are you doing")
@@ -643,7 +643,7 @@ class TestAnthropicMessageNormalization(unittest.TestCase):
         class _FakeClient:
             messages = _FakeMessages()
 
-        from harness.policy import RoleConfig as _RC
+        from harness.substrate import RoleConfig as _RC
         prov = AnthropicProvider(client=_FakeClient())
         role = _RC(role="code", provider="anthropic", model="claude-opus-4-6")
         mixed = [
@@ -669,7 +669,7 @@ class TestProviderRegistry(unittest.TestCase):
     def test_openai_base_url_keyed(self):
         reg = ProviderRegistry()
         # Two different local role configs should produce two providers.
-        from harness.policy import RoleConfig
+        from harness.substrate import RoleConfig
         r1 = RoleConfig(
             role="local", provider="openai", model="m",
             base_url="http://127.0.0.1:8000/v1",
@@ -754,7 +754,7 @@ class TestFallbackConstructionIsLazy(unittest.TestCase):
 
     def test_primary_succeeds_without_constructing_fallback(self):
         import vybn_spark_agent as agent
-        from harness.policy import RoleConfig, default_policy
+        from harness.substrate import RoleConfig, default_policy
 
         policy = default_policy()
         # Primary points at gpt-5.5; default fallback chain pivots to
@@ -806,7 +806,7 @@ class TestFallbackConstructionIsLazy(unittest.TestCase):
 
     def test_walks_to_lazy_fallback_when_primary_fails(self):
         import vybn_spark_agent as agent
-        from harness.policy import RoleConfig, default_policy
+        from harness.substrate import RoleConfig, default_policy
 
         policy = default_policy()
         primary_cfg = RoleConfig(
@@ -1371,7 +1371,7 @@ class TestExecutableContracts(unittest.TestCase):
     def test_turn_event_contract_logs_minimum_debug_facts(self):
         import json
         import tempfile
-        from harness.policy import EventLogger, TURN_EVENT_REQUIRED_FIELDS, turn_event
+        from harness.substrate import EventLogger, TURN_EVENT_REQUIRED_FIELDS, turn_event
 
         with tempfile.TemporaryDirectory() as d:
             log_path = Path(d) / "events.jsonl"
@@ -1867,4 +1867,13 @@ class TestBeamkeeperCapsule(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+def test_harness_single_file_projection_makes_policy_absorption_inevitable():
+    from spark.harness.substrate import buoyant_consolidation_packet_for, harness_single_file_projection_for
+    proj = harness_single_file_projection_for(["spark/harness/mcp.py", "spark/harness/policy.py", "spark/harness/providers.py", "spark/harness/substrate.py"])
+    assert proj["next_step"] == "absorb_policy_into_substrate_and_remove_router_wrapper"
+    assert "Policy.classify is already the router" in proj["code_efficiency"]
+    pkt = buoyant_consolidation_packet_for(["spark/harness/policy.py"], beam="spark/harness")
+    assert pkt["cluster"] == "mixed_boundary_dissolution"
+    assert "routing_policy" in pkt["moveTogether"]
 

@@ -35,7 +35,7 @@ THIS = Path(__file__).resolve()
 SPARK_DIR = THIS.parent.parent
 sys.path.insert(0, str(SPARK_DIR))
 
-import harness.policy as policy  # noqa: E402
+import harness.substrate as policy  # noqa: E402
 
 
 class SystemCriticalPilotREDefined(unittest.TestCase):
@@ -410,7 +410,7 @@ class ProtectedMutationSentinelGate(unittest.TestCase):
             "cat spark/router_policy.yaml",
             "wc -l spark/vybn_spark_agent.py",
             "python3 -c 'import sys; print(sys.version)'",
-            "python3 -m py_compile spark/harness/policy.py",
+            "python3 -m py_compile spark/harness/substrate.py",
         ):
             is_mut, _ = _is_mutation_sentinel(f"[NEEDS-EXEC: {cmd}]")
             self.assertFalse(is_mut, f"{cmd!r} should be classified read-only")

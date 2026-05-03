@@ -3,7 +3,7 @@
 Covers three distinct bugs observed in the terminal session
   agent_events.jsonl @ 20260419T104246:
 
-1. Router false positive — "hey, how does the new harness feel?"
+1. Policy false positive — "hey, how does the new harness feel?"
    routed to code role via the (feel|feeling|doing|going|holding|state
    |status|shape|condition|health) heuristic. Conversational-voice
    register should stay on chat. The code heuristic is now narrowed
@@ -60,9 +60,8 @@ class TestRouterHeuristicNarrowing(unittest.TestCase):
     """The code heuristic must not swallow conversational-voice probes."""
 
     def setUp(self):
-        from harness.policy import default_policy
-        from harness.policy import Router
-        self.router = Router(default_policy())
+        from harness.substrate import default_policy
+        self.router = default_policy()
 
     def _role(self, text: str) -> str:
         decision = self.router.classify(text)
