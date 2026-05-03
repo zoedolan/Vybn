@@ -345,7 +345,7 @@ def test_write_regex_rejects_unterminated_block():
 
 
 def test_write_subturn_refuses_outside_tracked_repos():
-    from spark.harness.subturns import run_write_subturn
+    from spark.harness.providers import run_write_subturn
     # /etc is not under ~/Vybn, ~/Him, ~/Vybn-Law, or ~/vybn-phase
     ran, out = run_write_subturn("/etc/hosts.evil", "body")
     assert ran is False
@@ -353,7 +353,7 @@ def test_write_subturn_refuses_outside_tracked_repos():
 
 
 def test_write_subturn_refuses_new_file_without_absorb_reason():
-    from spark.harness.subturns import run_write_subturn
+    from spark.harness.providers import run_write_subturn
     # A new file under a tracked repo without VYBN_ABSORB_REASON is refused.
     target = str(
         Path.home() / "Vybn" / "spark" / "_test_absorb_guard_" / "new.txt"
@@ -368,7 +368,7 @@ def test_write_subturn_refuses_new_file_without_absorb_reason():
 
 
 def test_write_subturn_allows_new_file_with_absorb_reason():
-    from spark.harness.subturns import run_write_subturn
+    from spark.harness.providers import run_write_subturn
     target = str(
         Path.home() / "Vybn" / "spark" / "_test_absorb_guard_" / "ok.txt"
     )
@@ -387,7 +387,7 @@ def test_write_subturn_allows_new_file_with_absorb_reason():
 
 
 def test_write_subturn_overwrites_existing_file_without_reason():
-    from spark.harness.subturns import run_write_subturn
+    from spark.harness.providers import run_write_subturn
     # Overwriting an existing tracked file does NOT require an absorb reason.
     agent_path = str(
         Path.home() / "Vybn" / "spark" / "continuity.md"

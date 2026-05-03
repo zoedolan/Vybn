@@ -9,7 +9,7 @@ sys.path.insert(0, str(REPO / "spark"))
 
 from harness.providers import is_parallel_safe, validate_command
 import vybn_spark_agent as agent
-from spark.harness.subturns import probe_envelope
+from spark.harness.providers import probe_envelope
 
 BAD = "rm" + " -rf" + " /"
 
