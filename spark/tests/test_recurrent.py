@@ -28,7 +28,7 @@ SPARK_DIR = THIS.parent.parent
 sys.path.insert(0, str(SPARK_DIR))
 
 from harness.substrate import default_policy, RoleConfig  # noqa: E402
-from harness.providers import (  # noqa: E402
+from harness.substrate import (  # noqa: E402
     NormalizedResponse,
     ProviderRegistry,
     StreamHandle,
@@ -57,7 +57,7 @@ from harness.substrate import (  # noqa: E402
 
 @dataclass
 class StubProvider:
-    """Mimics harness.providers.Provider with queued responses.
+    """Mimics harness.substrate.Provider with queued responses.
 
     Each call to .stream() pops the next response from `queue`. If the
     queue is empty it returns an empty end_turn — useful for testing

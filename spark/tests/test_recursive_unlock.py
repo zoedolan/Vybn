@@ -7,9 +7,9 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 REPO = ROOT.parent
 sys.path.insert(0, str(REPO / "spark"))
 
-from harness.providers import is_parallel_safe, validate_command
+from harness.substrate import is_parallel_safe, validate_command
 import vybn_spark_agent as agent
-from spark.harness.providers import probe_envelope
+from spark.harness.substrate import probe_envelope
 
 BAD = "rm" + " -rf" + " /"
 

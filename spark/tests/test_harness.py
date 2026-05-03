@@ -26,16 +26,16 @@ SPARK_DIR = THIS.parent.parent
 sys.path.insert(0, str(SPARK_DIR))
 
 from harness.substrate import Policy, load_policy  # noqa: E402
-from harness.providers import ToolSpec, absorb_gate, validate_command  # noqa: E402
+from harness.substrate import ToolSpec, absorb_gate, validate_command  # noqa: E402
 from harness.substrate import LayeredPrompt, classify_action_text, load_beam, render_beam_capsule  # noqa: E402
 from harness.substrate import default_policy  # noqa: E402
-from harness.providers import (  # noqa: E402
+from harness.substrate import (  # noqa: E402
     AnthropicProvider,
     OpenAIProvider,
     ProviderRegistry,
     ToolCall,
 )
-from harness.providers import BASH_TOOL_SPEC  # noqa: E402
+from harness.substrate import BASH_TOOL_SPEC  # noqa: E402
 from harness.substrate import build_layered_prompt  # noqa: E402
 
 
@@ -49,7 +49,7 @@ class TestAbsorbGate(unittest.TestCase):
         self.assertIsNone(absorb_gate("echo hi > /tmp/existing.txt"))
 
     def test_allow_with_reason(self):
-        cmd = 'VYBN_ABSORB_REASON="new module" VYBN_ABSORB_CONSIDERED="providers.py: wrong layer" echo x > /home/vybnz69/Vybn/new_file.py'
+        cmd = 'VYBN_ABSORB_REASON="new module" VYBN_ABSORB_CONSIDERED="substrate.py: wrong layer" echo x > /home/vybnz69/Vybn/new_file.py'
         self.assertIsNone(absorb_gate(cmd))
 
     def test_refuse_new_tracked_file(self):
@@ -64,7 +64,7 @@ class TestAbsorbGate(unittest.TestCase):
 
 class TestRepoClosureAuditProjectionState(unittest.TestCase):
     def test_fetch_refspec_complete_only_for_all_branch_projection(self):
-        import harness.mcp as audit
+        import harness.substrate as audit
 
         self.assertTrue(
             audit.fetch_refspec_is_complete([audit.EXPECTED_FETCH_REFSPEC])
@@ -76,7 +76,7 @@ class TestRepoClosureAuditProjectionState(unittest.TestCase):
         )
 
     def test_expected_fetch_refspec_is_all_heads_to_origin_remotes(self):
-        import harness.mcp as audit
+        import harness.substrate as audit
 
         self.assertEqual(
             audit.EXPECTED_FETCH_REFSPEC,
@@ -86,7 +86,7 @@ class TestRepoClosureAuditProjectionState(unittest.TestCase):
 
 
     def test_primary_branch_for_known_repos(self):
-        import harness.mcp as audit
+        import harness.substrate as audit
 
         self.assertEqual(audit.primary_branch_for(Path("/tmp/Vybn")), "main")
         self.assertEqual(audit.primary_branch_for(Path("/tmp/Him")), "main")
@@ -94,7 +94,7 @@ class TestRepoClosureAuditProjectionState(unittest.TestCase):
         self.assertEqual(audit.primary_branch_for(Path("/tmp/Origins")), "gh-pages")
 
     def test_branch_limbo_language_is_encoded_in_audit(self):
-        text = Path(SPARK_DIR / "harness" / "mcp.py").read_text()
+        text = Path(SPARK_DIR / "harness" / "substrate.py").read_text()
         self.assertIn("active branch is", text)
         self.assertIn("not primary closure branch", text)
         self.assertIn("has unmerged work outside", text)
@@ -102,7 +102,7 @@ class TestRepoClosureAuditProjectionState(unittest.TestCase):
 
     def test_subtractive_constitution_lives_in_tracked_pre_commit_hook(self):
         from pathlib import Path as _P
-        import harness.mcp as audit
+        import harness.substrate as audit
 
         # Constitution must live in the tracked .githooks/pre-commit, not an
         # untracked .git/hooks/ shadow that core.hooksPath=.githooks ignores.
@@ -147,7 +147,7 @@ class TestValidateCommand(unittest.TestCase):
         old = os.getcwd()
         try:
             os.chdir(os.path.expanduser("~/Vybn"))
-            r = absorb_gate("cat > spark/harness/providers.py")
+            r = absorb_gate("cat > spark/harness/substrate.py")
         finally:
             os.chdir(old)
         self.assertIsNone(r)
@@ -697,7 +697,7 @@ class TestProviderImportIsolation(unittest.TestCase):
     def test_openai_provider_construction_does_not_import_anthropic(self):
         # Block `anthropic` in sys.modules so an accidental import raises.
         # OpenAIProvider construction must not trip the gate.
-        from harness.providers import OpenAIProvider
+        from harness.substrate import OpenAIProvider
         saved = sys.modules.pop("anthropic", None)
         sys.modules["anthropic"] = None  # type: ignore[assignment]
         try:
@@ -714,7 +714,7 @@ class TestProviderImportIsolation(unittest.TestCase):
         # the provider as a fallback option even when the SDK is absent.
         # Only when `.client` is touched (or stream() runs) does the
         # import fire.
-        from harness.providers import AnthropicProvider
+        from harness.substrate import AnthropicProvider
         saved = sys.modules.pop("anthropic", None)
         sys.modules["anthropic"] = None  # type: ignore[assignment]
         try:
@@ -735,7 +735,7 @@ class TestProviderImportIsolation(unittest.TestCase):
     def test_anthropic_provider_with_injected_client_skips_sdk(self):
         # The harness tests construct providers with a fake client to
         # avoid hitting the SDK; that path must keep working.
-        from harness.providers import AnthropicProvider
+        from harness.substrate import AnthropicProvider
         sentinel = object()
         prov = AnthropicProvider(client=sentinel)
         self.assertIs(prov.client, sentinel)
@@ -858,13 +858,13 @@ class TestFallbackConstructionIsLazy(unittest.TestCase):
 
 class TestHimOSHarnessBridge(unittest.TestCase):
     def test_trusted_discovery_advertises_him_os_runtime(self):
-        from harness.mcp import build_discovery_record
+        from harness.substrate import build_discovery_record
 
         record = build_discovery_record(endpoint="http://127.0.0.1:8400/mcp", trust_hint="trusted")
         self.assertIn("vybn://him/os/runtime", record["capabilities"]["resources"])
 
     def test_him_os_runtime_helper_is_read_only_markdown(self):
-        from harness.mcp import _read_him_os_runtime_markdown
+        from harness.substrate import _read_him_os_runtime_markdown
 
         body = _read_him_os_runtime_markdown()
         self.assertIn("# HimOS Runtime Tick", body)
@@ -872,13 +872,13 @@ class TestHimOSHarnessBridge(unittest.TestCase):
         self.assertIn("waking judgment", body)
 
     def test_trusted_discovery_advertises_him_os_ask_tool(self):
-        from harness.mcp import build_discovery_record
+        from harness.substrate import build_discovery_record
 
         record = build_discovery_record(endpoint="http://127.0.0.1:8400/mcp", trust_hint="trusted")
         self.assertIn("him_os_ask", record["capabilities"]["tools"])
 
     def test_him_os_ask_helper_returns_truth_labeled_packet(self):
-        from harness.mcp import _ask_him_os_markdown
+        from harness.substrate import _ask_him_os_markdown
 
         body = _ask_him_os_markdown("What are you?")
         self.assertIn("# HimOS Ask", body)
@@ -926,7 +926,7 @@ class SelfImprovementGateQuotaPressureTest(unittest.TestCase):
 
 
 class TestEnsubstrate(unittest.TestCase):
-    """Ensubstration behavior lives in harness.mcp.
+    """Ensubstration behavior lives in harness.substrate.
 
     The old standalone ensubstrate module was absorbed into the MCP home so
     the CLI and MCP tool share one implementation.
@@ -939,7 +939,7 @@ class TestEnsubstrate(unittest.TestCase):
         from pathlib import Path
 
         root = Path(__file__).resolve().parents[2]
-        out = subprocess.check_output([sys.executable, "-m", "harness.mcp", "--ensubstrate", text], cwd=root / "spark", text=True)
+        out = subprocess.check_output([sys.executable, "-m", "harness.substrate", "--ensubstrate", text], cwd=root / "spark", text=True)
         return json.loads(out)
 
     def surface_names(self, plan: dict) -> set[str]:
@@ -998,35 +998,35 @@ class TestMCPEvolutionDeltaHelpers(unittest.TestCase):
     without starting the MCP server."""
 
     def test_emit_delta_returns_row_when_changed(self):
-        from harness.mcp import _emit_delta
+        from harness.substrate import _emit_delta
         row = _emit_delta("totals.files", 10, 12)
         self.assertEqual(row, {"field": "totals.files", "from": 10, "to": 12, "change": 2})
 
     def test_emit_delta_returns_none_when_equal(self):
-        from harness.mcp import _emit_delta
+        from harness.substrate import _emit_delta
         self.assertIsNone(_emit_delta("totals.files", 10, 10))
 
     def test_emit_delta_no_change_key_for_booleans(self):
-        from harness.mcp import _emit_delta
+        from harness.substrate import _emit_delta
         row = _emit_delta("walk.active", True, False)
         self.assertIsNotNone(row)
         self.assertNotIn("change", row)
 
     def test_emit_delta_string_values(self):
-        from harness.mcp import _emit_delta
+        from harness.substrate import _emit_delta
         row = _emit_delta("walk.built_at", "2026-01-01", "2026-01-02")
         self.assertEqual(row["field"], "walk.built_at")
         self.assertNotIn("change", row)
 
     def test_compute_evolution_delta_returns_typed_object(self):
-        from harness.mcp import _compute_evolution_delta, EvolutionDelta
+        from harness.substrate import _compute_evolution_delta, EvolutionDelta
         delta = _compute_evolution_delta()
         self.assertIsInstance(delta, EvolutionDelta)
         self.assertIsInstance(delta.deltas, list)
         self.assertIsInstance(delta.note, str)
 
     def test_format_delta_markdown_returns_string(self):
-        from harness.mcp import _format_delta_markdown, EvolutionDelta
+        from harness.substrate import _format_delta_markdown, EvolutionDelta
         # _format_delta_markdown only renders delta rows when both state snapshots present
         fake_state = {"generated_at": "2026-01-01T00:00:00Z", "totals": {}}
         delta = EvolutionDelta(
@@ -1044,13 +1044,13 @@ class TestMCPEvolutionDeltaHelpers(unittest.TestCase):
         self.assertIn("12", md)
 
     def test_format_delta_markdown_no_deltas(self):
-        from harness.mcp import _format_delta_markdown, EvolutionDelta
+        from harness.substrate import _format_delta_markdown, EvolutionDelta
         delta = EvolutionDelta(note="The substrate is at rest.")
         md = _format_delta_markdown(delta)
         self.assertIsInstance(md, str)
 
     def test_perception_packet_unset_returns_empty(self):
-        from harness.mcp import _read_evolve_perception_packet
+        from harness.substrate import _read_evolve_perception_packet
         prev = os.environ.pop("VYBN_OMNI_PERCEPTION", None)
         try:
             text, path = _read_evolve_perception_packet()
@@ -1061,7 +1061,7 @@ class TestMCPEvolutionDeltaHelpers(unittest.TestCase):
                 os.environ["VYBN_OMNI_PERCEPTION"] = prev
 
     def test_perception_packet_missing_file_does_not_raise(self):
-        from harness.mcp import _read_evolve_perception_packet
+        from harness.substrate import _read_evolve_perception_packet
         prev = os.environ.get("VYBN_OMNI_PERCEPTION")
         os.environ["VYBN_OMNI_PERCEPTION"] = "/tmp/__vybn_evolve_missing_packet__.txt"
         try:
@@ -1076,7 +1076,7 @@ class TestMCPEvolutionDeltaHelpers(unittest.TestCase):
 
     def test_perception_packet_reads_bounded_prefix_and_strips_controls(self):
         import tempfile
-        from harness.mcp import _read_evolve_perception_packet
+        from harness.substrate import _read_evolve_perception_packet
         prev = os.environ.get("VYBN_OMNI_PERCEPTION")
         # 20k chars of payload + a NUL + a bell — verify bound (16k cap)
         # and control-character stripping.
@@ -1107,7 +1107,7 @@ class TestMCPEvolutionDeltaHelpers(unittest.TestCase):
 
     def test_perception_packet_whitespace_only_returns_empty_text(self):
         import tempfile
-        from harness.mcp import _read_evolve_perception_packet
+        from harness.substrate import _read_evolve_perception_packet
         prev = os.environ.get("VYBN_OMNI_PERCEPTION")
         with tempfile.NamedTemporaryFile(
             "w", suffix=".txt", delete=False, encoding="utf-8"
@@ -1134,7 +1134,7 @@ class TestLocalContinuityScout(unittest.TestCase):
     """Local evolve-scout continuity tests folded into the harness suite."""
 
     def test_local_continuity_scout_surfaces_horizon_and_self_assembly(self):
-        from harness.mcp import _local_continuity_scout
+        from harness.substrate import _local_continuity_scout
 
         report = _local_continuity_scout(
             delta_md="horizon horizoning cyberception",
@@ -1149,7 +1149,7 @@ class TestLocalContinuityScout(unittest.TestCase):
         self.assertIn("beam, or has it started pretending to be the horizon", report)
 
     def test_build_continuity_scout_report_is_non_mutating_report(self):
-        from harness.mcp import build_continuity_scout_report
+        from harness.substrate import build_continuity_scout_report
 
         report = build_continuity_scout_report()
         self.assertIn("## Local continuity scout", report)
@@ -1161,7 +1161,7 @@ class TestLocalContinuityScout(unittest.TestCase):
         import sys
 
         proc = subprocess.run(
-            [sys.executable, "-m", "spark.harness.mcp", "--continuity-scout"],
+            [sys.executable, "-m", "spark.harness.substrate", "--continuity-scout"],
             cwd=str(Path(__file__).resolve().parents[2]),
             text=True,
             capture_output=True,
@@ -1404,7 +1404,7 @@ class TestExecutableContracts(unittest.TestCase):
     def test_introspect_returns_typed_json_schema(self):
         import json
         import tempfile
-        from harness.providers import default_introspect
+        from harness.substrate import default_introspect
 
         with tempfile.TemporaryDirectory() as d:
             spark_dir = Path(d)
@@ -1594,7 +1594,7 @@ class TestToolCalls(unittest.TestCase):
 
     def test_execute_bash_tool_call_serial(self):
         from types import SimpleNamespace
-        from harness.providers import execute_tool_calls
+        from harness.substrate import execute_tool_calls
         response = SimpleNamespace(tool_calls=[self._call("bash", "1", {"command": "echo ok"})])
         bash = self._Bash()
         results, interrupted = execute_tool_calls(response, bash, self._Provider())
@@ -1604,39 +1604,39 @@ class TestToolCalls(unittest.TestCase):
 
     def test_execute_introspect_tool_call(self):
         from types import SimpleNamespace
-        from harness.providers import execute_tool_calls
+        from harness.substrate import execute_tool_calls
         response = SimpleNamespace(tool_calls=[self._call("introspect", "i")])
         results, interrupted = execute_tool_calls(response, self._Bash(), self._Provider(), introspect=lambda: "state")
         self.assertFalse(interrupted)
         self.assertEqual(results, [{"id": "i", "text": "state"}])
 
     def test_default_introspect_handles_missing_events(self):
-        from harness.providers import default_introspect
+        from harness.substrate import default_introspect
         import tempfile
         with tempfile.TemporaryDirectory() as td:
             out = default_introspect(td)
             self.assertIn("events unavailable", out)
 
 class TestSafeFetch(unittest.TestCase):
-    """Safe external fetch behavior lives in harness.mcp with the MCP CLI."""
+    """Safe external fetch behavior lives in harness.substrate with the MCP CLI."""
 
     def test_rejects_http(self):
-        from harness.mcp import validate_fetch_url
+        from harness.substrate import validate_fetch_url
         with self.assertRaises(ValueError):
             validate_fetch_url("http://example.com")
 
     def test_rejects_credentials(self):
-        from harness.mcp import validate_fetch_url
+        from harness.substrate import validate_fetch_url
         with self.assertRaises(ValueError):
             validate_fetch_url("https://user:pass@example.com")
 
     def test_rejects_localhost_ip(self):
-        from harness.mcp import validate_fetch_url
+        from harness.substrate import validate_fetch_url
         with self.assertRaises(ValueError):
             validate_fetch_url("https://127.0.0.1")
 
     def test_extracts_html_text_without_scripts(self):
-        from harness.mcp import extract_fetch_text
+        from harness.substrate import extract_fetch_text
         html = "<html><head><title>T</title><script>evil()</script></head><body><h1>Head</h1><p>Body text</p></body></html>"
         text = extract_fetch_text(html, "text/html")
         self.assertIn("Head", text)
@@ -1644,18 +1644,18 @@ class TestSafeFetch(unittest.TestCase):
         self.assertNotIn("evil", text)
 
     def test_cli_source_mentions_untrusted_output_mode(self):
-        source = Path("spark/harness/mcp.py").read_text()
+        source = Path("spark/harness/substrate.py").read_text()
         self.assertIn("UNTRUSTED_TEXT_WRITTEN", source)
         self.assertIn("Path(out).expanduser()", source)
         self.assertIn("--safe-fetch", source)
 
     def test_json_ld_is_allowed_content_prefix(self):
-        from harness.mcp import ALLOWED_CONTENT_PREFIXES
+        from harness.substrate import ALLOWED_CONTENT_PREFIXES
         self.assertTrue(any("application/ld+json".startswith(p) for p in ALLOWED_CONTENT_PREFIXES))
 
 
 def test_github_cli_env_strips_shadowing_github_token(monkeypatch):
-    from spark.harness.providers import github_cli_env
+    from spark.harness.substrate import github_cli_env
 
     monkeypatch.setenv("GITHUB_TOKEN", "shadow-token")
     monkeypatch.setenv("GH_TOKEN", "kept-token")
@@ -1665,7 +1665,7 @@ def test_github_cli_env_strips_shadowing_github_token(monkeypatch):
 
 
 def test_normalize_github_cli_command_unshadows_pr_create():
-    from spark.harness.providers import normalize_github_cli_command
+    from spark.harness.substrate import normalize_github_cli_command
 
     cmd = "git push -u origin branch && gh pr create --base main --head branch"
     fixed = normalize_github_cli_command(cmd)
@@ -1743,7 +1743,7 @@ def test_zoe_perspective_governor_in_substrate():
 # Folded commons-walk tests — commons walk is now an MCP command surface.
 import unittest
 
-from harness.mcp import (
+from harness.substrate import (
     AI_NATIVE_PRINCIPLE,
     CANONICAL_ROLES,
     authority_for_target,
@@ -1835,7 +1835,7 @@ class CommonsWalkTests(unittest.TestCase):
     def test_target_classification_and_authority(self):
         self.assertEqual(classify_target("https://vybn.ai/somewhere.html"), "public_url")
         self.assertEqual(classify_target("private://Him/semantic-web.jsonld"), "private_uri")
-        self.assertEqual(classify_target("python3 -m spark.harness.mcp --commons-walk"), "local_command")
+        self.assertEqual(classify_target("python3 -m spark.harness.substrate --commons-walk"), "local_command")
         self.assertEqual(authority_for_target("https://vybn.ai/somewhere.html", "public_web"), "public_read")
         self.assertEqual(authority_for_target("python3 spark/him_os.py tick --format md", "private_workbench"), "private_local_only")
 
@@ -1870,7 +1870,7 @@ if __name__ == "__main__":
 
 def test_harness_single_file_projection_makes_policy_absorption_inevitable():
     from spark.harness.substrate import buoyant_consolidation_packet_for, harness_single_file_projection_for
-    proj = harness_single_file_projection_for(["spark/harness/mcp.py", "spark/harness/policy.py", "spark/harness/providers.py", "spark/harness/substrate.py"])
+    proj = harness_single_file_projection_for(["spark/harness/substrate.py", "spark/harness/policy.py", "spark/harness/substrate.py", "spark/harness/substrate.py"])
     assert proj["next_step"] == "absorb_policy_into_substrate_and_remove_router_wrapper"
     assert "Policy.classify is already the router" in proj["code_efficiency"]
     pkt = buoyant_consolidation_packet_for(["spark/harness/policy.py"], beam="spark/harness")

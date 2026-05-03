@@ -25,7 +25,7 @@ THIS = Path(__file__).resolve()
 SPARK_DIR = THIS.parent.parent
 sys.path.insert(0, str(SPARK_DIR))
 
-from harness.providers import load_env_files, describe  # noqa: E402
+from harness.substrate import load_env_files, describe  # noqa: E402
 
 
 SENTINEL = "sk-test-ENV-LOADER-SENTINEL-0123456789"

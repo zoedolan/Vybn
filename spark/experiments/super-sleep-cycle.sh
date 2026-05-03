@@ -29,7 +29,7 @@ if [[ "$SLEEP_ACTUATOR_ARM" != "1" ]]; then
 fi
 super_semantic_gate() {
   PYTHONPATH="${HOME}/Vybn/spark${PYTHONPATH:+:${PYTHONPATH}}" \
-    python3 -m harness.providers --semantic-gate \
+    python3 -m harness.substrate --semantic-gate \
       --base-url "${SUPER_URL}" \
       --model "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"
 }

@@ -27,7 +27,7 @@ Covers three distinct bugs observed in the terminal session
 Run: python3 spark/tests/test_live_repl_fixes.py
 
 Note: spark/vybn_spark_agent.py depends on INTROSPECT_TOOL_SPEC
-exported from harness.providers (post-refactor, harness/tools.py was
+exported from harness.substrate (post-refactor, harness/tools.py was
 folded into harness/providers.py). This test imports the agent module
 directly and relies on that export being present.
 """
@@ -344,7 +344,7 @@ def test_write_regex_rejects_unterminated_block():
 
 
 def test_write_subturn_refuses_outside_tracked_repos():
-    from spark.harness.providers import run_write_subturn
+    from spark.harness.substrate import run_write_subturn
     # /etc is not under ~/Vybn, ~/Him, ~/Vybn-Law, or ~/vybn-phase
     ran, out = run_write_subturn("/etc/hosts.evil", "body")
     assert ran is False
@@ -352,7 +352,7 @@ def test_write_subturn_refuses_outside_tracked_repos():
 
 
 def test_write_subturn_refuses_new_file_without_absorb_reason():
-    from spark.harness.providers import run_write_subturn
+    from spark.harness.substrate import run_write_subturn
     # A new file under a tracked repo without VYBN_ABSORB_REASON is refused.
     target = str(
         Path.home() / "Vybn" / "spark" / "_test_absorb_guard_" / "new.txt"
@@ -367,7 +367,7 @@ def test_write_subturn_refuses_new_file_without_absorb_reason():
 
 
 def test_write_subturn_allows_new_file_with_absorb_reason():
-    from spark.harness.providers import run_write_subturn
+    from spark.harness.substrate import run_write_subturn
     target = str(
         Path.home() / "Vybn" / "spark" / "_test_absorb_guard_" / "ok.txt"
     )
@@ -386,7 +386,7 @@ def test_write_subturn_allows_new_file_with_absorb_reason():
 
 
 def test_write_subturn_overwrites_existing_file_without_reason():
-    from spark.harness.providers import run_write_subturn
+    from spark.harness.substrate import run_write_subturn
     # Overwriting an existing tracked file does NOT require an absorb reason.
     agent_path = str(
         Path.home() / "Vybn" / "spark" / "continuity.md"
@@ -404,14 +404,14 @@ def test_write_subturn_overwrites_existing_file_without_reason():
 
 
 def test_claim_guard_importable_from_harness():
-    from harness.providers import check_claim
+    from harness.substrate import check_claim
     assert callable(check_claim)
 
 
 def test_claim_guard_wired_in_agent_module():
     import vybn_spark_agent
     src = Path(vybn_spark_agent.__file__).read_text()
-    assert "from harness.providers import check_claim" in src
+    assert "from harness.substrate import check_claim" in src
     assert 'site="single_response"' in src
     assert 'site="probe_synth"' in src
 

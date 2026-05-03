@@ -35,7 +35,7 @@ sys.path.insert(0, str(SPARK_DIR))
 
 from harness.substrate import RoleConfig  # noqa: E402
 from harness.substrate import LayeredPrompt, rag_snippets  # noqa: E402
-from harness.providers import OpenAIProvider  # noqa: E402
+from harness.substrate import OpenAIProvider  # noqa: E402
 
 
 # ---------------------------------------------------------------------------

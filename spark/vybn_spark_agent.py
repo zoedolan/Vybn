@@ -39,16 +39,16 @@ if _SPARK_DIR not in sys.path:
     sys.path.insert(0, _SPARK_DIR)
 
 from harness.substrate import EventLogger, Policy, load_policy, turn_event
-from harness.providers import BashTool, ProviderRegistry, ToolSpec, validate_command
+from harness.substrate import BashTool, ProviderRegistry, ToolSpec, validate_command
 from harness.substrate import LayeredPrompt, build_layered_prompt, load_file, SessionStore, run_probes
 from harness.substrate import run_recurrent_loop
-from harness.providers import BASH_TOOL_SPEC, DELEGATE_TOOL_SPEC, INTROSPECT_TOOL_SPEC  # noqa: E402
-from harness.providers import execute_readonly, is_parallel_safe  # noqa: E402
+from harness.substrate import BASH_TOOL_SPEC, DELEGATE_TOOL_SPEC, INTROSPECT_TOOL_SPEC  # noqa: E402
+from harness.substrate import execute_readonly, is_parallel_safe  # noqa: E402
 from harness.substrate import rag_snippets, rag_snippets_with_tier, render_him_vy_discovery_packet, render_him_vy_turn_packet  # noqa: E402
-from harness.providers import execute_tool_calls, default_introspect  # noqa: E402
-from harness.providers import check_claim, check_structural_claim  # noqa: E402
+from harness.substrate import execute_tool_calls, default_introspect  # noqa: E402
+from harness.substrate import check_claim, check_structural_claim  # noqa: E402
 from harness.substrate import is_system_critical_pilot_turn  # noqa: E402
-from harness.providers import (  # noqa: E402
+from harness.substrate import (  # noqa: E402
     SUPER_SEMANTIC_GATE_CACHE as _SUPER_SEMANTIC_GATE_CACHE,
     SUPER_SEMANTIC_GATE_PROBES as _SUPER_SEMANTIC_GATE_PROBES,
     is_loopback_super_base as _is_loopback_super_base,
@@ -241,10 +241,10 @@ def _fit_probe_output(out: str) -> str:
 
 
 # Round 5: positive-signal probe sub-turn. A no-tool role (chat, create,
-# Sentinel protocol parsing lives in harness.providers.
+# Sentinel protocol parsing lives in harness.substrate.
 # These names are re-exported here for backward compatibility with tests and
 # callers that import vybn_spark_agent._PROBE_RE / _WRITE_BLOCK_RE directly.
-from harness.providers import (
+from harness.substrate import (
     _BracketBalancedProbe,
     _NEEDS_RESTART_RE,
     _NEEDS_ROLE_RE,
@@ -253,7 +253,7 @@ from harness.providers import (
     _WRITE_BLOCK_RE,
 )
 
-from harness.providers import (  # noqa: E402
+from harness.substrate import (  # noqa: E402
     classify_unlock_layer,
     probe_envelope,
     run_restart_subturn,
@@ -266,8 +266,8 @@ from harness.providers import (  # noqa: E402
 # is_parallel_safe so tests can mock agent.execute_readonly cleanly.
 def _run_probe_subturn(command: str, bash) -> tuple[bool, str]:  # noqa: E302
     """Thin wrapper so mock.patch.object(agent, 'execute_readonly') works in tests."""
-    import harness.providers as _st
-    import harness.providers as _prov
+    import harness.substrate as _st
+    import harness.substrate as _prov
     # Temporarily redirect the subturns module's references to our module-level names
     _orig_er, _orig_ips = _st.execute_readonly, _st.is_parallel_safe
     _st.execute_readonly = execute_readonly  # type: ignore[assignment]
@@ -990,7 +990,7 @@ def _stream_with_fallback(
 # ---------------------------------------------------------------------------
 # Round 5: positive-signal probe sub-turn.
 # ---------------------------------------------------------------------------
-# Subturn execution lives in harness.providers. Legacy private helper names are
+# Subturn execution lives in harness.substrate. Legacy private helper names are
 # imported above for compatibility with tests and older call sites.
 # ---------------------------------------------------------------------------
 
@@ -2465,7 +2465,7 @@ def main() -> None:
     # at ~/.config/vybn/llm.env. Load them before any provider client
     # reads os.environ. Existing env vars win; no values are printed.
     try:
-        from harness.providers import load_env_files, describe  # noqa: E402
+        from harness.substrate import load_env_files, describe  # noqa: E402
         _applied = load_env_files()
         if _applied:
             print(f"  [env] {describe(_applied)}")
@@ -2594,7 +2594,7 @@ def main() -> None:
     try:
         import subprocess as _sp
         _audit_result = _sp.run(
-            ["python3", "-m", "spark.harness.mcp", "--repo-closure-audit"],
+            ["python3", "-m", "spark.harness.substrate", "--repo-closure-audit"],
             capture_output=True, text=True, cwd=str(Path.home() / "Vybn"), timeout=30
         )
         if "DRIFT PRESENT" in _audit_result.stdout or "DELETED" in _audit_result.stdout:

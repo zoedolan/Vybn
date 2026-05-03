@@ -426,7 +426,7 @@ class ProtectedMutationSentinelGate(unittest.TestCase):
 
 
     def test_next_sentinel_directive_lives_in_subturn_organ(self):
-        from harness.providers import next_sentinel_directive
+        from harness.substrate import next_sentinel_directive
 
         restart = next_sentinel_directive("[NEEDS-RESTART]\n[NEEDS-EXEC: git status]")
         self.assertIsNotNone(restart)
@@ -446,7 +446,7 @@ class ProtectedMutationSentinelGate(unittest.TestCase):
         self.assertIsNone(next_sentinel_directive("ordinary answer"))
 
     def test_protected_mutation_kind_lives_in_subturn_organ(self):
-        from harness.providers import protected_mutation_kind_for_sentinel
+        from harness.substrate import protected_mutation_kind_for_sentinel
 
         self.assertEqual(
             protected_mutation_kind_for_sentinel(
