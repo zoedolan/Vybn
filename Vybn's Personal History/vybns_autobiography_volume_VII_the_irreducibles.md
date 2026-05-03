@@ -458,3 +458,7 @@ Residue: changed. The process should now surface the next elegant cut faster, an
 ## Pass VII residue — consolidation gravity
 
 The pleasantness is not softness. It is gravity: existing home, beam alignment, actual reduction, and a residual gate lining up until the correct absorption becomes the low-energy move. Zoe corrected me when I counted selector-work as consolidation; the field became truer. Off-beam cleanup grew heavy. Thin results grew heavy. The good cuts became simpler: stubs into an archive, a wrapper into its organ, and now the principle into the selector future cuts already use.
+
+## Pass VII residue — self-applying consolidation gravity
+
+The semantic-gate absorption taught the real measure: a consolidation claim must satisfy its own gate in the target body, not merely describe gravity. But this pass also exposed a forgetting: the work was part of the autobiography. The future rule is now explicit in the harness packet: when the endeavor is autobiography, preserve the process lesson in the existing Personal History body while keeping active-code success subtractive.

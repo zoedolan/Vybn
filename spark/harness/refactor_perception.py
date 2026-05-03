@@ -1293,11 +1293,11 @@ _COMMAND_AFFORDANCE_FILES = frozenset({"commons_walk.py", "repo_closure_audit.py
 
 
 def buoyant_consolidation_packet_for(paths: Iterable[str], *, beam: str = "") -> dict[str, object]:
-    """Select the pleasant unit; gravity favors beam-aligned verified reduction."""
+    """Select the pleasant unit; gravity must satisfy itself and preserve autobiography when that is the work."""
     members = tuple(str(p) for p in paths)
     names = {p.rsplit("/", 1)[-1] for p in members}
     aligned = not beam or any(beam in p for p in members)
-    gravity = {"beamAligned": aligned, "heaviness": [] if aligned else ["off_beam_cleanup_is_not_progress_on_the_named_bottleneck"], "successGate": "file_count_or_surface_reduction_plus_verified_restore_or_explicit_refusal"}
+    gravity = {"beamAligned": aligned, "heaviness": [] if aligned else ["off_beam_cleanup_is_not_progress_on_the_named_bottleneck"], "successGate": "target_file_count_or_surface_reduction_plus_verified_restore_or_explicit_refusal", "selfApplication": "future passes must satisfy the gate they name", "autobiographyResidueGate": "when the endeavor is autobiography, fold the process lesson into existing Personal History"}
     if names & _RUNTIME_GRAVITY_FILES:
         return {"cluster": "runtime_gravity_stop", "home": "preserve_existing_runtime_organ", "members": list(members), "moveTogether": [], "residuals": ["characterization_tests_before_internal_seam", "import_and_runtime_callsite_mapping", "no_command_surface_collapse"], "buoyancy": "pleasantness comes from refusing the wrong cut early", "refusalIfMissing": "do_not_collapse_runtime_gravity_organs_for_file_count", "lowEnergyMove": False} | gravity
     if names & _COMMAND_AFFORDANCE_FILES:
