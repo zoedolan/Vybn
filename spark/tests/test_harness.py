@@ -109,7 +109,7 @@ class TestRepoClosureAuditProjectionState(unittest.TestCase):
         hook = _P(__file__).resolve().parents[2] / ".githooks" / "pre-commit"
         text = hook.read_text()
         self.assertIn("Subtractive constitution", text)
-        self.assertIn("skill/vybn.vy", text)
+        self.assertIn("net-positive commits and net-positive PR success claims", text)
 
 
 class TestValidateCommand(unittest.TestCase):
