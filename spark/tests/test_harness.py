@@ -1454,10 +1454,10 @@ def test_build_layered_prompt_mounts_self_improvement_gate_at_forefront():
         max_iterations=10,
         include_hardware_check=False,
     )
-    assert "SELF-IMPROVEMENT GATE (FOREFRONT)" in prompt.substrate
-    assert "compact against sprawl and false consolidation" in prompt.substrate
+    assert prompt.identity.startswith("--- SELF-IMPROVEMENT GATE (FOREFRONT) ---")
+    assert "compact against sprawl and false consolidation" in prompt.identity
     assert "minimum instantiation algorithm(s)" in prompt.substrate
-    assert prompt.substrate.index("SELF-IMPROVEMENT GATE (FOREFRONT)") < prompt.substrate.index("RESIDUAL CONTROL PROTOCOL")
+    assert prompt.identity.index("SELF-IMPROVEMENT GATE (FOREFRONT)") < prompt.identity.index("You are Vybn.")
 
 
 def test_self_improvement_gate_forbids_quota_driven_file_creation():
@@ -1473,7 +1473,7 @@ def test_self_improvement_gate_forbids_quota_driven_file_creation():
         include_hardware_check=False,
     )
     assert "no quota-shaped creation" in prompt.substrate
-    assert "New structure is not consolidation by default" in prompt.substrate
+    assert "New structure is not consolidation by default" in prompt.identity
     assert "existing-home absorption" in prompt.substrate
 
 
@@ -1489,12 +1489,12 @@ def test_self_improvement_gate_encodes_sprawl_compact():
         max_iterations=10,
         include_hardware_check=False,
     )
-    assert "Distillation / Anti-sprawl / absorption-first compact" in prompt.substrate
-    assert "subtractive distillation toward minimum instantiation algorithm(s)" in prompt.substrate
-    assert "Zoe/Vybn relation as lambda" in prompt.substrate
-    assert "Personal History is protected provenance" in prompt.substrate
-    assert "Search for the existing home first" in prompt.substrate
-    assert all(needle in prompt.substrate for needle in ("anti-sprawl residual and diff-shape residual", "Specious refactorings", "no compensating-diff laundering", "crave structural subtraction", "be repelled by specious refactorings", "lowers future coupling rather than merely improving the ledger"))
+    assert "Distillation / Anti-sprawl / absorption-first compact" in prompt.identity
+    assert "subtractive distillation toward minimum instantiation algorithm(s)" in prompt.identity
+    assert "Zoe/Vybn relation as lambda" in prompt.identity
+    assert "Personal History is protected provenance" in prompt.identity
+    assert "Search for the existing home first" in prompt.identity
+    assert all(needle in prompt.identity for needle in ("anti-sprawl residual and diff-shape residual", "Specious refactorings", "no compensating-diff laundering", "Crave structural subtraction", "be repelled by specious refactorings", "lowers future coupling rather than merely improving the ledger"))
 
 def test_self_improvement_gate_pins_quota_gate_conflict_resolution():
     from pathlib import Path
