@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 import warnings
 
-from spark.harness.refactor_perception import (
+from spark.harness.substrate import (
     CHANGE_SELF_HEALING_PRINCIPLE,
     CONNECTIVE_TISSUE_PRINCIPLE,
     ADAPTIVE_CONSOLIDATION_PRINCIPLE,
@@ -287,14 +287,14 @@ def test_becoming_loop_protocol_is_loaded_into_orchestrator_substrate():
 
 
 def test_refactor_protocol_uses_consequential_smallness():
-    from spark.harness.refactor_perception import render_refactor_perception_protocol
+    from spark.harness.substrate import render_refactor_perception_protocol
 
     text = render_refactor_perception_protocol()
     assert "smallest consequential" in text
     assert "smallest beautiful true move" not in text
 
 def test_next_structural_tick_turns_pressure_into_action(tmp_path):
-    from spark.harness.refactor_perception import next_structural_tick_for_repo
+    from spark.harness.substrate import next_structural_tick_for_repo
 
     src = tmp_path / "giant.py"
     body = "\n".join([
@@ -313,7 +313,7 @@ def test_next_structural_tick_turns_pressure_into_action(tmp_path):
 
 
 def test_next_structural_tick_refuses_protected_only_pressure(tmp_path):
-    from spark.harness.refactor_perception import next_structural_tick_for_repo
+    from spark.harness.substrate import next_structural_tick_for_repo
 
     hist = tmp_path / "Vybn's Personal History"
     hist.mkdir()
@@ -328,7 +328,7 @@ def test_next_structural_tick_refuses_protected_only_pressure(tmp_path):
 
 
 def test_render_next_structural_tick_is_not_a_visualization_only(tmp_path):
-    from spark.harness.refactor_perception import render_next_structural_tick
+    from spark.harness.substrate import render_next_structural_tick
 
     src = tmp_path / "organ.py"
     src.write_text("def f():\n" + "\n".join("    pass" for _ in range(220)) + "\n")
@@ -387,7 +387,7 @@ def test_residual_coupling_law_prefers_him_vy_contract(monkeypatch, tmp_path):
 def test_archive_duplicate_consolidation_lesson_is_loaded():
     from pathlib import Path
 
-    source = Path(__file__).resolve().parents[1] / "harness" / "refactor_perception.py"
+    source = Path(__file__).resolve().parents[1] / "harness" / "substrate.py"
     text = source.read_text()
     assert "ARCHIVE_DUPLICATE_CONSOLIDATION" in text
     assert "retire_archive_duplicate_with_manifest_restore" in text
@@ -396,7 +396,7 @@ def test_archive_duplicate_consolidation_lesson_is_loaded():
 def test_retired_script_consolidation_lesson_is_loaded():
     from pathlib import Path
 
-    source = Path(__file__).resolve().parents[1] / "harness" / "refactor_perception.py"
+    source = Path(__file__).resolve().parents[1] / "harness" / "substrate.py"
     text = source.read_text()
     assert "RETIRED_SCRIPT_CONSOLIDATION" in text
     assert "retire_unreferenced_retired_script_with_manifest_restore" in text
@@ -405,7 +405,7 @@ def test_retired_script_consolidation_lesson_is_loaded():
 
 
 def test_semantic_operating_system_protocol_names_the_breakthrough():
-    from spark.harness.refactor_perception import render_semantic_operating_system_protocol
+    from spark.harness.substrate import render_semantic_operating_system_protocol
 
     text = render_semantic_operating_system_protocol()
     assert "semantic operating system for codebases and institutions" in text
@@ -416,7 +416,7 @@ def test_semantic_operating_system_protocol_names_the_breakthrough():
 
 
 def test_semantic_operating_system_tick_composes_existing_structural_tick(tmp_path):
-    from spark.harness.refactor_perception import semantic_operating_system_tick_for_repo
+    from spark.harness.substrate import semantic_operating_system_tick_for_repo
 
     src = tmp_path / "organ.py"
     src.write_text("def large():\n" + "\n".join(f"    x_{i} = {i}" for i in range(220)) + "\n    return 1\n")
@@ -434,9 +434,9 @@ def test_semantic_operating_system_tick_composes_existing_structural_tick(tmp_pa
 
 
 def test_refactor_packet_carries_semantic_operating_system_loop():
-    from spark.harness.refactor_perception import packet_for
+    from spark.harness.substrate import packet_for
 
-    pkt = packet_for("spark/harness/refactor_perception.py", lines=1400, public=False)
+    pkt = packet_for("spark/harness/substrate.py", lines=3000, public=False)
     assert "semanticOperatingSystemPrinciple" in pkt
     assert [step["id"] for step in pkt["semanticOperatingSystemLoop"]] == [
         "memory_pressure",
@@ -449,7 +449,7 @@ def test_refactor_packet_carries_semantic_operating_system_loop():
 
 
 def test_lifecycle_architecture_maps_owner_timing_cleanup_and_restore():
-    from spark.harness.refactor_perception import lifecycle_architecture_for
+    from spark.harness.substrate import lifecycle_architecture_for
 
     arch = lifecycle_architecture_for("vybn-phase/state/history.jsonl")
     assert arch.owner == "deep_memory_or_walk_daemon"
@@ -460,7 +460,7 @@ def test_lifecycle_architecture_maps_owner_timing_cleanup_and_restore():
 
 
 def test_deletion_consolidation_gate_fails_destructive_moves_closed():
-    from spark.harness.refactor_perception import deletion_consolidation_gate_for
+    from spark.harness.substrate import deletion_consolidation_gate_for
 
     gate = deletion_consolidation_gate_for("spark/agent_events.jsonl", "delete stale runtime event log")
     assert gate.status == "ARCHITECTURE_GATE_FIRST"
@@ -470,7 +470,7 @@ def test_deletion_consolidation_gate_fails_destructive_moves_closed():
 
 
 def test_deletion_consolidation_gate_refuses_protected_provenance_even_after_contact():
-    from spark.harness.refactor_perception import deletion_consolidation_gate_for
+    from spark.harness.substrate import deletion_consolidation_gate_for
 
     gate = deletion_consolidation_gate_for(
         "Vybn/Vybn's Personal History/zoes_memoirs.txt",
@@ -482,7 +482,7 @@ def test_deletion_consolidation_gate_refuses_protected_provenance_even_after_con
 
 
 def test_refactor_packet_carries_lifecycle_architecture_gate():
-    from spark.harness.refactor_perception import packet_for
+    from spark.harness.substrate import packet_for
 
     pkt = packet_for("spark/agent_events.jsonl", proposed_change="delete stale runtime event log")
     assert "lifecycleArchitecturePrinciple" in pkt
@@ -490,7 +490,7 @@ def test_refactor_packet_carries_lifecycle_architecture_gate():
     assert pkt["lifecycleArchitecture"]["owner"] == "runtime_process_or_service"
 
 def test_buoyant_consolidation_selects_cluster_or_stop():
-    from spark.harness.refactor_perception import buoyant_consolidation_packet_for as pkt
+    from spark.harness.substrate import buoyant_consolidation_packet_for as pkt
     cmd = pkt(["spark/harness/commons_walk.py", "semantic-web.jsonld"], beam="spark/harness")
     stop = pkt(["spark/harness/providers.py"], beam="spark/harness"); off = pkt(["Vybn_Mind/signal-noise/sessions/x.md"], beam="spark/harness")
     assert (cmd["cluster"], cmd["home"], cmd["lowEnergyMove"]) == ("command_affordance_cluster", "spark/harness/mcp.py", True)

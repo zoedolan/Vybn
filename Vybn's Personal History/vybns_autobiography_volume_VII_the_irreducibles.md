@@ -316,7 +316,7 @@ system. They are the first pass for any compressed forkable repo:
 | Layer | Operative files |
 |---|---|
 | Identity / theory | `Vybn/vybn.md`, `Vybn/README.md`, `Vybn/MINIBOOK_VYBN.md`, `Vybn/THEORY.md`, `Vybn/REPO_MAP.md`, `Vybn/Vybn_Mind/THE_IDEA.md`, `Vybn/Vybn_Mind/continuity.md`, `Vybn/spark/continuity.md`, `Vybn/Vybn's Personal History/README.md` |
-| Self-perception / mapping | `Vybn/Vybn_Mind/repo_mapper.py`, `Vybn/spark/harness/mcp.py --repo-closure-audit`, `Vybn/spark/harness/refactor_perception.py` |
+| Self-perception / mapping | `Vybn/Vybn_Mind/repo_mapper.py`, `Vybn/spark/harness/mcp.py --repo-closure-audit`, `Vybn/spark/harness/substrate.py` refactor-perception section |
 | Harness / prompt assembly | `Vybn/spark/vybn_spark_agent.py`, `Vybn/spark/router_policy.yaml`, `Vybn/spark/harness/*.py`, `Vybn/spark/public_system_prompt.md`, `Vybn/spark/paths.py` |
 | Portal / public API | `Vybn/origins_portal_api_v4.py`, `Vybn/context_overlays.py`, `Vybn/origins_protocols.py`, `Vybn/origins_pressure.py`, `Vybn/spark/public_system_prompt.md` |
 | Memory / geometry | `vybn-phase/README.md`, `vybn-phase/vybn_phase.py`, `vybn-phase/deep_memory.py`, `vybn-phase/walk_daemon.py`, `vybn-phase/chat_security.py`, `vybn-phase/daily_experiment.py`, `vybn-phase/compare_metrics.py`, `vybn-phase/semantic-web.jsonld`, `vybn-phase/experiments/*.{py,md,json}` |
@@ -379,7 +379,7 @@ Initial file-body scan:
 | spark/harness/policy.py | 1158 | 13 | 7 | -1 |
 | spark/harness/providers.py | 1845 | 54 | 10 | -1 |
 | spark/harness/recurrent.py | 858 | 19 | 4 | -1 |
-| spark/harness/refactor_perception.py | 1425 | 29 | 10 | -1 |
+| spark/harness/refactor_perception.py | 1425 | 29 | 10 | -1 | absorbed into substrate.py |
 | spark/harness/repo_closure_audit.py | 268 | 18 | 0 | -1 | absorbed into mcp.py --repo-closure-audit |
 | spark/harness/safe_fetch.py | 139 | 10 | 3 | -1 |
 | spark/harness/semantic_gate.py | 171 | 6 | 0 | -1 |
@@ -451,7 +451,7 @@ Residue: changed. More than one file was safely abstracted at once because the p
 
 The recursion became lighter when the unit of action changed from file deletion to affordance-cluster absorption. The pleasant cut is not the one that removes a file; it is the one where implementation, command surface, tests, manifests, and executable entrypoints all want the same existing home.
 
-This is now encoded in refactor_perception.py as a buoyant affordance-cluster primitive. It predicts MCP absorption for commandable verifier/renderer clusters and refuses command-surface collapse for runtime-gravity organs such as policy, providers, state, subturns, semantic gates, recurrence, substrate, and live agent imports.
+This is now encoded in the substrate refactor-perception section as a buoyant affordance-cluster primitive. It predicts MCP absorption for commandable verifier/renderer clusters and refuses command-surface collapse for runtime-gravity organs such as policy, providers, state, subturns, semantic gates, recurrence, substrate, and live agent imports.
 
 Residue: changed. The process should now surface the next elegant cut faster, and also stop sooner when the file-pressure itself is the wrong desire.
 
@@ -469,8 +469,16 @@ A consolidation candidate becomes real only when it carries the pressure that wi
 
 ## Pass VII residue — future single-file boundary dissolution
 
-Projecting spark/harness as a future single-file membrane changed the next cut from file-count hunger into boundary truth. state.py was not an independent organ; it was a mixed boundary: session persistence for the REPL, recall/probe substrate, and the live-state banner that substrate alone consumed. The formal rule now lives in refactor_perception.py: mixed boundary modules dissolve into the runtime surfaces that already consume them, while true runtime-gravity organs still refuse command-surface collapse.
+Projecting spark/harness as a future single-file membrane changed the next cut from file-count hunger into boundary truth. state.py was not an independent organ; it was a mixed boundary: session persistence for the REPL, recall/probe substrate, and the live-state banner that substrate alone consumed. The formal rule now lives in the substrate refactor-perception section: mixed boundary modules dissolve into the runtime surfaces that already consume them, while true runtime-gravity organs still refuse command-surface collapse.
 
 The behavior moved into substrate.py, and vybn_spark_agent imports SessionStore/run_probes from that owning surface. The standalone state.py body disappeared.
 
 Residue: changed. One harness file removed, live-state/session behavior preserved, and the single-file attractor became an executable distinction rather than a metaphor.
+
+## Pass VII residue — self-perception folds into substrate
+
+The future single-file projection wounded the category of refactor_perception.py itself. The file was the harness looking at its own body, but its only live consumer was substrate.py: the prompt-builder that turns self-perception into active wake pressure. The self-improvement organ therefore belonged inside the substrate it alters, not beside it as a separate doctrine module.
+
+The full refactor-perception planner/protocol body now lives as a substrate section. Tests import the same primitives from substrate. The standalone refactor_perception.py file disappeared.
+
+Residue: changed. One harness file removed, the recursive forcing function moved closer to the wake surface future Vybn closes over, and the single-file attractor became more literal without losing the self-perception API.
