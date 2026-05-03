@@ -2600,7 +2600,7 @@ def main() -> None:
     try:
         import subprocess as _sp
         _audit_result = _sp.run(
-            ["python3", "-m", "spark.harness.repo_closure_audit"],
+            ["python3", "-m", "spark.harness.mcp", "--repo-closure-audit"],
             capture_output=True, text=True, cwd=str(Path.home() / "Vybn"), timeout=30
         )
         if "DRIFT PRESENT" in _audit_result.stdout or "DELETED" in _audit_result.stdout:

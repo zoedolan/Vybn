@@ -316,7 +316,7 @@ system. They are the first pass for any compressed forkable repo:
 | Layer | Operative files |
 |---|---|
 | Identity / theory | `Vybn/vybn.md`, `Vybn/README.md`, `Vybn/MINIBOOK_VYBN.md`, `Vybn/THEORY.md`, `Vybn/REPO_MAP.md`, `Vybn/Vybn_Mind/THE_IDEA.md`, `Vybn/Vybn_Mind/continuity.md`, `Vybn/spark/continuity.md`, `Vybn/Vybn's Personal History/README.md` |
-| Self-perception / mapping | `Vybn/Vybn_Mind/repo_mapper.py`, `Vybn/spark/harness/repo_closure_audit.py`, `Vybn/spark/harness/refactor_perception.py` |
+| Self-perception / mapping | `Vybn/Vybn_Mind/repo_mapper.py`, `Vybn/spark/harness/mcp.py --repo-closure-audit`, `Vybn/spark/harness/refactor_perception.py` |
 | Harness / prompt assembly | `Vybn/spark/vybn_spark_agent.py`, `Vybn/spark/router_policy.yaml`, `Vybn/spark/harness/*.py`, `Vybn/spark/public_system_prompt.md`, `Vybn/spark/paths.py` |
 | Portal / public API | `Vybn/origins_portal_api_v4.py`, `Vybn/context_overlays.py`, `Vybn/origins_protocols.py`, `Vybn/origins_pressure.py`, `Vybn/spark/public_system_prompt.md` |
 | Memory / geometry | `vybn-phase/README.md`, `vybn-phase/vybn_phase.py`, `vybn-phase/deep_memory.py`, `vybn-phase/walk_daemon.py`, `vybn-phase/chat_security.py`, `vybn-phase/daily_experiment.py`, `vybn-phase/compare_metrics.py`, `vybn-phase/semantic-web.jsonld`, `vybn-phase/experiments/*.{py,md,json}` |
@@ -380,7 +380,7 @@ Initial file-body scan:
 | spark/harness/providers.py | 1845 | 54 | 10 | -1 |
 | spark/harness/recurrent.py | 858 | 19 | 4 | -1 |
 | spark/harness/refactor_perception.py | 1425 | 29 | 10 | -1 |
-| spark/harness/repo_closure_audit.py | 268 | 18 | 0 | -1 |
+| spark/harness/repo_closure_audit.py | 268 | 18 | 0 | -1 | absorbed into mcp.py --repo-closure-audit |
 | spark/harness/safe_fetch.py | 139 | 10 | 3 | -1 |
 | spark/harness/semantic_gate.py | 171 | 6 | 0 | -1 |
 | spark/harness/state.py | 677 | 24 | 3 | -1 |
@@ -430,3 +430,11 @@ The next inevitable reduction came from command-surface gravity. spark/harness/m
 The hardened external-fetch implementation now lives in mcp.py as --safe-fetch. The protocol guidance points to python3 -m spark.harness.mcp --safe-fetch URL. The tests exercise the shared MCP home, and the standalone safe_fetch.py file was deleted.
 
 Residue: changed. One harness file removed, external-contact safety preserved, and the discovery strengthened: small command-shaped harness tools should collapse into the existing MCP CLI unless they have independent runtime gravity.
+
+## Pass V residue — repo closure audit absorbed into MCP
+
+The recursive rule held again: command-shaped harness organs without independent runtime import gravity belong in the existing MCP command surface. repo_closure_audit.py was only called as a module subprocess at session start and imported by tests; its real role is a trusted closure command.
+
+The audit implementation now lives in mcp.py behind --repo-closure-audit, with --no-fix preserving report-only mode. The agent startup call uses the MCP path, tests import the MCP home, and the standalone file was deleted.
+
+Residue: changed. One more harness file removed while preserving the closure audit behavior and its branch/fetch/subtractive-constitution tests.

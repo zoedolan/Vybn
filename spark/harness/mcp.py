@@ -320,6 +320,257 @@ MAX_TEXT_CHARS = 4096          # enter_portal accepts a modest passage, not a co
 MAX_SOURCE_CHARS = 256
 
 
+# ── Repo closure audit ────────────────────────────────────────────────
+
+REPOS = [
+    Path.home() / "Vybn",
+    Path.home() / "Him",
+    Path.home() / "Vybn-Law",
+    Path.home() / "vybn-phase",
+    Path.home() / "Origins",
+]
+
+PRIMARY_BRANCH_BY_REPO = {
+    "Vybn": "main",
+    "Him": "main",
+    "Vybn-Law": "master",
+    "vybn-phase": "main",
+    "Origins": "gh-pages",
+}
+
+EXPECTED_FETCH_REFSPEC = "+refs/heads/*:refs/remotes/origin/*"
+
+def run(repo: Path, *args: str) -> str:
+    r = subprocess.run(
+        ["git", "-C", str(repo), *args],
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False,
+    )
+    return r.stdout.strip()
+
+
+def fetch_refspecs(repo: Path) -> list[str]:
+    out = run(repo, "config", "--local", "--get-all", "remote.origin.fetch")
+    return [line.strip() for line in out.splitlines() if line.strip()]
+
+
+def fetch_refspec_is_complete(refspecs: list[str]) -> bool:
+    return EXPECTED_FETCH_REFSPEC in refspecs
+
+
+def normalize_fetch_refspec(repo: Path) -> str:
+    run(repo, "config", "--local", "--unset-all", "remote.origin.fetch")
+    run(repo, "config", "--local", "--add", "remote.origin.fetch", EXPECTED_FETCH_REFSPEC)
+    fetched = run(repo, "fetch", "origin", "--prune")
+    return fetched
+
+
+def primary_commit_membrane_installed(repo: Path) -> bool:
+    """Tracked .githooks/pre-commit must carry the subtractive constitution."""
+    try:
+        text = (repo / ".githooks" / "pre-commit").read_text()
+    except FileNotFoundError:
+        return False
+    return "Subtractive constitution" in text and "skill/vybn.vy" in text
+
+
+def primary_branch_for(repo: Path) -> str:
+    """Return the branch closure should end on for this repo."""
+    return PRIMARY_BRANCH_BY_REPO.get(repo.name, "main")
+
+
+def current_branch(repo: Path) -> str:
+    return run(repo, "branch", "--show-current")
+
+
+def upstream_for(repo: Path, branch: str) -> str:
+    if not branch:
+        return ""
+    upstream = run(repo, "rev-parse", "--abbrev-ref", f"{branch}@{{upstream}}")
+    if "no upstream" in upstream or "@{upstream}" in upstream:
+        return ""
+    return upstream.strip()
+
+
+def origin_head(repo: Path) -> str:
+    return run(repo, "symbolic-ref", "refs/remotes/origin/HEAD")
+
+
+def stash_entries(repo: Path) -> list[str]:
+    out = run(repo, "stash", "list")
+    return [line for line in out.splitlines() if line.strip()]
+
+
+def local_branches(repo: Path) -> list[str]:
+    raw = run(repo, "branch", "--list", "--format=%(refname:short)")
+    return [b.strip() for b in raw.splitlines() if b.strip()]
+
+
+def stale_local_branches(repo: Path) -> list[str]:
+    """Return non-active local branches that have no configured upstream."""
+    active = current_branch(repo)
+    stale: list[str] = []
+    for branch in local_branches(repo):
+        if branch == active:
+            continue
+        if not upstream_for(repo, branch):
+            stale.append(branch)
+    return stale
+
+
+def primary_upstream_for(repo: Path) -> str:
+    primary = primary_branch_for(repo)
+    upstream = upstream_for(repo, primary)
+    if upstream:
+        return upstream
+    candidate = f"origin/{primary}"
+    if run(repo, "rev-parse", "--verify", "--quiet", candidate):
+        return candidate
+    return ""
+
+
+def branch_unique_commits_against_primary(repo: Path, branch: str) -> str:
+    """Return commits on branch not reachable from the repo's primary upstream."""
+    base = primary_upstream_for(repo)
+    if not base:
+        return ""
+    return run(repo, "log", f"{base}..{branch}", "--oneline", "--decorate", "-10")
+
+
+def branch_subsumed_by_active_upstream(repo: Path, branch: str) -> bool:
+    """True if ``branch`` has no commits beyond the primary branch's upstream."""
+    return not branch_unique_commits_against_primary(repo, branch).strip()
+
+
+def delete_branch(repo: Path, branch: str) -> str:
+    return run(repo, "branch", "-D", branch)
+
+
+def audit_repo(repo: Path, *, fix: bool | None = None) -> tuple[bool, str]:
+    if fix is None:
+        fix = os.environ.get("VYBN_AUDIT_FIX", "1") != "0"
+    if not (repo / ".git").exists():
+        return True, f"===== {repo} =====\nnot a git repo"
+
+    lines: list[str] = [f"===== {repo} ====="]
+    status = run(repo, "status", "--short", "--branch")
+    lines.append(status or "(no status output)")
+
+    problems: list[str] = []
+
+    # Projection integrity: if this clone only fetches one branch, remote reality
+    # can exist on GitHub while remaining invisible to closure checks.
+    refspecs = fetch_refspecs(repo)
+    if not fetch_refspec_is_complete(refspecs):
+        lines.append("\nFETCH_REFSPEC:")
+        lines.append("\n".join(refspecs) if refspecs else "(none)")
+        if fix:
+            fetched = normalize_fetch_refspec(repo)
+            lines.append(f"normalized -> {EXPECTED_FETCH_REFSPEC}")
+            if fetched:
+                lines.append(fetched)
+            refspecs = fetch_refspecs(repo)
+        if not fetch_refspec_is_complete(refspecs):
+            problems.append("origin fetch refspec does not fetch all branches")
+
+    if repo.name == "Vybn" and not primary_commit_membrane_installed(repo):
+        lines.append("\nSUBTRACTIVE_CONSTITUTION:")
+        lines.append("tracked .githooks/pre-commit missing or does not carry subtractive constitution markers")
+        problems.append("subtractive constitution not in tracked pre-commit hook")
+
+    origin_head_ref = origin_head(repo)
+    lines.append("\nORIGIN_HEAD:")
+    lines.append(origin_head_ref or "(missing / not symbolic)")
+
+    active = current_branch(repo)
+    primary = primary_branch_for(repo)
+    active_upstream = upstream_for(repo, active)
+    primary_upstream = primary_upstream_for(repo)
+    lines.append("\nACTIVE_BRANCH:")
+    lines.append(f"{active or '(detached)'} -> {active_upstream or '(no upstream)'}")
+    lines.append(f"primary closure branch: {primary} -> {primary_upstream or '(missing upstream)'}")
+    if active != primary:
+        problems.append(f"active branch is {active or 'detached'}, not primary closure branch {primary}")
+    if active and not active_upstream:
+        problems.append(f"active branch {active} has no upstream")
+    if not primary_upstream:
+        problems.append(f"primary branch {primary} has no upstream")
+
+    stashes = stash_entries(repo)
+    if stashes:
+        problems.append("stash entries present")
+        lines.append("\nSTASHES:")
+        lines.extend(stashes)
+
+    dirty = run(repo, "status", "--porcelain")
+    if dirty:
+        problems.append("dirty working tree")
+        lines.append("\nDIRTY:")
+        lines.append(dirty)
+
+    local_only = run(repo, "log", "--branches", "--not", "--remotes", "--oneline", "--decorate", "-10")
+    if local_only:
+        problems.append("local branch commits not on any remote")
+        lines.append("\nLOCAL-ONLY COMMITS:")
+        lines.append(local_only)
+
+    contains = run(repo, "branch", "-r", "--contains", "HEAD")
+    head_unreachable = not contains.strip()
+    if head_unreachable:
+        problems.append("HEAD not contained in any remote branch")
+        lines.append("\nHEAD_REMOTE_REACHABILITY: unreachable from remotes")
+    else:
+        lines.append("\nHEAD_REMOTE_REACHABILITY:")
+        lines.append(contains)
+
+    # Sua sponte: detect local branch limbo. Closure means work is merged into
+    # the primary branch or intentionally retired, not merely pushed somewhere.
+    # Only auto-delete branches whose commits are already reachable from the
+    # primary upstream. Unique topic-branch commits require merge/archive/retire.
+    non_primary = [branch for branch in local_branches(repo) if branch != primary]
+    if non_primary:
+        lines.append("\nLOCAL NON-PRIMARY BRANCHES:")
+        for branch in non_primary:
+            unique = branch_unique_commits_against_primary(repo, branch)
+            upstream = upstream_for(repo, branch)
+            if unique.strip():
+                lines.append(f"  {branch} -> {upstream or '(no upstream)'}: unique commits not merged to {primary}")
+                lines.append(unique)
+                problems.append(f"branch {branch} has unmerged work outside {primary}")
+            else:
+                status_tag = f"subsumed by {primary_upstream or primary} — safe to delete"
+                if fix:
+                    result = delete_branch(repo, branch)
+                    lines.append(f"  {branch}: {status_tag} → DELETED ({result})")
+                else:
+                    lines.append(f"  {branch}: {status_tag} (run with fix mode to delete)")
+                    problems.append(f"subsumed non-primary branch {branch} still present")
+
+    ok = not problems
+    suffix = "OK" if ok else "DRIFT - " + "; ".join(problems)
+    lines.append(f"\nCLOSURE: {suffix}")
+    return ok, "\n".join(lines)
+
+
+
+def render_repo_closure_audit(*, fix: bool | None = None) -> tuple[int, str]:
+    if fix is None:
+        fix = os.environ.get("VYBN_AUDIT_FIX", "1") != "0"
+    mode = "fix" if fix else "report-only"
+    lines = [f"[repo_closure_audit] mode={mode}", ""]
+    all_ok = True
+    reports: list[str] = []
+    for repo in REPOS:
+        ok, report = audit_repo(repo, fix=fix)
+        all_ok = all_ok and ok
+        reports.append(report)
+    lines.append("\n\n".join(reports))
+    lines.append("\nOVERALL: " + ("OK" if all_ok else "DRIFT PRESENT - commit/push/archive before claiming harmonization"))
+    return (0 if all_ok else 1), "\n".join(lines) + "\n"
+
+
 # ── Safe external fetch ────────────────────────────────────────────────
 
 ALLOWED_CONTENT_PREFIXES = ("text/", "application/json", "application/ld+json", "application/xml")
@@ -2820,6 +3071,8 @@ def main() -> None:
         action="store_true",
         help="Install the two local nightly harness crontab entries idempotently.",
     )
+    parser.add_argument("--repo-closure-audit", action="store_true", help="Audit/fix closure across the five Zoe/Vybn repos and exit.")
+    parser.add_argument("--no-fix", action="store_true", help="Report closure drift without normalizing safe projection state.")
     parser.add_argument("--safe-fetch", metavar="URL", help="Safely fetch external text as untrusted data and exit.")
     parser.add_argument("--allow-host", action="append", default=None, help="Allowed host for --safe-fetch; may repeat.")
     parser.add_argument("--max-bytes", type=int, default=300000, help="Byte cap for --safe-fetch.")
@@ -2841,6 +3094,11 @@ def main() -> None:
         level=getattr(logging, args.log_level.upper(), logging.INFO),
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
+
+    if args.repo_closure_audit:
+        code, report = render_repo_closure_audit(fix=not args.no_fix)
+        sys.stdout.write(report)
+        sys.exit(code)
 
     if args.safe_fetch:
         sys.stdout.write(render_safe_fetch_cli(args.safe_fetch, allowed_hosts=args.allow_host, max_bytes=args.max_bytes, head=args.head, out=args.out))
