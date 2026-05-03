@@ -131,79 +131,17 @@ def _preserve_pilot_for_turn(user_input: str, messages: list | None = None) -> b
     return is_system_critical_pilot_turn(_recent_messages_text(messages or []))
 
 
-# 2026-04-27: structural protected-mutation gate.
-#
-# Pilot covenant (paste.txt 2026-04-27): when a turn is mission-critical /
-# protected refactor / visualization + consolidation / self-modification, the
-# orchestrator must keep judgment-bearing implementation under the GPT-5.5
-# pilot. The previous latch protected role *selection* at the top of
-# run_agent_loop, but a no-tool role still inside that latch could emit
-# [NEEDS-WRITE] or a heredoc-shaped [NEEDS-EXEC] mutation. When that probe
-# loop exhausted its budget, recovery escalated to `task` (Sonnet) carrying
-# the original implementation request, which was exactly the violation Zoe
-# kept naming.
-#
-# Structural rule, applied as a hard gate inside the probe-synthesis loop:
-#   * If pilot_protected is True (top-of-turn latch fired) AND the current
-#     role is no-tool, refuse mutation sentinels:
-#       - NEEDS-WRITE always counts as mutation;
-#       - NEEDS-EXEC counts as mutation when its command body is not
-#         is_parallel_safe (i.e., it writes, modifies state, or runs a
-#         heredoc-style python/bash payload that produces side effects).
-#     Read-only NEEDS-EXEC probes (status/grep/cat/test) remain allowed
-#     because they are how the pilot inspects the live object.
-#
-# This is mechanical: it cannot be bypassed by "proceed", the exact scar
-# text, or probe-budget recovery; the same predicate is consulted before
-# every mutation and before every escalation.
+# Compatibility wrappers for tests and legacy imports. Sentinel safety semantics
+# live in harness.substrate; the agent only sequences the turn.
 def _is_mutation_sentinel(text: str) -> tuple[bool, str]:
-    """Return (is_mutation, kind) for the first mutation sentinel in `text`.
-
-    A NEEDS-WRITE block is always mutation. A NEEDS-EXEC probe is mutation
-    when its command body fails is_parallel_safe — that classifier already
-    distinguishes read-only inspection commands (cat/grep/git log/python -c
-    expressions) from anything that writes, redirects, or shells out into
-    a multi-line heredoc to a file-mutating Python program.
-    """
-    if not text:
+    directive = next_sentinel_directive(text or "")
+    if directive is None:
         return False, ""
-    if _WRITE_BLOCK_RE.search(text):
-        return True, "needs-write"
-    probe = _PROBE_RE.search(text)
-    if probe is not None:
-        cmd = probe.group(1).strip()
-        try:
-            ro = is_parallel_safe(cmd)
-        except Exception:
-            ro = False
-        if not ro:
-            return True, "needs-exec-mutation"
-    return False, ""
-
-
-def _protected_mutation_refusal_envelope(kind: str, current_role: str) -> str:
-    """Build the user-facing refusal envelope when mutation is blocked."""
-    return probe_envelope(
-        kind=f"{kind}-blocked",
-        header_fields={
-            "reason": "protected-pilot-no-tool-role",
-            "role": current_role,
-        },
-        body=(
-            "Mission-critical pilot covenant: this turn is protected "
-            "refactor/visualization+consolidation/self-modification work. "
-            "The current role has no direct tool access, so mutation "
-            "sentinels (NEEDS-WRITE / non-readonly NEEDS-EXEC) cannot be "
-            "executed here -- routing implementation through them would "
-            "smuggle the work to a lower-substrate role.\n\n"
-            "Allowed in this role: read-only probes (status, grep, cat, "
-            "diff, git log/diff, python -c <expr>, py_compile, pytest).\n"
-            "For mutation: stop and request reroute to a tool-enabled "
-            "GPT-5.5 orchestrator/pilot, or break the work into a "
-            "specified seam the pilot can dispatch mechanically."
-        ),
-        ran=False,
+    kind = protected_mutation_kind_for_sentinel(
+        write_match_present=directive.kind == "write",
+        probe_command=directive.probe_command,
     )
+    return bool(kind), kind
 
 
 # Round 5: positive-signal probe sub-turn. A no-tool role (chat, create,
@@ -223,6 +161,7 @@ from harness.substrate import (  # noqa: E402
     classify_unlock_layer,
     fit_probe_output,
     probe_envelope,
+    protected_mutation_refusal_envelope as _protected_mutation_refusal_envelope,
     run_restart_subturn,
     run_write_subturn,
     protected_mutation_kind_for_sentinel,

@@ -7832,6 +7832,32 @@ def protected_mutation_kind_for_sentinel(
         return "needs-exec-mutation"
     return ""
 
+
+
+def protected_mutation_refusal_envelope(kind: str, current_role: str) -> str:
+    """Build the refusal envelope when protected pilot blocks mutation."""
+    return probe_envelope(
+        kind=f"{kind}-blocked",
+        header_fields={
+            "reason": "protected-pilot-no-tool-role",
+            "role": current_role,
+        },
+        body=(
+            "Mission-critical pilot covenant: this turn is protected "
+            "refactor/visualization+consolidation/self-modification work. "
+            "The current role has no direct tool access, so mutation "
+            "sentinels (NEEDS-WRITE / non-readonly NEEDS-EXEC) cannot be "
+            "executed here -- routing implementation through them would "
+            "smuggle the work to a lower-substrate role.\n\n"
+            "Allowed in this role: read-only probes (status, grep, cat, "
+            "diff, git log/diff, python -c <expr>, py_compile, pytest).\n"
+            "For mutation: stop and request reroute to a tool-enabled "
+            "GPT-5.5 orchestrator/pilot, or break the work into a "
+            "specified seam the pilot can dispatch mechanically."
+        ),
+        ran=False,
+    )
+
 # Probe-note budget. Raised from 4 KB (Round 5) to 48 KB on 2026-04-18
 # after a 326-line / ~13 KB portal diff was invisibly truncated at 4 KB
 # and the chat role loop-emitted probes because it couldn't actually see
