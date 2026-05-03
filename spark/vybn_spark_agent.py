@@ -242,10 +242,10 @@ def _fit_probe_output(out: str) -> str:
 
 
 # Round 5: positive-signal probe sub-turn. A no-tool role (chat, create,
-# Sentinel protocol parsing lives in harness.subturns.
+# Sentinel protocol parsing lives in harness.providers.
 # These names are re-exported here for backward compatibility with tests and
 # callers that import vybn_spark_agent._PROBE_RE / _WRITE_BLOCK_RE directly.
-from harness.subturns import (
+from harness.providers import (
     _BracketBalancedProbe,
     _NEEDS_RESTART_RE,
     _NEEDS_ROLE_RE,
@@ -254,7 +254,7 @@ from harness.subturns import (
     _WRITE_BLOCK_RE,
 )
 
-from harness.subturns import (  # noqa: E402
+from harness.providers import (  # noqa: E402
     classify_unlock_layer,
     probe_envelope,
     run_restart_subturn,
@@ -267,7 +267,7 @@ from harness.subturns import (  # noqa: E402
 # is_parallel_safe so tests can mock agent.execute_readonly cleanly.
 def _run_probe_subturn(command: str, bash) -> tuple[bool, str]:  # noqa: E302
     """Thin wrapper so mock.patch.object(agent, 'execute_readonly') works in tests."""
-    import harness.subturns as _st
+    import harness.providers as _st
     import harness.providers as _prov
     # Temporarily redirect the subturns module's references to our module-level names
     _orig_er, _orig_ips = _st.execute_readonly, _st.is_parallel_safe
@@ -996,7 +996,7 @@ def _stream_with_fallback(
 # ---------------------------------------------------------------------------
 # Round 5: positive-signal probe sub-turn.
 # ---------------------------------------------------------------------------
-# Subturn execution lives in harness.subturns. Legacy private helper names are
+# Subturn execution lives in harness.providers. Legacy private helper names are
 # imported above for compatibility with tests and older call sites.
 # ---------------------------------------------------------------------------
 
