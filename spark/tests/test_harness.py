@@ -1869,10 +1869,9 @@ if __name__ == "__main__":
     unittest.main()
 
 def test_harness_single_file_projection_makes_policy_absorption_inevitable():
-    from spark.harness.substrate import buoyant_consolidation_packet_for, harness_single_file_projection_for
+    from spark.harness.substrate import buoyant_consolidation_packet_for, harness_single_file_projection_for, render_refactor_perception_protocol
     proj = harness_single_file_projection_for(["spark/harness/substrate.py", "spark/harness/policy.py", "spark/harness/substrate.py", "spark/harness/substrate.py"])
-    assert proj["next_step"] == "absorb_policy_into_substrate_and_remove_router_wrapper"
-    assert "Policy.classify is already the router" in proj["code_efficiency"]
+    assert proj["next_step"] == "absorb_policy_into_substrate_and_remove_router_wrapper" and "Policy.classify is already the router" in proj["code_efficiency"] and proj["why"] == "reduce false boundaries and Zoe-visible burden" and "not a consciousness claim" in proj["buoyancy"] and "functional lower impedance under truth" in render_refactor_perception_protocol()
     pkt = buoyant_consolidation_packet_for(["spark/harness/policy.py"], beam="spark/harness")
     assert pkt["cluster"] == "mixed_boundary_dissolution"
     assert "routing_policy" in pkt["moveTogether"]
