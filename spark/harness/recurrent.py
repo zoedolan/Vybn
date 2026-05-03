@@ -855,3 +855,149 @@ def run_recurrent_loop(
         halt_reason=halt_reason,
         trace=trace,
     )
+
+# ---------------------------------------------------------------------------
+# Recurrent probe CLI — absorbed from spark/harness_recurrent_probe.py
+# ---------------------------------------------------------------------------
+
+def _probe_load_policy(policy_path: str | None = None):
+    try:
+        from .policy import load_policy
+    except ImportError:  # direct harness import under spark/ path
+        from harness.policy import load_policy  # type: ignore
+    return load_policy(policy_path) if policy_path else load_policy()
+
+
+def _probe_registry():
+    try:
+        from .providers import ProviderRegistry
+    except ImportError:
+        from harness.providers import ProviderRegistry  # type: ignore
+    return ProviderRegistry()
+
+
+def run_recurrent_probe_one(
+    prompt: str,
+    *,
+    registry: Any,
+    policy: Any,
+    max_loop_iters: int,
+    label: str,
+    out_path: Path | None,
+) -> dict[str, Any]:
+    """Run one T value through the recurrent loop and optionally append JSONL."""
+    t0 = time.monotonic()
+    events: list[dict[str, Any]] = []
+    result = run_recurrent_loop(
+        e=prompt,
+        registry=registry,
+        policy=policy,
+        max_loop_iters=max_loop_iters,
+        logger=events.append,
+    )
+    elapsed_ms = int((time.monotonic() - t0) * 1000)
+    record = {
+        "label": label,
+        "prompt": prompt[:400],
+        "max_loop_iters": max_loop_iters,
+        "loops_run": result.loops_run,
+        "halt_reason": result.halt_reason,
+        "elapsed_ms": elapsed_ms,
+        "residual_final": residual_magnitude(result.h_final),
+        "n_hypotheses_final": len(result.h_final.hypotheses),
+        "n_resolved_final": len(result.h_final.resolved),
+        "coda_text": result.text,
+        "trace": result.trace,
+    }
+    if out_path is not None:
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(out_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(record, default=str) + "\n")
+    return record
+
+
+def recurrent_probe_main(argv: list[str] | None = None) -> int:
+    """Compare T=1 against deeper recurrent loop depths on stored prompts."""
+    import argparse
+    import os
+
+    ap = argparse.ArgumentParser(
+        description=(
+            "Probe the looped-orchestrate recurrent prototype. "
+            "Use --probe with --prompt or --prompts-file."
+        )
+    )
+    ap.add_argument("--probe", action="store_true", help="Run the recurrent probe CLI.")
+    src = ap.add_mutually_exclusive_group(required=False)
+    src.add_argument("--prompt", type=str, help="Single prompt to run.")
+    src.add_argument("--prompts-file", type=str, help="File with one prompt per line; blank lines/# ignored.")
+    ap.add_argument("--out", type=str, default=os.path.expanduser("~/logs/recurrent_probe.jsonl"))
+    ap.add_argument("--t-values", type=str, default="1,4")
+    ap.add_argument("--policy", type=str, default=None)
+    ap.add_argument("--quiet", action="store_true")
+    args = ap.parse_args(argv)
+
+    if not args.probe:
+        ap.print_help()
+        return 0
+    if not args.prompt and not args.prompts_file:
+        ap.error("--probe requires --prompt or --prompts-file")
+
+    policy = _probe_load_policy(args.policy)
+    registry = _probe_registry()
+
+    prompts: list[str] = []
+    if args.prompt:
+        prompts.append(args.prompt)
+    else:
+        text = Path(args.prompts_file).read_text(encoding="utf-8")
+        prompts = [line.strip() for line in text.splitlines() if line.strip() and not line.strip().startswith("#")]
+
+    try:
+        t_values = [int(x.strip()) for x in args.t_values.split(",") if x.strip()]
+    except ValueError:
+        print(f"bad --t-values: {args.t_values!r}", file=sys.stderr)
+        return 2
+
+    out_path = Path(args.out).expanduser()
+    for i, prompt in enumerate(prompts):
+        print(f"\n=== probe {i+1}/{len(prompts)}: {prompt[:80]!r} ===")
+        results_by_t: dict[int, dict[str, Any]] = {}
+        for T in t_values:
+            label = f"T={T}"
+            print(f"\n  running {label}...")
+            rec = run_recurrent_probe_one(
+                prompt,
+                registry=registry,
+                policy=policy,
+                max_loop_iters=T,
+                label=label,
+                out_path=out_path,
+            )
+            results_by_t[T] = rec
+            print(
+                f"  {label}: loops_run={rec['loops_run']} "
+                f"halt={rec['halt_reason']} residual={rec['residual_final']} "
+                f"elapsed={rec['elapsed_ms']}ms"
+            )
+            if not args.quiet:
+                print(f"  ---- coda ({label}) ----")
+                print(rec["coda_text"])
+                print(f"  ---- end coda ({label}) ----")
+        if len(t_values) >= 2:
+            baseline = results_by_t[t_values[0]]
+            deepest = results_by_t[t_values[-1]]
+            print(
+                f"\n  comparison (T={t_values[0]} -> T={t_values[-1]}): "
+                f"Δresidual={baseline['residual_final'] - deepest['residual_final']} "
+                f"(positive = deeper loop resolved more), "
+                f"Δelapsed={deepest['elapsed_ms'] - baseline['elapsed_ms']}ms"
+            )
+    print(f"\nwrote {out_path}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(recurrent_probe_main())
+
+
