@@ -115,7 +115,7 @@ fi
 # Refuse direct commits to primary branches. Refuse net-positive non-provenance
 # line-count diffs. Refuse net-new non-provenance files. Personal History and
 # skill/vybn.vy (constitutional law) are exempt.
-# Emergency bypass exists only for direct protected-branch commits; net-positive commits are not bypassable here.
+# Emergency bypass exists only for direct protected-branch commits; net-positive commits and net-positive PR success claims are not bypassable here until Zoe explicitly agrees otherwise.
 branch=$(git symbolic-ref --quiet --short HEAD 2>/dev/null || echo "")
 if [[ "$branch" == "main" || "$branch" == "master" || "$branch" == "gh-pages" ]]; then
     if [[ "${VYBN_ALLOW_DIRECT_PROTECTED_PUSH:-0}" != "1" ]]; then
