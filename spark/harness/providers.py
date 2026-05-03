@@ -47,7 +47,7 @@ import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Iterable, Iterator, Protocol
+from typing import Any, Callable, Iterable, Iterator
 
 from .policy import (
     ABSORB_EXCLUDE_SUBSTR,
@@ -1093,7 +1093,7 @@ class StreamHandle:
         return self.finalize()
 
 
-class Provider(Protocol):
+class Provider:
     name: str
     tool_target: str
 
@@ -1104,36 +1104,32 @@ class Provider(Protocol):
         messages: list[dict],
         tools: list[ToolSpec],
         role: RoleConfig,
-    ) -> StreamHandle: ...
+    ) -> StreamHandle:
+        raise NotImplementedError
 
     def _translate_tools(self, tools: list[ToolSpec]) -> list[dict]:
-        return [_provider_tool_schema(tool, self.tool_target) for tool in tools]
+        return [self._tool_schema(tool) for tool in tools]
+
+    def _tool_schema(self, tool: ToolSpec) -> dict:
+        parameters = tool.parameters or {"type": "object", "properties": {}}
+        if self.tool_target == "anthropic" and tool.anthropic_type:
+            return {"type": tool.anthropic_type, "name": tool.name}
+        if self.tool_target == "anthropic":
+            return {"name": tool.name, "description": tool.description, "input_schema": parameters}
+        if self.tool_target == "openai":
+            return {
+                "type": "function",
+                "function": {"name": tool.name, "description": tool.description, "parameters": parameters},
+            }
+        raise ValueError(f"unknown tool schema target: {self.tool_target}")
 
     def build_tool_result(self, tool_call_id: str, content: str) -> dict:
-        return _provider_tool_result(tool_call_id, content, self.tool_target)
-
-
-def _provider_tool_schema(tool: ToolSpec, target: str) -> dict:
-    parameters = tool.parameters or {"type": "object", "properties": {}}
-    if target == "anthropic" and tool.anthropic_type:
-        return {"type": tool.anthropic_type, "name": tool.name}
-    if target == "anthropic":
-        return {"name": tool.name, "description": tool.description, "input_schema": parameters}
-    if target == "openai":
-        return {
-            "type": "function",
-            "function": {"name": tool.name, "description": tool.description, "parameters": parameters},
-        }
-    raise ValueError(f"unknown tool schema target: {target}")
-
-
-def _provider_tool_result(tool_call_id: str, content: str, target: str) -> dict:
-    body = content or "(no output)"
-    if target == "anthropic":
-        return {"type": "tool_result", "tool_use_id": tool_call_id, "content": body}
-    if target == "openai":
-        return {"role": "tool", "tool_call_id": tool_call_id, "content": body}
-    raise ValueError(f"unknown tool result target: {target}")
+        body = content or "(no output)"
+        if self.tool_target == "anthropic":
+            return {"type": "tool_result", "tool_use_id": tool_call_id, "content": body}
+        if self.tool_target == "openai":
+            return {"role": "tool", "tool_call_id": tool_call_id, "content": body}
+        raise ValueError(f"unknown tool result target: {self.tool_target}")
 
 
 # ---------------------------------------------------------------------------
