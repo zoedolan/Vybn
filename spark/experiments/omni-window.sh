@@ -120,7 +120,7 @@ fi
 # cleanup's restart path recover Super; Omni artifacts must not be consumed.
 super_semantic_gate() {
   PYTHONPATH="${HOME}/Vybn/spark${PYTHONPATH:+:${PYTHONPATH}}" \
-    python3 -m harness.semantic_gate \
+    python3 -m harness.providers --semantic-gate \
       --base-url "${SUPER_URL}" \
       --model "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"
 }

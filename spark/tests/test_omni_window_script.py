@@ -17,7 +17,7 @@ import pytest
 
 SCRIPT = Path(__file__).resolve().parents[1] / "experiments" / "omni-window.sh"
 SLEEP_CYCLE_SCRIPT = Path(__file__).resolve().parents[1] / "experiments" / "super-sleep-cycle.sh"
-SEMANTIC_GATE_MODULE = Path(__file__).resolve().parents[1] / "harness" / "semantic_gate.py"
+SEMANTIC_GATE_MODULE = Path(__file__).resolve().parents[1] / "harness" / "providers.py"
 
 
 def _src() -> str:
@@ -115,7 +115,7 @@ def test_super_semantic_gate_exists_and_uses_raw_deterministic_expected_outputs(
     src = _src()
     gate = SEMANTIC_GATE_MODULE.read_text()
     assert "super_semantic_gate()" in src
-    assert "python3 -m harness.semantic_gate" in src
+    assert "python3 -m harness.providers --semantic-gate" in src
     assert 'api_base + "/completions"' in gate
     assert '"temperature": 0' in gate
     assert '"max_tokens": 24' in gate
@@ -127,7 +127,7 @@ def test_super_semantic_gate_exists_and_uses_raw_deterministic_expected_outputs(
         assert probe_name in gate
     assert "corruption_signature=" in gate
     assert 'finish == "length"' in gate or 'finish_reason=length' in gate
-    assert "<<'PY'" not in src, "omni-window must not duplicate the canonical semantic gate heredoc"
+    assert "<<'PY'" not in src, "omni-window must not duplicate the provider-owned semantic gate heredoc"
 
 
 def test_semantic_gate_runs_before_sleep_and_after_wake_before_success():
@@ -164,7 +164,7 @@ def test_super_sleep_cycle_harness_is_isolated_from_omni_and_defaults_level1():
     assert "sleep request failed/timed out" in src
     assert "wake request failed/timed out" in src
     assert "super_semantic_gate()" in src
-    assert "python3 -m harness.semantic_gate" in src
+    assert "python3 -m harness.providers --semantic-gate" in src
     assert 'api_base + "/completions"' in gate
     assert '"temperature": 0' in gate
     assert '"max_tokens": 24' in gate
@@ -177,7 +177,7 @@ def test_super_sleep_cycle_harness_is_isolated_from_omni_and_defaults_level1():
     assert "corruption_signature=" in gate
     assert "cold_restart_super_non_sleep" in src
     assert "failing closed after cold restart" in src
-    assert "<<'PY'" not in src, "sleep-cycle must not duplicate the canonical semantic gate heredoc"
+    assert "<<'PY'" not in src, "sleep-cycle must not duplicate the provider-owned semantic gate heredoc"
 
 
 def test_super_sleep_cycle_harness_bash_syntax_clean():
