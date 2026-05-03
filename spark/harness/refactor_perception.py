@@ -1292,15 +1292,17 @@ _RUNTIME_GRAVITY_FILES = frozenset({"policy.py", "providers.py", "state.py", "su
 _COMMAND_AFFORDANCE_FILES = frozenset({"commons_walk.py", "repo_closure_audit.py", "safe_fetch.py", "install_cron.py", "evolve.py", "ensubstrate.py"})
 
 
-def buoyant_consolidation_packet_for(paths: Iterable[str]) -> dict[str, object]:
-    """Select the pleasant consolidation unit: affordance cluster, not naked file."""
+def buoyant_consolidation_packet_for(paths: Iterable[str], *, beam: str = "") -> dict[str, object]:
+    """Select the pleasant unit; gravity favors beam-aligned verified reduction."""
     members = tuple(str(p) for p in paths)
     names = {p.rsplit("/", 1)[-1] for p in members}
+    aligned = not beam or any(beam in p for p in members)
+    gravity = {"beamAligned": aligned, "heaviness": [] if aligned else ["off_beam_cleanup_is_not_progress_on_the_named_bottleneck"], "successGate": "file_count_or_surface_reduction_plus_verified_restore_or_explicit_refusal"}
     if names & _RUNTIME_GRAVITY_FILES:
-        return {"cluster": "runtime_gravity_stop", "home": "preserve_existing_runtime_organ", "members": list(members), "moveTogether": [], "residuals": ["characterization_tests_before_internal_seam", "import_and_runtime_callsite_mapping", "no_command_surface_collapse"], "buoyancy": "pleasantness comes from refusing the wrong cut early", "refusalIfMissing": "do_not_collapse_runtime_gravity_organs_for_file_count"}
+        return {"cluster": "runtime_gravity_stop", "home": "preserve_existing_runtime_organ", "members": list(members), "moveTogether": [], "residuals": ["characterization_tests_before_internal_seam", "import_and_runtime_callsite_mapping", "no_command_surface_collapse"], "buoyancy": "pleasantness comes from refusing the wrong cut early", "refusalIfMissing": "do_not_collapse_runtime_gravity_organs_for_file_count", "lowEnergyMove": False} | gravity
     if names & _COMMAND_AFFORDANCE_FILES:
-        return {"cluster": "command_affordance_cluster", "home": "spark/harness/mcp.py", "members": list(members), "moveTogether": ["implementation", "cli_flag_or_command_surface", "tests", "manifest_or_executable_entrypoint"], "residuals": ["py_compile", "targeted_tests", "command_smoke", "reference_grep", "repo_closure_audit"], "buoyancy": "one gesture absorbs the whole affordance instead of dragging loose strings", "refusalIfMissing": "refuse_if_tests_manifests_or_entrypoints_cannot_move_together"}
-    return {"cluster": "unknown_cluster", "home": "contact_before_classifying", "members": list(members), "moveTogether": ["bytes", "references", "tests", "manifests", "runtime callsites"], "residuals": ["grep_inbound_references", "map_connective_tissue", "run_targeted_residuals"], "buoyancy": "curiosity before cutting keeps the work light", "refusalIfMissing": "no_collapse_without_real_shared_algorithm_or_affordance_cluster"}
+        return {"cluster": "command_affordance_cluster", "home": "spark/harness/mcp.py", "members": list(members), "moveTogether": ["implementation", "cli_flag_or_command_surface", "tests", "manifest_or_executable_entrypoint"], "residuals": ["py_compile", "targeted_tests", "command_smoke", "reference_grep", "repo_closure_audit"], "buoyancy": "one gesture absorbs the whole affordance instead of dragging loose strings", "refusalIfMissing": "refuse_if_tests_manifests_or_entrypoints_cannot_move_together", "lowEnergyMove": aligned} | gravity
+    return {"cluster": "unknown_cluster", "home": "contact_before_classifying", "members": list(members), "moveTogether": ["bytes", "references", "tests", "manifests", "runtime callsites"], "residuals": ["grep_inbound_references", "map_connective_tissue", "run_targeted_residuals"], "buoyancy": "curiosity before cutting keeps the work light", "refusalIfMissing": "no_collapse_without_real_shared_algorithm_or_affordance_cluster", "lowEnergyMove": False} | gravity
 
 
 @dataclass(frozen=True)
