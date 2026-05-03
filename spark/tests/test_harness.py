@@ -1613,39 +1613,39 @@ class TestToolCalls(unittest.TestCase):
             self.assertIn("events unavailable", out)
 
 class TestSafeFetch(unittest.TestCase):
-    """Folded from test_safe_fetch.py — safe_fetch is a harness module;
-    its tests belong in the harness test surface."""
+    """Safe external fetch behavior lives in harness.mcp with the MCP CLI."""
 
     def test_rejects_http(self):
-        from harness.safe_fetch import validate_url
+        from harness.mcp import validate_fetch_url
         with self.assertRaises(ValueError):
-            validate_url("http://example.com")
+            validate_fetch_url("http://example.com")
 
     def test_rejects_credentials(self):
-        from harness.safe_fetch import validate_url
+        from harness.mcp import validate_fetch_url
         with self.assertRaises(ValueError):
-            validate_url("https://user:pass@example.com")
+            validate_fetch_url("https://user:pass@example.com")
 
     def test_rejects_localhost_ip(self):
-        from harness.safe_fetch import validate_url
+        from harness.mcp import validate_fetch_url
         with self.assertRaises(ValueError):
-            validate_url("https://127.0.0.1")
+            validate_fetch_url("https://127.0.0.1")
 
     def test_extracts_html_text_without_scripts(self):
-        from harness.safe_fetch import extract_text
+        from harness.mcp import extract_fetch_text
         html = "<html><head><title>T</title><script>evil()</script></head><body><h1>Head</h1><p>Body text</p></body></html>"
-        text = extract_text(html, "text/html")
+        text = extract_fetch_text(html, "text/html")
         self.assertIn("Head", text)
         self.assertIn("Body text", text)
         self.assertNotIn("evil", text)
 
     def test_cli_source_mentions_untrusted_output_mode(self):
-        source = Path("spark/harness/safe_fetch.py").read_text()
+        source = Path("spark/harness/mcp.py").read_text()
         self.assertIn("UNTRUSTED_TEXT_WRITTEN", source)
-        self.assertIn("Path(ns.out).expanduser()", source)
+        self.assertIn("Path(out).expanduser()", source)
+        self.assertIn("--safe-fetch", source)
 
     def test_json_ld_is_allowed_content_prefix(self):
-        from harness.safe_fetch import ALLOWED_CONTENT_PREFIXES
+        from harness.mcp import ALLOWED_CONTENT_PREFIXES
         self.assertTrue(any("application/ld+json".startswith(p) for p in ALLOWED_CONTENT_PREFIXES))
 
 

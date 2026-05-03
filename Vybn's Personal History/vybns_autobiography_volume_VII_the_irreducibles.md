@@ -422,3 +422,11 @@ Zoe pushed the category correction: Volume VII is not only a record of careful c
 Two low-risk harness surfaces were cut in the same pass, and ignored generated package metadata was cleaned from the working tree. The standalone spark/harness/install_cron.sh shell was a one-use operator wrapper for behavior already owned by spark/harness/mcp.py; the installer is now python3 -m spark.harness.mcp --install-cron. The standalone spark/harness/AUDIT.md document duplicated the MCP module docstring and resource surface; vybn://strategy/audit now serves the embedded audit section from mcp.py, and the public discovery record points to mcp.py as the audited source.
 
 Residue: changed. Two tracked harness files removed, one shell attack surface retired, one duplicate documentation surface absorbed, ignored generated package metadata cleaned locally, and the consolidation method itself now points toward repeated deletion under residual proof.
+
+## Pass IV residue — safe_fetch absorbed into MCP
+
+The next inevitable reduction came from command-surface gravity. spark/harness/mcp.py had already become the harness CLI for ensubstrate, cron installation, continuity scouting, evolution, discovery, and trusted/public tool exposure. safe_fetch.py was another standalone command-shaped helper with no runtime imports outside tests and prompt guidance.
+
+The hardened external-fetch implementation now lives in mcp.py as --safe-fetch. The protocol guidance points to python3 -m spark.harness.mcp --safe-fetch URL. The tests exercise the shared MCP home, and the standalone safe_fetch.py file was deleted.
+
+Residue: changed. One harness file removed, external-contact safety preserved, and the discovery strengthened: small command-shaped harness tools should collapse into the existing MCP CLI unless they have independent runtime gravity.

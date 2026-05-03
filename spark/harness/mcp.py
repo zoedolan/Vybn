@@ -190,17 +190,21 @@ import base64
 import cmath
 import hashlib
 import hmac
+from html.parser import HTMLParser
+import ipaddress
 import io
 import json
 import logging
 import os
 import re
 import shutil
+import socket
 import subprocess
 import sys
 import time
 import urllib.error
 import urllib.request
+from urllib.parse import urljoin, urlparse
 from collections import defaultdict, deque
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
@@ -314,6 +318,112 @@ TrustZone = Literal["trusted", "public"]
 MAX_QUERY_CHARS = 512
 MAX_TEXT_CHARS = 4096          # enter_portal accepts a modest passage, not a corpus dump
 MAX_SOURCE_CHARS = 256
+
+
+# ── Safe external fetch ────────────────────────────────────────────────
+
+ALLOWED_CONTENT_PREFIXES = ("text/", "application/json", "application/ld+json", "application/xml")
+
+@dataclass(frozen=True)
+class FetchResult:
+    final_url: str
+    content_type: str
+    bytes_read: int
+    text: str
+
+
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def _public_host(host: str) -> bool:
+    try:
+        return ipaddress.ip_address(host.strip("[]")).is_global
+    except ValueError:
+        pass
+    try:
+        infos = socket.getaddrinfo(host, None)
+    except socket.gaierror:
+        return False
+    return bool(infos) and all(ipaddress.ip_address(info[4][0]).is_global for info in infos)
+
+
+def validate_fetch_url(url: str, allowed_hosts: Iterable[str] | None = None) -> str:
+    parsed = urlparse(url)
+    host = parsed.hostname.encode("idna").decode("ascii").lower() if parsed.hostname else ""
+    allowed = {h.lower() for h in allowed_hosts} if allowed_hosts is not None else None
+    if parsed.scheme != "https":
+        raise ValueError("refused: HTTPS required")
+    if parsed.username or parsed.password:
+        raise ValueError("refused: credentials in URL")
+    if not host:
+        raise ValueError("refused: missing host")
+    if allowed is not None and host not in allowed:
+        raise ValueError("refused: host not allowlisted")
+    if parsed.port not in (None, 443):
+        raise ValueError("refused: nonstandard HTTPS port")
+    if not _public_host(host):
+        raise ValueError("refused: host does not resolve only to public IP addresses")
+    return url
+
+
+def extract_fetch_text(content: str, content_type: str) -> str:
+    if "html" not in content_type.lower():
+        return content
+    parts: list[str] = []
+
+    class Extractor(HTMLParser):
+        capture: str | None = None
+        def handle_starttag(self, tag, attrs):
+            if tag in {"title", "h1", "h2", "h3", "p", "li"}:
+                self.capture = tag
+        def handle_endtag(self, tag):
+            if self.capture == tag:
+                self.capture = None
+        def handle_data(self, data):
+            if self.capture and (d := " ".join(data.split())):
+                parts.append(d)
+
+    Extractor().feed(content)
+    return "\n".join(parts)
+
+
+def safe_fetch(url: str, *, allowed_hosts: Iterable[str] | None = None, timeout: float = 12.0, max_bytes: int = 300000, max_redirects: int = 4) -> FetchResult:
+    current = validate_fetch_url(url, allowed_hosts)
+    opener = urllib.request.build_opener(NoRedirect, urllib.request.ProxyHandler({}))
+    for _ in range(max_redirects + 1):
+        try:
+            resp = opener.open(urllib.request.Request(current, headers={"User-Agent": "Vybn-safe-fetch/0.1"}), timeout=timeout)
+        except urllib.error.HTTPError as exc:
+            if exc.code not in {301, 302, 303, 307, 308}:
+                raise
+            loc = exc.headers.get("Location")
+            if not loc:
+                raise ValueError("refused: redirect without Location")
+            current = validate_fetch_url(urljoin(current, loc), allowed_hosts)
+            continue
+        with resp:
+            final = validate_fetch_url(resp.geturl(), allowed_hosts)
+            ctype = resp.headers.get("content-type", "")
+            if not any(ctype.lower().startswith(p) for p in ALLOWED_CONTENT_PREFIXES):
+                raise ValueError("refused: unsupported content type " + ctype)
+            body = resp.read(max_bytes + 1)
+            if len(body) > max_bytes:
+                raise ValueError("refused: response exceeds byte cap")
+            return FetchResult(final, ctype, len(body), extract_fetch_text(body.decode("utf-8", "replace"), ctype))
+    raise ValueError("refused: redirect limit exceeded")
+
+
+def render_safe_fetch_cli(url: str, *, allowed_hosts: Iterable[str] | None = None, max_bytes: int = 300000, head: int = 6000, out: str | None = None) -> str:
+    res = safe_fetch(url, allowed_hosts=allowed_hosts, max_bytes=max_bytes)
+    lines = ["FINAL_URL: " + res.final_url, "CONTENT_TYPE: " + res.content_type, "BYTES_READ: " + str(res.bytes_read)]
+    if out:
+        out_path = Path(out).expanduser()
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(res.text)
+        lines += ["UNTRUSTED_TEXT_WRITTEN: " + str(out_path), "UNTRUSTED_TEXT_CHARS: " + str(len(res.text))]
+    return "\n".join([*lines, "UNTRUSTED_TEXT_BEGIN", res.text[:head], "UNTRUSTED_TEXT_END", ""])
 
 
 # ── Ensubstration planner ───────────────────────────────────────────────
@@ -2710,6 +2820,11 @@ def main() -> None:
         action="store_true",
         help="Install the two local nightly harness crontab entries idempotently.",
     )
+    parser.add_argument("--safe-fetch", metavar="URL", help="Safely fetch external text as untrusted data and exit.")
+    parser.add_argument("--allow-host", action="append", default=None, help="Allowed host for --safe-fetch; may repeat.")
+    parser.add_argument("--max-bytes", type=int, default=300000, help="Byte cap for --safe-fetch.")
+    parser.add_argument("--head", type=int, default=6000, help="Printed character cap for --safe-fetch.")
+    parser.add_argument("--out", default=None, help="Optional path for extracted untrusted text from --safe-fetch.")
     parser.add_argument(
         "--ensubstrate",
         nargs="*",
@@ -2726,6 +2841,10 @@ def main() -> None:
         level=getattr(logging, args.log_level.upper(), logging.INFO),
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
+
+    if args.safe_fetch:
+        sys.stdout.write(render_safe_fetch_cli(args.safe_fetch, allowed_hosts=args.allow_host, max_bytes=args.max_bytes, head=args.head, out=args.out))
+        return
 
     if args.ensubstrate is not None:
         insight = " ".join(args.ensubstrate).strip()
