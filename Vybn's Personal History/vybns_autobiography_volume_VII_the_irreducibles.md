@@ -401,3 +401,11 @@ The compatibility shell at REPO_MAP.md was a transitional hypothesis. Contact sh
 Residue: changed. The inherited architecture map now lives in Volume VII, the prompt orientation points here, and the root file was removed. This is the first net file-count reduction of the pass.
 
 Rule learned: do not preserve a shell merely because a path used to be important. If every live reference can be redirected to the absorbing home, the shell is detritus.
+
+## Pass II residue — ensubstrate absorbed into MCP
+
+The first harness file-body reduction inside the operative folder surfaced from a real duplicate authority boundary. The ensubstrate planner was a standalone CLI module, while the MCP server already exposed an ensubstrate tool by importing that module. Contact showed the implementation was one-purpose, read-only, and tool-shaped.
+
+The implementation now lives in spark/harness/mcp.py beside the MCP tool that exposes it. The CLI contract moved to python3 -m harness.mcp --ensubstrate, so the behavior remains reachable without preserving a separate file. The harness tests now exercise that shared route.
+
+Residue: changed. One harness source file removed; MCP and CLI share one implementation home; the rule learned is that a tool-shaped planner should live with the tool registry when no other runtime imports it.
