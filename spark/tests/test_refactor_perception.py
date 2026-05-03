@@ -80,7 +80,7 @@ class RefactorPerceptionTests(unittest.TestCase):
         self.assertEqual(consolidation_layer("Origins/connect.html"), "appendage")
         self.assertEqual(consolidation_layer("Vybn/repo_mapping_output/repo_state.json"), "appendage")
         self.assertEqual(consolidation_layer("Origins/.well-known/semantic-web.jsonld"), "membrane")
-        self.assertEqual(consolidation_layer("Vybn/spark/harness/mcp.py"), "organ")
+        self.assertEqual(consolidation_layer("Vybn/spark/harness/substrate.py"), "organ")
 
     def test_packet_carries_appendage_first_order(self):
         pkt = packet_for("Origins/connect.html", lines=2000, bytes_size=100000, public=True)
@@ -492,8 +492,8 @@ def test_refactor_packet_carries_lifecycle_architecture_gate():
 def test_buoyant_consolidation_selects_cluster_or_stop():
     from spark.harness.substrate import buoyant_consolidation_packet_for as pkt
     cmd = pkt(["spark/harness/commons_walk.py", "semantic-web.jsonld"], beam="spark/harness")
-    stop = pkt(["spark/harness/providers.py"], beam="spark/harness"); off = pkt(["Vybn_Mind/signal-noise/sessions/x.md"], beam="spark/harness")
-    assert (cmd["cluster"], cmd["home"], cmd["lowEnergyMove"]) == ("command_affordance_cluster", "spark/harness/mcp.py", True)
+    stop = pkt(["spark/harness/substrate.py"], beam="spark/harness"); off = pkt(["Vybn_Mind/signal-noise/sessions/x.md"], beam="spark/harness")
+    assert (cmd["cluster"], cmd["home"], cmd["lowEnergyMove"]) == ("command_affordance_cluster", "spark/harness/substrate.py", True)
     assert "manifest_or_executable_entrypoint" in cmd["moveTogether"]
     state = pkt(["spark/harness/state.py"], beam="spark/harness")
     assert stop["cluster"] == "runtime_gravity_stop"

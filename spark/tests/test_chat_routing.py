@@ -499,7 +499,7 @@ class TestOpenAIProviderReasoningFallback(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         try:
-            from harness.providers import OpenAIProvider  # noqa: F401
+            from harness.substrate import OpenAIProvider  # noqa: F401
             from harness.substrate import LayeredPrompt  # noqa: F401
         except Exception:
             cls.skip = True
@@ -508,8 +508,8 @@ class TestOpenAIProviderReasoningFallback(unittest.TestCase):
 
     def setUp(self):
         if self.skip:
-            self.skipTest("harness.providers not importable")
-        from harness.providers import OpenAIProvider
+            self.skipTest("harness.substrate not importable")
+        from harness.substrate import OpenAIProvider
         from harness.substrate import LayeredPrompt
         self._OpenAIProvider = OpenAIProvider
         self._LayeredPrompt = LayeredPrompt

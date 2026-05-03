@@ -26,7 +26,7 @@ dependencies = [
 # surface is a different shape; expose it as `vybn-mcp` for callers
 # who want the FastMCP server.
 vybn = "vybn_spark_agent:main"
-vybn-mcp = "harness.mcp:main"
+vybn-mcp = "harness.substrate:mcp_main"
 
 [tool.setuptools]
 py-modules = ["vybn_spark_agent"]
