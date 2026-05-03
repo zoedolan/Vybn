@@ -1108,12 +1108,46 @@ class Provider(Protocol):
     def build_tool_result(self, tool_call_id: str, content: str) -> dict: ...
 
 
+def _provider_tool_schema(tool: ToolSpec, target: str) -> dict:
+    parameters = tool.parameters or {"type": "object", "properties": {}}
+    if target == "anthropic" and tool.anthropic_type:
+        return {"type": tool.anthropic_type, "name": tool.name}
+    if target == "anthropic":
+        return {"name": tool.name, "description": tool.description, "input_schema": parameters}
+    if target == "openai":
+        return {
+            "type": "function",
+            "function": {"name": tool.name, "description": tool.description, "parameters": parameters},
+        }
+    raise ValueError(f"unknown tool schema target: {target}")
+
+
+def _provider_tool_result(tool_call_id: str, content: str, target: str) -> dict:
+    body = content or "(no output)"
+    if target == "anthropic":
+        return {"type": "tool_result", "tool_use_id": tool_call_id, "content": body}
+    if target == "openai":
+        return {"role": "tool", "tool_call_id": tool_call_id, "content": body}
+    raise ValueError(f"unknown tool result target: {target}")
+
+
+class ProviderTranslationMixin:
+    tool_target: str
+
+    def _translate_tools(self, tools: list[ToolSpec]) -> list[dict]:
+        return [_provider_tool_schema(tool, self.tool_target) for tool in tools]
+
+    def build_tool_result(self, tool_call_id: str, content: str) -> dict:
+        return _provider_tool_result(tool_call_id, content, self.tool_target)
+
+
 # ---------------------------------------------------------------------------
 # AnthropicProvider
 # ---------------------------------------------------------------------------
 
-class AnthropicProvider:
+class AnthropicProvider(ProviderTranslationMixin):
     name = "anthropic"
+    tool_target = "anthropic"
 
     def __init__(self, client: Any | None = None, api_key: str | None = None) -> None:
         # Defer the SDK import until first use. Constructing this provider
@@ -1221,19 +1255,6 @@ class AnthropicProvider:
         _flush_tool_results()
         return out
 
-    def _translate_tools(self, tools: list[ToolSpec]) -> list[dict]:
-        out: list[dict] = []
-        for t in tools:
-            if t.anthropic_type:
-                out.append({"type": t.anthropic_type, "name": t.name})
-            else:
-                out.append({
-                    "name": t.name,
-                    "description": t.description,
-                    "input_schema": t.parameters or {"type": "object", "properties": {}},
-                })
-        return out
-
     def stream(
         self,
         *,
@@ -1329,14 +1350,6 @@ class AnthropicProvider:
 
         return StreamHandle(iterator=_iter(), finalize=_final)
 
-    def build_tool_result(self, tool_call_id: str, content: str) -> dict:
-        return {
-            "type": "tool_result",
-            "tool_use_id": tool_call_id,
-            "content": content or "(no output)",
-        }
-
-
 # ---------------------------------------------------------------------------
 # OpenAIProvider — also used for local OpenAI-compatible vLLM / Nemotron
 # ---------------------------------------------------------------------------
@@ -1418,7 +1431,7 @@ def _strip_reasoning(text: str) -> str:
     return cleaned.strip()
 
 
-class OpenAIProvider:
+class OpenAIProvider(ProviderTranslationMixin):
     """OpenAI-compatible provider.
 
     Works for:
@@ -1427,6 +1440,7 @@ class OpenAIProvider:
     """
 
     name = "openai"
+    tool_target = "openai"
 
     def __init__(
         self,
@@ -1436,21 +1450,6 @@ class OpenAIProvider:
     ) -> None:
         self.api_key = api_key or os.environ.get("OPENAI_API_KEY") or "EMPTY"
         self.base_url = base_url
-
-    def _translate_tools(self, tools: list[ToolSpec]) -> list[dict]:
-        return [
-            {
-                "type": "function",
-                "function": {
-                    "name": t.name,
-                    "description": t.description,
-                    "parameters": t.parameters or {
-                        "type": "object", "properties": {}
-                    },
-                },
-            }
-            for t in tools
-        ]
 
     def _messages_for_openai(
         self, system: LayeredPrompt, messages: list[dict]
@@ -1733,14 +1732,6 @@ class OpenAIProvider:
         )
 
         return StreamHandle(iterator=_iter(), finalize=lambda: finalized)
-
-    def build_tool_result(self, tool_call_id: str, content: str) -> dict:
-        return {
-            "role": "tool",
-            "tool_call_id": tool_call_id,
-            "content": content or "(no output)",
-        }
-
 
 # === NO-TOOL SENTINEL SUBTURNS ===========================================
 # Folded into the provider/tool organ: NEEDS-EXEC, NEEDS-WRITE, and
