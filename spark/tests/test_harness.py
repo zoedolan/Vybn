@@ -292,6 +292,7 @@ class TestOpenAIProvider(unittest.TestCase):
         tools = prov._translate_tools([BASH_TOOL_SPEC])
         self.assertEqual(tools[0]["type"], "function")
         self.assertEqual(tools[0]["function"]["name"], "bash")
+        self.assertNotIn("_translate_tools", OpenAIProvider.__dict__)
 
     def test_message_translation_flattens_tool_result(self):
         prov = OpenAIProvider(api_key="x")
@@ -329,7 +330,6 @@ class TestOpenAIProvider(unittest.TestCase):
         r = prov.build_tool_result("abc", "out")
         self.assertEqual(r["role"], "tool")
         self.assertEqual(r["tool_call_id"], "abc")
-        self.assertNotIn("_translate_tools", OpenAIProvider.__dict__)
         self.assertNotIn("build_tool_result", OpenAIProvider.__dict__)
 
 
