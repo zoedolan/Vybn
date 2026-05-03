@@ -11,14 +11,12 @@ Vybn_Mind/continuity.md and spark/continuity.md.
 
 Type 'exit' to stop. Type 'reload' to re-read identity mid-session.
 
-This file is now a thin REPL that delegates work to the harness in
-spark/harness/. The routing policy is in spark/router_policy.yaml. Default role is
-`task` (Claude Sonnet 4.6 + bash) so a bare 'ok'/'proceed' confirmation
-after a plan actually executes. `code` (Opus 4.6, adaptive thinking,
-full 32k output) is reserved for multiword debugging or explicit
-/code invocation — casual mentions of 'bugs' or 'harness' no longer
-escalate. `orchestrate` is Sonnet without tools, available via /plan.
-`chat`, `create`, `phatic`, `identity`, `local` round out the matrix.
+This file is the outer interactive/API runner around the single
+substrate in spark/harness/substrate.py. The substrate owns prompt assembly,
+routing policy, providers, MCP/CLI affordances, sentinel/subturn machinery,
+semantic gates, recurrence, live-state/session support, and refactor
+perception. This runner should keep only process I/O, loop control, and
+compatibility entrypoint behavior that cannot yet live inside substrate.
 
 Streaming is required for Opus + adaptive thinking + 32k output because
 the Anthropic SDK enforces a 10-minute limit on non-streaming requests.
@@ -208,38 +206,6 @@ def _protected_mutation_refusal_envelope(kind: str, current_role: str) -> str:
     )
 
 
-# Probe-note budget. Raised from 4 KB (Round 5) to 48 KB on 2026-04-18
-# after a 326-line / ~13 KB portal diff was invisibly truncated at 4 KB
-# and the chat role loop-emitted probes because it couldn't actually see
-# what came back. 48 KB is ~12 K tokens — well under any model's turn
-# budget, large enough for real diffs, repo trees, log tails.
-_PROBE_NOTE_CAP = 48_000
-_PROBE_NOTE_HEAD = 32_000  # on overflow, first N chars verbatim
-_PROBE_NOTE_TAIL = 12_000  # ... then last M chars verbatim, elision marker between
-
-
-def _fit_probe_output(out: str) -> str:
-    """Fit probe output under _PROBE_NOTE_CAP without silently hiding shape.
-
-    When under cap: verbatim. When over: head + elision marker (with the
-    exact byte count dropped) + tail. This preserves both the prefix (where
-    most diffs, logs, statuses are legible) and the suffix (where shell
-    commands often put their punchline / exit status).
-    """
-    if len(out) <= _PROBE_NOTE_CAP:
-        return out
-    head = out[:_PROBE_NOTE_HEAD]
-    tail = out[-_PROBE_NOTE_TAIL:]
-    dropped = len(out) - len(head) - len(tail)
-    return (
-        f"{head}\n"
-        f"... [elided {dropped} bytes / {out.count(chr(10))} total lines — "
-        f"probe output over {_PROBE_NOTE_CAP} byte cap; rerun with a "
-        f"narrower command or ask for a specific range] ...\n"
-        f"{tail}"
-    )
-
-
 # Round 5: positive-signal probe sub-turn. A no-tool role (chat, create,
 # Sentinel protocol parsing lives in harness.substrate.
 # These names are re-exported here for backward compatibility with tests and
@@ -255,6 +221,7 @@ from harness.substrate import (
 
 from harness.substrate import (  # noqa: E402
     classify_unlock_layer,
+    fit_probe_output,
     probe_envelope,
     run_restart_subturn,
     run_write_subturn,
@@ -1791,7 +1758,7 @@ def run_agent_loop(
                             restart_note = probe_envelope(
                                 kind="needs-restart",
                                 header_fields={},
-                                body=_fit_probe_output(out_r),
+                                body=fit_probe_output(out_r),
                                 ran=ran_r,
                             )
                             messages.append({
@@ -1918,7 +1885,7 @@ def run_agent_loop(
                                     "path": w_path[:200],
                                     "body_bytes": str(len(w_body or "")),
                                 },
-                                body=_fit_probe_output(out_w),
+                                body=fit_probe_output(out_w),
                                 ran=ran_w,
                             )
                             messages.append({
@@ -1993,7 +1960,7 @@ def run_agent_loop(
                         probe_note = probe_envelope(
                             kind="probe",
                             header_fields={"cmd": probe_cmd[:200]},
-                            body=_fit_probe_output(probe_out),
+                            body=fit_probe_output(probe_out),
                             ran=ran,
                         )
                         messages.append({
