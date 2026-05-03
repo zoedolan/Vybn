@@ -1,4 +1,4 @@
-# Seed prompts for the looped-orchestrate probe.
+# Seed prompts for python3 -m spark.harness.recurrent --probe.
 # Each line is one probe. Blank lines and # comments are ignored.
 # The point: prompts where a single pass is expected to be insufficient
 # (multi-hop reasoning, latent-dependent constraints, verification work)

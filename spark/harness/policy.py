@@ -230,8 +230,8 @@ class RoleConfig:
     # recurrent.py; this field is the one YAML-reachable on-ramp so
     # wiring the loop on real turns is a policy change, not another
     # refactor. Measurement gate: bump this only after
-    # spark/harness_recurrent_probe.py shows T=N beats T=1 on stored
-    # prompts for the target role (see _HARNESS_STRATEGY
+    # python3 -m spark.harness.recurrent --probe shows T=N beats T=1
+    # on stored prompts for the target role (see _HARNESS_STRATEGY
     # .principles.recurrent_depth_seam).
     recurrent_depth: int = 1
     # Optional canned reply that the runtime can serve directly without a

@@ -490,3 +490,30 @@ class TestRecurrentLoop(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestRecurrentProbeCli(unittest.TestCase):
+    def test_recurrent_probe_main_help_is_local(self):
+        from harness.recurrent import recurrent_probe_main
+        self.assertEqual(recurrent_probe_main([]), 0)
+
+    def test_recurrent_probe_one_writes_jsonl_with_stub_provider(self):
+        from harness.recurrent import run_recurrent_probe_one
+        provider = StubProvider(queue=[
+            '{"summary":"s","hypotheses":[],"open_questions":[],"resolved":["done"],"converged":true,"rationale":"ok"}',
+            "coda",
+        ])
+        out = Path("/tmp/recurrent_probe_test.jsonl")
+        if out.exists():
+            out.unlink()
+        rec = run_recurrent_probe_one(
+            "probe",
+            registry=StubRegistry(provider),
+            policy=default_policy(),
+            max_loop_iters=1,
+            label="T=1",
+            out_path=out,
+        )
+        self.assertEqual(rec["label"], "T=1")
+        self.assertTrue(out.exists())
+        self.assertIn('"label": "T=1"', out.read_text())
