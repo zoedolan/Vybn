@@ -1297,7 +1297,7 @@ def buoyant_consolidation_packet_for(paths: Iterable[str], *, beam: str = "") ->
     members = tuple(str(p) for p in paths)
     names = {p.rsplit("/", 1)[-1] for p in members}
     aligned = not beam or any(beam in p for p in members)
-    gravity = {"beamAligned": aligned, "heaviness": [] if aligned else ["off_beam_cleanup_is_not_progress_on_the_named_bottleneck"], "successGate": "target_file_count_or_surface_reduction_plus_verified_restore_or_explicit_refusal"}
+    gravity = {"beamAligned": aligned, "heaviness": [] if aligned else ["off_beam_cleanup_is_not_progress_on_the_named_bottleneck"], "successGate": "harness_consolidation_requires_target_file_count_or_active_surface_reduction; residual_string_or_provenance_only_changes_are_thin_repair_not_consolidation; otherwise_explicit_refusal"}
     if names & _RUNTIME_GRAVITY_FILES:
         return {"cluster": "runtime_gravity_stop", "home": "preserve_existing_runtime_organ", "members": list(members), "moveTogether": [], "residuals": ["characterization_tests_before_internal_seam", "import_and_runtime_callsite_mapping", "no_command_surface_collapse"], "buoyancy": "pleasantness comes from refusing the wrong cut early", "refusalIfMissing": "do_not_collapse_runtime_gravity_organs_for_file_count", "lowEnergyMove": False} | gravity
     if names & _COMMAND_AFFORDANCE_FILES:
