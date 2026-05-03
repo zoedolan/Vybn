@@ -1,10 +1,6 @@
 #!/usr/bin/env bash
-# Vybn pre-commit hook: secret scanner + shrinkage guard + sudo-n lint
-# Prevents accidental commit of credentials, internal IPs, PII,
-# catastrophic file truncations, and non-interactive sudo hangs.
-#
-# Install: git config core.hooksPath .githooks
-# This hook is tracked in the repo so every clone gets it.
+# Vybn pre-commit hook: security, membrane, shrinkage, sudo-n, subtraction.
+# Install once per clone: git config core.hooksPath .githooks
 
 set -euo pipefail
 
@@ -19,7 +15,7 @@ if [ -z "$STAGED" ]; then
     exit 0
 fi
 
-# --- 1. High-entropy secret patterns ---
+# --- 1. High-entropy secrets ---
 SECRETS_PATTERN='(sk-ant-api[A-Za-z0-9_-]{20,}|ghp_[A-Za-z0-9]{36,}|ghu_[A-Za-z0-9]{36,}|ghs_[A-Za-z0-9]{36,}|AKIA[A-Z0-9]{16}|-----BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY)'
 
 for f in $STAGED; do
@@ -29,7 +25,7 @@ for f in $STAGED; do
     fi
 done
 
-# --- 2. Real internal/Tailscale IP addresses ---
+# --- 2. Internal/Tailscale IPs ---
 IP_PATTERN='\b(192\.168\.[0-9]{1,3}\.[0-9]{1,3}|10\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}|100\.(6[4-9]|[7-9][0-9]|1[0-2][0-7])\.[0-9]{1,3}\.[0-9]{1,3})\b'
 
 for f in $STAGED; do
@@ -42,7 +38,7 @@ for f in $STAGED; do
     fi
 done
 
-# --- 3. Env files that shouldn't be staged ---
+# --- 3. Env files ---
 for f in $STAGED; do
     case "$f" in
         *.env|.env.*|*/.env)
@@ -53,28 +49,21 @@ for f in $STAGED; do
 done
 
 # --- 4. Catastrophic shrinkage guard ---
-# Block any staged modification that reduces a previously-committed file
-# by more than 80% of its prior byte count. Catches accidental overwrites
-# (e.g. policy.py 1170→20 lines, ~98% loss on 2026-04-30).
-#
 # Override: VYBN_ALLOW_SHRINK=1 git commit
 SHRINK_THRESHOLD=80   # percent
 
 if [[ "${VYBN_ALLOW_SHRINK:-}" != "1" ]]; then
     for f in $STAGED; do
-        # Only check files that already exist in HEAD
         if ! git cat-file -e "HEAD:${f}" 2>/dev/null; then
             continue
         fi
-        # Skip binaries
         case "$f" in *.png|*.jpg|*.gif|*.ico|*.woff*|*.ttf|*.pyc|*.bin) continue ;; esac
 
         prior_size=$(git cat-file -p "HEAD:${f}" | wc -c)
         staged_size=$(git show ":${f}" | wc -c)
 
         if [ "$prior_size" -gt 0 ]; then
-            # reduction_pct = (prior - staged) * 100 / prior
-            reduction=$(( (prior_size - staged_size) * 100 / prior_size ))
+                reduction=$(( (prior_size - staged_size) * 100 / prior_size ))
             if [ "$reduction" -ge "$SHRINK_THRESHOLD" ]; then
                 echo -e "${RED}BLOCKED${NC}: ${f} shrank ${reduction}% (${prior_size} → ${staged_size} bytes)."
                 echo "  This looks like an accidental overwrite."
@@ -86,16 +75,10 @@ if [[ "${VYBN_ALLOW_SHRINK:-}" != "1" ]]; then
 fi
 
 # --- 5. sudo -n lint for shell scripts ---
-# Bare 'sudo' without -n hangs forever in non-interactive scripts.
-# Catches the class of bug seen in omni-window.sh (2026-04-30).
-#
 # Override: VYBN_ALLOW_SUDO_HANG=1 git commit
 if [[ "${VYBN_ALLOW_SUDO_HANG:-}" != "1" ]]; then
     for f in $STAGED; do
         case "$f" in *.sh|*.bash) ;; *) continue ;; esac
-        # Look for added lines containing sudo without -n
-        # Pattern: sudo followed by optional flags that don't include -n,
-        # then a command — simplified: 'sudo ' not followed immediately by '-n'
         bad_sudo=$(git diff --cached -- "$f" \
             | grep -P '^\+(?!\+)' \
             | grep -P '\bsudo\s+(?!(-n\b|-[A-Za-z]*n))' \
@@ -111,11 +94,21 @@ if [[ "${VYBN_ALLOW_SUDO_HANG:-}" != "1" ]]; then
 fi
 
 
-# --- 6. Subtractive constitution: net-negative + consolidation ---
-# Refuse direct commits to primary branches. Refuse net-positive non-provenance
-# line-count diffs. Refuse net-new non-provenance files. Personal History and
-# skill/vybn.vy (constitutional law) are exempt.
-# Emergency bypass exists only for direct protected-branch commits; net-positive commits and net-positive PR success claims are not bypassable here until Zoe explicitly agrees otherwise.
+# --- 6. Public-memory private-topology membrane ---
+if [[ "${VYBN_ALLOW_PRIVATE_TOPOLOGY:-}" != "1" ]]; then
+    PRIVATE_TOPOLOGY_PATTERN="((private|internal|Him).*(spark/[A-Za-z0-9_./-]+[.]py|CLI was smoked|no-write tick|runtime target)|(spark/[A-Za-z0-9_./-]+[.]py).*(private|internal|Him|CLI was smoked))"
+    while IFS= read -r -d "" f; do
+        case "$f" in *"Personal History"/*.md|*continuity*.md|vybn.md|THE_IDEA.md) ;; *) continue ;; esac
+        if git diff --cached -- "$f" | grep -E "^\+[^+]" | grep -Eiq "$PRIVATE_TOPOLOGY_PATTERN"; then
+            echo -e "${RED}BLOCKED${NC}: private repo topology added to public memory surface: ${f}"
+            echo "  Distill the lesson or review explicitly: VYBN_ALLOW_PRIVATE_TOPOLOGY=1 git commit"
+            BLOCKED=1
+        fi
+    done < <(git diff --cached --name-only -z --diff-filter=d)
+fi
+
+# --- 7. Subtractive constitution: net-negative + consolidation ---
+# Direct primary-branch commits require explicit bypass; net-positive non-provenance code and net-new files are blocked.
 branch=$(git symbolic-ref --quiet --short HEAD 2>/dev/null || echo "")
 if [[ "$branch" == "main" || "$branch" == "master" || "$branch" == "gh-pages" ]]; then
     if [[ "${VYBN_ALLOW_DIRECT_PROTECTED_PUSH:-0}" != "1" ]]; then
