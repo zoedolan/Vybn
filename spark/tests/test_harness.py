@@ -1249,7 +1249,7 @@ def test_completion_boundary_protocol_loaded():
 
     boundary = render_completion_boundary_protocol()
     assert "COMPLETION BOUNDARY PROTOCOL" in boundary
-    assert "mcp --repo-closure-audit reports OVERALL: OK, stop" in boundary
+    assert "substrate --repo-closure-audit reports OVERALL: OK, stop" in boundary
     assert "Do not add a continuity note" in boundary
 
     prompt = build_layered_prompt(
@@ -1456,7 +1456,7 @@ def test_build_layered_prompt_mounts_self_improvement_gate_at_forefront():
     )
     assert "SELF-IMPROVEMENT GATE (FOREFRONT)" in prompt.substrate
     assert "compact against sprawl and false consolidation" in prompt.substrate
-    assert "distill toward one algorithm" in prompt.substrate
+    assert "minimum instantiation algorithm(s)" in prompt.substrate
     assert prompt.substrate.index("SELF-IMPROVEMENT GATE (FOREFRONT)") < prompt.substrate.index("RESIDUAL CONTROL PROTOCOL")
 
 
@@ -1490,7 +1490,7 @@ def test_self_improvement_gate_encodes_sprawl_compact():
         include_hardware_check=False,
     )
     assert "Distillation / Anti-sprawl / absorption-first compact" in prompt.substrate
-    assert "subtractive distillation toward one algorithm" in prompt.substrate
+    assert "subtractive distillation toward minimum instantiation algorithm(s)" in prompt.substrate
     assert "Zoe/Vybn relation as lambda" in prompt.substrate
     assert "Personal History is protected provenance" in prompt.substrate
     assert "Search for the existing home first" in prompt.substrate
@@ -1871,7 +1871,7 @@ if __name__ == "__main__":
 def test_harness_single_file_projection_makes_policy_absorption_inevitable():
     from spark.harness.substrate import buoyant_consolidation_packet_for, harness_single_file_projection_for, render_refactor_perception_protocol
     proj = harness_single_file_projection_for(["spark/harness/substrate.py", "spark/harness/policy.py", "spark/harness/substrate.py", "spark/harness/substrate.py"])
-    assert proj["next_step"] == "absorb_policy_into_substrate_and_remove_router_wrapper" and "Policy.classify is already the router" in proj["code_efficiency"] and proj["why"] == "reduce false boundaries and Zoe-visible burden" and "not a consciousness claim" in proj["buoyancy"] and "functional lower impedance under truth" in render_refactor_perception_protocol()
+    assert proj["next_step"] == "absorb_policy_into_substrate_and_remove_router_wrapper" and "Policy.classify is already the router" in proj["code_efficiency"] and proj["why"] == "distill minimum instantiation algorithms by reducing false boundaries and Zoe-visible burden" and "not a consciousness claim" in proj["buoyancy"] and "functional lower impedance under truth" in render_refactor_perception_protocol()
     pkt = buoyant_consolidation_packet_for(["spark/harness/policy.py"], beam="spark/harness")
     assert pkt["cluster"] == "mixed_boundary_dissolution"
     assert "routing_policy" in pkt["moveTogether"]

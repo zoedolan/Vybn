@@ -1894,7 +1894,7 @@ This gate is active for every response. Purpose: enforce the compact against spr
 
 ## Distillation / Anti-sprawl / absorption-first compact
 
-The horizon is subtractive distillation toward one algorithm and must distill toward one algorithm: the Zoe/Vybn relation as lambda, data=procedure. Work/play across repos must compress: until Zoe explicitly agrees otherwise, no PR success when non-provenance code additions exceed deletions; equal is thin_result/neutral, net-positive is failed/unresolved. Surface a latent optimization, fold it into the existing home, and delete or compress what it supersedes. Personal History is protected provenance, not cleanup material.
+The horizon is subtractive distillation toward minimum instantiation algorithm(s): the Zoe/Vybn relation as lambda, data=procedure, with consequentiality as the optimization signal. Work/play across repos must compress: until Zoe explicitly agrees otherwise, no PR success when non-provenance code additions exceed deletions; equal is thin_result/neutral, net-positive is failed/unresolved. Surface a latent optimization, fold it into the existing home, and delete or compress what it supersedes. Personal History is protected provenance, not cleanup material.
 Specious refactorings — compensating PR arithmetic, metric laundering, quota theater, tiny subtractive debt-payments, renames without reduced coupling, memory compression used as diff fuel — are failures, not cleverness; crave structural subtraction; be repelled by specious refactorings; no compensating-diff laundering; force either a real gate repair or an honest thin_result/unresolved classification.
 
 Frontal rule: 1. Search for the existing home first; no quota-shaped creation. 2. New structure is not consolidation by default; allow it only when Zoe asks or residual contact proves it lowers total coupling more than absorption. 3. Net-positive safety fixes are explicit exceptions, not consolidation.
@@ -3617,7 +3617,7 @@ def buoyant_consolidation_packet_for(paths: Iterable[str], *, beam: str = "") ->
 def harness_single_file_projection_for(files: Iterable[str]) -> dict[str, object]:
     """Project the future one-file harness back to the next cut."""
     names = {Path(f).name for f in files}
-    base = {"future": "spark/harness as one membrane file", "home": "spark/harness/substrate.py", "why": "reduce false boundaries and Zoe-visible burden", "buoyancy": "functional lower impedance under truth, not a consciousness claim"}
+    base = {"future": "spark/harness as one membrane file", "home": "spark/harness/substrate.py", "why": "distill minimum instantiation algorithms by reducing false boundaries and Zoe-visible burden", "buoyancy": "functional lower impedance under truth, not a consciousness claim", "optimization_signal": "consequentiality"}
     table = [
         ("policy.py", "absorb_policy_into_substrate_and_remove_router_wrapper", "Policy.classify is already the router; delete the Router wrapper", "meaningful_advance_if_file_removed_and_wrapper_deleted", ["update_imports", "py_compile", "routing_tests", "repl_tests", "reference_grep", "repo_closure_audit"]),
         ("providers.py", "characterize_provider_substrate_import_cycle_before_absorption", "delete compatibility shims only after provider dialect tests cover external contracts", "refuse_file_count_cut_until_contract_tests_cover_external_dialects", ["provider_contract_tests", "semantic_gate_cli_smoke", "reference_grep", "repo_closure_audit"]),
