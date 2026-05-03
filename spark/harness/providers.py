@@ -17,7 +17,7 @@ This file contains:
     absorb_gate + log_absorb + validate_command — safety wrappers BashTool
         enforces on every execute(). These are policy-rule enforcement;
         the rules themselves (DANGEROUS_PATTERNS, TRACKED_REPOS) live in
-        harness.policy and are imported here.
+        harness.substrate and are imported here.
 
     is_parallel_safe + execute_readonly — the classifier and runner for
         read-only commands that can fan out across fresh subprocesses
@@ -49,7 +49,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Iterable, Iterator
 
-from .policy import (
+from .substrate import (
     ABSORB_EXCLUDE_SUBSTR,
     ABSORB_EXCLUDE_SUFFIX,
     ABSORB_LOG,

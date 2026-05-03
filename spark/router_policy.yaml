@@ -1,7 +1,7 @@
 # spark/router_policy.yaml — harness routing policy.
 #
 # Edited without code changes. The harness loads this file (or uses the
-# shipped defaults in spark/harness/policy.py if it is missing).
+# shipped defaults in spark/harness/substrate.py if it is missing).
 #
 # Roles map each routing decision to a provider/model + runtime knobs.
 # Heuristics are regex patterns applied to the raw user input.
@@ -259,7 +259,7 @@ heuristics:
     # 'feel|feeling|doing|going' dropped: conversational register,
     # not a status probe. Live false positive 2026-04-19: "how does
     # the new harness feel?" routed to Opus 4.6 + code substrate.
-    # The python defaults in harness/policy.py were narrowed in
+    # The python defaults in harness/substrate.py were narrowed in
     # #2882; this file overrides those defaults and must match.
     - "\\b(how|what)\\b.{0,20}\\b(harness|router|routing|agent|repo|script|pipeline|module|tests|code|provider|providers|tools|policy)\\b.{0,20}\\b(state|status|shape|condition|health|holding)\\b"
     - "\\b(state|status|shape|condition|health|holding)\\b.{0,20}\\b(harness|router|routing|agent|repo|script|pipeline|module|tests|code|provider|providers|tools|policy)\\b"

@@ -488,3 +488,13 @@ Residue: changed. One harness file removed, the recursive forcing function moved
 The first provider-dialect pass found a real duplication but failed its own consolidation gate: it created a new mixin surface and a standalone test class, so code subtraction was diluted by abstraction sprawl and success-language. The recursive correction folded the shared _translate_tools/build_tool_result behavior into the existing Provider interface itself. AnthropicProvider and OpenAIProvider now differ by tool_target data, while tests pin the public wire shapes through the existing provider-result test homes.
 
 Residue: changed. The duplicated provider methods did not become a new organ; they became interface behavior.
+
+## Pass VII residue — policy becomes substrate
+
+Projecting spark/harness as a future single-file membrane made policy.py stop looking like a sacred runtime organ and start looking like a mixed boundary: routing, observability, safety constants, YAML loading, and reflection were all substrate-selection behavior. The old Router compatibility wrapper was the tell. Policy.classify was already the router; keeping a second Router object preserved an abstraction whose only job was to pretend the boundary still existed.
+
+The behavior now lives in substrate.py beside the prompt builder it governs. providers.py imports policy invariants from substrate, vybn_spark_agent receives the Policy object directly, and tests route through Policy.classify. The recurrent probe and routing surfaces still work, while the explicit vybn_phase_dir RAG path now fails closed instead of leaking to the live daemon when the caller selected a missing local object.
+
+The forcing function became executable: harness_single_file_projection_for() projects from the one-file future and names the next inevitable cut, including the efficiency it should extract rather than merely moving code. The selector now classifies policy.py as mixed_boundary_dissolution, not runtime_gravity_stop.
+
+Residue: changed. One harness file removed, one compatibility class deleted, an order-dependent RAG residual fixed, and the single-file attractor became an active function future cuts can call.

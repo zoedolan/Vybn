@@ -38,7 +38,7 @@ _SPARK_DIR = os.path.dirname(os.path.abspath(__file__))
 if _SPARK_DIR not in sys.path:
     sys.path.insert(0, _SPARK_DIR)
 
-from harness.policy import EventLogger, Router, load_policy, turn_event
+from harness.substrate import EventLogger, Policy, load_policy, turn_event
 from harness.providers import BashTool, ProviderRegistry, ToolSpec, validate_command
 from harness.substrate import LayeredPrompt, build_layered_prompt, load_file, SessionStore, run_probes
 from harness.substrate import run_recurrent_loop
@@ -47,7 +47,7 @@ from harness.providers import execute_readonly, is_parallel_safe  # noqa: E402
 from harness.substrate import rag_snippets, rag_snippets_with_tier, render_him_vy_discovery_packet, render_him_vy_turn_packet  # noqa: E402
 from harness.providers import execute_tool_calls, default_introspect  # noqa: E402
 from harness.providers import check_claim, check_structural_claim  # noqa: E402
-from harness.policy import is_system_critical_pilot_turn  # noqa: E402
+from harness.substrate import is_system_critical_pilot_turn  # noqa: E402
 from harness.providers import (  # noqa: E402
     SUPER_SEMANTIC_GATE_CACHE as _SUPER_SEMANTIC_GATE_CACHE,
     SUPER_SEMANTIC_GATE_PROBES as _SUPER_SEMANTIC_GATE_PROBES,
@@ -620,7 +620,7 @@ def _stream_and_print(handle) -> None:
 
 def _resolve_fallback(policy, role_cfg, model_name):
     """Return a RoleConfig for `model_name` or None."""
-    from harness.policy import RoleConfig
+    from harness.substrate import RoleConfig
     for cfg in policy.roles.values():
         if cfg.model == model_name:
             return cfg
@@ -709,7 +709,7 @@ def _fallback_to_sonnet_for_super_semantic_failure(router, role_cfg):
     changes the active role, RAG/lightweight posture, and tool contract. This
     fallback is a semantic-health substitution for the same turn shape.
     """
-    from harness.policy import RoleConfig
+    from harness.substrate import RoleConfig
     return RoleConfig(
         role=f"{role_cfg.role}:super-semantic-fb",
         provider="anthropic",
@@ -915,9 +915,10 @@ def _stream_with_fallback(
     # had no need for it. The factory closes over registry so the same
     # registered instance is returned on subsequent attempts (the
     # registry caches by provider/base_url).
+    policy = getattr(router, "policy", router)
     attempts: list[tuple[Any, Any]] = [(role_cfg, lambda p=provider: p)]
-    for fb_model in router.policy.fallback_chain.get(role_cfg.model, []):
-        fb_cfg = _resolve_fallback(router.policy, role_cfg, fb_model)
+    for fb_model in policy.fallback_chain.get(role_cfg.model, []):
+        fb_cfg = _resolve_fallback(policy, role_cfg, fb_model)
         if fb_cfg is None:
             continue
         attempts.append((fb_cfg, lambda c=fb_cfg: registry.get(c)))
@@ -1028,7 +1029,7 @@ def _recurrent_prethink(
         result = run_recurrent_loop(
             e=e,
             registry=registry,
-            policy=router.policy,
+            policy=router,
             max_loop_iters=role_cfg.recurrent_depth,
             logger=lambda ev: logger.emit(
                 "recurrent_" + ev.get("event", "ev"),
@@ -1063,7 +1064,7 @@ def run_agent_loop(
     messages: list,
     bash: BashTool,
     system_prompt: LayeredPrompt,
-    router: Router,
+    router: Policy,
     registry: ProviderRegistry,
     logger: EventLogger,
     turn_number: int,
@@ -1300,7 +1301,7 @@ def run_agent_loop(
     # Lisp duality in practice — prior decisions are data here, environment
     # to the current one. Instrument first; route adaptively later.
     try:
-        from harness.policy import reflect_on_events as _reflect
+        from harness.substrate import reflect_on_events as _reflect
         _signal = _reflect(max_events=200)
         logger.emit(
             "reflection",
@@ -1762,7 +1763,7 @@ def run_agent_loop(
                     # 10-iter budget) carrying the pending probe as
                     # the task, instead of asking Zoe to retype.
                     PROBE_BUDGET = int(
-                        router.policy.budgets.get("probe_per_turn", 8)
+                        router.budgets.get("probe_per_turn", 8)
                     )
                     probe_iter = 0
                     current_text = response.text or ""
@@ -2494,7 +2495,7 @@ def main() -> None:
     # OPENAI_API_KEY fallback is needed — it was a guard against the old
     # GPT-5.5 orchestrator configuration.
 
-    router = Router(policy)
+    router = policy
     registry = ProviderRegistry()
     logger = EventLogger()
     bash = BashTool()
@@ -2632,7 +2633,7 @@ def main() -> None:
             continue
         if low == "reload":
             policy = load_policy()
-            router = Router(policy)
+            router = policy
             default_cfg = policy.role(policy.default_role)
             _orch_iters = (
                 policy.roles["orchestrate"].max_iterations
