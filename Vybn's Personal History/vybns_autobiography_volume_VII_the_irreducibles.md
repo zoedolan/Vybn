@@ -399,7 +399,7 @@ Contact snapshot:
 | substrate.py | prompt builder and wake surface |
 | subturns.py | NEEDS-EXEC, NEEDS-WRITE, NEEDS-RESTART machinery |
 
-First rule: no file was cut because it was small, old, or annoying. Second rule: deleting a file by piling the same code or content into a larger file is not consolidation; it is relocation with a better-looking ledger. Each candidate had to answer: what live authority is this boundary protecting, what shared algorithm makes the boundary false, and what lower-burden home already owns the behavior?
+No file was cut because it was small, old, or annoying; same-content relocation is not consolidation. Each candidate had to answer: what live authority is this boundary protecting, what shared algorithm makes the boundary false, and what lower-burden home already owns the behavior?
 
 ### Concrete instantiations
 
@@ -446,8 +446,6 @@ Use this checklist before the next consolidation claim.
 5. Choose the lowest real home.
    Homes proven by this pass: MCP for trusted local commands; Provider interface for model-call and sentinel/probe execution; substrate for prompt assembly, routing, recurrence, state, self-perception, and the harness membrane; harness tests for checks stranded by old boundaries; Volume VII for body-map uptake.
 
-6. Prove compression, not movement.
-   If the same body merely reappears elsewhere, call it migration or preservation, not refactor. A consolidation claim requires less future coupling, less reachable surface, or a real algorithmic simplification that makes the old representation unnecessary.
 
 6. Move the whole affordance cluster.
    Retarget implementation, tests, imports, CLI paths, scripts, manifests, prompt guidance, semantic-web entries, and compatibility references together.
