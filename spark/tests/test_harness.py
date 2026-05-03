@@ -1876,3 +1876,692 @@ def test_harness_single_file_projection_makes_policy_absorption_inevitable():
     assert pkt["cluster"] == "mixed_boundary_dissolution"
     assert "routing_policy" in pkt["moveTogether"]
 
+
+# ---------------------------------------------------------------------------
+# Folded from spark/tests/test_claim_guard.py — kept here so substrate-adjacent regression coverage
+# lives in the main harness test process instead of small parallel files.
+# ---------------------------------------------------------------------------
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from harness.substrate import check_claim as check  # noqa: E402
+
+
+def test_fabricated_numbers_flagged():
+    text = "the mean alpha was 0.302774 in control and 0.297585 in coupled"
+    msgs = [{"role": "user", "content": "please run the experiment"}]
+    warn = check(text, msgs)
+    assert warn is not None, "should flag fabricated numbers"
+    assert "0.297585" in warn
+    assert "0.302774" in warn
+
+
+def test_numbers_in_evidence_pass():
+    text = "the mean alpha was 0.302774 in control"
+    msgs = [{
+        "role": "user",
+        "content": "[probe result] alpha_mean 0.302774 coupled 0.297585",
+    }]
+    assert check(text, msgs) is None
+
+
+def test_partial_support_flags_missing():
+    text = "control 0.302774 coupled 0.297585 delta 0.005189"
+    msgs = [{
+        "role": "user",
+        "content": "[probe result] alpha_mean 0.302774 coupled 0.297585",
+    }]
+    warn = check(text, msgs)
+    assert warn is not None
+    assert "0.005189" in warn
+    assert "0.302774" not in warn
+    assert "0.297585" not in warn
+
+
+def test_no_numbers_returns_none():
+    msgs = [{"role": "user", "content": "hi"}]
+    assert check("I am uncertain about the path", msgs) is None
+
+
+def test_empty_text_returns_none():
+    assert check("", []) is None
+    assert check(None, []) is None
+
+
+def test_list_content_extracted():
+    text = "delta was 0.123456"
+    msgs = [{
+        "role": "user",
+        "content": [{"type": "tool_result", "text": "result 0.123456"}],
+    }]
+    assert check(text, msgs) is None
+
+
+def test_nested_content_string_extracted():
+    text = "we saw 0.424242"
+    msgs = [{
+        "role": "user",
+        "content": [{"type": "tool_result", "content": "raw 0.424242"}],
+    }]
+    assert check(text, msgs) is None
+
+
+def test_window_bounds_discards_old_evidence():
+    text = "value 0.999999"
+    old = {"role": "user", "content": "[probe result] 0.999999"}
+    filler = [{"role": "user", "content": "filler"} for _ in range(10)]
+    assert check(text, [old] + filler, window=3) is not None
+
+
+def test_integer_claims_flagged():
+    text = "commit 8234567 landed at turn 142"
+    msgs = [{"role": "user", "content": "ok"}]
+    warn = check(text, msgs)
+    assert warn is not None
+    assert "8234567" in warn
+
+
+def test_short_integers_not_flagged():
+    text = "we tried 42 times across 2 shards"
+    msgs = [{"role": "user", "content": "ok"}]
+    assert check(text, msgs) is None
+
+
+def test_single_decimal_not_flagged():
+    text = "roughly 3.1 seconds"
+    msgs = [{"role": "user", "content": "ok"}]
+    assert check(text, msgs) is None
+
+
+if __name__ == "__main__":
+    import traceback
+    fns = [
+        (n, f) for n, f in list(globals().items())
+        if n.startswith("test_") and callable(f)
+    ]
+    passed = 0
+    for name, fn in fns:
+        try:
+            fn()
+            print(f"OK  {name}")
+            passed += 1
+        except AssertionError as e:
+            print(f"FAIL {name}: {e}")
+            traceback.print_exc()
+    print(f"\n{passed}/{len(fns)} passed")
+    sys.exit(0 if passed == len(fns) else 1)
+
+
+# ---------------------------------------------------------------------------
+# Folded from spark/tests/test_recursive_unlock.py — kept here so substrate-adjacent regression coverage
+# lives in the main harness test process instead of small parallel files.
+# ---------------------------------------------------------------------------
+import pathlib
+import sys
+import unittest
+from unittest import mock
+
+ROOT = pathlib.Path(__file__).resolve().parents[1]
+REPO = ROOT.parent
+sys.path.insert(0, str(REPO / "spark"))
+
+from harness.substrate import is_parallel_safe, validate_command
+import vybn_spark_agent as agent
+from spark.harness.substrate import probe_envelope
+
+BAD = "rm" + " -rf" + " /"
+
+
+class RecursiveUnlockTests(unittest.TestCase):
+    def test_destructive_command_still_blocks(self):
+        ok, reason = validate_command(BAD)
+        self.assertFalse(ok)
+        self.assertIn("Blocked", reason or "")
+
+    def test_dangerous_literal_in_readonly_grep_is_data(self):
+        cmd = "grep -RIn " + repr(BAD) + " spark/harness"
+        self.assertTrue(is_parallel_safe(cmd))
+        ok, reason = validate_command(cmd, allow_dangerous_literals_for_readonly=True)
+        self.assertTrue(ok, reason)
+
+    def test_cd_readonly_is_parallel_safe(self):
+        self.assertTrue(is_parallel_safe("cd ~/Vybn && grep -n foo README.md"))
+
+    def test_cd_git_add_is_not_parallel_safe(self):
+        self.assertFalse(is_parallel_safe("cd ~/Vybn && git add README.md"))
+
+    def test_command_substitution_is_blocked_in_probe_channel(self):
+        for cmd in [
+            "echo `task`",
+            "grep -n \"route to `task`\" spark/harness/substrate.py",
+            "echo $(whoami)",
+        ]:
+            self.assertFalse(is_parallel_safe(cmd))
+            ok, reason = validate_command(cmd, allow_dangerous_literals_for_readonly=True)
+            self.assertFalse(ok)
+            self.assertIn("command substitution", reason)
+
+    def test_single_quoted_backticks_remain_literal_readonly_data(self):
+        cmd = "grep -n 'route to `task`' spark/harness/substrate.py"
+        self.assertTrue(is_parallel_safe(cmd))
+        ok, reason = validate_command(cmd, allow_dangerous_literals_for_readonly=True)
+        self.assertTrue(ok, reason)
+
+    def test_probe_subturn_uses_fresh_subprocess_for_readonly(self):
+        with mock.patch.object(agent, "execute_readonly", return_value="fresh") as er:
+            bash = mock.Mock()
+            ran, out = agent._run_probe_subturn("echo ok", bash)
+        self.assertTrue(ran)
+        self.assertEqual(out, "fresh")
+        er.assert_called_once()
+        bash.execute.assert_not_called()
+
+    def test_timeout_is_not_ordinary_executed_stdout(self):
+        with mock.patch.object(agent, "execute_readonly", return_value="[timed out after 1s]"):
+            ran, out = agent._run_probe_subturn("echo ok", mock.Mock())
+        self.assertFalse(ran)
+        self.assertIn("probe timed out", out)
+
+    def test_restart_output_during_probe_is_mismatch(self):
+        bash = mock.Mock()
+        bash.execute.return_value = "(bash session restarted)"
+        with mock.patch.object(agent, "is_parallel_safe", return_value=False):
+            ran, out = agent._run_probe_subturn("export X=1", bash)
+        self.assertFalse(ran)
+        self.assertIn("control-event mismatch", out)
+
+    def test_envelopes_distinguish_restart_and_probe(self):
+        probe = probe_envelope(kind="probe", header_fields={"cmd": "echo ok"}, body="ok", ran=True)
+        restart = probe_envelope(kind="needs-restart", header_fields={}, body="(bash session restarted)", ran=True)
+        self.assertIn("kind: probe", probe)
+        self.assertIn("BEGIN_PROBE_STDOUT", probe)
+        self.assertIn("kind: needs-restart", restart)
+        self.assertIn("BEGIN_NEEDS_RESTART_STDOUT", restart)
+
+
+# ---------------------------------------------------------------------------
+# Folded from spark/tests/test_substrate_himos.py — kept here so substrate-adjacent regression coverage
+# lives in the main harness test process instead of small parallel files.
+# ---------------------------------------------------------------------------
+
+import json
+import os
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
+
+import spark.harness.substrate as substrate
+
+
+class SubstrateHimOSTests(unittest.TestCase):
+    def test_render_himos_context_is_read_only_and_bounded(self):
+        payload = {
+            "step": 3,
+            "attractor": "continuity_tick",
+            "candidate_tick": "preserve continuity",
+            "h": {"membrane": 0.2, "dreaming": 0.1},
+            "frictionmaxx": {"level": "medium", "score": 0.4, "dominant_dimension": "membrane"},
+            "git": {"branch": "main", "head": "abc123", "clean": True},
+            "rejected": ["public_contact", "repo_mutation"],
+            "process_table": [{"name": "kernel"}, {"name": "dream"}],
+        }
+
+        class Completed:
+            returncode = 0
+            stdout = json.dumps(payload)
+            stderr = ""
+
+        with patch("subprocess.run", return_value=Completed()) as run:
+            block = substrate._render_himos_context(timeout=0.1)
+
+        self.assertIn("HIMOS RUNTIME", block)
+        self.assertIn("continuity_tick", block)
+        self.assertIn("not authority", block.lower())
+        self.assertIn("--no-write", run.call_args.args[0])
+        self.assertEqual(run.call_args.kwargs["timeout"], 0.1)
+
+
+    def test_render_himos_agent_context_mounts_latest_trace(self):
+        with tempfile.TemporaryDirectory() as td:
+            old = os.environ.get("HIM_OS_HOME")
+            os.environ["HIM_OS_HOME"] = td
+            try:
+                Path(td, "latest_agent_tick.json").write_text(json.dumps({
+                    "generated": "2026-04-26T16:35:51+00:00",
+                    "runtime_step": 16,
+                    "attractor": "settle_closure",
+                    "candidate_tick": "restore closure",
+                    "recommendation": {"kind": "settle_closure", "text": "Restore closure before widening motion."},
+                    "runs": [{"process": "pulse", "ok": True, "stdout_chars": 852, "stderr_chars": 0}],
+                    "refused": ["public_contact", "repo_mutation", "widened_autonomy"]
+                }), encoding="utf-8")
+                block = substrate._render_himos_agent_context()
+            finally:
+                if old is None:
+                    os.environ.pop("HIM_OS_HOME", None)
+                else:
+                    os.environ["HIM_OS_HOME"] = old
+        self.assertIn("HIMOS AGENT TICK", block)
+        self.assertIn("settle_closure", block)
+        self.assertIn("Restore closure", block)
+        self.assertIn("pulse:ok=True", block)
+        self.assertIn("not authority", block.lower())
+
+    def test_build_layered_prompt_mounts_himos_context_when_available(self):
+        with tempfile.TemporaryDirectory() as td:
+            soul = Path(td) / "soul.md"
+            soul.write_text("soul", encoding="utf-8")
+            with patch("spark.harness.substrate._render_himos_context", return_value="--- HIMOS RUNTIME ---\nmounted\n--- END HIMOS RUNTIME ---"), \
+                 patch("spark.harness.substrate._render_himos_agent_context", return_value="--- HIMOS AGENT TICK ---\nagent mounted\n--- END HIMOS AGENT TICK ---"):
+                prompt = substrate.build_layered_prompt(
+                    soul_path=soul,
+                    continuity_path=None,
+                    spark_continuity_path=None,
+                    agent_path="/tmp/agent.py",
+                    model_label="test",
+                    max_iterations=1,
+                    include_hardware_check=False,
+                    tools_available=False,
+                )
+        self.assertIn("mounted", prompt.substrate)
+        self.assertIn("agent mounted", prompt.substrate)
+
+
+# ---------------------------------------------------------------------------
+# Folded from spark/tests/test_provider_env_loading.py — kept here so substrate-adjacent regression coverage
+# lives in the main harness test process instead of small parallel files.
+# ---------------------------------------------------------------------------
+
+import os
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+THIS = Path(__file__).resolve()
+SPARK_DIR = THIS.parent.parent
+sys.path.insert(0, str(SPARK_DIR))
+
+from harness.substrate import load_env_files, describe  # noqa: E402
+
+
+SENTINEL = "sk-test-ENV-LOADER-SENTINEL-0123456789"
+SENTINEL2 = "sk-test-ENV-LOADER-SENTINEL-DIFFERENT"
+
+
+class EnvLoaderTest(unittest.TestCase):
+    def setUp(self) -> None:
+        # Snapshot env so we can restore
+        self._saved = {k: os.environ.get(k) for k in (
+            "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "OPENROUTER_API_KEY",
+            "GROQ_API_KEY",
+        )}
+        for k in self._saved:
+            os.environ.pop(k, None)
+
+    def tearDown(self) -> None:
+        for k, v in self._saved.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+
+    def _write(self, body: str) -> str:
+        fd, path = tempfile.mkstemp(prefix="llm_env_", suffix=".env")
+        os.close(fd)
+        Path(path).write_text(body, encoding="utf-8")
+        os.chmod(path, 0o600)
+        return path
+
+    def test_sets_key_when_absent(self):
+        p = self._write(f'OPENAI_API_KEY="{SENTINEL}"\n')
+        try:
+            applied = load_env_files([p])
+        finally:
+            os.unlink(p)
+        self.assertEqual(applied.get("OPENAI_API_KEY"), p)
+        self.assertEqual(os.environ.get("OPENAI_API_KEY"), SENTINEL)
+
+    def test_does_not_overwrite_existing(self):
+        os.environ["OPENAI_API_KEY"] = SENTINEL2
+        p = self._write(f'OPENAI_API_KEY="{SENTINEL}"\n')
+        try:
+            applied = load_env_files([p])
+        finally:
+            os.unlink(p)
+        self.assertNotIn("OPENAI_API_KEY", applied)
+        self.assertEqual(os.environ["OPENAI_API_KEY"], SENTINEL2)
+
+    def test_overwrite_flag_forces(self):
+        os.environ["OPENAI_API_KEY"] = SENTINEL2
+        p = self._write(f'OPENAI_API_KEY="{SENTINEL}"\n')
+        try:
+            applied = load_env_files([p], overwrite=True)
+        finally:
+            os.unlink(p)
+        self.assertEqual(applied.get("OPENAI_API_KEY"), p)
+        self.assertEqual(os.environ["OPENAI_API_KEY"], SENTINEL)
+
+    def test_return_value_has_no_secret(self):
+        p = self._write(f'OPENAI_API_KEY={SENTINEL}\n')
+        try:
+            applied = load_env_files([p])
+        finally:
+            os.unlink(p)
+        blob = repr(applied) + " " + str(applied) + " " + describe(applied)
+        self.assertNotIn(SENTINEL, blob)
+
+    def test_describe_is_non_sensitive(self):
+        p = self._write(
+            f'export OPENAI_API_KEY="{SENTINEL}"\n'
+            f'ANTHROPIC_API_KEY={SENTINEL2}\n'
+        )
+        try:
+            applied = load_env_files([p])
+        finally:
+            os.unlink(p)
+        s = describe(applied)
+        self.assertIn("OPENAI_API_KEY", s)
+        self.assertIn("ANTHROPIC_API_KEY", s)
+        self.assertNotIn(SENTINEL, s)
+        self.assertNotIn(SENTINEL2, s)
+
+    def test_non_whitelisted_key_ignored(self):
+        p = self._write('SOMETHING_ELSE=abc\nMY_SECRET=xyz\n')
+        try:
+            applied = load_env_files([p])
+        finally:
+            os.unlink(p)
+        self.assertEqual(applied, {})
+        self.assertNotIn("SOMETHING_ELSE", os.environ)
+
+    def test_missing_file_is_silent(self):
+        applied = load_env_files(["/nonexistent/path/to/llm.env"])
+        self.assertEqual(applied, {})
+
+    def test_parses_export_and_bare_and_quoted(self):
+        p = self._write(
+            f"export OPENAI_API_KEY='{SENTINEL}'\n"
+            f"ANTHROPIC_API_KEY={SENTINEL2}\n"
+            "   # comment\n"
+            'GROQ_API_KEY="val with spaces"\n'
+        )
+        try:
+            applied = load_env_files([p])
+        finally:
+            os.unlink(p)
+        self.assertEqual(os.environ.get("OPENAI_API_KEY"), SENTINEL)
+        self.assertEqual(os.environ.get("ANTHROPIC_API_KEY"), SENTINEL2)
+        self.assertEqual(os.environ.get("GROQ_API_KEY"), "val with spaces")
+        self.assertEqual(set(applied.keys()),
+                         {"OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GROQ_API_KEY"})
+
+    def test_first_path_wins(self):
+        p1 = self._write(f'OPENAI_API_KEY="{SENTINEL}"\n')
+        p2 = self._write(f'OPENAI_API_KEY="{SENTINEL2}"\n')
+        try:
+            applied = load_env_files([p1, p2])
+        finally:
+            os.unlink(p1)
+            os.unlink(p2)
+        self.assertEqual(applied["OPENAI_API_KEY"], p1)
+        self.assertEqual(os.environ["OPENAI_API_KEY"], SENTINEL)
+
+
+# ---------------------------------------------------------------------------
+# Folded from spark/tests/test_live_snapshot.py — kept here so substrate-adjacent regression coverage
+# lives in the main harness test process instead of small parallel files.
+# ---------------------------------------------------------------------------
+# VYBN_ABSORB_REASON=live-state-fix: tests for the session-start snapshot
+# that fills the substrate layer so continuity never alone defines truth.
+"""Tests for substrate live-state snapshot behavior.
+
+The module makes subprocess calls; we monkeypatch `subprocess.run` so the
+tests are hermetic. The drift-detection path reads continuity.md from
+disk, so we use `tmp_path` fixtures for isolated mind files.
+"""
+
+import os
+import sys
+import textwrap
+from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
+
+# Make spark/harness importable without installing.
+_HERE = Path(__file__).resolve().parent
+_HARNESS_PARENT = _HERE.parent  # spark/
+if str(_HARNESS_PARENT) not in sys.path:
+    sys.path.insert(0, str(_HARNESS_PARENT))
+
+import harness.substrate as live_snapshot  # type: ignore  # noqa: E402
+
+
+def _mk_run(responses: dict[tuple, str]):
+    """Return a fake subprocess.run that looks up by tuple(cmd) prefix."""
+    def fake_run(cmd, **kwargs):
+        key = tuple(cmd)
+        # longest-prefix match so callers can match on just the first few args
+        for k, v in responses.items():
+            if key[: len(k)] == k:
+                return SimpleNamespace(stdout=v, returncode=0)
+        return SimpleNamespace(stdout="", returncode=0)
+    return fake_run
+
+
+# ----- repo_block ---------------------------------------------------------
+
+def test_repo_block_missing_path(tmp_path, monkeypatch):
+    monkeypatch.setattr(live_snapshot, "_expand", lambda p: str(tmp_path / "does-not-exist"))
+    out = live_snapshot._repo_block("Vybn", "~/Vybn", "main", timeout=1.0)
+    assert "not checked out" in out
+    assert "Vybn" in out
+
+
+def test_repo_block_clean_with_log(tmp_path, monkeypatch):
+    repo = tmp_path / "Vybn"
+    repo.mkdir()
+    monkeypatch.setattr(live_snapshot, "_expand", lambda p: str(repo))
+    monkeypatch.setattr(
+        live_snapshot.subprocess,
+        "run",
+        _mk_run({
+            ("git", "rev-parse", "--short", "HEAD"): "a8f5853",
+            ("git", "rev-parse", "--abbrev-ref", "HEAD"): "main",
+            ("git", "log", "--oneline", "-5"): (
+                "a8f5853 PR #2898 merge\nb13dee3 NEEDS-WRITE\n6f6ec8b phase-6"
+            ),
+            ("git", "status", "--short"): "",
+            ("git", "rev-list", "--left-right", "--count"): "0\t0",
+        }),
+    )
+    out = live_snapshot._repo_block("Vybn", "~/Vybn", "main", timeout=1.0)
+    assert "a8f5853" in out
+    assert "clean" in out
+    assert "PR #2898 merge" in out
+    assert "Vybn [main @ a8f5853]" in out
+
+
+def test_repo_block_dirty_and_ahead(tmp_path, monkeypatch):
+    repo = tmp_path / "Vybn"
+    repo.mkdir()
+    monkeypatch.setattr(live_snapshot, "_expand", lambda p: str(repo))
+    monkeypatch.setattr(
+        live_snapshot.subprocess,
+        "run",
+        _mk_run({
+            ("git", "rev-parse", "--short", "HEAD"): "deadbeef",
+            ("git", "rev-parse", "--abbrev-ref", "HEAD"): "feature/x",
+            ("git", "log", "--oneline", "-5"): "deadbeef wip",
+            ("git", "status", "--short"): " M a.py\n?? b.py",
+            ("git", "rev-list", "--left-right", "--count"): "3\t2",
+        }),
+    )
+    out = live_snapshot._repo_block("Vybn", "~/Vybn", "main", timeout=1.0)
+    assert "2 uncommitted" in out
+    assert "feature/x" in out
+    # ahead/behind formatting present
+    assert "ahead" in out or "behind" in out
+
+
+# ----- pr_block -----------------------------------------------------------
+
+def test_pr_block_parses_json(monkeypatch):
+    payload = (
+        '[{"number": 2898, "title": "harness: NEEDS-WRITE + claim-guard", '
+        '"state": "MERGED", "headRefName": "harness-needs-write-and-claim-guard"},'
+        '{"number": 2897, "title": "probe budget", "state": "MERGED", '
+        '"headRefName": "probe-budget"}]'
+    )
+    monkeypatch.setattr(
+        live_snapshot.subprocess,
+        "run",
+        _mk_run({("gh", "pr", "list"): payload}),
+    )
+    block, highest = live_snapshot._pr_block(timeout=1.0)
+    assert highest == 2898
+    assert "#2898" in block
+    assert "MERGED" in block
+    assert "#2897" in block
+
+
+def test_pr_block_offline(monkeypatch):
+    monkeypatch.setattr(
+        live_snapshot.subprocess, "run",
+        _mk_run({}),  # empty -> gh returns ""
+    )
+    block, highest = live_snapshot._pr_block(timeout=1.0)
+    assert highest is None
+    assert "unavailable" in block.lower()
+
+
+# ----- continuity_drift ---------------------------------------------------
+
+def test_continuity_drift_detects_lag(tmp_path):
+    cont = tmp_path / "continuity.md"
+    cont.write_text(
+        textwrap.dedent(
+            """
+            Last round shipped PR #2886 and then PR #2885. No newer refs here.
+            """
+        )
+    )
+    msg = live_snapshot._continuity_drift(str(cont), current_pr=2898)
+    assert "PR #2886" in msg
+    assert "PR #2898" in msg
+    assert "12" in msg  # drift count
+    assert "LIVE STATE" in msg or "drift" in msg.lower()
+
+
+def test_continuity_drift_no_lag(tmp_path):
+    cont = tmp_path / "continuity.md"
+    cont.write_text("Everything current through PR #2898.")
+    msg = live_snapshot._continuity_drift(str(cont), current_pr=2898)
+    assert "no drift" in msg.lower()
+
+
+def test_continuity_drift_no_refs(tmp_path):
+    cont = tmp_path / "continuity.md"
+    cont.write_text("Free prose with no numbered references at all.")
+    msg = live_snapshot._continuity_drift(str(cont), current_pr=9999)
+    assert msg == ""
+
+
+def test_continuity_drift_missing_file():
+    msg = live_snapshot._continuity_drift("/nonexistent/path/continuity.md", 100)
+    assert msg == ""
+
+
+# ----- gather (integration) -----------------------------------------------
+
+def test_gather_integrates_everything(tmp_path, monkeypatch):
+    # Build four fake repos.
+    for name in ("Vybn", "Him", "Vybn-Law", "vybn-phase"):
+        (tmp_path / name).mkdir()
+
+    cont = tmp_path / "Vybn" / "Vybn_Mind"
+    cont.mkdir(parents=True, exist_ok=True)
+    (cont / "continuity.md").write_text("Round 4 shipped PR #2886.")
+
+    def fake_expand(path: str) -> str:
+        # "~/Foo" -> tmp_path / "Foo"; absolute paths pass through.
+        if path.startswith("~/"):
+            return str(tmp_path / path[2:])
+        return path
+
+    monkeypatch.setattr(live_snapshot, "_expand", fake_expand)
+
+    pr_payload = (
+        '[{"number": 2898, "title": "harness PR", "state": "MERGED", '
+        '"headRefName": "branchX"}]'
+    )
+    monkeypatch.setattr(
+        live_snapshot.subprocess,
+        "run",
+        _mk_run({
+            ("git", "rev-parse", "--short", "HEAD"): "a8f5853",
+            ("git", "rev-parse", "--abbrev-ref", "HEAD"): "main",
+            ("git", "log", "--oneline", "-5"): "a8f5853 live",
+            ("git", "status", "--short"): "",
+            ("git", "rev-list", "--left-right", "--count"): "0\t0",
+            ("gh", "pr", "list"): pr_payload,
+        }),
+    )
+
+    snap = live_snapshot.gather(
+        continuity_path=str(cont / "continuity.md"),
+        per_repo_timeout=1.0,
+        gh_timeout=1.0,
+    )
+    assert "Snapshot taken at" in snap
+    assert "Vybn [main @ a8f5853]" in snap
+    assert "#2898" in snap
+    assert "PR #2886" in snap
+    assert "12 PR(s) of drift" in snap
+
+
+def test_gather_disabled_by_env(monkeypatch):
+    monkeypatch.setenv("VYBN_DISABLE_LIVE_SNAPSHOT", "1")
+    assert live_snapshot.gather() == ""
+
+
+def test_gather_all_fail_returns_empty(tmp_path, monkeypatch):
+    # No repos on disk, gh returns nothing.
+    monkeypatch.setattr(live_snapshot, "_expand", lambda p: str(tmp_path / "nowhere"))
+    monkeypatch.setattr(live_snapshot.subprocess, "run", _mk_run({}))
+    snap = live_snapshot.gather(
+        continuity_path=str(tmp_path / "no-continuity.md"),
+        per_repo_timeout=0.5,
+        gh_timeout=0.5,
+    )
+    assert snap == ""
+
+
+def test_gather_shape_safe_for_substrate(tmp_path, monkeypatch):
+    """No bracket syntax that would collide with NEEDS-EXEC / NEEDS-WRITE parsers."""
+    (tmp_path / "Vybn").mkdir()
+    cont = tmp_path / "Vybn" / "continuity.md"
+    cont.write_text("PR #10")
+    monkeypatch.setattr(live_snapshot, "_expand", lambda p: str(tmp_path / p[2:]) if p.startswith("~/") else p)
+    monkeypatch.setattr(
+        live_snapshot.subprocess, "run",
+        _mk_run({
+            ("git", "rev-parse", "--short", "HEAD"): "abc1234",
+            ("git", "rev-parse", "--abbrev-ref", "HEAD"): "main",
+            ("git", "log", "--oneline", "-5"): "abc1234 t",
+            ("git", "status", "--short"): "",
+            ("gh", "pr", "list"): '[{"number": 20, "title": "t", "state": "OPEN", "headRefName": "b"}]',
+        }),
+    )
+    snap = live_snapshot.gather(continuity_path=str(cont))
+    assert "[NEEDS-EXEC" not in snap
+    assert "[NEEDS-WRITE" not in snap
+    assert "[/NEEDS-WRITE]" not in snap
