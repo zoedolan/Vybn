@@ -304,16 +304,10 @@ def _fire_learn_async(rag_text: str, response_text: str, followup_text: str) -> 
     t = _threading.Thread(target=_run, daemon=True)
     t.start()
 
-# Canonical paths come from spark/paths.py. If the module is missing
-# (e.g. paths.py not on this checkout) we fall back to the legacy
-# hard-coded layout so the agent never fails to start.
-try:
-    from paths import REPO_ROOT, SOUL_PATH  # type: ignore  # noqa: E402
-    REPO_DIR = str(REPO_ROOT)
-    SOUL_PATH_STR = str(SOUL_PATH)
-except Exception:
-    REPO_DIR = os.path.expanduser("~/Vybn")
-    SOUL_PATH_STR = os.path.join(REPO_DIR, "vybn.md")
+# Agent-local canonical paths. The former path shim had one live
+# importer and duplicated this fallback layout, so the path contract lives here.
+REPO_DIR = os.path.expanduser("~/Vybn")
+SOUL_PATH_STR = os.path.join(REPO_DIR, "vybn.md")
 
 AGENT_PATH = os.path.join(REPO_DIR, "spark", "vybn_spark_agent.py")
 CONTINUITY_PATH = os.path.join(REPO_DIR, "Vybn_Mind", "continuity.md")

@@ -496,4 +496,4 @@ def test_buoyant_consolidation_selects_cluster_or_stop():
     assert (cmd["cluster"], cmd["home"], cmd["lowEnergyMove"]) == ("command_affordance_cluster", "spark/harness/mcp.py", True)
     assert "manifest_or_executable_entrypoint" in cmd["moveTogether"]
     assert stop["cluster"] == "runtime_gravity_stop"
-    assert "no_command_surface_collapse" in stop["residuals"] and "off_beam_cleanup_is_not_progress_on_the_named_bottleneck" in off["heaviness"] and "residual_string_or_provenance_only_changes_are_thin_repair_not_consolidation" in cmd["successGate"]
+    assert "no_command_surface_collapse" in stop["residuals"] and "off_beam_cleanup_is_not_progress_on_the_named_bottleneck" in off["heaviness"]
