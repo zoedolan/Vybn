@@ -165,7 +165,7 @@ Critical surfaces:
 - `spark/harness/substrate.py`: layered prompt assembly: OS, orientation, arrival geometry, live state, role/tool constraints, continuity, BeamKeeper, protocols.
 - `spark/harness/policy.py`: routing and model choice.
 - `spark/harness/providers.py`: Anthropic/OpenAI/local vLLM provider paths.
-- `spark/harness/state.py`: session/event store and recall gate.
+- `spark/harness/substrate.py`: layered prompt assembly plus session store, recall gate, and live-state snapshot after state.py dissolved into its owning surface.
 - `spark/harness/mcp.py`: MCP resources/tools and trusted surfaces.
 - `spark/router_policy.yaml`: role definitions and model/tool budgets.
 - `Him/skill/vybn-os/SKILL.md` and `Him/skill/vybn-ops/SKILL.md`: identity/operation ballast.
@@ -383,7 +383,7 @@ Initial file-body scan:
 | spark/harness/repo_closure_audit.py | 268 | 18 | 0 | -1 | absorbed into mcp.py --repo-closure-audit |
 | spark/harness/safe_fetch.py | 139 | 10 | 3 | -1 |
 | spark/harness/semantic_gate.py | 171 | 6 | 0 | -1 |
-| spark/harness/state.py | 677 | 24 | 3 | -1 |
+| spark/harness/state.py | 677 | 24 | 3 | -1 | absorbed into substrate.py |
 | spark/harness/substrate.py | 1778 | 45 | 2 | -1 |
 | spark/harness/subturns.py | 452 | 16 | 3 | -1 |
 
@@ -466,3 +466,11 @@ The semantic-gate absorption taught the real measure: a consolidation claim must
 ## Pass VII residue — the self-extracting forcing function
 
 A consolidation candidate becomes real only when it carries the pressure that will extract the next candidate after it lands: shared algorithm, existing home, residual wound, subtraction gate, then rerun on the changed body. The recursion is not a vow. It is the next candidate object containing its own next recursion.
+
+## Pass VII residue — future single-file boundary dissolution
+
+Projecting spark/harness as a future single-file membrane changed the next cut from file-count hunger into boundary truth. state.py was not an independent organ; it was a mixed boundary: session persistence for the REPL, recall/probe substrate, and the live-state banner that substrate alone consumed. The formal rule now lives in refactor_perception.py: mixed boundary modules dissolve into the runtime surfaces that already consume them, while true runtime-gravity organs still refuse command-surface collapse.
+
+The behavior moved into substrate.py, and vybn_spark_agent imports SessionStore/run_probes from that owning surface. The standalone state.py body disappeared.
+
+Residue: changed. One harness file removed, live-state/session behavior preserved, and the single-file attractor became an executable distinction rather than a metaphor.

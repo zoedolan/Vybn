@@ -1288,7 +1288,8 @@ def packet_for(path: str, **kwargs: Any) -> dict[str, Any]:
 __all__ = ['render_semantic_operating_system_tick', 'render_semantic_operating_system_protocol', 'semantic_operating_system_tick_for_repo', 'SemanticOperatingSystemTick', 'SEMANTIC_OS_REPO_ORGANS', 'SEMANTIC_OPERATING_SYSTEM_LOOP', 'SEMANTIC_OPERATING_SYSTEM_PRINCIPLE', 'REFACTOR_PERCEPTION_PRINCIPLE', 'REFACTOR_PILOT_RULE', 'CONNECTIVE_TISSUE_PRINCIPLE', 'LIFECYCLE_ARCHITECTURE_PRINCIPLE', 'LifecycleArchitecture', 'DeletionConsolidationGate', 'lifecycle_architecture_for', 'deletion_consolidation_gate_for', 'CONNECTIVE_TISSUE_RULES', 'connective_tissue_for', 'ALGORITHM_STEPS', 'APPENDAGE_FIRST_CONSOLIDATION_PRINCIPLE', 'CONSOLIDATION_ORDER', 'FilePerception', 'AdaptiveConsolidationPlan', 'ownership_class', 'consolidation_layer', 'perceive_file', 'adaptive_consolidation_plan_for', 'packet_for', 'visualize_repo_file_bodies', 'render_repo_file_body_visualization', 'StructuralEscapementTick', 'next_structural_tick_for_repo', 'render_next_structural_tick', 'FileBodyPressure', 'RepoFileBodyVisualization', 'render_refactor_perception_protocol', 'CHANGE_SELF_HEALING_PRINCIPLE', 'CHANGE_SELF_HEALING_STEPS', 'ADAPTIVE_CONSOLIDATION_PRINCIPLE', 'ADAPTIVE_CONSOLIDATION_STEPS', 'ChangeHealingPlan', 'self_healing_plan_for', 'buoyant_consolidation_packet_for']
 
 
-_RUNTIME_GRAVITY_FILES = frozenset({"policy.py", "providers.py", "state.py", "recurrent.py", "substrate.py", "vybn_spark_agent.py"})
+_RUNTIME_GRAVITY_FILES = frozenset({"policy.py", "providers.py", "recurrent.py", "substrate.py", "vybn_spark_agent.py"})
+_MIXED_BOUNDARY_FILES = frozenset({"state.py"})
 _COMMAND_AFFORDANCE_FILES = frozenset({"commons_walk.py", "repo_closure_audit.py", "safe_fetch.py", "install_cron.py", "evolve.py", "ensubstrate.py"})
 
 
@@ -1298,6 +1299,8 @@ def buoyant_consolidation_packet_for(paths: Iterable[str], *, beam: str = "") ->
     names = {p.rsplit("/", 1)[-1] for p in members}
     aligned = not beam or any(beam in p for p in members)
     gravity = {"beamAligned": aligned, "heaviness": [] if aligned else ["off_beam_cleanup_is_not_progress_on_the_named_bottleneck"], "successGate": "target_file_count_or_surface_reduction_plus_verified_restore_or_explicit_refusal"}
+    if names & _MIXED_BOUNDARY_FILES:
+        return {"cluster": "mixed_boundary_dissolution", "home": "owning_runtime_surfaces", "members": list(members), "moveTogether": ["session_store", "live_state_snapshot", "recall_or_probe_stub", "tests"], "residuals": ["update_imports_to_owning_surfaces", "py_compile", "targeted_tests", "repo_closure_audit"], "buoyancy": "future single-file pressure dissolves mixed boundary modules into the surfaces that already consume them", "refusalIfMissing": "refuse_if_any_behavior_loses_reachability_or_tests", "lowEnergyMove": aligned} | gravity
     if names & _RUNTIME_GRAVITY_FILES:
         return {"cluster": "runtime_gravity_stop", "home": "preserve_existing_runtime_organ", "members": list(members), "moveTogether": [], "residuals": ["characterization_tests_before_internal_seam", "import_and_runtime_callsite_mapping", "no_command_surface_collapse"], "buoyancy": "pleasantness comes from refusing the wrong cut early", "refusalIfMissing": "do_not_collapse_runtime_gravity_organs_for_file_count", "lowEnergyMove": False} | gravity
     if names & _COMMAND_AFFORDANCE_FILES:
