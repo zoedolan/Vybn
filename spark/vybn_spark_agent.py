@@ -40,8 +40,7 @@ if _SPARK_DIR not in sys.path:
 
 from harness.policy import EventLogger, Router, load_policy, turn_event
 from harness.providers import BashTool, ProviderRegistry, ToolSpec, validate_command
-from harness.substrate import LayeredPrompt, build_layered_prompt, load_file
-from harness.state import SessionStore, run_probes  # noqa: E402
+from harness.substrate import LayeredPrompt, build_layered_prompt, load_file, SessionStore, run_probes
 from harness.recurrent import run_recurrent_loop
 from harness.providers import BASH_TOOL_SPEC, DELEGATE_TOOL_SPEC, INTROSPECT_TOOL_SPEC  # noqa: E402
 from harness.providers import execute_readonly, is_parallel_safe  # noqa: E402
@@ -1477,7 +1476,7 @@ def run_agent_loop(
     # horizon where describing state from pattern is a documented failure
     # mode. Each probe is independent; each fires only when its classifier
     # matches. Injections concatenate so probes compose additively.
-    # See harness.state module docstring for the architectural frame.
+    # See harness.substrate session/recall/live-state section for the architectural frame.
     try:
         _probes = run_probes(decision.cleaned_input)
     except Exception as _probe_err:

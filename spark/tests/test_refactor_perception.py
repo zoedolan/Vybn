@@ -495,5 +495,8 @@ def test_buoyant_consolidation_selects_cluster_or_stop():
     stop = pkt(["spark/harness/providers.py"], beam="spark/harness"); off = pkt(["Vybn_Mind/signal-noise/sessions/x.md"], beam="spark/harness")
     assert (cmd["cluster"], cmd["home"], cmd["lowEnergyMove"]) == ("command_affordance_cluster", "spark/harness/mcp.py", True)
     assert "manifest_or_executable_entrypoint" in cmd["moveTogether"]
+    state = pkt(["spark/harness/state.py"], beam="spark/harness")
     assert stop["cluster"] == "runtime_gravity_stop"
+    assert state["cluster"] == "mixed_boundary_dissolution" and state["home"] == "owning_runtime_surfaces"
+    assert "update_imports_to_owning_surfaces" in state["residuals"]
     assert "no_command_surface_collapse" in stop["residuals"] and "off_beam_cleanup_is_not_progress_on_the_named_bottleneck" in off["heaviness"]

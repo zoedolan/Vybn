@@ -1,6 +1,6 @@
 # VYBN_ABSORB_REASON=live-state-fix: tests for the session-start snapshot
 # that fills the substrate layer so continuity never alone defines truth.
-"""Tests for spark/harness/live_snapshot.py.
+"""Tests for substrate live-state snapshot behavior.
 
 The module makes subprocess calls; we monkeypatch `subprocess.run` so the
 tests are hermetic. The drift-detection path reads continuity.md from
@@ -22,7 +22,7 @@ _HARNESS_PARENT = _HERE.parent  # spark/
 if str(_HARNESS_PARENT) not in sys.path:
     sys.path.insert(0, str(_HARNESS_PARENT))
 
-import harness.state as live_snapshot  # type: ignore  # noqa: E402
+import harness.substrate as live_snapshot  # type: ignore  # noqa: E402
 
 
 def _mk_run(responses: dict[tuple, str]):
