@@ -1095,6 +1095,7 @@ class StreamHandle:
 
 class Provider(Protocol):
     name: str
+    tool_target: str
 
     def stream(
         self,
@@ -1105,7 +1106,11 @@ class Provider(Protocol):
         role: RoleConfig,
     ) -> StreamHandle: ...
 
-    def build_tool_result(self, tool_call_id: str, content: str) -> dict: ...
+    def _translate_tools(self, tools: list[ToolSpec]) -> list[dict]:
+        return [_provider_tool_schema(tool, self.tool_target) for tool in tools]
+
+    def build_tool_result(self, tool_call_id: str, content: str) -> dict:
+        return _provider_tool_result(tool_call_id, content, self.tool_target)
 
 
 def _provider_tool_schema(tool: ToolSpec, target: str) -> dict:
@@ -1131,21 +1136,11 @@ def _provider_tool_result(tool_call_id: str, content: str, target: str) -> dict:
     raise ValueError(f"unknown tool result target: {target}")
 
 
-class ProviderTranslationMixin:
-    tool_target: str
-
-    def _translate_tools(self, tools: list[ToolSpec]) -> list[dict]:
-        return [_provider_tool_schema(tool, self.tool_target) for tool in tools]
-
-    def build_tool_result(self, tool_call_id: str, content: str) -> dict:
-        return _provider_tool_result(tool_call_id, content, self.tool_target)
-
-
 # ---------------------------------------------------------------------------
 # AnthropicProvider
 # ---------------------------------------------------------------------------
 
-class AnthropicProvider(ProviderTranslationMixin):
+class AnthropicProvider(Provider):
     name = "anthropic"
     tool_target = "anthropic"
 
@@ -1431,7 +1426,7 @@ def _strip_reasoning(text: str) -> str:
     return cleaned.strip()
 
 
-class OpenAIProvider(ProviderTranslationMixin):
+class OpenAIProvider(Provider):
     """OpenAI-compatible provider.
 
     Works for:
