@@ -446,3 +446,11 @@ The discovery strengthened from command-surface gravity into executable-affordan
 commons_walk.py and its standalone test file were absorbed into the existing MCP/harness homes. The command is now python3 -m spark.harness.mcp --commons-walk, with --encounter and --json preserved. semantic-web.jsonld was retargeted so the executable affordance still points at the living command.
 
 Residue: changed. More than one file was safely abstracted at once because the process exposed a whole affordance cluster, not an isolated file.
+
+## Pass VII residue — buoyant affordance-cluster selection
+
+The recursion became lighter when the unit of action changed from file deletion to affordance-cluster absorption. The pleasant cut is not the one that removes a file; it is the one where implementation, command surface, tests, manifests, and executable entrypoints all want the same existing home.
+
+This is now encoded in refactor_perception.py as a buoyant affordance-cluster primitive. It predicts MCP absorption for commandable verifier/renderer clusters and refuses command-surface collapse for runtime-gravity organs such as policy, providers, state, subturns, semantic gates, recurrence, substrate, and live agent imports.
+
+Residue: changed. The process should now surface the next elegant cut faster, and also stop sooner when the file-pressure itself is the wrong desire.

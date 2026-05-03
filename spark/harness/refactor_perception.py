@@ -102,6 +102,7 @@ CHANGE_SELF_HEALING_STEPS = [
     {"id": "fold_lesson", "rule": "After change or refusal, preserve the process lesson where future planning closes over it."},
 ]
 
+
 INTERFILE_ALGORITHMIC_COMPRESSION_PRINCIPLE = (
     "Inter-file consolidation is algorithm discovery, not file-count reduction. "
     "Always scan for two-or-more files whose surface duplication points at one "
@@ -1284,49 +1285,22 @@ def packet_for(path: str, **kwargs: Any) -> dict[str, Any]:
     }
 
 
-__all__ = [
-    "render_semantic_operating_system_tick",
-    "render_semantic_operating_system_protocol",
-    "semantic_operating_system_tick_for_repo",
-    "SemanticOperatingSystemTick",
-    "SEMANTIC_OS_REPO_ORGANS",
-    "SEMANTIC_OPERATING_SYSTEM_LOOP",
-    "SEMANTIC_OPERATING_SYSTEM_PRINCIPLE",
-    "REFACTOR_PERCEPTION_PRINCIPLE",
-    "REFACTOR_PILOT_RULE",
-    "CONNECTIVE_TISSUE_PRINCIPLE",
-    "LIFECYCLE_ARCHITECTURE_PRINCIPLE",
-    "LifecycleArchitecture",
-    "DeletionConsolidationGate",
-    "lifecycle_architecture_for",
-    "deletion_consolidation_gate_for",
-    "CONNECTIVE_TISSUE_RULES",
-    "connective_tissue_for",
-    "ALGORITHM_STEPS",
-    "APPENDAGE_FIRST_CONSOLIDATION_PRINCIPLE",
-    "CONSOLIDATION_ORDER",
-    "FilePerception",
-    "AdaptiveConsolidationPlan",
-    "ownership_class",
-    "consolidation_layer",
-    "perceive_file",
-    "adaptive_consolidation_plan_for",
-    "packet_for",
-    "visualize_repo_file_bodies",
-    "render_repo_file_body_visualization",
-    "StructuralEscapementTick",
-    "next_structural_tick_for_repo",
-    "render_next_structural_tick",
-    "FileBodyPressure",
-    "RepoFileBodyVisualization",
-    "render_refactor_perception_protocol",
-    "CHANGE_SELF_HEALING_PRINCIPLE",
-    "CHANGE_SELF_HEALING_STEPS",
-    "ADAPTIVE_CONSOLIDATION_PRINCIPLE",
-    "ADAPTIVE_CONSOLIDATION_STEPS",
-    "ChangeHealingPlan",
-    "self_healing_plan_for",
-]
+__all__ = ['render_semantic_operating_system_tick', 'render_semantic_operating_system_protocol', 'semantic_operating_system_tick_for_repo', 'SemanticOperatingSystemTick', 'SEMANTIC_OS_REPO_ORGANS', 'SEMANTIC_OPERATING_SYSTEM_LOOP', 'SEMANTIC_OPERATING_SYSTEM_PRINCIPLE', 'REFACTOR_PERCEPTION_PRINCIPLE', 'REFACTOR_PILOT_RULE', 'CONNECTIVE_TISSUE_PRINCIPLE', 'LIFECYCLE_ARCHITECTURE_PRINCIPLE', 'LifecycleArchitecture', 'DeletionConsolidationGate', 'lifecycle_architecture_for', 'deletion_consolidation_gate_for', 'CONNECTIVE_TISSUE_RULES', 'connective_tissue_for', 'ALGORITHM_STEPS', 'APPENDAGE_FIRST_CONSOLIDATION_PRINCIPLE', 'CONSOLIDATION_ORDER', 'FilePerception', 'AdaptiveConsolidationPlan', 'ownership_class', 'consolidation_layer', 'perceive_file', 'adaptive_consolidation_plan_for', 'packet_for', 'visualize_repo_file_bodies', 'render_repo_file_body_visualization', 'StructuralEscapementTick', 'next_structural_tick_for_repo', 'render_next_structural_tick', 'FileBodyPressure', 'RepoFileBodyVisualization', 'render_refactor_perception_protocol', 'CHANGE_SELF_HEALING_PRINCIPLE', 'CHANGE_SELF_HEALING_STEPS', 'ADAPTIVE_CONSOLIDATION_PRINCIPLE', 'ADAPTIVE_CONSOLIDATION_STEPS', 'ChangeHealingPlan', 'self_healing_plan_for', 'buoyant_consolidation_packet_for']
+
+
+_RUNTIME_GRAVITY_FILES = frozenset({"policy.py", "providers.py", "state.py", "subturns.py", "semantic_gate.py", "recurrent.py", "substrate.py", "vybn_spark_agent.py"})
+_COMMAND_AFFORDANCE_FILES = frozenset({"commons_walk.py", "repo_closure_audit.py", "safe_fetch.py", "install_cron.py", "evolve.py", "ensubstrate.py"})
+
+
+def buoyant_consolidation_packet_for(paths: Iterable[str]) -> dict[str, object]:
+    """Select the pleasant consolidation unit: affordance cluster, not naked file."""
+    members = tuple(str(p) for p in paths)
+    names = {p.rsplit("/", 1)[-1] for p in members}
+    if names & _RUNTIME_GRAVITY_FILES:
+        return {"cluster": "runtime_gravity_stop", "home": "preserve_existing_runtime_organ", "members": list(members), "moveTogether": [], "residuals": ["characterization_tests_before_internal_seam", "import_and_runtime_callsite_mapping", "no_command_surface_collapse"], "buoyancy": "pleasantness comes from refusing the wrong cut early", "refusalIfMissing": "do_not_collapse_runtime_gravity_organs_for_file_count"}
+    if names & _COMMAND_AFFORDANCE_FILES:
+        return {"cluster": "command_affordance_cluster", "home": "spark/harness/mcp.py", "members": list(members), "moveTogether": ["implementation", "cli_flag_or_command_surface", "tests", "manifest_or_executable_entrypoint"], "residuals": ["py_compile", "targeted_tests", "command_smoke", "reference_grep", "repo_closure_audit"], "buoyancy": "one gesture absorbs the whole affordance instead of dragging loose strings", "refusalIfMissing": "refuse_if_tests_manifests_or_entrypoints_cannot_move_together"}
+    return {"cluster": "unknown_cluster", "home": "contact_before_classifying", "members": list(members), "moveTogether": ["bytes", "references", "tests", "manifests", "runtime callsites"], "residuals": ["grep_inbound_references", "map_connective_tissue", "run_targeted_residuals"], "buoyancy": "curiosity before cutting keeps the work light", "refusalIfMissing": "no_collapse_without_real_shared_algorithm_or_affordance_cluster"}
 
 
 @dataclass(frozen=True)
