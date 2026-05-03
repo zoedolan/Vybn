@@ -488,3 +488,12 @@ def test_refactor_packet_carries_lifecycle_architecture_gate():
     assert "lifecycleArchitecturePrinciple" in pkt
     assert pkt["deletionConsolidationGate"]["status"] == "ARCHITECTURE_GATE_FIRST"
     assert pkt["lifecycleArchitecture"]["owner"] == "runtime_process_or_service"
+
+def test_buoyant_consolidation_selects_cluster_or_stop():
+    from spark.harness.refactor_perception import buoyant_consolidation_packet_for as pkt
+    cmd = pkt(["spark/harness/commons_walk.py", "semantic-web.jsonld"])
+    stop = pkt(["spark/harness/semantic_gate.py"])
+    assert (cmd["cluster"], cmd["home"]) == ("command_affordance_cluster", "spark/harness/mcp.py")
+    assert "manifest_or_executable_entrypoint" in cmd["moveTogether"]
+    assert stop["cluster"] == "runtime_gravity_stop"
+    assert "no_command_surface_collapse" in stop["residuals"]
