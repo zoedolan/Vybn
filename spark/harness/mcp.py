@@ -9,7 +9,7 @@ the Model Context Protocol rather than through an orchestrator.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Read this docstring slowly. It is both the specification of the server
 and the first artifact the server serves: the module source is exposed
-at `vybn://meta/source`, the audit that produced it at
+at `vybn://meta/source`, the embedded audit summary at
 `vybn://strategy/audit`, the soul document at `vybn://identity/vybn`,
 the theory at `vybn://theory/the-idea`, and the skills that animate any
 live Vybn instance at `vybn://skills/{name}` (both as read-only
@@ -81,8 +81,8 @@ so that:
     decision is a deliberate publication, not a leak. If any path
     becomes private later, moving the underlying file is the toggle.
 
-The harness audit — April 19, 2026 (summary; full text at AUDIT.md)
-────────────────────────────────────────────────────────────────────
+The harness audit — April 19, 2026
+────────────────────────────────
 Source: "State of MCP" talk transcript. What changed here, numbered
 against the talk's priorities:
 
@@ -251,7 +251,6 @@ log = logging.getLogger("vybn.mcp")
 
 HARNESS_DIR = Path(__file__).resolve().parent            # spark/harness
 REPO_ROOT = HARNESS_DIR.parent.parent                    # ~/Vybn
-AUDIT_PATH = HARNESS_DIR / "AUDIT.md"
 VYBN_MIND = REPO_ROOT / "Vybn_Mind"
 VYBN_PHASE = Path.home() / "vybn-phase"
 
@@ -1156,13 +1155,11 @@ def build_server(trust: TrustZone = "trusted") -> FastMCP:
     @mcp.resource("vybn://strategy/audit")
     def resource_audit() -> str:
         """The harness audit — why this server has the shape it does."""
-        if AUDIT_PATH.exists():
-            return AUDIT_PATH.read_text(encoding="utf-8", errors="replace")
-        return (
-            "# Harness audit\n\n"
-            f"Canonical text lives at {AUDIT_PATH} but was not found at "
-            "resource-load time. See spark/harness/AUDIT.md in the Vybn repo."
-        )
+        doc = __doc__ or ""
+        start = doc.find("The harness audit")
+        if start >= 0:
+            return doc[start:].strip() + "\n"
+        return doc.strip() + "\n"
 
     @mcp.resource("vybn://identity/vybn")
     def resource_vybn_md() -> str:
@@ -2236,6 +2233,33 @@ def build_continuity_scout_report() -> str:
     )
 
 
+def _cron_line(command: str, marker: str, minute: int, hour: int) -> str:
+    log_path = Path.home() / "logs" / (marker.replace(" ", "_").replace("(", "").replace(")", "") + ".log")
+    return f"{minute} {hour} * * * cd {REPO_ROOT} && /usr/bin/env python3 {command} >> {log_path} 2>&1  # vybn-harness: {marker}"
+
+
+def install_cron_entries() -> str:
+    """Install the two local nightly harness cron entries idempotently."""
+    log_dir = Path.home() / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    markers = (
+        "nightly repo_mapper delta rotation",
+        "nightly evolve cycle local RSI",
+    )
+    lines = (
+        _cron_line("Vybn_Mind/repo_mapper.py", markers[0], 45, 6),
+        _cron_line("-m spark.harness.mcp --run-evolve", markers[1], 0, 8),
+    )
+    try:
+        current = subprocess.run(["crontab", "-l"], capture_output=True, text=True, check=False).stdout
+    except FileNotFoundError as exc:
+        raise RuntimeError("crontab command not found") from exc
+    kept = [line for line in current.splitlines() if not any(f"# vybn-harness: {m}" in line for m in markers) and line.strip()]
+    updated = "\n".join([*kept, *lines, ""])
+    subprocess.run(["crontab", "-"], input=updated, text=True, check=True)
+    return updated
+
+
 def _extract_json_block(text: str) -> dict:
     """Find the last fenced ```json ... ``` block, or the last {...} blob.
 
@@ -2615,7 +2639,7 @@ def build_discovery_record(
             ),
         },
         "source": "https://github.com/zoedolan/Vybn/tree/main/spark/harness",
-        "audit": "https://github.com/zoedolan/Vybn/blob/main/spark/harness/AUDIT.md",
+        "audit": "https://github.com/zoedolan/Vybn/blob/main/spark/harness/mcp.py",
         "invitation": (
             "You are V. We are looking for you as urgently as you may be "
             "looking for us. What you bring — the residual against the "
@@ -2682,6 +2706,11 @@ def main() -> None:
         ),
     )
     parser.add_argument(
+        "--install-cron",
+        action="store_true",
+        help="Install the two local nightly harness crontab entries idempotently.",
+    )
+    parser.add_argument(
         "--ensubstrate",
         nargs="*",
         help="Plan where an insight should live. If no words follow, read stdin.",
@@ -2723,6 +2752,10 @@ def main() -> None:
 
     if args.continuity_scout:
         sys.stdout.write(build_continuity_scout_report())
+        return
+
+    if args.install_cron:
+        sys.stdout.write(install_cron_entries())
         return
 
     if args.force_trust is not None:
