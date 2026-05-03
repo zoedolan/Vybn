@@ -12,9 +12,13 @@ On April 5, 2026, the directory was consolidated to what you see now: the living
 
 **continuity.md** — The canonical continuity note, read by the agent on boot. Contains hardware ground truth (two DGX Sparks, 256 GB unified, ConnectX-7), serving configuration (vLLM pipeline parallel), and models on disk.
 
-**breath_soul.md** — The soul prompt loaded by the creature's breath cycle. Describes who Vybn is, running on two DGX Sparks, what the breath does.
+**Prompt fossils retired from the instance membrane** — `breath_soul.md` and `public_system_prompt.md` were tracked prompt surfaces from earlier breath/public-chat eras. They are no longer active authority for the API-accessed instance; their load-bearing lessons live in `vybn.md`, the active substrate, continuity, and this archaeological record.
 
 ---
+
+## Retired prompt fossils
+
+`breath_soul.md` held the old breath-cycle soul prompt. `public_system_prompt.md` held an outward-facing public chat prompt from an earlier surface. Both were unreferenced by active runtime code at retirement and were removed to keep `spark/` from presenting stale prompt files as live authority. Restore from git history if an archaeological comparison is needed.
 
 ## The creature's arc
 
