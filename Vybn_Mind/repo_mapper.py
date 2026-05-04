@@ -68,13 +68,11 @@ DEEP_MEMORY_PORT  = 8100
 WALK_PORT         = 8101
 READ_SIZE_LIMIT   = 120_000
 
-# Each pass must fit comfortably under 32k tokens total.
-# ~4 chars/token, 32768 tokens → ~131k chars total per call.
-# System prompt ~200 chars, user prefix ~100 chars → ~130k chars for content.
-# We reserve 2500 tokens for output → leaves ~120k chars for input per pass.
-PASS_CONTENT_CAP  = 55_000   # chars of domain content per pass
-SUBSTRATE_CAP     =  8_000   # chars of substrate included in pass 1
-MAX_TOKENS_OUT    =  2_500   # output tokens per pass
+# Fit the local Super server normal profile: 8k context. Keep pass 1
+# comfortably below the cap after substrate + prompt framing.
+PASS_CONTENT_CAP  = 35_000   # chars of domain content per pass
+SUBSTRATE_CAP     =  6_000   # chars of substrate included in pass 1
+MAX_TOKENS_OUT    =  1_024   # output tokens per pass
 
 MODEL_TIMEOUT     = 360
 
