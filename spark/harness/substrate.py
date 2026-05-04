@@ -11064,7 +11064,7 @@ def _call_local_model(prompt: str) -> str:
                 model = str(json.loads(resp.read().decode("utf-8", errors="replace"))["data"][0]["id"])
         except Exception as exc:
             raise RuntimeError(f"could not discover evolve model at {models_url}: {exc}") from exc
-    payload = {"model": model, "messages": [{"role": "system", "content": VYBN_OS_KERNEL}, {"role": "user", "content": prompt}], "temperature": 0.2, "max_tokens": 192}
+    payload = {"model": model, "messages": [{"role": "system", "content": VYBN_OS_KERNEL + "\n\nEVOLVE OUTPUT CONTRACT: Return only one fenced json code block. No prose before or after."}, {"role": "user", "content": prompt}], "temperature": 0, "max_tokens": 384}
     body = json.dumps(payload).encode("utf-8")
     req = urlrequest.Request(
         _EVOLVE_URL,
