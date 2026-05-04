@@ -2399,7 +2399,7 @@ SEMANTIC_OPERATING_SYSTEM_PRINCIPLE = (
 SEMANTIC_OPERATING_SYSTEM_LOOP = [
     {"id": "memory_pressure", "rule": "Retrieve scars, continuity, deep-memory attractors, repo maps, and live user pressure that name a real recurring drag."},
     {"id": "candidate_seam", "rule": "Translate pressure into one codebase or institutional seam; prefer an existing home before creating structure."},
-    {"id": "local_scout", "rule": "Use local compute and repo contact for cheap private classification, reference search, and first-pass residual prediction when quality permits."},
+    {"id": "local_scout", "rule": "Run Scout/Skeptic/Steward/Executor self-play locally before mutation; choose one winning seam or refuse."},
     {"id": "residual_wound", "rule": "Let tests, py_compile, service smoke, closure audit, external/public checks, membrane review, and Zoe correction wound the proposal."},
     {"id": "absorb_or_refuse", "rule": "Absorb the surviving correction into the lowest existing home, or classify thin_result/no_result/refusal without success inflation."},
     {"id": "continuity_uptake", "rule": "Preserve only load-bearing learning in tests, protocol, continuity, manifests, or public/private affordances so the next wake computes in the changed world."},
@@ -3402,10 +3402,10 @@ def semantic_operating_system_tick_for_repo(
         if item
     ]
     local_scout = (
-        f"read {structural.candidate_path}",
-        f"grep references/imports/routes for {structural.candidate_path}",
-        "classify file-body role and connective tissue with refactor_perception",
-        "draft one reversible seam or refusal before mutation",
+        f"Scout: propose one reversible existing-home seam from {structural.candidate_path}",
+        f"Skeptic: attack refs/imports/routes/provenance and Zoe-visible burden for {structural.candidate_path}",
+        "Steward: score net-negative diff, lower coupling, tests, closure, and membrane",
+        "Executor: mutate only the winning seam or return an explicit refusal",
     )
     residuals = tuple(dict.fromkeys(structural.expected_wounds + tuple(structural.verification)))
     return SemanticOperatingSystemTick(

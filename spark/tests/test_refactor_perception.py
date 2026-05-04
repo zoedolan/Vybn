@@ -431,8 +431,8 @@ def test_semantic_operating_system_tick_composes_existing_structural_tick(tmp_pa
     assert tick.candidate_path == "organ.py"
     assert tick.existing_home == "organ.py"
     assert "live user pressure" in tick.memory_pressure
-    assert "absorb into the named existing_home" in tick.absorption_rule
-    assert any("targeted" in item for item in tick.continuity_uptake)
+    assert tick.local_scout[0].startswith("Scout:") and tick.local_scout[1].startswith("Skeptic:")
+    assert tick.local_scout[2].startswith("Steward:") and "absorb into the named existing_home" in tick.absorption_rule and any("targeted" in item for item in tick.continuity_uptake)
 
 
 def test_refactor_packet_carries_semantic_operating_system_loop():
