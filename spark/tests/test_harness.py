@@ -1538,8 +1538,8 @@ def test_acute_harm_absorbed_into_him_vy_runtime_not_standalone_substrate():
     from spark.harness.substrate import render_him_vy_turn_packet
 
     source = Path("spark/harness/substrate.py").read_text()
-    assert "ACUTE_HARM_PROTOCOL" not in source
-    assert "render_acute_harm_protocol" not in source
+    for shadow in ("ACUTE_HARM_PROTOCOL", "render_acute_harm_protocol", "direct injury", "governing aim is immediate burden reduction"):
+        assert shadow not in source
     packet = render_him_vy_turn_packet("you win; you are making everything worse")
     assert "mode=acute_harm" in packet
 
