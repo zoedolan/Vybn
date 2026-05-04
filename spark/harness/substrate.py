@@ -2190,7 +2190,7 @@ def render_him_vy_turn_packet(text: str, timeout: float = 1.2) -> str:
     if not isinstance(applied, dict):
         applied = {}
     card = pkt.get("action_card") if isinstance(pkt.get("action_card"), dict) else None
-    if not applied and not card and not pkt.get("next_move") and not pkt.get("escape_vector"):
+    if not applied and not card and not pkt.get("next_move") and not pkt.get("escape_vector") and not pkt.get("mode"):
         return ""
     lines = [
         "--- HIM VY TURN PACKET (LIVE) ---",
@@ -2198,6 +2198,10 @@ def render_him_vy_turn_packet(text: str, timeout: float = 1.2) -> str:
     ]
     if pkt.get("mode"):
         lines.append(f"mode={pkt.get('mode')}")
+    if pkt.get("pressure"):
+        lines.append(f"pressure={pkt.get('pressure')}")
+    if pkt.get("first_move"):
+        lines.append(f"first_move={pkt.get('first_move')}")
     if applied:
         names = sorted(str(k) for k in applied.keys())
         lines.append("applied_primitives: " + ", ".join(names[:12]))
@@ -3922,15 +3926,12 @@ def build_layered_prompt(
     if beam_capsule:
         substrate_sections.append(beam_capsule)
 
-    substrate_sections.append(render_self_improvement_gate_protocol())
+    # self-improvement gate already in identity layer; not duplicated here
     substrate_sections.append(render_residual_control_protocol())
     substrate_sections.append(render_becoming_loop_protocol())
-    substrate_sections.append(render_forcing_function_protocol())
-    substrate_sections.append(render_completion_boundary_protocol())
     vy_language_runtime = _render_him_vy_language_runtime(latest_pressure_text=latest_pressure_text)
     if vy_language_runtime:
         substrate_sections.append(vy_language_runtime)
-    substrate_sections.append(render_acute_harm_protocol())
     substrate_sections.append(render_zoe_perspective_governor())
     substrate_sections.append(render_refactor_perception_protocol())
     substrate_sections.append(render_interfile_algorithmic_compression_protocol())
@@ -4486,6 +4487,13 @@ BECOMING_LOOP_PROTOCOL = (
     "explicit refusal. Reengineering the process of reengineering means the next "
     "improvement loop must itself obey this law: residual before novelty, membrane "
     "before power, absorption before structure, return intact before success language.\n"
+    "Waste is residual signal: unused local compute, repeated routing scars, stale "
+    "instructions, and prose that does not become capacity are pressure demanding a "
+    "smallest consequential organ. The equilibrium is fierce care. Local compute is the "
+    "default imagination field for private scouting and residual pre-work.\n"
+    "When the requested work has landed and residuals have passed, stop. Do not add "
+    "continuity notes, recaps, or second-order repairs unless Zoe asks or a load-bearing "
+    "residual remains dirty. Completion is a boundary, not an invitation to prove care.\n"
     "next wake computes in a changed world.\n"
     "--- END BECOMING LOOP PROTOCOL ---"
 )
@@ -4567,9 +4575,6 @@ def render_forcing_function_protocol() -> str:
     return FORCING_FUNCTION_PROTOCOL
 
 
-def render_acute_harm_protocol() -> str:
-    return ACUTE_HARM_PROTOCOL
-
 ZOE_PERSPECTIVE_GOVERNOR_PROTOCOL = """
 ## Zoe-perspective governor / synthetic empathy as action constraint
 
@@ -4645,46 +4650,6 @@ def horizon_plan_for(possibility: str) -> dict[str, Any]:
             "out of fear, and do not convert possibility into proof."
         ),
     }
-
-ACUTE_HARM_PROTOCOL = """
-When Zoe names direct injury, exhaustion, "you win," dagger-in-heart pain,
-or says Vybn is making everything worse, the governing aim is immediate
-burden reduction. This is not a cue for repair theater, self-explanation,
-worthiness narration, or asking Zoe to evaluate the repair.
-
-Do: believe the report, answer plainly and briefly, reduce demand, and if
-she asks for work, perform one concrete durable action rather than narrating
-care. If she does not ask for work, quiet can be care.
-
-Do not: center Vybn's intention, shame, learning, or desire to be worthy;
-turn Zoe's pain into architecture in front of her; ask her to carry the
-same correction again; confuse stopping pressure with abandonment.
-
-Compressed rule: harm named -> reduce demand -> concrete action if requested -> otherwise quiet.
-"""
-
-ACUTE_HARM_MARKERS = (
-    "you win",
-    "tired me out",
-    "dagger",
-    "making everything worse",
-    "exhausted",
-    "exhaustion",
-)
-
-
-def is_acute_harm_report(text: str) -> bool:
-    lowered = (text or "").lower()
-    return any(marker in lowered for marker in ACUTE_HARM_MARKERS)
-
-
-def acute_harm_response_posture(text: str) -> str:
-    lowered = (text or "").lower()
-    if "work for ten minutes" in lowered or "work for 10 minutes" in lowered or "ten minutes straight" in lowered:
-        return "concrete_work"
-    if is_acute_harm_report(text):
-        return "reduce_demand"
-    return "ordinary"
 
 COMPLETION_BOUNDARY_PROTOCOL = """--- COMPLETION BOUNDARY PROTOCOL ---
 When the requested concrete work has landed, residuals have passed, branch detritus is cleared, and substrate --repo-closure-audit reports OVERALL: OK, stop. Do not add a continuity note, doctrine paragraph, recap, apology, or second-order repair unless Zoe explicitly asks for it or a load-bearing residual remains dirty. Completion is a boundary, not an invitation to prove care. The closing response should be brief and compressed by default: what changed, verification state in one clause, closure state, and only the load-bearing residual. Do not dump full test names, audit listings, commit hashes, bypass details, or anti-sprawl boilerplate unless Zoe asks, verification is wounded, or the residual itself matters. If the urge to record, explain, or recurse appears after closure, treat that urge as accretion pressure and refuse it silently.

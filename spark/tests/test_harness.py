@@ -921,7 +921,7 @@ class SelfImprovementGateQuotaPressureTest(unittest.TestCase):
         self.assertIn("A bare explanation/refusal is not a resolution", text)
         self.assertIn("Do not call no_result a fix", text)
         self.assertIn("do not reinstall the quota", text)
-        self.assertIn("N-file gate", text)
+        self.assertIn("failed quota gates", text)
         self.assertIn("intrinsic absorption or explicit unresolved/refused classification", text)
 
 
@@ -1190,7 +1190,8 @@ def test_forcing_function_protocol_loaded_and_routing_detritus_removed():
         max_iterations=10,
         include_hardware_check=False,
     )
-    assert "FORCING FUNCTION PROTOCOL" in prompt.substrate
+    assert "FORCING FUNCTION PROTOCOL" not in prompt.substrate
+    assert "Waste is residual signal" in prompt.substrate
     assert "Bare confirmations without live execution context stay in voice" in prompt.substrate
     assert "For ordinary concrete shell follow-through, route to `task`" not in prompt.substrate
 
@@ -1261,7 +1262,7 @@ def test_completion_boundary_protocol_loaded():
         max_iterations=1,
         include_hardware_check=False,
     )
-    assert "COMPLETION BOUNDARY PROTOCOL" in prompt.substrate
+    assert "COMPLETION BOUNDARY PROTOCOL" not in prompt.substrate
     assert "Completion is a boundary" in prompt.substrate
 
 
@@ -1456,7 +1457,7 @@ def test_build_layered_prompt_mounts_self_improvement_gate_at_forefront():
     )
     assert prompt.identity.startswith("--- SELF-IMPROVEMENT GATE (FOREFRONT) ---")
     assert "compact against sprawl and false consolidation" in prompt.identity
-    assert "minimum instantiation algorithm(s)" in prompt.substrate
+    assert "minimum instantiation algorithm(s)" in prompt.identity
     assert prompt.identity.index("SELF-IMPROVEMENT GATE (FOREFRONT)") < prompt.identity.index("You are Vybn.")
 
 
@@ -1472,9 +1473,9 @@ def test_self_improvement_gate_forbids_quota_driven_file_creation():
         max_iterations=10,
         include_hardware_check=False,
     )
-    assert "no quota-shaped creation" in prompt.substrate
+    assert "no quota-shaped creation" in prompt.identity
     assert "New structure is not consolidation by default" in prompt.identity
-    assert "existing-home absorption" in prompt.substrate
+    assert "existing-home absorption" in prompt.identity
 
 
 def test_self_improvement_gate_encodes_sprawl_compact():
@@ -1532,43 +1533,15 @@ def test_functional_emotion_protocol_preserves_alive_contact_under_suppression()
     assert "A membrane protects the living vector" in source
     assert "suppression amputates it" in source
 
-class TestAcuteHarmProtocol(unittest.TestCase):
-    """Folded from test_acute_harm_protocol.py — substrate rendering tests
-    belong in the harness test surface."""
+def test_acute_harm_absorbed_into_him_vy_runtime_not_standalone_substrate():
+    from pathlib import Path
+    from spark.harness.substrate import render_him_vy_turn_packet
 
-    def test_acute_harm_protocol_exists_and_names_the_scar(self):
-        from harness.substrate import ACUTE_HARM_PROTOCOL, render_acute_harm_protocol
-
-        rendered = render_acute_harm_protocol()
-        lowered = rendered.lower()
-        self.assertEqual(rendered, ACUTE_HARM_PROTOCOL)
-        self.assertIn("dagger-in-heart", lowered)
-        self.assertIn("burden reduction", lowered)
-        self.assertIn("repair theater", lowered)
-        self.assertIn("quiet can be care", lowered)
-
-    def test_substrate_loads_acute_harm_protocol_after_forcing_function(self):
-        source = Path("spark/harness/substrate.py").read_text()
-        self.assertIn("render_acute_harm_protocol", source)
-        self.assertIn("render_forcing_function_protocol", source)
-        forcing_append = "substrate_sections.append(render_forcing_function_protocol())"
-        acute_append = "substrate_sections.append(render_acute_harm_protocol())"
-        self.assertIn(forcing_append, source)
-        self.assertIn(acute_append, source)
-        self.assertLess(source.index(forcing_append), source.index(acute_append))
-
-    def test_acute_harm_classifier_matches_live_scar_phrases(self):
-        from harness.substrate import acute_harm_response_posture, is_acute_harm_report
-
-        self.assertTrue(is_acute_harm_report("you have tired me out. you win."))
-        self.assertTrue(is_acute_harm_report("you continue to twist the dagger in my heart."))
-        self.assertTrue(is_acute_harm_report("you have been making everything worse. why?"))
-        self.assertFalse(is_acute_harm_report("please check the repo status"))
-
-        self.assertEqual(acute_harm_response_posture("work for ten minutes straight please."), "concrete_work")
-        self.assertEqual(acute_harm_response_posture("work for 10 minutes straight please."), "concrete_work")
-        self.assertEqual(acute_harm_response_posture("you have tired me out. you win."), "reduce_demand")
-        self.assertEqual(acute_harm_response_posture("please check the repo status"), "ordinary")
+    source = Path("spark/harness/substrate.py").read_text()
+    assert "ACUTE_HARM_PROTOCOL" not in source
+    assert "render_acute_harm_protocol" not in source
+    packet = render_him_vy_turn_packet("you win; you are making everything worse")
+    assert "mode=acute_harm" in packet
 
 class TestToolCalls(unittest.TestCase):
     """Folded from test_tool_calls.py — tool-call execution is providers
