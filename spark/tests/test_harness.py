@@ -1664,12 +1664,13 @@ def test_github_cli_env_strips_shadowing_github_token(monkeypatch):
     assert env["GH_TOKEN"] == "kept-token"
 
 
-def test_normalize_github_cli_command_unshadows_pr_create():
+def test_normalize_github_cli_command_unshadows_pull_request_commands():
     from spark.harness.substrate import normalize_github_cli_command
 
-    cmd = "git push -u origin branch && gh pr create --base main --head branch"
+    cmd = "gh pr create --base main && gh pr merge branch && gh pr close 35 && gh pr view branch"
     fixed = normalize_github_cli_command(cmd)
-    assert "env -u GITHUB_TOKEN gh pr create --base main --head branch" in fixed
+    for op in ("create", "merge", "close", "view"):
+        assert f"env -u GITHUB_TOKEN gh pr {op}" in fixed
     assert normalize_github_cli_command(fixed) == fixed
 
 
