@@ -6644,15 +6644,12 @@ def github_cli_env(base: dict[str, str] | None = None) -> dict[str, str]:
 
 
 def normalize_github_cli_command(command: str) -> str:
-    """Make shell-authored PR creation use the stored gh credential.
-
-    This is intentionally narrow: only `gh pr create` is rewritten. Other
-    gh calls keep their original environment, and explicit `env -u
-    GITHUB_TOKEN gh pr create` commands are left alone.
-    """
-    if "gh pr create" not in command or "env -u GITHUB_TOKEN gh pr create" in command:
+    """Make shell-authored PR operations use the stored gh credential."""
+    if "gh pr " not in command:
         return command
-    return re.sub(r"(?<![\w./-])gh\s+pr\s+create\b", "env -u GITHUB_TOKEN gh pr create", command)
+    pr_ops = "create|merge|close|view"
+    pattern = rf"(?<!GITHUB_TOKEN )(?<![\w./-])gh\s+pr\s+({pr_ops})\b"
+    return re.sub(pattern, r"env -u GITHUB_TOKEN gh pr \1", command)
 
 
 def execute_readonly(command: str, timeout: int = DEFAULT_TIMEOUT) -> str:
