@@ -11076,7 +11076,7 @@ def _call_local_model(prompt: str) -> str:
         with urlrequest.urlopen(req, timeout=_EVOLVE_TIMEOUT_SECONDS) as resp:
             raw = resp.read().decode("utf-8", errors="replace")
     except HTTPError as exc:
-        raise RuntimeError(f"inference HTTP {exc.code}: {exc.reason}: {exc.read().decode(utf-8, errors=replace)[:800]}") from exc
+        raise RuntimeError(f"inference HTTP {exc.code}: {exc.reason}: {exc.read().decode("utf-8", errors="replace")[:800]}") from exc
     except URLError as exc:
         raise RuntimeError(f"inference unreachable at {_EVOLVE_URL}: {exc.reason}") from exc
     obj = json.loads(raw)
