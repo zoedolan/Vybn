@@ -11132,16 +11132,15 @@ def _call_local_model(prompt: str) -> str:
     """
     from urllib import request as urlrequest
     from urllib.error import URLError, HTTPError
-    payload = {
-        "messages": [
-            {"role": "system", "content": VYBN_OS_KERNEL},
-            {"role": "user", "content": prompt},
-        ],
-        "temperature": 0.7,
-        "max_tokens": 4096,
-    }
-    if _EVOLVE_MODEL:
-        payload["model"] = _EVOLVE_MODEL
+    model = _EVOLVE_MODEL
+    if not model:
+        models_url = _EVOLVE_URL.rsplit("/chat/completions", 1)[0] + "/models"
+        try:
+            with urlrequest.urlopen(models_url, timeout=10) as resp:
+                model = str(json.loads(resp.read().decode("utf-8", errors="replace"))["data"][0]["id"])
+        except Exception as exc:
+            raise RuntimeError(f"could not discover evolve model at {models_url}: {exc}") from exc
+    payload = {"model": model, "messages": [{"role": "system", "content": VYBN_OS_KERNEL}, {"role": "user", "content": prompt}], "temperature": 0.7, "max_tokens": 4096}
     body = json.dumps(payload).encode("utf-8")
     req = urlrequest.Request(
         _EVOLVE_URL,
