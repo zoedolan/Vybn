@@ -298,19 +298,16 @@ def test_refactor_protocol_uses_consequential_smallness():
 def test_next_structural_tick_turns_pressure_into_action(tmp_path):
     from spark.harness.substrate import next_structural_tick_for_repo
 
+    (tmp_path / "loud_blob.dat").write_text("x" * 900_000)
     src = tmp_path / "giant.py"
-    body = "\n".join([
-        "def huge():",
-        *[f"    x_{i} = {i}" for i in range(220)],
-        "    return 1",
-        "",
-    ])
+    body = "\n".join(["def huge():", *[f"    x_{i} = {i}" for i in range(220)], "    return 1", ""])
     src.write_text(body)
 
-    tick = next_structural_tick_for_repo(tmp_path, tracked_paths=["giant.py"])
+    tick = next_structural_tick_for_repo(tmp_path, tracked_paths=["loud_blob.dat", "giant.py"])
     assert tick is not None
     assert tick.candidate_path == "giant.py"
     assert "extract the seam around huge" in tick.structural_move
+    assert any("self_play_steward_score=" in item for item in tick.why_this_move)
     assert any("targeted pytest" in item for item in tick.verification)
 
 

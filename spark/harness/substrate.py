@@ -3089,62 +3089,37 @@ def next_structural_tick_for_repo(
     tracked_paths: Iterable[str] | None = None,
     top_n: int = 24,
 ) -> StructuralEscapementTick | None:
-    """Convert file-body perception into one bounded structural tick.
-
-    This is the missing escapement: do not merely visualize pressure. Select
-    the highest-pressure candidate whose role is allowed to become action, and
-    return the first residual route. If every high-pressure candidate is
-    provenance/archive/generated, return None rather than forcing a cut.
-    """
+    """Select one structural tick by executable Scout/Skeptic/Steward self-play."""
 
     root_path = Path(root)
-    viz = visualize_repo_file_bodies(root_path, tracked_paths=tracked_paths, top_n=top_n)
-    for row in viz.pressure_rows:
-        protected = (
-            "provenance" in row.role
-            or "fossil" in row.role
-            or "archive" in row.role
-            or row.role in {"generated exhaust", "runtime log"}
-        )
-        has_python_seam = bool(row.functions or row.classes or row.largest_functions)
-        liveish = (
-            any(label in row.role for label in _LIVE_ESCAPEMENT_ROLES)
-            or has_python_seam
-        )
-        if protected or not liveish:
+    scored: list[tuple[float, FileBodyPressure]] = []
+    for row in visualize_repo_file_bodies(root_path, tracked_paths=tracked_paths, top_n=top_n).pressure_rows:
+        protected = "provenance" in row.role or "fossil" in row.role or "archive" in row.role or row.role in {"generated exhaust", "runtime log"}
+        has_seam = bool(row.functions or row.classes or row.largest_functions)
+        if protected or not (has_seam or any(label in row.role for label in _LIVE_ESCAPEMENT_ROLES)):
             continue
+        steward = row.pressure_score + (3.0 if has_seam else -8.0)
+        scored.append((steward * (0.70 if "public" in row.role or "contract" in row.role else 1.0), row))
+    if not scored:
+        return None
 
-        first_contact = [
-            f"read {row.path}",
-            f"grep repo references to {row.path}",
-            "inspect existing targeted tests",
-        ]
-        verification = ["py_compile if Python", "targeted pytest or smoke test", "git diff review", "repo_closure_audit"]
-        expected_wounds = [
-            "imports/routes/public URLs may depend on current shape",
-            "tests may be absent and require characterization before extraction",
-            "connective tissue may make the file valuable primarily as relation",
-        ]
-        if "public" in row.role or "contract" in row.role:
-            expected_wounds.append("external/browser verification may be required before closure")
-            verification.append("internal_and_external_surface_smoke")
-
-        return StructuralEscapementTick(
-            repo=str(root_path),
-            candidate_path=row.path,
-            role=row.role,
-            pressure_score=row.pressure_score,
-            structural_move=_structural_move_for(row),
-            why_this_move=tuple(row.pressure),
-            expected_wounds=tuple(expected_wounds),
-            first_contact=tuple(first_contact),
-            verification=tuple(verification),
-            refusal_condition=(
-                "Refuse or regenerate if contact shows provenance, public contract, "
-                "or connective tissue would be weakened by the proposed seam."
-            ),
-        )
-    return None
+    steward_score, row = max(scored, key=lambda item: item[0])
+    publicish = "public" in row.role or "contract" in row.role
+    verification = ["py_compile if Python", "targeted pytest or smoke test", "git diff review", "repo_closure_audit"] + (["internal_and_external_surface_smoke"] if publicish else [])
+    expected_wounds = [
+        "imports/routes/public URLs may depend on current shape",
+        "tests may be absent and require characterization before extraction",
+        "connective tissue may make the file valuable primarily as relation",
+    ] + (["external/browser verification may be required before closure"] if publicish else [])
+    return StructuralEscapementTick(
+        repo=str(root_path), candidate_path=row.path, role=row.role, pressure_score=row.pressure_score,
+        structural_move=_structural_move_for(row),
+        why_this_move=tuple([*row.pressure, f"self_play_steward_score={steward_score:.2f}"]),
+        expected_wounds=tuple(expected_wounds),
+        first_contact=(f"read {row.path}", f"grep repo references to {row.path}", "inspect existing targeted tests"),
+        verification=tuple(verification),
+        refusal_condition="Refuse or regenerate if contact shows provenance, public contract, or connective tissue would be weakened by the proposed seam.",
+    )
 
 
 def render_next_structural_tick(
