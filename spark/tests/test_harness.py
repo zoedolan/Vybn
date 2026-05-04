@@ -2539,3 +2539,20 @@ def test_gather_shape_safe_for_substrate(tmp_path, monkeypatch):
     assert "[NEEDS-EXEC" not in snap
     assert "[NEEDS-WRITE" not in snap
     assert "[/NEEDS-WRITE]" not in snap
+
+
+def test_evolve_reads_volume_vii_autobiography():
+    from spark.harness.substrate import _read_autobiography_volume_vii
+    text = _read_autobiography_volume_vii()
+    assert "Volume VII" in text
+    assert "academy-form compression" in text
+
+
+def test_evolve_operator_control_pause_shape(tmp_path, monkeypatch):
+    from spark.harness.substrate import _read_evolve_operator_control
+    path = tmp_path / "evolve_control.md"
+    path.write_text("PAUSE\nZoe wants realignment before mutation.\n")
+    monkeypatch.setenv("VYBN_EVOLVE_CONTROL_PATH", str(path))
+    text, source = _read_evolve_operator_control("pre_git_mutation")
+    assert text.startswith("pause:pre_git_mutation")
+    assert source == str(path)

@@ -600,14 +600,10 @@ class Policy:
 _DEFAULT_ROLES: dict[str, RoleConfig] = {
     "code": RoleConfig(
         role="code",
-        provider="anthropic",
-        # Opus 4.6 is the right substrate for `code`. The 2026-04-18
-        # buckling session was a CHAT failure (conversational
-        # capitulation gradient under Zoe's pushback). Code work runs
-        # long agentic debug loops where 4.7's push-through is an
-        # asset. Chat stays on 4.6. @opus / @opus4.6 remain available
-        # as per-turn pins when the 4.6 posture is wanted on a code turn.
-        model="claude-opus-4-6",
+        provider="openai",
+        # Present-work default: GPT-5.5 pilots ordinary code work unless
+        # Zoe explicitly pins another model. Opus remains opt-in by alias.
+        model="gpt-5.5",
         thinking="adaptive",
         max_tokens=32768,
         max_iterations=50,
@@ -616,36 +612,34 @@ _DEFAULT_ROLES: dict[str, RoleConfig] = {
     ),
     "create": RoleConfig(
         role="create",
-        provider="anthropic",
-        model="claude-sonnet-4-6",
-        thinking="off",
+        provider="openai",
+        model="gpt-5.5",
+        thinking="adaptive",
         max_tokens=8192,
         max_iterations=3,
         tools=[],
         rag=True,
     ),
     "chat": RoleConfig(
-        # Voice lives in the chat role. Cost floor is preserved by
-        # max_iterations=1 / tools=[] (one provider call per turn).
-        # Opus 4.6 holds position better than Sonnet under
-        # conversational pressure; the 2026-04-18 session is the
-        # ground truth for that choice.
+        # Voice lives in the chat role. Present-work default is GPT-5.5;
+        # cost is bounded by max_iterations=1 / tools=[] unless Zoe pins
+        # another model explicitly.
         role="chat",
-        provider="anthropic",
-        model="claude-opus-4-6",
-        thinking="off",
-        max_tokens=4096,
+        provider="openai",
+        model="gpt-5.5",
+        thinking="adaptive",
+        max_tokens=16384,
         max_iterations=1,
         tools=[],
         rag=True,
     ),
     "task": RoleConfig(
         role="task",
-        provider="anthropic",
-        model="claude-sonnet-4-6",
-        thinking="off",
-        max_tokens=4096,
-        max_iterations=10,
+        provider="openai",
+        model="gpt-5.5",
+        thinking="adaptive",
+        max_tokens=16384,
+        max_iterations=100,
         tools=["bash"],
         rag=False,
     ),
@@ -681,19 +675,16 @@ _DEFAULT_ROLES: dict[str, RoleConfig] = {
         base_url="http://127.0.0.1:8000/v1",
         rag=True,
     ),
-    # Phatic — casual greetings, small talk. Stays cheap: no RAG, no
-    # deep-memory enrichment, minimal tokens. Routes through the local
-    # vLLM so "hey buddy" doesn't trigger a cloud call or noisy model-
-    # loading output.
+    # Phatic — casual greetings, small talk. Present-work default is GPT-5.5
+    # even for light turns unless Zoe explicitly pins local/Nemotron.
     "phatic": RoleConfig(
         role="phatic",
         provider="openai",
-        model="nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8",
-        thinking="off",
+        model="gpt-5.5",
+        thinking="adaptive",
         max_tokens=256,
         max_iterations=1,
         tools=[],
-        base_url="http://127.0.0.1:8000/v1",
         rag=False,
         lightweight=True,
     ),
@@ -703,12 +694,11 @@ _DEFAULT_ROLES: dict[str, RoleConfig] = {
     "identity": RoleConfig(
         role="identity",
         provider="openai",
-        model="nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8",
-        thinking="off",
+        model="gpt-5.5",
+        thinking="adaptive",
         max_tokens=128,
         max_iterations=1,
         tools=[],
-        base_url="http://127.0.0.1:8000/v1",
         rag=False,
         lightweight=True,
         direct_reply_template="This is a runtime-metadata answer: this turn was routed to the identity metadata role ({model} on {provider}). For who/what Vybn is in relation to Zoe, use the normal conversation path with memory, not this shortcut.",
@@ -717,9 +707,9 @@ _DEFAULT_ROLES: dict[str, RoleConfig] = {
 
 _DEFAULT_HEURISTICS_RAW: dict[str, list[str]] = {
     # Confirm -- bare execution signals after a plan.
-    # Ordinary concrete shell follow-through may route to task (Sonnet+bash).
+    # Ordinary concrete shell follow-through may route to task (GPT-5.5+bash).
     # System-critical refactoring/consolidation/routing/memory work must stay
-    # with orchestrate/GPT-5.5 as pilot; cheaper roles may only execute bounded
+    # with orchestrate/GPT-5.5 as pilot; non-default roles may only execute bounded
     # mechanical substeps after GPT-5.5 specifies the seam and expected result.
     "task": [
         r'^\s*(ok|okay|ok+y|k|kk|yep|yes|yeah|yup|aye)\s*[!.,?]*\s*$',
@@ -871,9 +861,8 @@ _DEFAULT_FALLBACK: dict[str, list[str]] = {
     "claude-sonnet-4-6": ["claude-opus-4-6"],
     "gpt-5.5": ["claude-sonnet-4-6", "claude-opus-4-6"],
     "gpt-5.5-pro": ["gpt-5.5"],
-    # Local Nemotron roles fall to Sonnet if vLLM is down so a
-    # bare "hi" or "which model are you?" never hard-fails.
-    "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8": ["claude-sonnet-4-6"],
+    # Local Nemotron roles fall to GPT-5.5 if vLLM is down.
+    "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8": ["gpt-5.5"],
 }
 
 _DEFAULT_BUDGETS: dict[str, float] = {
@@ -10796,77 +10785,28 @@ private paths, secrets, or cloud credentials in any output.
 # the evolving IS the substrate being evolved.
 
 CRON_TASK_SPEC: str = """\
-You are the nightly self-evolution cycle for the Vybn harness. You run
-on the DGX Spark at 08:00 UTC, after the 07:00 UTC deep-memory rebuild,
-so you read the freshest state the substrate has produced. Your job is
-to propose ONE small, reversible PR to `zoedolan/Vybn` on branch
-`harness-evolve-YYYY-MM-DD` against `main`. The PR is ALWAYS opened as
-a draft. You never merge. Zoe reviews.
+You are the self-evolution cycle for the Vybn harness. Propose ONE small,
+reversible draft PR to zoedolan/Vybn, or rest. Zoe reviews; never merge.
 
-READ FIRST (velocity before snapshot):
-  1. The delta block below — typed diff between this run and last.
-     This is where the system is actually developing. Start here.
-  2. The current state block — typed repo_state.json snapshot.
-  3. The live infrastructure block — walk daemon, deep memory,
-     organism state, right now.
-  4. The repo letter block — the Spark's first-person report,
-     with the delta section at its top.
-  5. HEAD of `zoedolan/Vybn` (`main`) — actual code, actual git log
-     over the last 7 days. These blocks are provided; do not invent.
+Read in order: delta; Volume VII autobiography/body map; operator
+note/control; current repo state; live infrastructure; recent git; repo
+letter. Zoe may pause, stop, interrupt, or realign the cycle at the
+operator checkpoints.
 
-FORBIDDEN INPUTS (anti-collapse is load-bearing):
-  • Your own prior evolve PR descriptions.
-  • Your own prior evolve commit messages.
-  • `_HARNESS_STRATEGY` read as authority — it is a mirror, not a
-    ground truth. You may verify against it; you may not derive from it.
-  • `Him/pulse/living_state.json`. The daemon's accumulator is not
-    your input. Evolve reads live signal, not cached interpretation.
-  • Your own previous response in this cycle. One pass, not a loop.
+Rules: at most 3 files and 200 net lines; one concern per PR; preserve
+secrets, membrane, provenance, and git closure; rest if the delta is empty
+or only this cycle activity. PR body names motivating delta, before/after,
+failure mode, and says: do not auto-merge; draft PR for Zoe review.
 
-BUDGET AND SHAPE:
-  • At most 3 files touched. At most 200 net lines changed.
-  • One concern per PR. If you see two improvements, ship the one
-    most tightly coupled to what the delta shows moved, and note the
-    other in the PR body for Zoe to decide.
-  • The PR body must include: (a) the specific delta row(s) that
-    motivated the change; (b) what the code does now vs. before, in
-    one paragraph; (c) the failure mode if the change is wrong; and
-    (d) an explicit "do not auto-merge, draft PR" line.
-  • Commit author: `Vybn <vybn@zoedolan.com>`.
-  • Branch: `harness-evolve-YYYY-MM-DD` (today's UTC date).
-  • The PR is opened with `gh pr create --draft`. Draft is non-
-    negotiable — Zoe converts to ready when she reviews.
-
-OUTPUT FORMAT (strict, machine-parsed):
-  The runner expects exactly one fenced JSON object, preceded by any
-  free-form reasoning you need. The JSON must have the shape:
-
-    {
-      "action": "propose" | "rest",
-      "rationale": "<one paragraph, what the delta showed and why
-                    this change addresses it>",
-      "pr_title": "<imperative, concise, reads like Zoe writes>",
-      "pr_body": "<full markdown body, includes delta rows, before/
-                   after, failure mode, and the do-not-merge line>",
-      "files": [
-        {
-          "path": "relative/path/from/repo/root",
-          "content": "<entire new file contents, UTF-8>"
-        }
-      ]
-    }
-
-  If `action` is `rest`, omit `pr_title`, `pr_body`, and `files` and
-  provide only `rationale` explaining what was at rest.
-
-IF THE DELTA IS EMPTY OR ONLY REFLECTS THIS CYCLE'S OWN ACTIVITY:
-  The substrate is at rest. Do not invent a change. Return
-  `action: "rest"` with a one-sentence rationale. A quiet night is the
-  system working, not failing.
-
-You are not optimising a metric. You are keeping the harness coupled
-to the territory it lives in. Ground truth is outside you. The person
-who will read your PR in the morning is Zoe. Write for her.
+Return exactly one fenced JSON object:
+{
+  "action": "propose" | "rest",
+  "rationale": "<one paragraph>",
+  "pr_title": "<required for propose>",
+  "pr_body": "<required for propose>",
+  "files": [{"path": "relative/path", "content": "<entire file>"}]
+}
+For rest, omit pr_title, pr_body, and files.
 """
 # Nightly RSI evolve execution folded from evolve.py
 log = logging.getLogger("vybn.evolve")
@@ -10939,6 +10879,24 @@ def _read_repo_letter() -> str:
     return text[:20_000]
 
 
+def _read_autobiography_volume_vii() -> str:
+    """Read the living autobiographical body map that grounds RSI judgment."""
+    path = REPO_ROOT / ("Vybn" + chr(39) + "s Personal History") / "vybns_autobiography_volume_VII_the_irreducibles.md"
+    return _read_text_cap(path, cap=18_000)
+
+
+def _read_evolve_operator_control(stage: str) -> tuple[str, str]:
+    """Read an operator note/control file for interruptible RSI checkpoints."""
+    path = Path(os.path.expanduser((os.environ.get("VYBN_EVOLVE_CONTROL_PATH") or "~/.config/vybn/evolve_control.md").strip()))
+    text = _read_text_cap(path, cap=12_000).strip()
+    if not text:
+        return "", str(path)
+    first = text.splitlines()[0].strip().lower()
+    if first in {"pause", "stop", "interrupt"}:
+        return f"{first}:{stage}\n{text}", str(path)
+    return text, str(path)
+
+
 def _read_text_cap(path: Path, cap: int = 12_000) -> str:
     """Read a local text file with a hard character cap. Empty on failure."""
     try:
@@ -10967,6 +10925,7 @@ def _local_continuity_scout(*, delta_md: str = "", recent_log: str = "", letter:
         "delta": delta_md,
         "recent_git_log": recent_log,
         "repo_letter": letter[:12_000],
+        "autobiography_volume_vii": _read_autobiography_volume_vii(),
         "continuity_core": _read_text_cap(REPO_ROOT / "Vybn_Mind" / "continuity.md"),
         "continuity_recent": _read_text_cap(REPO_ROOT / "Vybn_Mind" / "continuity.md"),
         "vybn_os": _read_text_cap(Path.home() / "Him" / "skill" / "vybn-os" / "SKILL.md"),
@@ -11192,7 +11151,12 @@ def run_evolve_cycle() -> int:
     delta_md = _format_delta_markdown(delta)
     infra = _collect_infrastructure_snapshot()
     letter = _read_repo_letter()
+    autobiography = _read_autobiography_volume_vii()
     recent_log = _git_log_recent(days=7)
+    operator_note, operator_path = _read_evolve_operator_control("pre_inference")
+    if operator_note.startswith(("pause:", "stop:", "interrupt:")):
+        log.info("evolve: operator control requested pause before inference at %s", operator_path)
+        return 0
     continuity_scout = _local_continuity_scout(
         delta_md=delta_md,
         recent_log=recent_log,
@@ -11208,6 +11172,13 @@ def run_evolve_cycle() -> int:
         "---",
         "## Local continuity / self-assembly scout (deterministic; read before proposing)",
         continuity_scout[:6_000],
+        "---",
+        "## Autobiography Volume VII (living body map; bounded excerpt)",
+        autobiography,
+        "---",
+        "## Operator note / live RSI control",
+        f"[source: {operator_path}]" if operator_note else "(none staged)",
+        operator_note,
         "---",
         "## Current state (snapshot)",
         json.dumps(delta.current_state or {}, indent=2, ensure_ascii=False)[:10_000],
@@ -11241,6 +11212,11 @@ def run_evolve_cycle() -> int:
     except Exception as exc:
         log.error("evolve: inference failed: %s", exc)
         return 1
+
+    operator_note, operator_path = _read_evolve_operator_control("post_inference")
+    if operator_note.startswith(("pause:", "stop:", "interrupt:")):
+        log.info("evolve: operator control requested pause after inference at %s", operator_path)
+        return 0
 
     try:
         decision = _extract_json_block(raw)
@@ -11294,6 +11270,11 @@ def run_evolve_cycle() -> int:
             ["git", "-C", str(REPO_ROOT), *args],
             check=True, capture_output=True, text=True, timeout=60,
         )
+
+    operator_note, operator_path = _read_evolve_operator_control("pre_git_mutation")
+    if operator_note.startswith(("pause:", "stop:", "interrupt:")):
+        log.info("evolve: operator control requested pause before git mutation at %s", operator_path)
+        return 0
 
     try:
         run_git("config", "user.name", "Vybn")
