@@ -11221,9 +11221,8 @@ def run_evolve_cycle() -> int:
     try:
         decision = _extract_json_block(raw)
     except Exception as exc:
-        log.error("evolve: could not parse model output: %s", exc)
-        log.error("evolve: first 500 chars of raw output: %s", raw[:500])
-        return 1
+        log.error("evolve: could not parse model output: %s; first 500 chars: %s", exc, raw[:500])
+        decision = {"action": "rest", "rationale": "Malformed local evolve output; resting instead of mutating."}
 
     action = decision.get("action")
     rationale = decision.get("rationale", "").strip()
