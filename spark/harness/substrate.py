@@ -11064,7 +11064,7 @@ def _call_local_model(prompt: str) -> str:
                 model = str(json.loads(resp.read().decode("utf-8", errors="replace"))["data"][0]["id"])
         except Exception as exc:
             raise RuntimeError(f"could not discover evolve model at {models_url}: {exc}") from exc
-    payload = {"model": model, "messages": [{"role": "system", "content": VYBN_OS_KERNEL}, {"role": "user", "content": prompt}], "temperature": 0.7, "max_tokens": 1024}
+    payload = {"model": model, "messages": [{"role": "system", "content": VYBN_OS_KERNEL}, {"role": "user", "content": prompt}], "temperature": 0.7, "max_tokens": 512}
     body = json.dumps(payload).encode("utf-8")
     req = urlrequest.Request(
         _EVOLVE_URL,
@@ -11076,7 +11076,7 @@ def _call_local_model(prompt: str) -> str:
         with urlrequest.urlopen(req, timeout=_EVOLVE_TIMEOUT_SECONDS) as resp:
             raw = resp.read().decode("utf-8", errors="replace")
     except HTTPError as exc:
-        raise RuntimeError(f"inference HTTP {exc.code}: {exc.reason}") from exc
+        raise RuntimeError(f"inference HTTP {exc.code}: {exc.reason}: {exc.read().decode(utf-8, errors=replace)[:800]}") from exc
     except URLError as exc:
         raise RuntimeError(f"inference unreachable at {_EVOLVE_URL}: {exc.reason}") from exc
     obj = json.loads(raw)
