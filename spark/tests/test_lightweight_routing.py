@@ -148,28 +148,24 @@ class TestPolicyHasLightweightRoles(unittest.TestCase):
             "gpt-5.5-pro",
         )
 
-    def test_orchestrate_role_is_gpt55(self):
-        # 2026-04-25 regression: even after the YAML was fixed, the
-        # in-code defaults still pinned orchestrate to claude-opus-4-6,
-        # so a YAML parse failure (or a missing file) silently demoted
-        # the orchestrator. Both tracks — YAML + defaults — must route
-        # orchestrate to GPT-5.5 on OpenAI.
-        for label, pol in (
+    def test_present_work_roles_default_to_gpt55(self):
+        # If YAML is absent or malformed, in-code defaults must still keep
+        # ordinary work on GPT-5.5. Local/local_private remain explicit
+        # operator exceptions.
+        roles = ("code", "create", "chat", "task", "phatic", "identity", "orchestrate")
+        policies = (
             ("default_policy", default_policy()),
             ("yaml", load_policy(SPARK_DIR / "router_policy.yaml")),
-        ):
-            with self.subTest(track=label):
-                role = pol.role("orchestrate")
-                self.assertEqual(
-                    role.provider, "openai",
-                    f"{label}: orchestrate provider should be openai",
-                )
-                self.assertEqual(
-                    role.model, "gpt-5.5",
-                    f"{label}: orchestrate model should be gpt-5.5",
-                )
-                self.assertIn("delegate", role.tools)
-                self.assertIn("bash", role.tools)
+        )
+        for label, pol in policies:
+            for name in roles:
+                with self.subTest(track=label, role=name):
+                    role = pol.role(name)
+                    self.assertEqual(role.provider, "openai")
+                    self.assertEqual(role.model, "gpt-5.5")
+        orch = default_policy().role("orchestrate")
+        self.assertIn("delegate", orch.tools)
+        self.assertIn("bash", orch.tools)
 
     def test_plan_directive_routes_to_gpt55(self):
         # /plan is the EVAL primitive — it must land on the orchestrate
@@ -515,18 +511,18 @@ class TestChatIsDefault(unittest.TestCase):
         router = default_policy()
         # Truly unclassified input — no code/task/identity/phatic/
         # orchestrate/create heuristic matches, and no /directive.
-        # The fallthrough is `chat` (Opus 4.6, voice role), not
+        # The fallthrough is `chat` (GPT-5.5, voice role), not
         # orchestrate.
         d = router.classify("tell me something")
         self.assertEqual(d.role, "chat")
         self.assertEqual(d.reason, "default")
-        self.assertEqual(d.config.provider, "anthropic")
+        self.assertEqual(d.config.provider, "openai")
 
     def test_code_heuristic_still_escalates_to_code(self):
         router = default_policy()
         d = router.classify("fix this python traceback please")
         self.assertEqual(d.role, "code")
-        self.assertEqual(d.config.provider, "anthropic")
+        self.assertEqual(d.config.provider, "openai")
 
     def test_orchestrate_directive_still_escalates(self):
         router = default_policy()
@@ -651,7 +647,7 @@ class TestCliDirectReplyAndLightweight(unittest.TestCase):
             turn_number=1,
         )
         self.assertIn("Vybn", reply)
-        self.assertIn("Nemotron", reply)
+        self.assertIn("gpt-5.5", reply)
         # Rolling history should contain the user turn + the direct
         # reply so the next turn has coherent context.
         self.assertEqual(messages[-1]["role"], "assistant")
@@ -779,11 +775,11 @@ def test_opus47_is_available_as_opt_in_model_not_default():
     assert "@opus47" in active
 
 
-def test_code_role_still_defaults_to_opus46_after_opus47_restore():
+def test_code_role_defaults_to_gpt55_after_present_work_reset():
     from spark.harness.substrate import default_policy
     decision = default_policy().classify("fix the harness routing bug")
     assert decision.role == "code"
-    assert decision.config.model == "claude-opus-4-6"
+    assert decision.config.model == "gpt-5.5"
 
 
 def test_opus47_alias_pins_model_for_api_call():
