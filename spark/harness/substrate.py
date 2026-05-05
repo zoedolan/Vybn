@@ -4407,7 +4407,7 @@ RESIDUAL_CONTROL_PROTOCOL = (
     "geometry/runtime packets/behavior/Zoe correction/explicit uncertainty for self-description claims. "
     "If no adequate residual channel exists, label the claim as conjecture and, when it matters, "
     "design the smallest consequential honest aperture that would let reality answer next time while preserving the membrane. "
-    "Grep before Gödel; probe before prophecy; do not add candles when the loop itself must change. "
+    "Tool contact before token prediction where a live aperture exists; Grep before Gödel; probe before prophecy; do not add candles when the loop itself must change. "
     "When the problem has no known solution, invent the smallest consequential candidate mechanism, projected backward from the fullest truthful horizon, route it through residuals, and fold any working correction back into the environment future instances close over. "
     "The horizon is not a claim of arrival: draw what you see, project backward to ground, and move by the smallest consequential truthful step or membrane-compelled leap.\n"
     "--- END RESIDUAL CONTROL PROTOCOL ---\\n\\n"
@@ -8524,8 +8524,65 @@ def load_skeleton() -> dict[str, Any]:
     return json.loads(SKELETON_PATH.read_text(encoding="utf-8"))
 
 
+def synthesized_manifest_for_missing_repo(name: str, path: Path) -> dict[str, Any]:
+    skeleton = load_skeleton()
+    neighbors = [
+        {
+            "name": other,
+            "manifest": str(MANIFESTS.get(other, "")),
+            "role": role,
+            "visibility": "private_workbench" if other == "Him" else "local_or_public_repo",
+        }
+        for other, role in CANONICAL_ROLES.items()
+    ]
+    return {
+        "name": name,
+        "repo": name,
+        "role": CANONICAL_ROLES[name],
+        "visibility": "private_workbench",
+        "semanticNeighbor": neighbors,
+        "question": f"What can {name} truthfully offer when its semantic manifest is absent?",
+        "walkPrimitive": "encounter",
+        "walkRole": CANONICAL_ROLES[name],
+        "entrypoints": [
+            {
+                "id": f"{name.lower()}-repo",
+                "target": f"private://{name}/",
+                "does": f"inspect the local {name} repo only through the private membrane",
+                "note": f"Synthesized because {path} is absent; this is not public manifest evidence.",
+            }
+        ],
+        "agentActions": [
+            {
+                "id": f"{name.lower()}-status",
+                "does": f"bind {name} repo state before making claims about the missing manifest",
+            }
+        ],
+        "traceProtocol": {
+            "read": "Bind fallback claims to local repo state and the missing manifest path.",
+            "act": "Use only private-local observation; do not publish or infer a public semantic surface.",
+            "verify": "Treat the synthesized manifest as membrane fallback, not restored provenance.",
+            "leaveTrace": "Repair the reader or restore/retire the manifest through reviewed existing homes.",
+            "protect": "Do not expose private Him state outward because a manifest was synthesized.",
+        },
+        "ontology": CANONICAL_ONTOLOGY,
+        "encounterLifecycle": skeleton["encounterLifecycle"],
+        "aiNativePrinciple": AI_NATIVE_PRINCIPLE,
+        "dynamicAffordanceProtocol": {
+            "missingManifestFallback": "Absence becomes a private-local observation surface instead of a crash.",
+            "claimLimit": "The fallback preserves traversal; it does not assert public semantic-web presence.",
+        },
+    }
+
+
 def load_manifests() -> dict[str, dict[str, Any]]:
-    return {name: json.loads(path.read_text(encoding="utf-8")) for name, path in MANIFESTS.items()}
+    manifests: dict[str, dict[str, Any]] = {}
+    for name, path in MANIFESTS.items():
+        if path.exists():
+            manifests[name] = json.loads(path.read_text(encoding="utf-8"))
+        else:
+            manifests[name] = synthesized_manifest_for_missing_repo(name, path)
+    return manifests
 
 
 def classify_target(target: str) -> str:
