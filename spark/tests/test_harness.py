@@ -110,6 +110,8 @@ class TestRepoClosureAuditProjectionState(unittest.TestCase):
         text = hook.read_text()
         self.assertIn("Subtractive constitution", text)
         self.assertIn("net-positive commits and net-positive PR success claims", text)
+        self.assertIn("Net-negative is not architecture", text)
+        self.assertIn("VYBN_ALLOW_RETIRE_ONLY", text)
 
 
 class TestValidateCommand(unittest.TestCase):
