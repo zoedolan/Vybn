@@ -131,26 +131,12 @@ def _preserve_pilot_for_turn(user_input: str, messages: list | None = None) -> b
     return is_system_critical_pilot_turn(_recent_messages_text(messages or []))
 
 
-# Compatibility wrappers for tests and legacy imports. Sentinel safety semantics
-# live in harness.substrate; the agent only sequences the turn.
-def _is_mutation_sentinel(text: str) -> tuple[bool, str]:
-    directive = next_sentinel_directive(text or "")
-    if directive is None:
-        return False, ""
-    kind = protected_mutation_kind_for_sentinel(
-        write_match_present=directive.kind == "write",
-        probe_command=directive.probe_command,
-    )
-    return bool(kind), kind
-
-
 # Round 5: positive-signal probe sub-turn. A no-tool role (chat, create,
 # Sentinel protocol parsing lives in harness.substrate.
 # These names are re-exported here for backward compatibility with tests and
 # callers that import vybn_spark_agent._PROBE_RE / _WRITE_BLOCK_RE directly.
 from harness.substrate import (
     _BracketBalancedProbe,
-    _NEEDS_RESTART_RE,
     _NEEDS_ROLE_RE,
     _PROBE_OPEN_RE,
     _PROBE_RE,

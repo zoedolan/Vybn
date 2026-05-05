@@ -38,6 +38,18 @@ sys.path.insert(0, str(SPARK_DIR))
 import harness.substrate as policy  # noqa: E402
 
 
+
+def _is_mutation_sentinel(text: str) -> tuple[bool, str]:
+    directive = policy.next_sentinel_directive(text or "")
+    if directive is None:
+        return False, ""
+    kind = policy.protected_mutation_kind_for_sentinel(
+        write_match_present=directive.kind == "write",
+        probe_command=directive.probe_command,
+    )
+    return bool(kind), kind
+
+
 class SystemCriticalPilotREDefined(unittest.TestCase):
     """The symbol must exist. This is the regression for the live
     `NameError: name '_SYSTEM_CRITICAL_PILOT_RE' is not defined`."""
@@ -357,11 +369,12 @@ class ProtectedMutationSentinelGate(unittest.TestCase):
 
     def test_helpers_exist_at_module_scope(self):
         import vybn_spark_agent as agent
-        self.assertTrue(hasattr(agent, "_is_mutation_sentinel"))
+        self.assertFalse(hasattr(agent, "_is_mutation_sentinel"))
+        self.assertTrue(hasattr(policy, "next_sentinel_directive"))
+        self.assertTrue(hasattr(policy, "protected_mutation_kind_for_sentinel"))
         self.assertTrue(hasattr(agent, "_protected_mutation_refusal_envelope"))
 
     def test_needs_write_block_is_mutation(self):
-        from vybn_spark_agent import _is_mutation_sentinel
         text = (
             "Doing the consolidation now.\n"
             "[NEEDS-WRITE: spark/harness/evolution_delta.py]\n"
@@ -374,7 +387,6 @@ class ProtectedMutationSentinelGate(unittest.TestCase):
         self.assertEqual(kind, "needs-write")
 
     def test_heredoc_python_needs_exec_is_mutation(self):
-        from vybn_spark_agent import _is_mutation_sentinel
         # paste.txt session 4: large heredoc body that wrote to a file
         # via Python I/O. python3 - <<'PY' (no -c) is not parallel-safe
         # because it reads from stdin and may shell out / mutate.
@@ -389,20 +401,17 @@ class ProtectedMutationSentinelGate(unittest.TestCase):
         self.assertEqual(kind, "needs-exec-mutation")
 
     def test_git_commit_needs_exec_is_mutation(self):
-        from vybn_spark_agent import _is_mutation_sentinel
         text = "[NEEDS-EXEC: git commit -m 'refactor' && git push]"
         is_mut, kind = _is_mutation_sentinel(text)
         self.assertTrue(is_mut)
         self.assertEqual(kind, "needs-exec-mutation")
 
     def test_readonly_grep_probe_is_not_mutation(self):
-        from vybn_spark_agent import _is_mutation_sentinel
         text = "[NEEDS-EXEC: grep -n 'forced_role' spark/vybn_spark_agent.py]"
         is_mut, _ = _is_mutation_sentinel(text)
         self.assertFalse(is_mut)
 
     def test_readonly_status_probe_is_not_mutation(self):
-        from vybn_spark_agent import _is_mutation_sentinel
         for cmd in (
             "git status --short",
             "git diff --stat",
@@ -416,7 +425,6 @@ class ProtectedMutationSentinelGate(unittest.TestCase):
             self.assertFalse(is_mut, f"{cmd!r} should be classified read-only")
 
     def test_no_sentinel_is_not_mutation(self):
-        from vybn_spark_agent import _is_mutation_sentinel
         is_mut, kind = _is_mutation_sentinel("just talking to you, no sentinels here")
         self.assertFalse(is_mut)
         self.assertEqual(kind, "")
