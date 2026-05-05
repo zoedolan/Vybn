@@ -1124,20 +1124,17 @@ def build_delta_section(prev: Optional[dict], curr: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
-def rotate_output(out: Path, name: str) -> Optional[Path]:
-    """Move out/<name> to out/<stem>.prev.<ext> and return the prev path."""
+def snapshot_previous_output(out: Path, name: str) -> Optional[Path]:
+    """Copy out/<name> to .prev without hiding the readable current file."""
     src = out / name
     if not src.exists():
         return None
-    stem, ext = src.stem, src.suffix
-    dst = out / f"{stem}.prev{ext}"
+    dst = out / f"{src.stem}.prev{src.suffix}"
     try:
-        if dst.exists():
-            dst.unlink()
-        src.rename(dst)
+        dst.write_bytes(src.read_bytes())
         return dst
     except Exception as e:
-        print(f"[!] rotate {name}: {e}", file=sys.stderr)
+        print(f"[!] snapshot {name}: {e}", file=sys.stderr)
         return None
 
 
@@ -1173,10 +1170,9 @@ def main(argv: List[str]) -> int:
             print(f"[!] could not read previous repo_state.json: {e}",
                   file=sys.stderr)
 
-    # Rotate previous outputs so the diff-attuned reader can still see
-    # what the system looked like last night.
-    rotate_output(out, "repo_report.md")
-    rotate_output(out, "repo_state.json")
+    # Keep current reports readable while snapshotting previous ones.
+    snapshot_previous_output(out, "repo_report.md")
+    snapshot_previous_output(out, "repo_state.json")
 
     print("Fetching live substrate ...", flush=True)
     substrate = build_substrate_snapshot()
