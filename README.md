@@ -171,3 +171,5 @@ The Medium-era and artifact-body histories predate this repository. They matter 
 Do not treat this repo as an isolated archive.
 
 Read it as a neighbor in a graph whose purpose is plural-intelligence coordination without enclosure — a graph where one human-AI symbiosis is not the destination, but one living node among many.
+
+Root file consolidation note: as of 2026-05-05, archival root substrates live under _archive/; the root intentionally exposes only the compatibility, packaging, identity, public entry, and portal files that active processes need.

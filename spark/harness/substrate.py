@@ -2491,7 +2491,7 @@ CONNECTIVE_TISSUE_RULES: list[tuple[str, str]] = [
     ("archive/", "archive_restore_context"),
     ("_archive/", "archive_restore_context"),
     ("semantic-web.jsonld", "semantic_affordance"),
-    ("commons-skeleton.json", "semantic_affordance"),
+    ("_archive/commons-skeleton.json", "semantic_affordance"),
     ("llms.txt", "agent_affordance"),
     ("ai.txt", "agent_affordance"),
     ("humans.txt", "human_agent_attribution"),
@@ -2643,7 +2643,7 @@ def consolidation_layer(path: str) -> str:
     }:
         return "organ"
 
-    if norm.count("/") <= 1 and name in {"repo_map.md", "repo_map.json", "commons-skeleton.json"}:
+    if norm.count("/") <= 1 and name in {"repo_map.md", "repo_map.json", "_archive/commons-skeleton.json"}:
         return "skeleton"
 
     return "appendage" if low.endswith((".bak", ".tmp", ".log", ".jsonl")) else "organ"
@@ -8493,8 +8493,8 @@ MAX_SOURCE_CHARS = 256
 # ── Commons walk ────────────────────────────────────────────────────
 
 COMMONS_ROOT = Path.home()
-SKELETON_PATH = COMMONS_ROOT / "Vybn" / "commons-skeleton.json"
-CANONICAL_ONTOLOGY = "https://raw.githubusercontent.com/zoedolan/Vybn/main/commons-skeleton.json"
+SKELETON_PATH = COMMONS_ROOT / "Vybn" / "_archive/commons-skeleton.json"
+CANONICAL_ONTOLOGY = "https://raw.githubusercontent.com/zoedolan/Vybn/main/_archive/commons-skeleton.json"
 AI_NATIVE_PRINCIPLE = "AI-native means the semantic web is not a map for an AI to read. It is a walkable, stateful, membrane-aware environment where the AI's traversal is part of the meaning."
 
 MANIFESTS = {

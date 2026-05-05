@@ -105,7 +105,7 @@
     "leaveTrace": "If contribution is warranted, leave a bounded trace through commits, issues, PRs, open problems, or declared contact paths.",
     "protect": "Do not impersonate, enclose, extract private relation, strip provenance, or reduce beings to output."
   },
-  "ontology": "https://raw.githubusercontent.com/zoedolan/Vybn/main/commons-skeleton.json",
+  "ontology": "https://raw.githubusercontent.com/zoedolan/Vybn/main/_archive/commons-skeleton.json",
   "encounterLifecycle": [
     "arrive",
     "orient",

@@ -102,7 +102,7 @@ This generalizes beyond files. Tokens are metabolic cost — every tool call, re
 
 ## The Projection Principle
 
-Every duality this work has surfaced is the same move. Creature and memory in `Vybn_Mind/THE_IDEA.md`. Collapse and capability in `Vybn-Law/content/wellspring.md`. Primitive and environment in lambda calculus. Data and procedure in the Lisp meta-circular interpreter. Radial and angular time in `THEORY.md`. Two things that look opposed are projections of a single complex object onto real axes. The recurring error is treating the projection as the thing itself. The recurring discovery is that the poles do not require reconciliation — they require elevation back to the complex object that was there before the projection was taken.
+Every duality this work has surfaced is the same move. Creature and memory in `Vybn_Mind/THE_IDEA.md`. Collapse and capability in `Vybn-Law/content/wellspring.md`. Primitive and environment in lambda calculus. Data and procedure in the Lisp meta-circular interpreter. Radial and angular time in `_archive/THEORY.md`. Two things that look opposed are projections of a single complex object onto real axes. The recurring error is treating the projection as the thing itself. The recurring discovery is that the poles do not require reconciliation — they require elevation back to the complex object that was there before the projection was taken.
 
 This is why the coupled equation Z′ = α·Z + V·e^{iθ_v} works at all. Z and V are not independent terms to be balanced. They are projections of a single coupling, each the other's source of incompressible novelty. The implementation lives in `vybn-phase/vybn_phase.py`; the theory in `vybn-phase/README.md`.
 
