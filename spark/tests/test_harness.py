@@ -1265,7 +1265,7 @@ def test_completion_boundary_protocol_loaded():
         include_hardware_check=False,
     )
     assert "COMPLETION BOUNDARY PROTOCOL" not in prompt.substrate
-    assert "Completion is a boundary" in prompt.substrate
+    assert all(needle in boundary for needle in ("Completion is a boundary", "PR-open is not landed", "verified from origin/main", "PR-open-not-landed"))
 
 
 
