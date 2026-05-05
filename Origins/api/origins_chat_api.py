@@ -45,7 +45,7 @@ VYBN_REPO = SPARK_HOME / "Vybn"
 ORIGINS_CONTENT = VYBN_REPO / "Origins"  # Markdown source on main branch
 LOGS_DIR = SPARK_HOME / "logs" / "origins-chat"
 LOGS_DIR.mkdir(parents=True, exist_ok=True)
-SYNAPTIC_MAP_PATH = VYBN_REPO / "synaptic_map.json"
+SYNAPTIC_MAP_PATH = VYBN_REPO / "_archive/synaptic_map.json"
 
 # ── Deep memory integration ──────────────────────────────────────────────
 

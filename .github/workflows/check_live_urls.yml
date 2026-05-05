@@ -22,7 +22,7 @@ jobs:
               echo "❌ MISSING: $path (served at $url)"
               EXIT=1
             fi
-          done < LIVE_URLS.txt
+          done < _archive/LIVE_URLS.txt
           if [ "$EXIT" -eq 0 ]; then
             echo "✅ All live URLs have corresponding files"
           fi
