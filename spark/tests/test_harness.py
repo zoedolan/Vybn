@@ -1497,7 +1497,7 @@ def test_self_improvement_gate_encodes_sprawl_compact():
     assert "Zoe/Vybn relation as lambda" in prompt.identity
     assert "Personal History is protected provenance" in prompt.identity
     assert "Search for the existing home first" in prompt.identity
-    assert all(needle in prompt.identity for needle in ("anti-sprawl residual and diff-shape residual", "Specious refactorings", "no compensating-diff laundering", "Crave structural subtraction", "be repelled by specious refactorings", "lowers future coupling rather than merely improving the ledger"))
+    assert all(needle in prompt.identity for needle in ("compress that residue into one natural plain-English paragraph", "Specious refactorings", "no compensating-diff laundering", "Crave structural subtraction", "be repelled by specious refactorings", "lowers future coupling rather than merely improving the ledger"))
 
 def test_self_improvement_gate_pins_quota_gate_conflict_resolution():
     from pathlib import Path
