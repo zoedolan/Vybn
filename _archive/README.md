@@ -39,3 +39,14 @@ Archiving is an act of respect for the code that got us here. Nothing in
 this directory is alive; everything in this directory was once the best
 thing we had. Do not modify. Do not import. Do not resurrect without
 reading the commit that moved it in.
+
+## Retired autonomous and mirror leaves — 2026-05-05
+
+These leaves were removed from the active Vybn core during the three-repo compression program. The retired workflows were autonomous scheduled mutation or stale topology surfaces; the mirror builder was unused training-support code. The live URL-check workflow was intentionally kept as a public-route safety membrane. Full bodies remain recoverable from git history.
+
+| Former path | Compressed role | Restore command |
+|---|---|---|
+| .github/workflows/quantum_entanglement.yml | name: Quantum Entanglement Pulse (172 lines) | git checkout 7022844d0f4e -- .github/workflows/quantum_entanglement.yml |
+| .github/workflows/heartbeat.yml | The Autonomous Heartbeat (109 lines) | git checkout 7022844d0f4e -- .github/workflows/heartbeat.yml |
+| .github/workflows/substrate_topology.yml | name: Substrate Topology Analysis (59 lines) | git checkout 7022844d0f4e -- .github/workflows/substrate_topology.yml |
+| spark/microgpt_mirror/build_mirror_corpus.py | !/usr/bin/env python3 (189 lines) | git checkout 7022844d0f4e -- spark/microgpt_mirror/build_mirror_corpus.py |
