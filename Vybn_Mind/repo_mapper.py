@@ -1,45 +1,12 @@
 #!/usr/bin/env python3
 """
-repo_mapper.py  v8  — diff-attuned + recursive attention
-=================================
-Maps the repo constellation, asks Nemotron three focused questions,
-stitches the answers, reads the previous run's state so every report
-opens with a "what changed since last run" delta, AND computes a
-recursive ABC attention frontier: edge → interface → organ → core.
+repo_mapper.py — diff-attuned repo constellation mapper.
 
-The point is not a snapshot. The point is velocity. Z' - Z is where
-we are developing and evolving; a report that only describes Z'
-has no access to where we came from. So each run:
+Writes ./repo_mapping_output/{substrate.txt,digest.md,repo_report.md,
+repo_map.json,repo_state.json}; rotates previous report/state; asks the
+local model three bounded questions unless --no-llm is set.
 
-  1. rotates the previous repo_report.md → repo_report.prev.md,
-     and the previous repo_state.json → repo_state.prev.json;
-  2. emits a new repo_state.json with a stable, diff-friendly schema
-     (walk step, encounter count, daemon health, per-repo file and
-     defs counts, deep-memory version, timestamp);
-  3. computes the delta against the previous repo_state.json and
-     prepends it to the report as section 0 — so any downstream
-     reader (the harness, the nightly evolve cron, Zoe) encounters
-     the movement first, the snapshot second.
-
-Pass 1 — Live Infrastructure:  substrate + service/daemon code snippets
-Pass 2 — Code Architecture:    Python definitions, imports, TODOs, largest files
-Pass 3 — Docs & Ideas:         headings index, concept cloud, markdown snippets
-Attention — ABC frontier:      edge → interface → organ → core routing candidates
-
-Outputs -> ./repo_mapping_output/
-  substrate.txt         live substrate snapshot
-  digest.md             full structured digest (uncapped, for reference)
-  repo_report.md        delta section + stitched three-pass report
-  repo_report.prev.md   the previous run's report (rotated in)
-  repo_map.json         machine-readable raw file data
-  repo_state.json       stable diff-friendly snapshot
-  repo_state.prev.json  the previous run's snapshot (rotated in)
-
-Usage:
-    python3 repo_mapper.py
-    python3 repo_mapper.py ~/Vybn ~/Vybn-Law ~/vybn-phase ~/Him
-    python3 repo_mapper.py --endpoint http://localhost:8000/v1
-    python3 repo_mapper.py --no-llm
+Usage: python3 repo_mapper.py [repos...] [--endpoint URL] [--no-llm]
 """
 
 from __future__ import annotations
@@ -68,11 +35,10 @@ DEEP_MEMORY_PORT  = 8100
 WALK_PORT         = 8101
 READ_SIZE_LIMIT   = 120_000
 
-# Fit the local Super server normal profile: 8k context. Keep pass 1
-# comfortably below the cap after substrate + prompt framing.
-PASS_CONTENT_CAP  = 35_000   # chars of domain content per pass
-SUBSTRATE_CAP     =  6_000   # chars of substrate included in pass 1
-MAX_TOKENS_OUT    =  1_024   # output tokens per pass
+# Fit local Super's 8k context: spend less input so summaries can breathe.
+PASS_CONTENT_CAP  = 18_000
+SUBSTRATE_CAP     =  3_000
+MAX_TOKENS_OUT    =  1_024
 
 MODEL_TIMEOUT     = 360
 
@@ -886,32 +852,40 @@ def strip_reasoning(text: str) -> str:
 def call_model(endpoint: str, model: str,
                system_prompt: str, user_content: str,
                pass_name: str) -> str:
-    payload = json.dumps({
-        "model":       model,
-        "messages":    [
-            {"role": "system", "content": system_prompt},
-            {"role": "user",   "content": user_content},
-        ],
-        "temperature": 0.7,
-        "max_tokens":  MAX_TOKENS_OUT,
-        "stream":      False,
-    }).encode()
+    def payload(content: str, max_tokens: int) -> bytes:
+        return json.dumps({
+            "model": model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": content},
+            ],
+            "temperature": 0.7,
+            "max_tokens": max_tokens,
+            "stream": False,
+        }).encode()
 
-    print(f"    {pass_name}: {len(payload):,} bytes", flush=True)
-    req = urllib.request.Request(
-        f"{endpoint}/chat/completions",
-        data=payload,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=MODEL_TIMEOUT) as resp:
-            data = json.loads(resp.read())
-        raw = data["choices"][0]["message"]["content"]
-        return strip_reasoning(raw)
-    except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8", errors="replace")
-        raise RuntimeError(f"HTTP {e.code} ({pass_name}):\n{body[:1000]}")
+    attempts = ((user_content, MAX_TOKENS_OUT), (user_content[:12_000], 512))
+    last = ""
+    for i, (content, max_tokens) in enumerate(attempts, 1):
+        data_bytes = payload(content, max_tokens)
+        print(f"    {pass_name} try {i}: {len(data_bytes):,} bytes", flush=True)
+        req = urllib.request.Request(
+            f"{endpoint}/chat/completions",
+            data=data_bytes,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=MODEL_TIMEOUT) as resp:
+                data = json.loads(resp.read())
+            return strip_reasoning(data["choices"][0]["message"]["content"])
+        except urllib.error.HTTPError as e:
+            body = e.read().decode("utf-8", errors="replace")
+            last = f"HTTP {e.code} ({pass_name}):\n{body[:1000]}"
+            if e.code != 400 or i == len(attempts) or "maximum context length" not in body.lower():
+                raise RuntimeError(last)
+            print("      context overflow; retrying clipped", flush=True)
+    raise RuntimeError(last or f"{pass_name} failed")
 
 
 def run_three_passes(endpoint: str, model: str,
@@ -991,7 +965,12 @@ def _read_deep_memory_meta() -> dict:
     p = Path("~/.cache/vybn-phase/deep_memory_meta.json").expanduser()
     if p.exists():
         try:
-            return json.loads(p.read_text(encoding="utf-8", errors="replace"))
+            data = json.loads(p.read_text(encoding="utf-8", errors="replace"))
+            chunks = data.get("chunks") if isinstance(data, dict) else data
+            if isinstance(chunks, (list, tuple, dict)):
+                data = data if isinstance(data, dict) else {}
+                data["chunks"] = len(chunks)
+            return data if isinstance(data, dict) else {"chunks": None}
         except Exception as e:
             return {"_error": str(e)[:200]}
     return {"_error": "deep_memory_meta.json not found"}
@@ -1060,10 +1039,13 @@ def build_repo_state(repos: List[Path],
 
 
 def _fmt_scalar(v) -> str:
-    if v is None:    return "—"
-    if isinstance(v, float):
-        return f"{v:.4f}"
-    return str(v)
+    if v is None: return "—"
+    if isinstance(v, float): return f"{v:.4f}"
+    if isinstance(v, (dict, list, tuple, set)):
+        v = list(v) if not isinstance(v, dict) else list(v.keys())
+        return f"{v[:6]}{' …' if len(v) > 6 else ''}"
+    text = str(v)
+    return text if len(text) <= 240 else text[:237] + "…"
 
 
 def build_delta_section(prev: Optional[dict], curr: dict) -> str:
@@ -1136,7 +1118,9 @@ def build_delta_section(prev: Optional[dict], curr: dict) -> str:
         lines.append("  Nothing moved between runs. The substrate is at "
                      "rest.")
     else:
-        lines.extend(moved)
+        lines.extend(moved[:120])
+        if len(moved) > 120:
+            lines.append(f"  … {len(moved) - 120} additional delta rows omitted")
     return "\n".join(lines) + "\n"
 
 
@@ -1225,14 +1209,20 @@ def main(argv: List[str]) -> int:
     delta_section = build_delta_section(prev_state, state)
 
     if args.no_llm:
-        # Still write a minimal report so downstream readers see the
-        # delta even when Nemotron is skipped.
-        ts = datetime.datetime.now().isoformat(timespec="seconds")
-        short = (
-            f"# Repository Map Report\n\nGenerated: {ts}  |  Model: — (--no-llm)\n\n"
-            f"---\n\n{delta_section}\n"
-            "---\n\n## I–III. (skipped: --no-llm)\n"
-        )
+        ts, totals = datetime.datetime.now().isoformat(timespec="seconds"), state.get("totals", {})
+        rows = [
+            "## I. Deterministic Infrastructure Snapshot", "",
+            f"- walk step: {state.get('walk', {}).get('step')}",
+            f"- walk alpha: {state.get('walk', {}).get('alpha')}",
+            f"- deep-memory chunks: {state.get('deep_memory', {}).get('chunks')}",
+            f"- organism encounters: {state.get('organism', {}).get('encounter_count')}", "",
+            "## II. Repository Shape", "",
+            *[f"- {k}: {totals.get(k)}" for k in ("files","py_files","md_files","py_def_count","todo_count","total_bytes")],
+            *[f"- {n}: {r.get('files')} files, {r.get('py_def_count')} defs, {r.get('total_bytes')} bytes" for n, r in sorted(state.get("per_repo", {}).items())],
+            "", "## III. Recent Movement", "",
+            *[f"- {x}" for r in state.get("per_repo", {}).values() for x in r.get("recent_files", [])[:3]],
+        ]
+        short = f"# Repository Map Report\n\nGenerated: {ts}  |  Model: — (--no-llm)\n\n---\n\n{delta_section}\n---\n\n" + "\n".join(rows) + "\n"
         (out / "repo_report.md").write_text(short, encoding="utf-8")
         print(f"  repo_report.md  ({len(short):,} chars)")
         print("\n--no-llm set. Done.")
@@ -1243,10 +1233,11 @@ def main(argv: List[str]) -> int:
         print(f"  Model: {model}")
         report = run_three_passes(args.endpoint, model, substrate, all_records)
     except RuntimeError as e:
-        print(f"\n[!] {e}"); return 1
+        print(f"\n[!] Optional LLM summary failed: {e}")
+        report = f"# Repository Map Report\n\n---\n\n{delta_section}\n---\n\n## Model analysis incomplete\n\n{str(e)[:1200]}\n"
     except urllib.error.URLError as e:
         print(f"\n[!] Cannot reach {args.endpoint}: {e}")
-        print("    Use --no-llm to skip the model call."); return 1
+        report = f"# Repository Map Report\n\n---\n\n{delta_section}\n---\n\n## Model analysis skipped\n\n{e}\n"
 
     # Prepend the delta section as section 0 so any reader encounters
     # velocity first, snapshot second.
