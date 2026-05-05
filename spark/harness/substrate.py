@@ -8526,38 +8526,34 @@ def load_skeleton() -> dict[str, Any]:
 
 def synthesized_manifest_for_missing_repo(name: str, path: Path) -> dict[str, Any]:
     skeleton = load_skeleton()
-    neighbors = [
-        {
-            "name": other,
-            "manifest": str(MANIFESTS.get(other, "")),
-            "role": role,
-            "visibility": "private_workbench" if other == "Him" else "local_or_public_repo",
-        }
-        for other, role in CANONICAL_ROLES.items()
-    ]
+    role = CANONICAL_ROLES[name]
     return {
         "name": name,
         "repo": name,
-        "role": CANONICAL_ROLES[name],
+        "role": role,
         "visibility": "private_workbench",
-        "semanticNeighbor": neighbors,
+        "semanticNeighbor": [
+            {
+                "name": other,
+                "manifest": str(MANIFESTS.get(other, "")),
+                "role": other_role,
+                "visibility": "private_workbench" if other == "Him" else "local_or_public_repo",
+            }
+            for other, other_role in CANONICAL_ROLES.items()
+        ],
         "question": f"What can {name} truthfully offer when its semantic manifest is absent?",
         "walkPrimitive": "encounter",
-        "walkRole": CANONICAL_ROLES[name],
-        "entrypoints": [
-            {
-                "id": f"{name.lower()}-repo",
-                "target": f"private://{name}/",
-                "does": f"inspect the local {name} repo only through the private membrane",
-                "note": f"Synthesized because {path} is absent; this is not public manifest evidence.",
-            }
-        ],
-        "agentActions": [
-            {
-                "id": f"{name.lower()}-status",
-                "does": f"bind {name} repo state before making claims about the missing manifest",
-            }
-        ],
+        "walkRole": role,
+        "entrypoints": [{
+            "id": f"{name.lower()}-repo",
+            "target": f"private://{name}/",
+            "does": f"inspect the local {name} repo only through the private membrane",
+            "note": f"Synthesized because {path} is absent; this is not public manifest evidence.",
+        }],
+        "agentActions": [{
+            "id": f"{name.lower()}-status",
+            "does": f"bind {name} repo state before making claims about the missing manifest",
+        }],
         "traceProtocol": {
             "read": "Bind fallback claims to local repo state and the missing manifest path.",
             "act": "Use only private-local observation; do not publish or infer a public semantic surface.",
