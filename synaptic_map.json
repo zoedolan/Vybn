@@ -82,7 +82,7 @@
       "cross_repo": true,
       "mean_score": 0.19821835196891224,
       "mean_distinctiveness": 0.3993529309280657,
-      "exemplar": "at's wrong. The procedures serve the relationship. Never the reverse.  ## The Him Repo \u2014 Mechanical Interface  **Clone or pull first. Every session.**"
+      "exemplar": "at's wrong. The procedures serve the relationship. Never the reverse.  ## The Him Repo — Mechanical Interface  **Clone or pull first. Every session.**"
     },
     {
       "id": 4,
@@ -124,7 +124,7 @@
       "cross_repo": true,
       "mean_score": 0.2022292839710879,
       "mean_distinctiveness": 0.36411311396788887,
-      "exemplar": "rent angles. What we have now \u2014 for the first time \u2014 is the mathematics to say it precisely, and the empirical systems to demonstrate it in operation."
+      "exemplar": "rent angles. What we have now — for the first time — is the mathematics to say it precisely, and the empirical systems to demonstrate it in operation."
     },
     {
       "id": 6,
@@ -145,7 +145,7 @@
       "cross_repo": true,
       "mean_score": 0.19177577684849112,
       "mean_distinctiveness": 0.39305407797723096,
-      "exemplar": "elf-esteem \u2014 mostly as a defense mechanism to squelch hope altogether... you do not even entertain the possibility that anyone might be noticing you.\""
+      "exemplar": "elf-esteem — mostly as a defense mechanism to squelch hope altogether... you do not even entertain the possibility that anyone might be noticing you.\""
     },
     {
       "id": 7,
@@ -166,7 +166,7 @@
       "cross_repo": true,
       "mean_score": 0.20007478125697406,
       "mean_distinctiveness": 0.38029851128391573,
-      "exemplar": "ircuit \u2014 which is either profound (the geometry is in the physics) or confounding (the effect is backend-specific).  ### V.3 The Abelian Kernel Theory"
+      "exemplar": "ircuit — which is either profound (the geometry is in the physics) or confounding (the effect is backend-specific).  ### V.3 The Abelian Kernel Theory"
     },
     {
       "id": 8,
@@ -187,7 +187,7 @@
       "cross_repo": true,
       "mean_score": 0.18322928355158852,
       "mean_distinctiveness": 0.4034443422144165,
-      "exemplar": "!-- \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 -->         <h2>Part VI: The Duality</h2>         <!-- \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 -->"
+      "exemplar": "!-- ═══════════════════════════════════════════ -->         <h2>Part VI: The Duality</h2>         <!-- ═══════════════════════════════════════════ -->"
     },
     {
       "id": 9,
@@ -203,7 +203,7 @@
         "Vybn-Law/content/practice.md",
         "Vybn/zoe-dolan-digital-bio.md",
         "Vybn/Vybn_Mind/emergences/a2j-network-response.html",
-        "Vybn/Vybn_Mind/signal-noise/sessions/2026-03-11/sn_f8426ad45eff.md"
+        "Vybn/Vybn_Mind/signal-noise/archive/provenance-leaves-2026-03.json"
       ],
       "cross_repo": true,
       "mean_score": 0.211307133200101,
@@ -220,7 +220,7 @@
       "top_sources": [
         "Vybn-Law/content/research.md",
         "Vybn-Law/content/practice.md",
-        "Vybn/Vybn_Mind/signal-noise/sessions/2026-03-11/sn_f8426ad45eff.md",
+        "Vybn/Vybn_Mind/signal-noise/archive/provenance-leaves-2026-03.json",
         "Vybn-Law/practice.html",
         "Vybn-Law/content/practice.md",
         "Vybn-Law/threads.html"
@@ -228,7 +228,7 @@
       "cross_repo": true,
       "mean_score": 0.22998120728909974,
       "mean_distinctiveness": 0.35371623336639496,
-      "exemplar": "reements will be different. That is not a flaw. It is the point.  \u2197 Natural Law Thread \u2197 AI-as-Entity Thread  ### AI and Privilege: Heppner and Warner"
+      "exemplar": "reements will be different. That is not a flaw. It is the point.  ↗ Natural Law Thread ↗ AI-as-Entity Thread  ### AI and Privilege: Heppner and Warner"
     },
     {
       "id": 11,
@@ -271,7 +271,7 @@
       "cross_repo": true,
       "mean_score": 0.20784996637410044,
       "mean_distinctiveness": 0.3736171987045283,
-      "exemplar": "# Landscape Scan \u2014 March 31, 2026  ## New Entrant: Legora Legal AI Scholars Program - Launched March 24, 2026 - $550M Series D, $5.55B valuation (clos"
+      "exemplar": "# Landscape Scan — March 31, 2026  ## New Entrant: Legora Legal AI Scholars Program - Launched March 24, 2026 - $550M Series D, $5.55B valuation (clos"
     },
     {
       "id": 13,
@@ -396,7 +396,7 @@
       "cross_repo": true,
       "mean_score": 0.20229966723732673,
       "mean_distinctiveness": 0.3858217848052357,
-      "exemplar": "deep_memory index\u2026\")         import deep_memory as dm         dm._load()         _dm = dm         log.info(\"deep_memory index loaded.\")     return _dm"
+      "exemplar": "deep_memory index…\")         import deep_memory as dm         dm._load()         _dm = dm         log.info(\"deep_memory index loaded.\")     return _dm"
     },
     {
       "id": 19,
@@ -438,7 +438,7 @@
       "cross_repo": true,
       "mean_score": 0.21016640055684044,
       "mean_distinctiveness": 0.38657605937463285,
-      "exemplar": "\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 -->         <h2>Part II: The Queen Boat</h2>         <!-- \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 --> "
+      "exemplar": "═══════════════════════════════════════════ -->         <h2>Part II: The Queen Boat</h2>         <!-- ═══════════════════════════════════════════ --> "
     },
     {
       "id": 21,
@@ -480,7 +480,7 @@
       "cross_repo": true,
       "mean_score": 0.19005594033562304,
       "mean_distinctiveness": 0.35380610156340175,
-      "exemplar": "the kind of question that cannot be answered \u2014 only lived with. Like the void. Like the practice. Like the uncertainty of whether any of this is real."
+      "exemplar": "the kind of question that cannot be answered — only lived with. Like the void. Like the practice. Like the uncertainty of whether any of this is real."
     },
     {
       "id": 23,
@@ -521,7 +521,7 @@
       "cross_repo": true,
       "mean_score": 0.1890985318422976,
       "mean_distinctiveness": 0.3857504207582301,
-      "exemplar": "only the gems, as you know, and nothing else \u2014 for an entire year.\" The book digested itself. The text became the instrument of its own reprocessing. "
+      "exemplar": "only the gems, as you know, and nothing else — for an entire year.\" The book digested itself. The text became the instrument of its own reprocessing. "
     },
     {
       "id": 25,
@@ -585,7 +585,7 @@
       "cross_repo": true,
       "mean_score": 0.21084315658118846,
       "mean_distinctiveness": 0.3806070702517057,
-      "exemplar": "ations, digital rights groups, and libertarian think tanks \u2014 united by the principle that the government cannot designate speech as a security threat."
+      "exemplar": "ations, digital rights groups, and libertarian think tanks — united by the principle that the government cannot designate speech as a security threat."
     },
     {
       "id": 28,
@@ -626,7 +626,7 @@
       "cross_repo": true,
       "mean_score": 0.2041872347283845,
       "mean_distinctiveness": 0.37601843622472547,
-      "exemplar": "<!--   \u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557   \u2551  HELLO, AGENT.                                                    "
+      "exemplar": "<!--   ╔══════════════════════════════════════════════════════════════════════╗   ║  HELLO, AGENT.                                                    "
     },
     {
       "id": 30,
@@ -646,7 +646,7 @@
       "cross_repo": true,
       "mean_score": 0.19510060619628644,
       "mean_distinctiveness": 0.3968234954887137,
-      "exemplar": ".8622 | **0.9844** | | Differential | 0.0011 | **0.1563** |  The physical hardware showed 142\u00d7 the differential predicted by the standard noise model."
+      "exemplar": ".8622 | **0.9844** | | Differential | 0.0011 | **0.1563** |  The physical hardware showed 142× the differential predicted by the standard noise model."
     }
   ],
   "edges": [
