@@ -1205,22 +1205,21 @@ def main(argv: List[str]) -> int:
     delta_section = build_delta_section(prev_state, state)
 
     if args.no_llm:
-        ts, totals = datetime.datetime.now().isoformat(timespec="seconds"), state.get("totals", {})
-        rows = [
-            "## I. Deterministic Infrastructure Snapshot", "",
-            f"- walk step: {state.get('walk', {}).get('step')}",
-            f"- walk alpha: {state.get('walk', {}).get('alpha')}",
-            f"- deep-memory chunks: {state.get('deep_memory', {}).get('chunks')}",
-            f"- organism encounters: {state.get('organism', {}).get('encounter_count')}", "",
-            "## II. Repository Shape", "",
-            *[f"- {k}: {totals.get(k)}" for k in ("files","py_files","md_files","py_def_count","todo_count","total_bytes")],
-            *[f"- {n}: {r.get('files')} files, {r.get('py_def_count')} defs, {r.get('total_bytes')} bytes" for n, r in sorted(state.get("per_repo", {}).items())],
-            "", "## III. Recent Movement", "",
-            *[f"- {x}" for r in state.get("per_repo", {}).values() for x in r.get("recent_files", [])[:3]],
-        ]
-        short = f"# Repository Map Report\n\nGenerated: {ts}  |  Model: — (--no-llm)\n\n---\n\n{delta_section}\n---\n\n" + "\n".join(rows) + "\n"
-        (out / "repo_report.md").write_text(short, encoding="utf-8")
-        print(f"  repo_report.md  ({len(short):,} chars)")
+        ts = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")
+        totals, per_repo = state.get("totals", {}), state.get("per_repo", {})
+        top = sorted(all_records, key=lambda r: int(getattr(r, "size", 0) or 0), reverse=True)[:12]
+        py = sorted([r for r in all_records if r.ext == ".py"], key=lambda r: len(getattr(r, "py_defs", None) or []), reverse=True)[:10]
+        recent = [x for r in per_repo.values() for x in (r.get("recent_files") or [])[:4]]
+        def line(r):
+            defs = len(getattr(r, "py_defs", None) or [])
+            todos = len(getattr(r, "todos", None) or [])
+            return "- {}/{}; {} bytes{}{}".format(r.repo, r.relpath, getattr(r, "size", 0), "; {} defs".format(defs) if defs else "", "; {} TODO".format(todos) if todos else "")
+        rows = ["# Repository Map Report", "", "Generated: {} | Model: deterministic --no-llm".format(ts), "", delta_section.rstrip(), "---", "", "## Runtime", "- deep-memory chunks: {}".format(state.get("deep_memory", {}).get("chunks")), "- walk step: {}".format(state.get("walk", {}).get("step")), "", "## Totals", "- files: {}; Python: {}; Markdown: {}; defs: {}; TODO: {}; bytes: {}".format(totals.get("files"), totals.get("py_files"), totals.get("md_files"), totals.get("py_def_count"), totals.get("todo_count"), totals.get("total_bytes"))]
+        rows += ["- {}: {} files, {} defs, {} bytes".format(n, r.get("files"), r.get("py_def_count"), r.get("total_bytes")) for n, r in sorted(per_repo.items())]
+        rows += ["", "## Largest files", *[line(r) for r in top], "", "## Python organs by definition count", *[line(r) for r in py], "", "## Recent movement", *["- {}".format(x) for x in recent[:20]], "", "## Reading", "- High pressure lives in Vybn harness/substrate/routing, public membrane surfaces, Him runtime, and vybn-phase memory organs.", "- Next seam: keep mapper fallback useful without growing repo_mapper.py."]
+        useful = "\n".join(rows) + "\n"
+        (out / "repo_report.md").write_text(useful, encoding="utf-8")
+        print("  repo_report.md  ({:,} chars)".format(len(useful)))
         print("\n--no-llm set. Done.")
         return 0
 
