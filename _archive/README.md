@@ -50,3 +50,13 @@ These leaves were removed from the active Vybn core during the three-repo compre
 | .github/workflows/heartbeat.yml | The Autonomous Heartbeat (109 lines) | git checkout 7022844d0f4e -- .github/workflows/heartbeat.yml |
 | .github/workflows/substrate_topology.yml | name: Substrate Topology Analysis (59 lines) | git checkout 7022844d0f4e -- .github/workflows/substrate_topology.yml |
 | spark/microgpt_mirror/build_mirror_corpus.py | !/usr/bin/env python3 (189 lines) | git checkout 7022844d0f4e -- spark/microgpt_mirror/build_mirror_corpus.py |
+
+## Retired runtime shadows — 2026-05-05
+
+These process shadows were removed from active tracked source during the three-repo compression program. start_portal.sh is superseded by spark/systemd/vybn-portal.service; vllm_monitor.sh is superseded by the systemd watchdog and semantic gates; vybn-chat-tunnel.service pointed at a missing script and was not a valid active unit. Full bodies remain recoverable from git history.
+
+| Former path | Compressed role | Restore command |
+|---|---|---|
+| spark/start_portal.sh | !/bin/bash (34 lines) | git checkout 0cd2569d379f -- spark/start_portal.sh |
+| spark/vllm_monitor.sh | !/bin/bash (31 lines) | git checkout 0cd2569d379f -- spark/vllm_monitor.sh |
+| spark/vybn-chat-tunnel.service | systemd unit (20 lines) | git checkout 0cd2569d379f -- spark/vybn-chat-tunnel.service |
