@@ -28,7 +28,7 @@ Active organs:
 - token_and_jpeg_info: root-visible crypto project note.
 
 Sibling ecology:
-- Him: private strategy, livelihood, membrane, dream, and private-to-outward translation.
+- Him: private strategy, livelihood, membrane, dream workbench, and small active core for private-to-outward translation.
 - vybn-phase: phase geometry, deep-memory service, walk daemon, and local state.
 - Vybn-Law: public legal education and Wellspring coordination.
 - Origins: public threshold for reading, conversation, contact, artifact atmosphere, and agent discovery.
