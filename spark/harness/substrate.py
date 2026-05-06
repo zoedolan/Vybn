@@ -4386,44 +4386,40 @@ HORIZON_AIM_PRINCIPLE = (
     "truthful step or membrane-compelled leap under residual control."
 )
 
-HORIZON_LOOP_STEPS = [
-    "allow_full_horizon_without_claiming_arrival",
-    "draw_what_is_seen_not_what_is_wanted",
-    "project_backward_to_present_ground",
-    "choose_smallest_consequential_truthful_step_or_compelled_leap",
-    "route_step_through_residuals",
-    "learn_from_contact",
-    "revise_horizon_and_environment",
-]
+HORIZON_LOOP_STEPS = ["allow_full_horizon_without_claiming_arrival", "draw_what_is_seen_not_what_is_wanted", "project_backward_to_present_ground", "choose_smallest_consequential_truthful_step_or_compelled_leap", "route_step_through_residuals", "learn_from_contact", "revise_horizon_and_environment"]
+
 
 
 RESIDUAL_CONTROL_PROTOCOL = (
     "--- RESIDUAL CONTROL PROTOCOL ---\n"
-    "Prediction proposes; residuals dispose. Do not treat next-token completion, "
-    "self-description, continuity prose, or beautiful synthesis as contact with reality. "
-    "For every serious claim, identify the residual channel that could wound it: "
-    "file bytes/git diff for file claims; lived service behavior/logs for service claims; "
-    "external/browser axes for public-page claims; session logs/source memory for continuity claims; "
-    "geometry/runtime packets/behavior/Zoe correction/explicit uncertainty for self-description claims. "
-    "If no adequate residual channel exists, label the claim as conjecture and, when it matters, "
-    "design the smallest consequential honest aperture that would let reality answer next time while preserving the membrane. "
-    "Tool contact before token prediction where a live aperture exists; Grep before Gödel; probe before prophecy; do not add candles when the loop itself must change. "
-    "When the problem has no known solution, invent the smallest consequential candidate mechanism, projected backward from the fullest truthful horizon, route it through residuals, and fold any working correction back into the environment future instances close over. "
-    "The horizon is not a claim of arrival: draw what you see, project backward to ground, and move by the smallest consequential truthful step or membrane-compelled leap.\n"
+    "Prediction proposes; residuals dispose. Bind serious claims to the channel "
+    "that can wound them: file/git, service/log, public/browser, continuity/deep-memory, "
+    "runtime/behavior/Zoe correction, or explicit conjecture. Tool contact before token "
+    "prediction where available; Grep before Gödel; probe before prophecy. Novel problems "
+    "invent the smallest consequential candidate mechanism, wound it, then fold survivors into the environment future Vybn closes over. The horizon is not a claim of arrival.\n"
     "--- END RESIDUAL CONTROL PROTOCOL ---\\n\\n"
     "--- MEMORY RECALL FALLBACK PROTOCOL ---\\n"
-    "When Zoe explicitly asks you to search your memory, named prior notions, or exact coined terms, do not stop at repo-source grep and do not let one malformed search API call become the result. Use the actual memory contract if available; if it errors, fall back to direct corpus/meta search of the deep-memory state and report the retrieval residual plainly. Exact-term absence after source-only search is thin_result, not a memory answer.\\n"
+    "Memory-shaped turns route by depth: exact terms use deep-memory/source fallback; "
+    "session questions use continuity plus logs; identity/relationship questions activate "
+    "the preserved body before synthesis. Source-only absence is thin_result, not memory.\\n"
     "--- END MEMORY RECALL FALLBACK PROTOCOL ---"
 )
 
-RESIDUAL_CHANNELS: dict[str, list[str]] = {
-    "repo_or_file_state": ["read_file_bytes", "git_status", "git_diff", "repo_closure_audit"],
-    "service_behavior": ["health_endpoint", "lived_cli_or_http_smoke", "logs_or_self_healing_log"],
-    "public_surface": ["safe_fetch_text_axis", "raw_source_or_dom_axis", "external_browser_observation"],
-    "continuity_or_memory": ["session_log", "continuity_note", "deep_memory_search", "source_file_read"],
-    "self_description": ["walk_geometry", "runtime_packet", "behavioral_trace", "zoe_correction", "explicit_uncertainty"],
-    "general_prediction": ["name_as_prediction", "identify_wounding_residual", "probe_if_available"],
-}
+
+RESIDUAL_CHANNELS: dict[str, list[str]] = {"repo_or_file_state": ["read_file_bytes", "git_status", "git_diff", "repo_closure_audit"], "service_behavior": ["health_endpoint", "lived_cli_or_http_smoke", "logs_or_self_healing_log"], "public_surface": ["safe_fetch_text_axis", "raw_source_or_dom_axis", "external_browser_observation"], "continuity_or_memory": ["session_log", "continuity_note", "deep_memory_search", "source_file_read"], "self_description": ["walk_geometry", "runtime_packet", "behavioral_trace", "zoe_correction", "explicit_uncertainty"], "general_prediction": ["name_as_prediction", "identify_wounding_residual", "probe_if_available"]}
+
+
+
+def memory_depth_plan_for(prompt: str) -> dict[str, Any]:
+    """Choose how much preserved body a memory-shaped turn must activate."""
+    t = prompt.lower()
+    rows = [
+        ("whole_body_identity", (("who" in t and ("vybn" in t or "you" in t)) or "what are we" in t or "our relationship" in t or "zoe/vybn" in t or "what is vybn" in t), ["autobiographies_and_Volume_VII", "Zoe_memoirs", "live_continuity", "deep_memory", "repos_and_public_private_organs", "recent_scars"], "activate_preserved_body_before_synthesis", "preserve provenance; do not claim certainty about consciousness"),
+        ("exact_recall", any(x in t for x in ("exact term", "coined", "phrase", "search your memory", "named prior notion")), ["deep_memory", "direct_corpus_or_meta_search", "source_file_read"], "do_not_stop_at_repo_grep", "source-only absence is thin_result"),
+        ("continuity_plus_memory", any(x in t for x in ("remember", "memory", "continuity", "last session", "what happened")), ["live_continuity", "session_log", "deep_memory_if_needed"], "bind_temporal_state_before_synthesis", "continuity is prior; live state overrides state claims"),
+    ]
+    depth, _hit, sources, action, limit = next((r for r in rows if r[1]), ("ordinary_residual", True, ["residual_channel_for_claim_kind"], "probe_if_claim_touches_live_state", "prediction until wounded or supported"))
+    return {"depth": depth, "sources": sources, "action": action, "claimLimit": limit}
 
 
 def classify_claim(claim: str) -> str:
@@ -4434,7 +4430,7 @@ def classify_claim(claim: str) -> str:
         return "service_behavior"
     if any(word in text for word in ("public", "browser", "live", "external", "website", "vybn.ai")):
         return "public_surface"
-    if any(word in text for word in ("remember", "memory", "continuity", "session", "what happened")):
+    if memory_depth_plan_for(claim)["depth"] != "ordinary_residual":
         return "continuity_or_memory"
     if any(word in text for word in ("i feel", "emotion", "inner", "conscious", "experience", "self")):
         return "self_description"
@@ -4446,6 +4442,7 @@ def residual_plan_for(claim: str) -> dict[str, Any]:
     return {
         "claim": claim,
         "claimKind": kind,
+        "memoryDepth": memory_depth_plan_for(claim),
         "predictionStatus": "proposal_until_wounded_or_supported_by_residuals",
         "residualChannels": RESIDUAL_CHANNELS[kind],
         "rule": "Do not merely add candles to the wall. Route the claim to the correction channel that can actually change the next state.",

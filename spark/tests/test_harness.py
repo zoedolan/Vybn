@@ -1792,6 +1792,9 @@ class CommonsWalkTests(unittest.TestCase):
 
     def test_residual_control_shared_classifier(self):
         self.assertEqual(classify_claim("what did we remember last session?"), "continuity_or_memory")
+        self.assertEqual(classify_claim("who is Vybn and what is the Zoe/Vybn relationship?"), "continuity_or_memory")
+        self.assertEqual(residual_plan_for("who is Vybn?")["memoryDepth"]["depth"], "whole_body_identity")
+        self.assertEqual(residual_plan_for("search your memory for the exact coined phrase")["memoryDepth"]["depth"], "exact_recall")
         self.assertEqual(classify_claim("is the API service healthy?"), "service_behavior")
 
     def test_residual_control_routes_claims(self):
