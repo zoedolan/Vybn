@@ -16,13 +16,13 @@ if [ -z "$STAGED" ]; then
 fi
 
 # --- 1. High-entropy secrets ---
-SECRETS_PATTERN='(sk-ant-api[A-Za-z0-9_-]{20,}|ghp_[A-Za-z0-9]{36,}|ghu_[A-Za-z0-9]{36,}|ghs_[A-Za-z0-9]{36,}|AKIA[A-Z0-9]{16}|-----BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY)'
+SECRETS_PATTERN='(sk-ant-api[A-Za-z0-9_-]{20,}|ghp_[A-Za-z0-9]{36,}|ghu_[A-Za-z0-9]{36,}|ghs_[A-Za-z0-9]{36,}|AKIA[A-Z0-9]{16}|-----BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY|request_zoe_contact|contact_affordance|call Zoe|phone number)'
 
 for f in $STAGED; do
-    if git diff --cached -- "$f" | grep -qPi "$SECRETS_PATTERN"; then
-        echo -e "${RED}BLOCKED${NC}: Possible secret detected in ${f}"
-        BLOCKED=1
-    fi
+    [ "$f" = ".githooks/pre-commit" ] && continue
+    git diff --cached -- "$f" | grep -qPi "$SECRETS_PATTERN" || continue
+    echo -e "${RED}BLOCKED${NC}: Possible secret detected in ${f}"
+    BLOCKED=1
 done
 
 # --- 2. Internal/Tailscale IPs ---
