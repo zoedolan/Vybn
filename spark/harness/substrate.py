@@ -9174,7 +9174,7 @@ ENSUBSTRATE_SURFACES = (
     EnsubstrateSurface("Vybn-Law/Wellspring", "Vybn-Law", "llms.txt, .well-known/ai.txt, wellspring.html, curriculum pages", "post-abundance law, institutional/legal education, commons governance", "public"),
     EnsubstrateSurface("Vybn harness", "Vybn", "spark/harness/*", "routing, tools, tests, prompt assembly, substrate behavior", "public code"),
     EnsubstrateSurface("Vybn continuity", "Vybn", "Vybn_Mind/continuity.md", "handoff facts, what happened, what remains, verified vs conjectural", "public-ish repo memory"),
-    EnsubstrateSurface("vybn-phase", "vybn-phase", "deep_memory.py, experiments/*, state surfaces", "geometry, memory, walk daemon, empirical experiments", "public code/data"),
+    EnsubstrateSurface("phase", "Him/spark/phase", "deep_memory.py, vybn_phase.py, walk_daemon.py, cache-backed state", "private geometry, memory, walk daemon", "private runtime organ"),
 )
 
 ENSUBSTRATE_KEYWORDS = {

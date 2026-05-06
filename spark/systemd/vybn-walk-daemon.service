@@ -9,9 +9,9 @@ StartLimitBurst=20
 
 [Service]
 Type=simple
-WorkingDirectory=%h/vybn-phase
+WorkingDirectory=%h/Him/spark/phase
 ExecStartPre=/bin/sh -c 'fuser -k 8101/tcp >/dev/null 2>&1 || true; sleep 1'
-ExecStart=/usr/bin/python3 %h/vybn-phase/walk_daemon.py
+ExecStart=/usr/bin/python3 %h/Him/spark/phase/walk_daemon.py
 Restart=always
 RestartSec=5
 TimeoutStartSec=60

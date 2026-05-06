@@ -9,8 +9,8 @@ After=network.target
 
 [Service]
 Type=oneshot
-WorkingDirectory=%h/vybn-phase
-ExecStart=/usr/bin/python3 %h/vybn-phase/deep_memory.py --self-check
+WorkingDirectory=%h/Him/spark/phase
+ExecStart=/usr/bin/python3 %h/Him/spark/phase/deep_memory.py --self-check
 StandardOutput=append:%h/.cache/vybn-phase/self_check.stdout.log
 StandardError=append:%h/.cache/vybn-phase/self_check.stderr.log
 
