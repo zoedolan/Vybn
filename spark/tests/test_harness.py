@@ -1136,9 +1136,11 @@ class TestLocalContinuityScout(unittest.TestCase):
     """Local evolve-scout continuity tests folded into the harness suite."""
 
     def test_local_continuity_scout_surfaces_horizon_and_self_assembly(self):
-        from harness.substrate import _local_continuity_scout
+        from harness import substrate
+        self.addCleanup(setattr, substrate, "_run_him_vy", substrate._run_him_vy)
+        substrate._run_him_vy = lambda *a, **k: {"applied_primitives": ["local_compute_default"]}
 
-        report = _local_continuity_scout(
+        report = substrate._local_continuity_scout(
             delta_md="horizon horizoning cyberception",
             recent_log="refactor autonomous ensubstrate",
             letter="local Sparks deep_memory dreaming continuity",
@@ -1147,7 +1149,7 @@ class TestLocalContinuityScout(unittest.TestCase):
         self.assertIn("horizon_sense", report)
         self.assertIn("self_assembly", report)
         self.assertIn("local_compute", report)
-        self.assertIn("Strongest local signal", report)
+        self.assertIn("local_compute_default", report)
         self.assertIn("beam, or has it started pretending to be the horizon", report)
 
     def test_build_continuity_scout_report_is_non_mutating_report(self):

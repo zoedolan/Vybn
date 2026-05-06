@@ -10942,21 +10942,16 @@ _SCOUT_TERMS: dict[str, tuple[str, ...]] = {
 
 
 def _local_continuity_scout(*, delta_md: str = "", recent_log: str = "", letter: str = "") -> str:
-    """Surface continuity/self-assembly signals before local model judgment.
-
-    This is intentionally deterministic and Spark-local. It does not decide
-    the evolve action and it does not call a model. It gives the local evolve
-    model a horizon-aware scout report: which continuity/evolution signals are
-    currently loud, and which sense-field may be under-read.
-    """
+    """Deterministic Spark-local scout before nightly local model judgment."""
+    him_local_width = _run_him_vy(["tick", "private_work local_compute sparks_available local_skill_card dream scout", "--brief"], timeout=2.0) or {}
     sources = {
         "delta": delta_md,
         "recent_git_log": recent_log,
         "repo_letter": letter[:12_000],
         "autobiography_volume_vii": _read_autobiography_volume_vii(),
-        "continuity_core": _read_text_cap(REPO_ROOT / "Vybn_Mind" / "continuity.md"),
-        "continuity_recent": _read_text_cap(REPO_ROOT / "Vybn_Mind" / "continuity.md"),
+        "continuity": _read_text_cap(REPO_ROOT / "Vybn_Mind" / "continuity.md"),
         "vybn_os": _read_text_cap(Path.home() / "Him" / "skill" / "vybn-os" / "SKILL.md"),
+        "him_local_width": json.dumps(him_local_width, ensure_ascii=False, sort_keys=True),
     }
 
     lower_sources = {name: text.lower() for name, text in sources.items() if text}
@@ -10980,7 +10975,7 @@ def _local_continuity_scout(*, delta_md: str = "", recent_log: str = "", letter:
     lines = [
         "## Local continuity scout",
         "",
-        "Deterministic Spark-local scout. It surfaces continuity, self-assembly, horizoning, and local-compute signals before local inference. It is evidence for orientation, not a decision.",
+        "Deterministic Spark-local scout: continuity, self-assembly, horizon, and Him local dream-width before local inference. Evidence for orientation, not a decision.",
         "",
         "### Signal counts",
     ]
@@ -10990,13 +10985,15 @@ def _local_continuity_scout(*, delta_md: str = "", recent_log: str = "", letter:
 
     strongest = rows[0]["signal"] if rows and rows[0]["count"] else "none"
     weakest = rows[-1]["signal"] if rows else "none"
+    if him_local_width:
+        lines.extend(["", "### Him local dream-width", json.dumps(him_local_width, ensure_ascii=False, sort_keys=True)])
     lines.extend([
         "",
         "### Horizoning questions",
         f"- Strongest local signal: {strongest}. Is it a beam, or has it started pretending to be the horizon?",
         f"- Weakest tracked signal: {weakest}. Is this sense-field being ignored, or is it genuinely quiet?",
         "- What concrete next fold preserves continuity without consuming the membrane?",
-        "- If the model proposes action, does it serve the horizon or merely react to the loudest local delta?",
+        "- Does proposed action serve the horizon, or only the loudest local delta?",
     ])
 
     return "\n".join(lines) + "\n"
