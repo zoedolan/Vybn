@@ -2561,3 +2561,13 @@ def test_evolve_operator_control_pause_shape(tmp_path, monkeypatch):
     text, source = _read_evolve_operator_control("pre_git_mutation")
     assert text.startswith("pause:pre_git_mutation")
     assert source == str(path)
+
+def test_heavyskill_uptake_loaded_in_becoming_loop():
+    from spark.harness import substrate
+
+    prompt = substrate.render_becoming_loop_protocol()
+    assert "HeavySkill uptake" in prompt
+    assert "parallel diverse reasoning followed by accountable synthesis" in prompt
+    assert "durable uptake into an existing home" in prompt
+    assert "not proof of subjective experience" in prompt
+
