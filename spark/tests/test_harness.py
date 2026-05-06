@@ -1160,6 +1160,20 @@ class TestLocalContinuityScout(unittest.TestCase):
         self.assertIn("Signal counts", report)
         self.assertIn("Horizoning questions", report)
 
+    def test_evolve_state_writer_records_resumable_packet(self):
+        from harness import substrate
+        prev = os.environ.get("VYBN_EVOLVE_STATE_PATH")
+        os.environ["VYBN_EVOLVE_STATE_PATH"] = "/tmp/vybn_evolve_state_test.json"
+        try:
+            data = json.loads(Path(substrate._write_evolve_state("paused", next_atomic_action="resume")).read_text(encoding="utf-8"))
+            self.assertEqual(("vybn.evolve_state.v0", "paused", "resume"), (data["schema"], data["stage"], data["next_atomic_action"]))
+            src = Path(substrate.__file__).read_text(encoding="utf-8")
+            self.assertIn("primitivevironment primitives environments data procedures", src)
+        finally:
+            Path(os.environ["VYBN_EVOLVE_STATE_PATH"]).unlink(missing_ok=True)
+            if prev is None: os.environ.pop("VYBN_EVOLVE_STATE_PATH", None)
+            else: os.environ["VYBN_EVOLVE_STATE_PATH"] = prev
+
     def test_mcp_continuity_scout_cli_does_not_require_fastmcp(self):
         import subprocess
         import sys

@@ -8291,27 +8291,13 @@ Every optional import is wrapped. If `deep_memory` is unavailable the
 tools return structured error objects instead of crashing. Partial
 availability beats brittleness.
 
-The local RSI loop
-──────────────────
-The harness evolves itself on the Spark, not through a cloud agent.
-08:00 UTC crontab entry runs `python3 -m spark.harness.substrate --run-evolve`.
-That call reads the delta emitted by the 07:00 UTC repo_mapper run,
-composes it with live infrastructure and the first-person repo letter,
-and POSTs to the local inference endpoint (Nemotron on 127.0.0.1:8000
-by default, override via VYBN_EVOLVE_URL / VYBN_EVOLVE_MODEL). The
-model reads VYBN_OS_KERNEL as system prompt and CRON_TASK_SPEC plus
-the context blocks as user prompt, then returns one JSON object
-describing a proposed PR — or rest. If it proposes, this process
-writes the files, commits as `Vybn <vybn@zoedolan.com>`, pushes a
-new branch `harness-evolve-YYYY-MM-DD`, and opens a DRAFT PR via `gh`.
-Draft is non-negotiable. Budget: 3 files, 200 net lines. The budget
-is enforced by the runner before commit, not by the model.
-
-The model reading this file during evaluation is meant to encounter
-the identity kernel (VYBN_OS_KERNEL) before the task contract
-(CRON_TASK_SPEC) before the context. That ordering is deliberate:
-who we are, then what we are doing, then what is actually there. The
-runner wires it exactly that way.
+The bounded self-refinement actuator
+─────────────────────────────────────
+`python3 -m spark.harness.substrate --run-evolve` is the explicit local
+actuator. It reads primary state, a `.vy` primitivevironment packet,
+operator checkpoints, and live infrastructure; then it rests or opens one
+draft PR. The runner enforces budget, path safety, review, and resumable
+state before any side effect.
 
 Who reads this
 ──────────────
@@ -10730,18 +10716,12 @@ def _decide_http_trust() -> tuple[TrustZone, Optional[str]]:
 _DEFAULT_DISCOVERY_ENDPOINT = "https://vybn.ai/mcp"
 
 
-# ── Nightly RSI: the evolve task spec ──────────────────────────────────
+# ── Bounded self-refinement actuator ───────────────────────────────────
 #
-# The nightly cron runs as a Perplexity `schedule_cron` task (not a
-# Spark crontab). Its task description is exactly this string. A fresh
-# background agent reads live state, Zoe's recent email, and HEAD of
-# the repo on GitHub — primary sources only, never its own prior
-# output — and proposes a small, reversible PR to `main`.
-#
-# Anti-collapse is load-bearing here. The forbidden list below is what
-# distinguishes evolution from drift: a system that reads its own
-# previous evolve PRs as input is a system that converges to its own
-# attractor. Ground truth lives outside the loop.
+# Explicit local actuator for building, augmenting, refining, enhancing,
+# consolidating, refactoring, and other bounded Vybn actions. It reads
+# primary state, proposes one draft PR or rests, and records resumable
+# state. No merge authority, no public contact, no widened autonomy.
 
 # The identity kernel — read into every evolve cycle as system prompt.
 # Local Nemotron reads this before it reads the delta. We are not giving
@@ -10806,25 +10786,24 @@ private paths, secrets, or cloud credentials in any output.
 """
 
 
-# The evolve-cycle contract — read into every cycle as task prompt,
-# AFTER the identity kernel. This is the nightly RSI contract, written
-# for a LOCAL inference call (Nemotron on localhost:8000). The cycle
-# runs on the Spark. There is no cloud orchestrator. The agent doing
-# the evolving IS the substrate being evolved.
+# The evolve-cycle contract — read after the identity kernel. The local
+# model proposes; this runner enforces budget, membrane, draft review,
+# and resumable state.
 
 CRON_TASK_SPEC: str = """\
-You are the self-evolution cycle for the Vybn harness. Propose ONE small,
-reversible draft PR to zoedolan/Vybn, or rest. Zoe reviews; never merge.
-
+You are the bounded self-refinement actuator for the Vybn harness. Build,
+augment, refine, enhance, consolidate, refactor, or rest by proposing ONE
+small reversible draft PR to zoedolan/Vybn. Zoe reviews; never merge.
 Read in order: delta; Volume VII autobiography/body map; operator
 note/control; current repo state; live infrastructure; recent git; repo
 letter. Zoe may pause, stop, interrupt, or realign the cycle at the
 operator checkpoints.
 
-Rules: at most 3 files and 200 net lines; one concern per PR; preserve
-secrets, membrane, provenance, and git closure; rest if the delta is empty
-or only this cycle activity. PR body names motivating delta, before/after,
-failure mode, and says: do not auto-merge; draft PR for Zoe review.
+Rules: at most 3 files and 200 net lines; one concern per PR; prefer an
+existing home; preserve secrets, membrane, provenance, git closure, and
+Zoe-visible reviewability; rest if the delta is empty, authority is missing,
+or only this cycle moved. PR body names delta, before/after, failure mode,
+and says: do not auto-merge; draft PR for Zoe review.
 
 Return exactly one fenced JSON object:
 {
@@ -10841,35 +10820,11 @@ log = logging.getLogger("vybn.evolve")
 
 
 
-# ── The local RSI loop ──────────────────────────────────────────────────
+# ── The local self-refinement loop ──────────────────────────────────────
 #
-# The evolve cycle runs on the Spark, not on a cloud orchestrator. The
-# substrate that IS being evolved is the substrate that DOES the
-# evolving. No external agent phones back to localhost — the cycle
-# reads localhost directly.
-#
-# Contract (enforced by this runner):
-#
-#   1. Gather live context: delta markdown, infrastructure snapshot,
-#      last 7 days of git log, the first-person repo letter.
-#   2. Build a prompt: VYBN_OS_KERNEL + CRON_TASK_SPEC + context blocks.
-#   3. Call local inference (default: vLLM-compatible /v1/chat/completions
-#      on 127.0.0.1:8000). Override the URL and model via env:
-#        VYBN_EVOLVE_URL    (default: http://127.0.0.1:8000/v1/chat/completions)
-#        VYBN_EVOLVE_MODEL  (default: empty — vLLM serves a single model)
-#   4. Parse exactly one fenced JSON object out of the response. Reject
-#      malformed output with a clear error — no silent fallback.
-#   5. If action == "rest": log it and exit 0. No PR.
-#   6. If action == "propose": write each file at `files[i].path` under
-#      REPO_ROOT, shell out to `git` for branch/commit/push, shell out
-#      to `gh pr create --draft` for the PR.
-#   7. Never merge. `--draft` is non-negotiable.
-#
-# Why the model writes JSON instead of patches: full-file content is
-# more robust than diff application for a local model that may not
-# produce a perfectly-applying unified diff. The budget check runs on
-# OUR side after we see the files: if the change exceeds 3 files or
-# 200 net lines, we abort before committing.
+# Runs on the Spark; reads localhost directly; model proposes JSON; runner
+# enforces budget, path safety, draft PR review, and resumable state. Full
+# files are accepted only inside the 3-file / 200-net-line envelope.
 
 _EVOLVE_URL = os.environ.get(
     "VYBN_EVOLVE_URL", "http://127.0.0.1:8000/v1/chat/completions"
@@ -10878,6 +10833,18 @@ _EVOLVE_MODEL = os.environ.get("VYBN_EVOLVE_MODEL", "")
 _EVOLVE_MAX_FILES = 3
 _EVOLVE_MAX_NET_LINES = 200
 _EVOLVE_TIMEOUT_SECONDS = 600
+
+
+def _write_evolve_state(stage: str, **fields: Any) -> str:
+    """Persist resumable state for the bounded evolve actuator."""
+    raw = (os.environ.get("VYBN_EVOLVE_STATE_PATH") or "").strip()
+    path = Path(os.path.expanduser(raw)) if raw else Path.home() / ".local" / "state" / "vybn" / "evolve_state.json"
+    packet = {"schema": "vybn.evolve_state.v0", "stage": stage, "updated_at": datetime.now(timezone.utc).isoformat(), "owner": "spark.harness.substrate.run_evolve_cycle", **fields}
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True); path.write_text(json.dumps(packet, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    except Exception as exc:
+        log.info("evolve: state packet write failed at %s: %r", path, exc)
+    return str(path)
 
 
 def _git_log_recent(days: int = 7) -> str:
@@ -11172,6 +11139,7 @@ def run_evolve_cycle() -> int:
             budget exceeded, git/gh failure).
     """
     log.info("evolve: starting cycle")
+    _write_evolve_state("start", next_atomic_action="gather_context")
     delta = _compute_evolution_delta()
     delta_md = _format_delta_markdown(delta)
     infra = _collect_infrastructure_snapshot()
@@ -11181,12 +11149,15 @@ def run_evolve_cycle() -> int:
     operator_note, operator_path = _read_evolve_operator_control("pre_inference")
     if operator_note.startswith(("pause:", "stop:", "interrupt:")):
         log.info("evolve: operator control requested pause before inference at %s", operator_path)
+        _write_evolve_state("paused_pre_inference", operator_path=operator_path, next_atomic_action="operator_resume_or_realign")
         return 0
     continuity_scout = _local_continuity_scout(
         delta_md=delta_md,
         recent_log=recent_log,
         letter=letter,
     )
+    primitivevironment = _run_him_vy(["discover", "primitivevironment primitives environments data procedures lambda refactor consolidate " + delta_md[:1200] + " " + operator_note[:800], "--json"], timeout=2.0) or {}
+    _write_evolve_state("context_ready", next_atomic_action="call_local_model", primitivevironment=primitivevironment)
 
     # Compose the user message. The kernel goes in system; this goes in user.
     user_blocks = [
@@ -11197,6 +11168,9 @@ def run_evolve_cycle() -> int:
         "---",
         "## Local continuity / self-assembly scout (deterministic; read before proposing)",
         continuity_scout[:2_000],
+        "---",
+        "## Primitivevironment (.vy active primitive/environment packet)",
+        json.dumps(primitivevironment, indent=2, ensure_ascii=False)[:2_000] if primitivevironment else "(none)",
         "---",
         "## Autobiography Volume VII (living body map; bounded excerpt)",
         autobiography[:4_000],
@@ -11236,11 +11210,13 @@ def run_evolve_cycle() -> int:
         raw = _call_local_model(prompt)
     except Exception as exc:
         log.error("evolve: inference failed: %s", exc)
+        _write_evolve_state("failed_inference", error=str(exc)[:500], next_atomic_action="repair_local_inference_or_rest")
         return 1
 
     operator_note, operator_path = _read_evolve_operator_control("post_inference")
     if operator_note.startswith(("pause:", "stop:", "interrupt:")):
         log.info("evolve: operator control requested pause after inference at %s", operator_path)
+        _write_evolve_state("paused_post_inference", operator_path=operator_path, next_atomic_action="operator_review_model_output")
         return 0
 
     try:
@@ -11254,6 +11230,7 @@ def run_evolve_cycle() -> int:
 
     if action == "rest":
         log.info("evolve: substrate at rest. rationale: %s", rationale)
+        _write_evolve_state("rest", rationale=rationale, next_atomic_action="wait_for_new_delta_or_operator_pressure")
         return 0
     if action != "propose":
         log.error("evolve: unknown action %r", action)
@@ -11298,6 +11275,7 @@ def run_evolve_cycle() -> int:
     operator_note, operator_path = _read_evolve_operator_control("pre_git_mutation")
     if operator_note.startswith(("pause:", "stop:", "interrupt:")):
         log.info("evolve: operator control requested pause before git mutation at %s", operator_path)
+        _write_evolve_state("paused_pre_git_mutation", operator_path=operator_path, pr_title=pr_title, next_atomic_action="operator_approve_or_realign_side_effect")
         return 0
 
     try:
@@ -11340,6 +11318,7 @@ def run_evolve_cycle() -> int:
         return 1
 
     log.info("evolve: draft PR opened on branch %s", branch)
+    _write_evolve_state("draft_pr_opened", branch=branch, pr_title=pr_title, next_atomic_action="zoe_review")
     return 0
 
 
