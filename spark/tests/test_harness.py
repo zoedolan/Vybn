@@ -1142,7 +1142,7 @@ class TestLocalContinuityScout(unittest.TestCase):
 
         report = substrate._local_continuity_scout(
             delta_md="horizon horizoning cyberception",
-            recent_log="refactor autonomous ensubstrate",
+            recent_log="autonomous ensubstrate",
             letter="local Sparks deep_memory dreaming continuity",
         )
         self.assertIn("## Local continuity scout", report)
@@ -1150,7 +1150,11 @@ class TestLocalContinuityScout(unittest.TestCase):
         self.assertIn("self_assembly", report)
         self.assertIn("local_compute", report)
         self.assertIn("local_compute_default", report)
-        self.assertIn("beam, or has it started pretending to be the horizon", report)
+        self.assertIn("Beam or horizon substitute?", report)
+        self.assertIn("reservoir_noise: no durable memory signal -> rest", report)
+        memory_report = substrate._local_continuity_scout(delta_md="Zoe corrected the recurring scar. Please remember this architecture decision.", recent_log="", letter="")
+        for term in ("zoe_correction", "recurring_scar", "architecture_decision", "reservoir_noise/rest"):
+            self.assertIn(term, memory_report)
 
     def test_build_continuity_scout_report_is_non_mutating_report(self):
         from harness.substrate import build_continuity_scout_report
