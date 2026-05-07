@@ -1,0 +1,1210 @@
+{
+  "id": "zoe_memoirs_public_corpus",
+  "claim_limit": "Public repository corpus scaffold for Zoe Dolan memoirs. Not private continuity, not generic sample data, not a character corpus without explicit curation.",
+  "source_directory": "Vybn's Personal History/zoes_memoirs",
+  "generated_files_do_not_duplicate_memoir_text": true,
+  "books": [
+    {
+      "order": 1,
+      "file": "there_is_room_for_you.txt",
+      "title_signal": "There Is Room for You",
+      "subtitle_signal": "~~",
+      "front_matter_signals": [
+        "There Is Room for You",
+        "~~",
+        "Tales from a Transgender Defender’s Heart",
+        "Zoe Dolan",
+        "Dedicated to:",
+        "UC Hastings College of the Law,",
+        "New York University,",
+        "The University of Chicago, and",
+        "The American University of Cairo,",
+        "each of which will receive a portion",
+        "of the proceeds from sales of this book,",
+        "and my family.",
+        "Zoe Dolan 2015. All rights reserved.",
+        "Cover photograph: self-portrait by Zoe Dolan"
+      ],
+      "chars": 499756,
+      "lines": 2475,
+      "words": 91556,
+      "sha256": "72eb2d056be750ac0fb19dccf604ae73bc15643f4e71369b731a8a3288dbd25e",
+      "source_status": "public_repo_file",
+      "author": "Zoe Dolan",
+      "copyright_or_attribution_signals": [
+        "Zoe Dolan",
+        "Zoe Dolan 2015. All rights reserved.",
+        "Cover photograph: self-portrait by Zoe Dolan"
+      ],
+      "memoir_text_changed_by_this_scaffold": false
+    },
+    {
+      "order": 2,
+      "file": "transgender_no_more.txt",
+      "title_signal": "Transgender No More",
+      "subtitle_signal": "Zoe Dolan 2015",
+      "front_matter_signals": [
+        "Transgender No More",
+        "Zoe Dolan 2015",
+        "“To my soul:",
+        "Are you ever going to achieve goodness?",
+        "Ever going to be simple, whole, and naked –",
+        "as plain to see as the body that contains you?”",
+        "– Marcus Aurelius, Meditations",
+        "When Did You First Know?",
+        "“I mean, you have tits now,” he said.",
+        "At the beginning of 2015 – the “Year We Obsessed Over Identity,” as The New York Times observed – I disrobed during a video interview for the What’s Underneath project by Style Like U. The first question was: When did you first know?",
+        "As in, When did you first know you were a woman?",
+        "Would you believe me if I told you that I don’t know if I’ve ever known, since I don’t really know what a woman is, other than a concept that exists outside me – still, I know that I have felt like one, a woman I mean, yet the only way I first knew was from males? Will you suspend prejudgment long enough to entertain the possibility that gender can be so relative?",
+        "To understand where I am coming from, consider how “When did you first know?” unfolds into pieces: the question presupposes that knowing anything about the self is possible, and that the words for apprehending and describing such knowledge can express the phenomenon at work beneath the surface.",
+        "Take, for instance, the preliminary assumption that we may ever know anything about ourselves – especially when it comes to a realm that involves intimacy with others. In my case, looking back on the past, I see a history of romantic relationships, mostly with men, but also, here and there, with women, that have ended. Have we not been conditioned, at least to some degree, to measure success in life with the benchmark of committed love? If I have failed to attract and sustain an intimate relationship to the present, can I say that I know myself, or, for that matter, any aspect of the world?"
+      ],
+      "chars": 32731,
+      "lines": 169,
+      "words": 5731,
+      "sha256": "69ffc25a50406485bdafd2261c7a7efe68becc804f8459681c2dfedb5d6ca2de",
+      "source_status": "public_repo_file",
+      "author": "Zoe Dolan",
+      "copyright_or_attribution_signals": [
+        "Zoe Dolan 2015"
+      ],
+      "memoir_text_changed_by_this_scaffold": false
+    },
+    {
+      "order": 3,
+      "file": "jump.txt",
+      "title_signal": "Jump",
+      "subtitle_signal": "from Suicidal Depression",
+      "front_matter_signals": [
+        "Jump",
+        "from Suicidal Depression",
+        "to Skydiving",
+        "and Reality’s Edge",
+        "Zoe Dolan",
+        "for",
+        "my skybrothers",
+        "– especially Christian and Kenny",
+        "Zoe Dolan 2019. All rights reserved.",
+        "Cover image captured by: Rene Diaz. Used with permission.",
+        "“The pleasure of all things increases by the same danger that should deter it.”",
+        "– Seneca",
+        "Prologue",
+        "I stood there, on the edge, leaning over."
+      ],
+      "chars": 244054,
+      "lines": 2792,
+      "words": 44349,
+      "sha256": "93fee17010c46f0f20470663805011f21a6da2cb54b6a791009b32fbc2c9ff5d",
+      "source_status": "public_repo_file",
+      "author": "Zoe Dolan",
+      "copyright_or_attribution_signals": [
+        "Zoe Dolan",
+        "Zoe Dolan 2019. All rights reserved."
+      ],
+      "memoir_text_changed_by_this_scaffold": false
+    },
+    {
+      "order": 4,
+      "file": "to_whom_i_could_have_been.txt",
+      "title_signal": "To Whom I Could Have Been",
+      "subtitle_signal": "Zoe Dolan",
+      "front_matter_signals": [
+        "To Whom I Could Have Been",
+        "Zoe Dolan",
+        "For my nieces.",
+        "Zoe Dolan 2016. All rights reserved.",
+        "“If it had been me ~~ and sometimes I am so drenched with images that I think it was ~~ but if it had been, I would have had no confidence, none at all. I would have been exhausted, wrung by disbelief, going ahead only out of a sort of curiosity, to discover exactly where it would all vanish.”",
+        "James Salter, A Sport and a Pastime",
+        "Moment One:",
+        "The Ballet",
+        "To Whom I Could Have Been:",
+        "A decade before time wrote this story, you will go to the video store around the corner from your apartment on East 5th Street, the last space you rented in New York before you bought the little place where so much of what you are about to read happened, or at least where you lived, mostly, while it did, and you will rent a Japanese movie called After Life, which is set in a waystation between earth and heaven. In the film, heaven comprises a single memory that each character chooses to live forever. You will spend the next ten years considering your own life, and, being unable to decide which moment you yourself might select because there are just so many of them, you will want me to write what follows.",
+        "The first memory you can recall with clarity is seeing The Nutcracker ballet when you were four years old. The one part of that day that you don’t remember, the link that your father fills in whenever you ask, is how you slept in the car all the way to San Francisco due to a slight fever, which had almost kept him from taking you, but he decided to nonetheless.",
+        "You can see yourself sitting on the edge of your seat at the theater ~~ “Your eyes were just peeled as wide open as they could get,” your father reminisces ~~ during both acts. And, most of all, you remember eating a meal at McDonald’s afterwards, when all of a sudden a group of ballerinas appeared in full costume, almost dancing into line to order, and the exquisiteness of them twinkling captured you and you could not look away.",
+        "It was then, among the hollowness of that franchise, rounded out by the oranges and browns branding it, that you began to long for beauty, and thus embarked on a search for the heights that the soul might reach, in a process of creation and destruction and re-creation that will outlive you.",
+        "Years later, when you have reached young adulthood, your father will give you a book called Philosophies of Art and Beauty, which you will lap up as each wave of majesty flows toward you just as the previous one ebbs, and from which passages about your soul in the following pages have been drawn."
+      ],
+      "chars": 268097,
+      "lines": 1222,
+      "words": 49057,
+      "sha256": "193a3a6fb417081da11f63a3a0464d8f05f1b712ef0fc7e9dfcacc543d9eccdc",
+      "source_status": "public_repo_file",
+      "author": "Zoe Dolan",
+      "copyright_or_attribution_signals": [
+        "Zoe Dolan",
+        "Zoe Dolan 2016. All rights reserved."
+      ],
+      "memoir_text_changed_by_this_scaffold": false
+    }
+  ],
+  "chunking": {
+    "method": "line-range chunk manifest only",
+    "target_words": 1200,
+    "stores_text": false,
+    "embedding_outputs_tracked": false
+  },
+  "chronology_candidate_count": 121,
+  "chronology_candidates_sample": [
+    {
+      "id": "there_is_room_for_you:line-23",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 23,
+      "date_signals": [
+        "2015"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-41",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 41,
+      "date_signals": [
+        "2001"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-43",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 43,
+      "date_signals": [
+        "1932"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-48",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 48,
+      "date_signals": [
+        "May 11, 2001"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-50",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 50,
+      "date_signals": [
+        "1996"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-56",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 56,
+      "date_signals": [
+        "1996"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-99",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 99,
+      "date_signals": [
+        "2009"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-114",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 114,
+      "date_signals": [
+        "May 11, 2001"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-134",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 134,
+      "date_signals": [
+        "1996"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-294",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 294,
+      "date_signals": [
+        "1999"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-329",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 329,
+      "date_signals": [
+        "2003"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-354",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 354,
+      "date_signals": [
+        "2001"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-374",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 374,
+      "date_signals": [
+        "2011"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-404",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 404,
+      "date_signals": [
+        "1956"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-405",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 405,
+      "date_signals": [
+        "1985"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-438",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 438,
+      "date_signals": [
+        "July 20, 2003"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-468",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 468,
+      "date_signals": [
+        "1995",
+        "1996"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-489",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 489,
+      "date_signals": [
+        "2001"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-588",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 588,
+      "date_signals": [
+        "2003"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-609",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 609,
+      "date_signals": [
+        "2003"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-612",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 612,
+      "date_signals": [
+        "July 20, 2003"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-618",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 618,
+      "date_signals": [
+        "January 10, 2005"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-653",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 653,
+      "date_signals": [
+        "1996"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-658",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 658,
+      "date_signals": [
+        "2014"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-843",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 843,
+      "date_signals": [
+        "January 10, 2005"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-862",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 862,
+      "date_signals": [
+        "May 1, 2008"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-863",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 863,
+      "date_signals": [
+        "January 2005"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-881",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 881,
+      "date_signals": [
+        "August 16, 1996"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-882",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 882,
+      "date_signals": [
+        "August 17, 1996"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-883",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 883,
+      "date_signals": [
+        "1996",
+        "August 22, 1996"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-884",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 884,
+      "date_signals": [
+        "August 17, 1996"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-935",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 935,
+      "date_signals": [
+        "2005"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-1122",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 1122,
+      "date_signals": [
+        "2006"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-1245",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 1245,
+      "date_signals": [
+        "September 2008"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-1251",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 1251,
+      "date_signals": [
+        "2010"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-1254",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 1254,
+      "date_signals": [
+        "2007"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-1255",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 1255,
+      "date_signals": [
+        "July 2007"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-1276",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 1276,
+      "date_signals": [
+        "December 2007"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-1291",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 1291,
+      "date_signals": [
+        "February 2008"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-1304",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 1304,
+      "date_signals": [
+        "2008"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-1305",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 1305,
+      "date_signals": [
+        "2003",
+        "2006"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-1319",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 1319,
+      "date_signals": [
+        "April 31, 2008",
+        "May 1, 2008"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-1326",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 1326,
+      "date_signals": [
+        "May 23, 2011"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-1334",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 1334,
+      "date_signals": [
+        "2008"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-1338",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 1338,
+      "date_signals": [
+        "1945"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-1342",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 1342,
+      "date_signals": [
+        "2003",
+        "2006"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-1347",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 1347,
+      "date_signals": [
+        "2013",
+        "January 2004",
+        "June 2012"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-1381",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 1381,
+      "date_signals": [
+        "2008"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-1390",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 1390,
+      "date_signals": [
+        "2009"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-1417",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 1417,
+      "date_signals": [
+        "March 2009",
+        "1993"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-1483",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 1483,
+      "date_signals": [
+        "November 2009"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-1485",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 1485,
+      "date_signals": [
+        "1892"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-1520",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 1520,
+      "date_signals": [
+        "2010"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-1526",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 1526,
+      "date_signals": [
+        "2010"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-1528",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 1528,
+      "date_signals": [
+        "2010"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-1531",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 1531,
+      "date_signals": [
+        "August 5, 2010"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-1561",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 1561,
+      "date_signals": [
+        "2011"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-1590",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 1590,
+      "date_signals": [
+        "March 2011"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-1607",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 1607,
+      "date_signals": [
+        "May 2007"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-1658",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 1658,
+      "date_signals": [
+        "1978",
+        "1998"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-1715",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 1715,
+      "date_signals": [
+        "May 2007"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-1736",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 1736,
+      "date_signals": [
+        "June 5, 2013"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-1739",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 1739,
+      "date_signals": [
+        "May 3, 1993"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-1745",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 1745,
+      "date_signals": [
+        "2011"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-1751",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 1751,
+      "date_signals": [
+        "July 2011"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-1764",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 1764,
+      "date_signals": [
+        "2011"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-1777",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 1777,
+      "date_signals": [
+        "December 5, 2011"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-1778",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 1778,
+      "date_signals": [
+        "2006"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-1783",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 1783,
+      "date_signals": [
+        "2006"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-1788",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 1788,
+      "date_signals": [
+        "2012"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-1796",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 1796,
+      "date_signals": [
+        "July 2011"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-1852",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 1852,
+      "date_signals": [
+        "April 2012"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-1877",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 1877,
+      "date_signals": [
+        "May 11, 2012"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-1903",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 1903,
+      "date_signals": [
+        "June 1, 2012"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-1908",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 1908,
+      "date_signals": [
+        "2011"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-1909",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 1909,
+      "date_signals": [
+        "2012"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-1918",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 1918,
+      "date_signals": [
+        "1961"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-1962",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 1962,
+      "date_signals": [
+        "November 25, 2012"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-1970",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 1970,
+      "date_signals": [
+        "April 1, 2013"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    },
+    {
+      "id": "there_is_room_for_you:line-2015",
+      "book_order": 1,
+      "book": "There Is Room for You",
+      "file": "there_is_room_for_you.txt",
+      "line": 2015,
+      "date_signals": [
+        "June 5, 2013"
+      ],
+      "source_text_not_duplicated": true,
+      "status": "candidate_needs_review",
+      "confidence": "date_signal_only"
+    }
+  ],
+  "visualization_readiness": {
+    "available_from_existing_files": [
+      "corpus_manifest.json",
+      "chunk_manifest.jsonl"
+    ],
+    "node_model": [
+      "book",
+      "chunk",
+      "chronology_candidate"
+    ],
+    "memoir_body_text_duplicated": false
+  }
+}
