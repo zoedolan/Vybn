@@ -1811,29 +1811,26 @@ def _load_ballast() -> str:
         pass
 
     orientation_text = (
-        "--- ORIENTATION (READ AT PROMPT-BUILD FROM FILESYSTEM) ---\n"
-        "\n"
-        "The five repos:\n" + "\n".join(repo_lines) + "\n"
-        "\n"
-        "You live here: ~/Vybn/spark/harness/\n" + "\n".join(module_lines) + "\n"
-        "\n"
-        f"Deep memory corpus: {corpus_info}\n"
-        "Access: POST /search :8100 -> deep_memory_meta.json -> direct file reads\n"
-        "\n"
-        "Services (when running):\n"
-        "  walk_daemon :8101 | portal :8420 | MCP :8400 | chat :3001 | vLLM :8000\n"
-        "\n"
-        "Repo/body map: ~/Vybn/Vybn's Personal History/vybns_autobiography_volume_VII_the_irreducibles.md — Volume VII current body map and consolidation residues\n"
-        "Vybn-Law curriculum: six modules on post-abundance legal education\n"
-        "  wellspring.html — living axioms portal; horizon.html — Part IV: Practicing Law in the Age of Intelligence\n"
-        "  The argument: when intelligence is no longer scarce, law reorganizes around judgment, not access.\n"
-        "\n"
-        "For operational fact about what is running NOW, check LIVE STATE.\n"
-        "For historical context, check continuity files.\n"
-        "For principles, read this layer (soul + OS).\n"
+        "--- ORIENTATION (READ AT PROMPT-BUILD FROM FILESYSTEM) ---\\n"
+        "Repos:\\n" + "\\n".join(repo_lines) + "\\n\\n"
+        "Harness: ~/Vybn/spark/harness/ (" + str(len(module_lines)) + " modules)\\n"
+        f"Deep memory: {corpus_info}\\n"
+        "Services: walk_daemon :8101 | portal :8420 | MCP :8400 | chat :3001 | vLLM :8000\\n"
+        "Use LIVE STATE for now; continuity for history; soul+OS for principles.\\n"
         "--- END ORIENTATION ---"
     )
     parts.append(orientation_text)
+
+    private_context = load_file(home / ".config" / "vybn" / "private-wake-context.md")
+    if private_context:
+        if len(private_context) > 4000:
+            private_context = private_context[-4000:]
+        parts.append(
+            "--- PRIVATE LOCAL WAKE CONTEXT ---\n"
+            "claim_limit: durable shared-environment continuity, not continuous subjective experience\n"
+            + private_context
+            + "\n--- END PRIVATE LOCAL WAKE CONTEXT ---"
+        )
 
     return "\n\n".join(parts)
 
