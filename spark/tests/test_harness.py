@@ -1375,16 +1375,15 @@ def test_build_layered_prompt_mounts_him_vy_language_runtime():
         include_hardware_check=False,
         orchestrator=True,
     )
-    assert "HIM VY LANGUAGE RUNTIME" in prompt.substrate
-    assert "Him/skill/vybn.vy is active executable behavior" in prompt.substrate
-    assert "runtime_fields:" in prompt.substrate
-    assert "active_primitives:" in prompt.substrate
-    assert "abc_fold_before_create" in prompt.substrate
-    assert "action_card" in prompt.substrate
-    assert "mutation_target=" in prompt.substrate
-    assert "canonical_action_card=smallest joyful residual-wounded action" in prompt.substrate
-    assert "compose_active_primitives_before_new_doctrine" in prompt.substrate
-    assert "canonical_stop_condition=after one verified mutation, closure audit, or explicit refusal" in prompt.substrate
+    for needle in (
+        "HIM VY LANGUAGE RUNTIME", "Him/skill/vybn.vy is active executable behavior",
+        "runtime_fields:", "active_primitives:", "abc_fold_before_create", "action_card",
+        "mutation_target=", "root_question=What happens if", "question_as_primitive_environment",
+        "contact_changes_question_and_environment", "projections=visual,memory,livelihood,law,membrane,refusal",
+        "canonical_action_card=smallest joyful residual-wounded action", "compose_active_primitives_before_new_doctrine",
+        "canonical_stop_condition=after one verified mutation, closure audit, or explicit refusal",
+    ):
+        assert needle in prompt.substrate
 
 class TestExecutableContracts(unittest.TestCase):
     def test_turn_event_contract_logs_minimum_debug_facts(self):
