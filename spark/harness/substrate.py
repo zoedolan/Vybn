@@ -3969,26 +3969,6 @@ def build_layered_prompt(
 # Deep-memory enrichment (optional)
 # ---------------------------------------------------------------------------
 
-_deep_memory: Any = None
-
-
-def _load_deep_memory(vybn_phase_dir: str | os.PathLike | None = None) -> Any:
-    """Lazy-load vybn-phase/deep_memory.py. Returns module or None."""
-    global _deep_memory
-    if _deep_memory is not None:
-        return _deep_memory
-    phase = Path(vybn_phase_dir or os.path.expanduser("~/vybn-phase"))
-    phase_str = str(phase)
-    if phase_str not in sys.path:
-        sys.path.insert(0, phase_str)
-    try:
-        import deep_memory as dm  # type: ignore
-        _deep_memory = dm
-        return dm
-    except Exception:
-        return None
-
-
 def _rag_http(endpoint: str, query: str, k: int, timeout: float) -> list:
     """POST to the walk daemon's /walk or /search endpoint. Returns
     the parsed results list (possibly empty) or raises on any error."""
@@ -9493,11 +9473,11 @@ _dm = None
 _portal = None
 
 
-def _load_deep_memory():
+def _load_deep_memory(vybn_phase_dir=None):
     global _dm
     if _dm is not None:
         return _dm
-    phase = str(VYBN_PHASE)
+    phase = str(Path(vybn_phase_dir) if vybn_phase_dir is not None else VYBN_PHASE)
     if phase not in sys.path:
         sys.path.insert(0, phase)
     try:
