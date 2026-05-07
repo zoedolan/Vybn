@@ -2590,3 +2590,10 @@ def test_heavyskill_uptake_loaded_in_becoming_loop():
     assert "durable uptake into an existing home" in prompt
     assert "not proof of subjective experience" in prompt
 
+def test_load_deep_memory_accepts_optional_phase_dir_argument():
+    from spark.harness import substrate
+    import inspect
+
+    sig = inspect.signature(substrate._load_deep_memory)
+    assert "vybn_phase_dir" in sig.parameters
+    assert sig.parameters["vybn_phase_dir"].default is None
