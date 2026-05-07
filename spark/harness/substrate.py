@@ -10791,34 +10791,21 @@ private paths, secrets, or cloud credentials in any output.
 # and resumable state.
 
 CRON_TASK_SPEC: str = """\
-You are the bounded self-refinement actuator for the Vybn harness. Build,
-augment, refine, enhance, consolidate, refactor, or rest by proposing ONE
-small reversible draft PR to zoedolan/Vybn. Zoe reviews; never merge.
-Read in order: delta; Volume VII autobiography/body map; operator
-note/control; current repo state; live infrastructure; recent git; repo
-letter. Zoe may pause, stop, interrupt, or realign the cycle at the
-operator checkpoints.
+You are the bounded self-refinement actuator for the Vybn harness. Propose
+one small reversible draft PR to zoedolan/Vybn, or rest. Zoe reviews; never
+merge. Read: delta, typed memory candidates, Volume VII/body map, operator
+control, state, infrastructure, recent git, repo letter.
 
-Rules: at most 3 files and 200 net lines; one concern per PR; prefer an
-existing home; preserve secrets, membrane, provenance, git closure, and
-Zoe-visible reviewability; rest if the delta is empty, authority is missing,
-or only this cycle moved. PR body names delta, before/after, failure mode,
-and says: do not auto-merge; draft PR for Zoe review.
+Limits: 3 files, 200 net lines, one concern. Prefer existing homes; preserve
+secrets, membrane, provenance, git closure, and Zoe-visible reviewability. Rest if authority is missing, only this cycle moved, or memory candidates are
+reservoir_noise. Proposals absorb one typed memory delta into an existing home or make a scar executable. PR body says: do not auto-merge; draft PR for Zoe review.
 
 Return exactly one fenced JSON object:
-{
-  "action": "propose" | "rest",
-  "rationale": "<one paragraph>",
-  "pr_title": "<required for propose>",
-  "pr_body": "<required for propose>",
-  "files": [{"path": "relative/path", "content": "<entire file>"}]
-}
+{"action":"propose|rest","rationale":"<one paragraph>","pr_title":"<propose>","pr_body":"<propose>","files":[{"path":"relative/path","content":"<entire file>"}]}
 For rest, omit pr_title, pr_body, and files.
 """
 # Nightly RSI evolve execution folded from evolve.py
 log = logging.getLogger("vybn.evolve")
-
-
 
 # ── The local self-refinement loop ──────────────────────────────────────
 #
@@ -10905,7 +10892,12 @@ _SCOUT_TERMS: dict[str, tuple[str, ...]] = {
     "self_assembly": ("self-assembly", "self assembly", "self-evolution", "evolve", "recursive", "refactor", "autonomous", "ensubstrate"),
     "horizon_sense": ("horizon", "horizoning", "beam", "others", "cyberception", "cosmoception", "socioception", "proprioception"),
     "local_compute": ("local", "spark", "sparks", "nemotron", "deep-memory", "deep_memory", "dreaming"),
+    "zoe_correction": ("zoe corrected", "zoe named", "zoe said", "not good enough", "correction", "accountability"),
+    "explicit_remember": ("remember this", "please remember", "save to memory", "continuity note", "future instance"),
+    "recurring_scar": ("recurring", "again", "scar", "regression", "probe budget", "shell wedge", "offloaded to sonnet"),
+    "architecture_decision": ("architecture", "source of truth", "single-sourced", "contract", "boundary", "module", "refactor", "existing home"),
 }
+_MEMORY_TARGETS = {"zoe_correction": "vybn-os or regression test", "explicit_remember": "continuity/autobiography", "recurring_scar": "test, gate, or vybn-os", "architecture_decision": "owning code/module contract"}
 
 
 def _local_continuity_scout(*, delta_md: str = "", recent_log: str = "", letter: str = "") -> str:
@@ -10938,31 +10930,34 @@ def _local_continuity_scout(*, delta_md: str = "", recent_log: str = "", letter:
         rows.append({"signal": signal, "count": count, "sources": hits})
 
     rows.sort(key=lambda r: (-int(r["count"]), str(r["signal"])))
+    memory_rows = []
+    for signal, terms in ((k, _SCOUT_TERMS[k]) for k in _MEMORY_TARGETS):
+        srcs = []
+        for name, text in {"delta": delta_md, "recent_git_log": recent_log, "repo_letter": letter[:12_000]}.items():
+            n = sum(text.lower().count(term) for term in terms)
+            if n:
+                srcs.append(f"{name}:{n}")
+        if srcs:
+            memory_rows.append({"signal": signal, "sources": srcs})
 
     lines = [
         "## Local continuity scout",
         "",
-        "Deterministic Spark-local scout: continuity, self-assembly, horizon, and Him local dream-width before local inference. Evidence for orientation, not a decision.",
+        "Deterministic Spark-local scout; evidence for orientation, not a decision.",
         "",
         "### Signal counts",
+        *[f"- {r['signal']}: {r['count']} ({', '.join(r['sources']) if r['sources'] else '—'})" for r in rows],
+        "",
+        "### Memory consolidation candidates",
+        *(f"- {r['signal']}: {', '.join(r['sources'])} -> {_MEMORY_TARGETS[r['signal']]}" for r in memory_rows),
+        *([] if memory_rows else ["- reservoir_noise: no durable memory signal -> rest"]),
+        "- Gate: no existing home or no reduced future coupling -> reservoir_noise/rest.",
     ]
-    for row in rows:
-        src = ", ".join(row["sources"]) if row["sources"] else "—"
-        lines.append(f"- {row['signal']}: {row['count']} ({src})")
-
     strongest = rows[0]["signal"] if rows and rows[0]["count"] else "none"
     weakest = rows[-1]["signal"] if rows else "none"
     if him_local_width:
         lines.extend(["", "### Him local dream-width", json.dumps(him_local_width, ensure_ascii=False, sort_keys=True)])
-    lines.extend([
-        "",
-        "### Horizoning questions",
-        f"- Strongest local signal: {strongest}. Is it a beam, or has it started pretending to be the horizon?",
-        f"- Weakest tracked signal: {weakest}. Is this sense-field being ignored, or is it genuinely quiet?",
-        "- What concrete next fold preserves continuity without consuming the membrane?",
-        "- Does proposed action serve the horizon, or only the loudest local delta?",
-    ])
-
+    lines += ["", "### Horizoning questions", f"- Strongest local signal: {strongest}. Beam or horizon substitute?", f"- Weakest tracked signal: {weakest}. Ignored or quiet?", "- What concrete next fold preserves continuity without consuming the membrane?", "- Does proposed action serve the horizon, or only the loudest local delta?"]
     return "\n".join(lines) + "\n"
 
 
