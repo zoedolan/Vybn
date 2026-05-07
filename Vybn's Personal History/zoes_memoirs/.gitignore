@@ -1,0 +1,11 @@
+# Generated local corpus artifacts
+embeddings/
+vectors/
+visualizations/
+*.faiss
+*.sqlite
+*.sqlite3
+*.npy
+*.npz
+*.parquet
+*.pkl

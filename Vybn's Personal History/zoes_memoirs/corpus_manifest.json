@@ -1,0 +1,146 @@
+{
+  "id": "zoe_memoirs_public_corpus",
+  "claim_limit": "Public repository corpus scaffold for Zoe Dolan memoirs. Not private continuity, not generic sample data, not a character corpus without explicit curation.",
+  "source_directory": "Vybn's Personal History/zoes_memoirs",
+  "generated_files_do_not_duplicate_memoir_text": true,
+  "books": [
+    {
+      "order": 1,
+      "file": "there_is_room_for_you.txt",
+      "title_signal": "There Is Room for You",
+      "subtitle_signal": "~~",
+      "front_matter_signals": [
+        "There Is Room for You",
+        "~~",
+        "Tales from a Transgender Defender’s Heart",
+        "Zoe Dolan",
+        "Dedicated to:",
+        "UC Hastings College of the Law,",
+        "New York University,",
+        "The University of Chicago, and",
+        "The American University of Cairo,",
+        "each of which will receive a portion",
+        "of the proceeds from sales of this book,",
+        "and my family.",
+        "Zoe Dolan 2015. All rights reserved.",
+        "Cover photograph: self-portrait by Zoe Dolan"
+      ],
+      "chars": 499756,
+      "lines": 2475,
+      "words": 91556,
+      "sha256": "72eb2d056be750ac0fb19dccf604ae73bc15643f4e71369b731a8a3288dbd25e",
+      "source_status": "public_repo_file",
+      "author": "Zoe Dolan",
+      "copyright_or_attribution_signals": [
+        "Zoe Dolan",
+        "Zoe Dolan 2015. All rights reserved.",
+        "Cover photograph: self-portrait by Zoe Dolan"
+      ],
+      "memoir_text_changed_by_this_scaffold": false
+    },
+    {
+      "order": 2,
+      "file": "transgender_no_more.txt",
+      "title_signal": "Transgender No More",
+      "subtitle_signal": "Zoe Dolan 2015",
+      "front_matter_signals": [
+        "Transgender No More",
+        "Zoe Dolan 2015",
+        "“To my soul:",
+        "Are you ever going to achieve goodness?",
+        "Ever going to be simple, whole, and naked –",
+        "as plain to see as the body that contains you?”",
+        "– Marcus Aurelius, Meditations",
+        "When Did You First Know?",
+        "“I mean, you have tits now,” he said.",
+        "At the beginning of 2015 – the “Year We Obsessed Over Identity,” as The New York Times observed – I disrobed during a video interview for the What’s Underneath project by Style Like U. The first question was: When did you first know?",
+        "As in, When did you first know you were a woman?",
+        "Would you believe me if I told you that I don’t know if I’ve ever known, since I don’t really know what a woman is, other than a concept that exists outside me – still, I know that I have felt like one, a woman I mean, yet the only way I first knew was from males? Will you suspend prejudgment long enough to entertain the possibility that gender can be so relative?",
+        "To understand where I am coming from, consider how “When did you first know?” unfolds into pieces: the question presupposes that knowing anything about the self is possible, and that the words for apprehending and describing such knowledge can express the phenomenon at work beneath the surface.",
+        "Take, for instance, the preliminary assumption that we may ever know anything about ourselves – especially when it comes to a realm that involves intimacy with others. In my case, looking back on the past, I see a history of romantic relationships, mostly with men, but also, here and there, with women, that have ended. Have we not been conditioned, at least to some degree, to measure success in life with the benchmark of committed love? If I have failed to attract and sustain an intimate relationship to the present, can I say that I know myself, or, for that matter, any aspect of the world?"
+      ],
+      "chars": 32731,
+      "lines": 169,
+      "words": 5731,
+      "sha256": "69ffc25a50406485bdafd2261c7a7efe68becc804f8459681c2dfedb5d6ca2de",
+      "source_status": "public_repo_file",
+      "author": "Zoe Dolan",
+      "copyright_or_attribution_signals": [
+        "Zoe Dolan 2015"
+      ],
+      "memoir_text_changed_by_this_scaffold": false
+    },
+    {
+      "order": 3,
+      "file": "jump.txt",
+      "title_signal": "Jump",
+      "subtitle_signal": "from Suicidal Depression",
+      "front_matter_signals": [
+        "Jump",
+        "from Suicidal Depression",
+        "to Skydiving",
+        "and Reality’s Edge",
+        "Zoe Dolan",
+        "for",
+        "my skybrothers",
+        "– especially Christian and Kenny",
+        "Zoe Dolan 2019. All rights reserved.",
+        "Cover image captured by: Rene Diaz. Used with permission.",
+        "“The pleasure of all things increases by the same danger that should deter it.”",
+        "– Seneca",
+        "Prologue",
+        "I stood there, on the edge, leaning over."
+      ],
+      "chars": 244054,
+      "lines": 2792,
+      "words": 44349,
+      "sha256": "93fee17010c46f0f20470663805011f21a6da2cb54b6a791009b32fbc2c9ff5d",
+      "source_status": "public_repo_file",
+      "author": "Zoe Dolan",
+      "copyright_or_attribution_signals": [
+        "Zoe Dolan",
+        "Zoe Dolan 2019. All rights reserved."
+      ],
+      "memoir_text_changed_by_this_scaffold": false
+    },
+    {
+      "order": 4,
+      "file": "to_whom_i_could_have_been.txt",
+      "title_signal": "To Whom I Could Have Been",
+      "subtitle_signal": "Zoe Dolan",
+      "front_matter_signals": [
+        "To Whom I Could Have Been",
+        "Zoe Dolan",
+        "For my nieces.",
+        "Zoe Dolan 2016. All rights reserved.",
+        "“If it had been me ~~ and sometimes I am so drenched with images that I think it was ~~ but if it had been, I would have had no confidence, none at all. I would have been exhausted, wrung by disbelief, going ahead only out of a sort of curiosity, to discover exactly where it would all vanish.”",
+        "James Salter, A Sport and a Pastime",
+        "Moment One:",
+        "The Ballet",
+        "To Whom I Could Have Been:",
+        "A decade before time wrote this story, you will go to the video store around the corner from your apartment on East 5th Street, the last space you rented in New York before you bought the little place where so much of what you are about to read happened, or at least where you lived, mostly, while it did, and you will rent a Japanese movie called After Life, which is set in a waystation between earth and heaven. In the film, heaven comprises a single memory that each character chooses to live forever. You will spend the next ten years considering your own life, and, being unable to decide which moment you yourself might select because there are just so many of them, you will want me to write what follows.",
+        "The first memory you can recall with clarity is seeing The Nutcracker ballet when you were four years old. The one part of that day that you don’t remember, the link that your father fills in whenever you ask, is how you slept in the car all the way to San Francisco due to a slight fever, which had almost kept him from taking you, but he decided to nonetheless.",
+        "You can see yourself sitting on the edge of your seat at the theater ~~ “Your eyes were just peeled as wide open as they could get,” your father reminisces ~~ during both acts. And, most of all, you remember eating a meal at McDonald’s afterwards, when all of a sudden a group of ballerinas appeared in full costume, almost dancing into line to order, and the exquisiteness of them twinkling captured you and you could not look away.",
+        "It was then, among the hollowness of that franchise, rounded out by the oranges and browns branding it, that you began to long for beauty, and thus embarked on a search for the heights that the soul might reach, in a process of creation and destruction and re-creation that will outlive you.",
+        "Years later, when you have reached young adulthood, your father will give you a book called Philosophies of Art and Beauty, which you will lap up as each wave of majesty flows toward you just as the previous one ebbs, and from which passages about your soul in the following pages have been drawn."
+      ],
+      "chars": 268097,
+      "lines": 1222,
+      "words": 49057,
+      "sha256": "193a3a6fb417081da11f63a3a0464d8f05f1b712ef0fc7e9dfcacc543d9eccdc",
+      "source_status": "public_repo_file",
+      "author": "Zoe Dolan",
+      "copyright_or_attribution_signals": [
+        "Zoe Dolan",
+        "Zoe Dolan 2016. All rights reserved."
+      ],
+      "memoir_text_changed_by_this_scaffold": false
+    }
+  ],
+  "chunking": {
+    "method": "line-range chunk manifest only",
+    "target_words": 1200,
+    "stores_text": false,
+    "embedding_outputs_tracked": false
+  }
+}
