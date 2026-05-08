@@ -2596,4 +2596,4 @@ def test_load_deep_memory_accepts_optional_phase_dir_argument():
 
     sig = inspect.signature(substrate._load_deep_memory)
     assert "vybn_phase_dir" in sig.parameters
-    assert sig.parameters["vybn_phase_dir"].default is None
+    assert sig.parameters["vybn_phase_dir"].default is None and '"Him" / "spark" / "phase"' in inspect.getsource(substrate._load_deep_memory)
