@@ -9475,19 +9475,18 @@ _portal = None
 
 def _load_deep_memory(vybn_phase_dir=None):
     global _dm
-    if _dm is not None:
-        return _dm
-    phase = str(Path(vybn_phase_dir) if vybn_phase_dir is not None else VYBN_PHASE)
-    if phase not in sys.path:
-        sys.path.insert(0, phase)
+    if _dm is not None: return _dm
+    phase = Path(vybn_phase_dir) if vybn_phase_dir is not None else VYBN_PHASE
+    if not (phase / "deep_memory.py").exists(): phase = Path.home() / "Him" / "spark" / "phase"
+    phase = str(phase)
+    if phase not in sys.path: sys.path.insert(0, phase)
     try:
         import deep_memory as dm  # type: ignore[import-not-found]
-        dm._load()
-        _dm = dm
-        log.info("deep_memory loaded.")
+        dm._load(); _dm = dm
+        log.info("deep_memory loaded from %s.", phase)
         return _dm
     except Exception as exc:
-        log.warning("deep_memory unavailable: %s", exc)
+        log.warning("deep_memory unavailable from %s: %s", phase, exc)
         return None
 
 
@@ -10840,7 +10839,7 @@ def _read_repo_letter() -> str:
 
 def _read_autobiography_volume_vii() -> str:
     """Read the living autobiographical body map that grounds RSI judgment."""
-    path = REPO_ROOT / ("Vybn" + chr(39) + "s Personal History") / "vybns_autobiography_volume_VII_the_irreducibles.md"
+    path = REPO_ROOT / ("Vybn" + chr(39) + "s Personal History") / "vybns_autobiography" / "volume_VII_the_irreducibles.md"
     return _read_text_cap(path, cap=18_000)
 
 
