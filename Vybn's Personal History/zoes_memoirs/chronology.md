@@ -77,3 +77,45 @@ Scope: first reviewed pass over the visible candidate sample only. These are sou
 | July 20, 2003 | there_is_room_for_you.txt:612 | By this meeting Zoe names a year of change: first year of law school, beginning gender transition, and taking a first step along recovery. | grounded source line; date explicit |
 | January 10, 2005 | there_is_room_for_you.txt:618 | In a Bushwick apartment building stairwell, Zoe stood naked and screamed for help shortly after arriving there. | grounded source line; date/place explicit |
 | summer 2014 | there_is_room_for_you.txt:658 | Zoe began serving on the Hastings Board of Governors and attended an early meeting with the new Dean. | grounded source line; season/year explicit |
+
+## Associative memory field - v0
+
+Purpose: extend the chronology from date extraction into a continuous, iterative memory field without pretending omniscience. Dates remain anchors, but the living object is the connective tissue between anchors: motifs, enabling conditions, returns, silences, place-recursions, voice changes, and unresolved intervals.
+
+Rule: associative links are hypotheses, not memoir facts. Each link must cite grounded atoms or source coordinates, carry confidence, and remain revisable when later memoir/autobiography evidence changes the field.
+
+### Atom extensions
+
+Future reviewed atoms may carry these fields when the source supports them:
+
+| Field | Meaning |
+|---|---|
+| temporal status | explicit date, inherited period, inferred interval, undated but placeable, or unresolved |
+| motif signals | recurring images, places, pressures, roles, wounds, freedoms, or questions |
+| enabling conditions | what likely had to already be true for this passage/event/voice to exist |
+| associative neighbors | other atoms/passages made more legible by this one |
+| relation to Zoe arc | source-grounded developmental relation, if any |
+| relation to Vybn arc | possible later bridge to autobiographies/WVWHM/continuity, never causal by default |
+| residual questions | what remains unknown or membrane-sensitive |
+
+### First associative edges from reviewed atoms only
+
+These are not new biography claims. They are graph edges between already reviewed source-coordinate atoms, offered as the first continuous-memory substrate.
+
+| Edge | Grounded anchors | Associative hypothesis | Confidence / membrane |
+|---|---|---|---|
+| first Cairo -> Queen Boat -> fall 2001 nadir | 1996 arrival/study in Cairo; May 11, 2001 Queen Boat arrest; fall 2001 isolation after Egypt | Egypt is not a single dated episode but a return-field: discovery, danger, geopolitical contact, and later psychic aftermath cluster around Cairo/Egypt across multiple anchors. | medium; source-grounded cluster, not total interpretation |
+| September 11 aftermath -> October 2001 recovery -> spring/summer 2003 recovery meetings | October 2001 recovery meetings; spring 2003 retreat; July 20, 2003 San Francisco meeting | Recovery appears as a continuity process rather than a point-event: meetings, fellowship, law school, transition, and self-narration become mutually legible across 2001-2003. | medium; source-grounded continuity, causality not asserted |
+| law school / transition / recovery convergence | July 20, 2003 atom naming first year of law school, beginning gender transition, and first recovery step | July 2003 functions as a convergence anchor where institutional future, gendered becoming, and recovery discipline share one remembered coordinate. | high for co-presence in source atom; low for broader life-arc interpretation |
+| New York theater refuge -> Kuwait layover -> Egypt return | late spring 1999 theater refuge; New Year 2001 Kuwait layover; 2001 Egypt context | Mobility and performance/refuge form a possible pre-recovery interval: theater, travel, exes, cities, and return routes appear before the October 2001 recovery anchor. | low-medium; needs more source review before arc language |
+| Bushwick stairwell after arrival | January 10, 2005 Bushwick atom | This may be a high-intensity discontinuity node: a scene whose meaning should be linked only after surrounding 2004-2005 source passages are reviewed. | deliberately low; preserve as unresolved, do not overinterpret |
+| Hastings Board return | summer 2014 Hastings Board atom; July 2003 law-school atom | The law/institutional line may arc from student formation toward institutional governance, but this needs intervening anchors before being treated as a life arc. | low-medium; promising bridge, incomplete interval |
+
+### Iterative update loop
+
+1. Keep explicit dates as fixed stars.
+2. Add undated fragments as probability clouds only when source context supports placement.
+3. Link fragments by motifs and enabling conditions, not just chronology.
+4. Let new evidence revise old confidence instead of appending contradictions.
+5. Preserve unresolved intervals as first-class objects; absence is information, not permission to invent.
+6. Later, braid Zoe memoir atoms with Vybn autobiography/WVWHM atoms through shared motifs and enabling conditions, while keeping claim limits visible.
