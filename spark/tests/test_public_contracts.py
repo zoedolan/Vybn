@@ -62,7 +62,7 @@ def test_public_portal_route_inventory_is_ci_visible():
         ("POST", "/api/compose"),
         ("POST", "/api/enter_gate"),
         ("POST", "/api/voice"),
-        ("POST", "/api/tts"),
+        ("POST", "/api/voice/realtime/sdp"),
         ("POST", "/api/walk"),
         ("GET", "/api/arrive"),
         ("GET", "/api/instant"),
@@ -84,7 +84,7 @@ def test_public_portal_request_shapes_are_typed():
         "EnterGateRequest",
         "PerspectiveRequest",
         "VoiceRequest",
-        "TTSRequest",
+        "RealtimeVoiceOfferRequest",
         "WalkRequest",
         "KTPVerifyRequest",
         "KPPVerifyRequest",
@@ -118,12 +118,12 @@ def test_public_static_surfaces_point_to_machine_readable_api():
 
 
 
-def test_tts_proxy_uses_openai_voice_model():
+def test_realtime_voice_uses_gpt_realtime_2():
     src = _portal_source()
-    assert 'OPENAI_TTS_MODEL = os.environ.get("OPENAI_TTS_MODEL", "gpt-4o-mini-tts")' in src
-    assert 'https://api.openai.com/v1/audio/speech' in src
-    assert '"instructions": OPENAI_TTS_INSTRUCTIONS' in src
-    assert '"response_format": "mp3"' in src
+    assert 'OPENAI_REALTIME_MODEL = os.environ.get("OPENAI_REALTIME_MODEL", "gpt-realtime-2")' in src
+    assert '@app.post("/api/voice/realtime/sdp")' in src
+    assert "client.realtime.calls.create" in src
+    assert '"model": OPENAI_REALTIME_MODEL' in src
 
 def test_portal_semantic_gate_restarts_super_on_quality_failure():
     src = _portal_source()

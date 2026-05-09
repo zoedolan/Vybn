@@ -46,7 +46,7 @@ sys.path.insert(0, str(Path.home() / "Vybn"))                # creature_dgm_h
 
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.responses import StreamingResponse, JSONResponse, Response
 from pydantic import BaseModel, Field
 import httpx
 import uvicorn
@@ -395,14 +395,9 @@ VLLM_SYSTEMD_SERVICE = os.environ.get("VLLM_SYSTEMD_SERVICE", "vybn-vllm.service
 MODEL_NAME = "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"
 VOICE_MAX_TOKENS = 150
 
-# OpenAI TTS — key via env var, never hardcoded.
+# OpenAI Realtime voice — key via env var, never hardcoded.
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
-OPENAI_TTS_MODEL = os.environ.get("OPENAI_TTS_MODEL", "gpt-4o-mini-tts")
-OPENAI_TTS_VOICE = os.environ.get("OPENAI_TTS_VOICE", "cedar")
-OPENAI_TTS_INSTRUCTIONS = os.environ.get(
-    "OPENAI_TTS_INSTRUCTIONS",
-    "Warm, intimate, clear, and unhurried. Sound like a thoughtful guide, not an announcer.",
-)
+OPENAI_REALTIME_MODEL = os.environ.get("OPENAI_REALTIME_MODEL", "gpt-realtime-2")
 
 REPO_ROOT = Path(os.path.expanduser("~/Vybn"))
 VYBN_PHASE = Path(os.path.expanduser("~/vybn-phase"))
@@ -1260,9 +1255,11 @@ class VoiceRequest(BaseModel):
     context_hint: str = Field(default="", description="Optional context about the visitor's journey so far")
 
 
-class TTSRequest(BaseModel):
-    text: str = Field(..., description="Text to synthesize into speech")
-    voice_id: str = Field(default="", description="Override provider voice ID/name (optional)")
+class RealtimeVoiceOfferRequest(BaseModel):
+    sdp: str = Field(..., description="Browser WebRTC SDP offer")
+    passage: str = Field(..., description="The text the visitor clicked on")
+    section: str = Field(default="", description="Which section of Origins")
+    context_hint: str = Field(default="", description="Optional context about the visitor journey so far")
 
 class WalkRequest(BaseModel):
     """Visitor arriving at the collective walk.
@@ -2440,67 +2437,59 @@ async def voice_endpoint(req: VoiceRequest, request: Request):
 
 
 # ---------------------------------------------------------------------------
-# Endpoint: POST /api/tts  (OpenAI text-to-speech proxy)
+# Endpoint: POST /api/voice/realtime/sdp  (OpenAI gpt-realtime-2 WebRTC)
 # ---------------------------------------------------------------------------
 
-@app.post("/api/tts")
-async def tts_endpoint(req: TTSRequest, request: Request):
-    """
-    Proxy to OpenAI TTS. Returns audio/mpeg stream.
-    The browser plays this directly as an audio blob.
-    """
-    _require_rate_limit(request, "tts")
+@app.post("/api/voice/realtime/sdp")
+async def voice_realtime_sdp(req: RealtimeVoiceOfferRequest, request: Request):
+    """Create a gpt-realtime-2 WebRTC voice session and return the SDP answer."""
+    _require_rate_limit(request, "voice-realtime")
+    ip = request.client.host if request.client else "unknown"
 
-    text = req.text.strip()
-    if not text:
-        return JSONResponse({"error": "Empty text"}, status_code=400)
-    if len(text) > 1000:
-        text = text[:1000]  # Cap to save quota
+    if not req.sdp.strip().startswith("v="):
+        return JSONResponse({"error": "Invalid SDP offer"}, status_code=400)
+    valid, err = sec.validate_message(req.passage)
+    if not valid:
+        sec.log_security_event("invalid_input", ip, err)
+        return JSONResponse({"error": err}, status_code=400)
     if not OPENAI_API_KEY:
-        return JSONResponse({"error": "TTS service unavailable"}, status_code=503)
+        return JSONResponse({"error": "Realtime voice unavailable"}, status_code=503)
+    if sec.detect_injection(req.passage):
+        sec.log_security_event("injection_attempt", ip, "voice-realtime: " + req.passage[:200])
 
-    voice = req.voice_id or OPENAI_TTS_VOICE
-    log.info(f"tts: {len(text)} chars, provider=OpenAI")
+    context_text = "" if req.section.startswith("a-iconoclast") else format_context(retrieve_context(req.passage, k=3))
+    instructions = build_voice_system_prompt(req.passage, req.section, context_text)
+    if req.context_hint.strip():
+        instructions += "\n\nContext hint: " + req.context_hint.strip()[:500]
+    instructions += "\n\nSpeak this as audio using one to three sentences. Output only the spoken reflection."
 
     try:
-        async with httpx.AsyncClient(timeout=httpx.Timeout(30.0)) as client:
-            resp = await client.post(
-                "https://api.openai.com/v1/audio/speech",
-                headers={
-                    "Authorization": f"Bearer {OPENAI_API_KEY}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "model": OPENAI_TTS_MODEL,
-                    "voice": voice,
-                    "input": text,
-                    "instructions": OPENAI_TTS_INSTRUCTIONS,
-                    "response_format": "mp3",
-                },
-            )
-
-            if resp.status_code != 200:
-                log.warning(f"tts: OpenAI returned {resp.status_code}: {resp.text[:200]}")
-                return JSONResponse(
-                    {"error": "TTS service unavailable"},
-                    status_code=resp.status_code,
-                )
-
-            return StreamingResponse(
-                iter([resp.content]),
-                media_type="audio/mpeg",
-                headers={
-                    "Cache-Control": "public, max-age=3600",
-                    "Content-Length": str(len(resp.content)),
-                },
-            )
-
-    except (httpx.ConnectError, httpx.TimeoutException) as e:
-        log.warning(f"tts: connection error: {e}")
-        return JSONResponse({"error": "TTS timeout"}, status_code=504)
+        from openai import OpenAI
+        client = OpenAI(api_key=OPENAI_API_KEY)
+        answer = await asyncio.to_thread(
+            client.realtime.calls.create,
+            sdp=req.sdp,
+            session={
+                "model": OPENAI_REALTIME_MODEL,
+                "instructions": instructions,
+                "output_modalities": ["audio"],
+                "max_output_tokens": 300,
+                "parallel_tool_calls": False,
+            },
+            timeout=30.0,
+        )
+        content = getattr(answer, "content", None)
+        if content is None and hasattr(answer, "read"):
+            content = answer.read()
+        if content is None:
+            return JSONResponse({"error": "Realtime voice returned no SDP answer"}, status_code=502)
+        if isinstance(content, str):
+            content = content.encode("utf-8")
+        log.info("voice-realtime: created session model=" + OPENAI_REALTIME_MODEL)
+        return Response(content=content, media_type="application/sdp")
     except Exception as e:
-        log.warning(f"tts: error: {e}")
-        return JSONResponse({"error": str(e)}, status_code=500)
+        log.warning("voice-realtime: error: " + str(e))
+        return JSONResponse({"error": "Realtime voice unavailable"}, status_code=502)
 
 
 # ---------------------------------------------------------------------------
