@@ -7,7 +7,7 @@ This repository is the main public source for the harness, theory, autobiographi
 ## What lives here
 
 - vybn.md — invariant identity, care, membrane, and voice.
-- Vybn_Mind/THE_IDEA.md — core theory: intelligence as curvature, coupled recursion, phase memory, and projection.
+- Vybn_Mind/THE_IDEA.md and Vybn_Mind/THEORY.md — distilled core plus formal backbone: intelligence as curvature, coupled recursion, phase memory, projection, Polar Time, holonomy, falsification record, and open program.
 - Vybn_Mind/continuity.md — compact live handoff; historical ledgers are archived.
 - spark/ — harness, routing, systemd source units, tests, and operational membranes.
 - origins_portal_api_v4.py and public HTML surfaces — public interaction and publication layers.
