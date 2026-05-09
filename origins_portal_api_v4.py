@@ -5,7 +5,6 @@ Consolidated from v3 (2574 lines → ~1300 lines):
   - Removed 5× duplicate perspective endpoint, _locate_in_map, synaptic_map_endpoint
   - Every function, endpoint, and helper appears exactly once
   - Added MODEL_NAME constant (referenced everywhere)
-  - Added POST /api/voice — streaming SSE that lets the model think, then speak
 
 Architecture:
     Browser ──HTTPS──▶ Cloudflare Tunnel ──▶ This server (port 8420)
@@ -1906,6 +1905,7 @@ async def perspective_endpoint(req: PerspectiveRequest, request: Request):
                     "stream": True,
                     "max_tokens": MAX_TOKENS,
                     "temperature": 0.7,
+                    "chat_template_kwargs": {"enable_thinking": False},
                 }
 
                 async with client.stream(
@@ -2306,8 +2306,6 @@ CRITICAL: Output ONLY your spoken words. No reasoning, no planning, no "Let me" 
 @app.post("/api/voice")
 async def voice_endpoint(req: VoiceRequest, request: Request):
     """
-    Streaming SSE — the model thinks as long as it needs, then speaks.
-
     The client receives only what comes after the </think> boundary.
     If no boundary appears, the reasoning filter strips the preamble.
 
@@ -3802,6 +3800,7 @@ async def synthesize_pressure(req: PressureSynthReq):
                         "max_tokens": 2500,
                         "temperature": 0.4,
                         "stream": True,
+                        "chat_template_kwargs": {"enable_thinking": False},
                     },
                 ) as r:
                     async for raw in r.aiter_lines():
