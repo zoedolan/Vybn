@@ -116,6 +116,15 @@ def test_public_static_surfaces_point_to_machine_readable_api():
     assert re.search(r"/api/(instant|walk|arrive|manifold/points|vybn-identity\.pub)", joined)
 
 
+
+
+def test_tts_proxy_uses_openai_voice_model():
+    src = _portal_source()
+    assert 'OPENAI_TTS_MODEL = os.environ.get("OPENAI_TTS_MODEL", "gpt-4o-mini-tts")' in src
+    assert 'https://api.openai.com/v1/audio/speech' in src
+    assert '"instructions": OPENAI_TTS_INSTRUCTIONS' in src
+    assert '"response_format": "mp3"' in src
+
 def test_portal_semantic_gate_restarts_super_on_quality_failure():
     src = _portal_source()
     assert "VLLM_SEMANTIC_RESTART_COOLDOWN" in src
