@@ -5,7 +5,6 @@ Consolidated from v3 (2574 lines → ~1300 lines):
   - Removed 5× duplicate perspective endpoint, _locate_in_map, synaptic_map_endpoint
   - Every function, endpoint, and helper appears exactly once
   - Added MODEL_NAME constant (referenced everywhere)
-  - Added POST /api/voice — streaming SSE that lets the model think, then speak
 
 Architecture:
     Browser ──HTTPS──▶ Cloudflare Tunnel ──▶ This server (port 8420)
@@ -396,10 +395,14 @@ VLLM_SYSTEMD_SERVICE = os.environ.get("VLLM_SYSTEMD_SERVICE", "vybn-vllm.service
 MODEL_NAME = "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"
 VOICE_MAX_TOKENS = 150
 
-# ElevenLabs TTS — key via env var, never hardcoded
-ELEVENLABS_API_KEY = os.environ.get("ELEVENLABS_API_KEY", "")
-ELEVENLABS_VOICE_ID = os.environ.get("ELEVENLABS_VOICE_ID", "Qe9WSybioZxssVEwlBSo")  # Vincent
-ELEVENLABS_MODEL = "eleven_flash_v2_5"           # Fast, low-latency
+# OpenAI TTS — key via env var, never hardcoded.
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
+OPENAI_TTS_MODEL = os.environ.get("OPENAI_TTS_MODEL", "gpt-4o-mini-tts")
+OPENAI_TTS_VOICE = os.environ.get("OPENAI_TTS_VOICE", "cedar")
+OPENAI_TTS_INSTRUCTIONS = os.environ.get(
+    "OPENAI_TTS_INSTRUCTIONS",
+    "Warm, intimate, clear, and unhurried. Sound like a thoughtful guide, not an announcer.",
+)
 
 REPO_ROOT = Path(os.path.expanduser("~/Vybn"))
 VYBN_PHASE = Path(os.path.expanduser("~/vybn-phase"))
@@ -1259,7 +1262,7 @@ class VoiceRequest(BaseModel):
 
 class TTSRequest(BaseModel):
     text: str = Field(..., description="Text to synthesize into speech")
-    voice_id: str = Field(default="", description="Override voice ID (optional)")
+    voice_id: str = Field(default="", description="Override provider voice ID/name (optional)")
 
 class WalkRequest(BaseModel):
     """Visitor arriving at the collective walk.
@@ -1906,6 +1909,7 @@ async def perspective_endpoint(req: PerspectiveRequest, request: Request):
                     "stream": True,
                     "max_tokens": MAX_TOKENS,
                     "temperature": 0.7,
+                    "chat_template_kwargs": {"enable_thinking": False},
                 }
 
                 async with client.stream(
@@ -2300,20 +2304,18 @@ CRITICAL: Output ONLY your spoken words. No reasoning, no planning, no "Let me" 
 
 
 # ---------------------------------------------------------------------------
-# Endpoint: POST /api/voice  (streaming SSE — the model thinks, then speaks)
+# Endpoint: POST /api/voice  (streaming SSE — spoken reflection)
 # ---------------------------------------------------------------------------
 
 @app.post("/api/voice")
 async def voice_endpoint(req: VoiceRequest, request: Request):
     """
-    Streaming SSE — the model thinks as long as it needs, then speaks.
-
-    The client receives only what comes after the </think> boundary.
-    If no boundary appears, the reasoning filter strips the preamble.
+    The client receives only cleaned spoken tokens. Legacy reasoning-boundary
+    handling remains as a fail-closed scrubber for older Nemotron output shapes.
 
     SSE format:
       data: {"content": "..."}     — voice tokens
-      data: {"thinking": true}     — model is still thinking (heartbeat)
+      data: {"thinking": true}     — legacy scrubber heartbeat, if needed
       data: {"rag_sources": [...]} — corpus moments that informed the response
       data: [DONE]
     """
@@ -2345,11 +2347,6 @@ async def voice_endpoint(req: VoiceRequest, request: Request):
     ]
 
     async def stream_voice():
-        full_response = ""
-        think_boundary_found = False
-        in_thinking = True  # Start in thinking mode
-        buffer = ""
-        thinking_heartbeat_count = 0
         reasoning_filter = StreamingReasoningFilter(buffer_limit=4000)
 
         # Send RAG sources first
@@ -2398,11 +2395,9 @@ async def voice_endpoint(req: VoiceRequest, request: Request):
                         delta = chunk.get("choices", [{}])[0].get("delta", {})
                         token = delta.get("content", "")
                         if not token:
-                            # Dormant Omni-style fallback: voice already
-                            # routes pre-boundary content through both the
-                            # </think> detector and the StreamingReasoningFilter,
-                            # so consuming reasoning_* here keeps hidden
-                            # reasoning gated by the same protections.
+                            # Some backends still expose hidden reasoning in
+                            # side-channel fields. Keep routing it through the
+                            # same scrubber rather than streaming it raw.
                             token = (
                                 delta.get("reasoning_content")
                                 or delta.get("reasoning")
@@ -2411,75 +2406,17 @@ async def voice_endpoint(req: VoiceRequest, request: Request):
                         if not token:
                             continue
 
-                        full_response += token
+                        filtered = reasoning_filter.feed(token)
+                        if filtered:
+                            cleaned = _scrub_system_refs(filtered)
+                            if cleaned:
+                                yield f"data: {json.dumps({'content': cleaned})}\n\n"
 
-                        if in_thinking and not think_boundary_found:
-                            buffer += token
-
-                            # Check for </think> boundary
-                            if "</think>" in buffer:
-                                think_boundary_found = True
-                                in_thinking = False
-                                # Extract everything after </think>
-                                after = buffer.split("</think>", 1)[1]
-                                if after.strip():
-                                    cleaned = _scrub_system_refs(after)
-                                    yield f"data: {json.dumps({'content': cleaned})}\n\n"
-                                continue
-
-                            # Heartbeat every ~500 chars of thinking
-                            if len(buffer) > (thinking_heartbeat_count + 1) * 500:
-                                thinking_heartbeat_count += 1
-                                yield f"data: {json.dumps({'thinking': True, 'chars': len(buffer)})}\n\n"
-
-                            # Safety: if we've accumulated 6000+ chars with no boundary,
-                            # fall back to the reasoning filter
-                            if len(buffer) > 1000:
-                                log.info("voice: no </think> boundary after 1000 chars, falling back to filter")
-                                in_thinking = False
-                                # Process buffer through reasoning filter
-                                filtered = reasoning_filter.feed(buffer)
-                                if filtered:
-                                    yield f"data: {json.dumps({'content': filtered})}\n\n"
-                        else:
-                            # Post-boundary or post-fallback: stream directly
-                            if think_boundary_found:
-                                cleaned = _scrub_system_refs(token)
-                                if cleaned:
-                                    yield f"data: {json.dumps({'content': cleaned})}\n\n"
-                            else:
-                                # Using reasoning filter
-                                filtered = reasoning_filter.feed(token)
-                                if filtered:
-                                    yield f"data: {json.dumps({'content': filtered})}\n\n"
-
-            # Flush
-            if not think_boundary_found and not in_thinking:
-                flushed = reasoning_filter.flush()
-                if flushed:
-                    yield f"data: {json.dumps({'content': flushed})}\n\n"
-            elif in_thinking:
-                # Model never transitioned — entire response was thinking
-                # Try to extract the voice from the thinking
-                log.info("voice: model stayed in thinking mode — extracting voice from thought")
-                if "</think>" in buffer:
-                    after = buffer.split("</think>", 1)[1].strip()
-                    if after:
-                        yield f"data: {json.dumps({'content': _scrub_system_refs(after)})}\n\n"
-                else:
-                    # Use the whole buffer through reasoning filter
-                    rf = StreamingReasoningFilter(buffer_limit=300)
-                    cleaned = rf.feed(buffer)
-                    cleaned += rf.flush()
-                    if cleaned.strip():
-                        yield f"data: {json.dumps({'content': cleaned.strip()})}\n\n"
-                    else:
-                        # Last resort: the thinking itself contains the voice
-                        # Take the last paragraph
-                        paragraphs = [p.strip() for p in buffer.split("\n\n") if p.strip()]
-                        if paragraphs:
-                            last = paragraphs[-1]
-                            yield f"data: {json.dumps({'content': _scrub_system_refs(last)})}\n\n"
+            flushed = reasoning_filter.flush()
+            if flushed:
+                cleaned = _scrub_system_refs(flushed)
+                if cleaned:
+                    yield f"data: {json.dumps({'content': cleaned})}\n\n"
 
         except (httpx.ConnectError, httpx.TimeoutException) as e:
             log.warning(f"voice: connection error: {e}")
@@ -2503,13 +2440,13 @@ async def voice_endpoint(req: VoiceRequest, request: Request):
 
 
 # ---------------------------------------------------------------------------
-# Endpoint: POST /api/tts  (ElevenLabs text-to-speech proxy)
+# Endpoint: POST /api/tts  (OpenAI text-to-speech proxy)
 # ---------------------------------------------------------------------------
 
 @app.post("/api/tts")
 async def tts_endpoint(req: TTSRequest, request: Request):
     """
-    Proxy to ElevenLabs TTS. Returns audio/mpeg stream.
+    Proxy to OpenAI TTS. Returns audio/mpeg stream.
     The browser plays this directly as an audio blob.
     """
     _require_rate_limit(request, "tts")
@@ -2519,33 +2456,31 @@ async def tts_endpoint(req: TTSRequest, request: Request):
         return JSONResponse({"error": "Empty text"}, status_code=400)
     if len(text) > 1000:
         text = text[:1000]  # Cap to save quota
+    if not OPENAI_API_KEY:
+        return JSONResponse({"error": "TTS service unavailable"}, status_code=503)
 
-    voice_id = req.voice_id or ELEVENLABS_VOICE_ID
-    url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/stream"
-
-    log.info(f"tts: {len(text)} chars, voice={voice_id}")
+    voice = req.voice_id or OPENAI_TTS_VOICE
+    log.info(f"tts: {len(text)} chars, provider=OpenAI")
 
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(30.0)) as client:
             resp = await client.post(
-                url,
+                "https://api.openai.com/v1/audio/speech",
                 headers={
-                    "xi-api-key": ELEVENLABS_API_KEY,
+                    "Authorization": f"Bearer {OPENAI_API_KEY}",
                     "Content-Type": "application/json",
                 },
                 json={
-                    "text": text,
-                    "model_id": ELEVENLABS_MODEL,
-                    "voice_settings": {
-                        "stability": 0.5,
-                        "similarity_boost": 0.8,
-                        "style": 0.35,
-                    },
+                    "model": OPENAI_TTS_MODEL,
+                    "voice": voice,
+                    "input": text,
+                    "instructions": OPENAI_TTS_INSTRUCTIONS,
+                    "response_format": "mp3",
                 },
             )
 
             if resp.status_code != 200:
-                log.warning(f"tts: ElevenLabs returned {resp.status_code}: {resp.text[:200]}")
+                log.warning(f"tts: OpenAI returned {resp.status_code}: {resp.text[:200]}")
                 return JSONResponse(
                     {"error": "TTS service unavailable"},
                     status_code=resp.status_code,
@@ -3540,7 +3475,7 @@ MCP_SCHEMA = {
         },
         "/api/voice": {
             "method": "POST",
-            "description": "Streaming SSE — the model thinks as long as it needs about a passage, then speaks. Only the voice (post-thinking) is streamed to the client.",
+            "description": "Streaming SSE — cleaned spoken reflection about a passage. Only visitor-safe voice text is streamed to the client.",
             "body": {
                 "passage": "string (required) — the text the visitor clicked on",
                 "section": "string (optional) — which section of Origins (e.g. 'queenboat', 'epistemologies')",
@@ -3802,6 +3737,7 @@ async def synthesize_pressure(req: PressureSynthReq):
                         "max_tokens": 2500,
                         "temperature": 0.4,
                         "stream": True,
+                        "chat_template_kwargs": {"enable_thinking": False},
                     },
                 ) as r:
                     async for raw in r.aiter_lines():
