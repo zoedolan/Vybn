@@ -41,8 +41,7 @@ import numpy as np
 # ---------------------------------------------------------------------------
 # Path setup — must happen before any local imports
 # ---------------------------------------------------------------------------
-sys.path.insert(0, os.path.expanduser("~/vybn-phase"))       # deep_memory
-sys.path.insert(0, str(Path.home() / "Vybn"))                # creature_dgm_h
+sys.path[:0] = [str(Path.home() / "Vybn-Law" / "api"), str(Path.home() / "Vybn"), os.path.expanduser("~/vybn-phase")]
 
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware

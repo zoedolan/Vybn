@@ -124,6 +124,7 @@ def test_realtime_voice_uses_gpt_realtime_2():
     assert '@app.post("/api/voice/realtime/sdp")' in src
     assert "client.realtime.calls.create" in src
     assert '"model": OPENAI_REALTIME_MODEL' in src
+    assert 'Path.home() / "Vybn-Law" / "api"' in src
 
 def test_portal_semantic_gate_restarts_super_on_quality_failure():
     src = _portal_source()
