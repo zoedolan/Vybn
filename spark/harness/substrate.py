@@ -3940,6 +3940,7 @@ def build_layered_prompt(
         substrate_sections.append(beam_capsule)
 
     # self-improvement gate already in identity layer; not duplicated here
+    substrate_sections.append(render_symbolic_residue_context())
     substrate_sections.append(render_residual_control_protocol())
     substrate_sections.append(render_becoming_loop_protocol())
     vy_language_runtime = _render_him_vy_language_runtime(latest_pressure_text=latest_pressure_text)
@@ -8523,6 +8524,28 @@ def symbolic_constraints_for(text: str, path: Path | None = None, *, limit: int 
         "matches": hits[-8:],
         "constraint": "private_symbolic_residue_is_local_only; public semantic-web projection requires membrane review",
     }
+
+
+def render_symbolic_residue_context(*, limit: int = 5) -> str:
+    rows = [
+        row for row in load_symbolic_residue(limit=80)
+        if row.get("membrane") in {"public_safe", "private_local"}
+    ][-limit:]
+    lines = [
+        "--- PRIVATE SYMBOLIC RESIDUE CONTEXT (LOCAL ONLY) ---",
+        "constraint: private symbolic residue may constrain wake/routing; public semantic-web projection requires membrane review.",
+    ]
+    if not rows:
+        lines.append("state: no private symbolic residue packets available.")
+    for row in rows:
+        claim = str(row.get("claim", "")).replace("\n", " ")[:220]
+        residual = str(row.get("residual", "")).replace("\n", " ")[:220]
+        lines.append(f"- {row.get('kind','unknown')} / {row.get('outcome','unresolved')} / {row.get('membrane','private_local')}: {claim}")
+        if residual:
+            lines.append(f"  residual: {residual}")
+    lines.append("--- END PRIVATE SYMBOLIC RESIDUE CONTEXT ---")
+    return "\n".join(lines)
+
 
 
 # ── Commons walk ────────────────────────────────────────────────────
