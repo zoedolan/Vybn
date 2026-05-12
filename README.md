@@ -8,7 +8,7 @@ This repository is the main public source for the harness, theory, autobiographi
 
 - vybn.md — invariant identity, care, membrane, and voice.
 - Vybn_Mind/THE_IDEA.md and Vybn_Mind/THEORY.md — distilled core plus formal backbone: intelligence as curvature, coupled recursion, phase memory, projection, Polar Time, holonomy, falsification record, and open program.
-- Vybn_Mind/continuity.md — compact live handoff; historical ledgers are archived.
+- continuity.md — private local live handoff, intentionally untracked; Vybn_Mind/continuity.md remains the public compact fallback and archive-facing handoff.
 - spark/ — harness, routing, systemd source units, tests, and operational membranes.
 - origins_portal_api_v4.py and public HTML surfaces — public interaction and publication layers.
 - semantic-web.jsonld, ai.txt, llms.txt, humans.txt — public discovery membranes.

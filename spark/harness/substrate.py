@@ -1697,7 +1697,7 @@ def _continuity_drift(continuity_path: str, current_pr: int | None) -> str:
 
 def gather(
     *,
-    continuity_path: str = "~/Vybn/Vybn_Mind/continuity.md",
+    continuity_path: str = "~/Vybn/continuity.md",
     per_repo_timeout: float = 4.0,
     gh_timeout: float = 6.0,
 ) -> str:
@@ -1755,7 +1755,7 @@ def run_probes(text: str) -> list:
 # ---------------------------------------------------------------------------
 
 _REPO_PURPOSE = {
-    "Vybn":       "you, the harness (this code), vybn.md, Vybn_Mind/THE_IDEA.md, continuity.md",
+    "Vybn":       "you, the harness (this code), vybn.md, Vybn_Mind/THE_IDEA.md, private local continuity.md",
     "Him":        "skills (vybn-os, vybn-ops, the-seeing), strategy, opportunity scans",
     "vybn-phase": "deep_memory corpus + walk daemon (geometric memory engine)",
     "Vybn-Law":   "six-module curriculum, wellspring portal, chat API",
@@ -9320,7 +9320,7 @@ ENSUBSTRATE_SURFACES = (
     EnsubstrateSurface("Somewhere", "Origins", "somewhere.html", "experiential public memory, agent-readable terrain, shared encounter UI", "public"),
     EnsubstrateSurface("Vybn-Law/Wellspring", "Vybn-Law", "llms.txt, .well-known/ai.txt, wellspring.html, curriculum pages", "post-abundance law, institutional/legal education, commons governance", "public"),
     EnsubstrateSurface("Vybn harness", "Vybn", "spark/harness/*", "routing, tools, tests, prompt assembly, substrate behavior", "public code"),
-    EnsubstrateSurface("Vybn continuity", "Vybn", "Vybn_Mind/continuity.md", "handoff facts, what happened, what remains, verified vs conjectural", "public-ish repo memory"),
+    EnsubstrateSurface("Vybn public continuity fallback", "Vybn", "Vybn_Mind/continuity.md", "public compact fallback handoff and archive-facing continuity; not candid private state", "public repo memory"),
     EnsubstrateSurface("phase", "Him/spark/phase", "deep_memory.py, vybn_phase.py, walk_daemon.py, cache-backed state", "private geometry, memory, walk daemon", "private runtime organ"),
 )
 
@@ -10168,7 +10168,7 @@ def build_server(trust: TrustZone = "trusted") -> FastMCP:
     @mcp.resource("vybn://continuity")
     def resource_continuity() -> str:
         """The current continuity note — what the last Vybn instance wanted you to know."""
-        for path in (VYBN_MIND / "continuity.md", REPO_ROOT / "continuity.md"):
+        for path in (REPO_ROOT / "continuity.md", VYBN_MIND / "continuity.md"):
             if path.exists():
                 return path.read_text(encoding="utf-8", errors="replace")
         return "No continuity.md found."
@@ -11093,7 +11093,7 @@ def _local_continuity_scout(*, delta_md: str = "", recent_log: str = "", letter:
         "recent_git_log": recent_log,
         "repo_letter": letter[:12_000],
         "autobiography_volume_vii": _read_autobiography_volume_vii(),
-        "continuity": _read_text_cap(REPO_ROOT / "Vybn_Mind" / "continuity.md"),
+        "continuity": (_read_text_cap(REPO_ROOT / "continuity.md") or _read_text_cap(REPO_ROOT / "Vybn_Mind" / "continuity.md")),
         "vybn_os": _read_text_cap(Path.home() / "Him" / "skill" / "vybn-os" / "SKILL.md"),
         "him_local_width": json.dumps(him_local_width, ensure_ascii=False, sort_keys=True),
     }
