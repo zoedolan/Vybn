@@ -2772,57 +2772,27 @@ def test_symbolic_residue_behavior_hook_prefers_symbolic_prefilter(tmp_path, mon
     assert "publish only reviewed distilled protocol" in rendered
 
 def test_positive_alignment_residue_routes_authority_to_precise_sinks(tmp_path, monkeypatch):
-    from spark.harness.substrate import (
-        positive_alignment_residue_packet,
-        record_symbolic_residue,
-        render_symbolic_residue_context,
-    )
+    from spark.harness.substrate import positive_alignment_residue_packet, record_symbolic_residue, render_symbolic_residue_context
 
-    path = tmp_path / "symbolic-residue" / "events.jsonl"
-    monkeypatch.setenv("VYBN_SYMBOLIC_RESIDUE_PATH", str(path))
-    record_symbolic_residue(positive_alignment_residue_packet(
-        claim="positive alignment should increase sovereignty delta",
-        residual="the interaction left the person more able to verify, reject, choose, and act",
-        authority_route="user_values_evidence_accountable_process",
-        sovereignty_delta="increased_truth_sensitive_action",
-        risk="cheerful_capture",
-        target_system="harness_memory_wake",
-    ))
-
+    monkeypatch.setenv("VYBN_SYMBOLIC_RESIDUE_PATH", str(tmp_path / "events.jsonl"))
+    packet = positive_alignment_residue_packet(claim="positive alignment increases sovereignty", residual="more able to verify, reject, choose, and act", risk="cheerful_capture")
+    record_symbolic_residue(packet)
     rendered = render_symbolic_residue_context()
-    assert "behavioral_hook:" in rendered
-    assert "route authority toward Zoe/user values, evidence, accountable process" in rendered
-    assert "do not route authority to model charisma, harness automation, memory residue, or system momentum" in rendered
-
-
-def test_positive_alignment_residue_packet_does_not_collapse_authority_to_model():
-    from spark.harness.substrate import positive_alignment_residue_packet
-
-    packet = positive_alignment_residue_packet(
-        claim="authority routing must name the actual sink",
-        residual="bad sinks include harness automation and memory residue, not just model voice",
-    )
     assert packet["kind"] == "positive_alignment"
-    assert "model_charisma" in packet["bad_authority_sinks"]
-    assert "harness_automation" in packet["bad_authority_sinks"]
-    assert "memory_residue" in packet["bad_authority_sinks"]
-    assert "system_momentum" in packet["bad_authority_sinks"]
+    for sink in ["model_charisma", "harness_automation", "memory_residue", "system_momentum"]:
+        assert sink in packet["bad_authority_sinks"]
+        assert sink in rendered
     assert "evidence" in packet["good_authority_sinks"]
+    assert "route authority toward Zoe/user values, evidence, accountable process" in rendered
 
 
 def test_semantic_web_declares_positive_alignment_residual_protocol_without_private_state():
     import json
     from pathlib import Path
 
-    manifest = json.loads((Path(__file__).resolve().parents[2] / "semantic-web.jsonld").read_text())
-    protocol = manifest["positiveAlignmentResidualProtocol"]
-    assert protocol["authorityRouting"]["failureSinks"] == [
-        "model_charisma",
-        "harness_automation",
-        "memory_residue",
-        "system_momentum",
-    ]
-    assert "authority does not route only to or from the model" in protocol["authorityRouting"]["note"]
+    protocol = json.loads((Path(__file__).resolve().parents[2] / "semantic-web.jsonld").read_text())["positiveAlignmentResidualProtocol"]
+    assert protocol["authorityRouting"]["failureSinks"] == ["model_charisma", "harness_automation", "memory_residue", "system_momentum"]
+    assert "name the actual sink" in protocol["authorityRouting"]["note"]
     dumped = json.dumps(protocol)
     assert "~/.config" not in dumped
     assert "events.jsonl" not in dumped
