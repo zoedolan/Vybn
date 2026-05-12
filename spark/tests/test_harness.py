@@ -2726,3 +2726,47 @@ def test_symbolic_residue_induces_trajectory_rules_without_private_leakage(tmp_p
         assert expected in rendered
     assert "operational coordinate" not in rendered
     assert "hidden topology" not in rendered
+
+def test_symbolic_residue_context_includes_behavior_hook(tmp_path, monkeypatch):
+    from spark.harness.substrate import (
+        record_symbolic_residue,
+        render_symbolic_residue_context,
+        symbolic_residue_packet,
+    )
+
+    path = tmp_path / "symbolic-residue" / "events.jsonl"
+    monkeypatch.setenv("VYBN_SYMBOLIC_RESIDUE_PATH", str(path))
+    record_symbolic_residue(symbolic_residue_packet(
+        kind="safety",
+        claim="co-protection catches coordinate leaks before Zoe has to notice",
+        action="replace coordinates with role placeholders",
+        residual="membrane first",
+        outcome="meaningful_advance",
+        membrane="private_local",
+    ))
+    rendered = render_symbolic_residue_context()
+    assert "behavioral_hook:" in rendered
+    assert "before public or tracked output" in rendered
+    assert "coordinates, secrets, topology" in rendered
+
+
+def test_symbolic_residue_behavior_hook_prefers_symbolic_prefilter(tmp_path, monkeypatch):
+    from spark.harness.substrate import (
+        record_symbolic_residue,
+        render_symbolic_residue_context,
+        symbolic_residue_packet,
+    )
+
+    path = tmp_path / "symbolic-residue" / "events.jsonl"
+    monkeypatch.setenv("VYBN_SYMBOLIC_RESIDUE_PATH", str(path))
+    record_symbolic_residue(symbolic_residue_packet(
+        kind="research",
+        claim="symbolic residue should shape semantic-web projection",
+        action="private symbolic constraints prefilter neural expansion",
+        residual="public projection only after membrane review",
+        outcome="meaningful_advance",
+        membrane="private_local",
+    ))
+    rendered = render_symbolic_residue_context()
+    assert "let private symbolic constraints prefilter" in rendered
+    assert "publish only reviewed distilled protocol" in rendered
