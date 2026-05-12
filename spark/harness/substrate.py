@@ -9082,6 +9082,17 @@ def extract_fetch_text(content: str, content_type: str) -> str:
     return "\n".join(parts)
 
 
+
+def _safe_fetch_content_type_allowed(url: str, content_type: str) -> bool:
+    from urllib.parse import urlparse
+    ctype = (content_type or "").split(";", 1)[0].strip().lower()
+    host = (urlparse(url).hostname or "").lower()
+    return (
+        ctype.startswith("text/")
+        or ctype in {"application/json", "application/ld+json"}
+        or (host == "export.arxiv.org" and ctype in {"application/atom+xml", "application/xml", "text/xml"})
+    )
+
 def safe_fetch(url: str, *, allowed_hosts: Iterable[str] | None = None, timeout: float = 12.0, max_bytes: int = 300000, max_redirects: int = 4) -> FetchResult:
     current = validate_fetch_url(url, allowed_hosts)
     opener = urllib.request.build_opener(NoRedirect, urllib.request.ProxyHandler({}))
@@ -9099,7 +9110,7 @@ def safe_fetch(url: str, *, allowed_hosts: Iterable[str] | None = None, timeout:
         with resp:
             final = validate_fetch_url(resp.geturl(), allowed_hosts)
             ctype = resp.headers.get("content-type", "")
-            if not any(ctype.lower().startswith(p) for p in ALLOWED_CONTENT_PREFIXES):
+            if not _safe_fetch_content_type_allowed(url, ctype):
                 raise ValueError("refused: unsupported content type " + ctype)
             body = resp.read(max_bytes + 1)
             if len(body) > max_bytes:
