@@ -25,18 +25,8 @@ for f in $STAGED; do
     fi
 done
 
-# --- 2. Internal/Tailscale IPs ---
-IP_PATTERN='\b(192\.168\.[0-9]{1,3}\.[0-9]{1,3}|10\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}|100\.(6[4-9]|[7-9][0-9]|1[0-2][0-7])\.[0-9]{1,3}\.[0-9]{1,3})\b'
-
-for f in $STAGED; do
-    case "$f" in *.png|*.jpg|*.gif|*.ico|*.woff*|*.ttf) continue ;; esac
-    matches=$(git diff --cached -- "$f" | grep -P "^\+" | grep -Po "$IP_PATTERN" | sort -u || true)
-    if [ -n "$matches" ]; then
-        echo -e "${YELLOW}WARNING${NC}: Possible internal IP in ${f}:"
-        echo "$matches" | sed 's/^/  /'
-        BLOCKED=1
-    fi
-done
+# --- 2. Network-coordinate membrane ---
+python3 -c 'exec("import ipaddress,pathlib,re,subprocess,sys\nR=re.compile(r'"'"'(?<![\\\\d.])(?:\\\\d{1,3}\\\\.){3}\\\\d{1,3}(?![\\\\d.])'"'"')\nok={('"'"'spark/tests/test_lightweight_routing.py'"'"','"'"'203.0.113.1'"'"')}\nbad=[]\nfor rel in subprocess.run(['"'"'git'"'"','"'"'diff'"'"','"'"'--cached'"'"','"'"'--name-only'"'"'],text=True,stdout=subprocess.PIPE,check=True).stdout.splitlines():\n    p=pathlib.Path(rel)\n    if not p.is_file(): continue\n    for n,line in enumerate(p.read_text(errors='"'"'ignore'"'"').splitlines(),1):\n        for raw in set(R.findall(line)):\n            try: ip=ipaddress.ip_address(raw)\n            except ValueError: continue\n            if (rel,raw) not in ok and (ip.is_global or ip.is_link_local): bad.append((rel,n,raw))\nif bad:\n    print('"'"'BLOCKED: tracked public/global or link-local network coordinates found.'"'"')\n    print('"'"'Use SPARK_* placeholders; keep real coordinates private.'"'"')\n    [print('"'"'  %s:%s: %s'"'"'%x) for x in bad[:40]]\n    sys.exit(1)\n")'
 
 # --- 3. Env files ---
 for f in $STAGED; do

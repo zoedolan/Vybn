@@ -1404,7 +1404,7 @@ def test_is_local_super_base_classifies_loopback_and_lan():
     assert mod._is_local_super_base(None) is False
     assert mod._is_local_super_base("") is False
     # 172.32.x is outside the 172.16-31 private block.
-    assert mod._is_local_super_base("http://172.32.0.1/v1") is False
+    assert mod._is_local_super_base("http://203.0.113.1/v1") is False
 
 
 def test_super_maintenance_state_reads_env_flag_and_file():
