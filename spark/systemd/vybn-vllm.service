@@ -9,14 +9,14 @@ StartLimitBurst=5
 [Service]
 Type=simple
 WorkingDirectory=%h/spark-vllm-docker
-ExecStartPre=/bin/bash -c '%h/spark-vllm-docker/launch-cluster.sh -n 169.254.246.181,169.254.51.101 stop || true'
+ExecStartPre=/bin/bash -c '%h/spark-vllm-docker/launch-cluster.sh -n SPARK_HEAD_LINK_LOCAL,SPARK_PEER_LINK_LOCAL stop || true'
 Environment=VYBN_VLLM_GPU_MEMORY_UTILIZATION=0.72
 Environment=VYBN_VLLM_MAX_NUM_SEQS=4
 Environment=VYBN_VLLM_EXTRA_ARGS=
 Environment=VLLM_SERVER_DEV_MODE=0
 EnvironmentFile=-%h/.config/vybn/vllm.env
 ExecStart=/bin/bash %h/Vybn/spark/systemd/vllm-exec.sh
-ExecStop=/bin/bash -c '%h/spark-vllm-docker/launch-cluster.sh -n 169.254.246.181,169.254.51.101 stop || true'
+ExecStop=/bin/bash -c '%h/spark-vllm-docker/launch-cluster.sh -n SPARK_HEAD_LINK_LOCAL,SPARK_PEER_LINK_LOCAL stop || true'
 Restart=always
 RestartSec=30
 TimeoutStartSec=1200

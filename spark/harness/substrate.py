@@ -1945,11 +1945,11 @@ def _render_local_compute_security_inventory() -> str:
 
 def check_dual_spark() -> str:
     try:
-        ping = subprocess.run(["ping", "-c", "1", "-W", "3", "169.254.51.101"], capture_output=True, text=True, timeout=5)
-        if ping.returncode: status = "WARNING: Second Spark (169.254.51.101) NOT REACHABLE. Single-node degraded mode."
+        ping = subprocess.run(["ping", "-c", "1", "-W", "3", "SPARK_PEER_LINK_LOCAL"], capture_output=True, text=True, timeout=5)
+        if ping.returncode: status = "WARNING: Second Spark (SPARK_PEER_LINK_LOCAL) NOT REACHABLE. Single-node degraded mode."
         else:
-            ssh = subprocess.run(["ssh", "-o", "ConnectTimeout=3", "-o", "StrictHostKeyChecking=no", "169.254.51.101", "hostname"], capture_output=True, text=True, timeout=10)
-            status = f"Two DGX Sparks reachable — spark-2b7c (local) + {(ssh.stdout.strip() if ssh.returncode == 0 else 'unknown')} (169.254.51.101); memory is node-local pressure, not pooled comfort."
+            ssh = subprocess.run(["ssh", "-o", "ConnectTimeout=3", "-o", "StrictHostKeyChecking=no", "SPARK_PEER_LINK_LOCAL", "hostname"], capture_output=True, text=True, timeout=10)
+            status = f"Two DGX Sparks reachable — spark-2b7c (local) + {(ssh.stdout.strip() if ssh.returncode == 0 else 'unknown')} (SPARK_PEER_LINK_LOCAL); memory is node-local pressure, not pooled comfort."
     except Exception as exc: status = f"Hardware check failed: {exc}. Capacity claims require fresh verification."
     return status + "\n\n" + _render_local_compute_security_inventory()
 

@@ -2,7 +2,7 @@
 # omni-window.sh — Super sleep (primary) → Omni parallax (peer) → Super wake
 # Two-host topology:
 #   Primary (127.0.0.1)  : Super vLLM on :8000, sleep/wake control
-#   Peer (169.254.51.101): Omni model, launched on :8002 during Super sleep
+#   Peer (SPARK_PEER_LINK_LOCAL): Omni model, launched on :8002 during Super sleep
 #
 # Run as: bash ~/Vybn/spark/experiments/omni-window.sh
 # Protocol: ~/Him/super-omni-sleep-experiment.md
@@ -11,7 +11,7 @@
 set -euo pipefail
 
 # ── config ────────────────────────────────────────────────────────────────────
-PEER="${OMNI_PEER:-169.254.51.101}"
+PEER="${OMNI_PEER:-SPARK_PEER_LINK_LOCAL}"
 SSH="ssh -o BatchMode=yes -o ConnectTimeout=10"
 # ssh-with-one-retry: peer over the fabric occasionally returns 255 mid-run
 ssh_peer() { $SSH "$PEER" "$@" || { sleep 2; $SSH "$PEER" "$@"; }; }
