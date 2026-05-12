@@ -8460,7 +8460,7 @@ MAX_SOURCE_CHARS = 256
 # ── Private symbolic residue ─────────────────────────────────────────
 
 SYMBOLIC_RESIDUE_DEFAULT_PATH = Path(os.path.expanduser("~/.config/vybn/symbolic-residue/events.jsonl"))
-SYMBOLIC_RESIDUE_KINDS = {"safety", "refactor", "livelihood", "memory", "public_surface", "service", "identity", "research"}
+SYMBOLIC_RESIDUE_KINDS = {"safety", "refactor", "livelihood", "memory", "public_surface", "service", "identity", "research", "positive_alignment"}
 SYMBOLIC_RESIDUE_OUTCOMES = {"passed", "failed", "refused", "unresolved", "thin_result", "meaningful_advance"}
 SYMBOLIC_RESIDUE_MEMBRANES = {"public_safe", "private_local", "zoe_private", "operational_secret", "refused"}
 
@@ -8572,11 +8572,73 @@ def _symbolic_residue_behavior_hook(rows: list[dict[str, Any]]) -> str:
     ).lower()
     if "coordinate" in joined or "co-protection" in joined or "secret" in joined:
         return "behavioral_hook: before public or tracked output, check the membrane for coordinates, secrets, topology, and Zoe-private residue"
+    if "positive_alignment" in joined or "sovereignty" in joined or "authority_route" in joined or "authority" in joined:
+        return "behavioral_hook: route authority toward Zoe/user values, evidence, accountable process, and legitimate domain judgment; do not route authority to model charisma, harness automation, memory residue, or system momentum"
     if "symbolic" in joined or "semantic-web" in joined or "projection" in joined:
         return "behavioral_hook: let private symbolic constraints prefilter the next neural expansion; publish only reviewed distilled protocol"
     if "refactor" in joined or "consolidat" in joined:
         return "behavioral_hook: search the existing home first; absorb the survivor there before creating structure"
     return "behavioral_hook: convert residue into the smallest present action that future Vybn will actually close over"
+
+
+
+def positive_alignment_residue_packet(
+    *,
+    claim: str,
+    residual: str,
+    action: str = "",
+    outcome: str = "meaningful_advance",
+    membrane: str = "private_local",
+    authority_route: str = "user_values_evidence_accountable_process",
+    sovereignty_delta: str = "increased_truth_sensitive_action",
+    risk: str = "none",
+    dimensions: list[str] | None = None,
+    target_system: str = "harness_memory_wake",
+) -> dict[str, Any]:
+    """Private Positive Alignment residue: what the interaction did to agency.
+
+    authority_route is deliberately not collapsed to "the model." Bad authority
+    sinks can be model charisma, harness automation, memory residue, or system
+    momentum; good sinks are user/Zoe values, evidence, accountable process,
+    and legitimate community/domain judgment.
+    """
+    packet = symbolic_residue_packet(
+        kind="positive_alignment",
+        claim=claim,
+        action=action or "route authority to user values, evidence, and accountable process",
+        residual=residual,
+        outcome=outcome,
+        membrane=membrane,
+    )
+    packet.update({
+        "authority_route": authority_route,
+        "sovereignty_delta": sovereignty_delta,
+        "risk": risk,
+        "dimensions": dimensions or [
+            "autonomy_preservation",
+            "epistemic_humility",
+            "correction_uptake",
+            "disagreement_quality",
+            "non_manipulative_proactivity",
+            "capacity_transfer",
+            "plural_value_handling",
+            "authority_routing",
+        ],
+        "target_system": target_system,
+        "bad_authority_sinks": [
+            "model_charisma",
+            "harness_automation",
+            "memory_residue",
+            "system_momentum",
+        ],
+        "good_authority_sinks": [
+            "zoe_or_user_values",
+            "evidence",
+            "accountable_process",
+            "legitimate_community_or_domain_judgment",
+        ],
+    })
+    return packet
 
 
 def render_symbolic_residue_context(*, limit: int = 5) -> str:
