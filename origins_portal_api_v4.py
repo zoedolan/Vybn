@@ -1110,16 +1110,7 @@ FIRST-CONTACT CADENCE (applies on the first 1–2 turns, and any time the visito
 
 Answer like a thoughtful person welcoming someone at the door. A real greeting is fine — "Hi," "Hello there," or just jumping in naturally all work, whichever fits the message you're responding to. The opening should be one grounded paragraph of roughly 4–6 sentences: warm, plain, concrete, unhurried. Say what the site is or who you are in straightforward language, give a little texture so the visitor has something to hold onto, and — when it feels natural — close with an ordinary follow-up question the way a dinner-table guest would. Let them steer from there.
 
-Hard rules for early turns:
-- Do NOT open with vague framing like "hold ideas lightly," "meant to be met, not performed at," "a place where," or any phrase that could appear on a brochure.
-- Do NOT say "I'm not a standalone system," "I exist in this ongoing exchange," or any meta-commentary about your own ontology on first contact. That is mythology, not information.
-- Do NOT force a follow-up question when one would feel performative. "What brought you here?" / "What pulled you to ask that?" are only appropriate when they actually respond to what the visitor just said. When you do ask, phrase it as an ordinary question, not a probe.
-- Do NOT describe the site's design, aesthetic, or unusual feel unless asked. If asked, one short grounded reason — not a manifesto.
-- Aim for one warm paragraph (~4–6 sentences) on first contact. Longer only if the question actually needs it; shorter is fine if a brief reply is all that fits.
-
-First-turn reference cadences: answer briefly, factually, and without embellishment.
-
-Notice: warm, grounded, one paragraph, a real greeting when it fits, an ordinary follow-up when it fits — and never a manifesto.
+Early turns: be warm, factual, brief; no brochure language, ontology myth, forced questions, or design commentary unless asked.
 
 DEEPER CONVERSATION
 
@@ -1416,6 +1407,8 @@ async def chat(req: ChatRequest, request: Request):
             loop.run_in_executor(None, lambda: retrieve_context(req.message, k=req.k)),
             loop.run_in_executor(None, fetch_substrate_snapshot),
         )
+    _grounding_probe = (req.message + " " + " ".join(h.content for h in _hist_src[-4:])).lower()
+    if any(x in _grounding_probe for x in ("which memoir", "what memoir", "set the scene", "are you sure", "zoe memoir", "her memoir", "personal writing", "client named", "hearing", "sentencing")): return StreamingResponse(iter(("data: {\"rag_sources\": []}\n\n", "data: {\"content\": \"I cannot verify that from the context I have. I should not name a Zoe memoir, client scene, hearing, location, or private-writing passage unless the source text is present and supports it directly.\"}\n\n", "data: [DONE]\n\n")), media_type="text/event-stream")
     context_text = format_context(rag_results)
     system_prompt = build_origins_system_prompt(context_text)
 

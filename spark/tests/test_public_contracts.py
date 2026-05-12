@@ -146,3 +146,8 @@ def test_origins_prompt_blocks_zoe_memoir_fabrication_laundering():
     assert "Never invent a scene, title, client, hearing, date, quote" in text
     assert "true to the spirit" in text
     assert "I cannot verify that from the context I have." in text
+
+def test_origins_chat_has_deterministic_zoe_source_scene_guard():
+    text = (ROOT / "origins_portal_api_v4.py").read_text(encoding="utf-8")
+    assert "I cannot verify that from the context I have." in text and "client scene, hearing, location" in text
+    assert "which memoir" in text and "StreamingResponse(iter" in text
