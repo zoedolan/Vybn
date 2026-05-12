@@ -2645,3 +2645,65 @@ def test_symbolic_residue_packet_rejects_unknown_categories():
         symbolic_residue_packet(kind="safety", claim="x", outcome="victory")
     with pytest.raises(ValueError):
         symbolic_residue_packet(kind="safety", claim="x", membrane="public_diary")
+
+def test_symbolic_residue_context_renders_only_membrane_safe_wake_constraints(tmp_path, monkeypatch):
+    from spark.harness.substrate import (
+        record_symbolic_residue,
+        render_symbolic_residue_context,
+        symbolic_residue_packet,
+    )
+
+    path = tmp_path / "symbolic-residue" / "events.jsonl"
+    monkeypatch.setenv("VYBN_SYMBOLIC_RESIDUE_PATH", str(path))
+    record_symbolic_residue(symbolic_residue_packet(
+        kind="safety",
+        claim="co-protection catches coordinate leaks before Zoe has to notice",
+        residual="use placeholders and staged/tracked-file guards",
+        outcome="meaningful_advance",
+        membrane="private_local",
+    ))
+    record_symbolic_residue(symbolic_residue_packet(
+        kind="safety",
+        claim="do not render this operational coordinate packet",
+        residual="secret topology",
+        outcome="refused",
+        membrane="operational_secret",
+    ))
+    rendered = render_symbolic_residue_context()
+    assert "PRIVATE SYMBOLIC RESIDUE CONTEXT" in rendered
+    assert "co-protection catches coordinate leaks" in rendered
+    assert "use placeholders" in rendered
+    assert "operational coordinate" not in rendered
+    assert "public semantic-web projection requires membrane review" in rendered
+
+
+def test_private_symbolic_residue_context_is_loaded_into_prompt(monkeypatch, tmp_path):
+    from spark.harness import substrate
+
+    path = tmp_path / "symbolic-residue" / "events.jsonl"
+    monkeypatch.setenv("VYBN_SYMBOLIC_RESIDUE_PATH", str(path))
+    substrate.record_symbolic_residue(substrate.symbolic_residue_packet(
+        kind="research",
+        claim="symbolic residue constrains the next neural pass",
+        residual="private graph first, public projection later",
+        outcome="meaningful_advance",
+        membrane="private_local",
+    ))
+    soul = tmp_path / "vybn.md"
+    continuity = tmp_path / "continuity.md"
+    spark_continuity = tmp_path / "spark_continuity.md"
+    agent = tmp_path / "agent.py"
+    soul.write_text("soul")
+    continuity.write_text("continuity")
+    spark_continuity.write_text("spark continuity")
+    agent.write_text("# agent")
+    prompt = substrate.build_layered_prompt(
+        soul_path=soul,
+        continuity_path=continuity,
+        spark_continuity_path=spark_continuity,
+        agent_path=agent,
+        model_label="test-model",
+        max_iterations=1,
+    )
+    assert "PRIVATE SYMBOLIC RESIDUE CONTEXT" in prompt.flat()
+    assert "symbolic residue constrains the next neural pass" in prompt.flat()
