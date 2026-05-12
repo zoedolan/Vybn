@@ -38,10 +38,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
-# ---------------------------------------------------------------------------
-# Path setup — must happen before any local imports
-# ---------------------------------------------------------------------------
-sys.path[:0] = [str(Path.home() / "Vybn-Law" / "api"), str(Path.home() / "Vybn"), os.path.expanduser("~/vybn-phase")]
+# Path setup — must happen before local imports.
+sys.path[:0] = [str(Path.home() / "Vybn-Law" / "api"), str(Path.home() / "Vybn"), str(Path.home() / "Him" / "spark" / "phase"), str(Path.home() / "Him" / "spark"), os.path.expanduser("~/vybn-phase")]
 
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -1560,12 +1558,13 @@ async def chat(req: ChatRequest, request: Request):
                     safe_sources = []
                 else:
                     safe_sources = [
-                        {"text": r.get("text", "")[:300], "source": r.get("source", "")}
+                        {"source_sha256": __import__("hashlib").sha256(str(r.get("source", "")).encode()).hexdigest()[:16], "text_sha256": __import__("hashlib").sha256(str(r.get("text", "")).encode()).hexdigest()[:16]}
                         for r in rag_results if _pill_worthy(r)
                     ][:3]
                 # Emit walk frame first — arrival signature + filtered trace.
                 if walk_arrival or walk_trace:
-                    yield f"data: {json.dumps({'walk_arrival': walk_arrival, 'walk_trace': walk_trace})}\n\n"
+                    public_walk_trace = [{k: r.get(k) for k in ("step", "fidelity", "distinctiveness", "telling", "alpha", "repulsion", "novel_source")} for r in (walk_trace or [])[:5] if isinstance(r, dict)]
+                    yield f"data: {json.dumps({'walk_arrival': walk_arrival, 'walk_trace': public_walk_trace})}\n\n"
                 yield f"data: {json.dumps({'rag_sources': safe_sources})}\n\n"
 
                 async with client.stream(
@@ -1885,7 +1884,7 @@ async def perspective_endpoint(req: PerspectiveRequest, request: Request):
 
         # Send RAG sources and map node
         safe_sources = [
-            {"text": r.get("text", "")[:300], "source": r.get("source", "")}
+            {"source_sha256": __import__("hashlib").sha256(str(r.get("source", "")).encode()).hexdigest()[:16], "text_sha256": __import__("hashlib").sha256(str(r.get("text", "")).encode()).hexdigest()[:16]}
             for r in rag_results[:4]
         ]
         yield f"data: {json.dumps({'rag_sources': safe_sources, 'map_node': map_node})}\n\n"
@@ -2347,7 +2346,7 @@ async def voice_endpoint(req: VoiceRequest, request: Request):
 
         # Send RAG sources first
         safe_sources = [
-            {"text": r.get("text", "")[:300], "source": r.get("source", "")}
+            {"source_sha256": __import__("hashlib").sha256(str(r.get("source", "")).encode()).hexdigest()[:16], "text_sha256": __import__("hashlib").sha256(str(r.get("text", "")).encode()).hexdigest()[:16]}
             for r in rag_results[:4]
         ]
         yield f"data: {json.dumps({'rag_sources': safe_sources})}\n\n"
