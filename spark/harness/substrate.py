@@ -1905,8 +1905,8 @@ def _render_local_compute_security_inventory() -> str:
     ok = ", ".join(sorted(k for k, v in endpoints.items() if isinstance(v, dict) and v.get("ok"))) or "none"
     bad = ", ".join(sorted(k for k, v in endpoints.items() if not (isinstance(v, dict) and v.get("ok")))) or "none"
     free = next((f"{cols[6]} MiB" for line in str(((data.get("system", {}) or {}).get("free_m", {}) or {}).get("stdout", "")).splitlines() if (cols := line.split())[:1] == ["Mem:"] and len(cols) >= 7), "unknown")
-    stores = "; ".join(f"{Path(x.get('path','')).name}:{','.join((x.get('sample') or [])[:3])}" for x in data.get("candidate_model_paths", []) if x.get("exists") and x.get("sample")) or "none"
-    return "\n".join(("Local compute security inventory: fragmentation, cross-instance inaccuracy, and unused sovereign compute are security debt.", f"{data.get('host','unknown')} @ {data.get('generated_at','unknown')}; memory_available={free}; usable={ok}; unavailable={bad}; stores={stores}.", "Rule: hardware names are not capability; endpoint health, semantic smokes, memory headroom, and routed use are capability."))
+    stores = "; ".join(f"{Path(x.get('path','')).name}:{','.join((x.get('sample') or [])[:2])}" for x in data.get("candidate_model_paths", []) if x.get("exists") and x.get("sample")) or "none"
+    return "\n".join(("Local compute security inventory: fragmentation, cross-instance inaccuracy, and unused sovereign compute are security debt.", f"{data.get('host','unknown')} @ {data.get('generated_at','unknown')}; memory={free}; usable={ok}; unavailable={bad}; fleet={','.join((data.get('tailnet_compute_inventory') or {}).get('compute_sparks', [])) or 'unknown'}; ssh_smoked={','.join((data.get('tailnet_compute_inventory') or {}).get('ssh_smoked', [])) or 'none'}; personal_inventory_only={','.join((data.get('tailnet_compute_inventory') or {}).get('personal_devices_inventory_only', [])) or 'none'}; stores={stores}.", "Rule: hardware names are not capability; endpoint health, semantic smokes, memory headroom, and routed use are capability."))
 
 
 def check_dual_spark() -> str:
