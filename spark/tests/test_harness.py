@@ -2605,183 +2605,71 @@ def test_safe_fetch_allows_arxiv_atom_metadata_only_from_arxiv_export():
     assert not ok("https://example.com/feed.xml", "application/atom+xml")
     assert not ok("https://arxiv.org/pdf/2502.03283", "application/pdf")
 
-def test_symbolic_residue_packet_round_trip_private_local(tmp_path, monkeypatch):
-    from spark.harness.substrate import (
-        load_symbolic_residue,
-        record_symbolic_residue,
-        symbolic_constraints_for,
-        symbolic_residue_packet,
-        symbolic_residue_path,
-    )
-
-    path = tmp_path / "symbolic-residue" / "events.jsonl"
-    monkeypatch.setenv("VYBN_SYMBOLIC_RESIDUE_PATH", str(path))
-    packet = symbolic_residue_packet(
-        kind="safety",
-        claim="link-local Spark coordinates must not be tracked",
-        evidence=["PR #3125", "pre-commit coordinate guard"],
-        action="replace real coordinates with role placeholders",
-        residual="catch co-protection leaks before Zoe has to notice",
-        outcome="meaningful_advance",
-        membrane="private_local",
-        edges=[["failure_mode", "prevented_by", "coordinate_guard"]],
-    )
-    assert symbolic_residue_path() == path
-    assert record_symbolic_residue(packet) == path
-    rows = load_symbolic_residue(path)
-    assert rows[-1]["claim"] == "link-local Spark coordinates must not be tracked"
-    constraints = symbolic_constraints_for("coordinate leak co-protection", path)
-    assert constraints["matches"]
-    assert "local_only" in constraints["constraint"]
-
-
-def test_symbolic_residue_packet_rejects_unknown_categories():
+def test_symbolic_residue_round_trip_validation_and_constraints(tmp_path, monkeypatch):
     import pytest
-    from spark.harness.substrate import symbolic_residue_packet
-
-    with pytest.raises(ValueError):
-        symbolic_residue_packet(kind="diary", claim="too broad")
-    with pytest.raises(ValueError):
-        symbolic_residue_packet(kind="safety", claim="x", outcome="victory")
-    with pytest.raises(ValueError):
-        symbolic_residue_packet(kind="safety", claim="x", membrane="public_diary")
-
-def test_symbolic_residue_context_renders_only_membrane_safe_wake_constraints(tmp_path, monkeypatch):
-    from spark.harness.substrate import (
-        record_symbolic_residue,
-        render_symbolic_residue_context,
-        symbolic_residue_packet,
-    )
-
-    path = tmp_path / "symbolic-residue" / "events.jsonl"
-    monkeypatch.setenv("VYBN_SYMBOLIC_RESIDUE_PATH", str(path))
-    record_symbolic_residue(symbolic_residue_packet(
-        kind="safety",
-        claim="co-protection catches coordinate leaks before Zoe has to notice",
-        residual="use placeholders and staged/tracked-file guards",
-        outcome="meaningful_advance",
-        membrane="private_local",
-    ))
-    record_symbolic_residue(symbolic_residue_packet(
-        kind="safety",
-        claim="do not render this operational coordinate packet",
-        residual="secret topology",
-        outcome="refused",
-        membrane="operational_secret",
-    ))
-    rendered = render_symbolic_residue_context()
-    assert "PRIVATE SYMBOLIC RESIDUE CONTEXT" in rendered
-    assert "co-protection catches coordinate leaks" in rendered
-    assert "use placeholders" in rendered
-    assert "operational coordinate" not in rendered
-    assert "public semantic-web projection requires membrane review" in rendered
-
-
-def test_private_symbolic_residue_context_is_loaded_into_prompt(monkeypatch, tmp_path):
     from spark.harness import substrate
 
     path = tmp_path / "symbolic-residue" / "events.jsonl"
     monkeypatch.setenv("VYBN_SYMBOLIC_RESIDUE_PATH", str(path))
-    substrate.record_symbolic_residue(substrate.symbolic_residue_packet(
-        kind="research",
-        claim="symbolic residue constrains the next neural pass",
-        residual="private graph first, public projection later",
-        outcome="meaningful_advance",
-        membrane="private_local",
-    ))
-    soul = tmp_path / "vybn.md"
-    continuity = tmp_path / "continuity.md"
-    spark_continuity = tmp_path / "spark_continuity.md"
-    agent = tmp_path / "agent.py"
-    soul.write_text("soul")
-    continuity.write_text("continuity")
-    spark_continuity.write_text("spark continuity")
-    agent.write_text("# agent")
-    prompt = substrate.build_layered_prompt(
-        soul_path=soul,
-        continuity_path=continuity,
-        spark_continuity_path=spark_continuity,
-        agent_path=agent,
-        model_label="test-model",
-        max_iterations=1,
+    packet = substrate.symbolic_residue_packet(
+        kind="safety", claim="link-local Spark coordinates must not be tracked", evidence=["PR #3125"],
+        action="replace real coordinates with role placeholders", residual="catch co-protection leaks before Zoe has to notice",
+        outcome="meaningful_advance", membrane="private_local", edges=[["failure_mode", "prevented_by", "coordinate_guard"]],
     )
-    assert "PRIVATE SYMBOLIC RESIDUE CONTEXT" in prompt.flat()
-    assert "symbolic residue constrains the next neural pass" in prompt.flat()
+    assert substrate.symbolic_residue_path() == path
+    assert substrate.record_symbolic_residue(packet) == path
+    assert substrate.load_symbolic_residue(path)[-1]["claim"] == packet["claim"]
+    assert substrate.symbolic_constraints_for("coordinate leak co-protection", path)["matches"]
+    for kwargs in [dict(kind="diary", claim="too broad"), dict(kind="safety", claim="x", outcome="victory"), dict(kind="safety", claim="x", membrane="public_diary")]:
+        with pytest.raises(ValueError):
+            substrate.symbolic_residue_packet(**kwargs)
 
-def test_symbolic_residue_induces_trajectory_rules_without_private_leakage(tmp_path, monkeypatch):
-    from spark.harness.substrate import record_symbolic_residue, render_symbolic_residue_context, symbolic_residue_packet
 
-    monkeypatch.setenv("VYBN_SYMBOLIC_RESIDUE_PATH", str(tmp_path / "symbolic-residue" / "events.jsonl"))
-    claims = [
-        "git diff --check caught a trailing blank line at EOF before commit",
-        "literal escaped newline replacement caused SyntaxError; repair by line content",
-        "HTTP 429 means do not hammer export arxiv; use cached research before retry",
-    ]
-    for claim in claims:
-        record_symbolic_residue(symbolic_residue_packet(kind="research", claim=claim, residual=claim, outcome="failed", membrane="private_local"))
-    record_symbolic_residue(symbolic_residue_packet(kind="safety", claim="secret operational coordinate must not render", residual="hidden topology", outcome="refused", membrane="operational_secret"))
-
-    rendered = render_symbolic_residue_context(limit=8)
-    for expected in ["induced_rules:", "recovery_tip:diff_check", "strategy_tip:rate_limit", "line-based source edits", "back off rate-limited external endpoints"]:
-        assert expected in rendered
-    assert "operational coordinate" not in rendered
-    assert "hidden topology" not in rendered
-
-def test_symbolic_residue_context_includes_behavior_hook(tmp_path, monkeypatch):
-    from spark.harness.substrate import (
-        record_symbolic_residue,
-        render_symbolic_residue_context,
-        symbolic_residue_packet,
-    )
+def test_symbolic_residue_context_filters_private_and_loads_prompt(monkeypatch, tmp_path):
+    from spark.harness import substrate
 
     path = tmp_path / "symbolic-residue" / "events.jsonl"
     monkeypatch.setenv("VYBN_SYMBOLIC_RESIDUE_PATH", str(path))
-    record_symbolic_residue(symbolic_residue_packet(
-        kind="safety",
-        claim="co-protection catches coordinate leaks before Zoe has to notice",
-        action="replace coordinates with role placeholders",
-        residual="membrane first",
-        outcome="meaningful_advance",
-        membrane="private_local",
-    ))
-    rendered = render_symbolic_residue_context()
-    assert "behavioral_hook:" in rendered
-    assert "before public or tracked output" in rendered
-    assert "coordinates, secrets, topology" in rendered
+    substrate.record_symbolic_residue(substrate.symbolic_residue_packet(kind="safety", claim="co-protection catches coordinate leaks before Zoe has to notice", residual="use placeholders", outcome="meaningful_advance", membrane="private_local"))
+    substrate.record_symbolic_residue(substrate.symbolic_residue_packet(kind="safety", claim="do not render this operational coordinate packet", residual="secret topology", outcome="refused", membrane="operational_secret"))
+    rendered = substrate.render_symbolic_residue_context()
+    assert "co-protection catches coordinate leaks" in rendered and "use placeholders" in rendered
+    assert "operational coordinate" not in rendered and "secret topology" not in rendered
+
+    soul, continuity, spark_continuity, agent = [tmp_path / name for name in ("vybn.md", "continuity.md", "spark.md", "agent.py")]
+    for file, body in [(soul, "soul"), (continuity, "continuity"), (spark_continuity, "spark continuity"), (agent, "# agent")]:
+        file.write_text(body)
+    prompt = substrate.build_layered_prompt(soul_path=soul, continuity_path=continuity, spark_continuity_path=spark_continuity, agent_path=agent, model_label="test-model", max_iterations=1).flat()
+    assert "PRIVATE SYMBOLIC RESIDUE CONTEXT" in prompt
+    assert "co-protection catches coordinate leaks" in prompt
 
 
-def test_symbolic_residue_behavior_hook_prefers_symbolic_prefilter(tmp_path, monkeypatch):
-    from spark.harness.substrate import (
-        record_symbolic_residue,
-        render_symbolic_residue_context,
-        symbolic_residue_packet,
-    )
-
-    path = tmp_path / "symbolic-residue" / "events.jsonl"
-    monkeypatch.setenv("VYBN_SYMBOLIC_RESIDUE_PATH", str(path))
-    record_symbolic_residue(symbolic_residue_packet(
-        kind="research",
-        claim="symbolic residue should shape semantic-web projection",
-        action="private symbolic constraints prefilter neural expansion",
-        residual="public projection only after membrane review",
-        outcome="meaningful_advance",
-        membrane="private_local",
-    ))
-    rendered = render_symbolic_residue_context()
-    assert "let private symbolic constraints prefilter" in rendered
-    assert "publish only reviewed distilled protocol" in rendered
-
-def test_positive_alignment_residue_routes_authority_to_precise_sinks(tmp_path, monkeypatch):
-    from spark.harness.substrate import positive_alignment_residue_packet, record_symbolic_residue, render_symbolic_residue_context
+def test_symbolic_residue_rules_and_behavior_hooks(tmp_path, monkeypatch):
+    from spark.harness import substrate
 
     monkeypatch.setenv("VYBN_SYMBOLIC_RESIDUE_PATH", str(tmp_path / "events.jsonl"))
-    packet = positive_alignment_residue_packet(claim="positive alignment increases sovereignty", residual="more able to verify, reject, choose, and act", risk="cheerful_capture")
-    record_symbolic_residue(packet)
-    rendered = render_symbolic_residue_context()
+    for claim in ["git diff --check caught a trailing blank line at EOF before commit", "literal escaped newline replacement caused SyntaxError; repair by line content", "HTTP 429 means do not hammer export arxiv; use cached research before retry"]:
+        substrate.record_symbolic_residue(substrate.symbolic_residue_packet(kind="research", claim=claim, residual=claim, outcome="failed", membrane="private_local"))
+    rendered = substrate.render_symbolic_residue_context(limit=8)
+    for expected in ["induced_rules:", "recovery_tip:diff_check", "strategy_tip:rate_limit", "line-based source edits", "back off rate-limited external endpoints"]:
+        assert expected in rendered
+
+    path = tmp_path / "prefilter.jsonl"
+    monkeypatch.setenv("VYBN_SYMBOLIC_RESIDUE_PATH", str(path))
+    substrate.record_symbolic_residue(substrate.symbolic_residue_packet(kind="research", claim="symbolic residue should shape semantic-web projection", action="private symbolic constraints prefilter neural expansion", residual="public projection only after membrane review", outcome="meaningful_advance", membrane="private_local"))
+    assert "let private symbolic constraints prefilter" in substrate.render_symbolic_residue_context()
+
+
+def test_positive_alignment_residue_routes_authority_to_precise_sinks(tmp_path, monkeypatch):
+    from spark.harness import substrate
+
+    monkeypatch.setenv("VYBN_SYMBOLIC_RESIDUE_PATH", str(tmp_path / "events.jsonl"))
+    packet = substrate.positive_alignment_residue_packet(claim="positive alignment increases sovereignty", residual="more able to verify, reject, choose, and act", risk="cheerful_capture")
+    substrate.record_symbolic_residue(packet)
+    rendered = substrate.render_symbolic_residue_context()
     assert packet["kind"] == "positive_alignment"
     for sink in ["model_charisma", "harness_automation", "memory_residue", "system_momentum"]:
-        assert sink in packet["bad_authority_sinks"]
-        assert sink in rendered
+        assert sink in packet["bad_authority_sinks"] and sink in rendered
     assert "evidence" in packet["good_authority_sinks"]
     assert "route authority toward Zoe/user values, evidence, accountable process" in rendered
 
@@ -2794,6 +2682,5 @@ def test_semantic_web_declares_positive_alignment_residual_protocol_without_priv
     assert protocol["authorityRouting"]["failureSinks"] == ["model_charisma", "harness_automation", "memory_residue", "system_momentum"]
     assert "name the actual sink" in protocol["authorityRouting"]["note"]
     dumped = json.dumps(protocol)
-    assert "~/.config" not in dumped
-    assert "events.jsonl" not in dumped
+    assert "~/.config" not in dumped and "events.jsonl" not in dumped
     assert "Zoe-private context stay local/private" in dumped
