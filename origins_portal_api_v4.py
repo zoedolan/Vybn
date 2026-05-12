@@ -1407,8 +1407,7 @@ async def chat(req: ChatRequest, request: Request):
             loop.run_in_executor(None, lambda: retrieve_context(req.message, k=req.k)),
             loop.run_in_executor(None, fetch_substrate_snapshot),
         )
-    _grounding_probe = (req.message + " " + " ".join(h.content for h in _hist_src[-4:])).lower()
-    if any(x in _grounding_probe for x in ("which memoir", "what memoir", "set the scene", "are you sure", "zoe memoir", "her memoir", "personal writing", "client named", "hearing", "sentencing")): return StreamingResponse(iter(("data: {\"rag_sources\": []}\n\n", "data: {\"content\": \"I cannot verify that from the context I have. I should not name a Zoe memoir, client scene, hearing, location, or private-writing passage unless the source text is present and supports it directly.\"}\n\n", "data: [DONE]\n\n")), media_type="text/event-stream")
+    if sec.is_zoe_source_scene_request(req.message, _hist_src[-4:]): return StreamingResponse(iter(("data: {\"rag_sources\": []}\n\n", "data: "+json.dumps({"content": sec.zoe_source_scene_refusal_text()})+"\n\n", "data: [DONE]\n\n")), media_type="text/event-stream")
     context_text = format_context(rag_results)
     system_prompt = build_origins_system_prompt(context_text)
 

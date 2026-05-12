@@ -147,7 +147,10 @@ def test_origins_prompt_blocks_zoe_memoir_fabrication_laundering():
     assert "true to the spirit" in text
     assert "I cannot verify that from the context I have." in text
 
-def test_origins_chat_has_deterministic_zoe_source_scene_guard():
-    text = (ROOT / "origins_portal_api_v4.py").read_text(encoding="utf-8")
-    assert "I cannot verify that from the context I have." in text and "client scene, hearing, location" in text
-    assert "which memoir" in text and "StreamingResponse(iter" in text
+def test_origins_chat_uses_shared_zoe_source_scene_guard():
+    portal = (ROOT / "origins_portal_api_v4.py").read_text(encoding="utf-8")
+    legacy = (ROOT / "Origins/api/origins_chat_api.py").read_text(encoding="utf-8")
+    assert "sec.is_zoe_source_scene_request" in portal
+    assert "sec.zoe_source_scene_refusal_text()" in portal
+    assert "sec.is_zoe_source_scene_request" in legacy
+    assert "sec.zoe_source_scene_refusal_text()" in legacy

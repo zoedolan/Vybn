@@ -34,8 +34,10 @@ import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse
-
 import httpx
+
+sys.path.insert(0, str(Path.home() / "Vybn-Law" / "api"))
+import chat_security as sec
 
 # ── Paths ────────────────────────────────────────────────────────────────
 
@@ -439,6 +441,12 @@ async def chat(request: Request):
     page_content = load_page_content(relevant_pages) if relevant_pages else ""
 
     # Build messages
+    if sec.is_zoe_source_scene_request(user_msg, history):
+        async def source_guard():
+            yield "data: {\"rag_sources\": []}\\n\\n"
+            yield "data: "+json.dumps({"content": sec.zoe_source_scene_refusal_text()})+"\\n\\n"
+            yield "data: [DONE]\\n\\n"
+        return StreamingResponse(source_guard(), media_type="text/event-stream")
     messages = build_messages(user_msg, history, context, page_content)
 
     async def stream_response():
