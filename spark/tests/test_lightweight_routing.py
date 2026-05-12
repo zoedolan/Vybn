@@ -1730,8 +1730,8 @@ def test_loopback_super_semantic_gate_is_narrower_than_local_maintenance_gate():
     mod = _load_agent_module()
     assert mod._is_loopback_super_base("http://127.0.0.1:8000/v1") is True
     assert mod._is_loopback_super_base("http://localhost:8000/v1") is True
-    assert mod._is_loopback_super_base("http://169.254.51.101:8002/v1") is False
-    assert mod._is_local_super_base("http://169.254.51.101:8002/v1") is False
+    assert mod._is_loopback_super_base("http://example.invalid:8002/v1") is False
+    assert mod._is_local_super_base("http://example.invalid:8002/v1") is False
 
 
 def test_local_super_semantic_gate_rejects_empty_truncated_and_wrong_outputs(monkeypatch):

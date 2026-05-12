@@ -27,7 +27,7 @@
 set -euo pipefail
 
 CLUSTER="$HOME/spark-vllm-docker/launch-cluster.sh"
-NODES="169.254.246.181,169.254.51.101"
+NODES="SPARK_HEAD_LINK_LOCAL,SPARK_PEER_LINK_LOCAL"
 
 # Base cluster args (--apply-mod may be appended below)
 CLUSTER_ARGS=( -n "$NODES" )

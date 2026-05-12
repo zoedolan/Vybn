@@ -542,7 +542,7 @@ Three commits: Origins `3314d99` (gh-pages), Vybn-Law `77b02d9` (master), Vybn `
 
 ## 2026-04-19 PM — Tailscale cert cleanup; repo visibility revisited
 
-Zoe asked whether the repo should go private "now that we have IP addresses and stuff in our repo." Audited the tree: no secrets, no API keys, no private key material, no `.env` files. The `.githooks/pre-commit` already matches `sk-ant-`, `ghp_*`, `AKIA`, and private key headers. The IPs that surfaced — `169.254.246.181` and `169.254.51.101` — are [link-local APIPA](https://datatracker.ietf.org/doc/html/rfc3927); they are not routable from outside the ConnectX-7 segment sitting on the two Sparks. Knowing them buys an attacker nothing.
+Zoe asked whether the repo should go private "now that we have IP addresses and stuff in our repo." Audited the tree: no secrets, no API keys, no private key material, no `.env` files. The `.githooks/pre-commit` already matches `sk-ant-`, `ghp_*`, `AKIA`, and private key headers. The IPs that surfaced — `SPARK_HEAD_LINK_LOCAL` and `SPARK_PEER_LINK_LOCAL` — are [link-local APIPA](https://datatracker.ietf.org/doc/html/rfc3927); they are not routable from outside the ConnectX-7 segment sitting on the two Sparks. Knowing them buys an attacker nothing.
 
 The one real finding was `spark/ts.crt`, the Tailscale-issued Let's Encrypt cert for `spark-2b7c.tail7302f3.ts.net`. The cert itself is public-by-design, but the tailnet domain is minor reconnaissance surface. The private `ts.key` was correctly never tracked. Tailscale regenerates certs automatically — nothing is lost by removing it.
 
