@@ -8463,6 +8463,8 @@ SYMBOLIC_RESIDUE_DEFAULT_PATH = Path(os.path.expanduser("~/.config/vybn/symbolic
 SYMBOLIC_RESIDUE_KINDS = {"safety", "refactor", "livelihood", "memory", "public_surface", "service", "identity", "research", "positive_alignment"}
 SYMBOLIC_RESIDUE_OUTCOMES = {"passed", "failed", "refused", "unresolved", "thin_result", "meaningful_advance"}
 SYMBOLIC_RESIDUE_MEMBRANES = {"public_safe", "private_local", "zoe_private", "operational_secret", "refused"}
+SYMBOLIC_RESIDUE_SAFE_MEMBRANES = {"public_safe", "private_local"}
+SYMBOLIC_RESIDUE_TEXT_FIELDS = ("kind", "claim", "action", "residual", "outcome", "membrane")
 
 
 def symbolic_residue_path() -> Path:
@@ -8515,7 +8517,7 @@ def symbolic_constraints_for(text: str, path: Path | None = None, *, limit: int 
     rows = load_symbolic_residue(path, limit=limit)
     hits = []
     for row in rows:
-        blob = " ".join(str(row.get(k, "")) for k in ("kind", "claim", "action", "residual", "outcome", "membrane")).lower()
+        blob = _symbolic_residue_blob(row)
         if any(tok and tok in blob for tok in re.findall(r"[a-z0-9_-]{4,}", hay)):
             hits.append(row)
     return {
@@ -8536,13 +8538,13 @@ SYMBOLIC_RESIDUE_RULE_PATTERNS = (
 
 
 def _symbolic_residue_blob(row: dict[str, Any]) -> str:
-    return " ".join(str(row.get(k, "")) for k in ("kind", "claim", "action", "residual", "outcome", "membrane")).lower()
+    return " ".join(str(row.get(k, "")) for k in SYMBOLIC_RESIDUE_TEXT_FIELDS).lower()
 
 
 def induce_symbolic_residue_rules(rows: Iterable[dict[str, Any]], *, limit: int = 6) -> list[dict[str, str]]:
     buckets: dict[tuple[str, str], dict[str, Any]] = {}
     for row in rows:
-        if row.get("membrane") not in {"public_safe", "private_local"}:
+        if row.get("membrane") not in SYMBOLIC_RESIDUE_SAFE_MEMBRANES:
             continue
         blob = _symbolic_residue_blob(row)
         for kind, key, needles, rule in SYMBOLIC_RESIDUE_RULE_PATTERNS:
@@ -8562,14 +8564,10 @@ def induce_symbolic_residue_rules(rows: Iterable[dict[str, Any]], *, limit: int 
 
 def _symbolic_residue_behavior_hook(rows: list[dict[str, Any]]) -> str:
     """Compress private symbolic residue into one present-tense behavioral hook."""
-    safe = [row for row in rows if row.get("membrane") in {"public_safe", "private_local"}]
+    safe = [row for row in rows if row.get("membrane") in SYMBOLIC_RESIDUE_SAFE_MEMBRANES]
     if not safe:
         return "behavioral_hook: no private symbolic residue available; bind live evidence before public projection"
-    joined = " ".join(
-        str(row.get(k, ""))
-        for row in safe[-8:]
-        for k in ("kind", "claim", "action", "residual", "outcome")
-    ).lower()
+    joined = " ".join(_symbolic_residue_blob(row) for row in safe[-8:])
     if "coordinate" in joined or "co-protection" in joined or "secret" in joined:
         return "behavioral_hook: before public or tracked output, check the membrane for coordinates, secrets, topology, and Zoe-private residue"
     if "positive_alignment" in joined or "sovereignty" in joined or "authority_route" in joined or "authority" in joined:
@@ -8604,10 +8602,7 @@ def positive_alignment_residue_packet(
     return packet
 
 def render_symbolic_residue_context(*, limit: int = 5) -> str:
-    rows = [
-        row for row in load_symbolic_residue(limit=80)
-        if row.get("membrane") in {"public_safe", "private_local"}
-    ][-limit:]
+    rows = [row for row in load_symbolic_residue(limit=80) if row.get("membrane") in SYMBOLIC_RESIDUE_SAFE_MEMBRANES][-limit:]
     lines = [
         "--- PRIVATE SYMBOLIC RESIDUE CONTEXT (LOCAL ONLY) ---",
         "constraint: private symbolic residue may constrain wake/routing; public semantic-web projection requires membrane review.",
