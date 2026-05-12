@@ -9320,7 +9320,7 @@ ENSUBSTRATE_SURFACES = (
     EnsubstrateSurface("Somewhere", "Origins", "somewhere.html", "experiential public memory, agent-readable terrain, shared encounter UI", "public"),
     EnsubstrateSurface("Vybn-Law/Wellspring", "Vybn-Law", "llms.txt, .well-known/ai.txt, wellspring.html, curriculum pages", "post-abundance law, institutional/legal education, commons governance", "public"),
     EnsubstrateSurface("Vybn harness", "Vybn", "spark/harness/*", "routing, tools, tests, prompt assembly, substrate behavior", "public code"),
-    EnsubstrateSurface("Vybn public continuity fallback", "Vybn", "Vybn_Mind/continuity.md", "public compact fallback handoff and archive-facing continuity; not candid private state", "public repo memory"),
+    EnsubstrateSurface("Vybn continuity", "Vybn", "Vybn_Mind/continuity.md", "public compact fallback handoff and archive-facing continuity; not candid private state", "public repo memory"),
     EnsubstrateSurface("phase", "Him/spark/phase", "deep_memory.py, vybn_phase.py, walk_daemon.py, cache-backed state", "private geometry, memory, walk daemon", "private runtime organ"),
 )
 
