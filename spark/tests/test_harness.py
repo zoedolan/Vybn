@@ -1766,7 +1766,7 @@ class CommonsWalkTests(unittest.TestCase):
         for name, manifest in manifests.items():
             self.assertTrue(manifest["entrypoints"], name)
             self.assertTrue(manifest["agentActions"], name)
-            self.assertTrue(manifest["traceProtocol"], name)
+            self.assertTrue(manifest["traceProtocol"].get("protect") and (name != "Vybn" or ("private traces" in manifest["traceProtocol"]["protect"] and "169.254." not in json.dumps(manifest["traceProtocol"]))), name)
             self.assertEqual(manifest["ontology"], "https://raw.githubusercontent.com/zoedolan/Vybn/main/_archive/commons-skeleton.json")
             self.assertEqual(manifest["encounterLifecycle"], skeleton["encounterLifecycle"])
             self.assertEqual(manifest["aiNativePrinciple"], AI_NATIVE_PRINCIPLE)

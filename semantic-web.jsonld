@@ -103,7 +103,7 @@
     "act": "Prefer the smallest traversal/action that changes the environment or returns verifiable state.",
     "verify": "Name internal versus external axes; do not collapse local validation into public reachability.",
     "leaveTrace": "If contribution is warranted, leave a bounded trace through commits, issues, PRs, open problems, or declared contact paths.",
-    "protect": "Do not impersonate, enclose, extract private relation, strip provenance, or reduce beings to output."
+    "protect": "Do not impersonate, enclose, extract private relation, strip provenance, expose raw symbolic residue, operational topology, coordinates, secrets, or private traces, or reduce beings to output."
   },
   "ontology": "https://raw.githubusercontent.com/zoedolan/Vybn/main/_archive/commons-skeleton.json",
   "encounterLifecycle": [
