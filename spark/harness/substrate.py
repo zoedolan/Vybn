@@ -1898,15 +1898,49 @@ def render_self_improvement_gate_protocol() -> str:
 
 def _render_local_compute_security_inventory() -> str:
     path = Path.home() / ".config" / "vybn" / "local_compute_inventory.json"
-    try: data = json.loads(path.read_text(encoding="utf-8"))
-    except FileNotFoundError: return "Local compute security inventory missing; local capacity claims require a fresh private inventory."
-    except Exception as exc: return f"Local compute security inventory unreadable: {exc!r}; capacity claims are unverified."
-    endpoints = data.get("endpoints", {})
+    if not path.exists():
+        return "Local compute security inventory: missing; run inventory before claiming Spark/fleet capacity."
+    try:
+        data = json.loads(path.read_text())
+    except Exception as e:
+        return f"Local compute security inventory: unreadable ({e}); do not claim Spark/fleet capacity."
+
+    endpoints = data.get("endpoints", {}) or {}
     ok = ", ".join(sorted(k for k, v in endpoints.items() if isinstance(v, dict) and v.get("ok"))) or "none"
     bad = ", ".join(sorted(k for k, v in endpoints.items() if not (isinstance(v, dict) and v.get("ok")))) or "none"
     free = next((f"{cols[6]} MiB" for line in str(((data.get("system", {}) or {}).get("free_m", {}) or {}).get("stdout", "")).splitlines() if (cols := line.split())[:1] == ["Mem:"] and len(cols) >= 7), "unknown")
+    tci = data.get("tailnet_compute_inventory") or {}
     stores = "; ".join(f"{Path(x.get('path','')).name}:{','.join((x.get('sample') or [])[:2])}" for x in data.get("candidate_model_paths", []) if x.get("exists") and x.get("sample")) or "none"
-    return "\n".join(("Local compute security inventory: fragmentation, cross-instance inaccuracy, and unused sovereign compute are security debt.", f"{data.get('host','unknown')} @ {data.get('generated_at','unknown')}; memory={free}; usable={ok}; unavailable={bad}; fleet={','.join((data.get('tailnet_compute_inventory') or {}).get('compute_sparks', [])) or 'unknown'}; ssh_smoked={','.join((data.get('tailnet_compute_inventory') or {}).get('ssh_smoked', [])) or 'none'}; personal_inventory_only={','.join((data.get('tailnet_compute_inventory') or {}).get('personal_devices_inventory_only', [])) or 'none'}; roles={','.join(f'{k}:{v}' for k,v in ((data.get('tailnet_compute_inventory') or {}).get('role_candidates') or {}).items()) or 'unknown'}; workers={','.join((data.get('tailnet_compute_inventory') or {}).get('active_private_workers', [])) or 'none'}; stores={stores}.", "Rule: hardware names are not capability; endpoint health, semantic smokes, memory headroom, and routed use are capability."))
+    role_text = ",".join(f"{k}:{v}" for k, v in (tci.get("role_candidates") or {}).items()) or "unknown"
+    worker_text = ",".join(tci.get("active_private_workers") or []) or "none"
+    verified = tci.get("verified_capacity") or {}
+    verified_text = ",".join(f"{node}:{state}" for node, state in verified.items()) or "unverified"
+    unresolved = ",".join(tci.get("unresolved_capacity") or []) or "none"
+    overclaim_guard = tci.get("overclaim_guard") or "Do not infer optimized capacity from hardware names, cache entries, fallback endpoints, or in-progress installs."
+
+    dashboard = data.get("fleet_dashboard_plain_current") or {}
+    component_roles = []
+    for role in dashboard.get("roles") or []:
+        spark = role.get("spark") or "unknown"
+        job = role.get("job") or "unassigned"
+        status = role.get("status") or "unknown"
+        model = role.get("model") or "model-unverified"
+        blocker = role.get("blocker") or role.get("do_not_do") or ""
+        suffix = f"; {blocker}" if blocker else ""
+        component_roles.append(f"{spark}:{job} [{status}; {model}{suffix}]")
+    component_graph = " | ".join(component_roles) or "no unified component graph in inventory"
+    next_moves = " ".join(dashboard.get("next_three_moves") or []) or "no unified next moves recorded"
+    truth_limit = dashboard.get("truth_limit") or "inventory is an internal sensor surface, not external reachability proof"
+
+    return "\n".join((
+        "Local compute security inventory: fragmentation, cross-instance inaccuracy, and unused sovereign compute are security debt.",
+        f"{data.get('host','unknown')} @ {data.get('generated_at','unknown')}; memory={free}; usable={ok}; unavailable={bad}; fleet={','.join(tci.get('compute_sparks', [])) or 'unknown'}; ssh_smoked={','.join(tci.get('ssh_smoked', [])) or 'none'}; personal_inventory_only={','.join(tci.get('personal_devices_inventory_only', [])) or 'none'}; roles={role_text}; workers={worker_text}; verified_capacity={verified_text}; unresolved={unresolved}; stores={stores}.",
+        f"Unified component graph: {component_graph}.",
+        f"Unified next moves: {next_moves}",
+        f"Truth limit: {truth_limit}.",
+        "Rule: hardware names are not capability; endpoint health, semantic smokes, memory headroom, routed use, and component fit are capability.",
+        f"Overclaim guard: {overclaim_guard}",
+    ))
 
 
 def check_dual_spark() -> str:
