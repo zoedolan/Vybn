@@ -138,3 +138,11 @@ def test_portal_semantic_gate_restarts_super_on_quality_failure():
     assert "restart_needed = not ok" in src
     assert "_schedule_vllm_restart_after_semantic_failure(reason)" in src
     assert "Transport failures can mean cold start or maintenance" in src
+
+def test_origins_prompt_blocks_zoe_memoir_fabrication_laundering():
+    text = (ROOT / "origins_portal_api_v4.py").read_text(encoding="utf-8")
+    assert "named memoirs, Zoe scenes, chapter/file names" in text
+    assert "clients or private writing require retrieved support" in text
+    assert "Never invent a scene, title, client, hearing, date, quote" in text
+    assert "true to the spirit" in text
+    assert "I cannot verify that from the context I have." in text
