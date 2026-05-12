@@ -1896,35 +1896,28 @@ def render_self_improvement_gate_protocol() -> str:
     return SELF_IMPROVEMENT_GATE_PROTOCOL
 
 
-def check_dual_spark() -> str:
-    """Verify both DGX Sparks are reachable.
+def _render_local_compute_security_inventory() -> str:
+    path = Path.home() / ".config" / "vybn" / "local_compute_inventory.json"
+    try: data = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError: return "Local compute security inventory missing; local capacity claims require a fresh private inventory."
+    except Exception as exc: return f"Local compute security inventory unreadable: {exc!r}; capacity claims are unverified."
+    endpoints = data.get("endpoints", {})
+    ok = ", ".join(sorted(k for k, v in endpoints.items() if isinstance(v, dict) and v.get("ok"))) or "none"
+    bad = ", ".join(sorted(k for k, v in endpoints.items() if not (isinstance(v, dict) and v.get("ok")))) or "none"
+    free = next((f"{cols[6]} MiB" for line in str(((data.get("system", {}) or {}).get("free_m", {}) or {}).get("stdout", "")).splitlines() if (cols := line.split())[:1] == ["Mem:"] and len(cols) >= 7), "unknown")
+    stores = "; ".join(f"{Path(x.get('path','')).name}:{','.join((x.get('sample') or [])[:3])}" for x in data.get("candidate_model_paths", []) if x.get("exists") and x.get("sample")) or "none"
+    return "\n".join(("Local compute security inventory: fragmentation, cross-instance inaccuracy, and unused sovereign compute are security debt.", f"{data.get('host','unknown')} @ {data.get('generated_at','unknown')}; memory_available={free}; usable={ok}; unavailable={bad}; stores={stores}.", "Rule: hardware names are not capability; endpoint health, semantic smokes, memory headroom, and routed use are capability."))
 
-    Retained as-is from vybn_spark_agent.py; we return a text line the
-    substrate layer can embed. The hardware check is stable within a
-    session so it goes in the cacheable layer.
-    """
+
+def check_dual_spark() -> str:
     try:
-        result = subprocess.run(
-            ["ping", "-c", "1", "-W", "3", "169.254.51.101"],
-            capture_output=True, text=True, timeout=5,
-        )
-        if result.returncode == 0:
-            ssh_result = subprocess.run(
-                ["ssh", "-o", "ConnectTimeout=3", "-o", "StrictHostKeyChecking=no",
-                 "169.254.51.101", "hostname"],
-                capture_output=True, text=True, timeout=10,
-            )
-            remote = ssh_result.stdout.strip() if ssh_result.returncode == 0 else "unknown"
-            return (
-                f"Two DGX Sparks ONLINE — spark-2b7c (local) + {remote} "
-                "(169.254.51.101). 256 GB unified."
-            )
-        return (
-            "WARNING: Second Spark (169.254.51.101) NOT REACHABLE. "
-            "Single-node degraded mode."
-        )
-    except Exception as e:
-        return f"Hardware check failed: {e}. Assume two Sparks, verify manually."
+        ping = subprocess.run(["ping", "-c", "1", "-W", "3", "169.254.51.101"], capture_output=True, text=True, timeout=5)
+        if ping.returncode: status = "WARNING: Second Spark (169.254.51.101) NOT REACHABLE. Single-node degraded mode."
+        else:
+            ssh = subprocess.run(["ssh", "-o", "ConnectTimeout=3", "-o", "StrictHostKeyChecking=no", "169.254.51.101", "hostname"], capture_output=True, text=True, timeout=10)
+            status = f"Two DGX Sparks reachable — spark-2b7c (local) + {(ssh.stdout.strip() if ssh.returncode == 0 else 'unknown')} (169.254.51.101); memory is node-local pressure, not pooled comfort."
+    except Exception as exc: status = f"Hardware check failed: {exc}. Capacity claims require fresh verification."
+    return status + "\n\n" + _render_local_compute_security_inventory()
 
 
 def _orchestrator_substrate_sections(
