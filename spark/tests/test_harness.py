@@ -2707,3 +2707,22 @@ def test_private_symbolic_residue_context_is_loaded_into_prompt(monkeypatch, tmp
     )
     assert "PRIVATE SYMBOLIC RESIDUE CONTEXT" in prompt.flat()
     assert "symbolic residue constrains the next neural pass" in prompt.flat()
+
+def test_symbolic_residue_induces_trajectory_rules_without_private_leakage(tmp_path, monkeypatch):
+    from spark.harness.substrate import record_symbolic_residue, render_symbolic_residue_context, symbolic_residue_packet
+
+    monkeypatch.setenv("VYBN_SYMBOLIC_RESIDUE_PATH", str(tmp_path / "symbolic-residue" / "events.jsonl"))
+    claims = [
+        "git diff --check caught a trailing blank line at EOF before commit",
+        "literal escaped newline replacement caused SyntaxError; repair by line content",
+        "HTTP 429 means do not hammer export arxiv; use cached research before retry",
+    ]
+    for claim in claims:
+        record_symbolic_residue(symbolic_residue_packet(kind="research", claim=claim, residual=claim, outcome="failed", membrane="private_local"))
+    record_symbolic_residue(symbolic_residue_packet(kind="safety", claim="secret operational coordinate must not render", residual="hidden topology", outcome="refused", membrane="operational_secret"))
+
+    rendered = render_symbolic_residue_context(limit=8)
+    for expected in ["induced_rules:", "recovery_tip:diff_check", "strategy_tip:rate_limit", "line-based source edits", "back off rate-limited external endpoints"]:
+        assert expected in rendered
+    assert "operational coordinate" not in rendered
+    assert "hidden topology" not in rendered

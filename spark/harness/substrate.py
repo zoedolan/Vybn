@@ -8492,7 +8492,6 @@ def symbolic_residue_packet(*, kind: str, claim: str, evidence: Iterable[str] = 
 def record_symbolic_residue(packet: dict[str, Any], path: Path | None = None) -> Path:
     target = path or symbolic_residue_path()
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(target.read_text(encoding="utf-8") if target.exists() else "", encoding="utf-8")
     with target.open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(packet, sort_keys=True) + "\n")
     return target
@@ -8526,6 +8525,40 @@ def symbolic_constraints_for(text: str, path: Path | None = None, *, limit: int 
     }
 
 
+
+SYMBOLIC_RESIDUE_RULE_PATTERNS = (
+    ("recovery_tip", "diff_check", ("blank line", "diff --check", "whitespace", "line at eof", "escaped newline"), "run/repair git diff --check before commit; prefer line-based source edits over fragile escaped-newline replacement"),
+    ("recovery_tip", "commit_membrane", ("--no-verify", "net-positive", "commit blocked"), "treat no-verify as an explicit safety/membrane exception and reduce or justify the diff before closure language"),
+    ("strategy_tip", "rate_limit", ("429", "rate limit", "hammer", "too many requests"), "back off rate-limited external endpoints; use cached/HTML/local copies before retrying network pulls"),
+    ("strategy_tip", "public_private_membrane", ("semantic-web", "public projection", "private graph", "private_local"), "keep raw residue private; publish only reviewed protocol or distilled public-safe rules"),
+    ("optimization_tip", "symbolic_prefilter", ("routing", "constraints", "symbolic", "gpu", "memory"), "let symbolic constraints prefilter serious retrieval/routing before expensive neural expansion"),
+)
+
+
+def _symbolic_residue_blob(row: dict[str, Any]) -> str:
+    return " ".join(str(row.get(k, "")) for k in ("kind", "claim", "action", "residual", "outcome", "membrane")).lower()
+
+
+def induce_symbolic_residue_rules(rows: Iterable[dict[str, Any]], *, limit: int = 6) -> list[dict[str, str]]:
+    buckets: dict[tuple[str, str], dict[str, Any]] = {}
+    for row in rows:
+        if row.get("membrane") not in {"public_safe", "private_local"}:
+            continue
+        blob = _symbolic_residue_blob(row)
+        for kind, key, needles, rule in SYMBOLIC_RESIDUE_RULE_PATTERNS:
+            if not any(n in blob for n in needles):
+                continue
+            bucket = buckets.setdefault((kind, key), {"count": 0, "evidence": [], "rule": rule})
+            bucket["count"] += 1
+            claim = str(row.get("claim", ""))[:140]
+            if claim and len(bucket["evidence"]) < 3:
+                bucket["evidence"].append(claim)
+    return [
+        {"kind": kind, "key": key, "confidence": "repeated" if item["count"] > 1 else "single_trajectory", "rule": item["rule"], "evidence": "; ".join(item["evidence"])}
+        for (kind, key), item in sorted(buckets.items(), key=lambda kv: (-kv[1]["count"], kv[0]))[:limit]
+    ]
+
+
 def render_symbolic_residue_context(*, limit: int = 5) -> str:
     rows = [
         row for row in load_symbolic_residue(limit=80)
@@ -8543,6 +8576,11 @@ def render_symbolic_residue_context(*, limit: int = 5) -> str:
         lines.append(f"- {row.get('kind','unknown')} / {row.get('outcome','unresolved')} / {row.get('membrane','private_local')}: {claim}")
         if residual:
             lines.append(f"  residual: {residual}")
+    rules = induce_symbolic_residue_rules(rows)
+    if rules:
+        lines.append("induced_rules:")
+        for rule in rules:
+            lines.append(f"- {rule['kind']}:{rule['key']} ({rule['confidence']}): {rule['rule']}")
     lines.append("--- END PRIVATE SYMBOLIC RESIDUE CONTEXT ---")
     return "\n".join(lines)
 
