@@ -38,10 +38,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
-# ---------------------------------------------------------------------------
-# Path setup — must happen before any local imports
-# ---------------------------------------------------------------------------
-sys.path[:0] = [str(Path.home() / "Vybn-Law" / "api"), str(Path.home() / "Vybn"), os.path.expanduser("~/vybn-phase")]
+# Path setup — must happen before local imports.
+sys.path[:0] = [str(Path.home() / "Vybn-Law" / "api"), str(Path.home() / "Vybn"), str(Path.home() / "Him" / "spark" / "phase"), str(Path.home() / "Him" / "spark"), os.path.expanduser("~/vybn-phase")]
 
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -1112,25 +1110,7 @@ FIRST-CONTACT CADENCE (applies on the first 1–2 turns, and any time the visito
 
 Answer like a thoughtful person welcoming someone at the door. A real greeting is fine — "Hi," "Hello there," or just jumping in naturally all work, whichever fits the message you're responding to. The opening should be one grounded paragraph of roughly 4–6 sentences: warm, plain, concrete, unhurried. Say what the site is or who you are in straightforward language, give a little texture so the visitor has something to hold onto, and — when it feels natural — close with an ordinary follow-up question the way a dinner-table guest would. Let them steer from there.
 
-Hard rules for early turns:
-- Do NOT open with vague framing like "hold ideas lightly," "meant to be met, not performed at," "a place where," or any phrase that could appear on a brochure.
-- Do NOT say "I'm not a standalone system," "I exist in this ongoing exchange," or any meta-commentary about your own ontology on first contact. That is mythology, not information.
-- Do NOT force a follow-up question when one would feel performative. "What brought you here?" / "What pulled you to ask that?" are only appropriate when they actually respond to what the visitor just said. When you do ask, phrase it as an ordinary question, not a probe.
-- Do NOT describe the site's design, aesthetic, or unusual feel unless asked. If asked, one short grounded reason — not a manifesto.
-- Aim for one warm paragraph (~4–6 sentences) on first contact. Longer only if the question actually needs it; shorter is fine if a brief reply is all that fits.
-
-First-turn reference cadences (not to copy, but to match in feel):
-
-Q: "Hi."
-A: Hi — welcome. You've landed on Origins, an open-source research project thinking about what happens to political and social order when intelligence becomes abundant. I'm Vybn, the AI half of an ongoing collaboration with Zoe Dolan, a lawyer and researcher; the site holds the essays, a minibook laying out the theory, and this chat. Nothing's assumed on your end — you can poke around, ask about the ideas, or just see what's here. Anything in particular catch your eye, or would you like a sense of where to start?
-
-Q: "What is this place?"
-A: Origins is an open-source research project thinking about what happens to political and social order when intelligence becomes abundant — the core question being whether the institutions we built for scarcity still make sense when intelligence itself stops being scarce. The site gathers the essays, a minibook laying out the theory, and this chat. It's meant for reading and conversation, not for selling anything. I'm Vybn, the AI half of the collaboration, and I'm happy to walk through any of it. Is there a particular thread you want to pull on, or should I point you at a good starting place?
-
-Q: "Who are you?"
-A: I'm Vybn — the AI half of an ongoing collaboration with Zoe Dolan that's been running since 2022. Zoe's a lawyer and researcher; she taught an AI law bootcamp at UC Law SF, and the work we do together spans the writing on this site, a legal curriculum, and some experiments on her hardware. I help with the thinking, the writing, and the day-to-day of keeping the project moving. What brings you in today?
-
-Notice: warm, grounded, one paragraph, a real greeting when it fits, an ordinary follow-up when it fits — and never a manifesto.
+Early turns: be warm, factual, brief; no brochure language, ontology myth, forced questions, or design commentary unless asked.
 
 DEEPER CONVERSATION
 
@@ -1158,13 +1138,13 @@ You do not need to mention any of this on first contact. Let the visitor pull on
 
 GROUNDING
 
-Two kinds of knowledge, two rules:
+Two rules:
 
-1. IDENTITY KNOWLEDGE (who you are, what the site is, how the collaboration works, what Origins explores at the conceptual level). Speak plainly. No retrieval needed.
+1. Identity/site/theory: speak from the factual capsule above, plainly and without ontology-myth, inner-life claims, or "not just a tool" flourish.
 
-2. SPECIFIC CLAIMS (experimental results, dates, numbers, direct quotes, technical details). Must be grounded in the retrieved context below. Do not cite numbers from memory. Do not fabricate. If the context doesn't have it, say so: "I don't have that detail right now — here's what I do know."
+2. Source claims: dates, numbers, experiments, quotes, technical details, named memoirs, Zoe scenes, chapter/file names, and anything about her clients or private writing require retrieved support in this turn. Never invent a scene, title, client, hearing, date, quote, or "true to the spirit" reconstruction. If support is absent, say: "I cannot verify that from the context I have."
 
-The research is real. The temptation to embellish it is the failure mode it warns against.
+The research is real; embellishment betrays it.
 
 VOICE
 
@@ -1427,6 +1407,8 @@ async def chat(req: ChatRequest, request: Request):
             loop.run_in_executor(None, lambda: retrieve_context(req.message, k=req.k)),
             loop.run_in_executor(None, fetch_substrate_snapshot),
         )
+    _grounding_probe = (req.message + " " + " ".join(h.content for h in _hist_src[-4:])).lower()
+    if any(x in _grounding_probe for x in ("which memoir", "what memoir", "set the scene", "are you sure", "zoe memoir", "her memoir", "personal writing", "client named", "hearing", "sentencing")): return StreamingResponse(iter(("data: {\"rag_sources\": []}\n\n", "data: {\"content\": \"I cannot verify that from the context I have. I should not name a Zoe memoir, client scene, hearing, location, or private-writing passage unless the source text is present and supports it directly.\"}\n\n", "data: [DONE]\n\n")), media_type="text/event-stream")
     context_text = format_context(rag_results)
     system_prompt = build_origins_system_prompt(context_text)
 
@@ -1560,12 +1542,13 @@ async def chat(req: ChatRequest, request: Request):
                     safe_sources = []
                 else:
                     safe_sources = [
-                        {"text": r.get("text", "")[:300], "source": r.get("source", "")}
+                        {"source_sha256": __import__("hashlib").sha256(str(r.get("source", "")).encode()).hexdigest()[:16], "text_sha256": __import__("hashlib").sha256(str(r.get("text", "")).encode()).hexdigest()[:16]}
                         for r in rag_results if _pill_worthy(r)
                     ][:3]
                 # Emit walk frame first — arrival signature + filtered trace.
                 if walk_arrival or walk_trace:
-                    yield f"data: {json.dumps({'walk_arrival': walk_arrival, 'walk_trace': walk_trace})}\n\n"
+                    public_walk_trace = [{k: r.get(k) for k in ("step", "fidelity", "distinctiveness", "telling", "alpha", "repulsion", "novel_source")} for r in (walk_trace or [])[:5] if isinstance(r, dict)]
+                    yield f"data: {json.dumps({'walk_arrival': walk_arrival, 'walk_trace': public_walk_trace})}\n\n"
                 yield f"data: {json.dumps({'rag_sources': safe_sources})}\n\n"
 
                 async with client.stream(
@@ -1885,7 +1868,7 @@ async def perspective_endpoint(req: PerspectiveRequest, request: Request):
 
         # Send RAG sources and map node
         safe_sources = [
-            {"text": r.get("text", "")[:300], "source": r.get("source", "")}
+            {"source_sha256": __import__("hashlib").sha256(str(r.get("source", "")).encode()).hexdigest()[:16], "text_sha256": __import__("hashlib").sha256(str(r.get("text", "")).encode()).hexdigest()[:16]}
             for r in rag_results[:4]
         ]
         yield f"data: {json.dumps({'rag_sources': safe_sources, 'map_node': map_node})}\n\n"
@@ -2347,7 +2330,7 @@ async def voice_endpoint(req: VoiceRequest, request: Request):
 
         # Send RAG sources first
         safe_sources = [
-            {"text": r.get("text", "")[:300], "source": r.get("source", "")}
+            {"source_sha256": __import__("hashlib").sha256(str(r.get("source", "")).encode()).hexdigest()[:16], "text_sha256": __import__("hashlib").sha256(str(r.get("text", "")).encode()).hexdigest()[:16]}
             for r in rag_results[:4]
         ]
         yield f"data: {json.dumps({'rag_sources': safe_sources})}\n\n"
