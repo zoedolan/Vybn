@@ -2597,3 +2597,10 @@ def test_load_deep_memory_accepts_optional_phase_dir_argument():
     sig = inspect.signature(substrate._load_deep_memory)
     assert "vybn_phase_dir" in sig.parameters
     assert sig.parameters["vybn_phase_dir"].default is None and '"Him" / "spark" / "phase"' in inspect.getsource(substrate._load_deep_memory)
+
+def test_safe_fetch_allows_arxiv_atom_metadata_only_from_arxiv_export():
+    from spark.harness.substrate import _safe_fetch_content_type_allowed as ok
+    assert ok("https://export.arxiv.org/api/query?id_list=2502.03283", "application/atom+xml; charset=utf-8")
+    assert ok("https://export.arxiv.org/api/query?id_list=2502.03283", "application/xml")
+    assert not ok("https://example.com/feed.xml", "application/atom+xml")
+    assert not ok("https://arxiv.org/pdf/2502.03283", "application/pdf")
