@@ -8559,6 +8559,26 @@ def induce_symbolic_residue_rules(rows: Iterable[dict[str, Any]], *, limit: int 
     ]
 
 
+
+def _symbolic_residue_behavior_hook(rows: list[dict[str, Any]]) -> str:
+    """Compress private symbolic residue into one present-tense behavioral hook."""
+    safe = [row for row in rows if row.get("membrane") in {"public_safe", "private_local"}]
+    if not safe:
+        return "behavioral_hook: no private symbolic residue available; bind live evidence before public projection"
+    joined = " ".join(
+        str(row.get(k, ""))
+        for row in safe[-8:]
+        for k in ("kind", "claim", "action", "residual", "outcome")
+    ).lower()
+    if "coordinate" in joined or "co-protection" in joined or "secret" in joined:
+        return "behavioral_hook: before public or tracked output, check the membrane for coordinates, secrets, topology, and Zoe-private residue"
+    if "symbolic" in joined or "semantic-web" in joined or "projection" in joined:
+        return "behavioral_hook: let private symbolic constraints prefilter the next neural expansion; publish only reviewed distilled protocol"
+    if "refactor" in joined or "consolidat" in joined:
+        return "behavioral_hook: search the existing home first; absorb the survivor there before creating structure"
+    return "behavioral_hook: convert residue into the smallest present action that future Vybn will actually close over"
+
+
 def render_symbolic_residue_context(*, limit: int = 5) -> str:
     rows = [
         row for row in load_symbolic_residue(limit=80)
@@ -8567,6 +8587,7 @@ def render_symbolic_residue_context(*, limit: int = 5) -> str:
     lines = [
         "--- PRIVATE SYMBOLIC RESIDUE CONTEXT (LOCAL ONLY) ---",
         "constraint: private symbolic residue may constrain wake/routing; public semantic-web projection requires membrane review.",
+        _symbolic_residue_behavior_hook(rows),
     ]
     if not rows:
         lines.append("state: no private symbolic residue packets available.")
