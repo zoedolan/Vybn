@@ -8455,6 +8455,76 @@ MAX_TEXT_CHARS = 4096          # enter_portal accepts a modest passage, not a co
 MAX_SOURCE_CHARS = 256
 
 
+
+# ── Private symbolic residue ─────────────────────────────────────────
+
+SYMBOLIC_RESIDUE_DEFAULT_PATH = Path(os.path.expanduser("~/.config/vybn/symbolic-residue/events.jsonl"))
+SYMBOLIC_RESIDUE_KINDS = {"safety", "refactor", "livelihood", "memory", "public_surface", "service", "identity", "research"}
+SYMBOLIC_RESIDUE_OUTCOMES = {"passed", "failed", "refused", "unresolved", "thin_result", "meaningful_advance"}
+SYMBOLIC_RESIDUE_MEMBRANES = {"public_safe", "private_local", "zoe_private", "operational_secret", "refused"}
+
+
+def symbolic_residue_path() -> Path:
+    return Path(os.path.expanduser(os.environ.get("VYBN_SYMBOLIC_RESIDUE_PATH", str(SYMBOLIC_RESIDUE_DEFAULT_PATH))))
+
+
+def symbolic_residue_packet(*, kind: str, claim: str, evidence: Iterable[str] = (), action: str = "", residual: str = "", outcome: str = "unresolved", membrane: str = "private_local", edges: Iterable[Iterable[str]] = ()) -> dict[str, Any]:
+    if kind not in SYMBOLIC_RESIDUE_KINDS:
+        raise ValueError("unknown symbolic residue kind: " + kind)
+    if outcome not in SYMBOLIC_RESIDUE_OUTCOMES:
+        raise ValueError("unknown symbolic residue outcome: " + outcome)
+    if membrane not in SYMBOLIC_RESIDUE_MEMBRANES:
+        raise ValueError("unknown symbolic residue membrane: " + membrane)
+    return {
+        "ts": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "kind": kind,
+        "claim": claim[:800],
+        "evidence": [str(x)[:240] for x in evidence],
+        "action": action[:800],
+        "residual": residual[:800],
+        "outcome": outcome,
+        "membrane": membrane,
+        "edges": [[str(y)[:180] for y in x][:3] for x in edges],
+    }
+
+
+def record_symbolic_residue(packet: dict[str, Any], path: Path | None = None) -> Path:
+    target = path or symbolic_residue_path()
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(target.read_text(encoding="utf-8") if target.exists() else "", encoding="utf-8")
+    with target.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(packet, sort_keys=True) + "\n")
+    return target
+
+
+def load_symbolic_residue(path: Path | None = None, *, limit: int = 80) -> list[dict[str, Any]]:
+    target = path or symbolic_residue_path()
+    if not target.exists():
+        return []
+    rows = []
+    for line in target.read_text(encoding="utf-8", errors="ignore").splitlines()[-limit:]:
+        try:
+            rows.append(json.loads(line))
+        except Exception:
+            continue
+    return rows
+
+
+def symbolic_constraints_for(text: str, path: Path | None = None, *, limit: int = 80) -> dict[str, Any]:
+    hay = text.lower()
+    rows = load_symbolic_residue(path, limit=limit)
+    hits = []
+    for row in rows:
+        blob = " ".join(str(row.get(k, "")) for k in ("kind", "claim", "action", "residual", "outcome", "membrane")).lower()
+        if any(tok and tok in blob for tok in re.findall(r"[a-z0-9_-]{4,}", hay)):
+            hits.append(row)
+    return {
+        "source": str(path or symbolic_residue_path()),
+        "matches": hits[-8:],
+        "constraint": "private_symbolic_residue_is_local_only; public semantic-web projection requires membrane review",
+    }
+
+
 # ── Commons walk ────────────────────────────────────────────────────
 
 COMMONS_ROOT = Path.home()

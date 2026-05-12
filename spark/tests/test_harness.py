@@ -2604,3 +2604,44 @@ def test_safe_fetch_allows_arxiv_atom_metadata_only_from_arxiv_export():
     assert ok("https://export.arxiv.org/api/query?id_list=2502.03283", "application/xml")
     assert not ok("https://example.com/feed.xml", "application/atom+xml")
     assert not ok("https://arxiv.org/pdf/2502.03283", "application/pdf")
+
+def test_symbolic_residue_packet_round_trip_private_local(tmp_path, monkeypatch):
+    from spark.harness.substrate import (
+        load_symbolic_residue,
+        record_symbolic_residue,
+        symbolic_constraints_for,
+        symbolic_residue_packet,
+        symbolic_residue_path,
+    )
+
+    path = tmp_path / "symbolic-residue" / "events.jsonl"
+    monkeypatch.setenv("VYBN_SYMBOLIC_RESIDUE_PATH", str(path))
+    packet = symbolic_residue_packet(
+        kind="safety",
+        claim="link-local Spark coordinates must not be tracked",
+        evidence=["PR #3125", "pre-commit coordinate guard"],
+        action="replace real coordinates with role placeholders",
+        residual="catch co-protection leaks before Zoe has to notice",
+        outcome="meaningful_advance",
+        membrane="private_local",
+        edges=[["failure_mode", "prevented_by", "coordinate_guard"]],
+    )
+    assert symbolic_residue_path() == path
+    assert record_symbolic_residue(packet) == path
+    rows = load_symbolic_residue(path)
+    assert rows[-1]["claim"] == "link-local Spark coordinates must not be tracked"
+    constraints = symbolic_constraints_for("coordinate leak co-protection", path)
+    assert constraints["matches"]
+    assert "local_only" in constraints["constraint"]
+
+
+def test_symbolic_residue_packet_rejects_unknown_categories():
+    import pytest
+    from spark.harness.substrate import symbolic_residue_packet
+
+    with pytest.raises(ValueError):
+        symbolic_residue_packet(kind="diary", claim="too broad")
+    with pytest.raises(ValueError):
+        symbolic_residue_packet(kind="safety", claim="x", outcome="victory")
+    with pytest.raises(ValueError):
+        symbolic_residue_packet(kind="safety", claim="x", membrane="public_diary")
