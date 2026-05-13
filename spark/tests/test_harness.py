@@ -2677,6 +2677,7 @@ def test_positive_alignment_residue_routes_authority_to_precise_sinks(tmp_path, 
 def test_semantic_web_declares_positive_alignment_residual_protocol_without_private_state():
     import json
     from pathlib import Path
+    from spark.harness import substrate
 
     protocol = json.loads((Path(__file__).resolve().parents[2] / "semantic-web.jsonld").read_text())["positiveAlignmentResidualProtocol"]
     assert protocol["authorityRouting"]["failureSinks"] == ["model_charisma", "harness_automation", "memory_residue", "system_momentum"]
@@ -2684,3 +2685,4 @@ def test_semantic_web_declares_positive_alignment_residual_protocol_without_priv
     dumped = json.dumps(protocol)
     assert "~/.config" not in dumped and "events.jsonl" not in dumped
     assert "Zoe-private context stay local/private" in dumped
+    assert "Capability lattice" in Path(substrate.__file__).read_text()

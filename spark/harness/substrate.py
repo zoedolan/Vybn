@@ -1922,12 +1922,10 @@ def _render_local_compute_security_inventory() -> str:
     component_roles = []
     for role in dashboard.get("roles") or []:
         spark = role.get("spark") or "unknown"
-        job = role.get("job") or "unassigned"
-        status = role.get("status") or "unknown"
-        model = role.get("model") or "model-unverified"
-        blocker = role.get("blocker") or role.get("do_not_do") or ""
-        suffix = f"; {blocker}" if blocker else ""
-        component_roles.append(f"{spark}:{job} [{status}; {model}{suffix}]")
+        text = " ".join(str(role.get(k) or "") for k in ("status", "truth", "evidence", "blocker", "do_not_do", "model", "job")).lower()
+        state = "production" if spark in {"spark-2b7c", "spark-1c8f"} and "serv" in text else "semantically-healthy" if "semantic smoke" in text and "not integrated" in text else "degraded" if role.get("blocker") else "callable" if "endpoint" in text or "live" in text else "present-on-disk" if "files present" in text or "cache present" in text else "aspiration"
+        guard = "protect/no-experiment" if spark in {"spark-2b7c", "spark-1c8f"} else "do-not-route-public" if state not in {"production", "integrated"} else "route-only-through-owner"
+        component_roles.append(f"{spark}:{state}:{guard}:{role.get('job') or 'unassigned'} [{role.get('status') or 'unknown'}; {role.get('model') or 'model-unverified'}; {role.get('truth') or role.get('evidence') or role.get('blocker') or role.get('do_not_do') or 'evidence-missing'}]")
     component_graph = " | ".join(component_roles) or "no unified component graph in inventory"
     next_moves = " ".join(dashboard.get("next_three_moves") or []) or "no unified next moves recorded"
     truth_limit = dashboard.get("truth_limit") or "inventory is an internal sensor surface, not external reachability proof"
@@ -1938,8 +1936,8 @@ def _render_local_compute_security_inventory() -> str:
         f"Unified component graph: {component_graph}.",
         f"Unified next moves: {next_moves}",
         f"Truth limit: {truth_limit}.",
-        "Rule: hardware names are not capability; endpoint health, semantic smokes, memory headroom, routed use, and component fit are capability.",
-        f"Overclaim guard: {overclaim_guard}",
+        "Capability lattice: aspiration -> present-on-disk -> configured -> callable -> semantically-healthy -> integrated -> production; degraded/quarantined/retired fail closed; promotion requires endpoint calls, semantic smokes, ownership, routed workload evidence, and rollback/circuit breakers, not configs, memories, prose, model files, aliases, or hardware names.",
+        f"Overclaim guard: {overclaim_guard} Protected production nodes are not experiments; semantically healthy non-integrated workers are not public capacity; unresolved Omni/Talkie/perception cannot touch chat.",
     ))
 
 
