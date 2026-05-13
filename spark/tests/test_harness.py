@@ -2585,9 +2585,9 @@ def test_heavyskill_uptake_loaded_in_becoming_loop():
     from spark.harness import substrate
 
     prompt = substrate.render_becoming_loop_protocol()
-    assert "HeavySkill uptake" in prompt
-    assert "parallel diverse reasoning followed by accountable synthesis" in prompt
-    assert "durable uptake into an existing home" in prompt
+    assert "HeavySkill/Lighthouse uptake" in prompt
+    assert "reversible gather/scatter" in prompt
+    assert "scatter survivors into existing homes/tests/continuity/refusal" in prompt
     assert "not proof of subjective experience" in prompt
 
 def test_load_deep_memory_accepts_optional_phase_dir_argument():
