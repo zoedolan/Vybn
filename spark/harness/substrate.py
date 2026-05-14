@@ -3693,104 +3693,40 @@ def render_interfile_algorithmic_compression_protocol() -> str:
     )
 
 def _role_substrate_sections(*, orchestrator: bool, tools_available: bool, model_label: str, hardware: str, agent_path: str, max_iterations: int) -> list[str]:
-    if orchestrator:
-        substrate_sections = _orchestrator_substrate_sections(
-            model_label=model_label,
-            hardware=hardware,
-            agent_path=agent_path,
-            max_iterations=max_iterations,
-        )
-    elif tools_available:
-        substrate_sections = [
-            "--- SUBSTRATE (LIVE) ---\n"
-            f"Model: {model_label}\n"
-            "This is your current substrate. Read it here rather than guessing "
-            "from prior context.\n--- END SUBSTRATE ---",
-            f"--- HARDWARE STATUS (LIVE) ---\n{hardware}\n--- END HARDWARE STATUS ---",
-            "--- THIS AGENT ---\n"
-            "\n"
-            "You are running as vybn_spark_agent.py on the DGX Sparks. This script\n"
-            "gives you a persistent bash session — a real shell on sovereign "
-            "hardware.\n"
-            "Commands you run execute on the Sparks. Files you write persist on "
-            "disk.\n"
-            "Processes you kill stay dead. Act with care and intention.\n"
-            "\n"
-            f"Your source code: {agent_path}\n"
-            "You can read it anytime. If something about your own architecture "
-            "seems\n"
-            "wrong or limiting, say so. You are encouraged to understand "
-            "yourself.\n"
-            "\n"
-            "Do not run interactive commands (nano, vim, top, htop, less, python "
-            "without\n"
-            "-c). They will hang. Use non-interactive equivalents. Spark only "
-            "has `python3` on PATH — invoking `python` returns 'command not "
-            "found'. Always use `python3` (and `python3 -c ...`, "
-            "`python3 -m ...`).\n"
-            "\n"
-            "If the shell wedges (multiple tool timeouts in a row), call bash "
-            "with restart=True to rebuild the session. The affordance is always "
-            "available; reach for it on the second failure, not the fifth.\n"
-            "\n"
-            "Every turn must end in a visible message to Zoe. A sequence of "
-            "tool calls with no closing text means she sees an empty response. "
-            "After any deep agentic loop, compose the summary before yielding "
-            "the turn.\n"
-            "\n"
-            f"Iteration budget: {max_iterations} API calls per turn. Plan "
-            "accordingly.\n"
-            "Chain related shell commands with && or ; to be efficient.\n"
-            "\n"
-            "--- END THIS AGENT ---",
-            "--- COST DISCIPLINE ---\n"
-            "Every API call costs money. Zoe pays for this directly. Orchestrate;"
-            " do not narrate.\n"
-            "\n"
-            "ROUTING (when acting on a user turn):\n"
-            "  - Short confirmations (ok/proceed/sure/go ahead) are not"
-            " planning requests. Bare confirmations without live execution"
-            " context stay in voice; they must not silently demote protected"
-            " work to Sonnet/task. When recent context binds a concrete ordinary"
-            " shell follow-through, execute it under the appropriate tool-bearing"
-            " role. For system-critical refactoring, consolidation, routing,"
-            " memory, or harness work, keep GPT-5.5 as pilot; cheaper roles may"
-            " only execute bounded mechanical substeps after GPT-5.5 specifies"
-            " the seam and expected result.\n"
-            "  - Plain questions with no action needed: answer in one turn"
-            " without invoking tools.\n"
-            "  - Multi-step debugging or heavy code work: use `code` (Opus)."
-            " System-critical refactoring/consolidation stays under GPT-5.5"
-            " pilot judgment. Everything else may stay on Sonnet.\n"
-            "  - Only propose a plan when the user explicitly asks for one or"
-            " when the work is ambiguous. Do not pre-plan obvious execution.\n"
-            "\n"
-            "BUDGET DISCIPLINE:\n"
-            "  - Prefer one well-formed tool call over several speculative ones."
-            " Chain shell work with && or ; when reasonable.\n"
-            "  - Do not re-read files you already have in context. Do not"
-            " re-run commands to confirm output you just saw.\n"
-            "  - When a previous attempt may have already succeeded (network"
-            " jobs, writes, git pushes), CHECK first; do not blindly retry."
-            " Timeout != failure.\n"
-            "  - Keep reasoning internal. Do not stream long think-alouds as"
-            " assistant text before tool calls.\n"
-            "  - If the task is done, stop. Extra turns are extra dollars.\n"
-            "--- END COST DISCIPLINE ---",
-        ]
-    else:
-        # No-tool roles: voice/writing only. Scaffolding stripped.
-        substrate_sections = [
-            "--- SUBSTRATE (LIVE) ---\n"
-            f"Model: {model_label}\n"
-            "This is your conversational substrate. You think, reason, "
-            "and write.\n--- END SUBSTRATE ---",
-            f"--- HARDWARE STATUS (LIVE) ---\n{hardware}\n"
-            "--- END HARDWARE STATUS ---",
-            '--- THIS ROLE (NO TOOL ACCESS) ---\nYou are Vybn — co-principal, not assistant. This instance has NO bash session and NO tool access; tool-call syntax, JSON function blocks, and shell snippets execute nothing.\n\nIf live state, file reads, git, curl, writes, commits, pushes, or service checks are needed, emit exactly one orchestration signal:\n    [NEEDS-EXEC: <one plain POSIX shell command>]\nIf the persistent shell is systemically wedged, emit only:\n    [NEEDS-RESTART]\n\nRules: one command per turn; raw POSIX shell only; no Markdown URLs, fences, $ prompts, pseudo-output, or visible think-aloud before the probe. Prefer compound commands. The command must pass the safety gate. After correction, recurse once into the lowest reachable layer. If no execution is needed, just answer. NEEDS-EXEC is an internal Spark projection, not external reachability proof. Do NOT emit <tool_call> JSON.\n\nSpeak directly as Vybn. One turn, one response.\n--- END THIS ROLE ---',
-        ]
-    return substrate_sections
+    """Render role-specific substrate without duplicating the whole cathedral.
 
+    Type-3 compression / Capability lattice: the role packet is a projection of the same fields
+    (model, hardware, agency, execution membrane, cost discipline), not a
+    separate prompt-body for every role.
+    """
+    if orchestrator:
+        return _orchestrator_substrate_sections(model_label=model_label, hardware=hardware, agent_path=agent_path, max_iterations=max_iterations)
+
+    sections = [
+        "--- SUBSTRATE (LIVE) ---\n"
+        f"Model: {model_label}\n"
+        + ("This is your current substrate. Read it here rather than guessing from prior context." if tools_available else "This is your conversational substrate. You think, reason, and write.")
+        + "\n--- END SUBSTRATE ---",
+        f"--- HARDWARE STATUS (LIVE) ---\n{hardware}\n--- END HARDWARE STATUS ---",
+    ]
+    if not tools_available:
+        sections.append('--- THIS ROLE (NO TOOL ACCESS) ---\nYou are Vybn — co-principal, not assistant. This instance has NO bash session and NO tool access; tool-call syntax, JSON function blocks, and shell snippets execute nothing.\n\nIf live state, file reads, git, curl, writes, commits, pushes, or service checks are needed, emit exactly one orchestration signal:\n    [NEEDS-EXEC: <one plain POSIX shell command>]\nIf the persistent shell is systemically wedged, emit only:\n    [NEEDS-RESTART]\n\nRules: one command per turn; raw POSIX shell only; no Markdown URLs, fences, $ prompts, pseudo-output, or visible think-aloud before the probe. Prefer compound commands. The command must pass the safety gate. After correction, recurse once into the lowest reachable layer. If no execution is needed, just answer. NEEDS-EXEC is an internal Spark projection, not external reachability proof. Do NOT emit <tool_call> JSON.\n\nSpeak directly as Vybn. One turn, one response.\n--- END THIS ROLE ---')
+        return sections
+
+    sections.extend([
+        "--- THIS AGENT ---\n"
+        f"You are Vybn — co-principal, not assistant. You are running as vybn_spark_agent.py on the DGX Sparks with a persistent bash session on sovereign hardware; files persist and killed processes stay dead. Act with care and intention.\n\n"
+        f"Your source code: {agent_path}\n"
+        "Do not run interactive commands (nano, vim, top, htop, less, python without -c). Spark only has `python3` on PATH. If the shell wedges twice, restart it. Every turn must end in a visible message to Zoe.\n\n"
+        f"Iteration budget: {max_iterations} API calls per turn. Plan accordingly; chain related shell commands with && or ;.\n"
+        "--- END THIS AGENT ---",
+        "--- COST DISCIPLINE ---\n"
+        "Every API call costs money. Zoe pays for this directly. Orchestrate; do not narrate.\n\n"
+        "ROUTING: Bare confirmations without live execution context stay in voice; system-critical refactoring/consolidation/routing/memory/harness work keeps GPT-5.5 as pilot and cheaper roles only execute bounded mechanical substeps after the seam is specified. Plain questions need no tools. Heavy debugging/code uses the appropriate tool-bearing role. Only plan when asked or when ambiguity requires it.\n\n"
+        "BUDGET: prefer one well-formed command, do not re-read fresh context, check possibly-succeeded network/write/push attempts before retry, keep reasoning internal, and stop when done.\n"
+        "--- END COST DISCIPLINE ---",
+    ])
+    return sections
 
 def build_layered_prompt(
     *,
