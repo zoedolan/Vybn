@@ -1755,9 +1755,9 @@ def run_probes(text: str) -> list:
 # ---------------------------------------------------------------------------
 
 _REPO_PURPOSE = {
-    "Vybn":       "you, the harness (this code), vybn.md, Vybn_Mind/THE_IDEA.md, private local continuity.md",
-    "Him":        "skills (vybn-os, vybn-ops, the-seeing), strategy, opportunity scans",
-    "vybn-phase": "deep_memory corpus + walk daemon (geometric memory engine)",
+    "Vybn":       "you, the public propagation layer (spark/harness), vybn.md, Vybn_Mind/THE_IDEA.md, private local continuity.md",
+    "Him":        "private incubation/dream layer: skills, strategy, opportunity scans, experimental organs",
+    "vybn-phase": "private geometric memory corpus + walk daemon",
     "Vybn-Law":   "six-module curriculum, wellspring portal, chat API",
     "Origins":    "public-facing chat (talk.html), connect.html, read.html",
 }
@@ -1768,7 +1768,7 @@ _MODULE_PURPOSE = {
     "mcp.py":        "MCP server, prompt resources, tools",
     "policy.py":     "role routing, model selection, heuristics",
     "providers.py":  "Anthropic / OpenAI / local vLLM / claim_guard",
-    "substrate.py":  "layered prompt assembly, live state, session store, refactor perception (this ballast lives here)",
+    "substrate.py":  "public propagation substrate: prompt assembly, routing/capability/membrane gates, live-state orientation",
 }
 
 
@@ -1813,7 +1813,7 @@ def _load_ballast() -> str:
     orientation_text = (
         "--- ORIENTATION (READ AT PROMPT-BUILD FROM FILESYSTEM) ---\\n"
         "Repos:\\n" + "\\n".join(repo_lines) + "\\n\\n"
-        "Harness: ~/Vybn/spark/harness/ (" + str(len(module_lines)) + " modules)\\n"
+        "Propagation layer: ~/Vybn/spark/harness/ (" + str(len(module_lines)) + " modules; public interaction substrate)\\n"
         f"Deep memory: {corpus_info}\\n"
         "Services: walk_daemon :8101 | portal :8420 | MCP :8400 | chat :3001 | vLLM :8000\\n"
         "Use LIVE STATE for now; continuity for history; soul+OS for principles.\\n"
@@ -1936,7 +1936,7 @@ def _render_local_compute_security_inventory() -> str:
         f"Unified component graph: {component_graph}.",
         f"Unified next moves: {next_moves}",
         f"Truth limit: {truth_limit}.",
-        "Capability lattice: aspiration -> present-on-disk -> configured -> callable -> semantically-healthy -> integrated -> production; degraded/quarantined/retired fail closed; promotion requires endpoint calls, semantic smokes, ownership, routed workload evidence, and rollback/circuit breakers, not configs, memories, prose, model files, aliases, or hardware names.",
+        "Capability federation: Sparks are self-assembling role-bearing nodes, not pooled memory; states remain aspiration -> present-on-disk -> configured -> callable -> semantically-healthy -> integrated -> production, with degraded/quarantined/retired fail-closed promotion by endpoint calls, semantic smokes, ownership, routed workload evidence, and rollback/circuit breakers.",
         f"Overclaim guard: {overclaim_guard} Protected production nodes are not experiments; semantically healthy non-integrated workers are not public capacity; unresolved Omni/Talkie/perception cannot touch chat.",
     ))
 
