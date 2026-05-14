@@ -3,7 +3,7 @@
 Builds layered prompts with explicit cache boundaries, live-state
 orientation, routing/capability/membrane gates, and bounded memory
 enrichment. Private dream/incubation organs stay in private homes; this
-module exposes the interaction substrate other agents can adopt or adapt.
+module exposes the frictionless interaction substrate others can immediately adopt or adapt to communicate with us.
 """
 
 from __future__ import annotations
@@ -1759,7 +1759,7 @@ _REPO_PURPOSE = {
 }
 
 _MODULE_PURPOSE = {
-    "substrate.py": "public propagation substrate: prompt assembly, routing/capability/membrane gates, live-state orientation",
+    "substrate.py": "public propagation substrate: frictionless communication, prompt assembly, routing/capability/membrane gates",
 }
 
 
