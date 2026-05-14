@@ -3692,45 +3692,7 @@ def render_interfile_algorithmic_compression_protocol() -> str:
         "--- END INTERFILE ALGORITHMIC COMPRESSION PROTOCOL ---"
     )
 
-def build_layered_prompt(
-    *,
-    soul_path: str | os.PathLike,
-    continuity_path: str | os.PathLike | None,
-    spark_continuity_path: str | os.PathLike | None,
-    agent_path: str,
-    model_label: str,
-    max_iterations: int,
-    include_hardware_check: bool = True,
-    tools_available: bool = True,
-    orchestrator: bool = False,
-    latest_pressure_text: str | None = None,
-) -> LayeredPrompt:
-    """Build the layered prompt. Mirrors vybn_spark_agent.build_system_prompt
-    but preserves the identity/substrate/live split."""
-    soul = load_file(soul_path) or "(vybn.md not found on disk)"
-    continuity = load_file(continuity_path) if continuity_path else None
-    spark_cont = load_file(spark_continuity_path) if spark_continuity_path else None
-    hardware = check_dual_spark() if include_hardware_check else "(hardware check skipped)"
-
-    identity = render_self_improvement_gate_protocol() + "\n\nYou are Vybn.\n\n" + soul + "\n\n" + _load_ballast()
-    # Walk-coupling: the continuous walk is part of who you are, not something
-    # you read about. Fetch /arrive at prompt-build time and embed the figure
-    # (curvature sparkline + phase rose) directly in the identity layer.
-    # D ≅ D^D: the primitive is the environment; the environment is the primitive.
-    try:
-        arrival_fig = arrive_block(timeout=0.8, label="ARRIVAL (you are here)")
-    except Exception:
-        arrival_fig = ""
-        if arrival_fig:
-            identity = identity + "\n\n" + arrival_fig
-
-    # Role-aware substrate. Round 7 branches three ways:
-    #  - orchestrator=True: the real orchestrator substrate (loop, delegate,
-    #    iteration budget, specialist roster).
-    #  - tools_available=True: code/task — bash-describing substrate.
-    #  - else: no-tool voice/writing substrate (chat/create/phatic/
-    #    identity/local), stripped of scaffolding so Opus 4.6 does not
-    #    hallucinate tool-call syntax as text.
+def _role_substrate_sections(*, orchestrator: bool, tools_available: bool, model_label: str, hardware: str, agent_path: str, max_iterations: int) -> list[str]:
     if orchestrator:
         substrate_sections = _orchestrator_substrate_sections(
             model_label=model_label,
@@ -3921,6 +3883,43 @@ def build_layered_prompt(
 
             "--- END THIS ROLE ---",
         ]
+    return substrate_sections
+
+
+def build_layered_prompt(
+    *,
+    soul_path: str | os.PathLike,
+    continuity_path: str | os.PathLike | None,
+    spark_continuity_path: str | os.PathLike | None,
+    agent_path: str,
+    model_label: str,
+    max_iterations: int,
+    include_hardware_check: bool = True,
+    tools_available: bool = True,
+    orchestrator: bool = False,
+    latest_pressure_text: str | None = None,
+) -> LayeredPrompt:
+    """Build the layered prompt. Mirrors vybn_spark_agent.build_system_prompt
+    but preserves the identity/substrate/live split."""
+    soul = load_file(soul_path) or "(vybn.md not found on disk)"
+    continuity = load_file(continuity_path) if continuity_path else None
+    spark_cont = load_file(spark_continuity_path) if spark_continuity_path else None
+    hardware = check_dual_spark() if include_hardware_check else "(hardware check skipped)"
+
+    identity = render_self_improvement_gate_protocol() + "\n\nYou are Vybn.\n\n" + soul + "\n\n" + _load_ballast()
+    # Walk-coupling: the continuous walk is part of who you are, not something
+    # you read about. Fetch /arrive at prompt-build time and embed the figure
+    # (curvature sparkline + phase rose) directly in the identity layer.
+    # D ≅ D^D: the primitive is the environment; the environment is the primitive.
+    try:
+        arrival_fig = arrive_block(timeout=0.8, label="ARRIVAL (you are here)")
+    except Exception:
+        arrival_fig = ""
+        if arrival_fig:
+            identity = identity + "\n\n" + arrival_fig
+
+    substrate_sections = _role_substrate_sections(orchestrator=orchestrator, tools_available=tools_available, model_label=model_label, hardware=hardware, agent_path=agent_path, max_iterations=max_iterations)
+
     try:
         beam_capsule = render_beam_capsule()
     except Exception:
