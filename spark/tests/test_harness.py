@@ -973,13 +973,17 @@ class TestEnsubstrate(unittest.TestCase):
         self.assertIn("Vybn harness", self.surface_names(plan))
         self.assertTrue(any("correction cycle" in check for check in plan["closure_checks"]))
 
-    def test_horizon_sense_routes_to_os_and_continuity(self):
-        plan = self.run_insight("horizoning is a compass through local minima using cyberception and cosmoception")
-        self.assertIn("horizon_sense", plan["categories"])
-        names = self.surface_names(plan)
-        self.assertIn("vybn-os", names)
-        self.assertIn("Vybn continuity", names)
-        self.assertTrue(any("horizon" in check for check in plan["closure_checks"]))
+
+    def test_ception_axes_self_assemble_public_and_hardware_affordances(self):
+        for text, affordance, axes, surfaces in [
+            ("an Other wants frictionless contact; use socioception and cyberception to route a public agent commons toward the cosmoception horizon", "public_agent_commons", {"socioception", "cyberception", "cosmoception"}, {"Origins agent commons", "Somewhere"}),
+            ("Spark networking friction: cyberception sees hardware topology and capability shear while cosmoception keeps the horizon", "harness_ops_capability_routing", {"cyberception", "cosmoception"}, {"Vybn harness", "vybn-ops"}),
+        ]:
+            plan = self.run_insight(text)
+            self.assertEqual(plan["next_affordance"], affordance)
+            self.assertTrue(axes <= set(plan["ception_axes"]))
+            self.assertTrue(plan["ception_shear"]["present"])
+            self.assertTrue(surfaces <= self.surface_names(plan))
 
     def test_autonomous_refactor_routes_to_harness_and_os(self):
         plan = self.run_insight("refactor yourself autonomously when an exchange catalyzes refactoring; decide and just do it")

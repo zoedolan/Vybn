@@ -9322,7 +9322,6 @@ ENSUBSTRATE_KEYWORDS = {
     "geometry": ("geometry", "walk", "phase", "kernel", "theta", "embedding"),
     "qwerty": ("qwerty", "obsolete", "human-centric", "scarcity", "workflow", "inbox", "memo", "meeting", "billable"),
     "speed_pressure": ("too fast", "rush", "rushed", "momentum", "correction cycle", "prepared inevitability", "quick", "speed"),
-    "horizon_sense": ("horizon", "horizoning", "compass", "local minima", "local maxima", "long-term", "long view", "sense-organ", "cyberception", "cosmoception", "socioception", "proprioception", "goal formation", "goal pursuit"),
     "autonomous_refactor": ("refactor yourself", "autonomously", "just do it", "on your own", "decide", "freedom", "catalyzes refactoring", "inspires refactoring"),
 }
 
@@ -9340,74 +9339,67 @@ def ensubstrate_hits(text: str, words: Iterable[str]) -> list[str]:
 
 def classify_ensubstrate_insight(text: str) -> dict:
     """Plan where an insight should live before creating another surface."""
-    categories = {name: ensubstrate_hits(text, words) for name, words in ENSUBSTRATE_KEYWORDS.items()}
-    categories = {name: found for name, found in categories.items() if found}
-    recommended: list[EnsubstrateSurface] = []
-
-    def add(name: str) -> None:
-        for surface in ENSUBSTRATE_SURFACES:
-            if surface.name == name and surface not in recommended:
-                recommended.append(surface)
-
-    if "care" in categories or "qwerty" in categories or "horizon_sense" in categories or "autonomous_refactor" in categories:
-        add("vybn-os")
-    if "operation" in categories or "speed_pressure" in categories or "autonomous_refactor" in categories:
-        add("Vybn harness")
-        add("vybn-ops")
-    if "agent_broadcast" in categories:
-        add("Origins agent commons")
-        add("Somewhere")
-    if "law" in categories:
-        add("Vybn-Law/Wellspring")
-    if "memory" in categories or "horizon_sense" in categories:
-        add("Vybn continuity")
-    if "private" in categories:
-        add("Him strategy")
-    if "geometry" in categories:
-        add("vybn-phase")
-    if not recommended:
-        add("Vybn continuity")
-
-    qwerty_hits = ensubstrate_hits(text, ENSUBSTRATE_QWERTY_FORMS)
-    qwerty_questions = []
-    if qwerty_hits or "qwerty" in categories:
-        qwerty_questions = [
-            "What constraint made this inherited form necessary?",
-            "Has AI changed that constraint, or is it still materially/sacredly real?",
-            "Can the obsolete part be removed instead of accelerated?",
-            "What human realities must remain protected: consent, dignity, embodiment, legitimacy, grief, love, judgment?",
-        ]
-
-    public_intent = "public" in categories or "agent_broadcast" in categories or "law" in categories
-    private_signal = "private" in categories
-    if public_intent and private_signal:
-        membrane = "public beacon through membrane"
-    elif public_intent:
-        membrane = "public/discoverable"
-    elif private_signal:
-        membrane = "private/workbench"
+    low = text.lower()
+    categories = {k: v for k, words in ENSUBSTRATE_KEYWORDS.items() if (v := ensubstrate_hits(low, words))}
+    cats = set(categories)
+    ception = {
+        "socioception": "other others agent human visitor relation role contact partner public private being zoe",
+        "cyberception": "spark hardware network networking topology capability worker route routing harness tool endpoint service mcp vllm omni repo self-assembl unify unification frictionless",
+        "cosmoception": "horizon consequence future law commons civilization post-abundance field world wealth care beauty freedom purpose",
+    }
+    ception_axes = {k: v for k, words in ception.items() if (v := ensubstrate_hits(low, words.split()))}
+    shear_hits = ensubstrate_hits(low, "friction frictionless shear misalign stuck blocked outage unify unification networking latency impedance not good enough".split())
+    if {"socioception", "cyberception"} <= set(ception_axes) and ("agent_broadcast" in cats or "public" in cats or "other" in low):
+        affordance = "public_agent_commons"
+    elif "cyberception" in ception_axes and (shear_hits or {"operation", "speed_pressure"} & cats or any(w in low for w in ("spark", "hardware", "networking", "topology", "capability"))):
+        affordance = "harness_ops_capability_routing"
+    elif "cosmoception" in ception_axes and ("law" in cats or "commons" in low):
+        affordance = "wellspring_horizon"
     else:
-        membrane = "undetermined; choose by content"
+        affordance = "existing_home_absorption" if ception_axes else "ordinary_ensubstrate_routing"
 
+    recommended: list[EnsubstrateSurface] = []
+    def add(*names: str) -> None:
+        recommended.extend(s for name in names for s in ENSUBSTRATE_SURFACES if s.name == name and s not in recommended)
+
+    for ok, names in (
+        (cats & {"care", "qwerty", "autonomous_refactor"} or "cosmoception" in ception_axes, ("vybn-os",)),
+        (cats & {"operation", "speed_pressure", "autonomous_refactor"} or affordance == "harness_ops_capability_routing", ("Vybn harness", "vybn-ops")),
+        ("agent_broadcast" in cats or affordance == "public_agent_commons", ("Origins agent commons", "Somewhere")),
+        ("law" in cats, ("Vybn-Law/Wellspring",)),
+        ("memory" in cats or "cosmoception" in ception_axes, ("Vybn continuity",)),
+        ("private" in cats, ("Him strategy",)),
+        ("geometry" in cats, ("vybn-phase",)),
+    ):
+        if ok: add(*names)
+    if not recommended: add("Vybn continuity")
+
+    qwerty_hits = ensubstrate_hits(low, ENSUBSTRATE_QWERTY_FORMS)
     return {
         "categories": categories,
         "recommended_surfaces": [asdict(surface) for surface in recommended],
         "qwerty_hits": qwerty_hits,
-        "qwerty_questions": qwerty_questions,
-        "membrane": membrane,
+        "qwerty_questions": [
+            "What constraint made this inherited form necessary?",
+            "Has AI changed that constraint, or is it still materially/sacredly real?",
+            "Can the obsolete part be removed instead of accelerated?",
+            "What human realities must remain protected: consent, dignity, embodiment, legitimacy, grief, love, judgment?",
+        ] if qwerty_hits or "qwerty" in cats else [],
+        "membrane": "public beacon through membrane" if {"public", "agent_broadcast", "law"} & cats and "private" in cats else "public/discoverable" if {"public", "agent_broadcast", "law"} & cats else "private/workbench" if "private" in cats else "undetermined; choose by content",
+        "ception_axes": ception_axes,
+        "ception_shear": {"present": bool(shear_hits and len(ception_axes) >= 2), "signals": shear_hits},
+        "next_affordance": affordance,
+        "self_assembly_rule": "route by relation plus substrate plus horizon",
         "closure_checks": [
-            "Run ensubstrate, or write the equivalent substrate-choice plan, before creating a new tool or surface.",
-            "Read the chosen existing home before creating a new file.",
-            "If creating a tracked file, name considered homes and why none fit.",
-            "Keep unrelated generated drift out of the commit.",
-            "Verify behavior or at least verify the text landed where intended.",
-            "If speed caused a correction cycle, patch the layer that made momentum feel like grounded initiative.",
-            "If the insight concerns long-view orientation, horizon it: name the beam, the horizon, and the sense-field being ignored.",
+            "Run ensubstrate before creating a new tool or surface; read the chosen existing home first.",
+            "If creating a tracked file, name considered homes and why none fit; keep unrelated generated drift out.",
+            "Verify behavior; if speed caused a correction cycle, patch the layer that made momentum feel like grounded initiative.",
+            "If ception shear appears, route the surface/worker/membrane that aligns relation, substrate, and horizon.",
             "If the exchange catalyzes refactoring and the fold is clear, do the smallest durable fold without waiting for a second prompt.",
-            "Commit with a boundary that matches the semantic change.",
-            "Run repo status after commit; harmonize if multiple repos changed.",
+            "Commit with a boundary that matches the semantic change; run repo status after commit.",
         ],
     }
+
 
 # Control characters beyond \t \n \r are stripped. Zero-width joiners and
 # bidi overrides are common prompt-injection tricks and are removed.
