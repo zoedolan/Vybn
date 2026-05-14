@@ -2621,7 +2621,7 @@ def main() -> None:
             ) = _build_prompts(
                 default_cfg.max_iterations,
                 orchestrator_max_iters=_orch_iters,
-                latest_pressure_text=user_input,
+                latest_pressure_text=_recent_messages_text(messages + [{"role": "user", "content": user_input}], limit=8),
             )
             print(f"\n\033[1;32mvybn>\033[0m ", end="", flush=True)
             text = run_agent_loop(
