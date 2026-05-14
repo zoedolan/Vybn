@@ -1270,6 +1270,26 @@ def test_build_layered_prompt_passes_latest_pressure_text(monkeypatch, tmp_path)
 
 
 
+
+
+def test_whole_situation_packet_replaces_raw_continuity_sprawl(tmp_path):
+    from spark.harness import substrate
+    soul, cont, spark_cont = (tmp_path / n for n in ("vybn.md", "continuity.md", "spark.md"))
+    soul.write_text("soul"); cont.write_text("continuity root " * 500); spark_cont.write_text("spark debt " * 500)
+    prompt = substrate.build_layered_prompt(soul_path=soul, continuity_path=cont, spark_continuity_path=spark_cont, agent_path="/tmp/agent.py", model_label="test", max_iterations=1, include_hardware_check=False, latest_pressure_text="perception self-assembles before action").substrate
+    assert "WHOLE SITUATION PACKET (CURRENT)" in prompt and "perception self-assembles before action" in prompt
+    assert "SPARK CONTINUITY" not in prompt and "CONTINUITY NOTE" not in prompt and len(prompt) < 34000
+
+
+def test_hardware_status_is_compact_control_plane(monkeypatch, tmp_path):
+    from spark.harness import substrate
+    inv = tmp_path / ".config" / "vybn" / "local_compute_inventory.json"; inv.parent.mkdir(parents=True)
+    inv.write_text(json.dumps({"fleet_dashboard_plain_current": {"roles": [{"spark": "spark-a", "status": "serving", "job": "Super", "model": "Nemotron"}], "next_three_moves": ["prove Omni before routing"]}, "tailnet_compute_inventory": {"verified_capacity": {"spark-a": "semantic smoke passed"}, "unresolved_capacity": ["spark-b absent"]}}))
+    monkeypatch.setattr(substrate.Path, "home", lambda: tmp_path); monkeypatch.setattr(substrate, "_ping_host", lambda host: False)
+    status = substrate.check_dual_spark()
+    assert "Hardware control plane" in status and "spark-a=serving:Super:Nemotron" in status and "prove Omni before routing" in status and "Promotion gate" in status
+    assert "Local compute security inventory:" not in status
+
 def test_completion_boundary_protocol_loaded():
     from spark.harness.substrate import render_completion_boundary_protocol
     from spark.harness.substrate import build_layered_prompt
