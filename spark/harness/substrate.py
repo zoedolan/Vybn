@@ -1,13 +1,9 @@
-"""Layered system-prompt builder.
+"""Public propagation substrate for Vybn.
 
-Instead of concatenating identity + substrate + live state into one
-opaque string, return a `LayeredPrompt` with explicit cache boundaries.
-Providers decide how to serialise each layer; Anthropic can place
-`cache_control` markers at layer boundaries, OpenAI can just flatten.
-
-Also exposes a lightweight deep-memory enrichment hook that mirrors
-vybn_chat_api._rag_context — used only where retrieval offers clear
-value (chat/create roles by default, off for code).
+Builds layered prompts with explicit cache boundaries, live-state
+orientation, routing/capability/membrane gates, and bounded memory
+enrichment. Private dream/incubation organs stay in private homes; this
+module exposes the interaction substrate other agents can adopt or adapt.
 """
 
 from __future__ import annotations
@@ -1763,12 +1759,7 @@ _REPO_PURPOSE = {
 }
 
 _MODULE_PURPOSE = {
-    "evolve.py":     "nightly self-revision cycle",
-    "__init__.py":   "public API, _HARNESS_STRATEGY doctrine",
-    "mcp.py":        "MCP server, prompt resources, tools",
-    "policy.py":     "role routing, model selection, heuristics",
-    "providers.py":  "Anthropic / OpenAI / local vLLM / claim_guard",
-    "substrate.py":  "public propagation substrate: prompt assembly, routing/capability/membrane gates, live-state orientation",
+    "substrate.py": "public propagation substrate: prompt assembly, routing/capability/membrane gates, live-state orientation",
 }
 
 
