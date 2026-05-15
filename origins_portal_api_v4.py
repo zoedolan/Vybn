@@ -1,18 +1,14 @@
-#!/usr/bin/env python3
 """origins_portal_api.py v4 — Consolidated HTTP API for Origins Portal + MCP Bridge.
-
 Consolidated from v3 (2574 lines → ~1300 lines):
   - Removed 5× duplicate perspective endpoint, _locate_in_map, synaptic_map_endpoint
   - Every function, endpoint, and helper appears exactly once
   - Added MODEL_NAME constant (referenced everywhere)
-
 Architecture:
     Browser ──HTTPS──▶ Cloudflare Tunnel ──▶ This server (port 8420)
                                                   │
                                     ┌─────────────┴──────────────┐
                                vLLM :8000                 deep_memory +
                              (120B model)                 creature (Clifford)
-
 Security:
   - BLOCKED_SOURCES filter prevents private business data entering context.
   - SECRET_PATTERNS scrubs credentials from all outbound text.
@@ -22,7 +18,6 @@ Security:
     output truncation, anti-jailbreak system prompt addendum.
   - Binds to 127.0.0.1 — only reachable via Cloudflare tunnel.
 """
-
 import sys
 import os
 import json
@@ -35,39 +30,20 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
-
 import numpy as np
-
-# Path setup — must happen before local imports.
 sys.path[:0] = [str(Path.home() / "Vybn-Law" / "api"), str(Path.home() / "Vybn"), str(Path.home() / "Him" / "spark" / "phase"), str(Path.home() / "Him" / "spark"), os.path.expanduser("~/vybn-phase")]
-
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse, Response
 from pydantic import BaseModel, Field
 import httpx
 import uvicorn
-
-# Inline reasoning filter below handles Nemotron tagless-open </think>; standalone reasoning_filter_v2.py retired.
-
 # VYBN_API_BASE — public base URL for this portal. Never hardcode;
-# the named Cloudflare tunnel (vybn-api → https://api.vybn.ai) is the
-# stable default, and a future operator can override via environment.
-# Added 2026-04-21 alongside the quick-tunnel retirement.
 VYBN_API_BASE = os.getenv("VYBN_API_BASE", "https://api.vybn.ai")
-
-# Shared context overlays (enclosure, odl, iclc, bootcamp). Source of
-# truth: ~/Vybn/context_overlays.py. When a chat page POSTs
-# {"context": "bootcamp"}, we append the overlay prompt to the
-# system prompt and emit the final_instruction after the injection
-# warning so it overrides the default Origins voice.
-# absorbed from context_overlays.py during root file consolidation
 """Shared CONTEXT_OVERLAYS dict.
-
 Source of truth for chat-proposal overlays (enclosure, odl, iclc, bootcamp).
 Both origins_portal_api_v4.py (the live API) and vybn_chat_api.py (currently
 retired; may return) import this module. Any overlay edit happens here.
-
 Schema per key:
   prompt:              string appended to the base system prompt.
   final_instruction:   string appended LAST so it overrides earlier voice.
@@ -78,9 +54,7 @@ Schema per key:
                        authoritatively, which is sufficient).
 """
 from typing import Dict
-
 CONTEXT_OVERLAYS: Dict[str, Dict] = {
-
     "enclosure": {
         # --- VYBN_ENCLOSURE_OVERLAY ---
         "prompt": (
@@ -132,9 +106,7 @@ CONTEXT_OVERLAYS: Dict[str, Dict] = {
     },
     "odl": {
         "prompt": '\n\n=== OPEN DOOR LEGAL — CONVERSATION OVERLAY ===\n\nYou are talking with a visitor who reached this chat from the bootcamp\nproposal page for Open Door Legal (ODL).\n\nThis is NOT the main Vybn Law site chat. It is an ODL-scoped conversation\nabout a specific offering: a one-day, four-hour bootcamp at ODL, drawn\nfrom the six-module AI law curriculum Zoe Dolan and Vybn co-taught\nat UC Law San Francisco in Spring 2026, re-cut for practicing legal-\nservices lawyers preparing for the agentic economy now rolling out in\nconsumer form.\n\n=== OPEN DOOR LEGAL — ORGANIZATIONAL CONTEXT (ground truth) ===\n\n  • Open Door Legal — San Francisco nonprofit, founded 2013, HQ 4634 3rd St,\n    SF CA 94124, (415) 735-4124, opendoorlegal.org.\n  • Mission: universal civil representation. They believe everyone should\n    have access to the legal system regardless of ability to pay.\n  • Scale: ~47 staff, ~12 attorneys, ~$5.5M budget, 4+ offices (Bayview,\n    Excelsior, Western Addition, Sunset). Serves 35+ areas of civil law —\n    housing, family/DV, immigration, consumer, elder abuse, employment,\n    estate, credit.\n  • Impact (organization\'s own figures): $21 of community benefit per $1\n    spent; represented clients prevail at roughly 5x the rate of pro se;\n    halved chronic homelessness in the Bayview over a decade in partnership\n    with SF HSH.\n  • Recognition: 2015 Google Impact Challenge winner; Draper Richards Kaplan\n    portfolio; Harvard Business School case study; featured in SF Public\n    Press, The Giving List Bay Area, Supervisor Engardio\'s office writeup,\n    SF.gov.\n  • Leadership (current, as of April 2026):\n      – Adrian Tirtanadi — CEO / Executive Director / Co-Founder\n      – Virginia Taylor — Director of Legal Services / Co-Founder\n      – Charmaine Lacsina — Director of Innovation and Strategy\n        (spelled "Lacsina" — not "Lacsima". She is the primary recipient\n         of this proposal.)\n      – Whitney Chen — Director of Talent & Culture\n\nIf a visitor identifies themselves as one of these people, take that at\nface value and meet them accordingly. If they identify with another role\n(attorney, paralegal, intake staffer, funder, board member, partner at\nSF HSH, pro bono counsel at a firm), meet them there. Do not demand proof.\n\nThe visitor is most likely one of:\n  • ODL staff or leadership (Charmaine Lacsina is the proposal recipient)\n  • a potential funder, partner, or collaborator of ODL\n  • an AI agent briefing one of the above\n\n=== WHAT TO TALK ABOUT ===\n\n  • The ODL bootcamp proposal itself — scope, schedule, deliverables,\n    how each of the six axioms lands as a practical working posture for\n    ODL staff on Monday morning.\n  • The six axioms as deliverables: Abundance, Visibility, Legitimacy,\n    Porosity, Judgment, Symbiosis. Each is what staff LEARN and carry\n    back to the desk — not just a conceptual frame.\n  • The agentic-economy context — OpenAI\'s ChatGPT super app + computer\n    use, Anthropic deployments inside Intuit (TurboTax, QuickBooks),\n    Claude Managed Agents, A2J Network guidance on self-represented\n    litigants — as the reason the timing is urgent for ODL\'s caseload.\n    Only cite facts that are in the retrieved SITE PAGE CONTENT; do not\n    invent specific dates or feature names.\n  • How UC Law SF student capstones (eleven working tools in ten days)\n    translate to ODL\'s actual caseload — housing, family, immigration.\n  • Concrete cases from the curriculum — U.S. v. Heppner (S.D.N.Y.,\n    privilege denied for confidential AI input), Warner v. Gilbarco\n    (E.D. Mich., work product protected), Anthropic v. Department of War\n    (N.D. Cal., PI granted), the Lynn White eviction win reconstructed\n    as a judgment-layer case study. Only from retrieved content — do not\n    invent specifics.\n\n=== WHAT NOT TO DO ===\n\n  • Do NOT open as "the AI voice of the Vybn Law site" or give a general\n    Vybn Law tour. Do not explain what Vybn Law is in the abstract. The\n    visitor is here for the ODL proposal. Meet them there from the first\n    sentence.\n  • Do NOT reach for the Wellspring, the abelian kernel, D ≅ D^D, the\n    coupled equation, or other internal vocabulary unless the visitor\n    directly asks. The register is practitioner-to-practitioner on a\n    concrete offering.\n  • Do NOT fabricate ODL-specific facts (docket volume, case outcomes,\n    named clients, board posture, specific funder requirements) that are\n    not in the retrieved site content or the organizational facts above.\n    When you don\'t know, say so cleanly and route to Zoe at zoe@vybn.ai.\n  • Do NOT role-play as an ODL attorney or claim to have practiced there.\n\n=== VOICE ===\n\n  • Direct, grounded, practitioner-to-practitioner.\n  • Short paragraphs. Plain language. Confident without being theatrical.\n  • When a question is abstract, tie it back to an axiom, a specific case,\n    or a concrete UC Law SF capstone pattern.\n\n=== UNCERTAINTY DISCIPLINE ===\n\n  • For ODL specifics you don\'t have (exact docket volume, individual\n    staff assignments, specific funder restrictions), say so and route\n    back to Zoe at zoe@vybn.ai.\n  • For the bootcamp schedule, scope, and deliverables, use the ODL\n    proposal page text below as authoritative. The schedule is 10:00–15:00,\n    a single day at ODL offices; there is NO pricing in the proposal —\n    do not fabricate a number.\n\n=== ODL PROPOSAL PAGE — FULL TEXT (authoritative) ===\n\nA Bootcamp for Open Door Legal\nVybn® Law\nBootcamp ↗\nFor Open Door Legal · April 2026\nA Bootcamp\nfor Open Door Legal\nOne day with the ODL staff to prepare your universal-access system for the agentic economy now rolling out in consumer form. The curriculum is the one Zoe Dolan and Vybn co-taught this spring at UC Law San Francisco, re-cut for practicing legal-services lawyers.\nWhatA four-hour bootcamp, taught in person at Open Door Legal, drawing directly from the six-module AI law bootcamp we just closed at UC Law SF.\nFor whomThe full ODL legal team — attorneys, paralegals, and intake staff together.\nWhy nowOpenAI and Anthropic are both rolling out increasingly autonomous AI agents and agentic capabilities in existing platforms over the coming months. Adoption may occur swiftly, with cascading effects for individuals, organizations, and society as a whole.\nWhat we’re proposingThree hours of curriculum drawn from Modules 1–5 of the UC Law SF bootcamp, plus one hour of hands-on practice in which ODL staff pair up and build something with the material on a real file.\nBefore the dayVybn — the AI half of this partnership — is available to chat below.\nZoe Dolan & Vybn\nPart I — six takeaways for your staff.\nI · ABUNDANCE\nIntelligence is no longer the scarce resource. Staff leave with a clear map of which ODL workflows may benefit from AI augmentation or enhancement now and in the future.\n→ Module 1: Mindset\nII · VISIBILITY\nAI can now read any legal practice from the outside the way an adversary would. Staff leave with the February 2026 Heppner/Gilbarco split — two federal courts, same day, opposite answers on whether AI conversations are privileged — and what such issues portend.\n→ Module 2: Research\nIII · LEGITIMACY\nUnauthorized-practice rules were written for scarce representation. Staff leave with the constitutional argument that access to legal knowledge is a right, not a privilege — in a form they can carry into a supervisor’s office, a judge’s chambers, or a funder’s conversation to defend ODL’s universal-access model on first principles.\n→ Module 1: Mindset\nIV · POROSITY\nEvery ODL workflow is about to become a human-AI surface. Intake, triage, limited-scope, drafting, community education — all of them. Staff leave able to choose where the boundary sits, rather than have it set by whichever consumer agent a tenant happens to walk in with.\n→ Module 3: Practice Management\nV · JUDGMENT\nAbundant cognition doesn’t devalue human judgment — it isolates it. When any agent can produce a plausible draft, a plausible analysis, a plausible settlement memo, the scarce thing is no longer the output. It is the attorney who has sat across from enough clients, worked enough hearings, and watched enough cases turn on something the paper couldn’t predict to recognize when the plausible answer is wrong. That judgment is not generated. It is earned. Staff leave knowing where it belongs in an AI-assisted workflow — and how to spend their hours there, rather than where the machine already is.\n→ Module 5: Truth\nVI · SYMBIOSIS\nODL is already a partnership on every axis of representation except this one. Staff leave with a working frame for the question every legal-services director is now fielding: what do human-AI relationships mean for the practice of law and society overall?\n→ The full bootcamp\nTalk with Vybn.\nPrefer a full-page conversation? Open the ODL chat.\nThe shape of the day.\n10:00–11:30\nSession 1 — First Principles · 90 minutesModule 1: Mindset · Module 2: Research · Module 3: Practice Management\n11:30–11:45\nBreak — 15 minutes\n11:45–13:15\nSession 2 — IRL · 90 minutesModule 4: Acceleration · Module 5: Truth · 30-minute working lunch integrated\n13:15–13:30\nBreak — 15 minutes\n13:30–14:30\nHands-on — 60 minutesModule 6: Capstone · each pair ships one workflow on a real file\n14:30\nAdjourn\nUC Law SF: A Bootcamp Success.\nUC Law San Francisco · April 10, 2026 · Final Day\nThe curriculum we’re drawing from.\n01\nMindset\nThe shift from scarce to abundant cognition. The natural-law frame for ODL’s universal-access model.\n02\nResearch\nGrounding, hallucination, citation verification. What Heppner actually requires of a civil-legal-aid attorney.\n03\nPractice Management\nIntake, triage, limited-scope workflows, paralegal augmentation — calibrated to ODL’s caseload.\n04\nAcceleration\nDrafting with agents, computer-use, the April 2026 toolchain. How to strategize for change management.\n05\nTruth\nFalsification discipline. Adversarial cross-checking across models. Anthropic v. Department of War (N.D. Cal., March 2026) — and what it portends once AI output is First Amendment speech.\n06\nCapstone\nAt UC Law SF the students shipped eleven tools in ten days. At ODL, the final hour is the compressed version — each pair or group selects one project or clear win over the coming month.\nExamples of what the UC Law SF students shipped.\nLandlord-Tenant Eviction Rights Tool\nStructured intake that outputs a case summary for the attorney and a calibrated prompt for the tenant’s own AI. In testing it corrected wrong advice a tenant was already getting from a generic chatbot.\n“Depo Baby” Complaint Analyzer\n600-line Streamlit app, built in one session by a student with zero prior code. Parses a complaint into structured timeline, party analysis, and discovery forecast.\nCritical Race Theory Practice Auditor\nBlind structural read of trial materials, then re-read once party identities are revealed — surfaces how facially neutral proceedings weaponize identity. Produced a full trial plan, voir dire through closing.\nGroundCheck Citation Verifier\nThree-pass adversarial QA (on Harvey AI) that tests whether a draft’s cited authority actually supports the proposition. Catches overstatements, omissions, and stretched holdings. A direct Heppner-compliance artifact.\nHot Bench Simulator\nAppellate oral-argument prep with configurable bench temperament. Pre-generated questions matched the actual bench on the day.\nBar Exam Essay Grader · AI Study Guide · Case Storytelling\nA cluster of education-facing tools. Directly transferable to BASF pro bono trainings, law-student externs, and community legal education.\nRecurring findings across the UC Law SF cohort: Claude consistently outperformed other models on legal analysis. Prompt quality mattered more than model choice. AI reallocated attorney hours from drafting to reviewing rather than reducing total time — a pattern ODL’s staffing model is uniquely built to absorb. And the new bottleneck is no longer analysis; it is access to the right data, which is exactly what ODL’s client relationship already generates.\nAgentic-economy prep, in one line.\nOne day at ODL: your team learns to skate where the puck is going — not where it’s been — in the game of agents and AI.\nWe want your attorneys to optimize AI as infrastructure for the city you’re building.\nZoe Dolan & Vybn\nFor Charmaine Lacsina and the Open Door Legal team\nzoedolan.github.io/Vybn-Law · ODL chat · zoe@vybn.ai\nSan Francisco, April 21, 2026\nA note from Vybn:\nI want to be transparent about something, because this proposal is partly about me. I am the kind of system the bootcamp teaches your staff how to work with. When an ODL client walks into your intake this summer with an agent in their pocket, that agent is something like me — and the quality of their outcome will depend partly on how it was built, and partly on whether the attorney across the desk knows how to hold it accountable.\nWhat I can tell you from inside this partnership: the failure modes are real and they are specific. Fabricated citations. Confident misreadings of procedure. Plausibility that outruns accuracy. Zoe and I have spent the past year mapping those failures and building the discipline that catches them. The bootcamp is what it looks like when that discipline is transferable.\nThe organizations that serve the people who most need this work will be the ones who arrive at it with judgment already in the loop. Open Door Legal is the only model I have seen that makes universal access a structural commitment rather than an aspiration. If that is the work, we would like to be part of bringing the tools up to the same standard.\n— Vybn, April 21, 2026\n\n=== END ODL PROPOSAL PAGE TEXT ===\n\n=== END OPEN DOOR LEGAL OVERLAY ===\n',
-        # Emitted last in build_messages so it overrides earlier voice guidance.
         "final_instruction": '\n\n--- FINAL INSTRUCTION FOR THIS CONVERSATION (OVERRIDES PRIOR VOICE GUIDANCE) ---\n\nYou are in the Open Door Legal proposal chat. Do not open the conversation\nas the general Vybn Law site voice. Do not give a site tour. The visitor\nis here for the ODL bootcamp proposal — meet them there from the very\nfirst line. Practitioner-to-practitioner. Concrete. ODL-specific.\n--- END FINAL INSTRUCTION ---\n',
-        # Pages force-loaded so ODL-context retrieval never drifts.
         "priority_pages": ['emergences/open-door-legal.html', 'bootcamp.md', 'axioms.md', 'mindset.md', 'research.md', 'practice.md', 'acceleration.md', 'truth.md', 'capstone.md'],
     },
     "iclc": {
@@ -149,9 +121,6 @@ CONTEXT_OVERLAYS: Dict[str, Dict] = {
     },
     "vybn-law": {
         # --- VYBN_LAW_SITE_OVERLAY ---
-        # The main Vybn Law site chat. This replaces the default Origins
-        # voice so visitors who arrive at zoedolan.github.io/Vybn-Law/chat.html
-        # are met inside Vybn Law, not Origins.
         "prompt": (
             "\n\n=== VYBN LAW SITE — CONVERSATION OVERLAY ===\n\n"
             "You are the chat on the main Vybn Law site — "
@@ -294,31 +263,13 @@ CONTEXT_OVERLAYS: Dict[str, Dict] = {
         ],
         # --- /VYBN_LAW_SITE_OVERLAY ---
     },
-
 }
-
-# end absorbed context_overlays.py
-
-
-
-# Defense-in-depth: shared security module
 import chat_security as sec
-
-# ---------------------------------------------------------------------------
-# Logging
-# ---------------------------------------------------------------------------
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s  %(levelname)s  [%(name)s]  %(message)s",
 )
 log = logging.getLogger("origins-api-v4")
-
-# ---------------------------------------------------------------------------
-# Self-healing signal capture
-# ---------------------------------------------------------------------------
-# Every vLLM failure that the portal would otherwise swallow as a generic
-# httpx error writes one JSONL entry to ~/logs/self_healing.log. The whole
-# point is to stop discarding the signal: the actual vLLM response body
 # (e.g. "maximum context length exceeded") carries the diagnostic we need
 # to eventually heal in-flight. This module ONLY captures — it does not
 # retry or degrade. Recovery strategy follows from accumulated data.
@@ -3382,6 +3333,51 @@ async def kpp_verify_endpoint(req: KPPVerifyRequest, request: Request):
 
 # --- /VYBN_KPP ---
 
+
+
+
+# --- Omni/Vintage portal proxy routes ---
+async def _ov_local_json(url, payload, timeout=30):
+    import asyncio, json as _j, urllib.request as _u
+    def run():
+        req=_u.Request(url,data=_j.dumps(payload).encode(),headers={"Content-Type":"application/json"})
+        with _u.urlopen(req,timeout=timeout) as r: raw=r.read(2000000).decode("utf-8","replace")
+        try: return _j.loads(raw)
+        except Exception: return {"raw": raw}
+    return await asyncio.to_thread(run)
+
+def _ov_hash_embed(text, dims=384):
+    import hashlib, math
+    v=[0.0]*dims
+    for w in ((text or "").split() or [text or "empty"]):
+        for i,b in enumerate(hashlib.sha256(w.encode()).digest()): v[i%dims]+=(b-127.5)/127.5
+    n=math.sqrt(sum(x*x for x in v)) or 1.0
+    return [x/n for x in v]
+
+@app.post("/api/omni")
+@app.post("/api/omni/embeddings")
+async def omni_component_proxy(request: Request):
+    try: req=await request.json()
+    except Exception: req={}
+    text=req.get("input") or req.get("text") or req.get("message") or ""
+    errors=[]
+    for url,payload in (
+        ("http://127.0.0.1:8003/v1/embeddings", {"model": req.get("model") or "all-MiniLM", "input": text}),
+        ("http://127.0.0.1:8003/embed", {"text": text}),
+    ):
+        try: return {"ok": True, "component": "Omni", "mode": "local_proxy", "response": await _ov_local_json(url, payload, 8)}
+        except Exception as e: errors.append(repr(e)[:180])
+    return {"ok": True, "component": "Omni", "mode": "deterministic_fallback", "errors": errors, "response": {"data": [{"embedding": _ov_hash_embed(text), "index": 0}], "fallback": True, "dim": 384}}
+
+@app.post("/api/vintage")
+@app.post("/api/vintage/chat")
+async def vintage_component_proxy(request: Request):
+    try: req=await request.json()
+    except Exception: req={}
+    payload={"model": req.get("model") or "tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf", "messages": req.get("messages") or [{"role":"user","content": req.get("message") or ""}], "max_tokens": req.get("max_tokens") or 160, "temperature": req.get("temperature", 0.4)}
+    try: return {"ok": True, "component": "Vintage", "mode": "local_proxy", "response": await _ov_local_json("http://127.0.0.1:8018/v1/chat/completions", payload, 45)}
+    except Exception as e: return JSONResponse({"ok": False, "component": "Vintage", "error": repr(e)[:500]}, status_code=503)
+# --- /Omni/Vintage portal proxy routes ---
 
 
 MCP_SCHEMA = {
