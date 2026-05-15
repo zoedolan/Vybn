@@ -188,18 +188,7 @@ def turn_event(
     touched, implicated contracts, and known verification gaps.
     """
     started = time.monotonic()
-    logger.emit(
-        "turn_start",
-        turn=turn,
-        role=role,
-        provider=provider,
-        model=model,
-        tools=list(tools or []),
-        state_touched=list(state_touched or []),
-        contracts_implicated=list(contracts_implicated or []),
-        verification_gaps=list(verification_gaps or []),
-    )
-    bag: dict[str, Any] = TurnEventContract(
+    start_contract = TurnEventContract(
         turn=turn,
         role=role,
         provider=provider,
@@ -209,6 +198,8 @@ def turn_event(
         contracts_implicated=list(contracts_implicated or []),
         verification_gaps=list(verification_gaps or []),
     ).to_record()
+    logger.emit("turn_start", **start_contract)
+    bag: dict[str, Any] = dict(start_contract)
     try:
         yield bag
     finally:
