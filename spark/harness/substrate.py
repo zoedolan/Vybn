@@ -277,10 +277,6 @@ class RouteDecision:
     # provider call. Role determination is unchanged; only the model pin.
     model_override: str | None = None
     alias_used: str | None = None
-    # Runtime audit annotations carried from routing into turn_event().
-    # Policy.classify() may populate this from ReflectionSignal so the
-    # signal reaches the turn contract instead of dying as prose.
-    verification_gaps: list[str] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -411,42 +407,6 @@ class Policy:
     # the alias from the cleaned_input and sets RouteDecision.model_override.
     # Role determination still flows through directives/heuristics normally.
     model_aliases: dict[str, str] = field(default_factory=dict)
-    event_logger: EventLogger | None = None
-    reflection_defect_threshold: float = 0.15
-
-    def _finalize_decision(self, decision: RouteDecision) -> RouteDecision:
-        """Let logged residuals annotate the route decision before it leaves Policy.
-
-        ReflectionSignal was previously computed by readers downstream of the
-        router. This keeps the same existing organ but closes the loop: an
-        anomalous event trail becomes a verification gap on the RouteDecision
-        and an audit event, so callers can carry it into turn_event().
-        """
-        try:
-            log_path = self.event_logger.path if self.event_logger is not None else None
-            signal = reflect_on_events(log_path=log_path)
-        except Exception as exc:  # pragma: no cover - fail-open observability only
-            if self.event_logger is not None:
-                self.event_logger.emit(
-                    "route_reflection_error",
-                    err=f"{type(exc).__name__}: {str(exc)[:120]}",
-                )
-            return decision
-
-        if signal.anomaly_flag and signal.defect_rate > self.reflection_defect_threshold:
-            gap = f"route_reflection_anomaly: {signal.note}"
-            if gap not in decision.verification_gaps:
-                decision.verification_gaps.append(gap)
-            if self.event_logger is not None:
-                self.event_logger.emit(
-                    "route_anomaly_detected",
-                    role=decision.role,
-                    reason=decision.reason,
-                    note=signal.note,
-                    defect_rate=round(signal.defect_rate, 4),
-                )
-        return decision
-
     def role(self, name: str) -> RoleConfig:
         return self.roles.get(name) or self.roles[self.default_role]
 
@@ -517,7 +477,7 @@ class Policy:
                         decision.model_override = model_override
                         decision.alias_used = alias_used
                         decision.reason = f"{decision.reason}+alias={alias_used}"
-                    return self._finalize_decision(decision)
+                    return decision
 
         # 2. Heuristics
         heur = self.heuristics
@@ -554,7 +514,7 @@ class Policy:
                 decision.model_override = model_override
                 decision.alias_used = alias_used
                 decision.reason = f"{decision.reason}+alias={alias_used}"
-            return self._finalize_decision(decision)
+            return decision
 
         # 2a. Orchestrator-mention override.
         # 2026-04-25 — Zoe surfaced: "hey buddy - is the orchestrator
@@ -588,7 +548,7 @@ class Policy:
                         decision.model_override = model_override
                         decision.alias_used = alias_used
                         decision.reason = f"{decision.reason}+alias={alias_used}"
-                    return self._finalize_decision(decision)
+                    return decision
 
         for role_name in ranked:
             if role_name == "identity" and any(term in text.lower() for term in ("zoe", "relationship", "future", "architecture", "model collapse", "reengineer")):
@@ -607,7 +567,7 @@ class Policy:
                         decision.model_override = model_override
                         decision.alias_used = alias_used
                         decision.reason = f"{decision.reason}+alias={alias_used}"
-                    return self._finalize_decision(decision)
+                    return decision
 
         # 3. Default
         default = self.default_role
@@ -621,7 +581,38 @@ class Policy:
             decision.model_override = model_override
             decision.alias_used = alias_used
             decision.reason = f"{decision.reason}+alias={alias_used}"
-        return self._finalize_decision(decision)
+        return decision
+
+
+def route_reflection_gaps(
+    decision: RouteDecision,
+    logger: EventLogger | None = None,
+    *,
+    defect_threshold: float = 0.15,
+) -> list[str]:
+    """Convert event-log reflection into turn-contract gaps without mutating Policy.
+
+    Policy stays a pure classifier. Residual pressure from previous events is
+    bound at the runner/contract boundary, where it can enter the durable turn
+    log instead of contaminating route selection.
+    """
+    try:
+        signal = reflect_on_events(log_path=logger.path if logger is not None else None)
+    except Exception as exc:  # pragma: no cover - fail-open observability only
+        if logger is not None:
+            logger.emit("route_reflection_error", err=f"{type(exc).__name__}: {str(exc)[:120]}")
+        return []
+    if not (signal.anomaly_flag and signal.defect_rate > defect_threshold):
+        return []
+    if logger is not None:
+        logger.emit(
+            "route_anomaly_detected",
+            role=decision.role,
+            reason=decision.reason,
+            note=signal.note,
+            defect_rate=round(signal.defect_rate, 4),
+        )
+    return [f"route_reflection_anomaly: {signal.note}"]
 
 
 # Router compatibility was removed in the single-file projection pass:
