@@ -423,7 +423,8 @@ class Policy:
         and an audit event, so callers can carry it into turn_event().
         """
         try:
-            signal = reflect_on_events()
+            log_path = self.event_logger.path if self.event_logger is not None else None
+            signal = reflect_on_events(log_path=log_path)
         except Exception as exc:  # pragma: no cover - fail-open observability only
             if self.event_logger is not None:
                 self.event_logger.emit(
