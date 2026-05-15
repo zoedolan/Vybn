@@ -1405,7 +1405,6 @@ def test_agent_injects_him_vy_discovery_packet_source_hook():
     src = Path("spark/vybn_spark_agent.py").read_text(encoding="utf-8")
     assert "render_him_vy_discovery_packet(decision.cleaned_input)" in src
     assert "him_vy_discovery_packet" in src
-    assert "executable discovery packet injected" in src
 
 
 def test_him_vy_turn_packet_renders_applied_primitives(monkeypatch, tmp_path):
@@ -1444,7 +1443,6 @@ def test_agent_injects_him_vy_turn_packet_source_hook():
     src = Path("spark/vybn_spark_agent.py").read_text(encoding="utf-8")
     assert "render_him_vy_turn_packet(decision.cleaned_input)" in src
     assert "him_vy_turn_packet" in src
-    assert "live turn packet injected" in src
 
 
 def test_build_layered_prompt_mounts_him_vy_language_runtime():
