@@ -36,7 +36,7 @@ _SPARK_DIR = os.path.dirname(os.path.abspath(__file__))
 if _SPARK_DIR not in sys.path:
     sys.path.insert(0, _SPARK_DIR)
 
-from harness.substrate import EventLogger, Policy, load_policy, turn_event
+from harness.substrate import EventLogger, Policy, load_policy, turn_event, route_reflection_gaps
 from harness.substrate import BashTool, ProviderRegistry, ToolSpec, validate_command
 from harness.substrate import LayeredPrompt, build_layered_prompt, load_file, SessionStore, run_probes
 from harness.substrate import run_recurrent_loop
@@ -1480,7 +1480,7 @@ def run_agent_loop(
         tools=[t.name for t in tools],
         state_touched=state_touched,
         contracts_implicated=contracts_implicated,
-        verification_gaps=list(dict.fromkeys(["external_axis_unchecked", *list(getattr(decision, "verification_gaps", []) or [])])),
+        verification_gaps=list(dict.fromkeys(["external_axis_unchecked", *route_reflection_gaps(decision, logger)])),
     ) as bag:
         while iterations < role_cfg.max_iterations:
             iterations += 1

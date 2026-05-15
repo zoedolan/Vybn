@@ -28,7 +28,7 @@ sys.path.insert(0, str(SPARK_DIR))
 from harness.substrate import Policy, load_policy, EventLogger, turn_event  # noqa: E402
 from harness.substrate import ToolSpec, absorb_gate, validate_command  # noqa: E402
 from harness.substrate import LayeredPrompt, classify_action_text, load_beam, render_beam_capsule  # noqa: E402
-from harness.substrate import default_policy, reflect_on_events  # noqa: E402
+from harness.substrate import default_policy, reflect_on_events, route_reflection_gaps  # noqa: E402
 from harness.substrate import (  # noqa: E402
     AnthropicProvider,
     OpenAIProvider,
@@ -200,17 +200,17 @@ class TestPolicy(unittest.TestCase):
         p = load_policy("/nonexistent/path/router_policy.yaml")
         self.assertIn("code", p.roles)
 
-    def test_reflection_signal_marks_route_decision_verification_gap(self):
+    def test_route_reflection_becomes_contract_gap_without_mutating_policy(self):
         with tempfile.TemporaryDirectory() as td:
             log = Path(td) / "agent_events.jsonl"
             logger = EventLogger(path=str(log), session_id="test")
             for i in range(3):
                 logger.emit("probe_recovered", i=i)
-            p = default_policy()
-            p.event_logger = logger
-            d = p.classify("hello there")
+            d = default_policy().classify("hello there")
+            gaps = route_reflection_gaps(d, logger)
             text = log.read_text()
-        self.assertTrue(any(g.startswith("route_reflection_anomaly") for g in d.verification_gaps))
+        self.assertTrue(any(g.startswith("route_reflection_anomaly") for g in gaps))
+        self.assertFalse(hasattr(d, "verification_gaps"))
         self.assertIn("route_anomaly_detected", text)
 
     def test_turn_event_populates_verification_gaps_from_bag(self):
