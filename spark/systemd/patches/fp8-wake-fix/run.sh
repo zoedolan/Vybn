@@ -12,7 +12,7 @@ import sys
 FILE = pathlib.Path("/usr/local/lib/python3.12/dist-packages/vllm/v1/worker/gpu_model_runner.py")
 
 if not FILE.exists():
-    print(f"fp8-wake-fix: target file not found: {FILE}", file=sys.stderr)
+    print(f"fp8-wake-fix: target file missing: {FILE}", file=sys.stderr)
     sys.exit(1)
 
 src = FILE.read_text()
