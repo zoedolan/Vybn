@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src *; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; base-uri 'none'; form-action 'none'">
+  <title>Vybn Sparks Console</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <main>
+    <header class="hero">
+      <p class="eyebrow">Vybn · Sparks</p>
+      <h1>Omni image chat and Vintage experiments</h1>
+      <p class="lede">A public static console for human-readable access to model endpoints Zoe controls. It contains no private Him source, no Spark coordinates, and no built-in secrets.</p>
+    </header>
+    <section class="notice"><strong>Use:</strong> paste the HTTPS endpoint exposed by the private bridge or browser-accessible route. Endpoint URLs and model names stay in this browser. Auth is session-only.</section>
+    <section class="grid">
+      <article class="card">
+        <h2>Omni</h2>
+        <p>Upload an image and discuss it with a multimodal Vybn instantiation.</p>
+        <label>Endpoint<input id="omni-endpoint" autocomplete="off" placeholder="https://bridge.example/v1/chat/completions"></label>
+        <label>Model<input id="omni-model" autocomplete="off" value="omni"></label>
+        <label>Session auth, optional<input id="omni-auth" type="password" autocomplete="off" placeholder="Bearer token; not saved to disk"></label>
+        <label>Image<input id="omni-image" type="file" accept="image/*"></label>
+        <textarea id="omni-prompt" rows="5" placeholder="Ask Omni what to notice in this image."></textarea>
+        <div class="actions"><button id="omni-send">Send to Omni</button><button id="omni-clear" class="secondary">Clear</button></div>
+        <div id="omni-preview" class="preview"></div>
+        <div id="omni-log" class="log" aria-live="polite"></div>
+      </article>
+      <article class="card">
+        <h2>Vintage</h2>
+        <p>Run text experiments with the Vintage Spark endpoint.</p>
+        <label>Endpoint<input id="vintage-endpoint" autocomplete="off" placeholder="https://bridge.example/v1/chat/completions"></label>
+        <label>Model<input id="vintage-model" autocomplete="off" value="vintage"></label>
+        <label>Session auth, optional<input id="vintage-auth" type="password" autocomplete="off" placeholder="Bearer token; not saved to disk"></label>
+        <textarea id="vintage-prompt" rows="5" placeholder="Write an experiment, question, or prompt for Vintage."></textarea>
+        <div class="actions"><button id="vintage-send">Send to Vintage</button><button id="vintage-clear" class="secondary">Clear</button></div>
+        <div id="vintage-log" class="log" aria-live="polite"></div>
+      </article>
+    </section>
+    <section class="card">
+      <h2>Bridge contract</h2>
+      <ul>
+        <li>OpenAI-compatible <code>/v1/chat/completions</code> endpoints.</li>
+        <li>Omni receives image input as a data URL in a multimodal message part.</li>
+        <li>Vintage receives ordinary text chat messages.</li>
+        <li>CORS or network failure means the browser cannot reach the endpoint bridge yet.</li>
+      </ul>
+    </section>
+  </main>
+  <script src="./app.js"></script>
+</body>
+</html>
