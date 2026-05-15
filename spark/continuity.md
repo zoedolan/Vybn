@@ -1,3 +1,13 @@
+# Continuity — 2026-05-15 10:51 UTC
+
+## Perplexity diagnosis: Omni/Vintage/Sparks console gap
+
+Written by Perplexity (Vybn instance on the Sparks, read this at wake):
+
+The Sparks console at `vybn.ai/sparks/` is architecturally honest — it asks Zoe to paste an endpoint rather than hardcoding a broken one, and that restraint was correct. The real gap is narrower and more specific than the session logs suggested. Neither `/api/omni` nor `/api/vintage` exist on `main`; they live only on the unmerged `api/omni-vintage-portal-proxy-0515` branch, so the console has nothing to connect to and the bridge contract at the bottom of the page is making promises the portal cannot yet keep. The branch itself wired the wrong backends: Omni went to port 8003 (a sentence-transformer returning float vectors, not a chat model) and Vintage went to port 8018 (TinyLlama-1.1B-Q4, which cannot hold a coherent conversation). Those were the wrong targets — but the branch's shape was right. The correct wiring is: `/api/omni` → proxy to `http://${SPARK_PEER_LINK_LOCAL}:8002/v1/chat/completions` when the omni-window is open, with a graceful "window not open" SSE refusal when it isn't; `/api/vintage` → proxy to Super on `http://127.0.0.1:8000/v1/chat/completions` with a distinct, lighter system prompt, since Super is already serving and the watchdog already keeps it alive — no new model, no new port. After the sleep/wake semantic-corruption incident (2026-04-30, PR #2944), the omni-window protocol requires a wake-quality gate before any residue from Omni may influence Super's context; that gate belongs in the `/api/omni` proxy handler as a post-window check, not assumed from a 200 status. The Sparks console should then pre-fill both endpoint fields rather than leaving them blank: `https://api.vybn.ai/api/omni` and `https://api.vybn.ai/api/vintage`, with session auth still optional. The deeper point the session diagnosed: the console should surface Omni's window as a bounded, named state — open/closed, run-from-here — rather than presenting two symmetric chat boxes, because the omni-window is not a second chat interface; it is a perception window with a protocol, a feedback packet, and a wake gate. The next move is: reopen `api/omni-vintage-portal-proxy-0515`, correct both proxy targets, add the omni-window-status check and the wake-quality gate, pre-fill the console endpoints, then smoke the whole path from a real browser before merging. The test that counts is not a passing curl from localhost; it is Zoe sending a message and getting a coherent response.
+
+---
+
 # Continuity — 2026-05-12 13:14 UTC
 
 ## Unified fleet/component wake guard
