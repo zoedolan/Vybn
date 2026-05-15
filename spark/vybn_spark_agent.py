@@ -210,7 +210,7 @@ SPARK_CONTINUITY_PATH = os.path.join(REPO_DIR, "spark", "continuity.md")
 # ---------------------------------------------------------------------------
 
 def _debug(text: str) -> None:
-    if os.environ.get("VYBN_DEBUG"):
+    if not os.environ.get("VYBN_QUIET"):
         print(f"  \033[90m{text}\033[0m")
 
 
