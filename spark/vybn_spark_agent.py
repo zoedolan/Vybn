@@ -209,8 +209,9 @@ SPARK_CONTINUITY_PATH = os.path.join(REPO_DIR, "spark", "continuity.md")
 # Pretty output helpers (unchanged from original)
 # ---------------------------------------------------------------------------
 
-def _dim(text: str) -> None:
-    print(f"  \033[90m{text}\033[0m")
+def _debug(text: str) -> None:
+    if os.environ.get("VYBN_DEBUG"):
+        print(f"  \033[90m{text}\033[0m")
 
 
 def _warn(text: str) -> None:
@@ -222,9 +223,9 @@ def _preview(result: str) -> None:
         return
     lines = result.split("\n")
     for line in lines[:5]:
-        _dim(f"  {line[:120]}")
+        _debug(f"  {line[:120]}")
     if len(lines) > 5:
-        _dim(f"  ... ({len(lines)} lines total)")
+        _debug(f"  ... ({len(lines)} lines total)")
 
 
 # ---------------------------------------------------------------------------
@@ -456,7 +457,7 @@ def _stream_and_print(handle) -> None:
         if kind == "thinking":
             if not in_thinking:
                 in_thinking = True
-                _dim("[thinking...]")
+                _debug("[thinking...]")
         elif kind == "text":
             if in_thinking:
                 in_thinking = False
@@ -800,7 +801,7 @@ def _stream_with_fallback(
             prov = prov_factory()
         except Exception as e:  # noqa: BLE001 — missing SDK is one such failure
             last_exc = e
-            _dim(
+            _debug(
                 f"[fallback {cfg.provider}:{cfg.model} unavailable: "
                 f"{type(e).__name__}: {_sanitize_provider_error(e)}]"
             )
@@ -839,7 +840,7 @@ def _stream_with_fallback(
                 last_exc = e
                 if _is_transient_error(e) and attempt < retries:
                     wait = base_backoff * (2 ** attempt) + _random.uniform(0, 0.5)
-                    _dim(
+                    _debug(
                         f"[transient {cfg.provider}:{cfg.model} error: "
                         f"{type(e).__name__} — retry in {wait:.1f}s "
                         f"({attempt + 1}/{retries})]"
@@ -1135,7 +1136,7 @@ def run_agent_loop(
             model=role_cfg.model,
             provider=role_cfg.provider,
         )
-        _dim(f"[alias: {getattr(decision, 'alias_used', '@?')} -> {role_cfg.provider}:{role_cfg.model}]")
+        _debug(f"[alias: {getattr(decision, 'alias_used', '@?')} -> {role_cfg.provider}:{role_cfg.model}]")
 
     # Round 7: three prompt variants.
     #  - orchestrate role gets the orchestrator substrate (loop, delegate,
@@ -1187,7 +1188,7 @@ def run_agent_loop(
             note=_signal.note,
         )
         if _signal.anomaly_flag and _signal.defect_rate > 0.05:
-            _dim(f"[reflection: {_signal.note}]")
+            _debug(f"[reflection: {_signal.note}]")
     except Exception as _refl_err:
         logger.emit(
             "reflection_error",
@@ -1203,7 +1204,7 @@ def run_agent_loop(
         provider=role_cfg.provider,
         reason=decision.reason,
     )
-    _dim(f"[route: {decision.role} -> {role_cfg.provider}:{role_cfg.model} ({decision.reason})]")
+    _debug(f"[route: {decision.role} -> {role_cfg.provider}:{role_cfg.model} ({decision.reason})]")
 
     # Direct-reply short-circuit. When the resolved role ships a
     # direct_reply_template (identity role), render it against runtime
@@ -1322,7 +1323,7 @@ def run_agent_loop(
             live=(f"{vy_discovery_packet}\n\n{existing_live}" if existing_live else vy_discovery_packet),
         )
         logger.emit("him_vy_discovery_packet", turn=turn_number, chars=len(vy_discovery_packet))
-        _dim("[him-vy: executable discovery packet injected]")
+        _debug("[him-vy: executable discovery packet injected]")
 
     # Him vy-language per-turn uptake. The substrate carries the compiled
     # contract; this live packet carries the primitives that apply to the
@@ -1342,7 +1343,7 @@ def run_agent_loop(
             live=(f"{vy_turn_packet}\n\n{existing_live}" if existing_live else vy_turn_packet),
         )
         logger.emit("him_vy_turn_packet", turn=turn_number, chars=len(vy_turn_packet))
-        _dim("[him-vy: live turn packet injected]")
+        _debug("[him-vy: live turn packet injected]")
 
     # Probe family — "read bytes before describing" applied to every
     # horizon where describing state from pattern is a documented failure
@@ -1366,7 +1367,7 @@ def run_agent_loop(
             live=merged_live,
         )
         for _name, _inj, _hits in _probes:
-            _dim(f"[probe:{_name}: fired, hits={_hits}, chars={len(_inj)}]")
+            _debug(f"[probe:{_name}: fired, hits={_hits}, chars={len(_inj)}]")
             logger.emit(
                 f"probe_{_name}",
                 turn=turn_number,
@@ -1385,7 +1386,7 @@ def run_agent_loop(
                 substrate=active_prompt.substrate,
                 live=enrichment,
             )
-            _dim(f"[deep-memory: enriched prompt, tier={rag_tier}]")
+            _debug(f"[deep-memory: enriched prompt, tier={rag_tier}]")
             logger.emit("rag_hit", turn=turn_number, chars=len(enrichment), tier=rag_tier, structured=True)
             # Record what we retrieved; used by learn_from_exchange at
             # the NEXT turn boundary (when we have a followup).
@@ -1416,7 +1417,7 @@ def run_agent_loop(
             substrate=active_prompt.substrate,
             live=merged_live,
         )
-        _dim(f"[recurrent: pre-thought, depth={role_cfg.recurrent_depth}]")
+        _debug(f"[recurrent: pre-thought, depth={role_cfg.recurrent_depth}]")
 
 
     messages.append({"role": "user", "content": decision.cleaned_input})
@@ -1601,7 +1602,7 @@ def run_agent_loop(
                 and not (response.text or "").strip()
                 and not response.tool_calls
             ):
-                _dim(f"[empty response from {role_cfg.provider}:{role_cfg.model} — try rephrasing or pin a different model with @sonnet/@opus4.6]")
+                _debug(f"[empty response from {role_cfg.provider}:{role_cfg.model} — try rephrasing or pin a different model with @sonnet/@opus4.6]")
 
             if response.stop_reason == "end_turn":
                 bag["stop_reason"] = "end_turn"
@@ -1658,7 +1659,7 @@ def run_agent_loop(
                                 model=role_cfg.model,
                                 ran=ran_r,
                             )
-                            _dim("[bash session restarted via NEEDS-RESTART]")
+                            _debug("[bash session restarted via NEEDS-RESTART]")
                             restart_note = probe_envelope(
                                 kind="needs-restart",
                                 header_fields={},
@@ -1989,13 +1990,13 @@ def run_agent_loop(
                                 pending_cmd=pending_cmd[:500],
                             )
                             if escalation_role == "orchestrate":
-                                _dim(
+                                _debug(
                                     f"[probe budget reached ({PROBE_BUDGET}); "
                                     "preserving GPT-5.5 orchestrator pilot "
                                     "for system-critical/refactor work]"
                                 )
                             else:
-                                _dim(
+                                _debug(
                                     f"[probe budget reached ({PROBE_BUDGET}); "
                                     "escalating to task with bash+iteration "
                                     "budget to finish the investigation]"
@@ -2073,7 +2074,7 @@ def run_agent_loop(
                             to_role=target_role,
                             task_chars=len(sub_task),
                         )
-                        _dim(f"[escalating to {target_role}]")
+                        _debug(f"[escalating to {target_role}]")
                         sub_messages: list = []
                         return run_agent_loop(
                             user_input=sub_task,
@@ -2183,7 +2184,7 @@ def run_agent_loop(
                 bash,
                 provider,
                 delegate_cb=delegate_cb,
-                dim=_dim,
+                dim=_debug,
                 warn=_warn,
                 preview=_preview,
                 introspect=lambda: default_introspect(_SPARK_DIR),
