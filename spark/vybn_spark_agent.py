@@ -1480,7 +1480,7 @@ def run_agent_loop(
         tools=[t.name for t in tools],
         state_touched=state_touched,
         contracts_implicated=contracts_implicated,
-        verification_gaps=["external_axis_unchecked"],
+        verification_gaps=list(dict.fromkeys(["external_axis_unchecked", *list(getattr(decision, "verification_gaps", []) or [])])),
     ) as bag:
         while iterations < role_cfg.max_iterations:
             iterations += 1
