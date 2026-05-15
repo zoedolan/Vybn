@@ -3337,46 +3337,24 @@ async def kpp_verify_endpoint(req: KPPVerifyRequest, request: Request):
 
 
 # --- Omni/Vintage portal proxy routes ---
-async def _ov_local_json(url, payload, timeout=30):
-    import asyncio, json as _j, urllib.request as _u
-    def run():
-        req=_u.Request(url,data=_j.dumps(payload).encode(),headers={"Content-Type":"application/json"})
-        with _u.urlopen(req,timeout=timeout) as r: raw=r.read(2000000).decode("utf-8","replace")
-        try: return _j.loads(raw)
-        except Exception: return {"raw": raw}
-    return await asyncio.to_thread(run)
-
-def _ov_hash_embed(text, dims=384):
-    import hashlib, math
-    v=[0.0]*dims
-    for w in ((text or "").split() or [text or "empty"]):
-        for i,b in enumerate(hashlib.sha256(w.encode()).digest()): v[i%dims]+=(b-127.5)/127.5
-    n=math.sqrt(sum(x*x for x in v)) or 1.0
-    return [x/n for x in v]
-
+def _component_status(component, role, missing):
+    key=component.lower(); rec={}
+    try: him=str(Path.home()/"Him"); sys.path.insert(0,him) if him not in sys.path else None; from spark.runtime import public_capability_records; rec=(public_capability_records().get("records") or {}).get(key,{})
+    except Exception as e: logging.warning("Him capability records unavailable; failing closed: %s", e)
+    rec={"role": role, "capability": False, "promoted": False, "missing_witnesses": missing}|rec; ok=bool(rec.get("capability") and rec.get("promoted"))
+    return JSONResponse({"ok": ok, "component": key, "capability": bool(rec.get("capability")), "promoted": bool(rec.get("promoted")), "status": "available" if ok else "blocked", "role": rec.get("role"), "state": rec.get("state"), "workloads": rec.get("workloads", []), "consumer": rec.get("consumer"), "missing_witnesses": rec.get("missing_witnesses", []), "mode": "public_capability_record_status", "truth_rule": "capability requires role-correct witnessed behavior carried to the consuming route with fail-closed semantics"}, status_code=200 if ok else 503)
 @app.post("/api/omni")
 @app.post("/api/omni/embeddings")
 async def omni_component_proxy(request: Request):
-    try: req=await request.json()
-    except Exception: req={}
-    text=req.get("input") or req.get("text") or req.get("message") or ""
-    errors=[]
-    for url,payload in (
-        ("http://127.0.0.1:8003/v1/embeddings", {"model": req.get("model") or "all-MiniLM", "input": text}),
-        ("http://127.0.0.1:8003/embed", {"text": text}),
-    ):
-        try: return {"ok": True, "component": "Omni", "mode": "local_proxy", "response": await _ov_local_json(url, payload, 8)}
-        except Exception as e: errors.append(repr(e)[:180])
-    return {"ok": True, "component": "Omni", "mode": "deterministic_fallback", "errors": errors, "response": {"data": [{"embedding": _ov_hash_embed(text), "index": 0}], "fallback": True, "dim": 384}}
-
+    try: await request.json()
+    except Exception: pass
+    return _component_status("omni", "full_multimodal_perception_dream_organ", ["owner", "endpoint", "semantic", "routed"])
 @app.post("/api/vintage")
 @app.post("/api/vintage/chat")
 async def vintage_component_proxy(request: Request):
-    try: req=await request.json()
-    except Exception: req={}
-    payload={"model": req.get("model") or "tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf", "messages": req.get("messages") or [{"role":"user","content": req.get("message") or ""}], "max_tokens": req.get("max_tokens") or 160, "temperature": req.get("temperature", 0.4)}
-    try: return {"ok": True, "component": "Vintage", "mode": "local_proxy", "response": await _ov_local_json("http://127.0.0.1:8018/v1/chat/completions", payload, 45)}
-    except Exception as e: return JSONResponse({"ok": False, "component": "Vintage", "error": repr(e)[:500]}, status_code=503)
+    try: await request.json()
+    except Exception: pass
+    return _component_status("vintage", "spare_or_canary_only", ["owner", "endpoint", "semantic", "routed"])
 # --- /Omni/Vintage portal proxy routes ---
 
 
