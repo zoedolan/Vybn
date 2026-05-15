@@ -696,11 +696,11 @@ _DEFAULT_ROLES: dict[str, RoleConfig] = {
         provider="openai",
         model="nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8",
         thinking="off",
-        max_tokens=4096,
+        max_tokens=1024,
         max_iterations=3,
         tools=[],
         base_url="http://127.0.0.1:8000/v1",
-        rag=True,
+        rag=False,
     ),
     # Phatic — casual greetings, small talk. Present-work default is GPT-5.5
     # even for light turns unless Zoe explicitly pins local/Nemotron.
