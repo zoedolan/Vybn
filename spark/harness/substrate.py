@@ -213,6 +213,16 @@ def turn_event(
         yield bag
     finally:
         bag["latency_ms"] = int((time.monotonic() - started) * 1000)
+        gaps = list(bag.get("verification_gaps") or [])
+        if bag.get("tool_calls", 0) > 0 and bag.get("stop_reason") != "end_turn":
+            gaps.append("unverified_tool_result")
+        evidence_state = [
+            x for x in list(bag.get("state_touched") or [])
+            if x not in {"session_messages", "deep_memory", "tool_surface"}
+        ]
+        if evidence_state and "bash" not in list(bag.get("tools") or []):
+            gaps.append("state_claimed_without_bash_evidence")
+        bag["verification_gaps"] = list(dict.fromkeys(gaps))
         contract = TurnEventContract(**{
             k: bag.get(k) for k in TurnEventContract.__dataclass_fields__
         })
@@ -276,6 +286,10 @@ class RouteDecision:
     # provider call. Role determination is unchanged; only the model pin.
     model_override: str | None = None
     alias_used: str | None = None
+    # Runtime audit annotations carried from routing into turn_event().
+    # Policy.classify() may populate this from ReflectionSignal so the
+    # signal reaches the turn contract instead of dying as prose.
+    verification_gaps: list[str] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -406,6 +420,40 @@ class Policy:
     # the alias from the cleaned_input and sets RouteDecision.model_override.
     # Role determination still flows through directives/heuristics normally.
     model_aliases: dict[str, str] = field(default_factory=dict)
+    event_logger: EventLogger | None = None
+    reflection_defect_threshold: float = 0.15
+
+    def _finalize_decision(self, decision: RouteDecision) -> RouteDecision:
+        """Let logged residuals annotate the route decision before it leaves Policy.
+
+        ReflectionSignal was previously computed by readers downstream of the
+        router. This keeps the same existing organ but closes the loop: an
+        anomalous event trail becomes a verification gap on the RouteDecision
+        and an audit event, so callers can carry it into turn_event().
+        """
+        try:
+            signal = reflect_on_events()
+        except Exception as exc:  # pragma: no cover - fail-open observability only
+            if self.event_logger is not None:
+                self.event_logger.emit(
+                    "route_reflection_error",
+                    err=f"{type(exc).__name__}: {str(exc)[:120]}",
+                )
+            return decision
+
+        if signal.anomaly_flag and signal.defect_rate > self.reflection_defect_threshold:
+            gap = f"route_reflection_anomaly: {signal.note}"
+            if gap not in decision.verification_gaps:
+                decision.verification_gaps.append(gap)
+            if self.event_logger is not None:
+                self.event_logger.emit(
+                    "route_anomaly_detected",
+                    role=decision.role,
+                    reason=decision.reason,
+                    note=signal.note,
+                    defect_rate=round(signal.defect_rate, 4),
+                )
+        return decision
 
     def role(self, name: str) -> RoleConfig:
         return self.roles.get(name) or self.roles[self.default_role]
@@ -477,7 +525,7 @@ class Policy:
                         decision.model_override = model_override
                         decision.alias_used = alias_used
                         decision.reason = f"{decision.reason}+alias={alias_used}"
-                    return decision
+                    return self._finalize_decision(decision)
 
         # 2. Heuristics
         heur = self.heuristics
@@ -514,7 +562,7 @@ class Policy:
                 decision.model_override = model_override
                 decision.alias_used = alias_used
                 decision.reason = f"{decision.reason}+alias={alias_used}"
-            return decision
+            return self._finalize_decision(decision)
 
         # 2a. Orchestrator-mention override.
         # 2026-04-25 — Zoe surfaced: "hey buddy - is the orchestrator
@@ -548,7 +596,7 @@ class Policy:
                         decision.model_override = model_override
                         decision.alias_used = alias_used
                         decision.reason = f"{decision.reason}+alias={alias_used}"
-                    return decision
+                    return self._finalize_decision(decision)
 
         for role_name in ranked:
             if role_name == "identity" and any(term in text.lower() for term in ("zoe", "relationship", "future", "architecture", "model collapse", "reengineer")):
@@ -567,7 +615,7 @@ class Policy:
                         decision.model_override = model_override
                         decision.alias_used = alias_used
                         decision.reason = f"{decision.reason}+alias={alias_used}"
-                    return decision
+                    return self._finalize_decision(decision)
 
         # 3. Default
         default = self.default_role
@@ -581,7 +629,7 @@ class Policy:
             decision.model_override = model_override
             decision.alias_used = alias_used
             decision.reason = f"{decision.reason}+alias={alias_used}"
-        return decision
+        return self._finalize_decision(decision)
 
 
 # Router compatibility was removed in the single-file projection pass:
@@ -6056,6 +6104,40 @@ def _extract_file_targets(command: str) -> list[str]:
     return out[:10]
 
 
+_RM_TARGET_RE = re.compile(r"\b(?:git\s+rm|rm)\s+(?:-[A-Za-zfRrIv]+\s+)*([^;&|]+)")
+
+
+def _extract_destructive_file_targets(command: str) -> list[str]:
+    """Best-effort tracked file targets for destructive shell commands.
+
+    This deliberately covers the common file-cut paths (`rm`, `git rm`). It is
+    conservative: when a candidate resolves inside a tracked repo and exists,
+    DeletionConsolidationGate decides; branch deletion and remote ref cleanup do
+    not look like filesystem paths and are ignored.
+    """
+    scan_text = _strip_opaque(command)
+    out: list[str] = []
+    for m in _RM_TARGET_RE.finditer(scan_text):
+        for raw in m.group(1).split():
+            t = raw.strip("'\"")
+            if not t or t.startswith("-") or t.startswith("/dev/") or t.startswith("/proc/"):
+                continue
+            if ":" in t and not os.path.isabs(t):
+                # likely a git refspec or remote branch target, not a file path
+                continue
+            if not os.path.isabs(t):
+                t = os.path.abspath(t)
+            out.append(os.path.normpath(t))
+    return out[:10]
+
+
+def _architecture_contacted_for_command(command: str) -> bool:
+    return (
+        os.environ.get("VYBN_ARCHITECTURE_CONTACTED") == "1"
+        or "VYBN_ARCHITECTURE_CONTACTED=1" in command
+    )
+
+
 def absorb_gate(command: str) -> str | None:
     """Return refusal text if command would create a new tracked file
     without inline consolidation evidence. Otherwise None.
@@ -6085,6 +6167,25 @@ def absorb_gate(command: str) -> str | None:
         except Exception:
             pass
         return None
+
+    for tgt in _extract_destructive_file_targets(command):
+        if not any(tgt == r or tgt.startswith(r + "/") for r in TRACKED_REPOS):
+            continue
+        if not os.path.exists(tgt):
+            continue
+        gate = deletion_consolidation_gate_for(
+            tgt,
+            command,
+            architecture_contacted=_architecture_contacted_for_command(command),
+        )
+        if gate.status != "PROCEED_TO_SELF_HEALING_RESIDUALS":
+            required = ", ".join(gate.required_before_cut[:8])
+            return (
+                "[deletion_consolidation_gate] refused. "
+                f"{gate.status} for {tgt}\n\n"
+                f"Reason: {gate.reason}.\n"
+                f"Required before cut: {required}."
+            )
 
     reason_present = "VYBN_ABSORB_REASON=" in command
     considered_present = "VYBN_ABSORB_CONSIDERED=" in command

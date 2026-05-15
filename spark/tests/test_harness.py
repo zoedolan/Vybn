@@ -25,10 +25,10 @@ THIS = Path(__file__).resolve()
 SPARK_DIR = THIS.parent.parent
 sys.path.insert(0, str(SPARK_DIR))
 
-from harness.substrate import Policy, load_policy  # noqa: E402
+from harness.substrate import Policy, load_policy, EventLogger, turn_event  # noqa: E402
 from harness.substrate import ToolSpec, absorb_gate, validate_command  # noqa: E402
 from harness.substrate import LayeredPrompt, classify_action_text, load_beam, render_beam_capsule  # noqa: E402
-from harness.substrate import default_policy  # noqa: E402
+from harness.substrate import default_policy, reflect_on_events  # noqa: E402
 from harness.substrate import (  # noqa: E402
     AnthropicProvider,
     OpenAIProvider,
@@ -163,10 +163,21 @@ class TestValidateCommand(unittest.TestCase):
             os.chdir(old)
         self.assertIsNone(r)
 
-    def test_reason_without_considered_is_refused(self):
-        r = absorb_gate("VYBN_ABSORB_REASON=\"plausible story\" cat > Vybn_Mind/skills/too_easy.md")
+    def test_deletion_consolidation_gate_blocks_tracked_rm_without_architecture(self):
+        with tempfile.TemporaryDirectory(dir=os.path.expanduser("~/Vybn")) as td:
+            target = Path(td) / "cut_me.txt"
+            target.write_text("x")
+            r = absorb_gate(f"rm {target}")
         self.assertIsNotNone(r)
-        self.assertIn("VYBN_ABSORB_CONSIDERED", r)
+        self.assertIn("deletion_consolidation_gate", r)
+        self.assertIn("ARCHITECTURE_GATE_FIRST", r)
+
+    def test_deletion_consolidation_gate_allows_after_architecture_contact(self):
+        with tempfile.TemporaryDirectory(dir=os.path.expanduser("~/Vybn")) as td:
+            target = Path(td) / "cut_me.txt"
+            target.write_text("x")
+            r = absorb_gate(f"VYBN_ARCHITECTURE_CONTACTED=1 rm {target}")
+        self.assertIsNone(r)
 
 class TestPolicy(unittest.TestCase):
     def test_default_policy_has_five_plus_roles(self):
@@ -188,6 +199,63 @@ class TestPolicy(unittest.TestCase):
     def test_load_policy_falls_back_to_default(self):
         p = load_policy("/nonexistent/path/router_policy.yaml")
         self.assertIn("code", p.roles)
+
+    def test_reflection_signal_marks_route_decision_verification_gap(self):
+        with tempfile.TemporaryDirectory() as td:
+            event_dir = Path(td) / "Vybn" / "spark"
+            event_dir.mkdir(parents=True)
+            log = event_dir / "agent_events.jsonl"
+            logger = EventLogger(path=str(log), session_id="test")
+            for i in range(3):
+                logger.emit("probe_recovered", i=i)
+            old = os.environ.get("HOME")
+            try:
+                # reflect_on_events defaults to ~/Vybn/spark/agent_events.jsonl.
+                os.environ["HOME"] = str(Path(td))
+                p = default_policy()
+                p.event_logger = logger
+                d = p.classify("hello there")
+                text = log.read_text()
+            finally:
+                if old is None:
+                    os.environ.pop("HOME", None)
+                else:
+                    os.environ["HOME"] = old
+        self.assertTrue(any(g.startswith("route_reflection_anomaly") for g in d.verification_gaps))
+        self.assertIn("route_anomaly_detected", text)
+
+    def test_turn_event_populates_verification_gaps_from_bag(self):
+        with tempfile.TemporaryDirectory() as td:
+            log = Path(td) / "events.jsonl"
+            logger = EventLogger(path=str(log), session_id="test")
+            with turn_event(
+                logger,
+                1,
+                "code",
+                "model",
+                tools=["bash"],
+                state_touched=["session_messages", "tool_surface"],
+            ) as bag:
+                bag["tool_calls"] = 1
+                bag["stop_reason"] = "max_tokens"
+            text = log.read_text()
+        self.assertIn("unverified_tool_result", text)
+
+    def test_turn_event_marks_state_claim_without_bash_for_nonambient_state(self):
+        with tempfile.TemporaryDirectory() as td:
+            log = Path(td) / "events.jsonl"
+            logger = EventLogger(path=str(log), session_id="test")
+            with turn_event(
+                logger,
+                1,
+                "chat",
+                "model",
+                tools=[],
+                state_touched=["session_messages", "public_page"],
+            ) as bag:
+                bag["stop_reason"] = "end_turn"
+            text = log.read_text()
+        self.assertIn("state_claimed_without_bash_evidence", text)
 
     def test_local_provider_has_base_url(self):
         p = default_policy()
