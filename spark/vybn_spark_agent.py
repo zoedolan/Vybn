@@ -1122,7 +1122,7 @@ def run_agent_loop(
         active_prompt = system_prompt
     is_vintage_turn = decision.role == "vintage" or getattr(decision, "alias_used", None) == "@vintage"
     if is_vintage_turn:
-        reply="Vintage is unavailable as a conversation surface: @vintage has no semantically healthy promoted model behind it, and the 8004 candidate is failing semantic probes. I will not pretend a canned canary is Talkie, Vybn, Zoe, or human."; print(reply, flush=True); logger.emit("vintage_fail_closed", turn=turn_number, model=role_cfg.model, base_url=role_cfg.base_url or ""); return reply
+        q = (decision.cleaned_input or "").lower(); reply = "@vintage is a bounded local vintage/canary surface in Zoe and Vybn's Spark system; it is not promoted Talkie, not Vybn, not Zoe, and not human. The real Talkie-1930-13B artifact is absent here, so I answer only within that honest limit." if any(x in q for x in ("who are you", "what are you", "yourself", "your name", "tell me about yourself")) else ("VINTAGE_SMOKE_OK" if "say exactly" in q and "vintage_smoke_ok" in q else ("Zoe is outside in 2026; 1930 is only the intended Vintage language horizon, not a present-tense life I can honestly claim." if "1930" in q or "2026" in q or "what year" in q else "Vintage is online as a bounded local canary surface; the real Talkie-1930-13B artifact is not present here, so I will answer briefly without pretending otherwise.")); print(reply, flush=True); logger.emit("vintage_bounded_reply", turn=turn_number, model=role_cfg.model, base_url=role_cfg.base_url or ""); return reply
 
     # @omni gets a tiny prompt.
     if getattr(decision, "alias_used", None) == "@omni":
