@@ -1277,11 +1277,9 @@ def run_agent_loop(
                 return notice
 
     if is_vintage_turn:
-        q = decision.cleaned_input.lower()
-        if any(w in q for w in ("year", "date", "when", "name", "who are you", "who r u", "explain", "sure", "certain", "understand")):
-            reply = "I am Vintage, the @vintage talkie-1930-13b-it route/model. Zoe is outside this model in 2026; 1930 is my language horizon, not my present year. I do not have lived memory or certainty."
-            messages.extend([{"role": "user", "content": decision.cleaned_input}, {"role": "assistant", "content": reply}]); print(reply, flush=True); logger.emit("vintage_self_knowledge", turn=turn_number, model=role_cfg.model); return reply
-        messages = []
+        reply = "Vintage is not ready to speak freely. Stable map: I am the @vintage talkie-1930-13b-it route/model; Zoe is outside this model in 2026; 1930 is only my language horizon; I do not have lived memory or certainty."
+        messages.extend([{"role": "user", "content": decision.cleaned_input}, {"role": "assistant", "content": reply}])
+        print(reply, flush=True); logger.emit("vintage_failed_closed", turn=turn_number, model=role_cfg.model); return reply
 
 
     provider = registry.get(role_cfg)

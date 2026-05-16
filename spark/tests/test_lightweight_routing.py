@@ -804,7 +804,7 @@ def test_vintage_alias_routes_to_vintage_role_with_no_fallback():
     decision = policy.classify("@vintage who are you?")
     assert decision.role == "vintage" and decision.alias_used == "@vintage" and policy.directives["/vintage"] == "vintage"
     assert "vintage" not in policy.fallback_chain and policy.role("vintage").rag is False and yaml_policy.role("vintage").rag is False
-    assert "vintage_self_knowledge" in (agent_text := (SPARK_DIR / "vybn_spark_agent.py").read_text()) and "I do not have lived memory or certainty" in agent_text and "I am Vintage, the @vintage talkie-1930-13b-it route/model" in agent_text and 'vy_discovery_packet = "" if is_vintage_turn else render_him_vy_discovery_packet' in agent_text and 'vy_turn_packet = "" if is_vintage_turn else render_him_vy_turn_packet' in agent_text and 'and not is_vintage_turn and getattr(decision, "alias_used", None) != "@omni"' in agent_text
+    assert "vintage_failed_closed" in (agent_text := (SPARK_DIR / "vybn_spark_agent.py").read_text()) and "Vintage is not ready to speak freely" in agent_text and "1930 is only my language horizon" in agent_text and 'and not is_vintage_turn and getattr(decision, "alias_used", None) != "@omni"' in agent_text
 
 
 def test_vintage_orientation_prompt_has_identity_time_and_ception_axes():
