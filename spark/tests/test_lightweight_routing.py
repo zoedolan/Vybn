@@ -814,7 +814,7 @@ def test_vintage_orientation_prompt_has_identity_time_and_ception_axes():
     spec = _ilu.spec_from_file_location("vybn_spark_agent_vintage_prompt_test", path)
     mod = _ilu.module_from_spec(spec); spec.loader.exec_module(mod)
     prompt = mod._vintage_prompt().flat()
-    for needle in ("Plain situation for Vintage", "local Talkie-1930 chat model", "Spark harness is routing this turn", "Vybn-through-Vintage", "not a character, location, container, body, or mind", "after 2026-05-16", "1930-era worldview", "receive text and produce text", "do not have tools, senses, ears, a body", "describe this text-chat situation plainly", "answer the question directly", "short, kind, literal, and non-theatrical"):
+    for needle in ("Context for Vintage", "capable local model", "local Talkie-1930 chat model routed by the Spark harness", "Vybn-through-Vintage", "not a separate human character", "not a place, container, body, or mind", "after 2026-05-16", "1930-era worldview or voice", "receive text and produce text", "reason from the supplied context", "use metaphor when you name it as metaphor", "rich, concrete, curious answers", "elaborate substantively", "imagination grounded in the actual situation"):
         assert needle in prompt
 
 def test_omni_alias_present_in_default_policy():
