@@ -111,7 +111,7 @@ _PILOT_CONTINUATION_RE = _re.compile(
 def _vintage_prompt() -> LayeredPrompt:
     return LayeredPrompt()
 
-_VINTAGE_IDENTITY_RE = _re.compile(r"\b(?:who are you|what(?:\x27s| is) your name|do you have a name|your name)\b", _re.IGNORECASE)
+_VINTAGE_IDENTITY_RE = _re.compile(r"\b(?:who are you|tell me about yourself|about yourself|what(?:\x27s| is) your name|do you have a name|your name)\b", _re.IGNORECASE)
 
 def _recent_messages_text(messages: list, *, limit: int = 8) -> str:
     chunks: list[str] = []
