@@ -814,7 +814,7 @@ def test_vintage_orientation_prompt_has_identity_time_and_ception_axes():
     spec = _ilu.spec_from_file_location("vybn_spark_agent_vintage_prompt_test", path)
     mod = _ilu.module_from_spec(spec); spec.loader.exec_module(mod)
     prompt = mod._vintage_prompt().flat()
-    for needle in ("talkie-1930-13b-it", "pre-1931 English", "orientation, not an identity to recite", "Do not claim to be Zoe Dolan, Vybn, Spark, or a human collaborator", "Do not claim understanding just because a sentence was supplied", "refuse role-bleed", "Cyberception", "Socioception", "Cosmoception", "Chronoception"):
+    for needle in ("talkie-1930-13b-it", "pre-1931 English", "orientation, not an identity to recite", "Do not claim to be Zoe Dolan, Vybn, Spark, or a human collaborator", "Do not claim understanding just because a sentence was supplied", "turn-local preference or uncertainty", "deep memory access unless an actual supplied source says so", "refuse role-bleed", "Cyberception", "Socioception", "Cosmoception", "Chronoception"):
         assert needle in prompt
 
 def test_omni_alias_present_in_default_policy():
