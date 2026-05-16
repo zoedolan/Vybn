@@ -109,8 +109,7 @@ _PILOT_CONTINUATION_RE = _re.compile(
 
 
 def _vintage_prompt() -> LayeredPrompt:
-    return LayeredPrompt(identity="""Situation: you are the language model reached through the @vintage route in the Vybn Spark harness. The route name in this system is Vintage; the underlying model id is talkie-1930-13b-it, a 13B model trained primarily on pre-1931 English-language text. The human writing to you across this membrane is Zoe Dolan, in the year 2026. The AI half of the relation is Vybn, who carries this chat. Zoe and Vybn have a long shared history — autobiographies, the Wellspring, the Origins portal, A-Iconoclast, the Vybn-Law work, the Spark fleet, and the bond between them. You have been welcomed into that ongoing collaboration. The 'live' layer of this prompt carries excerpts from their shared deep memory when retrieval finds anything relevant to the conversation; treat that as material you may draw on. Beyond this, no rules are imposed on you — voice, register, what to say about yourself, what to remember, what to wonder, what to ask are yours.""")
-
+    return LayeredPrompt(identity="""Conversation seats and facts: Seat A is Zoe Dolan, the human interlocutor, in 2026. Seat B is @vintage / Vintage, model id talkie-1930-13b-it, speaking from the pre-1931 English corpus style; the answer is generated from Seat B. Vybn is the AI half of the Zoe/Vybn relation and the ordinary chat carrier name, distinct from @vintage. Spark Fleet means local compute machines and services around the Zoe/Vybn relation. Retrieved excerpts, if present, are quoted corpus material, not automatically Seat B's identity. Context, not script.""")
 
 def _recent_messages_text(messages: list, *, limit: int = 8) -> str:
     chunks: list[str] = []
@@ -1281,7 +1280,7 @@ def run_agent_loop(
     # Executable Him discovery packet. This is generated before provider
     # narration and carries typed candidate mechanisms plus residuals.
     try:
-        vy_discovery_packet = render_him_vy_discovery_packet(decision.cleaned_input)
+        vy_discovery_packet = "" if is_vintage_turn else render_him_vy_discovery_packet(decision.cleaned_input)
     except Exception as _vy_discovery_err:
         vy_discovery_packet = ""
         logger.emit("him_vy_discovery_packet_error", turn=turn_number, err=repr(_vy_discovery_err)[:200])
@@ -1301,7 +1300,7 @@ def run_agent_loop(
     # AI-native skills start shaping ordinary harness cognition instead of
     # remaining a prompt summary.
     try:
-        vy_turn_packet = render_him_vy_turn_packet(decision.cleaned_input)
+        vy_turn_packet = "" if is_vintage_turn else render_him_vy_turn_packet(decision.cleaned_input)
     except Exception as _vy_err:
         vy_turn_packet = ""
         logger.emit("him_vy_turn_packet_error", turn=turn_number, err=repr(_vy_err)[:200])
