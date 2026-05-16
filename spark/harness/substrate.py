@@ -283,9 +283,8 @@ class RouteDecision:
 # Classification internals.
 # ---------------------------------------------------------------------------
 
-# Round 5: @alias pin. Matches @<word> at the very start of the input,
-# followed by whitespace or EOL. The <word> is looked up in policy.model_aliases.
-_ALIAS_RE = re.compile(r"^\s*(@[\w.]+)(\s|$)")
+# Round 5: @alias pin; tolerate observed @vi@alias stacked-prefix typo.
+_ALIAS_RE = re.compile(r"^\s*(?:@vi)?(@[\w.]+)(\s|$)")
 
 # 2026-04-27: refactor pilot doctrine override. File-level / whole-repo
 # refactoring, consolidation, routing, memory, and harness work is judgment
@@ -720,7 +719,7 @@ _DEFAULT_ROLES: dict[str, RoleConfig] = {
         max_iterations=1,
         tools=[],
         base_url="http://127.0.0.1:8004/v1",
-        rag=True,
+        rag=False,
     ),
     # Phatic — casual greetings, small talk. Present-work default is GPT-5.5
     # even for light turns unless Zoe explicitly pins local/Nemotron.
