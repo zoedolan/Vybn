@@ -461,14 +461,12 @@ class Policy:
                         # on something. Fall back to a greeting-shaped empty.
                         text = "hi"
                     if alias_key == "@vintage" and "vintage" in self.roles:
-                        return RouteDecision(
-                            role="vintage",
-                            config=self.role("vintage"),
-                            cleaned_input=text,
-                            reason="alias=@vintage",
-                            model_override=model_override,
-                            alias_used=alias_used,
-                        )
+                        return RouteDecision(role="vintage", config=self.role("vintage"), cleaned_input=text, reason="alias=@vintage", model_override=model_override, alias_used=alias_used)
+
+        if "@vintage" in text.lower() and "vintage" in self.roles:
+            idx = text.lower().find("@vintage")
+            cleaned = text[idx + len("@vintage"):].lstrip() or "hi"
+            return RouteDecision(role="vintage", config=self.role("vintage"), cleaned_input=cleaned, reason="alias=@vintage", model_override=aliases.get("@vintage"), alias_used="@vintage")
 
         # 1. Directive
         for prefix, role_name in self.directives.items():

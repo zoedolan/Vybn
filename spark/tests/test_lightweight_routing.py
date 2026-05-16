@@ -805,8 +805,8 @@ def test_opus47_has_fallback_chain():
 
 def test_vintage_alias_routes_to_talkie_without_chat_fallback():
     policy = default_policy(); yaml_policy = load_policy(SPARK_DIR / "router_policy.yaml"); src = (SPARK_DIR / "vybn_spark_agent.py").read_text()
-    d = policy.classify("@vintage please tell me about yourself?"); yd = yaml_policy.classify("@vintage please tell me about yourself?"); sd = policy.classify("@vi@vintage please tell me about yourself?"); syd = yaml_policy.classify("@vi@vintage please tell me about yourself?")
-    assert all(x.role == "vintage" and x.alias_used == "@vintage" and x.reason == "alias=@vintage" and x.config.model == "vintage-unavailable" and x.config.rag is False for x in (d, yd, sd, syd))
+    d = policy.classify("@vintage please tell me about yourself?"); yd = yaml_policy.classify("@vintage please tell me about yourself?"); sd = policy.classify("@vi@vintage please tell me about yourself?"); syd = yaml_policy.classify("@vi@vintage please tell me about yourself?"); td = policy.classify("zoe> @vintage please tell me about yourself?")
+    assert all(x.role == "vintage" and x.alias_used == "@vintage" and x.reason == "alias=@vintage" and x.config.model == "vintage-unavailable" and x.config.rag is False for x in (d, yd, sd, syd, td))
     assert "Vintage is unavailable" in src and "canary wrapper is not a real model" in src and "_vintage_frame_repair" not in src and "def _vintage_prompt" not in src
 
 
@@ -1947,3 +1947,4 @@ def test_local_super_semantic_failure_cloud_fallback_requires_explicit_opt_in(mo
         mod.render_him_vy_discovery_packet = saved_disc
         mod.render_him_vy_turn_packet = saved_turn
         mod.run_probes = saved_probes
+
