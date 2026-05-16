@@ -1122,7 +1122,7 @@ def run_agent_loop(
         active_prompt = system_prompt
     is_vintage_turn = decision.role == "vintage" or getattr(decision, "alias_used", None) == "@vintage"
     if is_vintage_turn and not os.environ.get("VYBN_VINTAGE_LIVE"):
-        reply = "Vintage is not promoted: Talkie is currently failing semantic generation, so this route fails closed instead of falling back to Vybn or leaking a raw provider error."
+        reply = "Vintage is not promoted: Talkie is currently failing semantic generation, so this route fails closed instead of falling back to Vybn or leaking a raw backend exception."
         print(reply, flush=True); logger.emit("vintage_fail_closed", turn=turn_number, model=role_cfg.model, base_url=role_cfg.base_url or ""); return reply
     if is_vintage_turn:
         import dataclasses as _dc; role_cfg = _dc.replace(role_cfg, rag=False, max_tokens=32); active_prompt = LayeredPrompt(identity="You are Vintage, a small experimental local Talkie route inside Zoe/Vybn. Reply in plain modern English; do not roleplay a newspaper, county, correspondent, or Victorian person. Be brief and honest about limits.", substrate="", live="")
