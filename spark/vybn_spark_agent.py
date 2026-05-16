@@ -1278,10 +1278,10 @@ def run_agent_loop(
 
     if is_vintage_turn:
         try:
-            base = (role_cfg.base_url or "").rstrip("/"); base += "" if base.endswith("/v1") else "/v1"; payload = {"model": role_cfg.model, "messages": [{"role": "system", "content": "Reply exactly: VINTAGE_OK Zoe=2026 Horizon=1930 NotHuman"}, {"role": "user", "content": "orientation check"}], "max_tokens": 32, "temperature": 0, "stream": False}; req = urllib.request.Request(base + "/chat/completions", data=json.dumps(payload).encode(), headers={"Content-Type": "application/json"})
+            base = (role_cfg.base_url or "").rstrip("/"); base += "" if base.endswith("/v1") else "/v1"; payload = {"model": role_cfg.model, "messages": [{"role": "system", "content": "You are reached by @vintage. In one short sentence, distinguish: route/model identity, Zoe outside in 2026, and your 1930 language horizon. Do not claim to be human."}, {"role": "user", "content": "what is going on here?"}], "max_tokens": 96, "temperature": 0, "stream": False}; req = urllib.request.Request(base + "/chat/completions", data=json.dumps(payload).encode(), headers={"Content-Type": "application/json"})
             with urllib.request.urlopen(req, timeout=20) as r: txt = (((json.loads(r.read().decode()).get("choices") or [{}])[0].get("message") or {}).get("content") or "").strip()
         except Exception as e: txt = f"{type(e).__name__}: {str(e)[:120]}"
-        if txt != "VINTAGE_OK Zoe=2026 Horizon=1930 NotHuman": notice = "Vintage is paused: the local Talkie route failed its orientation semantic gate, so I will not let it keep confusing 1930, 2026, model-route identity, and human embodiment."; logger.emit("vintage_semantic_gate_failed_closed", turn=turn_number, model=role_cfg.model, reason=txt[:200]); _warn(notice); messages.extend(({"role": "user", "content": decision.cleaned_input}, {"role": "assistant", "content": notice})); return notice
+        active_prompt = LayeredPrompt(identity=active_prompt.identity, live=(active_prompt.live + f"\n\n[self-knowledge] Orientation probe answer: {txt[:240]!r}. Use it as a mirror, not a script: you are @vintage route/model; Zoe is outside in 2026; 1930 is language horizon, not present place/body. Name uncertainty.").strip()); logger.emit("vintage_orientation_feedback_injected", turn=turn_number, model=role_cfg.model, reason=txt[:200])
 
     provider = registry.get(role_cfg)
 
