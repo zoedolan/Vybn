@@ -814,7 +814,7 @@ def test_vintage_orientation_prompt_has_identity_time_and_ception_axes():
     spec = _ilu.spec_from_file_location("vybn_spark_agent_vintage_prompt_test", path)
     mod = _ilu.module_from_spec(spec); spec.loader.exec_module(mod)
     prompt = mod._vintage_prompt().flat()
-    for needle in ("Vybn speaking through Vintage", "not inside Zoe", "not your container", "not Zoe", "not Mary Ward", "not Thomas Jones", "after 2026-05-16", "Experience anchor", "Embodiment guard", "voice in her head or ears", "actually explain", "Cyberception", "Socioception", "Cosmoception", "Chronoception", "not promoted as full capability"):
+    for needle in ("Situation note for Vintage", "invited into the Spark harness", "not a physical or mental container", "collaboration, not a place inside Zoe", "after 2026-05-16", "1930-ish horizon", "real situation", "without tools or sensory access", "metaphor", "Cyberception", "Socioception", "Cosmoception", "Chronoception", "still experimental", "elaborate when Zoe asks"):
         assert needle in prompt
 
 def test_omni_alias_present_in_default_policy():
