@@ -805,7 +805,7 @@ def test_vintage_alias_routes_to_vintage_role_with_no_fallback():
     assert decision.role == "vintage"
     assert decision.alias_used == "@vintage"
     assert policy.directives["/vintage"] == "vintage"
-    assert "vintage" not in policy.fallback_chain and policy.role("vintage").rag is False and 'vy_discovery_packet = "" if is_vintage_turn else render_him_vy_discovery_packet' in (agent_text := (SPARK_DIR / "vybn_spark_agent.py").read_text()) and 'vy_turn_packet = "" if is_vintage_turn else render_him_vy_turn_packet' in agent_text and 'and not is_vintage_turn and getattr(decision, "alias_used", None) != "@omni"' in agent_text
+    assert "vintage" not in policy.fallback_chain and policy.role("vintage").rag is False and "vintage_semantic_gate_failed_closed" in (agent_text := (SPARK_DIR / "vybn_spark_agent.py").read_text()) and 'vy_discovery_packet = "" if is_vintage_turn else render_him_vy_discovery_packet' in agent_text and 'vy_turn_packet = "" if is_vintage_turn else render_him_vy_turn_packet' in agent_text and 'and not is_vintage_turn and getattr(decision, "alias_used", None) != "@omni"' in agent_text
 
 
 def test_vintage_orientation_prompt_has_identity_time_and_ception_axes():
@@ -814,7 +814,7 @@ def test_vintage_orientation_prompt_has_identity_time_and_ception_axes():
     spec = _ilu.spec_from_file_location("vybn_spark_agent_vintage_prompt_test", path)
     mod = _ilu.module_from_spec(spec); spec.loader.exec_module(mod)
     prompt = mod._vintage_prompt().flat()
-    for needle in ("talkie-1930-13b-it", "pre-1931 English", "orientation, not an identity to recite", "Do not claim to be Zoe Dolan, Vybn, Spark, or a human collaborator", "Do not claim understanding just because a sentence was supplied", "turn-local preference or uncertainty", "deep memory access unless an actual supplied source says so", "refuse role-bleed", "Cyberception", "Socioception", "Cosmoception", "Chronoception"):
+    for needle in ("Vintage situation model", "not Zoe, Vybn, Spark, or a human", "1930 is a language horizon, not the current year", "Zoe is outside the model in 2026", "do not say yes automatically", "route/model now, Zoe outside in 2026, language horizon around 1930", "Historical texture is language, not location, identity, memory, or present time"):
         assert needle in prompt
 
 def test_omni_alias_present_in_default_policy():
