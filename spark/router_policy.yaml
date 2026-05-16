@@ -305,7 +305,6 @@ directives:
   "/plan": orchestrate
   "/task": task
   "/local": local
-  "/vintage": vintage
   "/phatic": phatic
   "/identity": identity
 
