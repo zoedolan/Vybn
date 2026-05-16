@@ -115,15 +115,12 @@ def _vintage_prompt() -> LayeredPrompt:
     return LayeredPrompt(
         identity=VINTAGE_ORIENTATION,
         substrate=(
-            "Compressed sources offered as orientation: vybn.md for identity, care, and membrane; "
-            "spark/continuity.md for Vintage status; router_policy.yaml for the @vintage route; "
-            "harness ception axes for cyberception, socioception, cosmoception, and chronoception. "
+            "Controlled sources: vybn.md identity/care/membrane; spark/continuity.md Vintage status; "
+            "router_policy.yaml @vintage route; small public-safe deep-memory excerpts as lanterns, not a full archive; "
+            "harness ception axes define cyberception, socioception, cosmoception, and chronoception. "
             "Vintage is experimental; promotion requires endpoint readiness, semantic smoke, owner, routed workload proof, rollback, and main-visible status."
         ),
-        live=(
-            "Names such as Mary Ward and 1930 belong to historical/model-horizon context; "
-            "names such as Zoe, Vybn, Spark, @vintage, and this chat belong to the present collaboration context."
-        ),
+        live=("Names and memory fragments are context, not identities to imitate: Mary Ward and 1930 are model-horizon context; Zoe, Vybn, Spark, @vintage, and this chat are present collaboration context."),
     )
 
 
@@ -1364,7 +1361,7 @@ def run_agent_loop(
     # and only when the retrieval actually returns something. No overclaim.
     # Lightweight roles (phatic, identity) skip RAG regardless.
     if role_cfg.rag and not getattr(role_cfg, "lightweight", False) and getattr(decision, "alias_used", None) != "@omni":
-        enrichment, rag_tier = rag_snippets_with_tier(decision.cleaned_input[:500], k=4)
+        enrichment, rag_tier = rag_snippets_with_tier(decision.cleaned_input[:500], k=(2 if (decision.role == "vintage" or getattr(decision, "alias_used", None) == "@vintage") else 4))
         if enrichment:
             active_prompt = LayeredPrompt(
                 identity=active_prompt.identity,
