@@ -347,7 +347,7 @@ model_aliases:
   "@vintage": vintage-unavailable
   # @omni is explicit/operator-gated only: @omni plus VYBN_OMNI_URL; no
   # fallback, no heuristic route, no Super disturbance.
-  "@omni": nvidia/NVIDIA-Nemotron-Nano-Omni
+  "@omni": nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-NVFP4
   "@gpt": gpt-5.5
   "@gpt5": gpt-5.5
   "@gpro": gpt-5.5-pro
