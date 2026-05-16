@@ -94,7 +94,7 @@ roles:
 
   vintage:
     provider: openai
-    model: talkie-1930-13b-it
+    model: vintage-unavailable
     thinking: off
     max_tokens: 256
     max_iterations: 1
@@ -344,7 +344,7 @@ model_aliases:
   "@sonnet46": claude-sonnet-4-6
   "@nemotron": nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
   "@local": nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
-  "@vintage": talkie-1930-13b-it
+  "@vintage": vintage-unavailable
   # @omni is explicit/operator-gated only: @omni plus VYBN_OMNI_URL; no
   # fallback, no heuristic route, no Super disturbance.
   "@omni": nvidia/NVIDIA-Nemotron-Nano-Omni

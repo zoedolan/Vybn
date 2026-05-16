@@ -713,7 +713,7 @@ _DEFAULT_ROLES: dict[str, RoleConfig] = {
     "vintage": RoleConfig(
         role="vintage",
         provider="openai",
-        model="talkie-1930-13b-it",
+        model="vintage-unavailable",
         thinking="off",
         max_tokens=256,
         max_iterations=1,
@@ -934,7 +934,7 @@ _DEFAULT_MODEL_ALIASES: dict[str, str] = {
     "@sonnet46": "claude-sonnet-4-6",
     "@nemotron": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8",
     "@local": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8",
-    "@vintage": "talkie-1930-13b-it",
+    "@vintage": "vintage-unavailable",
     # Omni — peer-Spark Nano-Omni endpoint. Operator-gated: only fires when
     # the user explicitly prefixes a turn with @omni AND the operator has
     # exported VYBN_OMNI_URL pointing at a started Omni endpoint. The alias

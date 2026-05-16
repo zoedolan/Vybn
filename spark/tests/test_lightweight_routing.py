@@ -806,8 +806,8 @@ def test_opus47_has_fallback_chain():
 def test_vintage_alias_routes_to_talkie_without_chat_fallback():
     policy = default_policy(); yaml_policy = load_policy(SPARK_DIR / "router_policy.yaml"); src = (SPARK_DIR / "vybn_spark_agent.py").read_text()
     d = policy.classify("@vintage please tell me about yourself?"); yd = yaml_policy.classify("@vintage please tell me about yourself?"); sd = policy.classify("@vi@vintage please tell me about yourself?"); syd = yaml_policy.classify("@vi@vintage please tell me about yourself?")
-    assert all(x.role == "vintage" and x.alias_used == "@vintage" and x.reason == "alias=@vintage" and x.config.base_url == "http://127.0.0.1:8004/v1" and x.config.rag is False for x in (d, yd, sd, syd))
-    assert "bounded local vintage/canary surface" in src and "real Talkie-1930-13B artifact is not present" in src and "_vintage_frame_repair" not in src and "def _vintage_prompt" not in src
+    assert all(x.role == "vintage" and x.alias_used == "@vintage" and x.reason == "alias=@vintage" and x.config.model == "vintage-unavailable" and x.config.rag is False for x in (d, yd, sd, syd))
+    assert "not available as a real model route" in src and "refusing to pretend this is fixed" in src and "_vintage_frame_repair" not in src and "def _vintage_prompt" not in src
 
 
 def test_omni_alias_present_in_default_policy():
