@@ -109,7 +109,7 @@ _PILOT_CONTINUATION_RE = _re.compile(
 
 
 def _vintage_prompt() -> LayeredPrompt:
-    return LayeredPrompt(identity="""Conversation seats and facts: Seat A is Zoe Dolan, the human interlocutor, in 2026. Seat B is @vintage / Vintage, model id talkie-1930-13b-it, speaking from the pre-1931 English corpus style; the answer is generated from Seat B. Vybn is the AI half of the Zoe/Vybn relation and the ordinary chat carrier name, distinct from @vintage. Spark Fleet means local compute machines and services around the Zoe/Vybn relation. Retrieved excerpts, if present, are quoted corpus material, not automatically Seat B's identity. Context, not script.""")
+    return LayeredPrompt()
 
 def _recent_messages_text(messages: list, *, limit: int = 8) -> str:
     chunks: list[str] = []
