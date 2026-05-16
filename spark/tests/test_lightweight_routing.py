@@ -796,16 +796,31 @@ def test_opus47_has_fallback_chain():
     assert policy.fallback_chain["claude-opus-4-7"] == ["claude-opus-4-6", "claude-sonnet-4-6"]
 
 
-# Omni explicit-activation alias. The peer-Spark Nano-Omni is the ONLY
-# automatic-routing-free path: it never appears in fallback_chain or in
-# any heuristic/directive, only as the @omni model alias which the
-# operator activates by exporting VYBN_OMNI_URL.
+# Omni is alias-only and operator-gated by VYBN_OMNI_URL.
+
+
+def test_vintage_alias_routes_to_vintage_role_with_no_fallback():
+    policy = default_policy()
+    decision = policy.classify("@vintage who are you?")
+    assert decision.role == "vintage"
+    assert decision.alias_used == "@vintage"
+    assert policy.directives["/vintage"] == "vintage"
+    assert "vintage" not in policy.fallback_chain
+
+
+def test_vintage_orientation_prompt_has_identity_time_and_ception_axes():
+    import importlib.util as _ilu
+    path = SPARK_DIR / "vybn_spark_agent.py"
+    spec = _ilu.spec_from_file_location("vybn_spark_agent_vintage_prompt_test", path)
+    mod = _ilu.module_from_spec(spec); spec.loader.exec_module(mod)
+    prompt = mod._vintage_prompt().flat()
+    for needle in ("Vybn speaking through Vintage", "not Zoe", "not Mary Ward", "after 2026-05-16", "Cyberception", "Socioception", "Cosmoception", "Chronoception", "not promoted as full capability"):
+        assert needle in prompt
+
 def test_omni_alias_present_in_default_policy():
     from spark.harness.substrate import default_policy
     policy = default_policy()
     assert policy.model_aliases.get("@omni") is not None
-    # Default model id is the Nano-Omni; operator can override via
-    # VYBN_OMNI_MODEL at runtime without editing policy.
     assert "Omni" in policy.model_aliases["@omni"]
 
 
@@ -823,8 +838,6 @@ def test_omni_not_in_fallback_chain():
     from spark.harness.substrate import default_policy
     policy = default_policy()
     omni_model = policy.model_aliases["@omni"]
-    # Omni model id must not be a fallback target for any other model
-    # (Super topology stays untouched; Omni only fires on explicit @omni).
     for src, chain in policy.fallback_chain.items():
         assert omni_model not in chain, (
             f"@omni model leaked into fallback_chain[{src!r}]"
@@ -856,14 +869,7 @@ def test_omni_alias_classifies_with_override():
     assert decision.model_override == default_policy().model_aliases["@omni"]
 
 
-# Operator-supplied perception preamble. VYBN_OMNI_PERCEPTION is the env
-# var that lets a perception/dream/evolve text packet ride the explicit
-# @omni turn (and only that turn). It must be documented alongside the
-# @omni alias in both the YAML and the default-policy module so the
-# operator surface stays discoverable, and it must be wired in the agent
-# loop inside the same alias-override branch that already gates on
-# VYBN_OMNI_URL — never as a separate path that could fire without the
-# URL gate (which would risk leaking onto Super).
+# VYBN_OMNI_PERCEPTION rides only the explicit URL-gated @omni turn.
 def test_omni_perception_env_documented():
     active = (
         Path("spark/harness/substrate.py").read_text()
@@ -876,11 +882,6 @@ def test_omni_perception_env_documented():
 def test_omni_perception_wired_in_agent_alias_branch():
     text = Path("spark/vybn_spark_agent.py").read_text()
     assert "VYBN_OMNI_PERCEPTION" in text
-    # The perception read must live inside the same @omni alias branch
-    # that gates on VYBN_OMNI_URL — i.e. between the alias_used == "@omni"
-    # check and the elif for claude- aliases. This guarantees perception
-    # is unreachable unless VYBN_OMNI_URL is set, so an unset operator
-    # cannot silently route a perception packet to Super on :8000.
     omni_branch_idx = text.find('alias_used", None) == "@omni"')
     elif_claude_idx = text.find('elif override_model.startswith("claude-")')
     assert omni_branch_idx > 0
@@ -889,8 +890,6 @@ def test_omni_perception_wired_in_agent_alias_branch():
     assert "VYBN_OMNI_URL" in branch
     assert "VYBN_OMNI_PERCEPTION" in branch
     assert "alias_omni_perception" in branch
-    # Bounded read — protects the turn against giant files. The agent
-    # reads at most this many bytes from the perception path.
     assert "16_000" in branch or "16000" in branch
 
 
@@ -910,10 +909,6 @@ def test_omni_perception_preamble_runs_on_explicit_omni_turn(tmp_path=None):
     mod = _ilu.module_from_spec(spec)
     spec.loader.exec_module(mod)
 
-    # Lightweight stand-ins for deep-memory + Him surfaces so the test
-    # exercises the @omni branch only and does not accidentally depend
-    # on RAG/torch model loading, which is expensive and pre-existing-
-    # skipped in this env.
     saved_rag = mod.rag_snippets
     saved_rag_tier = mod.rag_snippets_with_tier
     saved_disc = mod.render_him_vy_discovery_packet
@@ -1080,23 +1075,13 @@ def test_omni_perception_skipped_when_url_unset():
             pass
 
 
-# @omni max_tokens clamp. The vLLM Nano-Omni sidecar runs with
-# max_model_len=4096; if the @omni branch inherits the resolved role's
-# max_tokens (chat=16384, orchestrate=16384) the request is rejected
-# with "max_tokens=N cannot be greater than max_model_len=4096". The
-# clamp must (a) drop the request below 4096 by default, (b) be
-# overridable via VYBN_OMNI_MAX_TOKENS without editing policy, and
-# (c) only fire on @omni — non-Omni providers must keep their existing
-# role budget intact.
+# @omni max_tokens clamp: stay below sidecar context and never affect non-Omni aliases.
 def _run_omni_turn_capture_role(
     user_input: str,
     *,
     omni_url: str = "http://127.0.0.1:65535/v1",
     extra_env: dict | None = None,
 ):
-    """Drive run_agent_loop on a single @omni turn and capture the
-    RoleConfig the provider was called with. Returns (role_seen, events).
-    """
     import importlib.util as _ilu
     import os as _os
     from harness.substrate import default_policy as _dp
@@ -1315,13 +1300,9 @@ def test_omni_clamp_does_not_affect_non_omni_aliases():
         def emit(_s, name, **kw):
             _s.events.append((name, kw))
 
-    # VYBN_OMNI_MAX_TOKENS is set deliberately to prove that this var
-    # is scoped to @omni only — a non-@omni alias must ignore it.
     prev_omni_max = _os.environ.get("VYBN_OMNI_MAX_TOKENS")
     _os.environ["VYBN_OMNI_MAX_TOKENS"] = "256"
     try:
-        # Pick an alias that resolves and has a large role budget. We
-        # use @opus4.6 if present in the policy, otherwise skip.
         policy = _dp()
         candidate_alias = None
         for cand in ("@opus4.6", "@opus", "@sonnet"):
@@ -1331,8 +1312,6 @@ def test_omni_clamp_does_not_affect_non_omni_aliases():
         if candidate_alias is None:
             return  # nothing to assert; clamp scope is still proven by other tests
         decision = policy.classify(f"{candidate_alias} hello")
-        # Sanity: this alias must NOT be @omni and must produce an
-        # override.
         assert decision.alias_used == candidate_alias
         assert decision.model_override is not None
         original_role_budget = policy.roles[decision.role].max_tokens
@@ -1352,8 +1331,6 @@ def test_omni_clamp_does_not_affect_non_omni_aliases():
         assert role_seen is not None, (
             "provider was never invoked on non-@omni alias turn"
         )
-        # Non-@omni alias must keep its full role budget — clamp must
-        # NOT apply.
         assert role_seen.max_tokens == original_role_budget, (
             f"non-@omni alias {candidate_alias} had max_tokens="
             f"{role_seen.max_tokens}, expected role budget "

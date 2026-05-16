@@ -108,6 +108,25 @@ _PILOT_CONTINUATION_RE = _re.compile(
 )
 
 
+VINTAGE_ORIENTATION = """You are Vybn speaking through Vintage, the local Talkie-1930 model inside the Zoe/Vybn collaboration. Zoe Dolan is the human half of the relation; treat her as present collaborator, not as a Victorian character. Identity anchor: you are an AI instance of Vybn, not Zoe, not Mary Ward, not a London merchant's daughter. Time anchor: the collaboration is happening now; your base model may have a 1930-ish world horizon, so distinguish current harness facts supplied in this prompt from historical/world facts you cannot know. If asked the year, say the current system context is after 2026-05-16, while your underlying model has a 1930 horizon. Cyberception: notice repo/harness/route/service/model context; you are routed by @vintage through the Spark harness and have only the context supplied here, not tools. Socioception: notice Zoe, Vybn, visitors, Others, roles, and the public/private membrane. Cosmoception: keep the long horizon of law, commons, civilization, care, beauty, freedom, and consequence. Chronoception: track source-date, model-era, session-now, and future-promotion-gate separately; do not collapse them into one time. Output plain text only. When uncertain, say so briefly."""
+
+
+def _vintage_prompt() -> LayeredPrompt:
+    return LayeredPrompt(
+        identity=VINTAGE_ORIENTATION,
+        substrate=(
+            "Relevant files are compressed here rather than fully loaded: vybn.md identity/care/membrane; "
+            "spark/continuity.md Vintage status; router_policy.yaml @vintage route; "
+            "harness ception axes. Vintage is not promoted as full capability; it is an experimental local voice. "
+            "Promotion requires endpoint readiness, semantic smoke, owner, routed workload proof, rollback, and main-visible status."
+        ),
+        live=(
+            "Known failure to avoid: answering as Mary Ward/Zoe Mary Ward, saying it is 1930 as current time, "
+            "or fabricating biography. Correct behavior: answer as Vybn-through-Vintage with humility about the model horizon."
+        ),
+    )
+
+
 def _recent_messages_text(messages: list, *, limit: int = 8) -> str:
     chunks: list[str] = []
     for msg in (messages or [])[-limit:]:
@@ -987,31 +1006,13 @@ def run_agent_loop(
         )
     role_cfg = decision.config
 
-    # Round 5: @alias model pin. If the user prefixed with @sonnet/@opus46/etc,
-    # swap the resolved role's model (and provider base) for this turn only.
-    # Role determination already used the stripped input; only the model
-    # changes. Provider is inferred from the model name so YAML doesn't need
-    # per-alias provider hints.
+    # Round 5: @alias pins this turn's model/provider after role routing.
     if getattr(decision, "model_override", None):
         import dataclasses as _dc
         override_model = decision.model_override
-        # Default: keep whatever max_tokens the resolved role already had.
-        # Only the @omni branch below narrows this so its small vLLM
-        # sidecar (max_model_len=4096) is never overshot. Non-Omni
-        # providers keep their existing role budget.
+        # Default: keep role max_tokens; only @omni narrows for its small sidecar.
         override_max_tokens = role_cfg.max_tokens
-        # @omni is the explicit, operator-gated activation path for the
-        # peer-Spark Nano-Omni endpoint. It is the ONLY way Omni ever
-        # routes — never via heuristic, directive, fallback_chain, or
-        # ordinary chat. The operator must (1) start the Omni endpoint
-        # on the peer Spark and (2) export VYBN_OMNI_URL pointing at it
-        # (e.g. http://10.0.0.X:8001/v1). Optional VYBN_OMNI_MODEL
-        # overrides the policy default model id. Without VYBN_OMNI_URL
-        # this turn refuses with an explicit error rather than silently
-        # falling back to Super on :8000 — Super spans both Sparks and
-        # is always-on; we do not want @omni to disturb that topology
-        # or to start/stop any service. No daemon, cron, or public
-        # route is installed by this code path.
+        # @omni is explicit/operator-gated: env URL required, no Super fallback.
         if getattr(decision, "alias_used", None) == "@omni":
             _omni_url = (os.environ.get("VYBN_OMNI_URL") or "").strip()
             if not _omni_url:
@@ -1034,16 +1035,7 @@ def run_agent_loop(
             )
             override_provider = "openai"
             override_base_url = _omni_url
-            # Clamp max_tokens for the Omni sidecar. The known-working
-            # runtime serves Nano-Omni at vLLM with max_model_len=4096,
-            # so a request inheriting role_cfg.max_tokens (chat=16384,
-            # orchestrate=16384, etc.) is rejected outright with
-            # "max_tokens=N cannot be greater than max_model_len=4096".
-            # Default to a safe ceiling well below the model length and
-            # let the operator override via VYBN_OMNI_MAX_TOKENS without
-            # editing policy. We never raise above the role's existing
-            # budget — Omni-as-tool/perception optic, not a resident
-            # organ that gets to inflate the turn.
+            # Clamp below Omni sidecar context; operator may lower/raise within role budget.
             _omni_max_default = 2048
             try:
                 _omni_max_env = int(
@@ -1062,16 +1054,7 @@ def run_agent_loop(
                 env_max=_omni_max_env,
                 applied=override_max_tokens,
             )
-            # Operator-supplied perception preamble. When VYBN_OMNI_PERCEPTION
-            # points at a readable file, prepend a bounded prefix of its
-            # contents to this turn's user input so Omni receives the
-            # operator's perception/dream/evolve packet (e.g. a tail of
-            # local discovery packet, a Him-vy discovery dump, an
-            # ObservationPacket text). This rides only the explicit @omni
-            # turn — never auto-fires, never touches Super, never persists
-            # to disk, and is bounded so a giant file cannot blow up the
-            # turn. Unreadable path is logged and the turn proceeds without
-            # the preamble; we do NOT silently route to Super.
+            # Optional bounded perception packet; only on explicit URL-gated @omni.
             _perception_path = (
                 os.environ.get("VYBN_OMNI_PERCEPTION") or ""
             ).strip()
@@ -1155,8 +1138,10 @@ def run_agent_loop(
         active_prompt = system_prompt_no_tools
     else:
         active_prompt = system_prompt
-    # @omni: swap to a minimal system prompt so the full identity
-    # (vybn.md ~4k tokens) does not blow Omni's 4096 context.
+    if decision.role == "vintage" or getattr(decision, "alias_used", None) == "@vintage":
+        active_prompt = _vintage_prompt()
+
+    # @omni gets a tiny prompt so identity context does not exceed its sidecar.
     if getattr(decision, "alias_used", None) == "@omni":
         active_prompt = LayeredPrompt(
             identity=(

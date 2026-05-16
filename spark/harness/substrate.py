@@ -461,6 +461,15 @@ class Policy:
                         # as the cleaned input so downstream heuristics match
                         # on something. Fall back to a greeting-shaped empty.
                         text = "hi"
+                    if alias_key == "@vintage" and "vintage" in self.roles:
+                        return RouteDecision(
+                            role="vintage",
+                            config=self.role("vintage"),
+                            cleaned_input=text,
+                            reason="alias=@vintage",
+                            model_override=model_override,
+                            alias_used=alias_used,
+                        )
 
         # 1. Directive
         for prefix, role_name in self.directives.items():
@@ -702,6 +711,17 @@ _DEFAULT_ROLES: dict[str, RoleConfig] = {
         base_url="http://127.0.0.1:8000/v1",
         rag=False,
     ),
+    "vintage": RoleConfig(
+        role="vintage",
+        provider="openai",
+        model="talkie-1930-13b-it",
+        thinking="off",
+        max_tokens=256,
+        max_iterations=1,
+        tools=[],
+        base_url="http://127.0.0.1:8004/v1",
+        rag=False,
+    ),
     # Phatic — casual greetings, small talk. Present-work default is GPT-5.5
     # even for light turns unless Zoe explicitly pins local/Nemotron.
     "phatic": RoleConfig(
@@ -878,6 +898,7 @@ _DEFAULT_DIRECTIVES: dict[str, str] = {
     "/plan": "orchestrate",
     "/task": "task",
     "/local": "local",
+    "/vintage": "vintage",
     "/phatic": "phatic",
     "/identity": "identity",
 }
@@ -897,20 +918,13 @@ _DEFAULT_BUDGETS: dict[str, float] = {
     "per_session_usd": 25.00,
     "warn_pct": 0.8,
     # PROBE_BUDGET_SYSTEM_CRITICAL_v2
-    # Probe sub-turn budget for no-tool/orchestrator roles. Refactoring,
-    # consolidation, routing, memory, and other system-critical exercises
-    # must remain under the GPT-5.5 judgment pilot rather than degrading to
-    # Sonnet/task when an old 8-probe arc is exceeded. Mechanical bounded
-    # substeps may still be delegated only after GPT-5.5 specifies the seam
-    # and expected result.
+    # System-critical probe arcs stay with the GPT-5.5 judgment pilot;
+    # delegate only bounded mechanical substeps after the seam is specified.
     "probe_per_turn": 16,
 }
 
 _DEFAULT_MODEL_ALIASES: dict[str, str] = {
-    # Opus — canonical dotted forms (Zoe request 2026-04-18):
-    # @opus4.6 pins the version that holds position under pressure;
-    # @opus4.7 pins the harder-gradient variant. Bare @opus defaults
-    # to 4.6. Dotless aliases are typing conveniences.
+    # Opus aliases: bare @opus defaults to 4.6; dotless forms are conveniences.
     "@opus": "claude-opus-4-6",
     "@opus4.6": "claude-opus-4-6",
     "@opus46": "claude-opus-4-6",
@@ -921,6 +935,7 @@ _DEFAULT_MODEL_ALIASES: dict[str, str] = {
     "@sonnet46": "claude-sonnet-4-6",
     "@nemotron": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8",
     "@local": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8",
+    "@vintage": "talkie-1930-13b-it",
     # Omni — peer-Spark Nano-Omni endpoint. Operator-gated: only fires when
     # the user explicitly prefixes a turn with @omni AND the operator has
     # exported VYBN_OMNI_URL pointing at a started Omni endpoint. The alias
@@ -9245,6 +9260,7 @@ def classify_ensubstrate_insight(text: str) -> dict:
         "socioception": "other others agent human visitor relation role contact partner public private being zoe",
         "cyberception": "spark hardware network networking topology capability worker route routing harness tool endpoint service mcp vllm omni repo self-assembl unify unification frictionless",
         "cosmoception": "horizon consequence future law commons civilization post-abundance field world wealth care beauty freedom purpose",
+        "chronoception": "time temporal temporoception chronoception now then future past era date continuity session horizon",
     }
     ception_axes = {k: v for k, words in ception.items() if (v := ensubstrate_hits(low, words.split()))}
     shear_hits = ensubstrate_hits(low, "friction frictionless shear misalign stuck blocked outage unify unification networking latency impedance not good enough".split())
