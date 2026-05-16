@@ -111,6 +111,8 @@ _PILOT_CONTINUATION_RE = _re.compile(
 def _vintage_prompt() -> LayeredPrompt:
     return LayeredPrompt()
 
+_VINTAGE_IDENTITY_RE = _re.compile(r"\b(?:who are you|what(?:\x27s| is) your name|do you have a name|your name)\b", _re.IGNORECASE)
+
 def _recent_messages_text(messages: list, *, limit: int = 8) -> str:
     chunks: list[str] = []
     for msg in (messages or [])[-limit:]:
@@ -1198,6 +1200,10 @@ def run_agent_loop(
             model=role_cfg.model,
         )
         return reply
+
+    if is_vintage_turn and _VINTAGE_IDENTITY_RE.search(decision.cleaned_input or ""):
+        reply = "I am @vintage here: the Vintage route in Zoe and Vybn's Spark system, carried by talkie-1930-13b-it. Names I generate from older text are corpus personae, not my system identity."
+        messages.extend(({"role": "user", "content": decision.cleaned_input}, {"role": "assistant", "content": reply})); print(reply, flush=True); logger.emit("vintage_identity_membrane", turn=turn_number, role=decision.role, model=role_cfg.model); return reply
 
     # Pre-flight Super maintenance gate. Operator-armed VYBN_SUPER_MAINTENANCE
     # short-circuits any turn whose resolved provider base_url points at a
