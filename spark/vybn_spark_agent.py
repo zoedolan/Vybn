@@ -1120,9 +1120,9 @@ def run_agent_loop(
         active_prompt = system_prompt_no_tools
     else:
         active_prompt = system_prompt
-    if is_vintage_turn := (decision.role == "vintage" or getattr(decision, "alias_used", None) == "@vintage"):
-        print("Vintage is unavailable: no promoted Vintage endpoint is connected, so this route is fail-closed instead of falling through to chat.", flush=True)
-        return 1
+    is_vintage_turn = decision.role == "vintage" or getattr(decision, "alias_used", None) == "@vintage"
+    if is_vintage_turn:
+        import dataclasses as _dc; role_cfg = _dc.replace(role_cfg, rag=False, max_tokens=32); active_prompt = LayeredPrompt(identity="You are Vintage, a small experimental local Talkie route inside Zoe/Vybn. Be brief and honest about limits.", substrate="", live="")
 
     # @omni gets a tiny prompt so identity context does not exceed its sidecar.
     if getattr(decision, "alias_used", None) == "@omni":
@@ -1465,7 +1465,7 @@ def run_agent_loop(
                     logger=logger,
                     turn_number=turn_number,
                 )
-                response = handle.final() if is_vintage_turn else (_stream_and_print(handle) or handle.final())
+                response = _stream_and_print(handle) or handle.final()
                 # Cache-hit telemetry. With Anthropic's 5-min ephemeral
                 # TTL we need visibility into whether LayeredPrompt
                 # cache_control markers are actually hitting.

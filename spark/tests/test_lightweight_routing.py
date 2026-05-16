@@ -803,11 +803,11 @@ def test_opus47_has_fallback_chain():
 
 
 
-def test_vintage_alias_fails_closed_instead_of_falling_through_to_chat():
+def test_vintage_alias_routes_to_talkie_without_chat_fallback():
     policy = default_policy(); yaml_policy = load_policy(SPARK_DIR / "router_policy.yaml"); src = (SPARK_DIR / "vybn_spark_agent.py").read_text()
     d = policy.classify("@vintage please tell me about yourself?"); yd = yaml_policy.classify("@vintage please tell me about yourself?")
     assert d.role == "vintage" and d.alias_used == "@vintage" and yd.role == "vintage" and yd.alias_used == "@vintage"
-    assert "fail-closed instead of falling through to chat" in src and "_vintage_frame_repair" not in src and "def _vintage_prompt" not in src
+    assert "small experimental local Talkie route" in src and "_vintage_frame_repair" not in src and "def _vintage_prompt" not in src
 
 def test_omni_alias_present_in_default_policy():
     from spark.harness.substrate import default_policy
