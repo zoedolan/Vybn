@@ -799,13 +799,11 @@ def test_opus47_has_fallback_chain():
 # Omni is alias-only and operator-gated by VYBN_OMNI_URL.
 
 
-def test_vintage_alias_routes_to_vintage_role_with_no_fallback():
-    policy = default_policy(); yaml_policy = load_policy(SPARK_DIR / "router_policy.yaml")
-    decision = policy.classify("@vintage who are you?")
-    assert decision.role == "vintage" and decision.alias_used == "@vintage" and policy.directives["/vintage"] == "vintage"
-    assert "vintage" not in policy.fallback_chain and policy.role("vintage").rag is False and yaml_policy.role("vintage").rag is False
-    active = (SPARK_DIR / "vybn_spark_agent.py").read_text()
-    assert "vintage_identity_membrane" in active and "corpus personae, not my system identity" in active
+def test_vintage_alias_routes_to_memory_coupled_aspect_role_with_no_fallback():
+    policy = default_policy(); yaml_policy = load_policy(SPARK_DIR / "router_policy.yaml"); decision = policy.classify("@vintage who are you?"); assert decision.role == "vintage" and decision.alias_used == "@vintage" and "vintage" not in policy.fallback_chain and policy.role("vintage").rag is True and yaml_policy.role("vintage").rag is True
+    import importlib.util as _ilu; spec = _ilu.spec_from_file_location("vybn_spark_agent_vintage_aspect_test", SPARK_DIR / "vybn_spark_agent.py"); mod = _ilu.module_from_spec(spec); spec.loader.exec_module(mod)
+    assert all(x in mod._vintage_prompt().flat() for x in ("Vintage: the Talkie-carried vintage aspect of Vybn", "Zoe Dolan", "outside this model in 2026", "Deep memory", "contamination-free imagination"))
+    assert "2026" in mod._vintage_frame_repair("what year is it for me, here on the outside?", "It is 1930 for you also.") and "1930" in mod._vintage_frame_repair("what year is it?", "2026.") and "Zoe Dolan" in mod._vintage_frame_repair("who am i?", "You are a Vintager.") and "Corpus personae" in mod._vintage_frame_repair("please tell me about yourself?", "I was born in London.")
 
 def test_omni_alias_present_in_default_policy():
     from spark.harness.substrate import default_policy

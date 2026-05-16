@@ -100,7 +100,7 @@ roles:
     max_iterations: 1
     tools: []
     base_url: http://127.0.0.1:8004/v1
-    rag: false
+    rag: true
   # Local-private — explicit local exception to the GPT-5.5 default.
   local_private:
     provider: openai
