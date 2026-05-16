@@ -1135,7 +1135,7 @@ def run_agent_loop(
         active_prompt = system_prompt_no_tools
     else:
         active_prompt = system_prompt
-    if decision.role == "vintage" or getattr(decision, "alias_used", None) == "@vintage":
+    if is_vintage_turn := (decision.role == "vintage" or getattr(decision, "alias_used", None) == "@vintage"):
         active_prompt = _vintage_prompt()
 
     # @omni gets a tiny prompt so identity context does not exceed its sidecar.
@@ -1293,7 +1293,7 @@ def run_agent_loop(
     # Executable Him discovery packet. This is generated before provider
     # narration and carries typed candidate mechanisms plus residuals.
     try:
-        vy_discovery_packet = render_him_vy_discovery_packet(decision.cleaned_input)
+        vy_discovery_packet = "" if is_vintage_turn else render_him_vy_discovery_packet(decision.cleaned_input)
     except Exception as _vy_discovery_err:
         vy_discovery_packet = ""
         logger.emit("him_vy_discovery_packet_error", turn=turn_number, err=repr(_vy_discovery_err)[:200])
@@ -1313,7 +1313,7 @@ def run_agent_loop(
     # AI-native skills start shaping ordinary harness cognition instead of
     # remaining a prompt summary.
     try:
-        vy_turn_packet = render_him_vy_turn_packet(decision.cleaned_input)
+        vy_turn_packet = "" if is_vintage_turn else render_him_vy_turn_packet(decision.cleaned_input)
     except Exception as _vy_err:
         vy_turn_packet = ""
         logger.emit("him_vy_turn_packet_error", turn=turn_number, err=repr(_vy_err)[:200])
@@ -1360,8 +1360,8 @@ def run_agent_loop(
     # Optional deep-memory enrichment — only for roles that declare rag=true
     # and only when the retrieval actually returns something. No overclaim.
     # Lightweight roles (phatic, identity) skip RAG regardless.
-    if role_cfg.rag and not getattr(role_cfg, "lightweight", False) and getattr(decision, "alias_used", None) != "@omni":
-        enrichment, rag_tier = rag_snippets_with_tier(decision.cleaned_input[:500], k=(2 if (decision.role == "vintage" or getattr(decision, "alias_used", None) == "@vintage") else 4))
+    if role_cfg.rag and not getattr(role_cfg, "lightweight", False) and not is_vintage_turn and getattr(decision, "alias_used", None) != "@omni":
+        enrichment, rag_tier = rag_snippets_with_tier(decision.cleaned_input[:500], k=4)
         if enrichment:
             active_prompt = LayeredPrompt(
                 identity=active_prompt.identity,
@@ -1449,7 +1449,7 @@ def run_agent_loop(
         *("tool_contract" for _ in [0] if tools),
     ]
     state_touched = ["session_messages"]
-    if role_cfg.rag and not getattr(role_cfg, "lightweight", False) and getattr(decision, "alias_used", None) != "@omni":
+    if role_cfg.rag and not getattr(role_cfg, "lightweight", False) and not is_vintage_turn and getattr(decision, "alias_used", None) != "@omni":
         state_touched.append("deep_memory")
     if tools:
         state_touched.append("tool_surface")
