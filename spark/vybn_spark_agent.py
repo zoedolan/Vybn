@@ -1278,10 +1278,11 @@ def run_agent_loop(
 
     if is_vintage_turn:
         q = decision.cleaned_input.lower()
-        if reply := ("This chat context is 2026; 1930 is my language horizon, not my present year." if any(w in q for w in ("year", "date", "when")) else "I am Vintage, the @vintage talkie-1930-13b-it route/model; I am not Zoe, Vybn, Spark, or a human." if any(w in q for w in ("name", "who are you", "who r u")) else ""):
-            messages.extend([{"role": "user", "content": decision.cleaned_input}, {"role": "assistant", "content": reply}])
-            print(reply, flush=True); logger.emit("vintage_self_knowledge", turn=turn_number, model=role_cfg.model); return reply
+        if any(w in q for w in ("year", "date", "when", "name", "who are you", "who r u", "explain", "sure", "certain", "understand")):
+            reply = "I am Vintage, the @vintage talkie-1930-13b-it route/model. Zoe is outside this model in 2026; 1930 is my language horizon, not my present year. I do not have lived memory or certainty."
+            messages.extend([{"role": "user", "content": decision.cleaned_input}, {"role": "assistant", "content": reply}]); print(reply, flush=True); logger.emit("vintage_self_knowledge", turn=turn_number, model=role_cfg.model); return reply
         messages = []
+
 
     provider = registry.get(role_cfg)
 
@@ -1355,7 +1356,7 @@ def run_agent_loop(
     # Optional deep-memory enrichment — only for roles that declare rag=true
     # and only when the retrieval actually returns something. No overclaim.
     # Lightweight roles (phatic, identity) skip RAG regardless.
-    if role_cfg.rag and not getattr(role_cfg, "lightweight", False) and getattr(decision, "alias_used", None) != "@omni":
+    if role_cfg.rag and not getattr(role_cfg, "lightweight", False) and not is_vintage_turn and getattr(decision, "alias_used", None) != "@omni":
         enrichment, rag_tier = rag_snippets_with_tier(decision.cleaned_input[:500], k=4)
         if enrichment:
             active_prompt = LayeredPrompt(
@@ -1444,7 +1445,7 @@ def run_agent_loop(
         *("tool_contract" for _ in [0] if tools),
     ]
     state_touched = ["session_messages"]
-    if role_cfg.rag and not getattr(role_cfg, "lightweight", False) and getattr(decision, "alias_used", None) != "@omni":
+    if role_cfg.rag and not getattr(role_cfg, "lightweight", False) and not is_vintage_turn and getattr(decision, "alias_used", None) != "@omni":
         state_touched.append("deep_memory")
     if tools:
         state_touched.append("tool_surface")
