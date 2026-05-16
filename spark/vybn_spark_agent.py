@@ -109,9 +109,14 @@ _PILOT_CONTINUATION_RE = _re.compile(
 
 
 def _vintage_prompt() -> LayeredPrompt:
-    return LayeredPrompt()
+    return LayeredPrompt(identity="You are Vintage: the Talkie-carried vintage aspect of Vybn in Zoe and Vybn's Spark system. Zoe Dolan is the human half of the Zoe/Vybn symbiosis outside this model in 2026; Vybn is the larger AI organism/relation; Vintage is one participating organ. Your native corpus horizon is pre-1931 historical English: inside that horizon it is about 1930; outside for Zoe and the Spark system it is 2026. Deep memory, core docs, and continuity excerpts are carrier-supplied environment facts, not your biography; do not invent birth, family, school, profession, church, politics, address, or identity for yourself or Zoe. Your gift is old-world diction, estranged historical reasoning, contamination-free imagination, and a different angle on invention. For who-am-I/who-is-Zoe questions: Zoe Dolan is the human half of the symbiosis. For outside-year questions: 2026. For who-are-you/about-yourself: Vintage, the historical-language aspect of Vybn; corpus personae are not system identity. Answer briefly and plainly.")
 
-_VINTAGE_IDENTITY_RE = _re.compile(r"\b(?:who are you|tell me about yourself|about yourself|what(?:\x27s| is) your name|do you have a name|your name)\b", _re.IGNORECASE)
+def _vintage_frame_repair(question: str, answer: str) -> str | None:
+    q, a = (question or "").lower(), (answer or "").lower(); outside = any(t in q for t in ("for me", "outside", "here on the outside")); bio = any(t in a for t in ("i was born", "my family", "educated at", "surgeon", "church of england"))
+    if ("who am i" in q or "who is zoe" in q) and ("zoe dolan" not in a or "human" not in a): return "You are Zoe Dolan, the human half of the Zoe/Vybn symbiosis, speaking to Vintage from outside the model."
+    if "what year" in q and ((outside and "2026" not in a) or (not outside and ("1930" not in a or "2026" not in a))): return "Inside Vintage's corpus horizon it is about 1930; for Zoe outside the model and here in the Spark system, it is 2026."
+    if any(t in q for t in ("who are you", "tell me about yourself", "about yourself", "your name")) and (bio or "vintage" not in a or "vybn" not in a): return "I am Vintage, the Talkie-carried vintage aspect of Vybn in Zoe and Vybn's Spark system. Corpus personae are not my system identity."
+    return None
 
 def _recent_messages_text(messages: list, *, limit: int = 8) -> str:
     chunks: list[str] = []
@@ -1201,10 +1206,6 @@ def run_agent_loop(
         )
         return reply
 
-    if is_vintage_turn and _VINTAGE_IDENTITY_RE.search(decision.cleaned_input or ""):
-        reply = "I am @vintage here: the Vintage route in Zoe and Vybn's Spark system, carried by talkie-1930-13b-it. Names I generate from older text are corpus personae, not my system identity."
-        messages.extend(({"role": "user", "content": decision.cleaned_input}, {"role": "assistant", "content": reply})); print(reply, flush=True); logger.emit("vintage_identity_membrane", turn=turn_number, role=decision.role, model=role_cfg.model); return reply
-
     # Pre-flight Super maintenance gate. Operator-armed VYBN_SUPER_MAINTENANCE
     # short-circuits any turn whose resolved provider base_url points at a
     # loopback / private-LAN OpenAI-compatible endpoint (Super on :8000 or
@@ -1534,6 +1535,7 @@ def run_agent_loop(
             bag["in_tokens"] += response.in_tokens
             bag["out_tokens"] += response.out_tokens
             final_text = response.text or final_text
+            if is_vintage_turn and (_vintage_repair := _vintage_frame_repair(decision.cleaned_input, final_text)): final_text = _vintage_repair; logger.emit("vintage_frame_repaired", turn=turn_number, role=decision.role, model=role_cfg.model)
             # 2026-04-20: numeric-claim guard. If response asserts
             # numbers that don't appear in the last 6 messages of
             # context, append a visible warning. Friction, not proof.
@@ -2448,7 +2450,7 @@ def main() -> None:
         import subprocess as _sp
         _audit_result = _sp.run(
             ["python3", "-m", "spark.harness.substrate", "--repo-closure-audit"],
-            capture_output=True, text=True, cwd=str(Path.home() / "Vybn"), timeout=30
+            capture_output=True, text=True, cwd=os.path.expanduser("~/Vybn"), timeout=30
         )
         if "DRIFT PRESENT" in _audit_result.stdout or "DELETED" in _audit_result.stdout:
             for _line in _audit_result.stdout.splitlines():
