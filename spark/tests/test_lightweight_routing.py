@@ -805,7 +805,7 @@ def test_vintage_alias_routes_to_vintage_role_with_no_fallback():
     assert decision.role == "vintage"
     assert decision.alias_used == "@vintage"
     assert policy.directives["/vintage"] == "vintage"
-    assert "vintage" not in policy.fallback_chain and policy.role("vintage").rag is False and "vintage_semantic_gate_failed_closed" in (agent_text := (SPARK_DIR / "vybn_spark_agent.py").read_text()) and 'vy_discovery_packet = "" if is_vintage_turn else render_him_vy_discovery_packet' in agent_text and 'vy_turn_packet = "" if is_vintage_turn else render_him_vy_turn_packet' in agent_text and 'and not is_vintage_turn and getattr(decision, "alias_used", None) != "@omni"' in agent_text
+    assert "vintage" not in policy.fallback_chain and policy.role("vintage").rag is False and "vintage_orientation_feedback_injected" in (agent_text := (SPARK_DIR / "vybn_spark_agent.py").read_text()) and 'vy_discovery_packet = "" if is_vintage_turn else render_him_vy_discovery_packet' in agent_text and 'vy_turn_packet = "" if is_vintage_turn else render_him_vy_turn_packet' in agent_text and 'and not is_vintage_turn and getattr(decision, "alias_used", None) != "@omni"' in agent_text
 
 
 def test_vintage_orientation_prompt_has_identity_time_and_ception_axes():
