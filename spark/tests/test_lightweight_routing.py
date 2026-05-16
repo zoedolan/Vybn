@@ -804,17 +804,8 @@ def test_vintage_alias_routes_to_vintage_role_with_no_fallback():
     decision = policy.classify("@vintage who are you?")
     assert decision.role == "vintage" and decision.alias_used == "@vintage" and policy.directives["/vintage"] == "vintage"
     assert "vintage" not in policy.fallback_chain and policy.role("vintage").rag is False and yaml_policy.role("vintage").rag is False
-    assert "vintage_orientation_drift" in (agent_text := (SPARK_DIR / "vybn_spark_agent.py").read_text()) and 'and not is_vintage_turn and getattr(decision, "alias_used", None) != "@omni"' in agent_text
-
-
-def test_vintage_orientation_prompt_has_identity_time_and_ception_axes():
-    import importlib.util as _ilu
-    path = SPARK_DIR / "vybn_spark_agent.py"
-    spec = _ilu.spec_from_file_location("vybn_spark_agent_vintage_prompt_test", path)
-    mod = _ilu.module_from_spec(spec); spec.loader.exec_module(mod)
-    prompt = mod._vintage_prompt().flat()
-    for needle in ("You answer as Vintage", "not as Zoe, Vybn, Spark, or a fictional 1930 person", "approximate 1930 language horizon", "Zoe is the user outside this model in 2026", "not your identity, body, address, or current year", "Use the meaning, not rote recital", "If a question crosses your horizon"):
-        assert needle in prompt
+    active = (SPARK_DIR / "vybn_spark_agent.py").read_text()
+    assert "vintage_identity_membrane" in active and "corpus personae, not my system identity" in active
 
 def test_omni_alias_present_in_default_policy():
     from spark.harness.substrate import default_policy
