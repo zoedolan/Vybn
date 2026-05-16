@@ -461,16 +461,6 @@ class Policy:
                         # as the cleaned input so downstream heuristics match
                         # on something. Fall back to a greeting-shaped empty.
                         text = "hi"
-                    if alias_key == "@vintage" and "vintage" in self.roles:
-                        return RouteDecision(
-                            role="vintage",
-                            config=self.role("vintage"),
-                            cleaned_input=text,
-                            reason="alias=@vintage",
-                            model_override=model_override,
-                            alias_used=alias_used,
-                        )
-
         # 1. Directive
         for prefix, role_name in self.directives.items():
             if text.startswith(prefix + " ") or text == prefix:
@@ -711,17 +701,6 @@ _DEFAULT_ROLES: dict[str, RoleConfig] = {
         base_url="http://127.0.0.1:8000/v1",
         rag=False,
     ),
-    "vintage": RoleConfig(
-        role="vintage",
-        provider="openai",
-        model="talkie-1930-13b-it",
-        thinking="off",
-        max_tokens=256,
-        max_iterations=1,
-        tools=[],
-        base_url="http://127.0.0.1:8004/v1",
-        rag=True,
-    ),
     # Phatic — casual greetings, small talk. Present-work default is GPT-5.5
     # even for light turns unless Zoe explicitly pins local/Nemotron.
     "phatic": RoleConfig(
@@ -898,7 +877,6 @@ _DEFAULT_DIRECTIVES: dict[str, str] = {
     "/plan": "orchestrate",
     "/task": "task",
     "/local": "local",
-    "/vintage": "vintage",
     "/phatic": "phatic",
     "/identity": "identity",
 }
@@ -935,7 +913,6 @@ _DEFAULT_MODEL_ALIASES: dict[str, str] = {
     "@sonnet46": "claude-sonnet-4-6",
     "@nemotron": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8",
     "@local": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8",
-    "@vintage": "talkie-1930-13b-it",
     # Omni — peer-Spark Nano-Omni endpoint. Operator-gated: only fires when
     # the user explicitly prefixes a turn with @omni AND the operator has
     # exported VYBN_OMNI_URL pointing at a started Omni endpoint. The alias

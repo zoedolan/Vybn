@@ -1119,9 +1119,7 @@ def run_agent_loop(
         active_prompt = system_prompt_no_tools
     else:
         active_prompt = system_prompt
-    if is_vintage_turn := (decision.role == "vintage" or getattr(decision, "alias_used", None) == "@vintage"):
-        print("Vintage is fail-closed: the current Talkie route is not semantically healthy enough to collaborate without persona drift or broken completions.", flush=True)
-        return 0
+    is_vintage_turn = False
 
     # @omni gets a tiny prompt so identity context does not exceed its sidecar.
     if getattr(decision, "alias_used", None) == "@omni":

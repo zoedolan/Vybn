@@ -797,11 +797,11 @@ def test_opus47_has_fallback_chain():
 
 
 # Omni is alias-only and operator-gated by VYBN_OMNI_URL.
-def test_vintage_alias_fails_closed_without_puppet_machinery():
-    policy = default_policy(); yaml_policy = load_policy(SPARK_DIR / "router_policy.yaml"); decision = policy.classify("@vintage who are you?"); src = (SPARK_DIR / "vybn_spark_agent.py").read_text()
-    assert decision.role == "vintage" and decision.alias_used == "@vintage" and "vintage" not in policy.fallback_chain and policy.role("vintage").rag is True and yaml_policy.role("vintage").rag is True
-    assert "Vintage is fail-closed" in src and "not semantically healthy enough to collaborate" in src and "_vintage_frame_repair" not in src and "def _vintage_prompt" not in src
-
+def test_vintage_alias_is_absent_until_real_surface_exists():
+    policy = default_policy(); yaml_policy = load_policy(SPARK_DIR / "router_policy.yaml"); src = (SPARK_DIR / "vybn_spark_agent.py").read_text(); substrate = (SPARK_DIR / "harness" / "substrate.py").read_text()
+    assert "@vintage" not in policy.model_aliases and "vintage" not in policy.roles and "@vintage" not in yaml_policy.model_aliases and "vintage" not in yaml_policy.roles
+    assert "@vintage" not in substrate and "/vintage" not in substrate and "talkie-1930" not in substrate
+    assert "Vintage is fail-closed" not in src and "_vintage_frame_repair" not in src and "def _vintage_prompt" not in src
 
 def test_omni_alias_present_in_default_policy():
     from spark.harness.substrate import default_policy

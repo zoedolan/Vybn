@@ -92,16 +92,6 @@ roles:
     base_url: http://127.0.0.1:8000/v1
     rag: false
 
-  vintage:
-    provider: openai
-    model: talkie-1930-13b-it
-    thinking: off
-    max_tokens: 256
-    max_iterations: 1
-    tools: []
-    base_url: http://127.0.0.1:8004/v1
-    rag: true
-  # Local-private — explicit local exception to the GPT-5.5 default.
   local_private:
     provider: openai
     model: nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
@@ -344,7 +334,6 @@ model_aliases:
   "@sonnet46": claude-sonnet-4-6
   "@nemotron": nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
   "@local": nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
-  "@vintage": talkie-1930-13b-it
   # @omni is explicit/operator-gated only: @omni plus VYBN_OMNI_URL; no
   # fallback, no heuristic route, no Super disturbance.
   "@omni": nvidia/NVIDIA-Nemotron-Nano-Omni
