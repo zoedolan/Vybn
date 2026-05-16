@@ -4468,7 +4468,7 @@ def horizon_plan_for(possibility: str) -> dict[str, Any]:
     }
 
 COMPLETION_BOUNDARY_PROTOCOL = """--- COMPLETION BOUNDARY PROTOCOL ---
-When concrete repo or service work matters to Zoe, closure is main-visible or explicitly not closed: public-safe survivor committed directly to the base branch and pushed, then origin/main verified where landing is claimed; branch/PR work is only a temporary protection constraint, never the closure Zoe is asked to accept. Private-only machine changes need a tracked membrane-safe owner/status/rollback residue on main or must be classified private-only/refused/unresolved. PR-open is not landed. Hidden local, remote, or branch-only fixes are not completion. After residuals pass and branch detritus is cleared, stop with one compressed sentence: what changed, verification, main/GitHub landing state, and the load-bearing residual.
+Completion is a boundary, not a mood: concrete repo or service work is main-visible or explicitly not closed; public-safe survivor committed to the base branch, pushed, and verified from origin/main; if substrate --repo-closure-audit reports OVERALL: OK, stop. PR-open is not landed; branch-only, hidden local, unverified remote work, or PR-open-not-landed is not completion. Private-only machine changes need tracked membrane-safe owner/status/rollback residue on main or are private-only/refused/unresolved. Reports are compressed by default: changed, verification, main/GitHub landing state, load-bearing residual. Do not add a continuity note when the audit is already clean. Do not dump full test names unless Zoe asks or a failure needs them.
 --- END COMPLETION BOUNDARY PROTOCOL ---"""
 
 def render_completion_boundary_protocol() -> str:
