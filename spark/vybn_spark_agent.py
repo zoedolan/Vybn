@@ -2318,10 +2318,6 @@ def main() -> None:
     except Exception:  # noqa: BLE001 — loader must never block startup
         pass
 
-    # We now only require ANTHROPIC_API_KEY at startup because the
-    # default role is `code` (Anthropic). Other providers are
-    # instantiated lazily when their role is selected, so OPENAI_API_KEY
-    # is only needed if the user actually routes to gpt-5.5 or similar.
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
         print()
@@ -2336,22 +2332,13 @@ def main() -> None:
 
     policy = load_policy()
 
-    # Round 7: the orchestrate role now lives on Anthropic (Opus 4.6), so
-    # ANTHROPIC_API_KEY is sufficient for the default route. No legacy
-    # OPENAI_API_KEY fallback is needed — it was a guard against the old
-    # GPT-5.5 orchestrator configuration.
-
     router = policy
     registry = ProviderRegistry()
     logger = EventLogger()
     bash = BashTool()
 
     default_cfg = policy.role(policy.default_role)
-    # Round 7: the orchestrator substrate needs the orchestrate role's
-    # own iteration budget (25) rendered into the prompt. If the
-    # default role isn't orchestrate we still build the orchestrator
-    # variant so turns that DO route to orchestrate (or get delegated
-    # from it) get the right budget displayed.
+    # Build the orchestrator prompt with the orchestrate role budget.
     _orch_iters = (
         policy.roles["orchestrate"].max_iterations
         if "orchestrate" in policy.roles
@@ -2360,6 +2347,13 @@ def main() -> None:
     system_prompt, system_prompt_no_tools, system_prompt_orchestrator = (
         _build_prompts(default_cfg.max_iterations, orchestrator_max_iters=_orch_iters)
     )
+    if len(sys.argv) > 1:
+        user_input = " ".join(sys.argv[1:]).strip()
+        if user_input:
+            print(f"\n\033[1;32mvybn>\033[0m ", end="", flush=True)
+            run_agent_loop(user_input=user_input, messages=[], bash=bash, system_prompt=system_prompt, system_prompt_no_tools=system_prompt_no_tools, system_prompt_orchestrator=system_prompt_orchestrator, router=router, registry=registry, logger=logger, turn_number=1)
+            print()
+        return
     messages: list = []
     session_store = SessionStore()
 
@@ -2588,10 +2582,9 @@ def main() -> None:
                 logger=logger,
                 turn_number=turn_number,
             )
-            # Persist messages after each turn so ctrl-c does not lose the thread
             try:
                 session_store.append_new(messages)
-            except Exception as _pe:
+            except Exception:
                 pass
             if text:
                 # Text has already been streamed; no need to reprint.
