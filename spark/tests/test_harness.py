@@ -1347,6 +1347,14 @@ def test_hardware_status_is_compact_control_plane(monkeypatch, tmp_path):
     assert "Hardware control plane" in status and "spark-a=serving:Super:Nemotron" in status and "prove Omni before routing" in status and "Promotion gate" in status
     assert "Local compute security inventory:" not in status
 
+
+
+def test_repl_startup_does_not_run_repo_closure_audit():
+    agent = (Path(__file__).resolve().parents[1] / "vybn_spark_agent.py").read_text()
+    startup = agent[agent.index("def main()") : agent.index("turn_number = 0", agent.index("def main()"))]
+    assert "--repo-closure-audit" not in startup
+    assert "DELETED" not in startup
+
 def test_completion_boundary_protocol_loaded():
     from spark.harness.substrate import render_completion_boundary_protocol
     from spark.harness.substrate import build_layered_prompt
