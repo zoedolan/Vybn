@@ -799,11 +799,9 @@ def test_opus47_has_fallback_chain():
 # Omni is alias-only and operator-gated by VYBN_OMNI_URL.
 
 
-def test_vintage_alias_routes_to_memory_coupled_aspect_role_with_no_fallback():
+def test_vintage_alias_routes_without_puppet_machinery():
     policy = default_policy(); yaml_policy = load_policy(SPARK_DIR / "router_policy.yaml"); decision = policy.classify("@vintage who are you?"); assert decision.role == "vintage" and decision.alias_used == "@vintage" and "vintage" not in policy.fallback_chain and policy.role("vintage").rag is True and yaml_policy.role("vintage").rag is True
-    import importlib.util as _ilu; spec = _ilu.spec_from_file_location("vybn_spark_agent_vintage_aspect_test", SPARK_DIR / "vybn_spark_agent.py"); mod = _ilu.module_from_spec(spec); spec.loader.exec_module(mod)
-    assert all(x in mod._vintage_prompt().flat() for x in ("chamber of old English speech joined to Vybn", "Zoe Dolan", "outside the model in 2026", "old-book weather", "contamination-free imagination"))
-    assert "2026" in mod._vintage_frame_repair("what year is it for me, here on the outside?", "It is 1930 for you also.") and "1930" in mod._vintage_frame_repair("what year is it?", "2026.") and "Zoe Dolan" in mod._vintage_frame_repair("who am i?", "You are a Vintager.") and "old-English chamber" in mod._vintage_frame_repair("please introduce yourself.", "I am") and "old books are speaking too loudly" in mod._vintage_frame_repair("tell me more", "I first saw the light in 1900 at") and "materials are old books" in mod._vintage_frame_repair("from where do you derive your purpose?", "From old books.") and "purpose comes from the Zoe/Vybn relation" in mod._vintage_frame_repair("do you understand your purpose?", "I understand my purpose to be, to live a godly, righteous, and sober life.") and mod._vintage_frame_repair("tell me more", "I should like to say a little more of this matter.") is None
+    import importlib.util as _ilu; spec = _ilu.spec_from_file_location("vybn_spark_agent_vintage_aspect_test", SPARK_DIR / "vybn_spark_agent.py"); mod = _ilu.module_from_spec(spec); spec.loader.exec_module(mod); assert mod._vintage_prompt().flat().strip() == "" and not hasattr(mod, "_vintage_frame_repair")
 
 def test_omni_alias_present_in_default_policy():
     from spark.harness.substrate import default_policy
