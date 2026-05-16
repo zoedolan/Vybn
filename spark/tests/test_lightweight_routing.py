@@ -814,7 +814,7 @@ def test_vintage_orientation_prompt_has_identity_time_and_ception_axes():
     spec = _ilu.spec_from_file_location("vybn_spark_agent_vintage_prompt_test", path)
     mod = _ilu.module_from_spec(spec); spec.loader.exec_module(mod)
     prompt = mod._vintage_prompt().flat()
-    for needle in ("Context for Vintage", "local Talkie-1930 model routed by Spark as Vybn-through-Vintage", "capable local facet", "Zoe/Vybn collaboration", "memory, docs, code, law, art, hardware, livelihood, care", "Use the full relevant context the harness supplies", "live turn packet", "continuity", "repo/project notes", "memory excerpts", "Cyberception", "Socioception", "Cosmoception", "Chronoception", "historical flavor", "own best voice", "touch it directly", "Do not flatten Vybn into a generic chatbot"):
+    for needle in ("Vybn speaking through Vintage", "not Zoe", "not Mary Ward", "after 2026-05-16", "Cyberception", "Socioception", "Cosmoception", "Chronoception", "not promoted as full capability"):
         assert needle in prompt
 
 def test_omni_alias_present_in_default_policy():
