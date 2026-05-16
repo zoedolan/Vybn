@@ -2443,22 +2443,6 @@ def main() -> None:
     except Exception:
         pass
 
-    # Sua sponte: clean up stale local branches at session start.
-    # Branches subsumed by main are deleted automatically; unique-commit branches
-    # are flagged but not touched. Report is suppressed unless there's drift.
-    try:
-        import subprocess as _sp
-        _audit_result = _sp.run(
-            ["python3", "-m", "spark.harness.substrate", "--repo-closure-audit"],
-            capture_output=True, text=True, cwd=os.path.expanduser("~/Vybn"), timeout=30
-        )
-        if "DRIFT PRESENT" in _audit_result.stdout or "DELETED" in _audit_result.stdout:
-            for _line in _audit_result.stdout.splitlines():
-                if any(kw in _line for kw in ("DELETED", "manual review", "DRIFT", "OVERALL")):
-                    print("[2m[audit] " + _line + "[0m")
-    except Exception:
-        pass
-
     turn_number = 0
     while True:
         try:
