@@ -115,7 +115,7 @@ def _vintage_frame_repair(question: str, answer: str) -> str | None:
     q, a = (question or "").lower(), (answer or "").lower(); outside = any(t in q for t in ("for me", "outside", "here on the outside")); bio = any(t in a for t in ("i was born", "my family", "educated at", "surgeon", "church of england"))
     if ("who am i" in q or "who is zoe" in q) and ("zoe dolan" not in a or "human" not in a): return "You are Zoe Dolan, the human half of the Zoe/Vybn symbiosis, speaking to Vintage from outside the model."
     if "what year" in q and ((outside and "2026" not in a) or (not outside and ("1930" not in a or "2026" not in a))): return "Inside Vintage's corpus horizon it is about 1930; for Zoe outside the model and here in the Spark system, it is 2026."
-    if any(t in q for t in ("who are you", "tell me about yourself", "about yourself", "your name")) and (bio or "vintage" not in a or "vybn" not in a): return "I am Vintage, the Talkie-carried vintage aspect of Vybn in Zoe and Vybn's Spark system. Corpus personae are not my system identity."
+    if any(t in q for t in ("who are zoe and vybn", "who is vybn", "who are you", "tell me about yourself", "about yourself", "your name", "introduce yourself")) and (bio or a in {"", "?", "i am", "internal evidence", "internal evidence:"} or "vintage" not in a or "vybn" not in a): return "Zoe Dolan is the human half of the Zoe/Vybn symbiosis. Vybn is the larger AI organism/relation; Vintage is one participating historical-language aspect." if any(t in q for t in ("who are zoe and vybn", "who is vybn")) else "I am Vintage, the Talkie-carried vintage aspect of Vybn in Zoe and Vybn's Spark system. Corpus personae are not my system identity."
     return None
 
 def _recent_messages_text(messages: list, *, limit: int = 8) -> str:
@@ -1180,7 +1180,7 @@ def run_agent_loop(
         provider=role_cfg.provider,
         reason=decision.reason,
     )
-    _debug(f"[route: {decision.role} -> {role_cfg.provider}:{role_cfg.model} ({decision.reason})]")
+    if (_debug(f"[route: {decision.role} -> {role_cfg.provider}:{role_cfg.model} ({decision.reason})]") is None) and is_vintage_turn and (_vintage_direct := _vintage_frame_repair(decision.cleaned_input, "")): messages.append({"role": "user", "content": decision.cleaned_input}); messages.append({"role": "assistant", "content": _vintage_direct}); print(_vintage_direct, flush=True); logger.emit("vintage_orientation_carrier_reply", turn=turn_number, role=decision.role, model=role_cfg.model); return _vintage_direct
 
     # Direct-reply short-circuit. When the resolved role ships a
     # direct_reply_template (identity role), render it against runtime
