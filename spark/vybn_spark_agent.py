@@ -1120,11 +1120,14 @@ def run_agent_loop(
         active_prompt = system_prompt_no_tools
     else:
         active_prompt = system_prompt
-    if is_vintage_turn := (decision.role == "vintage" or getattr(decision, "alias_used", None) == "@vintage"):
-        print("Vintage is unavailable: no promoted Vintage endpoint is connected, so this route is fail-closed instead of falling through to chat.", flush=True)
-        return 1
+    is_vintage_turn = decision.role == "vintage" or getattr(decision, "alias_used", None) == "@vintage"
+    if is_vintage_turn and not os.environ.get("VYBN_VINTAGE_LIVE"):
+        reply = "Vintage is not promoted: Talkie is currently failing semantic generation, so this route fails closed instead of falling back to Vybn or leaking a raw backend exception."
+        print(reply, flush=True); logger.emit("vintage_fail_closed", turn=turn_number, model=role_cfg.model, base_url=role_cfg.base_url or ""); return reply
+    if is_vintage_turn:
+        import dataclasses as _dc; role_cfg = _dc.replace(role_cfg, rag=False, max_tokens=32); active_prompt = LayeredPrompt(identity="You are Vintage, a small experimental local Talkie route inside Zoe/Vybn. Reply in plain modern English; do not roleplay a newspaper, county, correspondent, or Victorian person. Be brief and honest about limits.", substrate="", live="")
 
-    # @omni gets a tiny prompt so identity context does not exceed its sidecar.
+    # @omni gets a tiny prompt.
     if getattr(decision, "alias_used", None) == "@omni":
         active_prompt = LayeredPrompt(
             identity=(
@@ -1276,8 +1279,7 @@ def run_agent_loop(
 
     provider = registry.get(role_cfg)
 
-    # Executable Him discovery packet. This is generated before provider
-    # narration and carries typed candidate mechanisms plus residuals.
+    # Executable Him discovery packet; skip for Vintage.
     try:
         vy_discovery_packet = "" if is_vintage_turn else render_him_vy_discovery_packet(decision.cleaned_input)
     except Exception as _vy_discovery_err:
@@ -1295,9 +1297,7 @@ def run_agent_loop(
 
     # Him vy-language per-turn uptake. The substrate carries the compiled
     # contract; this live packet carries the primitives that apply to the
-    # actual current turn, with do/then/verify fields. This is the seam where
-    # AI-native skills start shaping ordinary harness cognition instead of
-    # remaining a prompt summary.
+    # actual current turn; skip for Vintage.
     try:
         vy_turn_packet = "" if is_vintage_turn else render_him_vy_turn_packet(decision.cleaned_input)
     except Exception as _vy_err:
@@ -1465,7 +1465,7 @@ def run_agent_loop(
                     logger=logger,
                     turn_number=turn_number,
                 )
-                response = handle.final() if is_vintage_turn else (_stream_and_print(handle) or handle.final())
+                response = _stream_and_print(handle) or handle.final()
                 # Cache-hit telemetry. With Anthropic's 5-min ephemeral
                 # TTL we need visibility into whether LayeredPrompt
                 # cache_control markers are actually hitting.
