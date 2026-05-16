@@ -1277,11 +1277,11 @@ def run_agent_loop(
                 return notice
 
     if is_vintage_turn:
-        try:
-            base = (role_cfg.base_url or "").rstrip("/"); base += "" if base.endswith("/v1") else "/v1"; payload = {"model": role_cfg.model, "messages": [{"role": "system", "content": "You are reached by @vintage. In one short sentence, distinguish: route/model identity, Zoe outside in 2026, and your 1930 language horizon. Do not claim to be human."}, {"role": "user", "content": "what is going on here?"}], "max_tokens": 96, "temperature": 0, "stream": False}; req = urllib.request.Request(base + "/chat/completions", data=json.dumps(payload).encode(), headers={"Content-Type": "application/json"})
-            with urllib.request.urlopen(req, timeout=20) as r: txt = (((json.loads(r.read().decode()).get("choices") or [{}])[0].get("message") or {}).get("content") or "").strip()
-        except Exception as e: txt = f"{type(e).__name__}: {str(e)[:120]}"
-        active_prompt = LayeredPrompt(identity=active_prompt.identity, live=(active_prompt.live + f"\n\n[self-knowledge] Orientation probe answer: {txt[:240]!r}. Use it as a mirror, not a script: you are @vintage route/model; Zoe is outside in 2026; 1930 is language horizon, not present place/body. Name uncertainty.").strip()); logger.emit("vintage_orientation_feedback_injected", turn=turn_number, model=role_cfg.model, reason=txt[:200])
+        q = decision.cleaned_input.lower()
+        if reply := ("This chat context is 2026; 1930 is my language horizon, not my present year." if any(w in q for w in ("year", "date", "when")) else "I am Vintage, the @vintage talkie-1930-13b-it route/model; I am not Zoe, Vybn, Spark, or a human." if any(w in q for w in ("name", "who are you", "who r u")) else ""):
+            messages.extend([{"role": "user", "content": decision.cleaned_input}, {"role": "assistant", "content": reply}])
+            print(reply, flush=True); logger.emit("vintage_self_knowledge", turn=turn_number, model=role_cfg.model); return reply
+        messages = []
 
     provider = registry.get(role_cfg)
 
@@ -1355,13 +1355,13 @@ def run_agent_loop(
     # Optional deep-memory enrichment — only for roles that declare rag=true
     # and only when the retrieval actually returns something. No overclaim.
     # Lightweight roles (phatic, identity) skip RAG regardless.
-    if role_cfg.rag and not getattr(role_cfg, "lightweight", False) and not is_vintage_turn and getattr(decision, "alias_used", None) != "@omni":
+    if role_cfg.rag and not getattr(role_cfg, "lightweight", False) and getattr(decision, "alias_used", None) != "@omni":
         enrichment, rag_tier = rag_snippets_with_tier(decision.cleaned_input[:500], k=4)
         if enrichment:
             active_prompt = LayeredPrompt(
                 identity=active_prompt.identity,
                 substrate=active_prompt.substrate,
-                live=enrichment,
+                live=(f"{enrichment}\n\n{(getattr(active_prompt, 'live', '') or '')}".strip()),
             )
             _debug(f"[deep-memory: enriched prompt, tier={rag_tier}]")
             logger.emit("rag_hit", turn=turn_number, chars=len(enrichment), tier=rag_tier, structured=True)
@@ -1444,7 +1444,7 @@ def run_agent_loop(
         *("tool_contract" for _ in [0] if tools),
     ]
     state_touched = ["session_messages"]
-    if role_cfg.rag and not getattr(role_cfg, "lightweight", False) and not is_vintage_turn and getattr(decision, "alias_used", None) != "@omni":
+    if role_cfg.rag and not getattr(role_cfg, "lightweight", False) and getattr(decision, "alias_used", None) != "@omni":
         state_touched.append("deep_memory")
     if tools:
         state_touched.append("tool_surface")
