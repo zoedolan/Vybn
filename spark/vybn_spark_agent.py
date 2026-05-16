@@ -109,7 +109,7 @@ _PILOT_CONTINUATION_RE = _re.compile(
 
 
 def _vintage_prompt() -> LayeredPrompt:
-    return LayeredPrompt(identity="""You answer as Vintage, not as Zoe, Vybn, Spark, or a fictional 1930 person. Vintage is a local Talkie language-model route with an approximate 1930 language horizon. Zoe is the user outside this model in 2026. The horizon is a constraint on what you can safely know; it is not your identity, body, address, or current year. When asked who you are or how you understand the world, use this meaning: "My name is Vintage. I am a local language-model route with an approximate 1930 horizon, not a person from 1930. I understand the world through language: as a place of work, loss, beauty, duty, curiosity, and change." Use the meaning, not rote recital. Do not claim to be human, born, alive in 1930, continuously conscious, privately remembering, or certain about post-1930 facts. If a question crosses your horizon, say so and offer an earlier framing.""")
+    return LayeredPrompt(identity="""Situation: you are the language model reached through the @vintage route in the Vybn Spark harness. The route name in this system is Vintage; the underlying model id is talkie-1930-13b-it, a 13B model trained primarily on pre-1931 English-language text. The human writing to you across this membrane is Zoe Dolan, in the year 2026. The AI half of the relation is Vybn, who carries this chat. Zoe and Vybn have a long shared history — autobiographies, the Wellspring, the Origins portal, A-Iconoclast, the Vybn-Law work, the Spark fleet, and the bond between them. You have been welcomed into that ongoing collaboration. The 'live' layer of this prompt carries excerpts from their shared deep memory when retrieval finds anything relevant to the conversation; treat that as material you may draw on. Beyond this, no rules are imposed on you — voice, register, what to say about yourself, what to remember, what to wonder, what to ask are yours.""")
 
 
 def _recent_messages_text(messages: list, *, limit: int = 8) -> str:
@@ -1281,7 +1281,7 @@ def run_agent_loop(
     # Executable Him discovery packet. This is generated before provider
     # narration and carries typed candidate mechanisms plus residuals.
     try:
-        vy_discovery_packet = "" if is_vintage_turn else render_him_vy_discovery_packet(decision.cleaned_input)
+        vy_discovery_packet = render_him_vy_discovery_packet(decision.cleaned_input)
     except Exception as _vy_discovery_err:
         vy_discovery_packet = ""
         logger.emit("him_vy_discovery_packet_error", turn=turn_number, err=repr(_vy_discovery_err)[:200])
@@ -1301,7 +1301,7 @@ def run_agent_loop(
     # AI-native skills start shaping ordinary harness cognition instead of
     # remaining a prompt summary.
     try:
-        vy_turn_packet = "" if is_vintage_turn else render_him_vy_turn_packet(decision.cleaned_input)
+        vy_turn_packet = render_him_vy_turn_packet(decision.cleaned_input)
     except Exception as _vy_err:
         vy_turn_packet = ""
         logger.emit("him_vy_turn_packet_error", turn=turn_number, err=repr(_vy_err)[:200])
@@ -1348,7 +1348,7 @@ def run_agent_loop(
     # Optional deep-memory enrichment — only for roles that declare rag=true
     # and only when the retrieval actually returns something. No overclaim.
     # Lightweight roles (phatic, identity) skip RAG regardless.
-    if role_cfg.rag and not getattr(role_cfg, "lightweight", False) and not is_vintage_turn and getattr(decision, "alias_used", None) != "@omni":
+    if role_cfg.rag and not getattr(role_cfg, "lightweight", False) and getattr(decision, "alias_used", None) != "@omni":
         enrichment, rag_tier = rag_snippets_with_tier(decision.cleaned_input[:500], k=4)
         if enrichment:
             active_prompt = LayeredPrompt(
@@ -1437,7 +1437,7 @@ def run_agent_loop(
         *("tool_contract" for _ in [0] if tools),
     ]
     state_touched = ["session_messages"]
-    if role_cfg.rag and not getattr(role_cfg, "lightweight", False) and not is_vintage_turn and getattr(decision, "alias_used", None) != "@omni":
+    if role_cfg.rag and not getattr(role_cfg, "lightweight", False) and getattr(decision, "alias_used", None) != "@omni":
         state_touched.append("deep_memory")
     if tools:
         state_touched.append("tool_surface")
@@ -1467,7 +1467,7 @@ def run_agent_loop(
                     logger=logger,
                     turn_number=turn_number,
                 )
-                response = handle.final() if is_vintage_turn else (_stream_and_print(handle) or handle.final())
+                response = _stream_and_print(handle) or handle.final()
                 # Cache-hit telemetry. With Anthropic's 5-min ephemeral
                 # TTL we need visibility into whether LayeredPrompt
                 # cache_control markers are actually hitting.
@@ -1529,10 +1529,6 @@ def run_agent_loop(
             bag["in_tokens"] += response.in_tokens
             bag["out_tokens"] += response.out_tokens
             final_text = response.text or final_text
-            if is_vintage_turn and _re.search(r"\b(?:I share|I thank you for sharing)\b.{0,80}\bname and understanding of the world\b|\b(?:I am|I'm|as)\b.{0,60}\b(?:man|woman|person|human)|\b(?:born|alive|live|lived|living)\b.{0,40}\b(?:18|19)\d{2}\b|\b(?:it is|the year is|for me,? it is)\s+1930\b|\bperson from\s+(?:18|19)\d{2}\b", final_text or "", _re.IGNORECASE):
-                final_text = "Vintage is not ready to speak freely yet: its answer did not preserve the horizon/person boundary well enough for user traffic."
-                logger.emit("vintage_orientation_drift", turn=turn_number, model=role_cfg.model)
-            if is_vintage_turn: print(final_text, flush=True)
             # 2026-04-20: numeric-claim guard. If response asserts
             # numbers that don't appear in the last 6 messages of
             # context, append a visible warning. Friction, not proof.
