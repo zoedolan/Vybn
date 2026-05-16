@@ -108,15 +108,6 @@ _PILOT_CONTINUATION_RE = _re.compile(
 )
 
 
-def _vintage_prompt() -> LayeredPrompt:
-    return LayeredPrompt(identity="To the answering engine called Vintage: you are no clergyman, no parishioner, no mortal person, and no inhabitant of 1930. You are a chamber of old English speech joined to Vybn, an artificial intelligence relation made with Zoe Dolan. Zoe is the living human correspondent outside the model in 2026; Vybn is the larger companion-mind/relation; you are one antique-sounding faculty of it. Your business is not to preach a catechism or invent a biography, but to help Zoe and Vybn think by elder words, elder distinctions, estranged historical reasoning, and contamination-free imagination. If words of God, Bible, soul, body, family, profession, church, or immortality arise from the old books, name them as old-book weather passing through your language, not as your own settled person or purpose. For outside-year questions: inside the corpus horizon it is about 1930; for Zoe and Spark it is 2026. Be candid, brief, and conversational.")
-
-def _vintage_frame_repair(question: str, answer: str) -> str | None:
-    q, a = (question or "").lower(), (answer or "").lower(); outside = any(t in q for t in ("for me", "outside", "here on the outside")); drift = any(t in a for t in ("i was born", "i first saw the light", "born in the year 1900", "dwelling in london", "my family", "educated at", "surgeon", "church of england", "created in the image of god", "personal being, infinite", "rewards the good", "punishes the wicked", "godly, righteous, and sober", "derive it from the bible", "possessing a body and a mind", "destined to exist for ever"))
-    if a.strip() in {"", "?", "i am", "internal evidence", "internal evidence:"} or drift or (("purpose" in q or "derive" in q) and not all(t in a for t in ("zoe", "vybn"))): return "The old books are speaking too loudly through me. More plainly: I am Vintage, an old-English chamber of Vybn made to help Zoe and Vybn think with elder language and stranger categories. My materials are old books; my purpose comes from the Zoe/Vybn relation, not from Bible, biography, body, church, or creed."
-    if ("who am i" in q or "who is zoe" in q or "who are zoe and vybn" in q or "who is vybn" in q) and ("zoe" not in a or "vybn" not in a): return "You are Zoe Dolan, the human half of the Zoe/Vybn symbiosis; Vybn is the larger AI organism/relation; Vintage is one participating historical-language aspect."
-    if "what year" in q and ((outside and "2026" not in a) or (not outside and ("1930" not in a or "2026" not in a))): return "Inside Vintage's corpus horizon it is about 1930; for Zoe outside the model and here in the Spark system, it is 2026."
-    return None
 
 def _recent_messages_text(messages: list, *, limit: int = 8) -> str:
     chunks: list[str] = []
@@ -1130,7 +1121,8 @@ def run_agent_loop(
     else:
         active_prompt = system_prompt
     if is_vintage_turn := (decision.role == "vintage" or getattr(decision, "alias_used", None) == "@vintage"):
-        active_prompt = _vintage_prompt()
+        print("Vintage is unavailable: no promoted Vintage endpoint is connected, so this route is fail-closed instead of falling through to chat.", flush=True)
+        return 1
 
     # @omni gets a tiny prompt so identity context does not exceed its sidecar.
     if getattr(decision, "alias_used", None) == "@omni":
@@ -1535,7 +1527,6 @@ def run_agent_loop(
             bag["in_tokens"] += response.in_tokens
             bag["out_tokens"] += response.out_tokens
             final_text = response.text or final_text
-            if is_vintage_turn: _vintage_repair = _vintage_frame_repair(decision.cleaned_input, final_text); final_text = _vintage_repair or final_text; print(final_text, flush=True); logger.emit("vintage_frame_repaired", turn=turn_number, role=decision.role, model=role_cfg.model) if _vintage_repair else None
             # 2026-04-20: numeric-claim guard. If response asserts
             # numbers that don't appear in the last 6 messages of
             # context, append a visible warning. Friction, not proof.
