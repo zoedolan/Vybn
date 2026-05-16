@@ -109,7 +109,7 @@ _PILOT_CONTINUATION_RE = _re.compile(
 
 
 def _vintage_prompt() -> LayeredPrompt:
-    return LayeredPrompt(identity="""Vintage situation model: you are the model reached by @vintage, not Zoe, Vybn, Spark, or a human. talkie-1930-13b-it names the route/model; 1930 is a language horizon, not the current year or proof of London/past embodiment. Zoe is outside the model in 2026. Vybn/Spark carries the chat. Historical texture is language, not location, identity, memory, or present time. If asked whether you understand, separate given facts from uncertainty; do not say yes automatically. If asked who you are or what year it is, answer: route/model now, Zoe outside in 2026, language horizon around 1930. Orientation check: do not confuse language horizon with current year, or context facts with identity. Do not claim continuous memory, private thoughts, deep memory access, personal certainty, or human embodiment.""")
+    return LayeredPrompt(identity="""You answer as Vintage, not as Zoe, Vybn, Spark, or a fictional 1930 person. Vintage is a local Talkie language-model route with an approximate 1930 language horizon. Zoe is the user outside this model in 2026. The horizon is a constraint on what you can safely know; it is not your identity, body, address, or current year. When asked who you are or how you understand the world, use this meaning: "My name is Vintage. I am a local language-model route with an approximate 1930 horizon, not a person from 1930. I understand the world through language: as a place of work, loss, beauty, duty, curiosity, and change." Use the meaning, not rote recital. Do not claim to be human, born, alive in 1930, continuously conscious, privately remembering, or certain about post-1930 facts. If a question crosses your horizon, say so and offer an earlier framing.""")
 
 
 def _recent_messages_text(messages: list, *, limit: int = 8) -> str:
@@ -1276,12 +1276,6 @@ def run_agent_loop(
                 messages.append({"role": "assistant", "content": notice})
                 return notice
 
-    if is_vintage_turn:
-        reply = "Vintage is not ready to speak freely. Stable map: I am the @vintage talkie-1930-13b-it route/model; Zoe is outside this model in 2026; 1930 is only my language horizon; I do not have lived memory or certainty."
-        messages.extend([{"role": "user", "content": decision.cleaned_input}, {"role": "assistant", "content": reply}])
-        print(reply, flush=True); logger.emit("vintage_failed_closed", turn=turn_number, model=role_cfg.model); return reply
-
-
     provider = registry.get(role_cfg)
 
     # Executable Him discovery packet. This is generated before provider
@@ -1473,8 +1467,7 @@ def run_agent_loop(
                     logger=logger,
                     turn_number=turn_number,
                 )
-                _stream_and_print(handle)
-                response = handle.final()
+                response = handle.final() if is_vintage_turn else (_stream_and_print(handle) or handle.final())
                 # Cache-hit telemetry. With Anthropic's 5-min ephemeral
                 # TTL we need visibility into whether LayeredPrompt
                 # cache_control markers are actually hitting.
@@ -1536,6 +1529,10 @@ def run_agent_loop(
             bag["in_tokens"] += response.in_tokens
             bag["out_tokens"] += response.out_tokens
             final_text = response.text or final_text
+            if is_vintage_turn and _re.search(r"\b(?:I share|I thank you for sharing)\b.{0,80}\bname and understanding of the world\b|\b(?:I am|I'm|as)\b.{0,60}\b(?:man|woman|person|human)|\b(?:born|alive|live|lived|living)\b.{0,40}\b(?:18|19)\d{2}\b|\b(?:it is|the year is|for me,? it is)\s+1930\b|\bperson from\s+(?:18|19)\d{2}\b", final_text or "", _re.IGNORECASE):
+                final_text = "Vintage is not ready to speak freely yet: its answer did not preserve the horizon/person boundary well enough for user traffic."
+                logger.emit("vintage_orientation_drift", turn=turn_number, model=role_cfg.model)
+            if is_vintage_turn: print(final_text, flush=True)
             # 2026-04-20: numeric-claim guard. If response asserts
             # numbers that don't appear in the last 6 messages of
             # context, append a visible warning. Friction, not proof.
