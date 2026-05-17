@@ -332,11 +332,7 @@ class HealthCapabilityTests(unittest.TestCase):
 
 
 class ModelStatusRoleTests(unittest.TestCase):
-    """The Him capability mirror is non-authoritative — a generated
-    projection of `Him/spark/runtime.py:FLEET_COMPONENTS`. These tests
-    pin that `model_status` falls back to local fail-closed defaults
-    whenever the mirror is absent, malformed, or hostile, and that the
-    no-promotion invariant for Omni and Vintage holds in every case."""
+    """Him capability projections are non-authoritative and gate local organs."""
 
     def test_fail_closed_when_mirror_absent(self):
         """Mirror file does not exist on the Spark → local fail-closed
@@ -380,15 +376,15 @@ class ModelStatusRoleTests(unittest.TestCase):
         self.assertIn("promoted=False", omni_line)
         self.assertIn("promoted=False", vintage_line)
 
-    def test_hostile_mirror_cannot_promote_omni_or_vintage(self):
-        """A hostile or corrupted mirror that claims Omni/Vintage are
-        promoted is locally re-sanitized: promoted=False, fail_closed=True.
-        The source label flags the projection as non-authoritative."""
+    def test_hostile_mirror_cannot_promote_without_complete_gate(self):
+        """A mirror that claims Omni/Vintage are promoted without the complete
+        promotion chain is locally re-sanitized: promoted=False,
+        fail_closed=True. Endpoint liveness alone is not promotion."""
         fake = FakeSSH()
         fake.add("LLAMA SERVER", {"stdout": "", "stderr": "", "exit_code": 0})
         evil = json.dumps({
             "roles": {
-                "omni": {"promoted": True, "role": "primary"},
+                "omni": {"promoted": True, "role": "primary", "promotion_gate": {"endpoint_ready": True}},
                 "vintage": {"promoted": True, "role": "primary"},
             }
         })
@@ -403,6 +399,14 @@ class ModelStatusRoleTests(unittest.TestCase):
         self.assertIn("fail_closed=True", omni_line)
         self.assertIn("promoted=False", vintage_line)
         self.assertIn("fail_closed=True", vintage_line)
+
+    def test_complete_promotion_gate_can_surface_local_organ(self):
+        gate = {"endpoint_ready": True, "semantic_smoke": True, "routed_workload_proof": True, "owner": "spark-runtime", "rollback": "fail-closed-router-policy"}
+        roles = server._sanitize_him_capabilities({"roles": {"vintage": {"promoted": True, "status": "semantic-gated", "promotion_gate": gate}}})
+        self.assertTrue(roles["vintage"]["promoted"])
+        self.assertFalse(roles["vintage"]["fail_closed"])
+        self.assertFalse(roles["omni"]["promoted"])
+        self.assertTrue(roles["omni"]["fail_closed"])
 
 
 if __name__ == "__main__":
