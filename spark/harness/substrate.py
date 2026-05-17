@@ -928,17 +928,17 @@ _DEFAULT_MODEL_ALIASES: dict[str, str] = {
     "@sonnet46": "claude-sonnet-4-6",
     "@nemotron": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8",
     "@local": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8",
-    "@vintage": "vintage-unavailable",
+    "@vintage": "vintage-1930-guarded-local",
     # Omni — peer-Spark Nano-Omni endpoint. Operator-gated: only fires when
     # the user explicitly prefixes a turn with @omni AND the operator has
     # exported VYBN_OMNI_URL pointing at a started Omni endpoint. The alias
     # is intentionally absent from heuristics, directives, fallback_chain,
     # and ordinary chat routing so Super stays the main local model surface,
-    # not the main substrate, and is never silently substituted for Omni. Without VYBN_OMNI_URL the alias surfaces
+    # not the main substrate, and is never silently substituted for a real multimodal Omni model. Without VYBN_OMNI_URL the alias may surface the local perception packet at ~/.config/vybn/omni_perception_packet.json and surfaces
     # an explicit error rather than falling back to Super's :8000. Optional
     # VYBN_OMNI_MODEL overrides the default model id below. Optional
     # VYBN_OMNI_PERCEPTION=<path> rides a bounded operator-supplied
-    # perception packet (text file) on the explicit @omni turn only — used
+    # perception packet (text file or JSON packet) on the explicit @omni turn only — used
     # for perception/dream/evolve narratives produced elsewhere in the
     # repo; never auto-fires, never persists, never touches Super.
     "@omni": "nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-NVFP4",
