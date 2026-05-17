@@ -966,6 +966,17 @@ def _is_organ_contact_greeting(cleaned_input: str) -> bool:
     Matching is word-boundary aware so short greeting words ("hi", "hey")
     do not accidentally fire on "this", "they", etc. inside substantive
     prompts ("summarise this paragraph for me").
+
+    Multi-clause escape (2026-05-17): Zoe surfaced from the live REPL that
+    when she greets the model and then adds another clause — "hello, my
+    dear friend, what is your name?", "hello, how are you?", "my friend,
+    what is your favorite poem?", "are you with me, what do you think of
+    rain?" — that is conversation with the model, not a bare contact ping.
+    The principle is "if there is a second clause/question/content after
+    the contact phrase, raw contact wins." Prompts containing a comma
+    (i.e. more than one clause) therefore fall through to the raw
+    unpromoted contact path; only single-clause contact tokens stay on
+    the brief Vybn reply.
     """
     text = (cleaned_input or "").strip().lower()
     if not text:
@@ -973,6 +984,11 @@ def _is_organ_contact_greeting(cleaned_input: str) -> bool:
         return True
     # Long prompts are not greetings even if they mention "hi"/"friend".
     if len(text) > 80:
+        return False
+    # Multi-clause prompts (greeting + content) reach the backend, even if
+    # every clause matches a known greeting token in isolation. "hello,
+    # how are you?" is conversation, not a bare ping.
+    if "," in text and len([c for c in text.split(",") if c.strip()]) >= 2:
         return False
     import re as _re
     for token in _ORGAN_CONTACT_GREETING_TOKENS:
