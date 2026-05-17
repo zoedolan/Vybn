@@ -888,6 +888,8 @@ def test_omni_perception_wired_in_agent_alias_branch():
     assert "VYBN_OMNI_PERCEPTION" in branch
     assert "alias_omni_perception" in branch
     assert "16_000" in branch or "16000" in branch
+    assert "@omni gets a tiny prompt" not in text
+    assert 'alias_used", None) != "@omni"' not in text
 
 
 def test_omni_perception_preamble_runs_on_explicit_omni_turn(tmp_path=None):
