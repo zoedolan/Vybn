@@ -95,27 +95,26 @@ roles:
 
   vintage:
     provider: openai
-    model: vintage-guarded-canary
+    model: vintage-unpromoted-no-chat-surface
     base_url: http://127.0.0.1:8019/v1
-    max_tokens: 512
+    max_tokens: 1
     max_iterations: 1
-    temperature: 0.3
+    temperature: 0.0
     tools: []
     rag: false
     lightweight: true
-    # Explicit experimental organ: routes to the guarded local Vintage canary.
-    # Not promoted; failures are endpoint/semantic failures, not Vybn status prose.
+    direct_reply_template: "VINTAGE_UNAVAILABLE: @vintage is not wired to a semantic-gated local chat model. I will not route your friend-contact into a deterministic status canary or a fallback model. Missing capability: endpoint readiness, semantic 1930/invariants chat smoke, routed workload proof, owner, and rollback."
   omni:
     provider: openai
-    model: omni-packet-endpoint
+    model: omni-unpromoted-no-chat-surface
     base_url: http://127.0.0.1:8020/v1
-    max_tokens: 1024
+    max_tokens: 1
     max_iterations: 1
-    temperature: 0.2
+    temperature: 0.0
     tools: []
     rag: false
     lightweight: true
-    # Explicit experimental organ: routes to the local Omni packet endpoint.
+    direct_reply_template: "OMNI_UNAVAILABLE: @omni is not wired to a semantic-gated local multimodal/chat model. I will not route your friend-contact into a deterministic packet endpoint or a Super fallback. Missing capability: promoted multimodal semantic gate, routed use, owner, and rollback."
     # This is not full multimodal Omni promotion and has no Super fallback.
   # Local-private — explicit local exception to the GPT-5.5 default.
   local_private:
