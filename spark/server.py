@@ -1628,6 +1628,9 @@ async def _probe_deep_search_capability() -> dict:
       live: live memory API answered (loopback service role).
       stale-fallback: live API down, absorbed Him phase fallback answered.
       fail-closed: neither path answered; tool will refuse rather than improvise.
+      indeterminate: probe did not finish within its budget; the tool itself
+        remains the authority — /health learned nothing, which is not the
+        same as the tool refusing.
     Bounded by HEALTH_PROBE_BUDGET_S so /health cannot hang. No external
     coordinates or topology are leaked — only loopback/service-role
     language is acceptable here.
@@ -1654,7 +1657,11 @@ async def _probe_deep_search_capability() -> dict:
     try:
         return await asyncio.wait_for(_do_probe(), timeout=HEALTH_PROBE_BUDGET_S)
     except asyncio.TimeoutError:
-        return {"state": "fail-closed", "reason": "probe-budget-exceeded"}
+        # Budget exhausted before either path answered. We did not observe
+        # the tool refusing — we only failed to learn in time. Reporting
+        # "fail-closed" here would overclaim and fragment from tool truth
+        # (the tool itself can still be live). Stay honest: indeterminate.
+        return {"state": "indeterminate", "reason": "probe-budget-exceeded"}
 
 
 async def health_endpoint(request: Request) -> Response:
@@ -1666,11 +1673,11 @@ async def health_endpoint(request: Request) -> Response:
     here; it does not overclaim "ok" for the whole MCP surface.
     """
     deep = await _probe_deep_search_capability()
-    probed_rollup = (
-        "live" if deep["state"] == "live"
-        else "stale-fallback" if deep["state"] == "stale-fallback"
-        else "fail-closed"
-    )
+    # Mirror the per-capability state directly. Do not flatten "indeterminate"
+    # (probe budget exhausted, nothing observed) into "fail-closed" — that
+    # would falsely promote a probe timeout into a claim that the tool
+    # refused, fragmenting /health from tool truth.
+    probed_rollup = deep["state"]
     payload = {
         "status": "gateway-alive",
         "probed_capabilities_state": probed_rollup,
