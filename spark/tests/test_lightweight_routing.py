@@ -214,7 +214,8 @@ class TestExplicitOrganAliasesRouteToExperimentalEndpoints(unittest.TestCase):
                 self.assertEqual(d.alias_used, alias)
                 self.assertEqual(d.config.provider, "openai")
                 self.assertEqual(d.config.model, model)
-                self.assertIsNone(d.config.direct_reply_template)
+                self.assertIsNotNone(d.config.direct_reply_template)
+        self.assertIn("UNAVAILABLE", d.config.direct_reply_template)
 
 
 class TestRouterLightweightClassification(unittest.TestCase):
@@ -878,7 +879,9 @@ def test_omni_not_in_any_heuristic_or_directive():
 
 def test_omni_alias_classifies_with_override():
     from spark.harness.substrate import default_policy
-    decision = default_policy().classify("@omni summarise this paragraph")
+    policy = default_policy()
+    assert "@omni" not in policy.model_aliases
+    decision = policy.classify("@omni summarise this paragraph")
     assert decision.alias_used == "@omni"
     assert decision.model_override is None
     assert decision.role == "omni"

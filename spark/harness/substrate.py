@@ -745,8 +745,8 @@ _DEFAULT_ROLES: dict[str, RoleConfig] = {
         base_url="http://127.0.0.1:8000/v1",
         temperature=0.2,
         rag=False,
-        lightweight=True,
-    ),
+            lightweight=True,
+              ),
     # Phatic — casual greetings, small talk. Present-work default is GPT-5.5
     # even for light turns unless Zoe explicitly pins local/Nemotron.
     "phatic": RoleConfig(
