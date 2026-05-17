@@ -1007,7 +1007,7 @@ def run_agent_loop(
                 return (
                     "[@omni unavailable: VYBN_OMNI_URL is not set. "
                     "Start the Omni endpoint on the peer Spark and "
-                    "export VYBN_OMNI_URL=http://<host>:<port>/v1 "
+                    "use the local packet endpoint at 127.0.0.1:8020/v1 unless a real Omni endpoint is witnessed "
                     "before retrying. This turn will not silently "
                     "fall back to Super (:8000) — Super is the main local model surface, "
                     "not the main substrate.]"
@@ -1121,7 +1121,7 @@ def run_agent_loop(
     else:
         active_prompt = system_prompt
     is_vintage_turn = decision.role == "vintage" or getattr(decision, "alias_used", None) == "@vintage"
-    if is_vintage_turn: reply = "Vintage is unpromoted: the live backend is a failing semantic canary, not a Zoe/Vybn organ. Endpoint-shaped is not capability; agent containment is not model success."; print(reply, flush=True); logger.emit("vintage_unpromoted_canary_refusal", turn=turn_number, model=role_cfg.model, base_url=role_cfg.base_url or ""); return reply
+    if is_vintage_turn and role_cfg.model != "vintage-1930-guarded-local": reply = "Vintage is unpromoted: no semantic-gated local Vintage model is routed."; print(reply, flush=True); logger.emit("vintage_unpromoted_canary_refusal", turn=turn_number, model=role_cfg.model, base_url=role_cfg.base_url or ""); return reply
 
     # Reflection: read the trail of the last N events before deciding.
     # Lisp duality in practice — prior decisions are data here, environment
@@ -2394,7 +2394,7 @@ def main() -> None:
     print("  Type naturally. Prefix with /chat, /create, /plan, /task, /local "
           "to force a role,")
     print("  or with @opus4.6/@opus4.6/@sonnet/@nemotron/@gpt to pin a model for one turn.")
-    print("  @omni pins peer-Spark Nano-Omni — requires VYBN_OMNI_URL set; "
+    print("  @omni pins the witnessed local Omni packet endpoint; full Omni still requires a semantic-gated real endpoint; "
           "refuses (no Super fallback) when unset.")
     print("    optional VYBN_OMNI_PERCEPTION=<path> rides a perception "
           "packet on the @omni turn only.")
