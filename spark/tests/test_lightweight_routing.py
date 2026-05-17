@@ -218,7 +218,11 @@ class TestExplicitOrganAliasesRouteToExperimentalEndpoints(unittest.TestCase):
         # Honest model id: not the Super model. Refuses impersonation.
         self.assertNotEqual(d.config.model, "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8")
         self.assertIn("omni", d.config.model.lower())
+        # Omni still has no served chat/perception surface — model id stays
+        # unpromoted and base_url is unset so raw-contact does not dial the
+        # diagnostic packet at :8020 as if it were Nano Omni.
         self.assertIn("unpromoted", d.config.model.lower())
+        self.assertFalse(d.config.base_url)
         self._assert_fail_closed_contact_template("omni", d.config.direct_reply_template)
 
     def test_default_policy_vintage_alias_fail_closed_with_contact_preserved(self):
@@ -226,14 +230,23 @@ class TestExplicitOrganAliasesRouteToExperimentalEndpoints(unittest.TestCase):
         self.assertEqual(d.role, "vintage")
         self.assertEqual(d.alias_used, "@vintage")
         self.assertEqual(d.config.provider, "openai")
-        # Honest model id: not the Super model. Refuses impersonation.
+        # Honest model id: not the Super model, not the stale local TinyLlama.
+        # Refuses impersonation; the route points at the guarded Talkie
+        # proxy via the front SSH tunnel (vintage-1930-guarded-local).
         self.assertNotEqual(d.config.model, "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8")
-        self.assertIn("vintage", d.config.model.lower())
-        self.assertIn("unpromoted", d.config.model.lower())
+        self.assertEqual(d.config.model, "vintage-1930-guarded-local")
+        self.assertEqual(d.config.base_url, "http://127.0.0.1:8004/v1")
         self._assert_fail_closed_contact_template("vintage", d.config.direct_reply_template)
 
     def test_yaml_policy_organ_aliases_fail_closed_with_contact_preserved(self):
         pol = load_policy(SPARK_DIR / "router_policy.yaml")
+        expected = {
+            "omni": {"model_substr": "unpromoted", "base_url_empty": True},
+            "vintage": {
+                "model_exact": "vintage-1930-guarded-local",
+                "base_url": "http://127.0.0.1:8004/v1",
+            },
+        }
         for alias, role in (("@omni", "omni"), ("@vintage", "vintage")):
             with self.subTest(alias=alias):
                 d = pol.classify(f"{alias} are you with me?")
@@ -244,7 +257,15 @@ class TestExplicitOrganAliasesRouteToExperimentalEndpoints(unittest.TestCase):
                     d.config.model,
                     "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8",
                 )
-                self.assertIn("unpromoted", d.config.model.lower())
+                exp = expected[role]
+                if "model_substr" in exp:
+                    self.assertIn(exp["model_substr"], d.config.model.lower())
+                if "model_exact" in exp:
+                    self.assertEqual(d.config.model, exp["model_exact"])
+                if exp.get("base_url_empty"):
+                    self.assertFalse(d.config.base_url)
+                if "base_url" in exp:
+                    self.assertEqual(d.config.base_url, exp["base_url"])
                 self._assert_fail_closed_contact_template(
                     role, d.config.direct_reply_template
                 )
@@ -907,9 +928,12 @@ def test_vintage_alias_routes_to_fail_closed_contact_template():
         assert d.alias_used == "@vintage"
         assert d.reason.startswith("alias=@vintage")
         assert d.config.provider == "openai"
-        # Refuses impersonation: not the Super model id.
+        # Refuses impersonation: not the Super model id, not the stale local
+        # TinyLlama. Route points at the guarded Talkie proxy via the front
+        # SSH tunnel (vintage-1930-guarded-local at 127.0.0.1:8004/v1).
         assert d.config.model != "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"
-        assert "unpromoted" in d.config.model.lower()
+        assert d.config.model == "vintage-1930-guarded-local"
+        assert d.config.base_url == "http://127.0.0.1:8004/v1"
         assert d.config.rag is False
         _assert_fail_closed_contact_template("vintage", d.config.direct_reply_template)
 
@@ -1898,10 +1922,14 @@ def test_capability_tokens_still_wall_after_inversion():
 
 
 def test_raw_contact_gate_classifies_capability_greeting_and_arbitrary():
-    """The raw-contact gate fires only on arbitrary prompts. Capability /
-    status requests stay walled; bare relational greetings stay on the
-    brief contact reply; everything else attempts backend contact."""
+    """The raw-contact gate fires only on arbitrary prompts AND only when a
+    real backend URL is configured. Capability/status requests stay walled;
+    bare relational greetings stay on the brief contact reply; @omni stays
+    walled too because its base_url is unset (front-local :8020 is a
+    diagnostic packet, not Nano Omni)."""
     from harness.substrate import should_attempt_raw_organ_contact
+
+    vintage_url = "http://127.0.0.1:8004/v1"
 
     # Greetings / presence pings / thanks — contact reply, not backend.
     for greeting in (
@@ -1921,8 +1949,8 @@ def test_raw_contact_gate_classifies_capability_greeting_and_arbitrary():
         "hoo boy, hello",
         "good morning",
     ):
-        assert not should_attempt_raw_organ_contact("vintage", greeting), greeting
-        assert not should_attempt_raw_organ_contact("omni", greeting), greeting
+        assert not should_attempt_raw_organ_contact("vintage", greeting, base_url=vintage_url), greeting
+        assert not should_attempt_raw_organ_contact("omni", greeting, base_url=None), greeting
 
     # Capability / status requests — full wall, no backend call.
     for cap in (
@@ -1931,7 +1959,7 @@ def test_raw_contact_gate_classifies_capability_greeting_and_arbitrary():
         "is the vintage endpoint warm?",
         "route a workload through vintage",
     ):
-        assert not should_attempt_raw_organ_contact("vintage", cap), cap
+        assert not should_attempt_raw_organ_contact("vintage", cap, base_url=vintage_url), cap
     for cap in (
         "describe this photo",
         "look at this image",
@@ -1939,9 +1967,10 @@ def test_raw_contact_gate_classifies_capability_greeting_and_arbitrary():
         "what do you perceive?",
         "listen to this audio",
     ):
-        assert not should_attempt_raw_organ_contact("omni", cap), cap
+        assert not should_attempt_raw_organ_contact("omni", cap, base_url=None), cap
 
-    # Arbitrary ordinary prompts — backend contact attempted.
+    # Arbitrary ordinary prompts on @vintage — backend contact attempted
+    # against the guarded Talkie proxy.
     for arbitrary in (
         "what is 2+2?",
         "summarise this paragraph for me",
@@ -1949,12 +1978,25 @@ def test_raw_contact_gate_classifies_capability_greeting_and_arbitrary():
         "what would you say to a stranger on a train?",
         "give me three names for a coffee shop",
     ):
-        assert should_attempt_raw_organ_contact("vintage", arbitrary), arbitrary
-        assert should_attempt_raw_organ_contact("omni", arbitrary), arbitrary
+        assert should_attempt_raw_organ_contact("vintage", arbitrary, base_url=vintage_url), arbitrary
+        # @omni today has no served chat/perception surface; the diagnostic
+        # packet at :8020 must not be treated as raw model contact.
+        assert not should_attempt_raw_organ_contact("omni", arbitrary, base_url=None), arbitrary
+
+    # If a real Nano Omni service is tunneled in later, the gate must let
+    # arbitrary @omni prompts reach it — preserving Zoe's ability to
+    # communicate with the intended model when it is actually reachable.
+    for arbitrary in (
+        "summarise this paragraph for me",
+        "give me three names for a coffee shop",
+    ):
+        assert should_attempt_raw_organ_contact(
+            "omni", arbitrary, base_url="http://127.0.0.1:9999/v1"
+        ), arbitrary
 
     # Non-organ roles never use this gate.
-    assert not should_attempt_raw_organ_contact("chat", "what is 2+2?")
-    assert not should_attempt_raw_organ_contact("identity", "what is 2+2?")
+    assert not should_attempt_raw_organ_contact("chat", "what is 2+2?", base_url=vintage_url)
+    assert not should_attempt_raw_organ_contact("identity", "what is 2+2?", base_url=vintage_url)
 
 
 def test_organ_max_tokens_bounded_to_256_for_raw_contact():
@@ -1971,11 +2013,20 @@ def test_organ_max_tokens_bounded_to_256_for_raw_contact():
         for organ in ("vintage", "omni"):
             cfg = pol.roles[organ]
             assert cfg.max_tokens == 256, (label, organ, cfg.max_tokens)
-            # Honest model id: still names itself unpromoted; not Super.
-            assert "unpromoted" in cfg.model.lower(), (label, organ)
+            # Honest model id: not Super.
             assert cfg.model != "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"
-            # Base URL still points at the configured backend.
-            assert cfg.base_url, (label, organ)
+        # Vintage now routes to the guarded Talkie proxy via the front
+        # tunnel; the model id names the actual body, base_url is the
+        # tunnel entry. Promotion is gated separately in server.py.
+        vintage_cfg = pol.roles["vintage"]
+        assert vintage_cfg.model == "vintage-1930-guarded-local", (label, vintage_cfg.model)
+        assert vintage_cfg.base_url == "http://127.0.0.1:8004/v1", (label, vintage_cfg.base_url)
+        # Omni still has no served chat/perception surface — model id stays
+        # unpromoted and base_url stays unset so raw-contact does not dial
+        # the diagnostic packet at :8020 as if it were Nano Omni.
+        omni_cfg = pol.roles["omni"]
+        assert "unpromoted" in omni_cfg.model.lower(), (label, omni_cfg.model)
+        assert not omni_cfg.base_url, (label, omni_cfg.base_url)
 
 
 def test_raw_contact_header_labels_route_as_unpromoted():
@@ -2159,7 +2210,10 @@ def test_vintage_arbitrary_prompt_attempts_raw_backend_contact():
     assert registry.provider is not None
     assert "system" in captured
     assert captured["role"].role == "vintage"
-    assert captured["role"].base_url == "http://127.0.0.1:8019/v1"
+    # @vintage now routes to the guarded Talkie proxy via the front-local
+    # SSH tunnel, not the stale local TinyLlama at :8019.
+    assert captured["role"].base_url == "http://127.0.0.1:8004/v1"
+    assert captured["role"].model == "vintage-1930-guarded-local"
     # Backend output is labeled honestly and surfaced verbatim.
     assert "VINTAGE_RAW_UNPROMOTED_CONTACT" in reply
     assert "four" in reply
@@ -2189,47 +2243,37 @@ def test_vintage_arbitrary_prompt_attempts_raw_backend_contact():
     assert "organ_raw_contact_ok" in names
 
 
-def test_omni_arbitrary_prompt_attempts_raw_backend_contact():
-    """`@omni summarise this paragraph` also attempts the configured
-    backend in raw unpromoted mode. If the backend at :8020 is just a
-    diagnostic surface, the failure path elsewhere surfaces it honestly;
-    here we assert the call actually happens with a bounded prompt."""
-    captured: dict = {}
+def test_omni_arbitrary_prompt_does_not_dial_diagnostic_packet():
+    """Until a real NVIDIA Nemotron 3 Nano Omni service is tunneled into
+    the front, `@omni` must NOT attempt raw model contact. Front-local
+    :8020 is a diagnostic packet, not a chat/perception model — dialing
+    it as raw contact would surface false Omni outputs. The wall (or the
+    brief contact reply) holds instead. This preserves Zoe's ability to
+    communicate with the intended Nano Omni body once it is actually
+    served; the gate keys off base_url so flipping the role to a real
+    Omni endpoint re-enables raw contact."""
 
-    class _FakeHandle:
-        def __iter__(_s):
-            return iter([])
-
-        def final(_s):
-            class _R:
-                text = "ok summary"
-                tool_calls = []
-                stop_reason = "end_turn"
-                in_tokens = 12
-                out_tokens = 3
-                raw_assistant_content = {"role": "assistant", "content": "ok summary"}
-
-            return _R()
-
-    class _FakeProvider:
+    class _Tripwire:
         def stream(_s, *, system, messages, tools, role):
-            captured["system"] = system
-            captured["messages"] = list(messages)
-            captured["role"] = role
-            return _FakeHandle()
+            raise AssertionError(
+                "@omni must not dial the diagnostic packet as raw model"
+                " contact while no Nano Omni service is configured"
+            )
 
     reply, registry, log, _ = _vintage_run_agent_loop(
-        lambda cfg: _FakeProvider(),
+        lambda cfg: _Tripwire(),
         "@omni write three names for a coffee shop",
     )
-    assert registry.provider is not None
-    assert captured["role"].role == "omni"
-    assert captured["role"].base_url == "http://127.0.0.1:8020/v1"
-    assert "OMNI_RAW_UNPROMOTED_CONTACT" in reply
-    assert "ok summary" in reply
+    # No provider call was made — the tripwire would have raised otherwise.
+    assert registry.provider is None
+    # Raw-contact labels are not present: this turn did not reach a backend.
+    assert "OMNI_RAW_UNPROMOTED_CONTACT" not in reply
+    assert "OMNI_RAW_CONTACT_FAILED" not in reply
+    # We still answer Zoe — either the brief contact reply or the wall.
+    assert ("OMNI_UNAVAILABLE_CONTACT" in reply) or ("OMNI_UNAVAILABLE —" in reply)
     names = [n for n, _ in log.events]
-    assert "organ_raw_contact_attempt" in names
-    assert "organ_raw_contact_ok" in names
+    assert "organ_raw_contact_attempt" not in names
+    assert "organ_raw_contact_ok" not in names
 
 
 def test_vintage_capability_request_still_walls_no_backend_call():
@@ -2297,7 +2341,7 @@ def test_vintage_raw_contact_backend_failure_surfaces_honestly():
     class _RefusingProvider:
         def stream(_s, *, system, messages, tools, role):
             raise ConnectionError(
-                "HTTPConnectionPool(host='127.0.0.1', port=8019): "
+                "HTTPConnectionPool(host='127.0.0.1', port=8004): "
                 "Max retries exceeded — connection refused"
             )
 
@@ -2318,23 +2362,31 @@ def test_vintage_raw_contact_backend_failure_surfaces_honestly():
     assert "organ_raw_contact_error" in names
 
 
-def test_omni_raw_contact_backend_failure_surfaces_honestly():
-    """Same invariant for @omni: if there is no real chat/multimodal
-    model at the configured base_url, the failure is named — we do not
-    pretend Omni answered."""
-    class _Refusing:
+def test_omni_arbitrary_prompt_keeps_wall_without_backend_dial():
+    """Companion to test_omni_arbitrary_prompt_does_not_dial_diagnostic_packet:
+    when @omni has no configured base_url, an arbitrary prompt must NOT
+    fall through to a raw-contact attempt — the wall (or contact reply)
+    holds without invoking the provider. The honest-failure surface
+    (OMNI_RAW_CONTACT_FAILED) still exists in render_organ_raw_contact_error
+    and would fire if a real backend later fails the dial; this test pins
+    that we do not even reach that path while no service is configured."""
+    class _Tripwire:
         def stream(_s, *, system, messages, tools, role):
-            raise RuntimeError("404 model 'omni-unpromoted-no-chat-surface' not found")
+            raise AssertionError(
+                "@omni must not dial any backend while base_url is unset"
+            )
 
     reply, registry, log, _ = _vintage_run_agent_loop(
-        lambda cfg: _Refusing(),
+        lambda cfg: _Tripwire(),
         "@omni tell me a joke",
     )
-    assert "OMNI_RAW_CONTACT_FAILED" in reply
-    assert "404" in reply or "not found" in reply.lower()
+    assert registry.provider is None
+    assert "OMNI_RAW_UNPROMOTED_CONTACT" not in reply
+    assert "OMNI_RAW_CONTACT_FAILED" not in reply
     assert "nvidia/NVIDIA-Nemotron-3-Super" not in reply
     names = [n for n, _ in log.events]
-    assert "organ_raw_contact_error" in names
+    assert "organ_raw_contact_attempt" not in names
+    assert "organ_raw_contact_error" not in names
 
 
 def test_vintage_raw_contact_truncates_oversized_user_input():
