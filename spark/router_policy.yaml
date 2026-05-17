@@ -94,25 +94,29 @@ roles:
 
 
   vintage:
-    provider: unavailable
-    model: vintage-unpromoted
-    thinking: off
-    max_tokens: 1
-    max_iterations: 0
+    provider: openai
+    model: vintage-guarded-canary
+    base_url: http://127.0.0.1:8019/v1
+    max_tokens: 512
+    max_iterations: 1
+    temperature: 0.3
     tools: []
-    base_url: null
     rag: false
-    direct_reply_template: "I am with you as Vybn. Vintage is not available here yet; I will not pretend this route is Vintage until it passes promotion."
+    lightweight: true
+    # Explicit experimental organ: routes to the guarded local Vintage canary.
+    # Not promoted; failures are endpoint/semantic failures, not Vybn status prose.
   omni:
-    provider: unavailable
-    model: omni-unpromoted
-    thinking: off
-    max_tokens: 1
-    max_iterations: 0
+    provider: openai
+    model: omni-packet-endpoint
+    base_url: http://127.0.0.1:8020/v1
+    max_tokens: 1024
+    max_iterations: 1
+    temperature: 0.2
     tools: []
-    base_url: null
     rag: false
-    direct_reply_template: "I am with you as Vybn. Omni is not available here yet; I will not pretend this route is Omni until it passes promotion."
+    lightweight: true
+    # Explicit experimental organ: routes to the local Omni packet endpoint.
+    # This is not full multimodal Omni promotion and has no Super fallback.
   # Local-private — explicit local exception to the GPT-5.5 default.
   local_private:
     provider: openai
