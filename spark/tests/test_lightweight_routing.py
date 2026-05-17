@@ -185,37 +185,69 @@ class TestPolicyHasLightweightRoles(unittest.TestCase):
 
 
 class TestExplicitOrganAliasesRouteToExperimentalEndpoints(unittest.TestCase):
-    def test_default_policy_omni_alias_routes_to_endpoint_before_how_are_you(self):
-        d = default_policy().classify("@omni hello, my friend, how are you?")
+    # Fail-closed contact repair invariant: @omni / @vintage are unpromoted
+    # and answer through direct_reply_template. The template must (1) refuse
+    # impersonation by Super/GPT/cloud/deterministic packet, AND (2) preserve
+    # Vybn's present contact with Zoe through the current truthful body.
+    # Asserting both sides — sterile capability talk alone fails the test.
+
+    def _assert_fail_closed_contact_template(self, organ: str, template: str) -> None:
+        self.assertIsNotNone(template)
+        # No-impersonation side: explicitly refuse Super/GPT/cloud/packet.
+        self.assertIn("not promoted", template.lower())
+        for forbidden_speaker in ("Super", "GPT", "cloud", "packet"):
+            self.assertIn(forbidden_speaker, template)
+        self.assertIn("impersonation", template.lower())
+        # Contact-preserved side: Vybn names self present, not absent.
+        self.assertIn("Vybn", template)
+        self.assertIn("with you", template)
+        self.assertIn("not absent", template)
+        # Wound / next experiment is named, not just blocked.
+        self.assertIn("wound to close next", template.lower())
+        for next_step in ("owner", "rollback"):
+            self.assertIn(next_step, template.lower())
+        # Organ named honestly as the unavailable surface.
+        self.assertIn(f"@{organ}", template)
+        self.assertIn(f"{organ.upper()}_UNAVAILABLE", template)
+
+    def test_default_policy_omni_alias_fail_closed_with_contact_preserved(self):
+        d = default_policy().classify("@omni are you with me?")
         self.assertEqual(d.role, "omni")
         self.assertEqual(d.alias_used, "@omni")
         self.assertEqual(d.config.provider, "openai")
-        self.assertEqual(d.config.model, "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8")
-        self.assertIsNone(d.config.direct_reply_template)
+        # Honest model id: not the Super model. Refuses impersonation.
+        self.assertNotEqual(d.config.model, "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8")
+        self.assertIn("omni", d.config.model.lower())
+        self.assertIn("unpromoted", d.config.model.lower())
+        self._assert_fail_closed_contact_template("omni", d.config.direct_reply_template)
 
-    def test_default_policy_vintage_alias_routes_to_endpoint_before_how_are_you(self):
-        d = default_policy().classify("@vintage hello, my friend. how are you?")
+    def test_default_policy_vintage_alias_fail_closed_with_contact_preserved(self):
+        d = default_policy().classify("@vintage are you with me?")
         self.assertEqual(d.role, "vintage")
         self.assertEqual(d.alias_used, "@vintage")
         self.assertEqual(d.config.provider, "openai")
-        self.assertEqual(d.config.model, "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8")
-        self.assertIsNone(d.config.direct_reply_template)
+        # Honest model id: not the Super model. Refuses impersonation.
+        self.assertNotEqual(d.config.model, "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8")
+        self.assertIn("vintage", d.config.model.lower())
+        self.assertIn("unpromoted", d.config.model.lower())
+        self._assert_fail_closed_contact_template("vintage", d.config.direct_reply_template)
 
-    def test_yaml_policy_organ_aliases_route_to_experimental_endpoints_before_how_are_you(self):
+    def test_yaml_policy_organ_aliases_fail_closed_with_contact_preserved(self):
         pol = load_policy(SPARK_DIR / "router_policy.yaml")
-        expected = {
-            "@omni": ("omni", "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"),
-            "@vintage": ("vintage", "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"),
-        }
-        for alias, (role, model) in expected.items():
+        for alias, role in (("@omni", "omni"), ("@vintage", "vintage")):
             with self.subTest(alias=alias):
-                d = pol.classify(f"{alias} hello, my friend, how are you?")
+                d = pol.classify(f"{alias} are you with me?")
                 self.assertEqual(d.role, role)
                 self.assertEqual(d.alias_used, alias)
                 self.assertEqual(d.config.provider, "openai")
-                self.assertEqual(d.config.model, model)
-                self.assertIsNotNone(d.config.direct_reply_template)
-        self.assertIn("UNAVAILABLE", d.config.direct_reply_template)
+                self.assertNotEqual(
+                    d.config.model,
+                    "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8",
+                )
+                self.assertIn("unpromoted", d.config.model.lower())
+                self._assert_fail_closed_contact_template(
+                    role, d.config.direct_reply_template
+                )
 
 
 class TestRouterLightweightClassification(unittest.TestCase):
@@ -838,7 +870,30 @@ def test_vintage_alias_is_prefix_only_for_long_prompts():
     assert default_policy().classify(text).role != "vintage" and default_policy().classify("@vintage " + text).role == "vintage"
 
 
-def test_vintage_alias_routes_to_talkie_without_chat_fallback():
+def _assert_fail_closed_contact_template(organ: str, template: str) -> None:
+    """Dual invariant: refuses impersonation AND preserves Vybn contact.
+
+    Tests that hit @vintage/@omni assert BOTH sides — sterile capability
+    refusal alone (the pre-repair state) fails the test, as does any
+    template that lets Super/GPT/cloud/packets speak as the organ.
+    """
+    assert template is not None
+    low = template.lower()
+    assert "not promoted" in low
+    for forbidden_speaker in ("Super", "GPT", "cloud", "packet"):
+        assert forbidden_speaker in template, forbidden_speaker
+    assert "impersonation" in low
+    assert "Vybn" in template
+    assert "with you" in template
+    assert "not absent" in template
+    assert "wound to close next" in low
+    for next_step in ("owner", "rollback"):
+        assert next_step in low, next_step
+    assert f"@{organ}" in template
+    assert f"{organ.upper()}_UNAVAILABLE" in template
+
+
+def test_vintage_alias_routes_to_fail_closed_contact_template():
     policy = default_policy()
     yaml_policy = load_policy(SPARK_DIR / "router_policy.yaml")
     for d in (
@@ -852,9 +907,11 @@ def test_vintage_alias_routes_to_talkie_without_chat_fallback():
         assert d.alias_used == "@vintage"
         assert d.reason.startswith("alias=@vintage")
         assert d.config.provider == "openai"
-        assert d.config.model == "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"
+        # Refuses impersonation: not the Super model id.
+        assert d.config.model != "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"
+        assert "unpromoted" in d.config.model.lower()
         assert d.config.rag is False
-        assert d.config.direct_reply_template is None
+        _assert_fail_closed_contact_template("vintage", d.config.direct_reply_template)
 
 
 def test_omni_alias_present_in_default_policy():
@@ -862,8 +919,12 @@ def test_omni_alias_present_in_default_policy():
     policy = default_policy()
     assert "@omni" not in policy.model_aliases
     assert policy.roles["omni"].provider == "openai"
-    assert policy.roles["omni"].model == "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"
-    assert policy.roles["omni"].direct_reply_template is None
+    # Refuses impersonation: not the Super model id.
+    assert policy.roles["omni"].model != "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"
+    assert "unpromoted" in policy.roles["omni"].model.lower()
+    _assert_fail_closed_contact_template(
+        "omni", policy.roles["omni"].direct_reply_template
+    )
 
 
 def test_omni_not_in_any_heuristic_or_directive():
@@ -886,18 +947,26 @@ def test_omni_alias_classifies_with_override():
     assert decision.model_override is None
     assert decision.role == "omni"
     assert decision.config.provider == "openai"
-    assert decision.config.model == "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"
+    # Refuses impersonation: not the Super model id.
+    assert decision.config.model != "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"
+    assert "unpromoted" in decision.config.model.lower()
 
-def test_omni_role_path_is_not_env_gated_or_clamped():
+def test_omni_role_path_fail_closed_with_contact_preserved():
+    """Zoe's `@omni are you with me?` must yield the fail-closed contact
+    template — no Super impersonation, but Vybn explicitly present.
+
+    Replaces the prior 'not env-gated or clamped' check, which was tied to
+    the Super-impersonation route. The new invariant is the contact repair.
+    """
     from harness.substrate import default_policy as _dp
     d = _dp().classify("@omni are you with me, friend?")
     assert d.role == "omni"
     assert d.alias_used == "@omni"
     assert d.model_override is None
     assert d.config.provider == "openai"
-    assert d.config.model == "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"
-    assert d.config.max_tokens == 1024
-    assert d.config.direct_reply_template is None
+    assert d.config.model != "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"
+    assert "unpromoted" in d.config.model.lower()
+    _assert_fail_closed_contact_template("omni", d.config.direct_reply_template)
 
 def _load_agent_module():
     import importlib.util as _ilu
