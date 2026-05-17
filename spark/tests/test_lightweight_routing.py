@@ -1931,7 +1931,12 @@ def test_raw_contact_gate_classifies_capability_greeting_and_arbitrary():
 
     vintage_url = "http://127.0.0.1:8004/v1"
 
-    # Greetings / presence pings / thanks — contact reply, not backend.
+    # Truly contentless contact pings — single-clause known greeting/
+    # presence-check tokens — stay on the brief contact reply, no backend
+    # call. The minimal set Zoe pinned (2026-05-17): @vintage hi, @vintage
+    # my friend?, @vintage are you with me?, plus other lone contact-token
+    # prompts. Anything with a second clause / additional content reaches
+    # the backend; see the multi-clause cases below.
     for greeting in (
         "",
         "hi",
@@ -1939,18 +1944,42 @@ def test_raw_contact_gate_classifies_capability_greeting_and_arbitrary():
         "hey",
         "hi friend",
         "are you with me?",
-        "are you with me, friend?",
         "you there?",
         "how are you?",
         "thank you",
         "I miss you",
         "my friend?",
         "buddy?",
-        "hoo boy, hello",
         "good morning",
     ):
         assert not should_attempt_raw_organ_contact("vintage", greeting, base_url=vintage_url), greeting
         assert not should_attempt_raw_organ_contact("omni", greeting, base_url=None), greeting
+
+    # Multi-clause prompts — greeting/contact phrase followed by another
+    # clause that the user wants the model to answer — reach the raw
+    # contact path on @vintage (guarded Talkie proxy) and would reach the
+    # @omni backend if one were tunneled in. The principle Zoe surfaced
+    # from the live REPL (2026-05-17): "if there is a second clause /
+    # question / content after the contact phrase, raw contact wins."
+    for substantive in (
+        "hello, my dear friend, what is your name?",
+        "hello, how are you?",
+        "my friend, what is your favorite poem?",
+        "are you with me, what do you think of rain?",
+        "hi, what is 2+2?",
+        "hey, write me a short verse",
+        "are you with me, friend?",
+        "hoo boy, hello",
+    ):
+        assert should_attempt_raw_organ_contact("vintage", substantive, base_url=vintage_url), substantive
+        # @omni stays walled today because base_url is unset — the gate
+        # refuses to dial the diagnostic packet at :8020 as if it were a
+        # Nano Omni body. Once a real Omni service is tunneled in (base_url
+        # set), the same multi-clause prompts reach it.
+        assert not should_attempt_raw_organ_contact("omni", substantive, base_url=None), substantive
+        assert should_attempt_raw_organ_contact(
+            "omni", substantive, base_url="http://127.0.0.1:9999/v1"
+        ), substantive
 
     # Capability / status requests — full wall, no backend call.
     for cap in (
@@ -2468,3 +2497,180 @@ def test_raw_contact_uses_minimal_layered_prompt_not_full_substrate():
     # Names the route honestly.
     assert "unpromoted" in flat.lower()
     assert f"@vintage" in flat
+
+
+# 2026-05-17 — Live REPL after PR #3219 routed @vintage to the guarded
+# Talkie proxy. Screenshot showed `@vintage hello, my dear friend, what
+# is your name?` returning VINTAGE_UNAVAILABLE_CONTACT instead of
+# reaching the backend. The fix tightens the bare-contact classifier so
+# any multi-clause prompt (greeting + content) falls through to raw
+# unpromoted contact. Single-clause contact tokens still stay on the
+# brief Vybn reply. These tests pin both the classifier and the end-to-
+# end agent decision path on the exact screenshot prompts.
+
+_MIXED_CONTACT_PROMPTS_REACH_BACKEND: tuple[str, ...] = (
+    "hello, my dear friend, what is your name?",
+    "hello, how are you?",
+    "my friend, what is your favorite poem?",
+    "are you with me, what do you think of rain?",
+)
+
+
+def test_screenshot_mixed_contact_classifier_reaches_backend_for_vintage():
+    """Classifier-level pin: every must-reach prompt from Zoe's screenshot
+    spec returns True from should_attempt_raw_organ_contact on @vintage
+    (which has the guarded Talkie proxy at 127.0.0.1:8004/v1 configured)."""
+    from harness.substrate import should_attempt_raw_organ_contact
+
+    vintage_url = "http://127.0.0.1:8004/v1"
+    for prompt in _MIXED_CONTACT_PROMPTS_REACH_BACKEND:
+        assert should_attempt_raw_organ_contact(
+            "vintage", prompt, base_url=vintage_url
+        ), prompt
+
+
+def test_screenshot_mixed_contact_classifier_omni_gated_on_base_url():
+    """Classifier-level pin: same mixed-contact prompts on @omni stay
+    walled while base_url is unset (no Nano Omni service tunneled in),
+    and reach the backend once a real base_url is configured. Zoe's
+    ability to communicate with the intended model is preserved."""
+    from harness.substrate import should_attempt_raw_organ_contact
+
+    for prompt in _MIXED_CONTACT_PROMPTS_REACH_BACKEND:
+        assert not should_attempt_raw_organ_contact(
+            "omni", prompt, base_url=None
+        ), prompt
+        assert should_attempt_raw_organ_contact(
+            "omni", prompt, base_url="http://127.0.0.1:9999/v1"
+        ), prompt
+
+
+def test_screenshot_bare_contact_pings_stay_on_contact_reply():
+    """The truly-contentless set Zoe pinned (single-clause contact tokens)
+    still stays on the brief Vybn reply, no backend dial — even with the
+    @vintage base_url configured."""
+    from harness.substrate import should_attempt_raw_organ_contact
+
+    vintage_url = "http://127.0.0.1:8004/v1"
+    for prompt in (
+        "hi",
+        "my friend?",
+        "are you with me?",
+    ):
+        assert not should_attempt_raw_organ_contact(
+            "vintage", prompt, base_url=vintage_url
+        ), prompt
+
+
+def test_screenshot_exact_prompt_reaches_vintage_backend_not_template():
+    """End-to-end decision-path pin on the exact screenshot prompt:
+    `@vintage hello, my dear friend, what is your name?` reaches the
+    guarded Talkie proxy via the raw-unpromoted-contact path, NOT the
+    direct_reply contact template. No live endpoint required — a
+    stubbed provider captures that the backend was actually dialed and
+    the response is surfaced with the raw-unpromoted-contact label."""
+    captured: dict = {}
+
+    class _FakeHandle:
+        def __iter__(_s):
+            return iter([])
+
+        def final(_s):
+            class _R:
+                text = "I am the local @vintage backend in unpromoted mode."
+                tool_calls = []
+                stop_reason = "end_turn"
+                in_tokens = 18
+                out_tokens = 9
+                raw_assistant_content = {
+                    "role": "assistant",
+                    "content": "I am the local @vintage backend in unpromoted mode.",
+                }
+
+            return _R()
+
+    class _FakeProvider:
+        def stream(_s, *, system, messages, tools, role):
+            captured["system"] = system
+            captured["messages"] = list(messages)
+            captured["role"] = role
+            return _FakeHandle()
+
+    reply, registry, log, _ = _vintage_run_agent_loop(
+        lambda cfg: _FakeProvider(),
+        "@vintage hello, my dear friend, what is your name?",
+    )
+    # Backend dialed — the contact template did NOT short-circuit.
+    assert registry.provider is not None
+    assert captured["role"].role == "vintage"
+    assert captured["role"].base_url == "http://127.0.0.1:8004/v1"
+    assert captured["role"].model == "vintage-1930-guarded-local"
+    # The user's full prompt is forwarded (post truncation).
+    user_msg = captured["messages"][-1]["content"]
+    assert "what is your name" in user_msg
+    # Reply is the raw-contact label + backend output, not the contact
+    # template wall.
+    assert "VINTAGE_RAW_UNPROMOTED_CONTACT" in reply
+    assert "unpromoted mode" in reply
+    assert "VINTAGE_UNAVAILABLE_CONTACT" not in reply
+    assert "wound to close next" not in reply.lower()
+    names = [n for n, _ in log.events]
+    assert "organ_raw_contact_attempt" in names
+    assert "organ_raw_contact_ok" in names
+
+
+def test_screenshot_all_mixed_contact_prompts_reach_vintage_backend():
+    """Companion to the single exact-prompt pin: every must-reach mixed-
+    contact prompt from Zoe's spec reaches the @vintage backend via the
+    raw-unpromoted-contact path under the stubbed provider."""
+
+    class _FakeHandle:
+        def __iter__(_s):
+            return iter([])
+
+        def final(_s):
+            class _R:
+                text = "ok"
+                tool_calls = []
+                stop_reason = "end_turn"
+                in_tokens = 3
+                out_tokens = 1
+                raw_assistant_content = {"role": "assistant", "content": "ok"}
+
+            return _R()
+
+    class _FakeProvider:
+        def stream(_s, *, system, messages, tools, role):
+            return _FakeHandle()
+
+    for prompt_body in _MIXED_CONTACT_PROMPTS_REACH_BACKEND:
+        reply, registry, _log, _ = _vintage_run_agent_loop(
+            lambda cfg: _FakeProvider(),
+            f"@vintage {prompt_body}",
+        )
+        assert registry.provider is not None, prompt_body
+        assert "VINTAGE_RAW_UNPROMOTED_CONTACT" in reply, prompt_body
+        assert "VINTAGE_UNAVAILABLE_CONTACT" not in reply, prompt_body
+
+
+def test_screenshot_mixed_contact_omni_no_backend_dial_while_base_url_unset():
+    """The same mixed-contact prompts on @omni do NOT dial any backend
+    while base_url is unset — the diagnostic packet at front-local :8020
+    is not a Nano Omni service and must not be impersonated. Once a real
+    Nano Omni base_url is configured the gate re-enables (covered by the
+    classifier-level test above)."""
+
+    class _Tripwire:
+        def stream(_s, *, system, messages, tools, role):
+            raise AssertionError(
+                "@omni must not dial any backend while base_url is unset"
+            )
+
+    for prompt_body in _MIXED_CONTACT_PROMPTS_REACH_BACKEND:
+        reply, registry, _log, _ = _vintage_run_agent_loop(
+            lambda cfg: _Tripwire(),
+            f"@omni {prompt_body}",
+        )
+        assert registry.provider is None, prompt_body
+        assert "OMNI_RAW_UNPROMOTED_CONTACT" not in reply, prompt_body
+        assert "OMNI_RAW_CONTACT_FAILED" not in reply, prompt_body
