@@ -647,7 +647,7 @@ class TestCliDirectReplyAndLightweight(unittest.TestCase):
             turn_number=1,
         )
         self.assertIn("Vybn", reply)
-        self.assertIn("gpt-5.5", reply)
+        self.assertTrue("gpt-5.5" in reply and "vintage" not in reply.lower(), reply)
         # Rolling history should contain the user turn + the direct
         # reply so the next turn has coherent context.
         self.assertEqual(messages[-1]["role"], "assistant")
@@ -1947,4 +1947,3 @@ def test_local_super_semantic_failure_cloud_fallback_requires_explicit_opt_in(mo
         mod.render_him_vy_discovery_packet = saved_disc
         mod.render_him_vy_turn_packet = saved_turn
         mod.run_probes = saved_probes
-
