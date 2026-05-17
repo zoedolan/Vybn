@@ -46,6 +46,7 @@ from harness.substrate import rag_snippets, rag_snippets_with_tier, render_him_v
 from harness.substrate import execute_tool_calls, default_introspect  # noqa: E402
 from harness.substrate import check_claim, check_structural_claim  # noqa: E402
 from harness.substrate import is_system_critical_pilot_turn  # noqa: E402
+from harness.substrate import render_organ_alias_direct_reply  # noqa: E402
 from harness.substrate import (  # noqa: E402
     SUPER_SEMANTIC_GATE_CACHE as _SUPER_SEMANTIC_GATE_CACHE,
     SUPER_SEMANTIC_GATE_PROBES as _SUPER_SEMANTIC_GATE_PROBES,
@@ -1088,11 +1089,16 @@ def run_agent_loop(
     # not a hallucinated string.
     template = getattr(role_cfg, "direct_reply_template", None)
     if template and not role_cfg.tools:
-        reply = template.format(
-            role=role_cfg.role,
-            provider=role_cfg.provider,
-            model=role_cfg.model,
-            base_url=role_cfg.base_url or "",
+        reply = render_organ_alias_direct_reply(
+            role_cfg.role,
+            decision.cleaned_input or "",
+            template,
+            fmt_kwargs={
+                "role": role_cfg.role,
+                "provider": role_cfg.provider,
+                "model": role_cfg.model,
+                "base_url": role_cfg.base_url or "",
+            },
         )
         messages.append({"role": "user", "content": decision.cleaned_input})
         messages.append({"role": "assistant", "content": reply})

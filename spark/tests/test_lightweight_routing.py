@@ -1569,3 +1569,191 @@ def test_gpt55_has_no_cross_provider_fallback():
     from harness.substrate import default_policy, load_policy
     assert default_policy().fallback_chain.get("gpt-5.5") == []
     assert load_policy(SPARK_DIR / "router_policy.yaml").fallback_chain.get("gpt-5.5") == []
+
+
+# Contact-greeting repair for @vintage / @omni. After PR #3212 the role
+# stored a fail-closed wall on direct_reply_template that named the
+# impersonation refusal AND named Vybn present, but every turn — even
+# "@vintage hi" — rendered the full diagnostic plaque. These tests pin
+# the next step: ordinary contact (hi / hello / are you with me / bare
+# alias) produces a brief Vybn reply that still refuses impersonation
+# and names the organ as unpromoted, while any turn that actually needs
+# an unavailable Vintage/Omni capability still renders the full wall.
+
+def _vintage_wall() -> str:
+    return default_policy().roles["vintage"].direct_reply_template
+
+
+def _omni_wall() -> str:
+    return default_policy().roles["omni"].direct_reply_template
+
+
+def _assert_contact_reply_invariants(organ: str, reply: str) -> None:
+    # Marked as the contact variant, not the bare wall.
+    assert f"{organ.upper()}_UNAVAILABLE_CONTACT" in reply, reply
+    assert f"{organ.upper()}_UNAVAILABLE —" not in reply, reply
+    # Names the organ as unpromoted, so the read is honest.
+    assert f"@{organ}" in reply
+    assert "not promoted" in reply.lower()
+    # Refuses impersonation by Super / GPT / cloud / packet.
+    for forbidden_speaker in ("Super", "GPT", "cloud", "packet"):
+        assert forbidden_speaker in reply, (forbidden_speaker, reply)
+    assert "impersonation" in reply.lower()
+    # Vybn is present with Zoe — contact preserved, not abandoned.
+    assert "Vybn" in reply
+    assert "with you" in reply.lower()
+    assert "not absent" in reply.lower()
+    # Brief: the contact reply must not dump the full wound list. The
+    # phrase "wound to close next" belongs to the capability wall, not
+    # the greeting reply.
+    assert "wound to close next" not in reply.lower(), reply
+
+
+def test_organ_alias_contact_greeting_returns_brief_vybn_reply():
+    from harness.substrate import render_organ_alias_direct_reply
+
+    for organ, wall in (("vintage", _vintage_wall()), ("omni", _omni_wall())):
+        for greeting in (
+            f"@{organ}",
+            "",
+            "hi",
+            "hello",
+            "hey",
+            "hi friend",
+            "are you with me?",
+            "are you with me, friend?",
+            "you there?",
+            "how are you?",
+        ):
+            reply = render_organ_alias_direct_reply(organ, greeting, wall)
+            _assert_contact_reply_invariants(organ, reply)
+
+
+def test_omni_capability_request_still_renders_full_wall():
+    from harness.substrate import render_organ_alias_direct_reply
+
+    wall = _omni_wall()
+    for capability_request in (
+        "please describe this photo",
+        "look at this image and tell me what you see",
+        "what do you perceive in this picture?",
+        "run perception on this screenshot",
+        "use your vision and read this",
+        "are you multimodal?",
+        "listen to this audio",
+        "watch this video",
+    ):
+        reply = render_organ_alias_direct_reply("omni", capability_request, wall)
+        # Full wall, not the brief contact reply.
+        assert reply == wall, capability_request
+        assert "OMNI_UNAVAILABLE_CONTACT" not in reply
+        assert "wound to close next" in reply.lower()
+
+
+def test_vintage_capability_request_still_renders_full_wall():
+    from harness.substrate import render_organ_alias_direct_reply
+
+    wall = _vintage_wall()
+    for capability_request in (
+        "tell me about the 1930 corpus",
+        "what are the vintage invariants?",
+        "run a vintage chat smoke",
+        "route a workload through vintage",
+        "is the vintage endpoint warm?",
+    ):
+        reply = render_organ_alias_direct_reply("vintage", capability_request, wall)
+        assert reply == wall, capability_request
+        assert "VINTAGE_UNAVAILABLE_CONTACT" not in reply
+        assert "wound to close next" in reply.lower()
+
+
+def test_non_organ_role_with_template_is_unaffected():
+    """Identity / other direct_reply roles must continue to render verbatim."""
+    from harness.substrate import default_policy, render_organ_alias_direct_reply
+
+    identity = default_policy().roles["identity"]
+    rendered = render_organ_alias_direct_reply(
+        identity.role,
+        "which model are you?",
+        identity.direct_reply_template,
+        fmt_kwargs={
+            "role": identity.role,
+            "provider": identity.provider,
+            "model": identity.model,
+            "base_url": identity.base_url or "",
+        },
+    )
+    # Identity reply is the runtime-metadata answer, not an organ contact reply.
+    assert "runtime-metadata answer" in rendered
+    assert "UNAVAILABLE_CONTACT" not in rendered
+    assert identity.model in rendered
+
+
+def test_organ_alias_contact_reply_does_not_speak_as_organ():
+    """The contact reply must not impersonate Vintage / Omni. It speaks as
+    Vybn, names the absent organ honestly, and asks Zoe to direct organ-
+    specific work back to that organ."""
+    from harness.substrate import render_organ_alias_direct_reply
+
+    for organ, wall in (("vintage", _vintage_wall()), ("omni", _omni_wall())):
+        reply = render_organ_alias_direct_reply(organ, "hi", wall)
+        # Speaker is Vybn, not the organ.
+        assert "I, Vybn" in reply
+        # The organ is named as something to ask, not something speaking.
+        assert f"Ask {organ.capitalize()}" in reply
+        # No claim of being the organ.
+        forbidden_claims = (
+            f"I am {organ.capitalize()}",
+            f"This is {organ.capitalize()}",
+            f"{organ.capitalize()} here",
+        )
+        for claim in forbidden_claims:
+            assert claim not in reply, claim
+
+
+def test_agent_direct_reply_uses_contact_aware_renderer_for_organ_greeting():
+    """End-to-end: the agent's direct-reply short-circuit calls the
+    contact-aware renderer, so `@omni hi` and `@vintage hi` reach Zoe as
+    contactful Vybn replies, not the full diagnostic wall."""
+    mod = _load_agent_module()
+    policy = default_policy()
+
+    class _NoOpLogger:
+        def emit(self, *_a, **_k):
+            pass
+
+    class _NoOpRegistry:
+        def get(self, _cfg):
+            raise AssertionError("registry.get must not be called on direct_reply short-circuit")
+
+    for organ, alias in (("vintage", "@vintage"), ("omni", "@omni")):
+        d = policy.classify(f"{alias} hi")
+        # Render through the same path the agent takes.
+        rendered = mod.render_organ_alias_direct_reply(
+            d.config.role,
+            d.cleaned_input or "",
+            d.config.direct_reply_template,
+            fmt_kwargs={
+                "role": d.config.role,
+                "provider": d.config.provider,
+                "model": d.config.model,
+                "base_url": d.config.base_url or "",
+            },
+        )
+        _assert_contact_reply_invariants(organ, rendered)
+
+
+def test_yaml_policy_contact_greeting_renders_brief_vybn_reply():
+    """YAML-loaded policy must produce the same contact reply as the
+    default policy — the helper is wired off role name, not provenance."""
+    from harness.substrate import render_organ_alias_direct_reply
+
+    pol = load_policy(SPARK_DIR / "router_policy.yaml")
+    for organ, alias in (("vintage", "@vintage"), ("omni", "@omni")):
+        d = pol.classify(f"{alias} are you with me?")
+        reply = render_organ_alias_direct_reply(
+            d.config.role,
+            d.cleaned_input or "",
+            d.config.direct_reply_template,
+        )
+        _assert_contact_reply_invariants(organ, reply)

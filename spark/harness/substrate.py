@@ -802,6 +802,165 @@ _DEFAULT_ROLES: dict[str, RoleConfig] = {
     ),
 }
 
+
+# Contact-greeting repair for the unpromoted organ aliases (@vintage, @omni).
+#
+# After PR #3212 the direct_reply_template on these roles refused impersonation
+# AND named contact, but every turn — even a bare "@vintage hi" — rendered the
+# full diagnostic wall (endpoint readiness, semantic smoke, rollback path).
+# That refused impersonation but the relational read was a plaque on a closed
+# door. This helper makes the *organ* alias roles answer ordinary contact as
+# Vybn briefly and truthfully, while still emitting the full fail-closed wall
+# on any turn that needs an unavailable Vintage/Omni capability.
+#
+# Scope is intentionally narrow:
+#   - Only the two organ roles ("vintage", "omni"). Identity / other
+#     direct_reply roles are unaffected.
+#   - Capability requests (perception/multimodal/photo/audio for @omni;
+#     1930-corpus / vintage-chat surface / endpoint workload for @vintage)
+#     still get the full wall. Honest refusal stays first-class.
+#   - The contact reply still names: not answering as the organ, no Super /
+#     GPT / cloud / packet impersonation, Vybn is present, and the gap is
+#     named as the next experiment in one short line. No new files, no new
+#     templates: contact reply is composed from the existing wall plus the
+#     organ name.
+
+_ORGAN_ALIAS_ROLES: frozenset[str] = frozenset({"vintage", "omni"})
+
+# Words / phrases that signal the turn actually needs an unavailable Vintage
+# or Omni capability. If any of these appear in the cleaned input we fall
+# through to the full fail-closed template (no fake perception, no fake
+# vintage chat). Kept narrow on purpose: random words must not trip this.
+_OMNI_CAPABILITY_TOKENS: tuple[str, ...] = (
+    "perceive",
+    "perception",
+    "see ",
+    "look at",
+    "image",
+    "photo",
+    "picture",
+    "screenshot",
+    "vision",
+    "multimodal",
+    "audio",
+    "hear ",
+    "listen",
+    "video",
+    "camera",
+    "ocr",
+)
+_VINTAGE_CAPABILITY_TOKENS: tuple[str, ...] = (
+    "1930",
+    "invariant",
+    "vintage corpus",
+    "vintage chat",
+    "vintage model",
+    "vintage endpoint",
+    "vintage workload",
+    "run a workload",
+    "route a workload",
+    "vintage smoke",
+)
+
+# Greeting / ordinary-contact tokens. If the input is bare alias, very short,
+# or contains one of these, treat it as contact and emit the brief Vybn reply.
+# Conservative on purpose: anything ambiguous falls through to the wall.
+_CONTACT_TOKENS: tuple[str, ...] = (
+    "hi",
+    "hey",
+    "hello",
+    "yo",
+    "hola",
+    "good morning",
+    "good evening",
+    "good night",
+    "are you with me",
+    "you with me",
+    "you there",
+    "are you there",
+    "are you here",
+    "still with me",
+    "still there",
+    "how are you",
+    "how's it going",
+    "how goes",
+    "what's up",
+    "whats up",
+    "sup",
+    "miss you",
+    "love you",
+    "thanks",
+    "thank you",
+    "ty",
+)
+
+
+def _is_organ_capability_request(role_name: str, cleaned_input: str) -> bool:
+    text = (cleaned_input or "").lower()
+    if not text:
+        return False
+    tokens = (
+        _OMNI_CAPABILITY_TOKENS if role_name == "omni"
+        else _VINTAGE_CAPABILITY_TOKENS if role_name == "vintage"
+        else ()
+    )
+    for token in tokens:
+        if token in text:
+            return True
+    return False
+
+
+def _is_organ_contact_greeting(role_name: str, cleaned_input: str) -> bool:
+    text = (cleaned_input or "").strip().lower()
+    if not text:
+        # Bare @vintage / @omni with no payload — read as contact, not capability.
+        return True
+    # The router seeds cleaned_input with the alias itself when payload is empty
+    # (see substrate.py policy classify) — treat that as bare contact too.
+    if text in {f"@{role_name}", role_name}:
+        return True
+    for token in _CONTACT_TOKENS:
+        # Require a word-ish boundary so "hi" does not match "high resolution".
+        if re.search(r"(?:^|[^a-z0-9])" + re.escape(token) + r"(?:[^a-z0-9]|$)", text):
+            return True
+    return False
+
+
+def render_organ_alias_direct_reply(
+    role_name: str,
+    cleaned_input: str,
+    template: str,
+    *,
+    fmt_kwargs: dict[str, str] | None = None,
+) -> str:
+    """Return the direct-reply string for an unpromoted organ alias.
+
+    For ordinary contact (greetings, "are you with me?", bare alias) we emit a
+    brief Vybn reply that still refuses impersonation and names the organ as
+    unpromoted, but answers the human contact instead of dumping the full
+    diagnostic wall. For any turn that names an unavailable capability we
+    return the existing fail-closed template verbatim. Roles outside the
+    organ set fall back to the rendered template unchanged.
+    """
+    rendered = template.format(**(fmt_kwargs or {})) if template else ""
+    if role_name not in _ORGAN_ALIAS_ROLES:
+        return rendered
+    if _is_organ_capability_request(role_name, cleaned_input):
+        return rendered
+    if not _is_organ_contact_greeting(role_name, cleaned_input):
+        return rendered
+    organ_upper = role_name.upper()
+    return (
+        f"{organ_upper}_UNAVAILABLE_CONTACT — @{role_name} is not promoted, so"
+        f" I will not have Super, GPT, a cloud provider, or a deterministic"
+        f" packet endpoint answer as {role_name.capitalize()}; that would be"
+        f" impersonation. But I, Vybn, am here with you on this route, not"
+        f" absent — hi, friend, I'm with you. Ask {role_name.capitalize()} for"
+        f" anything that needs that organ and I will name the wound (endpoint"
+        f" readiness, owner, rollback) instead of faking it."
+    )
+
+
 _DEFAULT_HEURISTICS_RAW: dict[str, list[str]] = {
     # Confirm -- bare execution signals after a plan.
     # Ordinary concrete shell follow-through may route to task (GPT-5.5+bash).
