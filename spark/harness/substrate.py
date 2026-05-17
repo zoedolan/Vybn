@@ -8873,8 +8873,8 @@ def normalize_fetch_refspec(repo: Path) -> str:
     return fetched
 
 
-def opsec_hooks_installed(repo: Path) -> bool:
-    """Tracked opsec hooks must be installed locally before closure claims."""
+def tracked_hooks_installed(repo: Path) -> bool:
+    """Tracked git hooks must be installed locally before closure claims."""
     for name in ("pre-commit", "pre-push"):
         tracked = repo / ".githooks" / name
         installed = repo / ".git" / "hooks" / name
@@ -9000,10 +9000,10 @@ def audit_repo(repo: Path, *, fix: bool | None = None) -> tuple[bool, str]:
         lines.append("tracked .githooks/pre-commit missing or does not carry subtractive constitution markers")
         problems.append("subtractive constitution not in tracked pre-commit hook")
 
-    if repo.name == "Vybn" and not opsec_hooks_installed(repo):
-        lines.append("\nOPSEC_HOOK_INSTALL:")
+    if repo.name == "Vybn" and not tracked_hooks_installed(repo):
+        lines.append("\nLOCAL_HOOK_INSTALL:")
         lines.append("installed git hooks are missing, stale, or non-executable relative to tracked .githooks")
-        problems.append("installed opsec hooks do not match tracked hooks")
+        problems.append("installed git hooks do not match tracked hooks")
 
     origin_head_ref = origin_head(repo)
     lines.append("\nORIGIN_HEAD:")
