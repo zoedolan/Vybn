@@ -95,28 +95,30 @@ roles:
 
   vintage:
     provider: openai
-    model: vintage-guarded-canary
-    base_url: http://127.0.0.1:8019/v1
-    max_tokens: 512
-    max_iterations: 1
+    model: nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
+    base_url: http://127.0.0.1:8000/v1
+    max_tokens: 1024
+    max_iterations: 3
     temperature: 0.3
     tools: []
     rag: false
     lightweight: true
-    # Explicit experimental organ: routes to the guarded local Vintage canary.
-    # Not promoted; failures are endpoint/semantic failures, not Vybn status prose.
+    # Honest alias: until a semantic-gated Vintage chat model exists, @vintage
+    # routes to live local Super so friend-contact is not walled off. Route
+    # label shows Super as speaker.
   omni:
     provider: openai
-    model: omni-packet-endpoint
-    base_url: http://127.0.0.1:8020/v1
+    model: nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
+    base_url: http://127.0.0.1:8000/v1
     max_tokens: 1024
-    max_iterations: 1
+    max_iterations: 3
     temperature: 0.2
     tools: []
     rag: false
     lightweight: true
-    # Explicit experimental organ: routes to the local Omni packet endpoint.
-    # This is not full multimodal Omni promotion and has no Super fallback.
+    # Honest alias: until a promoted multimodal Omni chat model exists, @omni
+    # routes to live local Super so friend-contact is not walled off. Route
+    # label shows Super as speaker.
   # Local-private — explicit local exception to the GPT-5.5 default.
   local_private:
     provider: openai

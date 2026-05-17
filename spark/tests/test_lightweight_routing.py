@@ -190,7 +190,7 @@ class TestExplicitOrganAliasesRouteToExperimentalEndpoints(unittest.TestCase):
         self.assertEqual(d.role, "omni")
         self.assertEqual(d.alias_used, "@omni")
         self.assertEqual(d.config.provider, "openai")
-        self.assertEqual(d.config.model, "omni-packet-endpoint")
+        self.assertEqual(d.config.model, "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8")
         self.assertIsNone(d.config.direct_reply_template)
 
     def test_default_policy_vintage_alias_routes_to_endpoint_before_how_are_you(self):
@@ -198,14 +198,14 @@ class TestExplicitOrganAliasesRouteToExperimentalEndpoints(unittest.TestCase):
         self.assertEqual(d.role, "vintage")
         self.assertEqual(d.alias_used, "@vintage")
         self.assertEqual(d.config.provider, "openai")
-        self.assertEqual(d.config.model, "vintage-guarded-canary")
+        self.assertEqual(d.config.model, "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8")
         self.assertIsNone(d.config.direct_reply_template)
 
     def test_yaml_policy_organ_aliases_route_to_experimental_endpoints_before_how_are_you(self):
         pol = load_policy(SPARK_DIR / "router_policy.yaml")
         expected = {
-            "@omni": ("omni", "omni-packet-endpoint"),
-            "@vintage": ("vintage", "vintage-guarded-canary"),
+            "@omni": ("omni", "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"),
+            "@vintage": ("vintage", "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"),
         }
         for alias, (role, model) in expected.items():
             with self.subTest(alias=alias):
@@ -851,7 +851,7 @@ def test_vintage_alias_routes_to_talkie_without_chat_fallback():
         assert d.alias_used == "@vintage"
         assert d.reason.startswith("alias=@vintage")
         assert d.config.provider == "openai"
-        assert d.config.model == "vintage-guarded-canary"
+        assert d.config.model == "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"
         assert d.config.rag is False
         assert d.config.direct_reply_template is None
 
@@ -861,18 +861,8 @@ def test_omni_alias_present_in_default_policy():
     policy = default_policy()
     assert "@omni" not in policy.model_aliases
     assert policy.roles["omni"].provider == "openai"
-    assert policy.roles["omni"].model == "omni-packet-endpoint"
+    assert policy.roles["omni"].model == "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"
     assert policy.roles["omni"].direct_reply_template is None
-
-
-def test_omni_not_in_fallback_chain():
-    from spark.harness.substrate import default_policy
-    policy = default_policy()
-    omni_role = policy.roles["omni"]
-    assert "@omni" not in policy.model_aliases
-    assert omni_role.provider == "openai"
-    assert omni_role.model not in {policy.model_aliases.get("@gpt"), policy.model_aliases.get("@local")}
-    assert omni_role.model == "omni-packet-endpoint"
 
 
 def test_omni_not_in_any_heuristic_or_directive():
@@ -893,7 +883,7 @@ def test_omni_alias_classifies_with_override():
     assert decision.model_override is None
     assert decision.role == "omni"
     assert decision.config.provider == "openai"
-    assert decision.config.model == "omni-packet-endpoint"
+    assert decision.config.model == "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"
 
 def test_omni_role_path_is_not_env_gated_or_clamped():
     from harness.substrate import default_policy as _dp
@@ -902,7 +892,7 @@ def test_omni_role_path_is_not_env_gated_or_clamped():
     assert d.alias_used == "@omni"
     assert d.model_override is None
     assert d.config.provider == "openai"
-    assert d.config.model == "omni-packet-endpoint"
+    assert d.config.model == "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"
     assert d.config.max_tokens == 1024
     assert d.config.direct_reply_template is None
 
