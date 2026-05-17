@@ -25,8 +25,10 @@ Covers:
     for the whole MCP surface.
   - /health body leaks no IP, no http(s) URL, no known internal port
     or hostname.
-  - model_status does not promote Omni or Vintage, even when a
-    Him-resident capability mirror tries to claim they are promoted.
+  - model_status treats the Him capability mirror as a non-authoritative
+    projection of `Him/spark/runtime.py:FLEET_COMPONENTS`. The mirror
+    can be absent, malformed, or hostile; in every case the local
+    fail-closed defaults hold and Omni / Vintage stay unpromoted.
 
 Run: python3 spark/tests/test_mcp_capability_truth.py
 """
@@ -264,28 +266,58 @@ class HealthCapabilityTests(unittest.TestCase):
 
 
 class ModelStatusRoleTests(unittest.TestCase):
-    def test_no_promotion_of_omni_or_vintage(self):
+    """The Him capability mirror is non-authoritative — a generated
+    projection of `Him/spark/runtime.py:FLEET_COMPONENTS`. These tests
+    pin that `model_status` falls back to local fail-closed defaults
+    whenever the mirror is absent, malformed, or hostile, and that the
+    no-promotion invariant for Omni and Vintage holds in every case."""
+
+    def test_fail_closed_when_mirror_absent(self):
+        """Mirror file does not exist on the Spark → local fail-closed
+        defaults; Omni and Vintage stay unpromoted; Super stays promoted;
+        the source label reports the non-authoritative posture."""
         fake = FakeSSH()
         fake.add("LLAMA SERVER", {"stdout": "llama running", "stderr": "", "exit_code": 0})
-        # No Him capability mirror present.
         fake.add("Him/spark/capability.json", {"stdout": "", "stderr": "no file", "exit_code": 1})
         with mock.patch.object(server, "run_ssh", fake):
             out = _run(server.handle_model_status({}))
         text = out["content"][0]["text"]
         self.assertIn("=== ROLES ===", text)
-        self.assertIn("omni:", text)
-        self.assertIn("vintage:", text)
+        self.assertIn("local-fail-closed-defaults", text)
+        self.assertIn("no mirror present", text)
         omni_line = next(l for l in text.splitlines() if l.startswith("omni:"))
         vintage_line = next(l for l in text.splitlines() if l.startswith("vintage:"))
         self.assertIn("promoted=False", omni_line)
         self.assertIn("fail_closed=True", omni_line)
         self.assertIn("promoted=False", vintage_line)
         self.assertIn("fail_closed=True", vintage_line)
-        # Super remains promoted (we do not modify Super behavior).
         super_line = next(l for l in text.splitlines() if l.startswith("super:"))
         self.assertIn("promoted=True", super_line)
 
-    def test_corrupted_him_mirror_cannot_promote_omni_or_vintage(self):
+    def test_fail_closed_when_mirror_malformed(self):
+        """Mirror file exists but contains non-JSON garbage → treated as
+        absent; local fail-closed defaults apply; Omni and Vintage are
+        not promoted; source label reports no mirror present."""
+        fake = FakeSSH()
+        fake.add("LLAMA SERVER", {"stdout": "", "stderr": "", "exit_code": 0})
+        fake.add("Him/spark/capability.json", {
+            "stdout": "<<<not json>>>",
+            "stderr": "",
+            "exit_code": 0,
+        })
+        with mock.patch.object(server, "run_ssh", fake):
+            out = _run(server.handle_model_status({}))
+        text = out["content"][0]["text"]
+        self.assertIn("local-fail-closed-defaults", text)
+        omni_line = next(l for l in text.splitlines() if l.startswith("omni:"))
+        vintage_line = next(l for l in text.splitlines() if l.startswith("vintage:"))
+        self.assertIn("promoted=False", omni_line)
+        self.assertIn("promoted=False", vintage_line)
+
+    def test_hostile_mirror_cannot_promote_omni_or_vintage(self):
+        """A hostile or corrupted mirror that claims Omni/Vintage are
+        promoted is locally re-sanitized: promoted=False, fail_closed=True.
+        The source label flags the projection as non-authoritative."""
         fake = FakeSSH()
         fake.add("LLAMA SERVER", {"stdout": "", "stderr": "", "exit_code": 0})
         evil = json.dumps({
@@ -298,10 +330,13 @@ class ModelStatusRoleTests(unittest.TestCase):
         with mock.patch.object(server, "run_ssh", fake):
             out = _run(server.handle_model_status({}))
         text = out["content"][0]["text"]
+        self.assertIn("him-mirror-projection (non-authoritative)", text)
         omni_line = next(l for l in text.splitlines() if l.startswith("omni:"))
         vintage_line = next(l for l in text.splitlines() if l.startswith("vintage:"))
         self.assertIn("promoted=False", omni_line)
+        self.assertIn("fail_closed=True", omni_line)
         self.assertIn("promoted=False", vintage_line)
+        self.assertIn("fail_closed=True", vintage_line)
 
 
 if __name__ == "__main__":

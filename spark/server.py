@@ -972,15 +972,19 @@ async def handle_sensorium(args: dict) -> dict:
     return {"content": [{"type": "text", "text": truncate_output(output)}]}
 
 
-# Path on the Spark to a Him-resident capability snapshot, if present.
-# We MIRROR this when available rather than maintaining a new ledger
-# here. Absence means we report role-aware defaults that still refuse to
-# promote Omni or Vintage.
-# Path on the Spark to a Him-resident capability snapshot, if present.
-# This is a *mirror* / projection — not the source of truth. The Him
-# repo holds the executable capability ledger; this surface only
-# reflects it locally and refuses to promote Omni/Vintage regardless of
-# what the mirror claims.
+# HIM_CAPABILITY_MIRROR_PATH — non-authoritative.
+#
+# This is a *generated / cache projection* of the authoritative ledger
+# in the Him repo (`Him/spark/runtime.py:FLEET_COMPONENTS`), nothing more.
+# It is never a source of truth. The MCP surface only reads it; it does
+# not write to it, does not derive promotion decisions from it, and
+# does not require it to exist. When the mirror file is absent,
+# unreadable, malformed, stale, or hostile, this module falls back to
+# the local fail-closed defaults in `_default_role_capabilities()`,
+# which keep Omni and Vintage unpromoted and `fail_closed=True`
+# regardless of anything the mirror might claim. The sanitizer in
+# `_sanitize_him_capabilities()` re-enforces those invariants even on
+# the happy path so a corrupted projection cannot leak through.
 HIM_CAPABILITY_MIRROR_PATH = os.environ.get(
     "HIM_CAPABILITY_MIRROR_PATH",
     os.environ.get("HIM_CAPABILITY_PATH", "~/Him/spark/capability.json"),
@@ -988,11 +992,14 @@ HIM_CAPABILITY_MIRROR_PATH = os.environ.get(
 
 
 def _default_role_capabilities() -> dict:
-    """Role-aware defaults. These never promote Omni or Vintage and never
-    alter Super behavior. They reflect the agreed organ posture:
+    """Local fail-closed defaults used when the Him capability *mirror*
+    (a generated projection of `Him/spark/runtime.py:FLEET_COMPONENTS`,
+    not a source of truth) is absent, malformed, stale, or hostile.
+    These never promote Omni or Vintage and never alter Super behavior.
+    They reflect the agreed organ posture:
       - super: promoted, but a semantic-gate follow-up may be required.
       - minilm: embedding-only.
-      - omni: diagnostic-only (unpromoted).
+      - omni: diagnostic-only (unpromoted, fail_closed).
       - vintage: unpromoted / ambiguous — fail closed.
     """
     return {
@@ -1020,9 +1027,14 @@ def _default_role_capabilities() -> dict:
 
 
 def _sanitize_him_capabilities(raw: dict) -> dict:
-    """Mirror Him capability truth, but enforce the no-promotion invariant
-    locally so a corrupted or stale Him file cannot accidentally promote
-    Omni or Vintage through this surface."""
+    """Project the non-authoritative Him capability mirror onto the local
+    role view, then enforce the no-promotion invariant. The mirror is a
+    cache/projection of `Him/spark/runtime.py:FLEET_COMPONENTS`; nothing
+    here treats it as truth. Any field for Omni or Vintage that claims
+    promotion is overwritten with `promoted=False, fail_closed=True`, so
+    a corrupted, stale, or hostile mirror cannot leak a promotion
+    through this surface. Returns the local fail-closed defaults
+    unchanged when `raw` is not a usable mapping."""
     out = _default_role_capabilities()
     if not isinstance(raw, dict):
         return out
@@ -1081,7 +1093,7 @@ async def handle_model_status(args: dict) -> dict:
 
     role_lines = [
         "=== ROLES ===",
-        f"source: {'mirrored-from-him' if mirrored else 'local-defaults-no-him-snapshot'}",
+        f"source: {'him-mirror-projection (non-authoritative)' if mirrored else 'local-fail-closed-defaults (no mirror present)'}",
         f"super:   promoted={roles['super'].get('promoted')} role={roles['super'].get('role')} note={roles['super'].get('note', '')}",
         f"minilm:  promoted={roles['minilm'].get('promoted')} role={roles['minilm'].get('role')}",
         f"omni:    promoted={roles['omni'].get('promoted')} role={roles['omni'].get('role')} fail_closed={roles['omni'].get('fail_closed')}",
