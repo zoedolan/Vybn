@@ -1,15 +1,32 @@
 """Tests for the bounded MCP capability-truth repair in spark/server.py.
 
+Why a new test home (the single new-file exception in this patch):
+    The other modules in `spark/tests/` exercise routing, chat-API,
+    harness, contracts, and refactors — none import `spark/server.py`
+    or test its MCP handlers. The handlers are the surface this patch
+    repairs (deep_search live-API truth, /health capability split,
+    model_status role mirroring), so the assertions only belong here.
+    Putting them in any of the existing files would require importing
+    `server.py` into a module whose subject is something else. One new
+    file scoped exactly to server-handler truth is the minimal addition.
+
 Covers:
   - handle_deep_search consults the live loopback memory API first.
   - The stale ~/vybn-phase/deep_memory.py path is no longer referenced
     as active code anywhere in the module.
   - On live-API failure, deep_search falls back to the absorbed Him
     phase path or fails closed honestly — never silently improvises.
+  - The Him-phase fallback shell command contains an absolute path
+    (the tilde is expanded against the Spark user's home); it does
+    NOT pass a single-quoted `~/...` literal that bash would refuse
+    to expand.
   - /health distinguishes gateway liveness from deep_search capability
-    (live | stale-fallback | fail-closed).
+    (live | stale-fallback | fail-closed) and does not overclaim "ok"
+    for the whole MCP surface.
+  - /health body leaks no IP, no http(s) URL, no known internal port
+    or hostname.
   - model_status does not promote Omni or Vintage, even when a
-    Him-resident capability snapshot tries to claim they are promoted.
+    Him-resident capability mirror tries to claim they are promoted.
 
 Run: python3 spark/tests/test_mcp_capability_truth.py
 """
@@ -20,6 +37,7 @@ import asyncio
 import importlib
 import json
 import os
+import re
 import sys
 import unittest
 from pathlib import Path
@@ -43,7 +61,7 @@ server = _load_server()
 
 
 def _run(coro):
-    return asyncio.get_event_loop().run_until_complete(coro) if False else asyncio.new_event_loop().run_until_complete(coro)
+    return asyncio.new_event_loop().run_until_complete(coro)
 
 
 class FakeSSH:
@@ -80,9 +98,7 @@ class DeepSearchLiveAPITests(unittest.TestCase):
             "exit_code": 0,
         })
         with mock.patch.object(server, "run_ssh", fake):
-            out = asyncio.new_event_loop().run_until_complete(
-                server.handle_deep_search({"query": "what is x"})
-            )
+            out = _run(server.handle_deep_search({"query": "what is x"}))
         self.assertFalse(out.get("isError"))
         text = out["content"][0]["text"]
         self.assertIn("[live deep_search]", text)
@@ -113,9 +129,7 @@ class DeepSearchLiveAPITests(unittest.TestCase):
             "exit_code": 0,
         })
         with mock.patch.object(server, "run_ssh", fake):
-            out = asyncio.new_event_loop().run_until_complete(
-                server.handle_deep_search({"query": "again"})
-            )
+            out = _run(server.handle_deep_search({"query": "again"}))
         self.assertFalse(out.get("isError"))
         text = out["content"][0]["text"]
         self.assertIn("absorbed Him phase fallback", text)
@@ -124,32 +138,43 @@ class DeepSearchLiveAPITests(unittest.TestCase):
         for _, cmd in fake.calls:
             self.assertNotIn("~/vybn-phase/deep_memory.py", cmd)
 
+    def test_him_phase_fallback_command_uses_absolute_path(self):
+        """Regression: the Him fallback used to pass a single-quoted
+        `~/Him/...` literal to the Spark's bash, which never expands.
+        The command actually issued must contain an absolute path
+        (e.g. /home/vybn/Him/spark/phase/deep_memory.py) and must NOT
+        contain a `~/` literal — single quotes prevent bash expansion."""
+        fake = FakeSSH()
+        # Force both arms to be attempted so we can inspect the Him command.
+        fake.add("__HTTP__", {"stdout": "", "stderr": "down", "exit_code": 7})
+        fake.add("deep_memory.py", {"stdout": "[]", "stderr": "", "exit_code": 0})
+        with mock.patch.object(server, "run_ssh", fake):
+            _run(server.handle_deep_search({"query": "probe"}))
+        him_calls = [c[1] for c in fake.calls if "deep_memory.py" in c[1]]
+        self.assertTrue(him_calls, "Him fallback command was not issued")
+        cmd = him_calls[0]
+        # Must reference an absolute home path for the configured user.
+        self.assertIn("/home/vybn/Him/spark/phase/deep_memory.py", cmd)
+        # Must NOT contain a literal `~/` anywhere — single-quoted tildes
+        # do not expand in bash, so this would silently fail in production.
+        self.assertNotIn("~/", cmd)
+
     def test_fails_closed_when_both_paths_down(self):
         fake = FakeSSH()
         fake.add("__HTTP__", {"stdout": "", "stderr": "curl: connection refused", "exit_code": 7})
-        fake.add("Him/spark/phase/deep_memory.py", {"stdout": "", "stderr": "no file", "exit_code": 1})
+        fake.add("deep_memory.py", {"stdout": "", "stderr": "no file", "exit_code": 1})
         with mock.patch.object(server, "run_ssh", fake):
-            out = asyncio.new_event_loop().run_until_complete(
-                server.handle_deep_search({"query": "anything"})
-            )
+            out = _run(server.handle_deep_search({"query": "anything"}))
         self.assertTrue(out.get("isError"))
         self.assertIn("unavailable", out["content"][0]["text"].lower())
         self.assertIn("failing closed", out["content"][0]["text"].lower())
 
     def test_validates_query_and_k(self):
-        # Empty query
-        out = asyncio.new_event_loop().run_until_complete(
-            server.handle_deep_search({"query": "   "})
-        )
+        out = _run(server.handle_deep_search({"query": "   "}))
         self.assertTrue(out.get("isError"))
-        # Bad k
-        out = asyncio.new_event_loop().run_until_complete(
-            server.handle_deep_search({"query": "ok", "k": "not-an-int"})
-        )
+        out = _run(server.handle_deep_search({"query": "ok", "k": "not-an-int"}))
         self.assertTrue(out.get("isError"))
-        out = asyncio.new_event_loop().run_until_complete(
-            server.handle_deep_search({"query": "ok", "k": 0})
-        )
+        out = _run(server.handle_deep_search({"query": "ok", "k": 0}))
         self.assertTrue(out.get("isError"))
 
 
@@ -159,7 +184,6 @@ class StaleDeepSearchPathReferenceTests(unittest.TestCase):
         active execution path anywhere in spark/server.py. Comments may
         legitimately mention it, but no run-able command should target it."""
         src = (SPARK_DIR / "server.py").read_text(encoding="utf-8")
-        # Scan code lines only — strip line comments.
         bad = []
         for lineno, line in enumerate(src.splitlines(), 1):
             code = line.split("#", 1)[0]
@@ -183,7 +207,10 @@ class HealthCapabilityTests(unittest.TestCase):
         self.assertIn("capabilities", data)
         self.assertIn("deep_search", data["capabilities"])
         self.assertEqual(data["capabilities"]["deep_search"]["state"], "live")
-        self.assertEqual(data["status"], "ok")
+        # /health rollup describes only what was probed — gateway-alive
+        # is the precise top-level statement, not an "ok" overclaim.
+        self.assertEqual(data["status"], "gateway-alive")
+        self.assertEqual(data["probed_capabilities_state"], "live")
 
     def test_health_reports_fail_closed_without_promoting(self):
         async def probe_fc():
@@ -193,11 +220,12 @@ class HealthCapabilityTests(unittest.TestCase):
             client = TestClient(server.app)
             resp = client.get("/health")
         data = resp.json()
-        # gateway is alive (handler ran), tool truth is degraded — these
-        # must not be conflated.
         self.assertTrue(data["gateway"]["alive"])
         self.assertEqual(data["capabilities"]["deep_search"]["state"], "fail-closed")
-        self.assertEqual(data["status"], "degraded")
+        # Top-level rollup remains "gateway-alive" — it never asserts
+        # whole-surface health. Capability state is the separate axis.
+        self.assertEqual(data["status"], "gateway-alive")
+        self.assertEqual(data["probed_capabilities_state"], "fail-closed")
 
     def test_health_does_not_leak_topology(self):
         async def probe_live():
@@ -207,27 +235,46 @@ class HealthCapabilityTests(unittest.TestCase):
             client = TestClient(server.app)
             resp = client.get("/health")
         body = resp.text
-        # No external IPs, no tailscale hostnames, no API URL with port.
+        # Hand-rolled forbidden list (known internal coordinates).
         for forbidden in ("tailscale", "ts.net", "8100", "8420", "127.0.0.1"):
             self.assertNotIn(forbidden, body, f"leaked '{forbidden}' in /health body")
+        # Generic shape checks: no dotted-quad IP, no http(s) URL.
+        self.assertIsNone(re.search(r"\b\d{1,3}(?:\.\d{1,3}){3}\b", body),
+                          f"/health leaked an IP-shaped string: {body!r}")
+        self.assertIsNone(re.search(r"https?://", body),
+                          f"/health leaked a URL: {body!r}")
+
+    def test_health_probe_is_bounded(self):
+        """If the probe hangs, /health must time out cleanly (fail-closed),
+        never block the gateway response indefinitely."""
+        async def slow_probe():
+            await asyncio.sleep(10)
+            return {"state": "live", "via": "loopback-memory-api"}
+        # Patch the inner probe call and tighten the budget for the test.
+        with mock.patch.object(server, "_probe_memory_api_readiness", lambda m: slow_probe()), \
+             mock.patch.object(server, "_deep_search_via_him_phase", lambda *a, **kw: slow_probe()), \
+             mock.patch.object(server, "HEALTH_PROBE_BUDGET_S", 0.1):
+            from starlette.testclient import TestClient
+            client = TestClient(server.app)
+            resp = client.get("/health")
+        data = resp.json()
+        self.assertEqual(data["capabilities"]["deep_search"]["state"], "fail-closed")
+        self.assertEqual(data["capabilities"]["deep_search"].get("reason"),
+                         "probe-budget-exceeded")
 
 
 class ModelStatusRoleTests(unittest.TestCase):
     def test_no_promotion_of_omni_or_vintage(self):
         fake = FakeSSH()
         fake.add("LLAMA SERVER", {"stdout": "llama running", "stderr": "", "exit_code": 0})
-        # No Him capability file present.
+        # No Him capability mirror present.
         fake.add("Him/spark/capability.json", {"stdout": "", "stderr": "no file", "exit_code": 1})
         with mock.patch.object(server, "run_ssh", fake):
-            out = asyncio.new_event_loop().run_until_complete(
-                server.handle_model_status({})
-            )
+            out = _run(server.handle_model_status({}))
         text = out["content"][0]["text"]
-        # Find role lines.
         self.assertIn("=== ROLES ===", text)
         self.assertIn("omni:", text)
         self.assertIn("vintage:", text)
-        # Omni and Vintage must not be promoted.
         omni_line = next(l for l in text.splitlines() if l.startswith("omni:"))
         vintage_line = next(l for l in text.splitlines() if l.startswith("vintage:"))
         self.assertIn("promoted=False", omni_line)
@@ -238,7 +285,7 @@ class ModelStatusRoleTests(unittest.TestCase):
         super_line = next(l for l in text.splitlines() if l.startswith("super:"))
         self.assertIn("promoted=True", super_line)
 
-    def test_corrupted_him_cannot_promote_omni_or_vintage(self):
+    def test_corrupted_him_mirror_cannot_promote_omni_or_vintage(self):
         fake = FakeSSH()
         fake.add("LLAMA SERVER", {"stdout": "", "stderr": "", "exit_code": 0})
         evil = json.dumps({
@@ -249,9 +296,7 @@ class ModelStatusRoleTests(unittest.TestCase):
         })
         fake.add("Him/spark/capability.json", {"stdout": evil, "stderr": "", "exit_code": 0})
         with mock.patch.object(server, "run_ssh", fake):
-            out = asyncio.new_event_loop().run_until_complete(
-                server.handle_model_status({})
-            )
+            out = _run(server.handle_model_status({}))
         text = out["content"][0]["text"]
         omni_line = next(l for l in text.splitlines() if l.startswith("omni:"))
         vintage_line = next(l for l in text.splitlines() if l.startswith("vintage:"))

@@ -95,26 +95,30 @@ roles:
 
   vintage:
     provider: openai
-    model: vintage-1930-guarded-local
-    base_url: http://127.0.0.1:8019/v1
-    max_tokens: 512
-    max_iterations: 1
+    model: nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
+    base_url: http://127.0.0.1:8000/v1
+    max_tokens: 1024
+    max_iterations: 3
     temperature: 0.3
     tools: []
     rag: false
     lightweight: true
-    direct_reply_template: "VINTAGE_UNAVAILABLE: @vintage has no reachable semantic-gated local chat model right now. I will not call this Super, will not use GPT fallback, and will not substitute a deterministic status/canary endpoint. Missing capability: live model backend, endpoint readiness, semantic 1930/invariants smoke, routed workload proof, owner, and rollback."
+    # Honest alias: until a semantic-gated Vintage chat model exists, @vintage
+    # routes to live local Super so friend-contact is not walled off. Route
+    # label shows Super as speaker.
   omni:
     provider: openai
-    model: omni-perception-packet-local
-    base_url: http://127.0.0.1:8020/v1
+    model: nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
+    base_url: http://127.0.0.1:8000/v1
     max_tokens: 1024
-    max_iterations: 1
+    max_iterations: 3
     temperature: 0.2
     tools: []
     rag: false
     lightweight: true
-    direct_reply_template: "OMNI_UNAVAILABLE: @omni is only a diagnostic/perception packet endpoint right now, not a semantic-gated multimodal chat model. I will not use Super, GPT fallback, or a deterministic packet response as if it were Omni chatting. Missing capability: promoted multimodal backend, semantic gate, routed use, owner, and rollback."
+    # Honest alias: until a promoted multimodal Omni chat model exists, @omni
+    # routes to live local Super so friend-contact is not walled off. Route
+    # label shows Super as speaker.
   # Local-private — explicit local exception to the GPT-5.5 default.
   local_private:
     provider: openai
