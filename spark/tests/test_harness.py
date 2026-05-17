@@ -1317,12 +1317,12 @@ def test_build_layered_prompt_passes_latest_pressure_text(monkeypatch, tmp_path)
 
 
 
-def test_whole_situation_packet_replaces_raw_continuity_sprawl(tmp_path):
+def test_whole_situation_packet_replaces_raw_continuity_sprawl(tmp_path, monkeypatch):
     from spark.harness import substrate
-    soul, cont, spark_cont = (tmp_path / n for n in ("vybn.md", "continuity.md", "spark.md"))
-    soul.write_text("soul"); cont.write_text("continuity root " * 500); spark_cont.write_text("spark debt " * 500)
+    soul, cont, spark_cont = (tmp_path / n for n in ("vybn.md", "continuity.md", "spark.md")); him = tmp_path / "Him"; him.mkdir()
+    (him / "README.md").write_text("# Him -- grounded continuity workbench\nhardware is central grounding for the continuity experiment\n"); soul.write_text("soul"); cont.write_text("continuity root " * 500); spark_cont.write_text("spark debt " * 500); monkeypatch.setattr(substrate.Path, "home", lambda: tmp_path)
     prompt = substrate.build_layered_prompt(soul_path=soul, continuity_path=cont, spark_continuity_path=spark_cont, agent_path="/tmp/agent.py", model_label="test", max_iterations=1, include_hardware_check=False, latest_pressure_text="perception self-assembles before action").substrate
-    assert "WHOLE SITUATION PACKET (CURRENT)" in prompt and "perception self-assembles before action" in prompt
+    assert all(x in prompt for x in ("WHOLE SITUATION PACKET (CURRENT)", "perception self-assembles before action", "Him grounded-continuity hypothesis:", "hardware is central grounding for the continuity experiment"))
     assert "SPARK CONTINUITY" not in prompt and "CONTINUITY NOTE" not in prompt and len(prompt) < 34000
 
 

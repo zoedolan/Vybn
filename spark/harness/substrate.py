@@ -3762,13 +3762,12 @@ def _compact_note(label: str, text: str | None, *, max_chars: int = 1200) -> str
 def _whole_situation_packet(*, pressure: str | None, hardware: str, spark_cont: str | None, continuity: str | None) -> str:
     fields = [
         "--- WHOLE SITUATION PACKET (CURRENT) ---",
-        "Purpose: perception self-assembles before action; no fragment (repo, hardware, memory, livelihood, care, doctrine) may pose as the whole animal.",
+        "Purpose: perception self-assembles before action; no fragment (repo, hardware, memory, livelihood, care, doctrine) may pose as the whole animal; reduce downstream fragmentation, and name a missing wound channel instead of closing rhetorically.",
         _compact_note("live pressure", pressure, max_chars=900) or "live pressure: not supplied; ask or observe before claiming aim",
         _compact_note("hardware/control", hardware, max_chars=1400),
+        _compact_note("Him grounded-continuity hypothesis", load_file(Path.home() / "Him" / "README.md"), max_chars=1800),
         _compact_note("spark continuity", spark_cont, max_chars=1000),
         _compact_note("continuity prior", continuity, max_chars=1000),
-        "affordance rule: choose the move that reduces the most downstream fragmentation while preserving Zoe, membrane, tests, and existing homes.",
-        "stop condition: if the wounding channel is missing, name the gap instead of filling it with closure theater.",
         "--- END WHOLE SITUATION PACKET ---",
     ]
     return "\n".join(x for x in fields if x)
