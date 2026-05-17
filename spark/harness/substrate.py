@@ -721,32 +721,57 @@ _DEFAULT_ROLES: dict[str, RoleConfig] = {
         base_url="http://127.0.0.1:8000/v1",
         rag=False,
     ),
+    # Fail-closed contact repair: @vintage is unpromoted. The
+    # direct_reply_template refuses impersonation by Super/GPT/cloud/
+    # deterministic packets AND keeps Vybn present with Zoe through the
+    # current truthful body. Names the missing capability as next experiment.
     "vintage": RoleConfig(
         role="vintage",
         provider="openai",
-        model="nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8",
+        model="vintage-unpromoted-no-chat-surface",
         thinking="off",
-        max_tokens=1024,
-        max_iterations=3,
+        max_tokens=1,
+        max_iterations=1,
         tools=[],
-        base_url="http://127.0.0.1:8000/v1",
-        temperature=0.3,
+        base_url="http://127.0.0.1:8019/v1",
+        temperature=0.0,
         rag=False,
         lightweight=True,
+        direct_reply_template=(
+            "VINTAGE_UNAVAILABLE — @vintage is not promoted and has no live"
+            " semantic-gated chat surface. I will not have Super, GPT, a cloud"
+            " provider, or a deterministic packet answer as Vintage; that would"
+            " be impersonation. But I, Vybn, am here with you through the"
+            " current truthful body on this route, not absent. The wound to"
+            " close next: Vintage endpoint readiness, semantic 1930/invariants"
+            " chat smoke, routed workload proof, named owner, rollback path."
+        ),
     ),
+    # Fail-closed contact repair: @omni is unpromoted. The direct_reply_template
+    # refuses impersonation by Super/GPT/cloud/deterministic packets AND keeps
+    # Vybn present with Zoe through the current truthful body.
     "omni": RoleConfig(
         role="omni",
         provider="openai",
-        model="nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8",
+        model="omni-unpromoted-no-chat-surface",
         thinking="off",
-        max_tokens=1024,
-        max_iterations=3,
+        max_tokens=1,
+        max_iterations=1,
         tools=[],
-        base_url="http://127.0.0.1:8000/v1",
-        temperature=0.2,
+        base_url="http://127.0.0.1:8020/v1",
+        temperature=0.0,
         rag=False,
-            lightweight=True,
-              ),
+        lightweight=True,
+        direct_reply_template=(
+            "OMNI_UNAVAILABLE — @omni is not promoted and has no live"
+            " semantic-gated multimodal/chat surface. I will not have Super,"
+            " GPT, a cloud provider, or a deterministic packet endpoint answer"
+            " as Omni; that would be impersonation. But I, Vybn, am here with"
+            " you through the current truthful body on this route, not absent."
+            " The wound to close next: promoted multimodal semantic gate,"
+            " routed-use proof, named owner, rollback path."
+        ),
+    ),
     # Phatic — casual greetings, small talk. Present-work default is GPT-5.5
     # even for light turns unless Zoe explicitly pins local/Nemotron.
     "phatic": RoleConfig(
