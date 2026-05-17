@@ -1009,8 +1009,8 @@ def run_agent_loop(
                     "Start the Omni endpoint on the peer Spark and "
                     "export VYBN_OMNI_URL=http://<host>:<port>/v1 "
                     "before retrying. This turn will not silently "
-                    "fall back to Super (:8000) — Super topology is "
-                    "preserved.]"
+                    "fall back to Super (:8000) — Super is the main local model surface, "
+                    "not the main substrate.]"
                 )
             override_model = (
                 os.environ.get("VYBN_OMNI_MODEL") or override_model

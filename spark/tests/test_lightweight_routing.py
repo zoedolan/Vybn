@@ -1006,7 +1006,7 @@ def test_omni_perception_preamble_runs_on_explicit_omni_turn(tmp_path=None):
 def test_omni_perception_skipped_when_url_unset():
     """If VYBN_OMNI_URL is unset, the @omni turn refuses with the
     explicit error envelope and the perception path is never opened —
-    even if VYBN_OMNI_PERCEPTION points at a real file. Super topology
+    even if VYBN_OMNI_PERCEPTION points at a real file. Super is the main local model surface, not the main substrate; local topology
     is preserved (no provider call)."""
     import importlib.util as _ilu
     import os as _os

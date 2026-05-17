@@ -933,8 +933,8 @@ _DEFAULT_MODEL_ALIASES: dict[str, str] = {
     # the user explicitly prefixes a turn with @omni AND the operator has
     # exported VYBN_OMNI_URL pointing at a started Omni endpoint. The alias
     # is intentionally absent from heuristics, directives, fallback_chain,
-    # and ordinary chat routing so Super topology (always-on, both Sparks)
-    # is never silently interrupted. Without VYBN_OMNI_URL the alias surfaces
+    # and ordinary chat routing so Super stays the main local model surface,
+    # not the main substrate, and is never silently substituted for Omni. Without VYBN_OMNI_URL the alias surfaces
     # an explicit error rather than falling back to Super's :8000. Optional
     # VYBN_OMNI_MODEL overrides the default model id below. Optional
     # VYBN_OMNI_PERCEPTION=<path> rides a bounded operator-supplied
