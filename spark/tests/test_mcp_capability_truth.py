@@ -274,6 +274,62 @@ class HealthCapabilityTests(unittest.TestCase):
         self.assertTrue(data["gateway"]["alive"])
         self.assertEqual(data["status"], "gateway-alive")
 
+    def test_readiness_witness_uses_search_endpoint_not_healthz(self):
+        """The deep_search readiness witness must hit the same loopback
+        endpoint the tool itself uses (POST /search), not a separate
+        liveness route. Live observation: the memory service exposes
+        /health and /search but not /healthz — so a /healthz pre-check
+        404s, the probe falls through to the Him-phase fallback, and
+        /health reports `stale-fallback` even though the real tool is
+        answering live. Pin: the issued shell command must be a POST
+        to DEEP_SEARCH_API_URL with a minimal `__health__` body, and a
+        2xx response must yield state=live."""
+        fake = FakeSSH()
+        # Witness command: POST /search with __health__ body returns 200.
+        fake.add("__health__", {
+            "stdout": "200",
+            "stderr": "",
+            "exit_code": 0,
+        })
+        with mock.patch.object(server, "run_ssh", fake):
+            ready = _run(server._probe_memory_api_readiness("spark-1"))
+        self.assertTrue(ready, "2xx from POST /search must be witnessed as live")
+        # Exactly one SSH command was issued, and it must:
+        #   - POST (not GET) to the search endpoint the tool itself uses
+        #   - carry the minimal __health__ probe body with k=1
+        #   - NOT reach for /healthz, which the memory service does not expose
+        self.assertEqual(len(fake.calls), 1)
+        cmd = fake.calls[0][1]
+        self.assertIn("-X POST", cmd)
+        self.assertIn("__health__", cmd)
+        self.assertIn('"k": 1', cmd)
+        self.assertIn(server.DEEP_SEARCH_API_URL, cmd)
+        self.assertNotIn("/healthz", cmd)
+
+    def test_health_live_via_search_witness_does_not_fall_back(self):
+        """End-to-end: when the search-witness succeeds, /health reports
+        state=live via loopback-memory-api and never invokes the Him-phase
+        fallback. This is the case that was misreporting `stale-fallback`
+        live — pin it shut."""
+        fake = FakeSSH()
+        fake.add("__health__", {"stdout": "200", "stderr": "", "exit_code": 0})
+        # If the fallback is ever called we'd see "deep_memory.py" in calls;
+        # we explicitly do NOT register a response for it. The default
+        # response (exit_code 1) would still cause `state=fail-closed`,
+        # so a live witness must short-circuit before that path.
+        with mock.patch.object(server, "run_ssh", fake):
+            from starlette.testclient import TestClient
+            client = TestClient(server.app)
+            resp = client.get("/health")
+        data = resp.json()
+        self.assertEqual(data["capabilities"]["deep_search"]["state"], "live")
+        self.assertEqual(data["capabilities"]["deep_search"].get("via"),
+                         "loopback-memory-api")
+        self.assertEqual(data["probed_capabilities_state"], "live")
+        # Fallback path must not have been touched on the live happy path.
+        for _, cmd in fake.calls:
+            self.assertNotIn("deep_memory.py", cmd)
+
 
 class ModelStatusRoleTests(unittest.TestCase):
     """The Him capability mirror is non-authoritative — a generated
