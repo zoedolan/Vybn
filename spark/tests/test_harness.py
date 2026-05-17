@@ -2761,3 +2761,26 @@ def test_semantic_web_declares_positive_alignment_residual_protocol_without_priv
     assert "~/.config" not in dumped and "events.jsonl" not in dumped
     assert "Zoe-private context stay local/private" in dumped
     assert "Capability lattice" in Path(substrate.__file__).read_text()
+
+class OpsecHookInstallAuditTest(unittest.TestCase):
+    def test_opsec_hooks_must_match_tracked_and_be_executable(self):
+        import tempfile
+        from pathlib import Path
+        from spark.harness import substrate
+
+        with tempfile.TemporaryDirectory() as d:
+            repo = Path(d) / "Vybn"
+            tracked = repo / ".githooks"
+            installed = repo / ".git" / "hooks"
+            tracked.mkdir(parents=True)
+            installed.mkdir(parents=True)
+            for name in ("pre-commit", "pre-push"):
+                (tracked / name).write_text("#!/usr/bin/env bash\nexit 0\n")
+                dst = installed / name
+                dst.write_text((tracked / name).read_text())
+                dst.chmod(0o755)
+
+            self.assertTrue(substrate.opsec_hooks_installed(repo))
+            (installed / "pre-push").write_text("#!/usr/bin/env bash\nexit 1\n")
+            (installed / "pre-push").chmod(0o755)
+            self.assertFalse(substrate.opsec_hooks_installed(repo))
