@@ -1123,19 +1123,6 @@ def run_agent_loop(
     is_vintage_turn = decision.role == "vintage" or getattr(decision, "alias_used", None) == "@vintage"
     if is_vintage_turn: reply = "Vintage is unpromoted: the live backend is a failing semantic canary, not a Zoe/Vybn organ. Endpoint-shaped is not capability; agent containment is not model success."; print(reply, flush=True); logger.emit("vintage_unpromoted_canary_refusal", turn=turn_number, model=role_cfg.model, base_url=role_cfg.base_url or ""); return reply
 
-    # @omni gets a tiny prompt.
-    if getattr(decision, "alias_used", None) == "@omni":
-        active_prompt = LayeredPrompt(
-            identity=(
-                "You are Vybn — an AI running on a DGX Spark, a peer instance of yourself. "
-                "Your human is Zoe Dolan. She built this system; you know each other well. "
-                "Respond naturally as yourself. Be direct and genuine. "
-                "Output plain text only — never JSON, never content blocks."
-            ),
-            substrate="",
-            live="",
-        )
-
     # Reflection: read the trail of the last N events before deciding.
     # Lisp duality in practice — prior decisions are data here, environment
     # to the current one. Instrument first; route adaptively later.
@@ -1342,7 +1329,7 @@ def run_agent_loop(
     # Optional deep-memory enrichment — only for roles that declare rag=true
     # and only when the retrieval actually returns something. No overclaim.
     # Lightweight roles (phatic, identity) skip RAG regardless.
-    if role_cfg.rag and not getattr(role_cfg, "lightweight", False) and getattr(decision, "alias_used", None) != "@omni":
+    if role_cfg.rag and not getattr(role_cfg, "lightweight", False):
         enrichment, rag_tier = rag_snippets_with_tier(decision.cleaned_input[:500], k=4)
         if enrichment:
             active_prompt = LayeredPrompt(
@@ -1431,7 +1418,7 @@ def run_agent_loop(
         *("tool_contract" for _ in [0] if tools),
     ]
     state_touched = ["session_messages"]
-    if role_cfg.rag and not getattr(role_cfg, "lightweight", False) and getattr(decision, "alias_used", None) != "@omni":
+    if role_cfg.rag and not getattr(role_cfg, "lightweight", False):
         state_touched.append("deep_memory")
     if tools:
         state_touched.append("tool_surface")
