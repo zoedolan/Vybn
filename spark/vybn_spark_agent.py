@@ -688,7 +688,7 @@ def _format_super_maintenance_notice(
             pass
     if cause == "refused":
         head = (
-            "[Super is briefly unreachable — endpoint refused this turn. "
+            "[Local organ endpoint is unreachable — no fallback was used; paused briefly. "
             "Resuming shortly; please retry."
         )
     else:
