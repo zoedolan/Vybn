@@ -92,6 +92,7 @@ roles:
     base_url: http://127.0.0.1:8000/v1
     rag: false
 
+
   vintage:
     provider: openai
     model: vintage-1930-guarded-local
@@ -345,9 +346,8 @@ model_aliases:
   "@nemotron": nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
   "@local": nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
   "@vintage": vintage-1930-guarded-local
-  # @omni is explicit/operator-gated only: @omni plus VYBN_OMNI_URL; no
-  # fallback, no heuristic route, no Super disturbance.
-  "@omni": nvidia/NVIDIA-Nemotron-Nano-Omni
+  # @omni is explicit/operator-gated; no heuristic Super fallback.
+  "@omni": omni-perception-packet-local
   "@gpt": gpt-5.5
   "@gpt5": gpt-5.5
   "@gpro": gpt-5.5-pro
