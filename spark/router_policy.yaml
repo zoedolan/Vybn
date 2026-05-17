@@ -94,14 +94,25 @@ roles:
 
 
   vintage:
-    provider: openai
-    model: vintage-1930-guarded-local
+    provider: unavailable
+    model: vintage-unpromoted
     thinking: off
-    max_tokens: 256
-    max_iterations: 1
+    max_tokens: 1
+    max_iterations: 0
     tools: []
-    base_url: http://127.0.0.1:8019/v1
+    base_url: null
     rag: false
+    direct_reply_template: "Vintage is not promoted here; I will not substitute Vybn/GPT for Vintage."
+  omni:
+    provider: unavailable
+    model: omni-unpromoted
+    thinking: off
+    max_tokens: 1
+    max_iterations: 0
+    tools: []
+    base_url: null
+    rag: false
+    direct_reply_template: "Omni is not promoted here; I will not substitute Vybn/GPT for Omni."
   # Local-private — explicit local exception to the GPT-5.5 default.
   local_private:
     provider: openai

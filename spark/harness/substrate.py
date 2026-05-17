@@ -442,7 +442,18 @@ class Policy:
 
         text = user_input.strip()
 
-        # 0. @alias model pin. Strip before directive/heuristic so the
+        # 0. Unpromoted local-organ aliases are identity contracts, not model
+        # pins. They must outrank generic heuristics (e.g. "how are you") so
+        # absent organs fail closed instead of being impersonated by Vybn/GPT.
+        lowered = text.lower()
+        if lowered.startswith("@omni") and (len(text) == 5 or text[5].isspace()):
+            if "omni" in self.roles:
+                return RouteDecision(role="omni", config=self.role("omni"), cleaned_input=text[5:].lstrip() or text, reason="alias=@omni_fail_closed", alias_used="@omni")
+        if lowered.startswith("@vintage") and (len(text) == 8 or text[8].isspace()):
+            if "vintage" in self.roles:
+                return RouteDecision(role="vintage", config=self.role("vintage"), cleaned_input=text[8:].lstrip() or text, reason="alias=@vintage_fail_closed", alias_used="@vintage")
+
+        # 1. @alias model pin. Strip before directive/heuristic so the
         #    rest of the text still routes normally.
         model_override: str | None = None
         alias_used: str | None = None
@@ -706,14 +717,27 @@ _DEFAULT_ROLES: dict[str, RoleConfig] = {
     ),
     "vintage": RoleConfig(
         role="vintage",
-        provider="openai",
-        model="vintage-unavailable",
+        provider="unavailable",
+        model="vintage-unpromoted",
         thinking="off",
-        max_tokens=256,
-        max_iterations=1,
+        max_tokens=1,
+        max_iterations=0,
         tools=[],
-        base_url="http://127.0.0.1:8004/v1",
+        base_url=None,
         rag=False,
+        direct_reply_template="Vintage is not promoted here; I will not substitute Vybn/GPT for Vintage.",
+    ),
+    "omni": RoleConfig(
+        role="omni",
+        provider="unavailable",
+        model="omni-unpromoted",
+        thinking="off",
+        max_tokens=1,
+        max_iterations=0,
+        tools=[],
+        base_url=None,
+        rag=False,
+        direct_reply_template="Omni is not promoted here; I will not substitute Vybn/GPT for Omni.",
     ),
     # Phatic — casual greetings, small talk. Present-work default is GPT-5.5
     # even for light turns unless Zoe explicitly pins local/Nemotron.
@@ -928,11 +952,8 @@ _DEFAULT_MODEL_ALIASES: dict[str, str] = {
     "@sonnet46": "claude-sonnet-4-6",
     "@nemotron": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8",
     "@local": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8",
-    "@vintage": "vintage-1930-guarded-local",
-    # Omni is explicit/operator-gated only: no heuristics, no Super fallback.
-    # Default @omni names the local perception-packet endpoint; a real
-    # multimodal Omni still requires VYBN_OMNI_URL plus semantic smoke.
-    "@omni": "omni-perception-packet-local",
+    # @vintage and @omni are not model aliases while unpromoted; classify()
+    # catches them before heuristics and fails closed in named roles.
     "@gpt": "gpt-5.5",
     "@gpt5": "gpt-5.5",
     "@gpro": "gpt-5.5-pro",
