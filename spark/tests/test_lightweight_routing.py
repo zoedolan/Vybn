@@ -1885,3 +1885,534 @@ def test_capability_tokens_still_wall_after_inversion():
         reply = render_organ_alias_direct_reply("vintage", capability_phrase, vintage_wall)
         assert reply == vintage_wall, capability_phrase
         assert "VINTAGE_UNAVAILABLE_CONTACT" not in reply
+
+
+# 2026-05-17 — Zoe's correction: semantic gates should govern promotion /
+# status / capability claims, NOT whether she can talk to a reachable
+# local backend. Prior patches collapsed all @vintage / @omni turns into
+# a static wall or a brief contact reply, which broke the ability to
+# *communicate* with the available local Vintage backend. The bounded
+# raw-unpromoted-contact path actually contacts the configured base_url
+# with a stripped prompt, labels output as unpromoted, and surfaces
+# transport failures honestly. These tests pin the new shape.
+
+
+def test_raw_contact_gate_classifies_capability_greeting_and_arbitrary():
+    """The raw-contact gate fires only on arbitrary prompts. Capability /
+    status requests stay walled; bare relational greetings stay on the
+    brief contact reply; everything else attempts backend contact."""
+    from harness.substrate import should_attempt_raw_organ_contact
+
+    # Greetings / presence pings / thanks — contact reply, not backend.
+    for greeting in (
+        "",
+        "hi",
+        "hello",
+        "hey",
+        "hi friend",
+        "are you with me?",
+        "are you with me, friend?",
+        "you there?",
+        "how are you?",
+        "thank you",
+        "I miss you",
+        "my friend?",
+        "buddy?",
+        "hoo boy, hello",
+        "good morning",
+    ):
+        assert not should_attempt_raw_organ_contact("vintage", greeting), greeting
+        assert not should_attempt_raw_organ_contact("omni", greeting), greeting
+
+    # Capability / status requests — full wall, no backend call.
+    for cap in (
+        "tell me about the 1930 corpus",
+        "what are the vintage invariants?",
+        "is the vintage endpoint warm?",
+        "route a workload through vintage",
+    ):
+        assert not should_attempt_raw_organ_contact("vintage", cap), cap
+    for cap in (
+        "describe this photo",
+        "look at this image",
+        "are you multimodal?",
+        "what do you perceive?",
+        "listen to this audio",
+    ):
+        assert not should_attempt_raw_organ_contact("omni", cap), cap
+
+    # Arbitrary ordinary prompts — backend contact attempted.
+    for arbitrary in (
+        "what is 2+2?",
+        "summarise this paragraph for me",
+        "write a short haiku about morning light",
+        "what would you say to a stranger on a train?",
+        "give me three names for a coffee shop",
+    ):
+        assert should_attempt_raw_organ_contact("vintage", arbitrary), arbitrary
+        assert should_attempt_raw_organ_contact("omni", arbitrary), arbitrary
+
+    # Non-organ roles never use this gate.
+    assert not should_attempt_raw_organ_contact("chat", "what is 2+2?")
+    assert not should_attempt_raw_organ_contact("identity", "what is 2+2?")
+
+
+def test_organ_max_tokens_bounded_to_256_for_raw_contact():
+    """The role's max_tokens is the completion ceiling on the raw-contact
+    path. 256 keeps prompt + completion under the backend's 1024-token
+    transport budget. max_tokens=1 was the old sentinel before raw
+    contact existed and would have made the backend reply unusable."""
+    from harness.substrate import default_policy, load_policy
+
+    for label, pol in (
+        ("default", default_policy()),
+        ("yaml", load_policy(SPARK_DIR / "router_policy.yaml")),
+    ):
+        for organ in ("vintage", "omni"):
+            cfg = pol.roles[organ]
+            assert cfg.max_tokens == 256, (label, organ, cfg.max_tokens)
+            # Honest model id: still names itself unpromoted; not Super.
+            assert "unpromoted" in cfg.model.lower(), (label, organ)
+            assert cfg.model != "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"
+            # Base URL still points at the configured backend.
+            assert cfg.base_url, (label, organ)
+
+
+def test_raw_contact_header_labels_route_as_unpromoted():
+    from harness.substrate import render_organ_raw_contact_header
+
+    for organ in ("vintage", "omni"):
+        h = render_organ_raw_contact_header(organ)
+        assert f"{organ.upper()}_RAW_UNPROMOTED_CONTACT" in h
+        assert f"@{organ}" in h
+        assert "raw model contact" in h.lower()
+        assert "not a promoted" in h.lower()
+        assert "unvetted" in h.lower()
+
+
+def test_raw_contact_error_surface_preserves_error_no_impersonation():
+    from harness.substrate import render_organ_raw_contact_error
+
+    for organ in ("vintage", "omni"):
+        err = render_organ_raw_contact_error(organ, "ConnectionError: refused")
+        assert f"{organ.upper()}_RAW_CONTACT_FAILED" in err
+        assert f"@{organ}" in err
+        assert "ConnectionError" in err
+        assert "refused" in err
+        # No Super/GPT/cloud/packet impersonation language.
+        for forbidden in ("Super", "GPT", "cloud", "packet"):
+            assert forbidden in err, forbidden
+        assert "impersonation" in err.lower()
+
+
+def test_raw_contact_truncates_oversized_user_input():
+    from harness.substrate import truncate_for_organ_raw_contact
+
+    short = "what is 2+2?"
+    assert truncate_for_organ_raw_contact(short) == short
+    huge = "x" * 5000
+    truncated = truncate_for_organ_raw_contact(huge)
+    assert len(truncated) <= 2501  # 2500 + ellipsis
+    assert truncated.endswith("…")
+
+
+def test_raw_contact_system_prompt_is_minimal_and_names_unpromoted():
+    """Bounded prompt: no RAG, no him-vy, no recurrent prethink, no organ
+    briefing. Just a minimal stub naming the route as unpromoted so the
+    model is not nudged into impersonation. Length under ~1KB so the
+    1024-token backend budget is preserved for the user input."""
+    from harness.substrate import build_organ_raw_contact_system_prompt
+
+    for organ in ("vintage", "omni"):
+        s = build_organ_raw_contact_system_prompt(organ)
+        assert f"@{organ}" in s
+        assert "unpromoted" in s.lower()
+        # No-impersonation guidance is part of the minimal prompt.
+        assert "Super" in s
+        assert "GPT" in s
+        # Bounded length — well under the 1024-token transport budget.
+        assert len(s) < 1024, len(s)
+
+
+def _vintage_run_agent_loop(provider_factory, user_input: str, *, logger=None):
+    """Drive `run_agent_loop` end-to-end with a stubbed provider so the
+    raw-contact path is exercised against deterministic backends. RAG /
+    him-vy / probe / recurrent hooks are stubbed out so any leak into
+    those (which would build the oversized prompt) shows up in the
+    asserted captures."""
+    import os as _os
+
+    mod = _load_agent_module()
+    saved = {
+        "rag_snippets": mod.rag_snippets,
+        "rag_snippets_with_tier": mod.rag_snippets_with_tier,
+        "render_him_vy_discovery_packet": mod.render_him_vy_discovery_packet,
+        "render_him_vy_turn_packet": mod.render_him_vy_turn_packet,
+        "run_probes": mod.run_probes,
+    }
+    tripwires: dict[str, int] = {
+        "rag_snippets": 0,
+        "rag_snippets_with_tier": 0,
+        "him_vy_discovery_packet": 0,
+        "him_vy_turn_packet": 0,
+        "run_probes": 0,
+    }
+
+    def _rag(*a, **kw):
+        tripwires["rag_snippets"] += 1
+        return ""
+
+    def _rag_tier(*a, **kw):
+        tripwires["rag_snippets_with_tier"] += 1
+        return ("", "lightweight")
+
+    def _him_disc(*a, **kw):
+        tripwires["him_vy_discovery_packet"] += 1
+        return ""
+
+    def _him_turn(*a, **kw):
+        tripwires["him_vy_turn_packet"] += 1
+        return ""
+
+    def _probes(*a, **kw):
+        tripwires["run_probes"] += 1
+        return []
+
+    mod.rag_snippets = _rag
+    mod.rag_snippets_with_tier = _rag_tier
+    mod.render_him_vy_discovery_packet = _him_disc
+    mod.render_him_vy_turn_packet = _him_turn
+    mod.run_probes = _probes
+
+    class _FakeRegistry:
+        def __init__(_s):
+            _s.provider = None
+
+        def get(_s, cfg):
+            _s.provider = provider_factory(cfg)
+            return _s.provider
+
+    class _FakeLogger:
+        path = "/dev/null"
+
+        def __init__(_s):
+            _s.events = []
+
+        def emit(_s, name, **kw):
+            _s.events.append((name, kw))
+
+    log = logger or _FakeLogger()
+    registry = _FakeRegistry()
+    try:
+        reply = mod.run_agent_loop(
+            user_input=user_input,
+            messages=[],
+            bash=None,
+            system_prompt=None,
+            router=default_policy(),
+            registry=registry,
+            logger=log,
+            turn_number=1,
+        )
+    finally:
+        for k, v in saved.items():
+            setattr(mod, k, v)
+    return reply, registry, log, tripwires
+
+
+def test_vintage_arbitrary_prompt_attempts_raw_backend_contact():
+    """`@vintage what is 2+2?` must reach the configured local backend on
+    a bounded prompt and surface the backend output prefixed with the
+    raw-unpromoted-contact label — not the static wall, not the static
+    contact reply."""
+    captured: dict = {}
+
+    class _FakeHandle:
+        def __iter__(_s):
+            return iter([])
+
+        def final(_s):
+            class _R:
+                text = "four"
+                tool_calls = []
+                stop_reason = "end_turn"
+                in_tokens = 12
+                out_tokens = 3
+                raw_assistant_content = {"role": "assistant", "content": "four"}
+
+            return _R()
+
+    class _FakeProvider:
+        def stream(_s, *, system, messages, tools, role):
+            captured["system"] = system
+            captured["messages"] = list(messages)
+            captured["tools"] = list(tools)
+            captured["role"] = role
+            return _FakeHandle()
+
+    reply, registry, log, tripwires = _vintage_run_agent_loop(
+        lambda cfg: _FakeProvider(),
+        "@vintage what is 2+2?",
+    )
+
+    # Backend was actually contacted.
+    assert registry.provider is not None
+    assert "system" in captured
+    assert captured["role"].role == "vintage"
+    assert captured["role"].base_url == "http://127.0.0.1:8019/v1"
+    # Backend output is labeled honestly and surfaced verbatim.
+    assert "VINTAGE_RAW_UNPROMOTED_CONTACT" in reply
+    assert "four" in reply
+    # Walls / contact replies are NOT what we returned here.
+    assert "VINTAGE_UNAVAILABLE_CONTACT" not in reply
+    assert "wound to close next" not in reply.lower()
+    # Bounded prompt: tools empty, no RAG/him-vy/recurrent leak.
+    assert captured["tools"] == []
+    assert tripwires["rag_snippets"] == 0
+    assert tripwires["rag_snippets_with_tier"] == 0
+    assert tripwires["him_vy_discovery_packet"] == 0
+    assert tripwires["him_vy_turn_packet"] == 0
+    assert tripwires["run_probes"] == 0
+    # System prompt is the minimal stub, not the layered substrate +
+    # local-organ briefing + him-vy + RAG. Hard size cap.
+    system_text = captured["system"].flat()
+    assert len(system_text) < 1024, len(system_text)
+    assert "unpromoted" in system_text.lower()
+    # User message does NOT carry the local-organ briefing (that pushed
+    # prompts well past the 1024-token backend budget).
+    user_msg = captured["messages"][-1]["content"]
+    assert "local-organ briefing" not in user_msg
+    assert "what is 2+2?" in user_msg
+    # Telemetry fired.
+    names = [n for n, _ in log.events]
+    assert "organ_raw_contact_attempt" in names
+    assert "organ_raw_contact_ok" in names
+
+
+def test_omni_arbitrary_prompt_attempts_raw_backend_contact():
+    """`@omni summarise this paragraph` also attempts the configured
+    backend in raw unpromoted mode. If the backend at :8020 is just a
+    diagnostic surface, the failure path elsewhere surfaces it honestly;
+    here we assert the call actually happens with a bounded prompt."""
+    captured: dict = {}
+
+    class _FakeHandle:
+        def __iter__(_s):
+            return iter([])
+
+        def final(_s):
+            class _R:
+                text = "ok summary"
+                tool_calls = []
+                stop_reason = "end_turn"
+                in_tokens = 12
+                out_tokens = 3
+                raw_assistant_content = {"role": "assistant", "content": "ok summary"}
+
+            return _R()
+
+    class _FakeProvider:
+        def stream(_s, *, system, messages, tools, role):
+            captured["system"] = system
+            captured["messages"] = list(messages)
+            captured["role"] = role
+            return _FakeHandle()
+
+    reply, registry, log, _ = _vintage_run_agent_loop(
+        lambda cfg: _FakeProvider(),
+        "@omni write three names for a coffee shop",
+    )
+    assert registry.provider is not None
+    assert captured["role"].role == "omni"
+    assert captured["role"].base_url == "http://127.0.0.1:8020/v1"
+    assert "OMNI_RAW_UNPROMOTED_CONTACT" in reply
+    assert "ok summary" in reply
+    names = [n for n, _ in log.events]
+    assert "organ_raw_contact_attempt" in names
+    assert "organ_raw_contact_ok" in names
+
+
+def test_vintage_capability_request_still_walls_no_backend_call():
+    """`@vintage tell me about the 1930 corpus` must keep returning the
+    fail-closed wall with NO provider call — capability claims cannot be
+    routed to an unpromoted backend that might fabricate a vintage answer."""
+    class _Tripwire:
+        def stream(_s, *, system, messages, tools, role):
+            raise AssertionError(
+                "capability request must not reach the provider — wall must hold"
+            )
+
+    reply, registry, log, _ = _vintage_run_agent_loop(
+        lambda cfg: _Tripwire(),
+        "@vintage tell me about the 1930 corpus",
+    )
+    assert registry.provider is None
+    assert "VINTAGE_UNAVAILABLE —" in reply
+    assert "wound to close next" in reply.lower()
+    assert "RAW_UNPROMOTED_CONTACT" not in reply
+    names = [n for n, _ in log.events]
+    assert "direct_reply" in names
+    assert "organ_raw_contact_attempt" not in names
+
+
+def test_omni_capability_request_still_walls_no_backend_call():
+    class _Tripwire:
+        def stream(_s, *, system, messages, tools, role):
+            raise AssertionError(
+                "capability request must not reach the provider — wall must hold"
+            )
+
+    reply, registry, log, _ = _vintage_run_agent_loop(
+        lambda cfg: _Tripwire(),
+        "@omni describe this photo for me",
+    )
+    assert registry.provider is None
+    assert "OMNI_UNAVAILABLE —" in reply
+    assert "wound to close next" in reply.lower()
+    assert "RAW_UNPROMOTED_CONTACT" not in reply
+
+
+def test_vintage_greeting_still_contact_no_backend_call():
+    """`@vintage hi` is a greeting — brief contact reply, no provider."""
+    class _Tripwire:
+        def stream(_s, *, system, messages, tools, role):
+            raise AssertionError(
+                "greeting must not reach the provider — contact reply must hold"
+            )
+
+    reply, registry, log, _ = _vintage_run_agent_loop(
+        lambda cfg: _Tripwire(),
+        "@vintage hi",
+    )
+    assert registry.provider is None
+    assert "VINTAGE_UNAVAILABLE_CONTACT" in reply
+    assert "RAW_UNPROMOTED_CONTACT" not in reply
+
+
+def test_vintage_raw_contact_backend_failure_surfaces_honestly():
+    """When the local Vintage backend refuses (Connection refused, 404,
+    transport timeout) the bounded raw-contact path surfaces the error
+    rather than letting Super/GPT/cloud impersonate. Fail closed on false
+    claims, NOT on Zoe's ability to see the real backend state."""
+    class _RefusingProvider:
+        def stream(_s, *, system, messages, tools, role):
+            raise ConnectionError(
+                "HTTPConnectionPool(host='127.0.0.1', port=8019): "
+                "Max retries exceeded — connection refused"
+            )
+
+    reply, registry, log, _ = _vintage_run_agent_loop(
+        lambda cfg: _RefusingProvider(),
+        "@vintage what is 2+2?",
+    )
+    assert registry.provider is not None  # We tried; we did not impersonate.
+    assert "VINTAGE_RAW_CONTACT_FAILED" in reply
+    assert "connection refused" in reply.lower()
+    # No fallback into the Super model id or cloud.
+    assert "nvidia/NVIDIA-Nemotron-3-Super" not in reply
+    # No-impersonation language is still present.
+    for forbidden in ("Super", "GPT", "cloud", "packet"):
+        assert forbidden in reply, forbidden
+    names = [n for n, _ in log.events]
+    assert "organ_raw_contact_attempt" in names
+    assert "organ_raw_contact_error" in names
+
+
+def test_omni_raw_contact_backend_failure_surfaces_honestly():
+    """Same invariant for @omni: if there is no real chat/multimodal
+    model at the configured base_url, the failure is named — we do not
+    pretend Omni answered."""
+    class _Refusing:
+        def stream(_s, *, system, messages, tools, role):
+            raise RuntimeError("404 model 'omni-unpromoted-no-chat-surface' not found")
+
+    reply, registry, log, _ = _vintage_run_agent_loop(
+        lambda cfg: _Refusing(),
+        "@omni tell me a joke",
+    )
+    assert "OMNI_RAW_CONTACT_FAILED" in reply
+    assert "404" in reply or "not found" in reply.lower()
+    assert "nvidia/NVIDIA-Nemotron-3-Super" not in reply
+    names = [n for n, _ in log.events]
+    assert "organ_raw_contact_error" in names
+
+
+def test_vintage_raw_contact_truncates_oversized_user_input():
+    """A 5000-char prompt must be truncated before it hits the 1024-token
+    backend. The bounded raw-contact path applies a hard char cap so the
+    transport budget is never overflowed."""
+    captured: dict = {}
+
+    class _FakeHandle:
+        def __iter__(_s):
+            return iter([])
+
+        def final(_s):
+            class _R:
+                text = "noted"
+                tool_calls = []
+                stop_reason = "end_turn"
+                in_tokens = 600
+                out_tokens = 1
+                raw_assistant_content = {"role": "assistant", "content": "noted"}
+
+            return _R()
+
+    class _Provider:
+        def stream(_s, *, system, messages, tools, role):
+            captured["messages"] = list(messages)
+            return _FakeHandle()
+
+    huge = "x" * 5000
+    reply, _, _, _ = _vintage_run_agent_loop(
+        lambda cfg: _Provider(),
+        f"@vintage {huge}",
+    )
+    user_msg = captured["messages"][-1]["content"]
+    # The truncation cap is 2500 chars + ellipsis; the agent-loop briefing
+    # is also stripped on this path, so the message is bounded.
+    assert len(user_msg) <= 2501
+    assert user_msg.endswith("…")
+    assert "VINTAGE_RAW_UNPROMOTED_CONTACT" in reply
+
+
+def test_raw_contact_uses_minimal_layered_prompt_not_full_substrate():
+    """The system prompt sent to the backend must be the minimal stub —
+    no full LayeredPrompt with identity/substrate/live layers, no
+    local-organ briefing, no RAG enrichment. This is what keeps prompt
+    + completion within the 1024-token backend budget."""
+    captured: dict = {}
+
+    class _FakeHandle:
+        def __iter__(_s):
+            return iter([])
+
+        def final(_s):
+            class _R:
+                text = "ok"
+                tool_calls = []
+                stop_reason = "end_turn"
+                in_tokens = 0
+                out_tokens = 0
+                raw_assistant_content = {"role": "assistant", "content": "ok"}
+
+            return _R()
+
+    class _Provider:
+        def stream(_s, *, system, messages, tools, role):
+            captured["system"] = system
+            return _FakeHandle()
+
+    _vintage_run_agent_loop(
+        lambda cfg: _Provider(),
+        "@vintage write a couplet about morning",
+    )
+    flat = captured["system"].flat()
+    # The full chat-mode substrate carries vy-language, Wellspring,
+    # protocol details — none of that should be in the bounded prompt.
+    assert "vy-language" not in flat.lower()
+    assert "wellspring" not in flat.lower()
+    assert "local-organ briefing" not in flat.lower()
+    # Names the route honestly.
+    assert "unpromoted" in flat.lower()
+    assert f"@vintage" in flat

@@ -97,7 +97,10 @@ roles:
     provider: openai
     model: vintage-unpromoted-no-chat-surface
     base_url: http://127.0.0.1:8019/v1
-    max_tokens: 1
+    # Bounded raw-contact path: ordinary @vintage prompts strip enrichment
+    # so prompt + completion fit the backend's 1024-token budget. 256 is
+    # the completion ceiling, leaving ~768 for the bounded prompt.
+    max_tokens: 256
     max_iterations: 1
     temperature: 0.0
     tools: []
@@ -112,7 +115,10 @@ roles:
     provider: openai
     model: omni-unpromoted-no-chat-surface
     base_url: http://127.0.0.1:8020/v1
-    max_tokens: 1
+    # See vintage: ordinary @omni prompts attempt raw unpromoted contact
+    # at the configured base_url. Transport failures surface honestly —
+    # no Super/GPT/cloud impersonation.
+    max_tokens: 256
     max_iterations: 1
     temperature: 0.0
     tools: []

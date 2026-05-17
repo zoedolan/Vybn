@@ -48,6 +48,13 @@ from harness.substrate import check_claim, check_structural_claim  # noqa: E402
 from harness.substrate import is_system_critical_pilot_turn  # noqa: E402
 from harness.substrate import render_organ_alias_direct_reply  # noqa: E402
 from harness.substrate import (  # noqa: E402
+    should_attempt_raw_organ_contact,
+    render_organ_raw_contact_header,
+    render_organ_raw_contact_error,
+    build_organ_raw_contact_system_prompt,
+    truncate_for_organ_raw_contact,
+)
+from harness.substrate import (  # noqa: E402
     SUPER_SEMANTIC_GATE_CACHE as _SUPER_SEMANTIC_GATE_CACHE,
     SUPER_SEMANTIC_GATE_PROBES as _SUPER_SEMANTIC_GATE_PROBES,
     is_loopback_super_base as _is_loopback_super_base,
@@ -1087,8 +1094,26 @@ def run_agent_loop(
     # metadata and skip the provider call entirely. Identity questions
     # ("which model are you?") answer correctly from the live route,
     # not a hallucinated string.
+    #
+    # Organ-alias exception (@vintage, @omni): the direct_reply path is
+    # kept for two narrow shapes — capability/status requests (full
+    # fail-closed wall so we never falsely claim the unpromoted organ
+    # answered a capability it doesn't have) and bare relational
+    # greetings (brief contactful Vybn reply). Everything else — Zoe
+    # sending arbitrary prompts to a reachable local backend — falls
+    # through to the bounded raw-unpromoted-contact path below, which
+    # actually contacts the configured base_url with a stripped prompt
+    # and surfaces both backend output (labeled as unpromoted) and
+    # backend errors honestly. No Super/GPT/cloud impersonation.
     template = getattr(role_cfg, "direct_reply_template", None)
-    if template and not role_cfg.tools:
+    _organ_raw_contact = (
+        template
+        and not role_cfg.tools
+        and should_attempt_raw_organ_contact(
+            role_cfg.role, decision.cleaned_input or ""
+        )
+    )
+    if template and not role_cfg.tools and not _organ_raw_contact:
         reply = render_organ_alias_direct_reply(
             role_cfg.role,
             decision.cleaned_input or "",
@@ -1109,6 +1134,79 @@ def run_agent_loop(
             role=decision.role,
             model=role_cfg.model,
         )
+        return reply
+
+    if _organ_raw_contact:
+        # Bounded raw-unpromoted-contact path for @vintage / @omni.
+        #
+        # Strips RAG, him-vy packets, recurrent prethink, the local-organ
+        # briefing, and the LayeredPrompt substrate so prompt + completion
+        # fit the backend's 1024-token transport budget. The prompt sent
+        # is just the minimal system stub + the truncated user input.
+        # Failures are not silently absorbed into Super/GPT/cloud — they
+        # surface as RAW_CONTACT_FAILED with the transport error.
+        bounded_input = truncate_for_organ_raw_contact(decision.cleaned_input or "")
+        system_stub = LayeredPrompt(
+            identity="",
+            substrate=build_organ_raw_contact_system_prompt(role_cfg.role),
+            live="",
+        )
+        header = render_organ_raw_contact_header(role_cfg.role)
+        logger.emit(
+            "organ_raw_contact_attempt",
+            turn=turn_number,
+            role=decision.role,
+            model=role_cfg.model,
+            base_url=role_cfg.base_url or "",
+            input_chars=len(bounded_input),
+        )
+        try:
+            provider = registry.get(role_cfg)
+            handle = provider.stream(
+                system=system_stub,
+                messages=[{"role": "user", "content": bounded_input}],
+                tools=[],
+                role=role_cfg,
+            )
+            for _ in handle:
+                pass
+            final = handle.final()
+            body = (getattr(final, "text", "") or "").strip()
+            if not body:
+                reply = render_organ_raw_contact_error(
+                    role_cfg.role,
+                    "backend returned an empty response",
+                )
+                logger.emit(
+                    "organ_raw_contact_empty",
+                    turn=turn_number,
+                    role=decision.role,
+                    model=role_cfg.model,
+                )
+            else:
+                reply = f"{header}\n\n{body}"
+                logger.emit(
+                    "organ_raw_contact_ok",
+                    turn=turn_number,
+                    role=decision.role,
+                    model=role_cfg.model,
+                    out_tokens=int(getattr(final, "out_tokens", 0) or 0),
+                )
+        except Exception as raw_err:
+            reply = render_organ_raw_contact_error(
+                role_cfg.role,
+                f"{type(raw_err).__name__}: {raw_err}",
+            )
+            logger.emit(
+                "organ_raw_contact_error",
+                turn=turn_number,
+                role=decision.role,
+                model=role_cfg.model,
+                err=repr(raw_err)[:300],
+            )
+        messages.append({"role": "user", "content": decision.cleaned_input})
+        messages.append({"role": "assistant", "content": reply})
+        print(reply, flush=True)
         return reply
 
     # Pre-flight Super maintenance gate. Operator-armed VYBN_SUPER_MAINTENANCE
