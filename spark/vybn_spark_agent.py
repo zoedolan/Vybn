@@ -1121,7 +1121,7 @@ def run_agent_loop(
     else:
         active_prompt = system_prompt
     is_vintage_turn = decision.role == "vintage" or getattr(decision, "alias_used", None) == "@vintage"
-    if is_vintage_turn: q=(decision.cleaned_input or "").lower(); reply=("VINTAGE_SMOKE_OK" if ("say exactly" in q and "vintage_smoke_ok" in q) else ("@vintage is a bounded local vintage/canary surface in Zoe and Vybn Spark; it is not promoted Talkie, not Vybn, not Zoe, and not human." if any(x in q for x in ("who are you", "what are you", "yourself", "your name")) else ("Zoe is outside in 2026; 1930 is only the intended Vintage language horizon, not a present-tense life I can honestly claim." if ("1930" in q or "2026" in q or "what year" in q) else "Vintage is online as a bounded local canary surface; the real Talkie-1930-13B artifact is not present here, so I will answer briefly without pretending otherwise."))); print(reply, flush=True); logger.emit("vintage_bounded_reply", turn=turn_number, model=role_cfg.model, base_url=role_cfg.base_url or ""); return reply
+    if is_vintage_turn: reply = "Vintage is unpromoted: the live backend is a failing semantic canary, not a Zoe/Vybn organ. Endpoint-shaped is not capability; agent containment is not model success."; print(reply, flush=True); logger.emit("vintage_unpromoted_canary_refusal", turn=turn_number, model=role_cfg.model, base_url=role_cfg.base_url or ""); return reply
 
     # @omni gets a tiny prompt.
     if getattr(decision, "alias_used", None) == "@omni":
