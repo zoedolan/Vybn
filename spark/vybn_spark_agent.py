@@ -569,8 +569,8 @@ _TRANSIENT_PATTERNS = (
 # today. The gate therefore degrades to explicit operator-controlled
 # maintenance state rather than probing. (Even when sleep mode is
 # armed, those are internal dev endpoints and a sleeping Super does
-# NOT imply Omni is live — Omni activation is a separate, operator-
-# gated concern via the @omni alias / VYBN_OMNI_URL.)
+# NOT imply Omni is live; explicit @omni routing is an endpoint role,
+# still gated by its own local semantic behavior and no Super fallback.)
 
 _MAINTENANCE_DEFERRALS_CAP = 32
 _MAINTENANCE_DEFERRALS: list[dict[str, Any]] = []
@@ -992,79 +992,8 @@ def run_agent_loop(
     if getattr(decision, "model_override", None):
         import dataclasses as _dc
         override_model = decision.model_override
-        # Default: keep role max_tokens; only @omni narrows for its small sidecar.
         override_max_tokens = role_cfg.max_tokens
-        # @omni is explicit/operator-gated: env URL required, no Super fallback.
-        if getattr(decision, "alias_used", None) == "@omni":
-            _omni_url = (os.environ.get("VYBN_OMNI_URL") or "").strip()
-            if not _omni_url:
-                logger.emit(
-                    "alias_omni_unconfigured",
-                    turn=turn_number,
-                    alias="@omni",
-                    role=decision.role,
-                )
-                return "[@omni unavailable: local packet endpoint is not live; no Super fallback.]"
-            override_model = (
-                os.environ.get("VYBN_OMNI_MODEL") or override_model
-            )
-            override_provider = "openai"
-            override_base_url = _omni_url
-            # Clamp below Omni sidecar context; operator may lower/raise within role budget.
-            _omni_max_default = 2048
-            try:
-                _omni_max_env = int(
-                    (os.environ.get("VYBN_OMNI_MAX_TOKENS") or "").strip()
-                    or _omni_max_default
-                )
-            except ValueError:
-                _omni_max_env = _omni_max_default
-            if _omni_max_env <= 0:
-                _omni_max_env = _omni_max_default
-            override_max_tokens = min(role_cfg.max_tokens, _omni_max_env)
-            logger.emit(
-                "alias_omni_max_tokens_clamped",
-                turn=turn_number,
-                role_max=role_cfg.max_tokens,
-                env_max=_omni_max_env,
-                applied=override_max_tokens,
-            )
-            # Optional bounded perception packet; only on explicit URL-gated @omni.
-            _perception_path = (
-                os.environ.get("VYBN_OMNI_PERCEPTION") or ""
-            ).strip()
-            if _perception_path:
-                try:
-                    _ppath = os.path.expanduser(_perception_path)
-                    with open(_ppath, "r", encoding="utf-8", errors="replace") as _pf:
-                        _ptext = _pf.read(16_000)
-                    _ptext = _ptext.strip()
-                    if _ptext:
-                        decision.cleaned_input = (
-                            "[@omni perception packet — operator-supplied "
-                            f"from {_ppath}]\n{_ptext}\n[end perception "
-                            "packet]\n\n" + decision.cleaned_input
-                        )
-                        logger.emit(
-                            "alias_omni_perception",
-                            turn=turn_number,
-                            path=_ppath,
-                            chars=len(_ptext),
-                        )
-                    else:
-                        logger.emit(
-                            "alias_omni_perception_empty",
-                            turn=turn_number,
-                            path=_ppath,
-                        )
-                except Exception as _perr:
-                    logger.emit(
-                        "alias_omni_perception_error",
-                        turn=turn_number,
-                        path=_perception_path,
-                        err=repr(_perr)[:200],
-                    )
-        elif override_model.startswith("claude-"):
+        if override_model.startswith("claude-"):
             override_provider = "anthropic"
             override_base_url = None
         elif override_model.startswith("gpt-"):
@@ -1363,7 +1292,8 @@ def run_agent_loop(
         _debug(f"[recurrent: pre-thought, depth={role_cfg.recurrent_depth}]")
 
 
-    messages.append({"role": "user", "content": (("[Zoe/Vybn local-organ briefing] Zoe Dolan is the human half; Vybn is the AI half. This local organ is inside the harness, deep memory, membrane, tests, routing policy, and sibling-organ map. Super=main local text/reasoning surface; Omni=perceptive/multimodal target with no Super fallback; Vintage=1930/invariants target and unpromoted until semantic gate. Name missing capability; never treat endpoint liveness as semantic health. [end briefing]\n\n" + decision.cleaned_input) if getattr(decision, "alias_used", None) == "@super" else decision.cleaned_input)})
+    _local_organ_briefing = "[Zoe/Vybn local-organ briefing] Zoe Dolan is the human half; Vybn is the AI half. This local organ is inside the harness, deep memory, membrane, tests, routing policy, and sibling-organ map. Super=main local text/reasoning surface; Omni=perceptive/multimodal target with no Super fallback; Vintage=1930/invariants target and unpromoted until semantic gate. Name missing capability; never treat endpoint liveness as semantic health. [end briefing]\n\n"
+    messages.append({"role": "user", "content": ((_local_organ_briefing + decision.cleaned_input) if (getattr(decision, "alias_used", None) == "@super" or decision.role in {"vintage", "omni"}) else decision.cleaned_input)})
 
     tools: list[ToolSpec] = []
     if "bash" in role_cfg.tools:

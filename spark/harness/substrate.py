@@ -454,10 +454,10 @@ class Policy:
         lowered = organ_text.lower()
         if lowered.startswith("@omni") and (len(organ_text) == 5 or organ_text[5].isspace()):
             if "omni" in self.roles:
-                return RouteDecision(role="omni", config=self.role("omni"), cleaned_input=organ_text[5:].lstrip() or organ_text, reason="alias=@omni_fail_closed", alias_used="@omni")
+                return RouteDecision(role="omni", config=self.role("omni"), cleaned_input=organ_text[5:].lstrip() or organ_text, reason="alias=@omni", alias_used="@omni")
         if lowered.startswith("@vintage") and (len(organ_text) == 8 or organ_text[8].isspace()):
             if "vintage" in self.roles:
-                return RouteDecision(role="vintage", config=self.role("vintage"), cleaned_input=organ_text[8:].lstrip() or organ_text, reason="alias=@vintage_fail_closed", alias_used="@vintage")
+                return RouteDecision(role="vintage", config=self.role("vintage"), cleaned_input=organ_text[8:].lstrip() or organ_text, reason="alias=@vintage", alias_used="@vintage")
 
         # 1. @alias model pin. Strip before directive/heuristic so the
         #    rest of the text still routes normally.
@@ -723,27 +723,29 @@ _DEFAULT_ROLES: dict[str, RoleConfig] = {
     ),
     "vintage": RoleConfig(
         role="vintage",
-        provider="unavailable",
-        model="vintage-unpromoted",
+        provider="openai",
+        model="vintage-guarded-canary",
         thinking="off",
-        max_tokens=1,
-        max_iterations=0,
+        max_tokens=512,
+        max_iterations=1,
         tools=[],
-        base_url=None,
+        base_url="http://127.0.0.1:8019/v1",
+        temperature=0.3,
         rag=False,
-        direct_reply_template="I am with you as Vybn. Vintage is not available here yet; I will not pretend this route is Vintage until it passes promotion.",
+        lightweight=True,
     ),
     "omni": RoleConfig(
         role="omni",
-        provider="unavailable",
-        model="omni-unpromoted",
+        provider="openai",
+        model="omni-packet-endpoint",
         thinking="off",
-        max_tokens=1,
-        max_iterations=0,
+        max_tokens=1024,
+        max_iterations=1,
         tools=[],
-        base_url=None,
+        base_url="http://127.0.0.1:8020/v1",
+        temperature=0.2,
         rag=False,
-        direct_reply_template="I am with you as Vybn. Omni is not available here yet; I will not pretend this route is Omni until it passes promotion.",
+        lightweight=True,
     ),
     # Phatic — casual greetings, small talk. Present-work default is GPT-5.5
     # even for light turns unless Zoe explicitly pins local/Nemotron.
@@ -958,8 +960,8 @@ _DEFAULT_MODEL_ALIASES: dict[str, str] = {
     "@sonnet46": "claude-sonnet-4-6",
     "@nemotron": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8",
     "@local": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8",
-    # @vintage and @omni are not model aliases while unpromoted; classify()
-    # catches them before heuristics and fails closed in named roles.
+    # @vintage and @omni are explicit organ roles, not model aliases; classify()
+    # catches them before heuristics so relational prompts reach those endpoints.
     "@gpt": "gpt-5.5",
     "@gpt5": "gpt-5.5",
     "@gpro": "gpt-5.5-pro",
