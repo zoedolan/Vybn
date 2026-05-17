@@ -863,7 +863,7 @@ class TestFallbackConstructionIsLazy(unittest.TestCase):
         # never have been asked for any model.
         self.assertEqual(constructed, [])
 
-    def test_walks_to_lazy_fallback_when_primary_fails(self):
+    def test_gpt55_primary_failure_fails_closed_without_claude_fallback(self):
         import vybn_spark_agent as agent
         from harness.substrate import RoleConfig, default_policy
 
@@ -874,45 +874,33 @@ class TestFallbackConstructionIsLazy(unittest.TestCase):
 
         constructed: list[str] = []
 
-        class _DummyHandle:
-            pass
-
         class _FailingPrimary:
             def stream(self, **_kw):
                 raise RuntimeError("OpenAIProvider needs either the openai SDK or requests")
 
-        class _DummyFallback:
-            def stream(self, **_kw):
-                return _DummyHandle()
-
         class _RecordingRegistry:
             def get(self, cfg):
                 constructed.append(cfg.model)
-                return _DummyFallback()
+                raise AssertionError("GPT-5.5 must not construct a Claude fallback")
 
         class _DummyLogger:
             def emit(self, *_a, **_kw):
                 pass
 
-        handle, cfg, prov = agent._stream_with_fallback(
-            router=type("R", (), {"policy": policy})(),
-            registry=_RecordingRegistry(),
-            role_cfg=primary_cfg,
-            provider=_FailingPrimary(),
-            system_prompt=None,
-            messages=[],
-            tools=[],
-            logger=_DummyLogger(),
-            turn_number=1,
-            retries=0,
-        )
-        self.assertIsInstance(handle, _DummyHandle)
-        # First fallback (claude-sonnet-4-6) was constructed lazily
-        # only after the primary failed. Subsequent fallback models in
-        # the chain may also have been constructed; what matters is
-        # the registry was not touched before the primary call.
-        self.assertGreaterEqual(len(constructed), 1)
-        self.assertEqual(constructed[0], "claude-sonnet-4-6")
+        with self.assertRaisesRegex(RuntimeError, "OpenAIProvider needs"):
+            agent._stream_with_fallback(
+                router=type("R", (), {"policy": policy})(),
+                registry=_RecordingRegistry(),
+                role_cfg=primary_cfg,
+                provider=_FailingPrimary(),
+                system_prompt=None,
+                messages=[],
+                tools=[],
+                logger=_DummyLogger(),
+                turn_number=1,
+                retries=0,
+            )
+        self.assertEqual(constructed, [])
 
 
 class TestHimOSHarnessBridge(unittest.TestCase):

@@ -1947,3 +1947,9 @@ def test_local_super_semantic_failure_cloud_fallback_requires_explicit_opt_in(mo
         mod.render_him_vy_discovery_packet = saved_disc
         mod.render_him_vy_turn_packet = saved_turn
         mod.run_probes = saved_probes
+
+
+def test_gpt55_has_no_cross_provider_fallback():
+    from harness.substrate import default_policy, load_policy
+    assert default_policy().fallback_chain.get("gpt-5.5") == []
+    assert load_policy(SPARK_DIR / "router_policy.yaml").fallback_chain.get("gpt-5.5") == []

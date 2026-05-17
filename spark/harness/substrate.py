@@ -904,7 +904,7 @@ _DEFAULT_FALLBACK: dict[str, list[str]] = {
     "claude-opus-4-7": ["claude-opus-4-6", "claude-sonnet-4-6"],
     "claude-opus-4-6": ["claude-opus-4-7", "claude-sonnet-4-6"],
     "claude-sonnet-4-6": ["claude-opus-4-6"],
-    "gpt-5.5": ["claude-sonnet-4-6", "claude-opus-4-6"],
+    "gpt-5.5": [],
     "gpt-5.5-pro": ["gpt-5.5"],
     # Local Nemotron roles fall to GPT-5.5 if vLLM is down.
     "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8": ["gpt-5.5"],

@@ -323,7 +323,7 @@ fallback_chain:
   claude-opus-4-7: [claude-opus-4-6, claude-sonnet-4-6]
   claude-opus-4-6: [claude-opus-4-7, claude-sonnet-4-6]
   claude-sonnet-4-6: [claude-opus-4-6]
-  gpt-5.5: [claude-opus-4-6, claude-sonnet-4-6]
+  gpt-5.5: []
   nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8: [gpt-5.5]
   gpt-5.5-pro: [gpt-5.5]
 
