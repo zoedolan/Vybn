@@ -823,9 +823,21 @@ def _stream_with_fallback(
             continue
         for attempt in range(retries + 1):
             try:
+                _stream_system = system_prompt
+                _stream_messages = messages
+                # Local lightweight aliases must not inherit the full Vybn/Him/RAG
+                # prompt body. TinyLlama has a 1024-token context, and @omni on
+                # the Super surface also failed when fed the full agent harness.
+                # For these local alias roles, use the working Super-style move:
+                # one plain user message to the model surface, no diagnostic wall,
+                # no fallback-to-cloud impersonation.
+                if getattr(cfg, "lightweight", False) and str(getattr(cfg, "base_url", "") or "").startswith("http://127.0.0.1:"):
+                    _stream_system = LayeredPrompt(identity="", substrate="", live="")
+                    _users = [m for m in messages if isinstance(m, dict) and m.get("role") == "user"]
+                    _stream_messages = _users[-1:] if _users else messages[-1:]
                 handle = prov.stream(
-                    system=system_prompt,
-                    messages=messages,
+                    system=_stream_system,
+                    messages=_stream_messages,
                     tools=tools,
                     role=cfg,
                 )
