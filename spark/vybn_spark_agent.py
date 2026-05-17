@@ -1004,14 +1004,7 @@ def run_agent_loop(
                     alias="@omni",
                     role=decision.role,
                 )
-                return (
-                    "[@omni unavailable: VYBN_OMNI_URL is not set. "
-                    "Start the Omni endpoint on the peer Spark and "
-                    "use the local packet endpoint at 127.0.0.1:8020/v1 unless a real Omni endpoint is witnessed "
-                    "before retrying. This turn will not silently "
-                    "fall back to Super (:8000) — Super is the main local model surface, "
-                    "not the main substrate.]"
-                )
+                return "[@omni unavailable: local packet endpoint is not live; no Super fallback.]"
             override_model = (
                 os.environ.get("VYBN_OMNI_MODEL") or override_model
             )
@@ -1120,6 +1113,8 @@ def run_agent_loop(
         active_prompt = system_prompt_no_tools
     else:
         active_prompt = system_prompt
+    if getattr(decision, "alias_used", None) == "@omni" or role_cfg.model == "omni-perception-packet-local": role_cfg.base_url = "http://127.0.0.1:8020/v1"; role_cfg.model = "omni-perception-packet-local"
+    if getattr(decision, "alias_used", None) == "@vintage" or role_cfg.model == "vintage-1930-guarded-local": role_cfg.base_url = "http://127.0.0.1:8019/v1"; role_cfg.model = "vintage-1930-guarded-local"
     is_vintage_turn = decision.role == "vintage" or getattr(decision, "alias_used", None) == "@vintage"
     if is_vintage_turn and role_cfg.model != "vintage-1930-guarded-local": reply = "Vintage is unpromoted: no semantic-gated local Vintage model is routed."; print(reply, flush=True); logger.emit("vintage_unpromoted_canary_refusal", turn=turn_number, model=role_cfg.model, base_url=role_cfg.base_url or ""); return reply
 
@@ -2394,10 +2389,7 @@ def main() -> None:
     print("  Type naturally. Prefix with /chat, /create, /plan, /task, /local "
           "to force a role,")
     print("  or with @opus4.6/@opus4.6/@sonnet/@nemotron/@gpt to pin a model for one turn.")
-    print("  @omni pins the witnessed local Omni packet endpoint; full Omni still requires a semantic-gated real endpoint; "
-          "refuses (no Super fallback) when unset.")
-    print("    optional VYBN_OMNI_PERCEPTION=<path> rides a perception "
-          "packet on the @omni turn only.")
+    print("  @omni pins local packet; full Omni remains gated. @vintage pins the 1930 guard.")
     print("  REPL commands: exit | clear | reload | history | policy | /resume | /sessions | /newsession")
     print()
 
