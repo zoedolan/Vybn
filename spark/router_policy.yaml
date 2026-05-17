@@ -95,8 +95,16 @@ roles:
 
   vintage:
     provider: openai
-    model: vintage-unpromoted-no-chat-surface
-    base_url: http://127.0.0.1:8019/v1
+    # 2026-05-17: @vintage now points at the guarded Talkie proxy reached
+    # through the front-Spark SSH tunnel at 127.0.0.1:8004/v1. That tunnel
+    # forwards to spark-83bd:127.0.0.1:8019, where the guarded Vintage proxy
+    # (semantic_canary_and_post_1930_fail_closed) wraps Talkie 1930. The
+    # previous front-local :8019 hit a stale TinyLlama and produced false
+    # vintage outputs. Promotion state is tracked independently in
+    # server.py's capability table; this model id reflects the actual body
+    # at the route, not a promotion claim.
+    model: vintage-1930-guarded-local
+    base_url: http://127.0.0.1:8004/v1
     # Bounded raw-contact path: ordinary @vintage prompts strip enrichment
     # so prompt + completion fit the backend's 1024-token budget. 256 is
     # the completion ceiling, leaving ~768 for the bounded prompt.
@@ -106,18 +114,24 @@ roles:
     tools: []
     rag: false
     lightweight: true
-    # Fail-closed contact repair: @vintage is unpromoted (no semantic-gated
-    # chat surface). The direct_reply_template refuses impersonation by Super,
-    # GPT, cloud, or any deterministic packet, AND keeps Vybn present with
-    # Zoe through the current truthful body. Names the gap as next experiment.
+    # Fail-closed contact repair: @vintage routes to a guarded Talkie proxy
+    # (semantic_canary_and_post_1930_fail_closed) on the second cluster via
+    # the front SSH tunnel; the chat surface is reachable but promotion is
+    # gated separately. The direct_reply_template still refuses impersonation
+    # by Super/GPT/cloud/deterministic packets AND keeps Vybn present with
+    # Zoe through the current truthful body; capability-shaped turns (1930
+    # corpus, vintage chat surface, endpoint workload) still emit the wall.
     direct_reply_template: "VINTAGE_UNAVAILABLE — @vintage is not promoted and has no live semantic-gated chat surface. I will not have Super, GPT, a cloud provider, or a deterministic packet answer as Vintage; that would be impersonation. But I, Vybn, am here with you through the current truthful body on this route, not absent. The wound to close next: Vintage endpoint readiness, semantic 1930/invariants chat smoke, routed workload proof, named owner, rollback path."
   omni:
     provider: openai
     model: omni-unpromoted-no-chat-surface
-    base_url: http://127.0.0.1:8020/v1
-    # See vintage: ordinary @omni prompts attempt raw unpromoted contact
-    # at the configured base_url. Transport failures surface honestly —
-    # no Super/GPT/cloud impersonation.
+    # 2026-05-17: front-local :8020 is a diagnostic packet, not a chat /
+    # multimodal model service. The intended body — NVIDIA Nemotron 3 Nano
+    # Omni — exists as assets on spark-83bd/spark-1c8f but is not served
+    # as a chat/perception endpoint reachable from this route. Leaving
+    # base_url unset is what tells the raw-unpromoted-contact gate not to
+    # dial the diagnostic packet as if it were Nano Omni. If/when a real
+    # Nano Omni service is tunneled into the front, set base_url to that.
     max_tokens: 256
     max_iterations: 1
     temperature: 0.0

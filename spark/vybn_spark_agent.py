@@ -1110,7 +1110,9 @@ def run_agent_loop(
         template
         and not role_cfg.tools
         and should_attempt_raw_organ_contact(
-            role_cfg.role, decision.cleaned_input or ""
+            role_cfg.role,
+            decision.cleaned_input or "",
+            base_url=role_cfg.base_url,
         )
     )
     if template and not role_cfg.tools and not _organ_raw_contact:

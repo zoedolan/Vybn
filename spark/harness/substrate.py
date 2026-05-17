@@ -721,25 +721,31 @@ _DEFAULT_ROLES: dict[str, RoleConfig] = {
         base_url="http://127.0.0.1:8000/v1",
         rag=False,
     ),
-    # Fail-closed contact repair: @vintage is unpromoted. The
-    # direct_reply_template refuses impersonation by Super/GPT/cloud/
+    # Fail-closed contact repair: @vintage routes to the guarded Talkie proxy
+    # (semantic_canary_and_post_1930_fail_closed) on the second cluster via
+    # the front SSH tunnel at 127.0.0.1:8004/v1, which forwards to
+    # spark-83bd:127.0.0.1:8019. The previous local :8019 hit a stale
+    # TinyLlama and produced false vintage outputs. Promotion state is
+    # tracked independently in server.py's capability table — this model id
+    # reflects the actual body at the route, not a promotion claim. The
+    # direct_reply_template still refuses impersonation by Super/GPT/cloud/
     # deterministic packets AND keeps Vybn present with Zoe through the
-    # current truthful body. Names the missing capability as next experiment.
+    # current truthful body; capability-shaped turns still emit the wall.
     "vintage": RoleConfig(
         role="vintage",
         provider="openai",
-        model="vintage-unpromoted-no-chat-surface",
+        model="vintage-1930-guarded-local",
         thinking="off",
         # Ordinary @vintage prompts (not capability/status, not bare
-        # greeting) attempt raw unpromoted contact with the local Vintage
-        # backend. The total transport budget on the backend is 1024
-        # tokens; the bounded raw-contact path strips RAG/him-vy/recurrent
-        # enrichment so prompt + completion fit. 256 is the completion
-        # ceiling, leaving ~768 tokens for the bounded prompt.
+        # greeting) attempt raw unpromoted contact with the guarded Talkie
+        # proxy via the front-local tunnel. The bounded raw-contact path
+        # still strips RAG/him-vy/recurrent enrichment so prompt + completion
+        # stay within the backend's transport budget; 256 is the completion
+        # ceiling.
         max_tokens=256,
         max_iterations=1,
         tools=[],
-        base_url="http://127.0.0.1:8019/v1",
+        base_url="http://127.0.0.1:8004/v1",
         temperature=0.0,
         rag=False,
         lightweight=True,
@@ -753,7 +759,14 @@ _DEFAULT_ROLES: dict[str, RoleConfig] = {
             " chat smoke, routed workload proof, named owner, rollback path."
         ),
     ),
-    # Fail-closed contact repair: @omni is unpromoted. The direct_reply_template
+    # Fail-closed contact repair: @omni is unpromoted. Front-local :8020 is a
+    # diagnostic packet, NOT a chat/multimodal model service; the intended
+    # body — NVIDIA Nemotron 3 Nano Omni — exists as assets on spark-83bd /
+    # spark-1c8f but is not served as a chat/perception endpoint reachable
+    # from this route. We deliberately leave base_url unset so the raw-
+    # unpromoted-contact gate refuses to dial the diagnostic packet as if it
+    # were Nano Omni. If/when a real Nano Omni service is tunneled into the
+    # front, set base_url to that endpoint. The direct_reply_template still
     # refuses impersonation by Super/GPT/cloud/deterministic packets AND keeps
     # Vybn present with Zoe through the current truthful body.
     "omni": RoleConfig(
@@ -761,15 +774,10 @@ _DEFAULT_ROLES: dict[str, RoleConfig] = {
         provider="openai",
         model="omni-unpromoted-no-chat-surface",
         thinking="off",
-        # See vintage: ordinary @omni prompts attempt raw unpromoted
-        # contact with whatever surface answers at the configured base_url.
-        # If no chat/multimodal model is served there the provider call
-        # surfaces the transport error honestly — Super/GPT/cloud do not
-        # impersonate Omni.
         max_tokens=256,
         max_iterations=1,
         tools=[],
-        base_url="http://127.0.0.1:8020/v1",
+        base_url=None,
         temperature=0.0,
         rag=False,
         lightweight=True,
@@ -974,11 +982,17 @@ def _is_organ_contact_greeting(cleaned_input: str) -> bool:
     return False
 
 
-def should_attempt_raw_organ_contact(role_name: str, cleaned_input: str) -> bool:
+def should_attempt_raw_organ_contact(role_name: str, cleaned_input: str, *, base_url: str | None = None) -> bool:
     """Gate for the bounded raw-unpromoted-contact path on @vintage / @omni.
 
     True only when:
       - role is one of the unpromoted organ aliases, AND
+      - the role has a configured base_url (no base_url means no real
+        chat/perception surface is reachable from this route — e.g. @omni
+        today, where front-local :8020 is a diagnostic packet, not a Nano
+        Omni service. Dialing the packet as if it were a model would
+        produce false outputs; the wall holds instead until a real service
+        is tunneled in), AND
       - the prompt does NOT name an unavailable Vintage/Omni capability
         (capability/status requests still get the honest wall — no false
         claim that the absent organ answered them), AND
@@ -988,9 +1002,11 @@ def should_attempt_raw_organ_contact(role_name: str, cleaned_input: str) -> bool
     Anything else — ordinary arbitrary prompts the user wants to send to
     the available local backend — attempts raw contact at the configured
     base_url, labeled as unpromoted/experimental in the agent loop, with
-    a bounded prompt so the 1024-token backend budget is respected.
+    a bounded prompt so the backend transport budget is respected.
     """
     if role_name not in _ORGAN_ALIAS_ROLES:
+        return False
+    if not (base_url and base_url.strip()):
         return False
     if _is_organ_capability_request(role_name, cleaned_input):
         return False
