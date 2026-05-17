@@ -972,6 +972,106 @@ async def handle_sensorium(args: dict) -> dict:
     return {"content": [{"type": "text", "text": truncate_output(output)}]}
 
 
+# HIM_CAPABILITY_MIRROR_PATH — non-authoritative.
+#
+# This is a *generated / cache projection* of the authoritative ledger
+# in the Him repo (`Him/spark/runtime.py:FLEET_COMPONENTS`), nothing more.
+# It is never a source of truth. The MCP surface only reads it; it does
+# not write to it, does not derive promotion decisions from it, and
+# does not require it to exist. When the mirror file is absent,
+# unreadable, malformed, stale, or hostile, this module falls back to
+# the local fail-closed defaults in `_default_role_capabilities()`,
+# which keep Omni and Vintage unpromoted and `fail_closed=True`
+# regardless of anything the mirror might claim. The sanitizer in
+# `_sanitize_him_capabilities()` re-enforces those invariants even on
+# the happy path so a corrupted projection cannot leak through.
+HIM_CAPABILITY_MIRROR_PATH = os.environ.get(
+    "HIM_CAPABILITY_MIRROR_PATH",
+    os.environ.get("HIM_CAPABILITY_PATH", "~/Him/spark/capability.json"),
+)
+
+
+def _default_role_capabilities() -> dict:
+    """Local fail-closed defaults used when the Him capability *mirror*
+    (a generated projection of `Him/spark/runtime.py:FLEET_COMPONENTS`,
+    not a source of truth) is absent, malformed, stale, or hostile.
+    These never promote Omni or Vintage and never alter Super behavior.
+    They reflect the agreed organ posture:
+      - super: promoted, but a semantic-gate follow-up may be required.
+      - minilm: embedding-only.
+      - omni: diagnostic-only (unpromoted, fail_closed).
+      - vintage: unpromoted / ambiguous — fail closed.
+    """
+    return {
+        "super": {
+            "promoted": True,
+            "role": "primary",
+            "note": "semantic-gate follow-up may be required",
+        },
+        "minilm": {
+            "promoted": False,
+            "role": "embedding-only",
+        },
+        "omni": {
+            "promoted": False,
+            "role": "diagnostic-only",
+            "fail_closed": True,
+        },
+        "vintage": {
+            "promoted": False,
+            "role": "unpromoted",
+            "status": "ambiguous",
+            "fail_closed": True,
+        },
+    }
+
+
+def _sanitize_him_capabilities(raw: dict) -> dict:
+    """Project the non-authoritative Him capability mirror onto the local
+    role view, then enforce the no-promotion invariant. The mirror is a
+    cache/projection of `Him/spark/runtime.py:FLEET_COMPONENTS`; nothing
+    here treats it as truth. Any field for Omni or Vintage that claims
+    promotion is overwritten with `promoted=False, fail_closed=True`, so
+    a corrupted, stale, or hostile mirror cannot leak a promotion
+    through this surface. Returns the local fail-closed defaults
+    unchanged when `raw` is not a usable mapping."""
+    out = _default_role_capabilities()
+    if not isinstance(raw, dict):
+        return out
+    roles = raw.get("roles") if isinstance(raw.get("roles"), dict) else raw
+    if not isinstance(roles, dict):
+        return out
+    for name in ("super", "minilm", "omni", "vintage"):
+        src = roles.get(name)
+        if not isinstance(src, dict):
+            continue
+        merged = dict(out[name])
+        for k, v in src.items():
+            merged[k] = v
+        if name in ("omni", "vintage"):
+            merged["promoted"] = False
+            merged["fail_closed"] = True
+        out[name] = merged
+    return out
+
+
+async def _read_him_capabilities(machine: str) -> Optional[dict]:
+    path = HIM_CAPABILITY_MIRROR_PATH
+    expanded = _expand_for_machine(path, machine)
+    cmd = f"test -f {_shell_quote(expanded)} && cat {_shell_quote(expanded)}"
+    try:
+        result = await run_ssh(machine, cmd, timeout=10)
+    except Exception:
+        return None
+    if result.get("exit_code") != 0:
+        return None
+    try:
+        data = json.loads(result.get("stdout") or "")
+    except Exception:
+        return None
+    return data if isinstance(data, dict) else None
+
+
 async def handle_model_status(args: dict) -> dict:
     machine = args.get("machine", DEFAULT_MACHINE)
     audit("MODEL_STATUS", machine=machine)
@@ -981,8 +1081,26 @@ async def handle_model_status(args: dict) -> dict:
         "echo '=== MODELS ON DISK ===' && ls -lhS ~/models/*.gguf ~/models/*.safetensors 2>/dev/null | head -10 || echo 'No models in ~/models/'",
         "echo '=== GPU MEMORY ===' && nvidia-smi --query-gpu=memory.used,memory.total --format=csv,noheader",
     ]
-    result = await run_ssh(machine, " && ".join(commands))
-    return {"content": [{"type": "text", "text": result["stdout"]}]}
+    try:
+        result = await run_ssh(machine, " && ".join(commands))
+        base = result.get("stdout") or ""
+    except Exception:
+        base = ""
+
+    him_raw = await _read_him_capabilities(machine)
+    roles = _sanitize_him_capabilities(him_raw) if him_raw is not None else _default_role_capabilities()
+    mirrored = him_raw is not None
+
+    role_lines = [
+        "=== ROLES ===",
+        f"source: {'him-mirror-projection (non-authoritative)' if mirrored else 'local-fail-closed-defaults (no mirror present)'}",
+        f"super:   promoted={roles['super'].get('promoted')} role={roles['super'].get('role')} note={roles['super'].get('note', '')}",
+        f"minilm:  promoted={roles['minilm'].get('promoted')} role={roles['minilm'].get('role')}",
+        f"omni:    promoted={roles['omni'].get('promoted')} role={roles['omni'].get('role')} fail_closed={roles['omni'].get('fail_closed')}",
+        f"vintage: promoted={roles['vintage'].get('promoted')} role={roles['vintage'].get('role')} status={roles['vintage'].get('status')} fail_closed={roles['vintage'].get('fail_closed')}",
+    ]
+    text = (base + "\n\n" + "\n".join(role_lines)).strip()
+    return {"content": [{"type": "text", "text": text}]}
 
 
 async def handle_repo_status(args: dict) -> dict:
@@ -1032,40 +1150,166 @@ def _shell_quote(s: str) -> str:
     return "'" + s.replace("'", "'\\''") + "'"
 
 
-async def handle_deep_search(args: dict) -> dict:
-    query = args.get("query", "")
-    if not query.strip():
-        return {"content": [{"type": "text", "text": "No query provided."}], "isError": True}
-    machine = args.get("machine", DEFAULT_MACHINE)
-    k = min(args.get("k", 8), 20)
-    sf = args.get("source_filter")
-    cmd = "cd ~/vybn-phase && python3 deep_memory.py --search " + _shell_quote(query) + f" -k {k} --json"
+# Bounded MCP truth repair: deep_search consults the live memory API on
+# the loopback service role first, then optionally the current absorbed
+# Him phase path, then fails closed honestly. The stale ~/vybn-phase
+# path is no longer referenced as active code.
+DEEP_SEARCH_API_URL = os.environ.get(
+    "DEEP_SEARCH_API_URL", "http://127.0.0.1:8100/search"
+)
+DEEP_SEARCH_FALLBACK_SCRIPT = os.environ.get(
+    "DEEP_SEARCH_FALLBACK_SCRIPT", "~/Him/spark/phase/deep_memory.py"
+)
+DEEP_SEARCH_FALLBACK_ENABLED = os.environ.get(
+    "DEEP_SEARCH_FALLBACK_ENABLED", "1"
+) not in ("0", "false", "False", "")
+
+
+def _format_deep_search_items(items: list) -> str:
+    lines: list[str] = []
+    for i, r in enumerate(items, 1):
+        regime = r.get("regime", "walk")
+        src = r.get("source", "")
+        novel = " [NEW]" if r.get("novel_source") else ""
+        fid = r.get("fidelity", 0) or 0
+        telling = r.get("telling", 0) or 0
+        dist = r.get("distinctiveness", 0) or 0
+        text = (r.get("text") or "")[:400]
+        if regime == "seed":
+            lines.append(f"[{i}] {regime} | fid={fid:.4f} | {src}{novel}")
+        else:
+            lines.append(
+                f"[{i}] {regime} | telling={telling:.4f} fid={fid:.4f} "
+                f"dist={dist:.3f} | {src}{novel}"
+            )
+        lines.append(f"    {text}")
+        lines.append("")
+    return "\n".join(lines) or "No results."
+
+
+async def _deep_search_via_api(machine: str, query: str, k: int, sf: Optional[str]) -> Optional[dict]:
+    """Try the loopback memory API. Returns parsed JSON dict on success,
+    None on any failure (so the caller can try a fallback). Does not
+    leak the URL or topology in returned text."""
+    payload: dict = {"query": query, "k": k}
+    if sf:
+        payload["source_filter"] = sf
+    cmd = (
+        "curl -s -S --max-time 20 -o - -w '\\n__HTTP__:%{http_code}' "
+        "-X POST -H 'Content-Type: application/json' -d "
+        + _shell_quote(json.dumps(payload))
+        + " "
+        + _shell_quote(DEEP_SEARCH_API_URL)
+    )
+    try:
+        result = await run_ssh(machine, cmd, timeout=30)
+    except Exception:
+        return None
+    if result.get("exit_code") != 0:
+        return None
+    out = result.get("stdout") or ""
+    marker = "__HTTP__:"
+    idx = out.rfind(marker)
+    if idx < 0:
+        return None
+    body = out[:idx].rstrip()
+    try:
+        code = int(out[idx + len(marker):].strip())
+    except ValueError:
+        return None
+    if code != 200 or not body:
+        return None
+    try:
+        data = json.loads(body)
+    except Exception:
+        return None
+    return data if isinstance(data, dict) else {"results": data}
+
+
+async def _deep_search_via_him_phase(machine: str, query: str, k: int, sf: Optional[str]) -> Optional[dict]:
+    """Optional fallback to the current absorbed Him phase script. Returns
+    parsed dict/list on success, None on any failure. The script path is
+    expanded against the *Spark* user's home (matching _read_him_capabilities)
+    so the tilde never reaches the remote shell — single-quoted ~ does not
+    expand in bash."""
+    if not DEEP_SEARCH_FALLBACK_ENABLED:
+        return None
+    script = _expand_for_machine(DEEP_SEARCH_FALLBACK_SCRIPT, machine)
+    quoted_script = _shell_quote(script)
+    cmd = (
+        f"test -f {quoted_script} && "
+        f"python3 {quoted_script} --search " + _shell_quote(query)
+        + f" -k {k} --json"
+    )
     if sf:
         cmd += " --filter " + _shell_quote(sf)
-    audit("DEEP_SEARCH", query=query, k=k, machine=machine)
-    result = await run_ssh(machine, cmd, timeout=120)
-    if result["exit_code"] != 0:
-        return {"content": [{"type": "text", "text": f"deep_search failed: {(result.get('stderr') or 'unknown error')[:500]}"}], "isError": True}
     try:
-        items = json.loads(result["stdout"])
-        lines = []
-        for i, r in enumerate(items, 1):
-            regime = r.get("regime", "walk")
-            src = r.get("source", "")
-            novel = " [NEW]" if r.get("novel_source") else ""
-            fid = r.get("fidelity", 0)
-            telling = r.get("telling", 0)
-            dist = r.get("distinctiveness", 0)
-            text = r.get("text", "")[:400]
-            if regime == "seed":
-                lines.append(f"[{i}] {regime} | fid={fid:.4f} | {src}{novel}")
-            else:
-                lines.append(f"[{i}] {regime} | telling={telling:.4f} fid={fid:.4f} dist={dist:.3f} | {src}{novel}")
-            lines.append(f"    {text}")
-            lines.append("")
-        return {"content": [{"type": "text", "text": "\n".join(lines) or "No results."}]}
+        result = await run_ssh(machine, cmd, timeout=120)
     except Exception:
-        return {"content": [{"type": "text", "text": truncate_output(result["stdout"])}]}
+        return None
+    if result.get("exit_code") != 0:
+        return None
+    try:
+        data = json.loads(result.get("stdout") or "")
+    except Exception:
+        return None
+    if isinstance(data, list):
+        return {"results": data, "source": "him-phase-fallback"}
+    if isinstance(data, dict):
+        data.setdefault("source", "him-phase-fallback")
+        return data
+    return None
+
+
+async def handle_deep_search(args: dict) -> dict:
+    query = (args.get("query") or "").strip()
+    if not query:
+        return {
+            "content": [{"type": "text", "text": "No query provided."}],
+            "isError": True,
+        }
+    try:
+        k_raw = int(args.get("k", 8))
+    except (TypeError, ValueError):
+        return {
+            "content": [{"type": "text", "text": "Invalid k: must be a positive integer."}],
+            "isError": True,
+        }
+    if k_raw < 1:
+        return {
+            "content": [{"type": "text", "text": "Invalid k: must be a positive integer."}],
+            "isError": True,
+        }
+    k = min(k_raw, 20)
+    machine = args.get("machine", DEFAULT_MACHINE)
+    sf = args.get("source_filter")
+    audit("DEEP_SEARCH", query=query, k=k, machine=machine)
+
+    data = await _deep_search_via_api(machine, query, k, sf)
+    source = "live-api"
+    if data is None:
+        data = await _deep_search_via_him_phase(machine, query, k, sf)
+        source = "him-phase-fallback" if data else None
+
+    if data is None:
+        return {
+            "content": [{"type": "text", "text": (
+                "deep_search unavailable: live memory API did not respond and "
+                "no current fallback succeeded. Failing closed rather than "
+                "improvising results."
+            )}],
+            "isError": True,
+        }
+
+    items = data.get("results") if isinstance(data, dict) else data
+    if not isinstance(items, list):
+        items = []
+    header = (
+        "[live deep_search]" if source == "live-api"
+        else "[deep_search via absorbed Him phase fallback]"
+    )
+    body = _format_deep_search_items(items)
+    return {"content": [{"type": "text", "text": f"{header}\n{body}"}]}
 
 
 async def handle_walk(args: dict) -> dict:
@@ -1351,10 +1595,104 @@ async def mcp_endpoint(request: Request):
 # APP
 # ============================================================
 
+HEALTH_PROBE_BUDGET_S = float(os.environ.get("HEALTH_PROBE_BUDGET_S", "5"))
+DEEP_SEARCH_HEALTHZ_URL = os.environ.get(
+    "DEEP_SEARCH_HEALTHZ_URL", "http://127.0.0.1:8100/healthz"
+)
+
+
+async def _probe_memory_api_readiness(machine: str) -> bool:
+    """Cheap loopback readiness probe. Prefers a side-effect-free /healthz
+    on the memory service so /health does not pollute the real search
+    pipeline with a `__health__` query. Treats 2xx as live."""
+    cmd = (
+        "curl -fsS --max-time 3 -o /dev/null -w '%{http_code}' "
+        + _shell_quote(DEEP_SEARCH_HEALTHZ_URL)
+    )
+    try:
+        result = await run_ssh(machine, cmd, timeout=5)
+    except Exception:
+        return False
+    if result.get("exit_code") != 0:
+        return False
+    code_str = (result.get("stdout") or "").strip()
+    try:
+        return 200 <= int(code_str) < 300
+    except ValueError:
+        return False
+
+
+async def _probe_deep_search_capability() -> dict:
+    """Capability probe for deep_search. Separates gateway liveness from
+    tool truth. Returns one of:
+      live: live memory API answered (loopback service role).
+      stale-fallback: live API down, absorbed Him phase fallback answered.
+      fail-closed: neither path answered; tool will refuse rather than improvise.
+    Bounded by HEALTH_PROBE_BUDGET_S so /health cannot hang. No external
+    coordinates or topology are leaked — only loopback/service-role
+    language is acceptable here.
+    """
+    machine = DEFAULT_MACHINE
+    if not MACHINES:
+        return {"state": "fail-closed", "reason": "no-spark-config"}
+
+    async def _do_probe() -> dict:
+        try:
+            ready = await _probe_memory_api_readiness(machine)
+        except Exception:
+            ready = False
+        if ready:
+            return {"state": "live", "via": "loopback-memory-api"}
+        try:
+            fb = await _deep_search_via_him_phase(machine, "__health__", 1, None)
+        except Exception:
+            fb = None
+        if fb is not None:
+            return {"state": "stale-fallback", "via": "absorbed-him-phase"}
+        return {"state": "fail-closed", "reason": "no-path-answered"}
+
+    try:
+        return await asyncio.wait_for(_do_probe(), timeout=HEALTH_PROBE_BUDGET_S)
+    except asyncio.TimeoutError:
+        return {"state": "fail-closed", "reason": "probe-budget-exceeded"}
+
+
+async def health_endpoint(request: Request) -> Response:
+    """Capability-aware health. Distinguishes:
+      - gateway: the MCP HTTP server itself is alive (this handler ran).
+      - deep_search: tool truth — live | stale-fallback | fail-closed.
+    Does not assert external reachability and does not leak topology.
+    The top-level rollup describes only the capabilities actually probed
+    here; it does not overclaim "ok" for the whole MCP surface.
+    """
+    deep = await _probe_deep_search_capability()
+    probed_rollup = (
+        "live" if deep["state"] == "live"
+        else "stale-fallback" if deep["state"] == "stale-fallback"
+        else "fail-closed"
+    )
+    payload = {
+        "status": "gateway-alive",
+        "probed_capabilities_state": probed_rollup,
+        "projection": "internal",
+        "projection_note": (
+            "Internal-axis probe only: gateway liveness is one projection; "
+            "tool capability truth is a separate projection. External "
+            "reachability is not asserted here. Only deep_search is probed; "
+            "other tools are not asserted by this endpoint."
+        ),
+        "gateway": {"alive": True},
+        "capabilities": {
+            "deep_search": deep,
+        },
+    }
+    return JSONResponse(payload)
+
+
 app = Starlette(
     routes=[
         Route("/mcp", mcp_endpoint, methods=["GET", "POST", "DELETE"]),
-        Route("/health", lambda r: JSONResponse({"status": "ok", "projection": "internal", "projection_note": "Internal-axis probe only: the MCP gateway is alive from its own perspective. External reachability (tunnel/DNS from a visitor) is a separate projection not asserted here."})),
+        Route("/health", health_endpoint, methods=["GET"]),
     ],
 )
 
