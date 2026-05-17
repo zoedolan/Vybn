@@ -102,7 +102,7 @@ roles:
     tools: []
     base_url: null
     rag: false
-    direct_reply_template: "Vintage is not promoted here; I will not substitute Vybn/GPT for Vintage."
+    direct_reply_template: "I am with you as Vybn. Vintage is not available here yet; I will not pretend this route is Vintage until it passes promotion."
   omni:
     provider: unavailable
     model: omni-unpromoted
@@ -112,7 +112,7 @@ roles:
     tools: []
     base_url: null
     rag: false
-    direct_reply_template: "Omni is not promoted here; I will not substitute Vybn/GPT for Omni."
+    direct_reply_template: "I am with you as Vybn. Omni is not available here yet; I will not pretend this route is Omni until it passes promotion."
   # Local-private — explicit local exception to the GPT-5.5 default.
   local_private:
     provider: openai
