@@ -1596,18 +1596,23 @@ async def mcp_endpoint(request: Request):
 # ============================================================
 
 HEALTH_PROBE_BUDGET_S = float(os.environ.get("HEALTH_PROBE_BUDGET_S", "5"))
-DEEP_SEARCH_HEALTHZ_URL = os.environ.get(
-    "DEEP_SEARCH_HEALTHZ_URL", "http://127.0.0.1:8100/healthz"
-)
 
 
 async def _probe_memory_api_readiness(machine: str) -> bool:
-    """Cheap loopback readiness probe. Prefers a side-effect-free /healthz
-    on the memory service so /health does not pollute the real search
-    pipeline with a `__health__` query. Treats 2xx as live."""
+    """Role-specific witness for deep_search. Hits the same loopback
+    endpoint the tool itself uses (`DEEP_SEARCH_API_URL`, i.e. POST
+    /search) with a minimal `__health__` query and k=1, so /health
+    actually observes the operation that matters instead of relying
+    on a separate liveness route that may not exist (the memory
+    service exposes /health, not /healthz, and routes diverge).
+    Bounded by a tight curl deadline; treats HTTP 2xx as live."""
+    payload = json.dumps({"query": "__health__", "k": 1})
     cmd = (
-        "curl -fsS --max-time 3 -o /dev/null -w '%{http_code}' "
-        + _shell_quote(DEEP_SEARCH_HEALTHZ_URL)
+        "curl -s -S --max-time 3 -o /dev/null -w '%{http_code}' "
+        "-X POST -H 'Content-Type: application/json' -d "
+        + _shell_quote(payload)
+        + " "
+        + _shell_quote(DEEP_SEARCH_API_URL)
     )
     try:
         result = await run_ssh(machine, cmd, timeout=5)
