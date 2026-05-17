@@ -30,3 +30,5 @@ VYBN_ALLOW_DIRECT_PROTECTED_PUSH=1 git push origin main
 ```
 
 This is not a substitute for GitHub branch protection. It is a local membrane because this credential can bypass the remote PR rule; the bypass should be visible and rare.
+
+Closure requires tracked hooks to be installed, executable, and byte-for-byte current. Repo-visible policy without installed local enforcement is not protected closure.

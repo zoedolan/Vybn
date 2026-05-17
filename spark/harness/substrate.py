@@ -8873,6 +8873,20 @@ def normalize_fetch_refspec(repo: Path) -> str:
     return fetched
 
 
+def opsec_hooks_installed(repo: Path) -> bool:
+    """Tracked opsec hooks must be installed locally before closure claims."""
+    for name in ("pre-commit", "pre-push"):
+        tracked = repo / ".githooks" / name
+        installed = repo / ".git" / "hooks" / name
+        if not tracked.is_file() or not installed.is_file():
+            return False
+        if tracked.read_bytes() != installed.read_bytes():
+            return False
+        if installed.stat().st_mode & 0o111 == 0:
+            return False
+    return True
+
+
 def primary_commit_membrane_installed(repo: Path) -> bool:
     """Tracked .githooks/pre-commit must carry the subtractive constitution."""
     try:
@@ -8985,6 +8999,11 @@ def audit_repo(repo: Path, *, fix: bool | None = None) -> tuple[bool, str]:
         lines.append("\nSUBTRACTIVE_CONSTITUTION:")
         lines.append("tracked .githooks/pre-commit missing or does not carry subtractive constitution markers")
         problems.append("subtractive constitution not in tracked pre-commit hook")
+
+    if repo.name == "Vybn" and not opsec_hooks_installed(repo):
+        lines.append("\nOPSEC_HOOK_INSTALL:")
+        lines.append("installed git hooks are missing, stale, or non-executable relative to tracked .githooks")
+        problems.append("installed opsec hooks do not match tracked hooks")
 
     origin_head_ref = origin_head(repo)
     lines.append("\nORIGIN_HEAD:")
