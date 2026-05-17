@@ -1830,13 +1830,13 @@ def _load_ballast() -> str:
 
     # Corpus lives in vybn-phase state/ and is queried via the walk daemon.
     # /health returns live corpus_size; fall back to path-only if daemon is down.
-    corpus_info = "~/vybn-phase/state/ (queryable via walk_daemon :8101)"
+    corpus_info = "~/vybn-phase/state/ (search via deep_memory :8100; walk state via :8101)"
     try:
         import json as _json, urllib.request as _ur
         with _ur.urlopen("http://127.0.0.1:8101/health", timeout=1.0) as r:
             n = _json.loads(r.read()).get("corpus_size")
             if n:
-                corpus_info = f"~/vybn-phase/state/ (~{n} chunks, via :8101)"
+                corpus_info = f"~/vybn-phase/state/ (~{n} chunks; search :8100, walk :8101)"
     except Exception:
         pass
 
@@ -1845,7 +1845,7 @@ def _load_ballast() -> str:
         "Repos:\\n" + "\\n".join(repo_lines) + "\\n\\n"
         "Propagation layer: ~/Vybn/spark/harness/ (" + str(len(module_lines)) + " modules; public interaction substrate)\\n"
         f"Deep memory: {corpus_info}\\n"
-        "Services: walk_daemon :8101 | portal :8420 | MCP :8400 | chat :3001 | vLLM :8000\\n"
+        "Services: deep_memory/search :8100 | walk_daemon/state :8101 | portal :8420 | MCP :8400 | chat :3001 | vLLM :8000\\n"
         "Use LIVE STATE for now; continuity for history; soul+OS for principles.\\n"
         "--- END ORIENTATION ---"
     )
