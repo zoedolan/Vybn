@@ -103,7 +103,7 @@ roles:
     # vintage outputs. Promotion state is tracked independently in
     # server.py's capability table; this model id reflects the actual body
     # at the route, not a promotion claim.
-    model: vintage-1930-guarded-local
+    model: talkie-1930-13b-it
     base_url: http://127.0.0.1:8004/v1
     # Bounded raw-contact path: ordinary @vintage prompts strip enrichment
     # so prompt + completion fit the backend's 1024-token budget. 256 is
