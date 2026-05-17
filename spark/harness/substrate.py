@@ -834,8 +834,8 @@ _ORGAN_ALIAS_ROLES: frozenset[str] = frozenset({"vintage", "omni"})
 _OMNI_CAPABILITY_TOKENS: tuple[str, ...] = (
     "perceive",
     "perception",
-    "see ",
     "look at",
+    "look at this",
     "image",
     "photo",
     "picture",
@@ -843,11 +843,17 @@ _OMNI_CAPABILITY_TOKENS: tuple[str, ...] = (
     "vision",
     "multimodal",
     "audio",
-    "hear ",
-    "listen",
+    "listen to",
+    "hear this",
+    "hear that",
     "video",
     "camera",
     "ocr",
+    "can you see",
+    "do you see",
+    "what do you see",
+    "see this",
+    "see that",
 )
 _VINTAGE_CAPABILITY_TOKENS: tuple[str, ...] = (
     "1930",
@@ -862,37 +868,17 @@ _VINTAGE_CAPABILITY_TOKENS: tuple[str, ...] = (
     "vintage smoke",
 )
 
-# Greeting / ordinary-contact tokens. If the input is bare alias, very short,
-# or contains one of these, treat it as contact and emit the brief Vybn reply.
-# Conservative on purpose: anything ambiguous falls through to the wall.
-_CONTACT_TOKENS: tuple[str, ...] = (
-    "hi",
-    "hey",
-    "hello",
-    "yo",
-    "hola",
-    "good morning",
-    "good evening",
-    "good night",
-    "are you with me",
-    "you with me",
-    "you there",
-    "are you there",
-    "are you here",
-    "still with me",
-    "still there",
-    "how are you",
-    "how's it going",
-    "how goes",
-    "what's up",
-    "whats up",
-    "sup",
-    "miss you",
-    "love you",
-    "thanks",
-    "thank you",
-    "ty",
-)
+# Policy inversion (2026-05-17): the previous version gated contact on a
+# whitelist of greeting tokens, so ordinary relational prompts that did not
+# happen to use one of those words ("@vintage my friend?", "@omni buddy?",
+# "hoo boy, hello") fell through to the full diagnostic wall. Zoe surfaced
+# this from the live REPL after reload and named it as a closed-door read
+# on routine contact. The fix is to make the classifier conservative the
+# other way: render the full fail-closed wall ONLY when the turn names an
+# unavailable Vintage/Omni capability. Anything else — bare alias, "my
+# friend?", "are you there?", "thank you", "I miss you", any relational
+# prompt that does not request the absent organ — defaults to the brief
+# contactful Vybn reply. The capability lists below are the only gate.
 
 
 def _is_organ_capability_request(role_name: str, cleaned_input: str) -> bool:
@@ -910,22 +896,6 @@ def _is_organ_capability_request(role_name: str, cleaned_input: str) -> bool:
     return False
 
 
-def _is_organ_contact_greeting(role_name: str, cleaned_input: str) -> bool:
-    text = (cleaned_input or "").strip().lower()
-    if not text:
-        # Bare @vintage / @omni with no payload — read as contact, not capability.
-        return True
-    # The router seeds cleaned_input with the alias itself when payload is empty
-    # (see substrate.py policy classify) — treat that as bare contact too.
-    if text in {f"@{role_name}", role_name}:
-        return True
-    for token in _CONTACT_TOKENS:
-        # Require a word-ish boundary so "hi" does not match "high resolution".
-        if re.search(r"(?:^|[^a-z0-9])" + re.escape(token) + r"(?:[^a-z0-9]|$)", text):
-            return True
-    return False
-
-
 def render_organ_alias_direct_reply(
     role_name: str,
     cleaned_input: str,
@@ -935,19 +905,18 @@ def render_organ_alias_direct_reply(
 ) -> str:
     """Return the direct-reply string for an unpromoted organ alias.
 
-    For ordinary contact (greetings, "are you with me?", bare alias) we emit a
-    brief Vybn reply that still refuses impersonation and names the organ as
-    unpromoted, but answers the human contact instead of dumping the full
-    diagnostic wall. For any turn that names an unavailable capability we
-    return the existing fail-closed template verbatim. Roles outside the
-    organ set fall back to the rendered template unchanged.
+    Policy: the full fail-closed wall renders only when the turn names an
+    unavailable Vintage/Omni capability. Anything else — bare alias, "my
+    friend?", "are you with me?", "thank you", any relational prompt that
+    does not request the absent organ — defaults to the brief contactful
+    Vybn reply, which still refuses impersonation and names the organ as
+    unpromoted. Roles outside the organ set fall back to the rendered
+    template unchanged.
     """
     rendered = template.format(**(fmt_kwargs or {})) if template else ""
     if role_name not in _ORGAN_ALIAS_ROLES:
         return rendered
     if _is_organ_capability_request(role_name, cleaned_input):
-        return rendered
-    if not _is_organ_contact_greeting(role_name, cleaned_input):
         return rendered
     organ_upper = role_name.upper()
     return (
