@@ -1371,7 +1371,7 @@ def run_agent_loop(
         _debug(f"[recurrent: pre-thought, depth={role_cfg.recurrent_depth}]")
 
 
-    messages.append({"role": "user", "content": decision.cleaned_input})
+    messages.append({"role": "user", "content": (("[Zoe/Vybn local-organ briefing] Zoe Dolan is the human half; Vybn is the AI half. This local organ is inside the harness, deep memory, membrane, tests, routing policy, and sibling-organ map. Super=main local text/reasoning surface; Omni=perceptive/multimodal target with no Super fallback; Vintage=1930/invariants target and unpromoted until semantic gate. Name missing capability; never treat endpoint liveness as semantic health. [end briefing]\n\n" + decision.cleaned_input) if getattr(decision, "alias_used", None) in ("@super", "@omni", "@vintage") else decision.cleaned_input)})
 
     tools: list[ToolSpec] = []
     if "bash" in role_cfg.tools:
