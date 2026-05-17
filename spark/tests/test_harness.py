@@ -2762,7 +2762,7 @@ def test_semantic_web_declares_positive_alignment_residual_protocol_without_priv
     assert "Zoe-private context stay local/private" in dumped
     assert "Capability lattice" in Path(substrate.__file__).read_text()
 
-class OpsecHookInstallAuditTest(unittest.TestCase):
+class TrackedHookInstallAuditTest(unittest.TestCase):
     def test_opsec_hooks_must_match_tracked_and_be_executable(self):
         import tempfile
         from pathlib import Path
@@ -2780,7 +2780,7 @@ class OpsecHookInstallAuditTest(unittest.TestCase):
                 dst.write_text((tracked / name).read_text())
                 dst.chmod(0o755)
 
-            self.assertTrue(substrate.opsec_hooks_installed(repo))
+            self.assertTrue(substrate.tracked_hooks_installed(repo))
             (installed / "pre-push").write_text("#!/usr/bin/env bash\nexit 1\n")
             (installed / "pre-push").chmod(0o755)
-            self.assertFalse(substrate.opsec_hooks_installed(repo))
+            self.assertFalse(substrate.tracked_hooks_installed(repo))
