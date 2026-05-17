@@ -184,6 +184,34 @@ class TestPolicyHasLightweightRoles(unittest.TestCase):
         self.assertEqual(pol.model_aliases.get("@gpro"), "gpt-5.5-pro")
 
 
+class TestUnpromotedOrganAliasesFailClosed(unittest.TestCase):
+    def test_default_policy_omni_alias_fails_closed_before_how_are_you(self):
+        d = default_policy().classify("@omni hello, my friend, how are you?")
+        self.assertEqual(d.role, "omni")
+        self.assertEqual(d.config.provider, "unavailable")
+        self.assertEqual(d.config.model, "omni-unpromoted")
+        self.assertEqual(d.reason, "alias=@omni_fail_closed")
+        self.assertNotEqual(d.config.model, "gpt-5.5")
+
+    def test_default_policy_vintage_alias_fails_closed_before_how_are_you(self):
+        d = default_policy().classify("@vintage hello, my friend. how are you?")
+        self.assertEqual(d.role, "vintage")
+        self.assertEqual(d.config.provider, "unavailable")
+        self.assertEqual(d.config.model, "vintage-unpromoted")
+        self.assertEqual(d.reason, "alias=@vintage_fail_closed")
+        self.assertNotEqual(d.config.model, "gpt-5.5")
+
+    def test_yaml_policy_organ_aliases_fail_closed_before_how_are_you(self):
+        pol = load_policy(SPARK_DIR / "router_policy.yaml")
+        for alias, role in (("@omni", "omni"), ("@vintage", "vintage")):
+            with self.subTest(alias=alias):
+                d = pol.classify(f"{alias} hello, my friend, how are you?")
+                self.assertEqual(d.role, role)
+                self.assertEqual(d.config.provider, "unavailable")
+                self.assertTrue(d.reason.endswith("_fail_closed"))
+                self.assertNotEqual(d.config.model, "gpt-5.5")
+
+
 class TestRouterLightweightClassification(unittest.TestCase):
     """The router picks up greetings and identity questions via the new
     heuristics — before it would fall through to the chat/code defaults
