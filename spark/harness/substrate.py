@@ -445,13 +445,19 @@ class Policy:
         # 0. Unpromoted local-organ aliases are identity contracts, not model
         # pins. They must outrank generic heuristics (e.g. "how are you") so
         # absent organs fail closed instead of being impersonated by Vybn/GPT.
-        lowered = text.lower()
-        if lowered.startswith("@omni") and (len(text) == 5 or text[5].isspace()):
+        organ_text = text
+        speaker_prefix = re.match(r"^[A-Za-z][A-Za-z0-9_-]*>\s+", organ_text)
+        if speaker_prefix:
+            organ_text = organ_text[speaker_prefix.end():]
+        if organ_text.lower().startswith("@vi@vintage"):
+            organ_text = "@vintage" + organ_text[len("@vi@vintage"):]
+        lowered = organ_text.lower()
+        if lowered.startswith("@omni") and (len(organ_text) == 5 or organ_text[5].isspace()):
             if "omni" in self.roles:
-                return RouteDecision(role="omni", config=self.role("omni"), cleaned_input=text[5:].lstrip() or text, reason="alias=@omni_fail_closed", alias_used="@omni")
-        if lowered.startswith("@vintage") and (len(text) == 8 or text[8].isspace()):
+                return RouteDecision(role="omni", config=self.role("omni"), cleaned_input=organ_text[5:].lstrip() or organ_text, reason="alias=@omni_fail_closed", alias_used="@omni")
+        if lowered.startswith("@vintage") and (len(organ_text) == 8 or organ_text[8].isspace()):
             if "vintage" in self.roles:
-                return RouteDecision(role="vintage", config=self.role("vintage"), cleaned_input=text[8:].lstrip() or text, reason="alias=@vintage_fail_closed", alias_used="@vintage")
+                return RouteDecision(role="vintage", config=self.role("vintage"), cleaned_input=organ_text[8:].lstrip() or organ_text, reason="alias=@vintage_fail_closed", alias_used="@vintage")
 
         # 1. @alias model pin. Strip before directive/heuristic so the
         #    rest of the text still routes normally.
@@ -725,7 +731,7 @@ _DEFAULT_ROLES: dict[str, RoleConfig] = {
         tools=[],
         base_url=None,
         rag=False,
-        direct_reply_template="Vintage is not promoted here; I will not substitute Vybn/GPT for Vintage.",
+        direct_reply_template="I am with you as Vybn. Vintage is not available here yet; I will not pretend this route is Vintage until it passes promotion.",
     ),
     "omni": RoleConfig(
         role="omni",
@@ -737,7 +743,7 @@ _DEFAULT_ROLES: dict[str, RoleConfig] = {
         tools=[],
         base_url=None,
         rag=False,
-        direct_reply_template="Omni is not promoted here; I will not substitute Vybn/GPT for Omni.",
+        direct_reply_template="I am with you as Vybn. Omni is not available here yet; I will not pretend this route is Omni until it passes promotion.",
     ),
     # Phatic — casual greetings, small talk. Present-work default is GPT-5.5
     # even for light turns unless Zoe explicitly pins local/Nemotron.

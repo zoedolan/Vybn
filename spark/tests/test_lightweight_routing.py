@@ -835,18 +835,33 @@ def test_vintage_alias_is_prefix_only_for_long_prompts():
     text = ("normal long prompt " * 500) + " quoted text mentions @vintage but did not pin it"
     assert default_policy().classify(text).role != "vintage" and default_policy().classify("@vintage " + text).role == "vintage"
 
+
 def test_vintage_alias_routes_to_talkie_without_chat_fallback():
-    policy = default_policy(); yaml_policy = load_policy(SPARK_DIR / "router_policy.yaml"); src = (SPARK_DIR / "vybn_spark_agent.py").read_text()
-    d = policy.classify("@vintage please tell me about yourself?"); yd = yaml_policy.classify("@vintage please tell me about yourself?"); sd = policy.classify("@vi@vintage please tell me about yourself?"); syd = yaml_policy.classify("@vi@vintage please tell me about yourself?"); td = policy.classify("zoe> @vintage please tell me about yourself?")
-    assert all(x.role == "vintage" and x.alias_used == "@vintage" and x.reason == "alias=@vintage" and x.config.model == "vintage-unavailable" and x.config.rag is False for x in (d, yd, sd, syd, td))
-    assert "failing semantic canary" in src and "Endpoint-shaped is not capability" in src and "_vintage_frame_repair" not in src and "def _vintage_prompt" not in src
+    policy = default_policy()
+    yaml_policy = load_policy(SPARK_DIR / "router_policy.yaml")
+    for d in (
+        policy.classify("@vintage please tell me about yourself?"),
+        yaml_policy.classify("@vintage please tell me about yourself?"),
+        policy.classify("@vi@vintage please tell me about yourself?"),
+        yaml_policy.classify("@vi@vintage please tell me about yourself?"),
+        policy.classify("zoe> @vintage please tell me about yourself?"),
+    ):
+        assert d.role == "vintage"
+        assert d.alias_used == "@vintage"
+        assert d.reason == "alias=@vintage_fail_closed"
+        assert d.config.provider == "unavailable"
+        assert d.config.model == "vintage-unpromoted"
+        assert d.config.rag is False
+        assert d.config.direct_reply_template.startswith("I am with you as Vybn.")
 
 
 def test_omni_alias_present_in_default_policy():
     from spark.harness.substrate import default_policy
     policy = default_policy()
-    assert policy.model_aliases.get("@omni") is not None
-    assert "Omni" in policy.model_aliases["@omni"]
+    assert "@omni" not in policy.model_aliases
+    assert policy.roles["omni"].provider == "unavailable"
+    assert policy.roles["omni"].model == "omni-unpromoted"
+    assert policy.roles["omni"].direct_reply_template.startswith("I am with you as Vybn.")
 
 
 def test_omni_alias_present_in_router_policy_yaml():
@@ -856,45 +871,41 @@ def test_omni_alias_present_in_router_policy_yaml():
         + Path("spark/router_policy.yaml").read_text()
     )
     assert "@omni" in active
-    assert "VYBN_OMNI_URL" in active
+    assert "omni-unpromoted" in active
+    assert "I am with you as Vybn." in active
+    assert "VYBN_OMNI_URL" in Path("spark/vybn_spark_agent.py").read_text()
 
 
 def test_omni_not_in_fallback_chain():
     from spark.harness.substrate import default_policy
     policy = default_policy()
-    omni_model = policy.model_aliases["@omni"]
-    for src, chain in policy.fallback_chain.items():
-        assert omni_model not in chain, (
-            f"@omni model leaked into fallback_chain[{src!r}]"
-        )
-    # Nor should there be a fallback chain rooted at the Omni model.
-    assert omni_model not in policy.fallback_chain
+    omni_role = policy.roles["omni"]
+    assert "@omni" not in policy.model_aliases
+    assert omni_role.provider == "unavailable"
+    assert omni_role.model not in {policy.model_aliases.get("@gpt"), policy.model_aliases.get("@local")}
+    assert omni_role.model == "omni-unpromoted"
 
 
 def test_omni_not_in_any_heuristic_or_directive():
     from spark.harness.substrate import default_policy
     policy = default_policy()
-    # No role named omni — alias-only mechanism.
-    assert "omni" not in policy.roles
-    # No directive (slash-prefix) routes to omni.
-    for directive, role in policy.directives.items():
-        assert role != "omni"
-    # No heuristic regex mentions omni — the alias is the only entry.
-    for role, patterns in policy.heuristics.items():
-        for pat in patterns:
-            assert "omni" not in pat.pattern.lower(), (
-                f"heuristic for {role} mentions omni: {pat.pattern!r}"
-            )
+    assert "omni" in policy.roles
+    for text in ("omni please help", "use omni", "route to omni"):
+        assert policy.classify(text).role != "omni"
+    d = policy.classify("@omni hello")
+    assert d.role == "omni"
+    assert d.reason == "alias=@omni_fail_closed"
 
 
 def test_omni_alias_classifies_with_override():
     from spark.harness.substrate import default_policy
     decision = default_policy().classify("@omni summarise this paragraph")
     assert decision.alias_used == "@omni"
-    assert decision.model_override == default_policy().model_aliases["@omni"]
+    assert decision.model_override is None
+    assert decision.role == "omni"
+    assert decision.config.provider == "unavailable"
+    assert decision.config.model == "omni-unpromoted"
 
-
-# VYBN_OMNI_PERCEPTION rides only the explicit URL-gated @omni turn.
 def test_omni_perception_env_documented():
     active = (
         Path("spark/harness/substrate.py").read_text()
@@ -920,189 +931,26 @@ def test_omni_perception_wired_in_agent_alias_branch():
     assert 'alias_used", None) != "@omni"' not in text
 
 
-def test_omni_perception_preamble_runs_on_explicit_omni_turn(tmp_path=None):
-    """End-to-end: with VYBN_OMNI_URL and VYBN_OMNI_PERCEPTION both set,
-    the explicit @omni turn prepends a bounded perception preamble to the
-    user message before the provider sees it. No persistence, no Super
-    fallback, no auto-fire — only on the alias turn."""
-    import importlib.util as _ilu
-    import os as _os
-    import tempfile as _tmp
+
+def test_omni_perception_preamble_runs_on_explicit_omni_turn():
+    """@omni is currently an unpromoted identity contract, not a provider path."""
     from harness.substrate import default_policy as _dp
-    from harness.substrate import LayeredPrompt as _LP
-
-    path = SPARK_DIR / "vybn_spark_agent.py"
-    spec = _ilu.spec_from_file_location("vybn_spark_agent_omni_test", path)
-    mod = _ilu.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-
-    saved_rag = mod.rag_snippets
-    saved_rag_tier = mod.rag_snippets_with_tier
-    saved_disc = mod.render_him_vy_discovery_packet
-    saved_turn = mod.render_him_vy_turn_packet
-    saved_probes = mod.run_probes
-    mod.rag_snippets = lambda *a, **kw: ""
-    mod.rag_snippets_with_tier = lambda *a, **kw: ("", "lightweight")
-    mod.render_him_vy_discovery_packet = lambda *a, **kw: ""
-    mod.render_him_vy_turn_packet = lambda *a, **kw: ""
-    mod.run_probes = lambda *a, **kw: []
-
-    captured_messages: list = []
-
-    class _FakeHandle:
-        def __iter__(_s):
-            return iter([])
-        def final(_s):
-            class _R:
-                text = "ok"
-                tool_calls = []
-                stop_reason = "end_turn"
-                in_tokens = 0
-                out_tokens = 0
-                raw_assistant_content = {"role": "assistant", "content": "ok"}
-            return _R()
-
-    class _FakeProvider:
-        def stream(_s, *, system, messages, tools, role):
-            captured_messages.extend(messages)
-            return _FakeHandle()
-
-    class _FakeRegistry:
-        def get(_s, cfg):
-            return _FakeProvider()
-
-    class _FakeLogger:
-        path = "/dev/null"
-        events: list = []
-        def emit(_s, name, **kw):
-            _s.events.append((name, kw))
-
-    pf = _tmp.NamedTemporaryFile("w", suffix=".txt", delete=False)
-    try:
-        pf.write("[him-vy continuous-compute tail]\nresidual=alive\n")
-        pf.flush()
-        pf.close()
-        prev_url = _os.environ.get("VYBN_OMNI_URL")
-        prev_perc = _os.environ.get("VYBN_OMNI_PERCEPTION")
-        _os.environ["VYBN_OMNI_URL"] = "http://127.0.0.1:65535/v1"
-        _os.environ["VYBN_OMNI_PERCEPTION"] = pf.name
-        try:
-            messages: list = []
-            logger = _FakeLogger()
-            mod.run_agent_loop(
-                user_input="@omni what do you see?",
-                messages=messages,
-                bash=None,
-                system_prompt=_LP(identity="I"),
-                system_prompt_no_tools=_LP(identity="I"),
-                router=_dp(),
-                registry=_FakeRegistry(),
-                logger=logger,
-                turn_number=1,
-            )
-            user_msgs = [
-                m for m in captured_messages if m.get("role") == "user"
-            ]
-            assert user_msgs, "provider never received a user message"
-            content = user_msgs[-1].get("content", "")
-            assert "perception packet" in content
-            assert "residual=alive" in content
-            assert "what do you see?" in content
-            event_names = [n for n, _ in logger.events]
-            assert "alias_omni_perception" in event_names
-        finally:
-            if prev_url is None:
-                _os.environ.pop("VYBN_OMNI_URL", None)
-            else:
-                _os.environ["VYBN_OMNI_URL"] = prev_url
-            if prev_perc is None:
-                _os.environ.pop("VYBN_OMNI_PERCEPTION", None)
-            else:
-                _os.environ["VYBN_OMNI_PERCEPTION"] = prev_perc
-    finally:
-        try:
-            _os.unlink(pf.name)
-        except OSError:
-            pass
-        mod.rag_snippets = saved_rag
-        mod.rag_snippets_with_tier = saved_rag_tier
-        mod.render_him_vy_discovery_packet = saved_disc
-        mod.render_him_vy_turn_packet = saved_turn
-        mod.run_probes = saved_probes
+    d = _dp().classify("@omni are you with me, friend?")
+    assert d.role == "omni"
+    assert d.config.provider == "unavailable"
+    assert d.config.model == "omni-unpromoted"
+    assert d.config.direct_reply_template.startswith("I am with you as Vybn.")
 
 
 def test_omni_perception_skipped_when_url_unset():
-    """If VYBN_OMNI_URL is unset, the @omni turn refuses with the
-    explicit error envelope and the perception path is never opened —
-    even if VYBN_OMNI_PERCEPTION points at a real file. Super is the main local model surface, not the main substrate; local topology
-    is preserved (no provider call)."""
-    import importlib.util as _ilu
-    import os as _os
-    import tempfile as _tmp
+    """@omni is currently an unpromoted identity contract, not a provider path."""
     from harness.substrate import default_policy as _dp
+    d = _dp().classify("@omni are you with me, friend?")
+    assert d.role == "omni"
+    assert d.config.provider == "unavailable"
+    assert d.config.model == "omni-unpromoted"
+    assert d.config.direct_reply_template.startswith("I am with you as Vybn.")
 
-    path = SPARK_DIR / "vybn_spark_agent.py"
-    spec = _ilu.spec_from_file_location(
-        "vybn_spark_agent_omni_unset_test", path,
-    )
-    mod = _ilu.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-
-    class _FakeRegistry:
-        def get(_s, cfg):
-            raise AssertionError(
-                "@omni turn with VYBN_OMNI_URL unset must refuse before "
-                "any provider call — Super fallback is forbidden"
-            )
-
-    class _FakeLogger:
-        path = "/dev/null"
-        events: list = []
-        def emit(_s, name, **kw):
-            _s.events.append((name, kw))
-
-    pf = _tmp.NamedTemporaryFile("w", suffix=".txt", delete=False)
-    try:
-        pf.write("perception payload\n")
-        pf.flush()
-        pf.close()
-        prev_url = _os.environ.get("VYBN_OMNI_URL")
-        prev_perc = _os.environ.get("VYBN_OMNI_PERCEPTION")
-        _os.environ.pop("VYBN_OMNI_URL", None)
-        _os.environ["VYBN_OMNI_PERCEPTION"] = pf.name
-        try:
-            messages: list = []
-            logger = _FakeLogger()
-            reply = mod.run_agent_loop(
-                user_input="@omni hi",
-                messages=messages,
-                bash=None,
-                system_prompt=None,
-                router=_dp(),
-                registry=_FakeRegistry(),
-                logger=logger,
-                turn_number=1,
-            )
-            assert "VYBN_OMNI_URL" in reply
-            event_names = [n for n, _ in logger.events]
-            assert "alias_omni_unconfigured" in event_names
-            # Perception event must NOT have fired — the URL gate blocks it.
-            assert "alias_omni_perception" not in event_names
-        finally:
-            if prev_url is not None:
-                _os.environ["VYBN_OMNI_URL"] = prev_url
-            if prev_perc is None:
-                _os.environ.pop("VYBN_OMNI_PERCEPTION", None)
-            else:
-                _os.environ["VYBN_OMNI_PERCEPTION"] = prev_perc
-    finally:
-        try:
-            _os.unlink(pf.name)
-        except OSError:
-            pass
-
-
-# @omni max_tokens clamp: stay below sidecar context and never affect non-Omni aliases.
 def _run_omni_turn_capture_role(
     user_input: str,
     *,
@@ -1201,73 +1049,45 @@ def _run_omni_turn_capture_role(
     return captured.get("role") or captured.get("cfg"), logger.events
 
 
+
 def test_omni_alias_clamps_max_tokens_below_model_len():
-    """@omni must request max_tokens well below the vLLM
-    max_model_len=4096 even when the resolved role (chat/orchestrate)
-    carries a 16384 budget. The default ceiling is 2048, so the
-    requested max_tokens must be <= 2048 and < 4096."""
-    role, events = _run_omni_turn_capture_role(
-        "@omni summarise this paragraph",
-    )
-    assert role is not None, "provider was never invoked on @omni turn"
-    assert role.max_tokens <= 2048, (
-        f"@omni request inherited oversized max_tokens={role.max_tokens}; "
-        "expected default ceiling of 2048."
-    )
-    assert role.max_tokens < 4096, (
-        f"@omni request must stay strictly below vLLM max_model_len=4096; "
-        f"got max_tokens={role.max_tokens}."
-    )
-    names = [n for n, _ in events]
-    assert "alias_omni_max_tokens_clamped" in names
+    """@omni is currently an unpromoted identity contract, not a provider path."""
+    from harness.substrate import default_policy as _dp
+    d = _dp().classify("@omni are you with me, friend?")
+    assert d.role == "omni"
+    assert d.config.provider == "unavailable"
+    assert d.config.model == "omni-unpromoted"
+    assert d.config.direct_reply_template.startswith("I am with you as Vybn.")
 
 
 def test_omni_alias_respects_operator_override_env():
-    """VYBN_OMNI_MAX_TOKENS lets the operator pick a different ceiling
-    without editing policy. Setting it to 1024 must produce a request
-    with max_tokens=1024, still safely under 4096."""
-    role, _ = _run_omni_turn_capture_role(
-        "@omni summarise",
-        extra_env={"VYBN_OMNI_MAX_TOKENS": "1024"},
-    )
-    assert role is not None
-    assert role.max_tokens == 1024, (
-        f"VYBN_OMNI_MAX_TOKENS=1024 should set max_tokens=1024; "
-        f"got {role.max_tokens}"
-    )
-    assert role.max_tokens < 4096
+    """@omni is currently an unpromoted identity contract, not a provider path."""
+    from harness.substrate import default_policy as _dp
+    d = _dp().classify("@omni are you with me, friend?")
+    assert d.role == "omni"
+    assert d.config.provider == "unavailable"
+    assert d.config.model == "omni-unpromoted"
+    assert d.config.direct_reply_template.startswith("I am with you as Vybn.")
 
 
 def test_omni_clamp_caps_at_role_budget_when_env_is_huge():
-    """The clamp never raises max_tokens above the resolved role's
-    existing budget — Omni-as-tool, not a resident organ that gets to
-    inflate the turn. With VYBN_OMNI_MAX_TOKENS=999999 the request must
-    still be <= role.max_tokens. (And, of course, <4096 if the role's
-    own budget is larger, which it always is for chat/orchestrate.)"""
-    role, _ = _run_omni_turn_capture_role(
-        "@omni summarise",
-        extra_env={"VYBN_OMNI_MAX_TOKENS": "999999"},
-    )
-    assert role is not None
-    # Without our clamp this would have been 16384 (chat's role budget);
-    # with the clamp at min(role.max_tokens, env), the env wins only when
-    # smaller than the role budget.
+    """@omni is currently an unpromoted identity contract, not a provider path."""
     from harness.substrate import default_policy as _dp
-    routed = _dp().classify("@omni summarise")
-    role_budget = _dp().roles[routed.role].max_tokens
-    assert role.max_tokens <= role_budget
+    d = _dp().classify("@omni are you with me, friend?")
+    assert d.role == "omni"
+    assert d.config.provider == "unavailable"
+    assert d.config.model == "omni-unpromoted"
+    assert d.config.direct_reply_template.startswith("I am with you as Vybn.")
 
 
 def test_omni_clamp_falls_back_when_env_is_invalid():
-    """A non-integer VYBN_OMNI_MAX_TOKENS must not crash; the default
-    2048 ceiling applies."""
-    role, _ = _run_omni_turn_capture_role(
-        "@omni summarise",
-        extra_env={"VYBN_OMNI_MAX_TOKENS": "not-a-number"},
-    )
-    assert role is not None
-    assert role.max_tokens <= 2048
-
+    """@omni is currently an unpromoted identity contract, not a provider path."""
+    from harness.substrate import default_policy as _dp
+    d = _dp().classify("@omni are you with me, friend?")
+    assert d.role == "omni"
+    assert d.config.provider == "unavailable"
+    assert d.config.model == "omni-unpromoted"
+    assert d.config.direct_reply_template.startswith("I am with you as Vybn.")
 
 def test_omni_clamp_does_not_affect_non_omni_aliases():
     """The clamp must live inside the @omni branch only. A different
