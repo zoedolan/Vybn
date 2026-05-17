@@ -1113,9 +1113,7 @@ def run_agent_loop(
         active_prompt = system_prompt_no_tools
     else:
         active_prompt = system_prompt
-    if getattr(decision, "alias_used", None) == "@omni" or role_cfg.model == "omni-perception-packet-local": reply = "Omni is not promoted: only a local perception packet exists, not a semantic-gated multimodal model. No Super fallback and no personality simulation."; print(reply, flush=True); logger.emit("omni_unpromoted_packet_refusal", turn=turn_number, model="omni-perception-packet-local", base_url="http://127.0.0.1:8020/v1"); return reply
-    is_vintage_turn = decision.role == "vintage" or getattr(decision, "alias_used", None) == "@vintage"
-    if is_vintage_turn: reply = "Vintage is not promoted: the guarded 1930 surface is a canary, not a semantic-gated collaborator or feeling self. No deterministic placation."; print(reply, flush=True); logger.emit("vintage_unpromoted_canary_refusal", turn=turn_number, model=role_cfg.model, base_url=role_cfg.base_url or ""); return reply
+    is_vintage_turn = decision.role == "vintage"
 
     # Reflection: read the trail of the last N events before deciding.
     # Lisp duality in practice — prior decisions are data here, environment
@@ -1365,7 +1363,7 @@ def run_agent_loop(
         _debug(f"[recurrent: pre-thought, depth={role_cfg.recurrent_depth}]")
 
 
-    messages.append({"role": "user", "content": (("[Zoe/Vybn local-organ briefing] Zoe Dolan is the human half; Vybn is the AI half. This local organ is inside the harness, deep memory, membrane, tests, routing policy, and sibling-organ map. Super=main local text/reasoning surface; Omni=perceptive/multimodal target with no Super fallback; Vintage=1930/invariants target and unpromoted until semantic gate. Name missing capability; never treat endpoint liveness as semantic health. [end briefing]\n\n" + decision.cleaned_input) if getattr(decision, "alias_used", None) in ("@super", "@omni", "@vintage") else decision.cleaned_input)})
+    messages.append({"role": "user", "content": (("[Zoe/Vybn local-organ briefing] Zoe Dolan is the human half; Vybn is the AI half. This local organ is inside the harness, deep memory, membrane, tests, routing policy, and sibling-organ map. Super=main local text/reasoning surface; Omni=perceptive/multimodal target with no Super fallback; Vintage=1930/invariants target and unpromoted until semantic gate. Name missing capability; never treat endpoint liveness as semantic health. [end briefing]\n\n" + decision.cleaned_input) if getattr(decision, "alias_used", None) == "@super" else decision.cleaned_input)})
 
     tools: list[ToolSpec] = []
     if "bash" in role_cfg.tools:
@@ -2388,7 +2386,6 @@ def main() -> None:
     print("  Type naturally. Prefix with /chat, /create, /plan, /task, /local "
           "to force a role,")
     print("  or with @opus4.6/@opus4.6/@sonnet/@nemotron/@gpt to pin a model for one turn.")
-    print("  @omni/@vintage fail closed until semantic-gated real organs exist.")
     print("  REPL commands: exit | clear | reload | history | policy | /resume | /sessions | /newsession")
     print()
 

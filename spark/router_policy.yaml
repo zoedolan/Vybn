@@ -345,9 +345,7 @@ model_aliases:
   "@sonnet46": claude-sonnet-4-6
   "@nemotron": nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
   "@local": nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
-  "@vintage": vintage-1930-guarded-local
   # @omni is explicit/operator-gated; no heuristic Super fallback.
-  "@omni": omni-perception-packet-local
   "@gpt": gpt-5.5
   "@gpt5": gpt-5.5
   "@gpro": gpt-5.5-pro
