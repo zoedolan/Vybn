@@ -734,7 +734,7 @@ _DEFAULT_ROLES: dict[str, RoleConfig] = {
     "vintage": RoleConfig(
         role="vintage",
         provider="openai",
-        model="vintage-1930-guarded-local",
+        model="talkie-1930-13b-it",
         thinking="off",
         # Ordinary @vintage prompts (not capability/status, not bare
         # greeting) attempt raw unpromoted contact with the guarded Talkie

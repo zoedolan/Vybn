@@ -1139,15 +1139,13 @@ def run_agent_loop(
         return reply
 
     if _organ_raw_contact:
-        # Bounded raw-unpromoted-contact path for @vintage / @omni.
-        #
-        # Strips RAG, him-vy packets, recurrent prethink, the local-organ
-        # briefing, and the LayeredPrompt substrate so prompt + completion
-        # fit the backend's 1024-token transport budget. The prompt sent
-        # is just the minimal system stub + the truncated user input.
-        # Failures are not silently absorbed into Super/GPT/cloud — they
-        # surface as RAW_CONTACT_FAILED with the transport error.
-        bounded_input = truncate_for_organ_raw_contact(decision.cleaned_input or "")
+        # Bounded raw-unpromoted-contact path: strip heavy prompt layers,
+        # keep fallback refusal, and put Vintage's 1930 frame in-band because
+        # Talkie obeys the direct prompt body more reliably than system stubs.
+        raw_contact_input = decision.cleaned_input or ""
+        if role_cfg.role == "vintage":
+            raw_contact_input = "You are in the year 1930. Answer from that temporal frame. " + raw_contact_input
+        bounded_input = truncate_for_organ_raw_contact(raw_contact_input)
         system_stub = LayeredPrompt(
             identity="",
             substrate=build_organ_raw_contact_system_prompt(role_cfg.role),

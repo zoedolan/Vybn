@@ -232,9 +232,9 @@ class TestExplicitOrganAliasesRouteToExperimentalEndpoints(unittest.TestCase):
         self.assertEqual(d.config.provider, "openai")
         # Honest model id: not the Super model, not the stale local TinyLlama.
         # Refuses impersonation; the route points at the guarded Talkie
-        # proxy via the front SSH tunnel (vintage-1930-guarded-local).
+        # proxy via the front SSH tunnel (talkie-1930-13b-it).
         self.assertNotEqual(d.config.model, "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8")
-        self.assertEqual(d.config.model, "vintage-1930-guarded-local")
+        self.assertEqual(d.config.model, "talkie-1930-13b-it")
         self.assertEqual(d.config.base_url, "http://127.0.0.1:8004/v1")
         self._assert_fail_closed_contact_template("vintage", d.config.direct_reply_template)
 
@@ -243,7 +243,7 @@ class TestExplicitOrganAliasesRouteToExperimentalEndpoints(unittest.TestCase):
         expected = {
             "omni": {"model_substr": "unpromoted", "base_url_empty": True},
             "vintage": {
-                "model_exact": "vintage-1930-guarded-local",
+                "model_exact": "talkie-1930-13b-it",
                 "base_url": "http://127.0.0.1:8004/v1",
             },
         }
@@ -930,9 +930,9 @@ def test_vintage_alias_routes_to_fail_closed_contact_template():
         assert d.config.provider == "openai"
         # Refuses impersonation: not the Super model id, not the stale local
         # TinyLlama. Route points at the guarded Talkie proxy via the front
-        # SSH tunnel (vintage-1930-guarded-local at 127.0.0.1:8004/v1).
+        # SSH tunnel (talkie-1930-13b-it at 127.0.0.1:8004/v1).
         assert d.config.model != "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"
-        assert d.config.model == "vintage-1930-guarded-local"
+        assert d.config.model == "talkie-1930-13b-it"
         assert d.config.base_url == "http://127.0.0.1:8004/v1"
         assert d.config.rag is False
         _assert_fail_closed_contact_template("vintage", d.config.direct_reply_template)
@@ -2048,7 +2048,7 @@ def test_organ_max_tokens_bounded_to_256_for_raw_contact():
         # tunnel; the model id names the actual body, base_url is the
         # tunnel entry. Promotion is gated separately in server.py.
         vintage_cfg = pol.roles["vintage"]
-        assert vintage_cfg.model == "vintage-1930-guarded-local", (label, vintage_cfg.model)
+        assert vintage_cfg.model == "talkie-1930-13b-it", (label, vintage_cfg.model)
         assert vintage_cfg.base_url == "http://127.0.0.1:8004/v1", (label, vintage_cfg.base_url)
         # Omni still has no served chat/perception surface — model id stays
         # unpromoted and base_url stays unset so raw-contact does not dial
@@ -2242,7 +2242,7 @@ def test_vintage_arbitrary_prompt_attempts_raw_backend_contact():
     # @vintage now routes to the guarded Talkie proxy via the front-local
     # SSH tunnel, not the stale local TinyLlama at :8019.
     assert captured["role"].base_url == "http://127.0.0.1:8004/v1"
-    assert captured["role"].model == "vintage-1930-guarded-local"
+    assert captured["role"].model == "talkie-1930-13b-it"
     # Backend output is labeled honestly and surfaced verbatim.
     assert "VINTAGE_RAW_UNPROMOTED_CONTACT" in reply
     assert "four" in reply
@@ -2604,7 +2604,7 @@ def test_screenshot_exact_prompt_reaches_vintage_backend_not_template():
     assert registry.provider is not None
     assert captured["role"].role == "vintage"
     assert captured["role"].base_url == "http://127.0.0.1:8004/v1"
-    assert captured["role"].model == "vintage-1930-guarded-local"
+    assert captured["role"].model == "talkie-1930-13b-it"
     # The user's full prompt is forwarded (post truncation).
     user_msg = captured["messages"][-1]["content"]
     assert "what is your name" in user_msg
