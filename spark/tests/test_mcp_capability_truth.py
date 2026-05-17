@@ -247,8 +247,12 @@ class HealthCapabilityTests(unittest.TestCase):
                           f"/health leaked a URL: {body!r}")
 
     def test_health_probe_is_bounded(self):
-        """If the probe hangs, /health must time out cleanly (fail-closed),
-        never block the gateway response indefinitely."""
+        """If the probe hangs, /health must time out cleanly without blocking
+        the gateway response. A probe-budget timeout means we did not learn
+        whether the tool is live — it is NOT evidence that the tool refused.
+        The capability state must report `indeterminate` (with reason
+        `probe-budget-exceeded`), not `fail-closed`, so /health stays
+        coherent with tool truth instead of overclaiming a refusal."""
         async def slow_probe():
             await asyncio.sleep(10)
             return {"state": "live", "via": "loopback-memory-api"}
@@ -260,9 +264,15 @@ class HealthCapabilityTests(unittest.TestCase):
             client = TestClient(server.app)
             resp = client.get("/health")
         data = resp.json()
-        self.assertEqual(data["capabilities"]["deep_search"]["state"], "fail-closed")
+        self.assertEqual(data["capabilities"]["deep_search"]["state"], "indeterminate")
         self.assertEqual(data["capabilities"]["deep_search"].get("reason"),
                          "probe-budget-exceeded")
+        # Rollup must mirror the per-capability state — not be flattened
+        # to "fail-closed" merely because the probe ran out of time.
+        self.assertEqual(data["probed_capabilities_state"], "indeterminate")
+        # Gateway liveness is the separate axis and remains alive.
+        self.assertTrue(data["gateway"]["alive"])
+        self.assertEqual(data["status"], "gateway-alive")
 
 
 class ModelStatusRoleTests(unittest.TestCase):
