@@ -94,12 +94,12 @@ roles:
 
   vintage:
     provider: openai
-    model: vintage-unavailable
+    model: vintage-1930-guarded-local
     thinking: off
     max_tokens: 256
     max_iterations: 1
     tools: []
-    base_url: http://127.0.0.1:8004/v1
+    base_url: http://127.0.0.1:8019/v1
     rag: false
   # Local-private — explicit local exception to the GPT-5.5 default.
   local_private:
@@ -344,7 +344,7 @@ model_aliases:
   "@sonnet46": claude-sonnet-4-6
   "@nemotron": nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
   "@local": nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
-  "@vintage": vintage-unavailable
+  "@vintage": vintage-1930-guarded-local
   # @omni is explicit/operator-gated only: @omni plus VYBN_OMNI_URL; no
   # fallback, no heuristic route, no Super disturbance.
   "@omni": nvidia/NVIDIA-Nemotron-Nano-Omni
