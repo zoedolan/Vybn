@@ -972,19 +972,9 @@ async def handle_sensorium(args: dict) -> dict:
     return {"content": [{"type": "text", "text": truncate_output(output)}]}
 
 
-# HIM_CAPABILITY_MIRROR_PATH — non-authoritative.
-#
-# This is a *generated / cache projection* of the authoritative ledger
-# in the Him repo (`Him/spark/runtime.py:FLEET_COMPONENTS`), nothing more.
-# It is never a source of truth. The MCP surface only reads it; it does
-# not write to it, does not derive promotion decisions from it, and
-# does not require it to exist. When the mirror file is absent,
-# unreadable, malformed, stale, or hostile, this module falls back to
-# the local fail-closed defaults in `_default_role_capabilities()`,
-# which keep Omni and Vintage unpromoted and `fail_closed=True`
-# regardless of anything the mirror might claim. The sanitizer in
-# `_sanitize_him_capabilities()` re-enforces those invariants even on
-# the happy path so a corrupted projection cannot leak through.
+# HIM_CAPABILITY_MIRROR_PATH is a non-authoritative projection of Him runtime
+# state. Absent or incomplete evidence fails closed; promotion requires the
+# complete gate enforced by `_sanitize_him_capabilities()`.
 HIM_CAPABILITY_MIRROR_PATH = os.environ.get(
     "HIM_CAPABILITY_MIRROR_PATH",
     os.environ.get("HIM_CAPABILITY_PATH", "~/Him/spark/capability.json"),
@@ -992,16 +982,7 @@ HIM_CAPABILITY_MIRROR_PATH = os.environ.get(
 
 
 def _default_role_capabilities() -> dict:
-    """Local fail-closed defaults used when the Him capability *mirror*
-    (a generated projection of `Him/spark/runtime.py:FLEET_COMPONENTS`,
-    not a source of truth) is absent, malformed, stale, or hostile.
-    These never promote Omni or Vintage and never alter Super behavior.
-    They reflect the agreed organ posture:
-      - super: promoted, but a semantic-gate follow-up may be required.
-      - minilm: embedding-only.
-      - omni: diagnostic-only (unpromoted, fail_closed).
-      - vintage: unpromoted / ambiguous — fail closed.
-    """
+    """Local fail-closed defaults when Him capability evidence is missing."""
     return {
         "super": {
             "promoted": True,
@@ -1026,15 +1007,15 @@ def _default_role_capabilities() -> dict:
     }
 
 
+PROMOTION_GATE_REQUIRED = {"endpoint_ready", "semantic_smoke", "routed_workload_proof", "owner", "rollback"}
+
+
+def _promotion_gate_passed(src: dict) -> bool:
+    gate = src.get("promotion_gate")
+    return isinstance(gate, dict) and all(gate.get(k) is True or (isinstance(gate.get(k), str) and gate.get(k).strip()) for k in PROMOTION_GATE_REQUIRED)
+
 def _sanitize_him_capabilities(raw: dict) -> dict:
-    """Project the non-authoritative Him capability mirror onto the local
-    role view, then enforce the no-promotion invariant. The mirror is a
-    cache/projection of `Him/spark/runtime.py:FLEET_COMPONENTS`; nothing
-    here treats it as truth. Any field for Omni or Vintage that claims
-    promotion is overwritten with `promoted=False, fail_closed=True`, so
-    a corrupted, stale, or hostile mirror cannot leak a promotion
-    through this surface. Returns the local fail-closed defaults
-    unchanged when `raw` is not a usable mapping."""
+    """Expose Omni/Vintage as promoted only behind the complete local gate."""
     out = _default_role_capabilities()
     if not isinstance(raw, dict):
         return out
@@ -1049,8 +1030,9 @@ def _sanitize_him_capabilities(raw: dict) -> dict:
         for k, v in src.items():
             merged[k] = v
         if name in ("omni", "vintage"):
-            merged["promoted"] = False
-            merged["fail_closed"] = True
+            promoted = bool(src.get("promoted")) and _promotion_gate_passed(src)
+            merged["promoted"] = promoted
+            merged["fail_closed"] = not promoted
         out[name] = merged
     return out
 
