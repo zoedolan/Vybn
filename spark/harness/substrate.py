@@ -730,7 +730,13 @@ _DEFAULT_ROLES: dict[str, RoleConfig] = {
         provider="openai",
         model="vintage-unpromoted-no-chat-surface",
         thinking="off",
-        max_tokens=1,
+        # Ordinary @vintage prompts (not capability/status, not bare
+        # greeting) attempt raw unpromoted contact with the local Vintage
+        # backend. The total transport budget on the backend is 1024
+        # tokens; the bounded raw-contact path strips RAG/him-vy/recurrent
+        # enrichment so prompt + completion fit. 256 is the completion
+        # ceiling, leaving ~768 tokens for the bounded prompt.
+        max_tokens=256,
         max_iterations=1,
         tools=[],
         base_url="http://127.0.0.1:8019/v1",
@@ -755,7 +761,12 @@ _DEFAULT_ROLES: dict[str, RoleConfig] = {
         provider="openai",
         model="omni-unpromoted-no-chat-surface",
         thinking="off",
-        max_tokens=1,
+        # See vintage: ordinary @omni prompts attempt raw unpromoted
+        # contact with whatever surface answers at the configured base_url.
+        # If no chat/multimodal model is served there the provider call
+        # surfaces the transport error honestly — Super/GPT/cloud do not
+        # impersonate Omni.
+        max_tokens=256,
         max_iterations=1,
         tools=[],
         base_url="http://127.0.0.1:8020/v1",
@@ -894,6 +905,157 @@ def _is_organ_capability_request(role_name: str, cleaned_input: str) -> bool:
         if token in text:
             return True
     return False
+
+
+# Contact-shape prompts that should answer with the brief Vybn reply (no
+# backend call): bare alias, greetings, presence checks, thanks, the small
+# screenshot-spec set Zoe surfaced in the live REPL. Anything outside this
+# set — an arbitrary question, a request, a substantive turn — should
+# attempt raw unpromoted contact with the backend instead of being walled
+# off behind a static reply. The list is intentionally tight so ordinary
+# arbitrary prompts fall through to backend contact.
+_ORGAN_CONTACT_GREETING_TOKENS: tuple[str, ...] = (
+    "hi",
+    "hello",
+    "hey",
+    "yo",
+    "howdy",
+    "sup",
+    "hoo boy",
+    "thanks",
+    "thank you",
+    "ty",
+    "thx",
+    "i miss you",
+    "miss you",
+    "good to hear from you",
+    "are you there",
+    "you there",
+    "are you with me",
+    "with me?",
+    "with me, friend",
+    "you good",
+    "how are you",
+    "how's it going",
+    "hows it going",
+    "good morning",
+    "good afternoon",
+    "good evening",
+    "friend?",
+    "my friend",
+    "buddy",
+    "pal?",
+)
+
+
+def _is_organ_contact_greeting(cleaned_input: str) -> bool:
+    """True when the prompt looks like a bare relational ping (greeting,
+    presence check, thanks, screenshot-spec contact prompts). The brief
+    contactful Vybn reply answers these without a backend call. Any
+    longer / more substantive prompt is treated as ordinary communication
+    and routed to the raw unpromoted contact path.
+
+    Matching is word-boundary aware so short greeting words ("hi", "hey")
+    do not accidentally fire on "this", "they", etc. inside substantive
+    prompts ("summarise this paragraph for me").
+    """
+    text = (cleaned_input or "").strip().lower()
+    if not text:
+        # Bare alias (e.g. "@vintage" with no body) is a contact ping.
+        return True
+    # Long prompts are not greetings even if they mention "hi"/"friend".
+    if len(text) > 80:
+        return False
+    import re as _re
+    for token in _ORGAN_CONTACT_GREETING_TOKENS:
+        pattern = r"(?<![a-z])" + _re.escape(token) + r"(?![a-z])"
+        if _re.search(pattern, text):
+            return True
+    return False
+
+
+def should_attempt_raw_organ_contact(role_name: str, cleaned_input: str) -> bool:
+    """Gate for the bounded raw-unpromoted-contact path on @vintage / @omni.
+
+    True only when:
+      - role is one of the unpromoted organ aliases, AND
+      - the prompt does NOT name an unavailable Vintage/Omni capability
+        (capability/status requests still get the honest wall — no false
+        claim that the absent organ answered them), AND
+      - the prompt is NOT a bare relational greeting (those get the brief
+        Vybn contact reply, no backend call).
+
+    Anything else — ordinary arbitrary prompts the user wants to send to
+    the available local backend — attempts raw contact at the configured
+    base_url, labeled as unpromoted/experimental in the agent loop, with
+    a bounded prompt so the 1024-token backend budget is respected.
+    """
+    if role_name not in _ORGAN_ALIAS_ROLES:
+        return False
+    if _is_organ_capability_request(role_name, cleaned_input):
+        return False
+    if _is_organ_contact_greeting(cleaned_input):
+        return False
+    return True
+
+
+# Hard ceiling on how many characters of user input we hand the local
+# unpromoted backend in raw-contact mode. The role's max_tokens=256 is
+# the completion ceiling; the backend's 1024-token transport budget
+# leaves ~768 tokens for prompt + system. Truncating user input around
+# ~2500 chars (≈600 tokens) keeps us well under the budget even with
+# the minimal system prompt below.
+_ORGAN_RAW_CONTACT_INPUT_CHAR_LIMIT: int = 2500
+
+
+def render_organ_raw_contact_header(role_name: str) -> str:
+    """Label prepended to backend output for the raw-unpromoted-contact
+    path. Names the route as unpromoted/experimental so the user does not
+    read the output as a promoted/semantically-clean answer."""
+    organ_upper = role_name.upper()
+    return (
+        f"[{organ_upper}_RAW_UNPROMOTED_CONTACT — this is raw model contact on"
+        f" the local @{role_name} backend, not a promoted/semantically-gated"
+        f" route. Output below is unvetted experimental contact; capability and"
+        f" status claims are not endorsed by this path.]"
+    )
+
+
+def render_organ_raw_contact_error(role_name: str, err: str) -> str:
+    """Honest error surface when the raw-unpromoted-contact backend call
+    fails. No Super/GPT/cloud fallback impersonation."""
+    organ_upper = role_name.upper()
+    safe = (err or "").strip()
+    if len(safe) > 600:
+        safe = safe[:600] + "…"
+    return (
+        f"{organ_upper}_RAW_CONTACT_FAILED — raw unpromoted contact on the local"
+        f" @{role_name} backend did not return a usable reply. I will not have"
+        f" Super, GPT, a cloud provider, or a deterministic packet answer as"
+        f" {role_name.capitalize()}; that would be impersonation. Error:"
+        f" {safe}"
+    )
+
+
+def build_organ_raw_contact_system_prompt(role_name: str) -> str:
+    """Minimal system prompt for the bounded raw-contact path. Strips the
+    RAG / him-vy / recurrent / local-organ-briefing layers so prompt +
+    completion fit the backend's 1024-token transport budget. Names the
+    route as unpromoted so the model is not nudged into impersonation."""
+    return (
+        f"You are the local @{role_name} backend in raw unpromoted mode. This"
+        f" route is not semantically gated. Answer the user briefly and"
+        f" honestly. Do not claim to be a promoted system. Do not impersonate"
+        f" Super, GPT, or a cloud model."
+    )
+
+
+def truncate_for_organ_raw_contact(cleaned_input: str) -> str:
+    """Hard char-cap on user input handed to the bounded raw-contact path."""
+    text = cleaned_input or ""
+    if len(text) <= _ORGAN_RAW_CONTACT_INPUT_CHAR_LIMIT:
+        return text
+    return text[:_ORGAN_RAW_CONTACT_INPUT_CHAR_LIMIT] + "…"
 
 
 def render_organ_alias_direct_reply(
