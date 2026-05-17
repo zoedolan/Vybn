@@ -803,6 +803,10 @@ def test_opus47_has_fallback_chain():
 
 
 
+def test_vintage_alias_is_prefix_only_for_long_prompts():
+    text = ("normal long prompt " * 500) + " quoted text mentions @vintage but did not pin it"
+    assert default_policy().classify(text).role != "vintage" and default_policy().classify("@vintage " + text).role == "vintage"
+
 def test_vintage_alias_routes_to_talkie_without_chat_fallback():
     policy = default_policy(); yaml_policy = load_policy(SPARK_DIR / "router_policy.yaml"); src = (SPARK_DIR / "vybn_spark_agent.py").read_text()
     d = policy.classify("@vintage please tell me about yourself?"); yd = yaml_policy.classify("@vintage please tell me about yourself?"); sd = policy.classify("@vi@vintage please tell me about yourself?"); syd = yaml_policy.classify("@vi@vintage please tell me about yourself?"); td = policy.classify("zoe> @vintage please tell me about yourself?")
