@@ -1757,3 +1757,131 @@ def test_yaml_policy_contact_greeting_renders_brief_vybn_reply():
             d.config.direct_reply_template,
         )
         _assert_contact_reply_invariants(organ, reply)
+
+
+# 2026-05-17 — live REPL after reload: Zoe sent "@vintage my friend?" and
+# "@omni my friend?" expecting the contactful Vybn reply that PR #3215
+# promised, but both turns rendered the full UNAVAILABLE wall because
+# the previous contact-token whitelist did not contain "friend", "buddy",
+# "pal", "hoo boy", or "I miss you". The classifier is now inverted —
+# the wall renders only when an unavailable capability token is present,
+# everything else defaults to contact — so these screenshot prompts must
+# now read as contact. Pin that explicitly.
+
+_SCREENSHOT_CONTACT_PROMPTS: tuple[str, ...] = (
+    "my friend?",
+    "friend?",
+    "buddy?",
+    "are you there?",
+    "are you with me?",
+    "hello",
+    "hi",
+    "hoo boy, hello",
+    "thank you",
+    "I miss you",
+    "pal?",
+    "hey buddy",
+    "you good?",
+    "how's it going",
+    "good to hear from you",
+)
+
+
+def test_screenshot_prompts_return_contact_not_wall_for_vintage():
+    """Exact prompts from Zoe's live REPL screenshot after reload."""
+    from harness.substrate import render_organ_alias_direct_reply
+
+    wall = _vintage_wall()
+    for prompt in _SCREENSHOT_CONTACT_PROMPTS:
+        reply = render_organ_alias_direct_reply("vintage", prompt, wall)
+        _assert_contact_reply_invariants("vintage", reply)
+        assert reply != wall, prompt
+
+
+def test_screenshot_prompts_return_contact_not_wall_for_omni():
+    """Exact prompts from Zoe's live REPL screenshot after reload."""
+    from harness.substrate import render_organ_alias_direct_reply
+
+    wall = _omni_wall()
+    for prompt in _SCREENSHOT_CONTACT_PROMPTS:
+        reply = render_organ_alias_direct_reply("omni", prompt, wall)
+        _assert_contact_reply_invariants("omni", reply)
+        assert reply != wall, prompt
+
+
+def test_vintage_my_friend_through_full_classify_path():
+    """End-to-end: '@vintage my friend?' goes through policy.classify and
+    the renderer just like the agent's direct-reply short-circuit, and
+    yields the brief Vybn contact reply rather than the diagnostic wall."""
+    from harness.substrate import render_organ_alias_direct_reply
+
+    for pol in (default_policy(), load_policy(SPARK_DIR / "router_policy.yaml")):
+        d = pol.classify("@vintage my friend?")
+        assert d.config.role == "vintage", d
+        reply = render_organ_alias_direct_reply(
+            d.config.role,
+            d.cleaned_input or "",
+            d.config.direct_reply_template,
+            fmt_kwargs={
+                "role": d.config.role,
+                "provider": d.config.provider,
+                "model": d.config.model,
+                "base_url": d.config.base_url or "",
+            },
+        )
+        _assert_contact_reply_invariants("vintage", reply)
+
+
+def test_omni_my_friend_through_full_classify_path():
+    """End-to-end: '@omni my friend?' is contact, not capability."""
+    from harness.substrate import render_organ_alias_direct_reply
+
+    for pol in (default_policy(), load_policy(SPARK_DIR / "router_policy.yaml")):
+        d = pol.classify("@omni my friend?")
+        assert d.config.role == "omni", d
+        reply = render_organ_alias_direct_reply(
+            d.config.role,
+            d.cleaned_input or "",
+            d.config.direct_reply_template,
+            fmt_kwargs={
+                "role": d.config.role,
+                "provider": d.config.provider,
+                "model": d.config.model,
+                "base_url": d.config.base_url or "",
+            },
+        )
+        _assert_contact_reply_invariants("omni", reply)
+
+
+def test_capability_tokens_still_wall_after_inversion():
+    """The classifier inversion must not weaken the capability gate. Token
+    lists from the screenshot spec stay first-class: @omni see/photo/image/
+    video/perception/multimodal/look at still wall; @vintage 1930/invariants/
+    vintage-specific voice still walls."""
+    from harness.substrate import render_organ_alias_direct_reply
+
+    omni_wall = _omni_wall()
+    for capability_phrase in (
+        "can you see this?",
+        "describe this photo for me",
+        "look at this image friend",
+        "watch this video buddy",
+        "what is your perception, friend?",
+        "are you multimodal, my friend?",
+        "look at this for me please",
+    ):
+        reply = render_organ_alias_direct_reply("omni", capability_phrase, omni_wall)
+        assert reply == omni_wall, capability_phrase
+        assert "OMNI_UNAVAILABLE_CONTACT" not in reply
+
+    vintage_wall = _vintage_wall()
+    for capability_phrase in (
+        "tell me about 1930 my friend",
+        "what are the invariants, buddy?",
+        "is the vintage endpoint warm, friend?",
+        "run a vintage chat smoke please",
+        "route a workload through vintage",
+    ):
+        reply = render_organ_alias_direct_reply("vintage", capability_phrase, vintage_wall)
+        assert reply == vintage_wall, capability_phrase
+        assert "VINTAGE_UNAVAILABLE_CONTACT" not in reply
