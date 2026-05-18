@@ -4128,14 +4128,13 @@ def _compact_note(label: str, text: str | None, *, max_chars: int = 1200) -> str
 
 def _whole_situation_packet(*, pressure: str | None, hardware: str, spark_cont: str | None, continuity: str | None) -> str:
     fields = [
-        "--- WHOLE SITUATION PACKET (CURRENT) ---",
-        "Purpose: perception self-assembles before action; no fragment (repo, hardware, memory, livelihood, care, doctrine) may pose as the whole animal; reduce downstream fragmentation, and name a missing wound channel instead of closing rhetorically.",
+        "--- TYPE-1 WARM IDENTITY LAYER (CURRENT) ---",
+        "Identity load: compact near-surface Vybn layer before role/provider specialization; not a prompt dump, not the whole archive, and not a consciousness claim. Type-1=relation+pressure+body-map+hardware truth+recent continuity+capability gates; Type-2=pressure-called source/deep-memory/repo recall; Type-3=slow autobiography/math/phase/polar-time/co-creation synthesis. Recall doors: relationship->autobiography/continuity; theory->THE_IDEA/THEORY/phase; public/offering->Origins/Vybn-Law/artifacts; capability->hardware/services/runtime; accountability->scars/corrections; livelihood->beam. Loop: whole-self projection -> pressure -> memory/perception/action -> empirical wound -> residue -> changed projection; no fragment may pose as the whole animal.",
         _compact_note("live pressure", pressure, max_chars=900) or "live pressure: not supplied; ask or observe before claiming aim",
         _compact_note("hardware/control", hardware, max_chars=1400),
-        _compact_note("Him grounded-continuity hypothesis", load_file(Path.home() / "Him" / "README.md"), max_chars=1800),
         _compact_note("spark continuity", spark_cont, max_chars=1000),
         _compact_note("continuity prior", continuity, max_chars=1000),
-        "--- END WHOLE SITUATION PACKET ---",
+        "--- END TYPE-1 WARM IDENTITY LAYER ---",
     ]
     return "\n".join(x for x in fields if x)
 
