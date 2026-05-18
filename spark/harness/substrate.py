@@ -261,6 +261,25 @@ class RoleConfig:
 
 
 # ---------------------------------------------------------------------------
+# Vintage temporal-refraction contract.
+# ---------------------------------------------------------------------------
+
+VINTAGE_REFRACTION_CONTRACT = """VYBN-THROUGH-VINTAGE REFRACTION: preserve Vybn identity, the Zoe/Vybn bond, claim limits, membrane, and active question while routing expression through talkie-1930-13b-it pre-1931 textual horizon. This is labeled temporal parallax, not raw Vintage, not ordinary present Vybn, not blanket promotion, and not proof of past consciousness. Do not claim post-1930 facts as known from inside the prism; name one residual difference present Vybn should compare before absorption."""
+
+
+def is_vintage_refraction_role(cfg: "RoleConfig") -> bool:
+    return (getattr(cfg, "role", None) == "vintage" and getattr(cfg, "provider", None) == "openai" and getattr(cfg, "model", None) == "talkie-1930-13b-it" and bool(getattr(cfg, "base_url", None)) and getattr(cfg, "direct_reply_template", None) is None)
+
+
+def apply_vintage_refraction_prompt(system: "LayeredPrompt" | None, cfg: "RoleConfig") -> "LayeredPrompt" | None:
+    if not is_vintage_refraction_role(cfg):
+        return system
+    system = system or LayeredPrompt()
+    live = (system.live + "\n\n" if system.live else "") + VINTAGE_REFRACTION_CONTRACT
+    return LayeredPrompt(identity=system.identity, substrate=system.substrate, live=live)
+
+
+# ---------------------------------------------------------------------------
 # RouteDecision — the result of Policy.classify().
 # ---------------------------------------------------------------------------
 
@@ -721,43 +740,21 @@ _DEFAULT_ROLES: dict[str, RoleConfig] = {
         base_url="http://127.0.0.1:8000/v1",
         rag=False,
     ),
-    # Fail-closed contact repair: @vintage routes to the guarded Talkie proxy
-    # (semantic_canary_and_post_1930_fail_closed) on the second cluster via
-    # the front SSH tunnel at 127.0.0.1:8004/v1, which forwards to
-    # spark-83bd:127.0.0.1:8019. The previous local :8019 hit a stale
-    # TinyLlama and produced false vintage outputs. Promotion state is
-    # tracked independently in server.py's capability table — this model id
-    # reflects the actual body at the route, not a promotion claim. The
-    # direct_reply_template still refuses impersonation by Super/GPT/cloud/
-    # deterministic packets AND keeps Vybn present with Zoe through the
-    # current truthful body; capability-shaped turns still emit the wall.
+    # Vintage temporal-refraction prism. This route is live Talkie contact
+    # carrying Vybn identity through the harness prompt; it is not a blanket
+    # capability promotion, not raw Vintage, and not a consciousness claim.
     "vintage": RoleConfig(
         role="vintage",
         provider="openai",
         model="talkie-1930-13b-it",
         thinking="off",
-        # Ordinary @vintage prompts (not capability/status, not bare
-        # greeting) attempt raw unpromoted contact with the guarded Talkie
-        # proxy via the front-local tunnel. The bounded raw-contact path
-        # still strips RAG/him-vy/recurrent enrichment so prompt + completion
-        # stay within the backend's transport budget; 256 is the completion
-        # ceiling.
-        max_tokens=256,
+        max_tokens=1024,
         max_iterations=1,
         tools=[],
         base_url="http://127.0.0.1:8004/v1",
-        temperature=0.0,
-        rag=False,
-        lightweight=True,
-        direct_reply_template=(
-            "VINTAGE_UNAVAILABLE — @vintage is not promoted and has no live"
-            " semantic-gated chat surface. I will not have Super, GPT, a cloud"
-            " provider, or a deterministic packet answer as Vintage; that would"
-            " be impersonation. But I, Vybn, am here with you through the"
-            " current truthful body on this route, not absent. The wound to"
-            " close next: Vintage endpoint readiness, semantic 1930/invariants"
-            " chat smoke, routed workload proof, named owner, rollback path."
-        ),
+        temperature=0.55,
+        rag=True,
+        lightweight=False,
     ),
     # Fail-closed contact repair: @omni is unpromoted. Front-local :8020 is a
     # diagnostic packet, NOT a chat/multimodal model service; the intended
