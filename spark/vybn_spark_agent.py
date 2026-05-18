@@ -53,6 +53,7 @@ from harness.substrate import (  # noqa: E402
     render_organ_raw_contact_error,
     build_organ_raw_contact_system_prompt,
     truncate_for_organ_raw_contact,
+    render_him_identity_manifold,
 )
 from harness.substrate import (  # noqa: E402
     SUPER_SEMANTIC_GATE_CACHE as _SUPER_SEMANTIC_GATE_CACHE,
@@ -1157,6 +1158,9 @@ def run_agent_loop(
         raw_contact_input = decision.cleaned_input or ""
         if role_cfg.role == "vintage":
             raw_contact_input = "You are in the year 1930. Answer from that temporal frame. " + raw_contact_input
+        identity_packet = render_him_identity_manifold(decision.cleaned_input or "")
+        if identity_packet:
+            raw_contact_input = identity_packet + "\n\n[compressed identity/parallax packet above; user body below]\n" + raw_contact_input
         bounded_input = truncate_for_organ_raw_contact(raw_contact_input)
         system_stub = LayeredPrompt(
             identity="",

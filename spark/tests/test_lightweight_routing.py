@@ -2097,10 +2097,6 @@ def test_raw_contact_truncates_oversized_user_input():
 
 
 def test_raw_contact_system_prompt_is_minimal_and_names_unpromoted():
-    """Bounded prompt: no RAG, no him-vy, no recurrent prethink, no organ
-    briefing. Just a minimal stub naming the route as unpromoted so the
-    model is not nudged into impersonation. Length under ~1KB so the
-    1024-token backend budget is preserved for the user input."""
     from harness.substrate import build_organ_raw_contact_system_prompt
 
     for organ in ("vintage", "omni"):
@@ -2458,10 +2454,6 @@ def test_vintage_raw_contact_truncates_oversized_user_input():
 
 
 def test_raw_contact_uses_minimal_layered_prompt_not_full_substrate():
-    """The system prompt sent to the backend must be the minimal stub —
-    no full LayeredPrompt with identity/substrate/live layers, no
-    local-organ briefing, no RAG enrichment. This is what keeps prompt
-    + completion within the 1024-token backend budget."""
     captured: dict = {}
 
     class _FakeHandle:
@@ -2489,12 +2481,9 @@ def test_raw_contact_uses_minimal_layered_prompt_not_full_substrate():
         "@vintage write a couplet about morning",
     )
     flat = captured["system"].flat()
-    # The full chat-mode substrate carries vy-language, Wellspring,
-    # protocol details — none of that should be in the bounded prompt.
     assert "vy-language" not in flat.lower()
     assert "wellspring" not in flat.lower()
     assert "local-organ briefing" not in flat.lower()
-    # Names the route honestly.
     assert "unpromoted" in flat.lower()
     assert f"@vintage" in flat
 

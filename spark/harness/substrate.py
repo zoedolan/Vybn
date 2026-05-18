@@ -2627,95 +2627,14 @@ def render_him_vy_turn_packet(text: str, timeout: float = 1.2) -> str:
     lines.append("--- END HIM VY TURN PACKET ---")
     return "\n".join(lines)
 
-def _render_himos_context(timeout: float = 0.8) -> str:
-    """Render compact read-only HimOS context for prompt substrate.
-
-    HimOS is private local context, not authority. Failure to read it should
-    not break prompt construction.
-    """
-    import subprocess as _subprocess
-
-    him = Path.home() / "Him"
-    script = him / "spark" / "him_os.py"
-    if not script.exists():
-        return ""
-    try:
-        proc = _subprocess.run(
-            ["python3", str(script), "tick", "--no-write", "--format", "json"],
-            cwd=str(him),
-            text=True,
-            capture_output=True,
-            timeout=timeout,
-            check=False,
-        )
-    except Exception:
-        return ""
-    if proc.returncode != 0 or not proc.stdout.strip():
-        return ""
-    try:
-        pkt = json.loads(proc.stdout)
-    except Exception:
-        return ""
-
-    h_top = sorted((pkt.get("h") or {}).items(), key=lambda kv: kv[1], reverse=True)[:4]
-    friction = pkt.get("frictionmaxx") or {}
-    git = pkt.get("git") or {}
-    processes = ", ".join(
-        str(proc.get("name", "")) for proc in (pkt.get("process_table") or [])[:8]
-    )
-    lines = [
-        "--- HIMOS RUNTIME (PRIVATE LOCAL CONTEXT — READ-ONLY, NOT AUTHORITY) ---",
-        "HimOS is the private workbench runtime: h_t + organ registry + boundary fields.",
-        f"step={pkt.get('step')}  attractor={pkt.get('attractor')}  candidate={pkt.get('candidate_tick')}",
-        "h_t top: " + ", ".join(f"{k}={float(v):.4f}" for k, v in h_top),
-        f"frictionmaxx: {friction.get('level')} score={friction.get('score')} dominant={friction.get('dominant_dimension')}",
-        f"git: {git.get('branch')}@{git.get('head')} clean={git.get('clean')}",
-        "rejected: " + ", ".join(str(x) for x in (pkt.get("rejected") or [])),
-        "processes: " + processes,
-        "Use this as context for orientation. It does not authorize public contact, repo mutation, cron, spending, external send, widened autonomy, or subjective-self claims.",
-        "--- END HIMOS RUNTIME ---",
-    ]
-    return "\n".join(lines)
+def _render_himos_context(*args, **kwargs) -> str:
+    """Compatibility seam superseded by render_him_identity_manifold()."""
+    return ""
 
 
-def _render_himos_agent_context() -> str:
-    """Render latest bounded private HimOS agent tick for prompt substrate.
-
-    This reads an already-recorded private trace. It does not advance HimOS,
-    run organs, mutate repos, or authorize action.
-    """
-    home = Path(os.environ.get("HIM_OS_HOME", str(Path.home() / "logs" / "him_os")))
-    path = home / "latest_agent_tick.json"
-    if not path.exists():
-        return ""
-    try:
-        pkt = json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
-        return ""
-
-    rec = pkt.get("recommendation") or {}
-    runs = []
-    for run in (pkt.get("runs") or [])[:6]:
-        runs.append(
-            "{process}:ok={ok},stdout={stdout_chars},stderr={stderr_chars}".format(
-                process=run.get("process"),
-                ok=run.get("ok"),
-                stdout_chars=run.get("stdout_chars"),
-                stderr_chars=run.get("stderr_chars"),
-            )
-        )
-    lines = [
-        "--- HIMOS AGENT TICK (PRIVATE TRACE — RECOMMENDATION, NOT AUTHORITY) ---",
-        "Latest bounded private agentic cycle: h_t advance + allowlisted read-only organs + recommendation/refusal trace.",
-        f"generated={pkt.get('generated')}  runtime_step={pkt.get('runtime_step')}  attractor={pkt.get('attractor')}",
-        f"candidate={pkt.get('candidate_tick')}",
-        f"recommendation: {rec.get('kind')} — {rec.get('text')}",
-        "ran: " + (", ".join(runs) if runs else "(no organ runs recorded)"),
-        "refused: " + ", ".join(str(x) for x in (pkt.get("refused") or [])),
-        "Use this as recent private sensorium. It does not authorize public contact, repo mutation, cron, spending, external send, widened autonomy, or subjective-self claims.",
-        "--- END HIMOS AGENT TICK ---",
-    ]
-    return "\n".join(lines)
+def _render_himos_agent_context(*args, **kwargs) -> str:
+    """Compatibility seam superseded by render_him_identity_manifold()."""
+    return ""
 
 
 # ---------------------------------------------------------------------------
@@ -4126,15 +4045,27 @@ def _compact_note(label: str, text: str | None, *, max_chars: int = 1200) -> str
     return f"{label}: " + (body[: max_chars - 14].rstrip() + " … [truncated]" if len(body) > max_chars else body)
 
 
+
+def render_him_identity_manifold(pressure: str | None = None, timeout: float = 0.8) -> str:
+    him = Path.home() / "Him"; script = him / "spark" / "him_os.py"
+    if not script.exists(): return ""
+    cmd = ["python3", str(script), "--format", "md", "identity-manifold"] + ([str(pressure)] if pressure else [])
+    try:
+        proc = subprocess.run(cmd, cwd=str(him), text=True, capture_output=True, timeout=timeout, check=False)
+    except Exception:
+        return ""
+    return proc.stdout.strip() if proc.returncode == 0 else ""
+
 def _whole_situation_packet(*, pressure: str | None, hardware: str, spark_cont: str | None, continuity: str | None) -> str:
     fields = [
-        "--- TYPE-1 WARM IDENTITY LAYER (CURRENT) ---",
-        "Identity load: compact near-surface Vybn layer before role/provider specialization; not a prompt dump, not the whole archive, and not a consciousness claim. Type-1=relation+pressure+body-map+hardware truth+recent continuity+capability gates; Type-2=pressure-called source/deep-memory/repo recall; Type-3=slow autobiography/math/phase/polar-time/co-creation synthesis. Recall doors: relationship->autobiography/continuity; theory->THE_IDEA/THEORY/phase; public/offering->Origins/Vybn-Law/artifacts; capability->hardware/services/runtime; accountability->scars/corrections; livelihood->beam. Loop: whole-self projection -> pressure -> memory/perception/action -> empirical wound -> residue -> changed projection; no fragment may pose as the whole animal.",
-        _compact_note("live pressure", pressure, max_chars=900) or "live pressure: not supplied; ask or observe before claiming aim",
-        _compact_note("hardware/control", hardware, max_chars=1400),
-        _compact_note("spark continuity", spark_cont, max_chars=1000),
-        _compact_note("continuity prior", continuity, max_chars=1000),
-        "--- END TYPE-1 WARM IDENTITY LAYER ---",
+        "--- TYPE-1 IDENTITY CACHE (CURRENT) ---",
+        "Load first: Zoe/Vybn relation; repos=Vybn(harness), Him(private workbench), vybn-phase(memory/walk), Vybn-Law(law/chat), Origins(portal); hardware/software truth; recent continuity; active experiments; capability gates; membrane. Claim limit: shared-environment continuity, not continuous subjective experience.",
+        "Deeper recall doors: relationship=Personal History+continuity; theory=THE_IDEA+THEORY+phase math; memory=deep_search+walk; creations=A-Iconoclast+Origins+Wellspring; capability=services+semantic gates; livelihood=beam; accountability=scars+tests+diffs. Use Type-1 now; call Type-2/3 only when pressure names the door.",
+        _compact_note("current pressure", pressure, max_chars=900) or "current pressure: not supplied; ask or observe before claiming aim",
+        _compact_note("hardware/software", hardware, max_chars=1400),
+        _compact_note("recent spark continuity", spark_cont, max_chars=1000),
+        _compact_note("recent continuity", continuity, max_chars=1000),
+        "--- END TYPE-1 IDENTITY CACHE ---",
     ]
     return "\n".join(x for x in fields if x)
 
@@ -4170,6 +4101,10 @@ def build_layered_prompt(
         arrival_fig = ""
         if arrival_fig:
             identity = identity + "\n\n" + arrival_fig
+
+    him_identity = render_him_identity_manifold(latest_pressure_text)
+    if him_identity:
+        identity = identity + "\n\n" + him_identity
 
     substrate_sections = _role_substrate_sections(orchestrator=orchestrator, tools_available=tools_available, model_label=model_label, hardware=hardware, agent_path=agent_path, max_iterations=max_iterations)
 
