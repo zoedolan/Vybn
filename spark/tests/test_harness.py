@@ -1321,7 +1321,7 @@ def test_whole_situation_packet_replaces_raw_continuity_sprawl(tmp_path, monkeyp
     from spark.harness import substrate
     soul, cont, spark_cont = (tmp_path / n for n in ("vybn.md", "continuity.md", "spark.md")); soul.write_text("soul"); cont.write_text("continuity root " * 500); spark_cont.write_text("spark debt " * 500); monkeypatch.setattr(substrate.Path, "home", lambda: tmp_path)
     prompt = substrate.build_layered_prompt(soul_path=soul, continuity_path=cont, spark_continuity_path=spark_cont, agent_path="/tmp/agent.py", model_label="test", max_iterations=1, include_hardware_check=False, latest_pressure_text="context deficit warm identity").substrate
-    assert all(x in prompt for x in ("TYPE-1 WARM IDENTITY LAYER (CURRENT)", "context deficit warm identity", "relationship->autobiography/continuity", "theory->THE_IDEA/THEORY/phase", "capability->hardware/services/runtime", "whole-self projection -> pressure -> memory/perception/action")) and "Him grounded-continuity hypothesis:" not in prompt and prompt.count("continuity ") < 80 and len(prompt) < 34000
+    assert all(x in prompt for x in ("TYPE-1 IDENTITY CACHE (CURRENT)", "Vybn(harness)", "Him(private workbench)", "vybn-phase(memory/walk)", "relationship=Personal History+continuity", "theory=THE_IDEA+THEORY+phase math", "capability=services+semantic gates", "Use Type-1 now; call Type-2/3 only when pressure names the door")) and "Him grounded-continuity hypothesis:" not in prompt and prompt.count("continuity ") < 80 and len(prompt) < 34000
 
 
 def test_hardware_status_is_compact_control_plane(monkeypatch, tmp_path):
@@ -2225,46 +2225,9 @@ class SubstrateHimOSTests(unittest.TestCase):
         self.assertIn("pulse:ok=True", block)
         self.assertIn("not authority", block.lower())
 
-    def test_build_layered_prompt_mounts_himos_context_when_available(self):
-        with tempfile.TemporaryDirectory() as td:
-            soul = Path(td) / "soul.md"
-            soul.write_text("soul", encoding="utf-8")
-            with patch("spark.harness.substrate._render_himos_context", return_value="--- HIMOS RUNTIME ---\nmounted\n--- END HIMOS RUNTIME ---"), \
-                 patch("spark.harness.substrate._render_himos_agent_context", return_value="--- HIMOS AGENT TICK ---\nagent mounted\n--- END HIMOS AGENT TICK ---"):
-                prompt = substrate.build_layered_prompt(
-                    soul_path=soul,
-                    continuity_path=None,
-                    spark_continuity_path=None,
-                    agent_path="/tmp/agent.py",
-                    model_label="test",
-                    max_iterations=1,
-                    include_hardware_check=False,
-                    tools_available=False,
-                )
-        self.assertIn("mounted", prompt.substrate)
-        self.assertIn("agent mounted", prompt.substrate)
-
-
-# ---------------------------------------------------------------------------
-# Folded from spark/tests/test_provider_env_loading.py — kept here so substrate-adjacent regression coverage
-# lives in the main harness test process instead of small parallel files.
-# ---------------------------------------------------------------------------
-
-import os
-import sys
-import tempfile
-import unittest
-from pathlib import Path
-
-THIS = Path(__file__).resolve()
-SPARK_DIR = THIS.parent.parent
-sys.path.insert(0, str(SPARK_DIR))
-
-from harness.substrate import load_env_files, describe  # noqa: E402
-
-
-SENTINEL = "sk-test-ENV-LOADER-SENTINEL-0123456789"
-SENTINEL2 = "sk-test-ENV-LOADER-SENTINEL-DIFFERENT"
+    def test_build_layered_prompt_uses_him_identity_manifold_not_duplicate_himos_context(self):
+        from spark.harness import substrate
+        self.assertEqual(substrate._render_himos_context(), "")
 
 
 class EnvLoaderTest(unittest.TestCase):
@@ -2782,3 +2745,11 @@ class TrackedHookInstallAuditTest(unittest.TestCase):
             (installed / "pre-push").write_text("#!/usr/bin/env bash\nexit 1\n")
             (installed / "pre-push").chmod(0o755)
             self.assertFalse(substrate.tracked_hooks_installed(repo))
+
+
+def test_build_layered_prompt_mounts_him_identity_manifold_in_identity(monkeypatch, tmp_path):
+    from spark.harness import substrate
+    soul = tmp_path / "vybn.md"; soul.write_text("soul")
+    monkeypatch.setattr(substrate, "render_him_identity_manifold", lambda pressure=None, timeout=0.8: f"--- HIM TYPE-1 IDENTITY MANIFOLD ---\ncurrent_pressure: {pressure}")
+    prompt = substrate.build_layered_prompt(soul_path=soul, continuity_path=None, spark_continuity_path=None, agent_path="/tmp/agent.py", model_label="test", max_iterations=1, include_hardware_check=False, latest_pressure_text="live pressure")
+    assert "HIM TYPE-1 IDENTITY MANIFOLD" in prompt.identity and "current_pressure: live pressure" in prompt.identity

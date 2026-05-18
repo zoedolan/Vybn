@@ -47,12 +47,14 @@ from harness.substrate import execute_tool_calls, default_introspect  # noqa: E4
 from harness.substrate import check_claim, check_structural_claim  # noqa: E402
 from harness.substrate import is_system_critical_pilot_turn  # noqa: E402
 from harness.substrate import render_organ_alias_direct_reply  # noqa: E402
+from harness.substrate import apply_vintage_refraction_prompt  # noqa: E402
 from harness.substrate import (  # noqa: E402
     should_attempt_raw_organ_contact,
     render_organ_raw_contact_header,
     render_organ_raw_contact_error,
     build_organ_raw_contact_system_prompt,
     truncate_for_organ_raw_contact,
+    render_him_identity_manifold,
 )
 from harness.substrate import (  # noqa: E402
     SUPER_SEMANTIC_GATE_CACHE as _SUPER_SEMANTIC_GATE_CACHE,
@@ -1157,6 +1159,9 @@ def run_agent_loop(
         raw_contact_input = decision.cleaned_input or ""
         if role_cfg.role == "vintage":
             raw_contact_input = "You are in the year 1930. Answer from that temporal frame. " + raw_contact_input
+        identity_packet = render_him_identity_manifold(decision.cleaned_input or "")
+        if identity_packet:
+            raw_contact_input = identity_packet + "\n\n[compressed identity/parallax packet above; user body below]\n" + raw_contact_input
         bounded_input = truncate_for_organ_raw_contact(raw_contact_input)
         system_stub = LayeredPrompt(
             identity="",
@@ -1297,6 +1302,11 @@ def run_agent_loop(
                 messages.append({"role": "assistant", "content": notice})
                 return notice
 
+    system_prompt = apply_vintage_refraction_prompt(system_prompt, role_cfg)
+    if system_prompt is None:
+        system_prompt = LayeredPrompt()
+    if active_prompt is None or is_vintage_turn:
+        active_prompt = system_prompt
     provider = registry.get(role_cfg)
 
     # Executable Him discovery packet; skip for Vintage.

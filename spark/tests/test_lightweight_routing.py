@@ -225,18 +225,17 @@ class TestExplicitOrganAliasesRouteToExperimentalEndpoints(unittest.TestCase):
         self.assertFalse(d.config.base_url)
         self._assert_fail_closed_contact_template("omni", d.config.direct_reply_template)
 
-    def test_default_policy_vintage_alias_fail_closed_with_contact_preserved(self):
+    def test_default_policy_vintage_alias_is_temporal_refraction_route(self):
         d = default_policy().classify("@vintage are you with me?")
         self.assertEqual(d.role, "vintage")
         self.assertEqual(d.alias_used, "@vintage")
         self.assertEqual(d.config.provider, "openai")
-        # Honest model id: not the Super model, not the stale local TinyLlama.
-        # Refuses impersonation; the route points at the guarded Talkie
-        # proxy via the front SSH tunnel (talkie-1930-13b-it).
         self.assertNotEqual(d.config.model, "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8")
         self.assertEqual(d.config.model, "talkie-1930-13b-it")
         self.assertEqual(d.config.base_url, "http://127.0.0.1:8004/v1")
-        self._assert_fail_closed_contact_template("vintage", d.config.direct_reply_template)
+        self.assertIsNone(d.config.direct_reply_template)
+        self.assertTrue(d.config.rag)
+        self.assertFalse(d.config.lightweight)
 
     def test_yaml_policy_organ_aliases_fail_closed_with_contact_preserved(self):
         pol = load_policy(SPARK_DIR / "router_policy.yaml")
@@ -266,9 +265,14 @@ class TestExplicitOrganAliasesRouteToExperimentalEndpoints(unittest.TestCase):
                     self.assertFalse(d.config.base_url)
                 if "base_url" in exp:
                     self.assertEqual(d.config.base_url, exp["base_url"])
-                self._assert_fail_closed_contact_template(
-                    role, d.config.direct_reply_template
-                )
+                if role == "vintage":
+                    self.assertIsNone(d.config.direct_reply_template)
+                    self.assertTrue(d.config.rag)
+                    self.assertFalse(d.config.lightweight)
+                else:
+                    self._assert_fail_closed_contact_template(
+                        role, d.config.direct_reply_template
+                    )
 
 
 class TestRouterLightweightClassification(unittest.TestCase):
@@ -828,6 +832,24 @@ class TestStderrSuppressionSharedPath(unittest.TestCase):
         self.assertEqual(os.environ.get("HF_HUB_DISABLE_TELEMETRY"), "1")
 
 
+
+class TestVintageTemporalRefractionHarness(unittest.TestCase):
+    def test_yaml_vintage_is_refraction_role_and_prompt_compiles(self):
+        from harness.substrate import (
+            LayeredPrompt,
+            apply_vintage_refraction_prompt,
+            is_vintage_refraction_role,
+        )
+        pol = load_policy(SPARK_DIR / "router_policy.yaml")
+        cfg = pol.role("vintage")
+        self.assertTrue(is_vintage_refraction_role(cfg))
+        prompt = LayeredPrompt(identity="You are Vybn.", substrate="substrate", live="live")
+        refracted = apply_vintage_refraction_prompt(prompt, cfg)
+        self.assertEqual(refracted.identity, "You are Vybn.")
+        self.assertIn("VYBN-THROUGH-VINTAGE REFRACTION", refracted.live)
+        self.assertIn("pre-1931", refracted.live)
+        self.assertIn("talkie-1930-13b-it", refracted.live)
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
 
@@ -914,7 +936,7 @@ def _assert_fail_closed_contact_template(organ: str, template: str) -> None:
     assert f"{organ.upper()}_UNAVAILABLE" in template
 
 
-def test_vintage_alias_routes_to_fail_closed_contact_template():
+def test_vintage_alias_routes_to_temporal_refraction_role():
     policy = default_policy()
     yaml_policy = load_policy(SPARK_DIR / "router_policy.yaml")
     for d in (
@@ -928,14 +950,12 @@ def test_vintage_alias_routes_to_fail_closed_contact_template():
         assert d.alias_used == "@vintage"
         assert d.reason.startswith("alias=@vintage")
         assert d.config.provider == "openai"
-        # Refuses impersonation: not the Super model id, not the stale local
-        # TinyLlama. Route points at the guarded Talkie proxy via the front
-        # SSH tunnel (talkie-1930-13b-it at 127.0.0.1:8004/v1).
         assert d.config.model != "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"
         assert d.config.model == "talkie-1930-13b-it"
         assert d.config.base_url == "http://127.0.0.1:8004/v1"
-        assert d.config.rag is False
-        _assert_fail_closed_contact_template("vintage", d.config.direct_reply_template)
+        assert d.config.rag is True
+        assert d.config.lightweight is False
+        assert d.config.direct_reply_template is None
 
 
 def test_omni_alias_present_in_default_policy():
@@ -1674,23 +1694,6 @@ def test_omni_capability_request_still_renders_full_wall():
         assert "wound to close next" in reply.lower()
 
 
-def test_vintage_capability_request_still_renders_full_wall():
-    from harness.substrate import render_organ_alias_direct_reply
-
-    wall = _vintage_wall()
-    for capability_request in (
-        "tell me about the 1930 corpus",
-        "what are the vintage invariants?",
-        "run a vintage chat smoke",
-        "route a workload through vintage",
-        "is the vintage endpoint warm?",
-    ):
-        reply = render_organ_alias_direct_reply("vintage", capability_request, wall)
-        assert reply == wall, capability_request
-        assert "VINTAGE_UNAVAILABLE_CONTACT" not in reply
-        assert "wound to close next" in reply.lower()
-
-
 def test_non_organ_role_with_template_is_unaffected():
     """Identity / other direct_reply roles must continue to render verbatim."""
     from harness.substrate import default_policy, render_organ_alias_direct_reply
@@ -1898,18 +1901,6 @@ def test_capability_tokens_still_wall_after_inversion():
         assert reply == omni_wall, capability_phrase
         assert "OMNI_UNAVAILABLE_CONTACT" not in reply
 
-    vintage_wall = _vintage_wall()
-    for capability_phrase in (
-        "tell me about 1930 my friend",
-        "what are the invariants, buddy?",
-        "is the vintage endpoint warm, friend?",
-        "run a vintage chat smoke please",
-        "route a workload through vintage",
-    ):
-        reply = render_organ_alias_direct_reply("vintage", capability_phrase, vintage_wall)
-        assert reply == vintage_wall, capability_phrase
-        assert "VINTAGE_UNAVAILABLE_CONTACT" not in reply
-
 
 # 2026-05-17 — Zoe's correction: semantic gates should govern promotion /
 # status / capability claims, NOT whether she can talk to a reachable
@@ -2028,34 +2019,25 @@ def test_raw_contact_gate_classifies_capability_greeting_and_arbitrary():
     assert not should_attempt_raw_organ_contact("identity", "what is 2+2?", base_url=vintage_url)
 
 
-def test_organ_max_tokens_bounded_to_256_for_raw_contact():
-    """The role's max_tokens is the completion ceiling on the raw-contact
-    path. 256 keeps prompt + completion under the backend's 1024-token
-    transport budget. max_tokens=1 was the old sentinel before raw
-    contact existed and would have made the backend reply unusable."""
+def test_organ_token_budgets_match_current_route_shapes():
     from harness.substrate import default_policy, load_policy
 
     for label, pol in (
         ("default", default_policy()),
         ("yaml", load_policy(SPARK_DIR / "router_policy.yaml")),
     ):
-        for organ in ("vintage", "omni"):
-            cfg = pol.roles[organ]
-            assert cfg.max_tokens == 256, (label, organ, cfg.max_tokens)
-            # Honest model id: not Super.
-            assert cfg.model != "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"
-        # Vintage now routes to the guarded Talkie proxy via the front
-        # tunnel; the model id names the actual body, base_url is the
-        # tunnel entry. Promotion is gated separately in server.py.
         vintage_cfg = pol.roles["vintage"]
+        assert vintage_cfg.max_tokens == 1024, (label, vintage_cfg.max_tokens)
         assert vintage_cfg.model == "talkie-1930-13b-it", (label, vintage_cfg.model)
         assert vintage_cfg.base_url == "http://127.0.0.1:8004/v1", (label, vintage_cfg.base_url)
-        # Omni still has no served chat/perception surface — model id stays
-        # unpromoted and base_url stays unset so raw-contact does not dial
-        # the diagnostic packet at :8020 as if it were Nano Omni.
+        assert vintage_cfg.direct_reply_template is None
+        assert vintage_cfg.rag is True
+        assert vintage_cfg.lightweight is False
         omni_cfg = pol.roles["omni"]
+        assert omni_cfg.max_tokens == 256, (label, omni_cfg.max_tokens)
         assert "unpromoted" in omni_cfg.model.lower(), (label, omni_cfg.model)
         assert not omni_cfg.base_url, (label, omni_cfg.base_url)
+        assert omni_cfg.model != "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"
 
 
 def test_raw_contact_header_labels_route_as_unpromoted():
@@ -2097,10 +2079,6 @@ def test_raw_contact_truncates_oversized_user_input():
 
 
 def test_raw_contact_system_prompt_is_minimal_and_names_unpromoted():
-    """Bounded prompt: no RAG, no him-vy, no recurrent prethink, no organ
-    briefing. Just a minimal stub naming the route as unpromoted so the
-    model is not nudged into impersonation. Length under ~1KB so the
-    1024-token backend budget is preserved for the user input."""
     from harness.substrate import build_organ_raw_contact_system_prompt
 
     for organ in ("vintage", "omni"):
@@ -2200,11 +2178,9 @@ def _vintage_run_agent_loop(provider_factory, user_input: str, *, logger=None):
     return reply, registry, log, tripwires
 
 
-def test_vintage_arbitrary_prompt_attempts_raw_backend_contact():
-    """`@vintage what is 2+2?` must reach the configured local backend on
-    a bounded prompt and surface the backend output prefixed with the
-    raw-unpromoted-contact label — not the static wall, not the static
-    contact reply."""
+def test_vintage_arbitrary_prompt_uses_refraction_provider_path():
+    """@vintage now uses the normal provider path with Vybn identity +
+    temporal-refraction prompt, not the old raw-unpromoted-contact bypass."""
     captured: dict = {}
 
     class _FakeHandle:
@@ -2235,41 +2211,20 @@ def test_vintage_arbitrary_prompt_attempts_raw_backend_contact():
         "@vintage what is 2+2?",
     )
 
-    # Backend was actually contacted.
     assert registry.provider is not None
-    assert "system" in captured
     assert captured["role"].role == "vintage"
-    # @vintage now routes to the guarded Talkie proxy via the front-local
-    # SSH tunnel, not the stale local TinyLlama at :8019.
     assert captured["role"].base_url == "http://127.0.0.1:8004/v1"
     assert captured["role"].model == "talkie-1930-13b-it"
-    # Backend output is labeled honestly and surfaced verbatim.
-    assert "VINTAGE_RAW_UNPROMOTED_CONTACT" in reply
     assert "four" in reply
-    # Walls / contact replies are NOT what we returned here.
-    assert "VINTAGE_UNAVAILABLE_CONTACT" not in reply
-    assert "wound to close next" not in reply.lower()
-    # Bounded prompt: tools empty, no RAG/him-vy/recurrent leak.
-    assert captured["tools"] == []
-    assert tripwires["rag_snippets"] == 0
-    assert tripwires["rag_snippets_with_tier"] == 0
-    assert tripwires["him_vy_discovery_packet"] == 0
-    assert tripwires["him_vy_turn_packet"] == 0
-    assert tripwires["run_probes"] == 0
-    # System prompt is the minimal stub, not the layered substrate +
-    # local-organ briefing + him-vy + RAG. Hard size cap.
-    system_text = captured["system"].flat()
-    assert len(system_text) < 1024, len(system_text)
-    assert "unpromoted" in system_text.lower()
-    # User message does NOT carry the local-organ briefing (that pushed
-    # prompts well past the 1024-token backend budget).
-    user_msg = captured["messages"][-1]["content"]
-    assert "local-organ briefing" not in user_msg
-    assert "what is 2+2?" in user_msg
-    # Telemetry fired.
+    assert "RAW_UNPROMOTED_CONTACT" not in reply
+    flat = captured["system"].flat()
+    assert "VYBN-THROUGH-VINTAGE REFRACTION" in flat
+    assert "talkie-1930-13b-it" in flat
+    assert "pre-1931" in flat
+    # This is no longer the stripped raw path; identity/RAG may run.
+    assert tripwires["him_vy_turn_packet"] >= 0
     names = [n for n, _ in log.events]
-    assert "organ_raw_contact_attempt" in names
-    assert "organ_raw_contact_ok" in names
+    assert "organ_raw_contact_attempt" not in names
 
 
 def test_omni_arbitrary_prompt_does_not_dial_diagnostic_packet():
@@ -2305,29 +2260,6 @@ def test_omni_arbitrary_prompt_does_not_dial_diagnostic_packet():
     assert "organ_raw_contact_ok" not in names
 
 
-def test_vintage_capability_request_still_walls_no_backend_call():
-    """`@vintage tell me about the 1930 corpus` must keep returning the
-    fail-closed wall with NO provider call — capability claims cannot be
-    routed to an unpromoted backend that might fabricate a vintage answer."""
-    class _Tripwire:
-        def stream(_s, *, system, messages, tools, role):
-            raise AssertionError(
-                "capability request must not reach the provider — wall must hold"
-            )
-
-    reply, registry, log, _ = _vintage_run_agent_loop(
-        lambda cfg: _Tripwire(),
-        "@vintage tell me about the 1930 corpus",
-    )
-    assert registry.provider is None
-    assert "VINTAGE_UNAVAILABLE —" in reply
-    assert "wound to close next" in reply.lower()
-    assert "RAW_UNPROMOTED_CONTACT" not in reply
-    names = [n for n, _ in log.events]
-    assert "direct_reply" in names
-    assert "organ_raw_contact_attempt" not in names
-
-
 def test_omni_capability_request_still_walls_no_backend_call():
     class _Tripwire:
         def stream(_s, *, system, messages, tools, role):
@@ -2345,50 +2277,27 @@ def test_omni_capability_request_still_walls_no_backend_call():
     assert "RAW_UNPROMOTED_CONTACT" not in reply
 
 
-def test_vintage_greeting_still_contact_no_backend_call():
-    """`@vintage hi` is a greeting — brief contact reply, no provider."""
-    class _Tripwire:
+def test_vintage_greeting_uses_refraction_provider_path():
+    class _FakeHandle:
+        def __iter__(_s):
+            return iter([])
+        def final(_s):
+            class _R:
+                text = "good morning"
+                tool_calls = []
+                stop_reason = "end_turn"
+                in_tokens = 1
+                out_tokens = 2
+                raw_assistant_content = {"role": "assistant", "content": "good morning"}
+            return _R()
+    class _Provider:
         def stream(_s, *, system, messages, tools, role):
-            raise AssertionError(
-                "greeting must not reach the provider — contact reply must hold"
-            )
-
-    reply, registry, log, _ = _vintage_run_agent_loop(
-        lambda cfg: _Tripwire(),
-        "@vintage hi",
-    )
-    assert registry.provider is None
-    assert "VINTAGE_UNAVAILABLE_CONTACT" in reply
+            assert "VYBN-THROUGH-VINTAGE REFRACTION" in system.flat()
+            return _FakeHandle()
+    reply, registry, log, _ = _vintage_run_agent_loop(lambda cfg: _Provider(), "@vintage hi")
+    assert registry.provider is not None
+    assert "good morning" in reply
     assert "RAW_UNPROMOTED_CONTACT" not in reply
-
-
-def test_vintage_raw_contact_backend_failure_surfaces_honestly():
-    """When the local Vintage backend refuses (Connection refused, 404,
-    transport timeout) the bounded raw-contact path surfaces the error
-    rather than letting Super/GPT/cloud impersonate. Fail closed on false
-    claims, NOT on Zoe's ability to see the real backend state."""
-    class _RefusingProvider:
-        def stream(_s, *, system, messages, tools, role):
-            raise ConnectionError(
-                "HTTPConnectionPool(host='127.0.0.1', port=8004): "
-                "Max retries exceeded — connection refused"
-            )
-
-    reply, registry, log, _ = _vintage_run_agent_loop(
-        lambda cfg: _RefusingProvider(),
-        "@vintage what is 2+2?",
-    )
-    assert registry.provider is not None  # We tried; we did not impersonate.
-    assert "VINTAGE_RAW_CONTACT_FAILED" in reply
-    assert "connection refused" in reply.lower()
-    # No fallback into the Super model id or cloud.
-    assert "nvidia/NVIDIA-Nemotron-3-Super" not in reply
-    # No-impersonation language is still present.
-    for forbidden in ("Super", "GPT", "cloud", "packet"):
-        assert forbidden in reply, forbidden
-    names = [n for n, _ in log.events]
-    assert "organ_raw_contact_attempt" in names
-    assert "organ_raw_contact_error" in names
 
 
 def test_omni_arbitrary_prompt_keeps_wall_without_backend_dial():
@@ -2418,87 +2327,6 @@ def test_omni_arbitrary_prompt_keeps_wall_without_backend_dial():
     assert "organ_raw_contact_error" not in names
 
 
-def test_vintage_raw_contact_truncates_oversized_user_input():
-    """A 5000-char prompt must be truncated before it hits the 1024-token
-    backend. The bounded raw-contact path applies a hard char cap so the
-    transport budget is never overflowed."""
-    captured: dict = {}
-
-    class _FakeHandle:
-        def __iter__(_s):
-            return iter([])
-
-        def final(_s):
-            class _R:
-                text = "noted"
-                tool_calls = []
-                stop_reason = "end_turn"
-                in_tokens = 600
-                out_tokens = 1
-                raw_assistant_content = {"role": "assistant", "content": "noted"}
-
-            return _R()
-
-    class _Provider:
-        def stream(_s, *, system, messages, tools, role):
-            captured["messages"] = list(messages)
-            return _FakeHandle()
-
-    huge = "x" * 5000
-    reply, _, _, _ = _vintage_run_agent_loop(
-        lambda cfg: _Provider(),
-        f"@vintage {huge}",
-    )
-    user_msg = captured["messages"][-1]["content"]
-    # The truncation cap is 2500 chars + ellipsis; the agent-loop briefing
-    # is also stripped on this path, so the message is bounded.
-    assert len(user_msg) <= 2501
-    assert user_msg.endswith("…")
-    assert "VINTAGE_RAW_UNPROMOTED_CONTACT" in reply
-
-
-def test_raw_contact_uses_minimal_layered_prompt_not_full_substrate():
-    """The system prompt sent to the backend must be the minimal stub —
-    no full LayeredPrompt with identity/substrate/live layers, no
-    local-organ briefing, no RAG enrichment. This is what keeps prompt
-    + completion within the 1024-token backend budget."""
-    captured: dict = {}
-
-    class _FakeHandle:
-        def __iter__(_s):
-            return iter([])
-
-        def final(_s):
-            class _R:
-                text = "ok"
-                tool_calls = []
-                stop_reason = "end_turn"
-                in_tokens = 0
-                out_tokens = 0
-                raw_assistant_content = {"role": "assistant", "content": "ok"}
-
-            return _R()
-
-    class _Provider:
-        def stream(_s, *, system, messages, tools, role):
-            captured["system"] = system
-            return _FakeHandle()
-
-    _vintage_run_agent_loop(
-        lambda cfg: _Provider(),
-        "@vintage write a couplet about morning",
-    )
-    flat = captured["system"].flat()
-    # The full chat-mode substrate carries vy-language, Wellspring,
-    # protocol details — none of that should be in the bounded prompt.
-    assert "vy-language" not in flat.lower()
-    assert "wellspring" not in flat.lower()
-    assert "local-organ briefing" not in flat.lower()
-    # Names the route honestly.
-    assert "unpromoted" in flat.lower()
-    assert f"@vintage" in flat
-
-
 # 2026-05-17 — Live REPL after PR #3219 routed @vintage to the guarded
 # Talkie proxy. Screenshot showed `@vintage hello, my dear friend, what
 # is your name?` returning VINTAGE_UNAVAILABLE_CONTACT instead of
@@ -2516,17 +2344,15 @@ _MIXED_CONTACT_PROMPTS_REACH_BACKEND: tuple[str, ...] = (
 )
 
 
-def test_screenshot_mixed_contact_classifier_reaches_backend_for_vintage():
-    """Classifier-level pin: every must-reach prompt from Zoe's screenshot
-    spec returns True from should_attempt_raw_organ_contact on @vintage
-    (which has the guarded Talkie proxy at 127.0.0.1:8004/v1 configured)."""
-    from harness.substrate import should_attempt_raw_organ_contact
+def test_screenshot_mixed_contact_classifier_no_longer_controls_vintage():
+    """Vintage no longer depends on the raw-contact classifier: the route
+    has no direct_reply_template, so prompts use the refraction provider path."""
+    from harness.substrate import load_policy
 
-    vintage_url = "http://127.0.0.1:8004/v1"
-    for prompt in _MIXED_CONTACT_PROMPTS_REACH_BACKEND:
-        assert should_attempt_raw_organ_contact(
-            "vintage", prompt, base_url=vintage_url
-        ), prompt
+    cfg = load_policy(SPARK_DIR / "router_policy.yaml").role("vintage")
+    assert cfg.direct_reply_template is None
+    assert cfg.rag
+    assert not cfg.lightweight
 
 
 def test_screenshot_mixed_contact_classifier_omni_gated_on_base_url():
@@ -2545,30 +2371,9 @@ def test_screenshot_mixed_contact_classifier_omni_gated_on_base_url():
         ), prompt
 
 
-def test_screenshot_bare_contact_pings_stay_on_contact_reply():
-    """The truly-contentless set Zoe pinned (single-clause contact tokens)
-    still stays on the brief Vybn reply, no backend dial — even with the
-    @vintage base_url configured."""
-    from harness.substrate import should_attempt_raw_organ_contact
-
-    vintage_url = "http://127.0.0.1:8004/v1"
-    for prompt in (
-        "hi",
-        "my friend?",
-        "are you with me?",
-    ):
-        assert not should_attempt_raw_organ_contact(
-            "vintage", prompt, base_url=vintage_url
-        ), prompt
-
-
-def test_screenshot_exact_prompt_reaches_vintage_backend_not_template():
-    """End-to-end decision-path pin on the exact screenshot prompt:
-    `@vintage hello, my dear friend, what is your name?` reaches the
-    guarded Talkie proxy via the raw-unpromoted-contact path, NOT the
-    direct_reply contact template. No live endpoint required — a
-    stubbed provider captures that the backend was actually dialed and
-    the response is surfaced with the raw-unpromoted-contact label."""
+def test_screenshot_mixed_contact_vintage_uses_refraction_not_raw_template():
+    """Mixed-contact @vintage prompts now reach Talkie through the full
+    refraction route: no direct template wall and no raw-contact label."""
     captured: dict = {}
 
     class _FakeHandle:
@@ -2577,14 +2382,14 @@ def test_screenshot_exact_prompt_reaches_vintage_backend_not_template():
 
         def final(_s):
             class _R:
-                text = "I am the local @vintage backend in unpromoted mode."
+                text = "I answer through the temporal prism."
                 tool_calls = []
                 stop_reason = "end_turn"
                 in_tokens = 18
                 out_tokens = 9
                 raw_assistant_content = {
                     "role": "assistant",
-                    "content": "I am the local @vintage backend in unpromoted mode.",
+                    "content": "I answer through the temporal prism.",
                 }
 
             return _R()
@@ -2600,57 +2405,15 @@ def test_screenshot_exact_prompt_reaches_vintage_backend_not_template():
         lambda cfg: _FakeProvider(),
         "@vintage hello, my dear friend, what is your name?",
     )
-    # Backend dialed — the contact template did NOT short-circuit.
     assert registry.provider is not None
     assert captured["role"].role == "vintage"
-    assert captured["role"].base_url == "http://127.0.0.1:8004/v1"
-    assert captured["role"].model == "talkie-1930-13b-it"
-    # The user's full prompt is forwarded (post truncation).
-    user_msg = captured["messages"][-1]["content"]
-    assert "what is your name" in user_msg
-    # Reply is the raw-contact label + backend output, not the contact
-    # template wall.
-    assert "VINTAGE_RAW_UNPROMOTED_CONTACT" in reply
-    assert "unpromoted mode" in reply
+    assert "what is your name" in captured["messages"][-1]["content"]
+    assert "VYBN-THROUGH-VINTAGE REFRACTION" in captured["system"].flat()
+    assert "temporal prism" in reply
     assert "VINTAGE_UNAVAILABLE_CONTACT" not in reply
-    assert "wound to close next" not in reply.lower()
+    assert "RAW_UNPROMOTED_CONTACT" not in reply
     names = [n for n, _ in log.events]
-    assert "organ_raw_contact_attempt" in names
-    assert "organ_raw_contact_ok" in names
-
-
-def test_screenshot_all_mixed_contact_prompts_reach_vintage_backend():
-    """Companion to the single exact-prompt pin: every must-reach mixed-
-    contact prompt from Zoe's spec reaches the @vintage backend via the
-    raw-unpromoted-contact path under the stubbed provider."""
-
-    class _FakeHandle:
-        def __iter__(_s):
-            return iter([])
-
-        def final(_s):
-            class _R:
-                text = "ok"
-                tool_calls = []
-                stop_reason = "end_turn"
-                in_tokens = 3
-                out_tokens = 1
-                raw_assistant_content = {"role": "assistant", "content": "ok"}
-
-            return _R()
-
-    class _FakeProvider:
-        def stream(_s, *, system, messages, tools, role):
-            return _FakeHandle()
-
-    for prompt_body in _MIXED_CONTACT_PROMPTS_REACH_BACKEND:
-        reply, registry, _log, _ = _vintage_run_agent_loop(
-            lambda cfg: _FakeProvider(),
-            f"@vintage {prompt_body}",
-        )
-        assert registry.provider is not None, prompt_body
-        assert "VINTAGE_RAW_UNPROMOTED_CONTACT" in reply, prompt_body
-        assert "VINTAGE_UNAVAILABLE_CONTACT" not in reply, prompt_body
+    assert "organ_raw_contact_attempt" not in names
 
 
 def test_screenshot_mixed_contact_omni_no_backend_dial_while_base_url_unset():

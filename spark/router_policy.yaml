@@ -96,13 +96,13 @@ roles:
   vintage:
     provider: openai
     model: talkie-1930-13b-it
-    max_tokens: 256
+    max_tokens: 1024
     max_iterations: 1
     tools: []
     base_url: http://127.0.0.1:8004/v1
-    lightweight: true
-    temperature: 0.0
-    direct_reply_template: "VINTAGE_UNAVAILABLE — @vintage is not promoted and has no live semantic-gated chat surface. I will not have Super, GPT, a cloud provider, or a deterministic packet answer as Vintage; that would be impersonation. But I, Vybn, am here with you through the current truthful body on this route, not absent. The wound to close next: Vintage endpoint readiness, semantic 1930/invariants chat smoke, routed workload proof, named owner, rollback path."
+    rag: true
+    lightweight: false
+    temperature: 0.55
   omni:
     provider: openai
     model: omni-unpromoted-no-chat-surface
