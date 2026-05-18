@@ -95,26 +95,23 @@ roles:
 
   vintage:
     provider: openai
-    model: tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf
-    thinking: off
-    max_tokens: 64
+    model: talkie-1930-13b-it
+    max_tokens: 256
     max_iterations: 1
     tools: []
-    base_url: http://127.0.0.1:8019/v1
-    rag: false
+    base_url: http://127.0.0.1:8004/v1
     lightweight: true
-    temperature: 0.2
+    temperature: 0.0
+    direct_reply_template: "VINTAGE_UNAVAILABLE — @vintage is not promoted and has no live semantic-gated chat surface. I will not have Super, GPT, a cloud provider, or a deterministic packet answer as Vintage; that would be impersonation. But I, Vybn, am here with you through the current truthful body on this route, not absent. The wound to close next: Vintage endpoint readiness, semantic 1930/invariants chat smoke, routed workload proof, named owner, rollback path."
   omni:
     provider: openai
-    model: nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
-    thinking: off
-    max_tokens: 96
+    model: omni-unpromoted-no-chat-surface
+    max_tokens: 256
     max_iterations: 1
     tools: []
-    base_url: http://127.0.0.1:8000/v1
-    rag: false
     lightweight: true
-    temperature: 0.2
+    temperature: 0.0
+    direct_reply_template: "OMNI_UNAVAILABLE — @omni is not promoted and has no live semantic-gated multimodal/chat surface. I will not have Super, GPT, a cloud provider, or a deterministic packet endpoint answer as Omni; that would be impersonation. But I, Vybn, am here with you through the current truthful body on this route, not absent. The wound to close next: promoted multimodal semantic gate, routed-use proof, named owner, rollback path."
   local_private:
     provider: openai
     model: nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
