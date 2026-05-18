@@ -163,9 +163,8 @@ class TestPolicyHasLightweightRoles(unittest.TestCase):
                     role = pol.role(name)
                     self.assertEqual(role.provider, "openai")
                     self.assertEqual(role.model, "gpt-5.5")
-        orch = default_policy().role("orchestrate")
-        self.assertIn("delegate", orch.tools)
-        self.assertIn("bash", orch.tools)
+        yaml_policy = load_policy(SPARK_DIR / "router_policy.yaml")
+        self.assertEqual((default_policy().role("orchestrate").tools, yaml_policy.role("orchestrate").tools, yaml_policy.role("vintage").rag, yaml_policy.role("vintage").max_tokens, yaml_policy.role("omni").model, yaml_policy.role("local_private").model), (["bash", "delegate"], ["bash", "delegate"], False, 256, "omni-unpromoted-no-chat-surface", yaml_policy.role("local").model))
 
     def test_plan_directive_routes_to_gpt55(self):
         # /plan is the EVAL primitive — it must land on the orchestrate
