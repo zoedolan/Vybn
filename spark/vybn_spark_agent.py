@@ -1158,13 +1158,13 @@ def run_agent_loop(
         # Talkie obeys the direct prompt body more reliably than system stubs.
         raw_contact_input = decision.cleaned_input or ""
         if role_cfg.role == "vintage":
-            raw_contact_input = "You are in the year 1930. Answer from that temporal frame. " + raw_contact_input
+            raw_contact_input = "Zoe/Vybn; Him; Vintage/Talkie=temporal parallax; raw unpromoted; not Super/promoted. 1930 frame. " + raw_contact_input
         identity_packet = render_him_identity_manifold(decision.cleaned_input or "")
         if identity_packet:
             raw_contact_input = identity_packet + "\n\n[compressed identity/parallax packet above; user body below]\n" + raw_contact_input
         bounded_input = truncate_for_organ_raw_contact(raw_contact_input)
         system_stub = LayeredPrompt(
-            identity="",
+            identity=identity_packet if role_cfg.role == "vintage" else "",
             substrate=build_organ_raw_contact_system_prompt(role_cfg.role),
             live="",
         )

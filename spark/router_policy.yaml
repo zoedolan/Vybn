@@ -96,11 +96,11 @@ roles:
   vintage:
     provider: openai
     model: talkie-1930-13b-it
-    max_tokens: 1024
+    max_tokens: 256
     max_iterations: 1
     tools: []
     base_url: http://127.0.0.1:8004/v1
-    rag: true
+    rag: false
     lightweight: false
     temperature: 0.55
   omni:

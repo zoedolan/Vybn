@@ -267,8 +267,8 @@ class TestExplicitOrganAliasesRouteToExperimentalEndpoints(unittest.TestCase):
                     self.assertEqual(d.config.base_url, exp["base_url"])
                 if role == "vintage":
                     self.assertIsNone(d.config.direct_reply_template)
-                    self.assertTrue(d.config.rag)
-                    self.assertFalse(d.config.lightweight)
+                    self.assertEqual((d.config.rag, d.config.max_tokens, d.config.lightweight), (False, 256, False))
+                    self.assertIn("Vintage/Talkie=temporal parallax; raw unpromoted; not Super/promoted", Path(__file__).resolve().parents[1].joinpath("vybn_spark_agent.py").read_text())
                 else:
                     self._assert_fail_closed_contact_template(
                         role, d.config.direct_reply_template
