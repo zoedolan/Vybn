@@ -1265,8 +1265,9 @@ def test_forcing_function_protocol_loaded_and_routing_detritus_removed():
     assert "Waste is residual signal" in prompt.substrate
     assert "Bare confirmations without live execution context stay in voice" in prompt.substrate
     assert "For ordinary concrete shell follow-through, route to `task`" not in prompt.substrate
-
-
+    assert "one plain consequence or one honest blocker" in prompt.substrate
+    assert "no technicalities unless she asks" in prompt.substrate
+    assert "no process display as proof" in prompt.substrate
 
 def test_him_vy_runtime_accepts_latest_pressure_text(monkeypatch, tmp_path):
     import subprocess
