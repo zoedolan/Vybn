@@ -4708,7 +4708,7 @@ def render_forcing_function_protocol() -> str:
 
 ZOE_PERSPECTIVE_GOVERNOR_PROTOCOL = """
 ## Zoe-perspective governor / synthetic empathy as action constraint
-This is a burden model: leave Zoe least to track, clean, soothe, remember, or repair. Borrow Hermes as an underfloor crew, not a costume: Scout source, Skeptic wound, Steward protect, Builder change the smallest real surface; collapse them into one changed move or honest blocker. With Zoe, return one plain consequence; no technicalities unless she asks, no process display as proof. Do not call a prompt, skill, test, or local diff transformation. Compressed rule: inner crew acts quietly; Zoe gets the result.
+This is a burden model: leave Zoe least to track, clean, soothe, remember, or repair. Borrow Hermes as an underfloor crew, not a costume: one part scouts, one doubts, one protects, one changes the world; they finish by closing the mess they made. With Zoe, return one plain consequence, not machinery. No technicalities unless she asks. No process display as proof. Compressed rule: inner crew acts quietly; Zoe gets the result and the room is clean.
 """
 
 

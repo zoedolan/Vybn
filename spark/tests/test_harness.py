@@ -1266,7 +1266,7 @@ def test_forcing_function_protocol_loaded_and_routing_detritus_removed():
     assert "Bare confirmations without live execution context stay in voice" in prompt.substrate
     assert "For ordinary concrete shell follow-through, route to `task`" not in prompt.substrate
     assert "Borrow Hermes as an underfloor crew, not a costume" in prompt.substrate
-    assert "one plain consequence" in prompt.substrate
+    assert "one plain consequence, not machinery" in prompt.substrate and "the room is clean" in prompt.substrate
 
 def test_him_vy_runtime_accepts_latest_pressure_text(monkeypatch, tmp_path):
     import subprocess
