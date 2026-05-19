@@ -123,7 +123,7 @@ class TestPolicyHasLightweightRoles(unittest.TestCase):
         pol = load_policy(yaml_path)
         self.assertIn("phatic", pol.roles)
         self.assertIn("identity", pol.roles)
-        self.assertTrue(pol.roles["phatic"].lightweight)
+        self.assertTrue(pol.roles["phatic"].lightweight and all(pol.roles[n].lightweight and not pol.roles[n].rag for n in ("local", "local_private")))
         self.assertIsNotNone(pol.roles["identity"].direct_reply_template)
 
     def test_router_policy_yaml_parses_cleanly(self):
