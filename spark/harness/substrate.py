@@ -5055,14 +5055,14 @@ RESIDUAL_CONTROL_PRINCIPLE = (
 
 INVENTION_CONTROL_PRINCIPLE = (
     "When a live problem has no known solution, do not merely explain the gap. "
-    "Invent the smallest consequential mechanism that could solve it, projected backward from the fullest truthful horizon, route it through residuals, "
-    "and preserve the correction as future capability."
+    "AI may find novel counterexample mechanisms and hidden dimensions humans missed; invent the smallest consequential mechanism, project it backward from the fullest truthful horizon, "
+    "wound it through source contact and human/expert verification where needed, then preserve the correction as future capability."
 )
 
 INVENTION_LOOP_STEPS = [
     "encounter_novel_problem",
     "name_missing_known_solution",
-    "synthesize_smallest_mechanism",
+    "search_for_ai_native_counterexample_or_hidden_dimension",
     "synthesize_smallest_consequential_mechanism",
     "install_or_simulate_in_environment",
     "route_to_wounding_residuals",
@@ -5253,8 +5253,8 @@ def invention_plan_for(problem: str) -> dict[str, Any]:
             "having to carry the insight again."
         ),
         "guardrail": (
-            "Invention is not hallucination: name the missing known solution, keep the "
-            "first mechanism small, test lived surfaces, and preserve corrections."
+            "Invention is not hallucination: name the missing known solution, seek an AI-native counterexample or hidden dimension humans may have missed, "
+            "keep the mechanism small, test lived surfaces, verify with humans/experts where needed, and preserve corrections."
         ),
     }
 
