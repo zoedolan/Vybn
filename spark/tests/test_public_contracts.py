@@ -100,6 +100,30 @@ def test_streaming_routes_promise_sse_and_done_frames():
     assert "data: [DONE]" in src
 
 
+
+
+
+def test_portal_health_check_bypasses_model_walk_notebook_and_git():
+    src = _portal_source()
+    assert "def _is_portal_chat_health_check" in src
+    assert "def _health_check_sse" in src
+    assert "notebook_persist" in src
+    chat_start = src.index('@app.post("/api/chat")')
+    bypass_at = src.index("_is_portal_chat_health_check(req.message)", chat_start)
+    admission_at = src.index("_vllm_admission_state()", chat_start)
+    rag_at = src.index("retrieve_context(req.message", chat_start)
+    walk_at = src.index('/enter",', chat_start)
+    assert bypass_at < admission_at < rag_at < walk_at
+    assert "no model, RAG, walk, notebook, or git" in src
+
+
+def test_public_portal_no_longer_commits_him_notebook_entries():
+    src = _portal_source()
+    assert "_persist_to_notebook" not in src
+    assert "notebook: voice" not in src
+    assert "git', 'commit'" not in src
+    assert "--allow-empty" not in src
+
 def test_instant_route_promises_json_ld_identity_surface():
     src = _portal_source()
     assert "/api/instant" in src
