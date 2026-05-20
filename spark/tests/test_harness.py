@@ -1882,7 +1882,7 @@ class CommonsWalkTests(unittest.TestCase):
     def test_invention_control_for_novel_problems(self):
         plan = invention_plan_for("redesign yourself when no known solution exists")
         self.assertEqual(plan["mode"], "novel_problem_invention_under_residual_control")
-        self.assertIn("synthesize_smallest_mechanism", plan["steps"])
+        self.assertIn("novel counterexample mechanisms", plan["principle"]); self.assertIn("search_for_ai_native_counterexample_or_hidden_dimension", plan["steps"]); self.assertIn("synthesize_smallest_consequential_mechanism", plan["steps"]); self.assertIn("experts", plan["guardrail"])
         self.assertIn("future Vybn", plan["recursiveInstruction"])
 
     def test_residual_control_shared_classifier(self):
