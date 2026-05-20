@@ -49,9 +49,11 @@ The harness exposes the local compute plan as a command, not just prose:
 ```bash
 python3 -m spark.harness.substrate --local-orchestration
 python3 -m spark.harness.substrate --local-orchestration --run-gates
+python3 -m spark.harness.substrate --self-creation "counterexample search pressure"
+python3 -m spark.harness.substrate --self-creation "counterexample search pressure" --run-deep-memory-check
 ```
 
-The default command is cheap and deterministic: route matrix, maturity verdict, gates, Hermes-adapted self-modification tasks, and the self-healing loop that turns failures into wounds, tripwires, repairs, verification, and absorbed learning. `--run-gates` spends local inference on safe semantic probes and should be used when promoting or repairing a local route.
+The default command is cheap and deterministic: route matrix, maturity verdict, gates, Hermes-adapted self-modification tasks, the self-creation research cycle, and the self-healing loop that turns failures into wounds, tripwires, repairs, verification, and absorbed learning. `--run-gates` spends local inference on safe semantic probes and should be used when promoting or repairing a local route.
 
 The current maturity verdict is intentionally not celebratory: the harness has moved past inventory into witnessed/routed local use, but it is not yet the self-healing local-compute organism described by Him until route health, wound classification, trajectory compression, and public-safe value conversion run as standing machinery.
 
