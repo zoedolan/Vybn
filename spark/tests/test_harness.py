@@ -37,6 +37,10 @@ from harness.substrate import (  # noqa: E402
 )
 from harness.substrate import BASH_TOOL_SPEC  # noqa: E402
 from harness.substrate import build_layered_prompt  # noqa: E402
+from harness.substrate import load_env_files, describe  # noqa: E402
+
+SENTINEL = "test-openai-sentinel-value"
+SENTINEL2 = "test-anthropic-sentinel-value"
 
 
 class TestAbsorbGate(unittest.TestCase):

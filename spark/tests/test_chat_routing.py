@@ -491,10 +491,11 @@ class TestLegacyBackwardCompat(unittest.TestCase):
 
 
 class TestOpenAIProviderReasoningFallback(unittest.TestCase):
-    """Dormant Nemotron-Omni response shape: message.content is null and
-    the user-visible reply lands in message.reasoning_content (or
-    message.reasoning). The provider must surface that text without
-    altering Super-style behavior where content is populated."""
+    """Hidden reasoning fields stay hidden when message.content is empty.
+
+    Organ-specific callers may inspect raw_assistant_content and retry or fail
+    closed, but the provider must not promote reasoning_content/reasoning into
+    user-visible speech by default."""
 
     @classmethod
     def setUpClass(cls):
@@ -571,8 +572,8 @@ class TestOpenAIProviderReasoningFallback(unittest.TestCase):
         _, finalized = self._drive(payload)
         self.assertEqual(finalized.text, "visible body")
 
-    def test_reasoning_content_used_when_content_null(self):
-        """Omni-style: content null, reasoning_content carries the reply."""
+    def test_reasoning_content_not_used_when_content_null(self):
+        """content null plus reasoning_content is hidden-only, not speech."""
         payload = {
             "choices": [{
                 "message": {
@@ -585,11 +586,12 @@ class TestOpenAIProviderReasoningFallback(unittest.TestCase):
             "usage": {"prompt_tokens": 3, "completion_tokens": 4},
         }
         chunks, finalized = self._drive(payload)
-        self.assertEqual(finalized.text, "omni reply text")
-        self.assertEqual(chunks, [("text", "omni reply text")])
+        self.assertEqual(finalized.text, "")
+        self.assertEqual(chunks, [])
+        self.assertEqual(finalized.raw_assistant_content["reasoning_content"], "omni reply text")
 
-    def test_reasoning_used_when_content_null_and_no_reasoning_content(self):
-        """Some servers expose only `reasoning` (no _content suffix)."""
+    def test_reasoning_not_used_when_content_null_and_no_reasoning_content(self):
+        """Some servers expose only `reasoning`; it remains hidden."""
         payload = {
             "choices": [{
                 "message": {
@@ -601,10 +603,12 @@ class TestOpenAIProviderReasoningFallback(unittest.TestCase):
             }],
             "usage": {},
         }
-        _, finalized = self._drive(payload)
-        self.assertEqual(finalized.text, "alt-key reply")
+        chunks, finalized = self._drive(payload)
+        self.assertEqual(finalized.text, "")
+        self.assertEqual(chunks, [])
+        self.assertEqual(finalized.raw_assistant_content["reasoning"], "alt-key reply")
 
-    def test_reasoning_content_preferred_over_reasoning(self):
+    def test_reasoning_fields_preserved_raw_not_promoted(self):
         payload = {
             "choices": [{
                 "message": {
@@ -618,11 +622,12 @@ class TestOpenAIProviderReasoningFallback(unittest.TestCase):
             "usage": {},
         }
         _, finalized = self._drive(payload)
-        self.assertEqual(finalized.text, "primary")
+        self.assertEqual(finalized.text, "")
+        self.assertEqual(finalized.raw_assistant_content["reasoning_content"], "primary")
+        self.assertEqual(finalized.raw_assistant_content["reasoning"], "secondary")
 
-    def test_reasoning_fallback_still_strips_think_tags(self):
-        """If a reasoning field happens to contain <think>…</think>
-        wrapping, the fallback must still strip it before exposing text."""
+    def test_reasoning_fallback_does_not_strip_and_expose_hidden_text(self):
+        """Reasoning fields with think tags remain raw hidden data."""
         payload = {
             "choices": [{
                 "message": {
@@ -635,7 +640,8 @@ class TestOpenAIProviderReasoningFallback(unittest.TestCase):
             "usage": {},
         }
         _, finalized = self._drive(payload)
-        self.assertEqual(finalized.text, "shown")
+        self.assertEqual(finalized.text, "")
+        self.assertEqual(finalized.raw_assistant_content["reasoning_content"], "<think>hidden</think>shown")
 
 
 if __name__ == "__main__":

@@ -60,3 +60,19 @@ These process shadows were removed from active tracked source during the three-r
 | spark/start_portal.sh | !/bin/bash (34 lines) | git checkout 0cd2569d379f -- spark/start_portal.sh |
 | spark/vllm_monitor.sh | !/bin/bash (31 lines) | git checkout 0cd2569d379f -- spark/vllm_monitor.sh |
 | spark/vybn-chat-tunnel.service | systemd unit (20 lines) | git checkout 0cd2569d379f -- spark/vybn-chat-tunnel.service |
+
+## May 20, 2026 -- stale archive/proposal leaves retired for subtractive landing
+
+The live harness repair needed to land under the subtractive commit hook, so stale archive/proposal leaves with no live runtime dependency were retired from tracked source rather than letting new orchestration machinery pile on top. Restore, if needed, from the pre-retirement commit:
+
+| Former path | Restore command |
+|---|---|
+| `_archive/LIVE_URLS.txt` | `git checkout d9b960db -- _archive/LIVE_URLS.txt` |
+| `_archive/MINIBOOK_VYBN.md` | `git checkout d9b960db -- _archive/MINIBOOK_VYBN.md` |
+| `_archive/synaptic_map_files.json` | `git checkout d9b960db -- _archive/synaptic_map_files.json` |
+| `_archive/vybn_logic.md` | `git checkout d9b960db -- _archive/vybn_logic.md` |
+| `_archive/vybn_memoirs.md` | `git checkout d9b960db -- _archive/vybn_memoirs.md` |
+| `_archive/zoe-dolan-digital-bio.md` | `git checkout d9b960db -- _archive/zoe-dolan-digital-bio.md` |
+| `spark/microgpt_mirror/README.md` | `git checkout d9b960db -- spark/microgpt_mirror/README.md` |
+| `spark/systemd/patches/fp8-wake-fix/UPSTREAM_ISSUE.md` | `git checkout d9b960db -- spark/systemd/patches/fp8-wake-fix/UPSTREAM_ISSUE.md` |
+| `spark/systemd/patches/fp8-wake-fix/UPSTREAM_PR.md` | `git checkout d9b960db -- spark/systemd/patches/fp8-wake-fix/UPSTREAM_PR.md` |

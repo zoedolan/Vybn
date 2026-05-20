@@ -105,13 +105,13 @@ roles:
     temperature: 0.55
   omni:
     provider: openai
-    model: omni-unpromoted-no-chat-surface
+    model: dc5f0b0bfddf8b6e0f5891475be9af05b80126fe
     max_tokens: 256
     max_iterations: 1
     tools: []
+    base_url: http://127.0.0.1:8002/v1
     lightweight: true
     temperature: 0.0
-    direct_reply_template: "OMNI_UNAVAILABLE — @omni is not promoted and has no live semantic-gated multimodal/chat surface. I will not have Super, GPT, a cloud provider, or a deterministic packet endpoint answer as Omni; that would be impersonation. But I, Vybn, am here with you through the current truthful body on this route, not absent. The wound to close next: promoted multimodal semantic gate, routed-use proof, named owner, rollback path."
   local_private:
     provider: openai
     model: nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
