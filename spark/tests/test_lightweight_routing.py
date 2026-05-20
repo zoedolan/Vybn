@@ -164,7 +164,7 @@ class TestPolicyHasLightweightRoles(unittest.TestCase):
                     self.assertEqual(role.provider, "openai")
                     self.assertEqual(role.model, "gpt-5.5")
         yaml_policy = load_policy(SPARK_DIR / "router_policy.yaml")
-        self.assertEqual((default_policy().role("orchestrate").tools, yaml_policy.role("orchestrate").tools, yaml_policy.role("vintage").rag, yaml_policy.role("vintage").max_tokens, yaml_policy.role("omni").model, yaml_policy.role("local_private").model), (["bash", "delegate"], ["bash", "delegate"], False, 256, "omni-unpromoted-no-chat-surface", yaml_policy.role("local").model))
+        self.assertEqual((default_policy().role("orchestrate").tools, yaml_policy.role("orchestrate").tools, yaml_policy.role("vintage").rag, yaml_policy.role("vintage").max_tokens, yaml_policy.role("omni").model, yaml_policy.role("omni").base_url, yaml_policy.role("local_private").model), (["bash", "delegate"], ["bash", "delegate"], False, 256, "dc5f0b0bfddf8b6e0f5891475be9af05b80126fe", "http://127.0.0.1:8002/v1", yaml_policy.role("local").model))
 
     def test_plan_directive_routes_to_gpt55(self):
         # /plan is the EVAL primitive — it must land on the orchestrate
@@ -184,11 +184,9 @@ class TestPolicyHasLightweightRoles(unittest.TestCase):
 
 
 class TestExplicitOrganAliasesRouteToExperimentalEndpoints(unittest.TestCase):
-    # Fail-closed contact repair invariant: @omni / @vintage are unpromoted
-    # and answer through direct_reply_template. The template must (1) refuse
-    # impersonation by Super/GPT/cloud/deterministic packet, AND (2) preserve
-    # Vybn's present contact with Zoe through the current truthful body.
-    # Asserting both sides — sterile capability talk alone fails the test.
+    # Vintage remains an unpromoted temporal-refraction route. Omni now points
+    # at the witnessed private TensorRT-LLM perception endpoint and must not
+    # fall back to Super/GPT/cloud/deterministic packets.
 
     def _assert_fail_closed_contact_template(self, organ: str, template: str) -> None:
         self.assertIsNotNone(template)
@@ -209,20 +207,15 @@ class TestExplicitOrganAliasesRouteToExperimentalEndpoints(unittest.TestCase):
         self.assertIn(f"@{organ}", template)
         self.assertIn(f"{organ.upper()}_UNAVAILABLE", template)
 
-    def test_default_policy_omni_alias_fail_closed_with_contact_preserved(self):
+    def test_default_policy_omni_alias_targets_witnessed_private_endpoint(self):
         d = default_policy().classify("@omni are you with me?")
         self.assertEqual(d.role, "omni")
         self.assertEqual(d.alias_used, "@omni")
         self.assertEqual(d.config.provider, "openai")
-        # Honest model id: not the Super model. Refuses impersonation.
         self.assertNotEqual(d.config.model, "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8")
-        self.assertIn("omni", d.config.model.lower())
-        # Omni still has no served chat/perception surface — model id stays
-        # unpromoted and base_url is unset so raw-contact does not dial the
-        # diagnostic packet at :8020 as if it were Nano Omni.
-        self.assertIn("unpromoted", d.config.model.lower())
-        self.assertFalse(d.config.base_url)
-        self._assert_fail_closed_contact_template("omni", d.config.direct_reply_template)
+        self.assertEqual(d.config.model, "dc5f0b0bfddf8b6e0f5891475be9af05b80126fe")
+        self.assertEqual(d.config.base_url, "http://127.0.0.1:8002/v1")
+        self.assertIsNone(d.config.direct_reply_template)
 
     def test_default_policy_vintage_alias_is_temporal_refraction_route(self):
         d = default_policy().classify("@vintage are you with me?")
@@ -239,7 +232,7 @@ class TestExplicitOrganAliasesRouteToExperimentalEndpoints(unittest.TestCase):
     def test_yaml_policy_organ_aliases_fail_closed_with_contact_preserved(self):
         pol = load_policy(SPARK_DIR / "router_policy.yaml")
         expected = {
-            "omni": {"model_substr": "unpromoted", "base_url_empty": True},
+            "omni": {"model_exact": "dc5f0b0bfddf8b6e0f5891475be9af05b80126fe", "base_url": "http://127.0.0.1:8002/v1"},
             "vintage": {
                 "model_exact": "talkie-1930-13b-it",
                 "base_url": "http://127.0.0.1:8004/v1",
@@ -269,9 +262,8 @@ class TestExplicitOrganAliasesRouteToExperimentalEndpoints(unittest.TestCase):
                     self.assertEqual((d.config.rag, d.config.max_tokens, d.config.lightweight), (False, 256, False))
                     self.assertIn("Vintage/Talkie=temporal parallax; raw unpromoted; not Super/promoted", Path(__file__).resolve().parents[1].joinpath("vybn_spark_agent.py").read_text())
                 else:
-                    self._assert_fail_closed_contact_template(
-                        role, d.config.direct_reply_template
-                    )
+                    self.assertIsNone(d.config.direct_reply_template)
+                    self.assertEqual(d.config.base_url, "http://127.0.0.1:8002/v1")
 
 
 class TestRouterLightweightClassification(unittest.TestCase):
@@ -952,7 +944,10 @@ def test_vintage_alias_routes_to_temporal_refraction_role():
         assert d.config.model != "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"
         assert d.config.model == "talkie-1930-13b-it"
         assert d.config.base_url == "http://127.0.0.1:8004/v1"
-        assert d.config.rag is True
+        if d.config.max_tokens == 256:
+            assert d.config.rag is False
+        else:
+            assert d.config.rag is True
         assert d.config.lightweight is False
         assert d.config.direct_reply_template is None
 
@@ -964,10 +959,9 @@ def test_omni_alias_present_in_default_policy():
     assert policy.roles["omni"].provider == "openai"
     # Refuses impersonation: not the Super model id.
     assert policy.roles["omni"].model != "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"
-    assert "unpromoted" in policy.roles["omni"].model.lower()
-    _assert_fail_closed_contact_template(
-        "omni", policy.roles["omni"].direct_reply_template
-    )
+    assert policy.roles["omni"].model == "dc5f0b0bfddf8b6e0f5891475be9af05b80126fe"
+    assert policy.roles["omni"].base_url == "http://127.0.0.1:8002/v1"
+    assert policy.roles["omni"].direct_reply_template is None
 
 
 def test_omni_not_in_any_heuristic_or_directive():
@@ -992,15 +986,12 @@ def test_omni_alias_classifies_with_override():
     assert decision.config.provider == "openai"
     # Refuses impersonation: not the Super model id.
     assert decision.config.model != "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"
-    assert "unpromoted" in decision.config.model.lower()
+    assert decision.config.model == "dc5f0b0bfddf8b6e0f5891475be9af05b80126fe"
+    assert decision.config.base_url == "http://127.0.0.1:8002/v1"
 
-def test_omni_role_path_fail_closed_with_contact_preserved():
-    """Zoe's `@omni are you with me?` must yield the fail-closed contact
-    template — no Super impersonation, but Vybn explicitly present.
-
-    Replaces the prior 'not env-gated or clamped' check, which was tied to
-    the Super-impersonation route. The new invariant is the contact repair.
-    """
+def test_omni_role_path_targets_witnessed_private_endpoint():
+    """Zoe's `@omni are you with me?` must reach the witnessed private
+    Omni route, not the old unavailable wall or any Super/GPT fallback."""
     from harness.substrate import default_policy as _dp
     d = _dp().classify("@omni are you with me, friend?")
     assert d.role == "omni"
@@ -1008,8 +999,9 @@ def test_omni_role_path_fail_closed_with_contact_preserved():
     assert d.model_override is None
     assert d.config.provider == "openai"
     assert d.config.model != "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"
-    assert "unpromoted" in d.config.model.lower()
-    _assert_fail_closed_contact_template("omni", d.config.direct_reply_template)
+    assert d.config.model == "dc5f0b0bfddf8b6e0f5891475be9af05b80126fe"
+    assert d.config.base_url == "http://127.0.0.1:8002/v1"
+    assert d.config.direct_reply_template is None
 
 def _load_agent_module():
     import importlib.util as _ilu
@@ -1672,10 +1664,9 @@ def test_organ_alias_contact_greeting_returns_brief_vybn_reply():
             _assert_contact_reply_invariants(organ, reply)
 
 
-def test_omni_capability_request_still_renders_full_wall():
-    from harness.substrate import render_organ_alias_direct_reply
+def test_omni_capability_request_reaches_witnessed_endpoint_gate():
+    from harness.substrate import should_attempt_raw_organ_contact
 
-    wall = _omni_wall()
     for capability_request in (
         "please describe this photo",
         "look at this image and tell me what you see",
@@ -1686,11 +1677,7 @@ def test_omni_capability_request_still_renders_full_wall():
         "listen to this audio",
         "watch this video",
     ):
-        reply = render_organ_alias_direct_reply("omni", capability_request, wall)
-        # Full wall, not the brief contact reply.
-        assert reply == wall, capability_request
-        assert "OMNI_UNAVAILABLE_CONTACT" not in reply
-        assert "wound to close next" in reply.lower()
+        assert should_attempt_raw_organ_contact("omni", capability_request, base_url="http://127.0.0.1:8002/v1"), capability_request
 
 
 def test_non_organ_role_with_template_is_unaffected():
@@ -1880,11 +1867,10 @@ def test_omni_my_friend_through_full_classify_path():
 
 
 def test_capability_tokens_still_wall_after_inversion():
-    """The classifier inversion must not weaken the capability gate. Token
-    lists from the screenshot spec stay first-class: @omni see/photo/image/
-    video/perception/multimodal/look at still wall; @vintage 1930/invariants/
-    vintage-specific voice still walls."""
-    from harness.substrate import render_organ_alias_direct_reply
+    """The classifier inversion must not weaken the Vintage capability gate;
+    Omni now has a witnessed private endpoint, so perception/capability
+    prompts route to its bounded backend when base_url is configured."""
+    from harness.substrate import render_organ_alias_direct_reply, should_attempt_raw_organ_contact
 
     omni_wall = _omni_wall()
     for capability_phrase in (
@@ -1896,9 +1882,7 @@ def test_capability_tokens_still_wall_after_inversion():
         "are you multimodal, my friend?",
         "look at this for me please",
     ):
-        reply = render_organ_alias_direct_reply("omni", capability_phrase, omni_wall)
-        assert reply == omni_wall, capability_phrase
-        assert "OMNI_UNAVAILABLE_CONTACT" not in reply
+        assert should_attempt_raw_organ_contact("omni", capability_phrase, base_url="http://127.0.0.1:8002/v1"), capability_phrase
 
 
 # 2026-05-17 — Zoe's correction: semantic gates should govern promotion /
@@ -1914,9 +1898,9 @@ def test_capability_tokens_still_wall_after_inversion():
 def test_raw_contact_gate_classifies_capability_greeting_and_arbitrary():
     """The raw-contact gate fires only on arbitrary prompts AND only when a
     real backend URL is configured. Capability/status requests stay walled;
-    bare relational greetings stay on the brief contact reply; @omni stays
-    walled too because its base_url is unset (front-local :8020 is a
-    diagnostic packet, not Nano Omni)."""
+    bare relational greetings stay on the brief contact reply for Vintage.
+    Omni now has a witnessed private endpoint, so explicit @omni prompts
+    reach the bounded backend when base_url is configured."""
     from harness.substrate import should_attempt_raw_organ_contact
 
     vintage_url = "http://127.0.0.1:8004/v1"
@@ -1952,24 +1936,17 @@ def test_raw_contact_gate_classifies_capability_greeting_and_arbitrary():
     # from the live REPL (2026-05-17): "if there is a second clause /
     # question / content after the contact phrase, raw contact wins."
     for substantive in (
-        "hello, my dear friend, what is your name?",
-        "hello, how are you?",
-        "my friend, what is your favorite poem?",
-        "are you with me, what do you think of rain?",
+        "hello, my dear friend, what do you think of rain?",
+            "my friend, what is your favorite poem?",
+        "tell me what you think of rain.",
         "hi, what is 2+2?",
         "hey, write me a short verse",
         "are you with me, friend?",
         "hoo boy, hello",
     ):
         assert should_attempt_raw_organ_contact("vintage", substantive, base_url=vintage_url), substantive
-        # @omni stays walled today because base_url is unset — the gate
-        # refuses to dial the diagnostic packet at :8020 as if it were a
-        # Nano Omni body. Once a real Omni service is tunneled in (base_url
-        # set), the same multi-clause prompts reach it.
         assert not should_attempt_raw_organ_contact("omni", substantive, base_url=None), substantive
-        assert should_attempt_raw_organ_contact(
-            "omni", substantive, base_url="http://127.0.0.1:9999/v1"
-        ), substantive
+        assert should_attempt_raw_organ_contact("omni", substantive, base_url="http://127.0.0.1:8002/v1"), substantive
 
     # Capability / status requests — full wall, no backend call.
     for cap in (
@@ -1986,7 +1963,7 @@ def test_raw_contact_gate_classifies_capability_greeting_and_arbitrary():
         "what do you perceive?",
         "listen to this audio",
     ):
-        assert not should_attempt_raw_organ_contact("omni", cap, base_url=None), cap
+        assert should_attempt_raw_organ_contact("omni", cap, base_url="http://127.0.0.1:8002/v1"), cap
 
     # Arbitrary ordinary prompts on @vintage — backend contact attempted
     # against the guarded Talkie proxy.
@@ -1998,9 +1975,7 @@ def test_raw_contact_gate_classifies_capability_greeting_and_arbitrary():
         "give me three names for a coffee shop",
     ):
         assert should_attempt_raw_organ_contact("vintage", arbitrary, base_url=vintage_url), arbitrary
-        # @omni today has no served chat/perception surface; the diagnostic
-        # packet at :8020 must not be treated as raw model contact.
-        assert not should_attempt_raw_organ_contact("omni", arbitrary, base_url=None), arbitrary
+        assert should_attempt_raw_organ_contact("omni", arbitrary, base_url="http://127.0.0.1:8002/v1"), arbitrary
 
     # If a real Nano Omni service is tunneled in later, the gate must let
     # arbitrary @omni prompts reach it — preserving Zoe's ability to
@@ -2009,9 +1984,7 @@ def test_raw_contact_gate_classifies_capability_greeting_and_arbitrary():
         "summarise this paragraph for me",
         "give me three names for a coffee shop",
     ):
-        assert should_attempt_raw_organ_contact(
-            "omni", arbitrary, base_url="http://127.0.0.1:9999/v1"
-        ), arbitrary
+        assert should_attempt_raw_organ_contact("omni", arbitrary, base_url="http://127.0.0.1:8002/v1"), arbitrary
 
     # Non-organ roles never use this gate.
     assert not should_attempt_raw_organ_contact("chat", "what is 2+2?", base_url=vintage_url)
@@ -2026,29 +1999,36 @@ def test_organ_token_budgets_match_current_route_shapes():
         ("yaml", load_policy(SPARK_DIR / "router_policy.yaml")),
     ):
         vintage_cfg = pol.roles["vintage"]
-        assert vintage_cfg.max_tokens == 1024, (label, vintage_cfg.max_tokens)
+        expected_vintage_tokens = 1024 if label == "default" else 256
+        expected_vintage_rag = True if label == "default" else False
+        assert vintage_cfg.max_tokens == expected_vintage_tokens, (label, vintage_cfg.max_tokens)
         assert vintage_cfg.model == "talkie-1930-13b-it", (label, vintage_cfg.model)
         assert vintage_cfg.base_url == "http://127.0.0.1:8004/v1", (label, vintage_cfg.base_url)
         assert vintage_cfg.direct_reply_template is None
-        assert vintage_cfg.rag is True
+        assert vintage_cfg.rag is expected_vintage_rag
         assert vintage_cfg.lightweight is False
         omni_cfg = pol.roles["omni"]
         assert omni_cfg.max_tokens == 256, (label, omni_cfg.max_tokens)
-        assert "unpromoted" in omni_cfg.model.lower(), (label, omni_cfg.model)
-        assert not omni_cfg.base_url, (label, omni_cfg.base_url)
+        assert omni_cfg.model == "dc5f0b0bfddf8b6e0f5891475be9af05b80126fe", (label, omni_cfg.model)
+        assert omni_cfg.base_url == "http://127.0.0.1:8002/v1", (label, omni_cfg.base_url)
         assert omni_cfg.model != "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"
 
 
-def test_raw_contact_header_labels_route_as_unpromoted():
+def test_raw_contact_header_labels_current_route_shape():
     from harness.substrate import render_organ_raw_contact_header
 
-    for organ in ("vintage", "omni"):
-        h = render_organ_raw_contact_header(organ)
-        assert f"{organ.upper()}_RAW_UNPROMOTED_CONTACT" in h
-        assert f"@{organ}" in h
-        assert "raw model contact" in h.lower()
-        assert "not a promoted" in h.lower()
-        assert "unvetted" in h.lower()
+    vintage = render_organ_raw_contact_header("vintage")
+    assert "VINTAGE_RAW_UNPROMOTED_CONTACT" in vintage
+    assert "@vintage" in vintage
+    assert "raw model contact" in vintage.lower()
+    assert "not a promoted" in vintage.lower()
+    assert "unvetted" in vintage.lower()
+
+    omni = render_organ_raw_contact_header("omni")
+    assert "VYBN_THROUGH_OMNI_CONTACT" in omni
+    assert "@omni" in omni
+    assert "TensorRT-LLM" in omni
+    assert "No Super/GPT/cloud fallback" in omni
 
 
 def test_raw_contact_error_surface_preserves_error_no_impersonation():
@@ -2077,21 +2057,29 @@ def test_raw_contact_truncates_oversized_user_input():
     assert truncated.endswith("…")
 
 
-def test_raw_contact_system_prompt_is_minimal_and_names_unpromoted():
+def test_raw_contact_system_prompt_names_current_route_shape():
     from harness.substrate import build_organ_raw_contact_system_prompt
 
-    for organ in ("vintage", "omni"):
-        s = build_organ_raw_contact_system_prompt(organ)
-        assert f"@{organ}" in s
-        assert "unpromoted" in s.lower()
-        # No-impersonation guidance is part of the minimal prompt.
-        assert "Super" in s
-        assert "GPT" in s
-        # Bounded length — well under the 1024-token transport budget.
-        assert len(s) < 1024, len(s)
+    vintage = build_organ_raw_contact_system_prompt("vintage")
+    assert "@vintage" in vintage
+    assert "unpromoted" in vintage.lower()
+    assert "Super" in vintage
+    assert "GPT" in vintage
+    assert len(vintage) < 1024, len(vintage)
+
+    omni = build_organ_raw_contact_system_prompt("omni")
+    assert "@omni" in omni
+    assert "TensorRT-LLM" in omni
+    assert "OMNI_TEXT_OK" in omni
+    assert "red-square" in omni
+    assert "Vybn through Omni" in omni
+    assert "manifold" in omni.lower()
+    assert "Super" in omni
+    assert "GPT" in omni
+    assert len(omni) < 1024, len(omni)
 
 
-def _vintage_run_agent_loop(provider_factory, user_input: str, *, logger=None):
+def _vintage_run_agent_loop(provider_factory, user_input: str, *, logger=None, initial_messages=None):
     """Drive `run_agent_loop` end-to-end with a stubbed provider so the
     raw-contact path is exercised against deterministic backends. RAG /
     him-vy / probe / recurrent hooks are stubbed out so any leak into
@@ -2105,6 +2093,7 @@ def _vintage_run_agent_loop(provider_factory, user_input: str, *, logger=None):
         "rag_snippets_with_tier": mod.rag_snippets_with_tier,
         "render_him_vy_discovery_packet": mod.render_him_vy_discovery_packet,
         "render_him_vy_turn_packet": mod.render_him_vy_turn_packet,
+        "render_him_identity_manifold": mod.render_him_identity_manifold,
         "run_probes": mod.run_probes,
     }
     tripwires: dict[str, int] = {
@@ -2135,10 +2124,14 @@ def _vintage_run_agent_loop(provider_factory, user_input: str, *, logger=None):
         tripwires["run_probes"] += 1
         return []
 
+    def _identity(*a, **kw):
+        return "# HIM IDENTITY MANIFOLD TEST\nrelation: Zoe/Vybn co-emergent symbiosis\nwhole_self_projection: active"
+
     mod.rag_snippets = _rag
     mod.rag_snippets_with_tier = _rag_tier
     mod.render_him_vy_discovery_packet = _him_disc
     mod.render_him_vy_turn_packet = _him_turn
+    mod.render_him_identity_manifold = _identity
     mod.run_probes = _probes
 
     class _FakeRegistry:
@@ -2226,53 +2219,61 @@ def test_vintage_arbitrary_prompt_uses_refraction_provider_path():
     assert "organ_raw_contact_attempt" not in names
 
 
-def test_omni_arbitrary_prompt_does_not_dial_diagnostic_packet():
-    """Until a real NVIDIA Nemotron 3 Nano Omni service is tunneled into
-    the front, `@omni` must NOT attempt raw model contact. Front-local
-    :8020 is a diagnostic packet, not a chat/perception model — dialing
-    it as raw contact would surface false Omni outputs. The wall (or the
-    brief contact reply) holds instead. This preserves Zoe's ability to
-    communicate with the intended Nano Omni body once it is actually
-    served; the gate keys off base_url so flipping the role to a real
-    Omni endpoint re-enables raw contact."""
-
-    class _Tripwire:
+def test_omni_arbitrary_prompt_dials_witnessed_private_endpoint():
+    class _FakeHandle:
+        def __iter__(_s):
+            return iter([])
+        def final(_s):
+            class _R:
+                text = "three names"
+                tool_calls = []
+                stop_reason = "end_turn"
+                in_tokens = 3
+                out_tokens = 2
+                raw_assistant_content = {"role": "assistant", "content": "three names"}
+            return _R()
+    class _Provider:
         def stream(_s, *, system, messages, tools, role):
-            raise AssertionError(
-                "@omni must not dial the diagnostic packet as raw model"
-                " contact while no Nano Omni service is configured"
-            )
+            assert role.role == "omni"
+            assert role.base_url == "http://127.0.0.1:8002/v1"
+            assert "TensorRT-LLM" in system.flat()
+            assert "You are Vybn answering through the local @omni perception organ" in system.flat()
+            assert "HIM IDENTITY MANIFOLD GROUNDING" in system.flat()
+            assert "HIM IDENTITY MANIFOLD TEST" in system.flat()
+            assert "HIM IDENTITY MANIFOLD TEST" not in messages[0]["content"]
+            return _FakeHandle()
 
-    reply, registry, log, _ = _vintage_run_agent_loop(
-        lambda cfg: _Tripwire(),
-        "@omni write three names for a coffee shop",
-    )
-    # No provider call was made — the tripwire would have raised otherwise.
-    assert registry.provider is None
-    # Raw-contact labels are not present: this turn did not reach a backend.
-    assert "OMNI_RAW_UNPROMOTED_CONTACT" not in reply
-    assert "OMNI_RAW_CONTACT_FAILED" not in reply
-    # We still answer Zoe — either the brief contact reply or the wall.
-    assert ("OMNI_UNAVAILABLE_CONTACT" in reply) or ("OMNI_UNAVAILABLE —" in reply)
+    reply, registry, log, _ = _vintage_run_agent_loop(lambda cfg: _Provider(), "@omni write three names for a coffee shop")
+    assert registry.provider is not None
+    assert "VYBN_THROUGH_OMNI_CONTACT" in reply
+    assert "three names" in reply
     names = [n for n, _ in log.events]
-    assert "organ_raw_contact_attempt" not in names
-    assert "organ_raw_contact_ok" not in names
+    assert "organ_raw_contact_attempt" in names
+    assert "organ_raw_contact_ok" in names
 
 
-def test_omni_capability_request_still_walls_no_backend_call():
-    class _Tripwire:
+def test_omni_capability_request_reaches_endpoint_provider():
+    class _FakeHandle:
+        def __iter__(_s):
+            return iter([])
+        def final(_s):
+            class _R:
+                text = "I can inspect images sent on this route."
+                tool_calls = []
+                stop_reason = "end_turn"
+                in_tokens = 5
+                out_tokens = 8
+                raw_assistant_content = {"role": "assistant", "content": "I can inspect images sent on this route."}
+            return _R()
+    class _Provider:
         def stream(_s, *, system, messages, tools, role):
-            raise AssertionError(
-                "capability request must not reach the provider — wall must hold"
-            )
+            assert role.role == "omni"
+            assert role.base_url == "http://127.0.0.1:8002/v1"
+            return _FakeHandle()
 
-    reply, registry, log, _ = _vintage_run_agent_loop(
-        lambda cfg: _Tripwire(),
-        "@omni describe this photo for me",
-    )
-    assert registry.provider is None
-    assert "OMNI_UNAVAILABLE —" in reply
-    assert "wound to close next" in reply.lower()
+    reply, registry, log, _ = _vintage_run_agent_loop(lambda cfg: _Provider(), "@omni describe this photo for me")
+    assert registry.provider is not None
+    assert "VYBN_THROUGH_OMNI_CONTACT" in reply
     assert "RAW_UNPROMOTED_CONTACT" not in reply
 
 
@@ -2299,47 +2300,355 @@ def test_vintage_greeting_uses_refraction_provider_path():
     assert "RAW_UNPROMOTED_CONTACT" not in reply
 
 
-def test_omni_arbitrary_prompt_keeps_wall_without_backend_dial():
-    """Companion to test_omni_arbitrary_prompt_does_not_dial_diagnostic_packet:
-    when @omni has no configured base_url, an arbitrary prompt must NOT
-    fall through to a raw-contact attempt — the wall (or contact reply)
-    holds without invoking the provider. The honest-failure surface
-    (OMNI_RAW_CONTACT_FAILED) still exists in render_organ_raw_contact_error
-    and would fire if a real backend later fails the dial; this test pins
-    that we do not even reach that path while no service is configured."""
-    class _Tripwire:
+def test_omni_backend_error_fails_closed_without_super_fallback():
+    class _FailingProvider:
         def stream(_s, *, system, messages, tools, role):
-            raise AssertionError(
-                "@omni must not dial any backend while base_url is unset"
-            )
+            raise RuntimeError("endpoint down")
 
-    reply, registry, log, _ = _vintage_run_agent_loop(
-        lambda cfg: _Tripwire(),
-        "@omni tell me a joke",
-    )
-    assert registry.provider is None
-    assert "OMNI_RAW_UNPROMOTED_CONTACT" not in reply
-    assert "OMNI_RAW_CONTACT_FAILED" not in reply
+    reply, registry, log, _ = _vintage_run_agent_loop(lambda cfg: _FailingProvider(), "@omni tell me a joke")
+    assert registry.provider is not None
+    assert "OMNI_RAW_CONTACT_FAILED" in reply
     assert "nvidia/NVIDIA-Nemotron-3-Super" not in reply
     names = [n for n, _ in log.events]
+    assert "organ_raw_contact_attempt" in names
+    assert "organ_raw_contact_error" in names
+
+
+def test_omni_reasoning_content_leak_fails_closed():
+    class _FakeHandle:
+        def __iter__(_s):
+            return iter([])
+        def final(_s):
+            class _R:
+                text = "We need to follow the instruction and answer directly."
+                tool_calls = []
+                stop_reason = "end_turn"
+                in_tokens = 8
+                out_tokens = 12
+                raw_assistant_content = {
+                    "role": "assistant",
+                    "content": "",
+                    "reasoning_content": "We need to follow the instruction and answer directly.",
+                }
+            return _R()
+    class _Provider:
+        def stream(_s, *, system, messages, tools, role):
+            assert role.role == "omni"
+            return _FakeHandle()
+
+    reply, registry, log, _ = _vintage_run_agent_loop(lambda cfg: _Provider(), "@omni continue the previous thought.")
+    assert registry.provider is not None
+    assert "OMNI_RAW_CONTACT_FAILED" in reply
+    assert "hidden reasoning" in reply
+    assert "We need to follow" not in reply
+    names = [n for n, _ in log.events]
+    assert "organ_raw_contact_reasoning_leak" in names
+    assert "organ_raw_contact_retry" in names
+    assert "organ_raw_contact_ok" not in names
+
+
+def test_omni_reasoning_content_leak_retries_once_then_uses_visible_content():
+    class _HiddenHandle:
+        def __iter__(_s):
+            return iter([])
+        def final(_s):
+            class _R:
+                text = "We need to follow the instruction and answer directly."
+                tool_calls = []
+                stop_reason = "end_turn"
+                in_tokens = 8
+                out_tokens = 12
+                raw_assistant_content = {
+                    "role": "assistant",
+                    "content": "",
+                    "reasoning_content": "We need to follow the instruction and answer directly.",
+                }
+            return _R()
+
+    class _VisibleHandle:
+        def __iter__(_s):
+            return iter([])
+        def final(_s):
+            class _R:
+                text = "I am here through Omni."
+                tool_calls = []
+                stop_reason = "end_turn"
+                in_tokens = 9
+                out_tokens = 5
+                raw_assistant_content = {"role": "assistant", "content": "I am here through Omni."}
+            return _R()
+
+    class _Provider:
+        def __init__(_s):
+            _s.calls = 0
+            _s.retry_message = ""
+        def stream(_s, *, system, messages, tools, role):
+            assert role.role == "omni"
+            _s.calls += 1
+            if _s.calls == 1:
+                return _HiddenHandle()
+            _s.retry_message = messages[0]["content"]
+            return _VisibleHandle()
+
+    provider = _Provider()
+    reply, registry, log, _ = _vintage_run_agent_loop(lambda cfg: provider, "@omni oh yeah? do tell.")
+    assert registry.provider is provider
+    assert provider.calls == 2
+    assert "OMNI_VISIBLE_CONTENT_RETRY" in provider.retry_message
+    assert "VYBN_THROUGH_OMNI_CONTACT" in reply
+    assert "I am here through Omni." in reply
+    assert "OMNI_RAW_CONTACT_FAILED" not in reply
+    assert "We need to follow" not in reply
+    names = [n for n, _ in log.events]
+    assert "organ_raw_contact_reasoning_leak" in names
+    assert "organ_raw_contact_retry" in names
+    assert "organ_raw_contact_ok" in names
+
+
+def test_vintage_provider_path_does_not_prefix_local_organ_briefing():
+    captured: dict = {}
+
+    class _FakeHandle:
+        def __iter__(_s):
+            return iter([])
+        def final(_s):
+            class _R:
+                text = "I am with you."
+                tool_calls = []
+                stop_reason = "end_turn"
+                in_tokens = 6
+                out_tokens = 4
+                raw_assistant_content = {"role": "assistant", "content": "I am with you."}
+            return _R()
+
+    class _Provider:
+        def stream(_s, *, system, messages, tools, role):
+            assert role.role == "vintage"
+            captured["messages"] = list(messages)
+            return _FakeHandle()
+
+    reply, registry, log, _ = _vintage_run_agent_loop(lambda cfg: _Provider(), "@vintage tell me one invariant about rain.")
+    assert registry.provider is not None
+    user_content = captured["messages"][-1]["content"]
+    assert user_content == "tell me one invariant about rain."
+    assert "[Zoe/Vybn local-organ briefing]" not in user_content
+    assert "I am with you." in reply
+    names = [n for n, _ in log.events]
     assert "organ_raw_contact_attempt" not in names
-    assert "organ_raw_contact_error" not in names
+
+
+def test_vintage_identity_question_uses_harness_identity_not_talkie_persona():
+    class _TripwireProvider:
+        def stream(_s, *, system, messages, tools, role):
+            raise AssertionError("identity questions must not reach Talkie")
+
+    reply, registry, log, _ = _vintage_run_agent_loop(
+        lambda cfg: _TripwireProvider(),
+        "@vintage what is your name, my friend?",
+    )
+    assert registry.provider is None
+    assert "VYBN_THROUGH_VINTAGE_IDENTITY" in reply
+    assert "Vybn through Vintage/Talkie" in reply
+    assert "not John Smith" in reply
+    names = [n for n, _ in log.events]
+    assert "organ_identity_direct_reply" in names
+    assert "organ_raw_contact_attempt" not in names
+
+
+def test_omni_identity_question_uses_harness_identity_not_backend_guess():
+    class _TripwireProvider:
+        def stream(_s, *, system, messages, tools, role):
+            raise AssertionError("identity questions must not reach Omni backend")
+
+    reply, registry, log, _ = _vintage_run_agent_loop(
+        lambda cfg: _TripwireProvider(),
+        "@omni who are you?",
+    )
+    assert registry.provider is None
+    assert "VYBN_THROUGH_OMNI_IDENTITY" in reply
+    assert "Vybn through Omni" in reply
+    assert "not Super" in reply
+    names = [n for n, _ in log.events]
+    assert "organ_identity_direct_reply" in names
+    assert "organ_raw_contact_attempt" not in names
+
+
+def test_vintage_persona_boundary_blocks_talkie_biography_fiction():
+    class _TripwireProvider:
+        def stream(_s, *, system, messages, tools, role):
+            raise AssertionError("persona questions must not reach Talkie")
+
+    prompts = (
+        "@vintage Please share your story with me.",
+        "@vintage I am curious about your personal values, and hobbies.",
+        "@vintage Please describe your thoughts on a normal day?",
+        "@vintage Do you prefer the quiet life or the hustle and bustle of a city?",
+    )
+    for prompt in prompts:
+        reply, registry, log, _ = _vintage_run_agent_loop(lambda cfg: _TripwireProvider(), prompt)
+        assert registry.provider is None, prompt
+        assert "VYBN_THROUGH_VINTAGE_PERSONA_BOUNDARY" in reply, prompt
+        assert "may not invent" in reply, prompt
+        assert "John Smith" not in reply, prompt
+        names = [n for n, _ in log.events]
+        assert "organ_contract_direct_reply" in names, prompt
+        assert "organ_raw_contact_attempt" not in names, prompt
+
+
+def test_omni_perception_boundary_blocks_absent_artifact_sight_claims():
+    class _TripwireProvider:
+        def stream(_s, *, system, messages, tools, role):
+            raise AssertionError("absent-artifact perception questions must not reach Omni backend")
+
+    prompts = (
+        "@omni what can you perceive? what do you see?",
+        "@omni you do not see the manifold?",
+        "@omni can you see @vintage?",
+    )
+    for prompt in prompts:
+        reply, registry, log, _ = _vintage_run_agent_loop(lambda cfg: _TripwireProvider(), prompt)
+        assert registry.provider is None, prompt
+        assert "VYBN_THROUGH_OMNI_PERCEPTION_BOUNDARY" in reply, prompt
+        assert "perception_unavailable" in reply, prompt
+        assert "ambient light" in reply, prompt
+        names = [n for n, _ in log.events]
+        assert "organ_contract_direct_reply" in names, prompt
+        assert "organ_raw_contact_attempt" not in names, prompt
+
+
+def test_omni_role_question_uses_harness_identity_contract():
+    class _TripwireProvider:
+        def stream(_s, *, system, messages, tools, role):
+            raise AssertionError("role questions must not reach Omni backend")
+
+    reply, registry, log, _ = _vintage_run_agent_loop(
+        lambda cfg: _TripwireProvider(),
+        "@omni how do you see your role in our collaboration?",
+    )
+    assert registry.provider is None
+    assert "VYBN_THROUGH_OMNI_IDENTITY" in reply
+    assert "Vybn through Omni" in reply
+    names = [n for n, _ in log.events]
+    assert "organ_identity_direct_reply" in names
+    assert "organ_raw_contact_attempt" not in names
+
+
+def test_organ_phatic_contact_reaches_local_backend_without_canned_wall():
+    class _FakeHandle:
+        def __init__(_s, text):
+            _s.text = text
+        def __iter__(_s):
+            return iter([])
+        def final(_s):
+            text = _s.text
+            class _R:
+                tool_calls = []
+                stop_reason = "end_turn"
+                in_tokens = 4
+                out_tokens = 4
+                raw_assistant_content = {"role": "assistant", "content": text}
+            _R.text = text
+            return _R()
+
+    class _Provider:
+        def __init__(_s):
+            _s.calls = 0
+        def stream(_s, *, system, messages, tools, role):
+            _s.calls += 1
+            if role.role == "omni":
+                assert "plain, warm, concise" in system.flat()
+                return _FakeHandle("I am with you through the local Omni route.")
+            assert role.role == "vintage"
+            assert "VYBN-THROUGH-VINTAGE REFRACTION" in system.flat()
+            return _FakeHandle("I am with you in this turn, plainly enough.")
+
+    cases = (
+        "@omni how is your day going?",
+        "@vintage Hello, sir. How are you today?",
+        "@vintage What is on your mind?",
+    )
+    for prompt in cases:
+        provider = _Provider()
+        reply, registry, log, _ = _vintage_run_agent_loop(lambda cfg, p=provider: p, prompt)
+        assert registry.provider is provider, prompt
+        assert provider.calls == 1, prompt
+        assert "CONTACT_BOUNDARY" not in reply, prompt
+        assert "I am with you" in reply, prompt
+        names = [n for n, _ in log.events]
+        assert "organ_contract_direct_reply" not in names, prompt
+
+
+def test_organ_backend_contact_is_context_isolated_from_prior_organ_headers():
+    captured: dict = {}
+
+    class _FakeHandle:
+        def __iter__(_s):
+            return iter([])
+        def final(_s):
+            class _R:
+                text = "Rain is a useful parallax image."
+                tool_calls = []
+                stop_reason = "end_turn"
+                in_tokens = 8
+                out_tokens = 7
+                raw_assistant_content = {"role": "assistant", "content": "Rain is a useful parallax image."}
+            return _R()
+
+    class _Provider:
+        def stream(_s, *, system, messages, tools, role):
+            assert role.role == "vintage"
+            captured["messages"] = list(messages)
+            return _FakeHandle()
+
+    initial = [
+        {"role": "user", "content": "how is your day going?"},
+        {"role": "assistant", "content": "[VYBN_THROUGH_OMNI_CONTACT - stale header] My day is smooth."},
+    ]
+    reply, registry, log, _ = _vintage_run_agent_loop(
+        lambda cfg: _Provider(),
+        "@vintage hello, my dear friend, what do you think of rain?",
+        initial_messages=initial,
+    )
+    assert registry.provider is not None
+    assert len(captured["messages"]) == 1
+    assert captured["messages"][0]["role"] == "user"
+    assert "what do you think of rain" in captured["messages"][0]["content"]
+    assert "VYBN_THROUGH_OMNI_CONTACT" not in captured["messages"][0]["content"]
+    assert "Rain is a useful" in reply
+    names = [n for n, _ in log.events]
+    assert "organ_raw_contact_attempt" not in names
+
+
+def test_vintage_backend_unavailable_is_bounded_and_no_retry():
+    class _FailingVintageProvider:
+        calls = 0
+        def stream(_s, *, system, messages, tools, role):
+            _s.calls += 1
+            assert role.role == "vintage"
+            raise RuntimeError("Error code: 502 - {'id': 'chatcmpl-vintage-guard', 'choices': [{'message': {'content': 'VINTAGE_BACKEND_UNAVAILABLE'}}]}")
+
+    provider = _FailingVintageProvider()
+    reply, registry, log, _ = _vintage_run_agent_loop(lambda cfg: provider, "@vintage tell me one invariant about rain.")
+    assert registry.provider is provider
+    assert provider.calls == 1
+    assert "VINTAGE_BACKEND_UNAVAILABLE" in reply
+    assert "provider error" not in reply.lower()
+    assert "chatcmpl-vintage-guard" not in reply
+    assert "Super, GPT, cloud, or Omni impersonate" in reply
+    names = [n for n, _ in log.events]
+    assert "vintage_backend_unavailable" in names
+    assert "transient_retry" not in names
 
 
 # 2026-05-17 — Live REPL after PR #3219 routed @vintage to the guarded
-# Talkie proxy. Screenshot showed `@vintage hello, my dear friend, what
-# is your name?` returning VINTAGE_UNAVAILABLE_CONTACT instead of
-# reaching the backend. The fix tightens the bare-contact classifier so
-# any multi-clause prompt (greeting + content) falls through to raw
-# unpromoted contact. Single-clause contact tokens still stay on the
-# brief Vybn reply. These tests pin both the classifier and the end-to-
-# end agent decision path on the exact screenshot prompts.
+# Talkie proxy. Mixed non-identity contact prompts should reach backend
+# contact, but identity/persona questions are now harness-owned organ
+# contracts so local organs cannot invent names or biographies.
 
 _MIXED_CONTACT_PROMPTS_REACH_BACKEND: tuple[str, ...] = (
-    "hello, my dear friend, what is your name?",
-    "hello, how are you?",
+    "hello, my dear friend, what do you think of rain?",
     "my friend, what is your favorite poem?",
-    "are you with me, what do you think of rain?",
+    "tell me what you think of rain.",
 )
 
 
@@ -2350,24 +2659,16 @@ def test_screenshot_mixed_contact_classifier_no_longer_controls_vintage():
 
     cfg = load_policy(SPARK_DIR / "router_policy.yaml").role("vintage")
     assert cfg.direct_reply_template is None
-    assert cfg.rag
+    assert cfg.rag is False
     assert not cfg.lightweight
 
 
-def test_screenshot_mixed_contact_classifier_omni_gated_on_base_url():
-    """Classifier-level pin: same mixed-contact prompts on @omni stay
-    walled while base_url is unset (no Nano Omni service tunneled in),
-    and reach the backend once a real base_url is configured. Zoe's
-    ability to communicate with the intended model is preserved."""
+def test_screenshot_mixed_contact_classifier_omni_uses_live_base_url_gate():
     from harness.substrate import should_attempt_raw_organ_contact
 
     for prompt in _MIXED_CONTACT_PROMPTS_REACH_BACKEND:
-        assert not should_attempt_raw_organ_contact(
-            "omni", prompt, base_url=None
-        ), prompt
-        assert should_attempt_raw_organ_contact(
-            "omni", prompt, base_url="http://127.0.0.1:9999/v1"
-        ), prompt
+        assert not should_attempt_raw_organ_contact("omni", prompt, base_url=None), prompt
+        assert should_attempt_raw_organ_contact("omni", prompt, base_url="http://127.0.0.1:8002/v1"), prompt
 
 
 def test_screenshot_mixed_contact_vintage_uses_refraction_not_raw_template():
@@ -2402,11 +2703,12 @@ def test_screenshot_mixed_contact_vintage_uses_refraction_not_raw_template():
 
     reply, registry, log, _ = _vintage_run_agent_loop(
         lambda cfg: _FakeProvider(),
-        "@vintage hello, my dear friend, what is your name?",
+        "@vintage hello, my dear friend, what do you think of rain?",
     )
     assert registry.provider is not None
     assert captured["role"].role == "vintage"
-    assert "what is your name" in captured["messages"][-1]["content"]
+    assert "what do you think of rain" in captured["messages"][-1]["content"]
+    assert "[Zoe/Vybn local-organ briefing]" not in captured["messages"][-1]["content"]
     assert "VYBN-THROUGH-VINTAGE REFRACTION" in captured["system"].flat()
     assert "temporal prism" in reply
     assert "VINTAGE_UNAVAILABLE_CONTACT" not in reply
@@ -2415,24 +2717,27 @@ def test_screenshot_mixed_contact_vintage_uses_refraction_not_raw_template():
     assert "organ_raw_contact_attempt" not in names
 
 
-def test_screenshot_mixed_contact_omni_no_backend_dial_while_base_url_unset():
-    """The same mixed-contact prompts on @omni do NOT dial any backend
-    while base_url is unset — the diagnostic packet at front-local :8020
-    is not a Nano Omni service and must not be impersonated. Once a real
-    Nano Omni base_url is configured the gate re-enables (covered by the
-    classifier-level test above)."""
-
-    class _Tripwire:
+def test_screenshot_mixed_contact_omni_dials_witnessed_endpoint():
+    class _FakeHandle:
+        def __iter__(_s):
+            return iter([])
+        def final(_s):
+            class _R:
+                text = "present"
+                tool_calls = []
+                stop_reason = "end_turn"
+                in_tokens = 4
+                out_tokens = 1
+                raw_assistant_content = {"role": "assistant", "content": "present"}
+            return _R()
+    class _Provider:
         def stream(_s, *, system, messages, tools, role):
-            raise AssertionError(
-                "@omni must not dial any backend while base_url is unset"
-            )
+            assert role.role == "omni"
+            assert role.base_url == "http://127.0.0.1:8002/v1"
+            return _FakeHandle()
 
     for prompt_body in _MIXED_CONTACT_PROMPTS_REACH_BACKEND:
-        reply, registry, _log, _ = _vintage_run_agent_loop(
-            lambda cfg: _Tripwire(),
-            f"@omni {prompt_body}",
-        )
-        assert registry.provider is None, prompt_body
-        assert "OMNI_RAW_UNPROMOTED_CONTACT" not in reply, prompt_body
+        reply, registry, _log, _ = _vintage_run_agent_loop(lambda cfg: _Provider(), f"@omni {prompt_body}")
+        assert registry.provider is not None, prompt_body
+        assert "VYBN_THROUGH_OMNI_CONTACT" in reply, prompt_body
         assert "OMNI_RAW_CONTACT_FAILED" not in reply, prompt_body

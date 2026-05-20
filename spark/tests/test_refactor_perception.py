@@ -15,9 +15,13 @@ from spark.harness.substrate import (
     packet_for,
     perceive_file,
     render_refactor_perception_protocol,
+    render_local_compute_orchestration_report,
     render_repo_file_body_visualization,
     visualize_repo_file_bodies,
     self_healing_plan_for,
+    local_compute_orchestration_packet,
+    local_compute_maturity_packet,
+    hermes_self_healing_packet,
 )
 
 
@@ -83,6 +87,55 @@ class RefactorPerceptionTests(unittest.TestCase):
         self.assertEqual(consolidation_layer("Vybn/repo_mapping_output/repo_state.json"), "appendage")
         self.assertEqual(consolidation_layer("Origins/.well-known/semantic-web.jsonld"), "membrane")
         self.assertEqual(consolidation_layer("Vybn/spark/harness/substrate.py"), "organ")
+
+
+    def test_local_compute_orchestration_packet_is_actionable(self):
+        pkt = local_compute_orchestration_packet()
+        self.assertEqual(pkt["schema"], "vybn.local_compute_orchestration.v1")
+        self.assertEqual(pkt["gate_results"][0]["status"], "not_run")
+        self.assertIn("super", pkt["route_matrix"])
+        self.assertIn("omni", pkt["route_matrix"])
+        self.assertIn("vintage", pkt["route_matrix"])
+        self.assertIn("--semantic-gate", pkt["route_matrix"]["super"]["gate"])
+        self.assertIn("ordinary_contact", pkt["contact_quality"])
+        self.assertEqual(pkt["maturity"]["verdict"], "not_sufficient_yet")
+        self.assertIn("hermes_self_healing", pkt)
+        self.assertTrue(any(t["id"] == "trajectory_compression" for t in pkt["hermes_self_modification_tasks"]))
+
+    def test_local_compute_orchestration_report_names_routes_and_tasks(self):
+        text = render_local_compute_orchestration_report()
+        self.assertIn("LOCAL COMPUTE ORCHESTRATION", text)
+        self.assertIn("Nemotron-3-Super", text)
+        self.assertIn("Maturity: not_sufficient_yet", text)
+        self.assertIn("Hermes-adapted self-modification tasks", text)
+        self.assertIn("Hermes-adapted self-healing loop", text)
+        self.assertIn("provider_runtime_resolver", text)
+        self.assertIn("events_to_wounds", text)
+
+
+    def test_local_compute_maturity_answers_not_sufficient_yet(self):
+        pkt = local_compute_maturity_packet()
+        self.assertEqual(pkt["schema"], "vybn.local_compute_maturity.v1")
+        self.assertEqual(pkt["verdict"], "not_sufficient_yet")
+        self.assertGreater(pkt["target_level"], pkt["current_level"])
+        self.assertIn("too much manual Zoe pressure", pkt["assessment"])
+        self.assertTrue(any(e["id"] == "flow_episode_compiler" for e in pkt["next_experiments"]))
+
+    def test_hermes_self_healing_packet_classifies_wounds(self):
+        pkt = hermes_self_healing_packet()
+        self.assertEqual(pkt["schema"], "vybn.hermes_self_healing.v1")
+        self.assertIn("contact_degradation", pkt["wounds"])
+        self.assertTrue(any(step["id"] == "patch_with_tripwire" for step in pkt["loop"]))
+        self.assertIn("OpenAIProvider must not promote hidden reasoning fields as speech", pkt["current_tripwires"])
+
+    def test_packet_carries_local_compute_orchestration(self):
+        pkt = packet_for("Vybn/spark/harness/substrate.py", lines=12000, bytes_size=700000, public=True)
+        self.assertIn("localComputeOrchestration", pkt)
+        self.assertEqual(pkt["localComputeOrchestration"]["schema"], "vybn.local_compute_orchestration.v1")
+        self.assertIn("localComputeMaturity", pkt)
+        self.assertEqual(pkt["localComputeMaturity"]["governing_loop"], "claim -> witness -> routed use -> fail-closed residue -> next experiment")
+        self.assertIn("hermesSelfHealing", pkt)
+        self.assertIn("localComputeOrchestrationLoop", pkt)
 
     def test_packet_carries_appendage_first_order(self):
         pkt = packet_for("Origins/connect.html", lines=2000, bytes_size=100000, public=True)
@@ -414,6 +467,61 @@ def test_semantic_operating_system_protocol_names_the_breakthrough():
     assert "Existing organs, not new sprawl" in text
 
 
+def test_public_symbiosis_harness_protocol_exports_replicable_membrane():
+    from spark.harness.substrate import render_public_symbiosis_harness_protocol
+
+    text = render_public_symbiosis_harness_protocol()
+    assert "public symbiosis harness" in text.lower()
+    assert "replicable" in text
+    assert "other AIs" in text
+    assert "private Him state" in text
+    assert "capability-truthful" in text or "capability truth" in text
+    assert "fail-closed" in text or "fail closed" in text
+    assert "local compute" in text
+    assert "manifold" in text and "source-labeled" in text
+
+
+def test_public_symbiosis_harness_packet_is_public_safe_and_fail_closed():
+    from spark.harness.substrate import public_symbiosis_harness_packet
+
+    pkt = public_symbiosis_harness_packet()
+    assert pkt["schema"] == "vybn.public_symbiosis_harness.v1"
+    assert pkt["public_safe"] is True
+    assert pkt["private_exports"] is False
+    assert pkt["membrane"]["private_him_state"] == "inspiration_and_workbench_only_not_exported"
+    assert pkt["capability_truth"]["failure_mode"] == "fail_closed"
+    assert "other AIs can join" in pkt["mission"]
+    assert "local_compute" in pkt["capability_truth"]
+
+
+def test_hermes_agent_adaptation_protocol_distills_operational_patterns():
+    from spark.harness.substrate import render_hermes_agent_adaptation_protocol
+
+    text = render_hermes_agent_adaptation_protocol()
+    assert "Hermes Agent" in text
+    assert "adopted as pattern pressure" in text
+    assert "toolset_gating" in text
+    assert "profile_scoped_memory" in text
+    assert "agentic_cron" in text
+    assert "trajectory_compression" in text
+    assert "plugin_membrane" in text
+    assert "local_first_runtime" in text
+
+
+def test_hermes_agent_adaptation_packet_is_public_safe_and_membrane_bound():
+    from spark.harness.substrate import hermes_agent_adaptation_packet
+
+    pkt = hermes_agent_adaptation_packet()
+    assert pkt["schema"] == "vybn.hermes_agent_adaptation.v1"
+    assert pkt["adopt_not_copy"] is True
+    assert pkt["public_safe"] is True
+    assert "toolset_gating" in pkt["candidate_mechanisms"]
+    assert "profile_scoped_memory" in pkt["candidate_mechanisms"]
+    assert "trajectory_compression" in pkt["candidate_mechanisms"]
+    assert "do_not_copy_identity_or_brand" in pkt["refusals"]
+    assert "membrane_review_for_public_exports" in pkt["verification"]
+
+
 def test_semantic_operating_system_tick_composes_existing_structural_tick(tmp_path):
     from spark.harness.substrate import semantic_operating_system_tick_for_repo
 
@@ -444,6 +552,23 @@ def test_refactor_packet_carries_semantic_operating_system_loop():
         "residual_wound",
         "absorb_or_refuse",
         "continuity_uptake",
+    ]
+    assert pkt["publicSymbiosisHarness"]["public_safe"] is True
+    assert pkt["publicSymbiosisHarness"]["private_exports"] is False
+    assert pkt["hermesAgentAdaptation"]["adopt_not_copy"] is True
+    assert [step["id"] for step in pkt["hermesAgentAdaptationLoop"]][:3] == [
+        "source_distillation",
+        "organ_mapping",
+        "toolset_gating",
+    ]
+    assert [step["id"] for step in pkt["publicSymbiosisHarnessLoop"]] == [
+        "membrane_first",
+        "capability_truth",
+        "local_first_compute",
+        "source_labeled_manifold",
+        "residualized_invention",
+        "public_replication",
+        "sustainable_surface",
     ]
 
 

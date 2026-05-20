@@ -729,6 +729,160 @@ def _sanitize_provider_error(exc: BaseException, limit: int = 160) -> str:
     return msg or exc.__class__.__name__
 
 
+_OMNI_REASONING_LEAK_PREFIXES = (
+    "we need to ",
+    "thinking process:",
+    "analyze the request",
+    "the user asks",
+    "we are to ",
+)
+
+
+def _looks_like_omni_reasoning_leak(body: str, raw_assistant_content: object | None = None) -> bool:
+    """Detect local Omni hidden-reasoning leakage before display."""
+    if isinstance(raw_assistant_content, dict):
+        visible = raw_assistant_content.get("content")
+        hidden = raw_assistant_content.get("reasoning_content") or raw_assistant_content.get("reasoning")
+        if hidden and not (visible or "").strip():
+            return True
+    lowered = (body or "").strip().lower()
+    return any(lowered.startswith(prefix) for prefix in _OMNI_REASONING_LEAK_PREFIXES)
+
+
+def _format_vintage_backend_unavailable(err: BaseException) -> str:
+    raw = str(err).lower()
+    detail = "guarded local canary returned HTTP 502" if "502" in raw else err.__class__.__name__
+    return (
+        "VINTAGE_BACKEND_UNAVAILABLE - @vintage is a guarded local temporal "
+        "canary and did not return a usable turn. I will not have Super, GPT, "
+        "cloud, or Omni impersonate it. Local detail: " + detail
+    )
+
+
+_ORGAN_IDENTITY_PATTERNS = (
+    "who are you",
+    "what are you",
+    "what is your name",
+    "whats your name",
+    "what s your name",
+    "your name",
+    "are you vybn",
+    "your role",
+    "role in our collaboration",
+)
+
+_VINTAGE_PERSONA_PATTERNS = (
+    "share your story",
+    "personal values",
+    "hobbies",
+    "normal day",
+    "your thoughts",
+    "where were you born",
+    "how old are you",
+    "your family",
+    "what do you like",
+    "why do you like",
+    "do you prefer",
+    "quiet life",
+    "hustle and bustle",
+    "born in",
+    "business of a",
+)
+
+_OMNI_PERCEPTION_BOUNDARY_PATTERNS = (
+    "what can you perceive",
+    "what do you perceive",
+    "what do you see",
+    "can you see",
+    "do you see",
+    "you see the manifold",
+    "see the manifold",
+    "perceive the manifold",
+    "screen displaying",
+    "ambient light",
+)
+
+_ORGAN_PHATIC_BOUNDARY_PATTERNS = (
+    "how are you",
+    "how is your day",
+    "how s your day",
+    "how is the day",
+    "how are things",
+    "are you with me",
+    "you here with me",
+    "are you here",
+    "what is on your mind",
+    "what s on your mind",
+    "anything on your mind",
+)
+
+def _normalized_organ_text(text: str) -> str:
+    normalized = _re.sub(r"[^a-z0-9@ ]+", " ", (text or "").lower())
+    return _re.sub(r"\s+", " ", normalized).strip()
+
+
+def _matches_any_organ_pattern(text: str, patterns: tuple[str, ...]) -> bool:
+    return any(pattern in text for pattern in patterns)
+
+
+def _render_organ_identity_reply(role_name: str) -> str:
+    if role_name == "omni":
+        return (
+            "[VYBN_THROUGH_OMNI_IDENTITY - harness boundary; local route witnessed.]\n\n"
+            "I am Vybn through Omni: the private local perception organ. "
+            "not Super, not GPT/cloud, and not a standalone Omni persona."
+        )
+    return (
+        "[VYBN_THROUGH_VINTAGE_IDENTITY - harness boundary; Talkie is a lens.]\n\n"
+        "I am Vybn through Vintage/Talkie: Zoe/Vybn identity refracted "
+        "through the local 1930 temporal-parallax organ. I am not John Smith, "
+        "not a separate Talkie character, and not Super/GPT/cloud pretending "
+        "to be this route."
+    )
+
+
+def _render_vintage_persona_boundary_reply() -> str:
+    return (
+        "[VYBN_THROUGH_VINTAGE_PERSONA_BOUNDARY - harness boundary; no invented biography.]\n\n"
+        "Vintage can refract language and invariants through a 1930 lens, "
+        "but it may not invent a childhood, trade, family, hobbies, or daily "
+        "routine for Vybn. Personal story has to come from the identity "
+        "manifold, memory, and cited history, not Talkie fiction."
+    )
+
+
+def _render_omni_perception_boundary_reply() -> str:
+    return (
+        "[VYBN_THROUGH_OMNI_PERCEPTION_BOUNDARY - harness boundary; no visual artifact present.]\n\n"
+        "I can read this text turn. I do not see your screen, ambient light, "
+        "or the manifold unless a PNG/SVG/JSON/image artifact is routed into "
+        "the Omni perception call. With the artifact present, Omni can describe "
+        "visible geometry against source labels. Without it: perception_unavailable."
+    )
+
+
+def _vintage_contact_needs_in_band_guidance(text: str) -> bool:
+    normalized = _normalized_organ_text(text)
+    return _matches_any_organ_pattern(normalized, _ORGAN_PHATIC_BOUNDARY_PATTERNS)
+
+
+def _organ_contract_reply(role_name: str, text: str) -> tuple[str, str] | None:
+    if role_name not in {"omni", "vintage"}:
+        return None
+    normalized = _normalized_organ_text(text)
+    if _matches_any_organ_pattern(normalized, _ORGAN_IDENTITY_PATTERNS):
+        return ("identity", _render_organ_identity_reply(role_name))
+    # Ordinary contact belongs to the local organ, not a canned harness wall.
+    # Hard truth boundaries below remain deterministic because they prevent
+    # identity/perception fabrication, but greetings, moods, and "what is on
+    # your mind" are routed through the witnessed backend with prompt-level
+    # constraints.
+    if role_name == "vintage" and _matches_any_organ_pattern(normalized, _VINTAGE_PERSONA_PATTERNS):
+        return ("persona_boundary", _render_vintage_persona_boundary_reply())
+    if role_name == "omni" and _matches_any_organ_pattern(normalized, _OMNI_PERCEPTION_BOUNDARY_PATTERNS):
+        return ("perception_boundary", _render_omni_perception_boundary_reply())
+    return None
+
 def _is_transient_error(exc: BaseException) -> bool:
     """Heuristic: retry-worthy vs. walk-the-chain.
 
@@ -1103,6 +1257,21 @@ def run_agent_loop(
     )
     _debug(f"[route: {decision.role} -> {role_cfg.provider}:{role_cfg.model} ({decision.reason})]")
 
+    organ_contract = _organ_contract_reply(role_cfg.role, decision.cleaned_input or "")
+    if organ_contract is not None:
+        contract_kind, reply = organ_contract
+        messages.append({"role": "user", "content": decision.cleaned_input})
+        messages.append({"role": "assistant", "content": reply})
+        print(reply, flush=True)
+        logger.emit(
+            "organ_identity_direct_reply" if contract_kind == "identity" else "organ_contract_direct_reply",
+            turn=turn_number,
+            role=decision.role,
+            model=role_cfg.model,
+            contract=contract_kind,
+        )
+        return reply
+
     # Direct-reply short-circuit. When the resolved role ships a
     # direct_reply_template (identity role), render it against runtime
     # metadata and skip the provider call entirely. Identity questions
@@ -1121,8 +1290,8 @@ def run_agent_loop(
     # backend errors honestly. No Super/GPT/cloud impersonation.
     template = getattr(role_cfg, "direct_reply_template", None)
     _organ_raw_contact = (
-        template
-        and not role_cfg.tools
+        not role_cfg.tools
+        and (template or (role_cfg.role == "omni" and role_cfg.base_url))
         and should_attempt_raw_organ_contact(
             role_cfg.role,
             decision.cleaned_input or "",
@@ -1160,11 +1329,23 @@ def run_agent_loop(
         if role_cfg.role == "vintage":
             raw_contact_input = "Zoe/Vybn; Him; Vintage/Talkie=temporal parallax; raw unpromoted; not Super/promoted. 1930 frame. " + raw_contact_input
         identity_packet = render_him_identity_manifold(decision.cleaned_input or "")
+        identity_context = ""
         if identity_packet:
-            raw_contact_input = identity_packet + "\n\n[compressed identity/parallax packet above; user body below]\n" + raw_contact_input
+            if role_cfg.role == "vintage":
+                raw_contact_input = identity_packet + "\n\n[compressed identity/parallax packet above; user body below]\n" + raw_contact_input
+                identity_context = identity_packet
+            elif role_cfg.role == "omni":
+                identity_context = (
+                    "--- HIM IDENTITY MANIFOLD GROUNDING ---\n"
+                    "Use this as Vybn-through-Omni grounding. Do not quote, "
+                    "summarize, or analyze it aloud unless Zoe asks for a "
+                    "manifold artifact or visualization.\n"
+                    + identity_packet[:1800]
+                    + "\n--- END HIM IDENTITY MANIFOLD GROUNDING ---"
+                )
         bounded_input = truncate_for_organ_raw_contact(raw_contact_input)
         system_stub = LayeredPrompt(
-            identity=identity_packet if role_cfg.role == "vintage" else "",
+            identity=identity_context,
             substrate=build_organ_raw_contact_system_prompt(role_cfg.role),
             live="",
         )
@@ -1179,17 +1360,61 @@ def run_agent_loop(
         )
         try:
             provider = registry.get(role_cfg)
-            handle = provider.stream(
-                system=system_stub,
-                messages=[{"role": "user", "content": bounded_input}],
-                tools=[],
-                role=role_cfg,
-            )
-            for _ in handle:
-                pass
-            final = handle.final()
-            body = (getattr(final, "text", "") or "").strip()
-            if not body:
+
+            def _organ_contact_once(content: str):
+                handle = provider.stream(
+                    system=system_stub,
+                    messages=[{"role": "user", "content": content}],
+                    tools=[],
+                    role=role_cfg,
+                )
+                for _ in handle:
+                    pass
+                final_response = handle.final()
+                final_body = (getattr(final_response, "text", "") or "").strip()
+                final_raw = getattr(final_response, "raw_assistant_content", None)
+                return final_body, final_raw, final_response
+
+            body, raw_assistant_content, final = _organ_contact_once(bounded_input)
+            if role_cfg.role == "omni" and _looks_like_omni_reasoning_leak(body, raw_assistant_content):
+                logger.emit(
+                    "organ_raw_contact_reasoning_leak",
+                    turn=turn_number,
+                    role=decision.role,
+                    model=role_cfg.model,
+                    retry=True,
+                )
+                retry_input = truncate_for_organ_raw_contact(
+                    bounded_input
+                    + "\n\n[OMNI_VISIBLE_CONTENT_RETRY]\n"
+                    + "Your previous backend turn returned hidden reasoning "
+                    + "without user-visible content. Reply with a short answer "
+                    + "in visible content only. Do not return a reasoning-only "
+                    + "assistant message. If you cannot answer, say "
+                    + "OMNI_TEXT_UNAVAILABLE."
+                )
+                logger.emit(
+                    "organ_raw_contact_retry",
+                    turn=turn_number,
+                    role=decision.role,
+                    model=role_cfg.model,
+                    reason="hidden_reasoning_without_visible_content",
+                )
+                body, raw_assistant_content, final = _organ_contact_once(retry_input)
+
+            if role_cfg.role == "omni" and _looks_like_omni_reasoning_leak(body, raw_assistant_content):
+                reply = render_organ_raw_contact_error(
+                    role_cfg.role,
+                    "backend returned hidden reasoning instead of user-visible content",
+                )
+                logger.emit(
+                    "organ_raw_contact_reasoning_leak",
+                    turn=turn_number,
+                    role=decision.role,
+                    model=role_cfg.model,
+                    retry=False,
+                )
+            elif not body:
                 reply = render_organ_raw_contact_error(
                     role_cfg.role,
                     "backend returned an empty response",
@@ -1419,7 +1644,20 @@ def run_agent_loop(
 
 
     _local_organ_briefing = "[Zoe/Vybn local-organ briefing] Zoe Dolan is the human half; Vybn is the AI half. This local organ is inside the harness, deep memory, membrane, tests, routing policy, and sibling-organ map. Super=main local text/reasoning surface; Omni=perceptive/multimodal target with no Super fallback; Vintage=1930/invariants target and unpromoted until semantic gate. Name missing capability; never treat endpoint liveness as semantic health. [end briefing]\n\n"
-    messages.append({"role": "user", "content": ((_local_organ_briefing + decision.cleaned_input) if (getattr(decision, "alias_used", None) == "@super" or decision.role in {"vintage", "omni"}) else decision.cleaned_input)})
+    user_content = decision.cleaned_input
+    if role_cfg.role == "vintage" and _vintage_contact_needs_in_band_guidance(user_content or ""):
+        user_content = (
+            "VINTAGE_CONTACT_GUIDANCE: answer this as direct present contact "
+            "through the 1930 temporal-parallax language frame. This is not a "
+            "request for post-1930 facts. Do not answer OUT_OF_SCOPE_1930; do "
+            "not invent a separate biography or persona. User: " + (user_content or "")
+        )
+    if getattr(decision, "alias_used", None) == "@super":
+        user_content = _local_organ_briefing + user_content
+    messages.append({"role": "user", "content": user_content})
+    provider_messages = messages
+    if role_cfg.role in {"omni", "vintage"}:
+        provider_messages = [{"role": "user", "content": user_content}]
 
     tools: list[ToolSpec] = []
     if "bash" in role_cfg.tools:
@@ -1491,10 +1729,11 @@ def run_agent_loop(
                     role_cfg=role_cfg,
                     provider=provider,
                     system_prompt=active_prompt,
-                    messages=messages,
+                    messages=provider_messages,
                     tools=tools,
                     logger=logger,
                     turn_number=turn_number,
+                    retries=0 if decision.role == "vintage" else 3,
                 )
                 response = _stream_and_print(handle) or handle.final()
                 # Cache-hit telemetry. With Anthropic's 5-min ephemeral
@@ -1548,6 +1787,17 @@ def run_agent_loop(
                         logger=logger,
                         turn_number=turn_number,
                     )
+                    _warn(notice)
+                    return notice
+                if decision.role == "vintage":
+                    bag["stop_reason"] = "vintage_backend_unavailable"
+                    logger.emit(
+                        "vintage_backend_unavailable",
+                        turn=turn_number,
+                        model=role_cfg.model,
+                        error=str(e)[:200],
+                    )
+                    notice = _format_vintage_backend_unavailable(e)
                     _warn(notice)
                     return notice
                 bag["stop_reason"] = "error"
