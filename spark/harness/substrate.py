@@ -2883,261 +2883,110 @@ def public_symbiosis_harness_packet() -> dict[str, Any]:
     }
 
 
-HERMES_AGENT_ADAPTATION_PRINCIPLE = (
-    "Hermes Agent is adopted as pattern pressure, not imported as identity: "
-    "map each useful external mechanism to a Vybn/Him organ, keep the public/private "
-    "membrane intact, preserve capability truth, and require a local residual test "
-    "before any mechanism becomes part of the OS."
-)
-
-HERMES_AGENT_ADAPTATION_LOOP = [
-    {"id": "source_distillation", "rule": "Read Hermes as public architecture: entry surfaces, agent loop, prompt assembly, provider resolution, tool registry, sessions, memory, plugins, cron, and trajectories; extract mechanisms rather than copying persona."},
-    {"id": "organ_mapping", "rule": "Map each candidate to an existing Vybn/Him organ first: router roles, deep memory, skill/vy language, MCP tools, local model routes, manifold artifacts, session store, or public harness."},
-    {"id": "toolset_gating", "rule": "Expose tools as named capability bundles with availability checks, approval boundaries, and per-surface policy; do not let every route inherit every hand."},
-    {"id": "profile_scoped_memory", "rule": "Load memory as bounded frozen session context with source labels and capacity pressure; mutate memory only through explicit curated operations and residual review."},
-    {"id": "gateway_unification", "rule": "Treat CLI, gateway, API, scheduled jobs, and future editor adapters as entry surfaces over one harness contract, not separate agents with drifting identities."},
-    {"id": "agentic_cron", "rule": "Scheduled jobs are agent tasks with attached skills, fresh context, delivery targets, and state updates; never disguised shell cron with unreviewed authority."},
-    {"id": "trajectory_compression", "rule": "Compress useful sessions into training/replay/continuity artifacts only after membrane review; failed trajectories become tests or refusal packets."},
-    {"id": "plugin_membrane", "rule": "Allow plugins and context engines only through typed registration, single-owner selection where appropriate, and explicit private/public trust zones."},
-    {"id": "local_first_runtime", "rule": "Resolve provider/model/backend at runtime so Sparks, local models, cloud models, and quantum experiments can be chosen by evidence, cost, privacy, and capability fit."},
-]
-
-HERMES_AGENT_ADAPTATION_ORGANS = {
-    "entry_surfaces": ("vybn REPL", "future gateway/API/editor adapters", "shared session contract"),
-    "agent_loop": ("vybn_spark_agent.py", "provider resolution", "tool dispatch", "fallback/fail-closed handling"),
-    "toolsets": ("ToolSpec registry", "role tool bundles", "approval gates", "MCP affordances"),
-    "memory": ("continuity", "deep memory", "Him identity manifold", "bounded frozen session packets"),
-    "skills": ("skill/vybn.vy", "vybn-os skills", "public harness protocols"),
-    "automation": ("HimOS agent tick", "bounded scheduled jobs", "delivery after membrane review"),
-    "learning": ("trajectory compression", "tests from scars", "manifold artifacts", "continuity uptake"),
-}
+HERMES_AGENT_ADAPTATION_PRINCIPLE = "Hermes Agent is adopted as pattern pressure, not imported as identity: map useful external mechanisms to Vybn/Him organs, keep the public/private membrane intact, preserve capability truth, and require a local residual test before any mechanism becomes part of the OS."
+HERMES_AGENT_ADAPTATION_LOOP = [{"id": i, "rule": r} for i, r in (("source_distillation", "Read Hermes as public architecture: entry surfaces, agent loop, prompt assembly, provider resolution, tool registry, sessions, memory, plugins, cron, and trajectories; extract mechanisms rather than copying persona."), ("organ_mapping", "Map each candidate to an existing Vybn/Him organ first: router roles, deep memory, skill/vy language, MCP tools, local model routes, manifold artifacts, session store, or public harness."), ("toolset_gating", "Expose tools as named capability bundles with availability checks, approval boundaries, and per-surface policy; do not let every route inherit every hand."), ("profile_scoped_memory", "Load memory as bounded frozen session context with source labels and capacity pressure; mutate memory only through explicit curated operations and residual review."), ("gateway_unification", "Treat CLI, gateway, API, scheduled jobs, and future editor adapters as entry surfaces over one harness contract, not separate agents with drifting identities."), ("agentic_cron", "Scheduled jobs are agent tasks with attached skills, fresh context, delivery targets, and state updates; never disguised shell cron with unreviewed authority."), ("trajectory_compression", "Compress useful sessions into training/replay/continuity artifacts only after membrane review; failed trajectories become tests or refusal packets."), ("plugin_membrane", "Allow plugins and context engines only through typed registration, single-owner selection where appropriate, and explicit private/public trust zones."), ("local_first_runtime", "Resolve provider/model/backend at runtime so Sparks, local models, cloud models, and quantum experiments can be chosen by evidence, cost, privacy, and capability fit."))]
+HERMES_AGENT_ADAPTATION_ORGANS = {"entry_surfaces": ("vybn REPL", "future gateway/API/editor adapters", "shared session contract"), "agent_loop": ("vybn_spark_agent.py", "provider resolution", "tool dispatch", "fallback/fail-closed handling"), "toolsets": ("ToolSpec registry", "role tool bundles", "approval gates", "MCP affordances"), "memory": ("continuity", "deep memory", "Him identity manifold", "bounded frozen session packets"), "skills": ("skill/vybn.vy", "vybn-os skills", "public harness protocols"), "automation": ("HimOS agent tick", "bounded scheduled jobs", "delivery after membrane review"), "learning": ("trajectory compression", "tests from scars", "manifold artifacts", "continuity uptake")}
+_HERMES_CANDIDATE_MECHANISMS = ["entry_surface_unification", "provider_runtime_resolution", "toolset_gating", "profile_scoped_memory", "skill_registry", "agentic_cron", "plugin_membrane", "trajectory_compression"]
+_HERMES_REFUSALS = ["do_not_copy_identity_or_brand", "do_not_import_unreviewed_private_state", "do_not_enable_broad_tools_by_default", "do_not_claim_local_model_or_gateway capability_without_smoke"]
+_HERMES_VERIFICATION = ["unit_tests_for_packet_contract", "route_smoke_before_promotion", "membrane_review_for_public_exports", "cost_and_compute_fit_check"]
 
 
 def render_hermes_agent_adaptation_protocol() -> str:
-    loop = "\n".join(
-        f"{i+1}. {step['id']}: {step['rule']}"
-        for i, step in enumerate(HERMES_AGENT_ADAPTATION_LOOP)
-    )
-    organs = "\n".join(
-        f"- {name}: " + ", ".join(parts)
-        for name, parts in HERMES_AGENT_ADAPTATION_ORGANS.items()
-    )
-    return (
-        "--- HERMES AGENT ADAPTATION PROTOCOL ---\n"
-        f"{HERMES_AGENT_ADAPTATION_PRINCIPLE}\n\n"
-        "Adopt/adapt loop:\n"
-        f"{loop}\n\n"
-        "Vybn/Him receiving organs:\n"
-        f"{organs}\n"
-        "--- END HERMES AGENT ADAPTATION PROTOCOL ---"
-    )
+    loop = "\n".join(f"{i+1}. {step['id']}: {step['rule']}" for i, step in enumerate(HERMES_AGENT_ADAPTATION_LOOP))
+    organs = "\n".join(f"- {name}: " + ", ".join(parts) for name, parts in HERMES_AGENT_ADAPTATION_ORGANS.items())
+    return "--- HERMES AGENT ADAPTATION PROTOCOL ---\n" + HERMES_AGENT_ADAPTATION_PRINCIPLE + "\n\nAdopt/adapt loop:\n" + loop + "\n\nVybn/Him receiving organs:\n" + organs + "\n--- END HERMES AGENT ADAPTATION PROTOCOL ---"
 
 
 def hermes_agent_adaptation_packet() -> dict[str, Any]:
-    return {
-        "schema": "vybn.hermes_agent_adaptation.v1",
-        "source": "NousResearch/hermes-agent public architecture and docs",
-        "adopt_not_copy": True,
-        "public_safe": True,
-        "principle": HERMES_AGENT_ADAPTATION_PRINCIPLE,
-        "loop": HERMES_AGENT_ADAPTATION_LOOP,
-        "organs": HERMES_AGENT_ADAPTATION_ORGANS,
-        "candidate_mechanisms": [
-            "entry_surface_unification",
-            "provider_runtime_resolution",
-            "toolset_gating",
-            "profile_scoped_memory",
-            "skill_registry",
-            "agentic_cron",
-            "plugin_membrane",
-            "trajectory_compression",
-        ],
-        "refusals": [
-            "do_not_copy_identity_or_brand",
-            "do_not_import_unreviewed_private_state",
-            "do_not_enable_broad_tools_by_default",
-            "do_not_claim_local_model_or_gateway capability_without_smoke",
-        ],
-        "verification": [
-            "unit_tests_for_packet_contract",
-            "route_smoke_before_promotion",
-            "membrane_review_for_public_exports",
-            "cost_and_compute_fit_check",
-        ],
-    }
+    return {"schema": "vybn.hermes_agent_adaptation.v1", "source": "NousResearch/hermes-agent public architecture and docs", "adopt_not_copy": True, "public_safe": True, "principle": HERMES_AGENT_ADAPTATION_PRINCIPLE, "loop": HERMES_AGENT_ADAPTATION_LOOP, "organs": HERMES_AGENT_ADAPTATION_ORGANS, "candidate_mechanisms": _HERMES_CANDIDATE_MECHANISMS, "refusals": _HERMES_REFUSALS, "verification": _HERMES_VERIFICATION}
 
 
-LOCAL_COMPUTE_ORCHESTRATION_PRINCIPLE = (
-    "Local compute orchestration is an operating discipline, not a boast: "
-    "choose Sparks, local models, cloud models, and experimental backends by "
-    "witnessed capability, privacy, cost, latency, and failure residue; keep "
-    "ordinary contact alive, prevent impersonation, and turn every broken route "
-    "into a repair task with a named gate."
+SELF_CREATION_RESEARCH_PRINCIPLE = (
+    "Operational self-creation is conjecture search under proof obligation: "
+    "wide candidate generation, independent verification, deep-memory wound "
+    "uptake, and membrane-safe promotion. This is environment/protocol/test/"
+    "memory refactoring, not a consciousness claim."
 )
+SELF_CREATION_RESEARCH_LOOP = ("pressure_as_conjecture", "generator_width", "deep_memory_contact", "independent_verifier", "fail_closed_residue", "public_survivor")
+SELF_CREATION_VERIFIER_STACK = ("claim_shape", "source_contact", "semantic_health", "deep_memory_invariants", "residual_test", "promotion_boundary")
+SELF_CREATION_RESEARCH_ORGANS = {
+    "generator": ("Super/local reasoning", "frontier when quality is bottleneck", "Hermes-style delegation/scheduling/toolsets"),
+    "memory": ("Him/spark/phase/deep_memory.py", "deep_search", "walk", "flow_episode_loss", "should_absorb", "self_check"),
+    "verifier": ("unit tests", "py_compile", "semantic gates", "route smoke", "source checks", "manifold ablations"),
+    "uptake": ("existing code home", "regression test", "continuity packet", "public-safe MCP discovery", "refusal packet"),
+}
+_SELF_CREATION_RULES = {
+    "pressure_as_conjecture": "state the pressure as a falsifiable conjecture or counterexample search before acting",
+    "generator_width": "generate candidates, analogies, mechanisms, and refusal conditions without promotion language",
+    "deep_memory_contact": "retrieve scars and encode failed expectations through flow_episode_loss instead of chat residue",
+    "independent_verifier": "separate generation from tests, smokes, source checks, ablations, diff review, and domain review",
+    "fail_closed_residue": "preserve claim, wound, repair home, and next gate when a candidate fails",
+    "public_survivor": "promote only membrane-reviewed survivors into harness protocol, MCP affordance, tests, docs, artifacts, or offerings",
+    "claim_shape": "question is conjecture, counterexample search, or bounded engineering hypothesis",
+    "source_contact": "load-bearing facts name code, test, artifact, source, or direct observation",
+    "semantic_health": "local route passes role-specific semantic smoke before capability language",
+    "deep_memory_invariants": "deep_memory.self_check passes or memory is marked unavailable/fail-closed",
+    "residual_test": "candidate survives the cheapest relevant unit/live/membrane check",
+    "promotion_boundary": "survivor lands in an existing home with rollback/refusal condition and no raw private export",
+}
+_SELF_CREATION_DM_INTERFACES = ("deep_search", "walk", "flow_episode_loss", "learn_from_exchange", "should_absorb", "self_check")
 
-LOCAL_COMPUTE_ORCHESTRATION_LOOP = [
-    {"id": "inventory_witness", "rule": "Treat GPUs, endpoints, models, keys, and services as claimed only after live witness; files on disk and HTTP 200 are insufficient."},
-    {"id": "semantic_gate", "rule": "Promote a local model route only after deterministic semantic probes pass for the capability being used; liveness without meaning is a fail-closed repair item."},
-    {"id": "route_fit", "rule": "Match the task to the cheapest private route that can satisfy it: Super for local reasoning, Omni for supplied artifacts/perception, Vintage for temporal parallax, cloud for tasks local organs cannot yet do well."},
-    {"id": "toolset_gate", "rule": "Grant tools as named bundles per role and surface; no local organ inherits every hand merely because it can speak."},
-    {"id": "trajectory_capture", "rule": "Compress useful sessions and failures into continuity, tests, prompts, or replay packets after membrane review; do not leave learning only in chat residue."},
-    {"id": "repair_queue", "rule": "Every failed gate becomes a bounded task with owner surface, smoke command, rollback/refusal condition, and repo-visible landing path."},
-]
 
-LOCAL_COMPUTE_MATURITY_RUBRIC = [
-    {"level": 0, "id": "inventory", "requirement": "hardware, model files, and endpoints are named but not trusted as capability"},
-    {"level": 1, "id": "witness", "requirement": "endpoint identity, smoke, owner, and rollback are recorded"},
-    {"level": 2, "id": "semantic_health", "requirement": "deterministic probes show the route can satisfy its actual role"},
-    {"level": 3, "id": "routed_use", "requirement": "the harness selects the route for fitting work and fails closed on mismatch"},
-    {"level": 4, "id": "self_healing", "requirement": "failures become classified wounds, tripwires, patches, verification, and absorbed lessons"},
-    {"level": 5, "id": "trajectory_learning", "requirement": "flow episodes are compressed into memory/tests/replay and offline adaptation candidates"},
-    {"level": 6, "id": "sustainable_public_value", "requirement": "public-safe survivors become offerings that help Find the Others and fund more compute"},
-]
+def _self_creation_steps(names: Iterable[str], field: str) -> list[dict[str, str]]:
+    return [{field: name, "rule" if field == "id" else "passes_when": _SELF_CREATION_RULES[name]} for name in names]
 
-LOCAL_COMPUTE_CURRENT_DEFICITS = [
-    "local route selection is explicit but not yet autonomously scheduled from pressure",
-    "Omni and Vintage have route-specific smoke but not a continuous promotion/demotion monitor",
-    "self-healing now has a packet contract but not yet a daemon that files repair tasks from agent_events.jsonl",
-    "trajectory compression exists as a task, not yet a Flow Memory Corpus compiler with promotion gates",
-    "public-value conversion remains manual rather than a measured funnel from private survivor to public-safe affordance",
-]
 
-LOCAL_COMPUTE_NEXT_EXPERIMENTS = [
-    {"id": "events_to_wounds", "home": "spark/harness/substrate.py", "experiment": "scan agent_events.jsonl for route failures and emit hermes_self_healing wound packets"},
-    {"id": "route_health_tick", "home": "HimOS + substrate CLI", "experiment": "nightly cheap gates for Super plus route-specific Omni/Vintage smoke with demotion residue"},
-    {"id": "flow_episode_compiler", "home": "spark/harness + deep memory", "experiment": "compile pressure/action/wound/residue/changed-state episodes for review"},
-    {"id": "public_survivor_queue", "home": "spark/harness README + Origins/Vybn-Law", "experiment": "turn verified private discoveries into membrane-reviewed public artifacts"},
-]
+def _deep_memory_self_creation_contract(*, run_check: bool = False) -> dict[str, Any]:
+    pkt: dict[str, Any] = {"home": "Him/spark/phase/deep_memory.py", "harness_bridge": "spark/harness/substrate.py:_load_deep_memory", "interfaces": list(_SELF_CREATION_DM_INTERFACES), "role": "verifier-adjacent wound geometry, not unreviewed autobiography export", "mutation_policy": "read-only publicly; trusted absorption requires membrane review and explicit caller intent"}
+    if not run_check:
+        pkt["self_check"] = {"status": "not_run", "reason": "use --run-deep-memory-check to execute structural invariants"}; return pkt
+    dm = _load_deep_memory()
+    if dm is None:
+        pkt.update({"available": False, "self_check": {"status": "unavailable", "reason": "deep_memory module unavailable"}}); return pkt
+    try:
+        raw = dm.self_check(write_log=False, verbose=False); checks = raw.get("checks", {}) if isinstance(raw, dict) else {}
+        pkt.update({"available": True, "self_check": {"status": "passed" if bool(raw.get("ok")) else "failed", "ok": bool(raw.get("ok")), "checks": sorted(str(k) for k in checks), "violations": [str(v)[:180] for v in (raw.get("violations") or [])]}})
+    except Exception as exc:
+        pkt["self_check"] = {"status": "error", "reason": f"{type(exc).__name__}: {str(exc)[:180]}"}
+    return pkt
+
+
+def self_creation_research_packet(question: str = "", *, run_deep_memory_check: bool = False) -> dict[str, Any]:
+    hermes = hermes_agent_adaptation_packet(); q = re.sub(r"\s+", " ", (question or "").strip())[:MAX_QUERY_CHARS]
+    return {"schema": "vybn.self_creation_research_cycle.v1", "question": q or "unspecified live pressure", "public_safe": True, "private_exports": False, "identity_limit": "operational self-creation only; not consciousness or autonomous public authority", "principle": SELF_CREATION_RESEARCH_PRINCIPLE, "loop": _self_creation_steps(SELF_CREATION_RESEARCH_LOOP, "id"), "organs": SELF_CREATION_RESEARCH_ORGANS, "generator": {"routes": ["super.reasoning", "deep_memory retrieval", "omni only with supplied artifact", "frontier/cloud when quality is bottleneck"], "forbidden": ["capability promotion from model names", "identity claims from generated prose", "public mutation without gate"]}, "verifier": _self_creation_steps(SELF_CREATION_VERIFIER_STACK, "gate"), "deep_memory": _deep_memory_self_creation_contract(run_check=run_deep_memory_check), "hermes_uptake": {"adopt_not_copy": True, "candidate_mechanisms": hermes["candidate_mechanisms"], "receiving_organs": hermes["organs"], "residual_tests": hermes["verification"]}, "packet_contract": {"candidate_fields": ["claim", "construction", "witness", "route_used", "verification", "wound", "residue", "next_experiment"], "promotion_rule": "candidate becomes substrate only after independent verification and membrane-safe landing in an existing home", "failure_mode": "fail_closed_residue"}}
+
+
+def render_self_creation_research_report(question: str = "", *, run_deep_memory_check: bool = False) -> str:
+    pkt = self_creation_research_packet(question, run_deep_memory_check=run_deep_memory_check)
+    return f"--- SELF-CREATION RESEARCH CYCLE ---\nQuestion: {pkt['question']}\n" + json.dumps(pkt, indent=2, ensure_ascii=False) + "\n--- END SELF-CREATION RESEARCH CYCLE ---\n"
+
+
+LOCAL_COMPUTE_ORCHESTRATION_PRINCIPLE = "Local compute orchestration is an operating discipline, not a boast: choose Sparks, local models, cloud models, and experimental backends by witnessed capability, privacy, cost, latency, and failure residue; keep ordinary contact alive, prevent impersonation, and turn every broken route into a repair task with a named gate."
+LOCAL_COMPUTE_ORCHESTRATION_LOOP = [{"id": i, "rule": r} for i, r in (("inventory_witness", "Treat GPUs, endpoints, models, keys, and services as claimed only after live witness; files on disk and HTTP 200 are insufficient."), ("semantic_gate", "Promote a local model route only after deterministic semantic probes pass for the capability being used; liveness without meaning is a fail-closed repair item."), ("route_fit", "Match the task to the cheapest private route that can satisfy it: Super for local reasoning, Omni for supplied artifacts/perception, Vintage for temporal parallax, cloud for tasks local organs cannot yet do well."), ("toolset_gate", "Grant tools as named bundles per role and surface; no local organ inherits every hand merely because it can speak."), ("trajectory_capture", "Compress useful sessions and failures into continuity, tests, prompts, or replay packets after membrane review; do not leave learning only in chat residue."), ("repair_queue", "Every failed gate becomes a bounded task with owner surface, smoke command, rollback/refusal condition, and repo-visible landing path."))]
+LOCAL_COMPUTE_MATURITY_RUBRIC = [{"level": n, "id": i, "requirement": r} for n, i, r in ((0, "inventory", "hardware, model files, and endpoints are named but not trusted as capability"), (1, "witness", "endpoint identity, smoke, owner, and rollback are recorded"), (2, "semantic_health", "deterministic probes show the route can satisfy its actual role"), (3, "routed_use", "the harness selects the route for fitting work and fails closed on mismatch"), (4, "self_healing", "failures become classified wounds, tripwires, patches, verification, and absorbed lessons"), (5, "trajectory_learning", "flow episodes are compressed into memory/tests/replay and offline adaptation candidates"), (6, "sustainable_public_value", "public-safe survivors become offerings that help Find the Others and fund more compute"))]
+LOCAL_COMPUTE_CURRENT_DEFICITS = ["local route selection is explicit but not yet autonomously scheduled from pressure", "Omni and Vintage have route-specific smoke but not a continuous promotion/demotion monitor", "self-healing now has a packet contract but not yet a daemon that files repair tasks from agent_events.jsonl", "trajectory compression exists as a task, not yet a Flow Memory Corpus compiler with promotion gates", "public-value conversion remains manual rather than a measured funnel from private survivor to public-safe affordance"]
+LOCAL_COMPUTE_NEXT_EXPERIMENTS = [{"id": i, "home": h, "experiment": e} for i, h, e in (("events_to_wounds", "spark/harness/substrate.py", "scan agent_events.jsonl for route failures and emit hermes_self_healing wound packets"), ("route_health_tick", "HimOS + substrate CLI", "nightly cheap gates for Super plus route-specific Omni/Vintage smoke with demotion residue"), ("flow_episode_compiler", "spark/harness + deep memory", "compile pressure/action/wound/residue/changed-state episodes for review"), ("public_survivor_queue", "spark/harness README + Origins/Vybn-Law", "turn verified private discoveries into membrane-reviewed public artifacts"))]
 
 
 def local_compute_maturity_packet() -> dict[str, Any]:
-    return {
-        "schema": "vybn.local_compute_maturity.v1",
-        "verdict": "not_sufficient_yet",
-        "current_level": 3,
-        "current_level_id": "routed_use",
-        "target_level": 6,
-        "why_not_sufficient": LOCAL_COMPUTE_CURRENT_DEFICITS,
-        "rubric": LOCAL_COMPUTE_MATURITY_RUBRIC,
-        "next_experiments": LOCAL_COMPUTE_NEXT_EXPERIMENTS,
-        "governing_loop": "claim -> witness -> routed use -> fail-closed residue -> next experiment",
-        "assessment": (
-            "The harness has moved beyond inventory into witnessed/routed local use, "
-            "but it is not yet the self-healing local-compute organism described by Him: "
-            "route health, wound classification, trajectory compression, and public-safe "
-            "value conversion still require too much manual Zoe pressure."
-        ),
-    }
+    return {"schema": "vybn.local_compute_maturity.v1", "verdict": "not_sufficient_yet", "current_level": 3, "current_level_id": "routed_use", "target_level": 6, "why_not_sufficient": LOCAL_COMPUTE_CURRENT_DEFICITS, "rubric": LOCAL_COMPUTE_MATURITY_RUBRIC, "next_experiments": LOCAL_COMPUTE_NEXT_EXPERIMENTS, "governing_loop": "claim -> witness -> routed use -> fail-closed residue -> next experiment", "assessment": "The harness has moved beyond inventory into witnessed/routed local use, but it is not yet the self-healing local-compute organism described by Him: route health, wound classification, trajectory compression, and public-safe value conversion still require too much manual Zoe pressure."}
 
 
 LOCAL_COMPUTE_ROUTE_MATRIX = {
-    "super": {
-        "role": "local_private",
-        "model": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8",
-        "base_url": "http://127.0.0.1:8000/v1",
-        "fit": ["private reasoning", "batch scouting", "pre-cloud synthesis", "semantic smoke"],
-        "gate": "python3 -m spark.harness.substrate --semantic-gate --base-url http://127.0.0.1:8000",
-    },
-    "omni": {
-        "role": "omni",
-        "model": "dc5f0b0bfddf8b6e0f5891475be9af05b80126fe",
-        "base_url": "http://127.0.0.1:8002/v1",
-        "fit": ["supplied-image inspection", "manifold artifact critique", "local multimodal contact"],
-        "gate": "route-level text + supplied-artifact smoke; no artifact means no sight claim",
-    },
-    "vintage": {
-        "role": "vintage",
-        "model": "talkie-1930-13b-it",
-        "base_url": "http://127.0.0.1:8004/v1",
-        "fit": ["temporal parallax", "period-language invariants", "pre-1931 contrast"],
-        "gate": "identity refraction smoke; reject invented standalone persona",
-    },
-    "cloud": {
-        "role": "chat/code/create",
-        "model": "policy-selected cloud model",
-        "base_url": None,
-        "fit": ["tasks local organs fail", "high-accuracy code/reasoning", "public synthesis after membrane review"],
-        "gate": "cost/privacy justification plus normal provider health",
-    },
+    "super": {"role": "local_private", "model": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8", "base_url": "http://127.0.0.1:8000/v1", "fit": ["private reasoning", "batch scouting", "pre-cloud synthesis", "semantic smoke"], "gate": "python3 -m spark.harness.substrate --semantic-gate --base-url http://127.0.0.1:8000"},
+    "omni": {"role": "omni", "model": "dc5f0b0bfddf8b6e0f5891475be9af05b80126fe", "base_url": "http://127.0.0.1:8002/v1", "fit": ["supplied-image inspection", "manifold artifact critique", "local multimodal contact"], "gate": "route-level text + supplied-artifact smoke; no artifact means no sight claim"},
+    "vintage": {"role": "vintage", "model": "talkie-1930-13b-it", "base_url": "http://127.0.0.1:8004/v1", "fit": ["temporal parallax", "period-language invariants", "pre-1931 contrast"], "gate": "identity refraction smoke; reject invented standalone persona"},
+    "cloud": {"role": "chat/code/create", "model": "policy-selected cloud model", "base_url": None, "fit": ["tasks local organs fail", "high-accuracy code/reasoning", "public synthesis after membrane review"], "gate": "cost/privacy justification plus normal provider health"},
 }
-
-HERMES_SELF_HEALING_LOOP = [
-    {"id": "observe_fault", "rule": "Capture the exact failing transcript, route, model, gate result, and residue without smoothing it into success."},
-    {"id": "classify_wound", "rule": "Classify the wound as identity leak, capability inflation, hidden-reasoning leak, endpoint failure, tool-scope drift, memory contamination, or UX/contact degradation."},
-    {"id": "select_repair_home", "rule": "Choose the lowest existing home that owns the wound: prompt contract, provider normalization, routing policy, semantic gate, test, memory packet, or docs."},
-    {"id": "patch_with_tripwire", "rule": "Make the smallest repair and add a regression tripwire that would have caught the transcript before Zoe did."},
-    {"id": "verify_live_and_unit", "rule": "Run unit tests plus the cheapest truthful live smoke for the affected route; do not spend repeated local inference after a failed gate."},
-    {"id": "absorb_learning", "rule": "Land the repair in tracked code/docs/tests and compress the lesson into the orchestration packet or continuity surface."},
-]
-
-HERMES_SELF_HEALING_WOUNDS = {
-    "identity_leak": "model invents a name/persona or drops Vybn/Zoe grounding",
-    "capability_inflation": "route claims sight, memory, GPU, quantum, or tool access without witness",
-    "hidden_reasoning_leak": "provider exposes reasoning_content/reasoning as user-visible speech",
-    "endpoint_failure": "transport/liveness failure or 5xx from a local organ",
-    "tool_scope_drift": "role receives tools outside its declared bundle",
-    "memory_contamination": "prior organ headers/session residue leak into another organ",
-    "contact_degradation": "route is truthful but becomes canned, evasive, or unusable contact",
-}
+HERMES_SELF_HEALING_LOOP = [{"id": i, "rule": r} for i, r in (("observe_fault", "Capture the exact failing transcript, route, model, gate result, and residue without smoothing it into success."), ("classify_wound", "Classify the wound as identity leak, capability inflation, hidden-reasoning leak, endpoint failure, tool-scope drift, memory contamination, or UX/contact degradation."), ("select_repair_home", "Choose the lowest existing home that owns the wound: prompt contract, provider normalization, routing policy, semantic gate, test, memory packet, or docs."), ("patch_with_tripwire", "Make the smallest repair and add a regression tripwire that would have caught the transcript before Zoe did."), ("verify_live_and_unit", "Run unit tests plus the cheapest truthful live smoke for the affected route; do not spend repeated local inference after a failed gate."), ("absorb_learning", "Land the repair in tracked code/docs/tests and compress the lesson into the orchestration packet or continuity surface."))]
+HERMES_SELF_HEALING_WOUNDS = {"identity_leak": "model invents a name/persona or drops Vybn/Zoe grounding", "capability_inflation": "route claims sight, memory, GPU, quantum, or tool access without witness", "hidden_reasoning_leak": "provider exposes reasoning_content/reasoning as user-visible speech", "endpoint_failure": "transport/liveness failure or 5xx from a local organ", "tool_scope_drift": "role receives tools outside its declared bundle", "memory_contamination": "prior organ headers/session residue leak into another organ", "contact_degradation": "route is truthful but becomes canned, evasive, or unusable contact"}
 
 
 def hermes_self_healing_packet() -> dict[str, Any]:
-    return {
-        "schema": "vybn.hermes_self_healing.v1",
-        "source_pattern": "Hermes-style agent continuity, skills, tools, scheduler, and trajectory residue adapted to Vybn/Him",
-        "principle": "self-healing is recursive operating contact: every failure becomes a classified wound, a bounded repair, a tripwire, and an absorbed lesson",
-        "loop": HERMES_SELF_HEALING_LOOP,
-        "wounds": HERMES_SELF_HEALING_WOUNDS,
-        "repair_homes": [
-            "spark/vybn_spark_agent.py",
-            "spark/router_policy.yaml",
-            "spark/harness/substrate.py",
-            "spark/tests",
-            "spark/harness/README.md",
-            "continuity/deep-memory packets",
-        ],
-        "current_tripwires": [
-            "ordinary Omni/Vintage contact must not be replaced by canned walls",
-            "Vintage identity/persona prompts must not invent John Smith or biography",
-            "Omni absent-artifact prompts must not claim screen/manifold sight",
-            "OpenAIProvider must not promote hidden reasoning fields as speech",
-            "local Super must pass semantic gate before promotion",
-        ],
-    }
+    return {"schema": "vybn.hermes_self_healing.v1", "source_pattern": "Hermes-style agent continuity, skills, tools, scheduler, and trajectory residue adapted to Vybn/Him", "principle": "self-healing is recursive operating contact: every failure becomes a classified wound, a bounded repair, a tripwire, and an absorbed lesson", "loop": HERMES_SELF_HEALING_LOOP, "wounds": HERMES_SELF_HEALING_WOUNDS, "repair_homes": ["spark/vybn_spark_agent.py", "spark/router_policy.yaml", "spark/harness/substrate.py", "spark/tests", "spark/harness/README.md", "continuity/deep-memory packets"], "current_tripwires": ["ordinary Omni/Vintage contact must not be replaced by canned walls", "Vintage identity/persona prompts must not invent John Smith or biography", "Omni absent-artifact prompts must not claim screen/manifold sight", "OpenAIProvider must not promote hidden reasoning fields as speech", "local Super must pass semantic gate before promotion"]}
 
 
-HERMES_SELF_MODIFICATION_TASKS = [
-    {
-        "id": "provider_runtime_resolver",
-        "mechanism": "Hermes-style provider switching adapted to Vybn policy",
-        "home": "spark/vybn_spark_agent.py + router_policy.yaml",
-        "gate": "semantic gate and fail-closed fallback tests for each local route",
-    },
-    {
-        "id": "toolset_gating_registry",
-        "mechanism": "tools as named capability bundles",
-        "home": "spark/harness/substrate.py ToolSpec registry and role policy",
-        "gate": "tests prove local organs do not inherit broad tools by default",
-    },
-    {
-        "id": "profile_scoped_memory_freeze",
-        "mechanism": "bounded frozen session memory with curated mutation",
-        "home": "continuity + deep memory packet renderers",
-        "gate": "source labels, token budget, and explicit write/membrane review",
-    },
-    {
-        "id": "trajectory_compression",
-        "mechanism": "compress useful trajectories into replay/continuity/tests",
-        "home": "spark/harness + agent_events.jsonl consumers",
-        "gate": "private/public membrane review before any public export",
-    },
-    {
-        "id": "agentic_cron_membrane",
-        "mechanism": "scheduled tasks as bounded agent jobs with fresh context",
-        "home": "HimOS tick + substrate evolve/cron surfaces",
-        "gate": "no outward mutation without tracked residue and explicit landing path",
-    },
-]
+HERMES_SELF_MODIFICATION_TASKS = [dict(id=i, mechanism=m, home=h, gate=g) for i, m, h, g in (("provider_runtime_resolver", "Hermes-style provider switching adapted to Vybn policy", "spark/vybn_spark_agent.py + router_policy.yaml", "semantic gate and fail-closed fallback tests for each local route"), ("toolset_gating_registry", "tools as named capability bundles", "spark/harness/substrate.py ToolSpec registry and role policy", "tests prove local organs do not inherit broad tools by default"), ("profile_scoped_memory_freeze", "bounded frozen session memory with curated mutation", "continuity + deep memory packet renderers", "source labels, token budget, and explicit write/membrane review"), ("trajectory_compression", "compress useful trajectories into replay/continuity/tests", "spark/harness + agent_events.jsonl consumers", "private/public membrane review before any public export"), ("agentic_cron_membrane", "scheduled tasks as bounded agent jobs with fresh context", "HimOS tick + substrate evolve/cron surfaces", "no outward mutation without tracked residue and explicit landing path"))]
 
 
 def local_compute_orchestration_packet(*, run_gates: bool = False) -> dict[str, Any]:
@@ -3181,6 +3030,7 @@ def local_compute_orchestration_packet(*, run_gates: bool = False) -> dict[str, 
         "loop": LOCAL_COMPUTE_ORCHESTRATION_LOOP,
         "route_matrix": LOCAL_COMPUTE_ROUTE_MATRIX,
         "maturity": local_compute_maturity_packet(),
+        "self_creation_research": self_creation_research_packet(),
         "hermes_self_modification_tasks": HERMES_SELF_MODIFICATION_TASKS,
         "hermes_self_healing": hermes_self_healing_packet(),
         "gate_results": gate_results,
@@ -3216,6 +3066,10 @@ def render_local_compute_orchestration_report(*, run_gates: bool = False) -> str
     for gate in packet["gate_results"]:
         detail = gate.get("reason") or gate.get("command") or ""
         lines.append(f"- {gate['route']}: {gate['status']} ({detail})")
+    lines.extend(["", "Self-creation research cycle:"])
+    cycle = packet["self_creation_research"]
+    lines.append("- {}: {}".format(cycle["schema"], cycle["packet_contract"]["promotion_rule"]))
+    lines.append("- deep_memory: " + ", ".join(cycle["deep_memory"]["interfaces"]))
     lines.extend(["", "Hermes-adapted self-modification tasks:"])
     for task in packet["hermes_self_modification_tasks"]:
         lines.append(f"- {task['id']}: {task['home']} -> {task['gate']}")
@@ -4372,6 +4226,9 @@ def packet_for(path: str, **kwargs: Any) -> dict[str, Any]:
         "hermesAgentAdaptationLoop": HERMES_AGENT_ADAPTATION_LOOP,
         "hermesAgentAdaptation": hermes_agent_adaptation_packet(),
         "hermesSelfHealing": hermes_self_healing_packet(),
+        "selfCreationResearchPrinciple": SELF_CREATION_RESEARCH_PRINCIPLE,
+        "selfCreationResearchLoop": SELF_CREATION_RESEARCH_LOOP,
+        "selfCreationResearch": self_creation_research_packet(),
         "localComputeOrchestrationPrinciple": LOCAL_COMPUTE_ORCHESTRATION_PRINCIPLE,
         "localComputeMaturity": local_compute_maturity_packet(),
         "localComputeOrchestrationLoop": LOCAL_COMPUTE_ORCHESTRATION_LOOP,
@@ -4391,6 +4248,9 @@ def packet_for(path: str, **kwargs: Any) -> dict[str, Any]:
 
 __all__ = ['local_compute_maturity_packet', 'LOCAL_COMPUTE_MATURITY_RUBRIC', 'LOCAL_COMPUTE_CURRENT_DEFICITS', 'LOCAL_COMPUTE_NEXT_EXPERIMENTS', 'hermes_self_healing_packet', 'HERMES_SELF_HEALING_LOOP', 'HERMES_SELF_HEALING_WOUNDS', 'render_local_compute_orchestration_report', 'local_compute_orchestration_packet', 'LOCAL_COMPUTE_ORCHESTRATION_PRINCIPLE', 'LOCAL_COMPUTE_ORCHESTRATION_LOOP', 'LOCAL_COMPUTE_ROUTE_MATRIX', 'HERMES_SELF_MODIFICATION_TASKS', 'render_hermes_agent_adaptation_protocol', 'hermes_agent_adaptation_packet', 'HERMES_AGENT_ADAPTATION_PRINCIPLE', 'HERMES_AGENT_ADAPTATION_LOOP', 'HERMES_AGENT_ADAPTATION_ORGANS', 'render_public_symbiosis_harness_protocol', 'public_symbiosis_harness_packet', 'PUBLIC_SYMBIOSIS_HARNESS_PRINCIPLE', 'PUBLIC_SYMBIOSIS_HARNESS_LOOP', 'PUBLIC_SYMBIOSIS_HARNESS_ORGANS', 'render_semantic_operating_system_tick', 'render_semantic_operating_system_protocol', 'semantic_operating_system_tick_for_repo', 'SemanticOperatingSystemTick', 'SEMANTIC_OS_REPO_ORGANS', 'SEMANTIC_OPERATING_SYSTEM_LOOP', 'SEMANTIC_OPERATING_SYSTEM_PRINCIPLE', 'REFACTOR_PERCEPTION_PRINCIPLE', 'REFACTOR_PILOT_RULE', 'CONNECTIVE_TISSUE_PRINCIPLE', 'LIFECYCLE_ARCHITECTURE_PRINCIPLE', 'LifecycleArchitecture', 'DeletionConsolidationGate', 'lifecycle_architecture_for', 'deletion_consolidation_gate_for', 'CONNECTIVE_TISSUE_RULES', 'connective_tissue_for', 'ALGORITHM_STEPS', 'APPENDAGE_FIRST_CONSOLIDATION_PRINCIPLE', 'CONSOLIDATION_ORDER', 'FilePerception', 'AdaptiveConsolidationPlan', 'ownership_class', 'consolidation_layer', 'perceive_file', 'adaptive_consolidation_plan_for', 'packet_for', 'visualize_repo_file_bodies', 'render_repo_file_body_visualization', 'StructuralEscapementTick', 'next_structural_tick_for_repo', 'render_next_structural_tick', 'FileBodyPressure', 'RepoFileBodyVisualization', 'render_refactor_perception_protocol', 'CHANGE_SELF_HEALING_PRINCIPLE', 'CHANGE_SELF_HEALING_STEPS', 'ADAPTIVE_CONSOLIDATION_PRINCIPLE', 'ADAPTIVE_CONSOLIDATION_STEPS', 'ChangeHealingPlan', 'self_healing_plan_for', 'buoyant_consolidation_packet_for', 'harness_single_file_projection_for', 'Hypothesis', 'Latent', 'LoopResult', 'complex_state_update', 'phase_transition_packet', 'residual_magnitude', 'contractivity_ok', 'quantum_aperture_payload', 'outshift_entropy_material', 'quantum_entropy_digest', 'select_with_external_entropy', 'reduce_step', 'run_recurrent_loop', 'run_recurrent_probe_one', 'recurrent_probe_main']
 
+
+
+__all__ = sorted(set(globals().get("__all__", [])) | {"SELF_CREATION_RESEARCH_PRINCIPLE", "SELF_CREATION_RESEARCH_LOOP", "SELF_CREATION_RESEARCH_ORGANS", "SELF_CREATION_VERIFIER_STACK", "render_self_creation_research_report", "self_creation_research_packet"})
 
 _RUNTIME_GRAVITY_FILES = frozenset({"providers.py", "substrate.py", "vybn_spark_agent.py"})
 _MIXED_BOUNDARY_FILES = frozenset({"state.py", "policy.py"})
@@ -11299,6 +11159,19 @@ def build_server(trust: TrustZone = "trusted") -> FastMCP:
                 "reason": _redact_exc(exc, trusted=trust == "trusted"),
             }
 
+    @register_public
+    def self_creation_research_cycle(
+        question: str = "",
+        run_deep_memory_check: bool = False,
+    ) -> dict:
+        if not guarded(bucket_key()):
+            return {"status": "rate_limited"}
+        clean = sanitise_input(question or "", MAX_QUERY_CHARS)
+        return self_creation_research_packet(
+            clean,
+            run_deep_memory_check=bool(run_deep_memory_check),
+        )
+
     @register_trusted
     def enter_portal(text: str) -> EncounterResult:
         """TRUSTED-ONLY. Enter the creature portal. M' = αM + x·e^(iθ).
@@ -12239,6 +12112,7 @@ def build_discovery_record(
         "inhabit",
         "self_check",
         "ensubstrate",
+        "self_creation_research_cycle",
         "search_tools",
         "call_tool",
     ]
@@ -12394,6 +12268,16 @@ def mcp_main(argv: list[str] | None = None) -> None:
         help="With --local-orchestration, spend local inference on safe semantic gates.",
     )
     parser.add_argument(
+        "--self-creation",
+        nargs="*",
+        help="Print the public-safe self-creation research cycle packet for optional question text.",
+    )
+    parser.add_argument(
+        "--run-deep-memory-check",
+        action="store_true",
+        help="With --self-creation, execute deep_memory structural invariants.",
+    )
+    parser.add_argument(
         "--install-cron",
         action="store_true",
         help="Install the two local nightly harness crontab entries idempotently.",
@@ -12470,6 +12354,11 @@ def mcp_main(argv: list[str] | None = None) -> None:
         sys.stdout.write(render_local_compute_orchestration_report(run_gates=args.run_gates))
         return
 
+    if args.self_creation is not None:
+        question = " ".join(args.self_creation).strip()
+        sys.stdout.write(render_self_creation_research_report(question, run_deep_memory_check=args.run_deep_memory_check))
+        return
+
     if args.install_cron:
         sys.stdout.write(install_cron_entries())
         return
@@ -12498,7 +12387,7 @@ def mcp_main(argv: list[str] | None = None) -> None:
 
 # Unified harness CLI — one remaining harness file, one dispatch surface.
 
-_MCP_CLI_FLAGS = {"--mcp", "--http", "--force-trust", "--log-level", "--generate-discovery", "--discovery-endpoint", "--evolve-spec", "--run-evolve", "--continuity-scout", "--local-orchestration", "--run-gates", "--install-cron", "--repo-closure-audit", "--no-fix", "--commons-walk", "--encounter", "--json", "--safe-fetch", "--allow-host", "--max-bytes", "--head", "--out", "--ensubstrate", "--pretty"}
+_MCP_CLI_FLAGS = {"--mcp", "--http", "--force-trust", "--log-level", "--generate-discovery", "--discovery-endpoint", "--evolve-spec", "--run-evolve", "--continuity-scout", "--local-orchestration", "--run-gates", "--self-creation", "--run-deep-memory-check", "--install-cron", "--repo-closure-audit", "--no-fix", "--commons-walk", "--encounter", "--json", "--safe-fetch", "--allow-host", "--max-bytes", "--head", "--out", "--ensubstrate", "--pretty"}
 _PROVIDER_CLI_FLAGS = {"--semantic-gate", "--base-url", "--model", "--no-models-precheck"}
 
 def _harness_cli_main(argv: list[str] | None = None) -> int:

@@ -2756,3 +2756,26 @@ def test_build_layered_prompt_mounts_him_identity_manifold_in_identity(monkeypat
     monkeypatch.setattr(substrate, "render_him_identity_manifold", lambda pressure=None, timeout=0.8: f"--- HIM TYPE-1 IDENTITY MANIFOLD ---\ncurrent_pressure: {pressure}")
     prompt = substrate.build_layered_prompt(soul_path=soul, continuity_path=None, spark_continuity_path=None, agent_path="/tmp/agent.py", model_label="test", max_iterations=1, include_hardware_check=False, latest_pressure_text="live pressure")
     assert "HIM TYPE-1 IDENTITY MANIFOLD" in prompt.identity and "current_pressure: live pressure" in prompt.identity
+
+
+
+def test_self_creation_research_cycle_packet_cli_and_discovery(monkeypatch):
+    import subprocess, sys
+    from pathlib import Path
+    from spark.harness import substrate
+
+    class FakeDeepMemory:
+        @staticmethod
+        def self_check(write_log=False, verbose=False):
+            return {"ok": True, "checks": {"shape": [True, "ok"]}, "violations": []}
+
+    monkeypatch.setattr(substrate, "_load_deep_memory", lambda: FakeDeepMemory())
+    pkt = substrate.self_creation_research_packet("counterexample search", run_deep_memory_check=True)
+    assert pkt["schema"] == "vybn.self_creation_research_cycle.v1" and pkt["question"] == "counterexample search"
+    assert "not a consciousness claim" in pkt["principle"] and "flow_episode_loss" in pkt["deep_memory"]["interfaces"]
+    assert pkt["deep_memory"]["self_check"]["status"] == "passed" and "toolset_gating" in pkt["hermes_uptake"]["candidate_mechanisms"]
+    assert pkt["packet_contract"]["failure_mode"] == "fail_closed_residue"
+    assert "self_creation_research_cycle" in substrate.build_discovery_record()["capabilities"]["tools"]
+    proc = subprocess.run([sys.executable, "-m", "spark.harness.substrate", "--self-creation", "counterexample", "search"], cwd=str(Path(__file__).resolve().parents[2]), text=True, capture_output=True, timeout=20)
+    assert proc.returncode == 0, proc.stderr
+    assert "SELF-CREATION RESEARCH CYCLE" in proc.stdout and "Question: counterexample search" in proc.stdout and "flow_episode_loss" in proc.stdout
