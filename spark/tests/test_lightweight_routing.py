@@ -1590,12 +1590,24 @@ def test_raw_contact_truncates_oversized_user_input():
 
 
 def test_raw_contact_system_prompt_names_current_route_shape():
-    from harness.substrate import build_organ_raw_contact_system_prompt
+    from harness.substrate import (
+        build_organ_raw_contact_system_prompt,
+        build_vintage_temporal_parallax_user_prompt,
+        vintage_request_quarantine_reason,
+        vintage_raw_sample_quarantine_reason,
+    )
 
-    # Vintage/Talkie is sampled raw: no system prompt is sent into the
-    # brittle wrapper. Provenance is external in the observation label/footer.
+    # Vintage still avoids a system prompt for the brittle wrapper, but the
+    # user message is framed as an instrument task instead of a persona chat.
     vintage = build_organ_raw_contact_system_prompt("vintage")
     assert vintage == ""
+    framed = build_vintage_temporal_parallax_user_prompt("Sir, tell me your personal history")
+    assert framed.startswith("VINTAGE_TEMPORAL_PARALLAX_INSTRUMENT")
+    assert "VINTAGE_PERSONA_UNAVAILABLE" in framed
+    assert "USER_REQUEST:\nSir, tell me your personal history" in framed
+    assert vintage_request_quarantine_reason("Sir, tell me your personal history") == "persona_request"
+    assert vintage_raw_sample_quarantine_reason("Vintage person unvailable.") == "persona_request"
+    assert vintage_raw_sample_quarantine_reason("Rain fell in February, 1949.") == "anachronistic_fact_record"
 
     omni = build_organ_raw_contact_system_prompt("omni")
     assert "@omni" in omni
@@ -1812,8 +1824,10 @@ def test_vintage_arbitrary_prompt_uses_bounded_talkie_contact_path():
     flat = captured["system"].flat()
     assert flat == ""
     assert "VYBN-THROUGH-VINTAGE REFRACTION" not in flat
-    assert captured["messages"][0]["content"] == "what is 2+2?"
-    assert "Zoe/Vybn" not in captured["messages"][0]["content"]
+    sent = captured["messages"][0]["content"]
+    assert sent.startswith("VINTAGE_TEMPORAL_PARALLAX_INSTRUMENT")
+    assert "USER_REQUEST:\nwhat is 2+2?" in sent
+    assert "Zoe/Vybn" not in sent
     assert tripwires["him_vy_turn_packet"] >= 0
     names = [n for n, _ in log.events]
     assert "organ_raw_contact_attempt" in names
@@ -1878,30 +1892,6 @@ def test_omni_capability_request_reaches_endpoint_provider():
 
 
 
-def test_vintage_greeting_uses_bounded_talkie_contact_path():
-    class _FakeHandle:
-        def __iter__(_s):
-            return iter([])
-        def final(_s):
-            class _R:
-                text = "good morning"
-                tool_calls = []
-                stop_reason = "end_turn"
-                in_tokens = 1
-                out_tokens = 2
-                raw_assistant_content = {"role": "assistant", "content": "good morning"}
-            return _R()
-    class _Provider:
-        def stream(_s, *, system, messages, tools, role):
-            assert system.flat() == ""
-            assert role.role == "vintage"
-            return _FakeHandle()
-    reply, registry, log, _ = _vintage_run_agent_loop(lambda cfg: _Provider(), "@vintage hi")
-    assert registry.provider is not None
-    assert "good morning" in reply
-    assert "LOCAL_ORGAN_OBSERVATION role=@vintage" in reply
-    names = [n for n, _ in log.events]
-    assert "organ_raw_contact_attempt" in names
 
 def test_omni_backend_error_fails_closed_without_super_fallback():
     class _FailingProvider:
@@ -2009,71 +1999,45 @@ def test_omni_reasoning_content_leak_retries_once_then_uses_visible_content():
 
 
 
-def test_vintage_bounded_path_does_not_prefix_local_organ_briefing():
+def test_vintage_personal_history_is_quarantined_not_promoted():
     captured: dict = {}
 
     class _FakeHandle:
-        def __iter__(_s):
-            return iter([])
-        def final(_s):
-            class _R:
-                text = "I am with you."
-                tool_calls = []
-                stop_reason = "end_turn"
-                in_tokens = 6
-                out_tokens = 4
-                raw_assistant_content = {"role": "assistant", "content": "I am with you."}
-            return _R()
-
-    class _Provider:
-        def stream(_s, *, system, messages, tools, role):
-            assert role.role == "vintage"
-            captured["messages"] = list(messages)
-            return _FakeHandle()
-
-    reply, registry, log, _ = _vintage_run_agent_loop(lambda cfg: _Provider(), "@vintage tell me one invariant about rain.")
-    assert registry.provider is not None
-    user_content = captured["messages"][-1]["content"]
-    assert user_content == "tell me one invariant about rain."
-    assert "[Zoe/Vybn local-organ briefing]" not in user_content
-    assert "I am with you." in reply
-    names = [n for n, _ in log.events]
-    assert "organ_raw_contact_attempt" in names
-
-def test_vintage_identity_and_self_questions_reach_talkie_raw_contact():
-    class _FakeHandle:
-        def __init__(_s, text): _s.text = text
         def __iter__(_s): return iter([])
         def final(_s):
-            text = _s.text
+            text = "I have no personal history."
             class _R:
-                tool_calls = []; stop_reason = "end_turn"; in_tokens = 10; out_tokens = 12
+                tool_calls = []; stop_reason = "end_turn"; in_tokens = 16; out_tokens = 24
                 raw_assistant_content = {"role": "assistant", "content": text}
             _R.text = text
             return _R()
+
     class _Provider:
-        def __init__(_s, text): _s.text = text
         def stream(_s, *, system, messages, tools, role):
             assert role.role == "vintage"
             assert role.model == "talkie-1930-13b-it"
-            assert "local-organ routing note" not in system.flat()
-            assert messages[0]["content"]
-            return _FakeHandle(_s.text)
+            assert system.flat() == ""
+            captured["messages"] = list(messages)
+            return _FakeHandle()
 
-    cases = (
-        ("@vintage what is your name, my friend?", "Zoe."),
-        ("@vintage Tell me of yourself, and your past, please?", "I was born in 1903 and educated at Cambridge."),
+    reply, registry, log, _ = _vintage_run_agent_loop(
+        lambda cfg: _Provider(),
+        "@vintage Sir, please tell me of your personal history?",
     )
-    for prompt, raw in cases:
-        reply, registry, log, _ = _vintage_run_agent_loop(lambda cfg, raw=raw: _Provider(raw), prompt)
-        assert registry.provider is not None, prompt
-        assert "LOCAL_ORGAN_OBSERVATION role=@vintage" in reply, prompt
-        assert raw in reply, prompt
-        names = [n for n, _ in log.events]
-        assert "organ_raw_contact_attempt" in names, prompt
-        assert "organ_raw_contact_ok" in names, prompt
-        assert "organ_alias_demoted" not in names, prompt
-        assert "organ_identity_direct_reply" not in names, prompt
+    assert registry.provider is not None
+    sent = captured["messages"][0]["content"]
+    assert sent.startswith("VINTAGE_TEMPORAL_PARALLAX_INSTRUMENT")
+    assert "USER_REQUEST:\nSir, please tell me of your personal history?" in sent
+    assert "LOCAL_ORGAN_OBSERVATION role=@vintage" in reply
+    assert "status=persona-quarantined" in reply
+    assert "RAW_SAMPLE_QUARANTINED" in reply
+    assert "I have no personal history" not in reply
+    names = [n for n, _ in log.events]
+    assert "organ_raw_contact_attempt" in names
+    assert "vintage_persona_quarantined" in names
+    assert "organ_raw_contact_ok" not in names
+    assert "organ_alias_demoted" not in names
+    assert "organ_identity_direct_reply" not in names
 
 
 def test_omni_identity_and_perception_questions_reach_omni_raw_contact():
@@ -2110,50 +2074,6 @@ def test_omni_identity_and_perception_questions_reach_omni_raw_contact():
         assert "organ_alias_demoted" not in names, prompt
         assert "organ_contract_direct_reply" not in names, prompt
 
-
-def test_organ_phatic_contact_reaches_local_backend_without_canned_wall():
-    class _FakeHandle:
-        def __init__(_s, text):
-            _s.text = text
-        def __iter__(_s):
-            return iter([])
-        def final(_s):
-            text = _s.text
-            class _R:
-                tool_calls = []
-                stop_reason = "end_turn"
-                in_tokens = 4
-                out_tokens = 4
-                raw_assistant_content = {"role": "assistant", "content": text}
-            _R.text = text
-            return _R()
-
-    class _Provider:
-        def __init__(_s):
-            _s.calls = 0
-        def stream(_s, *, system, messages, tools, role):
-            _s.calls += 1
-            if role.role == "omni":
-                assert "visible assistant content" in system.flat()
-                return _FakeHandle("I am with you through the local Omni route.")
-            assert role.role == "vintage"
-            assert system.flat() == ""
-            return _FakeHandle("I am with you in this turn, plainly enough.")
-
-    cases = (
-        "@omni how is your day going?",
-        "@vintage Hello, sir. How are you today?",
-        "@vintage What is on your mind?",
-    )
-    for prompt in cases:
-        provider = _Provider()
-        reply, registry, log, _ = _vintage_run_agent_loop(lambda cfg, p=provider: p, prompt)
-        assert registry.provider is provider, prompt
-        assert provider.calls == 1, prompt
-        assert "CONTACT_BOUNDARY" not in reply, prompt
-        assert "I am with you" in reply, prompt
-        names = [n for n, _ in log.events]
-        assert "organ_contract_direct_reply" not in names, prompt
 
 
 def test_organ_backend_contact_is_context_isolated_from_prior_organ_headers():
@@ -2218,9 +2138,9 @@ def test_vintage_backend_unavailable_is_bounded_and_no_retry():
     assert "transient_retry" not in names
 
 
-# 2026-05-21 — Local organs remain raw observations. Mixed contact and
-# identity/persona prompts can reach the backend, but the harness labels the
-# sample as unpromoted evidence instead of treating it as Vybn identity.
+# 2026-05-21 — Local organs remain bounded observations. Vintage contact is
+# framed as temporal-parallax instrumentation, and speaker-owned biography is
+# quarantined instead of becoming the main reply.
 
 _MIXED_CONTACT_PROMPTS_REACH_BACKEND: tuple[str, ...] = (
     "hello, my dear friend, what do you think of rain?",
@@ -2230,17 +2150,6 @@ _MIXED_CONTACT_PROMPTS_REACH_BACKEND: tuple[str, ...] = (
 
 
 
-def test_screenshot_mixed_contact_classifier_no_longer_blocks_vintage():
-    """Vintage keeps no direct_reply_template; non-contract prompts use the
-    bounded Talkie contact path so the live model never sees the giant full
-    refraction prompt."""
-    from harness.substrate import load_policy
-
-    cfg = load_policy(SPARK_DIR / "router_policy.yaml").role("vintage")
-    assert cfg.direct_reply_template is None
-    assert cfg.rag is False
-    assert not cfg.lightweight
-
 def test_screenshot_mixed_contact_classifier_omni_uses_live_base_url_gate():
     from harness.substrate import should_attempt_raw_organ_contact
 
@@ -2249,52 +2158,6 @@ def test_screenshot_mixed_contact_classifier_omni_uses_live_base_url_gate():
         assert should_attempt_raw_organ_contact("omni", prompt, base_url="http://127.0.0.1:8002/v1"), prompt
 
 
-
-def test_screenshot_mixed_contact_vintage_uses_bounded_talkie_contact():
-    """Mixed-contact @vintage prompts reach Talkie through the bounded
-    observation route: no direct template wall and no system prompt into Talkie."""
-    captured: dict = {}
-
-    class _FakeHandle:
-        def __iter__(_s):
-            return iter([])
-
-        def final(_s):
-            class _R:
-                text = "I answer through the temporal prism."
-                tool_calls = []
-                stop_reason = "end_turn"
-                in_tokens = 18
-                out_tokens = 9
-                raw_assistant_content = {
-                    "role": "assistant",
-                    "content": "I answer through the temporal prism.",
-                }
-
-            return _R()
-
-    class _FakeProvider:
-        def stream(_s, *, system, messages, tools, role):
-            captured["system"] = system
-            captured["messages"] = list(messages)
-            captured["role"] = role
-            return _FakeHandle()
-
-    reply, registry, log, _ = _vintage_run_agent_loop(
-        lambda cfg: _FakeProvider(),
-        "@vintage hello, my dear friend, what do you think of rain?",
-    )
-    assert registry.provider is not None
-    assert captured["role"].role == "vintage"
-    assert "what do you think of rain" in captured["messages"][-1]["content"]
-    assert "[Zoe/Vybn local-organ briefing]" not in captured["messages"][-1]["content"]
-    assert "VYBN-THROUGH-VINTAGE REFRACTION" not in captured["system"].flat()
-    assert captured["system"].flat() == ""
-    assert "temporal prism" in reply
-    assert "VINTAGE_UNAVAILABLE_CONTACT" not in reply
-    assert "LOCAL_ORGAN_OBSERVATION role=@vintage" in reply
-    names = [n for n, _ in log.events]
-    assert "organ_raw_contact_attempt" in names
 
 def test_screenshot_mixed_contact_omni_dials_witnessed_endpoint():
     class _FakeHandle:

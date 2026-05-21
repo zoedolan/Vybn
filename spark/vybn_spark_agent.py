@@ -52,8 +52,12 @@ from harness.substrate import (  # noqa: E402
     render_organ_raw_contact_header,
     render_organ_raw_contact_footer,
     render_organ_raw_contact_error,
+    render_vintage_sample_quarantine,
     build_organ_raw_contact_system_prompt,
+    build_vintage_temporal_parallax_user_prompt,
     truncate_for_organ_raw_contact,
+    vintage_request_quarantine_reason,
+    vintage_raw_sample_quarantine_reason,
     render_him_identity_manifold,
 )
 from harness.substrate import (  # noqa: E402
@@ -1194,7 +1198,10 @@ def run_agent_loop(
                 + identity_packet[:1800]
                 + "\n--- END HIM IDENTITY MANIFOLD GROUNDING ---"
             )
-        bounded_input = truncate_for_organ_raw_contact(raw_contact_input)
+        if role_cfg.role == "vintage":
+            bounded_input = build_vintage_temporal_parallax_user_prompt(raw_contact_input)
+        else:
+            bounded_input = truncate_for_organ_raw_contact(raw_contact_input)
         system_stub = LayeredPrompt(
             identity=identity_context,
             substrate=build_organ_raw_contact_system_prompt(role_cfg.role),
@@ -1275,6 +1282,21 @@ def run_agent_loop(
                     turn=turn_number,
                     role=decision.role,
                     model=role_cfg.model,
+                )
+            elif role_cfg.role == "vintage" and (
+                quarantine_reason := (
+                    vintage_request_quarantine_reason(raw_contact_input)
+                    or vintage_raw_sample_quarantine_reason(body)
+                )
+            ):
+                reply = render_vintage_sample_quarantine(quarantine_reason, final)
+                logger.emit(
+                    "vintage_persona_quarantined",
+                    turn=turn_number,
+                    role=decision.role,
+                    model=role_cfg.model,
+                    reason=quarantine_reason,
+                    raw_prefix=body[:240],
                 )
             else:
                 reply = f"{header}\n\n{body}\n\n{render_organ_raw_contact_footer(final)}"

@@ -838,6 +838,24 @@ def render_organ_raw_contact_header(role_name: str) -> str:
     )
 
 
+def render_vintage_sample_quarantine(reason: str, final_response: object) -> str:
+    """User-visible surface when Talkie exceeds the Vintage contract."""
+    safe_reason = re.sub(r"[^a-z0-9_.:-]+", "_", (reason or "sample_leak").lower()).strip("_")
+    persona_reasons = {"persona_request", "speaker_owned_identity", "first_person_biography"}
+    status = "persona-quarantined" if safe_reason in persona_reasons else "fact-quarantined"
+    return (
+        "[LOCAL_ORGAN_OBSERVATION role=@vintage organ=Talkie "
+        f"model=talkie-1930-13b-it status={status} "
+        "no_super_gpt_cloud_fallback=true]\n\n"
+        "Vintage is a temporal-parallax instrument here, not a first-person "
+        "biography or factual-record source. This sample tried to answer from "
+        "speaker-owned identity, life history, or factual authority, so "
+        "it was held as route evidence instead of promoted as the reply.\n\n"
+        f"[RAW_SAMPLE_QUARANTINED reason={safe_reason}]\n\n"
+        f"{render_organ_raw_contact_footer(final_response)}"
+    )
+
+
 def render_organ_raw_contact_footer(final_response: object) -> str:
     """End marker for a raw local-organ sample.
 
@@ -882,10 +900,26 @@ def build_organ_raw_contact_system_prompt(role_name: str) -> str:
             " messages are retried once and then surfaced as route evidence."
         )
     # Talkie is brittle when the OpenAI-compatible wrapper receives a system
-    # message. Keep Vintage observation raw: user message in, external harness
-    # provenance out. Promotion and identity authority are handled by witness
-    # gates, not by prompt pressure.
+    # message. Vintage uses a framed user message and external provenance.
     return ""
+
+
+def build_vintage_temporal_parallax_user_prompt(cleaned_input: str) -> str:
+    """Frame @vintage as an instrument without making Super/GPT the speaker."""
+    request = truncate_for_organ_raw_contact(cleaned_input or "")
+    return (
+        "VINTAGE_TEMPORAL_PARALLAX_INSTRUMENT\n"
+        "You are being sampled as a pre-1931 text horizon, not interviewed as "
+        "a person. Refract the user's request through qualitative period "
+        "language, invariants, or anachronism contrast; do not invent "
+        "statistics, dates, offices, named persons, or factual records. "
+        "If the request asks the horizon "
+        "itself for name, biography, memories, profession, location, personal "
+        "history, or lived experience, answer exactly: "
+        "VINTAGE_PERSONA_UNAVAILABLE.\n\n"
+        "USER_REQUEST:\n"
+        f"{request}"
+    )
 
 
 def truncate_for_organ_raw_contact(cleaned_input: str) -> str:
@@ -894,6 +928,46 @@ def truncate_for_organ_raw_contact(cleaned_input: str) -> str:
     if len(text) <= _ORGAN_RAW_CONTACT_INPUT_CHAR_LIMIT:
         return text
     return text[:_ORGAN_RAW_CONTACT_INPUT_CHAR_LIMIT] + "…"
+
+
+def vintage_request_quarantine_reason(cleaned_input: str) -> str | None:
+    """Return a reason when the @vintage request asks for organ persona."""
+    lower = (cleaned_input or "").lower()
+    if re.search(r"\b(who are you|what is your name|tell me of yourself|tell me about yourself|your personal history|your past|your experiences?|where were you born|when were you born)\b", lower):
+        return "persona_request"
+    if re.search(r"\b(your|yourself|you)\b", lower) and re.search(r"\b(name|biograph|personal history|past|memories?|experiences?|born|educated|profession|chambers|career)\b", lower):
+        return "persona_request"
+    return None
+
+
+def vintage_raw_sample_quarantine_reason(body: str) -> str | None:
+    """Return a reason when raw Talkie output is not fit for the main surface."""
+    text = (body or "").strip()
+    if not text:
+        return None
+    lower = text.lower()
+    squashed = re.sub(r"[^a-z]+", "", lower)
+    if "vintagepersonaunavailable" in squashed or "vintagepersonunvailable" in squashed:
+        return "persona_request"
+    years = [int(y) for y in re.findall(r"\b(?:1[6-9]\d{2}|19\d{2}|20\d{2})\b", text)]
+    if any(y > 1930 for y in years):
+        return "anachronistic_fact_record"
+    numbers = re.findall(r"\b\d+(?:[·.]\d+)?\b", text)
+    if len(numbers) >= 2 and re.search(r"\b(rain|fell|fall|days?|inches?|feet|miles?|percent|statistics?)\b", lower):
+        return "fact_oracle_leak"
+    if re.search(r"\b(my name is|i am called|i was born|i have been born)\b", lower):
+        return "speaker_owned_identity"
+    if not re.search(r"\b(i|i'm|i am|i was|my|myself|me)\b", lower):
+        return None
+    life_markers = re.findall(
+        r"\b(?:born|educated|studied|travelled|traveled|practised|practiced|"
+        r"appointed|returned|parliament|chambers|counsel|bar|temple|knighted|"
+        r"retired|settled|lived|married|succeeded|solicitor|attorney|chancellor)\b",
+        lower,
+    )
+    if len(years) >= 2 or len(life_markers) >= 2:
+        return "first_person_biography"
+    return None
 
 
 def render_organ_alias_direct_reply(
