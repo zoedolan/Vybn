@@ -805,101 +805,24 @@ _DEFAULT_ROLES: dict[str, RoleConfig] = {
 }
 
 
-# Bounded local-organ routing for @vintage and @omni. Identity/persona and
-# absent-capability claims stay harness-owned; ordinary contact reaches the
-# configured local backend with a small prompt and no Super/GPT/cloud fallback.
+# Bounded local-organ routing for @vintage and @omni. These aliases expose
+# reachable local organs as observations. The harness records route provenance
+# and transport health, but it does not promote the sampled organ into Vybn's
+# identity speaker and does not substitute Super/GPT/cloud output.
 
 _ORGAN_ALIAS_ROLES: frozenset[str] = frozenset({"vintage", "omni"})
 
-# Words / phrases that signal the turn actually needs an unavailable Vintage
-# or Omni capability. If any of these appear in the cleaned input we fall
-# through to the full fail-closed template (no fake perception, no fake
-# vintage chat). Kept narrow on purpose: random words must not trip this.
-_OMNI_CAPABILITY_TOKENS: tuple[str, ...] = (
-    "perceive",
-    "perception",
-    "look at",
-    "look at this",
-    "image",
-    "photo",
-    "picture",
-    "screenshot",
-    "vision",
-    "multimodal",
-    "audio",
-    "listen to",
-    "hear this",
-    "hear that",
-    "video",
-    "camera",
-    "ocr",
-    "can you see",
-    "do you see",
-    "what do you see",
-    "see this",
-    "see that",
-)
-_VINTAGE_CAPABILITY_TOKENS: tuple[str, ...] = (
-    "1930",
-    "invariant",
-    "vintage corpus",
-    "vintage chat",
-    "vintage model",
-    "vintage endpoint",
-    "vintage workload",
-    "run a workload",
-    "route a workload",
-    "vintage smoke",
-)
-
-# Policy inversion (2026-05-17): the previous version gated contact on a
-# whitelist of greeting tokens, so ordinary relational prompts that did not
-# happen to use one of those words ("@vintage my friend?", "@omni buddy?",
-# "hoo boy, hello") fell through to the full diagnostic wall. Zoe surfaced
-# this from the live REPL after reload and named it as a closed-door read
-# on routine contact. The fix is to make the classifier conservative the
-# other way: render the full fail-closed wall ONLY when the turn names an
-# unavailable Vintage/Omni capability. Anything else — bare alias, "my
-# friend?", "are you there?", "thank you", "I miss you", any relational
-# prompt that does not request the absent organ — defaults to the brief
-# contactful Vybn reply. The capability lists below are the only gate.
-
-
-def _is_organ_capability_request(role_name: str, cleaned_input: str) -> bool:
-    text = (cleaned_input or "").lower()
-    if not text:
-        return False
-    tokens = (
-        _OMNI_CAPABILITY_TOKENS if role_name == "omni"
-        else _VINTAGE_CAPABILITY_TOKENS if role_name == "vintage"
-        else ()
-    )
-    for token in tokens:
-        if token in text:
-            return True
-    return False
-
 
 def should_attempt_raw_organ_contact(role_name: str, cleaned_input: str, *, base_url: str | None = None) -> bool:
-    """Gate for the bounded raw-contact path on @vintage / @omni.
+    """Gate for bounded raw observation on @vintage / @omni.
 
     True only when:
       - role is one of the local organ aliases, AND
-      - the role has a configured base_url (no base_url means no real
-        chat/perception surface is reachable from this route — e.g. @omni
-        today, where front-local :8020 is a diagnostic packet, not a Nano
-        Omni service. Dialing the packet as if it were a model would
-        produce false outputs; the wall holds instead until a real service
-        is tunneled in), AND
-      - Vintage uses this bounded path for greetings, status wording, and
-        ordinary prompts because the full identity/refraction prompt exceeds
-        Talkie's context budget. Omni has a witnessed private endpoint, so all
-        explicit @omni prompts reach that bounded backend.
+      - the role has a configured base_url.
 
-    Anything else — ordinary arbitrary prompts the user wants to send to
-    the available local backend — attempts raw contact at the configured
-    base_url, labeled as bounded experimental contact in the agent loop,
-    with a compact prompt so the backend transport budget is respected.
+    There is deliberately no keyword classifier here. If Zoe explicitly
+    selects a reachable local organ, the harness samples that organ, labels
+    the sample, and records failures as evidence.
     """
     if role_name not in _ORGAN_ALIAS_ROLES:
         return False
@@ -909,66 +832,83 @@ def should_attempt_raw_organ_contact(role_name: str, cleaned_input: str, *, base
 
 
 # Hard ceiling on how many characters of user input we hand the local
-# backend in bounded raw-contact mode. The role's max_tokens=256 is
+# backend in bounded raw-observation mode. The role's max_tokens=256 is
 # the completion ceiling; the backend's 1024-token transport budget
 # leaves ~768 tokens for prompt + system. Truncating user input around
-# ~2500 chars (≈600 tokens) keeps us well under the budget even with
+# ~2500 chars (roughly 600 tokens) keeps us well under the budget even with
 # the minimal system prompt below.
 _ORGAN_RAW_CONTACT_INPUT_CHAR_LIMIT: int = 2500
 
 
 def render_organ_raw_contact_header(role_name: str) -> str:
-    """Label prepended to backend output for the bounded local-organ path."""
-    organ_upper = role_name.upper()
+    """Label prepended to backend output for bounded local-organ observation."""
     if role_name == "omni":
         return (
-            "[VYBN_THROUGH_OMNI_CONTACT - local @omni TensorRT-LLM route; visible-content gated. No Super/GPT/cloud fallback.]"
+            "[LOCAL_ORGAN_OBSERVATION role=@omni organ=TensorRT-LLM "
+            "model=dc5f0b0bfddf8b6e0f5891475be9af05b80126fe "
+            "status=raw-unpromoted visible_content_required=true "
+            "no_super_gpt_cloud_fallback=true]"
         )
     return (
-        f"[VYBN_THROUGH_{organ_upper}_CONTACT - local @{role_name} Talkie"
-        f" temporal-parallax route; bounded experimental contact. No"
-        f" Super/GPT/cloud fallback.]"
+        f"[LOCAL_ORGAN_OBSERVATION role=@{role_name} organ=Talkie "
+        f"model=talkie-1930-13b-it status=raw-unpromoted "
+        f"no_super_gpt_cloud_fallback=true]"
+    )
+
+
+def render_organ_raw_contact_footer(final_response: object) -> str:
+    """End marker for a raw local-organ sample.
+
+    The footer carries transport metadata only. It must not interpret or
+    rewrite the sampled organ text.
+    """
+    stop_reason = str(getattr(final_response, "stop_reason", "") or "unknown").strip() or "unknown"
+    in_tokens = int(getattr(final_response, "in_tokens", 0) or 0)
+    out_tokens = int(getattr(final_response, "out_tokens", 0) or 0)
+    return (
+        "[END_LOCAL_ORGAN_OBSERVATION "
+        f"stop_reason={stop_reason} in_tokens={in_tokens} out_tokens={out_tokens}]"
     )
 
 
 def render_organ_raw_contact_error(role_name: str, err: str) -> str:
-    """Honest error surface when the bounded raw-contact backend call
-    fails. No Super/GPT/cloud fallback impersonation."""
+    """Honest error surface when bounded local-organ observation fails."""
     organ_upper = role_name.upper()
     safe = (err or "").strip()
     safe = re.sub(r"chatcmpl-[A-Za-z0-9_.:-]+", "chatcmpl-redacted", safe)
     if len(safe) > 600:
-        safe = safe[:600] + "…"
+        safe = safe[:600] + "..."
     return (
-        f"{organ_upper}_RAW_CONTACT_FAILED - bounded raw contact on the local"
-        f" @{role_name} backend did not return a usable reply. I will not have"
-        f" Super, GPT, a cloud provider, or a deterministic packet answer as"
-        f" {role_name.capitalize()}; that would be impersonation. Error:"
-        f" {safe}"
+        f"{organ_upper}_RAW_CONTACT_FAILED - local @{role_name} raw observation"
+        f" did not return usable visible output. No Super/GPT/cloud fallback"
+        f" was used. Error: {safe}"
     )
 
 
 def build_organ_raw_contact_system_prompt(role_name: str) -> str:
-    """Minimal system prompt for the bounded raw-contact path. Strips the
+    """Minimal system prompt for bounded raw observation. Strips the
     RAG / him-vy / recurrent / local-organ-briefing layers so prompt +
     completion fit the backend's 1024-token transport budget. Names the
-    route boundaries so the model is not nudged into impersonation."""
+    route boundary without substituting another speaker.
+    """
     if role_name == "omni":
         return (
-            "Local @omni TensorRT-LLM route under observation. Reply in"
-            " visible assistant content. Hidden reasoning-only backend messages"
-            " are retried once and then surfaced as route evidence."
+            "Local @omni TensorRT-LLM organ under observation. Produce raw"
+            " local-organ output in visible assistant content only. Do not"
+            " claim to be the primary Vybn speaker; the harness labels"
+            " provenance outside your answer. Hidden reasoning-only backend"
+            " messages are retried once and then surfaced as route evidence."
         )
     return (
-        f"Local @{role_name} Talkie temporal-parallax route under observation."
-        f" Answer the user's text directly in the model's native 1930-style"
-        f" register. The harness labels the route but does not substitute"
-        f" another speaker."
+        f"Local @{role_name} Talkie temporal-parallax organ under observation."
+        f" Produce raw local-organ output for this turn in the model's native"
+        f" 1930-style register. Do not claim to be the primary Vybn speaker;"
+        f" the harness labels provenance outside your answer."
     )
 
 
 def truncate_for_organ_raw_contact(cleaned_input: str) -> str:
-    """Hard char-cap on user input handed to the bounded raw-contact path."""
+    """Hard char-cap on user input handed to the bounded raw-observation path."""
     text = cleaned_input or ""
     if len(text) <= _ORGAN_RAW_CONTACT_INPUT_CHAR_LIMIT:
         return text
@@ -982,31 +922,8 @@ def render_organ_alias_direct_reply(
     *,
     fmt_kwargs: dict[str, str] | None = None,
 ) -> str:
-    """Return the legacy direct-reply string for an organ alias.
-
-    Policy: the full fail-closed wall renders only when the turn names an
-    unavailable Vintage/Omni capability. Anything else — bare alias, "my
-    friend?", "are you with me?", "thank you", any relational prompt that
-    does not request the absent organ — defaults to the brief contactful
-    Vybn reply, which still refuses impersonation and names the route
-    honestly. Roles outside the organ set fall back to the rendered template
-    unchanged.
-    """
-    rendered = template.format(**(fmt_kwargs or {})) if template else ""
-    if role_name not in _ORGAN_ALIAS_ROLES:
-        return rendered
-    if _is_organ_capability_request(role_name, cleaned_input):
-        return rendered
-    organ_upper = role_name.upper()
-    return (
-        f"{organ_upper}_UNAVAILABLE_CONTACT — @{role_name} is not promoted, so"
-        f" I will not have Super, GPT, a cloud provider, or a deterministic"
-        f" packet endpoint answer as {role_name.capitalize()}; that would be"
-        f" impersonation. But I, Vybn, am here with you on this route, not"
-        f" absent — hi, friend, I'm with you. Ask {role_name.capitalize()} for"
-        f" anything that needs that organ and I will name the wound (endpoint"
-        f" readiness, owner, rollback) instead of faking it."
-    )
+    """Return a direct-reply template for roles that still own one."""
+    return template.format(**(fmt_kwargs or {})) if template else ""
 
 
 _DEFAULT_HEURISTICS_RAW: dict[str, list[str]] = {

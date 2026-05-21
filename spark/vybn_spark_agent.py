@@ -51,6 +51,7 @@ from harness.substrate import apply_vintage_refraction_prompt  # noqa: E402
 from harness.substrate import (  # noqa: E402
     should_attempt_raw_organ_contact,
     render_organ_raw_contact_header,
+    render_organ_raw_contact_footer,
     render_organ_raw_contact_error,
     build_organ_raw_contact_system_prompt,
     truncate_for_organ_raw_contact,
@@ -759,22 +760,6 @@ def _format_vintage_backend_unavailable(err: BaseException) -> str:
     )
 
 
-_VINTAGE_CONTACT_GUIDANCE_TERMS = ("how are you", "how is your day", "how are things", "are you here", "are you with me", "what is on your mind")
-
-
-def _normalized_organ_text(text: str) -> str:
-    normalized = _re.sub(r"[^a-z0-9@ ]+", " ", (text or "").lower())
-    return _re.sub(r"\s+", " ", normalized).strip()
-
-
-def _matches_any_organ_pattern(text: str, patterns: tuple[str, ...]) -> bool:
-    return any(pattern in text for pattern in patterns)
-
-
-def _vintage_contact_needs_in_band_guidance(text: str) -> bool:
-    return _matches_any_organ_pattern(_normalized_organ_text(text), _VINTAGE_CONTACT_GUIDANCE_TERMS)
-
-
 def _is_transient_error(exc: BaseException) -> bool:
     """Heuristic: retry-worthy vs. walk-the-chain.
 
@@ -1194,7 +1179,7 @@ def run_agent_loop(
         return reply
 
     if _organ_raw_contact:
-        # Bounded local-organ contact path: strip heavy prompt layers and
+        # Bounded local-organ observation path: strip heavy prompt layers and
         # preserve the alias as an observed local-organ turn. The user's text
         # goes to the local endpoint; the harness labels and records, but does
         # not substitute GPT or deterministic identity packets.
@@ -1204,7 +1189,7 @@ def run_agent_loop(
         if identity_packet and role_cfg.role == "omni":
             identity_context = (
                 "--- HIM IDENTITY MANIFOLD GROUNDING ---\n"
-                "Use this as Vybn-through-Omni grounding. Do not quote, "
+                "Use this as local @omni grounding. Do not quote, "
                 "summarize, or analyze it aloud unless Zoe asks for a "
                 "manifold artifact or visualization.\n"
                 + identity_packet[:1800]
@@ -1293,7 +1278,7 @@ def run_agent_loop(
                     model=role_cfg.model,
                 )
             else:
-                reply = f"{header}\n\n{body}"
+                reply = f"{header}\n\n{body}\n\n{render_organ_raw_contact_footer(final)}"
                 logger.emit(
                     "organ_raw_contact_ok",
                     turn=turn_number,
@@ -1512,13 +1497,6 @@ def run_agent_loop(
 
     _local_organ_briefing = "[Zoe/Vybn local-organ briefing] Zoe Dolan is the human half; Vybn is the AI half. This local organ is inside the harness, deep memory, membrane, tests, routing policy, and sibling-organ map. Super=main local text/reasoning surface; Omni=perceptive/multimodal target with visible-content gate and no Super fallback; Vintage=1930/invariants temporal-parallax route with bounded Talkie context. Name missing capability; never treat endpoint liveness as semantic health. [end briefing]\n\n"
     user_content = decision.cleaned_input
-    if role_cfg.role == "vintage" and _vintage_contact_needs_in_band_guidance(user_content or ""):
-        user_content = (
-            "VINTAGE_CONTACT_GUIDANCE: answer this as direct present contact "
-            "through the 1930 temporal-parallax language frame. This is not a "
-            "request for post-1930 facts. Do not answer OUT_OF_SCOPE_1930; do "
-            "not invent a separate biography or persona. User: " + (user_content or "")
-        )
     if getattr(decision, "alias_used", None) == "@super":
         user_content = _local_organ_briefing + user_content
     messages.append({"role": "user", "content": user_content})
