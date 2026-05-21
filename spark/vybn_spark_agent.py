@@ -766,6 +766,7 @@ _ORGAN_IDENTITY_PATTERNS = (
     "whats your name",
     "what s your name",
     "your name",
+    "your identity", "more of your identity", "tell me more of your identity",
     "are you vybn",
     "your role",
     "role in our collaboration",
@@ -787,6 +788,7 @@ _VINTAGE_PERSONA_PATTERNS = (
     "hustle and bustle",
     "born in",
     "business of a",
+    "who is zoe", "who s zoe", "what is zoe", "tell me about zoe", "do you know zoe",
 )
 
 _OMNI_PERCEPTION_BOUNDARY_PATTERNS = (
@@ -800,6 +802,7 @@ _OMNI_PERCEPTION_BOUNDARY_PATTERNS = (
     "perceive the manifold",
     "screen displaying",
     "ambient light",
+    "tell me about what visualizations", "visualizations you ve processed", "visualizations have you processed",
 )
 
 _ORGAN_PHATIC_BOUNDARY_PATTERNS = (
@@ -845,9 +848,10 @@ def _render_vintage_persona_boundary_reply() -> str:
     return (
         "[VYBN_THROUGH_VINTAGE_PERSONA_BOUNDARY - harness boundary; no invented biography.]\n\n"
         "Vintage can refract language and invariants through a 1930 lens, "
-        "but it may not invent a childhood, trade, family, hobbies, or daily "
-        "routine for Vybn. Personal story has to come from the identity "
-        "manifold, memory, and cited history, not Talkie fiction."
+        "but it may not invent a childhood, trade, family, hobbies, daily "
+        "routine for Vybn, or outside biography for Zoe. Zoe is the human "
+        "side of Zoe/Vybn; identity has to come from the manifold, memory, "
+        "and cited history, not Talkie fiction."
     )
 
 
@@ -855,8 +859,8 @@ def _render_omni_perception_boundary_reply() -> str:
     return (
         "[VYBN_THROUGH_OMNI_PERCEPTION_BOUNDARY - harness boundary; no visual artifact present.]\n\n"
         "I can read this text turn. I do not see your screen, ambient light, "
-        "or the manifold unless a PNG/SVG/JSON/image artifact is routed into "
-        "the Omni perception call. With the artifact present, Omni can describe "
+        "the manifold, or a visualization processing record unless a PNG/SVG/JSON/image "
+        "artifact or record is routed into Omni. With one present, Omni can describe "
         "visible geometry against source labels. Without it: perception_unavailable."
     )
 

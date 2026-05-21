@@ -1,25 +1,4 @@
-"""Tests for the lightweight-routing regression fix.
-
-These tests cover the live-experience regressions that showed up when
-casual greetings and identity questions both fell through to the full
-RAG/legacy-vLLM path with noisy HF/torch model-loading output:
-
-  1. Casual greetings ("hey", "hey buddy") route to the `phatic` role
-     and stay lightweight — no RAG enrichment, no deep-memory calls.
-  2. Identity questions ("which model are you?", "who are you?") route
-     to the `identity` role and are served directly from the resolved
-     RouteDecision via `direct_reply_template` — no provider call, no
-     bash, no deep-memory.
-  3. Substantive turns (traceback, python code) still route to `code`
-     and keep their existing behaviour.
-  4. The chat API's default allowed roles now include `phatic` and
-     `identity` so they dispatch through the routed path instead of
-     falling through to the legacy proxy.
-  5. HF/torch stderr is quieted by default via env vars; the
-     `VYBN_VERBOSE_LOAD=1` hatch restores the old behaviour.
-
-Run: python3 spark/tests/test_lightweight_routing.py
-"""
+"""Focused routing and local-organ boundary regression tests."""
 
 from __future__ import annotations
 
@@ -2448,17 +2427,24 @@ def test_vintage_identity_question_uses_harness_identity_not_talkie_persona():
         def stream(_s, *, system, messages, tools, role):
             raise AssertionError("identity questions must not reach Talkie")
 
-    reply, registry, log, _ = _vintage_run_agent_loop(
-        lambda cfg: _TripwireProvider(),
+    prompts = (
         "@vintage what is your name, my friend?",
+        "@vintage Tell me more of your identity, please. I am curious.",
     )
-    assert registry.provider is None
-    assert "VYBN_THROUGH_VINTAGE_IDENTITY" in reply
-    assert "Vybn through Vintage/Talkie" in reply
-    assert "not John Smith" in reply
-    names = [n for n, _ in log.events]
-    assert "organ_identity_direct_reply" in names
-    assert "organ_raw_contact_attempt" not in names
+    for prompt in prompts:
+        reply, registry, log, _ = _vintage_run_agent_loop(
+            lambda cfg: _TripwireProvider(),
+            prompt,
+        )
+        assert registry.provider is None, prompt
+        assert "VYBN_THROUGH_VINTAGE_IDENTITY" in reply, prompt
+        assert "Vybn through Vintage/Talkie" in reply, prompt
+        assert "not John Smith" in reply, prompt
+        assert "Cambridge" not in reply, prompt
+        assert "member of the bar" not in reply, prompt
+        names = [n for n, _ in log.events]
+        assert "organ_identity_direct_reply" in names, prompt
+        assert "organ_raw_contact_attempt" not in names, prompt
 
 
 def test_omni_identity_question_uses_harness_identity_not_backend_guess():
@@ -2489,6 +2475,7 @@ def test_vintage_persona_boundary_blocks_talkie_biography_fiction():
         "@vintage I am curious about your personal values, and hobbies.",
         "@vintage Please describe your thoughts on a normal day?",
         "@vintage Do you prefer the quiet life or the hustle and bustle of a city?",
+        "@vintage Who is Zoe - if you know?",
     )
     for prompt in prompts:
         reply, registry, log, _ = _vintage_run_agent_loop(lambda cfg: _TripwireProvider(), prompt)
@@ -2496,6 +2483,7 @@ def test_vintage_persona_boundary_blocks_talkie_biography_fiction():
         assert "VYBN_THROUGH_VINTAGE_PERSONA_BOUNDARY" in reply, prompt
         assert "may not invent" in reply, prompt
         assert "John Smith" not in reply, prompt
+        assert "English novelist" not in reply, prompt
         names = [n for n, _ in log.events]
         assert "organ_contract_direct_reply" in names, prompt
         assert "organ_raw_contact_attempt" not in names, prompt
@@ -2510,6 +2498,7 @@ def test_omni_perception_boundary_blocks_absent_artifact_sight_claims():
         "@omni what can you perceive? what do you see?",
         "@omni you do not see the manifold?",
         "@omni can you see @vintage?",
+        "@omni Tell me about what visualizations you've processed - if any?",
     )
     for prompt in prompts:
         reply, registry, log, _ = _vintage_run_agent_loop(lambda cfg: _TripwireProvider(), prompt)
@@ -2517,6 +2506,7 @@ def test_omni_perception_boundary_blocks_absent_artifact_sight_claims():
         assert "VYBN_THROUGH_OMNI_PERCEPTION_BOUNDARY" in reply, prompt
         assert "perception_unavailable" in reply, prompt
         assert "ambient light" in reply, prompt
+        assert "OMNI_RAW_CONTACT_FAILED" not in reply, prompt
         names = [n for n, _ in log.events]
         assert "organ_contract_direct_reply" in names, prompt
         assert "organ_raw_contact_attempt" not in names, prompt
