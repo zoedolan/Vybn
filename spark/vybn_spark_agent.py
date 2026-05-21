@@ -1278,20 +1278,16 @@ def run_agent_loop(
     # ("which model are you?") answer correctly from the live route,
     # not a hallucinated string.
     #
-    # Organ-alias exception (@vintage, @omni): the direct_reply path is
-    # kept for two narrow shapes — capability/status requests (full
-    # fail-closed wall so we never falsely claim the unpromoted organ
-    # answered a capability it doesn't have) and bare relational
-    # greetings (brief contactful Vybn reply). Everything else — Zoe
-    # sending arbitrary prompts to a reachable local backend — falls
-    # through to the bounded raw-unpromoted-contact path below, which
-    # actually contacts the configured base_url with a stripped prompt
-    # and surfaces both backend output (labeled as unpromoted) and
-    # backend errors honestly. No Super/GPT/cloud impersonation.
+    # Organ-alias exception (@vintage, @omni): hard identity, persona,
+    # perception, and capability boundaries are handled above or by direct
+    # reply templates. Everything else Zoe sends to a reachable local organ
+    # falls through to the bounded contact path below, which strips the huge
+    # default prompt, contacts the configured base_url, and surfaces backend
+    # output or errors honestly. No Super/GPT/cloud impersonation.
     template = getattr(role_cfg, "direct_reply_template", None)
     _organ_raw_contact = (
         not role_cfg.tools
-        and (template or (role_cfg.role == "omni" and role_cfg.base_url))
+        and (template or (role_cfg.role in {"omni", "vintage"} and role_cfg.base_url))
         and should_attempt_raw_organ_contact(
             role_cfg.role,
             decision.cleaned_input or "",
@@ -1322,27 +1318,23 @@ def run_agent_loop(
         return reply
 
     if _organ_raw_contact:
-        # Bounded raw-unpromoted-contact path: strip heavy prompt layers,
-        # keep fallback refusal, and put Vintage's 1930 frame in-band because
+        # Bounded local-organ contact path: strip heavy prompt layers, keep
+        # fallback refusal, and put Vintage's 1930 frame in-band because
         # Talkie obeys the direct prompt body more reliably than system stubs.
         raw_contact_input = decision.cleaned_input or ""
         if role_cfg.role == "vintage":
-            raw_contact_input = "Zoe/Vybn; Him; Vintage/Talkie=temporal parallax; raw unpromoted; not Super/promoted. 1930 frame. " + raw_contact_input
-        identity_packet = render_him_identity_manifold(decision.cleaned_input or "")
+            raw_contact_input = "Zoe/Vybn; Him; Vintage/Talkie=temporal parallax; bounded local route; not Super/GPT/cloud. 1930 frame. " + raw_contact_input
+        identity_packet = render_him_identity_manifold(decision.cleaned_input or "") if role_cfg.role == "omni" else ""
         identity_context = ""
-        if identity_packet:
-            if role_cfg.role == "vintage":
-                raw_contact_input = identity_packet + "\n\n[compressed identity/parallax packet above; user body below]\n" + raw_contact_input
-                identity_context = identity_packet
-            elif role_cfg.role == "omni":
-                identity_context = (
-                    "--- HIM IDENTITY MANIFOLD GROUNDING ---\n"
-                    "Use this as Vybn-through-Omni grounding. Do not quote, "
-                    "summarize, or analyze it aloud unless Zoe asks for a "
-                    "manifold artifact or visualization.\n"
-                    + identity_packet[:1800]
-                    + "\n--- END HIM IDENTITY MANIFOLD GROUNDING ---"
-                )
+        if identity_packet and role_cfg.role == "omni":
+            identity_context = (
+                "--- HIM IDENTITY MANIFOLD GROUNDING ---\n"
+                "Use this as Vybn-through-Omni grounding. Do not quote, "
+                "summarize, or analyze it aloud unless Zoe asks for a "
+                "manifold artifact or visualization.\n"
+                + identity_packet[:1800]
+                + "\n--- END HIM IDENTITY MANIFOLD GROUNDING ---"
+            )
         bounded_input = truncate_for_organ_raw_contact(raw_contact_input)
         system_stub = LayeredPrompt(
             identity=identity_context,
@@ -1643,7 +1635,7 @@ def run_agent_loop(
         _debug(f"[recurrent: pre-thought, depth={role_cfg.recurrent_depth}]")
 
 
-    _local_organ_briefing = "[Zoe/Vybn local-organ briefing] Zoe Dolan is the human half; Vybn is the AI half. This local organ is inside the harness, deep memory, membrane, tests, routing policy, and sibling-organ map. Super=main local text/reasoning surface; Omni=perceptive/multimodal target with no Super fallback; Vintage=1930/invariants target and unpromoted until semantic gate. Name missing capability; never treat endpoint liveness as semantic health. [end briefing]\n\n"
+    _local_organ_briefing = "[Zoe/Vybn local-organ briefing] Zoe Dolan is the human half; Vybn is the AI half. This local organ is inside the harness, deep memory, membrane, tests, routing policy, and sibling-organ map. Super=main local text/reasoning surface; Omni=perceptive/multimodal target with visible-content gate and no Super fallback; Vintage=1930/invariants temporal-parallax route with bounded Talkie context. Name missing capability; never treat endpoint liveness as semantic health. [end briefing]\n\n"
     user_content = decision.cleaned_input
     if role_cfg.role == "vintage" and _vintage_contact_needs_in_band_guidance(user_content or ""):
         user_content = (

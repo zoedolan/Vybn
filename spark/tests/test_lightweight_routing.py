@@ -184,9 +184,9 @@ class TestPolicyHasLightweightRoles(unittest.TestCase):
 
 
 class TestExplicitOrganAliasesRouteToExperimentalEndpoints(unittest.TestCase):
-    # Vintage remains an unpromoted temporal-refraction route. Omni now points
-    # at the witnessed private TensorRT-LLM perception endpoint and must not
-    # fall back to Super/GPT/cloud/deterministic packets.
+    # Vintage is a bounded Talkie temporal-refraction route. Omni points at
+    # the private TensorRT-LLM perception endpoint through a visible-content
+    # gate. Neither route may fall back to Super/GPT/cloud/deterministic packets.
 
     def _assert_fail_closed_contact_template(self, organ: str, template: str) -> None:
         self.assertIsNotNone(template)
@@ -260,7 +260,7 @@ class TestExplicitOrganAliasesRouteToExperimentalEndpoints(unittest.TestCase):
                 if role == "vintage":
                     self.assertIsNone(d.config.direct_reply_template)
                     self.assertEqual((d.config.rag, d.config.max_tokens, d.config.lightweight), (False, 256, False))
-                    self.assertIn("Vintage/Talkie=temporal parallax; raw unpromoted; not Super/promoted", Path(__file__).resolve().parents[1].joinpath("vybn_spark_agent.py").read_text())
+                    self.assertIn("Vintage/Talkie=temporal parallax; bounded local route; not Super/GPT/cloud", Path(__file__).resolve().parents[1].joinpath("vybn_spark_agent.py").read_text())
                 else:
                     self.assertIsNone(d.config.direct_reply_template)
                     self.assertEqual(d.config.base_url, "http://127.0.0.1:8002/v1")
@@ -1612,8 +1612,8 @@ def test_gpt55_has_no_cross_provider_fallback():
 # "@vintage hi" — rendered the full diagnostic plaque. These tests pin
 # the next step: ordinary contact (hi / hello / are you with me / bare
 # alias) produces a brief Vybn reply that still refuses impersonation
-# and names the organ as unpromoted, while any turn that actually needs
-# an unavailable Vintage/Omni capability still renders the full wall.
+# and names the route honestly, while hard identity/persona/perception
+# boundaries still render deterministic harness replies.
 
 def _vintage_wall() -> str:
     return default_policy().roles["vintage"].direct_reply_template
@@ -1627,7 +1627,7 @@ def _assert_contact_reply_invariants(organ: str, reply: str) -> None:
     # Marked as the contact variant, not the bare wall.
     assert f"{organ.upper()}_UNAVAILABLE_CONTACT" in reply, reply
     assert f"{organ.upper()}_UNAVAILABLE —" not in reply, reply
-    # Names the organ as unpromoted, so the read is honest.
+    # Names the organ route honestly.
     assert f"@{organ}" in reply
     assert "not promoted" in reply.lower()
     # Refuses impersonation by Super / GPT / cloud / packet.
@@ -1890,27 +1890,24 @@ def test_capability_tokens_still_wall_after_inversion():
 # local backend. Prior patches collapsed all @vintage / @omni turns into
 # a static wall or a brief contact reply, which broke the ability to
 # *communicate* with the available local Vintage backend. The bounded
-# raw-unpromoted-contact path actually contacts the configured base_url
-# with a stripped prompt, labels output as unpromoted, and surfaces
+# bounded raw-contact path actually contacts the configured base_url
+# with a stripped prompt, labels output as local-organ contact, and surfaces
 # transport failures honestly. These tests pin the new shape.
 
 
 def test_raw_contact_gate_classifies_capability_greeting_and_arbitrary():
-    """The raw-contact gate fires only on arbitrary prompts AND only when a
-    real backend URL is configured. Capability/status requests stay walled;
-    bare relational greetings stay on the brief contact reply for Vintage.
-    Omni now has a witnessed private endpoint, so explicit @omni prompts
-    reach the bounded backend when base_url is configured."""
+    """The raw-contact gate fires when a real backend URL is configured.
+    Capability/status requests stay walled; Vintage greetings also use the
+    bounded path because the full refraction prompt exceeds Talkie's context.
+    Omni uses the same bounded backend when base_url is configured."""
     from harness.substrate import should_attempt_raw_organ_contact
 
     vintage_url = "http://127.0.0.1:8004/v1"
 
-    # Truly contentless contact pings — single-clause known greeting/
-    # presence-check tokens — stay on the brief contact reply, no backend
-    # call. The minimal set Zoe pinned (2026-05-17): @vintage hi, @vintage
-    # my friend?, @vintage are you with me?, plus other lone contact-token
-    # prompts. Anything with a second clause / additional content reaches
-    # the backend; see the multi-clause cases below.
+    # Truly contentless contact pings and single-clause greetings now still
+    # use the bounded Vintage backend path; the old full refraction prompt
+    # overruns Talkie's context window. Omni still requires a configured
+    # backend URL.
     for greeting in (
         "",
         "hi",
@@ -1926,7 +1923,7 @@ def test_raw_contact_gate_classifies_capability_greeting_and_arbitrary():
         "buddy?",
         "good morning",
     ):
-        assert not should_attempt_raw_organ_contact("vintage", greeting, base_url=vintage_url), greeting
+        assert should_attempt_raw_organ_contact("vintage", greeting, base_url=vintage_url), greeting
         assert not should_attempt_raw_organ_contact("omni", greeting, base_url=None), greeting
 
     # Multi-clause prompts — greeting/contact phrase followed by another
@@ -1948,14 +1945,16 @@ def test_raw_contact_gate_classifies_capability_greeting_and_arbitrary():
         assert not should_attempt_raw_organ_contact("omni", substantive, base_url=None), substantive
         assert should_attempt_raw_organ_contact("omni", substantive, base_url="http://127.0.0.1:8002/v1"), substantive
 
-    # Capability / status requests — full wall, no backend call.
+    # Vintage capability/status wording still uses the bounded backend when
+    # a real Talkie URL is configured; otherwise it would fall into the
+    # oversized full prompt path that the live service cannot accept.
     for cap in (
         "tell me about the 1930 corpus",
         "what are the vintage invariants?",
         "is the vintage endpoint warm?",
         "route a workload through vintage",
     ):
-        assert not should_attempt_raw_organ_contact("vintage", cap, base_url=vintage_url), cap
+        assert should_attempt_raw_organ_contact("vintage", cap, base_url=vintage_url), cap
     for cap in (
         "describe this photo",
         "look at this image",
@@ -2018,11 +2017,11 @@ def test_raw_contact_header_labels_current_route_shape():
     from harness.substrate import render_organ_raw_contact_header
 
     vintage = render_organ_raw_contact_header("vintage")
-    assert "VINTAGE_RAW_UNPROMOTED_CONTACT" in vintage
+    assert "VYBN_THROUGH_VINTAGE_CONTACT" in vintage
     assert "@vintage" in vintage
-    assert "raw model contact" in vintage.lower()
-    assert "not a promoted" in vintage.lower()
-    assert "unvetted" in vintage.lower()
+    assert "Talkie" in vintage
+    assert "temporal-parallax" in vintage
+    assert "No Super/GPT/cloud fallback" in vintage
 
     omni = render_organ_raw_contact_header("omni")
     assert "VYBN_THROUGH_OMNI_CONTACT" in omni
@@ -2062,7 +2061,9 @@ def test_raw_contact_system_prompt_names_current_route_shape():
 
     vintage = build_organ_raw_contact_system_prompt("vintage")
     assert "@vintage" in vintage
-    assert "unpromoted" in vintage.lower()
+    assert "temporal-parallax" in vintage
+    assert "OUT_OF_SCOPE_1930" in vintage
+    assert "biography" in vintage
     assert "Super" in vintage
     assert "GPT" in vintage
     assert len(vintage) < 1024, len(vintage)
@@ -2070,8 +2071,8 @@ def test_raw_contact_system_prompt_names_current_route_shape():
     omni = build_organ_raw_contact_system_prompt("omni")
     assert "@omni" in omni
     assert "TensorRT-LLM" in omni
-    assert "OMNI_TEXT_OK" in omni
-    assert "red-square" in omni
+    assert "visible" in omni.lower()
+    assert "hidden reasoning" in omni.lower()
     assert "Vybn through Omni" in omni
     assert "manifold" in omni.lower()
     assert "Super" in omni
@@ -2170,9 +2171,10 @@ def _vintage_run_agent_loop(provider_factory, user_input: str, *, logger=None, i
     return reply, registry, log, tripwires
 
 
-def test_vintage_arbitrary_prompt_uses_refraction_provider_path():
-    """@vintage now uses the normal provider path with Vybn identity +
-    temporal-refraction prompt, not the old raw-unpromoted-contact bypass."""
+
+def test_vintage_arbitrary_prompt_uses_bounded_talkie_contact_path():
+    """@vintage uses the bounded Talkie contact path, not the oversized
+    full refraction prompt that overruns the live 2048-token context."""
     captured: dict = {}
 
     class _FakeHandle:
@@ -2208,16 +2210,16 @@ def test_vintage_arbitrary_prompt_uses_refraction_provider_path():
     assert captured["role"].base_url == "http://127.0.0.1:8004/v1"
     assert captured["role"].model == "talkie-1930-13b-it"
     assert "four" in reply
-    assert "RAW_UNPROMOTED_CONTACT" not in reply
+    assert "VYBN_THROUGH_VINTAGE_CONTACT" in reply
     flat = captured["system"].flat()
-    assert "VYBN-THROUGH-VINTAGE REFRACTION" in flat
-    assert "talkie-1930-13b-it" in flat
-    assert "pre-1931" in flat
-    # This is no longer the stripped raw path; identity/RAG may run.
+    assert "temporal-parallax" in flat
+    assert "VYBN-THROUGH-VINTAGE REFRACTION" not in flat
+    assert "Vintage/Talkie=temporal parallax" in captured["messages"][0]["content"]
+    assert len(captured["messages"][0]["content"]) <= 2501
     assert tripwires["him_vy_turn_packet"] >= 0
     names = [n for n, _ in log.events]
-    assert "organ_raw_contact_attempt" not in names
-
+    assert "organ_raw_contact_attempt" in names
+    assert "organ_raw_contact_ok" in names
 
 def test_omni_arbitrary_prompt_dials_witnessed_private_endpoint():
     class _FakeHandle:
@@ -2277,7 +2279,8 @@ def test_omni_capability_request_reaches_endpoint_provider():
     assert "RAW_UNPROMOTED_CONTACT" not in reply
 
 
-def test_vintage_greeting_uses_refraction_provider_path():
+
+def test_vintage_greeting_uses_bounded_talkie_contact_path():
     class _FakeHandle:
         def __iter__(_s):
             return iter([])
@@ -2292,13 +2295,15 @@ def test_vintage_greeting_uses_refraction_provider_path():
             return _R()
     class _Provider:
         def stream(_s, *, system, messages, tools, role):
-            assert "VYBN-THROUGH-VINTAGE REFRACTION" in system.flat()
+            assert "temporal-parallax" in system.flat()
+            assert role.role == "vintage"
             return _FakeHandle()
     reply, registry, log, _ = _vintage_run_agent_loop(lambda cfg: _Provider(), "@vintage hi")
     assert registry.provider is not None
     assert "good morning" in reply
-    assert "RAW_UNPROMOTED_CONTACT" not in reply
-
+    assert "VYBN_THROUGH_VINTAGE_CONTACT" in reply
+    names = [n for n, _ in log.events]
+    assert "organ_raw_contact_attempt" in names
 
 def test_omni_backend_error_fails_closed_without_super_fallback():
     class _FailingProvider:
@@ -2405,7 +2410,8 @@ def test_omni_reasoning_content_leak_retries_once_then_uses_visible_content():
     assert "organ_raw_contact_ok" in names
 
 
-def test_vintage_provider_path_does_not_prefix_local_organ_briefing():
+
+def test_vintage_bounded_path_does_not_prefix_local_organ_briefing():
     captured: dict = {}
 
     class _FakeHandle:
@@ -2430,12 +2436,12 @@ def test_vintage_provider_path_does_not_prefix_local_organ_briefing():
     reply, registry, log, _ = _vintage_run_agent_loop(lambda cfg: _Provider(), "@vintage tell me one invariant about rain.")
     assert registry.provider is not None
     user_content = captured["messages"][-1]["content"]
-    assert user_content == "tell me one invariant about rain."
+    assert "tell me one invariant about rain." in user_content
+    assert "Vintage/Talkie=temporal parallax" in user_content
     assert "[Zoe/Vybn local-organ briefing]" not in user_content
     assert "I am with you." in reply
     names = [n for n, _ in log.events]
-    assert "organ_raw_contact_attempt" not in names
-
+    assert "organ_raw_contact_attempt" in names
 
 def test_vintage_identity_question_uses_harness_identity_not_talkie_persona():
     class _TripwireProvider:
@@ -2559,7 +2565,7 @@ def test_organ_phatic_contact_reaches_local_backend_without_canned_wall():
                 assert "plain, warm, concise" in system.flat()
                 return _FakeHandle("I am with you through the local Omni route.")
             assert role.role == "vintage"
-            assert "VYBN-THROUGH-VINTAGE REFRACTION" in system.flat()
+            assert "temporal-parallax" in system.flat()
             return _FakeHandle("I am with you in this turn, plainly enough.")
 
     cases = (
@@ -2616,7 +2622,7 @@ def test_organ_backend_contact_is_context_isolated_from_prior_organ_headers():
     assert "VYBN_THROUGH_OMNI_CONTACT" not in captured["messages"][0]["content"]
     assert "Rain is a useful" in reply
     names = [n for n, _ in log.events]
-    assert "organ_raw_contact_attempt" not in names
+    assert "organ_raw_contact_attempt" in names
 
 
 def test_vintage_backend_unavailable_is_bounded_and_no_retry():
@@ -2634,9 +2640,10 @@ def test_vintage_backend_unavailable_is_bounded_and_no_retry():
     assert "VINTAGE_BACKEND_UNAVAILABLE" in reply
     assert "provider error" not in reply.lower()
     assert "chatcmpl-vintage-guard" not in reply
-    assert "Super, GPT, cloud, or Omni impersonate" in reply
+    assert "Super, GPT" in reply
+    assert "impersonation" in reply.lower()
     names = [n for n, _ in log.events]
-    assert "vintage_backend_unavailable" in names
+    assert "organ_raw_contact_error" in names
     assert "transient_retry" not in names
 
 
@@ -2652,16 +2659,17 @@ _MIXED_CONTACT_PROMPTS_REACH_BACKEND: tuple[str, ...] = (
 )
 
 
-def test_screenshot_mixed_contact_classifier_no_longer_controls_vintage():
-    """Vintage no longer depends on the raw-contact classifier: the route
-    has no direct_reply_template, so prompts use the refraction provider path."""
+
+def test_screenshot_mixed_contact_classifier_no_longer_blocks_vintage():
+    """Vintage keeps no direct_reply_template; non-contract prompts use the
+    bounded Talkie contact path so the live model never sees the giant full
+    refraction prompt."""
     from harness.substrate import load_policy
 
     cfg = load_policy(SPARK_DIR / "router_policy.yaml").role("vintage")
     assert cfg.direct_reply_template is None
     assert cfg.rag is False
     assert not cfg.lightweight
-
 
 def test_screenshot_mixed_contact_classifier_omni_uses_live_base_url_gate():
     from harness.substrate import should_attempt_raw_organ_contact
@@ -2671,9 +2679,10 @@ def test_screenshot_mixed_contact_classifier_omni_uses_live_base_url_gate():
         assert should_attempt_raw_organ_contact("omni", prompt, base_url="http://127.0.0.1:8002/v1"), prompt
 
 
-def test_screenshot_mixed_contact_vintage_uses_refraction_not_raw_template():
-    """Mixed-contact @vintage prompts now reach Talkie through the full
-    refraction route: no direct template wall and no raw-contact label."""
+
+def test_screenshot_mixed_contact_vintage_uses_bounded_talkie_contact():
+    """Mixed-contact @vintage prompts reach Talkie through the bounded
+    contact route: no direct template wall and no oversized refraction system."""
     captured: dict = {}
 
     class _FakeHandle:
@@ -2709,13 +2718,13 @@ def test_screenshot_mixed_contact_vintage_uses_refraction_not_raw_template():
     assert captured["role"].role == "vintage"
     assert "what do you think of rain" in captured["messages"][-1]["content"]
     assert "[Zoe/Vybn local-organ briefing]" not in captured["messages"][-1]["content"]
-    assert "VYBN-THROUGH-VINTAGE REFRACTION" in captured["system"].flat()
+    assert "VYBN-THROUGH-VINTAGE REFRACTION" not in captured["system"].flat()
+    assert "temporal-parallax" in captured["system"].flat()
     assert "temporal prism" in reply
     assert "VINTAGE_UNAVAILABLE_CONTACT" not in reply
-    assert "RAW_UNPROMOTED_CONTACT" not in reply
+    assert "VYBN_THROUGH_VINTAGE_CONTACT" in reply
     names = [n for n, _ in log.events]
-    assert "organ_raw_contact_attempt" not in names
-
+    assert "organ_raw_contact_attempt" in names
 
 def test_screenshot_mixed_contact_omni_dials_witnessed_endpoint():
     class _FakeHandle:
