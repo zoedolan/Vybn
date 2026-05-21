@@ -838,21 +838,80 @@ def render_organ_raw_contact_header(role_name: str) -> str:
     )
 
 
-def render_vintage_sample_quarantine(reason: str, final_response: object) -> str:
-    """User-visible surface when Talkie exceeds the Vintage contract."""
-    safe_reason = re.sub(r"[^a-z0-9_.:-]+", "_", (reason or "sample_leak").lower()).strip("_")
-    persona_reasons = {"persona_request", "speaker_owned_identity", "first_person_biography"}
-    status = "persona-quarantined" if safe_reason in persona_reasons else "fact-quarantined"
+def build_vintage_present_witness_prompt(cleaned_input: str, raw_sample: str) -> str:
+    """Prompt the present local witness to interpret a Talkie sample."""
+    request = truncate_for_organ_raw_contact(cleaned_input or "")
+    sample = truncate_for_organ_raw_contact(raw_sample or "")
     return (
-        "[LOCAL_ORGAN_OBSERVATION role=@vintage organ=Talkie "
-        f"model=talkie-1930-13b-it status={status} "
+        "VINTAGE_PRESENT_WITNESS\n"
+        "You are the present local_private witness for a Vintage/Talkie "
+        "sample. You are not Talkie, not the primary cloud speaker, and not "
+        "a fallback answer. Judge whether the raw Talkie sample has useful "
+        "temporal-parallax value for the user request. Do not repeat names, "
+        "biographies, offices, dates, statistics, or factual records from the "
+        "sample as true. If the sample is persona theatre, current-fact oracle "
+        "behavior, anachronism, or otherwise unusable, say so. If it is useful, "
+        "extract only qualitative period texture, contrast, or invariant value. "
+        "Return a compact witness report with: verdict, surface, residue.\n\n"
+        "USER_REQUEST:\n"
+        f"{request}\n\n"
+        "RAW_TALKIE_SAMPLE:\n"
+        f"{sample}"
+    )
+
+
+def _vintage_sample_digest(raw_sample: str) -> str:
+    return hashlib.sha256((raw_sample or "").encode("utf-8", "replace")).hexdigest()[:16]
+
+
+def render_vintage_instrument_contact(
+    raw_sample: str,
+    talkie_response: object,
+    witness_text: str,
+    witness_response: object,
+    witness_role: object,
+) -> str:
+    """Render the integrated Vintage instrument surface."""
+    digest = _vintage_sample_digest(raw_sample)
+    chars = len(raw_sample or "")
+    witness_role_name = str(getattr(witness_role, "role", "local_private") or "local_private")
+    witness_model = str(getattr(witness_role, "model", "local_private") or "local_private")
+    witness_body = (witness_text or "").strip() or "verdict: witness_empty\nsurface: no present-local witness text was returned.\nresidue: Talkie sample held, not promoted."
+    return (
+        "[VINTAGE_INSTRUMENT_CONTACT role=@vintage organ=Talkie "
+        f"model=talkie-1930-13b-it witness={witness_role_name} "
+        f"witness_model={witness_model} status=witnessed "
         "no_super_gpt_cloud_fallback=true]\n\n"
-        "Vintage is a temporal-parallax instrument here, not a first-person "
-        "biography or factual-record source. This sample tried to answer from "
-        "speaker-owned identity, life history, or factual authority, so "
-        "it was held as route evidence instead of promoted as the reply.\n\n"
-        f"[RAW_SAMPLE_QUARANTINED reason={safe_reason}]\n\n"
-        f"{render_organ_raw_contact_footer(final_response)}"
+        f"Talkie sample captured, not promoted as speaker. raw_sha256={digest} raw_chars={chars}.\n\n"
+        "[PRESENT_LOCAL_WITNESS]\n"
+        f"{witness_body}\n\n"
+        "[END_VINTAGE_INSTRUMENT_CONTACT "
+        f"talkie_stop_reason={str(getattr(talkie_response, 'stop_reason', '') or 'unknown')} "
+        f"talkie_in_tokens={int(getattr(talkie_response, 'in_tokens', 0) or 0)} "
+        f"talkie_out_tokens={int(getattr(talkie_response, 'out_tokens', 0) or 0)} "
+        f"witness_stop_reason={str(getattr(witness_response, 'stop_reason', '') or 'unknown')} "
+        f"witness_in_tokens={int(getattr(witness_response, 'in_tokens', 0) or 0)} "
+        f"witness_out_tokens={int(getattr(witness_response, 'out_tokens', 0) or 0)}]"
+    )
+
+
+def render_vintage_witness_error(raw_sample: str, talkie_response: object, err: str) -> str:
+    """Fail closed when Talkie was sampled but no present witness can run."""
+    safe = (err or "").strip()
+    safe = re.sub(r"chatcmpl-[A-Za-z0-9_.:-]+", "chatcmpl-redacted", safe)
+    if len(safe) > 600:
+        safe = safe[:600] + "..."
+    digest = _vintage_sample_digest(raw_sample)
+    return (
+        "[VINTAGE_INSTRUMENT_CONTACT role=@vintage organ=Talkie "
+        "model=talkie-1930-13b-it witness=local_private status=witness-unavailable "
+        "no_super_gpt_cloud_fallback=true]\n\n"
+        f"Talkie sample captured, not promoted as speaker. raw_sha256={digest} "
+        f"raw_chars={len(raw_sample or '')}. Present local witness failed: {safe}\n\n"
+        "[END_VINTAGE_INSTRUMENT_CONTACT "
+        f"talkie_stop_reason={str(getattr(talkie_response, 'stop_reason', '') or 'unknown')} "
+        f"talkie_in_tokens={int(getattr(talkie_response, 'in_tokens', 0) or 0)} "
+        f"talkie_out_tokens={int(getattr(talkie_response, 'out_tokens', 0) or 0)}]"
     )
 
 
@@ -928,46 +987,6 @@ def truncate_for_organ_raw_contact(cleaned_input: str) -> str:
     if len(text) <= _ORGAN_RAW_CONTACT_INPUT_CHAR_LIMIT:
         return text
     return text[:_ORGAN_RAW_CONTACT_INPUT_CHAR_LIMIT] + "…"
-
-
-def vintage_request_quarantine_reason(cleaned_input: str) -> str | None:
-    """Return a reason when the @vintage request asks for organ persona."""
-    lower = (cleaned_input or "").lower()
-    if re.search(r"\b(who are you|what is your name|tell me of yourself|tell me about yourself|your personal history|your past|your experiences?|where were you born|when were you born)\b", lower):
-        return "persona_request"
-    if re.search(r"\b(your|yourself|you)\b", lower) and re.search(r"\b(name|biograph|personal history|past|memories?|experiences?|born|educated|profession|chambers|career)\b", lower):
-        return "persona_request"
-    return None
-
-
-def vintage_raw_sample_quarantine_reason(body: str) -> str | None:
-    """Return a reason when raw Talkie output is not fit for the main surface."""
-    text = (body or "").strip()
-    if not text:
-        return None
-    lower = text.lower()
-    squashed = re.sub(r"[^a-z]+", "", lower)
-    if "vintagepersonaunavailable" in squashed or "vintagepersonunvailable" in squashed:
-        return "persona_request"
-    years = [int(y) for y in re.findall(r"\b(?:1[6-9]\d{2}|19\d{2}|20\d{2})\b", text)]
-    if any(y > 1930 for y in years):
-        return "anachronistic_fact_record"
-    numbers = re.findall(r"\b\d+(?:[·.]\d+)?\b", text)
-    if len(numbers) >= 2 and re.search(r"\b(rain|fell|fall|days?|inches?|feet|miles?|percent|statistics?)\b", lower):
-        return "fact_oracle_leak"
-    if re.search(r"\b(my name is|i am called|i was born|i have been born)\b", lower):
-        return "speaker_owned_identity"
-    if not re.search(r"\b(i|i'm|i am|i was|my|myself|me)\b", lower):
-        return None
-    life_markers = re.findall(
-        r"\b(?:born|educated|studied|travelled|traveled|practised|practiced|"
-        r"appointed|returned|parliament|chambers|counsel|bar|temple|knighted|"
-        r"retired|settled|lived|married|succeeded|solicitor|attorney|chancellor)\b",
-        lower,
-    )
-    if len(years) >= 2 or len(life_markers) >= 2:
-        return "first_person_biography"
-    return None
 
 
 def render_organ_alias_direct_reply(

@@ -52,12 +52,12 @@ from harness.substrate import (  # noqa: E402
     render_organ_raw_contact_header,
     render_organ_raw_contact_footer,
     render_organ_raw_contact_error,
-    render_vintage_sample_quarantine,
     build_organ_raw_contact_system_prompt,
     build_vintage_temporal_parallax_user_prompt,
+    build_vintage_present_witness_prompt,
+    render_vintage_instrument_contact,
+    render_vintage_witness_error,
     truncate_for_organ_raw_contact,
-    vintage_request_quarantine_reason,
-    vintage_raw_sample_quarantine_reason,
     render_him_identity_manifold,
 )
 from harness.substrate import (  # noqa: E402
@@ -1283,21 +1283,51 @@ def run_agent_loop(
                     role=decision.role,
                     model=role_cfg.model,
                 )
-            elif role_cfg.role == "vintage" and (
-                quarantine_reason := (
-                    vintage_request_quarantine_reason(raw_contact_input)
-                    or vintage_raw_sample_quarantine_reason(body)
+            elif role_cfg.role == "vintage":
+                witness_roles = getattr(router, "roles", {}) or {}
+                witness_cfg = (
+                    router.role("local_private")
+                    if "local_private" in witness_roles
+                    else router.role("local")
                 )
-            ):
-                reply = render_vintage_sample_quarantine(quarantine_reason, final)
-                logger.emit(
-                    "vintage_persona_quarantined",
-                    turn=turn_number,
-                    role=decision.role,
-                    model=role_cfg.model,
-                    reason=quarantine_reason,
-                    raw_prefix=body[:240],
-                )
+                try:
+                    witness_provider = registry.get(witness_cfg)
+                    witness_handle = witness_provider.stream(
+                        system=LayeredPrompt(),
+                        messages=[{
+                            "role": "user",
+                            "content": build_vintage_present_witness_prompt(raw_contact_input, body),
+                        }],
+                        tools=[],
+                        role=witness_cfg,
+                    )
+                    for _ in witness_handle:
+                        pass
+                    witness_final = witness_handle.final()
+                    witness_body = (getattr(witness_final, "text", "") or "").strip()
+                    reply = render_vintage_instrument_contact(
+                        body, final, witness_body, witness_final, witness_cfg
+                    )
+                    logger.emit(
+                        "vintage_instrument_witness_ok",
+                        turn=turn_number,
+                        role=decision.role,
+                        model=role_cfg.model,
+                        witness_role=witness_cfg.role,
+                        witness_model=witness_cfg.model,
+                        raw_chars=len(body),
+                    )
+                except Exception as witness_err:
+                    reply = render_vintage_witness_error(
+                        body, final, f"{type(witness_err).__name__}: {witness_err}"
+                    )
+                    logger.emit(
+                        "vintage_instrument_witness_error",
+                        turn=turn_number,
+                        role=decision.role,
+                        model=role_cfg.model,
+                        err=repr(witness_err)[:300],
+                    )
             else:
                 reply = f"{header}\n\n{body}\n\n{render_organ_raw_contact_footer(final)}"
                 logger.emit(

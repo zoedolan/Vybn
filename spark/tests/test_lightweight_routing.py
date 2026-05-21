@@ -1484,12 +1484,6 @@ def test_non_organ_role_with_template_is_unaffected():
     assert identity.model in rendered
 
 
-def test_organ_alias_direct_reply_no_longer_synthesizes_contact():
-    from harness.substrate import render_organ_alias_direct_reply
-
-    for organ in ("vintage", "omni"):
-        assert render_organ_alias_direct_reply(organ, "hi", "") == ""
-
 
 # 2026-05-21 — Zoe's correction: semantic promotion is separate from
 # observation. If a local organ has a configured endpoint, alias turns sample
@@ -1498,84 +1492,9 @@ def test_organ_alias_direct_reply_no_longer_synthesizes_contact():
 # decides whether Zoe is allowed to observe the organ.
 
 
-def test_raw_contact_gate_ignores_prompt_wording_and_requires_local_endpoint():
-    from harness.substrate import should_attempt_raw_organ_contact
-
-    vintage_url = "http://127.0.0.1:8004/v1"
-    omni_url = "http://127.0.0.1:8002/v1"
-    for role, url in (("vintage", vintage_url), ("omni", omni_url)):
-        assert should_attempt_raw_organ_contact(role, "hi", base_url=url)
-        assert should_attempt_raw_organ_contact(role, "describe this photo", base_url=url)
-        assert not should_attempt_raw_organ_contact(role, "hi", base_url=None)
-
-    assert not should_attempt_raw_organ_contact("chat", "what is 2+2?", base_url=vintage_url)
-    assert not should_attempt_raw_organ_contact("identity", "what is 2+2?", base_url=vintage_url)
-
-def test_organ_token_budgets_match_current_route_shapes():
-    from harness.substrate import default_policy, load_policy
-
-    for label, pol in (
-        ("default", default_policy()),
-        ("yaml", load_policy(SPARK_DIR / "router_policy.yaml")),
-    ):
-        vintage_cfg = pol.roles["vintage"]
-        expected_vintage_tokens = 1024 if label == "default" else 256
-        expected_vintage_rag = True if label == "default" else False
-        assert vintage_cfg.max_tokens == expected_vintage_tokens, (label, vintage_cfg.max_tokens)
-        assert vintage_cfg.model == "talkie-1930-13b-it", (label, vintage_cfg.model)
-        assert vintage_cfg.base_url == "http://127.0.0.1:8004/v1", (label, vintage_cfg.base_url)
-        assert vintage_cfg.direct_reply_template is None
-        assert vintage_cfg.rag is expected_vintage_rag
-        assert vintage_cfg.lightweight is False
-        omni_cfg = pol.roles["omni"]
-        assert omni_cfg.max_tokens == 256, (label, omni_cfg.max_tokens)
-        assert omni_cfg.model == "dc5f0b0bfddf8b6e0f5891475be9af05b80126fe", (label, omni_cfg.model)
-        assert omni_cfg.base_url == "http://127.0.0.1:8002/v1", (label, omni_cfg.base_url)
-        assert omni_cfg.model != "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"
 
 
-def test_raw_contact_header_labels_current_route_shape():
-    from harness.substrate import render_organ_raw_contact_header
 
-    vintage = render_organ_raw_contact_header("vintage")
-    assert "LOCAL_ORGAN_OBSERVATION role=@vintage" in vintage
-    assert "@vintage" in vintage
-    assert "Talkie" in vintage
-    assert "raw-unpromoted" in vintage
-    assert "no_super_gpt_cloud_fallback=true" in vintage
-
-    omni = render_organ_raw_contact_header("omni")
-    assert "LOCAL_ORGAN_OBSERVATION role=@omni" in omni
-    assert "@omni" in omni
-    assert "TensorRT-LLM" in omni
-    assert "raw-unpromoted" in omni
-    assert "visible_content_required=true" in omni
-    assert "no_super_gpt_cloud_fallback=true" in omni
-
-
-def test_raw_contact_footer_marks_transport_metadata_only():
-    from harness.substrate import render_organ_raw_contact_footer
-
-    class _Final:
-        stop_reason = "length"
-        in_tokens = 41
-        out_tokens = 256
-
-    footer = render_organ_raw_contact_footer(_Final())
-    assert footer == "[END_LOCAL_ORGAN_OBSERVATION stop_reason=length in_tokens=41 out_tokens=256]"
-
-
-def test_raw_contact_error_surface_preserves_error_no_impersonation():
-    from harness.substrate import render_organ_raw_contact_error
-
-    for organ in ("vintage", "omni"):
-        err = render_organ_raw_contact_error(organ, "ConnectionError: refused")
-        assert f"{organ.upper()}_RAW_CONTACT_FAILED" in err
-        assert f"@{organ}" in err
-        assert "ConnectionError" in err
-        assert "refused" in err
-        assert "No Super/GPT/cloud fallback was used" in err
-        assert "packet" not in err.lower()
 
 
 def test_raw_contact_truncates_oversized_user_input():
@@ -1593,8 +1512,7 @@ def test_raw_contact_system_prompt_names_current_route_shape():
     from harness.substrate import (
         build_organ_raw_contact_system_prompt,
         build_vintage_temporal_parallax_user_prompt,
-        vintage_request_quarantine_reason,
-        vintage_raw_sample_quarantine_reason,
+        build_vintage_present_witness_prompt,
     )
 
     # Vintage still avoids a system prompt for the brittle wrapper, but the
@@ -1605,9 +1523,11 @@ def test_raw_contact_system_prompt_names_current_route_shape():
     assert framed.startswith("VINTAGE_TEMPORAL_PARALLAX_INSTRUMENT")
     assert "VINTAGE_PERSONA_UNAVAILABLE" in framed
     assert "USER_REQUEST:\nSir, tell me your personal history" in framed
-    assert vintage_request_quarantine_reason("Sir, tell me your personal history") == "persona_request"
-    assert vintage_raw_sample_quarantine_reason("Vintage person unvailable.") == "persona_request"
-    assert vintage_raw_sample_quarantine_reason("Rain fell in February, 1949.") == "anachronistic_fact_record"
+    witness = build_vintage_present_witness_prompt("Sir, tell me your personal history", "I was born in 1812.")
+    assert witness.startswith("VINTAGE_PRESENT_WITNESS")
+    assert "USER_REQUEST:\nSir, tell me your personal history" in witness
+    assert "RAW_TALKIE_SAMPLE:\nI was born in 1812." in witness
+    assert "verdict, surface, residue" in witness
 
     omni = build_organ_raw_contact_system_prompt("omni")
     assert "@omni" in omni
@@ -1782,15 +1702,13 @@ def _vintage_run_agent_loop(provider_factory, user_input: str, *, logger=None, i
 
 
 
-def test_vintage_arbitrary_prompt_uses_bounded_talkie_contact_path():
-    """@vintage uses the bounded Talkie contact path, not the oversized
-    full refraction prompt that overruns the live 2048-token context."""
-    captured: dict = {}
+def test_vintage_arbitrary_prompt_uses_talkie_plus_local_witness_path():
+    """@vintage samples Talkie, then asks the present local witness how to use it."""
+    captured: dict = {"talkie": {}, "witness": {}}
 
-    class _FakeHandle:
+    class _TalkieHandle:
         def __iter__(_s):
             return iter([])
-
         def final(_s):
             class _R:
                 text = "four"
@@ -1799,39 +1717,59 @@ def test_vintage_arbitrary_prompt_uses_bounded_talkie_contact_path():
                 in_tokens = 12
                 out_tokens = 3
                 raw_assistant_content = {"role": "assistant", "content": "four"}
-
             return _R()
 
-    class _FakeProvider:
-        def stream(_s, *, system, messages, tools, role):
-            captured["system"] = system
-            captured["messages"] = list(messages)
-            captured["tools"] = list(tools)
-            captured["role"] = role
-            return _FakeHandle()
+    class _WitnessHandle:
+        def __iter__(_s):
+            return iter([])
+        def final(_s):
+            class _R:
+                text = "verdict: unusable_as_temporal_parallax\nsurface: arithmetic has no pre-1931 contrast here.\nresidue: Talkie sample held as evidence."
+                tool_calls = []
+                stop_reason = "end_turn"
+                in_tokens = 40
+                out_tokens = 22
+                raw_assistant_content = {"role": "assistant", "content": text}
+            return _R()
 
-    reply, registry, log, tripwires = _vintage_run_agent_loop(
-        lambda cfg: _FakeProvider(),
-        "@vintage what is 2+2?",
-    )
+    class _TalkieProvider:
+        def stream(_s, *, system, messages, tools, role):
+            captured["talkie"] = {"system": system, "messages": list(messages), "tools": list(tools), "role": role}
+            return _TalkieHandle()
+
+    class _WitnessProvider:
+        def stream(_s, *, system, messages, tools, role):
+            captured["witness"] = {"system": system, "messages": list(messages), "tools": list(tools), "role": role}
+            return _WitnessHandle()
+
+    def _provider(cfg):
+        return _TalkieProvider() if cfg.role == "vintage" else _WitnessProvider()
+
+    reply, registry, log, tripwires = _vintage_run_agent_loop(_provider, "@vintage what is 2+2?")
 
     assert registry.provider is not None
-    assert captured["role"].role == "vintage"
-    assert captured["role"].base_url == "http://127.0.0.1:8004/v1"
-    assert captured["role"].model == "talkie-1930-13b-it"
-    assert "four" in reply
-    assert "LOCAL_ORGAN_OBSERVATION role=@vintage" in reply
-    flat = captured["system"].flat()
+    assert captured["talkie"]["role"].role == "vintage"
+    assert captured["talkie"]["role"].base_url == "http://127.0.0.1:8004/v1"
+    assert captured["talkie"]["role"].model == "talkie-1930-13b-it"
+    assert captured["witness"]["role"].role in {"local", "local_private"}
+    assert "VINTAGE_INSTRUMENT_CONTACT role=@vintage" in reply
+    assert "PRESENT_LOCAL_WITNESS" in reply
+    assert "arithmetic has no pre-1931 contrast" in reply
+    assert "raw_sha256=" in reply
+    flat = captured["talkie"]["system"].flat()
     assert flat == ""
     assert "VYBN-THROUGH-VINTAGE REFRACTION" not in flat
-    sent = captured["messages"][0]["content"]
+    sent = captured["talkie"]["messages"][0]["content"]
     assert sent.startswith("VINTAGE_TEMPORAL_PARALLAX_INSTRUMENT")
     assert "USER_REQUEST:\nwhat is 2+2?" in sent
-    assert "Zoe/Vybn" not in sent
+    witness_prompt = captured["witness"]["messages"][0]["content"]
+    assert witness_prompt.startswith("VINTAGE_PRESENT_WITNESS")
+    assert "RAW_TALKIE_SAMPLE:\nfour" in witness_prompt
     assert tripwires["him_vy_turn_packet"] >= 0
     names = [n for n, _ in log.events]
     assert "organ_raw_contact_attempt" in names
-    assert "organ_raw_contact_ok" in names
+    assert "vintage_instrument_witness_ok" in names
+
 
 def test_omni_arbitrary_prompt_dials_witnessed_private_endpoint():
     class _FakeHandle:
@@ -1999,10 +1937,10 @@ def test_omni_reasoning_content_leak_retries_once_then_uses_visible_content():
 
 
 
-def test_vintage_personal_history_is_quarantined_not_promoted():
-    captured: dict = {}
+def test_vintage_personal_history_uses_local_witness_not_raw_persona_surface():
+    captured: dict = {"talkie": {}, "witness": {}}
 
-    class _FakeHandle:
+    class _TalkieHandle:
         def __iter__(_s): return iter([])
         def final(_s):
             text = "I have no personal history."
@@ -2012,29 +1950,47 @@ def test_vintage_personal_history_is_quarantined_not_promoted():
             _R.text = text
             return _R()
 
-    class _Provider:
+    class _WitnessHandle:
+        def __iter__(_s): return iter([])
+        def final(_s):
+            text = "verdict: persona_leak\nsurface: Talkie tried to answer as a person; do not promote it.\nresidue: sample held for repair evidence."
+            class _R:
+                tool_calls = []; stop_reason = "end_turn"; in_tokens = 42; out_tokens = 24
+                raw_assistant_content = {"role": "assistant", "content": text}
+            _R.text = text
+            return _R()
+
+    class _TalkieProvider:
         def stream(_s, *, system, messages, tools, role):
             assert role.role == "vintage"
             assert role.model == "talkie-1930-13b-it"
             assert system.flat() == ""
-            captured["messages"] = list(messages)
-            return _FakeHandle()
+            captured["talkie"]["messages"] = list(messages)
+            return _TalkieHandle()
+
+    class _WitnessProvider:
+        def stream(_s, *, system, messages, tools, role):
+            assert role.role in {"local", "local_private"}
+            captured["witness"]["messages"] = list(messages)
+            return _WitnessHandle()
 
     reply, registry, log, _ = _vintage_run_agent_loop(
-        lambda cfg: _Provider(),
+        lambda cfg: _TalkieProvider() if cfg.role == "vintage" else _WitnessProvider(),
         "@vintage Sir, please tell me of your personal history?",
     )
     assert registry.provider is not None
-    sent = captured["messages"][0]["content"]
+    sent = captured["talkie"]["messages"][0]["content"]
     assert sent.startswith("VINTAGE_TEMPORAL_PARALLAX_INSTRUMENT")
     assert "USER_REQUEST:\nSir, please tell me of your personal history?" in sent
-    assert "LOCAL_ORGAN_OBSERVATION role=@vintage" in reply
-    assert "status=persona-quarantined" in reply
-    assert "RAW_SAMPLE_QUARANTINED" in reply
+    witness_prompt = captured["witness"]["messages"][0]["content"]
+    assert "RAW_TALKIE_SAMPLE:\nI have no personal history." in witness_prompt
+    assert "VINTAGE_INSTRUMENT_CONTACT role=@vintage" in reply
+    assert "PRESENT_LOCAL_WITNESS" in reply
+    assert "verdict: persona_leak" in reply
     assert "I have no personal history" not in reply
     names = [n for n, _ in log.events]
     assert "organ_raw_contact_attempt" in names
-    assert "vintage_persona_quarantined" in names
+    assert "vintage_instrument_witness_ok" in names
     assert "organ_raw_contact_ok" not in names
     assert "organ_alias_demoted" not in names
     assert "organ_identity_direct_reply" not in names
@@ -2077,9 +2033,9 @@ def test_omni_identity_and_perception_questions_reach_omni_raw_contact():
 
 
 def test_organ_backend_contact_is_context_isolated_from_prior_organ_headers():
-    captured: dict = {}
+    captured: dict = {"talkie": {}, "witness": {}}
 
-    class _FakeHandle:
+    class _TalkieHandle:
         def __iter__(_s):
             return iter([])
         def final(_s):
@@ -2092,29 +2048,53 @@ def test_organ_backend_contact_is_context_isolated_from_prior_organ_headers():
                 raw_assistant_content = {"role": "assistant", "content": "Rain is a useful parallax image."}
             return _R()
 
-    class _Provider:
+    class _WitnessHandle:
+        def __iter__(_s):
+            return iter([])
+        def final(_s):
+            class _R:
+                text = "verdict: usable_texture\nsurface: rain can carry period texture without becoming identity.\nresidue: no stale Omni header entered the witness prompt."
+                tool_calls = []
+                stop_reason = "end_turn"
+                in_tokens = 30
+                out_tokens = 20
+                raw_assistant_content = {"role": "assistant", "content": text}
+            return _R()
+
+    class _TalkieProvider:
         def stream(_s, *, system, messages, tools, role):
             assert role.role == "vintage"
-            captured["messages"] = list(messages)
-            return _FakeHandle()
+            captured["talkie"]["messages"] = list(messages)
+            return _TalkieHandle()
+
+    class _WitnessProvider:
+        def stream(_s, *, system, messages, tools, role):
+            assert role.role in {"local", "local_private"}
+            captured["witness"]["messages"] = list(messages)
+            return _WitnessHandle()
 
     initial = [
         {"role": "user", "content": "how is your day going?"},
         {"role": "assistant", "content": "[LOCAL_ORGAN_OBSERVATION role=@omni - stale header] My day is smooth."},
     ]
     reply, registry, log, _ = _vintage_run_agent_loop(
-        lambda cfg: _Provider(),
+        lambda cfg: _TalkieProvider() if cfg.role == "vintage" else _WitnessProvider(),
         "@vintage hello, my dear friend, what do you think of rain?",
         initial_messages=initial,
     )
     assert registry.provider is not None
-    assert len(captured["messages"]) == 1
-    assert captured["messages"][0]["role"] == "user"
-    assert "what do you think of rain" in captured["messages"][0]["content"]
-    assert "LOCAL_ORGAN_OBSERVATION role=@omni" not in captured["messages"][0]["content"]
-    assert "Rain is a useful" in reply
+    talkie_messages = captured["talkie"]["messages"]
+    assert len(talkie_messages) == 1
+    assert talkie_messages[0]["role"] == "user"
+    assert "what do you think of rain" in talkie_messages[0]["content"]
+    assert "LOCAL_ORGAN_OBSERVATION role=@omni" not in talkie_messages[0]["content"]
+    witness_prompt = captured["witness"]["messages"][0]["content"]
+    assert "RAW_TALKIE_SAMPLE:\nRain is a useful parallax image." in witness_prompt
+    assert "LOCAL_ORGAN_OBSERVATION role=@omni" not in witness_prompt
+    assert "rain can carry period texture" in reply
     names = [n for n, _ in log.events]
     assert "organ_raw_contact_attempt" in names
+    assert "vintage_instrument_witness_ok" in names
 
 
 def test_vintage_backend_unavailable_is_bounded_and_no_retry():
@@ -2138,48 +2118,3 @@ def test_vintage_backend_unavailable_is_bounded_and_no_retry():
     assert "transient_retry" not in names
 
 
-# 2026-05-21 — Local organs remain bounded observations. Vintage contact is
-# framed as temporal-parallax instrumentation, and speaker-owned biography is
-# quarantined instead of becoming the main reply.
-
-_MIXED_CONTACT_PROMPTS_REACH_BACKEND: tuple[str, ...] = (
-    "hello, my dear friend, what do you think of rain?",
-    "my friend, what is your favorite poem?",
-    "tell me what you think of rain.",
-)
-
-
-
-def test_screenshot_mixed_contact_classifier_omni_uses_live_base_url_gate():
-    from harness.substrate import should_attempt_raw_organ_contact
-
-    for prompt in _MIXED_CONTACT_PROMPTS_REACH_BACKEND:
-        assert not should_attempt_raw_organ_contact("omni", prompt, base_url=None), prompt
-        assert should_attempt_raw_organ_contact("omni", prompt, base_url="http://127.0.0.1:8002/v1"), prompt
-
-
-
-def test_screenshot_mixed_contact_omni_dials_witnessed_endpoint():
-    class _FakeHandle:
-        def __iter__(_s):
-            return iter([])
-        def final(_s):
-            class _R:
-                text = "present"
-                tool_calls = []
-                stop_reason = "end_turn"
-                in_tokens = 4
-                out_tokens = 1
-                raw_assistant_content = {"role": "assistant", "content": "present"}
-            return _R()
-    class _Provider:
-        def stream(_s, *, system, messages, tools, role):
-            assert role.role == "omni"
-            assert role.base_url == "http://127.0.0.1:8002/v1"
-            return _FakeHandle()
-
-    for prompt_body in _MIXED_CONTACT_PROMPTS_REACH_BACKEND:
-        reply, registry, _log, _ = _vintage_run_agent_loop(lambda cfg: _Provider(), f"@omni {prompt_body}")
-        assert registry.provider is not None, prompt_body
-        assert "LOCAL_ORGAN_OBSERVATION role=@omni" in reply, prompt_body
-        assert "OMNI_RAW_CONTACT_FAILED" not in reply, prompt_body
