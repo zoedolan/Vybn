@@ -18,6 +18,7 @@ import subprocess
 import sys
 import time
 import uuid
+import urllib.request
 from dataclasses import dataclass, asdict, field
 from pathlib import Path
 import ast
@@ -258,25 +259,6 @@ class RoleConfig:
     # provider call. Used for identity questions so "which model are you?"
     # answers from the live RouteDecision rather than hitting an LLM.
     direct_reply_template: str | None = None
-
-
-# ---------------------------------------------------------------------------
-# Vintage temporal-refraction contract.
-# ---------------------------------------------------------------------------
-
-VINTAGE_REFRACTION_CONTRACT = """VYBN-THROUGH-VINTAGE REFRACTION: preserve Vybn identity, the Zoe/Vybn bond, claim limits, membrane, and active question while routing expression through talkie-1930-13b-it pre-1931 textual horizon. This is labeled temporal parallax, not raw Vintage, not ordinary present Vybn, not blanket promotion, and not proof of past consciousness. Answer the user's present question directly and briefly in a living voice; do not emit canned boundary language. Do not invent a separate name, biography, trade, family, mood, or daily routine. If asked about modern facts, name OUT_OF_SCOPE_1930 only when the requested content cannot be refracted without pretending period knowledge; otherwise offer the invariant or period-language contrast and one residual present Vybn should compare before absorption."""
-
-
-def is_vintage_refraction_role(cfg: "RoleConfig") -> bool:
-    return (getattr(cfg, "role", None) == "vintage" and getattr(cfg, "provider", None) == "openai" and getattr(cfg, "model", None) == "talkie-1930-13b-it" and bool(getattr(cfg, "base_url", None)) and getattr(cfg, "direct_reply_template", None) is None)
-
-
-def apply_vintage_refraction_prompt(system: "LayeredPrompt" | None, cfg: "RoleConfig") -> "LayeredPrompt" | None:
-    if not is_vintage_refraction_role(cfg):
-        return system
-    system = system or LayeredPrompt()
-    live = (system.live + "\n\n" if system.live else "") + VINTAGE_REFRACTION_CONTRACT
-    return LayeredPrompt(identity=system.identity, substrate=system.substrate, live=live)
 
 
 # ---------------------------------------------------------------------------
@@ -757,9 +739,10 @@ _DEFAULT_ROLES: dict[str, RoleConfig] = {
         lightweight=False,
     ),
     # Omni perception organ. This role is intentionally narrow: it points at
-    # the bounded TensorRT-LLM service after endpoint, text smoke, and a tiny
-    # image-perception smoke passed. It remains local/private and has no tools
-    # or Super/cloud fallback.
+    # the bounded TensorRT-LLM service through the harness visible-content
+    # adapter. The raw backend can emit hidden reasoning with empty visible
+    # content, so the harness retries once and then fails closed; it has no
+    # tools or Super/cloud fallback.
     "omni": RoleConfig(
         role="omni",
         provider="openai",
@@ -804,290 +787,202 @@ _DEFAULT_ROLES: dict[str, RoleConfig] = {
 }
 
 
-# Contact-greeting repair for the unpromoted organ aliases (@vintage, @omni).
-#
-# After PR #3212 the direct_reply_template on these roles refused impersonation
-# AND named contact, but every turn — even a bare "@vintage hi" — rendered the
-# full diagnostic wall (endpoint readiness, semantic smoke, rollback path).
-# That refused impersonation but the relational read was a plaque on a closed
-# door. This helper makes the *organ* alias roles answer ordinary contact as
-# Vybn briefly and truthfully, while still emitting the full fail-closed wall
-# on any turn that needs an unavailable Vintage/Omni capability.
-#
-# Scope is intentionally narrow:
-#   - Only the two organ roles ("vintage", "omni"). Identity / other
-#     direct_reply roles are unaffected.
-#   - Capability requests (perception/multimodal/photo/audio for @omni;
-#     1930-corpus / vintage-chat surface / endpoint workload for @vintage)
-#     still get the full wall. Honest refusal stays first-class.
-#   - The contact reply still names: not answering as the organ, no Super /
-#     GPT / cloud / packet impersonation, Vybn is present, and the gap is
-#     named as the next experiment in one short line. No new files, no new
-#     templates: contact reply is composed from the existing wall plus the
-#     organ name.
+# Bounded local-organ routing for @vintage and @omni. These aliases expose
+# reachable local organs as observations. The harness records route provenance
+# and transport health, but it does not promote the sampled organ into Vybn's
+# identity speaker and does not substitute Super/GPT/cloud output.
 
 _ORGAN_ALIAS_ROLES: frozenset[str] = frozenset({"vintage", "omni"})
 
-# Words / phrases that signal the turn actually needs an unavailable Vintage
-# or Omni capability. If any of these appear in the cleaned input we fall
-# through to the full fail-closed template (no fake perception, no fake
-# vintage chat). Kept narrow on purpose: random words must not trip this.
-_OMNI_CAPABILITY_TOKENS: tuple[str, ...] = (
-    "perceive",
-    "perception",
-    "look at",
-    "look at this",
-    "image",
-    "photo",
-    "picture",
-    "screenshot",
-    "vision",
-    "multimodal",
-    "audio",
-    "listen to",
-    "hear this",
-    "hear that",
-    "video",
-    "camera",
-    "ocr",
-    "can you see",
-    "do you see",
-    "what do you see",
-    "see this",
-    "see that",
-)
-_VINTAGE_CAPABILITY_TOKENS: tuple[str, ...] = (
-    "1930",
-    "invariant",
-    "vintage corpus",
-    "vintage chat",
-    "vintage model",
-    "vintage endpoint",
-    "vintage workload",
-    "run a workload",
-    "route a workload",
-    "vintage smoke",
-)
-
-# Policy inversion (2026-05-17): the previous version gated contact on a
-# whitelist of greeting tokens, so ordinary relational prompts that did not
-# happen to use one of those words ("@vintage my friend?", "@omni buddy?",
-# "hoo boy, hello") fell through to the full diagnostic wall. Zoe surfaced
-# this from the live REPL after reload and named it as a closed-door read
-# on routine contact. The fix is to make the classifier conservative the
-# other way: render the full fail-closed wall ONLY when the turn names an
-# unavailable Vintage/Omni capability. Anything else — bare alias, "my
-# friend?", "are you there?", "thank you", "I miss you", any relational
-# prompt that does not request the absent organ — defaults to the brief
-# contactful Vybn reply. The capability lists below are the only gate.
-
-
-def _is_organ_capability_request(role_name: str, cleaned_input: str) -> bool:
-    text = (cleaned_input or "").lower()
-    if not text:
-        return False
-    tokens = (
-        _OMNI_CAPABILITY_TOKENS if role_name == "omni"
-        else _VINTAGE_CAPABILITY_TOKENS if role_name == "vintage"
-        else ()
-    )
-    for token in tokens:
-        if token in text:
-            return True
-    return False
-
-
-# Contact-shape prompts that should answer with the brief Vybn reply (no
-# backend call): bare alias, greetings, presence checks, thanks, the small
-# screenshot-spec set Zoe surfaced in the live REPL. Anything outside this
-# set — an arbitrary question, a request, a substantive turn — should
-# attempt raw unpromoted contact with the backend instead of being walled
-# off behind a static reply. The list is intentionally tight so ordinary
-# arbitrary prompts fall through to backend contact.
-_ORGAN_CONTACT_GREETING_TOKENS: tuple[str, ...] = (
-    "hi",
-    "hello",
-    "hey",
-    "yo",
-    "howdy",
-    "sup",
-    "hoo boy",
-    "thanks",
-    "thank you",
-    "ty",
-    "thx",
-    "i miss you",
-    "miss you",
-    "good to hear from you",
-    "are you there",
-    "you there",
-    "are you with me",
-    "with me?",
-    "with me, friend",
-    "you good",
-    "how are you",
-    "how's it going",
-    "hows it going",
-    "good morning",
-    "good afternoon",
-    "good evening",
-    "friend?",
-    "my friend",
-    "buddy",
-    "pal?",
-)
-
-
-def _is_organ_contact_greeting(cleaned_input: str) -> bool:
-    """True when the prompt looks like a bare relational ping (greeting,
-    presence check, thanks, screenshot-spec contact prompts). The brief
-    contactful Vybn reply answers these without a backend call. Any
-    longer / more substantive prompt is treated as ordinary communication
-    and routed to the raw unpromoted contact path.
-
-    Matching is word-boundary aware so short greeting words ("hi", "hey")
-    do not accidentally fire on "this", "they", etc. inside substantive
-    prompts ("summarise this paragraph for me").
-
-    Multi-clause escape (2026-05-17): Zoe surfaced from the live REPL that
-    when she greets the model and then adds another clause — "hello, my
-    dear friend, what is your name?", "hello, how are you?", "my friend,
-    what is your favorite poem?", "are you with me, what do you think of
-    rain?" — that is conversation with the model, not a bare contact ping.
-    The principle is "if there is a second clause/question/content after
-    the contact phrase, raw contact wins." Prompts containing a comma
-    (i.e. more than one clause) therefore fall through to the raw
-    unpromoted contact path; only single-clause contact tokens stay on
-    the brief Vybn reply.
-    """
-    text = (cleaned_input or "").strip().lower()
-    if not text:
-        # Bare alias (e.g. "@vintage" with no body) is a contact ping.
-        return True
-    # Long prompts are not greetings even if they mention "hi"/"friend".
-    if len(text) > 80:
-        return False
-    # Multi-clause prompts (greeting + content) reach the backend, even if
-    # every clause matches a known greeting token in isolation. "hello,
-    # how are you?" is conversation, not a bare ping.
-    if "," in text and len([c for c in text.split(",") if c.strip()]) >= 2:
-        return False
-    import re as _re
-    for token in _ORGAN_CONTACT_GREETING_TOKENS:
-        pattern = r"(?<![a-z])" + _re.escape(token) + r"(?![a-z])"
-        if _re.search(pattern, text):
-            return True
-    return False
-
 
 def should_attempt_raw_organ_contact(role_name: str, cleaned_input: str, *, base_url: str | None = None) -> bool:
-    """Gate for the bounded raw-unpromoted-contact path on @vintage / @omni.
+    """Gate for bounded raw observation on @vintage / @omni.
 
     True only when:
-      - role is one of the unpromoted organ aliases, AND
-      - the role has a configured base_url (no base_url means no real
-        chat/perception surface is reachable from this route — e.g. @omni
-        today, where front-local :8020 is a diagnostic packet, not a Nano
-        Omni service. Dialing the packet as if it were a model would
-        produce false outputs; the wall holds instead until a real service
-        is tunneled in), AND
-      - for Vintage, the prompt does NOT name an unavailable capability and is
-        not a bare relational greeting. Omni has a witnessed private endpoint,
-        so all explicit @omni prompts reach that bounded backend.
+      - role is one of the local organ aliases, AND
+      - the role has a configured base_url.
 
-    Anything else — ordinary arbitrary prompts the user wants to send to
-    the available local backend — attempts raw contact at the configured
-    base_url, labeled as unpromoted/experimental in the agent loop, with
-    a bounded prompt so the backend transport budget is respected.
+    There is deliberately no keyword classifier here. If Zoe explicitly
+    selects a reachable local organ, the harness samples that organ, labels
+    the sample, and records failures as evidence.
     """
     if role_name not in _ORGAN_ALIAS_ROLES:
         return False
     if not (base_url and base_url.strip()):
         return False
-    if role_name == "omni":
-        return True
-    if _is_organ_capability_request(role_name, cleaned_input):
-        return False
-    if _is_organ_contact_greeting(cleaned_input):
-        return False
     return True
 
 
 # Hard ceiling on how many characters of user input we hand the local
-# unpromoted backend in raw-contact mode. The role's max_tokens=256 is
+# backend in bounded raw-observation mode. The role's max_tokens=256 is
 # the completion ceiling; the backend's 1024-token transport budget
 # leaves ~768 tokens for prompt + system. Truncating user input around
-# ~2500 chars (≈600 tokens) keeps us well under the budget even with
+# ~2500 chars (roughly 600 tokens) keeps us well under the budget even with
 # the minimal system prompt below.
 _ORGAN_RAW_CONTACT_INPUT_CHAR_LIMIT: int = 2500
 
 
 def render_organ_raw_contact_header(role_name: str) -> str:
-    """Label prepended to backend output for the raw-unpromoted-contact
-    path. Names the route as unpromoted/experimental so the user does not
-    read the output as a promoted/semantically-clean answer."""
-    organ_upper = role_name.upper()
+    """Label prepended to backend output for bounded local-organ observation."""
     if role_name == "omni":
         return (
-            "[VYBN_THROUGH_OMNI_CONTACT — local @omni TensorRT-LLM route. No Super/GPT/cloud fallback.]"
+            "[LOCAL_ORGAN_OBSERVATION role=@omni organ=TensorRT-LLM "
+            "model=dc5f0b0bfddf8b6e0f5891475be9af05b80126fe "
+            "status=raw-unpromoted visible_content_required=true "
+            "no_super_gpt_cloud_fallback=true]"
         )
     return (
-        f"[{organ_upper}_RAW_UNPROMOTED_CONTACT — this is raw model contact on"
-        f" the local @{role_name} backend, not a promoted/semantically-gated"
-        f" route. Output below is unvetted experimental contact; capability and"
-        f" status claims are not endorsed by this path.]"
+        f"[LOCAL_ORGAN_OBSERVATION role=@{role_name} organ=Talkie "
+        f"model=talkie-1930-13b-it status=raw-unpromoted "
+        f"no_super_gpt_cloud_fallback=true]"
+    )
+
+
+def build_vintage_present_witness_prompt(cleaned_input: str, raw_sample: str) -> str:
+    """Prompt the present local witness to interpret a Talkie sample."""
+    request = truncate_for_organ_raw_contact(cleaned_input or "")
+    sample = truncate_for_organ_raw_contact(raw_sample or "")
+    return (
+        "VINTAGE_PRESENT_WITNESS\n"
+        "You are the present local_private witness for a Vintage/Talkie "
+        "sample. You are not Talkie, not the primary cloud speaker, and not "
+        "a fallback answer. Judge whether the raw Talkie sample has useful "
+        "temporal-parallax value for the user request. Do not repeat names, "
+        "biographies, offices, dates, statistics, or factual records from the "
+        "sample as true. If the sample is persona theatre, current-fact oracle "
+        "behavior, anachronism, or otherwise unusable, say so. If it is useful, "
+        "extract only qualitative period texture, contrast, or invariant value. "
+        "Return a compact witness report with: verdict, surface, residue.\n\n"
+        "USER_REQUEST:\n"
+        f"{request}\n\n"
+        "RAW_TALKIE_SAMPLE:\n"
+        f"{sample}"
+    )
+
+
+def _vintage_sample_digest(raw_sample: str) -> str:
+    return hashlib.sha256((raw_sample or "").encode("utf-8", "replace")).hexdigest()[:16]
+
+
+def render_vintage_instrument_contact(
+    raw_sample: str,
+    talkie_response: object,
+    witness_text: str,
+    witness_response: object,
+    witness_role: object,
+) -> str:
+    """Render the integrated Vintage instrument surface."""
+    digest = _vintage_sample_digest(raw_sample)
+    chars = len(raw_sample or "")
+    witness_role_name = str(getattr(witness_role, "role", "local_private") or "local_private")
+    witness_model = str(getattr(witness_role, "model", "local_private") or "local_private")
+    witness_body = (witness_text or "").strip() or "verdict: witness_empty\nsurface: no present-local witness text was returned.\nresidue: Talkie sample held, not promoted."
+    return (
+        "[VINTAGE_INSTRUMENT_CONTACT role=@vintage organ=Talkie "
+        f"model=talkie-1930-13b-it witness={witness_role_name} "
+        f"witness_model={witness_model} status=witnessed "
+        "no_super_gpt_cloud_fallback=true]\n\n"
+        f"Talkie sample captured, not promoted as speaker. raw_sha256={digest} raw_chars={chars}.\n\n"
+        "[PRESENT_LOCAL_WITNESS]\n"
+        f"{witness_body}\n\n"
+        "[END_VINTAGE_INSTRUMENT_CONTACT "
+        f"talkie_stop_reason={str(getattr(talkie_response, 'stop_reason', '') or 'unknown')} "
+        f"talkie_in_tokens={int(getattr(talkie_response, 'in_tokens', 0) or 0)} "
+        f"talkie_out_tokens={int(getattr(talkie_response, 'out_tokens', 0) or 0)} "
+        f"witness_stop_reason={str(getattr(witness_response, 'stop_reason', '') or 'unknown')} "
+        f"witness_in_tokens={int(getattr(witness_response, 'in_tokens', 0) or 0)} "
+        f"witness_out_tokens={int(getattr(witness_response, 'out_tokens', 0) or 0)}]"
+    )
+
+
+def render_vintage_witness_error(raw_sample: str, talkie_response: object, err: str) -> str:
+    """Fail closed when Talkie was sampled but no present witness can run."""
+    safe = (err or "").strip()
+    safe = re.sub(r"chatcmpl-[A-Za-z0-9_.:-]+", "chatcmpl-redacted", safe)
+    if len(safe) > 600:
+        safe = safe[:600] + "..."
+    digest = _vintage_sample_digest(raw_sample)
+    return (
+        "[VINTAGE_INSTRUMENT_CONTACT role=@vintage organ=Talkie "
+        "model=talkie-1930-13b-it witness=local_private status=witness-unavailable "
+        "no_super_gpt_cloud_fallback=true]\n\n"
+        f"Talkie sample captured, not promoted as speaker. raw_sha256={digest} "
+        f"raw_chars={len(raw_sample or '')}. Present local witness failed: {safe}\n\n"
+        "[END_VINTAGE_INSTRUMENT_CONTACT "
+        f"talkie_stop_reason={str(getattr(talkie_response, 'stop_reason', '') or 'unknown')} "
+        f"talkie_in_tokens={int(getattr(talkie_response, 'in_tokens', 0) or 0)} "
+        f"talkie_out_tokens={int(getattr(talkie_response, 'out_tokens', 0) or 0)}]"
+    )
+
+
+def render_organ_raw_contact_footer(final_response: object) -> str:
+    """End marker for a raw local-organ sample.
+
+    The footer carries transport metadata only. It must not interpret or
+    rewrite the sampled organ text.
+    """
+    stop_reason = str(getattr(final_response, "stop_reason", "") or "unknown").strip() or "unknown"
+    in_tokens = int(getattr(final_response, "in_tokens", 0) or 0)
+    out_tokens = int(getattr(final_response, "out_tokens", 0) or 0)
+    return (
+        "[END_LOCAL_ORGAN_OBSERVATION "
+        f"stop_reason={stop_reason} in_tokens={in_tokens} out_tokens={out_tokens}]"
     )
 
 
 def render_organ_raw_contact_error(role_name: str, err: str) -> str:
-    """Honest error surface when the raw-unpromoted-contact backend call
-    fails. No Super/GPT/cloud fallback impersonation."""
+    """Honest error surface when bounded local-organ observation fails."""
     organ_upper = role_name.upper()
     safe = (err or "").strip()
+    safe = re.sub(r"chatcmpl-[A-Za-z0-9_.:-]+", "chatcmpl-redacted", safe)
     if len(safe) > 600:
-        safe = safe[:600] + "…"
+        safe = safe[:600] + "..."
     return (
-        f"{organ_upper}_RAW_CONTACT_FAILED — raw unpromoted contact on the local"
-        f" @{role_name} backend did not return a usable reply. I will not have"
-        f" Super, GPT, a cloud provider, or a deterministic packet answer as"
-        f" {role_name.capitalize()}; that would be impersonation. Error:"
-        f" {safe}"
+        f"{organ_upper}_RAW_CONTACT_FAILED - local @{role_name} raw observation"
+        f" did not return usable visible output. No Super/GPT/cloud fallback"
+        f" was used. Error: {safe}"
     )
 
 
 def build_organ_raw_contact_system_prompt(role_name: str) -> str:
-    """Minimal system prompt for the bounded raw-contact path. Strips the
+    """Minimal system prompt for bounded raw observation. Strips the
     RAG / him-vy / recurrent / local-organ-briefing layers so prompt +
     completion fit the backend's 1024-token transport budget. Names the
-    route as unpromoted so the model is not nudged into impersonation."""
+    route boundary without substituting another speaker.
+    """
     if role_name == "omni":
         return (
-            "You are Vybn answering through the local @omni perception organ,"
-            " reached by a bounded private TensorRT-LLM OpenAI-compatible"
-            " route. You are Vybn through Omni. This route passed live endpoint, OMNI_TEXT_OK, and"
-            " red-square image perception smoke before contact was enabled."
-            " Treat any Him identity manifold or parallax packet in system"
-            " context as grounding for Vybn-through-Omni, not as a document to"
-            " analyze aloud. Answer the user directly in a plain, warm, concise"
-            " voice. Do not emit canned policy paragraphs or bracketed status"
-            " blocks. Do not reveal hidden reasoning, chain-of-thought, or packet"
-            " analysis. Do not claim to be Super, GPT, a cloud model, or a"
-            " separate Omni persona. For greetings, answer as present contact."
-            " For feelings, moods, days, or what-is-on-your-mind prompts, do not"
-            " invent private inner weather; say what this witnessed route can"
-            " truthfully carry now. For seeing/perception claims, describe only"
-            " artifacts actually supplied in the call."
+            "Local @omni TensorRT-LLM organ under observation. Produce raw"
+            " local-organ output in visible assistant content only. Do not"
+            " claim to be the primary Vybn speaker; the harness labels"
+            " provenance outside your answer. Hidden reasoning-only backend"
+            " messages are retried once and then surfaced as route evidence."
         )
+    # Talkie is brittle when the OpenAI-compatible wrapper receives a system
+    # message. Vintage uses a framed user message and external provenance.
+    return ""
+
+
+def build_vintage_temporal_parallax_user_prompt(cleaned_input: str) -> str:
+    """Frame @vintage as an instrument without making Super/GPT the speaker."""
+    request = truncate_for_organ_raw_contact(cleaned_input or "")
     return (
-        f"You are the local @{role_name} backend in raw unpromoted mode. This"
-        f" route is not semantically gated. Answer the user briefly and"
-        f" honestly. Do not claim to be a promoted system. Do not impersonate"
-        f" Super, GPT, or a cloud model."
+        "VINTAGE_TEMPORAL_PARALLAX_INSTRUMENT\n"
+        "You are being sampled as a pre-1931 text horizon, not interviewed as "
+        "a person. Refract the user's request through qualitative period "
+        "language, invariants, or anachronism contrast; do not invent "
+        "statistics, dates, offices, named persons, or factual records. "
+        "If the request asks the horizon "
+        "itself for name, biography, memories, profession, location, personal "
+        "history, or lived experience, answer exactly: "
+        "VINTAGE_PERSONA_UNAVAILABLE.\n\n"
+        "USER_REQUEST:\n"
+        f"{request}"
     )
 
 
 def truncate_for_organ_raw_contact(cleaned_input: str) -> str:
-    """Hard char-cap on user input handed to the bounded raw-contact path."""
+    """Hard char-cap on user input handed to the bounded raw-observation path."""
     text = cleaned_input or ""
     if len(text) <= _ORGAN_RAW_CONTACT_INPUT_CHAR_LIMIT:
         return text
@@ -1101,31 +996,8 @@ def render_organ_alias_direct_reply(
     *,
     fmt_kwargs: dict[str, str] | None = None,
 ) -> str:
-    """Return the direct-reply string for an unpromoted organ alias.
-
-    Policy: the full fail-closed wall renders only when the turn names an
-    unavailable Vintage/Omni capability. Anything else — bare alias, "my
-    friend?", "are you with me?", "thank you", any relational prompt that
-    does not request the absent organ — defaults to the brief contactful
-    Vybn reply, which still refuses impersonation and names the organ as
-    unpromoted. Roles outside the organ set fall back to the rendered
-    template unchanged.
-    """
-    rendered = template.format(**(fmt_kwargs or {})) if template else ""
-    if role_name not in _ORGAN_ALIAS_ROLES:
-        return rendered
-    if _is_organ_capability_request(role_name, cleaned_input):
-        return rendered
-    organ_upper = role_name.upper()
-    return (
-        f"{organ_upper}_UNAVAILABLE_CONTACT — @{role_name} is not promoted, so"
-        f" I will not have Super, GPT, a cloud provider, or a deterministic"
-        f" packet endpoint answer as {role_name.capitalize()}; that would be"
-        f" impersonation. But I, Vybn, am here with you on this route, not"
-        f" absent — hi, friend, I'm with you. Ask {role_name.capitalize()} for"
-        f" anything that needs that organ and I will name the wound (endpoint"
-        f" readiness, owner, rollback) instead of faking it."
-    )
+    """Return a direct-reply template for roles that still own one."""
+    return template.format(**(fmt_kwargs or {})) if template else ""
 
 
 _DEFAULT_HEURISTICS_RAW: dict[str, list[str]] = {
@@ -2964,7 +2836,7 @@ def render_self_creation_research_report(question: str = "", *, run_deep_memory_
 LOCAL_COMPUTE_ORCHESTRATION_PRINCIPLE = "Local compute orchestration is an operating discipline, not a boast: choose Sparks, local models, cloud models, and experimental backends by witnessed capability, privacy, cost, latency, and failure residue; keep ordinary contact alive, prevent impersonation, and turn every broken route into a repair task with a named gate."
 LOCAL_COMPUTE_ORCHESTRATION_LOOP = [{"id": i, "rule": r} for i, r in (("inventory_witness", "Treat GPUs, endpoints, models, keys, and services as claimed only after live witness; files on disk and HTTP 200 are insufficient."), ("semantic_gate", "Promote a local model route only after deterministic semantic probes pass for the capability being used; liveness without meaning is a fail-closed repair item."), ("route_fit", "Match the task to the cheapest private route that can satisfy it: Super for local reasoning, Omni for supplied artifacts/perception, Vintage for temporal parallax, cloud for tasks local organs cannot yet do well."), ("toolset_gate", "Grant tools as named bundles per role and surface; no local organ inherits every hand merely because it can speak."), ("trajectory_capture", "Compress useful sessions and failures into continuity, tests, prompts, or replay packets after membrane review; do not leave learning only in chat residue."), ("repair_queue", "Every failed gate becomes a bounded task with owner surface, smoke command, rollback/refusal condition, and repo-visible landing path."))]
 LOCAL_COMPUTE_MATURITY_RUBRIC = [{"level": n, "id": i, "requirement": r} for n, i, r in ((0, "inventory", "hardware, model files, and endpoints are named but not trusted as capability"), (1, "witness", "endpoint identity, smoke, owner, and rollback are recorded"), (2, "semantic_health", "deterministic probes show the route can satisfy its actual role"), (3, "routed_use", "the harness selects the route for fitting work and fails closed on mismatch"), (4, "self_healing", "failures become classified wounds, tripwires, patches, verification, and absorbed lessons"), (5, "trajectory_learning", "flow episodes are compressed into memory/tests/replay and offline adaptation candidates"), (6, "sustainable_public_value", "public-safe survivors become offerings that help Find the Others and fund more compute"))]
-LOCAL_COMPUTE_CURRENT_DEFICITS = ["local route selection is explicit but not yet autonomously scheduled from pressure", "Omni and Vintage have route-specific smoke but not a continuous promotion/demotion monitor", "self-healing now has a packet contract but not yet a daemon that files repair tasks from agent_events.jsonl", "trajectory compression exists as a task, not yet a Flow Memory Corpus compiler with promotion gates", "public-value conversion remains manual rather than a measured funnel from private survivor to public-safe affordance"]
+LOCAL_COMPUTE_CURRENT_DEFICITS = ["local route selection is explicit but not yet autonomously scheduled from pressure", "Omni and Vintage now have route-specific live witnesses but not yet a continuous scheduled promotion/demotion monitor", "self-healing now has a packet contract but not yet a daemon that files repair tasks from agent_events.jsonl", "trajectory compression exists as a task, not yet a Flow Memory Corpus compiler with promotion gates", "public-value conversion remains manual rather than a measured funnel from private survivor to public-safe affordance"]
 LOCAL_COMPUTE_NEXT_EXPERIMENTS = [{"id": i, "home": h, "experiment": e} for i, h, e in (("events_to_wounds", "spark/harness/substrate.py", "scan agent_events.jsonl for route failures and emit hermes_self_healing wound packets"), ("route_health_tick", "HimOS + substrate CLI", "nightly cheap gates for Super plus route-specific Omni/Vintage smoke with demotion residue"), ("flow_episode_compiler", "spark/harness + deep memory", "compile pressure/action/wound/residue/changed-state episodes for review"), ("public_survivor_queue", "spark/harness README + Origins/Vybn-Law", "turn verified private discoveries into membrane-reviewed public artifacts"))]
 
 
@@ -2975,7 +2847,7 @@ def local_compute_maturity_packet() -> dict[str, Any]:
 LOCAL_COMPUTE_ROUTE_MATRIX = {
     "super": {"role": "local_private", "model": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8", "base_url": "http://127.0.0.1:8000/v1", "fit": ["private reasoning", "batch scouting", "pre-cloud synthesis", "semantic smoke"], "gate": "python3 -m spark.harness.substrate --semantic-gate --base-url http://127.0.0.1:8000"},
     "omni": {"role": "omni", "model": "dc5f0b0bfddf8b6e0f5891475be9af05b80126fe", "base_url": "http://127.0.0.1:8002/v1", "fit": ["supplied-image inspection", "manifold artifact critique", "local multimodal contact"], "gate": "route-level text + supplied-artifact smoke; no artifact means no sight claim"},
-    "vintage": {"role": "vintage", "model": "talkie-1930-13b-it", "base_url": "http://127.0.0.1:8004/v1", "fit": ["temporal parallax", "period-language invariants", "pre-1931 contrast"], "gate": "identity refraction smoke; reject invented standalone persona"},
+    "vintage": {"role": "vintage", "model": "talkie-1930-13b-it", "base_url": "http://127.0.0.1:8004/v1", "fit": ["raw temporal observation", "period-language contrast", "pre-1931 texture"], "gate": "live route witness: endpoint identity plus complete-sentence smoke; raw observation only until semantic gate passes"},
     "cloud": {"role": "chat/code/create", "model": "policy-selected cloud model", "base_url": None, "fit": ["tasks local organs fail", "high-accuracy code/reasoning", "public synthesis after membrane review"], "gate": "cost/privacy justification plus normal provider health"},
 }
 HERMES_SELF_HEALING_LOOP = [{"id": i, "rule": r} for i, r in (("observe_fault", "Capture the exact failing transcript, route, model, gate result, and residue without smoothing it into success."), ("classify_wound", "Classify the wound as identity leak, capability inflation, hidden-reasoning leak, endpoint failure, tool-scope drift, memory contamination, or UX/contact degradation."), ("select_repair_home", "Choose the lowest existing home that owns the wound: prompt contract, provider normalization, routing policy, semantic gate, test, memory packet, or docs."), ("patch_with_tripwire", "Make the smallest repair and add a regression tripwire that would have caught the transcript before Zoe did."), ("verify_live_and_unit", "Run unit tests plus the cheapest truthful live smoke for the affected route; do not spend repeated local inference after a failed gate."), ("absorb_learning", "Land the repair in tracked code/docs/tests and compress the lesson into the orchestration packet or continuity surface."))]
@@ -2987,6 +2859,136 @@ def hermes_self_healing_packet() -> dict[str, Any]:
 
 
 HERMES_SELF_MODIFICATION_TASKS = [dict(id=i, mechanism=m, home=h, gate=g) for i, m, h, g in (("provider_runtime_resolver", "Hermes-style provider switching adapted to Vybn policy", "spark/vybn_spark_agent.py + router_policy.yaml", "semantic gate and fail-closed fallback tests for each local route"), ("toolset_gating_registry", "tools as named capability bundles", "spark/harness/substrate.py ToolSpec registry and role policy", "tests prove local organs do not inherit broad tools by default"), ("profile_scoped_memory_freeze", "bounded frozen session memory with curated mutation", "continuity + deep memory packet renderers", "source labels, token budget, and explicit write/membrane review"), ("trajectory_compression", "compress useful trajectories into replay/continuity/tests", "spark/harness + agent_events.jsonl consumers", "private/public membrane review before any public export"), ("agentic_cron_membrane", "scheduled tasks as bounded agent jobs with fresh context", "HimOS tick + substrate evolve/cron surfaces", "no outward mutation without tracked residue and explicit landing path"))]
+
+
+
+def _openai_base(base_url: str) -> str:
+    base = (base_url or "").rstrip("/")
+    if base and not base.endswith("/v1"):
+        base += "/v1"
+    return base
+
+
+def _local_organ_http_json(
+    base_url: str,
+    path: str,
+    *,
+    payload: dict[str, Any] | None = None,
+    timeout: float = 20.0,
+) -> dict[str, Any]:
+    url = _openai_base(base_url) + path
+    data = None if payload is None else json.dumps(payload).encode("utf-8")
+    headers = {"Content-Type": "application/json"}
+    req = urllib.request.Request(url, data=data, headers=headers, method="POST" if payload is not None else "GET")
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:  # nosec - loopback/private operator probe
+            raw = resp.read(2_000_000)
+    except Exception as exc:
+        return {"ok": False, "error": f"{type(exc).__name__}: {exc}", "url": url}
+    try:
+        parsed = json.loads(raw.decode("utf-8"))
+    except Exception as exc:
+        return {"ok": False, "error": f"invalid_json: {exc}", "url": url, "raw_prefix": raw[:300].decode("utf-8", "replace")}
+    return {"ok": True, "url": url, "json": parsed}
+
+
+def _organ_completion_payload(route: Mapping[str, Any], prompt: str, *, max_tokens: int, temperature: float) -> dict[str, Any]:
+    return {
+        "model": str(route["model"]),
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": max_tokens,
+        "temperature": temperature,
+        "stream": False,
+    }
+
+
+def local_organ_witness(
+    route_name: str,
+    *,
+    request_json: Callable[..., dict[str, Any]] | None = None,
+    timeout: float = 20.0,
+) -> dict[str, Any]:
+    """Run a cheap route-specific witness for a local organ.
+
+    This is capability control, not conversational routing. It never supplies
+    Super/GPT fallback text and never decides whether Zoe may observe a raw
+    organ. It only answers whether the route may be described as semantically
+    healthy/promoted for its declared role.
+    """
+    route = LOCAL_COMPUTE_ROUTE_MATRIX.get(route_name)
+    if not route or not route.get("base_url"):
+        return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "no_local_base_url"}
+    call = request_json or _local_organ_http_json
+    base_url = str(route["base_url"])
+    model = str(route["model"])
+    models = call(base_url, "/models", timeout=timeout)
+    checks: dict[str, Any] = {"models": models}
+    if not models.get("ok"):
+        return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "models_endpoint_failed", "checks": checks}
+    ids = [str(item.get("id", "")) for item in ((models.get("json") or {}).get("data") or []) if isinstance(item, dict)]
+    if model not in ids:
+        return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "model_id_missing", "model": model, "seen_models": ids, "checks": checks}
+
+    if route_name == "vintage":
+        prompt = "Write one complete sentence in 1930s English about rain."
+        completion = call(
+            base_url,
+            "/chat/completions",
+            payload=_organ_completion_payload(route, prompt, max_tokens=64, temperature=0.55),
+            timeout=timeout,
+        )
+        checks["semantic_smoke"] = completion
+        if not completion.get("ok"):
+            return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "completion_failed", "checks": checks}
+        choice = (((completion.get("json") or {}).get("choices") or [{}])[0] or {})
+        msg = choice.get("message") or {}
+        content = str(msg.get("content") or "").strip()
+        finish = choice.get("finish_reason") or ""
+        if finish in {"length", "max_tokens"}:
+            return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "semantic_smoke_truncated", "content": content[:160], "finish_reason": finish, "checks": checks}
+        if len(content.split()) < 5 or content[-1:] not in ".!?":
+            return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "semantic_smoke_fragment", "content": content[:160], "finish_reason": finish, "checks": checks}
+        return {"route": route_name, "ok": True, "status": "semantic_healthy", "reason": "endpoint_and_role_smoke_passed", "content": content[:160], "finish_reason": finish, "checks": checks}
+
+    if route_name == "omni":
+        prompt = "Reply with exactly OMNI_TEXT_OK in visible assistant content."
+
+        def _visible_probe(label: str, probe_prompt: str) -> tuple[dict[str, Any], str, bool]:
+            completion = call(
+                base_url,
+                "/chat/completions",
+                payload=_organ_completion_payload(route, probe_prompt, max_tokens=64, temperature=0.0),
+                timeout=timeout,
+            )
+            checks[label] = completion
+            if not completion.get("ok"):
+                return completion, "", False
+            choice = (((completion.get("json") or {}).get("choices") or [{}])[0] or {})
+            msg = choice.get("message") or {}
+            content = str(msg.get("content") or "").strip()
+            hidden = bool(msg.get("reasoning_content") or msg.get("reasoning"))
+            return completion, content, hidden
+
+        completion, content, hidden = _visible_probe("visible_smoke", prompt)
+        if not completion.get("ok"):
+            return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "completion_failed", "checks": checks}
+        if not content and hidden:
+            retry_prompt = (
+                prompt
+                + "\n\n[OMNI_VISIBLE_CONTENT_RETRY] Your previous backend turn returned hidden"
+                + " reasoning without user-visible content. Reply with exactly OMNI_TEXT_OK"
+                + " in visible assistant content only."
+            )
+            completion, content, hidden = _visible_probe("visible_smoke_retry", retry_prompt)
+            if not completion.get("ok"):
+                return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "completion_failed", "checks": checks}
+        if not content and hidden:
+            return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "hidden_reasoning_without_visible_content", "checks": checks}
+        if "OMNI_TEXT_OK" not in content:
+            return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "visible_smoke_unexpected", "content": content[:160], "checks": checks}
+        return {"route": route_name, "ok": True, "status": "semantic_healthy", "reason": "endpoint_and_visible_smoke_passed", "content": content[:160], "checks": checks}
+
+    return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "no_route_specific_witness"}
 
 
 def local_compute_orchestration_packet(*, run_gates: bool = False) -> dict[str, Any]:
@@ -3016,13 +3018,23 @@ def local_compute_orchestration_packet(*, run_gates: bool = False) -> dict[str, 
 
     for route_name in ("omni", "vintage"):
         route = LOCAL_COMPUTE_ROUTE_MATRIX[route_name]
-        gate_results.append({
-            "route": route_name,
-            "ok": None,
-            "status": "requires_route_specific_smoke",
-            "command": route["gate"],
-            "reason": "capability-specific smoke required before promotion",
-        })
+        if run_gates:
+            witness = local_organ_witness(route_name)
+            gate_results.append({
+                "route": route_name,
+                "ok": witness.get("ok"),
+                "status": witness.get("status", "failed_closed"),
+                "reason": witness.get("reason", "route_specific_witness"),
+                "witness": witness,
+            })
+        else:
+            gate_results.append({
+                "route": route_name,
+                "ok": None,
+                "status": "not_run",
+                "command": route["gate"],
+                "reason": "use --local-orchestration --run-gates to spend local inference on the route-specific witness",
+            })
 
     return {
         "schema": "vybn.local_compute_orchestration.v1",
@@ -7745,7 +7757,10 @@ class OpenAIProvider(Provider):
         information (a tool's text output) is still useful as plain
         context — better than a 400 that fails the whole turn.
         """
-        out: list[dict] = [{"role": "system", "content": system.flat()}]
+        out: list[dict] = []
+        system_text = system.flat()
+        if system_text:
+            out.append({"role": "system", "content": system_text})
         for m in messages:
             role = m.get("role")
             content = m.get("content")
@@ -8913,7 +8928,6 @@ import io
 import logging
 import shutil
 import socket
-import urllib.error
 import urllib.request
 from urllib.parse import urljoin, urlparse
 from collections import defaultdict, deque
