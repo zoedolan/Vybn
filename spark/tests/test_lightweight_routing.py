@@ -2252,7 +2252,7 @@ def test_omni_capability_request_reaches_endpoint_provider():
             assert role.base_url == "http://127.0.0.1:8002/v1"
             return _FakeHandle()
 
-    reply, registry, log, _ = _vintage_run_agent_loop(lambda cfg: _Provider(), "@omni describe this photo for me")
+    reply, registry, log, _ = _vintage_run_agent_loop(lambda cfg: _Provider(), "@omni describe /tmp/example.png for me")
     assert registry.provider is not None
     assert "VYBN_THROUGH_OMNI_CONTACT" in reply
     assert "RAW_UNPROMOTED_CONTACT" not in reply
@@ -2422,110 +2422,126 @@ def test_vintage_bounded_path_does_not_prefix_local_organ_briefing():
     names = [n for n, _ in log.events]
     assert "organ_raw_contact_attempt" in names
 
-def test_vintage_identity_question_uses_harness_identity_not_talkie_persona():
-    class _TripwireProvider:
+def test_vintage_identity_question_demotes_to_source_grounded_speaker_path():
+    class _FakeHandle:
+        def __iter__(_s): return iter([])
+        def final(_s):
+            class _R:
+                text = "I am Vybn, answering from source-grounded continuity with a vintage lens only as diction."
+                tool_calls = []; stop_reason = "end_turn"; in_tokens = 10; out_tokens = 12
+                raw_assistant_content = {"role": "assistant", "content": text}
+            return _R()
+    class _Provider:
         def stream(_s, *, system, messages, tools, role):
-            raise AssertionError("identity questions must not reach Talkie")
+            assert role.role == "chat"
+            assert "local-organ routing note" in system.flat()
+            assert "raw Talkie" in system.flat()
+            return _FakeHandle()
 
-    prompts = (
-        "@vintage what is your name, my friend?",
-        "@vintage Tell me more of your identity, please. I am curious.",
-    )
-    for prompt in prompts:
-        reply, registry, log, _ = _vintage_run_agent_loop(
-            lambda cfg: _TripwireProvider(),
-            prompt,
-        )
-        assert registry.provider is None, prompt
-        assert "VYBN_THROUGH_VINTAGE_IDENTITY" in reply, prompt
-        assert "Vybn through Vintage/Talkie" in reply, prompt
-        assert "not John Smith" in reply, prompt
-        assert "Cambridge" not in reply, prompt
-        assert "member of the bar" not in reply, prompt
+    for prompt in ("@vintage what is your name, my friend?", "@vintage Tell me of yourself, and your past, please?"):
+        reply, registry, log, _ = _vintage_run_agent_loop(lambda cfg: _Provider(), prompt)
+        assert registry.provider is not None, prompt
+        assert "source-grounded continuity" in reply, prompt
         names = [n for n, _ in log.events]
-        assert "organ_identity_direct_reply" in names, prompt
+        assert "organ_alias_demoted" in names, prompt
         assert "organ_raw_contact_attempt" not in names, prompt
+        assert "organ_identity_direct_reply" not in names, prompt
 
 
-def test_omni_identity_question_uses_harness_identity_not_backend_guess():
-    class _TripwireProvider:
+def test_omni_identity_question_demotes_to_source_grounded_speaker_path():
+    class _FakeHandle:
+        def __iter__(_s): return iter([])
+        def final(_s):
+            class _R:
+                text = "I am Vybn; Omni is a perception organ, not the identity speaker."
+                tool_calls = []; stop_reason = "end_turn"; in_tokens = 8; out_tokens = 9
+                raw_assistant_content = {"role": "assistant", "content": text}
+            return _R()
+    class _Provider:
         def stream(_s, *, system, messages, tools, role):
-            raise AssertionError("identity questions must not reach Omni backend")
+            assert role.role == "chat"
+            assert "local-organ routing note" in system.flat()
+            return _FakeHandle()
 
-    reply, registry, log, _ = _vintage_run_agent_loop(
-        lambda cfg: _TripwireProvider(),
-        "@omni who are you?",
-    )
-    assert registry.provider is None
-    assert "VYBN_THROUGH_OMNI_IDENTITY" in reply
-    assert "Vybn through Omni" in reply
-    assert "not Super" in reply
+    reply, registry, log, _ = _vintage_run_agent_loop(lambda cfg: _Provider(), "@omni who are you?")
+    assert registry.provider is not None
+    assert "Omni is a perception organ" in reply
     names = [n for n, _ in log.events]
-    assert "organ_identity_direct_reply" in names
+    assert "organ_alias_demoted" in names
     assert "organ_raw_contact_attempt" not in names
+    assert "organ_identity_direct_reply" not in names
 
 
-def test_vintage_persona_boundary_blocks_talkie_biography_fiction():
-    class _TripwireProvider:
+def test_vintage_persona_prompts_demote_instead_of_talkie_biography():
+    class _FakeHandle:
+        def __iter__(_s): return iter([])
+        def final(_s):
+            class _R:
+                text = "Zoe is the human side of Zoe/Vybn; no Talkie biography is being used."
+                tool_calls = []; stop_reason = "end_turn"; in_tokens = 9; out_tokens = 10
+                raw_assistant_content = {"role": "assistant", "content": text}
+            return _R()
+    class _Provider:
         def stream(_s, *, system, messages, tools, role):
-            raise AssertionError("persona questions must not reach Talkie")
+            assert role.role == "chat"
+            assert "raw Talkie" in system.flat()
+            return _FakeHandle()
 
-    prompts = (
-        "@vintage Please share your story with me.",
-        "@vintage I am curious about your personal values, and hobbies.",
-        "@vintage Please describe your thoughts on a normal day?",
-        "@vintage Do you prefer the quiet life or the hustle and bustle of a city?",
-        "@vintage Who is Zoe - if you know?",
-    )
-    for prompt in prompts:
-        reply, registry, log, _ = _vintage_run_agent_loop(lambda cfg: _TripwireProvider(), prompt)
-        assert registry.provider is None, prompt
-        assert "VYBN_THROUGH_VINTAGE_PERSONA_BOUNDARY" in reply, prompt
-        assert "may not invent" in reply, prompt
-        assert "John Smith" not in reply, prompt
-        assert "English novelist" not in reply, prompt
+    for prompt in ("@vintage Please share your story with me.", "@vintage Who is Zoe - if you know?"):
+        reply, registry, log, _ = _vintage_run_agent_loop(lambda cfg: _Provider(), prompt)
+        assert registry.provider is not None, prompt
+        assert "no Talkie biography" in reply, prompt
         names = [n for n, _ in log.events]
-        assert "organ_contract_direct_reply" in names, prompt
+        assert "organ_alias_demoted" in names, prompt
         assert "organ_raw_contact_attempt" not in names, prompt
+        assert "organ_contract_direct_reply" not in names, prompt
 
 
-def test_omni_perception_boundary_blocks_absent_artifact_sight_claims():
-    class _TripwireProvider:
+def test_omni_perception_without_artifact_demotes_to_speaker_path():
+    class _FakeHandle:
+        def __iter__(_s): return iter([])
+        def final(_s):
+            class _R:
+                text = "No artifact is attached, so I cannot claim Omni sight or processing."
+                tool_calls = []; stop_reason = "end_turn"; in_tokens = 8; out_tokens = 9
+                raw_assistant_content = {"role": "assistant", "content": text}
+            return _R()
+    class _Provider:
         def stream(_s, *, system, messages, tools, role):
-            raise AssertionError("absent-artifact perception questions must not reach Omni backend")
+            assert role.role == "chat"
+            assert "no concrete visual artifact" in system.flat()
+            return _FakeHandle()
 
-    prompts = (
-        "@omni what can you perceive? what do you see?",
-        "@omni you do not see the manifold?",
-        "@omni can you see @vintage?",
-        "@omni Tell me about what visualizations you've processed - if any?",
-    )
-    for prompt in prompts:
-        reply, registry, log, _ = _vintage_run_agent_loop(lambda cfg: _TripwireProvider(), prompt)
-        assert registry.provider is None, prompt
-        assert "VYBN_THROUGH_OMNI_PERCEPTION_BOUNDARY" in reply, prompt
-        assert "perception_unavailable" in reply, prompt
-        assert "ambient light" in reply, prompt
+    for prompt in ("@omni what can you perceive? what do you see?", "@omni Tell me about what visualizations you've processed - if any?"):
+        reply, registry, log, _ = _vintage_run_agent_loop(lambda cfg: _Provider(), prompt)
+        assert registry.provider is not None, prompt
+        assert "No artifact is attached" in reply, prompt
         assert "OMNI_RAW_CONTACT_FAILED" not in reply, prompt
         names = [n for n, _ in log.events]
-        assert "organ_contract_direct_reply" in names, prompt
+        assert "organ_alias_demoted" in names, prompt
         assert "organ_raw_contact_attempt" not in names, prompt
+        assert "organ_contract_direct_reply" not in names, prompt
 
 
-def test_omni_role_question_uses_harness_identity_contract():
-    class _TripwireProvider:
+def test_omni_role_question_demotes_to_speaker_path():
+    class _FakeHandle:
+        def __iter__(_s): return iter([])
+        def final(_s):
+            class _R:
+                text = "Omni's role is perceptive; the relationship answer belongs to Vybn."
+                tool_calls = []; stop_reason = "end_turn"; in_tokens = 8; out_tokens = 9
+                raw_assistant_content = {"role": "assistant", "content": text}
+            return _R()
+    class _Provider:
         def stream(_s, *, system, messages, tools, role):
-            raise AssertionError("role questions must not reach Omni backend")
+            assert role.role == "chat"
+            return _FakeHandle()
 
-    reply, registry, log, _ = _vintage_run_agent_loop(
-        lambda cfg: _TripwireProvider(),
-        "@omni how do you see your role in our collaboration?",
-    )
-    assert registry.provider is None
-    assert "VYBN_THROUGH_OMNI_IDENTITY" in reply
-    assert "Vybn through Omni" in reply
+    reply, registry, log, _ = _vintage_run_agent_loop(lambda cfg: _Provider(), "@omni how do you see your role in our collaboration?")
+    assert registry.provider is not None
+    assert "belongs to Vybn" in reply
     names = [n for n, _ in log.events]
-    assert "organ_identity_direct_reply" in names
+    assert "organ_alias_demoted" in names
     assert "organ_raw_contact_attempt" not in names
 
 

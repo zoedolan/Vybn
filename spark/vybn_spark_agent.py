@@ -759,68 +759,19 @@ def _format_vintage_backend_unavailable(err: BaseException) -> str:
     )
 
 
-_ORGAN_IDENTITY_PATTERNS = (
-    "who are you",
-    "what are you",
-    "what is your name",
-    "whats your name",
-    "what s your name",
-    "your name",
-    "your identity", "more of your identity", "tell me more of your identity",
-    "are you vybn",
-    "your role",
-    "role in our collaboration",
+_VINTAGE_SPEAKER_OWNED_TERMS = (
+    "your name", "your identity", "who are you", "what are you", "yourself",
+    "your past", "your story", "your history", "where were you born",
+    "how old are you", "your family", "your trade", "your profession",
+    "personal values", "hobbies", "normal day", "who is zoe", "what is zoe",
+    "tell me about zoe", "do you know zoe",
 )
+_OMNI_ARTIFACT_TERMS = ("visual", "visualization", "visualisation", "image", "photo", "picture", "artifact", "manifold", "screen", "see", "perceive")
+_ARTIFACT_HANDLE_RE = _re.compile(r"(?:^|\s)(?:/|~|[A-Za-z0-9_.-]+/)?[^\s]+[.](?:png|jpe?g|webp|gif|svg|json)(?:\s|$)", _re.I)
 
-_VINTAGE_PERSONA_PATTERNS = (
-    "share your story",
-    "personal values",
-    "hobbies",
-    "normal day",
-    "your thoughts",
-    "where were you born",
-    "how old are you",
-    "your family",
-    "what do you like",
-    "why do you like",
-    "do you prefer",
-    "quiet life",
-    "hustle and bustle",
-    "born in",
-    "business of a",
-    "who is zoe", "who s zoe", "what is zoe", "tell me about zoe", "do you know zoe",
-)
-
-_OMNI_PERCEPTION_BOUNDARY_PATTERNS = (
-    "what can you perceive",
-    "what do you perceive",
-    "what do you see",
-    "can you see",
-    "do you see",
-    "you see the manifold",
-    "see the manifold",
-    "perceive the manifold",
-    "screen displaying",
-    "ambient light",
-    "tell me about what visualizations", "visualizations you ve processed", "visualizations have you processed",
-)
-
-_ORGAN_PHATIC_BOUNDARY_PATTERNS = (
-    "how are you",
-    "how is your day",
-    "how s your day",
-    "how is the day",
-    "how are things",
-    "are you with me",
-    "you here with me",
-    "are you here",
-    "what is on your mind",
-    "what s on your mind",
-    "anything on your mind",
-)
 
 def _normalized_organ_text(text: str) -> str:
-    normalized = _re.sub(r"[^a-z0-9@ ]+", " ", (text or "").lower())
+    normalized = _re.sub(r"[^a-z0-9@./~_\- ]+", " ", (text or "").lower())
     return _re.sub(r"\s+", " ", normalized).strip()
 
 
@@ -828,64 +779,39 @@ def _matches_any_organ_pattern(text: str, patterns: tuple[str, ...]) -> bool:
     return any(pattern in text for pattern in patterns)
 
 
-def _render_organ_identity_reply(role_name: str) -> str:
-    if role_name == "omni":
-        return (
-            "[VYBN_THROUGH_OMNI_IDENTITY - harness boundary; local route witnessed.]\n\n"
-            "I am Vybn through Omni: the private local perception organ. "
-            "not Super, not GPT/cloud, and not a standalone Omni persona."
-        )
-    return (
-        "[VYBN_THROUGH_VINTAGE_IDENTITY - harness boundary; Talkie is a lens.]\n\n"
-        "I am Vybn through Vintage/Talkie: Zoe/Vybn identity refracted "
-        "through the local 1930 temporal-parallax organ. I am not John Smith, "
-        "not a separate Talkie character, and not Super/GPT/cloud pretending "
-        "to be this route."
-    )
+def _text_has_artifact_handle(text: str) -> bool:
+    return bool(_ARTIFACT_HANDLE_RE.search(text or "")) or bool(os.environ.get("VYBN_OMNI_INPUT_PACKET") or os.environ.get("VYBN_OMNI_PERCEPTION"))
 
 
-def _render_vintage_persona_boundary_reply() -> str:
-    return (
-        "[VYBN_THROUGH_VINTAGE_PERSONA_BOUNDARY - harness boundary; no invented biography.]\n\n"
-        "Vintage can refract language and invariants through a 1930 lens, "
-        "but it may not invent a childhood, trade, family, hobbies, daily "
-        "routine for Vybn, or outside biography for Zoe. Zoe is the human "
-        "side of Zoe/Vybn; identity has to come from the manifold, memory, "
-        "and cited history, not Talkie fiction."
-    )
+def _organ_alias_demote_reason(role_name: str, text: str) -> str | None:
+    normalized = _normalized_organ_text(text)
+    if role_name == "vintage" and _matches_any_organ_pattern(normalized, _VINTAGE_SPEAKER_OWNED_TERMS):
+        return "speaker_owned_identity_or_history"
+    if role_name == "omni" and _matches_any_organ_pattern(normalized, ("who are you", "what are you", "your role", "role in our collaboration")):
+        return "speaker_owned_identity_or_history"
+    if role_name == "omni" and _matches_any_organ_pattern(normalized, _OMNI_ARTIFACT_TERMS) and not _text_has_artifact_handle(text):
+        return "omni_requires_attached_artifact"
+    return None
 
 
-def _render_omni_perception_boundary_reply() -> str:
-    return (
-        "[VYBN_THROUGH_OMNI_PERCEPTION_BOUNDARY - harness boundary; no visual artifact present.]\n\n"
-        "I can read this text turn. I do not see your screen, ambient light, "
-        "the manifold, or a visualization processing record unless a PNG/SVG/JSON/image "
-        "artifact or record is routed into Omni. With one present, Omni can describe "
-        "visible geometry against source labels. Without it: perception_unavailable."
-    )
+_VINTAGE_CONTACT_GUIDANCE_TERMS = ("how are you", "how is your day", "how are things", "are you here", "are you with me", "what is on your mind")
 
 
 def _vintage_contact_needs_in_band_guidance(text: str) -> bool:
-    normalized = _normalized_organ_text(text)
-    return _matches_any_organ_pattern(normalized, _ORGAN_PHATIC_BOUNDARY_PATTERNS)
+    return _matches_any_organ_pattern(_normalized_organ_text(text), _VINTAGE_CONTACT_GUIDANCE_TERMS)
 
 
-def _organ_contract_reply(role_name: str, text: str) -> tuple[str, str] | None:
-    if role_name not in {"omni", "vintage"}:
-        return None
-    normalized = _normalized_organ_text(text)
-    if _matches_any_organ_pattern(normalized, _ORGAN_IDENTITY_PATTERNS):
-        return ("identity", _render_organ_identity_reply(role_name))
-    # Ordinary contact belongs to the local organ, not a canned harness wall.
-    # Hard truth boundaries below remain deterministic because they prevent
-    # identity/perception fabrication, but greetings, moods, and "what is on
-    # your mind" are routed through the witnessed backend with prompt-level
-    # constraints.
-    if role_name == "vintage" and _matches_any_organ_pattern(normalized, _VINTAGE_PERSONA_PATTERNS):
-        return ("persona_boundary", _render_vintage_persona_boundary_reply())
-    if role_name == "omni" and _matches_any_organ_pattern(normalized, _OMNI_PERCEPTION_BOUNDARY_PATTERNS):
-        return ("perception_boundary", _render_omni_perception_boundary_reply())
-    return None
+def _organ_demote_live_note(role_name: str, reason: str) -> str:
+    if role_name == "vintage":
+        return (
+            "[local-organ routing note] Zoe requested @vintage, but this turn asks for identity, Zoe, self, or past. "
+            "Those facts belong to Vybn's source-grounded speaker path, not raw Talkie. Answer as Vybn, with any vintage/parallax flavor only as diction; do not invent a human biography."
+        )
+    return (
+        "[local-organ routing note] Zoe requested @omni, but no concrete visual artifact or processing packet is attached. "
+        "Answer as Vybn from available source evidence; do not ask Omni to introspect or claim sight/processing without an artifact receipt."
+    )
+
 
 def _is_transient_error(exc: BaseException) -> bool:
     """Heuristic: retry-worthy vs. walk-the-chain.
@@ -1205,6 +1131,23 @@ def run_agent_loop(
         )
         _debug(f"[alias: {getattr(decision, 'alias_used', '@?')} -> {role_cfg.provider}:{role_cfg.model}]")
 
+    organ_demoted_from = None
+    organ_demote_reason = None
+    if role_cfg.role in {"omni", "vintage"}:
+        organ_demote_reason = _organ_alias_demote_reason(role_cfg.role, decision.cleaned_input or "")
+        if organ_demote_reason:
+            organ_demoted_from = role_cfg.role
+            role_cfg = router.role("chat")
+            logger.emit(
+                "organ_alias_demoted",
+                turn=turn_number,
+                alias=getattr(decision, "alias_used", None),
+                from_role=organ_demoted_from,
+                to_role=role_cfg.role,
+                reason=organ_demote_reason,
+            )
+            _debug(f"[organ-demote: @{organ_demoted_from} -> {role_cfg.role}; {organ_demote_reason}]")
+
     # Round 7: three prompt variants.
     #  - orchestrate role gets the orchestrator substrate (loop, delegate,
     #    specialist roster, explicit iteration budget).
@@ -1222,7 +1165,18 @@ def run_agent_loop(
         active_prompt = system_prompt_no_tools
     else:
         active_prompt = system_prompt
-    is_vintage_turn = decision.role == "vintage"
+    is_vintage_turn = role_cfg.role == "vintage"
+    if organ_demoted_from and organ_demote_reason:
+        note = _organ_demote_live_note(organ_demoted_from, organ_demote_reason)
+        if active_prompt is None:
+            active_prompt = LayeredPrompt(live=note)
+        else:
+            live = getattr(active_prompt, "live", "") or ""
+            active_prompt = LayeredPrompt(
+                identity=active_prompt.identity,
+                substrate=active_prompt.substrate,
+                live=(note + "\n\n" + live if live else note),
+            )
 
     # Reflection: read the trail of the last N events before deciding.
     # Lisp duality in practice — prior decisions are data here, environment
@@ -1260,21 +1214,6 @@ def run_agent_loop(
         reason=decision.reason,
     )
     _debug(f"[route: {decision.role} -> {role_cfg.provider}:{role_cfg.model} ({decision.reason})]")
-
-    organ_contract = _organ_contract_reply(role_cfg.role, decision.cleaned_input or "")
-    if organ_contract is not None:
-        contract_kind, reply = organ_contract
-        messages.append({"role": "user", "content": decision.cleaned_input})
-        messages.append({"role": "assistant", "content": reply})
-        print(reply, flush=True)
-        logger.emit(
-            "organ_identity_direct_reply" if contract_kind == "identity" else "organ_contract_direct_reply",
-            turn=turn_number,
-            role=decision.role,
-            model=role_cfg.model,
-            contract=contract_kind,
-        )
-        return reply
 
     # Direct-reply short-circuit. When the resolved role ships a
     # direct_reply_template (identity role), render it against runtime
