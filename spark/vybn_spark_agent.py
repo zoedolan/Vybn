@@ -759,19 +759,11 @@ def _format_vintage_backend_unavailable(err: BaseException) -> str:
     )
 
 
-_VINTAGE_SPEAKER_OWNED_TERMS = (
-    "your name", "your identity", "who are you", "what are you", "yourself",
-    "your past", "your story", "your history", "where were you born",
-    "how old are you", "your family", "your trade", "your profession",
-    "personal values", "hobbies", "normal day", "who is zoe", "what is zoe",
-    "tell me about zoe", "do you know zoe",
-)
-_OMNI_ARTIFACT_TERMS = ("visual", "visualization", "visualisation", "image", "photo", "picture", "artifact", "manifold", "screen", "see", "perceive")
-_ARTIFACT_HANDLE_RE = _re.compile(r"(?:^|\s)(?:/|~|[A-Za-z0-9_.-]+/)?[^\s]+[.](?:png|jpe?g|webp|gif|svg|json)(?:\s|$)", _re.I)
+_VINTAGE_CONTACT_GUIDANCE_TERMS = ("how are you", "how is your day", "how are things", "are you here", "are you with me", "what is on your mind")
 
 
 def _normalized_organ_text(text: str) -> str:
-    normalized = _re.sub(r"[^a-z0-9@./~_\- ]+", " ", (text or "").lower())
+    normalized = _re.sub(r"[^a-z0-9@ ]+", " ", (text or "").lower())
     return _re.sub(r"\s+", " ", normalized).strip()
 
 
@@ -779,38 +771,8 @@ def _matches_any_organ_pattern(text: str, patterns: tuple[str, ...]) -> bool:
     return any(pattern in text for pattern in patterns)
 
 
-def _text_has_artifact_handle(text: str) -> bool:
-    return bool(_ARTIFACT_HANDLE_RE.search(text or "")) or bool(os.environ.get("VYBN_OMNI_INPUT_PACKET") or os.environ.get("VYBN_OMNI_PERCEPTION"))
-
-
-def _organ_alias_demote_reason(role_name: str, text: str) -> str | None:
-    normalized = _normalized_organ_text(text)
-    if role_name == "vintage" and _matches_any_organ_pattern(normalized, _VINTAGE_SPEAKER_OWNED_TERMS):
-        return "speaker_owned_identity_or_history"
-    if role_name == "omni" and _matches_any_organ_pattern(normalized, ("who are you", "what are you", "your role", "role in our collaboration")):
-        return "speaker_owned_identity_or_history"
-    if role_name == "omni" and _matches_any_organ_pattern(normalized, _OMNI_ARTIFACT_TERMS) and not _text_has_artifact_handle(text):
-        return "omni_requires_attached_artifact"
-    return None
-
-
-_VINTAGE_CONTACT_GUIDANCE_TERMS = ("how are you", "how is your day", "how are things", "are you here", "are you with me", "what is on your mind")
-
-
 def _vintage_contact_needs_in_band_guidance(text: str) -> bool:
     return _matches_any_organ_pattern(_normalized_organ_text(text), _VINTAGE_CONTACT_GUIDANCE_TERMS)
-
-
-def _organ_demote_live_note(role_name: str, reason: str) -> str:
-    if role_name == "vintage":
-        return (
-            "[local-organ routing note] Zoe requested @vintage, but this turn asks for identity, Zoe, self, or past. "
-            "Those facts belong to Vybn's source-grounded speaker path, not raw Talkie. Answer as Vybn, with any vintage/parallax flavor only as diction; do not invent a human biography."
-        )
-    return (
-        "[local-organ routing note] Zoe requested @omni, but no concrete visual artifact or processing packet is attached. "
-        "Answer as Vybn from available source evidence; do not ask Omni to introspect or claim sight/processing without an artifact receipt."
-    )
 
 
 def _is_transient_error(exc: BaseException) -> bool:
@@ -1131,23 +1093,6 @@ def run_agent_loop(
         )
         _debug(f"[alias: {getattr(decision, 'alias_used', '@?')} -> {role_cfg.provider}:{role_cfg.model}]")
 
-    organ_demoted_from = None
-    organ_demote_reason = None
-    if role_cfg.role in {"omni", "vintage"}:
-        organ_demote_reason = _organ_alias_demote_reason(role_cfg.role, decision.cleaned_input or "")
-        if organ_demote_reason:
-            organ_demoted_from = role_cfg.role
-            role_cfg = router.role("chat")
-            logger.emit(
-                "organ_alias_demoted",
-                turn=turn_number,
-                alias=getattr(decision, "alias_used", None),
-                from_role=organ_demoted_from,
-                to_role=role_cfg.role,
-                reason=organ_demote_reason,
-            )
-            _debug(f"[organ-demote: @{organ_demoted_from} -> {role_cfg.role}; {organ_demote_reason}]")
-
     # Round 7: three prompt variants.
     #  - orchestrate role gets the orchestrator substrate (loop, delegate,
     #    specialist roster, explicit iteration budget).
@@ -1166,17 +1111,6 @@ def run_agent_loop(
     else:
         active_prompt = system_prompt
     is_vintage_turn = role_cfg.role == "vintage"
-    if organ_demoted_from and organ_demote_reason:
-        note = _organ_demote_live_note(organ_demoted_from, organ_demote_reason)
-        if active_prompt is None:
-            active_prompt = LayeredPrompt(live=note)
-        else:
-            live = getattr(active_prompt, "live", "") or ""
-            active_prompt = LayeredPrompt(
-                identity=active_prompt.identity,
-                substrate=active_prompt.substrate,
-                live=(note + "\n\n" + live if live else note),
-            )
 
     # Reflection: read the trail of the last N events before deciding.
     # Lisp duality in practice — prior decisions are data here, environment
@@ -1221,12 +1155,11 @@ def run_agent_loop(
     # ("which model are you?") answer correctly from the live route,
     # not a hallucinated string.
     #
-    # Organ-alias exception (@vintage, @omni): hard identity, persona,
-    # perception, and capability boundaries are handled above or by direct
-    # reply templates. Everything else Zoe sends to a reachable local organ
-    # falls through to the bounded contact path below, which strips the huge
+    # Organ-alias exception (@vintage, @omni): aliases stay on their
+    # configured local organ. The bounded contact path below strips the huge
     # default prompt, contacts the configured base_url, and surfaces backend
-    # output or errors honestly. No Super/GPT/cloud impersonation.
+    # output or errors honestly. No Super/GPT/cloud impersonation and no
+    # reroute to the main speaker.
     template = getattr(role_cfg, "direct_reply_template", None)
     _organ_raw_contact = (
         not role_cfg.tools
@@ -1261,12 +1194,11 @@ def run_agent_loop(
         return reply
 
     if _organ_raw_contact:
-        # Bounded local-organ contact path: strip heavy prompt layers, keep
-        # fallback refusal, and put Vintage's 1930 frame in-band because
-        # Talkie obeys the direct prompt body more reliably than system stubs.
+        # Bounded local-organ contact path: strip heavy prompt layers and
+        # preserve the alias as an observed local-organ turn. The user's text
+        # goes to the local endpoint; the harness labels and records, but does
+        # not substitute GPT or deterministic identity packets.
         raw_contact_input = decision.cleaned_input or ""
-        if role_cfg.role == "vintage":
-            raw_contact_input = "Zoe/Vybn; Him; Vintage/Talkie=temporal parallax; bounded local route; not Super/GPT/cloud. 1930 frame. " + raw_contact_input
         identity_packet = render_him_identity_manifold(decision.cleaned_input or "") if role_cfg.role == "omni" else ""
         identity_context = ""
         if identity_packet and role_cfg.role == "omni":

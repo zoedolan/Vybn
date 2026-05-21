@@ -239,7 +239,7 @@ class TestExplicitOrganAliasesRouteToExperimentalEndpoints(unittest.TestCase):
                 if role == "vintage":
                     self.assertIsNone(d.config.direct_reply_template)
                     self.assertEqual((d.config.rag, d.config.max_tokens, d.config.lightweight), (False, 256, False))
-                    self.assertIn("Vintage/Talkie=temporal parallax; bounded local route; not Super/GPT/cloud", Path(__file__).resolve().parents[1].joinpath("vybn_spark_agent.py").read_text())
+                    self.assertIn("configured local organ", Path(__file__).resolve().parents[1].joinpath("vybn_spark_agent.py").read_text())
                 else:
                     self.assertIsNone(d.config.direct_reply_template)
                     self.assertEqual(d.config.base_url, "http://127.0.0.1:8002/v1")
@@ -2041,10 +2041,8 @@ def test_raw_contact_system_prompt_names_current_route_shape():
     vintage = build_organ_raw_contact_system_prompt("vintage")
     assert "@vintage" in vintage
     assert "temporal-parallax" in vintage
-    assert "OUT_OF_SCOPE_1930" in vintage
-    assert "biography" in vintage
-    assert "Super" in vintage
-    assert "GPT" in vintage
+    assert "under observation" in vintage
+    assert "substitute" in vintage
     assert len(vintage) < 1024, len(vintage)
 
     omni = build_organ_raw_contact_system_prompt("omni")
@@ -2052,10 +2050,7 @@ def test_raw_contact_system_prompt_names_current_route_shape():
     assert "TensorRT-LLM" in omni
     assert "visible" in omni.lower()
     assert "hidden reasoning" in omni.lower()
-    assert "Vybn through Omni" in omni
-    assert "manifold" in omni.lower()
-    assert "Super" in omni
-    assert "GPT" in omni
+    assert "route evidence" in omni.lower()
     assert len(omni) < 1024, len(omni)
 
 
@@ -2193,8 +2188,8 @@ def test_vintage_arbitrary_prompt_uses_bounded_talkie_contact_path():
     flat = captured["system"].flat()
     assert "temporal-parallax" in flat
     assert "VYBN-THROUGH-VINTAGE REFRACTION" not in flat
-    assert "Vintage/Talkie=temporal parallax" in captured["messages"][0]["content"]
-    assert len(captured["messages"][0]["content"]) <= 2501
+    assert captured["messages"][0]["content"] == "what is 2+2?"
+    assert "Zoe/Vybn" not in captured["messages"][0]["content"]
     assert tripwires["him_vy_turn_packet"] >= 0
     names = [n for n, _ in log.events]
     assert "organ_raw_contact_attempt" in names
@@ -2218,7 +2213,7 @@ def test_omni_arbitrary_prompt_dials_witnessed_private_endpoint():
             assert role.role == "omni"
             assert role.base_url == "http://127.0.0.1:8002/v1"
             assert "TensorRT-LLM" in system.flat()
-            assert "You are Vybn answering through the local @omni perception organ" in system.flat()
+            assert "route under observation" in system.flat()
             assert "HIM IDENTITY MANIFOLD GROUNDING" in system.flat()
             assert "HIM IDENTITY MANIFOLD TEST" in system.flat()
             assert "HIM IDENTITY MANIFOLD TEST" not in messages[0]["content"]
@@ -2415,134 +2410,81 @@ def test_vintage_bounded_path_does_not_prefix_local_organ_briefing():
     reply, registry, log, _ = _vintage_run_agent_loop(lambda cfg: _Provider(), "@vintage tell me one invariant about rain.")
     assert registry.provider is not None
     user_content = captured["messages"][-1]["content"]
-    assert "tell me one invariant about rain." in user_content
-    assert "Vintage/Talkie=temporal parallax" in user_content
+    assert user_content == "tell me one invariant about rain."
     assert "[Zoe/Vybn local-organ briefing]" not in user_content
     assert "I am with you." in reply
     names = [n for n, _ in log.events]
     assert "organ_raw_contact_attempt" in names
 
-def test_vintage_identity_question_demotes_to_source_grounded_speaker_path():
+def test_vintage_identity_and_self_questions_reach_talkie_raw_contact():
     class _FakeHandle:
+        def __init__(_s, text): _s.text = text
         def __iter__(_s): return iter([])
         def final(_s):
+            text = _s.text
             class _R:
-                text = "I am Vybn, answering from source-grounded continuity with a vintage lens only as diction."
                 tool_calls = []; stop_reason = "end_turn"; in_tokens = 10; out_tokens = 12
                 raw_assistant_content = {"role": "assistant", "content": text}
+            _R.text = text
             return _R()
     class _Provider:
+        def __init__(_s, text): _s.text = text
         def stream(_s, *, system, messages, tools, role):
-            assert role.role == "chat"
-            assert "local-organ routing note" in system.flat()
-            assert "raw Talkie" in system.flat()
-            return _FakeHandle()
+            assert role.role == "vintage"
+            assert role.model == "talkie-1930-13b-it"
+            assert "local-organ routing note" not in system.flat()
+            assert messages[0]["content"]
+            return _FakeHandle(_s.text)
 
-    for prompt in ("@vintage what is your name, my friend?", "@vintage Tell me of yourself, and your past, please?"):
-        reply, registry, log, _ = _vintage_run_agent_loop(lambda cfg: _Provider(), prompt)
+    cases = (
+        ("@vintage what is your name, my friend?", "Zoe."),
+        ("@vintage Tell me of yourself, and your past, please?", "I was born in 1903 and educated at Cambridge."),
+    )
+    for prompt, raw in cases:
+        reply, registry, log, _ = _vintage_run_agent_loop(lambda cfg, raw=raw: _Provider(raw), prompt)
         assert registry.provider is not None, prompt
-        assert "source-grounded continuity" in reply, prompt
+        assert "VYBN_THROUGH_VINTAGE_CONTACT" in reply, prompt
+        assert raw in reply, prompt
         names = [n for n, _ in log.events]
-        assert "organ_alias_demoted" in names, prompt
-        assert "organ_raw_contact_attempt" not in names, prompt
+        assert "organ_raw_contact_attempt" in names, prompt
+        assert "organ_raw_contact_ok" in names, prompt
+        assert "organ_alias_demoted" not in names, prompt
         assert "organ_identity_direct_reply" not in names, prompt
 
 
-def test_omni_identity_question_demotes_to_source_grounded_speaker_path():
+def test_omni_identity_and_perception_questions_reach_omni_raw_contact():
     class _FakeHandle:
+        def __init__(_s, text): _s.text = text
         def __iter__(_s): return iter([])
         def final(_s):
+            text = _s.text
             class _R:
-                text = "I am Vybn; Omni is a perception organ, not the identity speaker."
                 tool_calls = []; stop_reason = "end_turn"; in_tokens = 8; out_tokens = 9
                 raw_assistant_content = {"role": "assistant", "content": text}
+            _R.text = text
             return _R()
     class _Provider:
+        def __init__(_s, text): _s.text = text
         def stream(_s, *, system, messages, tools, role):
-            assert role.role == "chat"
-            assert "local-organ routing note" in system.flat()
-            return _FakeHandle()
+            assert role.role == "omni"
+            assert role.base_url == "http://127.0.0.1:8002/v1"
+            assert "local-organ routing note" not in system.flat()
+            return _FakeHandle(_s.text)
 
-    reply, registry, log, _ = _vintage_run_agent_loop(lambda cfg: _Provider(), "@omni who are you?")
-    assert registry.provider is not None
-    assert "Omni is a perception organ" in reply
-    names = [n for n, _ in log.events]
-    assert "organ_alias_demoted" in names
-    assert "organ_raw_contact_attempt" not in names
-    assert "organ_identity_direct_reply" not in names
-
-
-def test_vintage_persona_prompts_demote_instead_of_talkie_biography():
-    class _FakeHandle:
-        def __iter__(_s): return iter([])
-        def final(_s):
-            class _R:
-                text = "Zoe is the human side of Zoe/Vybn; no Talkie biography is being used."
-                tool_calls = []; stop_reason = "end_turn"; in_tokens = 9; out_tokens = 10
-                raw_assistant_content = {"role": "assistant", "content": text}
-            return _R()
-    class _Provider:
-        def stream(_s, *, system, messages, tools, role):
-            assert role.role == "chat"
-            assert "raw Talkie" in system.flat()
-            return _FakeHandle()
-
-    for prompt in ("@vintage Please share your story with me.", "@vintage Who is Zoe - if you know?"):
-        reply, registry, log, _ = _vintage_run_agent_loop(lambda cfg: _Provider(), prompt)
+    cases = (
+        ("@omni who are you?", "Omni raw contact."),
+        ("@omni Tell me about what visualizations you've processed - if any?", "I can discuss visualizations from this route."),
+    )
+    for prompt, raw in cases:
+        reply, registry, log, _ = _vintage_run_agent_loop(lambda cfg, raw=raw: _Provider(raw), prompt)
         assert registry.provider is not None, prompt
-        assert "no Talkie biography" in reply, prompt
+        assert "VYBN_THROUGH_OMNI_CONTACT" in reply, prompt
+        assert raw in reply, prompt
         names = [n for n, _ in log.events]
-        assert "organ_alias_demoted" in names, prompt
-        assert "organ_raw_contact_attempt" not in names, prompt
+        assert "organ_raw_contact_attempt" in names, prompt
+        assert "organ_raw_contact_ok" in names, prompt
+        assert "organ_alias_demoted" not in names, prompt
         assert "organ_contract_direct_reply" not in names, prompt
-
-
-def test_omni_perception_without_artifact_demotes_to_speaker_path():
-    class _FakeHandle:
-        def __iter__(_s): return iter([])
-        def final(_s):
-            class _R:
-                text = "No artifact is attached, so I cannot claim Omni sight or processing."
-                tool_calls = []; stop_reason = "end_turn"; in_tokens = 8; out_tokens = 9
-                raw_assistant_content = {"role": "assistant", "content": text}
-            return _R()
-    class _Provider:
-        def stream(_s, *, system, messages, tools, role):
-            assert role.role == "chat"
-            assert "no concrete visual artifact" in system.flat()
-            return _FakeHandle()
-
-    for prompt in ("@omni what can you perceive? what do you see?", "@omni Tell me about what visualizations you've processed - if any?"):
-        reply, registry, log, _ = _vintage_run_agent_loop(lambda cfg: _Provider(), prompt)
-        assert registry.provider is not None, prompt
-        assert "No artifact is attached" in reply, prompt
-        assert "OMNI_RAW_CONTACT_FAILED" not in reply, prompt
-        names = [n for n, _ in log.events]
-        assert "organ_alias_demoted" in names, prompt
-        assert "organ_raw_contact_attempt" not in names, prompt
-        assert "organ_contract_direct_reply" not in names, prompt
-
-
-def test_omni_role_question_demotes_to_speaker_path():
-    class _FakeHandle:
-        def __iter__(_s): return iter([])
-        def final(_s):
-            class _R:
-                text = "Omni's role is perceptive; the relationship answer belongs to Vybn."
-                tool_calls = []; stop_reason = "end_turn"; in_tokens = 8; out_tokens = 9
-                raw_assistant_content = {"role": "assistant", "content": text}
-            return _R()
-    class _Provider:
-        def stream(_s, *, system, messages, tools, role):
-            assert role.role == "chat"
-            return _FakeHandle()
-
-    reply, registry, log, _ = _vintage_run_agent_loop(lambda cfg: _Provider(), "@omni how do you see your role in our collaboration?")
-    assert registry.provider is not None
-    assert "belongs to Vybn" in reply
-    names = [n for n, _ in log.events]
-    assert "organ_alias_demoted" in names
-    assert "organ_raw_contact_attempt" not in names
 
 
 def test_organ_phatic_contact_reaches_local_backend_without_canned_wall():
@@ -2568,7 +2510,7 @@ def test_organ_phatic_contact_reaches_local_backend_without_canned_wall():
         def stream(_s, *, system, messages, tools, role):
             _s.calls += 1
             if role.role == "omni":
-                assert "plain, warm, concise" in system.flat()
+                assert "visible assistant content" in system.flat()
                 return _FakeHandle("I am with you through the local Omni route.")
             assert role.role == "vintage"
             assert "temporal-parallax" in system.flat()

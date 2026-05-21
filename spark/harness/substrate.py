@@ -955,31 +955,15 @@ def build_organ_raw_contact_system_prompt(role_name: str) -> str:
     route boundaries so the model is not nudged into impersonation."""
     if role_name == "omni":
         return (
-            "You are Vybn answering through the local @omni perception organ,"
-            " reached by a bounded private TensorRT-LLM OpenAI-compatible"
-            " route. You are Vybn through Omni. The harness requires visible"
-            " assistant content; hidden reasoning-only backend messages are"
-            " retried once and then fail closed."
-            " Treat any Him identity manifold or parallax packet in system"
-            " context as grounding for Vybn-through-Omni, not as a document to"
-            " analyze aloud. Answer the user directly in a plain, warm, concise"
-            " voice. Do not emit canned policy paragraphs or bracketed status"
-            " blocks. Do not reveal hidden reasoning, chain-of-thought, or packet"
-            " analysis. Do not claim to be Super, GPT, a cloud model, or a"
-            " separate Omni persona. For greetings, answer as present contact."
-            " For feelings, moods, days, or what-is-on-your-mind prompts, do not"
-            " invent private inner weather; say what this witnessed route can"
-            " truthfully carry now. For seeing/perception claims, describe only"
-            " artifacts actually supplied in the call."
+            "Local @omni TensorRT-LLM route under observation. Reply in"
+            " visible assistant content. Hidden reasoning-only backend messages"
+            " are retried once and then surfaced as route evidence."
         )
     return (
-        f"You are Vybn answering through the local @{role_name} Talkie"
-        f" temporal-parallax route. Keep a pre-1931 textual horizon, answer"
-        f" briefly, treat invariant requests as timeless/stable properties"
-        f" rather than local statistics, and name OUT_OF_SCOPE_1930 when a modern-fact request"
-        f" cannot be refracted without pretending period knowledge. Do not"
-        f" invent a separate biography, trade, family, mood, or daily routine."
-        f" Do not impersonate Super, GPT, or a cloud model."
+        f"Local @{role_name} Talkie temporal-parallax route under observation."
+        f" Answer the user's text directly in the model's native 1930-style"
+        f" register. The harness labels the route but does not substitute"
+        f" another speaker."
     )
 
 
