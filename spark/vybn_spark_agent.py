@@ -47,7 +47,6 @@ from harness.substrate import execute_tool_calls, default_introspect  # noqa: E4
 from harness.substrate import check_claim, check_structural_claim  # noqa: E402
 from harness.substrate import is_system_critical_pilot_turn  # noqa: E402
 from harness.substrate import render_organ_alias_direct_reply  # noqa: E402
-from harness.substrate import apply_vintage_refraction_prompt  # noqa: E402
 from harness.substrate import (  # noqa: E402
     should_attempt_raw_organ_contact,
     render_organ_raw_contact_header,
@@ -1379,7 +1378,6 @@ def run_agent_loop(
                 messages.append({"role": "assistant", "content": notice})
                 return notice
 
-    system_prompt = apply_vintage_refraction_prompt(system_prompt, role_cfg)
     if system_prompt is None:
         system_prompt = LayeredPrompt()
     if active_prompt is None or is_vintage_turn:

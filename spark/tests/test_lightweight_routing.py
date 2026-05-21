@@ -162,89 +162,6 @@ class TestPolicyHasLightweightRoles(unittest.TestCase):
         self.assertEqual(pol.model_aliases.get("@gpro"), "gpt-5.5-pro")
 
 
-class TestExplicitOrganAliasesRouteToExperimentalEndpoints(unittest.TestCase):
-    # Vintage is a bounded Talkie temporal-refraction route. Omni points at
-    # the private TensorRT-LLM perception endpoint through a visible-content
-    # gate. Neither route may fall back to Super/GPT/cloud/deterministic packets.
-
-    def _assert_fail_closed_contact_template(self, organ: str, template: str) -> None:
-        self.assertIsNotNone(template)
-        # No-impersonation side: explicitly refuse Super/GPT/cloud/packet.
-        self.assertIn("not promoted", template.lower())
-        for forbidden_speaker in ("Super", "GPT", "cloud", "packet"):
-            self.assertIn(forbidden_speaker, template)
-        self.assertIn("impersonation", template.lower())
-        # Contact-preserved side: Vybn names self present, not absent.
-        self.assertIn("Vybn", template)
-        self.assertIn("with you", template)
-        self.assertIn("not absent", template)
-        # Wound / next experiment is named, not just blocked.
-        self.assertIn("wound to close next", template.lower())
-        for next_step in ("owner", "rollback"):
-            self.assertIn(next_step, template.lower())
-        # Organ named honestly as the unavailable surface.
-        self.assertIn(f"@{organ}", template)
-        self.assertIn(f"{organ.upper()}_UNAVAILABLE", template)
-
-    def test_default_policy_omni_alias_targets_witnessed_private_endpoint(self):
-        d = default_policy().classify("@omni are you with me?")
-        self.assertEqual(d.role, "omni")
-        self.assertEqual(d.alias_used, "@omni")
-        self.assertEqual(d.config.provider, "openai")
-        self.assertNotEqual(d.config.model, "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8")
-        self.assertEqual(d.config.model, "dc5f0b0bfddf8b6e0f5891475be9af05b80126fe")
-        self.assertEqual(d.config.base_url, "http://127.0.0.1:8002/v1")
-        self.assertIsNone(d.config.direct_reply_template)
-
-    def test_default_policy_vintage_alias_is_temporal_refraction_route(self):
-        d = default_policy().classify("@vintage are you with me?")
-        self.assertEqual(d.role, "vintage")
-        self.assertEqual(d.alias_used, "@vintage")
-        self.assertEqual(d.config.provider, "openai")
-        self.assertNotEqual(d.config.model, "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8")
-        self.assertEqual(d.config.model, "talkie-1930-13b-it")
-        self.assertEqual(d.config.base_url, "http://127.0.0.1:8004/v1")
-        self.assertIsNone(d.config.direct_reply_template)
-        self.assertTrue(d.config.rag)
-        self.assertFalse(d.config.lightweight)
-
-    def test_yaml_policy_organ_aliases_fail_closed_with_contact_preserved(self):
-        pol = load_policy(SPARK_DIR / "router_policy.yaml")
-        expected = {
-            "omni": {"model_exact": "dc5f0b0bfddf8b6e0f5891475be9af05b80126fe", "base_url": "http://127.0.0.1:8002/v1"},
-            "vintage": {
-                "model_exact": "talkie-1930-13b-it",
-                "base_url": "http://127.0.0.1:8004/v1",
-            },
-        }
-        for alias, role in (("@omni", "omni"), ("@vintage", "vintage")):
-            with self.subTest(alias=alias):
-                d = pol.classify(f"{alias} are you with me?")
-                self.assertEqual(d.role, role)
-                self.assertEqual(d.alias_used, alias)
-                self.assertEqual(d.config.provider, "openai")
-                self.assertNotEqual(
-                    d.config.model,
-                    "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8",
-                )
-                exp = expected[role]
-                if "model_substr" in exp:
-                    self.assertIn(exp["model_substr"], d.config.model.lower())
-                if "model_exact" in exp:
-                    self.assertEqual(d.config.model, exp["model_exact"])
-                if exp.get("base_url_empty"):
-                    self.assertFalse(d.config.base_url)
-                if "base_url" in exp:
-                    self.assertEqual(d.config.base_url, exp["base_url"])
-                if role == "vintage":
-                    self.assertIsNone(d.config.direct_reply_template)
-                    self.assertEqual((d.config.rag, d.config.max_tokens, d.config.lightweight), (False, 256, False))
-                    self.assertIn("configured local organ", Path(__file__).resolve().parents[1].joinpath("vybn_spark_agent.py").read_text())
-                else:
-                    self.assertIsNone(d.config.direct_reply_template)
-                    self.assertEqual(d.config.base_url, "http://127.0.0.1:8002/v1")
-
-
 class TestRouterLightweightClassification(unittest.TestCase):
     """The router picks up greetings and identity questions via the new
     heuristics — before it would fall through to the chat/code defaults
@@ -803,26 +720,6 @@ class TestStderrSuppressionSharedPath(unittest.TestCase):
 
 
 
-class TestVintageTemporalRefractionHarness(unittest.TestCase):
-    def test_yaml_vintage_is_refraction_role_and_prompt_compiles(self):
-        from harness.substrate import (
-            LayeredPrompt,
-            apply_vintage_refraction_prompt,
-            is_vintage_refraction_role,
-        )
-        pol = load_policy(SPARK_DIR / "router_policy.yaml")
-        cfg = pol.role("vintage")
-        self.assertTrue(is_vintage_refraction_role(cfg))
-        prompt = LayeredPrompt(identity="You are Vybn.", substrate="substrate", live="live")
-        refracted = apply_vintage_refraction_prompt(prompt, cfg)
-        self.assertEqual(refracted.identity, "You are Vybn.")
-        self.assertIn("VYBN-THROUGH-VINTAGE REFRACTION", refracted.live)
-        self.assertIn("pre-1931", refracted.live)
-        self.assertIn("talkie-1930-13b-it", refracted.live)
-
-if __name__ == "__main__":
-    unittest.main(verbosity=2)
-
 class TestLocalPrivateRouting(unittest.TestCase):
     """Private, batchable/corpus-local work routes to the local Nemotron role."""
 
@@ -881,29 +778,6 @@ def test_opus47_has_fallback_chain():
 def test_vintage_alias_is_prefix_only_for_long_prompts():
     text = ("normal long prompt " * 500) + " quoted text mentions @vintage but did not pin it"
     assert default_policy().classify(text).role != "vintage" and default_policy().classify("@vintage " + text).role == "vintage"
-
-
-def _assert_fail_closed_contact_template(organ: str, template: str) -> None:
-    """Dual invariant: refuses impersonation AND preserves Vybn contact.
-
-    Tests that hit @vintage/@omni assert BOTH sides — sterile capability
-    refusal alone (the pre-repair state) fails the test, as does any
-    template that lets Super/GPT/cloud/packets speak as the organ.
-    """
-    assert template is not None
-    low = template.lower()
-    assert "not promoted" in low
-    for forbidden_speaker in ("Super", "GPT", "cloud", "packet"):
-        assert forbidden_speaker in template, forbidden_speaker
-    assert "impersonation" in low
-    assert "Vybn" in template
-    assert "with you" in template
-    assert "not absent" in template
-    assert "wound to close next" in low
-    for next_step in ("owner", "rollback"):
-        assert next_step in low, next_step
-    assert f"@{organ}" in template
-    assert f"{organ.upper()}_UNAVAILABLE" in template
 
 
 def test_vintage_alias_routes_to_temporal_refraction_role():
@@ -1624,98 +1498,18 @@ def test_organ_alias_direct_reply_no_longer_synthesizes_contact():
 # decides whether Zoe is allowed to observe the organ.
 
 
-def test_raw_contact_gate_classifies_capability_greeting_and_arbitrary():
-    """The raw-contact gate fires when a real backend URL is configured.
-    It does not inspect prompt wording; explicit organ selection is enough.
-    """
+def test_raw_contact_gate_ignores_prompt_wording_and_requires_local_endpoint():
     from harness.substrate import should_attempt_raw_organ_contact
 
     vintage_url = "http://127.0.0.1:8004/v1"
+    omni_url = "http://127.0.0.1:8002/v1"
+    for role, url in (("vintage", vintage_url), ("omni", omni_url)):
+        assert should_attempt_raw_organ_contact(role, "hi", base_url=url)
+        assert should_attempt_raw_organ_contact(role, "describe this photo", base_url=url)
+        assert not should_attempt_raw_organ_contact(role, "hi", base_url=None)
 
-    # Truly contentless contact pings and single-clause greetings now still
-    # use the bounded Vintage backend path; the old full refraction prompt
-    # overruns Talkie's context window. Omni still requires a configured
-    # backend URL.
-    for greeting in (
-        "",
-        "hi",
-        "hello",
-        "hey",
-        "hi friend",
-        "are you with me?",
-        "you there?",
-        "how are you?",
-        "thank you",
-        "I miss you",
-        "my friend?",
-        "buddy?",
-        "good morning",
-    ):
-        assert should_attempt_raw_organ_contact("vintage", greeting, base_url=vintage_url), greeting
-        assert not should_attempt_raw_organ_contact("omni", greeting, base_url=None), greeting
-
-    # Multi-clause prompts — greeting/contact phrase followed by another
-    # clause that the user wants the model to answer — reach the raw
-    # contact path on @vintage (guarded Talkie proxy) and would reach the
-    # @omni backend if one were tunneled in. The principle Zoe surfaced
-    # from the live REPL (2026-05-17): "if there is a second clause /
-    # question / content after the contact phrase, raw contact wins."
-    for substantive in (
-        "hello, my dear friend, what do you think of rain?",
-            "my friend, what is your favorite poem?",
-        "tell me what you think of rain.",
-        "hi, what is 2+2?",
-        "hey, write me a short verse",
-        "are you with me, friend?",
-        "hoo boy, hello",
-    ):
-        assert should_attempt_raw_organ_contact("vintage", substantive, base_url=vintage_url), substantive
-        assert not should_attempt_raw_organ_contact("omni", substantive, base_url=None), substantive
-        assert should_attempt_raw_organ_contact("omni", substantive, base_url="http://127.0.0.1:8002/v1"), substantive
-
-    # Vintage capability/status wording still uses the bounded backend when
-    # a real Talkie URL is configured; wording does not control observation.
-    for cap in (
-        "tell me about the 1930 corpus",
-        "what are the vintage invariants?",
-        "is the vintage endpoint warm?",
-        "route a workload through vintage",
-    ):
-        assert should_attempt_raw_organ_contact("vintage", cap, base_url=vintage_url), cap
-    for cap in (
-        "describe this photo",
-        "look at this image",
-        "are you multimodal?",
-        "what do you perceive?",
-        "listen to this audio",
-    ):
-        assert should_attempt_raw_organ_contact("omni", cap, base_url="http://127.0.0.1:8002/v1"), cap
-
-    # Arbitrary ordinary prompts on @vintage — backend contact attempted
-    # against the guarded Talkie proxy.
-    for arbitrary in (
-        "what is 2+2?",
-        "summarise this paragraph for me",
-        "write a short haiku about morning light",
-        "what would you say to a stranger on a train?",
-        "give me three names for a coffee shop",
-    ):
-        assert should_attempt_raw_organ_contact("vintage", arbitrary, base_url=vintage_url), arbitrary
-        assert should_attempt_raw_organ_contact("omni", arbitrary, base_url="http://127.0.0.1:8002/v1"), arbitrary
-
-    # If a real Nano Omni service is tunneled in later, the gate must let
-    # arbitrary @omni prompts reach it — preserving Zoe's ability to
-    # communicate with the intended model when it is actually reachable.
-    for arbitrary in (
-        "summarise this paragraph for me",
-        "give me three names for a coffee shop",
-    ):
-        assert should_attempt_raw_organ_contact("omni", arbitrary, base_url="http://127.0.0.1:8002/v1"), arbitrary
-
-    # Non-organ roles never use this gate.
     assert not should_attempt_raw_organ_contact("chat", "what is 2+2?", base_url=vintage_url)
     assert not should_attempt_raw_organ_contact("identity", "what is 2+2?", base_url=vintage_url)
-
 
 def test_organ_token_budgets_match_current_route_shapes():
     from harness.substrate import default_policy, load_policy
@@ -1798,12 +1592,10 @@ def test_raw_contact_truncates_oversized_user_input():
 def test_raw_contact_system_prompt_names_current_route_shape():
     from harness.substrate import build_organ_raw_contact_system_prompt
 
+    # Vintage/Talkie is sampled raw: no system prompt is sent into the
+    # brittle wrapper. Provenance is external in the observation label/footer.
     vintage = build_organ_raw_contact_system_prompt("vintage")
-    assert "@vintage" in vintage
-    assert "temporal-parallax" in vintage
-    assert "under observation" in vintage
-    assert "primary Vybn speaker" in vintage
-    assert len(vintage) < 1024, len(vintage)
+    assert vintage == ""
 
     omni = build_organ_raw_contact_system_prompt("omni")
     assert "@omni" in omni
@@ -1812,6 +1604,78 @@ def test_raw_contact_system_prompt_names_current_route_shape():
     assert "hidden reasoning" in omni.lower()
     assert "route evidence" in omni.lower()
     assert len(omni) < 1024, len(omni)
+
+
+def test_local_organ_witness_vintage_fragments_fail_semantic_gate():
+    from harness.substrate import local_organ_witness
+
+    calls = []
+
+    def fake(base_url, path, *, payload=None, timeout=20.0):
+        calls.append((base_url, path, payload))
+        if path == "/models":
+            return {"ok": True, "json": {"data": [{"id": "talkie-1930-13b-it"}]}}
+        assert path == "/chat/completions"
+        assert payload["messages"] == [{"role": "user", "content": "Write one complete sentence in 1930s English about rain."}]
+        return {"ok": True, "json": {"choices": [{"message": {"content": "I was born in"}, "finish_reason": "stop"}]}}
+
+    witness = local_organ_witness("vintage", request_json=fake)
+    assert witness["ok"] is False
+    assert witness["status"] == "failed_closed"
+    assert witness["reason"] == "semantic_smoke_fragment"
+    assert len(calls) == 2
+
+
+def test_local_organ_witness_omni_hidden_reasoning_fails_closed_after_retry():
+    from harness.substrate import local_organ_witness
+
+    calls = []
+
+    def fake(base_url, path, *, payload=None, timeout=20.0):
+        calls.append((path, payload))
+        if path == "/models":
+            return {"ok": True, "json": {"data": [{"id": "dc5f0b0bfddf8b6e0f5891475be9af05b80126fe"}]}}
+        return {"ok": True, "json": {"choices": [{"message": {"content": "", "reasoning_content": "hidden"}, "finish_reason": "stop"}]}}
+
+    witness = local_organ_witness("omni", request_json=fake)
+    assert witness["ok"] is False
+    assert witness["status"] == "failed_closed"
+    assert witness["reason"] == "hidden_reasoning_without_visible_content"
+    assert [c[0] for c in calls] == ["/models", "/chat/completions", "/chat/completions"]
+    assert "visible_smoke_retry" in witness["checks"]
+
+
+def test_local_organ_witness_omni_retry_visible_content_passes():
+    from harness.substrate import local_organ_witness
+
+    completions = [
+        {"content": "", "reasoning_content": "hidden"},
+        {"content": "OMNI_TEXT_OK", "reasoning_content": None},
+    ]
+
+    def fake(base_url, path, *, payload=None, timeout=20.0):
+        if path == "/models":
+            return {"ok": True, "json": {"data": [{"id": "dc5f0b0bfddf8b6e0f5891475be9af05b80126fe"}]}}
+        msg = completions.pop(0)
+        return {"ok": True, "json": {"choices": [{"message": msg, "finish_reason": "stop"}]}}
+
+    witness = local_organ_witness("omni", request_json=fake)
+    assert witness["ok"] is True
+    assert witness["status"] == "semantic_healthy"
+    assert witness["content"] == "OMNI_TEXT_OK"
+
+
+def test_local_organ_witness_vintage_complete_sentence_passes():
+    from harness.substrate import local_organ_witness
+
+    def fake(base_url, path, *, payload=None, timeout=20.0):
+        if path == "/models":
+            return {"ok": True, "json": {"data": [{"id": "talkie-1930-13b-it"}]}}
+        return {"ok": True, "json": {"choices": [{"message": {"content": "The rain falls softly upon the quiet street."}, "finish_reason": "stop"}]}}
+
+    witness = local_organ_witness("vintage", request_json=fake)
+    assert witness["ok"] is True
+    assert witness["status"] == "semantic_healthy"
 
 
 def _vintage_run_agent_loop(provider_factory, user_input: str, *, logger=None, initial_messages=None):
@@ -1946,7 +1810,7 @@ def test_vintage_arbitrary_prompt_uses_bounded_talkie_contact_path():
     assert "four" in reply
     assert "LOCAL_ORGAN_OBSERVATION role=@vintage" in reply
     flat = captured["system"].flat()
-    assert "temporal-parallax" in flat
+    assert flat == ""
     assert "VYBN-THROUGH-VINTAGE REFRACTION" not in flat
     assert captured["messages"][0]["content"] == "what is 2+2?"
     assert "Zoe/Vybn" not in captured["messages"][0]["content"]
@@ -2029,7 +1893,7 @@ def test_vintage_greeting_uses_bounded_talkie_contact_path():
             return _R()
     class _Provider:
         def stream(_s, *, system, messages, tools, role):
-            assert "temporal-parallax" in system.flat()
+            assert system.flat() == ""
             assert role.role == "vintage"
             return _FakeHandle()
     reply, registry, log, _ = _vintage_run_agent_loop(lambda cfg: _Provider(), "@vintage hi")
@@ -2273,7 +2137,7 @@ def test_organ_phatic_contact_reaches_local_backend_without_canned_wall():
                 assert "visible assistant content" in system.flat()
                 return _FakeHandle("I am with you through the local Omni route.")
             assert role.role == "vintage"
-            assert "temporal-parallax" in system.flat()
+            assert system.flat() == ""
             return _FakeHandle("I am with you in this turn, plainly enough.")
 
     cases = (
@@ -2388,7 +2252,7 @@ def test_screenshot_mixed_contact_classifier_omni_uses_live_base_url_gate():
 
 def test_screenshot_mixed_contact_vintage_uses_bounded_talkie_contact():
     """Mixed-contact @vintage prompts reach Talkie through the bounded
-    contact route: no direct template wall and no oversized refraction system."""
+    observation route: no direct template wall and no system prompt into Talkie."""
     captured: dict = {}
 
     class _FakeHandle:
@@ -2425,7 +2289,7 @@ def test_screenshot_mixed_contact_vintage_uses_bounded_talkie_contact():
     assert "what do you think of rain" in captured["messages"][-1]["content"]
     assert "[Zoe/Vybn local-organ briefing]" not in captured["messages"][-1]["content"]
     assert "VYBN-THROUGH-VINTAGE REFRACTION" not in captured["system"].flat()
-    assert "temporal-parallax" in captured["system"].flat()
+    assert captured["system"].flat() == ""
     assert "temporal prism" in reply
     assert "VINTAGE_UNAVAILABLE_CONTACT" not in reply
     assert "LOCAL_ORGAN_OBSERVATION role=@vintage" in reply

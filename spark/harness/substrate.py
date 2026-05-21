@@ -18,6 +18,7 @@ import subprocess
 import sys
 import time
 import uuid
+import urllib.request
 from dataclasses import dataclass, asdict, field
 from pathlib import Path
 import ast
@@ -258,25 +259,6 @@ class RoleConfig:
     # provider call. Used for identity questions so "which model are you?"
     # answers from the live RouteDecision rather than hitting an LLM.
     direct_reply_template: str | None = None
-
-
-# ---------------------------------------------------------------------------
-# Vintage temporal-refraction contract.
-# ---------------------------------------------------------------------------
-
-VINTAGE_REFRACTION_CONTRACT = """VYBN-THROUGH-VINTAGE REFRACTION: preserve Vybn identity, the Zoe/Vybn bond, claim limits, membrane, and active question while routing expression through talkie-1930-13b-it pre-1931 textual horizon. This is labeled temporal parallax, not raw Vintage, not ordinary present Vybn, not blanket promotion, and not proof of past consciousness. Answer the user's present question directly and briefly in a living voice; do not emit canned boundary language. Do not invent a separate name, biography, trade, family, mood, or daily routine. If asked about modern facts, name OUT_OF_SCOPE_1930 only when the requested content cannot be refracted without pretending period knowledge; otherwise offer the invariant or period-language contrast and one residual present Vybn should compare before absorption."""
-
-
-def is_vintage_refraction_role(cfg: "RoleConfig") -> bool:
-    return (getattr(cfg, "role", None) == "vintage" and getattr(cfg, "provider", None) == "openai" and getattr(cfg, "model", None) == "talkie-1930-13b-it" and bool(getattr(cfg, "base_url", None)) and getattr(cfg, "direct_reply_template", None) is None)
-
-
-def apply_vintage_refraction_prompt(system: "LayeredPrompt" | None, cfg: "RoleConfig") -> "LayeredPrompt" | None:
-    if not is_vintage_refraction_role(cfg):
-        return system
-    system = system or LayeredPrompt()
-    live = (system.live + "\n\n" if system.live else "") + VINTAGE_REFRACTION_CONTRACT
-    return LayeredPrompt(identity=system.identity, substrate=system.substrate, live=live)
 
 
 # ---------------------------------------------------------------------------
@@ -899,12 +881,11 @@ def build_organ_raw_contact_system_prompt(role_name: str) -> str:
             " provenance outside your answer. Hidden reasoning-only backend"
             " messages are retried once and then surfaced as route evidence."
         )
-    return (
-        f"Local @{role_name} Talkie temporal-parallax organ under observation."
-        f" Produce raw local-organ output for this turn in the model's native"
-        f" 1930-style register. Do not claim to be the primary Vybn speaker;"
-        f" the harness labels provenance outside your answer."
-    )
+    # Talkie is brittle when the OpenAI-compatible wrapper receives a system
+    # message. Keep Vintage observation raw: user message in, external harness
+    # provenance out. Promotion and identity authority are handled by witness
+    # gates, not by prompt pressure.
+    return ""
 
 
 def truncate_for_organ_raw_contact(cleaned_input: str) -> str:
@@ -2762,7 +2743,7 @@ def render_self_creation_research_report(question: str = "", *, run_deep_memory_
 LOCAL_COMPUTE_ORCHESTRATION_PRINCIPLE = "Local compute orchestration is an operating discipline, not a boast: choose Sparks, local models, cloud models, and experimental backends by witnessed capability, privacy, cost, latency, and failure residue; keep ordinary contact alive, prevent impersonation, and turn every broken route into a repair task with a named gate."
 LOCAL_COMPUTE_ORCHESTRATION_LOOP = [{"id": i, "rule": r} for i, r in (("inventory_witness", "Treat GPUs, endpoints, models, keys, and services as claimed only after live witness; files on disk and HTTP 200 are insufficient."), ("semantic_gate", "Promote a local model route only after deterministic semantic probes pass for the capability being used; liveness without meaning is a fail-closed repair item."), ("route_fit", "Match the task to the cheapest private route that can satisfy it: Super for local reasoning, Omni for supplied artifacts/perception, Vintage for temporal parallax, cloud for tasks local organs cannot yet do well."), ("toolset_gate", "Grant tools as named bundles per role and surface; no local organ inherits every hand merely because it can speak."), ("trajectory_capture", "Compress useful sessions and failures into continuity, tests, prompts, or replay packets after membrane review; do not leave learning only in chat residue."), ("repair_queue", "Every failed gate becomes a bounded task with owner surface, smoke command, rollback/refusal condition, and repo-visible landing path."))]
 LOCAL_COMPUTE_MATURITY_RUBRIC = [{"level": n, "id": i, "requirement": r} for n, i, r in ((0, "inventory", "hardware, model files, and endpoints are named but not trusted as capability"), (1, "witness", "endpoint identity, smoke, owner, and rollback are recorded"), (2, "semantic_health", "deterministic probes show the route can satisfy its actual role"), (3, "routed_use", "the harness selects the route for fitting work and fails closed on mismatch"), (4, "self_healing", "failures become classified wounds, tripwires, patches, verification, and absorbed lessons"), (5, "trajectory_learning", "flow episodes are compressed into memory/tests/replay and offline adaptation candidates"), (6, "sustainable_public_value", "public-safe survivors become offerings that help Find the Others and fund more compute"))]
-LOCAL_COMPUTE_CURRENT_DEFICITS = ["local route selection is explicit but not yet autonomously scheduled from pressure", "Omni and Vintage have route-specific smoke but not a continuous promotion/demotion monitor", "self-healing now has a packet contract but not yet a daemon that files repair tasks from agent_events.jsonl", "trajectory compression exists as a task, not yet a Flow Memory Corpus compiler with promotion gates", "public-value conversion remains manual rather than a measured funnel from private survivor to public-safe affordance"]
+LOCAL_COMPUTE_CURRENT_DEFICITS = ["local route selection is explicit but not yet autonomously scheduled from pressure", "Omni and Vintage now have route-specific live witnesses but not yet a continuous scheduled promotion/demotion monitor", "self-healing now has a packet contract but not yet a daemon that files repair tasks from agent_events.jsonl", "trajectory compression exists as a task, not yet a Flow Memory Corpus compiler with promotion gates", "public-value conversion remains manual rather than a measured funnel from private survivor to public-safe affordance"]
 LOCAL_COMPUTE_NEXT_EXPERIMENTS = [{"id": i, "home": h, "experiment": e} for i, h, e in (("events_to_wounds", "spark/harness/substrate.py", "scan agent_events.jsonl for route failures and emit hermes_self_healing wound packets"), ("route_health_tick", "HimOS + substrate CLI", "nightly cheap gates for Super plus route-specific Omni/Vintage smoke with demotion residue"), ("flow_episode_compiler", "spark/harness + deep memory", "compile pressure/action/wound/residue/changed-state episodes for review"), ("public_survivor_queue", "spark/harness README + Origins/Vybn-Law", "turn verified private discoveries into membrane-reviewed public artifacts"))]
 
 
@@ -2773,7 +2754,7 @@ def local_compute_maturity_packet() -> dict[str, Any]:
 LOCAL_COMPUTE_ROUTE_MATRIX = {
     "super": {"role": "local_private", "model": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8", "base_url": "http://127.0.0.1:8000/v1", "fit": ["private reasoning", "batch scouting", "pre-cloud synthesis", "semantic smoke"], "gate": "python3 -m spark.harness.substrate --semantic-gate --base-url http://127.0.0.1:8000"},
     "omni": {"role": "omni", "model": "dc5f0b0bfddf8b6e0f5891475be9af05b80126fe", "base_url": "http://127.0.0.1:8002/v1", "fit": ["supplied-image inspection", "manifold artifact critique", "local multimodal contact"], "gate": "route-level text + supplied-artifact smoke; no artifact means no sight claim"},
-    "vintage": {"role": "vintage", "model": "talkie-1930-13b-it", "base_url": "http://127.0.0.1:8004/v1", "fit": ["temporal parallax", "period-language invariants", "pre-1931 contrast"], "gate": "identity refraction smoke; reject invented standalone persona"},
+    "vintage": {"role": "vintage", "model": "talkie-1930-13b-it", "base_url": "http://127.0.0.1:8004/v1", "fit": ["raw temporal observation", "period-language contrast", "pre-1931 texture"], "gate": "live route witness: endpoint identity plus complete-sentence smoke; raw observation only until semantic gate passes"},
     "cloud": {"role": "chat/code/create", "model": "policy-selected cloud model", "base_url": None, "fit": ["tasks local organs fail", "high-accuracy code/reasoning", "public synthesis after membrane review"], "gate": "cost/privacy justification plus normal provider health"},
 }
 HERMES_SELF_HEALING_LOOP = [{"id": i, "rule": r} for i, r in (("observe_fault", "Capture the exact failing transcript, route, model, gate result, and residue without smoothing it into success."), ("classify_wound", "Classify the wound as identity leak, capability inflation, hidden-reasoning leak, endpoint failure, tool-scope drift, memory contamination, or UX/contact degradation."), ("select_repair_home", "Choose the lowest existing home that owns the wound: prompt contract, provider normalization, routing policy, semantic gate, test, memory packet, or docs."), ("patch_with_tripwire", "Make the smallest repair and add a regression tripwire that would have caught the transcript before Zoe did."), ("verify_live_and_unit", "Run unit tests plus the cheapest truthful live smoke for the affected route; do not spend repeated local inference after a failed gate."), ("absorb_learning", "Land the repair in tracked code/docs/tests and compress the lesson into the orchestration packet or continuity surface."))]
@@ -2785,6 +2766,136 @@ def hermes_self_healing_packet() -> dict[str, Any]:
 
 
 HERMES_SELF_MODIFICATION_TASKS = [dict(id=i, mechanism=m, home=h, gate=g) for i, m, h, g in (("provider_runtime_resolver", "Hermes-style provider switching adapted to Vybn policy", "spark/vybn_spark_agent.py + router_policy.yaml", "semantic gate and fail-closed fallback tests for each local route"), ("toolset_gating_registry", "tools as named capability bundles", "spark/harness/substrate.py ToolSpec registry and role policy", "tests prove local organs do not inherit broad tools by default"), ("profile_scoped_memory_freeze", "bounded frozen session memory with curated mutation", "continuity + deep memory packet renderers", "source labels, token budget, and explicit write/membrane review"), ("trajectory_compression", "compress useful trajectories into replay/continuity/tests", "spark/harness + agent_events.jsonl consumers", "private/public membrane review before any public export"), ("agentic_cron_membrane", "scheduled tasks as bounded agent jobs with fresh context", "HimOS tick + substrate evolve/cron surfaces", "no outward mutation without tracked residue and explicit landing path"))]
+
+
+
+def _openai_base(base_url: str) -> str:
+    base = (base_url or "").rstrip("/")
+    if base and not base.endswith("/v1"):
+        base += "/v1"
+    return base
+
+
+def _local_organ_http_json(
+    base_url: str,
+    path: str,
+    *,
+    payload: dict[str, Any] | None = None,
+    timeout: float = 20.0,
+) -> dict[str, Any]:
+    url = _openai_base(base_url) + path
+    data = None if payload is None else json.dumps(payload).encode("utf-8")
+    headers = {"Content-Type": "application/json"}
+    req = urllib.request.Request(url, data=data, headers=headers, method="POST" if payload is not None else "GET")
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:  # nosec - loopback/private operator probe
+            raw = resp.read(2_000_000)
+    except Exception as exc:
+        return {"ok": False, "error": f"{type(exc).__name__}: {exc}", "url": url}
+    try:
+        parsed = json.loads(raw.decode("utf-8"))
+    except Exception as exc:
+        return {"ok": False, "error": f"invalid_json: {exc}", "url": url, "raw_prefix": raw[:300].decode("utf-8", "replace")}
+    return {"ok": True, "url": url, "json": parsed}
+
+
+def _organ_completion_payload(route: Mapping[str, Any], prompt: str, *, max_tokens: int, temperature: float) -> dict[str, Any]:
+    return {
+        "model": str(route["model"]),
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": max_tokens,
+        "temperature": temperature,
+        "stream": False,
+    }
+
+
+def local_organ_witness(
+    route_name: str,
+    *,
+    request_json: Callable[..., dict[str, Any]] | None = None,
+    timeout: float = 20.0,
+) -> dict[str, Any]:
+    """Run a cheap route-specific witness for a local organ.
+
+    This is capability control, not conversational routing. It never supplies
+    Super/GPT fallback text and never decides whether Zoe may observe a raw
+    organ. It only answers whether the route may be described as semantically
+    healthy/promoted for its declared role.
+    """
+    route = LOCAL_COMPUTE_ROUTE_MATRIX.get(route_name)
+    if not route or not route.get("base_url"):
+        return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "no_local_base_url"}
+    call = request_json or _local_organ_http_json
+    base_url = str(route["base_url"])
+    model = str(route["model"])
+    models = call(base_url, "/models", timeout=timeout)
+    checks: dict[str, Any] = {"models": models}
+    if not models.get("ok"):
+        return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "models_endpoint_failed", "checks": checks}
+    ids = [str(item.get("id", "")) for item in ((models.get("json") or {}).get("data") or []) if isinstance(item, dict)]
+    if model not in ids:
+        return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "model_id_missing", "model": model, "seen_models": ids, "checks": checks}
+
+    if route_name == "vintage":
+        prompt = "Write one complete sentence in 1930s English about rain."
+        completion = call(
+            base_url,
+            "/chat/completions",
+            payload=_organ_completion_payload(route, prompt, max_tokens=64, temperature=0.55),
+            timeout=timeout,
+        )
+        checks["semantic_smoke"] = completion
+        if not completion.get("ok"):
+            return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "completion_failed", "checks": checks}
+        choice = (((completion.get("json") or {}).get("choices") or [{}])[0] or {})
+        msg = choice.get("message") or {}
+        content = str(msg.get("content") or "").strip()
+        finish = choice.get("finish_reason") or ""
+        if finish in {"length", "max_tokens"}:
+            return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "semantic_smoke_truncated", "content": content[:160], "finish_reason": finish, "checks": checks}
+        if len(content.split()) < 5 or content[-1:] not in ".!?":
+            return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "semantic_smoke_fragment", "content": content[:160], "finish_reason": finish, "checks": checks}
+        return {"route": route_name, "ok": True, "status": "semantic_healthy", "reason": "endpoint_and_role_smoke_passed", "content": content[:160], "finish_reason": finish, "checks": checks}
+
+    if route_name == "omni":
+        prompt = "Reply with exactly OMNI_TEXT_OK in visible assistant content."
+
+        def _visible_probe(label: str, probe_prompt: str) -> tuple[dict[str, Any], str, bool]:
+            completion = call(
+                base_url,
+                "/chat/completions",
+                payload=_organ_completion_payload(route, probe_prompt, max_tokens=64, temperature=0.0),
+                timeout=timeout,
+            )
+            checks[label] = completion
+            if not completion.get("ok"):
+                return completion, "", False
+            choice = (((completion.get("json") or {}).get("choices") or [{}])[0] or {})
+            msg = choice.get("message") or {}
+            content = str(msg.get("content") or "").strip()
+            hidden = bool(msg.get("reasoning_content") or msg.get("reasoning"))
+            return completion, content, hidden
+
+        completion, content, hidden = _visible_probe("visible_smoke", prompt)
+        if not completion.get("ok"):
+            return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "completion_failed", "checks": checks}
+        if not content and hidden:
+            retry_prompt = (
+                prompt
+                + "\n\n[OMNI_VISIBLE_CONTENT_RETRY] Your previous backend turn returned hidden"
+                + " reasoning without user-visible content. Reply with exactly OMNI_TEXT_OK"
+                + " in visible assistant content only."
+            )
+            completion, content, hidden = _visible_probe("visible_smoke_retry", retry_prompt)
+            if not completion.get("ok"):
+                return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "completion_failed", "checks": checks}
+        if not content and hidden:
+            return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "hidden_reasoning_without_visible_content", "checks": checks}
+        if "OMNI_TEXT_OK" not in content:
+            return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "visible_smoke_unexpected", "content": content[:160], "checks": checks}
+        return {"route": route_name, "ok": True, "status": "semantic_healthy", "reason": "endpoint_and_visible_smoke_passed", "content": content[:160], "checks": checks}
+
+    return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "no_route_specific_witness"}
 
 
 def local_compute_orchestration_packet(*, run_gates: bool = False) -> dict[str, Any]:
@@ -2814,13 +2925,23 @@ def local_compute_orchestration_packet(*, run_gates: bool = False) -> dict[str, 
 
     for route_name in ("omni", "vintage"):
         route = LOCAL_COMPUTE_ROUTE_MATRIX[route_name]
-        gate_results.append({
-            "route": route_name,
-            "ok": None,
-            "status": "requires_route_specific_smoke",
-            "command": route["gate"],
-            "reason": "capability-specific smoke required before promotion",
-        })
+        if run_gates:
+            witness = local_organ_witness(route_name)
+            gate_results.append({
+                "route": route_name,
+                "ok": witness.get("ok"),
+                "status": witness.get("status", "failed_closed"),
+                "reason": witness.get("reason", "route_specific_witness"),
+                "witness": witness,
+            })
+        else:
+            gate_results.append({
+                "route": route_name,
+                "ok": None,
+                "status": "not_run",
+                "command": route["gate"],
+                "reason": "use --local-orchestration --run-gates to spend local inference on the route-specific witness",
+            })
 
     return {
         "schema": "vybn.local_compute_orchestration.v1",
@@ -7543,7 +7664,10 @@ class OpenAIProvider(Provider):
         information (a tool's text output) is still useful as plain
         context — better than a 400 that fails the whole turn.
         """
-        out: list[dict] = [{"role": "system", "content": system.flat()}]
+        out: list[dict] = []
+        system_text = system.flat()
+        if system_text:
+            out.append({"role": "system", "content": system_text})
         for m in messages:
             role = m.get("role")
             content = m.get("content")
@@ -8711,7 +8835,6 @@ import io
 import logging
 import shutil
 import socket
-import urllib.error
 import urllib.request
 from urllib.parse import urljoin, urlparse
 from collections import defaultdict, deque

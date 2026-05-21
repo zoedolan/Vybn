@@ -349,6 +349,17 @@ class TestLayeredPrompt(unittest.TestCase):
         self.assertIn("Iteration budget: 10", p.substrate)
 
 
+class TestOpenAIProviderSystemMessages(unittest.TestCase):
+    def test_empty_layered_prompt_does_not_emit_blank_system_message(self):
+        provider = OpenAIProvider(api_key="x")
+        messages = provider._messages_for_openai(
+            LayeredPrompt(identity="", substrate="", live=""),
+            [{"role": "user", "content": "hello"}],
+        )
+        self.assertEqual(messages[0], {"role": "user", "content": "hello"})
+
+
+
 class TestOpenAIProvider(unittest.TestCase):
     def test_tool_translation(self):
         prov = OpenAIProvider(api_key="x")
