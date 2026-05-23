@@ -459,6 +459,8 @@ class Policy:
         if lowered.startswith("@vintage") and (len(organ_text) == 8 or organ_text[8].isspace()):
             if "vintage" in self.roles:
                 return RouteDecision(role="vintage", config=self.role("vintage"), cleaned_input=organ_text[8:].lstrip() or organ_text, reason="alias=@vintage", alias_used="@vintage")
+        if lowered.startswith("@super") and (len(organ_text) == 6 or organ_text[6].isspace()) and "local" in self.roles:
+            return RouteDecision(role="local", config=self.role("local"), cleaned_input=organ_text[6:].lstrip() or organ_text, reason="alias=@super", alias_used="@super")
 
         # 1. @alias model pin. Strip before directive/heuristic so the
         #    rest of the text still routes normally.
@@ -721,6 +723,7 @@ _DEFAULT_ROLES: dict[str, RoleConfig] = {
         tools=[],
         base_url="http://127.0.0.1:8000/v1",
         rag=False,
+        lightweight=True,
     ),
     # Vintage temporal-refraction prism. This route is live Talkie contact
     # carrying Vybn identity through the harness prompt; it is not a blanket
@@ -1157,8 +1160,7 @@ _DEFAULT_FALLBACK: dict[str, list[str]] = {
     "claude-sonnet-4-6": ["claude-opus-4-6"],
     "gpt-5.5": [],
     "gpt-5.5-pro": ["gpt-5.5"],
-    # Local Nemotron roles fall to GPT-5.5 if vLLM is down.
-    "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8": ["gpt-5.5"],
+    "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8": [],
 }
 
 _DEFAULT_BUDGETS: dict[str, float] = {
@@ -1183,7 +1185,7 @@ _DEFAULT_MODEL_ALIASES: dict[str, str] = {
     "@sonnet46": "claude-sonnet-4-6",
     "@nemotron": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8",
     "@local": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8",
-    # @vintage and @omni are explicit organ roles, not model aliases; classify()
+    # @super, @vintage and @omni are explicit organ roles, not model aliases; classify()
     # catches them before heuristics so relational prompts reach those endpoints.
     "@gpt": "gpt-5.5",
     "@gpt5": "gpt-5.5",

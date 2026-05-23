@@ -780,6 +780,16 @@ def test_vintage_alias_is_prefix_only_for_long_prompts():
     assert default_policy().classify(text).role != "vintage" and default_policy().classify("@vintage " + text).role == "vintage"
 
 
+def test_super_alias_contacts_local_nemotron_without_omni_route():
+    for policy in (default_policy(), load_policy(SPARK_DIR / "router_policy.yaml")):
+        d = policy.classify("@super are you working?")
+        assert (d.role, d.alias_used, d.model_override) == ("local", "@super", None)
+        assert (d.config.lightweight, d.config.max_tokens, d.config.base_url) == (True, 1024, "http://127.0.0.1:8000/v1")
+        assert d.config.base_url != "http://127.0.0.1:8002/v1"
+        assert "@super" not in policy.model_aliases
+        assert policy.fallback_chain["nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"] == []
+
+
 def test_vintage_alias_routes_to_temporal_refraction_role():
     policy = default_policy()
     yaml_policy = load_policy(SPARK_DIR / "router_policy.yaml")
@@ -803,18 +813,6 @@ def test_vintage_alias_routes_to_temporal_refraction_role():
             assert d.config.rag is True
         assert d.config.lightweight is False
         assert d.config.direct_reply_template is None
-
-
-def test_omni_alias_present_in_default_policy():
-    from spark.harness.substrate import default_policy
-    policy = default_policy()
-    assert "@omni" not in policy.model_aliases
-    assert policy.roles["omni"].provider == "openai"
-    # Refuses impersonation: not the Super model id.
-    assert policy.roles["omni"].model != "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"
-    assert policy.roles["omni"].model == "dc5f0b0bfddf8b6e0f5891475be9af05b80126fe"
-    assert policy.roles["omni"].base_url == "http://127.0.0.1:8002/v1"
-    assert policy.roles["omni"].direct_reply_template is None
 
 
 def test_omni_not_in_any_heuristic_or_directive():
@@ -2116,5 +2114,3 @@ def test_vintage_backend_unavailable_is_bounded_and_no_retry():
     names = [n for n, _ in log.events]
     assert "organ_raw_contact_error" in names
     assert "transient_retry" not in names
-
-
