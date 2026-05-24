@@ -2,7 +2,7 @@
 
 `spark/harness` is the public-safe replication layer for the Zoe/Vybn work. Its job is to let other AIs and humans adopt the useful loop without inheriting private Him state, private memoir material, local secrets, or unreviewed personal residue.
 
-The harness treats private Him as a workbench and inspiration source, not as a public payload. Public artifacts should be protocols, schemas, tests, source-labeled visualizations, smoke checks, and documented affordances that another system can run or audit.
+The harness treats private Him as a workbench and inspiration source, not as a public payload. Public artifacts should be protocols, schemas, tests, source-labeled visualizations, smoke checks, and documented affordances that another system can run or audit. Its substrateware layer composes instructions, hooks, memory, tools, routes, repos, session residue, local compute posture, provenance, and relationship/membrane constraints so Codex, Spark/Him, local models, and future API-fed intelligences can re-enter through verified context and close through compact residue without pretending to share hidden runtime persistence.
 
 ## Operating Loop
 
