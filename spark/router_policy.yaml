@@ -334,7 +334,7 @@ fallback_chain:
   claude-opus-4-6: [claude-opus-4-7, claude-sonnet-4-6]
   claude-sonnet-4-6: [claude-opus-4-6]
   gpt-5.5: []
-  nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8: [gpt-5.5]
+  nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8: []
   gpt-5.5-pro: [gpt-5.5]
 
 # Round 5: @alias model pin. Prefix any turn with @<alias> to force a
@@ -354,7 +354,7 @@ model_aliases:
   "@sonnet46": claude-sonnet-4-6
   "@nemotron": nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
   "@local": nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
-  # @omni is explicit/operator-gated; no heuristic Super fallback.
+  # @super and @omni are explicit/operator-gated; no heuristic fallback.
   "@gpt": gpt-5.5
   "@gpt5": gpt-5.5
   "@gpro": gpt-5.5-pro

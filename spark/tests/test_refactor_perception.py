@@ -471,41 +471,31 @@ def test_public_symbiosis_harness_protocol_exports_replicable_membrane():
     from spark.harness.substrate import render_public_symbiosis_harness_protocol
 
     text = render_public_symbiosis_harness_protocol()
-    assert "public symbiosis harness" in text.lower()
-    assert "replicable" in text
-    assert "other AIs" in text
-    assert "private Him state" in text
+    for needle in ("public symbiosis harness", "replicable", "other AIs", "private Him state", "local compute", "manifold", "source-labeled", "substrateware"):
+        assert needle.lower() in text.lower()
     assert "capability-truthful" in text or "capability truth" in text
     assert "fail-closed" in text or "fail closed" in text
-    assert "local compute" in text
-    assert "manifold" in text and "source-labeled" in text
 
 
 def test_public_symbiosis_harness_packet_is_public_safe_and_fail_closed():
     from spark.harness.substrate import public_symbiosis_harness_packet
 
     pkt = public_symbiosis_harness_packet()
-    assert pkt["schema"] == "vybn.public_symbiosis_harness.v1"
-    assert pkt["public_safe"] is True
-    assert pkt["private_exports"] is False
+    assert (pkt["schema"], pkt["public_safe"], pkt["private_exports"]) == ("vybn.public_symbiosis_harness.v1", True, False)
     assert pkt["membrane"]["private_him_state"] == "inspiration_and_workbench_only_not_exported"
-    assert pkt["capability_truth"]["failure_mode"] == "fail_closed"
+    assert pkt["capability_truth"]["failure_mode"] == "fail_closed" and "local_compute" in pkt["capability_truth"]
     assert "other AIs can join" in pkt["mission"]
-    assert "local_compute" in pkt["capability_truth"]
+    assert pkt["substrateware"]["claim_limit"] == "shared_environment_continuity_not_hidden_runtime_persistence"
+    assert {"wake_packet", "pressure_packet", "close_packet"} <= set(pkt["substrateware"]["loop"])
+    assert "truth_and_beauty" in pkt["substrateware"]["public_projection"]
 
 
 def test_hermes_agent_adaptation_protocol_distills_operational_patterns():
     from spark.harness.substrate import render_hermes_agent_adaptation_protocol
 
     text = render_hermes_agent_adaptation_protocol()
-    assert "Hermes Agent" in text
-    assert "adopted as pattern pressure" in text
-    assert "toolset_gating" in text
-    assert "profile_scoped_memory" in text
-    assert "agentic_cron" in text
-    assert "trajectory_compression" in text
-    assert "plugin_membrane" in text
-    assert "local_first_runtime" in text
+    for needle in ("Hermes Agent", "adopted as pattern pressure", "toolset_gating", "profile_scoped_memory", "agentic_cron", "trajectory_compression", "plugin_membrane", "local_first_runtime"):
+        assert needle in text
 
 
 def test_hermes_agent_adaptation_packet_is_public_safe_and_membrane_bound():
@@ -556,6 +546,7 @@ def test_refactor_packet_carries_semantic_operating_system_loop():
     assert pkt["publicSymbiosisHarness"]["public_safe"] is True
     assert pkt["publicSymbiosisHarness"]["private_exports"] is False
     assert pkt["hermesAgentAdaptation"]["adopt_not_copy"] is True
+    assert {"wake_packet", "close_packet"} <= set(pkt["publicSymbiosisHarness"]["substrateware"]["loop"])
     assert [step["id"] for step in pkt["hermesAgentAdaptationLoop"]][:3] == [
         "source_distillation",
         "organ_mapping",

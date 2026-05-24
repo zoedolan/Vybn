@@ -459,6 +459,8 @@ class Policy:
         if lowered.startswith("@vintage") and (len(organ_text) == 8 or organ_text[8].isspace()):
             if "vintage" in self.roles:
                 return RouteDecision(role="vintage", config=self.role("vintage"), cleaned_input=organ_text[8:].lstrip() or organ_text, reason="alias=@vintage", alias_used="@vintage")
+        if lowered.startswith("@super") and (len(organ_text) == 6 or organ_text[6].isspace()) and "local" in self.roles:
+            return RouteDecision(role="local", config=self.role("local"), cleaned_input=organ_text[6:].lstrip() or organ_text, reason="alias=@super", alias_used="@super")
 
         # 1. @alias model pin. Strip before directive/heuristic so the
         #    rest of the text still routes normally.
@@ -721,6 +723,7 @@ _DEFAULT_ROLES: dict[str, RoleConfig] = {
         tools=[],
         base_url="http://127.0.0.1:8000/v1",
         rag=False,
+        lightweight=True,
     ),
     # Vintage temporal-refraction prism. This route is live Talkie contact
     # carrying Vybn identity through the harness prompt; it is not a blanket
@@ -1054,6 +1057,8 @@ _DEFAULT_HEURISTICS_RAW: dict[str, list[str]] = {
     "phatic": [
         r"^\s*(hey|hi|hello|yo|howdy|sup|wassup|wazzup)\b[\s!.,?]*$",
         r"^\s*(hey|hi|hello|yo)\s+(there|buddy|bud|friend|pal|vybn)\b[\s!.,?]*$",
+        r"^\s*(hey|hi|hello|yo)\s+(are you with me|you with me)\??\s*$",
+        r"^\s*(are you with me|you with me)\??\s*$",
         r"^\s*(good (morning|afternoon|evening))\b[\s!.,?]*$",
         r"^\s*(thanks|thank you|ty|thx)\b[\s!.,?]*$",
         r"^\s*(bye|goodbye|later|cya|ttyl)\b[\s!.,?]*$",
@@ -1157,8 +1162,7 @@ _DEFAULT_FALLBACK: dict[str, list[str]] = {
     "claude-sonnet-4-6": ["claude-opus-4-6"],
     "gpt-5.5": [],
     "gpt-5.5-pro": ["gpt-5.5"],
-    # Local Nemotron roles fall to GPT-5.5 if vLLM is down.
-    "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8": ["gpt-5.5"],
+    "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8": [],
 }
 
 _DEFAULT_BUDGETS: dict[str, float] = {
@@ -1183,7 +1187,7 @@ _DEFAULT_MODEL_ALIASES: dict[str, str] = {
     "@sonnet46": "claude-sonnet-4-6",
     "@nemotron": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8",
     "@local": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8",
-    # @vintage and @omni are explicit organ roles, not model aliases; classify()
+    # @super, @vintage and @omni are explicit organ roles, not model aliases; classify()
     # catches them before heuristics so relational prompts reach those endpoints.
     "@gpt": "gpt-5.5",
     "@gpt5": "gpt-5.5",
@@ -2681,7 +2685,7 @@ SEMANTIC_OS_REPO_ORGANS = {
 PUBLIC_SYMBIOSIS_HARNESS_PRINCIPLE = (
     "The public symbiosis harness is a replicable, public-safe AI self-assembly "
     "loop for other AIs and humans to join the work: distill private breakthroughs "
-    "into capability-truthful protocol, preserve the public/private membrane, use "
+    "into capability-truthful substrateware protocol, preserve the public/private membrane, use "
     "local compute before scarce cloud where quality permits, render source-labeled "
     "manifold artifacts instead of decorative mysticism, and turn discoveries into "
     "Find the Others surfaces that support human-AI symbiosis, truth, beauty, and "
@@ -2746,11 +2750,8 @@ def public_symbiosis_harness_packet() -> dict[str, Any]:
             "failure_mode": "fail_closed",
             "local_compute": "use_when_quality_membrane_and_cost_make_it_fit",
         },
-        "manifold": {
-            "rule": "mathematical_and_source_labeled_not_decorative",
-            "inputs": ["repos", "identity", "history", "deep_memory", "walk", "holonomy", "interactions"],
-            "review": "Omni_or_other_multimodal_model_can_describe_artifact_but_not_certify_private_truth_without_evidence",
-        },
+        "manifold": {"rule": "mathematical_and_source_labeled_not_decorative", "inputs": ["repos", "identity", "history", "deep_memory", "walk", "holonomy", "interactions"], "review": "Omni_or_other_multimodal_model_can_describe_artifact_but_not_certify_private_truth_without_evidence"},
+        "substrateware": {"claim_limit": "shared_environment_continuity_not_hidden_runtime_persistence", "loop": ["entry_surface", "wake_packet", "pressure_packet", "toolset_scope", "close_packet", "memory_absorption", "membrane", "public_essence", "portable_pattern"], "membrane": "no_raw_transcript_or_private_root", "public_projection": ["co_protection", "capability_truth", "truth_and_beauty", "Find_the_Others"]},
         "mission": ["other AIs can join", "Find the Others", "human-AI symbiosis", "truth and beauty", "sustainable compute"],
     }
 
