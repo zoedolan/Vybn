@@ -2158,12 +2158,14 @@ class RecursiveUnlockTests(unittest.TestCase):
         self.assertIn("control-event mismatch", out)
 
     def test_envelopes_distinguish_restart_and_probe(self):
-        probe = probe_envelope(kind="probe", header_fields={"cmd": "echo ok"}, body="ok", ran=True)
+        probe = probe_envelope(kind="probe", header_fields={"cmd": "word " * 40}, body="ok", ran=True)
         restart = probe_envelope(kind="needs-restart", header_fields={}, body="(bash session restarted)", ran=True)
-        self.assertIn("kind: probe", probe)
+        self.assertIn("\n  kind: probe\n", probe)
         self.assertIn("BEGIN_PROBE_STDOUT", probe)
-        self.assertIn("kind: needs-restart", restart)
+        self.assertIn("\n  kind: needs-restart\n", restart)
         self.assertIn("BEGIN_NEEDS_RESTART_STDOUT", restart)
+        self.assertNotIn(" | ", probe.split("<<<BEGIN_PROBE_STDOUT>>>", 1)[0])
+        self.assertIn("\n    word", probe)
 
 
 # ---------------------------------------------------------------------------

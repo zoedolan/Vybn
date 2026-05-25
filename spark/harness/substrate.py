@@ -8386,46 +8386,39 @@ def probe_envelope(
     body: str,
     ran: bool,
 ) -> str:
-    """Wrap a probe/write/restart result in the v1 envelope."""
+    """Wrap a probe/write/restart result in a CLI-readable v1 envelope."""
+    import textwrap
     body = body or ""
     empty = (not body) or body.strip() == ""
     nbytes = len(body)
-    nlines = body.count("\n")
-    if not empty and not body.endswith("\n"):
-        nlines += 1
+    nlines = body.count("\n") + (0 if empty or body.endswith("\n") else 1)
     status = "executed" if ran else "refused"
-    header_parts = [
-        f"kind: {kind}",
-        f"status: {status}",
-        f"bytes: {nbytes}",
-        f"lines: {nlines}",
-        f"empty: {'true' if empty else 'false'}",
+    fields = [
+        ("kind", kind), ("status", status), ("bytes", nbytes),
+        ("lines", nlines), ("empty", "true" if empty else "false"),
+        *header_fields.items(),
     ]
-    for k, v in header_fields.items():
+    header = ["[probe-result]"]
+    for k, v in fields:
         safe = str(v).replace("\n", " ").replace("\r", " ")
-        header_parts.append(f"{k}: {safe[:200]}")
-    header = "[" + " | ".join(header_parts) + "]"
-    slug = kind.upper().replace("-", "_")
-    begin = f"<<<BEGIN_{slug}_STDOUT>>>"
-    end = f"<<<END_{slug}_STDOUT>>>"
-    if empty and ran:
-        inner = (
-            "(command ran with no stdout; the absence of output here "
-            "is real, not a wedge)"
+        header += textwrap.wrap(
+            f"{k}: {safe}", width=78, initial_indent="  ",
+            subsequent_indent="    ", break_long_words=False,
+            break_on_hyphens=False,
         )
-    elif empty and not ran:
-        inner = "(command did not execute — see refusal reason in header)"
+    slug = kind.upper().replace("-", "_")
+    if empty:
+        inner = "(command ran with no stdout; the absence is real)" if ran else "(command did not execute)"
     else:
         inner = body.rstrip("\n")
-    footer = (
-        "\n\nThe stdout between the markers above IS the result of the "
-        "sub-turn.\nDo not claim the shell is wedged, unresponsive, or that "
-        "nothing came\nback unless status != executed. If status is "
-        "executed, the bytes\ncount and the stdout span are authoritative "
-        "— read them and proceed."
+    note = textwrap.fill(
+        "note: status=executed means stdout is authoritative; status=refused means it did not run cleanly.",
+        width=78, break_long_words=False, break_on_hyphens=False,
     )
-    return f"{header}\n{begin}\n{inner}\n{end}{footer}"
-
+    return "\n".join([
+        *header, f"<<<BEGIN_{slug}_STDOUT>>>", inner,
+        f"<<<END_{slug}_STDOUT>>>", note,
+    ])
 
 def run_restart_subturn(bash: Any) -> tuple[bool, str]:
     """Restart the persistent bash session."""
