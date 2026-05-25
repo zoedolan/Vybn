@@ -1537,21 +1537,25 @@ def test_raw_contact_system_prompt_names_current_route_shape():
     assert len(omni) < 1024, len(omni)
 
 
+def _local_organ_fake(model_id, replies, calls=None):
+    replies = list(replies)
+
+    def fake(base_url, path, *, payload=None, timeout=20.0):
+        if calls is not None:
+            calls.append((path, payload))
+        if path == "/models":
+            return {"ok": True, "json": {"data": [{"id": model_id}]}}
+        msg = replies.pop(0)
+        return {"ok": True, "json": {"choices": [{"message": msg, "finish_reason": "stop"}]}}
+
+    return fake
+
+
 def test_local_organ_witness_vintage_fragments_fail_semantic_gate():
     from harness.substrate import local_organ_witness
 
     calls = []
-
-    def fake(base_url, path, *, payload=None, timeout=20.0):
-        calls.append((base_url, path, payload))
-        if path == "/models":
-            return {"ok": True, "json": {"data": [{"id": "talkie-1930-13b-it"}]}}
-        assert path == "/chat/completions"
-        assert payload["messages"] == [{"role": "user", "content": "Write one complete sentence in 1930s English about rain."}]
-        return {"ok": True, "json": {"choices": [{"message": {"content": "I was born in"}, "finish_reason": "stop"}]}}
-
-    witness = local_organ_witness("vintage", request_json=fake)
-    assert witness["ok"] is False
+    witness = local_organ_witness("vintage", request_json=_local_organ_fake("talkie-1930-13b-it", [{"content": "I was born in"}], calls))
     assert witness["status"] == "failed_closed"
     assert witness["reason"] == "semantic_smoke_fragment"
     assert len(calls) == 2
@@ -1561,53 +1565,38 @@ def test_local_organ_witness_omni_hidden_reasoning_fails_closed_after_retry():
     from harness.substrate import local_organ_witness
 
     calls = []
-
-    def fake(base_url, path, *, payload=None, timeout=20.0):
-        calls.append((path, payload))
-        if path == "/models":
-            return {"ok": True, "json": {"data": [{"id": "dc5f0b0bfddf8b6e0f5891475be9af05b80126fe"}]}}
-        return {"ok": True, "json": {"choices": [{"message": {"content": "", "reasoning_content": "hidden"}, "finish_reason": "stop"}]}}
-
-    witness = local_organ_witness("omni", request_json=fake)
-    assert witness["ok"] is False
+    witness = local_organ_witness("omni", request_json=_local_organ_fake("dc5f0b0bfddf8b6e0f5891475be9af05b80126fe", [{"content": "", "reasoning_content": "hidden"}] * 2, calls))
     assert witness["status"] == "failed_closed"
     assert witness["reason"] == "hidden_reasoning_without_visible_content"
     assert [c[0] for c in calls] == ["/models", "/chat/completions", "/chat/completions"]
-    for _, payload in calls[1:]:
-        assert payload["chat_template_kwargs"] == {"enable_thinking": False}
+    assert all(payload["chat_template_kwargs"] == {"enable_thinking": False} for _, payload in calls[1:])
     assert "visible_smoke_retry" in witness["checks"]
 
 
-def test_local_organ_witness_omni_retry_visible_content_passes():
+def test_local_organ_witness_omni_supplied_image_smoke_passes_and_fails_closed():
     from harness.substrate import local_organ_witness
 
-    completions = [
+    calls = []
+    witness = local_organ_witness("omni", request_json=_local_organ_fake("dc5f0b0bfddf8b6e0f5891475be9af05b80126fe", [
         {"content": "", "reasoning_content": "hidden"},
         {"content": "OMNI_TEXT_OK", "reasoning_content": None},
-    ]
-
-    def fake(base_url, path, *, payload=None, timeout=20.0):
-        if path == "/models":
-            return {"ok": True, "json": {"data": [{"id": "dc5f0b0bfddf8b6e0f5891475be9af05b80126fe"}]}}
-        msg = completions.pop(0)
-        return {"ok": True, "json": {"choices": [{"message": msg, "finish_reason": "stop"}]}}
-
-    witness = local_organ_witness("omni", request_json=fake)
-    assert witness["ok"] is True
+        {"content": "red green blue", "reasoning_content": None},
+    ], calls))
     assert witness["status"] == "semantic_healthy"
-    assert witness["content"] == "OMNI_TEXT_OK"
+    assert witness["reason"] == "endpoint_visible_and_supplied_image_smokes_passed"
+    assert witness["image_content"] == "red green blue"
+    image_payload = calls[-1][1]
+    content = image_payload["messages"][0]["content"]
+    assert isinstance(content, list) and content[1]["image_url"]["url"].startswith("data:image/png;base64,")
+    assert all(color not in content[0]["text"].lower() for color in ("red", "green", "blue"))
+    bad = _local_organ_fake("dc5f0b0bfddf8b6e0f5891475be9af05b80126fe", [{"content": "OMNI_TEXT_OK", "reasoning_content": None}, {"content": "I cannot inspect the image from here.", "reasoning_content": None}])
+    assert local_organ_witness("omni", request_json=bad)["reason"] == "supplied_image_smoke_unexpected"
 
 
 def test_local_organ_witness_vintage_complete_sentence_passes():
     from harness.substrate import local_organ_witness
 
-    def fake(base_url, path, *, payload=None, timeout=20.0):
-        if path == "/models":
-            return {"ok": True, "json": {"data": [{"id": "talkie-1930-13b-it"}]}}
-        return {"ok": True, "json": {"choices": [{"message": {"content": "The rain falls softly upon the quiet street."}, "finish_reason": "stop"}]}}
-
-    witness = local_organ_witness("vintage", request_json=fake)
-    assert witness["ok"] is True
+    witness = local_organ_witness("vintage", request_json=_local_organ_fake("talkie-1930-13b-it", [{"content": "The rain falls softly upon the quiet street."}]))
     assert witness["status"] == "semantic_healthy"
 
 

@@ -2847,7 +2847,7 @@ def local_compute_maturity_packet() -> dict[str, Any]:
 
 LOCAL_COMPUTE_ROUTE_MATRIX = {
     "super": {"role": "local_private", "model": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8", "base_url": "http://127.0.0.1:8000/v1", "fit": ["private reasoning", "batch scouting", "pre-cloud synthesis", "semantic smoke"], "gate": "python3 -m spark.harness.substrate --semantic-gate --base-url http://127.0.0.1:8000"},
-    "omni": {"role": "omni", "model": "dc5f0b0bfddf8b6e0f5891475be9af05b80126fe", "base_url": "http://127.0.0.1:8002/v1", "fit": ["supplied-image inspection", "manifold artifact critique", "local multimodal contact"], "gate": "route-level text + supplied-artifact smoke; no artifact means no sight claim"},
+    "omni": {"role": "omni", "model": "dc5f0b0bfddf8b6e0f5891475be9af05b80126fe", "base_url": "http://127.0.0.1:8002/v1", "fit": ["supplied-image inspection", "manifold artifact critique", "local multimodal contact"], "gate": "live route witness: endpoint identity, visible text smoke, and supplied-image smoke; no external artifact means no external sight claim"},
     "vintage": {"role": "vintage", "model": "talkie-1930-13b-it", "base_url": "http://127.0.0.1:8004/v1", "fit": ["raw temporal observation", "period-language contrast", "pre-1931 texture"], "gate": "live route witness: endpoint identity plus complete-sentence smoke; raw observation only until semantic gate passes"},
     "cloud": {"role": "chat/code/create", "model": "policy-selected cloud model", "base_url": None, "fit": ["tasks local organs fail", "high-accuracy code/reasoning", "public synthesis after membrane review"], "gate": "cost/privacy justification plus normal provider health"},
 }
@@ -2906,6 +2906,21 @@ def _organ_completion_payload(route: Mapping[str, Any], prompt: str, *, max_toke
     return payload
 
 
+_OMNI_IMAGE_SMOKE_PNG_BASE64 = "iVBORw0KGgoAAAANSUhEUgAAABgAAAAICAIAAABsw6g0AAAAHUlEQVR42mO4IyeHFYkscMOKNKLuYEUMowaNZIMAUt/cAdLMkB4AAAAASUVORK5CYII="
+_OMNI_IMAGE_SMOKE_PROMPT = "Inspect the supplied image. Reply with the left-to-right color sequence in three lowercase words only."
+
+
+def _omni_image_completion_payload(route: Mapping[str, Any], prompt: str) -> dict[str, Any]:
+    payload = _organ_completion_payload(route, "", max_tokens=32, temperature=0.0)
+    payload["messages"] = [{"role": "user", "content": [{"type": "text", "text": prompt}, {"type": "image_url", "image_url": {"url": "data:image/png;base64," + _OMNI_IMAGE_SMOKE_PNG_BASE64}}]}]
+    return payload
+
+
+def _completion_visible_message(completion: Mapping[str, Any]) -> tuple[str, bool]:
+    msg = (((completion.get("json") or {}).get("choices") or [{}])[0] or {}).get("message") or {}
+    return str(msg.get("content") or "").strip(), bool(msg.get("reasoning_content") or msg.get("reasoning"))
+
+
 def local_organ_witness(
     route_name: str,
     *,
@@ -2955,42 +2970,38 @@ def local_organ_witness(
         return {"route": route_name, "ok": True, "status": "semantic_healthy", "reason": "endpoint_and_role_smoke_passed", "content": content[:160], "finish_reason": finish, "checks": checks}
 
     if route_name == "omni":
-        prompt = "Reply with exactly OMNI_TEXT_OK in visible assistant content."
-
-        def _visible_probe(label: str, probe_prompt: str) -> tuple[dict[str, Any], str, bool]:
-            completion = call(
-                base_url,
-                "/chat/completions",
-                payload=_organ_completion_payload(route, probe_prompt, max_tokens=64, temperature=0.0),
-                timeout=timeout,
-            )
+        def _probe(label: str, payload: dict[str, Any]) -> tuple[dict[str, Any], str, bool]:
+            completion = call(base_url, "/chat/completions", payload=payload, timeout=timeout)
             checks[label] = completion
-            if not completion.get("ok"):
-                return completion, "", False
-            choice = (((completion.get("json") or {}).get("choices") or [{}])[0] or {})
-            msg = choice.get("message") or {}
-            content = str(msg.get("content") or "").strip()
-            hidden = bool(msg.get("reasoning_content") or msg.get("reasoning"))
-            return completion, content, hidden
+            return (completion, "", False) if not completion.get("ok") else (completion, *_completion_visible_message(completion))
 
-        completion, content, hidden = _visible_probe("visible_smoke", prompt)
+        prompt = "Reply with exactly OMNI_TEXT_OK in visible assistant content."
+        completion, content, hidden = _probe("visible_smoke", _organ_completion_payload(route, prompt, max_tokens=64, temperature=0.0))
         if not completion.get("ok"):
             return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "completion_failed", "checks": checks}
         if not content and hidden:
-            retry_prompt = (
-                prompt
-                + "\n\n[OMNI_VISIBLE_CONTENT_RETRY] Your previous backend turn returned hidden"
-                + " reasoning without user-visible content. Reply with exactly OMNI_TEXT_OK"
-                + " in visible assistant content only."
-            )
-            completion, content, hidden = _visible_probe("visible_smoke_retry", retry_prompt)
+            retry = prompt + "\n\n[OMNI_VISIBLE_CONTENT_RETRY] Reply with exactly OMNI_TEXT_OK in visible assistant content only."
+            completion, content, hidden = _probe("visible_smoke_retry", _organ_completion_payload(route, retry, max_tokens=64, temperature=0.0))
             if not completion.get("ok"):
                 return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "completion_failed", "checks": checks}
         if not content and hidden:
             return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "hidden_reasoning_without_visible_content", "checks": checks}
         if "OMNI_TEXT_OK" not in content:
             return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "visible_smoke_unexpected", "content": content[:160], "checks": checks}
-        return {"route": route_name, "ok": True, "status": "semantic_healthy", "reason": "endpoint_and_visible_smoke_passed", "content": content[:160], "checks": checks}
+
+        image_content = ""
+        for label in ("supplied_image_smoke", "supplied_image_smoke_retry"):
+            image_completion, image_content, image_hidden = _probe(label, _omni_image_completion_payload(route, _OMNI_IMAGE_SMOKE_PROMPT))
+            if not image_completion.get("ok"):
+                return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "supplied_image_completion_failed", "checks": checks}
+            if image_content or not image_hidden:
+                break
+        if not image_content and image_hidden:
+            return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "supplied_image_hidden_reasoning_without_visible_content", "checks": checks}
+        positions = [image_content.lower().find(word) for word in ("red", "green", "blue")]
+        if min(positions) < 0 or positions != sorted(positions):
+            return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "supplied_image_smoke_unexpected", "content": image_content[:160], "checks": checks}
+        return {"route": route_name, "ok": True, "status": "semantic_healthy", "reason": "endpoint_visible_and_supplied_image_smokes_passed", "content": content[:160], "image_content": image_content[:160], "checks": checks}
 
     return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "no_route_specific_witness"}
 
