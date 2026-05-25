@@ -2894,13 +2894,16 @@ def _local_organ_http_json(
 
 
 def _organ_completion_payload(route: Mapping[str, Any], prompt: str, *, max_tokens: int, temperature: float) -> dict[str, Any]:
-    return {
+    payload: dict[str, Any] = {
         "model": str(route["model"]),
         "messages": [{"role": "user", "content": prompt}],
         "max_tokens": max_tokens,
         "temperature": temperature,
         "stream": False,
     }
+    if str(route.get("role") or "") == "omni":
+        payload["chat_template_kwargs"] = {"enable_thinking": False}
+    return payload
 
 
 def local_organ_witness(
@@ -7842,34 +7845,26 @@ class OpenAIProvider(Provider):
         self, role: RoleConfig, openai_messages: list[dict], tools: list[ToolSpec]
     ) -> dict:
         base = role.base_url or self.base_url
-        # For vLLM/Nemotron deployments that are served at host:port without
-        # the `/v1` suffix, the chat-completions URL would otherwise miss
-        # `/v1`. We normalise here so role configs can specify either form.
         if base and not base.rstrip("/").endswith("/v1"):
             base = base.rstrip("/") + "/v1"
 
-        # Cloud OpenAI (no base_url) requires max_completion_tokens for
-        # GPT-5.x and o-series models; passing the legacy max_tokens key
-        # returns HTTP 400. Local vLLM / Nemotron (base_url set) still
-        # speaks the legacy key. Branch on transport rather than model
-        # name so new OpenAI-compatible models don't need a code change.
         max_key = "max_tokens" if base else "max_completion_tokens"
-
-        # OpenAI reasoning models (gpt-5.x base, o1, o3, o4-mini) only
-        # accept temperature=1 and do not support the temperature param
-        # at all in some variants. Detect by model name and omit temp.
         _m = role.model.lower()
         _is_reasoning = (
             _m.startswith("o1") or _m.startswith("o3") or _m.startswith("o4")
             or (_m.startswith("gpt-5.") and not _m.endswith("-mini"))
         )
-
         payload: dict[str, Any] = {
             "model": role.model,
             "messages": openai_messages,
             max_key: role.max_tokens,
             "stream": False,
         }
+        local_vllm_extra_body: dict[str, Any] = (
+            {"chat_template_kwargs": {"enable_thinking": False}}
+            if base and role.role == "omni"
+            else {}
+        )
         if _is_reasoning:
             payload["temperature"] = 1
         else:
@@ -7877,9 +7872,6 @@ class OpenAIProvider(Provider):
         if tools:
             payload["tools"] = self._translate_tools(tools)
 
-        # Prefer the official SDK when available (handles auth, retries).
-        # Only swallow ImportError — real API failures must propagate with
-        # context rather than getting masked by the raw-HTTP fallback.
         try:
             from openai import OpenAI  # type: ignore
         except ImportError:
@@ -7890,14 +7882,14 @@ class OpenAIProvider(Provider):
                 client = OpenAI(
                     api_key=self.api_key, base_url=base, timeout=300.0,
                 )
-                resp = client.chat.completions.create(**payload)
+                sdk_payload = dict(payload)
+                if local_vllm_extra_body:
+                    sdk_payload["extra_body"] = local_vllm_extra_body
+                resp = client.chat.completions.create(**sdk_payload)
                 return (
                     resp.model_dump() if hasattr(resp, "model_dump") else dict(resp)
                 )
             except Exception as exc:
-                # Connection / transport problems to a local vLLM that has
-                # gone away get retried via plain HTTP below. Any other
-                # error (auth, bad-request from cloud OpenAI) propagates.
                 msg = str(exc).lower()
                 transport_signals = (
                     "connection", "refused", "timed out",
@@ -7906,8 +7898,6 @@ class OpenAIProvider(Provider):
                 if not any(sig in msg for sig in transport_signals):
                     raise
 
-        # Fallback: plain HTTP — works for local vLLM without openai SDK
-        # or when the SDK hit a transport issue against a local server.
         try:
             import requests  # type: ignore
         except ImportError as exc:
@@ -7919,7 +7909,10 @@ class OpenAIProvider(Provider):
         headers = {"Content-Type": "application/json"}
         if self.api_key and self.api_key != "EMPTY":
             headers["Authorization"] = f"Bearer {self.api_key}"
-        r = requests.post(url, json=payload, headers=headers, timeout=300)
+        http_payload = dict(payload)
+        if local_vllm_extra_body:
+            http_payload.update(local_vllm_extra_body)
+        r = requests.post(url, json=http_payload, headers=headers, timeout=300)
         if r.status_code >= 400:
             body = r.text[:500] if r.text else ""
             raise RuntimeError(

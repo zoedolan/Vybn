@@ -1573,6 +1573,8 @@ def test_local_organ_witness_omni_hidden_reasoning_fails_closed_after_retry():
     assert witness["status"] == "failed_closed"
     assert witness["reason"] == "hidden_reasoning_without_visible_content"
     assert [c[0] for c in calls] == ["/models", "/chat/completions", "/chat/completions"]
+    for _, payload in calls[1:]:
+        assert payload["chat_template_kwargs"] == {"enable_thinking": False}
     assert "visible_smoke_retry" in witness["checks"]
 
 
