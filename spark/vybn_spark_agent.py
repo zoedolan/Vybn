@@ -28,7 +28,7 @@ from __future__ import annotations
 import json
 import os
 import sys
-import time
+import time, textwrap
 import urllib.request
 
 # Ensure the spark/ directory is importable when this file is run directly.
@@ -1172,7 +1172,7 @@ def run_agent_loop(
         )
         messages.append({"role": "user", "content": decision.cleaned_input})
         messages.append({"role": "assistant", "content": reply})
-        print(reply, flush=True)
+        print(textwrap.fill(reply, width=78, break_long_words=False, break_on_hyphens=False), flush=True)
         logger.emit(
             "direct_reply",
             turn=turn_number,
@@ -1351,7 +1351,7 @@ def run_agent_loop(
             )
         messages.append({"role": "user", "content": decision.cleaned_input})
         messages.append({"role": "assistant", "content": reply})
-        print(reply, flush=True)
+        print(textwrap.fill(reply, width=78, break_long_words=False, break_on_hyphens=False), flush=True)
         return reply
 
     # Pre-flight Super maintenance gate. Operator-armed VYBN_SUPER_MAINTENANCE

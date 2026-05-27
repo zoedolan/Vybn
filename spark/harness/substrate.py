@@ -8402,7 +8402,7 @@ def probe_envelope(
     for k, v in fields:
         safe = str(v).replace("\n", " ").replace("\r", " ")
         header += textwrap.wrap(
-            f"{k}: {safe}", width=78, initial_indent="  ",
+            f"{k}: {safe}", width=68, initial_indent="  ",
             subsequent_indent="    ", break_long_words=False,
             break_on_hyphens=False,
         )
@@ -8410,7 +8410,7 @@ def probe_envelope(
     if empty:
         inner = "(command ran with no stdout; the absence is real)" if ran else "(command did not execute)"
     else:
-        inner = body.rstrip("\n")
+        inner = "\n".join(textwrap.wrap(body.rstrip("\n"), width=68, break_long_words=False, break_on_hyphens=False))
     note = textwrap.fill(
         "note: status=executed means stdout is authoritative; status=refused means it did not run cleanly.",
         width=78, break_long_words=False, break_on_hyphens=False,
