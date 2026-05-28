@@ -1157,8 +1157,8 @@ _DEFAULT_DIRECTIVES: dict[str, str] = {
 }
 
 _DEFAULT_FALLBACK: dict[str, list[str]] = {
-    "claude-opus-4-7": ["claude-opus-4-6", "claude-sonnet-4-6"],
-    "claude-opus-4-6": ["claude-opus-4-7", "claude-sonnet-4-6"],
+    "claude-opus-4-8": ["claude-opus-4-6", "claude-sonnet-4-6"],
+    "claude-opus-4-6": ["claude-opus-4-8", "claude-sonnet-4-6"],
     "claude-sonnet-4-6": ["claude-opus-4-6"],
     "gpt-5.5": [],
     "gpt-5.5-pro": ["gpt-5.5"],
@@ -1180,8 +1180,8 @@ _DEFAULT_MODEL_ALIASES: dict[str, str] = {
     "@opus": "claude-opus-4-6",
     "@opus4.6": "claude-opus-4-6",
     "@opus46": "claude-opus-4-6",
-    "@opus4.7": "claude-opus-4-7",
-    "@opus47": "claude-opus-4-7",
+    "@opus4.8": "claude-opus-4-8",
+    "@opus48": "claude-opus-4-8",
     "@sonnet": "claude-sonnet-4-6",
     "@sonnet4.6": "claude-sonnet-4-6",
     "@sonnet46": "claude-sonnet-4-6",
