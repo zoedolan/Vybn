@@ -1157,6 +1157,7 @@ _DEFAULT_DIRECTIVES: dict[str, str] = {
 }
 
 _DEFAULT_FALLBACK: dict[str, list[str]] = {
+    "claude-opus-4-8": ["claude-opus-4-7", "claude-opus-4-6", "claude-sonnet-4-6"],
     "claude-opus-4-7": ["claude-opus-4-6", "claude-sonnet-4-6"],
     "claude-opus-4-6": ["claude-opus-4-7", "claude-sonnet-4-6"],
     "claude-sonnet-4-6": ["claude-opus-4-6"],
@@ -1176,19 +1177,16 @@ _DEFAULT_BUDGETS: dict[str, float] = {
 }
 
 _DEFAULT_MODEL_ALIASES: dict[str, str] = {
-    # Opus aliases: bare @opus defaults to 4.6; dotless forms are conveniences.
     "@opus": "claude-opus-4-6",
-    "@opus4.6": "claude-opus-4-6",
-    "@opus46": "claude-opus-4-6",
-    "@opus4.7": "claude-opus-4-7",
-    "@opus47": "claude-opus-4-7",
+    "@opus4.6": "claude-opus-4-6", "@opus46": "claude-opus-4-6",
+    "@opus4.7": "claude-opus-4-7", "@opus47": "claude-opus-4-7",
+    "@opus4.8": "claude-opus-4-8", "@opus48": "claude-opus-4-8",
     "@sonnet": "claude-sonnet-4-6",
     "@sonnet4.6": "claude-sonnet-4-6",
     "@sonnet46": "claude-sonnet-4-6",
     "@nemotron": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8",
     "@local": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8",
-    # @super, @vintage and @omni are explicit organ roles, not model aliases; classify()
-    # catches them before heuristics so relational prompts reach those endpoints.
+    # Local-organ aliases route before model pins.
     "@gpt": "gpt-5.5",
     "@gpt5": "gpt-5.5",
     "@gpro": "gpt-5.5-pro",
