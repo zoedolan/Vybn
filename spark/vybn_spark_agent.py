@@ -1745,7 +1745,7 @@ def run_agent_loop(
                 and not (response.text or "").strip()
                 and not response.tool_calls
             ):
-                _debug(f"[empty response from {role_cfg.provider}:{role_cfg.model} — try rephrasing or pin a different model with @sonnet/@opus4.6]")
+                _debug(f"[empty response from {role_cfg.provider}:{role_cfg.model} — try rephrasing or pin a different model with @sonnet/@opus48]")
 
             if response.stop_reason == "end_turn":
                 bag["stop_reason"] = "end_turn"
@@ -2586,7 +2586,7 @@ def main() -> None:
 
     print("  Type naturally. Prefix with /chat, /create, /plan, /task, /local "
           "to force a role,")
-    print("  or with @opus4.6/@opus4.6/@sonnet/@nemotron/@gpt to pin a model for one turn.")
+    print("  or with @opus4.8/@opus48/@opus4.7/@sonnet/@nemotron/@gpt to pin a model for one turn.")
     print("  REPL commands: exit | clear | reload | history | policy | /resume | /sessions | /newsession")
     print()
 

@@ -126,6 +126,10 @@ class TestPolicyHasLightweightRoles(unittest.TestCase):
             (data.get("model_aliases") or {}).get("@gpro"),
             "gpt-5.5-pro",
         )
+        self.assertEqual(
+            (data.get("model_aliases") or {}).get("@opus48"),
+            "claude-opus-4-8",
+        )
 
     def test_present_work_roles_default_to_gpt55(self):
         # If YAML is absent or malformed, in-code defaults must still keep
@@ -160,6 +164,12 @@ class TestPolicyHasLightweightRoles(unittest.TestCase):
         self.assertEqual(pol.model_aliases.get("@gpt"), "gpt-5.5")
         self.assertEqual(pol.model_aliases.get("@gpt5"), "gpt-5.5")
         self.assertEqual(pol.model_aliases.get("@gpro"), "gpt-5.5-pro")
+        self.assertEqual(pol.model_aliases.get("@opus48"), "claude-opus-4-8")
+
+    def test_opus48_alias_keeps_default_chat_role_but_pins_anthropic_model(self):
+        for pol in (default_policy(), load_policy(SPARK_DIR / "router_policy.yaml")):
+            d = pol.classify("@opus48 you with me, buddy?")
+            self.assertEqual((d.role, d.cleaned_input, d.model_override, d.alias_used), ("chat", "you with me, buddy?", "claude-opus-4-8", "@opus48"))
 
 
 class TestRouterLightweightClassification(unittest.TestCase):
@@ -742,35 +752,16 @@ class TestLocalPrivateRouting(unittest.TestCase):
         d = p.classify("Use the local workbench for dreaming consolidation over Him memory.")
         self.assertEqual(d.role, "local_private")
 
-# --- absorbed from test_opus47_deprecated.py (2026-04-29 file consolidation;
-# existing home K_t=test_lightweight_routing; opus 4.7 alias coverage lives here now) ---
-
-def test_opus47_is_available_as_opt_in_model_not_default():
-    active = Path("spark/harness/substrate.py").read_text() + "\\n" + Path("spark/router_policy.yaml").read_text()
-    assert "claude-opus-4-7" in active
-    assert "@opus4.7" in active
-    assert "@opus47" in active
-
-
-def test_code_role_defaults_to_gpt55_after_present_work_reset():
-    from spark.harness.substrate import default_policy
-    decision = default_policy().classify("fix the harness routing bug")
-    assert decision.role == "code"
-    assert decision.config.model == "gpt-5.5"
-
-
-def test_opus47_alias_pins_model_for_api_call():
-    from spark.harness.substrate import default_policy
-    decision = default_policy().classify("@opus4.7 fix the harness routing bug")
-    assert decision.role == "code"
-    assert decision.model_override == "claude-opus-4-7"
-    assert decision.alias_used == "@opus4.7"
-
-
-def test_opus47_has_fallback_chain():
-    from spark.harness.substrate import default_policy
-    policy = default_policy()
-    assert policy.fallback_chain["claude-opus-4-7"] == ["claude-opus-4-6", "claude-sonnet-4-6"]
+def test_opus_aliases_and_fallback_chains():
+    from spark.harness.substrate import default_policy, load_policy
+    aliases = {"@opus4.7": "claude-opus-4-7", "@opus47": "claude-opus-4-7", "@opus4.8": "claude-opus-4-8", "@opus48": "claude-opus-4-8"}
+    fallbacks = {"claude-opus-4-7": ["claude-opus-4-6", "claude-sonnet-4-6"], "claude-opus-4-8": ["claude-opus-4-7", "claude-opus-4-6", "claude-sonnet-4-6"]}
+    for policy in (default_policy(), load_policy(SPARK_DIR / "router_policy.yaml")):
+        for alias, model in aliases.items():
+            d = policy.classify(f"{alias} fix the harness routing bug")
+            assert (d.role, d.model_override, d.alias_used) == ("code", model, alias)
+        for model, chain in fallbacks.items():
+            assert policy.fallback_chain[model] == chain
 
 
 # Omni is an explicit endpoint role, not a model alias or Super fallback.

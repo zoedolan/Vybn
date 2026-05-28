@@ -1278,7 +1278,8 @@ def load_policy(path: str | os.PathLike | None = None) -> Policy:
 
     heuristics_raw = data.get("heuristics") or _DEFAULT_HEURISTICS_RAW
     directives = dict(data.get("directives") or _DEFAULT_DIRECTIVES)
-    fallback = dict(data.get("fallback_chain") or _DEFAULT_FALLBACK)
+    fallback = dict(_DEFAULT_FALLBACK)
+    fallback.update(data.get("fallback_chain") or {})
     budgets = dict(data.get("budgets") or _DEFAULT_BUDGETS)
     # Round 7: orchestrate is eval, not the default. /plan invokes it;
     # unclassified turns stay quoted (chat). YAML can override if an
@@ -1287,9 +1288,10 @@ def load_policy(path: str | os.PathLike | None = None) -> Policy:
     if default_role not in roles:
         default_role = next(iter(roles))
 
-    # Round 5: model_aliases. Missing block -> ship defaults so @sonnet
-    # etc. still work on older YAML.
-    aliases_raw = data.get("model_aliases") or _DEFAULT_MODEL_ALIASES
+    # Round 5: model_aliases. Merge defaults into YAML so a shipped policy
+    # file cannot mask newly added in-code aliases such as @opus48.
+    aliases_raw = dict(_DEFAULT_MODEL_ALIASES)
+    aliases_raw.update(data.get("model_aliases") or {})
     model_aliases = {str(k): str(v) for k, v in aliases_raw.items()}
 
     return Policy(
