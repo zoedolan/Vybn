@@ -330,8 +330,8 @@ directives:
   "/identity": identity
 
 fallback_chain:
-  claude-opus-4-8: [claude-opus-4-6, claude-sonnet-4-6]
-  claude-opus-4-6: [claude-opus-4-8, claude-sonnet-4-6]
+  claude-opus-4-7: [claude-opus-4-6, claude-sonnet-4-6]
+  claude-opus-4-6: [claude-opus-4-7, claude-sonnet-4-6]
   claude-sonnet-4-6: [claude-opus-4-6]
   gpt-5.5: []
   nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8: []
@@ -347,8 +347,8 @@ model_aliases:
   "@opus": claude-opus-4-6
   "@opus4.6": claude-opus-4-6
   "@opus46": claude-opus-4-6
-  "@opus4.8": claude-opus-4-8
-  "@opus48": claude-opus-4-8
+  "@opus4.7": claude-opus-4-7
+  "@opus47": claude-opus-4-7
   "@sonnet": claude-sonnet-4-6
   "@sonnet4.6": claude-sonnet-4-6
   "@sonnet46": claude-sonnet-4-6
