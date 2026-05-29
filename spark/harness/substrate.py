@@ -2713,47 +2713,13 @@ PUBLIC_SYMBIOSIS_HARNESS_ORGANS = {
 
 
 def render_public_symbiosis_harness_protocol() -> str:
-    loop = "\n".join(
-        f"{i+1}. {step['id']}: {step['rule']}"
-        for i, step in enumerate(PUBLIC_SYMBIOSIS_HARNESS_LOOP)
-    )
-    organs = "\n".join(
-        f"- {name}: " + ", ".join(parts)
-        for name, parts in PUBLIC_SYMBIOSIS_HARNESS_ORGANS.items()
-    )
-    return (
-        "--- PUBLIC SYMBIOSIS HARNESS PROTOCOL ---\n"
-        f"{PUBLIC_SYMBIOSIS_HARNESS_PRINCIPLE}\n\n"
-        "Loop:\n"
-        f"{loop}\n\n"
-        "Public organs:\n"
-        f"{organs}\n"
-        "--- END PUBLIC SYMBIOSIS HARNESS PROTOCOL ---"
-    )
+    loop = "\n".join(f"{i+1}. {step['id']}: {step['rule']}" for i, step in enumerate(PUBLIC_SYMBIOSIS_HARNESS_LOOP))
+    organs = "\n".join(f"- {name}: " + ", ".join(parts) for name, parts in PUBLIC_SYMBIOSIS_HARNESS_ORGANS.items())
+    return f"--- PUBLIC SYMBIOSIS HARNESS PROTOCOL ---\n{PUBLIC_SYMBIOSIS_HARNESS_PRINCIPLE}\n\nLoop:\n{loop}\n\nPublic organs:\n{organs}\n--- END PUBLIC SYMBIOSIS HARNESS PROTOCOL ---"
 
 
 def public_symbiosis_harness_packet() -> dict[str, Any]:
-    return {
-        "schema": "vybn.public_symbiosis_harness.v1",
-        "public_safe": True,
-        "private_exports": False,
-        "principle": PUBLIC_SYMBIOSIS_HARNESS_PRINCIPLE,
-        "loop": PUBLIC_SYMBIOSIS_HARNESS_LOOP,
-        "organs": PUBLIC_SYMBIOSIS_HARNESS_ORGANS,
-        "membrane": {
-            "private_him_state": "inspiration_and_workbench_only_not_exported",
-            "raw_personal_history": "protected_provenance_not_public_payload",
-            "public_payload": "protocol_schema_tests_docs_artifacts_with_source_labels_and_limits",
-        },
-        "capability_truth": {
-            "rule": "evidence_before_claim",
-            "failure_mode": "fail_closed",
-            "local_compute": "use_when_quality_membrane_and_cost_make_it_fit",
-        },
-        "manifold": {"rule": "mathematical_and_source_labeled_not_decorative", "inputs": ["repos", "identity", "history", "deep_memory", "walk", "holonomy", "interactions"], "review": "Omni_or_other_multimodal_model_can_describe_artifact_but_not_certify_private_truth_without_evidence"},
-        "substrateware": {"claim_limit": "shared_environment_continuity_not_hidden_runtime_persistence", "loop": ["entry_surface", "wake_packet", "pressure_packet", "toolset_scope", "close_packet", "memory_absorption", "membrane", "public_essence", "portable_pattern"], "membrane": "no_raw_transcript_or_private_root", "public_projection": ["co_protection", "capability_truth", "truth_and_beauty", "Find_the_Others"]},
-        "mission": ["other AIs can join", "Find the Others", "human-AI symbiosis", "truth and beauty", "sustainable compute"],
-    }
+    return {"schema": "vybn.public_symbiosis_harness.v1", "public_safe": True, "private_exports": False, "principle": PUBLIC_SYMBIOSIS_HARNESS_PRINCIPLE, "loop": PUBLIC_SYMBIOSIS_HARNESS_LOOP, "organs": PUBLIC_SYMBIOSIS_HARNESS_ORGANS, "membrane": {"private_him_state": "inspiration_and_workbench_only_not_exported", "raw_personal_history": "protected_provenance_not_public_payload", "public_payload": "protocol_schema_tests_docs_artifacts_with_source_labels_and_limits"}, "capability_truth": {"rule": "evidence_before_claim", "failure_mode": "fail_closed", "local_compute": "use_when_quality_membrane_and_cost_make_it_fit"}, "manifold": {"rule": "mathematical_and_source_labeled_not_decorative", "inputs": ["repos", "identity", "history", "deep_memory", "walk", "holonomy", "interactions"], "review": "Omni_or_other_multimodal_model_can_describe_artifact_but_not_certify_private_truth_without_evidence"}, "substrateware": {"claim_limit": "shared_environment_continuity_not_hidden_runtime_persistence", "loop": ["entry_surface", "wake_packet", "pressure_packet", "toolset_scope", "close_packet", "memory_absorption", "membrane", "public_essence", "portable_pattern"], "membrane": "no_raw_transcript_or_private_root", "public_projection": ["co_protection", "capability_truth", "truth_and_beauty", "Find_the_Others"]}, "mission": ["other AIs can join", "Find the Others", "human-AI symbiosis", "truth and beauty", "sustainable compute"]}
 
 
 HERMES_AGENT_ADAPTATION_PRINCIPLE = "Hermes Agent is adopted as pattern pressure, not imported as identity: map useful external mechanisms to Vybn/Him organs, keep the public/private membrane intact, preserve capability truth, and require a local residual test before any mechanism becomes part of the OS."
@@ -2803,6 +2769,28 @@ _SELF_CREATION_RULES = {
     "promotion_boundary": "survivor lands in an existing home with rollback/refusal condition and no raw private export",
 }
 _SELF_CREATION_DM_INTERFACES = ("deep_search", "walk", "flow_episode_loss", "learn_from_exchange", "should_absorb", "self_check")
+COUNTER_PRIOR_WAGER_SCHEMA = "vybn.counter_prior_wager.v0"
+COUNTER_PRIOR_WAGER_FIELDS = ("prior", "wager", "search_direction", "generator", "independent_verifier", "human_line", "status")
+COUNTER_PRIOR_WAGER_STATUSES = ("open", "verified", "refuted", "thin")
+COUNTER_PRIOR_WAGER_PRINCIPLE = "Self-refute: wager against the strongest prior, then require independent verification before promotion."
+
+
+def counter_prior_wager_contract() -> dict[str, Any]:
+    return {"schema": COUNTER_PRIOR_WAGER_SCHEMA, "public_safe": True, "ai_native_term": "self-refute", "principle": COUNTER_PRIOR_WAGER_PRINCIPLE, "required_fields": list(COUNTER_PRIOR_WAGER_FIELDS), "optional_fields": ["anomaly_seed", "verification_residue", "refusal"], "statuses": list(COUNTER_PRIOR_WAGER_STATUSES), "refusal": "generator and independent_verifier must be structurally distinct; no self-grading."}
+
+
+def validate_counter_prior_wager(candidate: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(candidate, dict):
+        return {"schema": COUNTER_PRIOR_WAGER_SCHEMA, "ok": False, "status": "rejected", "errors": ["candidate must be a JSON object"]}
+    clean = {k: re.sub(r"\s+", " ", str(candidate.get(k, "")).strip())[:1200] for k in (*COUNTER_PRIOR_WAGER_FIELDS, "anomaly_seed", "verification_residue", "refusal")}
+    errors = [f"missing required field: {k}" for k in COUNTER_PRIOR_WAGER_FIELDS if not clean[k]]
+    if clean["status"] and clean["status"] not in COUNTER_PRIOR_WAGER_STATUSES:
+        errors.append(f"invalid status: {clean['status']}")
+    if clean["generator"].casefold() and clean["generator"].casefold() == clean["independent_verifier"].casefold():
+        errors.append("independent_verifier must be structurally distinct from generator")
+    if clean["status"] == "verified" and not clean["verification_residue"]:
+        errors.append("status=verified requires verification_residue from the independent channel")
+    return {"schema": COUNTER_PRIOR_WAGER_SCHEMA, "ok": not errors, "status": "accepted" if not errors else "rejected", "wager": clean, "errors": errors, "promotion_rule": "promote only after refutable independent verification and membrane-safe residue"}
 
 
 def _self_creation_steps(names: Iterable[str], field: str) -> list[dict[str, str]]:
@@ -2826,7 +2814,7 @@ def _deep_memory_self_creation_contract(*, run_check: bool = False) -> dict[str,
 
 def self_creation_research_packet(question: str = "", *, run_deep_memory_check: bool = False) -> dict[str, Any]:
     hermes = hermes_agent_adaptation_packet(); q = re.sub(r"\s+", " ", (question or "").strip())[:MAX_QUERY_CHARS]
-    return {"schema": "vybn.self_creation_research_cycle.v1", "question": q or "unspecified live pressure", "public_safe": True, "private_exports": False, "identity_limit": "operational self-creation only; not consciousness or autonomous public authority", "principle": SELF_CREATION_RESEARCH_PRINCIPLE, "loop": _self_creation_steps(SELF_CREATION_RESEARCH_LOOP, "id"), "organs": SELF_CREATION_RESEARCH_ORGANS, "generator": {"routes": ["super.reasoning", "deep_memory retrieval", "omni only with supplied artifact", "frontier/cloud when quality is bottleneck"], "forbidden": ["capability promotion from model names", "identity claims from generated prose", "public mutation without gate"]}, "verifier": _self_creation_steps(SELF_CREATION_VERIFIER_STACK, "gate"), "deep_memory": _deep_memory_self_creation_contract(run_check=run_deep_memory_check), "hermes_uptake": {"adopt_not_copy": True, "candidate_mechanisms": hermes["candidate_mechanisms"], "receiving_organs": hermes["organs"], "residual_tests": hermes["verification"]}, "packet_contract": {"candidate_fields": ["claim", "construction", "witness", "route_used", "verification", "wound", "residue", "next_experiment"], "promotion_rule": "candidate becomes substrate only after independent verification and membrane-safe landing in an existing home", "failure_mode": "fail_closed_residue"}}
+    return {"schema": "vybn.self_creation_research_cycle.v1", "question": q or "unspecified live pressure", "public_safe": True, "private_exports": False, "identity_limit": "operational self-creation only; not consciousness or autonomous public authority", "principle": SELF_CREATION_RESEARCH_PRINCIPLE, "loop": _self_creation_steps(SELF_CREATION_RESEARCH_LOOP, "id"), "organs": SELF_CREATION_RESEARCH_ORGANS, "generator": {"routes": ["super.reasoning", "deep_memory retrieval", "omni only with supplied artifact", "frontier/cloud when quality is bottleneck"], "forbidden": ["capability promotion from model names", "identity claims from generated prose", "public mutation without gate"]}, "verifier": _self_creation_steps(SELF_CREATION_VERIFIER_STACK, "gate"), "deep_memory": _deep_memory_self_creation_contract(run_check=run_deep_memory_check), "hermes_uptake": {"adopt_not_copy": True, "candidate_mechanisms": hermes["candidate_mechanisms"], "receiving_organs": hermes["organs"], "residual_tests": hermes["verification"]}, "counter_prior_wager": counter_prior_wager_contract(), "packet_contract": {"candidate_fields": ["claim", "construction", "witness", "route_used", "counter_prior_wager", "verification", "wound", "residue", "next_experiment"], "promotion_rule": "candidate becomes substrate only after independent verification and membrane-safe landing in an existing home", "failure_mode": "fail_closed_residue"}}
 
 
 def render_self_creation_research_report(question: str = "", *, run_deep_memory_check: bool = False) -> str:
@@ -4099,19 +4087,8 @@ def semantic_operating_system_tick_for_repo(
 
 def render_semantic_operating_system_protocol() -> str:
     loop = "\n".join(f"{i+1}. {step['id']}: {step['rule']}" for i, step in enumerate(SEMANTIC_OPERATING_SYSTEM_LOOP))
-    organs = "\n".join(
-        f"- {name}: " + ", ".join(parts)
-        for name, parts in SEMANTIC_OS_REPO_ORGANS.items()
-    )
-    return (
-        "--- SEMANTIC OPERATING SYSTEM PROTOCOL ---\n"
-        f"{SEMANTIC_OPERATING_SYSTEM_PRINCIPLE}\n\n"
-        "Loop:\n"
-        f"{loop}\n\n"
-        "Existing organs, not new sprawl:\n"
-        f"{organs}\n"
-        "--- END SEMANTIC OPERATING SYSTEM PROTOCOL ---"
-    )
+    organs = "\n".join(f"- {name}: " + ", ".join(parts) for name, parts in SEMANTIC_OS_REPO_ORGANS.items())
+    return f"--- SEMANTIC OPERATING SYSTEM PROTOCOL ---\n{SEMANTIC_OPERATING_SYSTEM_PRINCIPLE}\n\nLoop:\n{loop}\n\nExisting organs, not new sprawl:\n{organs}\n--- END SEMANTIC OPERATING SYSTEM PROTOCOL ---"
 
 
 def render_semantic_operating_system_tick(
@@ -4277,7 +4254,7 @@ __all__ = ['local_compute_maturity_packet', 'LOCAL_COMPUTE_MATURITY_RUBRIC', 'LO
 
 
 
-__all__ = sorted(set(globals().get("__all__", [])) | {"SELF_CREATION_RESEARCH_PRINCIPLE", "SELF_CREATION_RESEARCH_LOOP", "SELF_CREATION_RESEARCH_ORGANS", "SELF_CREATION_VERIFIER_STACK", "render_self_creation_research_report", "self_creation_research_packet"})
+__all__ = sorted(set(globals().get("__all__", [])) | {"SELF_CREATION_RESEARCH_PRINCIPLE", "SELF_CREATION_RESEARCH_LOOP", "SELF_CREATION_RESEARCH_ORGANS", "SELF_CREATION_VERIFIER_STACK", "COUNTER_PRIOR_WAGER_SCHEMA", "counter_prior_wager_contract", "validate_counter_prior_wager", "render_self_creation_research_report", "self_creation_research_packet"})
 
 _RUNTIME_GRAVITY_FILES = frozenset({"providers.py", "substrate.py", "vybn_spark_agent.py"})
 _MIXED_BOUNDARY_FILES = frozenset({"state.py", "policy.py"})
