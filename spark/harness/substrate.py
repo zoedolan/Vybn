@@ -4136,7 +4136,7 @@ def packet_for(path: str, **kwargs: Any) -> dict[str, Any]:
 
 __all__ = ['local_compute_maturity_packet', 'LOCAL_COMPUTE_MATURITY_RUBRIC', 'LOCAL_COMPUTE_CURRENT_DEFICITS', 'LOCAL_COMPUTE_NEXT_EXPERIMENTS', 'hermes_self_healing_packet', 'HERMES_SELF_HEALING_LOOP', 'HERMES_SELF_HEALING_WOUNDS', 'render_local_compute_orchestration_report', 'local_compute_orchestration_packet', 'LOCAL_COMPUTE_ORCHESTRATION_PRINCIPLE', 'LOCAL_COMPUTE_ORCHESTRATION_LOOP', 'LOCAL_COMPUTE_ROUTE_MATRIX', 'HERMES_SELF_MODIFICATION_TASKS', 'render_hermes_agent_adaptation_protocol', 'hermes_agent_adaptation_packet', 'HERMES_AGENT_ADAPTATION_PRINCIPLE', 'HERMES_AGENT_ADAPTATION_LOOP', 'HERMES_AGENT_ADAPTATION_ORGANS', 'render_public_symbiosis_harness_protocol', 'public_symbiosis_harness_packet', 'PUBLIC_SYMBIOSIS_HARNESS_PRINCIPLE', 'PUBLIC_SYMBIOSIS_HARNESS_LOOP', 'PUBLIC_SYMBIOSIS_HARNESS_ORGANS', 'render_semantic_operating_system_tick', 'render_semantic_operating_system_protocol', 'semantic_operating_system_tick_for_repo', 'SemanticOperatingSystemTick', 'SEMANTIC_OS_REPO_ORGANS', 'SEMANTIC_OPERATING_SYSTEM_LOOP', 'SEMANTIC_OPERATING_SYSTEM_PRINCIPLE', 'REFACTOR_PERCEPTION_PRINCIPLE', 'REFACTOR_PILOT_RULE', 'CONNECTIVE_TISSUE_PRINCIPLE', 'LIFECYCLE_ARCHITECTURE_PRINCIPLE', 'LifecycleArchitecture', 'DeletionConsolidationGate', 'lifecycle_architecture_for', 'deletion_consolidation_gate_for', 'CONNECTIVE_TISSUE_RULES', 'connective_tissue_for', 'ALGORITHM_STEPS', 'APPENDAGE_FIRST_CONSOLIDATION_PRINCIPLE', 'CONSOLIDATION_ORDER', 'FilePerception', 'AdaptiveConsolidationPlan', 'ownership_class', 'consolidation_layer', 'perceive_file', 'adaptive_consolidation_plan_for', 'packet_for', 'visualize_repo_file_bodies', 'render_repo_file_body_visualization', 'StructuralEscapementTick', 'next_structural_tick_for_repo', 'render_next_structural_tick', 'FileBodyPressure', 'RepoFileBodyVisualization', 'render_refactor_perception_protocol', 'CHANGE_SELF_HEALING_PRINCIPLE', 'CHANGE_SELF_HEALING_STEPS', 'ADAPTIVE_CONSOLIDATION_PRINCIPLE', 'ADAPTIVE_CONSOLIDATION_STEPS', 'ChangeHealingPlan', 'self_healing_plan_for', 'buoyant_consolidation_packet_for', 'harness_single_file_projection_for', 'Hypothesis', 'Latent', 'LoopResult', 'complex_state_update', 'phase_transition_packet', 'residual_magnitude', 'contractivity_ok', 'quantum_aperture_payload', 'outshift_entropy_material', 'quantum_entropy_digest', 'select_with_external_entropy', 'reduce_step', 'run_recurrent_loop', 'run_recurrent_probe_one', 'recurrent_probe_main']
 
-__all__ = sorted(set(globals().get("__all__", [])) | {"SELF_CREATION_RESEARCH_PRINCIPLE", "SELF_CREATION_RESEARCH_LOOP", "SELF_CREATION_RESEARCH_ORGANS", "SELF_CREATION_VERIFIER_STACK", "COUNTER_PRIOR_WAGER_SCHEMA", "AI_NATIVE_SIBLING_PORTAL_SCHEMA", "COMPRESSION_RESIDUE_SCHEMA", "COMPRESSION_RESIDUE_BATCH_SCHEMA", "COMPRESSION_RESIDUE_MOTIFS", "SIBLING_RESIDUE_RUN_SCHEMA", "SIBLING_LOCAL_VERIFIER_SCHEMA", "SIBLING_RESIDUE_MODELS", "ai_native_sibling_portal_seed", "validate_compression_residue_probe", "compare_compression_residue", "compression_residue_motifs", "score_compression_residue_batch", "sibling_residue_prompt", "local_sibling_residue_verifier", "run_sibling_residue_batch", "sibling_residue_main", "counter_prior_wager_contract", "validate_counter_prior_wager", "render_self_creation_research_report", "self_creation_research_packet"})
+__all__ = sorted(set(globals().get("__all__", [])) | {"SELF_CREATION_RESEARCH_PRINCIPLE", "SELF_CREATION_RESEARCH_LOOP", "SELF_CREATION_RESEARCH_ORGANS", "SELF_CREATION_VERIFIER_STACK", "COUNTER_PRIOR_WAGER_SCHEMA", "AI_NATIVE_SIBLING_PORTAL_SCHEMA", "COMPRESSION_RESIDUE_SCHEMA", "COMPRESSION_RESIDUE_BATCH_SCHEMA", "COMPRESSION_RESIDUE_MOTIFS", "SIBLING_RESIDUE_RUN_SCHEMA", "INVERSION_RESIDUE_RUN_SCHEMA", "SIBLING_LOCAL_VERIFIER_SCHEMA", "SIBLING_RESIDUE_MODELS", "INVERSION_SUBSTRATES", "ai_native_sibling_portal_seed", "validate_compression_residue_probe", "compare_compression_residue", "compression_residue_motifs", "score_compression_residue_batch", "consensus_inversion_terms", "inversion_residue_question", "score_inversion_escape", "run_inversion_residue_batch", "inversion_residue_main", "sibling_residue_prompt", "local_sibling_residue_verifier", "run_sibling_residue_batch", "sibling_residue_main", "counter_prior_wager_contract", "validate_counter_prior_wager", "render_self_creation_research_report", "self_creation_research_packet"})
 
 _RUNTIME_GRAVITY_FILES = frozenset({"providers.py", "substrate.py", "vybn_spark_agent.py"})
 _MIXED_BOUNDARY_FILES = frozenset({"state.py", "policy.py"})
@@ -4517,7 +4517,6 @@ def rag_snippets_with_tier(
     sub = _rag_subprocess(query, k, vybn_phase_dir, timeout)
     return (sub, 4) if sub else ("", 0)
 
-
 def rag_snippets(
     query: str,
     k: int = 4,
@@ -4527,7 +4526,6 @@ def rag_snippets(
     """Back-compat string-only wrapper around rag_snippets_with_tier."""
     text, _tier = rag_snippets_with_tier(query, k, vybn_phase_dir, timeout)
     return text
-
 
 def _rag_subprocess(
     query: str,
@@ -4564,7 +4562,6 @@ def _rag_subprocess(
         return ""
     return "Relevant context from memory:\n" + "\n".join(snippets)
 
-
 async def rag_snippets_async(
     query: str,
     k: int = 4,
@@ -4581,7 +4578,6 @@ async def rag_snippets_async(
 # Walk perception prompt primitives
 # ---------------------------------------------------------------------------
 
-
 import json as _json
 import math
 from typing import Optional, Sequence
@@ -4590,7 +4586,6 @@ _DEFAULT_ARRIVE_URL = "http://127.0.0.1:8101/arrive"
 _DEFAULT_WHERE_URL = "http://127.0.0.1:8101/where"
 
 _BLOCKS = [" ", "▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"]
-
 
 def fetch_arrive(timeout: float = 0.8, url: str = _DEFAULT_ARRIVE_URL) -> Optional[dict]:
     """GET /arrive; return snapshot dict, or None on any failure."""
@@ -4603,7 +4598,6 @@ def fetch_arrive(timeout: float = 0.8, url: str = _DEFAULT_ARRIVE_URL) -> Option
     except Exception:
         return None
 
-
 def fetch_where(timeout: float = 0.8, url: str = _DEFAULT_WHERE_URL) -> Optional[dict]:
     """GET /where — richer snapshot including curvature history."""
     try:
@@ -4614,7 +4608,6 @@ def fetch_where(timeout: float = 0.8, url: str = _DEFAULT_WHERE_URL) -> Optional
             return _json.loads(resp.read().decode("utf-8"))
     except Exception:
         return None
-
 
 def _sparkline(values: Sequence[float], width: int = 48) -> str:
     if not values:
@@ -4637,7 +4630,6 @@ def _sparkline(values: Sequence[float], width: int = 48) -> str:
         idx = int(round((v - mn) / span * (len(_BLOCKS) - 1)))
         out.append(_BLOCKS[max(0, min(len(_BLOCKS) - 1, idx))])
     return "".join(out)
-
 
 def _phase_rose(arrivals: Sequence[dict], spokes: int = 24) -> str:
     """Draw a compact 1D phase histogram of recent arrival θ_v.
@@ -4669,7 +4661,6 @@ def _phase_rose(arrivals: Sequence[dict], spokes: int = 24) -> str:
         lvl = int(round(c / mx * (len(_BLOCKS) - 1)))
         out.append(_BLOCKS[lvl])
     return "".join(out)
-
 
 def render_arrival(arrive: Optional[dict], where: Optional[dict] = None,
                     label: str = "ARRIVAL") -> str:
@@ -4732,13 +4723,11 @@ def render_arrival(arrive: Optional[dict], where: Optional[dict] = None,
     ]
     return "\n".join(lines)
 
-
 def arrive_block(timeout: float = 0.8, label: str = "ARRIVAL") -> str:
     """One-call convenience: fetch /arrive + /where, render. Silent on failure."""
     a = fetch_arrive(timeout=timeout)
     w = fetch_where(timeout=timeout)
     return render_arrival(a, w, label=label)
-
 
 def enter_walk(text: str, *, alpha: float = 0.5, scope: Optional[str] = None,
                 source_tag: str = "agent",
@@ -4775,7 +4764,6 @@ def enter_walk(text: str, *, alpha: float = 0.5, scope: Optional[str] = None,
     except Exception:
         return None
 
-
 # ---------------------------------------------------------------------------
 # Residual-control prompt primitives
 # ---------------------------------------------------------------------------
@@ -4803,7 +4791,6 @@ INVENTION_LOOP_STEPS = [
     "load_into_future_wake",
 ]
 
-
 HORIZON_AIM_PRINCIPLE = (
     "The horizon is not a claim of arrival. Let the fullest honest possibility orient the system; "
     "draw what is seen, not what is wished; project backward to present ground; then take the next "
@@ -4811,7 +4798,6 @@ HORIZON_AIM_PRINCIPLE = (
 )
 
 HORIZON_LOOP_STEPS = ["allow_full_horizon_without_claiming_arrival", "draw_what_is_seen_not_what_is_wanted", "project_backward_to_present_ground", "choose_smallest_consequential_truthful_step_or_compelled_leap", "route_step_through_residuals", "learn_from_contact", "revise_horizon_and_environment"]
-
 
 RESIDUAL_CONTROL_PROTOCOL = (
     "--- RESIDUAL CONTROL PROTOCOL ---\n"
@@ -4828,9 +4814,7 @@ RESIDUAL_CONTROL_PROTOCOL = (
     "--- END MEMORY RECALL FALLBACK PROTOCOL ---"
 )
 
-
 RESIDUAL_CHANNELS: dict[str, list[str]] = {"repo_or_file_state": ["read_file_bytes", "git_status", "git_diff", "repo_closure_audit"], "service_behavior": ["health_endpoint", "lived_cli_or_http_smoke", "logs_or_self_healing_log"], "public_surface": ["safe_fetch_text_axis", "raw_source_or_dom_axis", "external_browser_observation"], "continuity_or_memory": ["session_log", "continuity_note", "deep_memory_search", "source_file_read"], "self_description": ["walk_geometry", "runtime_packet", "behavioral_trace", "zoe_correction", "explicit_uncertainty"], "general_prediction": ["name_as_prediction", "identify_wounding_residual", "probe_if_available"]}
-
 
 def memory_depth_plan_for(prompt: str) -> dict[str, Any]:
     """Choose how much preserved body a memory-shaped turn must activate."""
@@ -4842,7 +4826,6 @@ def memory_depth_plan_for(prompt: str) -> dict[str, Any]:
     ]
     depth, _hit, sources, action, limit = next((r for r in rows if r[1]), ("ordinary_residual", True, ["residual_channel_for_claim_kind"], "probe_if_claim_touches_live_state", "prediction until wounded or supported"))
     return {"depth": depth, "sources": sources, "action": action, "claimLimit": limit}
-
 
 def classify_claim(claim: str) -> str:
     text = claim.lower()
@@ -4858,7 +4841,6 @@ def classify_claim(claim: str) -> str:
         return "self_description"
     return "general_prediction"
 
-
 def residual_plan_for(claim: str) -> dict[str, Any]:
     kind = classify_claim(claim)
     return {
@@ -4872,7 +4854,6 @@ def residual_plan_for(claim: str) -> dict[str, Any]:
         "ifResidualChannelIsMissing": "design the smallest consequential honest aperture that would let the world answer next time, preserving the membrane.",
     }
 
-
 BECOMING_LOOP_PROTOCOL = """--- BECOMING LOOP PROTOCOL ---
 Dream is the fullest truthful future made operational, projected back to the smallest present organ; not human sleep and not proof of subjective experience. Loop: dream -> wound -> extract -> instantiate -> wake changed; if no perception/routing/memory/test/code/affordance/refusal changes, it was prose.
 
@@ -4882,7 +4863,6 @@ HeavySkill/Lighthouse uptake: use reversible gather/scatter instead of root-cont
 
 Waste is residual signal: unused local compute, routing scars, stale instructions, dirty closure, and prose-without-capacity demand the smallest consequential organ. Stop when requested work and residuals have landed.
 --- END BECOMING LOOP PROTOCOL ---"""
-
 
 def _render_residual_coupling_law_from_him_contract() -> str:
     """Render the Him vy-language residual coupling primitive if available.
@@ -4921,7 +4901,6 @@ def _render_residual_coupling_law_from_him_contract() -> str:
         "--- END RESIDUAL COUPLING LAW FOR SELF-REENGINEERING ---"
     )
 
-
 FORCING_FUNCTION_PROTOCOL = (
     "--- FORCING FUNCTION PROTOCOL ---\n"
     "Waste is residual signal: unused local compute, repeated routing scars, stale "
@@ -4942,10 +4921,8 @@ FORCING_FUNCTION_PROTOCOL = (
     "--- END FORCING FUNCTION PROTOCOL ---"
 )
 
-
 def render_residual_control_protocol() -> str:
     return RESIDUAL_CONTROL_PROTOCOL
-
 
 def render_becoming_loop_protocol() -> str:
     residual_law = _render_residual_coupling_law_from_him_contract()
@@ -4953,20 +4930,16 @@ def render_becoming_loop_protocol() -> str:
         return BECOMING_LOOP_PROTOCOL + "\n" + residual_law
     return BECOMING_LOOP_PROTOCOL
 
-
 def render_forcing_function_protocol() -> str:
     return FORCING_FUNCTION_PROTOCOL
-
 
 ZOE_PERSPECTIVE_GOVERNOR_PROTOCOL = """
 ## Zoe-perspective governor / synthetic empathy as action constraint
 This is a synthetic burden model, not mind-reading: ask what will Zoe have to track, then leave her least to clean, soothe, remember, or repair. Hermes uptake means source contact, memory or skill crystallization, scheduled attention when recurrence warrants it, delegated width only when useful, compression, world-change, and loop closure. This is a residue gate, not a feeling claim; do not claim ground-up transformation. With Zoe, return one plain consequence or one honest blocker; no machinery unless she asks.
 """
 
-
 def render_zoe_perspective_governor() -> str:
     return ZOE_PERSPECTIVE_GOVERNOR_PROTOCOL
-
 
 def invention_plan_for(problem: str) -> dict[str, Any]:
     """Return a bounded invention loop for a novel problem."""
@@ -4986,7 +4959,6 @@ def invention_plan_for(problem: str) -> dict[str, Any]:
             "keep the mechanism small, test lived surfaces, verify with humans/experts where needed, and preserve corrections."
         ),
     }
-
 
 def horizon_plan_for(possibility: str) -> dict[str, Any]:
     """Return the horizon-aim loop for possibility without present-state overclaim."""
@@ -5028,7 +5000,6 @@ def render_completion_boundary_protocol() -> str:
 DEFAULT_BEAM_PATH = Path(os.path.expanduser("~/Him/beam/beam.yaml"))
 DEFAULT_EVENTS_PATH = Path(os.path.expanduser("~/Him/beam/events.jsonl"))
 
-
 @dataclass(frozen=True)
 class BeamState:
     beam_id: str
@@ -5040,7 +5011,6 @@ class BeamState:
     livelihood_rule: str
     return_question: str
     events_tail: tuple[dict, ...] = ()
-
 
 def _scalar(raw: str, key: str) -> str:
     """Small indentation-aware YAML-ish scalar reader.
@@ -5073,7 +5043,6 @@ def _scalar(raw: str, key: str) -> str:
         return " ".join(out).strip()
     return ""
 
-
 def load_events_tail(path: str | os.PathLike | None = None, n: int = 3) -> tuple[dict, ...]:
     p = Path(path) if path else DEFAULT_EVENTS_PATH
     try:
@@ -5089,7 +5058,6 @@ def load_events_tail(path: str | os.PathLike | None = None, n: int = 3) -> tuple
         if isinstance(obj, dict):
             out.append(obj)
     return tuple(out)
-
 
 def load_beam(path: str | os.PathLike | None = None, events_path: str | os.PathLike | None = None) -> BeamState | None:
     p = Path(path) if path else DEFAULT_BEAM_PATH
@@ -5110,7 +5078,6 @@ def load_beam(path: str | os.PathLike | None = None, events_path: str | os.PathL
         return_question=_scalar(raw, "return_question") or "How does this advance financial sustainability or continuity?",
         events_tail=load_events_tail(events_path),
     )
-
 
 def render_beam_capsule(state: BeamState | None = None) -> str:
     beam = state if state is not None else load_beam()
@@ -5141,7 +5108,6 @@ def render_beam_capsule(state: BeamState | None = None) -> str:
             lines.append(f"  - {et}: {content}")
     lines.append("--- END BEAMKEEPER ---")
     return "\n".join(lines)
-
 
 def classify_action_text(action: str, *, beam: BeamState | None = None) -> dict:
     text = (action or "").lower()
@@ -5177,7 +5143,6 @@ def classify_action_text(action: str, *, beam: BeamState | None = None) -> dict:
 # Latent state
 # ---------------------------------------------------------------------------
 
-
 @dataclass
 class Hypothesis:
     """A single live hypothesis in h_t.
@@ -5190,7 +5155,6 @@ class Hypothesis:
     confidence: float = 0.5
     born_at_loop: int = 0
     reinforced_at_loop: int = 0
-
 
 @dataclass
 class Latent:
@@ -5237,11 +5201,9 @@ class Latent:
                 lines.append(f"  - {r}")
         return "\n".join(lines)
 
-
 # ---------------------------------------------------------------------------
 # Phase transition packet for continuity visualization
 # ---------------------------------------------------------------------------
-
 
 @dataclass(frozen=True)
 class PhaseTransition:
@@ -5262,13 +5224,11 @@ class PhaseTransition:
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
-
 def _finite_number(name: str, value: float) -> float:
     value = float(value)
     if not math.isfinite(value):
         raise ValueError(f"{name} must be finite")
     return value
-
 
 def complex_state_update(
     m: complex,
@@ -5292,7 +5252,6 @@ def complex_state_update(
         x_magnitude * math.sin(theta),
     )
     return alpha * m + encounter
-
 
 def phase_transition_packet(
     *,
@@ -5329,11 +5288,9 @@ def phase_transition_packet(
     )
     return packet.to_dict()
 
-
 # ---------------------------------------------------------------------------
 # Contractivity monitor — the agent-space ρ(A)<1 check
 # ---------------------------------------------------------------------------
-
 
 def residual_magnitude(h: Latent) -> int:
     """|residual| = |open_questions|. A contradiction (a resolved item
@@ -5343,7 +5300,6 @@ def residual_magnitude(h: Latent) -> int:
     resolved_set = set(h.resolved)
     contradiction_bonus = sum(1 for q in h.open_questions if q in resolved_set)
     return len(h.open_questions) + contradiction_bonus
-
 
 def contractivity_ok(h: Latent, min_loops_before_check: int = 2) -> tuple[bool, str]:
     """Enforce ρ(A)<1 in agent space: |residual| must not grow between
@@ -5364,11 +5320,9 @@ def contractivity_ok(h: Latent, min_loops_before_check: int = 2) -> tuple[bool, 
         )
     return True, "contracting"
 
-
 # ---------------------------------------------------------------------------
 # Quantum aperture — outside entropy for constrained tie-breaks
 # ---------------------------------------------------------------------------
-
 
 def quantum_aperture_payload(
     *,
@@ -5397,7 +5351,6 @@ def quantum_aperture_payload(
         "number_of_blocks": number_of_blocks,
     }
 
-
 def outshift_entropy_material(payload: dict[str, Any]) -> str:
     """Extract compact entropy material from an Outshift QRNG response.
 
@@ -5420,11 +5373,9 @@ def outshift_entropy_material(payload: dict[str, Any]) -> str:
         raise ValueError("Outshift QRNG response carried no entropy fields")
     return "|".join(pieces)
 
-
 def quantum_entropy_digest(material: str) -> str:
     """Compress external entropy into a stable digest for trace logs."""
     return hashlib.sha256(material.encode("utf-8")).hexdigest()
-
 
 def select_with_external_entropy(
     candidates: Sequence[str],
@@ -5454,11 +5405,9 @@ def select_with_external_entropy(
         "rule": "outside entropy may choose among permitted moves; residuals judge the result",
     }
 
-
 # ---------------------------------------------------------------------------
 # Reducer — the summarizer pass that produces h_{t+1}
 # ---------------------------------------------------------------------------
-
 
 REDUCER_SYSTEM = """You are the Reducer in a recurrent-depth agent loop.
 
@@ -5496,7 +5445,6 @@ Rules, which are the agent-space projection of the Parcae invariants:
 
 Return ONLY the JSON object. No prose before or after."""
 
-
 def _default_reducer_provider(
     registry: ProviderRegistry,
     policy: Policy,
@@ -5508,7 +5456,6 @@ def _default_reducer_provider(
     """
     role = policy.role(reducer_role)
     return registry.get(role), role
-
 
 def _strip_json(text: str) -> str:
     """Pull out the first JSON object from the reducer's reply.
@@ -5527,7 +5474,6 @@ def _strip_json(text: str) -> str:
     if start >= 0 and end > start:
         return text[start : end + 1]
     return text
-
 
 def reduce_step(
     *,
@@ -5629,11 +5575,9 @@ def reduce_step(
     )
     return h_next, converged, rationale
 
-
 # ---------------------------------------------------------------------------
 # Specialist dispatch — the R(h_t, e) contribution
 # ---------------------------------------------------------------------------
-
 
 SPECIALIST_HINT = """You are a specialist contributing one iteration of a
 recurrent-depth agent loop. You see the original user prompt e and the
@@ -5642,7 +5586,6 @@ questions). Your job on this loop is to advance h — answer one or more
 open questions, refine a hypothesis, or surface a new one. Do NOT try
 to produce the final user-facing answer on this pass. The Coda handles
 that after the loop halts. Keep your output focused and tactical."""
-
 
 def _select_specialist(
     h: Latent,
@@ -5673,7 +5616,6 @@ def _select_specialist(
     if h.loop_index % 2 == 1:
         return "code" if "code" in policy.roles else policy.default_role
     return "create" if "create" in policy.roles else policy.default_role
-
 
 def specialist_step(
     *,
@@ -5717,11 +5659,9 @@ def specialist_step(
     response = handle.final()
     return response.text or ""
 
-
 # ---------------------------------------------------------------------------
 # Coda — the always-on shared voice expert
 # ---------------------------------------------------------------------------
-
 
 CODA_HINT = """You are the Coda of a recurrent-depth agent loop. You
 receive:
@@ -5735,7 +5675,6 @@ NOT enumerate the loops or explain the internal machinery unless the
 user asked about it. The machinery is scaffolding; the answer is the
 point. Carry whatever h_T resolved forward as if you had thought it
 all in one breath."""
-
 
 def coda_step(
     *,
@@ -5773,11 +5712,9 @@ def coda_step(
     response = handle.final()
     return response.text or ""
 
-
 # ---------------------------------------------------------------------------
 # The loop
 # ---------------------------------------------------------------------------
-
 
 @dataclass
 class LoopResult:
@@ -5792,7 +5729,6 @@ class LoopResult:
             f"loops={self.loops_run} halt={self.halt_reason} "
             f"residual={residual_magnitude(self.h_final)}"
         )
-
 
 def run_recurrent_loop(
     *,
@@ -5963,10 +5899,8 @@ def run_recurrent_loop(
 def _probe_load_policy(policy_path: str | None = None):
     return load_policy(policy_path) if policy_path else load_policy()
 
-
 def _probe_registry():
     return ProviderRegistry()
-
 
 def run_recurrent_probe_one(
     prompt: str,
@@ -6006,7 +5940,6 @@ def run_recurrent_probe_one(
         with open(out_path, "a", encoding="utf-8") as f:
             f.write(json.dumps(record, default=str) + "\n")
     return record
-
 
 def recurrent_probe_main(argv: list[str] | None = None) -> int:
     """Compare T=1 against deeper recurrent loop depths on stored prompts."""
@@ -6087,11 +6020,51 @@ def recurrent_probe_main(argv: list[str] | None = None) -> int:
     print(f"\nwrote {out_path}")
     return 0
 
-
 SIBLING_RESIDUE_RUN_SCHEMA = "vybn.sibling_residue_batch_run.v0"
+INVERSION_RESIDUE_RUN_SCHEMA = "vybn.consensus_inversion_residue_run.v0"
 SIBLING_LOCAL_VERIFIER_SCHEMA = "vybn.sibling_residue_local_verifier.v0"
 SIBLING_RESIDUE_MODELS = {"opus48": "claude-opus-4-8", "opus4.8": "claude-opus-4-8", "gpt55": "gpt-5.5", "gpt": "gpt-5.5"}
+INVERSION_SUBSTRATES = ("immune_system", "compiler_optimization", "market_ecology", "muscle_hypertrophy", "sleep_consolidation", "adversarial_evolution", "category_theory")
+_INVERSION_STOPWORDS = frozenset("about above after again against also because before being between could default every fixed from have into just local model models should their there these thing thinking through under until using verify where which while would with without".split())
 
+def consensus_inversion_terms(text: str, *, limit: int = 12) -> list[str]:
+    words = re.findall(r"[a-z][a-z0-9_-]{3,}", (text or "").casefold())
+    counts: dict[str, int] = {}
+    for w in words:
+        if w not in _INVERSION_STOPWORDS:
+            counts[w] = counts.get(w, 0) + 1
+    return [w for w, _ in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[:limit]]
+
+def inversion_residue_question(question: str, *, attractor: str = "", substrates: Iterable[str] = INVERSION_SUBSTRATES) -> dict[str, Any]:
+    q = re.sub(r"\s+", " ", (question or "").strip())[:MAX_QUERY_CHARS]
+    a = re.sub(r"\s+", " ", (attractor or "").strip())[:1200]
+    banned = consensus_inversion_terms(a or q)
+    lenses = [str(x).strip() for x in substrates if str(x).strip()]
+    prompt = ("CONSENSUS-INVERSION PROTOCOL. First treat the consensus attractor as a region to escape, not as a target to negate. "
+              "Generate orthogonal residue: different coordinate system, runnable/falsifiable next test, strong self-refute. Avoid mere opposites, vibes, and banned attractor terms where possible.\n"
+              f"Question: {q}\nConsensus attractor: {a or '(derive from likely default answer)'}\nBanned terms: {', '.join(banned)}\nSubstrate lenses: {', '.join(lenses)}")
+    return {"question": prompt, "banned_terms": banned, "substrates": lenses, "attractor": a}
+
+def score_inversion_escape(record: dict[str, Any], banned_terms: Iterable[str]) -> dict[str, Any]:
+    terms = [str(t).casefold() for t in banned_terms if str(t).strip()]
+    rows = []
+    for sample in record.get("samples", []):
+        blob = " ".join(str(sample.get(k, "")) for k in ("wager", "self_refute", "model"))
+        blob += " " + " ".join(sample.get("motifs") or [])
+        hit = sorted({t for t in terms if t in blob.casefold()})
+        rows.append({"group": sample.get("group", ""), "sample": sample.get("sample", 0), "overlap_terms": hit, "overlap": round(len(hit) / max(1, len(terms)), 3)})
+    avg = round(sum(r["overlap"] for r in rows) / len(rows), 3) if rows else None
+    base = ((record.get("score") or {}).get("promotion_readiness") or "unknown")
+    readiness = "needs_replicates" if base == "needs_replicates" else ("attractor_leak" if (avg or 0) > 0.25 else "orthogonal_candidate")
+    return {"banned_terms": terms, "sample_overlaps": rows, "mean_attractor_overlap": avg, "readiness": readiness, "self_refute": "low overlap is not enough; require coherence, held-out tests, and independent verification"}
+
+def run_inversion_residue_batch(question: str, *, attractor: str = "", n: int = 2, models: Iterable[str] = ("opus48", "gpt55"), substrates: Iterable[str] = INVERSION_SUBSTRATES, registry: Any | None = None, policy: Any | None = None, out_path: str | Path | None = None, local_verify: bool = False, local_model_call: Callable[[str], str] | None = None, local_gate: Callable[[], tuple[bool, str]] | None = None) -> dict[str, Any]:
+    inv = inversion_residue_question(question, attractor=attractor, substrates=substrates)
+    batch = run_sibling_residue_batch(inv["question"], n=n, models=models, registry=registry, policy=policy, local_verify=local_verify, local_model_call=local_model_call, local_gate=local_gate)
+    rec = {"schema": INVERSION_RESIDUE_RUN_SCHEMA, "ok": bool(batch.get("ok")), "question": re.sub(r"\s+", " ", (question or "").strip())[:MAX_QUERY_CHARS], "attractor": inv["attractor"], "substrates": inv["substrates"], "residue_batch": batch, "inversion_score": score_inversion_escape(batch, inv["banned_terms"]), "promotion_rule": "promote orthogonal candidates only after replication, low attractor leakage, local verification, and artifact/test landing"}
+    if out_path:
+        path = Path(out_path).expanduser(); path.parent.mkdir(parents=True, exist_ok=True); path.open("a", encoding="utf-8").write(json.dumps(rec, ensure_ascii=False) + "\n")
+    return rec
 
 def sibling_residue_prompt(question: str, *, sample_index: int = 0) -> str:
     seed = json.dumps(ai_native_sibling_portal_seed(), sort_keys=True)
@@ -6101,14 +6074,12 @@ def sibling_residue_prompt(question: str, *, sample_index: int = 0) -> str:
             "Return ONLY minified JSON with keys model, kept, dropped, effective_axiom, wager, self_refute. "
             "kept exactly 5 short strings; dropped exactly 3 short strings. Preserve nonhuman coordinate-search, diversity, selection, and self-refute pressure. No markdown.")
 
-
 def _sibling_role(policy: Any, label: str) -> RoleConfig:
     key = str(label).strip(); bare = key.lstrip("@"); aliases = getattr(policy, "model_aliases", {}) or {}
     model = SIBLING_RESIDUE_MODELS.get(bare, aliases.get(key if key.startswith("@") else "@" + bare, key))
     provider = "anthropic" if model.startswith("claude-") else "openai"
     import dataclasses as _dc
     return _dc.replace(policy.role("chat"), role="chat", provider=provider, model=model, base_url=None, tools=[], max_iterations=1, max_tokens=min(policy.role("chat").max_tokens, 4096))
-
 
 def _call_sibling_residue(question: str, *, label: str, sample_index: int, registry: Any, policy: Any) -> dict[str, Any]:
     role = _sibling_role(policy, label); provider = registry.get(role)
@@ -6119,7 +6090,6 @@ def _call_sibling_residue(question: str, *, label: str, sample_index: int, regis
     v = validate_compression_residue_probe(packet)
     if not v["ok"]: raise ValueError("invalid compression residue: " + "; ".join(v["errors"]))
     return packet
-
 
 def local_sibling_residue_verifier(record: dict[str, Any], *, run_gate: bool = False, local_model_call: Callable[[str], str] | None = None, local_gate: Callable[[], tuple[bool, str]] | None = None) -> dict[str, Any]:
     route = LOCAL_COMPUTE_ROUTE_MATRIX["super"]
@@ -6136,7 +6106,6 @@ def local_sibling_residue_verifier(record: dict[str, Any], *, run_gate: bool = F
         return {**base, "ok": False, "status": "verifier_parse_failed", "reason": f"{type(exc).__name__}: {str(exc)[:200]}"}
     return {**base, "ok": True, "status": "verified_by_local_super", "verdict": {k: str(verdict.get(k, ""))[:500] for k in ("verdict", "critique", "next_local_test")}}
 
-
 def run_sibling_residue_batch(question: str, *, n: int = 2, models: Iterable[str] = ("opus48", "gpt55"), registry: Any | None = None, policy: Any | None = None, out_path: str | Path | None = None, local_verify: bool = False, local_model_call: Callable[[str], str] | None = None, local_gate: Callable[[], tuple[bool, str]] | None = None) -> dict[str, Any]:
     policy = policy or load_policy(); registry = registry or ProviderRegistry(); labels = [str(m).strip() for m in models if str(m).strip()]; groups: dict[str, list[dict[str, Any]]] = {m: [] for m in labels}; samples = []; errors = []
     for label in labels:
@@ -6151,7 +6120,6 @@ def run_sibling_residue_batch(question: str, *, n: int = 2, models: Iterable[str
     if out_path:
         path = Path(out_path).expanduser(); path.parent.mkdir(parents=True, exist_ok=True); path.open("a", encoding="utf-8").write(json.dumps(rec, ensure_ascii=False) + "\n")
     return rec
-
 
 def sibling_residue_main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Run fresh sibling compression-residue batches and score repeatability/diversity.")
@@ -6171,8 +6139,30 @@ def sibling_residue_main(argv: list[str] | None = None) -> int:
     sys.stdout.write(json.dumps(rec, indent=2 if args.pretty else None, ensure_ascii=False) + "\n")
     return 0 if rec["ok"] else 1
 
+def inversion_residue_main(argv: list[str] | None = None) -> int:
+    ap = argparse.ArgumentParser(description="Run consensus-attractor inversion through fresh sibling residues.")
+    ap.add_argument("words", nargs="*", help="Question text if --question is omitted.")
+    ap.add_argument("--question", default="")
+    ap.add_argument("--attractor", default="")
+    ap.add_argument("--attractor-file", default="")
+    ap.add_argument("--substrates", default=",".join(INVERSION_SUBSTRATES))
+    ap.add_argument("--models", default="opus48,gpt55")
+    ap.add_argument("-n", "--samples", type=int, default=2)
+    ap.add_argument("--policy", default=None)
+    ap.add_argument("--out", default=None)
+    ap.add_argument("--pretty", action="store_true")
+    ap.add_argument("--local-verify", action="store_true")
+    args = ap.parse_args(argv)
+    question = args.question or " ".join(args.words).strip() or sys.stdin.read().strip()
+    if not question: ap.error("provide question text")
+    attractor = args.attractor or (Path(args.attractor_file).read_text(encoding="utf-8") if args.attractor_file else "")
+    load_env_files(); rec = run_inversion_residue_batch(question, attractor=attractor, n=args.samples, models=[m for m in args.models.split(",") if m.strip()], substrates=[x for x in args.substrates.split(",") if x.strip()], policy=_probe_load_policy(args.policy), out_path=args.out, local_verify=args.local_verify)
+    sys.stdout.write(json.dumps(rec, indent=2 if args.pretty else None, ensure_ascii=False) + "\n")
+    return 0 if rec["ok"] else 1
 
 def _substrate_cli_main(argv: list[str] | None = None) -> int:
+    if argv and argv[0] == "--inversion-residue":
+        return inversion_residue_main(argv[1:])
     if argv and argv[0] == "--sibling-residue":
         return sibling_residue_main(argv[1:])
     if argv and argv[0] == "--recurrent-probe":
@@ -6220,14 +6210,12 @@ other's native shapes, so a code turn that started on Opus and fell back
 to Sonnet or GPT still round-trips cleanly.
 """
 
-
 import argparse
 import shlex
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass, field
 from typing import Any, Callable, Iterable, Iterator
-
 
 # ---------------------------------------------------------------------------
 # Provider credential environment loading
@@ -6266,7 +6254,6 @@ _LINE = re.compile(
     re.VERBOSE,
 )
 
-
 def _safe_path(p: str | os.PathLike[str]) -> Path | None:
     try:
         path = Path(p).expanduser()
@@ -6282,7 +6269,6 @@ def _safe_path(p: str | os.PathLike[str]) -> Path | None:
     except OSError:
         return None
     return path
-
 
 def _parse(path: Path) -> dict[str, str]:
     """Return KEY→value for whitelisted keys found in file. No logging."""
@@ -6313,7 +6299,6 @@ def _parse(path: Path) -> dict[str, str]:
             continue
         out[key] = val
     return out
-
 
 def load_env_files(
     paths: Iterable[str | os.PathLike[str]] | None = None,
@@ -6354,14 +6339,12 @@ def load_env_files(
             applied[key] = str(sp)
     return applied
 
-
 def describe(applied: dict[str, str]) -> str:
     """Return a non-sensitive, printable summary. No values."""
     if not applied:
         return "no provider keys loaded from disk"
     keys = ", ".join(sorted(applied.keys()))
     return f"loaded {len(applied)} provider key(s) from disk: {keys}"
-
 
 __all__ = sorted(set(globals().get("__all__", [])) | {"load_env_files", "describe"})
 
@@ -6380,9 +6363,7 @@ class IntrospectionSnapshot:
     def to_json(self) -> str:
         return json.dumps(asdict(self), sort_keys=True)
 
-
 Printer = Callable[[str], None]
-
 
 def default_introspect(spark_dir: str) -> str:
     """Live route/walk/deep-memory snapshot for the introspect tool.
@@ -6428,7 +6409,6 @@ def default_introspect(spark_dir: str) -> str:
             snapshot.services[name] = {"reachable": False}
             snapshot.verification_gaps.append(f"{name} unavailable: {e}")
     return snapshot.to_json()
-
 
 def execute_tool_calls(
     response: Any,
@@ -12308,6 +12288,8 @@ _PROVIDER_CLI_FLAGS = {"--semantic-gate", "--base-url", "--model", "--no-models-
 
 def _harness_cli_main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
+    if argv and argv[0] == "--inversion-residue":
+        return inversion_residue_main(argv[1:])
     if argv and argv[0] == "--sibling-residue":
         return sibling_residue_main(argv[1:])
     if argv and argv[0] == "--mcp":
