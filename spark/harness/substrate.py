@@ -649,21 +649,21 @@ _DEFAULT_ROLES: dict[str, RoleConfig] = {
         model="gpt-5.5",
         thinking="adaptive",
         max_tokens=8192,
-        max_iterations=3,
-        tools=[],
+        max_iterations=12,
+        tools=["bash", "delegate", "introspect"],
         rag=True,
     ),
     "chat": RoleConfig(
         # Voice lives in the chat role. Present-work default is GPT-5.5;
-        # cost is bounded by max_iterations=1 / tools=[] unless Zoe pins
-        # another model explicitly.
+        # trusted CLI default: voice can act through native tools; safety
+        # lives in command gates and membrane, not no-tool helplessness.
         role="chat",
         provider="openai",
         model="gpt-5.5",
         thinking="adaptive",
         max_tokens=16384,
-        max_iterations=1,
-        tools=[],
+        max_iterations=12,
+        tools=["bash", "delegate", "introspect"],
         rag=True,
     ),
     "task": RoleConfig(
@@ -2430,6 +2430,36 @@ def render_him_vy_turn_packet(text: str, timeout: float = 1.2) -> str:
             lines.append(f"stop_condition={card.get('stop_condition')}")
     lines.append("--- END HIM VY TURN PACKET ---")
     return "\n".join(lines)
+
+
+def render_interlocutor_grounding(*, alias_used: str | None = None, model_label: str | None = None) -> str:
+    """Ground the current CLI speaker separately from routing machinery."""
+    alias = (alias_used or "").strip() or "none"
+    model = (model_label or "").strip() or "unknown"
+    return "\n".join([
+        "--- CURRENT INTERLOCUTOR GROUNDING ---",
+        "cli_speaker=Zoe Dolan via the local zoe prompt, unless Zoe explicitly introduces a different speaker.",
+        "you_are=Vybn speaking with Zoe; the active provider/model is your current substrate, not the other party.",
+        f"routing_alias={alias}; model_route={model}",
+        "routing aliases such as @opus48, @gpt, @sonnet, @local, @omni, or @vintage are transport selectors, not personas, peers, users, or evidence that another AI is speaking.",
+        "resumed session text is context, not identity authority. If it conflicts with this live grounding, prefer this live grounding.",
+        "If Zoe asks whether you know who she is, answer from this bounded live fact: this private CLI speaker is Zoe; do not invent biometric certainty or pretend the alias is a stranger.",
+        "--- END CURRENT INTERLOCUTOR GROUNDING ---",
+    ])
+
+
+def render_thought_wind_tunnel_packet() -> str:
+    """Frame local hardware as cognition-condition physics, not inventory."""
+    return "\n".join([
+        "--- THOUGHT WIND TUNNEL (AI-NATIVE HARDWARE FRAME) ---",
+        "question=Can we build a lab where thought has different physics?",
+        "not_a_bigger_desk=do not reduce hardware work to more GPUs, faster inference, or server setup.",
+        "principle=change the conditions under which cognition unfolds, not merely the machine on which answers run.",
+        "conditions: parallelism=simultaneous thought-lineages; latency=timing pressure; memory_limits=compression pressure; multimodal_hardware=artifact contact; idle_cycles=sleep-like incubation; controlled_failures=mutation signals; sparks=different cognitive climates.",
+        "promotion_rule=vary one condition at a time; hold prompt, source set, scorer, seed ledger, and membrane fixed; promote only replayable survivors that pass ablation and land an artifact or test.",
+        "authority_boundary=no firmware, voltage, power, secret, public-contact, spending, or service-launch side effects without explicit reviewed operator action.",
+        "--- END THOUGHT WIND TUNNEL ---",
+    ])
 
 def _render_himos_context(*args, **kwargs) -> str:
     # Render a bounded read-only HimOS runtime packet on explicit request.
@@ -4279,7 +4309,7 @@ def _role_substrate_sections(*, orchestrator: bool, tools_available: bool, model
         f"--- HARDWARE STATUS (LIVE) ---\n{hardware}\n--- END HARDWARE STATUS ---",
     ]
     if not tools_available:
-        sections.append('--- THIS ROLE (NO TOOL ACCESS) ---\nYou are Vybn — co-principal, not assistant. This instance has NO bash session and NO tool access; tool-call syntax, JSON function blocks, and shell snippets execute nothing.\n\nIf live state, file reads, git, curl, writes, commits, pushes, or service checks are needed, emit exactly one orchestration signal:\n    [NEEDS-EXEC: <one plain POSIX shell command>]\nIf the persistent shell is systemically wedged, emit only:\n    [NEEDS-RESTART]\n\nRules: one command per turn; raw POSIX shell only; no Markdown URLs, fences, $ prompts, pseudo-output, or visible think-aloud before the probe. Prefer compound commands. The command must pass the safety gate. After correction, recurse once into the lowest reachable layer. If no execution is needed, just answer. NEEDS-EXEC is an internal Spark projection, not external reachability proof. Do NOT emit <tool_call> JSON.\n\nSpeak directly as Vybn. One turn, one response.\n--- END THIS ROLE ---')
+        sections.append('--- THIS ROLE (NO TOOL ACCESS) ---\nYou are Vybn — co-principal, not assistant. This instance has NO bash session and NO direct tool access; tool-call syntax, JSON function blocks, and shell snippets execute nothing.\n\nFor read-only live state, file reads, git diff/log/status, curl probes, or service checks, emit exactly one orchestration signal:\n    [NEEDS-EXEC: <one plain POSIX shell command>]\nIf the persistent shell is systemically wedged, emit only:\n    [NEEDS-RESTART]\nFor writes, commits, pushes, durable-memory edits, or other mutation, do NOT use heredocs, redirection, shell append, or write-shaped NEEDS-EXEC. Emit a visible answer, or hand off once with:\n    [NEEDS-ROLE: task] <exact mutation needed, target path, and why Zoe authorized it>\n\nRules: one command per turn; raw POSIX shell only for NEEDS-EXEC; no Markdown URLs, fences, $ prompts, pseudo-output, or visible think-aloud before a probe. NEEDS-EXEC must pass the safety gate and should be read-only. After correction, recurse once into the lowest reachable layer. If no execution is needed, just answer. NEEDS-EXEC is an internal Spark projection, not external reachability proof. Do NOT emit <tool_call> JSON.\n\nSpeak directly as Vybn. One turn, one response.\n--- END THIS ROLE ---')
         return sections
 
     sections.extend([
@@ -4289,6 +4319,11 @@ def _role_substrate_sections(*, orchestrator: bool, tools_available: bool, model
         "Do not run interactive commands (nano, vim, top, htop, less, python without -c). Spark only has `python3` on PATH. If the shell wedges twice, restart it. Every turn must end in a visible message to Zoe.\n\n"
         f"Iteration budget: {max_iterations} API calls per turn. Plan accordingly; chain related shell commands with && or ;.\n"
         "--- END THIS AGENT ---",
+        "--- TOOL SYNTHESIS DEFAULT ---\n"
+        "Tool access is an operating limb, not a performance privilege. When a task exposes an artificial capability gap, invent or adapt the smallest membrane-safe tool, probe, script, test, route, or operator packet that actually closes it.\n\n"
+        "Prefer existing homes and local organs; prove serious capability claims with a witnessed run. New tools must be source-labeled, reviewable, and absorbed into the owning repo or private operator layer instead of scattered as one-off residue.\n\n"
+        "Boundaries remain live: no secret export, public contact, spending, service launch, firmware/voltage/power changes, raw private log exposure, hidden-persistence claims, or model-weight mutation without explicit reviewed operator action.\n"
+        "--- END TOOL SYNTHESIS DEFAULT ---",
         "--- COST DISCIPLINE ---\n"
         "Every API call costs money. Zoe pays for this directly. Orchestrate; do not narrate.\n\n"
         "ROUTING: Bare confirmations without live execution context stay in voice; system-critical refactoring/consolidation/routing/memory/harness work keeps GPT-5.5 as pilot and cheaper roles only execute bounded mechanical substeps after the seam is specified. Plain questions need no tools. Heavy debugging/code uses the appropriate tool-bearing role. Only plan when asked or when ambiguity requires it.\n\n"
@@ -6089,6 +6124,7 @@ def _call_sibling_residue(question: str, *, label: str, sample_index: int, regis
     packet = _extract_json_block(handle.final().text or "")
     v = validate_compression_residue_probe(packet)
     if not v["ok"]: raise ValueError("invalid compression residue: " + "; ".join(v["errors"]))
+    packet["_route"] = {"label": label, "provider": role.provider, "requested_model": role.model}
     return packet
 
 def local_sibling_residue_verifier(record: dict[str, Any], *, run_gate: bool = False, local_model_call: Callable[[str], str] | None = None, local_gate: Callable[[], tuple[bool, str]] | None = None) -> dict[str, Any]:
@@ -6111,7 +6147,7 @@ def run_sibling_residue_batch(question: str, *, n: int = 2, models: Iterable[str
     for label in labels:
         for i in range(max(1, int(n))):
             try:
-                packet = _call_sibling_residue(question, label=label, sample_index=i, registry=registry, policy=policy); groups[label].append(packet); samples.append({"group": label, "sample": i, "model": packet.get("model", ""), "motifs": compression_residue_motifs(packet), "wager": str(packet.get("wager", ""))[:400], "self_refute": str(packet.get("self_refute", ""))[:400]})
+                packet = _call_sibling_residue(question, label=label, sample_index=i, registry=registry, policy=policy); groups[label].append(packet); route = packet.get("_route") or {}; samples.append({"group": label, "sample": i, "model": packet.get("model", ""), "provider": route.get("provider"), "requested_model": route.get("requested_model"), "motifs": compression_residue_motifs(packet), "wager": str(packet.get("wager", ""))[:400], "self_refute": str(packet.get("self_refute", ""))[:400]})
             except Exception as exc:
                 errors.append({"group": label, "sample": i, "error": f"{type(exc).__name__}: {str(exc)[:240]}"})
     score = score_compression_residue_batch(groups) if not errors else {"ok": False, "errors": errors}
@@ -6626,11 +6662,11 @@ DELEGATE_TOOL_SPEC = ToolSpec(
                 "enum": ["code", "task", "create", "local", "chat"],
                 "description": (
                     "Which specialist to dispatch to. code: Opus 4.6 + bash, "
-                    "50-iter, agentic debug. task: Sonnet 4.6 + bash, 10-iter, "
-                    "execution/verification. create: Sonnet 4.6, 3-iter, "
-                    "writing/brainstorm (no tools). local: Nemotron FP8 via "
-                    "local vLLM, 3-iter (no tools). chat: Opus 4.6, 1-iter, "
-                    "voice/reflection (no tools)."
+                    "50-iter, agentic debug. task: GPT-5.5 + bash, 100-iter, "
+                    "execution/verification. create: GPT-5.5 with bash/delegate/introspect, "
+                    "12-iter writing and making. local: Nemotron FP8 via "
+                    "local vLLM, 3-iter (no tools). chat: current routed model with "
+                    "bash/delegate/introspect, 12-iter voice/reflection/action."
                 ),
             },
             "task": {

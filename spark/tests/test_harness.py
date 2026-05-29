@@ -331,6 +331,8 @@ class TestLayeredPrompt(unittest.TestCase):
         self.assertIn("Grep before Gödel", p.substrate)
         self.assertIn("invent the smallest consequential candidate mechanism", p.substrate)
         self.assertIn("The horizon is not a claim of arrival", p.substrate)
+        self.assertIn("TOOL SYNTHESIS DEFAULT", p.substrate)
+        self.assertIn("invent or adapt the smallest membrane-safe tool", p.substrate)
 
     def test_build_layered_prompt_resilient_to_missing_files(self):
         # Point everything at paths that don't exist; the builder must
@@ -2839,6 +2841,7 @@ class TestCounterPriorWager(unittest.TestCase):
 
         reg = FakeRegistry(); rec = substrate.run_sibling_residue_batch("unit distance", n=2, registry=reg, policy=substrate.default_policy())
         self.assertTrue(rec["ok"]); self.assertEqual(reg.models, ["claude-opus-4-8", "claude-opus-4-8", "gpt-5.5", "gpt-5.5"])
+        self.assertEqual((rec["samples"][0]["provider"], rec["samples"][0]["requested_model"], rec["samples"][2]["requested_model"]), ("anthropic", "claude-opus-4-8", "gpt-5.5"))
         self.assertEqual((rec["schema"], rec["score"]["promotion_readiness"], rec["local_verifier"]["status"]), ("vybn.sibling_residue_batch_run.v0", "style_divergence_only", "not_run"))
         rec2 = substrate.run_sibling_residue_batch("unit distance", n=1, models=["gpt55"], registry=reg, policy=substrate.default_policy(), local_verify=True, local_gate=lambda: (True, "semantic gate passed"), local_model_call=lambda _p: "{\"verdict\":\"needs_replicates\",\"critique\":\"local check only\",\"next_local_test\":\"run n=2\"}")
         self.assertEqual((rec2["local_verifier"]["status"], rec2["local_verifier"]["verdict"]["verdict"]), ("verified_by_local_super", "needs_replicates"))

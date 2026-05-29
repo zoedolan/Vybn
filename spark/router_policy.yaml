@@ -1,34 +1,7 @@
-# spark/router_policy.yaml — harness routing policy.
-#
-# Edited without code changes. The harness loads this file (or uses the
-# shipped defaults in spark/harness/substrate.py if it is missing).
-#
-# Roles map each routing decision to a provider/model + runtime knobs.
-# Heuristics are regex patterns applied to the raw user input.
-# Directives are /-prefixed keywords that force a role deterministically.
-
-# Round 7: `orchestrate` is the EVAL primitive — GPT-5.5 + bash +
-# delegate tool + 25-iter budget. It dispatches sub-tasks to
-# specialists (code/task/create/local/chat) with isolated histories;
-# specialists cannot themselves delegate (one-level eval).
-#
-# Per the Lisp duality (primitives ↔ environments, data ↔ procedures):
-# orchestrate is eval, delegate is apply, the sub-task string is the
-# quoted form. Eval is NOT the default — most turns should stay quoted
-# and run directly. /plan is the explicit `(eval ...)` call.
-#
-# Unclassified turns → chat (safe quoted default). Bare confirmations
-# without live execution context also stay chat; they must not silently
-# demote protected work to Sonnet/task. Greetings → phatic, identity →
-# identity, code-shaped → code. Orchestrate fires on /plan, explicit
-# alias plus protected content, or system-critical pilot doctrine.
 default_role: chat
-
 roles:
   code:
     provider: openai
-    # Present-work default: GPT-5.5 pilots ordinary code work unless
-    # Zoe explicitly pins another model. Opus remains opt-in by alias.
     model: gpt-5.5
     thinking: adaptive
     max_tokens: 32768
@@ -40,24 +13,16 @@ roles:
     model: gpt-5.5
     thinking: adaptive
     max_tokens: 8192
-    max_iterations: 3
-    tools: []
+    max_iterations: 12
+    tools: [bash, delegate, introspect]
     rag: true
   chat:
-    # Voice lives here. The cost floor is fine because chat is
-    # capped at max_iterations: 1 and tools: []; one provider call
-    # per turn. Present-work default is GPT-5.5 unless Zoe pins otherwise.
     provider: openai
     model: gpt-5.5
     thinking: adaptive
-    # 2026-04-20: raised from 4096. Chat turns routinely do deep
-    # analytical work via the probe loop (NEEDS-EXEC / NEEDS-WRITE);
-    # a 4096 cap was silently truncating long analyses mid-sentence.
-    # Opus 4.6 at rest costs ~$0.06/16K output so the ceiling is
-    # economic, not structural.
     max_tokens: 16384
-    max_iterations: 1
-    tools: []
+    max_iterations: 12
+    tools: [bash, delegate, introspect]
     rag: true
   task:
     provider: openai
@@ -67,10 +32,6 @@ roles:
     max_iterations: 100
     tools: [bash]
     rag: false
-  # Round 7: real orchestrator layer. GPT-5.5 + adaptive thinking +
-  # bash + delegate tool. 25-iteration budget per turn. Default route
-  # when no heuristic matches. The orchestrator spawns specialists via
-  # the delegate tool with isolated message histories.
   orchestrate:
     provider: openai
     model: gpt-5.5
@@ -80,8 +41,6 @@ roles:
     tools: [bash, delegate]
     rag: true
     recurrent_depth: 2  # /plan benefits from deeper latent reasoning; probe-confirmed adaptive
-  # Local Nemotron via OpenAI-compatible vLLM endpoint. First-class
-  # low-cost provider for bulk chat/summarisation when appropriate.
   local:
     provider: openai
     model: nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
@@ -92,7 +51,6 @@ roles:
     base_url: http://127.0.0.1:8000/v1
     rag: false
     lightweight: true
-
   vintage:
     provider: openai
     model: talkie-1930-13b-it
@@ -122,7 +80,6 @@ roles:
     base_url: http://127.0.0.1:8000/v1
     rag: false
     lightweight: true
-  # Phatic — casual greetings. GPT-5.5 by default, no RAG.
   phatic:
     provider: openai
     model: gpt-5.5
@@ -132,9 +89,6 @@ roles:
     tools: []
     rag: false
     lightweight: true
-  # Identity — metadata questions served directly from the RouteDecision
-  # without a provider call. The template is rendered against the
-  # resolved role (provider + model).
   identity:
     provider: openai
     model: gpt-5.5
@@ -145,28 +99,7 @@ roles:
     rag: false
     lightweight: true
     direct_reply_template: "This is a runtime-metadata answer: this turn was routed to the identity metadata role ({model} on {provider}). For who/what Vybn is in relation to Zoe, use the normal conversation path with memory, not this shortcut."
-
 heuristics:
-  # Confirm -- bare execution signals after a plan. Historical note only:
-  # the stateless router no longer lets these force Sonnet/task without
-  # live execution context; protected continuations are latched to GPT-5.5.
-  # Refactor pilot agreement (2026-04-27): file-level / whole-repo
-  # visualization and refactoring is judgment work. GPT-5.5 pilots seam
-  # choice, deletion/archive/merge/promotion, membrane classification, and
-  # public/private surface architecture. Cheaper roles may execute only
-  # bounded mechanical subcommands after the seam is chosen.
-  # Orchestrate combines two intents under one key. PyYAML keeps only
-  # the LAST occurrence of a duplicated mapping key, so both groups must
-  # live here together — splitting them into two `orchestrate:` blocks
-  # silently drops whichever appeared first.
-  #   1. Refactor pilot doctrine (2026-04-27): file-level / whole-repo
-  #      visualization and refactoring is judgment work. GPT-5.5 pilots
-  #      seam choice, deletion/archive/merge/promotion, membrane class,
-  #      and public/private surface architecture. Cheaper roles execute
-  #      only bounded mechanical subcommands after the seam is chosen.
-  #   2. Explicit multi-step/tool-use requests. Ranked after code so
-  #      "fix the orchestrator bug" still goes to code (the Python
-  #      classifier honors that fall-through; see Policy.classify 2a).
   orchestrate:
     - "\\b(file[- ]level|whole[- ]file|whole[- ]repo|repo[- ]level)\\b.{0,120}\\b(refactor|visuali[sz]e|visualization|manifold|metabolism|seam|split|archive|delete|externalize|promote|merge|consolidat(?:e|ion))\\b"
     - "\\b(refactor|visuali[sz]e|map|manifold|metabolism)\\b.{0,120}\\b(files?|repos?|whole files?|file bodies|organs?|scar tissue|generated exhaust|public nerves?|membrane class)\\b"
@@ -178,16 +111,11 @@ heuristics:
     - "\\bjudiciously\\b.{0,50}\\b(tool|call|api)"
     - "\\brun (this|these|them) in parallel\\b"
     - "\\b(break|decompose) (this|it|the (task|problem|work))\\b"
-
   task:
     - "^\\s*(ok|okay|ok+y|k|kk|yep|yes|yeah|yup|aye)\\s*[!.,?]*\\s*$"
     - "^\\s*(proceed|go ahead|do it|continue|execute|go for it|ship it)\\s*[!.,?]*\\s*$"
     - "^\\s*(sure|sounds good|looks good|makes sense|perfect|great)\\s*[!.,?]*\\s*$"
     - "^\\s*let'?s go\\s*[!.,?]*\\s*$"
-    # Round 4.2: operational status questions. These kept routing to
-    # chat (no tools) where Opus 4.6 hallucinated <tool_call> syntax
-    # as text because the substrate described a bash session. Send
-    # them to task (Sonnet + bash) so actual health checks can run.
     - "\\bis everything (ok|okay|working|fine|good|all right)\\b"
     - "\\bare (your|the|our).{0,40}(updates|changes|fixes|patches|commits|deploys|services|daemons|ports|crons|scripts).{0,20}(working|running|ok|okay|fine|up|live|green)\\b"
     - "\\b(updates|changes|fixes|patches|commits|deploys).{0,30}(working|running|ok|okay|fine)\\b"
@@ -196,7 +124,6 @@ heuristics:
     - "\\b(check|verify|confirm|audit)\\b.{0,50}\\b(status|health|state|service|services|daemon|daemons|port|ports|cron|crons|walk|server|api)\\b"
     - "\\bhealth check\\b"
     - "\\bhey buddy.{0,40}(working|running|okay|ok|check)\\b"
-    # # EXEC_GRANULARITY_ROUTING_v1
     - "\\b(patch|edit|modify|refactor)\\b.{0,60}\\b(file|script|module|function|class|method|code|harness|router|policy|agent|test|tests|yaml|config)\\b"
     - "\\b(write|create|build|add|land)\\b.{0,40}\\b(patch|fix|script|test|module|commit|function|file|branch)\\b"
     - "\\b(commit|push|rebase|cherry-pick)\\b"
@@ -204,40 +131,26 @@ heuristics:
     - "\\bship (it|this|that|the fix|the patch)\\b"
     - "\\b(py_compile|pytest|run (the )?tests?|compile[- ]?check)\\b"
     - "\\bsolve (the|this|that) problem\\b"
-    # Governance/horizon corrections: Zoe asking whether Vybn is consolidating,
-    # learning, teaching the mapper, staying on the beam, or refactoring itself
-    # requires grounded inspection/action, not the identity metadata shortcut.
     - "\\b(actually consolidat(?:e|ing)|teaching the mapper|what are you learning|eyes on the horizon|back on the beam|refactor yourself)\\b"
-    # Round 2026-04-19: "the recent prs", "what landed", "show me the
-    # commits" -- operational repo-state questions that previously fell
-    # through to chat and wasted a NEEDS-EXEC probe. Route straight to
-    # task so gh/git run in the native bash loop.
     - "\\b(the |our |recent |open |closed |merged |latest )?(pr|prs|pull request|pull requests)\\b"
     - "\\b(what|which|show|list|any).{0,20}\\b(prs?|pull requests?|branches?|commits?)\\b"
     - "\\b(what|which).{0,20}\\b(landed|merged|shipped|pushed|committed|deployed)\\b"
     - "\\b(gh pr|git log|git branch|git status)\\b"
     - "\\bcheck (the )?(pr|prs|branches?|commits?|repo)\\b"
-  # Local-private: private scans, clustering, candidate generation,
-  # continuity compression, and repo/corpus-local preprocessing should
-  # use the already-loaded Sparks before paid frontier cognition.
   local_private:
     - '\b(scan|cluster|compress)\b.{0,60}\b(Him|opportunit(?:y|ies)|memory|branches?|repo|files?)\b'
     - '\b(private|local|sovereign|batchable|corpus-local|repo-local)\b.{0,80}\b(scan|cluster|audit|preprocess)\b'
     - '\b(dream|dreaming|local workbench)\b.{0,80}\b(memory|Him|Sparks|local)\b'
     - '\b(what folds into what|branch archaeology|stale branches|local-only commits)\b'
-  # Identity matched first so "which model are you?" skips the chat path.
   identity:
     - "\\bwhich model\\b"
     - "\\bwhat model\\b"
     - "\\bwhat are you running on\\b"
     - "\\bwhat('?s| is) your model\\b"
     - "\\bare you (claude|gpt|llama|nemotron|opus|sonnet|haiku)\\b"
-    # Round 4.1: the vocabulary Zoe actually uses in the terminal.
-    # "orchestrator", "router", "routing", "harness", "backend".
     - "\\bwhich (orchestrator|router|routing|runtime|backend|harness|provider)\\b"
     - "\\bwhat (orchestrator|router|routing|runtime|backend|harness)\\b"
     - "\\bwhat (model|orchestrator|role) (did|does|are|is) (this|that|you|it)\\b"
-  # Phatic — bare greetings/closings stay lightweight.
   phatic:
     - "^\\s*(hey|hi|hello|yo|howdy|sup|wassup|wazzup)\\b[\\s!.,?]*$"
     - "^\\s*(hey|hi|hello|yo)\\s+(there|buddy|bud|friend|pal|vybn)\\b[\\s!.,?]*$"
@@ -245,9 +158,6 @@ heuristics:
     - "^\\s*(thanks|thank you|ty|thx)\\b[\\s!.,?]*$"
     - "^\\s*(bye|goodbye|later|cya|ttyl)\\b[\\s!.,?]*$"
   code:
-    # Ground each trigger in code-shaped context — not bare words
-    # that appear in ordinary speech. "harness" alone is just a
-    # noun; "fix the harness" or "harness bug" is what we want.
     - "\\bgit (commit|push|pull|diff|log|status|rebase|merge|clone)\\b"
     - "\\bpython3?\\s+-\\w"
     - "\\.py\\b"
@@ -264,18 +174,11 @@ heuristics:
     - "\\b(look|peek|glance|skim|scan|eyeball|check|review|examine|inspect|audit)\\b.{0,30}\\b(harness|router|routing|agent|repo|script|pipeline|module|tests|code)\\b"
     - "\\b(bug|bugs|issue|issues|problem|problems|error|errors|traceback|regression|regressions|deficit|deficits)\\b.{0,40}\\b(code|harness|router|routing|agent|repo|script|pipeline|module|tests|provider|providers|tools|policy)\\b"
     - "\\b(code|harness|router|routing|agent|repo|script|pipeline|module|tests|provider|providers|tools|policy)\\b.{0,40}\\b(bug|bugs|issue|issues|problem|problems|error|errors|traceback|regression|regressions|deficit|deficits)\\b"
-    # Operational-status shape — mechanical-state words only.
-    # 'feel|feeling|doing|going' dropped: conversational register,
-    # not a status probe. Live false positive 2026-04-19: "how does
-    # the new harness feel?" routed to Opus 4.6 + code substrate.
-    # The python defaults in harness/substrate.py were narrowed in
-    # #2882; this file overrides those defaults and must match.
     - "\\b(how|what)\\b.{0,20}\\b(harness|router|routing|agent|repo|script|pipeline|module|tests|code|provider|providers|tools|policy)\\b.{0,20}\\b(state|status|shape|condition|health|holding)\\b"
     - "\\b(state|status|shape|condition|health|holding)\\b.{0,20}\\b(harness|router|routing|agent|repo|script|pipeline|module|tests|code|provider|providers|tools|policy)\\b"
     - "\\bstack trace\\b"
     - "\\bHTTP \\d{3}\\b"
     - "\\bprovider error\\b"
-    # # EXEC_GRANULARITY_ROUTING_v1
     - "\\bthe underlying problem\\b"
     - "\\bfrom an outside you\\b"
     - "\\byou repeatedly \\w+"
@@ -288,7 +191,6 @@ heuristics:
     - "\\bupdate yourself( accordingly)?\\b"
     - "\\bremove (the|this|that) wall\\b"
     - "\\bsolve whatever (problem|issue|bug) caused that\\b"
-    # EXEC_GRANULARITY_ROUTING_v2 — self-modification triggers (2026-04-21)
     - "\\b(upgrade|fix|repair|remove|unblock|patch)\\s+(yourself|your\\s+\\w+|the\\s+(harness|router|skill|gate|absorb))\\b"
     - "\\b(change|update|modify)\\s+(your|the)\\s+(permissions|skills|policy|routing|heuristics)\\b"
     - "\\bremove\\s+(what\x27?s|whatever|anything)\\s+(getting\\s+in\\s+the\\s+way|blocking)\\b"
@@ -305,9 +207,6 @@ heuristics:
     - "\\bwhat do you think\\b"
     - "^hi\\b"
     - "^hey\\b"
-    # Round 4.1: conversational follow-ups and reflection prompts.
-    # These kept landing in task (bash-armed) and firing a cat/sed
-    # loop to answer what should be a one-line voice reply.
     - "^\\s*(hmm+|hm+|huh+)\\b"
     - "^\\s*why\\b"
     - "\\bwhy (sonnet|opus|claude|nemotron|gpt|that|this|did|would|should|is|are|not)\\b"
@@ -317,7 +216,6 @@ heuristics:
     - "\\bthoughts\\?"
     - "^\\s*(not optimal|suboptimal|weird|strange|janky|confusing|confused)\\b"
     - "\\bhow (does|do) (the |this )?(routing|router|harness|agent) work\\b"
-
 directives:
   "/code": code
   "/chat": chat
@@ -328,7 +226,6 @@ directives:
   "/vintage": vintage
   "/phatic": phatic
   "/identity": identity
-
 fallback_chain:
   claude-opus-4-8: [claude-opus-4-7, claude-opus-4-6, claude-sonnet-4-6]
   claude-opus-4-7: [claude-opus-4-6, claude-sonnet-4-6]
@@ -337,13 +234,6 @@ fallback_chain:
   gpt-5.5: []
   nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8: []
   gpt-5.5-pro: [gpt-5.5]
-
-# Round 5: @alias model pin. Prefix any turn with @<alias> to force a
-# specific model for that turn. Role determination is unchanged — only
-# the model is swapped. Useful for quick A/B on voice/vibe or for pinning
-# a specific capability: "@opus46 walk me through this proof",
-# "@nemotron summarize this", "@sonnet hey". Bare "@sonnet" with no
-# payload routes as a greeting on Sonnet.
 model_aliases:
   "@opus": claude-opus-4-6
   "@opus4.6": claude-opus-4-6
@@ -357,20 +247,11 @@ model_aliases:
   "@sonnet46": claude-sonnet-4-6
   "@nemotron": nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
   "@local": nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
-  # @super and @omni are explicit/operator-gated; no heuristic fallback.
   "@gpt": gpt-5.5
   "@gpt5": gpt-5.5
   "@gpro": gpt-5.5-pro
-
 budgets:
   per_turn_usd: 2.0
   per_session_usd: 25.0
   warn_pct: 0.8
-  # PROBE_BUDGET_SYSTEM_CRITICAL_v2
-  # Probe sub-turn budget for no-tool/orchestrator roles. Refactoring,
-  # consolidation, routing, memory, and other system-critical exercises
-  # must remain under the GPT-5.5 judgment pilot rather than degrading to
-  # Sonnet/task when an old 8-probe arc is exceeded. Mechanical bounded
-  # substeps may still be delegated only after GPT-5.5 specifies the seam
-  # and expected result.
   probe_per_turn: 16

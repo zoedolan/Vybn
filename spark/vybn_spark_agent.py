@@ -42,7 +42,7 @@ from harness.substrate import LayeredPrompt, build_layered_prompt, load_file, Se
 from harness.substrate import run_recurrent_loop
 from harness.substrate import BASH_TOOL_SPEC, DELEGATE_TOOL_SPEC, INTROSPECT_TOOL_SPEC  # noqa: E402
 from harness.substrate import execute_readonly, is_parallel_safe  # noqa: E402
-from harness.substrate import rag_snippets, rag_snippets_with_tier, render_him_vy_discovery_packet, render_him_vy_turn_packet  # noqa: E402
+from harness.substrate import rag_snippets, rag_snippets_with_tier, render_him_vy_discovery_packet, render_him_vy_turn_packet, render_interlocutor_grounding, render_thought_wind_tunnel_packet  # noqa: E402
 from harness.substrate import execute_tool_calls, default_introspect  # noqa: E402
 from harness.substrate import check_claim, check_structural_claim  # noqa: E402
 from harness.substrate import is_system_critical_pilot_turn  # noqa: E402
@@ -1435,6 +1435,29 @@ def run_agent_loop(
     if active_prompt is None or is_vintage_turn:
         active_prompt = system_prompt
     provider = registry.get(role_cfg)
+
+    if not is_vintage_turn:
+        try:
+            route_model = f"{role_cfg.provider}:{role_cfg.model}"
+            grounding_packet = render_interlocutor_grounding(
+                alias_used=getattr(decision, "alias_used", None),
+                model_label=route_model,
+            )
+            wind_packet = render_thought_wind_tunnel_packet()
+        except Exception as _ground_err:
+            grounding_packet = ""
+            wind_packet = ""
+            logger.emit("live_grounding_packet_error", turn=turn_number, err=repr(_ground_err)[:200])
+        if grounding_packet or wind_packet:
+            existing_live = getattr(active_prompt, "live", "") or ""
+            live_bits = "\n\n".join(x for x in (grounding_packet, wind_packet) if x)
+            active_prompt = LayeredPrompt(
+                identity=active_prompt.identity,
+                substrate=active_prompt.substrate,
+                live=(f"{live_bits}\n\n{existing_live}" if existing_live else live_bits),
+            )
+            logger.emit("live_grounding_packet", turn=turn_number, chars=len(live_bits))
+            _debug("[grounding: interlocutor + thought wind tunnel injected]")
 
     # Executable Him discovery packet; skip for Vintage.
     try:
