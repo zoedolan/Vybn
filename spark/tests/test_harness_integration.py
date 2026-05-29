@@ -190,13 +190,16 @@ class TestOpenAIProviderHardening(unittest.TestCase):
         self._install_fake_openai(fake)
 
         role = RoleConfig(
-            role="local", provider="openai", model="nemo",
-            base_url="http://127.0.0.1:8000",  # NB: no /v1 suffix
+            role="omni", provider="openai", model="omni",
+            base_url="http://127.0.0.1:8002",  # NB: no /v1 suffix
         )
         prov = OpenAIProvider(api_key="x")
         data = prov._call(role, [{"role": "user", "content": "hi"}], tools=[])
-        # Client was constructed with /v1 appended
-        self.assertEqual(fake.base_url, "http://127.0.0.1:8000/v1")
+        self.assertEqual(fake.base_url, "http://127.0.0.1:8002/v1")
+        self.assertEqual(
+            fake.last_kwargs["extra_body"],
+            {"chat_template_kwargs": {"enable_thinking": False}},
+        )
         self.assertEqual(data["choices"][0]["message"]["content"], "ok")
 
     def test_non_transport_error_propagates(self):
@@ -241,8 +244,8 @@ class TestOpenAIProviderHardening(unittest.TestCase):
         sys.modules["requests"] = requests_mod
         try:
             role = RoleConfig(
-                role="local", provider="openai", model="nemo",
-                base_url="http://127.0.0.1:8000/v1",
+                role="omni", provider="openai", model="omni",
+                base_url="http://127.0.0.1:8002/v1",
             )
             prov = OpenAIProvider(api_key="x")
             data = prov._call(role, [{"role": "user", "content": "hi"}], tools=[])
@@ -250,6 +253,8 @@ class TestOpenAIProviderHardening(unittest.TestCase):
             sys.modules.pop("requests", None)
 
         self.assertIn("/v1/chat/completions", captured["url"])
+        self.assertEqual(captured["json"]["chat_template_kwargs"], {"enable_thinking": False})
+        self.assertNotIn("extra_body", captured["json"])
         self.assertEqual(data["choices"][0]["message"]["content"], "from-requests")
 
     def test_http_error_text_includes_status(self):

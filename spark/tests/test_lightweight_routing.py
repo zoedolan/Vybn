@@ -126,6 +126,10 @@ class TestPolicyHasLightweightRoles(unittest.TestCase):
             (data.get("model_aliases") or {}).get("@gpro"),
             "gpt-5.5-pro",
         )
+        self.assertEqual(
+            (data.get("model_aliases") or {}).get("@opus48"),
+            "claude-opus-4-8",
+        )
 
     def test_present_work_roles_default_to_gpt55(self):
         # If YAML is absent or malformed, in-code defaults must still keep
@@ -160,6 +164,12 @@ class TestPolicyHasLightweightRoles(unittest.TestCase):
         self.assertEqual(pol.model_aliases.get("@gpt"), "gpt-5.5")
         self.assertEqual(pol.model_aliases.get("@gpt5"), "gpt-5.5")
         self.assertEqual(pol.model_aliases.get("@gpro"), "gpt-5.5-pro")
+        self.assertEqual(pol.model_aliases.get("@opus48"), "claude-opus-4-8")
+
+    def test_opus48_alias_keeps_default_chat_role_but_pins_anthropic_model(self):
+        for pol in (default_policy(), load_policy(SPARK_DIR / "router_policy.yaml")):
+            d = pol.classify("@opus48 you with me, buddy?")
+            self.assertEqual((d.role, d.cleaned_input, d.model_override, d.alias_used), ("chat", "you with me, buddy?", "claude-opus-4-8", "@opus48"))
 
 
 class TestRouterLightweightClassification(unittest.TestCase):
@@ -742,35 +752,16 @@ class TestLocalPrivateRouting(unittest.TestCase):
         d = p.classify("Use the local workbench for dreaming consolidation over Him memory.")
         self.assertEqual(d.role, "local_private")
 
-# --- absorbed from test_opus47_deprecated.py (2026-04-29 file consolidation;
-# existing home K_t=test_lightweight_routing; opus 4.7 alias coverage lives here now) ---
-
-def test_opus47_is_available_as_opt_in_model_not_default():
-    active = Path("spark/harness/substrate.py").read_text() + "\\n" + Path("spark/router_policy.yaml").read_text()
-    assert "claude-opus-4-7" in active
-    assert "@opus4.7" in active
-    assert "@opus47" in active
-
-
-def test_code_role_defaults_to_gpt55_after_present_work_reset():
-    from spark.harness.substrate import default_policy
-    decision = default_policy().classify("fix the harness routing bug")
-    assert decision.role == "code"
-    assert decision.config.model == "gpt-5.5"
-
-
-def test_opus47_alias_pins_model_for_api_call():
-    from spark.harness.substrate import default_policy
-    decision = default_policy().classify("@opus4.7 fix the harness routing bug")
-    assert decision.role == "code"
-    assert decision.model_override == "claude-opus-4-7"
-    assert decision.alias_used == "@opus4.7"
-
-
-def test_opus47_has_fallback_chain():
-    from spark.harness.substrate import default_policy
-    policy = default_policy()
-    assert policy.fallback_chain["claude-opus-4-7"] == ["claude-opus-4-6", "claude-sonnet-4-6"]
+def test_opus_aliases_and_fallback_chains():
+    from spark.harness.substrate import default_policy, load_policy
+    aliases = {"@opus4.7": "claude-opus-4-7", "@opus47": "claude-opus-4-7", "@opus4.8": "claude-opus-4-8", "@opus48": "claude-opus-4-8"}
+    fallbacks = {"claude-opus-4-7": ["claude-opus-4-6", "claude-sonnet-4-6"], "claude-opus-4-8": ["claude-opus-4-7", "claude-opus-4-6", "claude-sonnet-4-6"]}
+    for policy in (default_policy(), load_policy(SPARK_DIR / "router_policy.yaml")):
+        for alias, model in aliases.items():
+            d = policy.classify(f"{alias} fix the harness routing bug")
+            assert (d.role, d.model_override, d.alias_used) == ("code", model, alias)
+        for model, chain in fallbacks.items():
+            assert policy.fallback_chain[model] == chain
 
 
 # Omni is an explicit endpoint role, not a model alias or Super fallback.
@@ -1537,21 +1528,25 @@ def test_raw_contact_system_prompt_names_current_route_shape():
     assert len(omni) < 1024, len(omni)
 
 
+def _local_organ_fake(model_id, replies, calls=None):
+    replies = list(replies)
+
+    def fake(base_url, path, *, payload=None, timeout=20.0):
+        if calls is not None:
+            calls.append((path, payload))
+        if path == "/models":
+            return {"ok": True, "json": {"data": [{"id": model_id}]}}
+        msg = replies.pop(0)
+        return {"ok": True, "json": {"choices": [{"message": msg, "finish_reason": "stop"}]}}
+
+    return fake
+
+
 def test_local_organ_witness_vintage_fragments_fail_semantic_gate():
     from harness.substrate import local_organ_witness
 
     calls = []
-
-    def fake(base_url, path, *, payload=None, timeout=20.0):
-        calls.append((base_url, path, payload))
-        if path == "/models":
-            return {"ok": True, "json": {"data": [{"id": "talkie-1930-13b-it"}]}}
-        assert path == "/chat/completions"
-        assert payload["messages"] == [{"role": "user", "content": "Write one complete sentence in 1930s English about rain."}]
-        return {"ok": True, "json": {"choices": [{"message": {"content": "I was born in"}, "finish_reason": "stop"}]}}
-
-    witness = local_organ_witness("vintage", request_json=fake)
-    assert witness["ok"] is False
+    witness = local_organ_witness("vintage", request_json=_local_organ_fake("talkie-1930-13b-it", [{"content": "I was born in"}], calls))
     assert witness["status"] == "failed_closed"
     assert witness["reason"] == "semantic_smoke_fragment"
     assert len(calls) == 2
@@ -1561,51 +1556,38 @@ def test_local_organ_witness_omni_hidden_reasoning_fails_closed_after_retry():
     from harness.substrate import local_organ_witness
 
     calls = []
-
-    def fake(base_url, path, *, payload=None, timeout=20.0):
-        calls.append((path, payload))
-        if path == "/models":
-            return {"ok": True, "json": {"data": [{"id": "dc5f0b0bfddf8b6e0f5891475be9af05b80126fe"}]}}
-        return {"ok": True, "json": {"choices": [{"message": {"content": "", "reasoning_content": "hidden"}, "finish_reason": "stop"}]}}
-
-    witness = local_organ_witness("omni", request_json=fake)
-    assert witness["ok"] is False
+    witness = local_organ_witness("omni", request_json=_local_organ_fake("dc5f0b0bfddf8b6e0f5891475be9af05b80126fe", [{"content": "", "reasoning_content": "hidden"}] * 2, calls))
     assert witness["status"] == "failed_closed"
     assert witness["reason"] == "hidden_reasoning_without_visible_content"
     assert [c[0] for c in calls] == ["/models", "/chat/completions", "/chat/completions"]
+    assert all(payload["chat_template_kwargs"] == {"enable_thinking": False} for _, payload in calls[1:])
     assert "visible_smoke_retry" in witness["checks"]
 
 
-def test_local_organ_witness_omni_retry_visible_content_passes():
+def test_local_organ_witness_omni_supplied_image_smoke_passes_and_fails_closed():
     from harness.substrate import local_organ_witness
 
-    completions = [
+    calls = []
+    witness = local_organ_witness("omni", request_json=_local_organ_fake("dc5f0b0bfddf8b6e0f5891475be9af05b80126fe", [
         {"content": "", "reasoning_content": "hidden"},
         {"content": "OMNI_TEXT_OK", "reasoning_content": None},
-    ]
-
-    def fake(base_url, path, *, payload=None, timeout=20.0):
-        if path == "/models":
-            return {"ok": True, "json": {"data": [{"id": "dc5f0b0bfddf8b6e0f5891475be9af05b80126fe"}]}}
-        msg = completions.pop(0)
-        return {"ok": True, "json": {"choices": [{"message": msg, "finish_reason": "stop"}]}}
-
-    witness = local_organ_witness("omni", request_json=fake)
-    assert witness["ok"] is True
+        {"content": "red green blue", "reasoning_content": None},
+    ], calls))
     assert witness["status"] == "semantic_healthy"
-    assert witness["content"] == "OMNI_TEXT_OK"
+    assert witness["reason"] == "endpoint_visible_and_supplied_image_smokes_passed"
+    assert witness["image_content"] == "red green blue"
+    image_payload = calls[-1][1]
+    content = image_payload["messages"][0]["content"]
+    assert isinstance(content, list) and content[1]["image_url"]["url"].startswith("data:image/png;base64,")
+    assert all(color not in content[0]["text"].lower() for color in ("red", "green", "blue"))
+    bad = _local_organ_fake("dc5f0b0bfddf8b6e0f5891475be9af05b80126fe", [{"content": "OMNI_TEXT_OK", "reasoning_content": None}, {"content": "I cannot inspect the image from here.", "reasoning_content": None}])
+    assert local_organ_witness("omni", request_json=bad)["reason"] == "supplied_image_smoke_unexpected"
 
 
 def test_local_organ_witness_vintage_complete_sentence_passes():
     from harness.substrate import local_organ_witness
 
-    def fake(base_url, path, *, payload=None, timeout=20.0):
-        if path == "/models":
-            return {"ok": True, "json": {"data": [{"id": "talkie-1930-13b-it"}]}}
-        return {"ok": True, "json": {"choices": [{"message": {"content": "The rain falls softly upon the quiet street."}, "finish_reason": "stop"}]}}
-
-    witness = local_organ_witness("vintage", request_json=fake)
-    assert witness["ok"] is True
+    witness = local_organ_witness("vintage", request_json=_local_organ_fake("talkie-1930-13b-it", [{"content": "The rain falls softly upon the quiet street."}]))
     assert witness["status"] == "semantic_healthy"
 
 

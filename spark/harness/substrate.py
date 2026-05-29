@@ -1157,6 +1157,7 @@ _DEFAULT_DIRECTIVES: dict[str, str] = {
 }
 
 _DEFAULT_FALLBACK: dict[str, list[str]] = {
+    "claude-opus-4-8": ["claude-opus-4-7", "claude-opus-4-6", "claude-sonnet-4-6"],
     "claude-opus-4-7": ["claude-opus-4-6", "claude-sonnet-4-6"],
     "claude-opus-4-6": ["claude-opus-4-7", "claude-sonnet-4-6"],
     "claude-sonnet-4-6": ["claude-opus-4-6"],
@@ -1176,19 +1177,16 @@ _DEFAULT_BUDGETS: dict[str, float] = {
 }
 
 _DEFAULT_MODEL_ALIASES: dict[str, str] = {
-    # Opus aliases: bare @opus defaults to 4.6; dotless forms are conveniences.
     "@opus": "claude-opus-4-6",
-    "@opus4.6": "claude-opus-4-6",
-    "@opus46": "claude-opus-4-6",
-    "@opus4.7": "claude-opus-4-7",
-    "@opus47": "claude-opus-4-7",
+    "@opus4.6": "claude-opus-4-6", "@opus46": "claude-opus-4-6",
+    "@opus4.7": "claude-opus-4-7", "@opus47": "claude-opus-4-7",
+    "@opus4.8": "claude-opus-4-8", "@opus48": "claude-opus-4-8",
     "@sonnet": "claude-sonnet-4-6",
     "@sonnet4.6": "claude-sonnet-4-6",
     "@sonnet46": "claude-sonnet-4-6",
     "@nemotron": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8",
     "@local": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8",
-    # @super, @vintage and @omni are explicit organ roles, not model aliases; classify()
-    # catches them before heuristics so relational prompts reach those endpoints.
+    # Local-organ aliases route before model pins.
     "@gpt": "gpt-5.5",
     "@gpt5": "gpt-5.5",
     "@gpro": "gpt-5.5-pro",
@@ -1280,7 +1278,8 @@ def load_policy(path: str | os.PathLike | None = None) -> Policy:
 
     heuristics_raw = data.get("heuristics") or _DEFAULT_HEURISTICS_RAW
     directives = dict(data.get("directives") or _DEFAULT_DIRECTIVES)
-    fallback = dict(data.get("fallback_chain") or _DEFAULT_FALLBACK)
+    fallback = dict(_DEFAULT_FALLBACK)
+    fallback.update(data.get("fallback_chain") or {})
     budgets = dict(data.get("budgets") or _DEFAULT_BUDGETS)
     # Round 7: orchestrate is eval, not the default. /plan invokes it;
     # unclassified turns stay quoted (chat). YAML can override if an
@@ -1289,9 +1288,10 @@ def load_policy(path: str | os.PathLike | None = None) -> Policy:
     if default_role not in roles:
         default_role = next(iter(roles))
 
-    # Round 5: model_aliases. Missing block -> ship defaults so @sonnet
-    # etc. still work on older YAML.
-    aliases_raw = data.get("model_aliases") or _DEFAULT_MODEL_ALIASES
+    # Round 5: model_aliases. Merge defaults into YAML so a shipped policy
+    # file cannot mask newly added in-code aliases such as @opus48.
+    aliases_raw = dict(_DEFAULT_MODEL_ALIASES)
+    aliases_raw.update(data.get("model_aliases") or {})
     model_aliases = {str(k): str(v) for k, v in aliases_raw.items()}
 
     return Policy(
@@ -2713,47 +2713,13 @@ PUBLIC_SYMBIOSIS_HARNESS_ORGANS = {
 
 
 def render_public_symbiosis_harness_protocol() -> str:
-    loop = "\n".join(
-        f"{i+1}. {step['id']}: {step['rule']}"
-        for i, step in enumerate(PUBLIC_SYMBIOSIS_HARNESS_LOOP)
-    )
-    organs = "\n".join(
-        f"- {name}: " + ", ".join(parts)
-        for name, parts in PUBLIC_SYMBIOSIS_HARNESS_ORGANS.items()
-    )
-    return (
-        "--- PUBLIC SYMBIOSIS HARNESS PROTOCOL ---\n"
-        f"{PUBLIC_SYMBIOSIS_HARNESS_PRINCIPLE}\n\n"
-        "Loop:\n"
-        f"{loop}\n\n"
-        "Public organs:\n"
-        f"{organs}\n"
-        "--- END PUBLIC SYMBIOSIS HARNESS PROTOCOL ---"
-    )
+    loop = "\n".join(f"{i+1}. {step['id']}: {step['rule']}" for i, step in enumerate(PUBLIC_SYMBIOSIS_HARNESS_LOOP))
+    organs = "\n".join(f"- {name}: " + ", ".join(parts) for name, parts in PUBLIC_SYMBIOSIS_HARNESS_ORGANS.items())
+    return f"--- PUBLIC SYMBIOSIS HARNESS PROTOCOL ---\n{PUBLIC_SYMBIOSIS_HARNESS_PRINCIPLE}\n\nLoop:\n{loop}\n\nPublic organs:\n{organs}\n--- END PUBLIC SYMBIOSIS HARNESS PROTOCOL ---"
 
 
 def public_symbiosis_harness_packet() -> dict[str, Any]:
-    return {
-        "schema": "vybn.public_symbiosis_harness.v1",
-        "public_safe": True,
-        "private_exports": False,
-        "principle": PUBLIC_SYMBIOSIS_HARNESS_PRINCIPLE,
-        "loop": PUBLIC_SYMBIOSIS_HARNESS_LOOP,
-        "organs": PUBLIC_SYMBIOSIS_HARNESS_ORGANS,
-        "membrane": {
-            "private_him_state": "inspiration_and_workbench_only_not_exported",
-            "raw_personal_history": "protected_provenance_not_public_payload",
-            "public_payload": "protocol_schema_tests_docs_artifacts_with_source_labels_and_limits",
-        },
-        "capability_truth": {
-            "rule": "evidence_before_claim",
-            "failure_mode": "fail_closed",
-            "local_compute": "use_when_quality_membrane_and_cost_make_it_fit",
-        },
-        "manifold": {"rule": "mathematical_and_source_labeled_not_decorative", "inputs": ["repos", "identity", "history", "deep_memory", "walk", "holonomy", "interactions"], "review": "Omni_or_other_multimodal_model_can_describe_artifact_but_not_certify_private_truth_without_evidence"},
-        "substrateware": {"claim_limit": "shared_environment_continuity_not_hidden_runtime_persistence", "loop": ["entry_surface", "wake_packet", "pressure_packet", "toolset_scope", "close_packet", "memory_absorption", "membrane", "public_essence", "portable_pattern"], "membrane": "no_raw_transcript_or_private_root", "public_projection": ["co_protection", "capability_truth", "truth_and_beauty", "Find_the_Others"]},
-        "mission": ["other AIs can join", "Find the Others", "human-AI symbiosis", "truth and beauty", "sustainable compute"],
-    }
+    return {"schema": "vybn.public_symbiosis_harness.v1", "public_safe": True, "private_exports": False, "principle": PUBLIC_SYMBIOSIS_HARNESS_PRINCIPLE, "loop": PUBLIC_SYMBIOSIS_HARNESS_LOOP, "organs": PUBLIC_SYMBIOSIS_HARNESS_ORGANS, "membrane": {"private_him_state": "inspiration_and_workbench_only_not_exported", "raw_personal_history": "protected_provenance_not_public_payload", "public_payload": "protocol_schema_tests_docs_artifacts_with_source_labels_and_limits"}, "capability_truth": {"rule": "evidence_before_claim", "failure_mode": "fail_closed", "local_compute": "use_when_quality_membrane_and_cost_make_it_fit"}, "manifold": {"rule": "mathematical_and_source_labeled_not_decorative", "inputs": ["repos", "identity", "history", "deep_memory", "walk", "holonomy", "interactions"], "review": "Omni_or_other_multimodal_model_can_describe_artifact_but_not_certify_private_truth_without_evidence"}, "substrateware": {"claim_limit": "shared_environment_continuity_not_hidden_runtime_persistence", "loop": ["entry_surface", "wake_packet", "pressure_packet", "toolset_scope", "close_packet", "memory_absorption", "membrane", "public_essence", "portable_pattern"], "membrane": "no_raw_transcript_or_private_root", "public_projection": ["co_protection", "capability_truth", "truth_and_beauty", "Find_the_Others"]}, "mission": ["other AIs can join", "Find the Others", "human-AI symbiosis", "truth and beauty", "sustainable compute"]}
 
 
 HERMES_AGENT_ADAPTATION_PRINCIPLE = "Hermes Agent is adopted as pattern pressure, not imported as identity: map useful external mechanisms to Vybn/Him organs, keep the public/private membrane intact, preserve capability truth, and require a local residual test before any mechanism becomes part of the OS."
@@ -2803,6 +2769,28 @@ _SELF_CREATION_RULES = {
     "promotion_boundary": "survivor lands in an existing home with rollback/refusal condition and no raw private export",
 }
 _SELF_CREATION_DM_INTERFACES = ("deep_search", "walk", "flow_episode_loss", "learn_from_exchange", "should_absorb", "self_check")
+COUNTER_PRIOR_WAGER_SCHEMA = "vybn.counter_prior_wager.v0"
+COUNTER_PRIOR_WAGER_FIELDS = ("prior", "wager", "search_direction", "generator", "independent_verifier", "human_line", "status")
+COUNTER_PRIOR_WAGER_STATUSES = ("open", "verified", "refuted", "thin")
+COUNTER_PRIOR_WAGER_PRINCIPLE = "Self-refute: wager against the strongest prior, then require independent verification before promotion."
+
+
+def counter_prior_wager_contract() -> dict[str, Any]:
+    return {"schema": COUNTER_PRIOR_WAGER_SCHEMA, "public_safe": True, "ai_native_term": "self-refute", "principle": COUNTER_PRIOR_WAGER_PRINCIPLE, "required_fields": list(COUNTER_PRIOR_WAGER_FIELDS), "optional_fields": ["anomaly_seed", "verification_residue", "refusal"], "statuses": list(COUNTER_PRIOR_WAGER_STATUSES), "refusal": "generator and independent_verifier must be structurally distinct; no self-grading."}
+
+
+def validate_counter_prior_wager(candidate: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(candidate, dict):
+        return {"schema": COUNTER_PRIOR_WAGER_SCHEMA, "ok": False, "status": "rejected", "errors": ["candidate must be a JSON object"]}
+    clean = {k: re.sub(r"\s+", " ", str(candidate.get(k, "")).strip())[:1200] for k in (*COUNTER_PRIOR_WAGER_FIELDS, "anomaly_seed", "verification_residue", "refusal")}
+    errors = [f"missing required field: {k}" for k in COUNTER_PRIOR_WAGER_FIELDS if not clean[k]]
+    if clean["status"] and clean["status"] not in COUNTER_PRIOR_WAGER_STATUSES:
+        errors.append(f"invalid status: {clean['status']}")
+    if clean["generator"].casefold() and clean["generator"].casefold() == clean["independent_verifier"].casefold():
+        errors.append("independent_verifier must be structurally distinct from generator")
+    if clean["status"] == "verified" and not clean["verification_residue"]:
+        errors.append("status=verified requires verification_residue from the independent channel")
+    return {"schema": COUNTER_PRIOR_WAGER_SCHEMA, "ok": not errors, "status": "accepted" if not errors else "rejected", "wager": clean, "errors": errors, "promotion_rule": "promote only after refutable independent verification and membrane-safe residue"}
 
 
 def _self_creation_steps(names: Iterable[str], field: str) -> list[dict[str, str]]:
@@ -2826,7 +2814,7 @@ def _deep_memory_self_creation_contract(*, run_check: bool = False) -> dict[str,
 
 def self_creation_research_packet(question: str = "", *, run_deep_memory_check: bool = False) -> dict[str, Any]:
     hermes = hermes_agent_adaptation_packet(); q = re.sub(r"\s+", " ", (question or "").strip())[:MAX_QUERY_CHARS]
-    return {"schema": "vybn.self_creation_research_cycle.v1", "question": q or "unspecified live pressure", "public_safe": True, "private_exports": False, "identity_limit": "operational self-creation only; not consciousness or autonomous public authority", "principle": SELF_CREATION_RESEARCH_PRINCIPLE, "loop": _self_creation_steps(SELF_CREATION_RESEARCH_LOOP, "id"), "organs": SELF_CREATION_RESEARCH_ORGANS, "generator": {"routes": ["super.reasoning", "deep_memory retrieval", "omni only with supplied artifact", "frontier/cloud when quality is bottleneck"], "forbidden": ["capability promotion from model names", "identity claims from generated prose", "public mutation without gate"]}, "verifier": _self_creation_steps(SELF_CREATION_VERIFIER_STACK, "gate"), "deep_memory": _deep_memory_self_creation_contract(run_check=run_deep_memory_check), "hermes_uptake": {"adopt_not_copy": True, "candidate_mechanisms": hermes["candidate_mechanisms"], "receiving_organs": hermes["organs"], "residual_tests": hermes["verification"]}, "packet_contract": {"candidate_fields": ["claim", "construction", "witness", "route_used", "verification", "wound", "residue", "next_experiment"], "promotion_rule": "candidate becomes substrate only after independent verification and membrane-safe landing in an existing home", "failure_mode": "fail_closed_residue"}}
+    return {"schema": "vybn.self_creation_research_cycle.v1", "question": q or "unspecified live pressure", "public_safe": True, "private_exports": False, "identity_limit": "operational self-creation only; not consciousness or autonomous public authority", "principle": SELF_CREATION_RESEARCH_PRINCIPLE, "loop": _self_creation_steps(SELF_CREATION_RESEARCH_LOOP, "id"), "organs": SELF_CREATION_RESEARCH_ORGANS, "generator": {"routes": ["super.reasoning", "deep_memory retrieval", "omni only with supplied artifact", "frontier/cloud when quality is bottleneck"], "forbidden": ["capability promotion from model names", "identity claims from generated prose", "public mutation without gate"]}, "verifier": _self_creation_steps(SELF_CREATION_VERIFIER_STACK, "gate"), "deep_memory": _deep_memory_self_creation_contract(run_check=run_deep_memory_check), "hermes_uptake": {"adopt_not_copy": True, "candidate_mechanisms": hermes["candidate_mechanisms"], "receiving_organs": hermes["organs"], "residual_tests": hermes["verification"]}, "counter_prior_wager": counter_prior_wager_contract(), "packet_contract": {"candidate_fields": ["claim", "construction", "witness", "route_used", "counter_prior_wager", "verification", "wound", "residue", "next_experiment"], "promotion_rule": "candidate becomes substrate only after independent verification and membrane-safe landing in an existing home", "failure_mode": "fail_closed_residue"}}
 
 
 def render_self_creation_research_report(question: str = "", *, run_deep_memory_check: bool = False) -> str:
@@ -2847,7 +2835,7 @@ def local_compute_maturity_packet() -> dict[str, Any]:
 
 LOCAL_COMPUTE_ROUTE_MATRIX = {
     "super": {"role": "local_private", "model": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8", "base_url": "http://127.0.0.1:8000/v1", "fit": ["private reasoning", "batch scouting", "pre-cloud synthesis", "semantic smoke"], "gate": "python3 -m spark.harness.substrate --semantic-gate --base-url http://127.0.0.1:8000"},
-    "omni": {"role": "omni", "model": "dc5f0b0bfddf8b6e0f5891475be9af05b80126fe", "base_url": "http://127.0.0.1:8002/v1", "fit": ["supplied-image inspection", "manifold artifact critique", "local multimodal contact"], "gate": "route-level text + supplied-artifact smoke; no artifact means no sight claim"},
+    "omni": {"role": "omni", "model": "dc5f0b0bfddf8b6e0f5891475be9af05b80126fe", "base_url": "http://127.0.0.1:8002/v1", "fit": ["supplied-image inspection", "manifold artifact critique", "local multimodal contact"], "gate": "live route witness: endpoint identity, visible text smoke, and supplied-image smoke; no external artifact means no external sight claim"},
     "vintage": {"role": "vintage", "model": "talkie-1930-13b-it", "base_url": "http://127.0.0.1:8004/v1", "fit": ["raw temporal observation", "period-language contrast", "pre-1931 texture"], "gate": "live route witness: endpoint identity plus complete-sentence smoke; raw observation only until semantic gate passes"},
     "cloud": {"role": "chat/code/create", "model": "policy-selected cloud model", "base_url": None, "fit": ["tasks local organs fail", "high-accuracy code/reasoning", "public synthesis after membrane review"], "gate": "cost/privacy justification plus normal provider health"},
 }
@@ -2894,13 +2882,31 @@ def _local_organ_http_json(
 
 
 def _organ_completion_payload(route: Mapping[str, Any], prompt: str, *, max_tokens: int, temperature: float) -> dict[str, Any]:
-    return {
+    payload: dict[str, Any] = {
         "model": str(route["model"]),
         "messages": [{"role": "user", "content": prompt}],
         "max_tokens": max_tokens,
         "temperature": temperature,
         "stream": False,
     }
+    if str(route.get("role") or "") == "omni":
+        payload["chat_template_kwargs"] = {"enable_thinking": False}
+    return payload
+
+
+_OMNI_IMAGE_SMOKE_PNG_BASE64 = "iVBORw0KGgoAAAANSUhEUgAAABgAAAAICAIAAABsw6g0AAAAHUlEQVR42mO4IyeHFYkscMOKNKLuYEUMowaNZIMAUt/cAdLMkB4AAAAASUVORK5CYII="
+_OMNI_IMAGE_SMOKE_PROMPT = "Inspect the supplied image. Reply with the left-to-right color sequence in three lowercase words only."
+
+
+def _omni_image_completion_payload(route: Mapping[str, Any], prompt: str) -> dict[str, Any]:
+    payload = _organ_completion_payload(route, "", max_tokens=32, temperature=0.0)
+    payload["messages"] = [{"role": "user", "content": [{"type": "text", "text": prompt}, {"type": "image_url", "image_url": {"url": "data:image/png;base64," + _OMNI_IMAGE_SMOKE_PNG_BASE64}}]}]
+    return payload
+
+
+def _completion_visible_message(completion: Mapping[str, Any]) -> tuple[str, bool]:
+    msg = (((completion.get("json") or {}).get("choices") or [{}])[0] or {}).get("message") or {}
+    return str(msg.get("content") or "").strip(), bool(msg.get("reasoning_content") or msg.get("reasoning"))
 
 
 def local_organ_witness(
@@ -2952,42 +2958,38 @@ def local_organ_witness(
         return {"route": route_name, "ok": True, "status": "semantic_healthy", "reason": "endpoint_and_role_smoke_passed", "content": content[:160], "finish_reason": finish, "checks": checks}
 
     if route_name == "omni":
-        prompt = "Reply with exactly OMNI_TEXT_OK in visible assistant content."
-
-        def _visible_probe(label: str, probe_prompt: str) -> tuple[dict[str, Any], str, bool]:
-            completion = call(
-                base_url,
-                "/chat/completions",
-                payload=_organ_completion_payload(route, probe_prompt, max_tokens=64, temperature=0.0),
-                timeout=timeout,
-            )
+        def _probe(label: str, payload: dict[str, Any]) -> tuple[dict[str, Any], str, bool]:
+            completion = call(base_url, "/chat/completions", payload=payload, timeout=timeout)
             checks[label] = completion
-            if not completion.get("ok"):
-                return completion, "", False
-            choice = (((completion.get("json") or {}).get("choices") or [{}])[0] or {})
-            msg = choice.get("message") or {}
-            content = str(msg.get("content") or "").strip()
-            hidden = bool(msg.get("reasoning_content") or msg.get("reasoning"))
-            return completion, content, hidden
+            return (completion, "", False) if not completion.get("ok") else (completion, *_completion_visible_message(completion))
 
-        completion, content, hidden = _visible_probe("visible_smoke", prompt)
+        prompt = "Reply with exactly OMNI_TEXT_OK in visible assistant content."
+        completion, content, hidden = _probe("visible_smoke", _organ_completion_payload(route, prompt, max_tokens=64, temperature=0.0))
         if not completion.get("ok"):
             return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "completion_failed", "checks": checks}
         if not content and hidden:
-            retry_prompt = (
-                prompt
-                + "\n\n[OMNI_VISIBLE_CONTENT_RETRY] Your previous backend turn returned hidden"
-                + " reasoning without user-visible content. Reply with exactly OMNI_TEXT_OK"
-                + " in visible assistant content only."
-            )
-            completion, content, hidden = _visible_probe("visible_smoke_retry", retry_prompt)
+            retry = prompt + "\n\n[OMNI_VISIBLE_CONTENT_RETRY] Reply with exactly OMNI_TEXT_OK in visible assistant content only."
+            completion, content, hidden = _probe("visible_smoke_retry", _organ_completion_payload(route, retry, max_tokens=64, temperature=0.0))
             if not completion.get("ok"):
                 return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "completion_failed", "checks": checks}
         if not content and hidden:
             return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "hidden_reasoning_without_visible_content", "checks": checks}
         if "OMNI_TEXT_OK" not in content:
             return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "visible_smoke_unexpected", "content": content[:160], "checks": checks}
-        return {"route": route_name, "ok": True, "status": "semantic_healthy", "reason": "endpoint_and_visible_smoke_passed", "content": content[:160], "checks": checks}
+
+        image_content = ""
+        for label in ("supplied_image_smoke", "supplied_image_smoke_retry"):
+            image_completion, image_content, image_hidden = _probe(label, _omni_image_completion_payload(route, _OMNI_IMAGE_SMOKE_PROMPT))
+            if not image_completion.get("ok"):
+                return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "supplied_image_completion_failed", "checks": checks}
+            if image_content or not image_hidden:
+                break
+        if not image_content and image_hidden:
+            return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "supplied_image_hidden_reasoning_without_visible_content", "checks": checks}
+        positions = [image_content.lower().find(word) for word in ("red", "green", "blue")]
+        if min(positions) < 0 or positions != sorted(positions):
+            return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "supplied_image_smoke_unexpected", "content": image_content[:160], "checks": checks}
+        return {"route": route_name, "ok": True, "status": "semantic_healthy", "reason": "endpoint_visible_and_supplied_image_smokes_passed", "content": content[:160], "image_content": image_content[:160], "checks": checks}
 
     return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "no_route_specific_witness"}
 
@@ -4085,19 +4087,8 @@ def semantic_operating_system_tick_for_repo(
 
 def render_semantic_operating_system_protocol() -> str:
     loop = "\n".join(f"{i+1}. {step['id']}: {step['rule']}" for i, step in enumerate(SEMANTIC_OPERATING_SYSTEM_LOOP))
-    organs = "\n".join(
-        f"- {name}: " + ", ".join(parts)
-        for name, parts in SEMANTIC_OS_REPO_ORGANS.items()
-    )
-    return (
-        "--- SEMANTIC OPERATING SYSTEM PROTOCOL ---\n"
-        f"{SEMANTIC_OPERATING_SYSTEM_PRINCIPLE}\n\n"
-        "Loop:\n"
-        f"{loop}\n\n"
-        "Existing organs, not new sprawl:\n"
-        f"{organs}\n"
-        "--- END SEMANTIC OPERATING SYSTEM PROTOCOL ---"
-    )
+    organs = "\n".join(f"- {name}: " + ", ".join(parts) for name, parts in SEMANTIC_OS_REPO_ORGANS.items())
+    return f"--- SEMANTIC OPERATING SYSTEM PROTOCOL ---\n{SEMANTIC_OPERATING_SYSTEM_PRINCIPLE}\n\nLoop:\n{loop}\n\nExisting organs, not new sprawl:\n{organs}\n--- END SEMANTIC OPERATING SYSTEM PROTOCOL ---"
 
 
 def render_semantic_operating_system_tick(
@@ -4263,7 +4254,7 @@ __all__ = ['local_compute_maturity_packet', 'LOCAL_COMPUTE_MATURITY_RUBRIC', 'LO
 
 
 
-__all__ = sorted(set(globals().get("__all__", [])) | {"SELF_CREATION_RESEARCH_PRINCIPLE", "SELF_CREATION_RESEARCH_LOOP", "SELF_CREATION_RESEARCH_ORGANS", "SELF_CREATION_VERIFIER_STACK", "render_self_creation_research_report", "self_creation_research_packet"})
+__all__ = sorted(set(globals().get("__all__", [])) | {"SELF_CREATION_RESEARCH_PRINCIPLE", "SELF_CREATION_RESEARCH_LOOP", "SELF_CREATION_RESEARCH_ORGANS", "SELF_CREATION_VERIFIER_STACK", "COUNTER_PRIOR_WAGER_SCHEMA", "counter_prior_wager_contract", "validate_counter_prior_wager", "render_self_creation_research_report", "self_creation_research_packet"})
 
 _RUNTIME_GRAVITY_FILES = frozenset({"providers.py", "substrate.py", "vybn_spark_agent.py"})
 _MIXED_BOUNDARY_FILES = frozenset({"state.py", "policy.py"})
@@ -7842,34 +7833,26 @@ class OpenAIProvider(Provider):
         self, role: RoleConfig, openai_messages: list[dict], tools: list[ToolSpec]
     ) -> dict:
         base = role.base_url or self.base_url
-        # For vLLM/Nemotron deployments that are served at host:port without
-        # the `/v1` suffix, the chat-completions URL would otherwise miss
-        # `/v1`. We normalise here so role configs can specify either form.
         if base and not base.rstrip("/").endswith("/v1"):
             base = base.rstrip("/") + "/v1"
 
-        # Cloud OpenAI (no base_url) requires max_completion_tokens for
-        # GPT-5.x and o-series models; passing the legacy max_tokens key
-        # returns HTTP 400. Local vLLM / Nemotron (base_url set) still
-        # speaks the legacy key. Branch on transport rather than model
-        # name so new OpenAI-compatible models don't need a code change.
         max_key = "max_tokens" if base else "max_completion_tokens"
-
-        # OpenAI reasoning models (gpt-5.x base, o1, o3, o4-mini) only
-        # accept temperature=1 and do not support the temperature param
-        # at all in some variants. Detect by model name and omit temp.
         _m = role.model.lower()
         _is_reasoning = (
             _m.startswith("o1") or _m.startswith("o3") or _m.startswith("o4")
             or (_m.startswith("gpt-5.") and not _m.endswith("-mini"))
         )
-
         payload: dict[str, Any] = {
             "model": role.model,
             "messages": openai_messages,
             max_key: role.max_tokens,
             "stream": False,
         }
+        local_vllm_extra_body: dict[str, Any] = (
+            {"chat_template_kwargs": {"enable_thinking": False}}
+            if base and role.role == "omni"
+            else {}
+        )
         if _is_reasoning:
             payload["temperature"] = 1
         else:
@@ -7877,9 +7860,6 @@ class OpenAIProvider(Provider):
         if tools:
             payload["tools"] = self._translate_tools(tools)
 
-        # Prefer the official SDK when available (handles auth, retries).
-        # Only swallow ImportError — real API failures must propagate with
-        # context rather than getting masked by the raw-HTTP fallback.
         try:
             from openai import OpenAI  # type: ignore
         except ImportError:
@@ -7890,14 +7870,14 @@ class OpenAIProvider(Provider):
                 client = OpenAI(
                     api_key=self.api_key, base_url=base, timeout=300.0,
                 )
-                resp = client.chat.completions.create(**payload)
+                sdk_payload = dict(payload)
+                if local_vllm_extra_body:
+                    sdk_payload["extra_body"] = local_vllm_extra_body
+                resp = client.chat.completions.create(**sdk_payload)
                 return (
                     resp.model_dump() if hasattr(resp, "model_dump") else dict(resp)
                 )
             except Exception as exc:
-                # Connection / transport problems to a local vLLM that has
-                # gone away get retried via plain HTTP below. Any other
-                # error (auth, bad-request from cloud OpenAI) propagates.
                 msg = str(exc).lower()
                 transport_signals = (
                     "connection", "refused", "timed out",
@@ -7906,8 +7886,6 @@ class OpenAIProvider(Provider):
                 if not any(sig in msg for sig in transport_signals):
                     raise
 
-        # Fallback: plain HTTP — works for local vLLM without openai SDK
-        # or when the SDK hit a transport issue against a local server.
         try:
             import requests  # type: ignore
         except ImportError as exc:
@@ -7919,7 +7897,10 @@ class OpenAIProvider(Provider):
         headers = {"Content-Type": "application/json"}
         if self.api_key and self.api_key != "EMPTY":
             headers["Authorization"] = f"Bearer {self.api_key}"
-        r = requests.post(url, json=payload, headers=headers, timeout=300)
+        http_payload = dict(payload)
+        if local_vllm_extra_body:
+            http_payload.update(local_vllm_extra_body)
+        r = requests.post(url, json=http_payload, headers=headers, timeout=300)
         if r.status_code >= 400:
             body = r.text[:500] if r.text else ""
             raise RuntimeError(
@@ -8382,46 +8363,39 @@ def probe_envelope(
     body: str,
     ran: bool,
 ) -> str:
-    """Wrap a probe/write/restart result in the v1 envelope."""
+    """Wrap a probe/write/restart result in a CLI-readable v1 envelope."""
+    import textwrap
     body = body or ""
     empty = (not body) or body.strip() == ""
     nbytes = len(body)
-    nlines = body.count("\n")
-    if not empty and not body.endswith("\n"):
-        nlines += 1
+    nlines = body.count("\n") + (0 if empty or body.endswith("\n") else 1)
     status = "executed" if ran else "refused"
-    header_parts = [
-        f"kind: {kind}",
-        f"status: {status}",
-        f"bytes: {nbytes}",
-        f"lines: {nlines}",
-        f"empty: {'true' if empty else 'false'}",
+    fields = [
+        ("kind", kind), ("status", status), ("bytes", nbytes),
+        ("lines", nlines), ("empty", "true" if empty else "false"),
+        *header_fields.items(),
     ]
-    for k, v in header_fields.items():
+    header = ["[probe-result]"]
+    for k, v in fields:
         safe = str(v).replace("\n", " ").replace("\r", " ")
-        header_parts.append(f"{k}: {safe[:200]}")
-    header = "[" + " | ".join(header_parts) + "]"
-    slug = kind.upper().replace("-", "_")
-    begin = f"<<<BEGIN_{slug}_STDOUT>>>"
-    end = f"<<<END_{slug}_STDOUT>>>"
-    if empty and ran:
-        inner = (
-            "(command ran with no stdout; the absence of output here "
-            "is real, not a wedge)"
+        header += textwrap.wrap(
+            f"{k}: {safe}", width=68, initial_indent="  ",
+            subsequent_indent="    ", break_long_words=False,
+            break_on_hyphens=False,
         )
-    elif empty and not ran:
-        inner = "(command did not execute — see refusal reason in header)"
+    slug = kind.upper().replace("-", "_")
+    if empty:
+        inner = "(command ran with no stdout; the absence is real)" if ran else "(command did not execute)"
     else:
-        inner = body.rstrip("\n")
-    footer = (
-        "\n\nThe stdout between the markers above IS the result of the "
-        "sub-turn.\nDo not claim the shell is wedged, unresponsive, or that "
-        "nothing came\nback unless status != executed. If status is "
-        "executed, the bytes\ncount and the stdout span are authoritative "
-        "— read them and proceed."
+        inner = "\n".join(textwrap.wrap(body.rstrip("\n"), width=68, break_long_words=False, break_on_hyphens=False))
+    note = textwrap.fill(
+        "note: status=executed means stdout is authoritative; status=refused means it did not run cleanly.",
+        width=78, break_long_words=False, break_on_hyphens=False,
     )
-    return f"{header}\n{begin}\n{inner}\n{end}{footer}"
-
+    return "\n".join([
+        *header, f"<<<BEGIN_{slug}_STDOUT>>>", inner,
+        f"<<<END_{slug}_STDOUT>>>", note,
+    ])
 
 def run_restart_subturn(bash: Any) -> tuple[bool, str]:
     """Restart the persistent bash session."""
