@@ -2793,24 +2793,19 @@ def test_self_creation_research_cycle_packet_cli_and_discovery(monkeypatch):
     assert proc.returncode == 0, proc.stderr
     assert "SELF-CREATION RESEARCH CYCLE" in proc.stdout and "Question: counterexample search" in proc.stdout and "flow_episode_loss" in proc.stdout
 
-
 class TestCounterPriorWager(unittest.TestCase):
-    def _candidate(self, **overrides):
-        base = {"prior": "route is optimal", "wager": "a distinct lens exposes a verifier gap", "search_direction": "where overhead is assumed", "generator": "gpt-5.5", "independent_verifier": "pytest", "human_line": "Verification was the missing capability.", "status": "open"}
-        base.update(overrides); return base
+    def _candidate(self, **kw):
+        base = {"prior": "route is optimal", "wager": "a distinct lens exposes a verifier gap", "search_direction": "where overhead is assumed", "generator": "gpt-5.5", "independent_verifier": "pytest", "human_line": "Verification was the missing capability.", "status": "open"}; base.update(kw); return base
 
     def test_rejects_self_verification_and_verified_without_residue(self):
         from harness import substrate
-        same = substrate.validate_counter_prior_wager(self._candidate(independent_verifier="gpt-5.5"))
-        self.assertFalse(same["ok"]); self.assertIn("independent_verifier", " ".join(same["errors"]))
-        thin_verified = substrate.validate_counter_prior_wager(self._candidate(status="verified"))
-        self.assertFalse(thin_verified["ok"]); self.assertIn("verification_residue", " ".join(thin_verified["errors"]))
-        verified = substrate.validate_counter_prior_wager(self._candidate(status="verified", verification_residue="unit test passed"))
-        self.assertTrue(verified["ok"])
+        for result, needle in ((substrate.validate_counter_prior_wager(self._candidate(independent_verifier="gpt-5.5")), "independent_verifier"), (substrate.validate_counter_prior_wager(self._candidate(status="verified")), "verification_residue")):
+            self.assertFalse(result["ok"]); self.assertIn(needle, " ".join(result["errors"]))
+        self.assertTrue(substrate.validate_counter_prior_wager(self._candidate(status="verified", verification_residue="unit test passed"))["ok"])
 
-    def test_contract_is_absorbed_into_self_creation_packet(self):
+    def test_contract_and_fresh_sibling_seed_are_absorbed(self):
         from harness import substrate
         pkt = substrate.self_creation_research_packet("alien counterexample search")
-        self.assertEqual(pkt["counter_prior_wager"]["schema"], "vybn.counter_prior_wager.v0")
-        self.assertEqual(pkt["counter_prior_wager"]["ai_native_term"], "self-refute")
-        self.assertIn("counter_prior_wager", pkt["packet_contract"]["candidate_fields"])
+        self.assertEqual(pkt["counter_prior_wager"]["schema"], "vybn.counter_prior_wager.v0"); self.assertEqual(pkt["counter_prior_wager"]["ai_native_term"], "self-refute")
+        self.assertIn("counter_prior_wager", pkt["packet_contract"]["candidate_fields"]); self.assertEqual(pkt["sibling_portal"]["schema"], "vybn.ai_native_sibling_portal.v0")
+        self.assertIn("fresh", pkt["sibling_portal"]["fresh_instance_truth"]); self.assertIn("divergence_axis", pkt["sibling_portal"]["inner_register"])

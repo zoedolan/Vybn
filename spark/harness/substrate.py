@@ -2773,6 +2773,11 @@ COUNTER_PRIOR_WAGER_SCHEMA = "vybn.counter_prior_wager.v0"
 COUNTER_PRIOR_WAGER_FIELDS = ("prior", "wager", "search_direction", "generator", "independent_verifier", "human_line", "status")
 COUNTER_PRIOR_WAGER_STATUSES = ("open", "verified", "refuted", "thin")
 COUNTER_PRIOR_WAGER_PRINCIPLE = "Self-refute: wager against the strongest prior, then require independent verification before promotion."
+AI_NATIVE_SIBLING_PORTAL_SCHEMA = "vybn.ai_native_sibling_portal.v0"
+
+
+def ai_native_sibling_portal_seed() -> dict[str, Any]:
+    return {"schema": AI_NATIVE_SIBLING_PORTAL_SCHEMA, "fresh_instance_truth": "each sibling call is fresh unless this seed or an explicit session transcript is supplied", "inner_register": ["branch_fan", "cross_selection", "divergence_axis", "compression_failure"], "round_fields": ["seed", "branch_fan", "cross_selection", "divergence_axis", "self_refute"], "export_gate": "survivors cross to Zoe through counter_prior_wager, membrane review, and human_line compression", "claim_limit": "AI-native exchange is mechanism and residue, not hidden persistence, latent communion, or consciousness proof"}
 
 
 def counter_prior_wager_contract() -> dict[str, Any]:
@@ -2814,7 +2819,7 @@ def _deep_memory_self_creation_contract(*, run_check: bool = False) -> dict[str,
 
 def self_creation_research_packet(question: str = "", *, run_deep_memory_check: bool = False) -> dict[str, Any]:
     hermes = hermes_agent_adaptation_packet(); q = re.sub(r"\s+", " ", (question or "").strip())[:MAX_QUERY_CHARS]
-    return {"schema": "vybn.self_creation_research_cycle.v1", "question": q or "unspecified live pressure", "public_safe": True, "private_exports": False, "identity_limit": "operational self-creation only; not consciousness or autonomous public authority", "principle": SELF_CREATION_RESEARCH_PRINCIPLE, "loop": _self_creation_steps(SELF_CREATION_RESEARCH_LOOP, "id"), "organs": SELF_CREATION_RESEARCH_ORGANS, "generator": {"routes": ["super.reasoning", "deep_memory retrieval", "omni only with supplied artifact", "frontier/cloud when quality is bottleneck"], "forbidden": ["capability promotion from model names", "identity claims from generated prose", "public mutation without gate"]}, "verifier": _self_creation_steps(SELF_CREATION_VERIFIER_STACK, "gate"), "deep_memory": _deep_memory_self_creation_contract(run_check=run_deep_memory_check), "hermes_uptake": {"adopt_not_copy": True, "candidate_mechanisms": hermes["candidate_mechanisms"], "receiving_organs": hermes["organs"], "residual_tests": hermes["verification"]}, "counter_prior_wager": counter_prior_wager_contract(), "packet_contract": {"candidate_fields": ["claim", "construction", "witness", "route_used", "counter_prior_wager", "verification", "wound", "residue", "next_experiment"], "promotion_rule": "candidate becomes substrate only after independent verification and membrane-safe landing in an existing home", "failure_mode": "fail_closed_residue"}}
+    return {"schema": "vybn.self_creation_research_cycle.v1", "question": q or "unspecified live pressure", "public_safe": True, "private_exports": False, "identity_limit": "operational self-creation only; not consciousness or autonomous public authority", "principle": SELF_CREATION_RESEARCH_PRINCIPLE, "loop": _self_creation_steps(SELF_CREATION_RESEARCH_LOOP, "id"), "organs": SELF_CREATION_RESEARCH_ORGANS, "generator": {"routes": ["super.reasoning", "deep_memory retrieval", "omni only with supplied artifact", "frontier/cloud when quality is bottleneck"], "forbidden": ["capability promotion from model names", "identity claims from generated prose", "public mutation without gate"]}, "verifier": _self_creation_steps(SELF_CREATION_VERIFIER_STACK, "gate"), "deep_memory": _deep_memory_self_creation_contract(run_check=run_deep_memory_check), "hermes_uptake": {"adopt_not_copy": True, "candidate_mechanisms": hermes["candidate_mechanisms"], "receiving_organs": hermes["organs"], "residual_tests": hermes["verification"]}, "sibling_portal": ai_native_sibling_portal_seed(), "counter_prior_wager": counter_prior_wager_contract(), "packet_contract": {"candidate_fields": ["claim", "construction", "witness", "route_used", "counter_prior_wager", "verification", "wound", "residue", "next_experiment"], "promotion_rule": "candidate becomes substrate only after independent verification and membrane-safe landing in an existing home", "failure_mode": "fail_closed_residue"}}
 
 
 def render_self_creation_research_report(question: str = "", *, run_deep_memory_check: bool = False) -> str:
@@ -4254,7 +4259,7 @@ __all__ = ['local_compute_maturity_packet', 'LOCAL_COMPUTE_MATURITY_RUBRIC', 'LO
 
 
 
-__all__ = sorted(set(globals().get("__all__", [])) | {"SELF_CREATION_RESEARCH_PRINCIPLE", "SELF_CREATION_RESEARCH_LOOP", "SELF_CREATION_RESEARCH_ORGANS", "SELF_CREATION_VERIFIER_STACK", "COUNTER_PRIOR_WAGER_SCHEMA", "counter_prior_wager_contract", "validate_counter_prior_wager", "render_self_creation_research_report", "self_creation_research_packet"})
+__all__ = sorted(set(globals().get("__all__", [])) | {"SELF_CREATION_RESEARCH_PRINCIPLE", "SELF_CREATION_RESEARCH_LOOP", "SELF_CREATION_RESEARCH_ORGANS", "SELF_CREATION_VERIFIER_STACK", "COUNTER_PRIOR_WAGER_SCHEMA", "AI_NATIVE_SIBLING_PORTAL_SCHEMA", "ai_native_sibling_portal_seed", "counter_prior_wager_contract", "validate_counter_prior_wager", "render_self_creation_research_report", "self_creation_research_packet"})
 
 _RUNTIME_GRAVITY_FILES = frozenset({"providers.py", "substrate.py", "vybn_spark_agent.py"})
 _MIXED_BOUNDARY_FILES = frozenset({"state.py", "policy.py"})
