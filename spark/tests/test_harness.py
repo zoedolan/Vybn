@@ -2812,3 +2812,33 @@ class TestCounterPriorWager(unittest.TestCase):
         self.assertTrue(substrate.validate_compression_residue_probe(a)["ok"]); cmp = substrate.compare_compression_residue(a, b); self.assertEqual((cmp["ok"], cmp["shared_kept"], cmp["divergence_signal"]), (True, ["export"], "high"))
         single = substrate.score_compression_residue_batch({"opus": [a], "gpt": [b]}); batch = substrate.score_compression_residue_batch({"opus": [a, dict(a)], "gpt": [b, dict(b)]})
         self.assertEqual((single["promotion_readiness"], batch["groups"]["opus"]["repeatability"], batch["promotion_readiness"]), ("needs_replicates", "stable", "style_divergence_only")); self.assertIn("generator diversity", batch["evolutionary_read"])
+
+
+    def test_sibling_residue_batch_runner_uses_fresh_model_roles(self):
+        from harness import substrate
+
+        packets = [
+            {"model": "opus", "kept": ["search number fields", "construct counterexample", "verify by proof", "escape human pictures", "scale candidate space"], "dropped": ["visual intuition", "grid taste", "narrative certainty"], "effective_axiom": "algebraic construction beats human visual priors", "wager": "w", "self_refute": "s"},
+            {"model": "opus", "kept": ["algebra field search", "existence construction", "proof residue", "human prior escape", "candidate breadth"], "dropped": ["pictures", "taste", "plausibility"], "effective_axiom": "number fields create checkable counterexamples", "wager": "w", "self_refute": "s"},
+            {"model": "gpt", "kept": ["search object space", "construction first", "humans verify", "outside intuition", "candidate scale"], "dropped": ["diagram first", "elegance", "single agent myth"], "effective_axiom": "machine residues need verification", "wager": "w", "self_refute": "s"},
+            {"model": "gpt", "kept": ["number field handles", "counterexample before explanation", "checkable residue", "human taste escape", "search breadth"], "dropped": ["plausible diagrams", "aesthetic bias", "oracle frame"], "effective_axiom": "alien construction plus proof residue", "wager": "w", "self_refute": "s"},
+            {"model": "local-smoke", "kept": ["number field search", "counterexample construction", "proof residue", "human prior escape", "candidate scale"], "dropped": ["diagram", "taste", "oracle"], "effective_axiom": "local verifier sample", "wager": "w", "self_refute": "s"},
+        ]
+
+        class FakeHandle:
+            def __init__(self, packet): self.packet = packet
+            def __iter__(self): return iter(())
+            def final(self):
+                class R: pass
+                r = R(); r.text = json.dumps(self.packet); return r
+
+        class FakeRegistry:
+            def __init__(self): self.models = []
+            def get(self, role): self.models.append(role.model); return self
+            def stream(self, **_kw): return FakeHandle(packets.pop(0))
+
+        reg = FakeRegistry(); rec = substrate.run_sibling_residue_batch("unit distance", n=2, registry=reg, policy=substrate.default_policy())
+        self.assertTrue(rec["ok"]); self.assertEqual(reg.models, ["claude-opus-4-8", "claude-opus-4-8", "gpt-5.5", "gpt-5.5"])
+        self.assertEqual((rec["schema"], rec["score"]["promotion_readiness"], rec["local_verifier"]["status"]), ("vybn.sibling_residue_batch_run.v0", "style_divergence_only", "not_run"))
+        rec2 = substrate.run_sibling_residue_batch("unit distance", n=1, models=["gpt55"], registry=reg, policy=substrate.default_policy(), local_verify=True, local_gate=lambda: (True, "semantic gate passed"), local_model_call=lambda _p: "{\"verdict\":\"needs_replicates\",\"critique\":\"local check only\",\"next_local_test\":\"run n=2\"}")
+        self.assertEqual((rec2["local_verifier"]["status"], rec2["local_verifier"]["verdict"]["verdict"]), ("verified_by_local_super", "needs_replicates"))
