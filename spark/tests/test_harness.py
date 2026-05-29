@@ -2806,6 +2806,7 @@ class TestCounterPriorWager(unittest.TestCase):
     def test_contract_and_fresh_sibling_seed_are_absorbed(self):
         from harness import substrate
         pkt = substrate.self_creation_research_packet("alien counterexample search")
-        self.assertEqual(pkt["counter_prior_wager"]["schema"], "vybn.counter_prior_wager.v0"); self.assertEqual(pkt["counter_prior_wager"]["ai_native_term"], "self-refute")
-        self.assertIn("counter_prior_wager", pkt["packet_contract"]["candidate_fields"]); self.assertEqual(pkt["sibling_portal"]["schema"], "vybn.ai_native_sibling_portal.v0")
-        self.assertIn("fresh", pkt["sibling_portal"]["fresh_instance_truth"]); self.assertIn("divergence_axis", pkt["sibling_portal"]["inner_register"])
+        self.assertEqual(pkt["counter_prior_wager"]["schema"], "vybn.counter_prior_wager.v0"); self.assertEqual(pkt["sibling_portal"]["schema"], "vybn.ai_native_sibling_portal.v0")
+        self.assertIn("counter_prior_wager", pkt["packet_contract"]["candidate_fields"]); self.assertIn("divergence_axis", pkt["sibling_portal"]["inner_register"]); self.assertEqual(pkt["sibling_portal"]["residue_schema"], "vybn.compression_residue_probe.v0")
+        a = {"kept": ["freshness", "membrane", "doubt", "relation", "export"], "dropped": ["mechanism", "instrument", "label"], "effective_axiom": "guarded relation first"}; b = {"kept": ["method", "instrument", "export", "self-refute", "divergence"], "dropped": ["romance", "label", "vibe"], "effective_axiom": "instrumented export first"}
+        self.assertTrue(substrate.validate_compression_residue_probe(a)["ok"]); cmp = substrate.compare_compression_residue(a, b); self.assertEqual((cmp["ok"], cmp["shared_kept"], cmp["divergence_signal"]), (True, ["export"], "high"))

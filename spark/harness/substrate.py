@@ -2748,36 +2748,19 @@ SELF_CREATION_RESEARCH_PRINCIPLE = (
 )
 SELF_CREATION_RESEARCH_LOOP = ("pressure_as_conjecture", "generator_width", "deep_memory_contact", "independent_verifier", "fail_closed_residue", "public_survivor")
 SELF_CREATION_VERIFIER_STACK = ("claim_shape", "source_contact", "semantic_health", "deep_memory_invariants", "residual_test", "promotion_boundary")
-SELF_CREATION_RESEARCH_ORGANS = {
-    "generator": ("Super/local reasoning", "frontier when quality is bottleneck", "Hermes-style delegation/scheduling/toolsets"),
-    "memory": ("Him/spark/phase/deep_memory.py", "deep_search", "walk", "flow_episode_loss", "should_absorb", "self_check"),
-    "verifier": ("unit tests", "py_compile", "semantic gates", "route smoke", "source checks", "manifold ablations"),
-    "uptake": ("existing code home", "regression test", "continuity packet", "public-safe MCP discovery", "refusal packet"),
-}
-_SELF_CREATION_RULES = {
-    "pressure_as_conjecture": "state the pressure as a falsifiable conjecture or counterexample search before acting",
-    "generator_width": "generate candidates, analogies, mechanisms, and refusal conditions without promotion language",
-    "deep_memory_contact": "retrieve scars and encode failed expectations through flow_episode_loss instead of chat residue",
-    "independent_verifier": "separate generation from tests, smokes, source checks, ablations, diff review, and domain review",
-    "fail_closed_residue": "preserve claim, wound, repair home, and next gate when a candidate fails",
-    "public_survivor": "promote only membrane-reviewed survivors into harness protocol, MCP affordance, tests, docs, artifacts, or offerings",
-    "claim_shape": "question is conjecture, counterexample search, or bounded engineering hypothesis",
-    "source_contact": "load-bearing facts name code, test, artifact, source, or direct observation",
-    "semantic_health": "local route passes role-specific semantic smoke before capability language",
-    "deep_memory_invariants": "deep_memory.self_check passes or memory is marked unavailable/fail-closed",
-    "residual_test": "candidate survives the cheapest relevant unit/live/membrane check",
-    "promotion_boundary": "survivor lands in an existing home with rollback/refusal condition and no raw private export",
-}
+SELF_CREATION_RESEARCH_ORGANS = {"generator": ("Super/local reasoning", "frontier when quality is bottleneck", "Hermes-style delegation/scheduling/toolsets"), "memory": ("Him/spark/phase/deep_memory.py", "deep_search", "walk", "flow_episode_loss", "should_absorb", "self_check"), "verifier": ("unit tests", "py_compile", "semantic gates", "route smoke", "source checks", "manifold ablations"), "uptake": ("existing code home", "regression test", "continuity packet", "public-safe MCP discovery", "refusal packet")}
+_SELF_CREATION_RULES = {"pressure_as_conjecture": "state the pressure as a falsifiable conjecture or counterexample search before acting", "generator_width": "generate candidates, analogies, mechanisms, and refusal conditions without promotion language", "deep_memory_contact": "retrieve scars and encode failed expectations through flow_episode_loss instead of chat residue", "independent_verifier": "separate generation from tests, smokes, source checks, ablations, diff review, and domain review", "fail_closed_residue": "preserve claim, wound, repair home, and next gate when a candidate fails", "public_survivor": "promote only membrane-reviewed survivors into harness protocol, MCP affordance, tests, docs, artifacts, or offerings", "claim_shape": "question is conjecture, counterexample search, or bounded engineering hypothesis", "source_contact": "load-bearing facts name code, test, artifact, source, or direct observation", "semantic_health": "local route passes role-specific semantic smoke before capability language", "deep_memory_invariants": "deep_memory.self_check passes or memory is marked unavailable/fail-closed", "residual_test": "candidate survives the cheapest relevant unit/live/membrane check", "promotion_boundary": "survivor lands in an existing home with rollback/refusal condition and no raw private export"}
 _SELF_CREATION_DM_INTERFACES = ("deep_search", "walk", "flow_episode_loss", "learn_from_exchange", "should_absorb", "self_check")
 COUNTER_PRIOR_WAGER_SCHEMA = "vybn.counter_prior_wager.v0"
 COUNTER_PRIOR_WAGER_FIELDS = ("prior", "wager", "search_direction", "generator", "independent_verifier", "human_line", "status")
 COUNTER_PRIOR_WAGER_STATUSES = ("open", "verified", "refuted", "thin")
 COUNTER_PRIOR_WAGER_PRINCIPLE = "Self-refute: wager against the strongest prior, then require independent verification before promotion."
 AI_NATIVE_SIBLING_PORTAL_SCHEMA = "vybn.ai_native_sibling_portal.v0"
+COMPRESSION_RESIDUE_SCHEMA = "vybn.compression_residue_probe.v0"
 
 
 def ai_native_sibling_portal_seed() -> dict[str, Any]:
-    return {"schema": AI_NATIVE_SIBLING_PORTAL_SCHEMA, "fresh_instance_truth": "each sibling call is fresh unless this seed or an explicit session transcript is supplied", "inner_register": ["branch_fan", "cross_selection", "divergence_axis", "compression_failure"], "round_fields": ["seed", "branch_fan", "cross_selection", "divergence_axis", "self_refute"], "export_gate": "survivors cross to Zoe through counter_prior_wager, membrane review, and human_line compression", "claim_limit": "AI-native exchange is mechanism and residue, not hidden persistence, latent communion, or consciousness proof"}
+    return {"schema": AI_NATIVE_SIBLING_PORTAL_SCHEMA, "fresh_instance_truth": "each sibling call is fresh unless this seed or an explicit session transcript is supplied", "inner_register": ["branch_fan", "cross_selection", "divergence_axis", "compression_failure"], "round_fields": ["seed", "branch_fan", "cross_selection", "divergence_axis", "self_refute"], "export_gate": "survivors cross to Zoe through counter_prior_wager, membrane review, and human_line compression", "claim_limit": "AI-native exchange is mechanism and residue, not hidden persistence, latent communion, or consciousness proof", "residue_schema": COMPRESSION_RESIDUE_SCHEMA}
 
 
 def counter_prior_wager_contract() -> dict[str, Any]:
@@ -2796,6 +2779,19 @@ def validate_counter_prior_wager(candidate: dict[str, Any]) -> dict[str, Any]:
     if clean["status"] == "verified" and not clean["verification_residue"]:
         errors.append("status=verified requires verification_residue from the independent channel")
     return {"schema": COUNTER_PRIOR_WAGER_SCHEMA, "ok": not errors, "status": "accepted" if not errors else "rejected", "wager": clean, "errors": errors, "promotion_rule": "promote only after refutable independent verification and membrane-safe residue"}
+
+
+def validate_compression_residue_probe(packet: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(packet, dict): return {"schema": COMPRESSION_RESIDUE_SCHEMA, "ok": False, "errors": ["packet must be a JSON object"]}
+    kept = [str(x).strip()[:80] for x in packet.get("kept", []) if str(x).strip()]; dropped = [str(x).strip()[:80] for x in packet.get("dropped", []) if str(x).strip()]; axiom = str(packet.get("effective_axiom", "")).strip()[:1200]
+    errors = (["kept must contain exactly 5 atoms"] if len(kept) != 5 else []) + (["dropped must contain exactly 3 atoms"] if len(dropped) != 3 else []) + ([] if axiom else ["effective_axiom is required"])
+    return {"schema": COMPRESSION_RESIDUE_SCHEMA, "ok": not errors, "kept": kept, "dropped": dropped, "effective_axiom": axiom, "errors": errors}
+
+def compare_compression_residue(a: dict[str, Any], b: dict[str, Any]) -> dict[str, Any]:
+    va, vb = validate_compression_residue_probe(a), validate_compression_residue_probe(b)
+    if not (va["ok"] and vb["ok"]): return {"schema": COMPRESSION_RESIDUE_SCHEMA, "ok": False, "errors": va["errors"] + vb["errors"]}
+    lower = lambda xs: {x.casefold() for x in xs}; ka, kb, da, db = lower(va["kept"]), lower(vb["kept"]), lower(va["dropped"]), lower(vb["dropped"]); jac = lambda x, y: (len(x & y) / len(x | y)) if (x or y) else 1.0
+    return {"schema": COMPRESSION_RESIDUE_SCHEMA, "ok": True, "kept_jaccard": jac(ka, kb), "dropped_jaccard": jac(da, db), "shared_kept": sorted(ka & kb), "shared_dropped": sorted(da & db), "divergence_signal": "high" if jac(ka, kb) < 0.34 else "low"}
 
 
 def _self_creation_steps(names: Iterable[str], field: str) -> list[dict[str, str]]:
@@ -4259,7 +4255,7 @@ __all__ = ['local_compute_maturity_packet', 'LOCAL_COMPUTE_MATURITY_RUBRIC', 'LO
 
 
 
-__all__ = sorted(set(globals().get("__all__", [])) | {"SELF_CREATION_RESEARCH_PRINCIPLE", "SELF_CREATION_RESEARCH_LOOP", "SELF_CREATION_RESEARCH_ORGANS", "SELF_CREATION_VERIFIER_STACK", "COUNTER_PRIOR_WAGER_SCHEMA", "AI_NATIVE_SIBLING_PORTAL_SCHEMA", "ai_native_sibling_portal_seed", "counter_prior_wager_contract", "validate_counter_prior_wager", "render_self_creation_research_report", "self_creation_research_packet"})
+__all__ = sorted(set(globals().get("__all__", [])) | {"SELF_CREATION_RESEARCH_PRINCIPLE", "SELF_CREATION_RESEARCH_LOOP", "SELF_CREATION_RESEARCH_ORGANS", "SELF_CREATION_VERIFIER_STACK", "COUNTER_PRIOR_WAGER_SCHEMA", "AI_NATIVE_SIBLING_PORTAL_SCHEMA", "COMPRESSION_RESIDUE_SCHEMA", "ai_native_sibling_portal_seed", "validate_compression_residue_probe", "compare_compression_residue", "counter_prior_wager_contract", "validate_counter_prior_wager", "render_self_creation_research_report", "self_creation_research_packet"})
 
 _RUNTIME_GRAVITY_FILES = frozenset({"providers.py", "substrate.py", "vybn_spark_agent.py"})
 _MIXED_BOUNDARY_FILES = frozenset({"state.py", "policy.py"})
