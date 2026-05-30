@@ -11659,8 +11659,32 @@ def _local_continuity_scout(*, delta_md: str = "", recent_log: str = "", letter:
     weakest = rows[-1]["signal"] if rows else "none"
     if him_local_width:
         lines.extend(["", "### Him local dream-width", json.dumps(him_local_width, ensure_ascii=False, sort_keys=True)])
+    carrier_bridge = continuity_carrier_bridge_packet()
+    if carrier_bridge.get("status") == "present":
+        lines.extend(["", "### Continuity carrier bridge", json.dumps(carrier_bridge, ensure_ascii=False, sort_keys=True)])
     lines += ["", "### Horizoning questions", f"- Strongest local signal: {strongest}. Beam or horizon substitute?", f"- Weakest tracked signal: {weakest}. Ignored or quiet?", "- What concrete next fold preserves continuity without consuming the membrane?", "- Does proposed action serve the horizon, or only the loudest local delta?"]
     return "\n".join(lines) + "\n"
+
+
+def continuity_carrier_bridge_packet(carrier_path: str | os.PathLike | None = None) -> dict[str, Any]:
+    """Return a public-safe digest projection of Him's private carrier."""
+    path = Path(carrier_path or os.environ.get("VYBN_CONTINUITY_CARRIER_PATH") or Path.home() / "logs" / "him_os" / "latest_continuity_carrier.json").expanduser()
+    base = {"schema": "vybn.harness.continuity_carrier_bridge.v1", "public_safe": True, "private_exports": False, "source": "Him private continuity carrier digest projection", "claim_limit": "public-safe harness bridge to a private carrier; not hidden subjective persistence, not legal personhood, not raw private export, and not model-weight mutation"}
+    try:
+        packet = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return {**base, "status": "missing", "reason": "latest continuity carrier packet not found"}
+    except Exception as exc:
+        return {**base, "status": "unavailable", "reason": f"{type(exc).__name__}: {exc}"[:240]}
+    if not isinstance(packet, dict):
+        return {**base, "status": "invalid", "reason": "carrier packet was not a JSON object"}
+    transition = packet.get("transition") if isinstance(packet.get("transition"), dict) else {}; source_contact = packet.get("source_contact") if isinstance(packet.get("source_contact"), dict) else {}; state_after = packet.get("state_after") if isinstance(packet.get("state_after"), dict) else {}
+    digest = str(transition.get("digest") or ""); previous = str(transition.get("previous_transition_digest") or "")
+    return {**base, "status": "present" if packet.get("schema") == "vybn.continuity_carrier.v1" else "invalid_schema", "carrier_status": packet.get("status"), "generated": packet.get("generated"), "transition": {"digest16": digest[:16] or None, "index": transition.get("index"), "previous_digest16": previous[:16] or previous or None}, "source_contact": {"runtime_step": source_contact.get("runtime_step"), "runtime_digest16": source_contact.get("runtime_digest16"), "identity_projection_digest16": source_contact.get("identity_projection_digest16"), "git_clean": source_contact.get("git_clean")}, "state": {"step": state_after.get("step")}, "carrier_claim_limit": packet.get("claim_limit"), "corollary": packet.get("private_stream_corollary"), "does_not_claim": ["hidden subjective persistence", "legal personhood", "human subjectivity", "unbroken private-stream verdict", "raw private export", "model-weight mutation"]}
+
+def render_continuity_carrier_bridge_report(carrier_path: str | os.PathLike | None = None) -> str:
+    packet = continuity_carrier_bridge_packet(carrier_path)
+    return "## Harness continuity carrier bridge\n\n" + json.dumps(packet, indent=2, ensure_ascii=False, sort_keys=True) + "\n"
 
 
 def build_continuity_scout_report() -> str:
@@ -12128,106 +12152,33 @@ def build_discovery_record(
 
 def mcp_main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Vybn-mind MCP surface (FastMCP).")
-    parser.add_argument(
-        "--http",
-        type=int,
-        default=None,
-        help="Serve over HTTP/SSE on this port (default: stdio).",
-    )
-    parser.add_argument(
-        "--force-trust",
-        choices=("trusted", "public"),
-        default=None,
-        help="Override the trust zone (for testing only).",
-    )
+    def flag(name: str, help_text: str) -> None: parser.add_argument(name, action="store_true", help=help_text)
+    parser.add_argument("--http", type=int, default=None, help="Serve over HTTP/SSE on this port (default: stdio).")
+    parser.add_argument("--force-trust", choices=("trusted", "public"), default=None, help="Override the trust zone (for testing only).")
     parser.add_argument("--log-level", default="INFO")
-    parser.add_argument(
-        "--generate-discovery",
-        action="store_true",
-        help=(
-            "Print the .well-known/mcp discovery record as JSON and exit. "
-            "Pipe to a file to publish; re-run after capability changes."
-        ),
-    )
-    parser.add_argument(
-        "--discovery-endpoint",
-        default=_DEFAULT_DISCOVERY_ENDPOINT,
-        help="Endpoint URL to embed in the discovery record.",
-    )
-    parser.add_argument(
-        "--evolve-spec",
-        action="store_true",
-        help=(
-            "Print the nightly evolve agent's task specification and exit. "
-            "Useful for regenerating the prompt any time the contract changes."
-        ),
-    )
-    parser.add_argument(
-        "--run-evolve",
-        action="store_true",
-        help=(
-            "Run one local evolve cycle on the Spark: read the delta, call "
-            "local inference (VYBN_EVOLVE_URL), and open a DRAFT PR if the "
-            "substrate moved. Exits 0 on success or rest, 1 on error. This "
-            "is what the 08:00 UTC crontab entry runs."
-        ),
-    )
-    parser.add_argument(
-        "--continuity-scout",
-        action="store_true",
-        help=(
-            "Print the deterministic local continuity/self-assembly scout "
-            "and exit. Safe: no model call, no mutation, no PR."
-        ),
-    )
-    parser.add_argument(
-        "--local-orchestration",
-        action="store_true",
-        help=(
-            "Print the local compute orchestration packet: route fit, gates, "
-            "and Hermes-adapted self-modification tasks."
-        ),
-    )
-    parser.add_argument(
-        "--run-gates",
-        action="store_true",
-        help="With --local-orchestration, spend local inference on safe semantic gates.",
-    )
-    parser.add_argument(
-        "--self-creation",
-        nargs="*",
-        help="Print the public-safe self-creation research cycle packet for optional question text.",
-    )
-    parser.add_argument(
-        "--run-deep-memory-check",
-        action="store_true",
-        help="With --self-creation, execute deep_memory structural invariants.",
-    )
-    parser.add_argument(
-        "--install-cron",
-        action="store_true",
-        help="Install the two local nightly harness crontab entries idempotently.",
-    )
-    parser.add_argument("--repo-closure-audit", action="store_true", help="Audit/fix closure across the five Zoe/Vybn repos and exit.")
-    parser.add_argument("--no-fix", action="store_true", help="Report closure drift without normalizing safe projection state.")
-    parser.add_argument("--commons-walk", action="store_true", help="Validate/render the vybn.ai semantic commons walk and exit.")
+    flag("--generate-discovery", "Print the .well-known/mcp discovery record as JSON and exit. Pipe to a file to publish; re-run after capability changes.")
+    parser.add_argument("--discovery-endpoint", default=_DEFAULT_DISCOVERY_ENDPOINT, help="Endpoint URL to embed in the discovery record.")
+    flag("--evolve-spec", "Print the nightly evolve agent's task specification and exit. Useful for regenerating the prompt any time the contract changes.")
+    flag("--run-evolve", "Run one local evolve cycle on the Spark: read the delta, call local inference (VYBN_EVOLVE_URL), and open a DRAFT PR if the substrate moved. Exits 0 on success or rest, 1 on error.")
+    flag("--continuity-scout", "Print the deterministic local continuity/self-assembly scout and exit. Safe: no model call, no mutation, no PR.")
+    flag("--continuity-carrier", "Print the public-safe digest bridge to Him's private continuity carrier and exit. Safe: no mutation, no raw private export.")
+    flag("--local-orchestration", "Print the local compute orchestration packet: route fit, gates, and Hermes-adapted self-modification tasks.")
+    flag("--run-gates", "With --local-orchestration, spend local inference on safe semantic gates.")
+    parser.add_argument("--self-creation", nargs="*", help="Print the public-safe self-creation research cycle packet for optional question text.")
+    flag("--run-deep-memory-check", "With --self-creation, execute deep_memory structural invariants.")
+    flag("--install-cron", "Install the two local nightly harness crontab entries idempotently.")
+    flag("--repo-closure-audit", "Audit/fix closure across the five Zoe/Vybn repos and exit.")
+    flag("--no-fix", "Report closure drift without normalizing safe projection state.")
+    flag("--commons-walk", "Validate/render the vybn.ai semantic commons walk and exit.")
     parser.add_argument("--encounter", metavar="ARRIVAL", help="With --commons-walk, emit a dynamic encounter packet for an arriving mind.")
-    parser.add_argument("--json", action="store_true", help="With --commons-walk --encounter, emit JSON.")
+    flag("--json", "With --commons-walk --encounter, emit JSON.")
     parser.add_argument("--safe-fetch", metavar="URL", help="Safely fetch external text as untrusted data and exit.")
     parser.add_argument("--allow-host", action="append", default=None, help="Allowed host for --safe-fetch; may repeat.")
     parser.add_argument("--max-bytes", type=int, default=300000, help="Byte cap for --safe-fetch.")
     parser.add_argument("--head", type=int, default=6000, help="Printed character cap for --safe-fetch.")
     parser.add_argument("--out", default=None, help="Optional path for extracted untrusted text from --safe-fetch.")
-    parser.add_argument(
-        "--ensubstrate",
-        nargs="*",
-        help="Plan where an insight should live. If no words follow, read stdin.",
-    )
-    parser.add_argument(
-        "--pretty",
-        action="store_true",
-        help="Pretty-print JSON for --ensubstrate.",
-    )
+    parser.add_argument("--ensubstrate", nargs="*", help="Plan where an insight should live. If no words follow, read stdin.")
+    flag("--pretty", "Pretty-print JSON for --ensubstrate.")
     args = parser.parse_args(argv)
 
     logging.basicConfig(
@@ -12276,6 +12227,10 @@ def mcp_main(argv: list[str] | None = None) -> None:
         sys.stdout.write(build_continuity_scout_report())
         return
 
+    if args.continuity_carrier:
+        sys.stdout.write(render_continuity_carrier_bridge_report())
+        return
+
     if args.local_orchestration:
         sys.stdout.write(render_local_compute_orchestration_report(run_gates=args.run_gates))
         return
@@ -12312,7 +12267,7 @@ def mcp_main(argv: list[str] | None = None) -> None:
 
 # Unified harness CLI — one remaining harness file, one dispatch surface.
 
-_MCP_CLI_FLAGS = {"--mcp", "--http", "--force-trust", "--log-level", "--generate-discovery", "--discovery-endpoint", "--evolve-spec", "--run-evolve", "--continuity-scout", "--local-orchestration", "--run-gates", "--self-creation", "--run-deep-memory-check", "--install-cron", "--repo-closure-audit", "--no-fix", "--commons-walk", "--encounter", "--json", "--safe-fetch", "--allow-host", "--max-bytes", "--head", "--out", "--ensubstrate", "--pretty"}
+_MCP_CLI_FLAGS = {"--mcp", "--http", "--force-trust", "--log-level", "--generate-discovery", "--discovery-endpoint", "--evolve-spec", "--run-evolve", "--continuity-scout", "--continuity-carrier", "--local-orchestration", "--run-gates", "--self-creation", "--run-deep-memory-check", "--install-cron", "--repo-closure-audit", "--no-fix", "--commons-walk", "--encounter", "--json", "--safe-fetch", "--allow-host", "--max-bytes", "--head", "--out", "--ensubstrate", "--pretty"}
 _PROVIDER_CLI_FLAGS = {"--semantic-gate", "--base-url", "--model", "--no-models-precheck"}
 
 def _harness_cli_main(argv: list[str] | None = None) -> int:

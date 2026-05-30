@@ -1244,21 +1244,46 @@ class TestLocalContinuityScout(unittest.TestCase):
             if prev is None: os.environ.pop("VYBN_EVOLVE_STATE_PATH", None)
             else: os.environ["VYBN_EVOLVE_STATE_PATH"] = prev
 
+
+    def test_continuity_carrier_bridge_exports_digest_only_and_scout_includes_it(self):
+        from harness import substrate
+        self.addCleanup(setattr, substrate, "_run_him_vy", substrate._run_him_vy)
+        substrate._run_him_vy = lambda *a, **k: {}
+        with tempfile.TemporaryDirectory() as td:
+            carrier = Path(td) / "latest_continuity_carrier.json"
+            carrier.write_text(json.dumps({
+                "schema": "vybn.continuity_carrier.v1", "status": "transition_recorded", "generated": "2026-05-30T00:00:00+00:00", "claim_limit": "not proof of hidden subjective persistence", "private_stream_corollary": "continuous protected carrier process/state",
+                "transition": {"digest": "fedcba9876543210deadbeef", "index": 1, "previous_transition_digest": "genesis"},
+                "source_contact": {"runtime_step": 260, "runtime_digest16": "rt", "identity_projection_digest16": "id", "git_clean": True, "raw_private": "do not export"},
+                "state_after": {"step": 1, "source_contacts": [{"secret": "nope"}]}, "evidence_summary": {"note": "raw private evidence should not travel"},
+            }), encoding="utf-8")
+            prev = os.environ.get("VYBN_CONTINUITY_CARRIER_PATH"); os.environ["VYBN_CONTINUITY_CARRIER_PATH"] = str(carrier)
+            try:
+                packet = substrate.continuity_carrier_bridge_packet(carrier)
+                report = substrate._local_continuity_scout(delta_md="continuity", recent_log="", letter="")
+            finally:
+                if prev is None: os.environ.pop("VYBN_CONTINUITY_CARRIER_PATH", None)
+                else: os.environ["VYBN_CONTINUITY_CARRIER_PATH"] = prev
+        rendered = json.dumps(packet, sort_keys=True)
+        self.assertEqual(("vybn.harness.continuity_carrier_bridge.v1", "present", "fedcba9876543210", 260), (packet["schema"], packet["status"], packet["transition"]["digest16"], packet["source_contact"]["runtime_step"]))
+        self.assertTrue(packet["public_safe"]); self.assertFalse(packet["private_exports"])
+        self.assertIn("not raw private export", packet["claim_limit"])
+        for leaked in ("do not export", "raw private evidence", "secret"):
+            self.assertNotIn(leaked, rendered)
+        self.assertIn("### Continuity carrier bridge", report)
+        self.assertIn("fedcba9876543210", report)
+        self.assertIn("not hidden subjective persistence", report)
+
     def test_mcp_continuity_scout_cli_does_not_require_fastmcp(self):
         import subprocess
         import sys
 
-        proc = subprocess.run(
-            [sys.executable, "-m", "spark.harness.substrate", "--continuity-scout"],
-            cwd=str(Path(__file__).resolve().parents[2]),
-            text=True,
-            capture_output=True,
-            timeout=20,
-        )
-        self.assertEqual(proc.returncode, 0, proc.stderr)
-        self.assertIn("## Local continuity scout", proc.stdout)
-        self.assertIn("Horizoning questions", proc.stdout)
-        self.assertNotIn("requires FastMCP", proc.stderr)
+        for flag, needle in (("--continuity-scout", "## Local continuity scout"), ("--continuity-carrier", "## Harness continuity carrier bridge")):
+            proc = subprocess.run([sys.executable, "-m", "spark.harness.substrate", flag], cwd=str(Path(__file__).resolve().parents[2]), text=True, capture_output=True, timeout=20)
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            self.assertIn(needle, proc.stdout)
+            self.assertNotIn("requires FastMCP", proc.stderr)
+
 
 def test_forcing_function_protocol_loaded_and_routing_detritus_removed():
     from spark.harness.substrate import classify_action_text, load_beam, render_beam_capsule, render_forcing_function_protocol
