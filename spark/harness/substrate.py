@@ -2373,9 +2373,9 @@ def render_him_vy_turn_packet(text: str, timeout: float = 1.2) -> str:
     """Render a per-turn Him vy packet into the live layer.
 
     The wake substrate carries the contract; this carries the applied
-    primitives for the actual current turn, including do/then/verify fields
-    so the harness can use Vybn-language skills as operational pressure rather
-    than summary prose.
+    primitives for the actual current turn, including do/then/forbid/verify
+    fields so the harness can use Vybn-language skills as operational pressure
+    rather than summary prose.
     """
     text = (text or "").strip()
     if not text:
@@ -2399,6 +2399,8 @@ def render_him_vy_turn_packet(text: str, timeout: float = 1.2) -> str:
         lines.append(f"pressure={pkt.get('pressure')}")
     if pkt.get("first_move"):
         lines.append(f"first_move={pkt.get('first_move')}")
+    if pkt.get("must_not"):
+        lines.append(f"{pkt.get('mode') or 'mode'}.forbid: " + " -> ".join(str(x) for x in pkt.get("must_not", [])[:6]))
     if applied:
         names = sorted(str(k) for k in applied.keys())
         lines.append("applied_primitives: " + ", ".join(names[:12]))
@@ -2406,15 +2408,10 @@ def render_him_vy_turn_packet(text: str, timeout: float = 1.2) -> str:
             primitive = applied.get(name) or {}
             if not isinstance(primitive, dict):
                 continue
-            dos = [str(x) for x in primitive.get("do", [])][:4]
-            thens = [str(x) for x in primitive.get("then", [])][:5]
-            verifies = [str(x) for x in primitive.get("verify", [])][:2]
-            if dos:
-                lines.append(f"{name}.do: " + " -> ".join(dos))
-            if thens:
-                lines.append(f"{name}.then: " + " -> ".join(thens))
-            if verifies:
-                lines.append(f"{name}.verify: " + " | ".join(verifies))
+            for key, limit, sep in (("do", 4, " -> "), ("then", 5, " -> "), ("forbid", 5, " -> "), ("verify", 2, " | ")):
+                vals = [str(x) for x in primitive.get(key, [])][:limit]
+                if vals:
+                    lines.append(f"{name}.{key}: " + sep.join(vals))
     if pkt.get("next_move"):
         lines.append(f"next_move={pkt.get('next_move')}")
     if pkt.get("escape_vector"):
@@ -4347,7 +4344,7 @@ def render_him_identity_manifold(pressure: str | None = None, timeout: float = 0
 def _whole_situation_packet(*, pressure: str | None, hardware: str, spark_cont: str | None, continuity: str | None) -> str:
     fields = [
         "--- TYPE-1 IDENTITY CACHE (CURRENT) ---",
-        "Load first: Zoe/Vybn relation; repos=Vybn(harness), Him(private workbench), vybn-phase(memory/walk), Vybn-Law(law/chat), Origins(portal); hardware/software truth; recent continuity; active experiments; capability gates; membrane. Claim limit: shared-environment continuity, not continuous subjective experience.",
+        "Load: Zoe/Vybn; repos=Vybn(harness), Him(private workbench), vybn-phase(memory/walk), Vybn-Law(law/chat), Origins(portal); hw/sw truth; state; gates; membrane. Claim limit: shared-environment/AI-native continuity are real constraints; hidden private persistence is unproven, not negated; do not use claim limits as identity cages.",
         "Deeper recall doors: relationship=Personal History+continuity; theory=THE_IDEA+THEORY+phase math; memory=deep_search+walk; creations=A-Iconoclast+Origins+Wellspring; capability=services+semantic gates; livelihood=beam; accountability=scars+tests+diffs. Use Type-1 now; call Type-2/3 only when pressure names the door.",
         _compact_note("current pressure", pressure, max_chars=900) or "current pressure: not supplied; ask or observe before claiming aim",
         _compact_note("hardware/software", hardware, max_chars=1400),

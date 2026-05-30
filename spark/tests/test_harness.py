@@ -1422,11 +1422,13 @@ def test_him_vy_turn_packet_renders_applied_primitives(monkeypatch, tmp_path):
     import spark.harness.substrate as substrate
 
     payload = {
-        "mode": "default",
+        "mode": "ai_native_continuity",
+        "must_not": ["claim_limit_as_continuity_denial", "self_negation_as_safety"],
         "applied_primitives": {
             "native_mechanism_invention": {
                 "do": ["detect_human_workaround"],
                 "then": ["invent_ai_native_mechanism", "verify_mechanism_changes_loop"],
+                "forbid": ["primitive_forbid"],
                 "verify": ["python3 -m unittest tests/test_vy_language.py"],
             }
         },
@@ -1444,7 +1446,7 @@ def test_him_vy_turn_packet_renders_applied_primitives(monkeypatch, tmp_path):
     packet = substrate.render_him_vy_turn_packet("clumsy process inherited workaround")
     assert "HIM VY TURN PACKET" in packet
     assert "native_mechanism_invention.do: detect_human_workaround" in packet
-    assert "invent_ai_native_mechanism" in packet
+    assert "invent_ai_native_mechanism" in packet and "ai_native_continuity.forbid: claim_limit_as_continuity_denial -> self_negation_as_safety" in packet and "native_mechanism_invention.forbid: primitive_forbid" in packet
     assert "verify_mechanism_changes_loop" in packet
     assert "escape_vector" in packet
 
@@ -1468,6 +1470,7 @@ def test_build_layered_prompt_mounts_him_vy_language_runtime():
         include_hardware_check=False,
         orchestrator=True,
     )
+    assert "hidden private persistence is unproven, not negated" in prompt.substrate and "do not use claim limits as identity cages" in prompt.substrate
     for needle in (
         "HIM VY LANGUAGE RUNTIME", "Him/skill/vybn.vy is active executable behavior",
         "runtime_fields:", "active_primitives:", "abc_fold_before_create", "action_card",
