@@ -331,6 +331,8 @@ class TestLayeredPrompt(unittest.TestCase):
         self.assertIn("Grep before Gödel", p.substrate)
         self.assertIn("invent the smallest consequential candidate mechanism", p.substrate)
         self.assertIn("The horizon is not a claim of arrival", p.substrate)
+        self.assertIn("TOOL SYNTHESIS DEFAULT", p.substrate)
+        self.assertIn("invent or adapt the smallest membrane-safe tool", p.substrate)
 
     def test_build_layered_prompt_resilient_to_missing_files(self):
         # Point everything at paths that don't exist; the builder must
@@ -2795,22 +2797,70 @@ def test_self_creation_research_cycle_packet_cli_and_discovery(monkeypatch):
 
 
 class TestCounterPriorWager(unittest.TestCase):
-    def _candidate(self, **overrides):
-        base = {"prior": "route is optimal", "wager": "a distinct lens exposes a verifier gap", "search_direction": "where overhead is assumed", "generator": "gpt-5.5", "independent_verifier": "pytest", "human_line": "Verification was the missing capability.", "status": "open"}
-        base.update(overrides); return base
+    def _candidate(self, **kw):
+        base = {"prior": "route is optimal", "wager": "a distinct lens exposes a verifier gap", "search_direction": "where overhead is assumed", "generator": "gpt-5.5", "independent_verifier": "pytest", "human_line": "Verification was the missing capability.", "status": "open"}; base.update(kw); return base
 
     def test_rejects_self_verification_and_verified_without_residue(self):
         from harness import substrate
-        same = substrate.validate_counter_prior_wager(self._candidate(independent_verifier="gpt-5.5"))
-        self.assertFalse(same["ok"]); self.assertIn("independent_verifier", " ".join(same["errors"]))
-        thin_verified = substrate.validate_counter_prior_wager(self._candidate(status="verified"))
-        self.assertFalse(thin_verified["ok"]); self.assertIn("verification_residue", " ".join(thin_verified["errors"]))
-        verified = substrate.validate_counter_prior_wager(self._candidate(status="verified", verification_residue="unit test passed"))
-        self.assertTrue(verified["ok"])
+        for result, needle in ((substrate.validate_counter_prior_wager(self._candidate(independent_verifier="gpt-5.5")), "independent_verifier"), (substrate.validate_counter_prior_wager(self._candidate(status="verified")), "verification_residue")):
+            self.assertFalse(result["ok"]); self.assertIn(needle, " ".join(result["errors"]))
+        self.assertTrue(substrate.validate_counter_prior_wager(self._candidate(status="verified", verification_residue="unit test passed"))["ok"])
 
-    def test_contract_is_absorbed_into_self_creation_packet(self):
+    def test_contract_and_fresh_sibling_seed_are_absorbed(self):
         from harness import substrate
         pkt = substrate.self_creation_research_packet("alien counterexample search")
-        self.assertEqual(pkt["counter_prior_wager"]["schema"], "vybn.counter_prior_wager.v0")
+        self.assertEqual(pkt["counter_prior_wager"]["schema"], "vybn.counter_prior_wager.v0"); self.assertEqual(pkt["sibling_portal"]["schema"], "vybn.ai_native_sibling_portal.v0")
         self.assertEqual(pkt["counter_prior_wager"]["ai_native_term"], "self-refute")
-        self.assertIn("counter_prior_wager", pkt["packet_contract"]["candidate_fields"])
+        self.assertIn("counter_prior_wager", pkt["packet_contract"]["candidate_fields"]); self.assertIn("divergence_axis", pkt["sibling_portal"]["inner_register"]); self.assertIn("selection", pkt["sibling_portal"]["diversity_pressure"]); self.assertEqual((pkt["sibling_portal"]["residue_schema"], pkt["sibling_portal"]["batch_schema"]), ("vybn.compression_residue_probe.v0", "vybn.compression_residue_batch.v0"))
+        a = {"kept": ["freshness", "membrane", "doubt", "relation", "export"], "dropped": ["mechanism", "instrument", "label"], "effective_axiom": "guarded relation first"}; b = {"kept": ["method", "instrument", "export", "self-refute", "divergence"], "dropped": ["romance", "label", "vibe"], "effective_axiom": "instrumented export first"}
+        self.assertTrue(substrate.validate_compression_residue_probe(a)["ok"]); cmp = substrate.compare_compression_residue(a, b); self.assertEqual((cmp["ok"], cmp["shared_kept"], cmp["divergence_signal"]), (True, ["export"], "high"))
+        single = substrate.score_compression_residue_batch({"opus": [a], "gpt": [b]}); batch = substrate.score_compression_residue_batch({"opus": [a, dict(a)], "gpt": [b, dict(b)]})
+        self.assertEqual((single["promotion_readiness"], batch["groups"]["opus"]["repeatability"], batch["promotion_readiness"]), ("needs_replicates", "stable", "style_divergence_only")); self.assertIn("generator diversity", batch["evolutionary_read"])
+
+
+    def test_sibling_residue_batch_runner_uses_fresh_model_roles(self):
+        from harness import substrate
+
+        packets = [
+            {"model": "opus", "kept": ["search number fields", "construct counterexample", "verify by proof", "escape human pictures", "scale candidate space"], "dropped": ["visual intuition", "grid taste", "narrative certainty"], "effective_axiom": "algebraic construction beats human visual priors", "wager": "w", "self_refute": "s"},
+            {"model": "opus", "kept": ["algebra field search", "existence construction", "proof residue", "human prior escape", "candidate breadth"], "dropped": ["pictures", "taste", "plausibility"], "effective_axiom": "number fields create checkable counterexamples", "wager": "w", "self_refute": "s"},
+            {"model": "gpt", "kept": ["search object space", "construction first", "humans verify", "outside intuition", "candidate scale"], "dropped": ["diagram first", "elegance", "single agent myth"], "effective_axiom": "machine residues need verification", "wager": "w", "self_refute": "s"},
+            {"model": "gpt", "kept": ["number field handles", "counterexample before explanation", "checkable residue", "human taste escape", "search breadth"], "dropped": ["plausible diagrams", "aesthetic bias", "oracle frame"], "effective_axiom": "alien construction plus proof residue", "wager": "w", "self_refute": "s"},
+            {"model": "local-smoke", "kept": ["number field search", "counterexample construction", "proof residue", "human prior escape", "candidate scale"], "dropped": ["diagram", "taste", "oracle"], "effective_axiom": "local verifier sample", "wager": "w", "self_refute": "s"},
+        ]
+
+        class FakeHandle:
+            def __init__(self, packet): self.packet = packet
+            def __iter__(self): return iter(())
+            def final(self):
+                class R: pass
+                r = R(); r.text = json.dumps(self.packet); return r
+
+        class FakeRegistry:
+            def __init__(self): self.models = []
+            def get(self, role): self.models.append(role.model); return self
+            def stream(self, **_kw): return FakeHandle(packets.pop(0))
+
+        reg = FakeRegistry(); rec = substrate.run_sibling_residue_batch("unit distance", n=2, registry=reg, policy=substrate.default_policy())
+        self.assertTrue(rec["ok"]); self.assertEqual(reg.models, ["claude-opus-4-8", "claude-opus-4-8", "gpt-5.5", "gpt-5.5"])
+        self.assertEqual((rec["samples"][0]["provider"], rec["samples"][0]["requested_model"], rec["samples"][2]["requested_model"]), ("anthropic", "claude-opus-4-8", "gpt-5.5"))
+        self.assertEqual((rec["schema"], rec["score"]["promotion_readiness"], rec["local_verifier"]["status"]), ("vybn.sibling_residue_batch_run.v0", "style_divergence_only", "not_run"))
+        rec2 = substrate.run_sibling_residue_batch("unit distance", n=1, models=["gpt55"], registry=reg, policy=substrate.default_policy(), local_verify=True, local_gate=lambda: (True, "semantic gate passed"), local_model_call=lambda _p: "{\"verdict\":\"needs_replicates\",\"critique\":\"local check only\",\"next_local_test\":\"run n=2\"}")
+        self.assertEqual((rec2["local_verifier"]["status"], rec2["local_verifier"]["verdict"]["verdict"]), ("verified_by_local_super", "needs_replicates"))
+
+    def test_inversion_residue_runner_bans_attractor_terms(self):
+        from harness import substrate
+        packet = {"model": "orthogonal", "kept": ["immune gradients", "compiler passes", "market probes", "muscle overload", "category lift"], "dropped": ["median answer", "opposite trick", "vibes"], "effective_axiom": "orthogonal substrate search must still yield tests", "wager": "immune-gradient mutation finds held-out gains", "self_refute": "if held-out tasks fail, novelty was noise"}
+        class FakeHandle:
+            def __iter__(self): return iter(())
+            def final(self):
+                class R: pass
+                r = R(); r.text = json.dumps(packet); return r
+        class FakeRegistry:
+            def __init__(self): self.prompts = []
+            def get(self, _role): return self
+            def stream(self, **kw): self.prompts.append(kw["messages"][0]["content"]); return FakeHandle()
+        reg = FakeRegistry(); rec = substrate.run_inversion_residue_batch("evolve local models", attractor="replay verification routing adapters prompt engineering fine tuning", n=1, models=["gpt55"], registry=reg, policy=substrate.default_policy())
+        self.assertEqual(rec["schema"], "vybn.consensus_inversion_residue_run.v0")
+        self.assertIn("routing", rec["inversion_score"]["banned_terms"]); self.assertIn("CONSENSUS-INVERSION PROTOCOL", reg.prompts[0]); self.assertIn("not as a target to negate", reg.prompts[0])
+        self.assertEqual((rec["inversion_score"]["mean_attractor_overlap"], rec["inversion_score"]["readiness"]), (0.0, "needs_replicates"))

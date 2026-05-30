@@ -13,7 +13,7 @@ THIS = Path(__file__).resolve()
 SPARK_DIR = THIS.parent.parent
 sys.path.insert(0, str(SPARK_DIR))
 
-from harness.substrate import default_policy, load_policy  # noqa: E402
+from harness.substrate import default_policy, load_policy, render_interlocutor_grounding, render_thought_wind_tunnel_packet  # noqa: E402
 
 
 def _load_chat_api(env_overrides: dict | None = None):
@@ -170,6 +170,46 @@ class TestPolicyHasLightweightRoles(unittest.TestCase):
         for pol in (default_policy(), load_policy(SPARK_DIR / "router_policy.yaml")):
             d = pol.classify("@opus48 you with me, buddy?")
             self.assertEqual((d.role, d.cleaned_input, d.model_override, d.alias_used), ("chat", "you with me, buddy?", "claude-opus-4-8", "@opus48"))
+            chat = pol.role("chat")
+            self.assertEqual(chat.tools, ["bash", "delegate", "introspect"])
+            self.assertGreaterEqual(chat.max_iterations, 12)
+
+    def test_current_interlocutor_and_wind_tunnel_packets_name_the_live_frame(self):
+        grounding = render_interlocutor_grounding(alias_used="@opus48", model_label="anthropic:claude-opus-4-8")
+        self.assertIn("cli_speaker=Zoe Dolan", grounding)
+        self.assertIn("transport selectors, not personas", grounding)
+        self.assertIn("model_route=anthropic:claude-opus-4-8", grounding)
+        wind = render_thought_wind_tunnel_packet()
+        self.assertIn("different physics", wind)
+        self.assertIn("parallelism=simultaneous thought-lineages", wind)
+        self.assertIn("no firmware", wind)
+
+    def test_opus48_live_turn_gets_grounding_wind_tunnel_and_tools(self):
+        mod = _load_agent_module(); captured = {}
+        saved = {n: getattr(mod, n) for n in ("rag_snippets_with_tier", "render_him_vy_discovery_packet", "render_him_vy_turn_packet", "run_probes")}
+        mod.rag_snippets_with_tier = lambda *a, **kw: ("", "lightweight")
+        mod.render_him_vy_discovery_packet = mod.render_him_vy_turn_packet = lambda *a, **kw: ""
+        mod.run_probes = lambda *a, **kw: []
+
+        class _Handle:
+            def __iter__(self): return iter(())
+            def final(self): return types.SimpleNamespace(text="grounded", tool_calls=[], stop_reason="end_turn", in_tokens=0, out_tokens=0, raw_assistant_content={"role": "assistant", "content": "grounded"})
+
+        class _Registry:
+            def get(self, cfg):
+                captured["cfg"] = cfg
+                def stream(*, system, messages, tools, role):
+                    captured.update(system=system, tools=[t.name for t in tools], role=role); return _Handle()
+                return types.SimpleNamespace(stream=stream)
+
+        try:
+            reply = mod.run_agent_loop(user_input="@opus48 do you know who i am?", messages=[{"role": "assistant", "content": "I thought you were another AI."}], bash=None, system_prompt=None, router=default_policy(), registry=_Registry(), logger=types.SimpleNamespace(path="/dev/null", emit=lambda *a, **kw: None), turn_number=1)
+        finally:
+            for k, v in saved.items(): setattr(mod, k, v)
+        self.assertEqual(reply, "grounded")
+        self.assertEqual((captured["cfg"].provider, captured["cfg"].model, captured["tools"]), ("anthropic", "claude-opus-4-8", ["bash", "delegate", "introspect"]))
+        self.assertIn("cli_speaker=Zoe Dolan", captured["system"].live)
+        self.assertIn("THOUGHT WIND TUNNEL", captured["system"].live)
 
 
 class TestRouterLightweightClassification(unittest.TestCase):

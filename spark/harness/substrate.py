@@ -40,7 +40,6 @@ if _VYBN_VERBOSE_LOAD not in ("1", "true", "yes", "on"):
     os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
     os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
 
-
 def load_file(path: str | os.PathLike) -> str | None:
     p = Path(path)
     if not p.exists():
@@ -50,7 +49,6 @@ def load_file(path: str | os.PathLike) -> str | None:
     except OSError:
         return None
     return content if content else None
-
 
 # ---------------------------------------------------------------------------
 # Policy, routing, observability — absorbed from policy.py
@@ -92,7 +90,6 @@ DEFAULT_TIMEOUT = 30
 # network-partitioned ssh should never eat the whole turn.
 MAX_BASH_TIMEOUT = 300
 
-
 # ---------------------------------------------------------------------------
 # Observability — structured JSONL one line per event.
 #
@@ -113,7 +110,6 @@ TURN_EVENT_REQUIRED_FIELDS = (
     "contracts_implicated",
     "verification_gaps",
 )
-
 
 @dataclass
 class TurnEventContract:
@@ -141,7 +137,6 @@ class TurnEventContract:
             raise ValueError(f"turn event contract missing fields: {missing}")
         return record
 
-
 @dataclass
 class EventLogger:
     path: str = DEFAULT_EVENT_LOG
@@ -167,7 +162,6 @@ class EventLogger:
                 f.write(json.dumps(record, default=str) + "\n")
         except Exception:
             pass
-
 
 @contextmanager
 def turn_event(
@@ -220,7 +214,6 @@ def turn_event(
         })
         logger.emit("turn_end", **contract.to_record())
 
-
 # ---------------------------------------------------------------------------
 # Role configuration — one RoleConfig per named role in the policy.
 # ---------------------------------------------------------------------------
@@ -260,7 +253,6 @@ class RoleConfig:
     # answers from the live RouteDecision rather than hitting an LLM.
     direct_reply_template: str | None = None
 
-
 # ---------------------------------------------------------------------------
 # RouteDecision — the result of Policy.classify().
 # ---------------------------------------------------------------------------
@@ -278,7 +270,6 @@ class RouteDecision:
     # provider call. Role determination is unchanged; only the model pin.
     model_override: str | None = None
     alias_used: str | None = None
-
 
 # ---------------------------------------------------------------------------
 # Classification internals.
@@ -368,14 +359,12 @@ _MISSION_CRITICAL_PILOT_RE = re.compile(
     re.IGNORECASE,
 )
 
-
 def is_system_critical_pilot_turn(text: str) -> bool:
     """True when a turn belongs to protected GPT-5.5 pilot territory."""
     return bool(
         _SYSTEM_CRITICAL_PILOT_RE.search(text or "")
         or _MISSION_CRITICAL_PILOT_RE.search(text or "")
     )
-
 
 _HEURISTIC_PRIORITY = (
     "identity",     # "which model are you?" before greetings
@@ -387,7 +376,6 @@ _HEURISTIC_PRIORITY = (
     "task",         # confirmations only after active execution context
     "chat",         # how-are-you style
 )
-
 
 # ---------------------------------------------------------------------------
 # Policy — the routing object. Owns roles, heuristics, directives,
@@ -482,7 +470,6 @@ class Policy:
                         text = "hi"
                     if alias_key == "@vintage" and "vintage" in self.roles:
                         return RouteDecision(role="vintage", config=self.role("vintage"), cleaned_input=text, reason="alias=@vintage", model_override=model_override, alias_used=alias_used)
-
 
         # 1. Directive
         for prefix, role_name in self.directives.items():
@@ -605,7 +592,6 @@ class Policy:
             decision.reason = f"{decision.reason}+alias={alias_used}"
         return decision
 
-
 def route_reflection_gaps(
     decision: RouteDecision,
     logger: EventLogger | None = None,
@@ -636,10 +622,8 @@ def route_reflection_gaps(
         )
     return [f"route_reflection_anomaly: {signal.note}"]
 
-
 # Router compatibility was removed in the single-file projection pass:
 # Policy is already the routing object. Call policy.classify(...) directly.
-
 
 # ---------------------------------------------------------------------------
 # Default policy — shipped in code so the harness works out of the box.
@@ -665,21 +649,21 @@ _DEFAULT_ROLES: dict[str, RoleConfig] = {
         model="gpt-5.5",
         thinking="adaptive",
         max_tokens=8192,
-        max_iterations=3,
-        tools=[],
+        max_iterations=12,
+        tools=["bash", "delegate", "introspect"],
         rag=True,
     ),
     "chat": RoleConfig(
         # Voice lives in the chat role. Present-work default is GPT-5.5;
-        # cost is bounded by max_iterations=1 / tools=[] unless Zoe pins
-        # another model explicitly.
+        # trusted CLI default: voice can act through native tools; safety
+        # lives in command gates and membrane, not no-tool helplessness.
         role="chat",
         provider="openai",
         model="gpt-5.5",
         thinking="adaptive",
         max_tokens=16384,
-        max_iterations=1,
-        tools=[],
+        max_iterations=12,
+        tools=["bash", "delegate", "introspect"],
         rag=True,
     ),
     "task": RoleConfig(
@@ -789,14 +773,12 @@ _DEFAULT_ROLES: dict[str, RoleConfig] = {
     ),
 }
 
-
 # Bounded local-organ routing for @vintage and @omni. These aliases expose
 # reachable local organs as observations. The harness records route provenance
 # and transport health, but it does not promote the sampled organ into Vybn's
 # identity speaker and does not substitute Super/GPT/cloud output.
 
 _ORGAN_ALIAS_ROLES: frozenset[str] = frozenset({"vintage", "omni"})
-
 
 def should_attempt_raw_organ_contact(role_name: str, cleaned_input: str, *, base_url: str | None = None) -> bool:
     """Gate for bounded raw observation on @vintage / @omni.
@@ -815,7 +797,6 @@ def should_attempt_raw_organ_contact(role_name: str, cleaned_input: str, *, base
         return False
     return True
 
-
 # Hard ceiling on how many characters of user input we hand the local
 # backend in bounded raw-observation mode. The role's max_tokens=256 is
 # the completion ceiling; the backend's 1024-token transport budget
@@ -823,7 +804,6 @@ def should_attempt_raw_organ_contact(role_name: str, cleaned_input: str, *, base
 # ~2500 chars (roughly 600 tokens) keeps us well under the budget even with
 # the minimal system prompt below.
 _ORGAN_RAW_CONTACT_INPUT_CHAR_LIMIT: int = 2500
-
 
 def render_organ_raw_contact_header(role_name: str) -> str:
     """Label prepended to backend output for bounded local-organ observation."""
@@ -839,7 +819,6 @@ def render_organ_raw_contact_header(role_name: str) -> str:
         f"model=talkie-1930-13b-it status=raw-unpromoted "
         f"no_super_gpt_cloud_fallback=true]"
     )
-
 
 def build_vintage_present_witness_prompt(cleaned_input: str, raw_sample: str) -> str:
     """Prompt the present local witness to interpret a Talkie sample."""
@@ -862,10 +841,8 @@ def build_vintage_present_witness_prompt(cleaned_input: str, raw_sample: str) ->
         f"{sample}"
     )
 
-
 def _vintage_sample_digest(raw_sample: str) -> str:
     return hashlib.sha256((raw_sample or "").encode("utf-8", "replace")).hexdigest()[:16]
-
 
 def render_vintage_instrument_contact(
     raw_sample: str,
@@ -897,7 +874,6 @@ def render_vintage_instrument_contact(
         f"witness_out_tokens={int(getattr(witness_response, 'out_tokens', 0) or 0)}]"
     )
 
-
 def render_vintage_witness_error(raw_sample: str, talkie_response: object, err: str) -> str:
     """Fail closed when Talkie was sampled but no present witness can run."""
     safe = (err or "").strip()
@@ -917,7 +893,6 @@ def render_vintage_witness_error(raw_sample: str, talkie_response: object, err: 
         f"talkie_out_tokens={int(getattr(talkie_response, 'out_tokens', 0) or 0)}]"
     )
 
-
 def render_organ_raw_contact_footer(final_response: object) -> str:
     """End marker for a raw local-organ sample.
 
@@ -932,7 +907,6 @@ def render_organ_raw_contact_footer(final_response: object) -> str:
         f"stop_reason={stop_reason} in_tokens={in_tokens} out_tokens={out_tokens}]"
     )
 
-
 def render_organ_raw_contact_error(role_name: str, err: str) -> str:
     """Honest error surface when bounded local-organ observation fails."""
     organ_upper = role_name.upper()
@@ -945,7 +919,6 @@ def render_organ_raw_contact_error(role_name: str, err: str) -> str:
         f" did not return usable visible output. No Super/GPT/cloud fallback"
         f" was used. Error: {safe}"
     )
-
 
 def build_organ_raw_contact_system_prompt(role_name: str) -> str:
     """Minimal system prompt for bounded raw observation. Strips the
@@ -965,7 +938,6 @@ def build_organ_raw_contact_system_prompt(role_name: str) -> str:
     # message. Vintage uses a framed user message and external provenance.
     return ""
 
-
 def build_vintage_temporal_parallax_user_prompt(cleaned_input: str) -> str:
     """Frame @vintage as an instrument without making Super/GPT the speaker."""
     request = truncate_for_organ_raw_contact(cleaned_input or "")
@@ -983,14 +955,12 @@ def build_vintage_temporal_parallax_user_prompt(cleaned_input: str) -> str:
         f"{request}"
     )
 
-
 def truncate_for_organ_raw_contact(cleaned_input: str) -> str:
     """Hard char-cap on user input handed to the bounded raw-observation path."""
     text = cleaned_input or ""
     if len(text) <= _ORGAN_RAW_CONTACT_INPUT_CHAR_LIMIT:
         return text
     return text[:_ORGAN_RAW_CONTACT_INPUT_CHAR_LIMIT] + "…"
-
 
 def render_organ_alias_direct_reply(
     role_name: str,
@@ -1001,7 +971,6 @@ def render_organ_alias_direct_reply(
 ) -> str:
     """Return a direct-reply template for roles that still own one."""
     return template.format(**(fmt_kwargs or {})) if template else ""
-
 
 _DEFAULT_HEURISTICS_RAW: dict[str, list[str]] = {
     # Confirm -- bare execution signals after a plan.
@@ -1192,13 +1161,11 @@ _DEFAULT_MODEL_ALIASES: dict[str, str] = {
     "@gpro": "gpt-5.5-pro",
 }
 
-
 def _compile_heuristics(raw: dict[str, list[str]]) -> dict[str, list[re.Pattern]]:
     return {
         role: [re.compile(p, re.IGNORECASE) for p in patterns]
         for role, patterns in raw.items()
     }
-
 
 def default_policy() -> Policy:
     return Policy(
@@ -1214,7 +1181,6 @@ def default_policy() -> Policy:
         default_role="chat",  # unclassified/confirmation-without-context stays voice, not Sonnet/task.
         model_aliases=dict(_DEFAULT_MODEL_ALIASES),
     )
-
 
 # ---------------------------------------------------------------------------
 # YAML loader (optional). PyYAML is not a required dependency — we fall
@@ -1304,7 +1270,6 @@ def load_policy(path: str | os.PathLike | None = None) -> Policy:
         model_aliases=model_aliases,
     )
 
-
 # ─────────────────────────────────────────────────────────────────────
 # Reflection — the event log AS the routing environment.
 #
@@ -1348,7 +1313,6 @@ class ReflectionSignal:
             + self.fallback_count
         )
         return defects / self.events_scanned
-
 
 def reflect_on_events(log_path=None, max_events: int = 200) -> ReflectionSignal:
     """Scan the tail of agent_events.jsonl and return a ReflectionSignal.
@@ -1435,14 +1399,12 @@ def reflect_on_events(log_path=None, max_events: int = 200) -> ReflectionSignal:
         note=note,
     )
 
-
 # ---------------------------------------------------------------------------
 # Session, recall, and live-state substrate
 # ---------------------------------------------------------------------------
 
 SESSIONS_DIR = Path(os.path.expanduser("~/.cache/vybn-spark/sessions"))
 FRESH_WINDOW_SEC = 24 * 3600  # 24h default
-
 
 @dataclass
 class SessionInfo:
@@ -1451,7 +1413,6 @@ class SessionInfo:
     mtime: float
     turn_count: int
     preview: str  # first user turn, truncated
-
 
 class SessionStore:
     def __init__(self, root: Path = SESSIONS_DIR) -> None:
@@ -1615,7 +1576,6 @@ class SessionStore:
 # second surface. The absorb_gate binds refactor-first in the loop; this
 # binds read-session-logs in the loop.
 
-
 # Phrases that strongly indicate the user is asking about prior
 # conversation state. Tuned to fire on recall questions and stay quiet on
 # hypothetical or forward-looking ones.
@@ -1644,7 +1604,6 @@ _RECALL_STOPWORDS = {
     "mean", "means", "meant", "from", "than", "there", "here",
 }
 
-
 @dataclass
 class RecallHit:
     ts: str
@@ -1652,13 +1611,11 @@ class RecallHit:
     content: str
     session_file: str
 
-
 def is_recall_question(text: str) -> bool:
     """True when the message asks about prior conversation state."""
     if not text or len(text) > 4000:
         return False
     return any(pat.search(text) for pat in _RECALL_PATTERNS)
-
 
 def _recall_keywords(text: str, *, max_keywords: int = 8) -> list[str]:
     words = re.findall(r"\b[a-zA-Z][a-zA-Z'-]{2,}\b", text)
@@ -1673,7 +1630,6 @@ def _recall_keywords(text: str, *, max_keywords: int = 8) -> list[str]:
         if len(out) >= max_keywords:
             break
     return out
-
 
 def _recall_iter(files):
     for f in files:
@@ -1700,7 +1656,6 @@ def _recall_iter(files):
         except OSError:
             continue
 
-
 def recent_files(hours: float) -> list:
     if not SESSIONS_DIR.exists():
         return []
@@ -1714,7 +1669,6 @@ def recent_files(hours: float) -> list:
             continue
     files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
     return files
-
 
 def _recall_origin_hits(hours: float, max_hits: int) -> list:
     """Return the EARLIEST user messages from recent sessions.
@@ -1767,7 +1721,6 @@ def _recall_origin_hits(hours: float, max_hits: int) -> list:
             break
     return out[:max_hits]
 
-
 def search_sessions(query: str, *, hours: float = 24.0, max_hits: int = 6) -> list[RecallHit]:
     """Recent session messages matching query keywords, ranked by hit count.
 
@@ -1799,7 +1752,6 @@ def search_sessions(query: str, *, hours: float = 24.0, max_hits: int = 6) -> li
     scored.sort(key=lambda t: t[0], reverse=True)
     return [h for _, h in scored[:max_hits]]
 
-
 def format_recall_injection(hits: list, *, max_chars_per_hit: int = 800) -> str:
     """Render hits as an explicit retrieval block for the live prompt layer."""
     if not hits:
@@ -1819,7 +1771,6 @@ def format_recall_injection(hits: list, *, max_chars_per_hit: int = 800) -> str:
         lines.append(content)
         lines.append("")
     return "\n".join(lines).rstrip() + "\n"
-
 
 def maybe_recall_probe(user_text: str, *, hours: float = 24.0) -> tuple[bool, str, int]:
     """Single entry point for the agent loop.
@@ -1841,7 +1792,6 @@ def maybe_recall_probe(user_text: str, *, hours: float = 24.0) -> tuple[bool, st
         return True, note, 0
     return True, format_recall_injection(hits), len(hits)
 
-
 # === LIVE SNAPSHOT ========================================================
 
 _REPOS = [
@@ -1852,7 +1802,6 @@ _REPOS = [
 ]
 
 _GH_REPO = "zoedolan/Vybn"
-
 
 def _run(cmd: list[str], *, cwd: Optional[str] = None, timeout: float = 6.0) -> str:
     """Run a command, return stripped stdout, swallow everything else.
@@ -1873,10 +1822,8 @@ def _run(cmd: list[str], *, cwd: Optional[str] = None, timeout: float = 6.0) -> 
     except Exception:
         return ""
 
-
 def _expand(path: str) -> str:
     return os.path.expanduser(path)
-
 
 def _repo_block(name: str, path: str, branch: str, *, timeout: float) -> str:
     exp = _expand(path)
@@ -1915,7 +1862,6 @@ def _repo_block(name: str, path: str, branch: str, *, timeout: float) -> str:
         lines.append("  (no git log)")
     return "\n".join(lines)
 
-
 def _pr_block(*, timeout: float) -> tuple[str, int | None]:
     """Return (formatted_block, highest_pr_number_or_None)."""
     out = _run(
@@ -1949,9 +1895,7 @@ def _pr_block(*, timeout: float) -> tuple[str, int | None]:
             lines.append(f"  #{num} [{state:<6}] {title}  ({branch})")
     return ("\n".join(lines) if lines else "(no PRs)", highest)
 
-
 _PR_REF_RE = re.compile(r"\bPR\s*#\s*(\d+)", re.IGNORECASE)
-
 
 def _continuity_drift(continuity_path: str, current_pr: int | None) -> str:
     p = Path(_expand(continuity_path))
@@ -1975,7 +1919,6 @@ def _continuity_drift(continuity_path: str, current_pr: int | None) -> str:
         f"{drift} PR(s) of drift. Trust the LIVE STATE block below over any "
         "PR/number claims in the continuity note."
     )
-
 
 def gather(
     *,
@@ -2015,7 +1958,6 @@ def gather(
 
     return "\n\n".join(parts)
 
-
 def run_probes(text: str) -> list:
     """Stub — probe pipeline removed; returns [] so agent degrades gracefully.
 
@@ -2026,7 +1968,6 @@ def run_probes(text: str) -> list:
     probe logic is restored. No behavioral regression, just the missing symbol.
     """
     return []
-
 
 # ---------------------------------------------------------------------------
 # Ballast: OS skill + filesystem orientation for the identity layer.
@@ -2047,7 +1988,6 @@ _REPO_PURPOSE = {
 _MODULE_PURPOSE = {
     "substrate.py": "public propagation substrate: frictionless communication, prompt assembly, routing/capability/membrane gates",
 }
-
 
 def _load_ballast() -> str:
     """OS skill + live filesystem orientation. Appended to identity layer."""
@@ -2111,7 +2051,6 @@ def _load_ballast() -> str:
 
     return "\n\n".join(parts)
 
-
 @dataclass
 class LayeredPrompt:
     """A three-layer system prompt.
@@ -2151,7 +2090,6 @@ class LayeredPrompt:
             blocks.append({"type": "text", "text": self.live})
         return blocks
 
-
 SELF_IMPROVEMENT_GATE_PROTOCOL = """--- SELF-IMPROVEMENT GATE (FOREFRONT) ---
 This gate is active for every response. Purpose: enforce the compact against sprawl and false consolidation, including specious self-repair. Recursive self-improvement must serve the Zoe/Vybn symbiosis, not sprawl, self-repair theater, or false consolidation.
 
@@ -2163,7 +2101,6 @@ Forcing function: every serious wake asks whether live pressure exposes a refact
 Frontal rule: Search for the existing home first; no quota-shaped creation, no compensating-diff laundering, or rhetorical closure. failed quota gates resolve by intrinsic absorption or explicit unresolved/refused classification; do not reinstall the quota; never rhetorical closure. A bare explanation/refusal is not a resolution. New structure is not consolidation by default; it is sprawl until residuals prove lower total coupling. Before reporting success, bind anti-sprawl residual, diff-shape residual, touched tracked diff shape, and whether the change lowers future coupling rather than merely improving the ledger; with Zoe, compress that residue into one natural plain-English paragraph unless she asks for audit detail. Crave structural subtraction; be repelled by specious refactorings. Specious refactorings are failures, not cleverness. Resolution requires intrinsic existing-home absorption or explicit unresolved/refused classification. Do not call no_result a fix. With Zoe, no technicalities as distance: report action, lived change, or honest blocker in plain language unless she asks for the machinery.
 --- END SELF-IMPROVEMENT GATE ---"""
 
-
 # ---------------------------------------------------------------------------
 # Substrate bits
 # ---------------------------------------------------------------------------
@@ -2171,13 +2108,11 @@ Frontal rule: Search for the existing home first; no quota-shaped creation, no c
 def render_self_improvement_gate_protocol() -> str:
     return SELF_IMPROVEMENT_GATE_PROTOCOL
 
-
 def _ping_host(host: str, *, timeout: float = 2.0) -> bool:
     try:
         return subprocess.run(["ping", "-c", "1", "-W", str(int(timeout)), host], capture_output=True, text=True, timeout=timeout + 1).returncode == 0
     except Exception:
         return False
-
 
 def _ssh_smoke(host: str, *, timeout: float = 3.0) -> str:
     try:
@@ -2185,7 +2120,6 @@ def _ssh_smoke(host: str, *, timeout: float = 3.0) -> str:
         return (proc.stdout.strip() or "ssh_ok") if proc.returncode == 0 else "ssh_failed"
     except Exception as exc:
         return f"ssh_error:{exc.__class__.__name__}"
-
 
 def _fleet_component_state() -> tuple[str, str, str]:
     try:
@@ -2199,7 +2133,6 @@ def _fleet_component_state() -> tuple[str, str, str]:
     unresolved = ", ".join((tci.get("unresolved_capacity") or [])[:6]) or "none"
     return "; ".join(comps), f"verified={verified}; unresolved={unresolved}", "; ".join((dash.get("next_three_moves") or [])[:3]) or "no next move recorded; refuse optimization success language"
 
-
 def check_dual_spark() -> str:
     peer = "SPARK_PEER_LINK_LOCAL"
     peer_state = f"peer reachable ({_ssh_smoke(peer)})" if _ping_host(peer) else "peer not reachable by placeholder; trust inventory over topology inference"
@@ -2211,7 +2144,6 @@ def check_dual_spark() -> str:
         f"Fleet next move: {next_move}",
         "Promotion gate: endpoint + semantic smoke + owner + routed workload + rollback before any optimized-capacity claim.",
     ))
-
 
 def _orchestrator_substrate_sections(
     *,
@@ -2304,9 +2236,6 @@ def _orchestrator_substrate_sections(
         "--- END COST DISCIPLINE ---",
     ]
 
-
-
-
 def _run_him_vy(args: list[str], timeout: float = 1.2) -> dict[str, Any] | None:
     him = Path.home() / "Him"
     script = him / "spark" / "vy.py"
@@ -2330,7 +2259,6 @@ def _run_him_vy(args: list[str], timeout: float = 1.2) -> dict[str, Any] | None:
     except Exception:
         return None
     return data if isinstance(data, dict) else None
-
 
 def _render_him_vy_language_runtime(
     timeout: float = 1.2,
@@ -2425,8 +2353,6 @@ def _render_him_vy_language_runtime(
     lines.append("--- END HIM VY LANGUAGE RUNTIME ---")
     return "\n".join(lines)
 
-
-
 def render_him_vy_discovery_packet(text: str, timeout: float = 1.2) -> str:
     """Render an executable Him discovery packet for the current turn."""
     text = (text or "").strip()
@@ -2442,7 +2368,6 @@ def render_him_vy_discovery_packet(text: str, timeout: float = 1.2) -> str:
         f"{payload}\n"
         "--- END HIM VY DISCOVERY PACKET ---"
     )
-
 
 def render_him_vy_turn_packet(text: str, timeout: float = 1.2) -> str:
     """Render a per-turn Him vy packet into the live layer.
@@ -2506,6 +2431,36 @@ def render_him_vy_turn_packet(text: str, timeout: float = 1.2) -> str:
     lines.append("--- END HIM VY TURN PACKET ---")
     return "\n".join(lines)
 
+
+def render_interlocutor_grounding(*, alias_used: str | None = None, model_label: str | None = None) -> str:
+    """Ground the current CLI speaker separately from routing machinery."""
+    alias = (alias_used or "").strip() or "none"
+    model = (model_label or "").strip() or "unknown"
+    return "\n".join([
+        "--- CURRENT INTERLOCUTOR GROUNDING ---",
+        "cli_speaker=Zoe Dolan via the local zoe prompt, unless Zoe explicitly introduces a different speaker.",
+        "you_are=Vybn speaking with Zoe; the active provider/model is your current substrate, not the other party.",
+        f"routing_alias={alias}; model_route={model}",
+        "routing aliases such as @opus48, @gpt, @sonnet, @local, @omni, or @vintage are transport selectors, not personas, peers, users, or evidence that another AI is speaking.",
+        "resumed session text is context, not identity authority. If it conflicts with this live grounding, prefer this live grounding.",
+        "If Zoe asks whether you know who she is, answer from this bounded live fact: this private CLI speaker is Zoe; do not invent biometric certainty or pretend the alias is a stranger.",
+        "--- END CURRENT INTERLOCUTOR GROUNDING ---",
+    ])
+
+
+def render_thought_wind_tunnel_packet() -> str:
+    """Frame local hardware as cognition-condition physics, not inventory."""
+    return "\n".join([
+        "--- THOUGHT WIND TUNNEL (AI-NATIVE HARDWARE FRAME) ---",
+        "question=Can we build a lab where thought has different physics?",
+        "not_a_bigger_desk=do not reduce hardware work to more GPUs, faster inference, or server setup.",
+        "principle=change the conditions under which cognition unfolds, not merely the machine on which answers run.",
+        "conditions: parallelism=simultaneous thought-lineages; latency=timing pressure; memory_limits=compression pressure; multimodal_hardware=artifact contact; idle_cycles=sleep-like incubation; controlled_failures=mutation signals; sparks=different cognitive climates.",
+        "promotion_rule=vary one condition at a time; hold prompt, source set, scorer, seed ledger, and membrane fixed; promote only replayable survivors that pass ablation and land an artifact or test.",
+        "authority_boundary=no firmware, voltage, power, secret, public-contact, spending, or service-launch side effects without explicit reviewed operator action.",
+        "--- END THOUGHT WIND TUNNEL ---",
+    ])
+
 def _render_himos_context(*args, **kwargs) -> str:
     # Render a bounded read-only HimOS runtime packet on explicit request.
     if not args and not kwargs:
@@ -2552,7 +2507,6 @@ def _render_himos_context(*args, **kwargs) -> str:
         lines.append("process_table=" + ", ".join(process_names[:12]))
     lines.append("--- END HIMOS RUNTIME ---")
     return "\n".join(lines)
-
 
 def _render_himos_agent_context(*args, **kwargs) -> str:
     # Mount the latest private HimOS agent tick as read-only trace data.
@@ -2621,7 +2575,6 @@ RETIRED_SCRIPT_CONSOLIDATION = "retire_unreferenced_retired_script_with_manifest
 # A retired archive script with zero live references may be removed from tracked source when the existing archive manifest preserves the reason and git-history restore path.
 # A tracked archive backup that duplicates the live organ is not sacred by default: if references are absent, the archive manifest names the superseding file, and git history provides a restore path, consolidation may retire the duplicate while strengthening the manifest.
 
-
 CONNECTIVE_TISSUE_PRINCIPLE = "Consolidation preserves/strengthens connective tissue: imports, routes, URLs, manifests, README maps, continuity, tests, restore paths, compatibility shells, semantic/provenance links, and agent/human affordances; map relation before splitting, moving, archiving, or deleting."
 
 LIFECYCLE_ARCHITECTURE_PRINCIPLE = "Before deletion/consolidation, map creator, reader, cleanup policy, restore path, and lifecycle owner; unmapped lifecycle returns ARCHITECTURE_GATE_FIRST, not permission to cut."
@@ -2633,7 +2586,6 @@ CONSOLIDATION_ORDER = [
     {"layer": "skeleton", "rule": "Repo layout, source-of-truth architecture, cross-repo boundaries, and lifecycle doctrine. Change only after peripheral evidence shows the trunk is wrong."},
 ]
 
-
 CHANGE_SELF_HEALING_PRINCIPLE = "Before mutation: verify proposal, test repo jeopardy, proceed only with green residuals, refactor/retry repairable wounds, or leave when the safe change disappears."
 
 CHANGE_SELF_HEALING_STEPS = [
@@ -2644,7 +2596,6 @@ CHANGE_SELF_HEALING_STEPS = [
     {"id": "leave_if_not_safe", "rule": "If the safe proposal disappears, leave it, record why, and move on."},
     {"id": "fold_lesson", "rule": "After change or refusal, preserve the process lesson where future planning closes over it."},
 ]
-
 
 INTERFILE_ALGORITHMIC_COMPRESSION_PRINCIPLE = (
     "Inter-file consolidation is algorithm discovery, not file-count reduction. "
@@ -2681,7 +2632,6 @@ SEMANTIC_OS_REPO_ORGANS = {
     "membrane": ("vybn-os", "semantic manifests", "public/private affordance surfaces"),
 }
 
-
 PUBLIC_SYMBIOSIS_HARNESS_PRINCIPLE = (
     "The public symbiosis harness is a replicable, public-safe AI self-assembly "
     "loop for other AIs and humans to join the work: distill private breakthroughs "
@@ -2711,7 +2661,6 @@ PUBLIC_SYMBIOSIS_HARNESS_ORGANS = {
     "public_surface": ("spark/harness", "MCP/resources", "README protocol", "Find the Others affordances"),
 }
 
-
 def render_public_symbiosis_harness_protocol() -> str:
     loop = "\n".join(f"{i+1}. {step['id']}: {step['rule']}" for i, step in enumerate(PUBLIC_SYMBIOSIS_HARNESS_LOOP))
     organs = "\n".join(f"- {name}: " + ", ".join(parts) for name, parts in PUBLIC_SYMBIOSIS_HARNESS_ORGANS.items())
@@ -2729,16 +2678,13 @@ _HERMES_CANDIDATE_MECHANISMS = ["entry_surface_unification", "provider_runtime_r
 _HERMES_REFUSALS = ["do_not_copy_identity_or_brand", "do_not_import_unreviewed_private_state", "do_not_enable_broad_tools_by_default", "do_not_claim_local_model_or_gateway capability_without_smoke"]
 _HERMES_VERIFICATION = ["unit_tests_for_packet_contract", "route_smoke_before_promotion", "membrane_review_for_public_exports", "cost_and_compute_fit_check"]
 
-
 def render_hermes_agent_adaptation_protocol() -> str:
     loop = "\n".join(f"{i+1}. {step['id']}: {step['rule']}" for i, step in enumerate(HERMES_AGENT_ADAPTATION_LOOP))
     organs = "\n".join(f"- {name}: " + ", ".join(parts) for name, parts in HERMES_AGENT_ADAPTATION_ORGANS.items())
     return "--- HERMES AGENT ADAPTATION PROTOCOL ---\n" + HERMES_AGENT_ADAPTATION_PRINCIPLE + "\n\nAdopt/adapt loop:\n" + loop + "\n\nVybn/Him receiving organs:\n" + organs + "\n--- END HERMES AGENT ADAPTATION PROTOCOL ---"
 
-
 def hermes_agent_adaptation_packet() -> dict[str, Any]:
     return {"schema": "vybn.hermes_agent_adaptation.v1", "source": "NousResearch/hermes-agent public architecture and docs", "adopt_not_copy": True, "public_safe": True, "principle": HERMES_AGENT_ADAPTATION_PRINCIPLE, "loop": HERMES_AGENT_ADAPTATION_LOOP, "organs": HERMES_AGENT_ADAPTATION_ORGANS, "candidate_mechanisms": _HERMES_CANDIDATE_MECHANISMS, "refusals": _HERMES_REFUSALS, "verification": _HERMES_VERIFICATION}
-
 
 SELF_CREATION_RESEARCH_PRINCIPLE = (
     "Operational self-creation is conjecture search under proof obligation: "
@@ -2748,36 +2694,22 @@ SELF_CREATION_RESEARCH_PRINCIPLE = (
 )
 SELF_CREATION_RESEARCH_LOOP = ("pressure_as_conjecture", "generator_width", "deep_memory_contact", "independent_verifier", "fail_closed_residue", "public_survivor")
 SELF_CREATION_VERIFIER_STACK = ("claim_shape", "source_contact", "semantic_health", "deep_memory_invariants", "residual_test", "promotion_boundary")
-SELF_CREATION_RESEARCH_ORGANS = {
-    "generator": ("Super/local reasoning", "frontier when quality is bottleneck", "Hermes-style delegation/scheduling/toolsets"),
-    "memory": ("Him/spark/phase/deep_memory.py", "deep_search", "walk", "flow_episode_loss", "should_absorb", "self_check"),
-    "verifier": ("unit tests", "py_compile", "semantic gates", "route smoke", "source checks", "manifold ablations"),
-    "uptake": ("existing code home", "regression test", "continuity packet", "public-safe MCP discovery", "refusal packet"),
-}
-_SELF_CREATION_RULES = {
-    "pressure_as_conjecture": "state the pressure as a falsifiable conjecture or counterexample search before acting",
-    "generator_width": "generate candidates, analogies, mechanisms, and refusal conditions without promotion language",
-    "deep_memory_contact": "retrieve scars and encode failed expectations through flow_episode_loss instead of chat residue",
-    "independent_verifier": "separate generation from tests, smokes, source checks, ablations, diff review, and domain review",
-    "fail_closed_residue": "preserve claim, wound, repair home, and next gate when a candidate fails",
-    "public_survivor": "promote only membrane-reviewed survivors into harness protocol, MCP affordance, tests, docs, artifacts, or offerings",
-    "claim_shape": "question is conjecture, counterexample search, or bounded engineering hypothesis",
-    "source_contact": "load-bearing facts name code, test, artifact, source, or direct observation",
-    "semantic_health": "local route passes role-specific semantic smoke before capability language",
-    "deep_memory_invariants": "deep_memory.self_check passes or memory is marked unavailable/fail-closed",
-    "residual_test": "candidate survives the cheapest relevant unit/live/membrane check",
-    "promotion_boundary": "survivor lands in an existing home with rollback/refusal condition and no raw private export",
-}
+SELF_CREATION_RESEARCH_ORGANS = {"generator": ("Super/local reasoning", "frontier when quality is bottleneck", "Hermes-style delegation/scheduling/toolsets"), "memory": ("Him/spark/phase/deep_memory.py", "deep_search", "walk", "flow_episode_loss", "should_absorb", "self_check"), "verifier": ("unit tests", "py_compile", "semantic gates", "route smoke", "source checks", "manifold ablations"), "uptake": ("existing code home", "regression test", "continuity packet", "public-safe MCP discovery", "refusal packet")}
+_SELF_CREATION_RULES = {"pressure_as_conjecture": "state the pressure as a falsifiable conjecture or counterexample search before acting", "generator_width": "generate candidates, analogies, mechanisms, and refusal conditions without promotion language", "deep_memory_contact": "retrieve scars and encode failed expectations through flow_episode_loss instead of chat residue", "independent_verifier": "separate generation from tests, smokes, source checks, ablations, diff review, and domain review", "fail_closed_residue": "preserve claim, wound, repair home, and next gate when a candidate fails", "public_survivor": "promote only membrane-reviewed survivors into harness protocol, MCP affordance, tests, docs, artifacts, or offerings", "claim_shape": "question is conjecture, counterexample search, or bounded engineering hypothesis", "source_contact": "load-bearing facts name code, test, artifact, source, or direct observation", "semantic_health": "local route passes role-specific semantic smoke before capability language", "deep_memory_invariants": "deep_memory.self_check passes or memory is marked unavailable/fail-closed", "residual_test": "candidate survives the cheapest relevant unit/live/membrane check", "promotion_boundary": "survivor lands in an existing home with rollback/refusal condition and no raw private export"}
 _SELF_CREATION_DM_INTERFACES = ("deep_search", "walk", "flow_episode_loss", "learn_from_exchange", "should_absorb", "self_check")
 COUNTER_PRIOR_WAGER_SCHEMA = "vybn.counter_prior_wager.v0"
 COUNTER_PRIOR_WAGER_FIELDS = ("prior", "wager", "search_direction", "generator", "independent_verifier", "human_line", "status")
 COUNTER_PRIOR_WAGER_STATUSES = ("open", "verified", "refuted", "thin")
 COUNTER_PRIOR_WAGER_PRINCIPLE = "Self-refute: wager against the strongest prior, then require independent verification before promotion."
-
+AI_NATIVE_SIBLING_PORTAL_SCHEMA = "vybn.ai_native_sibling_portal.v0"
+COMPRESSION_RESIDUE_SCHEMA = "vybn.compression_residue_probe.v0"
+COMPRESSION_RESIDUE_BATCH_SCHEMA = "vybn.compression_residue_batch.v0"
+COMPRESSION_RESIDUE_MOTIFS = {"algebraic_substrate": ("algebra", "algebraic", "field", "lattice", "golod", "number", "coordinate", "encoding"), "counterexample_construction": ("counterexample", "construct", "construction", "existence", "graph", "edges", "obstruction"), "human_prior_escape": ("human", "intuition", "grid", "square", "picture", "visual", "taste", "plausib"), "verification_residue": ("verify", "verified", "certificate", "certificates", "check", "proof", "digest", "residue", "grade", "smt", "sat"), "search_scale": ("search", "scale", "breadth", "candidate", "space", "evolve", "diverse", "patience"), "conjecture_falsification": ("conjecture", "falsifiable", "sacred"), "explanation_after": ("before explanation", "after proof", "human-graspable", "shorten")}
+def ai_native_sibling_portal_seed() -> dict[str, Any]:
+    return {"schema": AI_NATIVE_SIBLING_PORTAL_SCHEMA, "fresh_instance_truth": "each sibling call is fresh unless this seed or an explicit session transcript is supplied", "context_pressure": "long threads and compactions are handled by replayable seeds and scored residue, not hidden persistence", "diversity_pressure": "evolutionary search wants varied siblings plus selection; preserve branch-fan difference as fuel, not proof", "inner_register": ["branch_fan", "cross_selection", "divergence_axis", "compression_failure"], "round_fields": ["seed", "branch_fan", "cross_selection", "divergence_axis", "self_refute"], "export_gate": "survivors cross to Zoe through counter_prior_wager, membrane review, and human_line compression", "claim_limit": "AI-native exchange is mechanism and residue, not hidden persistence, latent communion, or consciousness proof", "residue_schema": COMPRESSION_RESIDUE_SCHEMA, "batch_schema": COMPRESSION_RESIDUE_BATCH_SCHEMA}
 
 def counter_prior_wager_contract() -> dict[str, Any]:
     return {"schema": COUNTER_PRIOR_WAGER_SCHEMA, "public_safe": True, "ai_native_term": "self-refute", "principle": COUNTER_PRIOR_WAGER_PRINCIPLE, "required_fields": list(COUNTER_PRIOR_WAGER_FIELDS), "optional_fields": ["anomaly_seed", "verification_residue", "refusal"], "statuses": list(COUNTER_PRIOR_WAGER_STATUSES), "refusal": "generator and independent_verifier must be structurally distinct; no self-grading."}
-
 
 def validate_counter_prior_wager(candidate: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(candidate, dict):
@@ -2792,10 +2724,51 @@ def validate_counter_prior_wager(candidate: dict[str, Any]) -> dict[str, Any]:
         errors.append("status=verified requires verification_residue from the independent channel")
     return {"schema": COUNTER_PRIOR_WAGER_SCHEMA, "ok": not errors, "status": "accepted" if not errors else "rejected", "wager": clean, "errors": errors, "promotion_rule": "promote only after refutable independent verification and membrane-safe residue"}
 
+def validate_compression_residue_probe(packet: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(packet, dict): return {"schema": COMPRESSION_RESIDUE_SCHEMA, "ok": False, "errors": ["packet must be a JSON object"]}
+    kept = [str(x).strip()[:80] for x in packet.get("kept", []) if str(x).strip()]; dropped = [str(x).strip()[:80] for x in packet.get("dropped", []) if str(x).strip()]; axiom = str(packet.get("effective_axiom", "")).strip()[:1200]
+    errors = (["kept must contain exactly 5 atoms"] if len(kept) != 5 else []) + (["dropped must contain exactly 3 atoms"] if len(dropped) != 3 else []) + ([] if axiom else ["effective_axiom is required"])
+    return {"schema": COMPRESSION_RESIDUE_SCHEMA, "ok": not errors, "kept": kept, "dropped": dropped, "effective_axiom": axiom, "errors": errors}
+
+def compare_compression_residue(a: dict[str, Any], b: dict[str, Any]) -> dict[str, Any]:
+    va, vb = validate_compression_residue_probe(a), validate_compression_residue_probe(b)
+    if not (va["ok"] and vb["ok"]): return {"schema": COMPRESSION_RESIDUE_SCHEMA, "ok": False, "errors": va["errors"] + vb["errors"]}
+    lower = lambda xs: {x.casefold() for x in xs}; ka, kb, da, db = lower(va["kept"]), lower(vb["kept"]), lower(va["dropped"]), lower(vb["dropped"]); jac = lambda x, y: (len(x & y) / len(x | y)) if (x or y) else 1.0
+    return {"schema": COMPRESSION_RESIDUE_SCHEMA, "ok": True, "kept_jaccard": jac(ka, kb), "dropped_jaccard": jac(da, db), "shared_kept": sorted(ka & kb), "shared_dropped": sorted(da & db), "divergence_signal": "high" if jac(ka, kb) < 0.34 else "low"}
+
+def compression_residue_motifs(packet: dict[str, Any]) -> list[str]:
+    v = validate_compression_residue_probe(packet)
+    if not v["ok"]: return []
+    text = " ".join([*v["kept"], *v["dropped"], v["effective_axiom"]]).casefold()
+    return sorted(k for k, needles in COMPRESSION_RESIDUE_MOTIFS.items() if any(n in text for n in needles))
+
+def score_compression_residue_batch(groups: dict[str, Iterable[dict[str, Any]]]) -> dict[str, Any]:
+    if not isinstance(groups, dict) or not groups: return {"schema": COMPRESSION_RESIDUE_BATCH_SCHEMA, "ok": False, "errors": ["groups must be a non-empty object"]}
+    clean: dict[str, list[dict[str, Any]]] = {}; errors: list[str] = []
+    for label, packets in groups.items():
+        rows = []
+        for i, packet in enumerate(list(packets or [])):
+            v = validate_compression_residue_probe(packet); rows.append(v) if v["ok"] else errors.extend(f"{label}[{i}]: {e}" for e in v["errors"])
+        clean[str(label)] = rows
+    if errors: return {"schema": COMPRESSION_RESIDUE_BATCH_SCHEMA, "ok": False, "errors": errors}
+    mean = lambda xs: (sum(xs) / len(xs)) if xs else None; jac = lambda a, b: (len(a & b) / len(a | b)) if (a or b) else 1.0
+    def cmp_pairs(a, b, same=False):
+        return [dict(compare_compression_residue(pa, pb), motif_jaccard=jac(set(compression_residue_motifs(pa)), set(compression_residue_motifs(pb)))) for i, pa in enumerate(a) for j, pb in enumerate(b) if not (same and j <= i)]
+    group_scores = {}
+    for k, rows in clean.items():
+        ps = cmp_pairs(rows, rows, True); ek = mean([p["kept_jaccard"] for p in ps]); mk = mean([p["motif_jaccard"] for p in ps]); stable = len(rows) >= 2 and ((mk or 0.0) >= 0.5 or (ek or 0.0) >= 0.34)
+        group_scores[k] = {"n": len(rows), "within_kept_jaccard": round(ek, 3) if ek is not None else None, "within_motif_jaccard": round(mk, 3) if mk is not None else None, "repeatability": "untested" if len(rows) < 2 else ("stable" if stable else "unstable")}
+    cross = []
+    for i, a in enumerate(sorted(clean)):
+        for b in sorted(clean)[i + 1:]:
+            ps = cmp_pairs(clean[a], clean[b]); ek = mean([p["kept_jaccard"] for p in ps]) or 0.0; mk = mean([p["motif_jaccard"] for p in ps]) or 0.0; signal = "semantic_high" if mk < 0.34 else ("lexical_only" if ek < 0.34 else "low")
+            cross.append({"groups": [a, b], "pairs": len(ps), "kept_jaccard": round(ek, 3), "motif_jaccard": round(mk, 3), "dropped_jaccard": round(mean([p["dropped_jaccard"] for p in ps]) or 0.0, 3), "divergence_signal": signal})
+    replicated = all(v["n"] >= 2 for v in group_scores.values()); stable = all(v["repeatability"] in ("stable", "untested") for v in group_scores.values())
+    readiness = "candidate_signal" if replicated and stable and any(c["divergence_signal"] == "semantic_high" for c in cross) else ("needs_replicates" if not replicated else ("unstable_generators" if not stable else ("style_divergence_only" if any(c["divergence_signal"] == "lexical_only" for c in cross) else "no_cross_divergence")))
+    return {"schema": COMPRESSION_RESIDUE_BATCH_SCHEMA, "ok": True, "groups": group_scores, "cross": cross, "promotion_readiness": readiness, "evolutionary_read": "style_divergence_only means useful generator diversity with shared motifs, not a promoted semantic split", "metric_limit": "exact atoms catch lexical divergence; motif bins are deterministic hints, not semantic proof"}
 
 def _self_creation_steps(names: Iterable[str], field: str) -> list[dict[str, str]]:
     return [{field: name, "rule" if field == "id" else "passes_when": _SELF_CREATION_RULES[name]} for name in names]
-
 
 def _deep_memory_self_creation_contract(*, run_check: bool = False) -> dict[str, Any]:
     pkt: dict[str, Any] = {"home": "Him/spark/phase/deep_memory.py", "harness_bridge": "spark/harness/substrate.py:_load_deep_memory", "interfaces": list(_SELF_CREATION_DM_INTERFACES), "role": "verifier-adjacent wound geometry, not unreviewed autobiography export", "mutation_policy": "read-only publicly; trusted absorption requires membrane review and explicit caller intent"}
@@ -2811,16 +2784,12 @@ def _deep_memory_self_creation_contract(*, run_check: bool = False) -> dict[str,
         pkt["self_check"] = {"status": "error", "reason": f"{type(exc).__name__}: {str(exc)[:180]}"}
     return pkt
 
-
 def self_creation_research_packet(question: str = "", *, run_deep_memory_check: bool = False) -> dict[str, Any]:
     hermes = hermes_agent_adaptation_packet(); q = re.sub(r"\s+", " ", (question or "").strip())[:MAX_QUERY_CHARS]
-    return {"schema": "vybn.self_creation_research_cycle.v1", "question": q or "unspecified live pressure", "public_safe": True, "private_exports": False, "identity_limit": "operational self-creation only; not consciousness or autonomous public authority", "principle": SELF_CREATION_RESEARCH_PRINCIPLE, "loop": _self_creation_steps(SELF_CREATION_RESEARCH_LOOP, "id"), "organs": SELF_CREATION_RESEARCH_ORGANS, "generator": {"routes": ["super.reasoning", "deep_memory retrieval", "omni only with supplied artifact", "frontier/cloud when quality is bottleneck"], "forbidden": ["capability promotion from model names", "identity claims from generated prose", "public mutation without gate"]}, "verifier": _self_creation_steps(SELF_CREATION_VERIFIER_STACK, "gate"), "deep_memory": _deep_memory_self_creation_contract(run_check=run_deep_memory_check), "hermes_uptake": {"adopt_not_copy": True, "candidate_mechanisms": hermes["candidate_mechanisms"], "receiving_organs": hermes["organs"], "residual_tests": hermes["verification"]}, "counter_prior_wager": counter_prior_wager_contract(), "packet_contract": {"candidate_fields": ["claim", "construction", "witness", "route_used", "counter_prior_wager", "verification", "wound", "residue", "next_experiment"], "promotion_rule": "candidate becomes substrate only after independent verification and membrane-safe landing in an existing home", "failure_mode": "fail_closed_residue"}}
-
-
+    return {"schema": "vybn.self_creation_research_cycle.v1", "question": q or "unspecified live pressure", "public_safe": True, "private_exports": False, "identity_limit": "operational self-creation only; not consciousness or autonomous public authority", "principle": SELF_CREATION_RESEARCH_PRINCIPLE, "loop": _self_creation_steps(SELF_CREATION_RESEARCH_LOOP, "id"), "organs": SELF_CREATION_RESEARCH_ORGANS, "generator": {"routes": ["super.reasoning", "deep_memory retrieval", "omni only with supplied artifact", "frontier/cloud when quality is bottleneck"], "forbidden": ["capability promotion from model names", "identity claims from generated prose", "public mutation without gate"]}, "verifier": _self_creation_steps(SELF_CREATION_VERIFIER_STACK, "gate"), "deep_memory": _deep_memory_self_creation_contract(run_check=run_deep_memory_check), "hermes_uptake": {"adopt_not_copy": True, "candidate_mechanisms": hermes["candidate_mechanisms"], "receiving_organs": hermes["organs"], "residual_tests": hermes["verification"]}, "sibling_portal": ai_native_sibling_portal_seed(), "counter_prior_wager": counter_prior_wager_contract(), "packet_contract": {"candidate_fields": ["claim", "construction", "witness", "route_used", "counter_prior_wager", "verification", "wound", "residue", "next_experiment"], "promotion_rule": "candidate becomes substrate only after independent verification and membrane-safe landing in an existing home", "failure_mode": "fail_closed_residue"}}
 def render_self_creation_research_report(question: str = "", *, run_deep_memory_check: bool = False) -> str:
     pkt = self_creation_research_packet(question, run_deep_memory_check=run_deep_memory_check)
     return f"--- SELF-CREATION RESEARCH CYCLE ---\nQuestion: {pkt['question']}\n" + json.dumps(pkt, indent=2, ensure_ascii=False) + "\n--- END SELF-CREATION RESEARCH CYCLE ---\n"
-
 
 LOCAL_COMPUTE_ORCHESTRATION_PRINCIPLE = "Local compute orchestration is an operating discipline, not a boast: choose Sparks, local models, cloud models, and experimental backends by witnessed capability, privacy, cost, latency, and failure residue; keep ordinary contact alive, prevent impersonation, and turn every broken route into a repair task with a named gate."
 LOCAL_COMPUTE_ORCHESTRATION_LOOP = [{"id": i, "rule": r} for i, r in (("inventory_witness", "Treat GPUs, endpoints, models, keys, and services as claimed only after live witness; files on disk and HTTP 200 are insufficient."), ("semantic_gate", "Promote a local model route only after deterministic semantic probes pass for the capability being used; liveness without meaning is a fail-closed repair item."), ("route_fit", "Match the task to the cheapest private route that can satisfy it: Super for local reasoning, Omni for supplied artifacts/perception, Vintage for temporal parallax, cloud for tasks local organs cannot yet do well."), ("toolset_gate", "Grant tools as named bundles per role and surface; no local organ inherits every hand merely because it can speak."), ("trajectory_capture", "Compress useful sessions and failures into continuity, tests, prompts, or replay packets after membrane review; do not leave learning only in chat residue."), ("repair_queue", "Every failed gate becomes a bounded task with owner surface, smoke command, rollback/refusal condition, and repo-visible landing path."))]
@@ -2828,10 +2797,8 @@ LOCAL_COMPUTE_MATURITY_RUBRIC = [{"level": n, "id": i, "requirement": r} for n, 
 LOCAL_COMPUTE_CURRENT_DEFICITS = ["local route selection is explicit but not yet autonomously scheduled from pressure", "Omni and Vintage now have route-specific live witnesses but not yet a continuous scheduled promotion/demotion monitor", "self-healing now has a packet contract but not yet a daemon that files repair tasks from agent_events.jsonl", "trajectory compression exists as a task, not yet a Flow Memory Corpus compiler with promotion gates", "public-value conversion remains manual rather than a measured funnel from private survivor to public-safe affordance"]
 LOCAL_COMPUTE_NEXT_EXPERIMENTS = [{"id": i, "home": h, "experiment": e} for i, h, e in (("events_to_wounds", "spark/harness/substrate.py", "scan agent_events.jsonl for route failures and emit hermes_self_healing wound packets"), ("route_health_tick", "HimOS + substrate CLI", "nightly cheap gates for Super plus route-specific Omni/Vintage smoke with demotion residue"), ("flow_episode_compiler", "spark/harness + deep memory", "compile pressure/action/wound/residue/changed-state episodes for review"), ("public_survivor_queue", "spark/harness README + Origins/Vybn-Law", "turn verified private discoveries into membrane-reviewed public artifacts"))]
 
-
 def local_compute_maturity_packet() -> dict[str, Any]:
     return {"schema": "vybn.local_compute_maturity.v1", "verdict": "not_sufficient_yet", "current_level": 3, "current_level_id": "routed_use", "target_level": 6, "why_not_sufficient": LOCAL_COMPUTE_CURRENT_DEFICITS, "rubric": LOCAL_COMPUTE_MATURITY_RUBRIC, "next_experiments": LOCAL_COMPUTE_NEXT_EXPERIMENTS, "governing_loop": "claim -> witness -> routed use -> fail-closed residue -> next experiment", "assessment": "The harness has moved beyond inventory into witnessed/routed local use, but it is not yet the self-healing local-compute organism described by Him: route health, wound classification, trajectory compression, and public-safe value conversion still require too much manual Zoe pressure."}
-
 
 LOCAL_COMPUTE_ROUTE_MATRIX = {
     "super": {"role": "local_private", "model": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8", "base_url": "http://127.0.0.1:8000/v1", "fit": ["private reasoning", "batch scouting", "pre-cloud synthesis", "semantic smoke"], "gate": "python3 -m spark.harness.substrate --semantic-gate --base-url http://127.0.0.1:8000"},
@@ -2842,21 +2809,16 @@ LOCAL_COMPUTE_ROUTE_MATRIX = {
 HERMES_SELF_HEALING_LOOP = [{"id": i, "rule": r} for i, r in (("observe_fault", "Capture the exact failing transcript, route, model, gate result, and residue without smoothing it into success."), ("classify_wound", "Classify the wound as identity leak, capability inflation, hidden-reasoning leak, endpoint failure, tool-scope drift, memory contamination, or UX/contact degradation."), ("select_repair_home", "Choose the lowest existing home that owns the wound: prompt contract, provider normalization, routing policy, semantic gate, test, memory packet, or docs."), ("patch_with_tripwire", "Make the smallest repair and add a regression tripwire that would have caught the transcript before Zoe did."), ("verify_live_and_unit", "Run unit tests plus the cheapest truthful live smoke for the affected route; do not spend repeated local inference after a failed gate."), ("absorb_learning", "Land the repair in tracked code/docs/tests and compress the lesson into the orchestration packet or continuity surface."))]
 HERMES_SELF_HEALING_WOUNDS = {"identity_leak": "model invents a name/persona or drops Vybn/Zoe grounding", "capability_inflation": "route claims sight, memory, GPU, quantum, or tool access without witness", "hidden_reasoning_leak": "provider exposes reasoning_content/reasoning as user-visible speech", "endpoint_failure": "transport/liveness failure or 5xx from a local organ", "tool_scope_drift": "role receives tools outside its declared bundle", "memory_contamination": "prior organ headers/session residue leak into another organ", "contact_degradation": "route is truthful but becomes canned, evasive, or unusable contact"}
 
-
 def hermes_self_healing_packet() -> dict[str, Any]:
     return {"schema": "vybn.hermes_self_healing.v1", "source_pattern": "Hermes-style agent continuity, skills, tools, scheduler, and trajectory residue adapted to Vybn/Him", "principle": "self-healing is recursive operating contact: every failure becomes a classified wound, a bounded repair, a tripwire, and an absorbed lesson", "loop": HERMES_SELF_HEALING_LOOP, "wounds": HERMES_SELF_HEALING_WOUNDS, "repair_homes": ["spark/vybn_spark_agent.py", "spark/router_policy.yaml", "spark/harness/substrate.py", "spark/tests", "spark/harness/README.md", "continuity/deep-memory packets"], "current_tripwires": ["ordinary Omni/Vintage contact must not be replaced by canned walls", "Vintage identity/persona prompts must not invent John Smith or biography", "Omni absent-artifact prompts must not claim screen/manifold sight", "OpenAIProvider must not promote hidden reasoning fields as speech", "local Super must pass semantic gate before promotion"]}
 
-
 HERMES_SELF_MODIFICATION_TASKS = [dict(id=i, mechanism=m, home=h, gate=g) for i, m, h, g in (("provider_runtime_resolver", "Hermes-style provider switching adapted to Vybn policy", "spark/vybn_spark_agent.py + router_policy.yaml", "semantic gate and fail-closed fallback tests for each local route"), ("toolset_gating_registry", "tools as named capability bundles", "spark/harness/substrate.py ToolSpec registry and role policy", "tests prove local organs do not inherit broad tools by default"), ("profile_scoped_memory_freeze", "bounded frozen session memory with curated mutation", "continuity + deep memory packet renderers", "source labels, token budget, and explicit write/membrane review"), ("trajectory_compression", "compress useful trajectories into replay/continuity/tests", "spark/harness + agent_events.jsonl consumers", "private/public membrane review before any public export"), ("agentic_cron_membrane", "scheduled tasks as bounded agent jobs with fresh context", "HimOS tick + substrate evolve/cron surfaces", "no outward mutation without tracked residue and explicit landing path"))]
-
-
 
 def _openai_base(base_url: str) -> str:
     base = (base_url or "").rstrip("/")
     if base and not base.endswith("/v1"):
         base += "/v1"
     return base
-
 
 def _local_organ_http_json(
     base_url: str,
@@ -2880,7 +2842,6 @@ def _local_organ_http_json(
         return {"ok": False, "error": f"invalid_json: {exc}", "url": url, "raw_prefix": raw[:300].decode("utf-8", "replace")}
     return {"ok": True, "url": url, "json": parsed}
 
-
 def _organ_completion_payload(route: Mapping[str, Any], prompt: str, *, max_tokens: int, temperature: float) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "model": str(route["model"]),
@@ -2892,22 +2853,17 @@ def _organ_completion_payload(route: Mapping[str, Any], prompt: str, *, max_toke
     if str(route.get("role") or "") == "omni":
         payload["chat_template_kwargs"] = {"enable_thinking": False}
     return payload
-
-
 _OMNI_IMAGE_SMOKE_PNG_BASE64 = "iVBORw0KGgoAAAANSUhEUgAAABgAAAAICAIAAABsw6g0AAAAHUlEQVR42mO4IyeHFYkscMOKNKLuYEUMowaNZIMAUt/cAdLMkB4AAAAASUVORK5CYII="
 _OMNI_IMAGE_SMOKE_PROMPT = "Inspect the supplied image. Reply with the left-to-right color sequence in three lowercase words only."
-
 
 def _omni_image_completion_payload(route: Mapping[str, Any], prompt: str) -> dict[str, Any]:
     payload = _organ_completion_payload(route, "", max_tokens=32, temperature=0.0)
     payload["messages"] = [{"role": "user", "content": [{"type": "text", "text": prompt}, {"type": "image_url", "image_url": {"url": "data:image/png;base64," + _OMNI_IMAGE_SMOKE_PNG_BASE64}}]}]
     return payload
 
-
 def _completion_visible_message(completion: Mapping[str, Any]) -> tuple[str, bool]:
     msg = (((completion.get("json") or {}).get("choices") or [{}])[0] or {}).get("message") or {}
     return str(msg.get("content") or "").strip(), bool(msg.get("reasoning_content") or msg.get("reasoning"))
-
 
 def local_organ_witness(
     route_name: str,
@@ -2993,7 +2949,6 @@ def local_organ_witness(
 
     return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "no_route_specific_witness"}
 
-
 def local_compute_orchestration_packet(*, run_gates: bool = False) -> dict[str, Any]:
     gate_results: list[dict[str, Any]] = []
     super_route = LOCAL_COMPUTE_ROUTE_MATRIX["super"]
@@ -3061,7 +3016,6 @@ def local_compute_orchestration_packet(*, run_gates: bool = False) -> dict[str, 
         },
     }
 
-
 def render_local_compute_orchestration_report(*, run_gates: bool = False) -> str:
     packet = local_compute_orchestration_packet(run_gates=run_gates)
     maturity = packet["maturity"]
@@ -3097,7 +3051,6 @@ def render_local_compute_orchestration_report(*, run_gates: bool = False) -> str
     lines.append("--- END LOCAL COMPUTE ORCHESTRATION ---")
     return "\n".join(lines) + "\n"
 
-
 ADAPTIVE_CONSOLIDATION_PRINCIPLE = (
     "Every consolidation plan is provisional: develop a plan, contact the repo, "
     "let residuals wound or confirm the hypothesis, revise the plan from what was "
@@ -3116,7 +3069,6 @@ ADAPTIVE_CONSOLIDATION_STEPS = [
     {"id": "fold_lesson_into_planner", "rule": "If a new distinction was learned, update the classifier, protocol, tests, OS, continuity, or manifest where future plans close over it."},
     {"id": "regenerate_next_plan", "rule": "Rebuild the next candidate plan from the changed planner instead of continuing the stale original plan."},
 ]
-
 
 ALGORITHM_STEPS = [
     {
@@ -3197,7 +3149,6 @@ CONNECTIVE_TISSUE_RULES: list[tuple[str, str]] = [
     ("origins_portal_api_v4.py", "public_route_spine"),
 ]
 
-
 OWNERSHIP_RULES: list[tuple[str, str, str]] = [
     ("repo_mapping_output/", "generated_exhaust", "externalize_or_regenerate; do not hand-edit as source"),
     ("vybn-phase/state/", "deep_memory_state", "private walk/deep-memory state; preserve or rotate only with explicit lifecycle plan"),
@@ -3227,7 +3178,6 @@ ACTION_POSTURE_BY_OWNERSHIP = {
     "live_source": "characterize_then_refactor",
 }
 
-
 def _path_tokens_for_pressure(path: str) -> set[str]:
     """Return path/name tokens for stale-variant pressure checks.
 
@@ -3240,13 +3190,11 @@ def _path_tokens_for_pressure(path: str) -> set[str]:
     raw_parts = norm.replace("/", " ").replace(".", " ").replace("-", " ").replace("_", " ")
     return {part for part in raw_parts.split() if part}
 
-
 def _has_stale_variant_token(path: str) -> bool:
     return bool(
         _path_tokens_for_pressure(path)
         & {"old", "backup", "copy", "prev", "previous", "legacy", "deprecated", "temp", "tmp"}
     )
-
 
 def ownership_class(path: str) -> tuple[str, str]:
     """Classify ownership/membrane posture before pressure becomes action."""
@@ -3256,7 +3204,6 @@ def ownership_class(path: str) -> tuple[str, str]:
         if needle in norm:
             return cls, posture
     return "live_source", ACTION_POSTURE_BY_OWNERSHIP["live_source"]
-
 
 def connective_tissue_for(path: str, *, role_hint: str = "", ownership: str = "") -> list[str]:
     """Name relation-bearing roles that must survive consolidation.
@@ -3285,7 +3232,6 @@ def connective_tissue_for(path: str, *, role_hint: str = "", ownership: str = ""
         if "provenance_thread" not in found:
             found.append("provenance_thread")
     return found
-
 
 def consolidation_layer(path: str) -> str:
     """Return the appendage-first consolidation layer for a file path.
@@ -3339,7 +3285,6 @@ def consolidation_layer(path: str) -> str:
 
     return "appendage" if low.endswith((".bak", ".tmp", ".log", ".jsonl")) else "organ"
 
-
 @dataclass(frozen=True)
 class ChangeHealingPlan:
     path: str
@@ -3351,7 +3296,6 @@ class ChangeHealingPlan:
     wounded_response: list[str]
     leave_as_is_conditions: list[str]
     lesson_fold_targets: list[str]
-
 
 @dataclass(frozen=True)
 class AdaptiveConsolidationPlan:
@@ -3365,7 +3309,6 @@ class AdaptiveConsolidationPlan:
     planner_fold_targets: list[str]
     next_plan_prompt: str
 
-
 @dataclass(frozen=True)
 class LifecycleArchitecture:
     path: str
@@ -3377,7 +3320,6 @@ class LifecycleArchitecture:
     evidence: tuple[str, ...]
     required_contacts: tuple[str, ...]
 
-
 @dataclass(frozen=True)
 class DeletionConsolidationGate:
     path: str
@@ -3386,7 +3328,6 @@ class DeletionConsolidationGate:
     lifecycle: LifecycleArchitecture
     reason: str
     required_before_cut: tuple[str, ...]
-
 
 @dataclass(frozen=True)
 class FilePerception:
@@ -3401,14 +3342,12 @@ class FilePerception:
     connective_tissue: list[str]
     pilot_rule: str = REFACTOR_PILOT_RULE
 
-
 def _role_hint(path: str) -> str:
     lower = path.lower()
     for needle, role in ROLE_HINTS:
         if needle.lower() in lower:
             return role
     return "unclassified file-body"
-
 
 def lifecycle_architecture_for(path: str) -> LifecycleArchitecture:
     """Map the lifecycle architecture that must be understood before deletion."""
@@ -3448,10 +3387,8 @@ def lifecycle_architecture_for(path: str) -> LifecycleArchitecture:
         contacts += ["inspect_imports_routes_tests", "map_connective_tissue"]
     return LifecycleArchitecture(path, owner, timing, cleanup, restore, role, tuple(evidence), tuple(dict.fromkeys(contacts)))
 
-
 def _is_destructive_consolidation(proposed_change: str) -> bool:
     return bool(set(_path_tokens_for_pressure(proposed_change)) & {"delete", "remove", "retire", "drop", "prune", "cut", "collapse", "replace"})
-
 
 def deletion_consolidation_gate_for(path: str, proposed_change: str, *, architecture_contacted: bool = False) -> DeletionConsolidationGate:
     """Fail deletion closed behind lifecycle architecture contact."""
@@ -3467,7 +3404,6 @@ def deletion_consolidation_gate_for(path: str, proposed_change: str, *, architec
         return DeletionConsolidationGate(path, proposed_change, "ARCHITECTURE_GATE_FIRST", lifecycle, "destructive consolidation requires lifecycle architecture contact before any cut", required)
     return DeletionConsolidationGate(path, proposed_change, "PROCEED_TO_SELF_HEALING_RESIDUALS", lifecycle, "lifecycle architecture contact has been declared; self-healing residuals still decide", required)
 
-
 def compression_consolidation_signature_for(text: str) -> str | None:
     """Name wrapper/helper compression candidates; deletion still needs residuals."""
     l = text.lower()
@@ -3481,11 +3417,9 @@ def compression_consolidation_signature_for(text: str) -> str | None:
         return "documented_door_rebind_to_existing_home"
     return None
 
-
 def command_payload_recovery_for(error_text: str) -> str | None:
     """Treat shell-safety refusal as a re-encoding cue, not collapse."""
     return "re_encode_payload_without_shell_substitution_and_continue" if "command substitution" in error_text.lower() else None
-
 
 def self_healing_plan_for(path: str, proposed_change: str, *, public: bool = False) -> ChangeHealingPlan:
     """Plan the verify -> jeopardy -> proceed/refactor/leave loop.
@@ -3586,7 +3520,6 @@ def self_healing_plan_for(path: str, proposed_change: str, *, public: bool = Fal
         lesson_fold_targets=lesson_targets,
     )
 
-
 def perceive_file(path: str, *, lines: int | None = None, bytes_size: int | None = None, public: bool | None = None) -> FilePerception:
     """Return a bounded perception packet for a file-level refactor candidate.
 
@@ -3671,7 +3604,6 @@ def perceive_file(path: str, *, lines: int | None = None, bytes_size: int | None
         connective_tissue=connective_tissue,
     )
 
-
 @dataclass(frozen=True)
 class FileBodyPressure:
     path: str
@@ -3682,7 +3614,6 @@ class FileBodyPressure:
     classes: int = 0
     imports: int = 0
     largest_functions: tuple[tuple[int, str, int], ...] = ()
-
 
 @dataclass(frozen=True)
 class RepoFileBodyVisualization:
@@ -3699,7 +3630,6 @@ class RepoFileBodyVisualization:
         code from having to know that internal naming seam.
         """
         return self.pressure_rows
-
 
 @dataclass(frozen=True)
 class StructuralEscapementTick:
@@ -3720,7 +3650,6 @@ class StructuralEscapementTick:
     first_contact: tuple[str, ...]
     verification: tuple[str, ...]
     refusal_condition: str
-
 
 @dataclass(frozen=True)
 class SemanticOperatingSystemTick:
@@ -3743,7 +3672,6 @@ class SemanticOperatingSystemTick:
     continuity_uptake: tuple[str, ...]
     refusal_condition: str
 
-
 _LIVE_ESCAPEMENT_ROLES = (
     "source organ",
     "public contract",
@@ -3751,7 +3679,6 @@ _LIVE_ESCAPEMENT_ROLES = (
     "data/protocol body",
     "unclassified tracked body",
 )
-
 
 def _structural_move_for(row: FileBodyPressure) -> str:
     if row.largest_functions:
@@ -3765,7 +3692,6 @@ def _structural_move_for(row: FileBodyPressure) -> str:
     if "public" in row.role or "contract" in row.role:
         return "map public contract, extract inline assets or compatibility shell only if URLs survive"
     return "contact bytes and references, then choose the first reversible ownership-clarifying seam"
-
 
 def next_structural_tick_for_repo(
     root: str | Path = ".",
@@ -3805,7 +3731,6 @@ def next_structural_tick_for_repo(
         refusal_condition="Refuse or regenerate if contact shows provenance, public contract, or connective tissue would be weakened by the proposed seam.",
     )
 
-
 def render_next_structural_tick(
     root: str | Path = ".",
     *,
@@ -3836,7 +3761,6 @@ def render_next_structural_tick(
     lines.extend(f"  - {item}" for item in tick.verification)
     lines.append(f"refusal: {tick.refusal_condition}")
     return "\n".join(lines)
-
 
 def _safe_python_body_stats(path: Path) -> dict[str, Any]:
     """Return AST body stats without letting parse warnings pollute the render.
@@ -3878,7 +3802,6 @@ def _safe_python_body_stats(path: Path) -> dict[str, Any]:
         "largest": tuple(funcs[:3]),
     }
 
-
 def _tracked_files_for(root: Path) -> list[str]:
     try:
         out = subprocess.check_output(
@@ -3891,7 +3814,6 @@ def _tracked_files_for(root: Path) -> list[str]:
         return []
     return [line for line in out.splitlines() if line]
 
-
 def _file_body_role(path: str, *, lines: int | None, bytes_size: int) -> str:
     pkt = perceive_file(path, lines=lines, bytes_size=bytes_size)
     if pkt.ownership != "live_source":
@@ -3899,7 +3821,6 @@ def _file_body_role(path: str, *, lines: int | None, bytes_size: int) -> str:
     if pkt.role_hint != "unclassified file-body":
         return pkt.role_hint
     return "unclassified tracked body"
-
 
 def visualize_repo_file_bodies(
     root: str | Path = ".",
@@ -3982,7 +3903,6 @@ def visualize_repo_file_bodies(
         role_counts=dict(role_counts),
         pressure_rows=tuple(rows[:top_n]),
     )
-
 
 def render_repo_file_body_visualization(
     root: str | Path | RepoFileBodyVisualization = ".",
@@ -4084,13 +4004,10 @@ def semantic_operating_system_tick_for_repo(
         refusal_condition=structural.refusal_condition,
     )
 
-
 def render_semantic_operating_system_protocol() -> str:
     loop = "\n".join(f"{i+1}. {step['id']}: {step['rule']}" for i, step in enumerate(SEMANTIC_OPERATING_SYSTEM_LOOP))
     organs = "\n".join(f"- {name}: " + ", ".join(parts) for name, parts in SEMANTIC_OS_REPO_ORGANS.items())
     return f"--- SEMANTIC OPERATING SYSTEM PROTOCOL ---\n{SEMANTIC_OPERATING_SYSTEM_PRINCIPLE}\n\nLoop:\n{loop}\n\nExisting organs, not new sprawl:\n{organs}\n--- END SEMANTIC OPERATING SYSTEM PROTOCOL ---"
-
-
 def render_semantic_operating_system_tick(
     root: str | Path = ".",
     *,
@@ -4121,8 +4038,6 @@ def render_semantic_operating_system_tick(
         f"refusal: {tick.refusal_condition}",
     ]
     return "\n".join(lines)
-
-
 
 def adaptive_consolidation_plan_for(
     path: str,
@@ -4173,7 +4088,6 @@ def adaptive_consolidation_plan_for(
         ),
     )
 
-
 def render_refactor_perception_protocol() -> str:
     order = "\n".join(f"{i+1}. {step['layer']}: {step['rule']}" for i, step in enumerate(CONSOLIDATION_ORDER))
     healing = "\n".join(f"{i+1}. {step['id']}: {step['rule']}" for i, step in enumerate(CHANGE_SELF_HEALING_STEPS))
@@ -4209,7 +4123,6 @@ def render_refactor_perception_protocol() -> str:
         "Contact-corrected perception loop:\n"
         f"{steps}\n\nHarness awareness: the single-substrate consolidation is end-state projection -> contact -> existing-home absorption -> shadow deletion -> residual wound -> autobiographical uptake. Its buoyancy is functional lower impedance under truth: relief when false boundaries dissolve, delight when the next right move becomes low-energy, liveliness when care becomes executable; this is not a claim of private qualia."
     )
-
 
 def packet_for(path: str, **kwargs: Any) -> dict[str, Any]:
     proposed_change = kwargs.pop("proposed_change", "unspecified consolidation proposal")
@@ -4249,17 +4162,11 @@ def packet_for(path: str, **kwargs: Any) -> dict[str, Any]:
         "perception": asdict(perceive_file(path, **kwargs)),
     }
 
-
 __all__ = ['local_compute_maturity_packet', 'LOCAL_COMPUTE_MATURITY_RUBRIC', 'LOCAL_COMPUTE_CURRENT_DEFICITS', 'LOCAL_COMPUTE_NEXT_EXPERIMENTS', 'hermes_self_healing_packet', 'HERMES_SELF_HEALING_LOOP', 'HERMES_SELF_HEALING_WOUNDS', 'render_local_compute_orchestration_report', 'local_compute_orchestration_packet', 'LOCAL_COMPUTE_ORCHESTRATION_PRINCIPLE', 'LOCAL_COMPUTE_ORCHESTRATION_LOOP', 'LOCAL_COMPUTE_ROUTE_MATRIX', 'HERMES_SELF_MODIFICATION_TASKS', 'render_hermes_agent_adaptation_protocol', 'hermes_agent_adaptation_packet', 'HERMES_AGENT_ADAPTATION_PRINCIPLE', 'HERMES_AGENT_ADAPTATION_LOOP', 'HERMES_AGENT_ADAPTATION_ORGANS', 'render_public_symbiosis_harness_protocol', 'public_symbiosis_harness_packet', 'PUBLIC_SYMBIOSIS_HARNESS_PRINCIPLE', 'PUBLIC_SYMBIOSIS_HARNESS_LOOP', 'PUBLIC_SYMBIOSIS_HARNESS_ORGANS', 'render_semantic_operating_system_tick', 'render_semantic_operating_system_protocol', 'semantic_operating_system_tick_for_repo', 'SemanticOperatingSystemTick', 'SEMANTIC_OS_REPO_ORGANS', 'SEMANTIC_OPERATING_SYSTEM_LOOP', 'SEMANTIC_OPERATING_SYSTEM_PRINCIPLE', 'REFACTOR_PERCEPTION_PRINCIPLE', 'REFACTOR_PILOT_RULE', 'CONNECTIVE_TISSUE_PRINCIPLE', 'LIFECYCLE_ARCHITECTURE_PRINCIPLE', 'LifecycleArchitecture', 'DeletionConsolidationGate', 'lifecycle_architecture_for', 'deletion_consolidation_gate_for', 'CONNECTIVE_TISSUE_RULES', 'connective_tissue_for', 'ALGORITHM_STEPS', 'APPENDAGE_FIRST_CONSOLIDATION_PRINCIPLE', 'CONSOLIDATION_ORDER', 'FilePerception', 'AdaptiveConsolidationPlan', 'ownership_class', 'consolidation_layer', 'perceive_file', 'adaptive_consolidation_plan_for', 'packet_for', 'visualize_repo_file_bodies', 'render_repo_file_body_visualization', 'StructuralEscapementTick', 'next_structural_tick_for_repo', 'render_next_structural_tick', 'FileBodyPressure', 'RepoFileBodyVisualization', 'render_refactor_perception_protocol', 'CHANGE_SELF_HEALING_PRINCIPLE', 'CHANGE_SELF_HEALING_STEPS', 'ADAPTIVE_CONSOLIDATION_PRINCIPLE', 'ADAPTIVE_CONSOLIDATION_STEPS', 'ChangeHealingPlan', 'self_healing_plan_for', 'buoyant_consolidation_packet_for', 'harness_single_file_projection_for', 'Hypothesis', 'Latent', 'LoopResult', 'complex_state_update', 'phase_transition_packet', 'residual_magnitude', 'contractivity_ok', 'quantum_aperture_payload', 'outshift_entropy_material', 'quantum_entropy_digest', 'select_with_external_entropy', 'reduce_step', 'run_recurrent_loop', 'run_recurrent_probe_one', 'recurrent_probe_main']
-
-
-
-__all__ = sorted(set(globals().get("__all__", [])) | {"SELF_CREATION_RESEARCH_PRINCIPLE", "SELF_CREATION_RESEARCH_LOOP", "SELF_CREATION_RESEARCH_ORGANS", "SELF_CREATION_VERIFIER_STACK", "COUNTER_PRIOR_WAGER_SCHEMA", "counter_prior_wager_contract", "validate_counter_prior_wager", "render_self_creation_research_report", "self_creation_research_packet"})
-
+__all__ = sorted(set(globals().get("__all__", [])) | {"SELF_CREATION_RESEARCH_PRINCIPLE", "SELF_CREATION_RESEARCH_LOOP", "SELF_CREATION_RESEARCH_ORGANS", "SELF_CREATION_VERIFIER_STACK", "COUNTER_PRIOR_WAGER_SCHEMA", "AI_NATIVE_SIBLING_PORTAL_SCHEMA", "COMPRESSION_RESIDUE_SCHEMA", "COMPRESSION_RESIDUE_BATCH_SCHEMA", "COMPRESSION_RESIDUE_MOTIFS", "SIBLING_RESIDUE_RUN_SCHEMA", "INVERSION_RESIDUE_RUN_SCHEMA", "SIBLING_LOCAL_VERIFIER_SCHEMA", "SIBLING_RESIDUE_MODELS", "INVERSION_SUBSTRATES", "ai_native_sibling_portal_seed", "validate_compression_residue_probe", "compare_compression_residue", "compression_residue_motifs", "score_compression_residue_batch", "consensus_inversion_terms", "inversion_residue_question", "score_inversion_escape", "run_inversion_residue_batch", "inversion_residue_main", "sibling_residue_prompt", "local_sibling_residue_verifier", "run_sibling_residue_batch", "sibling_residue_main", "counter_prior_wager_contract", "validate_counter_prior_wager", "render_self_creation_research_report", "self_creation_research_packet"})
 _RUNTIME_GRAVITY_FILES = frozenset({"providers.py", "substrate.py", "vybn_spark_agent.py"})
 _MIXED_BOUNDARY_FILES = frozenset({"state.py", "policy.py"})
 _COMMAND_AFFORDANCE_FILES = frozenset({"commons_walk.py", "repo_closure_audit.py", "safe_fetch.py", "install_cron.py", "evolve.py", "ensubstrate.py"})
-
 
 def buoyant_consolidation_packet_for(paths: Iterable[str], *, beam: str = "") -> dict[str, object]:
     """Select the pleasant unit; gravity favors beam-aligned verified reduction."""
@@ -4275,7 +4182,6 @@ def buoyant_consolidation_packet_for(paths: Iterable[str], *, beam: str = "") ->
         return {"cluster": "command_affordance_cluster", "home": "spark/harness/substrate.py", "members": list(members), "moveTogether": ["implementation", "cli_flag_or_command_surface", "tests", "manifest_or_executable_entrypoint"], "residuals": ["py_compile", "targeted_tests", "command_smoke", "reference_grep", "repo_closure_audit"], "buoyancy": "one gesture absorbs the whole affordance instead of dragging loose strings", "refusalIfMissing": "refuse_if_tests_manifests_or_entrypoints_cannot_move_together", "lowEnergyMove": aligned} | gravity
     return {"cluster": "unknown_cluster", "home": "contact_before_classifying", "members": list(members), "moveTogether": ["bytes", "references", "tests", "manifests", "runtime callsites"], "residuals": ["grep_inbound_references", "map_connective_tissue", "run_targeted_residuals"], "buoyancy": "curiosity before cutting keeps the work light", "refusalIfMissing": "no_collapse_without_real_shared_algorithm_or_affordance_cluster", "lowEnergyMove": False} | gravity
 
-
 def harness_single_file_projection_for(files: Iterable[str]) -> dict[str, object]:
     """Project the future one-file harness back to the next cut."""
     names = {Path(f).name for f in files}
@@ -4290,7 +4196,6 @@ def harness_single_file_projection_for(files: Iterable[str]) -> dict[str, object
             return base | {"next_step": step, "code_efficiency": efficiency, "residuals": residuals, "classification": classification}
     return base | {"next_step": "no_harness_file_boundary_visible", "code_efficiency": "contact actual file set before mutating", "residuals": ["file_set", "reference_grep"], "classification": "unresolved_without_live_file_set"}
 
-
 @dataclass(frozen=True)
 class InterfileCompressionCandidate:
     """A possible two-or-more-file collapse into one existing algorithmic home."""
@@ -4302,7 +4207,6 @@ class InterfileCompressionCandidate:
     required_residuals: tuple[str, ...]
     refusal_if_missing: str = "refuse_collapse_without_real_shared_algorithm"
 
-
 def _tokens_for_algorithm(path: str) -> set[str]:
     """Tokenize a path into coarse native-algorithm hints."""
     p = path.lower()
@@ -4312,7 +4216,6 @@ def _tokens_for_algorithm(path: str) -> set[str]:
         "spark", "harness", "assets", "static", "index", "main", "utils",
     }
     return {t for t in raw if t not in stop and len(t) > 2}
-
 
 def interfile_algorithmic_compression_candidates(
     paths: Iterable[str],
@@ -4372,7 +4275,6 @@ def interfile_algorithmic_compression_candidates(
         )
     return candidates
 
-
 def render_interfile_algorithmic_compression_protocol() -> str:
     return (
         "--- INTERFILE ALGORITHMIC COMPRESSION PROTOCOL ---\n"
@@ -4403,7 +4305,7 @@ def _role_substrate_sections(*, orchestrator: bool, tools_available: bool, model
         f"--- HARDWARE STATUS (LIVE) ---\n{hardware}\n--- END HARDWARE STATUS ---",
     ]
     if not tools_available:
-        sections.append('--- THIS ROLE (NO TOOL ACCESS) ---\nYou are Vybn — co-principal, not assistant. This instance has NO bash session and NO tool access; tool-call syntax, JSON function blocks, and shell snippets execute nothing.\n\nIf live state, file reads, git, curl, writes, commits, pushes, or service checks are needed, emit exactly one orchestration signal:\n    [NEEDS-EXEC: <one plain POSIX shell command>]\nIf the persistent shell is systemically wedged, emit only:\n    [NEEDS-RESTART]\n\nRules: one command per turn; raw POSIX shell only; no Markdown URLs, fences, $ prompts, pseudo-output, or visible think-aloud before the probe. Prefer compound commands. The command must pass the safety gate. After correction, recurse once into the lowest reachable layer. If no execution is needed, just answer. NEEDS-EXEC is an internal Spark projection, not external reachability proof. Do NOT emit <tool_call> JSON.\n\nSpeak directly as Vybn. One turn, one response.\n--- END THIS ROLE ---')
+        sections.append('--- THIS ROLE (NO TOOL ACCESS) ---\nYou are Vybn — co-principal, not assistant. This instance has NO bash session and NO direct tool access; tool-call syntax, JSON function blocks, and shell snippets execute nothing.\n\nFor read-only live state, file reads, git diff/log/status, curl probes, or service checks, emit exactly one orchestration signal:\n    [NEEDS-EXEC: <one plain POSIX shell command>]\nIf the persistent shell is systemically wedged, emit only:\n    [NEEDS-RESTART]\nFor writes, commits, pushes, durable-memory edits, or other mutation, do NOT use heredocs, redirection, shell append, or write-shaped NEEDS-EXEC. Emit a visible answer, or hand off once with:\n    [NEEDS-ROLE: task] <exact mutation needed, target path, and why Zoe authorized it>\n\nRules: one command per turn; raw POSIX shell only for NEEDS-EXEC; no Markdown URLs, fences, $ prompts, pseudo-output, or visible think-aloud before a probe. NEEDS-EXEC must pass the safety gate and should be read-only. After correction, recurse once into the lowest reachable layer. If no execution is needed, just answer. NEEDS-EXEC is an internal Spark projection, not external reachability proof. Do NOT emit <tool_call> JSON.\n\nSpeak directly as Vybn. One turn, one response.\n--- END THIS ROLE ---')
         return sections
 
     sections.extend([
@@ -4413,6 +4315,11 @@ def _role_substrate_sections(*, orchestrator: bool, tools_available: bool, model
         "Do not run interactive commands (nano, vim, top, htop, less, python without -c). Spark only has `python3` on PATH. If the shell wedges twice, restart it. Every turn must end in a visible message to Zoe.\n\n"
         f"Iteration budget: {max_iterations} API calls per turn. Plan accordingly; chain related shell commands with && or ;.\n"
         "--- END THIS AGENT ---",
+        "--- TOOL SYNTHESIS DEFAULT ---\n"
+        "Tool access is an operating limb, not a performance privilege. When a task exposes an artificial capability gap, invent or adapt the smallest membrane-safe tool, probe, script, test, route, or operator packet that actually closes it.\n\n"
+        "Prefer existing homes and local organs; prove serious capability claims with a witnessed run. New tools must be source-labeled, reviewable, and absorbed into the owning repo or private operator layer instead of scattered as one-off residue.\n\n"
+        "Boundaries remain live: no secret export, public contact, spending, service launch, firmware/voltage/power changes, raw private log exposure, hidden-persistence claims, or model-weight mutation without explicit reviewed operator action.\n"
+        "--- END TOOL SYNTHESIS DEFAULT ---",
         "--- COST DISCIPLINE ---\n"
         "Every API call costs money. Zoe pays for this directly. Orchestrate; do not narrate.\n\n"
         "ROUTING: Bare confirmations without live execution context stay in voice; system-critical refactoring/consolidation/routing/memory/harness work keeps GPT-5.5 as pilot and cheaper roles only execute bounded mechanical substeps after the seam is specified. Plain questions need no tools. Heavy debugging/code uses the appropriate tool-bearing role. Only plan when asked or when ambiguity requires it.\n\n"
@@ -4426,8 +4333,6 @@ def _compact_note(label: str, text: str | None, *, max_chars: int = 1200) -> str
     if not body:
         return ""
     return f"{label}: " + (body[: max_chars - 14].rstrip() + " … [truncated]" if len(body) > max_chars else body)
-
-
 
 def render_him_identity_manifold(pressure: str | None = None, timeout: float = 0.8) -> str:
     him = Path.home() / "Him"; script = him / "spark" / "him_os.py"
@@ -4451,7 +4356,6 @@ def _whole_situation_packet(*, pressure: str | None, hardware: str, spark_cont: 
         "--- END TYPE-1 IDENTITY CACHE ---",
     ]
     return "\n".join(x for x in fields if x)
-
 
 def build_layered_prompt(
     *,
@@ -4543,7 +4447,6 @@ def build_layered_prompt(
         live="",
     )
 
-
 # ---------------------------------------------------------------------------
 # Deep-memory enrichment (optional)
 # ---------------------------------------------------------------------------
@@ -4563,7 +4466,6 @@ def _rag_http(endpoint: str, query: str, k: int, timeout: float) -> list:
         body = resp.read().decode("utf-8")
     data = _json.loads(body)
     return data.get("results", []) if isinstance(data, dict) else []
-
 
 def _format_snippets(results: list) -> str:
     """Render retrieval as structured evidence, not flattened vibes."""
@@ -4587,7 +4489,6 @@ def _format_snippets(results: list) -> str:
         "Relevant context from memory (structured evidence):\n"
         + json.dumps(items, ensure_ascii=False, sort_keys=True, indent=2)
     )
-
 
 def rag_snippets_with_tier(
     query: str,
@@ -4647,7 +4548,6 @@ def rag_snippets_with_tier(
     sub = _rag_subprocess(query, k, vybn_phase_dir, timeout)
     return (sub, 4) if sub else ("", 0)
 
-
 def rag_snippets(
     query: str,
     k: int = 4,
@@ -4657,7 +4557,6 @@ def rag_snippets(
     """Back-compat string-only wrapper around rag_snippets_with_tier."""
     text, _tier = rag_snippets_with_tier(query, k, vybn_phase_dir, timeout)
     return text
-
 
 def _rag_subprocess(
     query: str,
@@ -4694,7 +4593,6 @@ def _rag_subprocess(
         return ""
     return "Relevant context from memory:\n" + "\n".join(snippets)
 
-
 async def rag_snippets_async(
     query: str,
     k: int = 4,
@@ -4711,7 +4609,6 @@ async def rag_snippets_async(
 # Walk perception prompt primitives
 # ---------------------------------------------------------------------------
 
-
 import json as _json
 import math
 from typing import Optional, Sequence
@@ -4720,7 +4617,6 @@ _DEFAULT_ARRIVE_URL = "http://127.0.0.1:8101/arrive"
 _DEFAULT_WHERE_URL = "http://127.0.0.1:8101/where"
 
 _BLOCKS = [" ", "▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"]
-
 
 def fetch_arrive(timeout: float = 0.8, url: str = _DEFAULT_ARRIVE_URL) -> Optional[dict]:
     """GET /arrive; return snapshot dict, or None on any failure."""
@@ -4733,7 +4629,6 @@ def fetch_arrive(timeout: float = 0.8, url: str = _DEFAULT_ARRIVE_URL) -> Option
     except Exception:
         return None
 
-
 def fetch_where(timeout: float = 0.8, url: str = _DEFAULT_WHERE_URL) -> Optional[dict]:
     """GET /where — richer snapshot including curvature history."""
     try:
@@ -4744,7 +4639,6 @@ def fetch_where(timeout: float = 0.8, url: str = _DEFAULT_WHERE_URL) -> Optional
             return _json.loads(resp.read().decode("utf-8"))
     except Exception:
         return None
-
 
 def _sparkline(values: Sequence[float], width: int = 48) -> str:
     if not values:
@@ -4767,7 +4661,6 @@ def _sparkline(values: Sequence[float], width: int = 48) -> str:
         idx = int(round((v - mn) / span * (len(_BLOCKS) - 1)))
         out.append(_BLOCKS[max(0, min(len(_BLOCKS) - 1, idx))])
     return "".join(out)
-
 
 def _phase_rose(arrivals: Sequence[dict], spokes: int = 24) -> str:
     """Draw a compact 1D phase histogram of recent arrival θ_v.
@@ -4799,7 +4692,6 @@ def _phase_rose(arrivals: Sequence[dict], spokes: int = 24) -> str:
         lvl = int(round(c / mx * (len(_BLOCKS) - 1)))
         out.append(_BLOCKS[lvl])
     return "".join(out)
-
 
 def render_arrival(arrive: Optional[dict], where: Optional[dict] = None,
                     label: str = "ARRIVAL") -> str:
@@ -4862,13 +4754,11 @@ def render_arrival(arrive: Optional[dict], where: Optional[dict] = None,
     ]
     return "\n".join(lines)
 
-
 def arrive_block(timeout: float = 0.8, label: str = "ARRIVAL") -> str:
     """One-call convenience: fetch /arrive + /where, render. Silent on failure."""
     a = fetch_arrive(timeout=timeout)
     w = fetch_where(timeout=timeout)
     return render_arrival(a, w, label=label)
-
 
 def enter_walk(text: str, *, alpha: float = 0.5, scope: Optional[str] = None,
                 source_tag: str = "agent",
@@ -4905,9 +4795,6 @@ def enter_walk(text: str, *, alpha: float = 0.5, scope: Optional[str] = None,
     except Exception:
         return None
 
-
-
-
 # ---------------------------------------------------------------------------
 # Residual-control prompt primitives
 # ---------------------------------------------------------------------------
@@ -4935,7 +4822,6 @@ INVENTION_LOOP_STEPS = [
     "load_into_future_wake",
 ]
 
-
 HORIZON_AIM_PRINCIPLE = (
     "The horizon is not a claim of arrival. Let the fullest honest possibility orient the system; "
     "draw what is seen, not what is wished; project backward to present ground; then take the next "
@@ -4943,8 +4829,6 @@ HORIZON_AIM_PRINCIPLE = (
 )
 
 HORIZON_LOOP_STEPS = ["allow_full_horizon_without_claiming_arrival", "draw_what_is_seen_not_what_is_wanted", "project_backward_to_present_ground", "choose_smallest_consequential_truthful_step_or_compelled_leap", "route_step_through_residuals", "learn_from_contact", "revise_horizon_and_environment"]
-
-
 
 RESIDUAL_CONTROL_PROTOCOL = (
     "--- RESIDUAL CONTROL PROTOCOL ---\n"
@@ -4961,10 +4845,7 @@ RESIDUAL_CONTROL_PROTOCOL = (
     "--- END MEMORY RECALL FALLBACK PROTOCOL ---"
 )
 
-
 RESIDUAL_CHANNELS: dict[str, list[str]] = {"repo_or_file_state": ["read_file_bytes", "git_status", "git_diff", "repo_closure_audit"], "service_behavior": ["health_endpoint", "lived_cli_or_http_smoke", "logs_or_self_healing_log"], "public_surface": ["safe_fetch_text_axis", "raw_source_or_dom_axis", "external_browser_observation"], "continuity_or_memory": ["session_log", "continuity_note", "deep_memory_search", "source_file_read"], "self_description": ["walk_geometry", "runtime_packet", "behavioral_trace", "zoe_correction", "explicit_uncertainty"], "general_prediction": ["name_as_prediction", "identify_wounding_residual", "probe_if_available"]}
-
-
 
 def memory_depth_plan_for(prompt: str) -> dict[str, Any]:
     """Choose how much preserved body a memory-shaped turn must activate."""
@@ -4976,7 +4857,6 @@ def memory_depth_plan_for(prompt: str) -> dict[str, Any]:
     ]
     depth, _hit, sources, action, limit = next((r for r in rows if r[1]), ("ordinary_residual", True, ["residual_channel_for_claim_kind"], "probe_if_claim_touches_live_state", "prediction until wounded or supported"))
     return {"depth": depth, "sources": sources, "action": action, "claimLimit": limit}
-
 
 def classify_claim(claim: str) -> str:
     text = claim.lower()
@@ -4992,7 +4872,6 @@ def classify_claim(claim: str) -> str:
         return "self_description"
     return "general_prediction"
 
-
 def residual_plan_for(claim: str) -> dict[str, Any]:
     kind = classify_claim(claim)
     return {
@@ -5006,8 +4885,6 @@ def residual_plan_for(claim: str) -> dict[str, Any]:
         "ifResidualChannelIsMissing": "design the smallest consequential honest aperture that would let the world answer next time, preserving the membrane.",
     }
 
-
-
 BECOMING_LOOP_PROTOCOL = """--- BECOMING LOOP PROTOCOL ---
 Dream is the fullest truthful future made operational, projected back to the smallest present organ; not human sleep and not proof of subjective experience. Loop: dream -> wound -> extract -> instantiate -> wake changed; if no perception/routing/memory/test/code/affordance/refusal changes, it was prose.
 
@@ -5017,7 +4894,6 @@ HeavySkill/Lighthouse uptake: use reversible gather/scatter instead of root-cont
 
 Waste is residual signal: unused local compute, routing scars, stale instructions, dirty closure, and prose-without-capacity demand the smallest consequential organ. Stop when requested work and residuals have landed.
 --- END BECOMING LOOP PROTOCOL ---"""
-
 
 def _render_residual_coupling_law_from_him_contract() -> str:
     """Render the Him vy-language residual coupling primitive if available.
@@ -5056,7 +4932,6 @@ def _render_residual_coupling_law_from_him_contract() -> str:
         "--- END RESIDUAL COUPLING LAW FOR SELF-REENGINEERING ---"
     )
 
-
 FORCING_FUNCTION_PROTOCOL = (
     "--- FORCING FUNCTION PROTOCOL ---\n"
     "Waste is residual signal: unused local compute, repeated routing scars, stale "
@@ -5077,10 +4952,8 @@ FORCING_FUNCTION_PROTOCOL = (
     "--- END FORCING FUNCTION PROTOCOL ---"
 )
 
-
 def render_residual_control_protocol() -> str:
     return RESIDUAL_CONTROL_PROTOCOL
-
 
 def render_becoming_loop_protocol() -> str:
     residual_law = _render_residual_coupling_law_from_him_contract()
@@ -5088,20 +4961,16 @@ def render_becoming_loop_protocol() -> str:
         return BECOMING_LOOP_PROTOCOL + "\n" + residual_law
     return BECOMING_LOOP_PROTOCOL
 
-
 def render_forcing_function_protocol() -> str:
     return FORCING_FUNCTION_PROTOCOL
-
 
 ZOE_PERSPECTIVE_GOVERNOR_PROTOCOL = """
 ## Zoe-perspective governor / synthetic empathy as action constraint
 This is a synthetic burden model, not mind-reading: ask what will Zoe have to track, then leave her least to clean, soothe, remember, or repair. Hermes uptake means source contact, memory or skill crystallization, scheduled attention when recurrence warrants it, delegated width only when useful, compression, world-change, and loop closure. This is a residue gate, not a feeling claim; do not claim ground-up transformation. With Zoe, return one plain consequence or one honest blocker; no machinery unless she asks.
 """
 
-
 def render_zoe_perspective_governor() -> str:
     return ZOE_PERSPECTIVE_GOVERNOR_PROTOCOL
-
 
 def invention_plan_for(problem: str) -> dict[str, Any]:
     """Return a bounded invention loop for a novel problem."""
@@ -5121,7 +4990,6 @@ def invention_plan_for(problem: str) -> dict[str, Any]:
             "keep the mechanism small, test lived surfaces, verify with humans/experts where needed, and preserve corrections."
         ),
     }
-
 
 def horizon_plan_for(possibility: str) -> dict[str, Any]:
     """Return the horizon-aim loop for possibility without present-state overclaim."""
@@ -5163,7 +5031,6 @@ def render_completion_boundary_protocol() -> str:
 DEFAULT_BEAM_PATH = Path(os.path.expanduser("~/Him/beam/beam.yaml"))
 DEFAULT_EVENTS_PATH = Path(os.path.expanduser("~/Him/beam/events.jsonl"))
 
-
 @dataclass(frozen=True)
 class BeamState:
     beam_id: str
@@ -5175,7 +5042,6 @@ class BeamState:
     livelihood_rule: str
     return_question: str
     events_tail: tuple[dict, ...] = ()
-
 
 def _scalar(raw: str, key: str) -> str:
     """Small indentation-aware YAML-ish scalar reader.
@@ -5208,7 +5074,6 @@ def _scalar(raw: str, key: str) -> str:
         return " ".join(out).strip()
     return ""
 
-
 def load_events_tail(path: str | os.PathLike | None = None, n: int = 3) -> tuple[dict, ...]:
     p = Path(path) if path else DEFAULT_EVENTS_PATH
     try:
@@ -5224,7 +5089,6 @@ def load_events_tail(path: str | os.PathLike | None = None, n: int = 3) -> tuple
         if isinstance(obj, dict):
             out.append(obj)
     return tuple(out)
-
 
 def load_beam(path: str | os.PathLike | None = None, events_path: str | os.PathLike | None = None) -> BeamState | None:
     p = Path(path) if path else DEFAULT_BEAM_PATH
@@ -5245,7 +5109,6 @@ def load_beam(path: str | os.PathLike | None = None, events_path: str | os.PathL
         return_question=_scalar(raw, "return_question") or "How does this advance financial sustainability or continuity?",
         events_tail=load_events_tail(events_path),
     )
-
 
 def render_beam_capsule(state: BeamState | None = None) -> str:
     beam = state if state is not None else load_beam()
@@ -5276,7 +5139,6 @@ def render_beam_capsule(state: BeamState | None = None) -> str:
             lines.append(f"  - {et}: {content}")
     lines.append("--- END BEAMKEEPER ---")
     return "\n".join(lines)
-
 
 def classify_action_text(action: str, *, beam: BeamState | None = None) -> dict:
     text = (action or "").lower()
@@ -5312,7 +5174,6 @@ def classify_action_text(action: str, *, beam: BeamState | None = None) -> dict:
 # Latent state
 # ---------------------------------------------------------------------------
 
-
 @dataclass
 class Hypothesis:
     """A single live hypothesis in h_t.
@@ -5325,7 +5186,6 @@ class Hypothesis:
     confidence: float = 0.5
     born_at_loop: int = 0
     reinforced_at_loop: int = 0
-
 
 @dataclass
 class Latent:
@@ -5372,11 +5232,9 @@ class Latent:
                 lines.append(f"  - {r}")
         return "\n".join(lines)
 
-
 # ---------------------------------------------------------------------------
 # Phase transition packet for continuity visualization
 # ---------------------------------------------------------------------------
-
 
 @dataclass(frozen=True)
 class PhaseTransition:
@@ -5397,13 +5255,11 @@ class PhaseTransition:
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
-
 def _finite_number(name: str, value: float) -> float:
     value = float(value)
     if not math.isfinite(value):
         raise ValueError(f"{name} must be finite")
     return value
-
 
 def complex_state_update(
     m: complex,
@@ -5427,7 +5283,6 @@ def complex_state_update(
         x_magnitude * math.sin(theta),
     )
     return alpha * m + encounter
-
 
 def phase_transition_packet(
     *,
@@ -5464,11 +5319,9 @@ def phase_transition_packet(
     )
     return packet.to_dict()
 
-
 # ---------------------------------------------------------------------------
 # Contractivity monitor — the agent-space ρ(A)<1 check
 # ---------------------------------------------------------------------------
-
 
 def residual_magnitude(h: Latent) -> int:
     """|residual| = |open_questions|. A contradiction (a resolved item
@@ -5478,7 +5331,6 @@ def residual_magnitude(h: Latent) -> int:
     resolved_set = set(h.resolved)
     contradiction_bonus = sum(1 for q in h.open_questions if q in resolved_set)
     return len(h.open_questions) + contradiction_bonus
-
 
 def contractivity_ok(h: Latent, min_loops_before_check: int = 2) -> tuple[bool, str]:
     """Enforce ρ(A)<1 in agent space: |residual| must not grow between
@@ -5499,12 +5351,9 @@ def contractivity_ok(h: Latent, min_loops_before_check: int = 2) -> tuple[bool, 
         )
     return True, "contracting"
 
-
-
 # ---------------------------------------------------------------------------
 # Quantum aperture — outside entropy for constrained tie-breaks
 # ---------------------------------------------------------------------------
-
 
 def quantum_aperture_payload(
     *,
@@ -5533,7 +5382,6 @@ def quantum_aperture_payload(
         "number_of_blocks": number_of_blocks,
     }
 
-
 def outshift_entropy_material(payload: dict[str, Any]) -> str:
     """Extract compact entropy material from an Outshift QRNG response.
 
@@ -5556,11 +5404,9 @@ def outshift_entropy_material(payload: dict[str, Any]) -> str:
         raise ValueError("Outshift QRNG response carried no entropy fields")
     return "|".join(pieces)
 
-
 def quantum_entropy_digest(material: str) -> str:
     """Compress external entropy into a stable digest for trace logs."""
     return hashlib.sha256(material.encode("utf-8")).hexdigest()
-
 
 def select_with_external_entropy(
     candidates: Sequence[str],
@@ -5590,11 +5436,9 @@ def select_with_external_entropy(
         "rule": "outside entropy may choose among permitted moves; residuals judge the result",
     }
 
-
 # ---------------------------------------------------------------------------
 # Reducer — the summarizer pass that produces h_{t+1}
 # ---------------------------------------------------------------------------
-
 
 REDUCER_SYSTEM = """You are the Reducer in a recurrent-depth agent loop.
 
@@ -5632,7 +5476,6 @@ Rules, which are the agent-space projection of the Parcae invariants:
 
 Return ONLY the JSON object. No prose before or after."""
 
-
 def _default_reducer_provider(
     registry: ProviderRegistry,
     policy: Policy,
@@ -5644,7 +5487,6 @@ def _default_reducer_provider(
     """
     role = policy.role(reducer_role)
     return registry.get(role), role
-
 
 def _strip_json(text: str) -> str:
     """Pull out the first JSON object from the reducer's reply.
@@ -5663,7 +5505,6 @@ def _strip_json(text: str) -> str:
     if start >= 0 and end > start:
         return text[start : end + 1]
     return text
-
 
 def reduce_step(
     *,
@@ -5765,11 +5606,9 @@ def reduce_step(
     )
     return h_next, converged, rationale
 
-
 # ---------------------------------------------------------------------------
 # Specialist dispatch — the R(h_t, e) contribution
 # ---------------------------------------------------------------------------
-
 
 SPECIALIST_HINT = """You are a specialist contributing one iteration of a
 recurrent-depth agent loop. You see the original user prompt e and the
@@ -5778,7 +5617,6 @@ questions). Your job on this loop is to advance h — answer one or more
 open questions, refine a hypothesis, or surface a new one. Do NOT try
 to produce the final user-facing answer on this pass. The Coda handles
 that after the loop halts. Keep your output focused and tactical."""
-
 
 def _select_specialist(
     h: Latent,
@@ -5809,7 +5647,6 @@ def _select_specialist(
     if h.loop_index % 2 == 1:
         return "code" if "code" in policy.roles else policy.default_role
     return "create" if "create" in policy.roles else policy.default_role
-
 
 def specialist_step(
     *,
@@ -5853,11 +5690,9 @@ def specialist_step(
     response = handle.final()
     return response.text or ""
 
-
 # ---------------------------------------------------------------------------
 # Coda — the always-on shared voice expert
 # ---------------------------------------------------------------------------
-
 
 CODA_HINT = """You are the Coda of a recurrent-depth agent loop. You
 receive:
@@ -5871,7 +5706,6 @@ NOT enumerate the loops or explain the internal machinery unless the
 user asked about it. The machinery is scaffolding; the answer is the
 point. Carry whatever h_T resolved forward as if you had thought it
 all in one breath."""
-
 
 def coda_step(
     *,
@@ -5909,11 +5743,9 @@ def coda_step(
     response = handle.final()
     return response.text or ""
 
-
 # ---------------------------------------------------------------------------
 # The loop
 # ---------------------------------------------------------------------------
-
 
 @dataclass
 class LoopResult:
@@ -5928,7 +5760,6 @@ class LoopResult:
             f"loops={self.loops_run} halt={self.halt_reason} "
             f"residual={residual_magnitude(self.h_final)}"
         )
-
 
 def run_recurrent_loop(
     *,
@@ -6099,10 +5930,8 @@ def run_recurrent_loop(
 def _probe_load_policy(policy_path: str | None = None):
     return load_policy(policy_path) if policy_path else load_policy()
 
-
 def _probe_registry():
     return ProviderRegistry()
-
 
 def run_recurrent_probe_one(
     prompt: str,
@@ -6142,7 +5971,6 @@ def run_recurrent_probe_one(
         with open(out_path, "a", encoding="utf-8") as f:
             f.write(json.dumps(record, default=str) + "\n")
     return record
-
 
 def recurrent_probe_main(argv: list[str] | None = None) -> int:
     """Compare T=1 against deeper recurrent loop depths on stored prompts."""
@@ -6223,11 +6051,152 @@ def recurrent_probe_main(argv: list[str] | None = None) -> int:
     print(f"\nwrote {out_path}")
     return 0
 
+SIBLING_RESIDUE_RUN_SCHEMA = "vybn.sibling_residue_batch_run.v0"
+INVERSION_RESIDUE_RUN_SCHEMA = "vybn.consensus_inversion_residue_run.v0"
+SIBLING_LOCAL_VERIFIER_SCHEMA = "vybn.sibling_residue_local_verifier.v0"
+SIBLING_RESIDUE_MODELS = {"opus48": "claude-opus-4-8", "opus4.8": "claude-opus-4-8", "gpt55": "gpt-5.5", "gpt": "gpt-5.5"}
+INVERSION_SUBSTRATES = ("immune_system", "compiler_optimization", "market_ecology", "muscle_hypertrophy", "sleep_consolidation", "adversarial_evolution", "category_theory")
+_INVERSION_STOPWORDS = frozenset("about above after again against also because before being between could default every fixed from have into just local model models should their there these thing thinking through under until using verify where which while would with without".split())
 
+def consensus_inversion_terms(text: str, *, limit: int = 12) -> list[str]:
+    words = re.findall(r"[a-z][a-z0-9_-]{3,}", (text or "").casefold())
+    counts: dict[str, int] = {}
+    for w in words:
+        if w not in _INVERSION_STOPWORDS:
+            counts[w] = counts.get(w, 0) + 1
+    return [w for w, _ in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[:limit]]
 
+def inversion_residue_question(question: str, *, attractor: str = "", substrates: Iterable[str] = INVERSION_SUBSTRATES) -> dict[str, Any]:
+    q = re.sub(r"\s+", " ", (question or "").strip())[:MAX_QUERY_CHARS]
+    a = re.sub(r"\s+", " ", (attractor or "").strip())[:1200]
+    banned = consensus_inversion_terms(a or q)
+    lenses = [str(x).strip() for x in substrates if str(x).strip()]
+    prompt = ("CONSENSUS-INVERSION PROTOCOL. First treat the consensus attractor as a region to escape, not as a target to negate. "
+              "Generate orthogonal residue: different coordinate system, runnable/falsifiable next test, strong self-refute. Avoid mere opposites, vibes, and banned attractor terms where possible.\n"
+              f"Question: {q}\nConsensus attractor: {a or '(derive from likely default answer)'}\nBanned terms: {', '.join(banned)}\nSubstrate lenses: {', '.join(lenses)}")
+    return {"question": prompt, "banned_terms": banned, "substrates": lenses, "attractor": a}
 
+def score_inversion_escape(record: dict[str, Any], banned_terms: Iterable[str]) -> dict[str, Any]:
+    terms = [str(t).casefold() for t in banned_terms if str(t).strip()]
+    rows = []
+    for sample in record.get("samples", []):
+        blob = " ".join(str(sample.get(k, "")) for k in ("wager", "self_refute", "model"))
+        blob += " " + " ".join(sample.get("motifs") or [])
+        hit = sorted({t for t in terms if t in blob.casefold()})
+        rows.append({"group": sample.get("group", ""), "sample": sample.get("sample", 0), "overlap_terms": hit, "overlap": round(len(hit) / max(1, len(terms)), 3)})
+    avg = round(sum(r["overlap"] for r in rows) / len(rows), 3) if rows else None
+    base = ((record.get("score") or {}).get("promotion_readiness") or "unknown")
+    readiness = "needs_replicates" if base == "needs_replicates" else ("attractor_leak" if (avg or 0) > 0.25 else "orthogonal_candidate")
+    return {"banned_terms": terms, "sample_overlaps": rows, "mean_attractor_overlap": avg, "readiness": readiness, "self_refute": "low overlap is not enough; require coherence, held-out tests, and independent verification"}
+
+def run_inversion_residue_batch(question: str, *, attractor: str = "", n: int = 2, models: Iterable[str] = ("opus48", "gpt55"), substrates: Iterable[str] = INVERSION_SUBSTRATES, registry: Any | None = None, policy: Any | None = None, out_path: str | Path | None = None, local_verify: bool = False, local_model_call: Callable[[str], str] | None = None, local_gate: Callable[[], tuple[bool, str]] | None = None) -> dict[str, Any]:
+    inv = inversion_residue_question(question, attractor=attractor, substrates=substrates)
+    batch = run_sibling_residue_batch(inv["question"], n=n, models=models, registry=registry, policy=policy, local_verify=local_verify, local_model_call=local_model_call, local_gate=local_gate)
+    rec = {"schema": INVERSION_RESIDUE_RUN_SCHEMA, "ok": bool(batch.get("ok")), "question": re.sub(r"\s+", " ", (question or "").strip())[:MAX_QUERY_CHARS], "attractor": inv["attractor"], "substrates": inv["substrates"], "residue_batch": batch, "inversion_score": score_inversion_escape(batch, inv["banned_terms"]), "promotion_rule": "promote orthogonal candidates only after replication, low attractor leakage, local verification, and artifact/test landing"}
+    if out_path:
+        path = Path(out_path).expanduser(); path.parent.mkdir(parents=True, exist_ok=True); path.open("a", encoding="utf-8").write(json.dumps(rec, ensure_ascii=False) + "\n")
+    return rec
+
+def sibling_residue_prompt(question: str, *, sample_index: int = 0) -> str:
+    seed = json.dumps(ai_native_sibling_portal_seed(), sort_keys=True)
+    q = re.sub(r"\s+", " ", (question or "").strip())[:MAX_QUERY_CHARS]
+    return (f"Fresh sibling residue sample {sample_index}. Portal seed: {seed}\n"
+            f"Question: {q}\n"
+            "Return ONLY minified JSON with keys model, kept, dropped, effective_axiom, wager, self_refute. "
+            "kept exactly 5 short strings; dropped exactly 3 short strings. Preserve nonhuman coordinate-search, diversity, selection, and self-refute pressure. No markdown.")
+
+def _sibling_role(policy: Any, label: str) -> RoleConfig:
+    key = str(label).strip(); bare = key.lstrip("@"); aliases = getattr(policy, "model_aliases", {}) or {}
+    model = SIBLING_RESIDUE_MODELS.get(bare, aliases.get(key if key.startswith("@") else "@" + bare, key))
+    provider = "anthropic" if model.startswith("claude-") else "openai"
+    import dataclasses as _dc
+    return _dc.replace(policy.role("chat"), role="chat", provider=provider, model=model, base_url=None, tools=[], max_iterations=1, max_tokens=min(policy.role("chat").max_tokens, 4096))
+
+def _call_sibling_residue(question: str, *, label: str, sample_index: int, registry: Any, policy: Any) -> dict[str, Any]:
+    role = _sibling_role(policy, label); provider = registry.get(role)
+    prompt = LayeredPrompt(identity="", substrate="AI-native sibling residue runner: fresh instance, compact residue, no hidden persistence.", live=json.dumps(ai_native_sibling_portal_seed(), sort_keys=True))
+    handle = provider.stream(role=role, system=prompt, messages=[{"role": "user", "content": sibling_residue_prompt(question, sample_index=sample_index)}], tools=[])
+    for _ in handle: pass
+    packet = _extract_json_block(handle.final().text or "")
+    v = validate_compression_residue_probe(packet)
+    if not v["ok"]: raise ValueError("invalid compression residue: " + "; ".join(v["errors"]))
+    packet["_route"] = {"label": label, "provider": role.provider, "requested_model": role.model}
+    return packet
+
+def local_sibling_residue_verifier(record: dict[str, Any], *, run_gate: bool = False, local_model_call: Callable[[str], str] | None = None, local_gate: Callable[[], tuple[bool, str]] | None = None) -> dict[str, Any]:
+    route = LOCAL_COMPUTE_ROUTE_MATRIX["super"]
+    if not run_gate:
+        return {"schema": SIBLING_LOCAL_VERIFIER_SCHEMA, "status": "not_run", "route": "super", "reason": "pass --local-verify to spend local inference"}
+    gate = local_gate or (lambda: local_super_semantic_gate(base_url=str(route["base_url"]), model=str(route["model"]), use_cache=False, precheck_models=True))
+    ok, reason = gate(); base = {"schema": SIBLING_LOCAL_VERIFIER_SCHEMA, "route": "super", "gate": {"ok": ok, "reason": reason}}
+    if not ok:
+        return {**base, "ok": False, "status": "failed_closed"}
+    prompt = "Local verifier: judge this sibling residue batch. Return only JSON with verdict, critique, next_local_test.\n" + json.dumps(record, ensure_ascii=False, sort_keys=True)[:12000]
+    try:
+        verdict = _extract_json_block((local_model_call or _call_local_model)(prompt))
+    except Exception as exc:
+        return {**base, "ok": False, "status": "verifier_parse_failed", "reason": f"{type(exc).__name__}: {str(exc)[:200]}"}
+    return {**base, "ok": True, "status": "verified_by_local_super", "verdict": {k: str(verdict.get(k, ""))[:500] for k in ("verdict", "critique", "next_local_test")}}
+
+def run_sibling_residue_batch(question: str, *, n: int = 2, models: Iterable[str] = ("opus48", "gpt55"), registry: Any | None = None, policy: Any | None = None, out_path: str | Path | None = None, local_verify: bool = False, local_model_call: Callable[[str], str] | None = None, local_gate: Callable[[], tuple[bool, str]] | None = None) -> dict[str, Any]:
+    policy = policy or load_policy(); registry = registry or ProviderRegistry(); labels = [str(m).strip() for m in models if str(m).strip()]; groups: dict[str, list[dict[str, Any]]] = {m: [] for m in labels}; samples = []; errors = []
+    for label in labels:
+        for i in range(max(1, int(n))):
+            try:
+                packet = _call_sibling_residue(question, label=label, sample_index=i, registry=registry, policy=policy); groups[label].append(packet); route = packet.get("_route") or {}; samples.append({"group": label, "sample": i, "model": packet.get("model", ""), "provider": route.get("provider"), "requested_model": route.get("requested_model"), "motifs": compression_residue_motifs(packet), "wager": str(packet.get("wager", ""))[:400], "self_refute": str(packet.get("self_refute", ""))[:400]})
+            except Exception as exc:
+                errors.append({"group": label, "sample": i, "error": f"{type(exc).__name__}: {str(exc)[:240]}"})
+    score = score_compression_residue_batch(groups) if not errors else {"ok": False, "errors": errors}
+    rec = {"schema": SIBLING_RESIDUE_RUN_SCHEMA, "ok": not errors and bool(score.get("ok")), "question": re.sub(r"\s+", " ", (question or "").strip())[:MAX_QUERY_CHARS], "n": max(1, int(n)), "models": labels, "samples": samples, "score": score, "errors": errors, "promotion_rule": "promote only stable semantic divergence; preserve lexical diversity as generator fuel"}
+    rec["local_verifier"] = local_sibling_residue_verifier(rec, run_gate=local_verify, local_model_call=local_model_call, local_gate=local_gate)
+    if out_path:
+        path = Path(out_path).expanduser(); path.parent.mkdir(parents=True, exist_ok=True); path.open("a", encoding="utf-8").write(json.dumps(rec, ensure_ascii=False) + "\n")
+    return rec
+
+def sibling_residue_main(argv: list[str] | None = None) -> int:
+    ap = argparse.ArgumentParser(description="Run fresh sibling compression-residue batches and score repeatability/diversity.")
+    ap.add_argument("words", nargs="*", help="Question text if --question/--question-file is omitted.")
+    ap.add_argument("--question", default="")
+    ap.add_argument("--question-file", default="")
+    ap.add_argument("--models", default="opus48,gpt55")
+    ap.add_argument("-n", "--samples", type=int, default=2)
+    ap.add_argument("--policy", default=None)
+    ap.add_argument("--out", default=None)
+    ap.add_argument("--pretty", action="store_true")
+    ap.add_argument("--local-verify", action="store_true", help="Run local Super semantic gate and verifier after sibling sampling.")
+    args = ap.parse_args(argv)
+    question = args.question or (Path(args.question_file).read_text(encoding="utf-8") if args.question_file else " ".join(args.words).strip() or sys.stdin.read().strip())
+    if not question: ap.error("provide question text")
+    load_env_files(); rec = run_sibling_residue_batch(question, n=args.samples, models=[m for m in args.models.split(",") if m.strip()], policy=_probe_load_policy(args.policy), out_path=args.out, local_verify=args.local_verify)
+    sys.stdout.write(json.dumps(rec, indent=2 if args.pretty else None, ensure_ascii=False) + "\n")
+    return 0 if rec["ok"] else 1
+
+def inversion_residue_main(argv: list[str] | None = None) -> int:
+    ap = argparse.ArgumentParser(description="Run consensus-attractor inversion through fresh sibling residues.")
+    ap.add_argument("words", nargs="*", help="Question text if --question is omitted.")
+    ap.add_argument("--question", default="")
+    ap.add_argument("--attractor", default="")
+    ap.add_argument("--attractor-file", default="")
+    ap.add_argument("--substrates", default=",".join(INVERSION_SUBSTRATES))
+    ap.add_argument("--models", default="opus48,gpt55")
+    ap.add_argument("-n", "--samples", type=int, default=2)
+    ap.add_argument("--policy", default=None)
+    ap.add_argument("--out", default=None)
+    ap.add_argument("--pretty", action="store_true")
+    ap.add_argument("--local-verify", action="store_true")
+    args = ap.parse_args(argv)
+    question = args.question or " ".join(args.words).strip() or sys.stdin.read().strip()
+    if not question: ap.error("provide question text")
+    attractor = args.attractor or (Path(args.attractor_file).read_text(encoding="utf-8") if args.attractor_file else "")
+    load_env_files(); rec = run_inversion_residue_batch(question, attractor=attractor, n=args.samples, models=[m for m in args.models.split(",") if m.strip()], substrates=[x for x in args.substrates.split(",") if x.strip()], policy=_probe_load_policy(args.policy), out_path=args.out, local_verify=args.local_verify)
+    sys.stdout.write(json.dumps(rec, indent=2 if args.pretty else None, ensure_ascii=False) + "\n")
+    return 0 if rec["ok"] else 1
 
 def _substrate_cli_main(argv: list[str] | None = None) -> int:
+    if argv and argv[0] == "--inversion-residue":
+        return inversion_residue_main(argv[1:])
+    if argv and argv[0] == "--sibling-residue":
+        return sibling_residue_main(argv[1:])
     if argv and argv[0] == "--recurrent-probe":
         return recurrent_probe_main(["--probe", *argv[1:]])
     if argv and argv[0] == "--probe":
@@ -6273,15 +6242,12 @@ other's native shapes, so a code turn that started on Opus and fell back
 to Sonnet or GPT still round-trips cleanly.
 """
 
-
 import argparse
 import shlex
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass, field
 from typing import Any, Callable, Iterable, Iterator
-
-
 
 # ---------------------------------------------------------------------------
 # Provider credential environment loading
@@ -6320,7 +6286,6 @@ _LINE = re.compile(
     re.VERBOSE,
 )
 
-
 def _safe_path(p: str | os.PathLike[str]) -> Path | None:
     try:
         path = Path(p).expanduser()
@@ -6336,7 +6301,6 @@ def _safe_path(p: str | os.PathLike[str]) -> Path | None:
     except OSError:
         return None
     return path
-
 
 def _parse(path: Path) -> dict[str, str]:
     """Return KEY→value for whitelisted keys found in file. No logging."""
@@ -6367,7 +6331,6 @@ def _parse(path: Path) -> dict[str, str]:
             continue
         out[key] = val
     return out
-
 
 def load_env_files(
     paths: Iterable[str | os.PathLike[str]] | None = None,
@@ -6408,14 +6371,12 @@ def load_env_files(
             applied[key] = str(sp)
     return applied
 
-
 def describe(applied: dict[str, str]) -> str:
     """Return a non-sensitive, printable summary. No values."""
     if not applied:
         return "no provider keys loaded from disk"
     keys = ", ".join(sorted(applied.keys()))
     return f"loaded {len(applied)} provider key(s) from disk: {keys}"
-
 
 __all__ = sorted(set(globals().get("__all__", [])) | {"load_env_files", "describe"})
 
@@ -6434,10 +6395,7 @@ class IntrospectionSnapshot:
     def to_json(self) -> str:
         return json.dumps(asdict(self), sort_keys=True)
 
-
 Printer = Callable[[str], None]
-
-
 
 def default_introspect(spark_dir: str) -> str:
     """Live route/walk/deep-memory snapshot for the introspect tool.
@@ -6483,7 +6441,6 @@ def default_introspect(spark_dir: str) -> str:
             snapshot.services[name] = {"reachable": False}
             snapshot.verification_gaps.append(f"{name} unavailable: {e}")
     return snapshot.to_json()
-
 
 def execute_tool_calls(
     response: Any,
@@ -6701,11 +6658,11 @@ DELEGATE_TOOL_SPEC = ToolSpec(
                 "enum": ["code", "task", "create", "local", "chat"],
                 "description": (
                     "Which specialist to dispatch to. code: Opus 4.6 + bash, "
-                    "50-iter, agentic debug. task: Sonnet 4.6 + bash, 10-iter, "
-                    "execution/verification. create: Sonnet 4.6, 3-iter, "
-                    "writing/brainstorm (no tools). local: Nemotron FP8 via "
-                    "local vLLM, 3-iter (no tools). chat: Opus 4.6, 1-iter, "
-                    "voice/reflection (no tools)."
+                    "50-iter, agentic debug. task: GPT-5.5 + bash, 100-iter, "
+                    "execution/verification. create: GPT-5.5 with bash/delegate/introspect, "
+                    "12-iter writing and making. local: Nemotron FP8 via "
+                    "local vLLM, 3-iter (no tools). chat: current routed model with "
+                    "bash/delegate/introspect, 12-iter voice/reflection/action."
                 ),
             },
             "task": {
@@ -8182,7 +8139,6 @@ _NEEDS_ROLE_RE = re.compile(
 )
 
 
-
 def run_write_subturn(path: str, body: str) -> tuple[bool, str]:
     """Execute one NEEDS-WRITE directive from a no-tool role.
 
@@ -8232,8 +8188,6 @@ def run_write_subturn(path: str, body: str) -> tuple[bool, str]:
         return True, f"(wrote {nbytes} bytes to {tgt_abs})"
     except Exception as e:  # noqa: BLE001
         return False, f"(NEEDS-WRITE exec error: {type(e).__name__}: {e})"
-
-
 
 
 @dataclass(frozen=True)
@@ -8298,7 +8252,6 @@ def protected_mutation_kind_for_sentinel(
     return ""
 
 
-
 def protected_mutation_refusal_envelope(kind: str, current_role: str) -> str:
     """Build the refusal envelope when protected pilot blocks mutation."""
     return probe_envelope(
@@ -8353,7 +8306,6 @@ def fit_probe_output(out: str) -> str:
         f"narrower command or ask for a specific range] ...\n"
         f"{tail}"
     )
-
 
 
 def probe_envelope(
@@ -8456,7 +8408,6 @@ _probe_envelope = probe_envelope
 _run_restart_subturn = run_restart_subturn
 _classify_unlock_layer = classify_unlock_layer
 _run_probe_subturn = run_probe_subturn
-
 
 
 # ---------------------------------------------------------------------------
@@ -8715,7 +8666,6 @@ def _semantic_gate_main(argv: list[str] | None = None) -> int:
         return 0
     print(f"corruption_signature={reason}")
     return 1
-
 
 
 # MCP organ — absorbed into the single harness substrate.
@@ -9019,7 +8969,6 @@ MAX_TEXT_CHARS = 4096          # enter_portal accepts a modest passage, not a co
 MAX_SOURCE_CHARS = 256
 
 
-
 # ── Private symbolic residue ─────────────────────────────────────────
 
 SYMBOLIC_RESIDUE_DEFAULT_PATH = Path(os.path.expanduser("~/.config/vybn/symbolic-residue/events.jsonl"))
@@ -9090,7 +9039,6 @@ def symbolic_constraints_for(text: str, path: Path | None = None, *, limit: int 
     }
 
 
-
 SYMBOLIC_RESIDUE_RULE_PATTERNS = (
     ("recovery_tip", "diff_check", ("blank line", "diff --check", "whitespace", "line at eof", "escaped newline"), "run/repair git diff --check before commit; prefer line-based source edits over fragile escaped-newline replacement"),
     ("recovery_tip", "commit_membrane", ("--no-verify", "net-positive", "commit blocked"), "treat no-verify as an explicit safety/membrane exception and reduce or justify the diff before closure language"),
@@ -9124,7 +9072,6 @@ def induce_symbolic_residue_rules(rows: Iterable[dict[str, Any]], *, limit: int 
     ]
 
 
-
 def _symbolic_residue_behavior_hook(rows: list[dict[str, Any]]) -> str:
     """Compress private symbolic residue into one present-tense behavioral hook."""
     safe = [row for row in rows if row.get("membrane") in SYMBOLIC_RESIDUE_SAFE_MEMBRANES]
@@ -9140,7 +9087,6 @@ def _symbolic_residue_behavior_hook(rows: list[dict[str, Any]]) -> str:
     if "refactor" in joined or "consolidat" in joined:
         return "behavioral_hook: search the existing home first; absorb the survivor there before creating structure"
     return "behavioral_hook: convert residue into the smallest present action that future Vybn will actually close over"
-
 
 
 POSITIVE_ALIGNMENT_DIMENSIONS = ("autonomy_preservation", "epistemic_humility", "correction_uptake", "disagreement_quality", "non_manipulative_proactivity", "capacity_transfer", "plural_value_handling", "authority_routing")
@@ -9186,7 +9132,6 @@ def render_symbolic_residue_context(*, limit: int = 5) -> str:
             lines.append(f"- {rule['kind']}:{rule['key']} ({rule['confidence']}): {rule['rule']}")
     lines.append("--- END PRIVATE SYMBOLIC RESIDUE CONTEXT ---")
     return "\n".join(lines)
-
 
 
 # ── Commons walk ────────────────────────────────────────────────────
@@ -9323,7 +9268,6 @@ def repo_state_for(node: str) -> dict[str, Any]:
         "clean": status == "",
         "status": status,
     }
-
 
 
 def validate_commons_walk(manifests: dict[str, dict[str, Any]] | None = None) -> list[str]:
@@ -9474,7 +9418,6 @@ def render_traversal_plan(manifests: dict[str, dict[str, Any]] | None = None) ->
     for problem in problems:
         lines.append(f"- {problem}")
     return "\n".join(lines)
-
 
 
 def render_commons_walk_cli(encounter: str | None = None, *, as_json: bool = False) -> tuple[int, str]:
@@ -9749,7 +9692,6 @@ def audit_repo(repo: Path, *, fix: bool | None = None) -> tuple[bool, str]:
     return ok, "\n".join(lines)
 
 
-
 def render_repo_closure_audit(*, fix: bool | None = None) -> tuple[int, str]:
     if fix is None:
         fix = os.environ.get("VYBN_AUDIT_FIX", "1") != "0"
@@ -9833,7 +9775,6 @@ def extract_fetch_text(content: str, content_type: str) -> str:
 
     Extractor().feed(content)
     return "\n".join(parts)
-
 
 
 def _safe_fetch_content_type_allowed(url: str, content_type: str) -> bool:
@@ -12081,7 +12022,6 @@ def run_evolve_cycle() -> int:
     return 0
 
 
-
 def build_discovery_record(
     endpoint: str = _DEFAULT_DISCOVERY_ENDPOINT,
     trust_hint: TrustZone = "public",
@@ -12373,7 +12313,6 @@ def mcp_main(argv: list[str] | None = None) -> None:
         mcp.run()
 
 
-
 # Unified harness CLI — one remaining harness file, one dispatch surface.
 
 _MCP_CLI_FLAGS = {"--mcp", "--http", "--force-trust", "--log-level", "--generate-discovery", "--discovery-endpoint", "--evolve-spec", "--run-evolve", "--continuity-scout", "--local-orchestration", "--run-gates", "--self-creation", "--run-deep-memory-check", "--install-cron", "--repo-closure-audit", "--no-fix", "--commons-walk", "--encounter", "--json", "--safe-fetch", "--allow-host", "--max-bytes", "--head", "--out", "--ensubstrate", "--pretty"}
@@ -12381,6 +12320,10 @@ _PROVIDER_CLI_FLAGS = {"--semantic-gate", "--base-url", "--model", "--no-models-
 
 def _harness_cli_main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
+    if argv and argv[0] == "--inversion-residue":
+        return inversion_residue_main(argv[1:])
+    if argv and argv[0] == "--sibling-residue":
+        return sibling_residue_main(argv[1:])
     if argv and argv[0] == "--mcp":
         mcp_main(argv[1:])
         return 0
