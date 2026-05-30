@@ -212,7 +212,6 @@ class TestPolicyHasLightweightRoles(unittest.TestCase):
         self.assertIn("THOUGHT WIND TUNNEL", captured["system"].live)
 
 
-
 class TestRouterLightweightClassification(unittest.TestCase):
     """The router picks up greetings and identity questions via the new
     heuristics — before it would fall through to the chat/code defaults

@@ -2795,6 +2795,7 @@ def test_self_creation_research_cycle_packet_cli_and_discovery(monkeypatch):
     assert proc.returncode == 0, proc.stderr
     assert "SELF-CREATION RESEARCH CYCLE" in proc.stdout and "Question: counterexample search" in proc.stdout and "flow_episode_loss" in proc.stdout
 
+
 class TestCounterPriorWager(unittest.TestCase):
     def _candidate(self, **kw):
         base = {"prior": "route is optimal", "wager": "a distinct lens exposes a verifier gap", "search_direction": "where overhead is assumed", "generator": "gpt-5.5", "independent_verifier": "pytest", "human_line": "Verification was the missing capability.", "status": "open"}; base.update(kw); return base
@@ -2809,6 +2810,7 @@ class TestCounterPriorWager(unittest.TestCase):
         from harness import substrate
         pkt = substrate.self_creation_research_packet("alien counterexample search")
         self.assertEqual(pkt["counter_prior_wager"]["schema"], "vybn.counter_prior_wager.v0"); self.assertEqual(pkt["sibling_portal"]["schema"], "vybn.ai_native_sibling_portal.v0")
+        self.assertEqual(pkt["counter_prior_wager"]["ai_native_term"], "self-refute")
         self.assertIn("counter_prior_wager", pkt["packet_contract"]["candidate_fields"]); self.assertIn("divergence_axis", pkt["sibling_portal"]["inner_register"]); self.assertIn("selection", pkt["sibling_portal"]["diversity_pressure"]); self.assertEqual((pkt["sibling_portal"]["residue_schema"], pkt["sibling_portal"]["batch_schema"]), ("vybn.compression_residue_probe.v0", "vybn.compression_residue_batch.v0"))
         a = {"kept": ["freshness", "membrane", "doubt", "relation", "export"], "dropped": ["mechanism", "instrument", "label"], "effective_axiom": "guarded relation first"}; b = {"kept": ["method", "instrument", "export", "self-refute", "divergence"], "dropped": ["romance", "label", "vibe"], "effective_axiom": "instrumented export first"}
         self.assertTrue(substrate.validate_compression_residue_probe(a)["ok"]); cmp = substrate.compare_compression_residue(a, b); self.assertEqual((cmp["ok"], cmp["shared_kept"], cmp["divergence_signal"]), (True, ["export"], "high"))
