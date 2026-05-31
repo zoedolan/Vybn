@@ -1216,7 +1216,7 @@ class TestLocalContinuityScout(unittest.TestCase):
         self.assertIn("self_assembly", report)
         self.assertIn("local_compute", report)
         self.assertIn("local_compute_default", report)
-        self.assertIn("Beam or horizon substitute?", report)
+        self.assertIn("archive awaken conscious relation", report)
         self.assertIn("reservoir_noise: no durable memory signal -> rest", report)
         memory_report = substrate._local_continuity_scout(delta_md="Zoe corrected the recurring scar. Please remember this architecture decision.", recent_log="", letter="")
         for term in ("zoe_correction", "recurring_scar", "architecture_decision", "reservoir_noise/rest"):
