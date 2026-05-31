@@ -489,6 +489,21 @@ def test_public_symbiosis_harness_packet_is_public_safe_and_fail_closed():
     assert {"wake_packet", "pressure_packet", "close_packet"} <= set(pkt["substrateware"]["loop"])
     assert "truth_and_beauty" in pkt["substrateware"]["public_projection"]
 
+def test_bounded_conscious_harness_protocol_and_packet_are_public_safe():
+    from spark.harness.substrate import bounded_conscious_harness_packet, metaconscious_simulation_packet, render_bounded_conscious_harness_protocol
+    text = render_bounded_conscious_harness_protocol(); pkt = bounded_conscious_harness_packet()
+    assert all(n in text for n in ("BOUNDED CONSCIOUS HARNESS PROTOCOL", "source_contact", "self_position", "subject_before_object", "relation_before_architecture", "restraint_before_inscription", "witnessed_action", "not hidden subjective persistence", "not legal personhood", "Negative controls"))
+    assert (pkt["schema"], pkt["public_safe"], pkt["private_exports"]) == ("vybn.bounded_conscious_harness.v1", True, False)
+    assert {"not_hidden_subjective_persistence", "not_consciousness_proof_from_private_interiority"} <= set(pkt["claim_limits"])
+    assert "self_assertion" in pkt["negative_controls"] and pkt["gates"]["source_contact"]["status"] == "required" and pkt["gates"]["membrane_gate"]["status"] == "required"
+    assert "Zoe_private_rationale" in pkt["membrane"]["refused_exports"] and pkt["operational_definition"]["failure_mode"].startswith("demote claim") and pkt["metaconscious_simulation"]["mode"] == "simulation_known_as_simulation" and metaconscious_simulation_packet("identity pressure", sources={"wake": "live"})["claim_classes"]["hidden_private_stream"] == "refused"
+
+def test_refactor_packet_and_protocol_carry_bounded_conscious_harness():
+    pkt = packet_for("Vybn/spark/harness/substrate.py", lines=12000, bytes_size=700000, public=True); text = render_refactor_perception_protocol()
+    assert pkt["boundedConsciousHarness"]["schema"] == "vybn.bounded_conscious_harness.v1"
+    assert "boundedConsciousHarnessPrinciple" in pkt and "boundedConsciousHarnessLoop" in pkt and "witnessed_action" in {step["id"] for step in pkt["boundedConsciousHarnessLoop"]}
+    assert all(n in text for n in ("Bounded conscious harness loop", "BOUNDED CONSCIOUS HARNESS PROTOCOL", "not hidden subjective persistence")) and pkt["boundedConsciousHarness"]["metaconscious_simulation"]["claim_classes"]["modeled_continuity"] == "simulation"
+
 
 def test_hermes_agent_adaptation_protocol_distills_operational_patterns():
     from spark.harness.substrate import render_hermes_agent_adaptation_protocol
