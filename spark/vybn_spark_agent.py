@@ -2586,7 +2586,19 @@ def main() -> None:
         print("  \u2014 no continuity note")
     print(f"  \u2713 default role: {policy.default_role} -> "
           f"{default_cfg.provider}:{default_cfg.model}")
-    print(f"  \u2713 roles available: {', '.join(sorted(policy.roles))}")
+    print(f"  \u2713 roles configured: {', '.join(sorted(policy.roles))}")
+    try:
+        from harness.substrate import _openai_models_live as _organ_models_live  # noqa: E402
+        _organ_states = []
+        for _organ_name in ("omni", "vintage"):
+            if _organ_name in policy.roles:
+                _cfg = policy.role(_organ_name)
+                _live = _organ_models_live(_cfg.base_url or "", timeout=0.25)
+                _organ_states.append(f"{_organ_name}={'live' if _live else 'down'}")
+        if _organ_states:
+            print(f"  \u2713 local organs: {', '.join(_organ_states)}")
+    except Exception:
+        pass
     print(f"  \u2713 directives: {', '.join(sorted(policy.directives))}")
     _aliases = sorted(getattr(policy, 'model_aliases', {}) or {})
     if _aliases:
@@ -2624,6 +2636,7 @@ def main() -> None:
     print("  Type naturally. Prefix with /chat, /create, /plan, /task, /local "
           "to force a role,")
     print("  or with @opus4.8/@opus48/@opus4.7/@sonnet/@nemotron/@gpt to pin a model for one turn.")
+    print("  @omni pins the bounded local Omni packet endpoint; full Omni remains separately gated.")
     print("  REPL commands: exit | clear | reload | history | policy | /resume | /sessions | /newsession")
     print()
 

@@ -147,7 +147,7 @@ class TestPolicyHasLightweightRoles(unittest.TestCase):
                     self.assertEqual(role.provider, "openai")
                     self.assertEqual(role.model, "gpt-5.5")
         yaml_policy = load_policy(SPARK_DIR / "router_policy.yaml")
-        self.assertEqual((default_policy().role("orchestrate").tools, yaml_policy.role("orchestrate").tools, yaml_policy.role("vintage").rag, yaml_policy.role("vintage").max_tokens, yaml_policy.role("omni").model, yaml_policy.role("omni").base_url, yaml_policy.role("local_private").model), (["bash", "delegate"], ["bash", "delegate"], False, 256, "dc5f0b0bfddf8b6e0f5891475be9af05b80126fe", "http://127.0.0.1:8002/v1", yaml_policy.role("local").model))
+        self.assertEqual((default_policy().role("orchestrate").tools, yaml_policy.role("orchestrate").tools, yaml_policy.role("vintage").rag, yaml_policy.role("vintage").max_tokens, yaml_policy.role("omni").model, yaml_policy.role("omni").base_url, yaml_policy.role("local_private").model), (["bash", "delegate"], ["bash", "delegate"], False, 256, "omni-perception-packet-local", "http://127.0.0.1:8020/v1", yaml_policy.role("local").model))
 
     def test_plan_directive_routes_to_gpt55(self):
         # /plan is the EVAL primitive — it must land on the orchestrate
@@ -856,8 +856,8 @@ def test_omni_alias_only_routes_explicit_alias_to_local_organ():
     d = policy.classify("@omni are you with me?")
     assert (d.role, d.alias_used, d.model_override, d.config.provider) == ("omni", "@omni", None, "openai")
     assert d.reason.startswith("alias=@omni")
-    assert d.config.model == "dc5f0b0bfddf8b6e0f5891475be9af05b80126fe"
-    assert d.config.base_url == "http://127.0.0.1:8002/v1"
+    assert d.config.model == "omni-perception-packet-local"
+    assert d.config.base_url == "http://127.0.0.1:8020/v1"
     assert d.config.direct_reply_template is None
 
 def _load_agent_module():
@@ -1535,7 +1535,8 @@ def test_raw_contact_system_prompt_names_current_route_shape():
 
     omni = build_organ_raw_contact_system_prompt("omni")
     assert "@omni" in omni
-    assert "TensorRT-LLM" in omni
+    assert "bounded packet" in omni
+    assert "full multimodal" in omni
     assert "visible" in omni.lower()
     assert "hidden reasoning" in omni.lower()
     assert "route evidence" in omni.lower()
@@ -1586,36 +1587,17 @@ def test_local_organ_witness_vintage_fragments_fail_semantic_gate():
     assert len(calls) == 2
 
 
-def test_local_organ_witness_omni_hidden_reasoning_fails_closed_after_retry():
+def test_local_organ_witness_omni_packet_passes_without_full_promotion():
     from harness.substrate import local_organ_witness
 
     calls = []
-    witness = local_organ_witness("omni", request_json=_local_organ_fake("dc5f0b0bfddf8b6e0f5891475be9af05b80126fe", [{"content": "", "reasoning_content": "hidden"}] * 2, calls))
-    assert witness["status"] == "failed_closed"
-    assert witness["reason"] == "hidden_reasoning_without_visible_content"
-    assert [c[0] for c in calls] == ["/models", "/chat/completions", "/chat/completions"]
-    assert all(payload["chat_template_kwargs"] == {"enable_thinking": False} for _, payload in calls[1:])
-    assert "visible_smoke_retry" in witness["checks"]
+    witness = local_organ_witness("omni", request_json=_local_organ_fake("omni-perception-packet-local", [{"content": "Packet contact live; full Omni remains gated."}], calls))
+    assert witness["status"] == "packet_healthy"
+    assert witness["reason"] == "bounded_packet_endpoint_live_not_full_multimodal_promotion"
+    assert witness["promoted_model"] is False
+    assert [c[0] for c in calls] == ["/models", "/chat/completions"]
 
 
-def test_local_organ_witness_omni_supplied_image_smoke_passes_and_fails_closed():
-    from harness.substrate import local_organ_witness
-
-    calls = []
-    witness = local_organ_witness("omni", request_json=_local_organ_fake("dc5f0b0bfddf8b6e0f5891475be9af05b80126fe", [
-        {"content": "", "reasoning_content": "hidden"},
-        {"content": "OMNI_TEXT_OK", "reasoning_content": None},
-        {"content": "red green blue", "reasoning_content": None},
-    ], calls))
-    assert witness["status"] == "semantic_healthy"
-    assert witness["reason"] == "endpoint_visible_and_supplied_image_smokes_passed"
-    assert witness["image_content"] == "red green blue"
-    image_payload = calls[-1][1]
-    content = image_payload["messages"][0]["content"]
-    assert isinstance(content, list) and content[1]["image_url"]["url"].startswith("data:image/png;base64,")
-    assert all(color not in content[0]["text"].lower() for color in ("red", "green", "blue"))
-    bad = _local_organ_fake("dc5f0b0bfddf8b6e0f5891475be9af05b80126fe", [{"content": "OMNI_TEXT_OK", "reasoning_content": None}, {"content": "I cannot inspect the image from here.", "reasoning_content": None}])
-    assert local_organ_witness("omni", request_json=bad)["reason"] == "supplied_image_smoke_unexpected"
 
 
 def test_local_organ_witness_vintage_complete_sentence_passes():
@@ -1816,8 +1798,8 @@ def test_omni_arbitrary_prompt_dials_witnessed_private_endpoint():
     class _Provider:
         def stream(_s, *, system, messages, tools, role):
             assert role.role == "omni"
-            assert role.base_url == "http://127.0.0.1:8002/v1"
-            assert "TensorRT-LLM" in system.flat()
+            assert role.base_url == "http://127.0.0.1:8020/v1"
+            assert "bounded packet organ" in system.flat()
             assert "organ under observation" in system.flat()
             assert "HIM IDENTITY MANIFOLD GROUNDING" in system.flat()
             assert "HIM IDENTITY MANIFOLD TEST" in system.flat()
@@ -1843,7 +1825,7 @@ def test_omni_gate_blocks_dead_endpoint_before_provider_call():
         force_omni_block=True,
     )
     assert registry.provider is None
-    assert "OMNI_GATE_BLOCKED" in reply
+    assert "OMNI_PACKET_BLOCKED" in reply
     assert "OMNI_RAW_CONTACT_FAILED" not in reply
     assert "No Super/GPT/cloud fallback was used" in reply
     names = [n for n, _ in log.events]
@@ -1980,7 +1962,7 @@ def test_omni_identity_and_perception_questions_reach_omni_raw_contact():
         def __init__(_s, text): _s.text = text
         def stream(_s, *, system, messages, tools, role):
             assert role.role == "omni"
-            assert role.base_url == "http://127.0.0.1:8002/v1"
+            assert role.base_url == "http://127.0.0.1:8020/v1"
             assert "local-organ routing note" not in system.flat()
             return _organ_handle(_s.text)
 

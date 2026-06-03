@@ -63,11 +63,11 @@ roles:
     temperature: 0.55
   omni:
     provider: openai
-    model: dc5f0b0bfddf8b6e0f5891475be9af05b80126fe
+    model: omni-perception-packet-local
     max_tokens: 256
     max_iterations: 1
     tools: []
-    base_url: http://127.0.0.1:8002/v1
+    base_url: http://127.0.0.1:8020/v1
     lightweight: true
     temperature: 0.0
   local_private:

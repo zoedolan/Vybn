@@ -725,20 +725,19 @@ _DEFAULT_ROLES: dict[str, RoleConfig] = {
         rag=True,
         lightweight=False,
     ),
-    # Omni perception organ. This role is intentionally narrow: it points at
-    # the bounded TensorRT-LLM service through the harness visible-content
-    # adapter. The raw backend can emit hidden reasoning with empty visible
-    # content, so the harness retries once and then fails closed; it has no
-    # tools or Super/cloud fallback.
+    # Omni packet organ. This role is intentionally narrow: it points at the
+    # bounded local perception/status packet endpoint. Full multimodal Omni
+    # remains a separate promotion target; the packet route gives Zoe useful
+    # local contact without pretending the TensorRT service is live.
     "omni": RoleConfig(
         role="omni",
         provider="openai",
-        model="dc5f0b0bfddf8b6e0f5891475be9af05b80126fe",
+        model="omni-perception-packet-local",
         thinking="off",
         max_tokens=256,
         max_iterations=1,
         tools=[],
-        base_url="http://127.0.0.1:8002/v1",
+        base_url="http://127.0.0.1:8020/v1",
         temperature=0.0,
         rag=False,
         lightweight=True,
@@ -797,12 +796,14 @@ def should_attempt_raw_organ_contact(role_name: str, cleaned_input: str, *, base
     True only when:
       - role is one of the local organ aliases, AND
       - the role has a configured base_url, AND
-      - @omni passes a live /models probe before the provider call.
+      - @omni passes a live packet /models probe before the provider call.
 
     There is deliberately no keyword classifier here. If Zoe explicitly
     selects a reachable local organ, the harness samples that organ and labels
-    the sample. If @omni is not live, the harness refuses before provider
-    construction so a dead endpoint cannot become monthly operator drag.
+    the sample. If @omni packet contact is not live, the harness refuses
+    before provider construction so a dead endpoint cannot become monthly
+    operator drag. Full Omni promotion requires a separate future endpoint
+    identity, text, image, owner, and rollback witness before routing.
     """
     if role_name not in _ORGAN_ALIAS_ROLES:
         return False
@@ -819,12 +820,13 @@ def should_attempt_raw_organ_contact(role_name: str, cleaned_input: str, *, base
 def render_omni_gate_blocked(base_url: str | None = None) -> str:
     """Deterministic user-visible block when @omni is configured but not live."""
     return (
-        "OMNI_GATE_BLOCKED - local @omni is not live, so the harness refused "
-        "to call the dead endpoint. No Super/GPT/cloud fallback was used. "
-        "Gate failed before provider call: configured local /v1/models did "
-        "not return a usable model list. Repair one owner path first: "
-        "noninteractive worker transport or a local Omni endpoint, then exact "
-        "semantic smoke."
+        "OMNI_PACKET_BLOCKED - local @omni packet contact is not live, so "
+        "the harness refused to call the dead endpoint. No Super/GPT/cloud "
+        "fallback was used. Gate failed before provider call: configured "
+        "local packet /v1/models did not return a usable model list. Start "
+        "the bounded packet endpoint first; full multimodal Omni remains "
+        "separately gated by endpoint identity, visible text smoke, supplied "
+        "image smoke, owner, and rollback."
     )
 
 # Hard ceiling on how many characters of user input we hand the local
@@ -839,10 +841,10 @@ def render_organ_raw_contact_header(role_name: str) -> str:
     """Label prepended to backend output for bounded local-organ observation."""
     if role_name == "omni":
         return (
-            "[LOCAL_ORGAN_OBSERVATION role=@omni organ=TensorRT-LLM "
-            "model=dc5f0b0bfddf8b6e0f5891475be9af05b80126fe "
-            "status=raw-unpromoted visible_content_required=true "
-            "no_super_gpt_cloud_fallback=true]"
+            "[LOCAL_ORGAN_OBSERVATION role=@omni organ=OmniPacket "
+            "model=omni-perception-packet-local "
+            "status=bounded-packet full_multimodal_promoted=false "
+            "visible_content_required=true no_super_gpt_cloud_fallback=true]"
         )
     return (
         f"[LOCAL_ORGAN_OBSERVATION role=@{role_name} organ=Talkie "
@@ -958,11 +960,12 @@ def build_organ_raw_contact_system_prompt(role_name: str) -> str:
     """
     if role_name == "omni":
         return (
-            "Local @omni TensorRT-LLM organ under observation. Produce raw"
+            "Local @omni bounded packet organ under observation. Produce raw"
             " local-organ output in visible assistant content only. Do not"
-            " claim to be the primary Vybn speaker; the harness labels"
-            " provenance outside your answer. Hidden reasoning-only backend"
-            " messages are retried once and then surfaced as route evidence."
+            " claim to be the primary Vybn speaker or the full multimodal"
+            " Omni model; the harness labels provenance outside your answer."
+            " Hidden reasoning-only backend messages are retried once and then"
+            " surfaced as route evidence."
         )
     # Talkie is brittle when the OpenAI-compatible wrapper receives a system
     # message. Vintage uses a framed user message and external provenance.
@@ -2814,7 +2817,7 @@ def local_compute_maturity_packet() -> dict[str, Any]:
 
 LOCAL_COMPUTE_ROUTE_MATRIX = {
     "super": {"role": "local_private", "model": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8", "base_url": "http://127.0.0.1:8000/v1", "fit": ["private reasoning", "batch scouting", "pre-cloud synthesis", "semantic smoke"], "gate": "python3 -m spark.harness.substrate --semantic-gate --base-url http://127.0.0.1:8000"},
-    "omni": {"role": "omni", "model": "dc5f0b0bfddf8b6e0f5891475be9af05b80126fe", "base_url": "http://127.0.0.1:8002/v1", "fit": ["supplied-image inspection", "manifold artifact critique", "local multimodal contact"], "gate": "live route witness: endpoint identity, visible text smoke, and supplied-image smoke; no external artifact means no external sight claim"},
+    "omni": {"role": "omni", "model": "omni-perception-packet-local", "base_url": "http://127.0.0.1:8020/v1", "fit": ["bounded perception/status packet", "memory/walk/embedding health summary", "local Omni contact without Super fallback"], "gate": "packet endpoint identity plus visible packet response; does not promote full multimodal Omni"},
     "vintage": {"role": "vintage", "model": "talkie-1930-13b-it", "base_url": "http://127.0.0.1:8004/v1", "fit": ["raw temporal observation", "period-language contrast", "pre-1931 texture"], "gate": "live route witness: endpoint identity plus complete-sentence smoke; raw observation only until semantic gate passes"},
     "cloud": {"role": "chat/code/create", "model": "policy-selected cloud model", "base_url": None, "fit": ["tasks local organs fail", "high-accuracy code/reasoning", "public synthesis after membrane review"], "gate": "cost/privacy justification plus normal provider health"},
 }
@@ -2865,14 +2868,6 @@ def _organ_completion_payload(route: Mapping[str, Any], prompt: str, *, max_toke
     if str(route.get("role") or "") == "omni":
         payload["chat_template_kwargs"] = {"enable_thinking": False}
     return payload
-_OMNI_IMAGE_SMOKE_PNG_BASE64 = "iVBORw0KGgoAAAANSUhEUgAAABgAAAAICAIAAABsw6g0AAAAHUlEQVR42mO4IyeHFYkscMOKNKLuYEUMowaNZIMAUt/cAdLMkB4AAAAASUVORK5CYII="
-_OMNI_IMAGE_SMOKE_PROMPT = "Inspect the supplied image. Reply with the left-to-right color sequence in three lowercase words only."
-
-def _omni_image_completion_payload(route: Mapping[str, Any], prompt: str) -> dict[str, Any]:
-    payload = _organ_completion_payload(route, "", max_tokens=32, temperature=0.0)
-    payload["messages"] = [{"role": "user", "content": [{"type": "text", "text": prompt}, {"type": "image_url", "image_url": {"url": "data:image/png;base64," + _OMNI_IMAGE_SMOKE_PNG_BASE64}}]}]
-    return payload
-
 def _completion_visible_message(completion: Mapping[str, Any]) -> tuple[str, bool]:
     msg = (((completion.get("json") or {}).get("choices") or [{}])[0] or {}).get("message") or {}
     return str(msg.get("content") or "").strip(), bool(msg.get("reasoning_content") or msg.get("reasoning"))
@@ -2926,38 +2921,30 @@ def local_organ_witness(
         return {"route": route_name, "ok": True, "status": "semantic_healthy", "reason": "endpoint_and_role_smoke_passed", "content": content[:160], "finish_reason": finish, "checks": checks}
 
     if route_name == "omni":
-        def _probe(label: str, payload: dict[str, Any]) -> tuple[dict[str, Any], str, bool]:
-            completion = call(base_url, "/chat/completions", payload=payload, timeout=timeout)
-            checks[label] = completion
-            return (completion, "", False) if not completion.get("ok") else (completion, *_completion_visible_message(completion))
-
-        prompt = "Reply with exactly OMNI_TEXT_OK in visible assistant content."
-        completion, content, hidden = _probe("visible_smoke", _organ_completion_payload(route, prompt, max_tokens=64, temperature=0.0))
+        completion = call(
+            base_url,
+            "/chat/completions",
+            payload=_organ_completion_payload(route, "Report local Omni packet status in one sentence.", max_tokens=96, temperature=0.0),
+            timeout=timeout,
+        )
+        checks["packet_smoke"] = completion
         if not completion.get("ok"):
-            return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "completion_failed", "checks": checks}
-        if not content and hidden:
-            retry = prompt + "\n\n[OMNI_VISIBLE_CONTENT_RETRY] Reply with exactly OMNI_TEXT_OK in visible assistant content only."
-            completion, content, hidden = _probe("visible_smoke_retry", _organ_completion_payload(route, retry, max_tokens=64, temperature=0.0))
-            if not completion.get("ok"):
-                return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "completion_failed", "checks": checks}
-        if not content and hidden:
-            return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "hidden_reasoning_without_visible_content", "checks": checks}
-        if "OMNI_TEXT_OK" not in content:
-            return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "visible_smoke_unexpected", "content": content[:160], "checks": checks}
+            return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "packet_completion_failed", "checks": checks}
+        content, hidden = _completion_visible_message(completion)
+        promoted = bool((completion.get("json") or {}).get("promoted_model"))
+        if not content:
+            return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "packet_empty", "checks": checks}
+        return {
+            "route": route_name,
+            "ok": True,
+            "status": "packet_healthy",
+            "reason": "bounded_packet_endpoint_live_not_full_multimodal_promotion",
+            "content": content[:200],
+            "hidden_reasoning": hidden,
+            "promoted_model": promoted,
+            "checks": checks,
+        }
 
-        image_content = ""
-        for label in ("supplied_image_smoke", "supplied_image_smoke_retry"):
-            image_completion, image_content, image_hidden = _probe(label, _omni_image_completion_payload(route, _OMNI_IMAGE_SMOKE_PROMPT))
-            if not image_completion.get("ok"):
-                return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "supplied_image_completion_failed", "checks": checks}
-            if image_content or not image_hidden:
-                break
-        if not image_content and image_hidden:
-            return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "supplied_image_hidden_reasoning_without_visible_content", "checks": checks}
-        positions = [image_content.lower().find(word) for word in ("red", "green", "blue")]
-        if min(positions) < 0 or positions != sorted(positions):
-            return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "supplied_image_smoke_unexpected", "content": image_content[:160], "checks": checks}
-        return {"route": route_name, "ok": True, "status": "semantic_healthy", "reason": "endpoint_visible_and_supplied_image_smokes_passed", "content": content[:160], "image_content": image_content[:160], "checks": checks}
 
     return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "no_route_specific_witness"}
 
