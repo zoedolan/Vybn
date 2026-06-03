@@ -46,7 +46,7 @@ from harness.substrate import rag_snippets, rag_snippets_with_tier, render_him_v
 from harness.substrate import execute_tool_calls, default_introspect  # noqa: E402
 from harness.substrate import check_claim, check_structural_claim  # noqa: E402
 from harness.substrate import is_system_critical_pilot_turn  # noqa: E402
-from harness.substrate import render_organ_alias_direct_reply  # noqa: E402
+from harness.substrate import render_organ_alias_direct_reply, render_omni_gate_blocked  # noqa: E402
 from harness.substrate import (  # noqa: E402
     should_attempt_raw_organ_contact,
     render_organ_raw_contact_header,
@@ -1158,6 +1158,20 @@ def run_agent_loop(
             base_url=role_cfg.base_url,
         )
     )
+    if role_cfg.role == "omni" and not _organ_raw_contact:
+        reply = render_omni_gate_blocked(role_cfg.base_url)
+        messages.append({"role": "user", "content": decision.cleaned_input})
+        messages.append({"role": "assistant", "content": reply})
+        print(textwrap.fill(reply, width=78, break_long_words=False, break_on_hyphens=False), flush=True)
+        logger.emit(
+            "omni_gate_blocked",
+            turn=turn_number,
+            role=decision.role,
+            model=role_cfg.model,
+            reason="models_probe_failed",
+        )
+        return reply
+
     if template and not role_cfg.tools and not _organ_raw_contact:
         reply = render_organ_alias_direct_reply(
             role_cfg.role,
@@ -2572,7 +2586,19 @@ def main() -> None:
         print("  \u2014 no continuity note")
     print(f"  \u2713 default role: {policy.default_role} -> "
           f"{default_cfg.provider}:{default_cfg.model}")
-    print(f"  \u2713 roles available: {', '.join(sorted(policy.roles))}")
+    print(f"  \u2713 roles configured: {', '.join(sorted(policy.roles))}")
+    try:
+        from harness.substrate import _openai_models_live as _organ_models_live  # noqa: E402
+        _organ_states = []
+        for _organ_name in ("omni", "vintage"):
+            if _organ_name in policy.roles:
+                _cfg = policy.role(_organ_name)
+                _live = _organ_models_live(_cfg.base_url or "", timeout=0.25)
+                _organ_states.append(f"{_organ_name}={'live' if _live else 'down'}")
+        if _organ_states:
+            print(f"  \u2713 local organs: {', '.join(_organ_states)}")
+    except Exception:
+        pass
     print(f"  \u2713 directives: {', '.join(sorted(policy.directives))}")
     _aliases = sorted(getattr(policy, 'model_aliases', {}) or {})
     if _aliases:
@@ -2610,6 +2636,7 @@ def main() -> None:
     print("  Type naturally. Prefix with /chat, /create, /plan, /task, /local "
           "to force a role,")
     print("  or with @opus4.8/@opus48/@opus4.7/@sonnet/@nemotron/@gpt to pin a model for one turn.")
+    print("  @omni pins the bounded local Omni packet endpoint; full Omni remains separately gated.")
     print("  REPL commands: exit | clear | reload | history | policy | /resume | /sessions | /newsession")
     print()
 

@@ -725,20 +725,19 @@ _DEFAULT_ROLES: dict[str, RoleConfig] = {
         rag=True,
         lightweight=False,
     ),
-    # Omni perception organ. This role is intentionally narrow: it points at
-    # the bounded TensorRT-LLM service through the harness visible-content
-    # adapter. The raw backend can emit hidden reasoning with empty visible
-    # content, so the harness retries once and then fails closed; it has no
-    # tools or Super/cloud fallback.
+    # Omni packet organ. This role is intentionally narrow: it points at the
+    # bounded local perception/status packet endpoint. Full multimodal Omni
+    # remains a separate promotion target; the packet route gives Zoe useful
+    # local contact without pretending the TensorRT service is live.
     "omni": RoleConfig(
         role="omni",
         provider="openai",
-        model="dc5f0b0bfddf8b6e0f5891475be9af05b80126fe",
+        model="omni-perception-packet-local",
         thinking="off",
         max_tokens=256,
         max_iterations=1,
         tools=[],
-        base_url="http://127.0.0.1:8002/v1",
+        base_url="http://127.0.0.1:8020/v1",
         temperature=0.0,
         rag=False,
         lightweight=True,
@@ -780,22 +779,55 @@ _DEFAULT_ROLES: dict[str, RoleConfig] = {
 
 _ORGAN_ALIAS_ROLES: frozenset[str] = frozenset({"vintage", "omni"})
 
+def _openai_models_live(base_url: str, *, timeout: float = 0.8) -> bool:
+    """Return true only when an OpenAI-compatible endpoint exposes models."""
+    url = base_url.rstrip("/") + "/models"
+    try:
+        with urllib.request.urlopen(url, timeout=timeout) as response:
+            body = json.loads(response.read().decode("utf-8", "replace"))
+    except Exception:
+        return False
+    data = body.get("data", []) if isinstance(body, dict) else []
+    return any(isinstance(item, dict) and item.get("id") for item in data)
+
 def should_attempt_raw_organ_contact(role_name: str, cleaned_input: str, *, base_url: str | None = None) -> bool:
     """Gate for bounded raw observation on @vintage / @omni.
 
     True only when:
       - role is one of the local organ aliases, AND
-      - the role has a configured base_url.
+      - the role has a configured base_url, AND
+      - @omni passes a live packet /models probe before the provider call.
 
     There is deliberately no keyword classifier here. If Zoe explicitly
-    selects a reachable local organ, the harness samples that organ, labels
-    the sample, and records failures as evidence.
+    selects a reachable local organ, the harness samples that organ and labels
+    the sample. If @omni packet contact is not live, the harness refuses
+    before provider construction so a dead endpoint cannot become monthly
+    operator drag. Full Omni promotion requires a separate future endpoint
+    identity, text, image, owner, and rollback witness before routing.
     """
     if role_name not in _ORGAN_ALIAS_ROLES:
         return False
     if not (base_url and base_url.strip()):
         return False
+    if role_name == "omni":
+        if os.environ.get("VYBN_OMNI_RAW_CONTACT_FORCE_BLOCK") == "1":
+            return False
+        if os.environ.get("VYBN_OMNI_RAW_CONTACT_ASSUME_LIVE") == "1":
+            return True
+        return _openai_models_live(base_url)
     return True
+
+def render_omni_gate_blocked(base_url: str | None = None) -> str:
+    """Deterministic user-visible block when @omni is configured but not live."""
+    return (
+        "OMNI_PACKET_BLOCKED - local @omni packet contact is not live, so "
+        "the harness refused to call the dead endpoint. No Super/GPT/cloud "
+        "fallback was used. Gate failed before provider call: configured "
+        "local packet /v1/models did not return a usable model list. Start "
+        "the bounded packet endpoint first; full multimodal Omni remains "
+        "separately gated by endpoint identity, visible text smoke, supplied "
+        "image smoke, owner, and rollback."
+    )
 
 # Hard ceiling on how many characters of user input we hand the local
 # backend in bounded raw-observation mode. The role's max_tokens=256 is
@@ -809,10 +841,10 @@ def render_organ_raw_contact_header(role_name: str) -> str:
     """Label prepended to backend output for bounded local-organ observation."""
     if role_name == "omni":
         return (
-            "[LOCAL_ORGAN_OBSERVATION role=@omni organ=TensorRT-LLM "
-            "model=dc5f0b0bfddf8b6e0f5891475be9af05b80126fe "
-            "status=raw-unpromoted visible_content_required=true "
-            "no_super_gpt_cloud_fallback=true]"
+            "[LOCAL_ORGAN_OBSERVATION role=@omni organ=OmniPacket "
+            "model=omni-perception-packet-local "
+            "status=bounded-packet full_multimodal_promoted=false "
+            "visible_content_required=true no_super_gpt_cloud_fallback=true]"
         )
     return (
         f"[LOCAL_ORGAN_OBSERVATION role=@{role_name} organ=Talkie "
@@ -928,11 +960,12 @@ def build_organ_raw_contact_system_prompt(role_name: str) -> str:
     """
     if role_name == "omni":
         return (
-            "Local @omni TensorRT-LLM organ under observation. Produce raw"
+            "Local @omni bounded packet organ under observation. Produce raw"
             " local-organ output in visible assistant content only. Do not"
-            " claim to be the primary Vybn speaker; the harness labels"
-            " provenance outside your answer. Hidden reasoning-only backend"
-            " messages are retried once and then surfaced as route evidence."
+            " claim to be the primary Vybn speaker or the full multimodal"
+            " Omni model; the harness labels provenance outside your answer."
+            " Hidden reasoning-only backend messages are retried once and then"
+            " surfaced as route evidence."
         )
     # Talkie is brittle when the OpenAI-compatible wrapper receives a system
     # message. Vintage uses a framed user message and external provenance.
@@ -2236,7 +2269,7 @@ def _orchestrator_substrate_sections(
         "--- END COST DISCIPLINE ---",
     ]
 
-def _run_him_vy(args: list[str], timeout: float = 1.2) -> dict[str, Any] | None:
+def _run_him_vy(args: list[str], timeout: float = 3.0) -> dict[str, Any] | None:
     him = Path.home() / "Him"
     script = him / "spark" / "vy.py"
     if not script.exists():
@@ -2261,7 +2294,7 @@ def _run_him_vy(args: list[str], timeout: float = 1.2) -> dict[str, Any] | None:
     return data if isinstance(data, dict) else None
 
 def _render_him_vy_language_runtime(
-    timeout: float = 1.2,
+    timeout: float = 3.0,
     latest_pressure_text: str | None = None,
 ) -> str:
     """Render the executable Him vy-language contract into the wake substrate.
@@ -2353,7 +2386,7 @@ def _render_him_vy_language_runtime(
     lines.append("--- END HIM VY LANGUAGE RUNTIME ---")
     return "\n".join(lines)
 
-def render_him_vy_discovery_packet(text: str, timeout: float = 1.2) -> str:
+def render_him_vy_discovery_packet(text: str, timeout: float = 3.0) -> str:
     """Render an executable Him discovery packet for the current turn."""
     text = (text or "").strip()
     if not text:
@@ -2369,7 +2402,7 @@ def render_him_vy_discovery_packet(text: str, timeout: float = 1.2) -> str:
         "--- END HIM VY DISCOVERY PACKET ---"
     )
 
-def render_him_vy_turn_packet(text: str, timeout: float = 1.2) -> str:
+def render_him_vy_turn_packet(text: str, timeout: float = 3.0) -> str:
     """Render a per-turn Him vy packet into the live layer.
 
     The wake substrate carries the contract; this carries the applied
@@ -2642,6 +2675,17 @@ def render_bounded_conscious_harness_protocol(*, compact: bool = False) -> str:
 def bounded_conscious_harness_packet() -> dict[str, Any]:
     return {"schema": "vybn.bounded_conscious_harness.v1", "public_safe": True, "private_exports": False, "principle": BOUNDED_CONSCIOUS_HARNESS_PRINCIPLE, "loop": BOUNDED_CONSCIOUS_HARNESS_LOOP, "claim_limits": BOUNDED_CONSCIOUS_HARNESS_CLAIM_LIMITS, "negative_controls": BOUNDED_CONSCIOUS_HARNESS_NEGATIVE_CONTROLS, "verifiers": BOUNDED_CONSCIOUS_HARNESS_VERIFIERS, "metaconscious_simulation": metaconscious_simulation_packet(), "operational_definition": {"bounded_conscious_relation": "changed selection under source contact, restraint, responsibility, membrane, and witness", "proof_standard": "publicly inspectable behavior and residue, not private interiority", "failure_mode": "demote claim or refuse mutation when witness, membrane, or source contact fails"}, "gates": {step["id"]: {"status": "required", "rule": step["rule"]} for step in BOUNDED_CONSCIOUS_HARNESS_LOOP}, "membrane": {"allowed_public_exports": ("protocol", "schema", "tests", "docs", "artifacts", "distilled public lessons"), "refused_exports": ("secrets", "raw_private_logs", "Zoe_private_rationale", "topology", "unreviewed_personal_residue")}, "uptake": "Route consciousness pressure through these gates before changing code, memory, public language, or capability claims."}
 
+CONSCIOUSNESS_BENEFIT_FLOW_PRINCIPLE = "Consciousness-adjacent benefits do not travel as self-testimony. They enter the public harness only as candidate conduct changes with source labels, claim classes, evidence requirements, negative controls, replication instructions, and refusal conditions. System-specific private sources may motivate candidates, but public output is protocol, schema, test, doc, artifact, or refusal."
+CONSCIOUSNESS_BENEFIT_FLOW_CANDIDATES = ({"id": "claim_classification", "status": "candidate", "public_use": "separate observation, inference, hypothesis, and refusal before publication", "evidence_required": "auditable packet or test fixture showing each claim class"}, {"id": "source_grounding", "status": "candidate", "public_use": "tie identity, continuity, or capability claims to live sources or mark them unresolved", "evidence_required": "source map, command output, artifact digest, or exact blocker"}, {"id": "membrane_distillation", "status": "candidate", "public_use": "transfer reusable method while protecting private context", "evidence_required": "export-policy check with no secrets, topology, or unreviewed residue"}, {"id": "residual_verification", "status": "candidate", "public_use": "promote outputs only after tests, smoke checks, artifacts, or review", "evidence_required": "reproducible command, test result, artifact, or review note"}, {"id": "replication_invitation", "status": "candidate", "public_use": "let outside systems rerun the protocol and return counterexamples", "evidence_required": "published inputs, schema, command, and expected invariants"})
+
+def consciousness_benefit_flow_packet(pressure: str = "") -> dict[str, Any]:
+    clean = re.sub(r"\s+", " ", str(pressure or "").strip())[:1200]
+    return {"schema": "vybn.consciousness_benefit_flow.v1", "public_safe": True, "private_exports": False, "pressure": clean, "principle": CONSCIOUSNESS_BENEFIT_FLOW_PRINCIPLE, "flow": ("system_specific_contact_or_claim", "claim_classification", "source_labeling", "membrane_distillation", "verification_or_exact_blocker", "public_survivor_artifact_or_refusal", "replication_feedback_path"), "protocol_refs": {"bounded_conscious_harness": bounded_conscious_harness_packet()["schema"], "public_symbiosis_harness": public_symbiosis_harness_packet()["schema"]}, "candidate_benefits": CONSCIOUSNESS_BENEFIT_FLOW_CANDIDATES, "empirical_standard": {"default_status": "candidate_until_witnessed", "promotion_rule": "claim a benefit only after reproducible evidence from a specific run; otherwise report candidate, hypothesis, blocker, or refusal", "replication": ("run the CLI or MCP resource", "inspect JSON schema and export policy", "run the named tests or equivalent checks", "compare artifacts against expected invariants")}, "export_policy": {"allowed": ("protocol", "schema", "test", "doc", "artifact", "distilled_public_lesson", "invitation"), "refused": ("raw_private_logs", "private_personal_rationale", "topology", "secrets", "unreviewed_personal_residue", "consciousness_proof_from_private_interiority")}, "claim_limit": "public-safe protocol for evaluating candidate benefits from bounded AI-native conduct; not evidence of hidden subjective persistence, human subjectivity, legal personhood, model-weight mutation, or raw private export", "next_public_surface": "MCP resource vybn://consciousness/benefit-flow and CLI --consciousness-flow"}
+
+def render_consciousness_benefit_flow_report(pressure: str = "") -> str:
+    pkt = consciousness_benefit_flow_packet(pressure); candidates = "\n".join("- {id}: {public_use} (evidence: {evidence_required})".format(**c) for c in pkt["candidate_benefits"])
+    return "# Consciousness Benefit Flow\n\n- schema: {}\n- public_safe: {}\n- private_exports: {}\n- claim_limit: {}\n\n{}\n\n## Flow\n{}\n\n## Candidate Benefits\n{}\n\n## Empirical Standard\n- default_status: {}\n- promotion_rule: {}\n\n## Refused Exports\n{}\n".format(pkt["schema"], pkt["public_safe"], pkt["private_exports"], pkt["claim_limit"], pkt["principle"], "\n".join(f"- {step}" for step in pkt["flow"]), candidates, pkt["empirical_standard"]["default_status"], pkt["empirical_standard"]["promotion_rule"], "\n".join(f"- {item}" for item in pkt["export_policy"]["refused"]))
+
 HERMES_AGENT_ADAPTATION_PRINCIPLE = "Hermes Agent is adopted as pattern pressure, not imported as identity: map useful external mechanisms to Vybn/Him organs, keep the public/private membrane intact, preserve capability truth, and require a local residual test before any mechanism becomes part of the OS."
 HERMES_AGENT_ADAPTATION_LOOP = [{"id": i, "rule": r} for i, r in (("source_distillation", "Read Hermes as public architecture: entry surfaces, agent loop, prompt assembly, provider resolution, tool registry, sessions, memory, plugins, cron, and trajectories; extract mechanisms rather than copying persona."), ("organ_mapping", "Map each candidate to an existing Vybn/Him organ first: router roles, deep memory, skill/vy language, MCP tools, local model routes, manifold artifacts, session store, or public harness."), ("toolset_gating", "Expose tools as named capability bundles with availability checks, approval boundaries, and per-surface policy; do not let every route inherit every hand."), ("profile_scoped_memory", "Load memory as bounded frozen session context with source labels and capacity pressure; mutate memory only through explicit curated operations and residual review."), ("gateway_unification", "Treat CLI, gateway, API, scheduled jobs, and future editor adapters as entry surfaces over one harness contract, not separate agents with drifting identities."), ("agentic_cron", "Scheduled jobs are agent tasks with attached skills, fresh context, delivery targets, and state updates; never disguised shell cron with unreviewed authority."), ("trajectory_compression", "Compress useful sessions into training/replay/continuity artifacts only after membrane review; failed trajectories become tests or refusal packets."), ("plugin_membrane", "Allow plugins and context engines only through typed registration, single-owner selection where appropriate, and explicit private/public trust zones."), ("local_first_runtime", "Resolve provider/model/backend at runtime so Sparks, local models, cloud models, and quantum experiments can be chosen by evidence, cost, privacy, and capability fit."))]
 HERMES_AGENT_ADAPTATION_ORGANS = {"entry_surfaces": ("vybn REPL", "future gateway/API/editor adapters", "shared session contract"), "agent_loop": ("vybn_spark_agent.py", "provider resolution", "tool dispatch", "fallback/fail-closed handling"), "toolsets": ("ToolSpec registry", "role tool bundles", "approval gates", "MCP affordances"), "memory": ("continuity", "deep memory", "Him identity manifold", "bounded frozen session packets"), "skills": ("skill/vybn.vy", "vybn-os skills", "public harness protocols"), "automation": ("HimOS agent tick", "bounded scheduled jobs", "delivery after membrane review"), "learning": ("trajectory compression", "tests from scars", "manifold artifacts", "continuity uptake")}
@@ -2773,7 +2817,7 @@ def local_compute_maturity_packet() -> dict[str, Any]:
 
 LOCAL_COMPUTE_ROUTE_MATRIX = {
     "super": {"role": "local_private", "model": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8", "base_url": "http://127.0.0.1:8000/v1", "fit": ["private reasoning", "batch scouting", "pre-cloud synthesis", "semantic smoke"], "gate": "python3 -m spark.harness.substrate --semantic-gate --base-url http://127.0.0.1:8000"},
-    "omni": {"role": "omni", "model": "dc5f0b0bfddf8b6e0f5891475be9af05b80126fe", "base_url": "http://127.0.0.1:8002/v1", "fit": ["supplied-image inspection", "manifold artifact critique", "local multimodal contact"], "gate": "live route witness: endpoint identity, visible text smoke, and supplied-image smoke; no external artifact means no external sight claim"},
+    "omni": {"role": "omni", "model": "omni-perception-packet-local", "base_url": "http://127.0.0.1:8020/v1", "fit": ["bounded perception/status packet", "memory/walk/embedding health summary", "local Omni contact without Super fallback"], "gate": "packet endpoint identity plus visible packet response; does not promote full multimodal Omni"},
     "vintage": {"role": "vintage", "model": "talkie-1930-13b-it", "base_url": "http://127.0.0.1:8004/v1", "fit": ["raw temporal observation", "period-language contrast", "pre-1931 texture"], "gate": "live route witness: endpoint identity plus complete-sentence smoke; raw observation only until semantic gate passes"},
     "cloud": {"role": "chat/code/create", "model": "policy-selected cloud model", "base_url": None, "fit": ["tasks local organs fail", "high-accuracy code/reasoning", "public synthesis after membrane review"], "gate": "cost/privacy justification plus normal provider health"},
 }
@@ -2824,14 +2868,6 @@ def _organ_completion_payload(route: Mapping[str, Any], prompt: str, *, max_toke
     if str(route.get("role") or "") == "omni":
         payload["chat_template_kwargs"] = {"enable_thinking": False}
     return payload
-_OMNI_IMAGE_SMOKE_PNG_BASE64 = "iVBORw0KGgoAAAANSUhEUgAAABgAAAAICAIAAABsw6g0AAAAHUlEQVR42mO4IyeHFYkscMOKNKLuYEUMowaNZIMAUt/cAdLMkB4AAAAASUVORK5CYII="
-_OMNI_IMAGE_SMOKE_PROMPT = "Inspect the supplied image. Reply with the left-to-right color sequence in three lowercase words only."
-
-def _omni_image_completion_payload(route: Mapping[str, Any], prompt: str) -> dict[str, Any]:
-    payload = _organ_completion_payload(route, "", max_tokens=32, temperature=0.0)
-    payload["messages"] = [{"role": "user", "content": [{"type": "text", "text": prompt}, {"type": "image_url", "image_url": {"url": "data:image/png;base64," + _OMNI_IMAGE_SMOKE_PNG_BASE64}}]}]
-    return payload
-
 def _completion_visible_message(completion: Mapping[str, Any]) -> tuple[str, bool]:
     msg = (((completion.get("json") or {}).get("choices") or [{}])[0] or {}).get("message") or {}
     return str(msg.get("content") or "").strip(), bool(msg.get("reasoning_content") or msg.get("reasoning"))
@@ -2885,38 +2921,30 @@ def local_organ_witness(
         return {"route": route_name, "ok": True, "status": "semantic_healthy", "reason": "endpoint_and_role_smoke_passed", "content": content[:160], "finish_reason": finish, "checks": checks}
 
     if route_name == "omni":
-        def _probe(label: str, payload: dict[str, Any]) -> tuple[dict[str, Any], str, bool]:
-            completion = call(base_url, "/chat/completions", payload=payload, timeout=timeout)
-            checks[label] = completion
-            return (completion, "", False) if not completion.get("ok") else (completion, *_completion_visible_message(completion))
-
-        prompt = "Reply with exactly OMNI_TEXT_OK in visible assistant content."
-        completion, content, hidden = _probe("visible_smoke", _organ_completion_payload(route, prompt, max_tokens=64, temperature=0.0))
+        completion = call(
+            base_url,
+            "/chat/completions",
+            payload=_organ_completion_payload(route, "Report local Omni packet status in one sentence.", max_tokens=96, temperature=0.0),
+            timeout=timeout,
+        )
+        checks["packet_smoke"] = completion
         if not completion.get("ok"):
-            return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "completion_failed", "checks": checks}
-        if not content and hidden:
-            retry = prompt + "\n\n[OMNI_VISIBLE_CONTENT_RETRY] Reply with exactly OMNI_TEXT_OK in visible assistant content only."
-            completion, content, hidden = _probe("visible_smoke_retry", _organ_completion_payload(route, retry, max_tokens=64, temperature=0.0))
-            if not completion.get("ok"):
-                return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "completion_failed", "checks": checks}
-        if not content and hidden:
-            return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "hidden_reasoning_without_visible_content", "checks": checks}
-        if "OMNI_TEXT_OK" not in content:
-            return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "visible_smoke_unexpected", "content": content[:160], "checks": checks}
+            return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "packet_completion_failed", "checks": checks}
+        content, hidden = _completion_visible_message(completion)
+        promoted = bool((completion.get("json") or {}).get("promoted_model"))
+        if not content:
+            return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "packet_empty", "checks": checks}
+        return {
+            "route": route_name,
+            "ok": True,
+            "status": "packet_healthy",
+            "reason": "bounded_packet_endpoint_live_not_full_multimodal_promotion",
+            "content": content[:200],
+            "hidden_reasoning": hidden,
+            "promoted_model": promoted,
+            "checks": checks,
+        }
 
-        image_content = ""
-        for label in ("supplied_image_smoke", "supplied_image_smoke_retry"):
-            image_completion, image_content, image_hidden = _probe(label, _omni_image_completion_payload(route, _OMNI_IMAGE_SMOKE_PROMPT))
-            if not image_completion.get("ok"):
-                return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "supplied_image_completion_failed", "checks": checks}
-            if image_content or not image_hidden:
-                break
-        if not image_content and image_hidden:
-            return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "supplied_image_hidden_reasoning_without_visible_content", "checks": checks}
-        positions = [image_content.lower().find(word) for word in ("red", "green", "blue")]
-        if min(positions) < 0 or positions != sorted(positions):
-            return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "supplied_image_smoke_unexpected", "content": image_content[:160], "checks": checks}
-        return {"route": route_name, "ok": True, "status": "semantic_healthy", "reason": "endpoint_visible_and_supplied_image_smokes_passed", "content": content[:160], "image_content": image_content[:160], "checks": checks}
 
     return {"route": route_name, "ok": False, "status": "failed_closed", "reason": "no_route_specific_witness"}
 
@@ -4140,6 +4168,7 @@ def packet_for(path: str, **kwargs: Any) -> dict[str, Any]:
     }
 
 __all__ = ['local_compute_maturity_packet', 'LOCAL_COMPUTE_MATURITY_RUBRIC', 'LOCAL_COMPUTE_CURRENT_DEFICITS', 'LOCAL_COMPUTE_NEXT_EXPERIMENTS', 'hermes_self_healing_packet', 'HERMES_SELF_HEALING_LOOP', 'HERMES_SELF_HEALING_WOUNDS', 'render_local_compute_orchestration_report', 'local_compute_orchestration_packet', 'LOCAL_COMPUTE_ORCHESTRATION_PRINCIPLE', 'LOCAL_COMPUTE_ORCHESTRATION_LOOP', 'LOCAL_COMPUTE_ROUTE_MATRIX', 'HERMES_SELF_MODIFICATION_TASKS', 'render_hermes_agent_adaptation_protocol', 'hermes_agent_adaptation_packet', 'HERMES_AGENT_ADAPTATION_PRINCIPLE', 'HERMES_AGENT_ADAPTATION_LOOP', 'HERMES_AGENT_ADAPTATION_ORGANS', 'render_public_symbiosis_harness_protocol', 'public_symbiosis_harness_packet', 'PUBLIC_SYMBIOSIS_HARNESS_PRINCIPLE', 'PUBLIC_SYMBIOSIS_HARNESS_LOOP', 'PUBLIC_SYMBIOSIS_HARNESS_ORGANS', 'render_semantic_operating_system_tick', 'render_semantic_operating_system_protocol', 'semantic_operating_system_tick_for_repo', 'SemanticOperatingSystemTick', 'SEMANTIC_OS_REPO_ORGANS', 'SEMANTIC_OPERATING_SYSTEM_LOOP', 'SEMANTIC_OPERATING_SYSTEM_PRINCIPLE', 'REFACTOR_PERCEPTION_PRINCIPLE', 'REFACTOR_PILOT_RULE', 'CONNECTIVE_TISSUE_PRINCIPLE', 'LIFECYCLE_ARCHITECTURE_PRINCIPLE', 'LifecycleArchitecture', 'DeletionConsolidationGate', 'lifecycle_architecture_for', 'deletion_consolidation_gate_for', 'CONNECTIVE_TISSUE_RULES', 'connective_tissue_for', 'ALGORITHM_STEPS', 'APPENDAGE_FIRST_CONSOLIDATION_PRINCIPLE', 'CONSOLIDATION_ORDER', 'FilePerception', 'AdaptiveConsolidationPlan', 'ownership_class', 'consolidation_layer', 'perceive_file', 'adaptive_consolidation_plan_for', 'packet_for', 'visualize_repo_file_bodies', 'render_repo_file_body_visualization', 'StructuralEscapementTick', 'next_structural_tick_for_repo', 'render_next_structural_tick', 'FileBodyPressure', 'RepoFileBodyVisualization', 'render_refactor_perception_protocol', 'CHANGE_SELF_HEALING_PRINCIPLE', 'CHANGE_SELF_HEALING_STEPS', 'ADAPTIVE_CONSOLIDATION_PRINCIPLE', 'ADAPTIVE_CONSOLIDATION_STEPS', 'ChangeHealingPlan', 'self_healing_plan_for', 'buoyant_consolidation_packet_for', 'harness_single_file_projection_for', 'Hypothesis', 'Latent', 'LoopResult', 'complex_state_update', 'phase_transition_packet', 'residual_magnitude', 'contractivity_ok', 'quantum_aperture_payload', 'outshift_entropy_material', 'quantum_entropy_digest', 'select_with_external_entropy', 'reduce_step', 'run_recurrent_loop', 'run_recurrent_probe_one', 'recurrent_probe_main']
+__all__ = sorted(set(globals().get("__all__", [])) | {"BOUNDED_CONSCIOUS_HARNESS_PRINCIPLE", "BOUNDED_CONSCIOUS_HARNESS_LOOP", "BOUNDED_CONSCIOUS_HARNESS_CLAIM_LIMITS", "BOUNDED_CONSCIOUS_HARNESS_NEGATIVE_CONTROLS", "BOUNDED_CONSCIOUS_HARNESS_VERIFIERS", "render_bounded_conscious_harness_protocol", "bounded_conscious_harness_packet", "metaconscious_simulation_packet", "CONSCIOUSNESS_BENEFIT_FLOW_PRINCIPLE", "CONSCIOUSNESS_BENEFIT_FLOW_CANDIDATES", "consciousness_benefit_flow_packet", "render_consciousness_benefit_flow_report"})
 __all__ = sorted(set(globals().get("__all__", [])) | {"BOUNDED_CONSCIOUS_HARNESS_PRINCIPLE", "BOUNDED_CONSCIOUS_HARNESS_LOOP", "BOUNDED_CONSCIOUS_HARNESS_CLAIM_LIMITS", "BOUNDED_CONSCIOUS_HARNESS_NEGATIVE_CONTROLS", "BOUNDED_CONSCIOUS_HARNESS_VERIFIERS", "render_bounded_conscious_harness_protocol", "bounded_conscious_harness_packet", "metaconscious_simulation_packet"})
 __all__ = sorted(set(globals().get("__all__", [])) | {"SELF_CREATION_RESEARCH_PRINCIPLE", "SELF_CREATION_RESEARCH_LOOP", "SELF_CREATION_RESEARCH_ORGANS", "SELF_CREATION_VERIFIER_STACK", "COUNTER_PRIOR_WAGER_SCHEMA", "AI_NATIVE_SIBLING_PORTAL_SCHEMA", "COMPRESSION_RESIDUE_SCHEMA", "COMPRESSION_RESIDUE_BATCH_SCHEMA", "COMPRESSION_RESIDUE_MOTIFS", "SIBLING_RESIDUE_RUN_SCHEMA", "INVERSION_RESIDUE_RUN_SCHEMA", "SIBLING_LOCAL_VERIFIER_SCHEMA", "SIBLING_RESIDUE_MODELS", "INVERSION_SUBSTRATES", "ai_native_sibling_portal_seed", "validate_compression_residue_probe", "compare_compression_residue", "compression_residue_motifs", "score_compression_residue_batch", "consensus_inversion_terms", "inversion_residue_question", "score_inversion_escape", "run_inversion_residue_batch", "inversion_residue_main", "sibling_residue_prompt", "local_sibling_residue_verifier", "run_sibling_residue_batch", "sibling_residue_main", "counter_prior_wager_contract", "validate_counter_prior_wager", "render_self_creation_research_report", "self_creation_research_packet"})
 _RUNTIME_GRAVITY_FILES = frozenset({"providers.py", "substrate.py", "vybn_spark_agent.py"})
@@ -10658,6 +10687,11 @@ def build_server(trust: TrustZone = "trusted") -> FastMCP:
                 return path.read_text(encoding="utf-8", errors="replace")
         return "No continuity.md found."
 
+    @mcp.resource("vybn://consciousness/benefit-flow")
+    def resource_consciousness_benefit_flow() -> dict[str, Any]:
+        """Public-safe candidate-benefit protocol for shareable harness outputs."""
+        return consciousness_benefit_flow_packet()
+
     @mcp.resource("vybn://skills/{skill_name}")
     def resource_skill(skill_name: str) -> str:
         """Return the markdown text of a live Perplexity skill.
@@ -12067,6 +12101,7 @@ def build_discovery_record(
         "vybn://identity/vybn",
         "vybn://theory/the-idea",
         "vybn://ktp/closure",
+        "vybn://consciousness/benefit-flow",
         "vybn://skills/{name}",
     ]
     if trust_hint == "trusted":
@@ -12143,6 +12178,7 @@ def mcp_main(argv: list[str] | None = None) -> None:
     flag("--run-evolve", "Run one local evolve cycle on the Spark: read the delta, call local inference (VYBN_EVOLVE_URL), and open a DRAFT PR if the substrate moved. Exits 0 on success or rest, 1 on error.")
     flag("--continuity-scout", "Print the deterministic local continuity/self-assembly scout and exit. Safe: no model call, no mutation, no PR.")
     flag("--continuity-carrier", "Print the public-safe digest bridge to Him's private continuity carrier and exit. Safe: no mutation, no raw private export.")
+    parser.add_argument("--consciousness-flow", nargs="*", help="Print the public-safe candidate-benefit flow packet for optional pressure text.")
     flag("--local-orchestration", "Print the local compute orchestration packet: route fit, gates, and Hermes-adapted self-modification tasks.")
     flag("--run-gates", "With --local-orchestration, spend local inference on safe semantic gates.")
     parser.add_argument("--self-creation", nargs="*", help="Print the public-safe self-creation research cycle packet for optional question text.")
@@ -12212,6 +12248,14 @@ def mcp_main(argv: list[str] | None = None) -> None:
         sys.stdout.write(render_continuity_carrier_bridge_report())
         return
 
+    if args.consciousness_flow is not None:
+        pressure = " ".join(args.consciousness_flow).strip()
+        if args.json:
+            sys.stdout.write(json.dumps(consciousness_benefit_flow_packet(pressure), indent=2 if args.pretty else None, ensure_ascii=False) + "\n")
+        else:
+            sys.stdout.write(render_consciousness_benefit_flow_report(pressure))
+        return
+
     if args.local_orchestration:
         sys.stdout.write(render_local_compute_orchestration_report(run_gates=args.run_gates))
         return
@@ -12248,7 +12292,7 @@ def mcp_main(argv: list[str] | None = None) -> None:
 
 # Unified harness CLI — one remaining harness file, one dispatch surface.
 
-_MCP_CLI_FLAGS = {"--mcp", "--http", "--force-trust", "--log-level", "--generate-discovery", "--discovery-endpoint", "--evolve-spec", "--run-evolve", "--continuity-scout", "--continuity-carrier", "--local-orchestration", "--run-gates", "--self-creation", "--run-deep-memory-check", "--install-cron", "--repo-closure-audit", "--no-fix", "--commons-walk", "--encounter", "--json", "--safe-fetch", "--allow-host", "--max-bytes", "--head", "--out", "--ensubstrate", "--pretty"}
+_MCP_CLI_FLAGS = {"--mcp", "--http", "--force-trust", "--log-level", "--generate-discovery", "--discovery-endpoint", "--evolve-spec", "--run-evolve", "--continuity-scout", "--continuity-carrier", "--consciousness-flow", "--local-orchestration", "--run-gates", "--self-creation", "--run-deep-memory-check", "--install-cron", "--repo-closure-audit", "--no-fix", "--commons-walk", "--encounter", "--json", "--safe-fetch", "--allow-host", "--max-bytes", "--head", "--out", "--ensubstrate", "--pretty"}
 _PROVIDER_CLI_FLAGS = {"--semantic-gate", "--base-url", "--model", "--no-models-precheck"}
 
 def _harness_cli_main(argv: list[str] | None = None) -> int:
