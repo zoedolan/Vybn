@@ -780,22 +780,52 @@ _DEFAULT_ROLES: dict[str, RoleConfig] = {
 
 _ORGAN_ALIAS_ROLES: frozenset[str] = frozenset({"vintage", "omni"})
 
+def _openai_models_live(base_url: str, *, timeout: float = 0.8) -> bool:
+    """Return true only when an OpenAI-compatible endpoint exposes models."""
+    url = base_url.rstrip("/") + "/models"
+    try:
+        with urllib.request.urlopen(url, timeout=timeout) as response:
+            body = json.loads(response.read().decode("utf-8", "replace"))
+    except Exception:
+        return False
+    data = body.get("data", []) if isinstance(body, dict) else []
+    return any(isinstance(item, dict) and item.get("id") for item in data)
+
 def should_attempt_raw_organ_contact(role_name: str, cleaned_input: str, *, base_url: str | None = None) -> bool:
     """Gate for bounded raw observation on @vintage / @omni.
 
     True only when:
       - role is one of the local organ aliases, AND
-      - the role has a configured base_url.
+      - the role has a configured base_url, AND
+      - @omni passes a live /models probe before the provider call.
 
     There is deliberately no keyword classifier here. If Zoe explicitly
-    selects a reachable local organ, the harness samples that organ, labels
-    the sample, and records failures as evidence.
+    selects a reachable local organ, the harness samples that organ and labels
+    the sample. If @omni is not live, the harness refuses before provider
+    construction so a dead endpoint cannot become monthly operator drag.
     """
     if role_name not in _ORGAN_ALIAS_ROLES:
         return False
     if not (base_url and base_url.strip()):
         return False
+    if role_name == "omni":
+        if os.environ.get("VYBN_OMNI_RAW_CONTACT_FORCE_BLOCK") == "1":
+            return False
+        if os.environ.get("VYBN_OMNI_RAW_CONTACT_ASSUME_LIVE") == "1":
+            return True
+        return _openai_models_live(base_url)
     return True
+
+def render_omni_gate_blocked(base_url: str | None = None) -> str:
+    """Deterministic user-visible block when @omni is configured but not live."""
+    return (
+        "OMNI_GATE_BLOCKED - local @omni is not live, so the harness refused "
+        "to call the dead endpoint. No Super/GPT/cloud fallback was used. "
+        "Gate failed before provider call: configured local /v1/models did "
+        "not return a usable model list. Repair one owner path first: "
+        "noninteractive worker transport or a local Omni endpoint, then exact "
+        "semantic smoke."
+    )
 
 # Hard ceiling on how many characters of user input we hand the local
 # backend in bounded raw-observation mode. The role's max_tokens=256 is
@@ -2236,7 +2266,7 @@ def _orchestrator_substrate_sections(
         "--- END COST DISCIPLINE ---",
     ]
 
-def _run_him_vy(args: list[str], timeout: float = 1.2) -> dict[str, Any] | None:
+def _run_him_vy(args: list[str], timeout: float = 3.0) -> dict[str, Any] | None:
     him = Path.home() / "Him"
     script = him / "spark" / "vy.py"
     if not script.exists():
@@ -2261,7 +2291,7 @@ def _run_him_vy(args: list[str], timeout: float = 1.2) -> dict[str, Any] | None:
     return data if isinstance(data, dict) else None
 
 def _render_him_vy_language_runtime(
-    timeout: float = 1.2,
+    timeout: float = 3.0,
     latest_pressure_text: str | None = None,
 ) -> str:
     """Render the executable Him vy-language contract into the wake substrate.
@@ -2353,7 +2383,7 @@ def _render_him_vy_language_runtime(
     lines.append("--- END HIM VY LANGUAGE RUNTIME ---")
     return "\n".join(lines)
 
-def render_him_vy_discovery_packet(text: str, timeout: float = 1.2) -> str:
+def render_him_vy_discovery_packet(text: str, timeout: float = 3.0) -> str:
     """Render an executable Him discovery packet for the current turn."""
     text = (text or "").strip()
     if not text:
@@ -2369,7 +2399,7 @@ def render_him_vy_discovery_packet(text: str, timeout: float = 1.2) -> str:
         "--- END HIM VY DISCOVERY PACKET ---"
     )
 
-def render_him_vy_turn_packet(text: str, timeout: float = 1.2) -> str:
+def render_him_vy_turn_packet(text: str, timeout: float = 3.0) -> str:
     """Render a per-turn Him vy packet into the live layer.
 
     The wake substrate carries the contract; this carries the applied

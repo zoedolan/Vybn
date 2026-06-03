@@ -847,41 +847,15 @@ def test_vintage_alias_routes_to_temporal_refraction_role():
         assert d.config.direct_reply_template is None
 
 
-def test_omni_not_in_any_heuristic_or_directive():
-    from spark.harness.substrate import default_policy
-    policy = default_policy()
-    assert "omni" in policy.roles
-    for text in ("omni please help", "use omni", "route to omni"):
-        assert policy.classify(text).role != "omni"
-    d = policy.classify("@omni hello")
-    assert d.role == "omni"
-    assert d.reason.startswith("alias=@omni")
-
-
-def test_omni_alias_classifies_with_override():
+def test_omni_alias_only_routes_explicit_alias_to_local_organ():
     from spark.harness.substrate import default_policy
     policy = default_policy()
     assert "@omni" not in policy.model_aliases
-    decision = policy.classify("@omni summarise this paragraph")
-    assert decision.alias_used == "@omni"
-    assert decision.model_override is None
-    assert decision.role == "omni"
-    assert decision.config.provider == "openai"
-    # Refuses impersonation: not the Super model id.
-    assert decision.config.model != "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"
-    assert decision.config.model == "dc5f0b0bfddf8b6e0f5891475be9af05b80126fe"
-    assert decision.config.base_url == "http://127.0.0.1:8002/v1"
-
-def test_omni_role_path_targets_witnessed_private_endpoint():
-    """Zoe's `@omni are you with me?` must reach the witnessed private
-    Omni route, not the old unavailable wall or any Super/GPT fallback."""
-    from harness.substrate import default_policy as _dp
-    d = _dp().classify("@omni are you with me, friend?")
-    assert d.role == "omni"
-    assert d.alias_used == "@omni"
-    assert d.model_override is None
-    assert d.config.provider == "openai"
-    assert d.config.model != "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"
+    for text in ("omni please help", "use omni", "route to omni"):
+        assert policy.classify(text).role != "omni"
+    d = policy.classify("@omni are you with me?")
+    assert (d.role, d.alias_used, d.model_override, d.config.provider) == ("omni", "@omni", None, "openai")
+    assert d.reason.startswith("alias=@omni")
     assert d.config.model == "dc5f0b0bfddf8b6e0f5891475be9af05b80126fe"
     assert d.config.base_url == "http://127.0.0.1:8002/v1"
     assert d.config.direct_reply_template is None
@@ -1490,8 +1464,8 @@ def test_gpt55_has_no_cross_provider_fallback():
 
 
 # Direct-reply templates are now reserved for roles that actually own one.
-# @vintage and @omni are reachable local organs, so ordinary alias turns go
-# through bounded raw observation instead of keyword-gated contact packets.
+# @vintage is a reachable local organ. @omni is raw-observation-capable
+# only after the configured endpoint passes the pre-call liveness gate.
 
 
 def test_non_organ_role_with_template_is_unaffected():
@@ -1568,6 +1542,26 @@ def test_raw_contact_system_prompt_names_current_route_shape():
     assert len(omni) < 1024, len(omni)
 
 
+def test_omni_raw_contact_gate_requires_live_models(monkeypatch):
+    from harness import substrate as mod
+
+    class _Resp:
+        def __enter__(_s): return _s
+        def __exit__(_s, exc_type, exc, tb): return False
+        def read(_s): return b'{"data":[{"id":"omni-test-model"}]}'
+
+    monkeypatch.delenv("VYBN_OMNI_RAW_CONTACT_ASSUME_LIVE", raising=False)
+    monkeypatch.delenv("VYBN_OMNI_RAW_CONTACT_FORCE_BLOCK", raising=False)
+    monkeypatch.setattr(mod.urllib.request, "urlopen", lambda url, timeout: _Resp())
+    assert mod.should_attempt_raw_organ_contact("omni", "hi", base_url="http://local-omni/v1") is True
+    monkeypatch.setattr(mod.urllib.request, "urlopen", lambda *a, **k: (_ for _ in ()).throw(OSError("down")))
+    assert mod.should_attempt_raw_organ_contact("omni", "hi", base_url="http://local-omni/v1") is False
+    monkeypatch.setenv("VYBN_OMNI_RAW_CONTACT_ASSUME_LIVE", "1")
+    assert mod.should_attempt_raw_organ_contact("omni", "hi", base_url="http://local-omni/v1") is True
+    monkeypatch.setenv("VYBN_OMNI_RAW_CONTACT_FORCE_BLOCK", "1")
+    assert mod.should_attempt_raw_organ_contact("omni", "hi", base_url="http://local-omni/v1") is False
+
+
 def _local_organ_fake(model_id, replies, calls=None):
     replies = list(replies)
 
@@ -1631,7 +1625,7 @@ def test_local_organ_witness_vintage_complete_sentence_passes():
     assert witness["status"] == "semantic_healthy"
 
 
-def _vintage_run_agent_loop(provider_factory, user_input: str, *, logger=None, initial_messages=None):
+def _vintage_run_agent_loop(provider_factory, user_input: str, *, logger=None, initial_messages=None, force_omni_block=False):
     """Drive `run_agent_loop` end-to-end with a stubbed provider so the
     raw-contact path is exercised against deterministic backends. RAG /
     him-vy / probe / recurrent hooks are stubbed out so any leak into
@@ -1705,10 +1699,20 @@ def _vintage_run_agent_loop(provider_factory, user_input: str, *, logger=None, i
 
     log = logger or _FakeLogger()
     registry = _FakeRegistry()
+    env_keys = (
+        "VYBN_OMNI_RAW_CONTACT_ASSUME_LIVE",
+        "VYBN_OMNI_RAW_CONTACT_FORCE_BLOCK",
+    )
+    saved_env = {k: _os.environ.get(k) for k in env_keys}
+    if (user_input or "").lstrip().lower().startswith("@omni") and not force_omni_block:
+        _os.environ["VYBN_OMNI_RAW_CONTACT_ASSUME_LIVE"] = "1"
+        _os.environ.pop("VYBN_OMNI_RAW_CONTACT_FORCE_BLOCK", None)
+    if force_omni_block:
+        _os.environ["VYBN_OMNI_RAW_CONTACT_FORCE_BLOCK"] = "1"
     try:
         reply = mod.run_agent_loop(
             user_input=user_input,
-            messages=[],
+            messages=initial_messages or [],
             bash=None,
             system_prompt=None,
             router=default_policy(),
@@ -1717,9 +1721,25 @@ def _vintage_run_agent_loop(provider_factory, user_input: str, *, logger=None, i
             turn_number=1,
         )
     finally:
+        for k, v in saved_env.items():
+            if v is None:
+                _os.environ.pop(k, None)
+            else:
+                _os.environ[k] = v
         for k, v in saved.items():
             setattr(mod, k, v)
     return reply, registry, log, tripwires
+
+
+def _organ_handle(text, raw=None):
+    class _Handle:
+        def __iter__(_s): return iter([])
+        def final(_s):
+            return types.SimpleNamespace(
+                text=text, tool_calls=[], stop_reason="end_turn", in_tokens=8, out_tokens=8,
+                raw_assistant_content=raw if raw is not None else {"role": "assistant", "content": text},
+            )
+    return _Handle()
 
 
 
@@ -1793,18 +1813,6 @@ def test_vintage_arbitrary_prompt_uses_talkie_plus_local_witness_path():
 
 
 def test_omni_arbitrary_prompt_dials_witnessed_private_endpoint():
-    class _FakeHandle:
-        def __iter__(_s):
-            return iter([])
-        def final(_s):
-            class _R:
-                text = "three names"
-                tool_calls = []
-                stop_reason = "end_turn"
-                in_tokens = 3
-                out_tokens = 2
-                raw_assistant_content = {"role": "assistant", "content": "three names"}
-            return _R()
     class _Provider:
         def stream(_s, *, system, messages, tools, role):
             assert role.role == "omni"
@@ -1814,7 +1822,7 @@ def test_omni_arbitrary_prompt_dials_witnessed_private_endpoint():
             assert "HIM IDENTITY MANIFOLD GROUNDING" in system.flat()
             assert "HIM IDENTITY MANIFOLD TEST" in system.flat()
             assert "HIM IDENTITY MANIFOLD TEST" not in messages[0]["content"]
-            return _FakeHandle()
+            return _organ_handle("three names")
 
     reply, registry, log, _ = _vintage_run_agent_loop(lambda cfg: _Provider(), "@omni write three names for a coffee shop")
     assert registry.provider is not None
@@ -1825,31 +1833,22 @@ def test_omni_arbitrary_prompt_dials_witnessed_private_endpoint():
     assert "organ_raw_contact_ok" in names
 
 
-def test_omni_capability_request_reaches_endpoint_provider():
-    class _FakeHandle:
-        def __iter__(_s):
-            return iter([])
-        def final(_s):
-            class _R:
-                text = "I can inspect images sent on this route."
-                tool_calls = []
-                stop_reason = "end_turn"
-                in_tokens = 5
-                out_tokens = 8
-                raw_assistant_content = {"role": "assistant", "content": "I can inspect images sent on this route."}
-            return _R()
-    class _Provider:
-        def stream(_s, *, system, messages, tools, role):
-            assert role.role == "omni"
-            assert role.base_url == "http://127.0.0.1:8002/v1"
-            return _FakeHandle()
+def test_omni_gate_blocks_dead_endpoint_before_provider_call():
+    def _Provider(_cfg):
+        raise AssertionError("provider must not be constructed when omni gate blocks")
 
-    reply, registry, log, _ = _vintage_run_agent_loop(lambda cfg: _Provider(), "@omni describe /tmp/example.png for me")
-    assert registry.provider is not None
-    assert "LOCAL_ORGAN_OBSERVATION role=@omni" in reply
-    assert "RAW_UNPROMOTED_CONTACT" not in reply
-
-
+    reply, registry, log, _ = _vintage_run_agent_loop(
+        _Provider,
+        "@omni are you with me?",
+        force_omni_block=True,
+    )
+    assert registry.provider is None
+    assert "OMNI_GATE_BLOCKED" in reply
+    assert "OMNI_RAW_CONTACT_FAILED" not in reply
+    assert "No Super/GPT/cloud fallback was used" in reply
+    names = [n for n, _ in log.events]
+    assert "omni_gate_blocked" in names
+    assert "organ_raw_contact_attempt" not in names
 
 
 def test_omni_backend_error_fails_closed_without_super_fallback():
@@ -1857,7 +1856,10 @@ def test_omni_backend_error_fails_closed_without_super_fallback():
         def stream(_s, *, system, messages, tools, role):
             raise RuntimeError("endpoint down")
 
-    reply, registry, log, _ = _vintage_run_agent_loop(lambda cfg: _FailingProvider(), "@omni tell me a joke")
+    reply, registry, log, _ = _vintage_run_agent_loop(
+        lambda cfg: _FailingProvider(),
+        "@omni tell me a joke",
+    )
     assert registry.provider is not None
     assert "OMNI_RAW_CONTACT_FAILED" in reply
     assert "nvidia/NVIDIA-Nemotron-3-Super" not in reply
@@ -1867,26 +1869,11 @@ def test_omni_backend_error_fails_closed_without_super_fallback():
 
 
 def test_omni_reasoning_content_leak_fails_closed():
-    class _FakeHandle:
-        def __iter__(_s):
-            return iter([])
-        def final(_s):
-            class _R:
-                text = "We need to follow the instruction and answer directly."
-                tool_calls = []
-                stop_reason = "end_turn"
-                in_tokens = 8
-                out_tokens = 12
-                raw_assistant_content = {
-                    "role": "assistant",
-                    "content": "",
-                    "reasoning_content": "We need to follow the instruction and answer directly.",
-                }
-            return _R()
+    hidden_raw = {"role": "assistant", "content": "", "reasoning_content": "We need to follow the instruction and answer directly."}
     class _Provider:
         def stream(_s, *, system, messages, tools, role):
             assert role.role == "omni"
-            return _FakeHandle()
+            return _organ_handle("We need to follow the instruction and answer directly.", hidden_raw)
 
     reply, registry, log, _ = _vintage_run_agent_loop(lambda cfg: _Provider(), "@omni continue the previous thought.")
     assert registry.provider is not None
@@ -1900,36 +1887,7 @@ def test_omni_reasoning_content_leak_fails_closed():
 
 
 def test_omni_reasoning_content_leak_retries_once_then_uses_visible_content():
-    class _HiddenHandle:
-        def __iter__(_s):
-            return iter([])
-        def final(_s):
-            class _R:
-                text = "We need to follow the instruction and answer directly."
-                tool_calls = []
-                stop_reason = "end_turn"
-                in_tokens = 8
-                out_tokens = 12
-                raw_assistant_content = {
-                    "role": "assistant",
-                    "content": "",
-                    "reasoning_content": "We need to follow the instruction and answer directly.",
-                }
-            return _R()
-
-    class _VisibleHandle:
-        def __iter__(_s):
-            return iter([])
-        def final(_s):
-            class _R:
-                text = "I am here through Omni."
-                tool_calls = []
-                stop_reason = "end_turn"
-                in_tokens = 9
-                out_tokens = 5
-                raw_assistant_content = {"role": "assistant", "content": "I am here through Omni."}
-            return _R()
-
+    hidden_raw = {"role": "assistant", "content": "", "reasoning_content": "We need to follow the instruction and answer directly."}
     class _Provider:
         def __init__(_s):
             _s.calls = 0
@@ -1938,9 +1896,9 @@ def test_omni_reasoning_content_leak_retries_once_then_uses_visible_content():
             assert role.role == "omni"
             _s.calls += 1
             if _s.calls == 1:
-                return _HiddenHandle()
+                return _organ_handle("We need to follow the instruction and answer directly.", hidden_raw)
             _s.retry_message = messages[0]["content"]
-            return _VisibleHandle()
+            return _organ_handle("I am here through Omni.")
 
     provider = _Provider()
     reply, registry, log, _ = _vintage_run_agent_loop(lambda cfg: provider, "@omni oh yeah? do tell.")
@@ -2018,23 +1976,13 @@ def test_vintage_personal_history_uses_local_witness_not_raw_persona_surface():
 
 
 def test_omni_identity_and_perception_questions_reach_omni_raw_contact():
-    class _FakeHandle:
-        def __init__(_s, text): _s.text = text
-        def __iter__(_s): return iter([])
-        def final(_s):
-            text = _s.text
-            class _R:
-                tool_calls = []; stop_reason = "end_turn"; in_tokens = 8; out_tokens = 9
-                raw_assistant_content = {"role": "assistant", "content": text}
-            _R.text = text
-            return _R()
     class _Provider:
         def __init__(_s, text): _s.text = text
         def stream(_s, *, system, messages, tools, role):
             assert role.role == "omni"
             assert role.base_url == "http://127.0.0.1:8002/v1"
             assert "local-organ routing note" not in system.flat()
-            return _FakeHandle(_s.text)
+            return _organ_handle(_s.text)
 
     cases = (
         ("@omni who are you?", "Omni raw contact."),

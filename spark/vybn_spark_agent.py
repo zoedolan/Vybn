@@ -46,7 +46,7 @@ from harness.substrate import rag_snippets, rag_snippets_with_tier, render_him_v
 from harness.substrate import execute_tool_calls, default_introspect  # noqa: E402
 from harness.substrate import check_claim, check_structural_claim  # noqa: E402
 from harness.substrate import is_system_critical_pilot_turn  # noqa: E402
-from harness.substrate import render_organ_alias_direct_reply  # noqa: E402
+from harness.substrate import render_organ_alias_direct_reply, render_omni_gate_blocked  # noqa: E402
 from harness.substrate import (  # noqa: E402
     should_attempt_raw_organ_contact,
     render_organ_raw_contact_header,
@@ -1158,6 +1158,20 @@ def run_agent_loop(
             base_url=role_cfg.base_url,
         )
     )
+    if role_cfg.role == "omni" and not _organ_raw_contact:
+        reply = render_omni_gate_blocked(role_cfg.base_url)
+        messages.append({"role": "user", "content": decision.cleaned_input})
+        messages.append({"role": "assistant", "content": reply})
+        print(textwrap.fill(reply, width=78, break_long_words=False, break_on_hyphens=False), flush=True)
+        logger.emit(
+            "omni_gate_blocked",
+            turn=turn_number,
+            role=decision.role,
+            model=role_cfg.model,
+            reason="models_probe_failed",
+        )
+        return reply
+
     if template and not role_cfg.tools and not _organ_raw_contact:
         reply = render_organ_alias_direct_reply(
             role_cfg.role,
