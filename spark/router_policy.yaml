@@ -37,7 +37,7 @@ roles:
     model: gpt-5.5
     thinking: adaptive
     max_tokens: 16384
-    max_iterations: 100
+    max_iterations: 25
     tools: [bash, delegate]
     rag: true
     recurrent_depth: 2  # /plan benefits from deeper latent reasoning; probe-confirmed adaptive
@@ -63,11 +63,12 @@ roles:
     lightweight: true
   phatic:
     provider: openai
-    model: gpt-5.5
-    thinking: adaptive
-    max_tokens: 256
+    model: nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
+    thinking: off
+    max_tokens: 96
     max_iterations: 1
     tools: []
+    base_url: http://127.0.0.1:8000/v1
     rag: false
     lightweight: true
   identity:

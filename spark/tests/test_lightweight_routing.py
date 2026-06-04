@@ -71,8 +71,9 @@ class TestPolicyHasLightweightRoles(unittest.TestCase):
         self.assertTrue(phatic.lightweight)
         self.assertFalse(phatic.rag)
         self.assertEqual(phatic.provider, "openai")
-        # Small token budget so greetings stay cheap.
-        self.assertLessEqual(phatic.max_tokens, 512)
+        self.assertEqual(phatic.model, "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8")
+        self.assertEqual(phatic.base_url, "http://127.0.0.1:8000/v1")
+        self.assertLessEqual(phatic.max_tokens, 128)
 
     def test_identity_has_direct_reply_template(self):
         pol = default_policy()
@@ -133,9 +134,9 @@ class TestPolicyHasLightweightRoles(unittest.TestCase):
 
     def test_present_work_roles_default_to_gpt55(self):
         # If YAML is absent or malformed, in-code defaults must still keep
-        # ordinary work on GPT-5.5. Local/local_private remain explicit
-        # operator exceptions.
-        roles = ("code", "create", "chat", "task", "phatic", "identity", "orchestrate")
+        # ordinary work on GPT-5.5. Local/local_private and phatic remain
+        # explicit austerity/operator exceptions.
+        roles = ("code", "create", "chat", "task", "identity", "orchestrate")
         policies = (
             ("default_policy", default_policy()),
             ("yaml", load_policy(SPARK_DIR / "router_policy.yaml")),
@@ -515,8 +516,6 @@ class TestPhaticStaysLightweight(unittest.TestCase):
         self.assertEqual(
             body["choices"][0]["message"]["content"].strip(), "hey :)"
         )
-        # Provider was called (phatic still routes through vLLM) but
-        # RAG was NOT called — the tripwire above would have raised.
         self.assertIsNotNone(self.captured["kwargs"])
 
 

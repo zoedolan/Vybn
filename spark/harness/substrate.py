@@ -709,16 +709,15 @@ _DEFAULT_ROLES: dict[str, RoleConfig] = {
         rag=False,
         lightweight=True,
     ),
-    # Phatic — casual greetings, small talk. Present-work default is GPT-5.5
-    # even for light turns unless Zoe explicitly pins local/Nemotron.
     "phatic": RoleConfig(
         role="phatic",
         provider="openai",
-        model="gpt-5.5",
-        thinking="adaptive",
-        max_tokens=256,
+        model="nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8",
+        thinking="off",
+        max_tokens=96,
         max_iterations=1,
         tools=[],
+        base_url="http://127.0.0.1:8000/v1",
         rag=False,
         lightweight=True,
     ),
