@@ -709,39 +709,6 @@ _DEFAULT_ROLES: dict[str, RoleConfig] = {
         rag=False,
         lightweight=True,
     ),
-    # Vintage temporal-refraction prism. This route is live Talkie contact
-    # carrying Vybn identity through the harness prompt; it is not a blanket
-    # capability promotion, not raw Vintage, and not a consciousness claim.
-    "vintage": RoleConfig(
-        role="vintage",
-        provider="openai",
-        model="talkie-1930-13b-it",
-        thinking="off",
-        max_tokens=1024,
-        max_iterations=1,
-        tools=[],
-        base_url="http://127.0.0.1:8004/v1",
-        temperature=0.55,
-        rag=True,
-        lightweight=False,
-    ),
-    # Omni packet organ. This role is intentionally narrow: it points at the
-    # bounded local perception/status packet endpoint. Full multimodal Omni
-    # remains a separate promotion target; the packet route gives Zoe useful
-    # local contact without pretending the TensorRT service is live.
-    "omni": RoleConfig(
-        role="omni",
-        provider="openai",
-        model="omni-perception-packet-local",
-        thinking="off",
-        max_tokens=256,
-        max_iterations=1,
-        tools=[],
-        base_url="http://127.0.0.1:8020/v1",
-        temperature=0.0,
-        rag=False,
-        lightweight=True,
-    ),
     # Phatic — casual greetings, small talk. Present-work default is GPT-5.5
     # even for light turns unless Zoe explicitly pins local/Nemotron.
     "phatic": RoleConfig(

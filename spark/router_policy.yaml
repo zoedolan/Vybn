@@ -51,25 +51,6 @@ roles:
     base_url: http://127.0.0.1:8000/v1
     rag: false
     lightweight: true
-  vintage:
-    provider: openai
-    model: talkie-1930-13b-it
-    max_tokens: 256
-    max_iterations: 1
-    tools: []
-    base_url: http://127.0.0.1:8004/v1
-    rag: false
-    lightweight: false
-    temperature: 0.55
-  omni:
-    provider: openai
-    model: omni-perception-packet-local
-    max_tokens: 256
-    max_iterations: 1
-    tools: []
-    base_url: http://127.0.0.1:8020/v1
-    lightweight: true
-    temperature: 0.0
   local_private:
     provider: openai
     model: nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
