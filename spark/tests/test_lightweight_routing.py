@@ -226,7 +226,7 @@ class TestRouterLightweightClassification(unittest.TestCase):
         self.assertTrue(d.reason.startswith("heuristic"))
 
     def test_bare_hi_and_presence_check_route_to_phatic(self):
-        for text in ("hi", "hi are you with me?"):
+        for text in ("hi", "hi are you with me?", "are you there?", "you there?"):
             with self.subTest(text=text):
                 self.assertEqual(self.router.classify(text).role, "phatic")
 

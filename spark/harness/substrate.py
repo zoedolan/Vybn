@@ -1060,7 +1060,7 @@ _DEFAULT_HEURISTICS_RAW: dict[str, list[str]] = {
         r"^\s*(hey|hi|hello|yo|howdy|sup|wassup|wazzup)\b[\s!.,?]*$",
         r"^\s*(hey|hi|hello|yo)\s+(there|buddy|bud|friend|pal|vybn)\b[\s!.,?]*$",
         r"^\s*(hey|hi|hello|yo)\s+(are you with me|you with me)\??\s*$",
-        r"^\s*(are you with me|you with me)\??\s*$",
+        r"^\s*((are you|you) (with me|there))\??\s*$",
         r"^\s*(good (morning|afternoon|evening))\b[\s!.,?]*$",
         r"^\s*(thanks|thank you|ty|thx)\b[\s!.,?]*$",
         r"^\s*(bye|goodbye|later|cya|ttyl)\b[\s!.,?]*$",
