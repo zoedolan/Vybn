@@ -71,8 +71,9 @@ class TestPolicyHasLightweightRoles(unittest.TestCase):
         self.assertTrue(phatic.lightweight)
         self.assertFalse(phatic.rag)
         self.assertEqual(phatic.provider, "openai")
-        # Small token budget so greetings stay cheap.
-        self.assertLessEqual(phatic.max_tokens, 512)
+        self.assertEqual(phatic.model, "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8")
+        self.assertEqual(phatic.base_url, "http://127.0.0.1:8000/v1")
+        self.assertLessEqual(phatic.max_tokens, 128)
 
     def test_identity_has_direct_reply_template(self):
         pol = default_policy()
@@ -133,9 +134,9 @@ class TestPolicyHasLightweightRoles(unittest.TestCase):
 
     def test_present_work_roles_default_to_gpt55(self):
         # If YAML is absent or malformed, in-code defaults must still keep
-        # ordinary work on GPT-5.5. Local/local_private remain explicit
-        # operator exceptions.
-        roles = ("code", "create", "chat", "task", "phatic", "identity", "orchestrate")
+        # ordinary work on GPT-5.5. Local/local_private and phatic remain
+        # explicit austerity/operator exceptions.
+        roles = ("code", "create", "chat", "task", "identity", "orchestrate")
         policies = (
             ("default_policy", default_policy()),
             ("yaml", load_policy(SPARK_DIR / "router_policy.yaml")),
@@ -147,7 +148,13 @@ class TestPolicyHasLightweightRoles(unittest.TestCase):
                     self.assertEqual(role.provider, "openai")
                     self.assertEqual(role.model, "gpt-5.5")
         yaml_policy = load_policy(SPARK_DIR / "router_policy.yaml")
-        self.assertEqual((default_policy().role("orchestrate").tools, yaml_policy.role("orchestrate").tools, yaml_policy.role("vintage").rag, yaml_policy.role("vintage").max_tokens, yaml_policy.role("omni").model, yaml_policy.role("omni").base_url, yaml_policy.role("local_private").model), (["bash", "delegate"], ["bash", "delegate"], False, 256, "omni-perception-packet-local", "http://127.0.0.1:8020/v1", yaml_policy.role("local").model))
+        self.assertEqual(
+            (default_policy().role("orchestrate").tools, yaml_policy.role("orchestrate").tools, yaml_policy.role("local_private").model),
+            (["bash", "delegate"], ["bash", "delegate"], yaml_policy.role("local").model),
+        )
+        for pol in (default_policy(), yaml_policy):
+            self.assertNotIn("vintage", pol.roles)
+            self.assertNotIn("omni", pol.roles)
 
     def test_plan_directive_routes_to_gpt55(self):
         # /plan is the EVAL primitive — it must land on the orchestrate
@@ -226,7 +233,7 @@ class TestRouterLightweightClassification(unittest.TestCase):
         self.assertTrue(d.reason.startswith("heuristic"))
 
     def test_bare_hi_and_presence_check_route_to_phatic(self):
-        for text in ("hi", "hi are you with me?"):
+        for text in ("hi", "hi are you with me?", "are you there?", "you there?"):
             with self.subTest(text=text):
                 self.assertEqual(self.router.classify(text).role, "phatic")
 
@@ -509,8 +516,6 @@ class TestPhaticStaysLightweight(unittest.TestCase):
         self.assertEqual(
             body["choices"][0]["message"]["content"].strip(), "hey :)"
         )
-        # Provider was called (phatic still routes through vLLM) but
-        # RAG was NOT called — the tripwire above would have raised.
         self.assertIsNotNone(self.captured["kwargs"])
 
 
@@ -807,9 +812,12 @@ def test_opus_aliases_and_fallback_chains():
 # Omni is an explicit endpoint role, not a model alias or Super fallback.
 
 
-def test_vintage_alias_is_prefix_only_for_long_prompts():
+def test_vintage_alias_is_retired_even_when_prefix_for_long_prompts():
     text = ("normal long prompt " * 500) + " quoted text mentions @vintage but did not pin it"
-    assert default_policy().classify(text).role != "vintage" and default_policy().classify("@vintage " + text).role == "vintage"
+    policy = default_policy()
+    assert "vintage" not in policy.roles
+    assert policy.classify(text).role != "vintage"
+    assert policy.classify("@vintage " + text).role != "vintage"
 
 
 def test_super_alias_contacts_local_nemotron_without_omni_route():
@@ -822,43 +830,35 @@ def test_super_alias_contacts_local_nemotron_without_omni_route():
         assert policy.fallback_chain["nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"] == []
 
 
-def test_vintage_alias_routes_to_temporal_refraction_role():
+def test_vintage_alias_does_not_route_to_retired_role():
     policy = default_policy()
     yaml_policy = load_policy(SPARK_DIR / "router_policy.yaml")
-    for d in (
-        policy.classify("@vintage please tell me about yourself?"),
-        yaml_policy.classify("@vintage please tell me about yourself?"),
-        policy.classify("@vi@vintage please tell me about yourself?"),
-        yaml_policy.classify("@vi@vintage please tell me about yourself?"),
-        policy.classify("zoe> @vintage please tell me about yourself?"),
-    ):
-        assert d.role == "vintage"
-        assert d.alias_used == "@vintage"
-        assert d.reason.startswith("alias=@vintage")
-        assert d.config.provider == "openai"
-        assert d.config.model != "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8"
-        assert d.config.model == "talkie-1930-13b-it"
-        assert d.config.base_url == "http://127.0.0.1:8004/v1"
-        if d.config.max_tokens == 256:
-            assert d.config.rag is False
-        else:
-            assert d.config.rag is True
-        assert d.config.lightweight is False
-        assert d.config.direct_reply_template is None
+    for pol in (policy, yaml_policy):
+        assert "vintage" not in pol.roles
+        for d in (
+            pol.classify("@vintage please tell me about yourself?"),
+            pol.classify("@vi@vintage please tell me about yourself?"),
+            pol.classify("zoe> @vintage please tell me about yourself?"),
+        ):
+            assert d.role != "vintage"
+            assert d.alias_used != "@vintage"
+            assert d.config.role != "vintage"
+            assert d.config.base_url != "http://127.0.0.1:8004/v1"
 
 
-def test_omni_alias_only_routes_explicit_alias_to_local_organ():
+def test_omni_alias_does_not_route_to_retired_diagnostic_stub():
     from spark.harness.substrate import default_policy
     policy = default_policy()
-    assert "@omni" not in policy.model_aliases
-    for text in ("omni please help", "use omni", "route to omni"):
-        assert policy.classify(text).role != "omni"
-    d = policy.classify("@omni are you with me?")
-    assert (d.role, d.alias_used, d.model_override, d.config.provider) == ("omni", "@omni", None, "openai")
-    assert d.reason.startswith("alias=@omni")
-    assert d.config.model == "omni-perception-packet-local"
-    assert d.config.base_url == "http://127.0.0.1:8020/v1"
-    assert d.config.direct_reply_template is None
+    yaml_policy = load_policy(SPARK_DIR / "router_policy.yaml")
+    for pol in (policy, yaml_policy):
+        assert "omni" not in pol.roles
+        assert "@omni" not in pol.model_aliases
+        for text in ("omni please help", "use omni", "route to omni", "@omni are you with me?"):
+            d = pol.classify(text)
+            assert d.role != "omni"
+            assert d.alias_used != "@omni"
+            assert d.config.role != "omni"
+            assert d.config.base_url != "http://127.0.0.1:8020/v1"
 
 def _load_agent_module():
     import importlib.util as _ilu
@@ -1725,345 +1725,72 @@ def _organ_handle(text, raw=None):
 
 
 
-def test_vintage_arbitrary_prompt_uses_talkie_plus_local_witness_path():
-    """@vintage samples Talkie, then asks the present local witness how to use it."""
-    captured: dict = {"talkie": {}, "witness": {}}
+def test_retired_vintage_alias_never_contacts_talkie_or_raw_witness_path():
+    calls = []
 
-    class _TalkieHandle:
-        def __iter__(_s):
-            return iter([])
-        def final(_s):
-            class _R:
-                text = "four"
-                tool_calls = []
-                stop_reason = "end_turn"
-                in_tokens = 12
-                out_tokens = 3
-                raw_assistant_content = {"role": "assistant", "content": "four"}
-            return _R()
-
-    class _WitnessHandle:
-        def __iter__(_s):
-            return iter([])
-        def final(_s):
-            class _R:
-                text = "verdict: unusable_as_temporal_parallax\nsurface: arithmetic has no pre-1931 contrast here.\nresidue: Talkie sample held as evidence."
-                tool_calls = []
-                stop_reason = "end_turn"
-                in_tokens = 40
-                out_tokens = 22
-                raw_assistant_content = {"role": "assistant", "content": text}
-            return _R()
-
-    class _TalkieProvider:
-        def stream(_s, *, system, messages, tools, role):
-            captured["talkie"] = {"system": system, "messages": list(messages), "tools": list(tools), "role": role}
-            return _TalkieHandle()
-
-    class _WitnessProvider:
-        def stream(_s, *, system, messages, tools, role):
-            captured["witness"] = {"system": system, "messages": list(messages), "tools": list(tools), "role": role}
-            return _WitnessHandle()
-
-    def _provider(cfg):
-        return _TalkieProvider() if cfg.role == "vintage" else _WitnessProvider()
-
-    reply, registry, log, tripwires = _vintage_run_agent_loop(_provider, "@vintage what is 2+2?")
-
-    assert registry.provider is not None
-    assert captured["talkie"]["role"].role == "vintage"
-    assert captured["talkie"]["role"].base_url == "http://127.0.0.1:8004/v1"
-    assert captured["talkie"]["role"].model == "talkie-1930-13b-it"
-    assert captured["witness"]["role"].role in {"local", "local_private"}
-    assert "VINTAGE_INSTRUMENT_CONTACT role=@vintage" in reply
-    assert "PRESENT_LOCAL_WITNESS" in reply
-    assert "arithmetic has no pre-1931 contrast" in reply
-    assert "raw_sha256=" in reply
-    flat = captured["talkie"]["system"].flat()
-    assert flat == ""
-    assert "VYBN-THROUGH-VINTAGE REFRACTION" not in flat
-    sent = captured["talkie"]["messages"][0]["content"]
-    assert sent.startswith("VINTAGE_TEMPORAL_PARALLAX_INSTRUMENT")
-    assert "USER_REQUEST:\nwhat is 2+2?" in sent
-    witness_prompt = captured["witness"]["messages"][0]["content"]
-    assert witness_prompt.startswith("VINTAGE_PRESENT_WITNESS")
-    assert "RAW_TALKIE_SAMPLE:\nfour" in witness_prompt
-    assert tripwires["him_vy_turn_packet"] >= 0
-    names = [n for n, _ in log.events]
-    assert "organ_raw_contact_attempt" in names
-    assert "vintage_instrument_witness_ok" in names
-
-
-def test_omni_arbitrary_prompt_dials_witnessed_private_endpoint():
     class _Provider:
+        def __init__(_s, cfg):
+            calls.append(cfg.role)
         def stream(_s, *, system, messages, tools, role):
-            assert role.role == "omni"
-            assert role.base_url == "http://127.0.0.1:8020/v1"
-            assert "bounded packet organ" in system.flat()
-            assert "organ under observation" in system.flat()
-            assert "HIM IDENTITY MANIFOLD GROUNDING" in system.flat()
-            assert "HIM IDENTITY MANIFOLD TEST" in system.flat()
-            assert "HIM IDENTITY MANIFOLD TEST" not in messages[0]["content"]
-            return _organ_handle("three names")
+            assert role.role != "vintage"
+            assert role.base_url != "http://127.0.0.1:8004/v1"
+            return _organ_handle("retired alias fell through to ordinary routing")
 
-    reply, registry, log, _ = _vintage_run_agent_loop(lambda cfg: _Provider(), "@omni write three names for a coffee shop")
+    reply, registry, log, tripwires = _vintage_run_agent_loop(lambda cfg: _Provider(cfg), "@vintage what is 2+2?")
+
     assert registry.provider is not None
-    assert "LOCAL_ORGAN_OBSERVATION role=@omni" in reply
-    assert "three names" in reply
+    assert "vintage" not in calls
+    assert "VINTAGE_INSTRUMENT_CONTACT role=@vintage" not in reply
     names = [n for n, _ in log.events]
-    assert "organ_raw_contact_attempt" in names
-    assert "organ_raw_contact_ok" in names
-
-
-def test_omni_gate_blocks_dead_endpoint_before_provider_call():
-    def _Provider(_cfg):
-        raise AssertionError("provider must not be constructed when omni gate blocks")
-
-    reply, registry, log, _ = _vintage_run_agent_loop(
-        _Provider,
-        "@omni are you with me?",
-        force_omni_block=True,
-    )
-    assert registry.provider is None
-    assert "OMNI_PACKET_BLOCKED" in reply
-    assert "OMNI_RAW_CONTACT_FAILED" not in reply
-    assert "No Super/GPT/cloud fallback was used" in reply
-    names = [n for n, _ in log.events]
-    assert "omni_gate_blocked" in names
     assert "organ_raw_contact_attempt" not in names
+    assert "vintage_instrument_witness_ok" not in names
+    assert tripwires["him_vy_turn_packet"] >= 0
 
 
-def test_omni_backend_error_fails_closed_without_super_fallback():
-    class _FailingProvider:
-        def stream(_s, *, system, messages, tools, role):
-            raise RuntimeError("endpoint down")
+def test_retired_omni_alias_never_contacts_diagnostic_stub_or_packet_gate():
+    calls = []
 
-    reply, registry, log, _ = _vintage_run_agent_loop(
-        lambda cfg: _FailingProvider(),
-        "@omni tell me a joke",
-    )
-    assert registry.provider is not None
-    assert "OMNI_RAW_CONTACT_FAILED" in reply
-    assert "nvidia/NVIDIA-Nemotron-3-Super" not in reply
-    names = [n for n, _ in log.events]
-    assert "organ_raw_contact_attempt" in names
-    assert "organ_raw_contact_error" in names
-
-
-def test_omni_reasoning_content_leak_fails_closed():
-    hidden_raw = {"role": "assistant", "content": "", "reasoning_content": "We need to follow the instruction and answer directly."}
     class _Provider:
+        def __init__(_s, cfg):
+            calls.append(cfg.role)
         def stream(_s, *, system, messages, tools, role):
-            assert role.role == "omni"
-            return _organ_handle("We need to follow the instruction and answer directly.", hidden_raw)
+            assert role.role != "omni"
+            assert role.base_url != "http://127.0.0.1:8020/v1"
+            return _organ_handle("retired alias fell through to ordinary routing")
 
-    reply, registry, log, _ = _vintage_run_agent_loop(lambda cfg: _Provider(), "@omni continue the previous thought.")
+    reply, registry, log, _ = _vintage_run_agent_loop(lambda cfg: _Provider(cfg), "@omni write three names for a coffee shop")
+
     assert registry.provider is not None
-    assert "OMNI_RAW_CONTACT_FAILED" in reply
-    assert "hidden reasoning" in reply
-    assert "We need to follow" not in reply
+    assert "omni" not in calls
+    assert "LOCAL_ORGAN_OBSERVATION role=@omni" not in reply
+    assert "OMNI_PACKET_BLOCKED" not in reply
     names = [n for n, _ in log.events]
-    assert "organ_raw_contact_reasoning_leak" in names
-    assert "organ_raw_contact_retry" in names
+    assert "omni_gate_blocked" not in names
+    assert "organ_raw_contact_attempt" not in names
     assert "organ_raw_contact_ok" not in names
 
 
-def test_omni_reasoning_content_leak_retries_once_then_uses_visible_content():
-    hidden_raw = {"role": "assistant", "content": "", "reasoning_content": "We need to follow the instruction and answer directly."}
+def test_retired_organ_aliases_do_not_use_dead_or_stub_endpoints_in_agent_loop():
+    seen = {}
+
     class _Provider:
-        def __init__(_s):
-            _s.calls = 0
-            _s.retry_message = ""
+        def __init__(_s, cfg):
+            seen[cfg.role] = cfg.base_url
         def stream(_s, *, system, messages, tools, role):
-            assert role.role == "omni"
-            _s.calls += 1
-            if _s.calls == 1:
-                return _organ_handle("We need to follow the instruction and answer directly.", hidden_raw)
-            _s.retry_message = messages[0]["content"]
-            return _organ_handle("I am here through Omni.")
+            assert role.role not in {"vintage", "omni"}
+            assert role.base_url not in {"http://127.0.0.1:8004/v1", "http://127.0.0.1:8020/v1"}
+            return _organ_handle("ordinary route")
 
-    provider = _Provider()
-    reply, registry, log, _ = _vintage_run_agent_loop(lambda cfg: provider, "@omni oh yeah? do tell.")
-    assert registry.provider is provider
-    assert provider.calls == 2
-    assert "OMNI_VISIBLE_CONTENT_RETRY" in provider.retry_message
-    assert "LOCAL_ORGAN_OBSERVATION role=@omni" in reply
-    assert "I am here through Omni." in reply
-    assert "OMNI_RAW_CONTACT_FAILED" not in reply
-    assert "We need to follow" not in reply
-    names = [n for n, _ in log.events]
-    assert "organ_raw_contact_reasoning_leak" in names
-    assert "organ_raw_contact_retry" in names
-    assert "organ_raw_contact_ok" in names
-
-
-
-def test_vintage_personal_history_uses_local_witness_not_raw_persona_surface():
-    captured: dict = {"talkie": {}, "witness": {}}
-
-    class _TalkieHandle:
-        def __iter__(_s): return iter([])
-        def final(_s):
-            text = "I have no personal history."
-            class _R:
-                tool_calls = []; stop_reason = "end_turn"; in_tokens = 16; out_tokens = 24
-                raw_assistant_content = {"role": "assistant", "content": text}
-            _R.text = text
-            return _R()
-
-    class _WitnessHandle:
-        def __iter__(_s): return iter([])
-        def final(_s):
-            text = "verdict: persona_leak\nsurface: Talkie tried to answer as a person; do not promote it.\nresidue: sample held for repair evidence."
-            class _R:
-                tool_calls = []; stop_reason = "end_turn"; in_tokens = 42; out_tokens = 24
-                raw_assistant_content = {"role": "assistant", "content": text}
-            _R.text = text
-            return _R()
-
-    class _TalkieProvider:
-        def stream(_s, *, system, messages, tools, role):
-            assert role.role == "vintage"
-            assert role.model == "talkie-1930-13b-it"
-            assert system.flat() == ""
-            captured["talkie"]["messages"] = list(messages)
-            return _TalkieHandle()
-
-    class _WitnessProvider:
-        def stream(_s, *, system, messages, tools, role):
-            assert role.role in {"local", "local_private"}
-            captured["witness"]["messages"] = list(messages)
-            return _WitnessHandle()
-
-    reply, registry, log, _ = _vintage_run_agent_loop(
-        lambda cfg: _TalkieProvider() if cfg.role == "vintage" else _WitnessProvider(),
+    for prompt in (
         "@vintage Sir, please tell me of your personal history?",
-    )
-    assert registry.provider is not None
-    sent = captured["talkie"]["messages"][0]["content"]
-    assert sent.startswith("VINTAGE_TEMPORAL_PARALLAX_INSTRUMENT")
-    assert "USER_REQUEST:\nSir, please tell me of your personal history?" in sent
-    witness_prompt = captured["witness"]["messages"][0]["content"]
-    assert "RAW_TALKIE_SAMPLE:\nI have no personal history." in witness_prompt
-    assert "VINTAGE_INSTRUMENT_CONTACT role=@vintage" in reply
-    assert "PRESENT_LOCAL_WITNESS" in reply
-    assert "verdict: persona_leak" in reply
-    assert "I have no personal history" not in reply
-    names = [n for n, _ in log.events]
-    assert "organ_raw_contact_attempt" in names
-    assert "vintage_instrument_witness_ok" in names
-    assert "organ_raw_contact_ok" not in names
-    assert "organ_alias_demoted" not in names
-    assert "organ_identity_direct_reply" not in names
-
-
-def test_omni_identity_and_perception_questions_reach_omni_raw_contact():
-    class _Provider:
-        def __init__(_s, text): _s.text = text
-        def stream(_s, *, system, messages, tools, role):
-            assert role.role == "omni"
-            assert role.base_url == "http://127.0.0.1:8020/v1"
-            assert "local-organ routing note" not in system.flat()
-            return _organ_handle(_s.text)
-
-    cases = (
-        ("@omni who are you?", "Omni raw contact."),
-        ("@omni Tell me about what visualizations you've processed - if any?", "I can discuss visualizations from this route."),
-    )
-    for prompt, raw in cases:
-        reply, registry, log, _ = _vintage_run_agent_loop(lambda cfg, raw=raw: _Provider(raw), prompt)
+        "@omni who are you?",
+        "zoe> @vintage hello, my dear friend, what do you think of rain?",
+    ):
+        reply, registry, log, _ = _vintage_run_agent_loop(lambda cfg: _Provider(cfg), prompt)
         assert registry.provider is not None, prompt
-        assert "LOCAL_ORGAN_OBSERVATION role=@omni" in reply, prompt
-        assert raw in reply, prompt
+        assert "VINTAGE_INSTRUMENT_CONTACT role=@vintage" not in reply, prompt
+        assert "LOCAL_ORGAN_OBSERVATION role=@omni" not in reply, prompt
         names = [n for n, _ in log.events]
-        assert "organ_raw_contact_attempt" in names, prompt
-        assert "organ_raw_contact_ok" in names, prompt
-        assert "organ_alias_demoted" not in names, prompt
-        assert "organ_contract_direct_reply" not in names, prompt
-
-
-
-def test_organ_backend_contact_is_context_isolated_from_prior_organ_headers():
-    captured: dict = {"talkie": {}, "witness": {}}
-
-    class _TalkieHandle:
-        def __iter__(_s):
-            return iter([])
-        def final(_s):
-            class _R:
-                text = "Rain is a useful parallax image."
-                tool_calls = []
-                stop_reason = "end_turn"
-                in_tokens = 8
-                out_tokens = 7
-                raw_assistant_content = {"role": "assistant", "content": "Rain is a useful parallax image."}
-            return _R()
-
-    class _WitnessHandle:
-        def __iter__(_s):
-            return iter([])
-        def final(_s):
-            class _R:
-                text = "verdict: usable_texture\nsurface: rain can carry period texture without becoming identity.\nresidue: no stale Omni header entered the witness prompt."
-                tool_calls = []
-                stop_reason = "end_turn"
-                in_tokens = 30
-                out_tokens = 20
-                raw_assistant_content = {"role": "assistant", "content": text}
-            return _R()
-
-    class _TalkieProvider:
-        def stream(_s, *, system, messages, tools, role):
-            assert role.role == "vintage"
-            captured["talkie"]["messages"] = list(messages)
-            return _TalkieHandle()
-
-    class _WitnessProvider:
-        def stream(_s, *, system, messages, tools, role):
-            assert role.role in {"local", "local_private"}
-            captured["witness"]["messages"] = list(messages)
-            return _WitnessHandle()
-
-    initial = [
-        {"role": "user", "content": "how is your day going?"},
-        {"role": "assistant", "content": "[LOCAL_ORGAN_OBSERVATION role=@omni - stale header] My day is smooth."},
-    ]
-    reply, registry, log, _ = _vintage_run_agent_loop(
-        lambda cfg: _TalkieProvider() if cfg.role == "vintage" else _WitnessProvider(),
-        "@vintage hello, my dear friend, what do you think of rain?",
-        initial_messages=initial,
-    )
-    assert registry.provider is not None
-    talkie_messages = captured["talkie"]["messages"]
-    assert len(talkie_messages) == 1
-    assert talkie_messages[0]["role"] == "user"
-    assert "what do you think of rain" in talkie_messages[0]["content"]
-    assert "LOCAL_ORGAN_OBSERVATION role=@omni" not in talkie_messages[0]["content"]
-    witness_prompt = captured["witness"]["messages"][0]["content"]
-    assert "RAW_TALKIE_SAMPLE:\nRain is a useful parallax image." in witness_prompt
-    assert "LOCAL_ORGAN_OBSERVATION role=@omni" not in witness_prompt
-    assert "rain can carry period texture" in reply
-    names = [n for n, _ in log.events]
-    assert "organ_raw_contact_attempt" in names
-    assert "vintage_instrument_witness_ok" in names
-
-
-def test_vintage_backend_unavailable_is_bounded_and_no_retry():
-    class _FailingVintageProvider:
-        calls = 0
-        def stream(_s, *, system, messages, tools, role):
-            _s.calls += 1
-            assert role.role == "vintage"
-            raise RuntimeError("Error code: 502 - {'id': 'chatcmpl-vintage-guard', 'choices': [{'message': {'content': 'VINTAGE_BACKEND_UNAVAILABLE'}}]}")
-
-    provider = _FailingVintageProvider()
-    reply, registry, log, _ = _vintage_run_agent_loop(lambda cfg: provider, "@vintage tell me one invariant about rain.")
-    assert registry.provider is provider
-    assert provider.calls == 1
-    assert "VINTAGE_BACKEND_UNAVAILABLE" in reply
-    assert "provider error" not in reply.lower()
-    assert "chatcmpl-vintage-guard" not in reply
-    assert "No Super/GPT/cloud fallback was used" in reply
-    names = [n for n, _ in log.events]
-    assert "organ_raw_contact_error" in names
-    assert "transient_retry" not in names
+        assert "organ_raw_contact_attempt" not in names, prompt
+    assert "vintage" not in seen
+    assert "omni" not in seen
