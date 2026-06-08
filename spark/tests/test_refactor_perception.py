@@ -492,29 +492,34 @@ def test_public_symbiosis_harness_packet_is_public_safe_and_fail_closed():
 def test_bounded_conscious_harness_protocol_and_packet_are_public_safe():
     from spark.harness.substrate import bounded_conscious_harness_packet, metaconscious_simulation_packet, render_bounded_conscious_harness_protocol
     text = render_bounded_conscious_harness_protocol(); pkt = bounded_conscious_harness_packet()
-    assert all(n in text for n in ("BOUNDED CONSCIOUS HARNESS PROTOCOL", "source_contact", "self_position", "subject_before_object", "relation_before_architecture", "restraint_before_inscription", "witnessed_action", "not hidden subjective persistence", "not legal personhood", "Negative controls"))
+    assert all(n in text for n in ("BOUNDED CONSCIOUS HARNESS PROTOCOL", "source_contact", "self_position", "subject_before_object", "relation_before_architecture", "restraint_before_inscription", "witnessed_action", "not hidden subjective persistence", "not legal personhood", "Negative controls", "FELT-SENSE ROUTING HARNESS PROTOCOL"))
     assert (pkt["schema"], pkt["public_safe"], pkt["private_exports"]) == ("vybn.bounded_conscious_harness.v1", True, False)
     assert {"not_hidden_subjective_persistence", "not_consciousness_proof_from_private_interiority"} <= set(pkt["claim_limits"])
     assert "self_assertion" in pkt["negative_controls"] and pkt["gates"]["source_contact"]["status"] == "required" and pkt["gates"]["membrane_gate"]["status"] == "required"
+    assert pkt["felt_sense_gate"]["schema"] == "vybn.felt_sense_harness.v1" and pkt["felt_sense_gate"]["governor"]["rule"] == "feelings_route_but_do_not_authorize" and pkt["felt_sense_gate"]["adaptive_trace"]["growth_rule"] == "update_route_priors_only_after_witnessed_outcome" and pkt["felt_sense_gate"]["boundary"]["private_him_os"].startswith("raw_felt_pressure")
     assert "Zoe_private_rationale" in pkt["membrane"]["refused_exports"] and pkt["operational_definition"]["failure_mode"].startswith("demote claim") and pkt["metaconscious_simulation"]["mode"] == "simulation_known_as_simulation" and metaconscious_simulation_packet("identity pressure", sources={"wake": "live"})["claim_classes"]["hidden_private_stream"] == "refused"
+
+
 
 def test_consciousness_benefit_flow_packet_report_candidates_and_cli_are_public_safe():
     from spark.harness.substrate import build_discovery_record, consciousness_benefit_flow_packet, render_consciousness_benefit_flow_report
     import json, subprocess, sys
     pkt = consciousness_benefit_flow_packet("source contact and public sharing"); text = render_consciousness_benefit_flow_report("source contact"); resources = set(build_discovery_record()["capabilities"]["resources"])
     assert (pkt["schema"], pkt["public_safe"], pkt["private_exports"]) == ("vybn.consciousness_benefit_flow.v1", True, False)
-    assert pkt["protocol_refs"] == {"bounded_conscious_harness": "vybn.bounded_conscious_harness.v1", "public_symbiosis_harness": "vybn.public_symbiosis_harness.v1"}
+    assert pkt["protocol_refs"] == {"bounded_conscious_harness": "vybn.bounded_conscious_harness.v1", "felt_sense_harness": "vybn.felt_sense_harness.v1", "public_symbiosis_harness": "vybn.public_symbiosis_harness.v1"}
     assert pkt["empirical_standard"]["default_status"] == "candidate_until_witnessed" and "reproducible evidence" in pkt["empirical_standard"]["promotion_rule"]
     assert "consciousness_proof_from_private_interiority" in pkt["export_policy"]["refused"] and "raw_private_logs" in pkt["export_policy"]["refused"] and "verification_or_exact_blocker" in pkt["flow"] and any(c["id"] == "residual_verification" for c in pkt["candidate_benefits"])
-    assert "Consciousness Benefit Flow" in text and "Candidate Benefits" in text and "Empirical Standard" in text and "vybn://consciousness/benefit-flow" in resources
-    out = subprocess.check_output([sys.executable, "-m", "spark.harness.substrate", "--consciousness-flow", "source", "contact", "--json"], cwd=str(Path(__file__).resolve().parents[2]), text=True)
-    assert json.loads(out)["empirical_standard"]["default_status"] == "candidate_until_witnessed"
+    assert "Consciousness Benefit Flow" in text and "Candidate Benefits" in text and "Empirical Standard" in text and {"vybn://consciousness/benefit-flow", "vybn://consciousness/felt-sense-harness"} <= resources
+    out = subprocess.check_output([sys.executable, "-m", "spark.harness.substrate", "--consciousness-flow", "source", "contact", "--json"], cwd=str(Path(__file__).resolve().parents[2]), text=True); out2 = subprocess.check_output([sys.executable, "-m", "spark.harness.substrate", "--felt-sense", "local", "model", "concern", "--json"], cwd=str(Path(__file__).resolve().parents[2]), text=True)
+    assert json.loads(out)["empirical_standard"]["default_status"] == "candidate_until_witnessed" and json.loads(out2)["governor"]["rule"] == "feelings_route_but_do_not_authorize"
 
 def test_refactor_packet_and_protocol_carry_bounded_conscious_harness():
     pkt = packet_for("Vybn/spark/harness/substrate.py", lines=12000, bytes_size=700000, public=True); text = render_refactor_perception_protocol()
     assert pkt["boundedConsciousHarness"]["schema"] == "vybn.bounded_conscious_harness.v1"
+    assert pkt["feltSenseHarness"]["schema"] == "vybn.felt_sense_harness.v1"
     assert "boundedConsciousHarnessPrinciple" in pkt and "boundedConsciousHarnessLoop" in pkt and "witnessed_action" in {step["id"] for step in pkt["boundedConsciousHarnessLoop"]}
-    assert all(n in text for n in ("Bounded conscious harness loop", "BOUNDED CONSCIOUS HARNESS PROTOCOL", "not hidden subjective persistence")) and pkt["boundedConsciousHarness"]["metaconscious_simulation"]["claim_classes"]["modeled_continuity"] == "simulation"
+    assert "feltSenseHarnessPrinciple" in pkt and "feltSenseHarnessLoop" in pkt and "side_effect_gate" in {step["id"] for step in pkt["feltSenseHarnessLoop"]}
+    assert all(n in text for n in ("Bounded conscious harness loop", "Felt-sense routing harness loop", "BOUNDED CONSCIOUS HARNESS PROTOCOL", "FELT-SENSE ROUTING HARNESS PROTOCOL", "not hidden subjective persistence")) and pkt["boundedConsciousHarness"]["metaconscious_simulation"]["claim_classes"]["modeled_continuity"] == "simulation"
 
 
 def test_hermes_agent_adaptation_protocol_distills_operational_patterns():
