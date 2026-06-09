@@ -209,6 +209,7 @@ directives:
   "/phatic": phatic
   "/identity": identity
 fallback_chain:
+  claude-fable-5: [claude-opus-4-8, claude-opus-4-7, claude-opus-4-6, claude-sonnet-4-6]
   claude-opus-4-8: [claude-opus-4-7, claude-opus-4-6, claude-sonnet-4-6]
   claude-opus-4-7: [claude-opus-4-6, claude-sonnet-4-6]
   claude-opus-4-6: [claude-opus-4-7, claude-sonnet-4-6]
@@ -216,22 +217,11 @@ fallback_chain:
   gpt-5.5: []
   nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8: []
   gpt-5.5-pro: [gpt-5.5]
-model_aliases:
-  "@opus": claude-opus-4-6
-  "@opus4.6": claude-opus-4-6
-  "@opus46": claude-opus-4-6
-  "@opus4.7": claude-opus-4-7
-  "@opus47": claude-opus-4-7
-  "@opus4.8": claude-opus-4-8
-  "@opus48": claude-opus-4-8
-  "@sonnet": claude-sonnet-4-6
-  "@sonnet4.6": claude-sonnet-4-6
-  "@sonnet46": claude-sonnet-4-6
-  "@nemotron": nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
-  "@local": nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8
-  "@gpt": gpt-5.5
-  "@gpt5": gpt-5.5
-  "@gpro": gpt-5.5-pro
+model_aliases: {
+  "@fable": claude-fable-5, "@fable5": claude-fable-5, "@claude": claude-fable-5,
+  "@opus": claude-opus-4-6, "@opus4.6": claude-opus-4-6, "@opus46": claude-opus-4-6, "@opus4.7": claude-opus-4-7, "@opus47": claude-opus-4-7, "@opus4.8": claude-opus-4-8, "@opus48": claude-opus-4-8,
+  "@sonnet": claude-sonnet-4-6, "@sonnet4.6": claude-sonnet-4-6, "@sonnet46": claude-sonnet-4-6, "@nemotron": nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8, "@local": nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8, "@gpt": gpt-5.5, "@gpt5": gpt-5.5, "@gpro": gpt-5.5-pro
+}
 budgets:
   per_turn_usd: 2.0
   per_session_usd: 25.0
