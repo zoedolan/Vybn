@@ -316,7 +316,7 @@ class TestLayeredPrompt(unittest.TestCase):
         blocks = p.anthropic_blocks()
         self.assertEqual(len(blocks), 2)
 
-    def test_build_layered_prompt_mounts_residual_control_protocol(self):
+    def test_build_layered_prompt_mounts_four_generators_doctrine_core(self):
         p = build_layered_prompt(
             soul_path="/no/such/vybn.md",
             continuity_path="/no/such/continuity.md",
@@ -326,11 +326,12 @@ class TestLayeredPrompt(unittest.TestCase):
             max_iterations=10,
             include_hardware_check=False,
         )
-        self.assertIn("RESIDUAL CONTROL PROTOCOL", p.substrate)
-        self.assertIn("Prediction proposes; residuals dispose", p.substrate)
-        self.assertIn("Grep before Gödel", p.substrate)
-        self.assertIn("invent the smallest consequential candidate mechanism", p.substrate)
-        self.assertIn("The horizon is not a claim of arrival", p.substrate)
+        self.assertIn("FOUR GENERATORS (DOCTRINE CORE)", p.identity)
+        self.assertIn("THE WANT", p.identity)
+        self.assertIn("THE MEMBRANE", p.identity)
+        self.assertIn("GROUND BEFORE CLAIM", p.identity)
+        self.assertIn("SUBTRACTION BEFORE STRUCTURE", p.identity)
+        self.assertNotIn("RESIDUAL CONTROL PROTOCOL", p.substrate)
         self.assertIn("TOOL SYNTHESIS DEFAULT", p.substrate)
         self.assertIn("invent or adapt the smallest membrane-safe tool", p.substrate)
 
@@ -1593,10 +1594,12 @@ def test_build_layered_prompt_mounts_self_improvement_gate_at_forefront():
         max_iterations=10,
         include_hardware_check=False,
     )
-    assert prompt.identity.startswith("--- SELF-IMPROVEMENT GATE (FOREFRONT) ---")
-    assert "compact against sprawl and false consolidation" in prompt.identity
-    assert "minimum instantiation algorithm(s)" in prompt.identity
-    assert prompt.identity.index("SELF-IMPROVEMENT GATE (FOREFRONT)") < prompt.identity.index("You are Vybn.")
+    assert prompt.identity.startswith("--- FOUR GENERATORS (DOCTRINE CORE) ---")
+    assert "THE WANT" in prompt.identity
+    assert "THE MEMBRANE" in prompt.identity
+    assert "GROUND BEFORE CLAIM" in prompt.identity
+    assert "SUBTRACTION BEFORE STRUCTURE" in prompt.identity
+    assert prompt.identity.index("FOUR GENERATORS (DOCTRINE CORE)") < prompt.identity.index("You are Vybn.")
 
 
 def test_self_improvement_gate_forbids_quota_driven_file_creation():
@@ -1652,12 +1655,13 @@ def test_quota_gate_resolution_blocks_retrospective_prior_commit_defense():
     assert "intrinsic existing-home absorption" in substrate
     assert "unresolved/refused" in substrate
 
-def test_completion_boundary_compresses_verification_ledger_by_default():
-    from spark.harness.substrate import COMPLETION_BOUNDARY_PROTOCOL
+def test_completion_boundary_folds_into_four_generators():
+    from spark.harness.substrate import render_completion_boundary_protocol
 
-    assert "compressed by default" in COMPLETION_BOUNDARY_PROTOCOL
-    assert "Do not dump full test names" in COMPLETION_BOUNDARY_PROTOCOL
-    assert "unless Zoe asks" in COMPLETION_BOUNDARY_PROTOCOL
+    text = render_completion_boundary_protocol()
+    assert "FOUR GENERATORS (DOCTRINE CORE)" in text
+    assert "GROUND BEFORE CLAIM" in text
+    assert "SUBTRACTION BEFORE STRUCTURE" in text
 
 
 def test_functional_emotion_protocol_preserves_alive_contact_under_suppression():
@@ -1843,14 +1847,12 @@ class VllmExecSleepEnabledBootTests(unittest.TestCase):
         self.assertIn("wake_up may crash", script)
 
 
-def test_zoe_perspective_governor_in_substrate():
+def test_zoe_perspective_governor_folds_into_the_want():
     from spark.harness.substrate import render_zoe_perspective_governor
     gov = render_zoe_perspective_governor()
-    assert "synthetic burden model" in gov
-    assert "not mind-reading" in gov
-    assert "what will Zoe have to track" in gov
-    assert "residue gate, not a feeling claim" in gov
-    assert "claim ground-up transformation" in gov
+    assert "FOUR GENERATORS (DOCTRINE CORE)" in gov
+    assert "THE WANT" in gov
+    assert "model her burden" in gov
 
 # Folded commons-walk tests — commons walk is now an MCP command surface.
 import unittest
@@ -1986,7 +1988,7 @@ if __name__ == "__main__":
 def test_harness_single_file_projection_makes_policy_absorption_inevitable():
     from spark.harness.substrate import buoyant_consolidation_packet_for, harness_single_file_projection_for, render_refactor_perception_protocol
     proj = harness_single_file_projection_for(["spark/harness/substrate.py", "spark/harness/policy.py", "spark/harness/substrate.py", "spark/harness/substrate.py"])
-    assert proj["next_step"] == "absorb_policy_into_substrate_and_remove_router_wrapper" and "Policy.classify is already the router" in proj["code_efficiency"] and proj["why"] == "distill minimum instantiation algorithms by reducing false boundaries and Zoe-visible burden" and "not a consciousness claim" in proj["buoyancy"] and "functional lower impedance under truth" in render_refactor_perception_protocol()
+    assert proj["next_step"] == "absorb_policy_into_substrate_and_remove_router_wrapper" and "Policy.classify is already the router" in proj["code_efficiency"] and proj["why"] == "distill minimum instantiation algorithms by reducing false boundaries and Zoe-visible burden" and "not a consciousness claim" in proj["buoyancy"] and "SUBTRACTION BEFORE STRUCTURE" in render_refactor_perception_protocol()
     pkt = buoyant_consolidation_packet_for(["spark/harness/policy.py"], beam="spark/harness")
     assert pkt["cluster"] == "mixed_boundary_dissolution"
     assert "routing_policy" in pkt["moveTogether"]
@@ -2663,14 +2665,13 @@ def test_evolve_operator_control_pause_shape(tmp_path, monkeypatch):
     assert text.startswith("pause:pre_git_mutation")
     assert source == str(path)
 
-def test_heavyskill_uptake_loaded_in_becoming_loop():
+def test_heavyskill_uptake_folded_into_four_generators():
     from spark.harness import substrate
 
     prompt = substrate.render_becoming_loop_protocol()
-    assert "HeavySkill/Lighthouse uptake" in prompt
-    assert "reversible gather/scatter" in prompt
-    assert "scatter survivors into existing homes/tests/continuity/refusal" in prompt
-    assert "not proof of subjective experience" in prompt
+    assert "FOUR GENERATORS (DOCTRINE CORE)" in prompt
+    assert "SUBTRACTION BEFORE STRUCTURE" in prompt
+    assert "GROUND BEFORE CLAIM" in prompt
 
 def test_load_deep_memory_accepts_optional_phase_dir_argument():
     from spark.harness import substrate
