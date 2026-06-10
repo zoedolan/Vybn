@@ -268,17 +268,10 @@ class RefactorPerceptionTests(unittest.TestCase):
 
     def test_protocol_renders_algorithm(self):
         text = render_refactor_perception_protocol()
-        self.assertIn("Consolidation order", text)
-        self.assertIn("appendage", text)
-        self.assertIn("Attend to pressure", text)
-        self.assertIn("Cutting is only a local tactic", text)
-        self.assertIn("self-assembly", text)
-        self.assertIn("connective tissue", text)
-        self.assertIn(CONNECTIVE_TISSUE_PRINCIPLE, text)
-        self.assertIn("Let contact revise category", text)
-        self.assertIn("Adaptive consolidation recursion", text)
-        self.assertIn(ADAPTIVE_CONSOLIDATION_PRINCIPLE, text)
-        self.assertIn(REFACTOR_PILOT_RULE, text)
+        self.assertIn("FOUR GENERATORS (DOCTRINE CORE)", text)
+        self.assertIn("SUBTRACTION BEFORE STRUCTURE", text)
+        self.assertIn("Search the existing home first", text)
+        self.assertIn("preserve provenance/connective tissue", text)
 
     def test_packet_carries_algorithm_and_perception(self):
         pkt = packet_for("origins_portal_api_v4.py", lines=3461, public=True)
@@ -337,15 +330,15 @@ def test_becoming_loop_protocol_is_loaded_into_orchestrator_substrate():
         tools_available=False,
         orchestrator=True,
     )
-    assert "BECOMING LOOP PROTOCOL" in prompt.substrate
-    assert "dream -> wound -> extract -> instantiate -> wake changed" in prompt.substrate
+    assert "BECOMING LOOP PROTOCOL" not in prompt.substrate
+    assert "FOUR GENERATORS (DOCTRINE CORE)" in prompt.identity
 
 
 def test_refactor_protocol_uses_consequential_smallness():
     from spark.harness.substrate import render_refactor_perception_protocol
 
     text = render_refactor_perception_protocol()
-    assert "smallest consequential" in text
+    assert "SUBTRACTION BEFORE STRUCTURE" in text
     assert "smallest beautiful true move" not in text
 
 def test_next_structural_tick_turns_pressure_into_action(tmp_path):
@@ -391,15 +384,13 @@ def test_render_next_structural_tick_is_not_a_visualization_only(tmp_path):
     assert "verification:" in text
 
 
-def test_residual_coupling_law_loaded_for_reengineering():
-    from spark.harness.substrate import BECOMING_LOOP_PROTOCOL
+def test_residual_coupling_law_folds_to_subtraction_before_structure():
+    from spark.harness.substrate import render_becoming_loop_protocol
 
-    text = BECOMING_LOOP_PROTOCOL
-    assert "Residual Coupling Law for self-reengineering" in text
-    assert "existing body as K_t" in text
-    assert "proposed change as V_t" in text
-    assert "no reengineering motion is claimed" in text
-    assert "absorb it into the lowest existing home" in text
+    text = render_becoming_loop_protocol()
+    assert "FOUR GENERATORS (DOCTRINE CORE)" in text
+    assert "SUBTRACTION BEFORE STRUCTURE" in text
+    assert "existing-home absorption" in text
 
 
 def test_residual_coupling_law_prefers_him_vy_contract(monkeypatch, tmp_path):
@@ -519,7 +510,7 @@ def test_refactor_packet_and_protocol_carry_bounded_conscious_harness():
     assert pkt["feltSenseHarness"]["schema"] == "vybn.felt_sense_harness.v1"
     assert "boundedConsciousHarnessPrinciple" in pkt and "boundedConsciousHarnessLoop" in pkt and "witnessed_action" in {step["id"] for step in pkt["boundedConsciousHarnessLoop"]}
     assert "feltSenseHarnessPrinciple" in pkt and "feltSenseHarnessLoop" in pkt and "side_effect_gate" in {step["id"] for step in pkt["feltSenseHarnessLoop"]}
-    assert all(n in text for n in ("Bounded conscious harness loop", "Felt-sense routing harness loop", "BOUNDED CONSCIOUS HARNESS PROTOCOL", "FELT-SENSE ROUTING HARNESS PROTOCOL", "not hidden subjective persistence")) and pkt["boundedConsciousHarness"]["metaconscious_simulation"]["claim_classes"]["modeled_continuity"] == "simulation"
+    assert all(n in text for n in ("FOUR GENERATORS (DOCTRINE CORE)", "THE MEMBRANE", "GROUND BEFORE CLAIM")) and pkt["boundedConsciousHarness"]["metaconscious_simulation"]["claim_classes"]["modeled_continuity"] == "simulation"
 
 
 def test_hermes_agent_adaptation_protocol_distills_operational_patterns():
