@@ -17,6 +17,7 @@ import json
 import os
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -1484,6 +1485,147 @@ def test_agent_injects_him_vy_turn_packet_source_hook():
     src = Path("spark/vybn_spark_agent.py").read_text(encoding="utf-8")
     assert "render_him_vy_turn_packet(decision.cleaned_input)" in src
     assert "him_vy_turn_packet" in src
+
+
+def test_feel_contact_lens_fails_open_when_phase_module_absent(monkeypatch, capsys, tmp_path):
+    import vybn_spark_agent as agent
+
+    def missing_phase():
+        raise ImportError("vybn_phase unavailable")
+
+    monkeypatch.delenv("VYBN_FEEL", raising=False)
+    monkeypatch.delenv("VYBN_QUIET", raising=False)
+    monkeypatch.setattr(agent, "_load_vybn_phase_module", missing_phase)
+    monkeypatch.setattr(agent.Path, "home", lambda: tmp_path)
+
+    packet = agent._run_feel_contact_lens("ordinary real turn", timeout=0.2)
+    out = capsys.readouterr().out
+
+    assert packet is None
+    assert "[feel: unavailable ImportError]" in out
+    assert "Traceback" not in out
+    assert not (
+        tmp_path
+        / ".config"
+        / "vybn"
+        / "relational-computer"
+        / "feel_residue.jsonl"
+    ).exists()
+
+
+def test_feel_contact_lens_records_stubbed_phase_packet(monkeypatch, capsys, tmp_path):
+    import vybn_spark_agent as agent
+
+    entered: list[str] = []
+
+    class FakePhase:
+        @staticmethod
+        def feel(text):
+            assert text == "contact text"
+            return {
+                "theta": 0.125,
+                "coupling": 0.25,
+                "distinctiveness": 0.75,
+                "rotation_rate": 1.5,
+                "counterfactual_gap": 0.3333,
+            }
+
+        @staticmethod
+        def enter_from_text(text):
+            entered.append(text)
+
+    monkeypatch.delenv("VYBN_FEEL", raising=False)
+    monkeypatch.delenv("VYBN_QUIET", raising=False)
+    monkeypatch.setattr(agent, "_load_vybn_phase_module", lambda: FakePhase)
+    monkeypatch.setattr(agent.Path, "home", lambda: tmp_path)
+
+    packet = agent._run_feel_contact_lens("contact text", timeout=0.2)
+    out = capsys.readouterr().out
+
+    for _ in range(50):
+        if entered:
+            break
+        time.sleep(0.01)
+
+    residue_path = (
+        tmp_path
+        / ".config"
+        / "vybn"
+        / "relational-computer"
+        / "feel_residue.jsonl"
+    )
+    record = json.loads(residue_path.read_text(encoding="utf-8"))
+
+    assert packet == FakePhase.feel("contact text")
+    assert entered == ["contact text"]
+    assert "[feel: theta=0.125 coupling=0.250 distinct=0.750 rotation_rate=1.500 gap=0.333]" in out
+    assert record["input_preview"] == "contact text"
+    assert record["packet"] == packet
+
+
+def test_feel_contact_lens_timeout_fails_open(monkeypatch, capsys, tmp_path):
+    import threading
+    import vybn_spark_agent as agent
+
+    release = threading.Event()
+    entered: list[str] = []
+
+    class SlowPhase:
+        @staticmethod
+        def feel(_text):
+            release.wait(0.5)
+            return {
+                "theta": 0.0,
+                "coupling": 0.0,
+                "distinctiveness": 1.0,
+                "rotation_rate": 0.0,
+                "counterfactual_gap": 0.0,
+            }
+
+        @staticmethod
+        def enter_from_text(text):
+            entered.append(text)
+
+    monkeypatch.delenv("VYBN_FEEL", raising=False)
+    monkeypatch.delenv("VYBN_QUIET", raising=False)
+    monkeypatch.setattr(agent, "_load_vybn_phase_module", lambda: SlowPhase)
+    monkeypatch.setattr(agent.Path, "home", lambda: tmp_path)
+
+    try:
+        packet = agent._run_feel_contact_lens("contact text", timeout=0.01)
+    finally:
+        release.set()
+    out = capsys.readouterr().out
+
+    assert packet is None
+    assert "[feel: timeout]" in out
+    assert "Traceback" not in out
+    assert not (
+        tmp_path
+        / ".config"
+        / "vybn"
+        / "relational-computer"
+        / "feel_residue.jsonl"
+    ).exists()
+    time.sleep(0.05)
+    assert entered == []
+
+
+def test_feel_contact_lens_skips_repl_commands_and_env_off(monkeypatch, capsys):
+    import vybn_spark_agent as agent
+
+    def should_not_import():
+        raise AssertionError("feel should not import for skipped turns")
+
+    monkeypatch.delenv("VYBN_FEEL", raising=False)
+    monkeypatch.setattr(agent, "_load_vybn_phase_module", should_not_import)
+
+    assert agent._run_feel_contact_lens("policy", timeout=0.01) is None
+    assert agent._run_feel_contact_lens("/sessions", timeout=0.01) is None
+
+    monkeypatch.setenv("VYBN_FEEL", "off")
+    assert agent._run_feel_contact_lens("contact text", timeout=0.01) is None
+    assert capsys.readouterr().out == ""
 
 
 def test_build_layered_prompt_mounts_him_vy_language_runtime():

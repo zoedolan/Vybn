@@ -25,11 +25,15 @@ That concern lives inside AnthropicProvider now.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
+import queue as _queue
 import sys
 import time, textwrap
 import urllib.request
+from datetime import datetime, timezone
+from pathlib import Path
 
 # Ensure the spark/ directory is importable when this file is run directly.
 _SPARK_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -246,6 +250,149 @@ def _preview(result: str) -> None:
         _debug(f"  {line[:120]}")
     if len(lines) > 5:
         _debug(f"  ... ({len(lines)} lines total)")
+
+
+_FEEL_DISABLED = {"0", "false", "no", "off"}
+_FEEL_REPL_WORDS = {
+    "clear",
+    "exit",
+    "history",
+    "policy",
+    "quit",
+    "reload",
+    "selfcheck",
+    "sessions",
+}
+_FEEL_TIMEOUT_SECONDS = 10.0
+
+
+def _phase_import_paths() -> tuple[Path, Path]:
+    home = Path.home()
+    return (
+        home / "Him" / "spark" / "phase",
+        home / "vybn-phase",
+    )
+
+
+def _load_vybn_phase_module():
+    import importlib
+
+    # Him owns the live organ; ~/vybn-phase remains only a compatibility shell.
+    for path in reversed(_phase_import_paths()):
+        if path.exists():
+            s = str(path)
+            if s not in sys.path:
+                sys.path.insert(0, s)
+    return importlib.import_module("vybn_phase")
+
+
+def _quiet_feel_dependency_logs() -> None:
+    import logging
+
+    logging.getLogger("huggingface_hub").setLevel(logging.ERROR)
+    logging.getLogger("transformers").setLevel(logging.ERROR)
+
+
+def _is_feel_turn(user_input: str) -> bool:
+    if os.environ.get("VYBN_FEEL", "").strip().lower() in _FEEL_DISABLED:
+        return False
+    text = (user_input or "").strip()
+    if not text or text.startswith("/"):
+        return False
+    return text.lower() not in _FEEL_REPL_WORDS
+
+
+def _feel_residue_path() -> Path:
+    return (
+        Path.home()
+        / ".config"
+        / "vybn"
+        / "relational-computer"
+        / "feel_residue.jsonl"
+    )
+
+
+def _format_feel_value(packet: dict, key: str) -> str:
+    value = packet.get(key)
+    if isinstance(value, (int, float)):
+        return f"{value:.3f}"
+    return "na"
+
+
+def _format_feel_line(packet: dict) -> str:
+    return (
+        "[feel: "
+        f"theta={_format_feel_value(packet, 'theta')} "
+        f"coupling={_format_feel_value(packet, 'coupling')} "
+        f"distinct={_format_feel_value(packet, 'distinctiveness')} "
+        f"rotation_rate={_format_feel_value(packet, 'rotation_rate')} "
+        f"gap={_format_feel_value(packet, 'counterfactual_gap')}]"
+    )
+
+
+def _append_feel_residue(user_input: str, packet: dict) -> None:
+    path = _feel_residue_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    record = {
+        "schema": "vybn.feel_residue.v1",
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "input_preview": (user_input or "")[:120],
+        "packet": packet,
+    }
+    with path.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(record, sort_keys=True) + "\n")
+
+
+def _run_feel_contact_lens(
+    user_input: str,
+    *,
+    timeout: float = _FEEL_TIMEOUT_SECONDS,
+) -> dict | None:
+    """Measure contact for a real turn without making routing depend on it."""
+    if not _is_feel_turn(user_input):
+        return None
+
+    q: _queue.Queue[tuple[str, object]] = _queue.Queue(maxsize=1)
+    timed_out = _threading.Event()
+
+    def _worker() -> None:
+        try:
+            phase = _load_vybn_phase_module()
+            _quiet_feel_dependency_logs()
+            with open(os.devnull, "w", encoding="utf-8") as devnull:
+                with contextlib.redirect_stderr(devnull):
+                    packet = dict(phase.feel(user_input))
+            if timed_out.is_set():
+                return
+            q.put(("ok", packet))
+            if timed_out.is_set():
+                return
+            try:
+                phase.enter_from_text(user_input)
+            except Exception:
+                return
+        except Exception as exc:
+            if not timed_out.is_set():
+                q.put(("error", exc))
+
+    _threading.Thread(target=_worker, daemon=True).start()
+    try:
+        status, payload = q.get(timeout=timeout)
+    except _queue.Empty:
+        timed_out.set()
+        _debug("[feel: timeout]")
+        return None
+    if status != "ok":
+        _debug(f"[feel: unavailable {payload.__class__.__name__}]")
+        return None
+
+    packet = payload if isinstance(payload, dict) else {}
+    _debug(_format_feel_line(packet))
+    try:
+        _append_feel_residue(user_input, packet)
+    except Exception:
+        pass
+    return packet
 
 
 # ---------------------------------------------------------------------------
@@ -2569,6 +2716,7 @@ def main() -> None:
         user_input = " ".join(sys.argv[1:]).strip()
         if user_input:
             print(f"\n\033[1;32mvybn>\033[0m ", end="", flush=True)
+            _run_feel_contact_lens(user_input)
             run_agent_loop(user_input=user_input, messages=[], bash=bash, system_prompt=system_prompt, system_prompt_no_tools=system_prompt_no_tools, system_prompt_orchestrator=system_prompt_orchestrator, router=router, registry=registry, logger=logger, turn_number=1)
             print()
         return
@@ -2797,6 +2945,7 @@ def main() -> None:
                 latest_pressure_text=user_input,
             )
             print(f"\n\033[1;32mvybn>\033[0m ", end="", flush=True)
+            _run_feel_contact_lens(user_input)
             text = run_agent_loop(
                 user_input=user_input,
                 messages=messages,
