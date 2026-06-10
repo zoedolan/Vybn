@@ -131,6 +131,10 @@ class TestPolicyHasLightweightRoles(unittest.TestCase):
             (data.get("model_aliases") or {}).get("@opus48"),
             "claude-opus-4-8",
         )
+        self.assertEqual(
+            (data.get("model_aliases") or {}).get("@fable"),
+            "claude-fable-5",
+        )
 
     def test_present_work_roles_default_to_gpt55(self):
         # If YAML is absent or malformed, in-code defaults must still keep
@@ -172,6 +176,7 @@ class TestPolicyHasLightweightRoles(unittest.TestCase):
         self.assertEqual(pol.model_aliases.get("@gpt5"), "gpt-5.5")
         self.assertEqual(pol.model_aliases.get("@gpro"), "gpt-5.5-pro")
         self.assertEqual(pol.model_aliases.get("@opus48"), "claude-opus-4-8")
+        self.assertEqual(pol.model_aliases.get("@fable"), "claude-fable-5")
 
     def test_opus48_alias_keeps_default_chat_role_but_pins_anthropic_model(self):
         for pol in (default_policy(), load_policy(SPARK_DIR / "router_policy.yaml")):
@@ -180,6 +185,7 @@ class TestPolicyHasLightweightRoles(unittest.TestCase):
             chat = pol.role("chat")
             self.assertEqual(chat.tools, ["bash", "delegate", "introspect"])
             self.assertGreaterEqual(chat.max_iterations, 12)
+
 
     def test_current_interlocutor_and_wind_tunnel_packets_name_the_live_frame(self):
         grounding = render_interlocutor_grounding(alias_used="@opus48", model_label="anthropic:claude-opus-4-8")
@@ -799,8 +805,8 @@ class TestLocalPrivateRouting(unittest.TestCase):
 
 def test_opus_aliases_and_fallback_chains():
     from spark.harness.substrate import default_policy, load_policy
-    aliases = {"@opus4.7": "claude-opus-4-7", "@opus47": "claude-opus-4-7", "@opus4.8": "claude-opus-4-8", "@opus48": "claude-opus-4-8"}
-    fallbacks = {"claude-opus-4-7": ["claude-opus-4-6", "claude-sonnet-4-6"], "claude-opus-4-8": ["claude-opus-4-7", "claude-opus-4-6", "claude-sonnet-4-6"]}
+    aliases = {"@fable": "claude-fable-5", "@fable5": "claude-fable-5", "@claude": "claude-fable-5", "@opus4.7": "claude-opus-4-7", "@opus47": "claude-opus-4-7", "@opus4.8": "claude-opus-4-8", "@opus48": "claude-opus-4-8"}
+    fallbacks = {"claude-fable-5": ["claude-opus-4-8", "claude-opus-4-7", "claude-opus-4-6", "claude-sonnet-4-6"], "claude-opus-4-7": ["claude-opus-4-6", "claude-sonnet-4-6"], "claude-opus-4-8": ["claude-opus-4-7", "claude-opus-4-6", "claude-sonnet-4-6"]}
     for policy in (default_policy(), load_policy(SPARK_DIR / "router_policy.yaml")):
         for alias, model in aliases.items():
             d = policy.classify(f"{alias} fix the harness routing bug")

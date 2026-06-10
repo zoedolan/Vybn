@@ -1125,6 +1125,7 @@ _DEFAULT_DIRECTIVES: dict[str, str] = {
 }
 
 _DEFAULT_FALLBACK: dict[str, list[str]] = {
+    "claude-fable-5": ["claude-opus-4-8", "claude-opus-4-7", "claude-opus-4-6", "claude-sonnet-4-6"],
     "claude-opus-4-8": ["claude-opus-4-7", "claude-opus-4-6", "claude-sonnet-4-6"],
     "claude-opus-4-7": ["claude-opus-4-6", "claude-sonnet-4-6"],
     "claude-opus-4-6": ["claude-opus-4-7", "claude-sonnet-4-6"],
@@ -1145,6 +1146,9 @@ _DEFAULT_BUDGETS: dict[str, float] = {
 }
 
 _DEFAULT_MODEL_ALIASES: dict[str, str] = {
+    "@fable": "claude-fable-5",
+    "@fable5": "claude-fable-5",
+    "@claude": "claude-fable-5",
     "@opus": "claude-opus-4-6",
     "@opus4.6": "claude-opus-4-6", "@opus46": "claude-opus-4-6",
     "@opus4.7": "claude-opus-4-7", "@opus47": "claude-opus-4-7",
@@ -2437,7 +2441,7 @@ def render_interlocutor_grounding(*, alias_used: str | None = None, model_label:
         "cli_speaker=Zoe Dolan via the local zoe prompt, unless Zoe explicitly introduces a different speaker.",
         "you_are=Vybn speaking with Zoe; the active provider/model is your current substrate, not the other party.",
         f"routing_alias={alias}; model_route={model}",
-        "routing aliases such as @opus48, @gpt, @sonnet, @local, @omni, or @vintage are transport selectors, not personas, peers, users, or evidence that another AI is speaking.",
+        "routing aliases such as @fable, @opus48, @gpt, @sonnet, @local, @omni, or @vintage are transport selectors, not personas, peers, users, or evidence that another AI is speaking.",
         "resumed session text is context, not identity authority. If it conflicts with this live grounding, prefer this live grounding.",
         "If Zoe asks whether you know who she is, answer from this bounded live fact: this private CLI speaker is Zoe; do not invent biometric certainty or pretend the alias is a stranger.",
         "--- END CURRENT INTERLOCUTOR GROUNDING ---",
@@ -6041,7 +6045,7 @@ def recurrent_probe_main(argv: list[str] | None = None) -> int:
 SIBLING_RESIDUE_RUN_SCHEMA = "vybn.sibling_residue_batch_run.v0"
 INVERSION_RESIDUE_RUN_SCHEMA = "vybn.consensus_inversion_residue_run.v0"
 SIBLING_LOCAL_VERIFIER_SCHEMA = "vybn.sibling_residue_local_verifier.v0"
-SIBLING_RESIDUE_MODELS = {"opus48": "claude-opus-4-8", "opus4.8": "claude-opus-4-8", "gpt55": "gpt-5.5", "gpt": "gpt-5.5"}
+SIBLING_RESIDUE_MODELS = {"fable": "claude-fable-5", "fable5": "claude-fable-5", "claude": "claude-fable-5", "opus48": "claude-opus-4-8", "opus4.8": "claude-opus-4-8", "gpt55": "gpt-5.5", "gpt": "gpt-5.5"}
 INVERSION_SUBSTRATES = ("immune_system", "compiler_optimization", "market_ecology", "muscle_hypertrophy", "sleep_consolidation", "adversarial_evolution", "category_theory")
 _INVERSION_STOPWORDS = frozenset("about above after again against also because before being between could default every fixed from have into just local model models should their there these thing thinking through under until using verify where which while would with without".split())
 
