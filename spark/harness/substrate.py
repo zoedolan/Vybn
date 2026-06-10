@@ -7221,90 +7221,84 @@ class AnthropicProvider(Provider):
 
     @staticmethod
     def _normalize_messages_for_anthropic(messages: list[dict]) -> list[dict]:
-        """Rewrite messages so every entry is Anthropic-valid.
-
-        Mixed-provider sessions can leave OpenAI-native shapes in the
-        rolling history: {"role":"assistant","content":<openai_dict>} or
-        {"role":"tool","tool_call_id":...,"content":...}. Anthropic
-        rejects both with 400 ("messages.X.content: Input should be a
-        valid list"). We translate them to Anthropic content-block form.
-        Pure-Anthropic turns pass through unchanged.
-        """
+        """Rewrite mixed-provider history into Anthropic-valid messages."""
         out: list[dict] = []
-        pending_tool_results: list[dict] = []
-
-        def _flush_tool_results() -> None:
-            if pending_tool_results:
-                out.append({"role": "user", "content": list(pending_tool_results)})
-                pending_tool_results.clear()
-
+        pending: list[dict] = []
+        expect: set[str] = set()
+        def kind(block: Any) -> str | None:
+            return getattr(block, "type", None) or (block.get("type") if isinstance(block, dict) else None)
+        def text(value: Any) -> str:
+            if isinstance(value, str): return value
+            if isinstance(value, list):
+                return "\n".join(
+                    str((item.get("text") or item.get("content") or item) if isinstance(item, dict) else item)
+                    for item in value if item is not None
+                )
+            return str(value or "")
+        def orphan(block: Any) -> dict:
+            tid = block.get("tool_use_id", "") if isinstance(block, dict) else ""
+            body = text(block.get("content") if isinstance(block, dict) else block)
+            head = f"[orphan tool result for call {tid}]" if tid else "[orphan tool result]"
+            return {"type": "text", "text": f"{head}\n{body}"}
+        def tool_ids(content: Any) -> set[str]:
+            if not isinstance(content, list): return set()
+            ids: set[str] = set()
+            for block in content:
+                tid = getattr(block, "id", None) or (block.get("id") if isinstance(block, dict) else "")
+                if kind(block) == "tool_use" and tid: ids.add(tid)
+            return ids
+        def repair(blocks: list[Any], allow_results: bool) -> list[Any]:
+            fixed: list[Any] = []
+            for block in blocks:
+                tid = block.get("tool_use_id", "") if isinstance(block, dict) else ""
+                if kind(block) != "tool_result":
+                    fixed.append(block)
+                elif allow_results and tid and tid in expect:
+                    expect.discard(tid)
+                    patched = dict(block)
+                    patched["content"] = patched.get("content") or "(no output)"
+                    fixed.append(patched)
+                else:
+                    fixed.append(orphan(block))
+            return fixed
+        def flush() -> None:
+            if pending:
+                out.append({"role": "user", "content": repair(pending, True)})
+                pending.clear()
+                expect.clear()
         for msg in messages:
             role = msg.get("role")
             content = msg.get("content")
-
-            # OpenAI-shaped tool response: collapse into an Anthropic
-            # tool_result block on a user message.
             if role == "tool":
-                pending_tool_results.append({
-                    "type": "tool_result",
-                    "tool_use_id": msg.get("tool_call_id", ""),
-                    "content": content if isinstance(content, str) else str(content or ""),
-                })
+                pending.append({"type": "tool_result", "tool_use_id": msg.get("tool_call_id", ""), "content": text(content)})
                 continue
-
-            _flush_tool_results()
-
+            flush()
             if role == "assistant":
-                # Assistant content must be a string or a list of
-                # content blocks for Anthropic. The agent loop stores
-                # raw_assistant_content straight in `content` — for
-                # OpenAI turns that's a dict with its own role/content/
-                # tool_calls keys. Re-emit in block form.
                 if isinstance(content, dict) and "role" in content:
-                    text = content.get("content") or ""
                     blocks: list[dict] = []
-                    if isinstance(text, str) and text:
-                        blocks.append({"type": "text", "text": text})
+                    if content.get("content"):
+                        blocks.append({"type": "text", "text": content["content"]})
                     for tc in content.get("tool_calls") or []:
                         fn = tc.get("function") or {}
                         raw_args = fn.get("arguments")
-                        if isinstance(raw_args, str):
-                            try:
-                                args = json.loads(raw_args or "{}")
-                            except Exception:
-                                args = {}
-                        else:
-                            args = raw_args or {}
-                        blocks.append({
-                            "type": "tool_use",
-                            "id": tc.get("id", ""),
-                            "name": fn.get("name", ""),
-                            "input": args,
-                        })
-                    if not blocks:
-                        blocks.append({"type": "text", "text": ""})
-                    out.append({"role": "assistant", "content": blocks})
-                    continue
-                # Pure-Anthropic assistant content (list of block
-                # objects) or plain string — leave it alone.
+                        try:
+                            args = json.loads(raw_args or "{}") if isinstance(raw_args, str) else (raw_args or {})
+                        except Exception:
+                            args = {}
+                        blocks.append({"type": "tool_use", "id": tc.get("id", ""), "name": fn.get("name", ""), "input": args})
+                    content = blocks or [{"type": "text", "text": ""}]
+                elif isinstance(content, list):
+                    content = repair(content, False)
+                out.append({"role": "assistant", "content": content})
+                expect = tool_ids(content)
+            elif role == "user":
+                content = str(content) if isinstance(content, dict) else repair(content, True) if isinstance(content, list) else content
+                out.append({"role": "user", "content": content})
+                expect.clear()
+            else:
                 out.append(msg)
-                continue
-
-            if role == "user":
-                # User content can be a string or a list of blocks. If
-                # it's a non-block dict (shouldn't normally happen)
-                # coerce to string to avoid a 400.
-                if isinstance(content, dict):
-                    out.append({"role": "user", "content": str(content)})
-                else:
-                    out.append(msg)
-                continue
-
-            # Unknown roles (system would normally be stripped upstream)
-            # are passed through; Anthropic will surface errors clearly.
-            out.append(msg)
-
-        _flush_tool_results()
+                expect.clear()
+        flush()
         return out
 
     def stream(

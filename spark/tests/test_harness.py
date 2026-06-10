@@ -680,17 +680,20 @@ class TestAnthropicMessageNormalization(unittest.TestCase):
         out = self._normalize(raw)
         self.assertEqual(out, raw)
 
-    def test_multiple_consecutive_tool_results_collapse(self):
-        raw = [
-            {"role": "tool", "tool_call_id": "a", "content": "1"},
-            {"role": "tool", "tool_call_id": "b", "content": "2"},
-        ]
-        out = self._normalize(raw)
-        self.assertEqual(len(out), 1)
-        self.assertEqual(out[0]["role"], "user")
-        self.assertEqual(len(out[0]["content"]), 2)
-        ids = [b["tool_use_id"] for b in out[0]["content"]]
-        self.assertEqual(ids, ["a", "b"])
+    def test_tool_result_pairing_repair_preserves_valid_and_downgrades_orphans(self):
+        out = self._normalize([
+            {"role": "assistant", "content": [{"type": "tool_use", "id": "a", "name": "bash", "input": {}}]},
+            {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "a", "content": "1"}]},
+            {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "lost", "content": "stale"}]},
+            {"role": "assistant", "content": [{"type": "tool_result", "tool_use_id": "misstored", "content": "assistant-side"}]},
+            {"role": "tool", "tool_call_id": "openai_lost", "content": "openai"},
+        ])
+        blocks = [b for m in out for b in m.get("content", []) if isinstance(m.get("content"), list) and b.get("type") != "tool_use"]
+        self.assertEqual([b.get("type") for b in blocks], ["tool_result", "text", "text", "text"])
+        text = "\n".join(str(b) for b in blocks[1:])
+        self.assertNotIn("tool_use_id", text)
+        for snippet in ("stale", "assistant-side", "openai"):
+            self.assertIn(snippet, text)
 
     def test_stream_uses_normalised_messages(self):
         """AnthropicProvider.stream() must feed the normaliser output to
