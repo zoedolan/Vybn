@@ -46,6 +46,8 @@ from harness.substrate import rag_snippets, rag_snippets_with_tier, render_him_v
 from harness.substrate import execute_tool_calls, default_introspect  # noqa: E402
 from harness.substrate import check_claim, check_structural_claim  # noqa: E402
 from harness.substrate import is_system_critical_pilot_turn  # noqa: E402
+from harness.substrate import _ALIAS_RE as _SUB_ALIAS_RE  # noqa: E402
+from harness.substrate import _DEFAULT_MODEL_ALIASES as _SUB_MODEL_ALIASES  # noqa: E402
 from harness.substrate import render_organ_alias_direct_reply, render_omni_gate_blocked  # noqa: E402
 from harness.substrate import (  # noqa: E402
     should_attempt_raw_organ_contact,
@@ -137,7 +139,10 @@ def _recent_messages_text(messages: list, *, limit: int = 8) -> str:
 
 
 def _preserve_pilot_for_turn(user_input: str, messages: list | None = None) -> bool:
-    """Preserve GPT-5.5 pilot across mission-critical continuation turns."""
+    """Preserve GPT-5.5 pilot, unless Zoe hand-pins a leading @alias."""
+    m = _SUB_ALIAS_RE.match(user_input or "")
+    if m and (m.group(1).lower() in _SUB_MODEL_ALIASES or m.group(1).lower() in ("@super", "@omni", "@vintage")):
+        return False
     if is_system_critical_pilot_turn(user_input):
         return True
     text = (user_input or "").strip()

@@ -1,27 +1,7 @@
-"""Refactor pilot doctrine override.
+"""Refactor pilot routing regressions.
 
-Pins the 2026-04-27 doctrine: file-level / whole-repo /
-system-critical refactoring/consolidation/routing/memory/harness work
-routes to `orchestrate` (GPT-5.5 pilot), not to `code`/`task`/`chat`.
-
-Two surfaces are tested:
-
-  * `_SYSTEM_CRITICAL_PILOT_RE` exists at module scope. The live Spark
-    REPL crashed on every turn after `reload` with
-    `NameError: name '_SYSTEM_CRITICAL_PILOT_RE' is not defined`
-    because an in-progress local edit referenced the symbol before it
-    had been committed. Defining it in the module is the smallest
-    durable fix — the symbol now resolves regardless of which call
-    site reaches for it.
-
-  * `Policy.classify()` exposes a 2b override that fires on the regex
-    and returns `role=orchestrate` with `reason=heuristic=_SYSTEM_CRITICAL_PILOT_RE`.
-
-  * The shipped `router_policy.yaml` carries one (not two) `orchestrate:`
-    keys. PyYAML's `safe_load` keeps only the LAST occurrence of a
-    duplicated mapping key, so a split orchestrate block silently
-    drops one half. Compiling the loaded policy must yield all the
-    refactor-pilot patterns AND the multi-step/tool-use patterns.
+System-critical refactoring routes to orchestrate by default, but a
+leading hand-typed model alias is stronger and must not be hijacked.
 """
 
 from __future__ import annotations
@@ -566,6 +546,11 @@ def test_mission_critical_pilot_overrides_forced_task_in_agent_loop_source():
     assert old_shape not in source
     assert "if pilot_protected:" in source
     assert "forced_role = \"orchestrate\"" in source
+
+    bare = "re-engineer yourself as needed and consolidate the harness routing"
+    assert agent._preserve_pilot_for_turn(bare)
+    assert not agent._preserve_pilot_for_turn("@fable " + bare)
+    assert agent._preserve_pilot_for_turn("@notamodel " + bare)
 
 
 class NoBareSonnetDefault(unittest.TestCase):
