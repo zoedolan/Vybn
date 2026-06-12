@@ -138,7 +138,6 @@ heuristics:
     - "^\\s*(hey|hi|hello|yo)\\s+(there|buddy|bud|friend|pal|vybn)\\b[\\s!.,?]*$"
     - "^\\s*(good (morning|afternoon|evening))\\b[\\s!.,?]*$"
     - "^\\s*(thanks|thank you|ty|thx)\\b[\\s!.,?]*$"
-    - "^\\s*(bye|goodbye|later|cya|ttyl)\\b[\\s!.,?]*$"
   code:
     - "\\bgit (commit|push|pull|diff|log|status|rebase|merge|clone)\\b"
     - "\\bpython3?\\s+-\\w"
