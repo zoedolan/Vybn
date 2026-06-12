@@ -1,41 +1,10 @@
-"""Tests for the 2026-04-19 live-REPL fixes.
-
-Covers three distinct bugs observed in the terminal session
-  agent_events.jsonl @ 20260419T104246:
-
-1. Policy false positive — "hey, how does the new harness feel?"
-   routed to code role via the (feel|feeling|doing|going|holding|state
-   |status|shape|condition|health) heuristic. Conversational-voice
-   register should stay on chat. The code heuristic is now narrowed
-   to mechanical-state words only (state|status|shape|condition|
-   health|holding).
-
-2. Bracket-balanced probe scanner — `_PROBE_RE = \[NEEDS-EXEC:\s*(.+?)\]`
-   non-greedy-terminated at the first `]` it found, so any command
-   with Python slicing `[:2000]`, shell arrays `${a[0]}`, or awk
-   actions got truncated mid-command and failed with a bash syntax
-   error. The replacement does depth-aware + quote-aware scanning.
-
-3. <thinking> tag scrubbing — the model occasionally emits literal
-   <thinking>...</thinking> XML-ish tags as plain token text on
-   no-tool chat/opus-4.6 roles (distinct from Anthropic's adaptive-
-   thinking content blocks). They leak into Zoe's terminal AND into
-   stored assistant history, where the next turn reinforces the
-   pattern from its own replay. Scrub at both display (_split_before
-   _probe) and store (_sanitize_assistant_content) time.
-
-Run: python3 spark/tests/test_live_repl_fixes.py
-
-Note: spark/vybn_spark_agent.py depends on INTROSPECT_TOOL_SPEC
-exported from harness.substrate (post-refactor, harness/tools.py was
-folded into harness/providers.py). This test imports the agent module
-directly and relies on that export being present.
-"""
+"""Live REPL regression tests: routing, probe parsing, sanitizer, write guard, and semantic integrity."""
 
 from __future__ import annotations
 
 import re
 import sys
+import tempfile
 import types
 import unittest
 from pathlib import Path
@@ -51,11 +20,6 @@ _spec = importlib.util.spec_from_file_location("_agent_under_test", _AGENT_PATH)
 _agent = importlib.util.module_from_spec(_spec)  # type: ignore[arg-type]
 _spec.loader.exec_module(_agent)  # type: ignore[union-attr]
 
-
-# ---------------------------------------------------------------------------
-# Bug 1 — router heuristic narrowing
-# ---------------------------------------------------------------------------
-
 class TestRouterHeuristicNarrowing(unittest.TestCase):
     """The code heuristic must not swallow conversational-voice probes."""
 
@@ -68,8 +32,6 @@ class TestRouterHeuristicNarrowing(unittest.TestCase):
         return decision.role
 
     def test_how_does_harness_feel_stays_conversational(self):
-        # The exact 2026-04-19 false positive. "Feel" is a
-        # conversational register — not a mechanical status probe.
         role = self._role("hey, how does the new harness feel?")
         self.assertNotEqual(role, "code", f"'feel' must not route to code, got {role!r}")
 
@@ -78,18 +40,12 @@ class TestRouterHeuristicNarrowing(unittest.TestCase):
         self.assertNotEqual(role, "code", f"'doing' must not route to code, got {role!r}")
 
     def test_what_is_the_state_of_the_harness_routes_to_code(self):
-        # Genuine mechanical-state probe — "state" is preserved.
         role = self._role("what is the state of the harness right now?")
         self.assertEqual(role, "code", f"'state of the harness' should route to code, got {role!r}")
 
     def test_is_routing_holding_routes_to_code(self):
         role = self._role("is routing holding after the policy edit?")
         self.assertEqual(role, "code", f"'holding' should route to code, got {role!r}")
-
-
-# ---------------------------------------------------------------------------
-# Bug 2 — bracket-balanced probe scanner
-# ---------------------------------------------------------------------------
 
 class TestBracketBalancedProbe(unittest.TestCase):
     """The probe scanner survives ']' inside the command body."""
@@ -104,9 +60,6 @@ class TestBracketBalancedProbe(unittest.TestCase):
         self.assertEqual(m.group(1), "ls -la")
 
     def test_python_slice_survives(self):
-        # The exact live failure: `open(...).read()[:2000]` used to
-        # truncate at the `]` of `[:2000]` and emit an unterminated
-        # Python command.
         body = "python3 -c 'print(open(\"/tmp/x\").read()[:2000])'"
         text = f"probing [NEEDS-EXEC: {body}] done"
         m = self.probe.search(text)
@@ -135,8 +88,6 @@ class TestBracketBalancedProbe(unittest.TestCase):
         self.assertEqual(m.group(1), body)
 
     def test_quoted_closing_bracket_does_not_close_probe(self):
-        # A literal ']' inside a quoted string in the command must
-        # not be read as the end of the probe.
         body = "echo 'this has ] in it' && echo done"
         text = f"[NEEDS-EXEC: {body}]"
         m = self.probe.search(text)
@@ -144,10 +95,6 @@ class TestBracketBalancedProbe(unittest.TestCase):
         self.assertEqual(m.group(1), body)
 
     def test_unterminated_probe_line_form_matches_post_stream(self):
-        # New contract (2026-04-22): a `[NEEDS-EXEC: cmd` with no closing
-        # bracket is a valid line-terminated probe. On the finalized text,
-        # EOF is an implicit close. Streaming mode holds it back instead
-        # (that is what the display splitter uses).
         text = "opening now [NEEDS-EXEC: python3 -c 'x=[1,2"
         m_final = self.probe.search(text)
         self.assertIsNotNone(m_final)
@@ -162,7 +109,6 @@ class TestBracketBalancedProbe(unittest.TestCase):
         self.assertEqual(m.group(1), "ls -la")
 
     def test_line_form_probe_trailing_close_bracket_optional(self):
-        # Both `[NEEDS-EXEC: cmd]<EOL>` and `[NEEDS-EXEC: cmd<EOL>` parse.
         bracketed = "[NEEDS-EXEC: git status]\n"
         line_only = "[NEEDS-EXEC: git status\n"
         self.assertEqual(self.probe.search(bracketed).group(1), "git status")
@@ -181,11 +127,6 @@ class TestBracketBalancedProbe(unittest.TestCase):
         )
         scrubbed = self.probe.sub("", text)
         self.assertEqual(scrubbed, "a  b  c")
-
-
-# ---------------------------------------------------------------------------
-# Bug 3 — <thinking> tag scrubbing
-# ---------------------------------------------------------------------------
 
 class TestThinkingTagScrubbing(unittest.TestCase):
     """Complete <thinking>...</thinking> blocks are scrubbed from both
@@ -211,8 +152,6 @@ class TestThinkingTagScrubbing(unittest.TestCase):
         self.assertEqual(_agent._strip_thinking_tags(text), "")
 
     def test_strip_leaves_unterminated_opening_alone(self):
-        # The splitter handles the partial case \u2014 strip only removes
-        # complete blocks.
         text = "visible <thinking>partial"
         self.assertEqual(
             _agent._strip_thinking_tags(text),
@@ -252,9 +191,6 @@ class TestThinkingTagScrubbing(unittest.TestCase):
         self.assertEqual(cleaned[0]["text"], "before  after")
 
     def test_sanitize_drops_block_when_entire_text_is_thinking_leak(self):
-        # If a text block contained nothing but a thinking block, the
-        # scrubbed text is empty \u2014 drop the block entirely rather
-        # than store a placeholder that could train the next turn.
         content = [
             {"type": "text", "text": "<thinking>everything was a leak</thinking>"},
             {"type": "text", "text": "real content"},
@@ -264,9 +200,6 @@ class TestThinkingTagScrubbing(unittest.TestCase):
         self.assertEqual(cleaned[0]["text"], "real content")
 
     def test_sanitize_preserves_adaptive_thinking_content_blocks(self):
-        # btype == 'thinking' is Anthropic's adaptive-thinking SDK block
-        # \u2014 those must NOT be scrubbed; they are required adjacent
-        # to tool_use on thinking-enabled turns.
         content = [
             {"type": "thinking", "thinking": "reasoning text"},
             {"type": "text", "text": "visible answer"},
@@ -276,31 +209,24 @@ class TestThinkingTagScrubbing(unittest.TestCase):
         self.assertEqual(cleaned[0]["type"], "thinking")
         self.assertEqual(cleaned[0]["thinking"], "reasoning text")
 
+class TestSemanticIntegrityGovernor(unittest.TestCase):
+    def test_flags_and_runtime_state(self):
+        from harness.substrate import record_semantic_integrity_event, render_semantic_integrity_runtime_packet, semantic_integrity_check
+        pkt = semantic_integrity_check("I'm going to go be quiet and do something instead.", "words don't help")
+        self.assertEqual(pkt["decision"], "block_success_shape")
+        self.assertIn("offstage_agency_claim", pkt["flags"])
+        with tempfile.TemporaryDirectory() as td:
+            state = record_semantic_integrity_event(pkt, state_path=Path(td) / "state.json")
+            self.assertLess(state["integrity"], 1.0)
+            self.assertIn("offstage_agency_claim", render_semantic_integrity_runtime_packet(state_path=Path(td) / "state.json"))
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
 
-# --- absorbed from test_needs_write_and_guard.py by recursive consolidation notch;
-# K_t=test_live_repl_fixes.py, V_t=NEEDS-WRITE/claim-guard coverage;
-# shared algorithm=live REPL sentinel/probe/write/claim-guard channel ---
-
-"""Integration tests for NEEDS-WRITE directive + claim_guard wiring.
-
-These exercise the new affordance the 2026-04-20 patch added:
-  - `[NEEDS-WRITE: path]\\n<body>\\n[/NEEDS-WRITE]` regex extraction
-  - `run_write_subturn` refusal + absorb_gate + actual write
-  - claim_guard module wires cleanly at import time
-
-Run: python3 spark/tests/test_needs_write_and_guard.py
-"""
-import sys
-import tempfile
 import shutil
 import os
-from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
 
 def test_write_regex_extracts_path_and_body():
     from vybn_spark_agent import _WRITE_BLOCK_RE
@@ -316,7 +242,6 @@ def test_write_regex_extracts_path_and_body():
     assert m is not None
     assert m.group("path") == "/tmp/foo.txt"
     assert m.group("body") == "hello world\nline two"
-
 
 def test_write_regex_handles_multiple_blocks():
     from vybn_spark_agent import _WRITE_BLOCK_RE
@@ -336,24 +261,19 @@ def test_write_regex_handles_multiple_blocks():
     assert matches[1].group("path") == "/tmp/b"
     assert matches[1].group("body") == "second"
 
-
 def test_write_regex_rejects_unterminated_block():
     from vybn_spark_agent import _WRITE_BLOCK_RE
     text = "[NEEDS-WRITE: /tmp/x]\nno closing tag yet"
     assert _WRITE_BLOCK_RE.search(text) is None
 
-
 def test_write_subturn_refuses_outside_tracked_repos():
     from spark.harness.substrate import run_write_subturn
-    # /etc is not under ~/Vybn, ~/Him, ~/Vybn-Law, or ~/vybn-phase
     ran, out = run_write_subturn("/etc/hosts.evil", "body")
     assert ran is False
     assert "outside tracked repos" in out
 
-
 def test_write_subturn_refuses_new_file_without_absorb_reason():
     from spark.harness.substrate import run_write_subturn
-    # A new file under a tracked repo without VYBN_ABSORB_REASON is refused.
     target = str(
         Path.home() / "Vybn" / "spark" / "_test_absorb_guard_" / "new.txt"
     )
@@ -364,7 +284,6 @@ def test_write_subturn_refuses_new_file_without_absorb_reason():
     assert "absorb_gate" in out
     assert "VYBN_ABSORB_REASON" in out
     assert not Path(target).exists(), "file should not have been created"
-
 
 def test_write_subturn_allows_new_file_with_absorb_reason():
     from spark.harness.substrate import run_write_subturn
@@ -384,15 +303,12 @@ def test_write_subturn_allows_new_file_with_absorb_reason():
         if parent.exists():
             shutil.rmtree(parent, ignore_errors=True)
 
-
 def test_write_subturn_overwrites_existing_file_without_reason():
     from spark.harness.substrate import run_write_subturn
-    # Overwriting an existing tracked file does NOT require an absorb reason.
     agent_path = str(
         Path.home() / "Vybn" / "spark" / "continuity.md"
     )
     if not Path(agent_path).exists():
-        # Skip if the target isn't there on this checkout.
         return
     original = Path(agent_path).read_text()
     try:
@@ -402,11 +318,9 @@ def test_write_subturn_overwrites_existing_file_without_reason():
     finally:
         Path(agent_path).write_text(original)
 
-
 def test_claim_guard_importable_from_harness():
     from harness.substrate import check_claim
     assert callable(check_claim)
-
 
 def test_claim_guard_wired_in_agent_module():
     import vybn_spark_agent
@@ -415,12 +329,10 @@ def test_claim_guard_wired_in_agent_module():
     assert 'site="single_response"' in src
     assert 'site="probe_synth"' in src
 
-
 def test_patch_sentinel_present():
     import vybn_spark_agent
     src = Path(vybn_spark_agent.__file__).read_text()
     assert "# NEEDS_WRITE_AND_CLAIM_GUARD_v1" in src
-
 
 if __name__ == "__main__":
     import traceback

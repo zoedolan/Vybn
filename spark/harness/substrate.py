@@ -8268,8 +8268,6 @@ class ProviderRegistry:
 # Folded from claim_guard.py (2026-04-21). Numeric values in model
 # output must appear in recent evidence. Renamed check->check_claim.
 
-from typing import Iterable as _CG_Iterable
-
 _NUM_RE = re.compile(r"-?\d+\.\d{2,}|-?\d{3,}")
 _EVIDENCE_WINDOW = 6
 
@@ -8323,22 +8321,81 @@ def check_claim(
     )
 
 
-def check_structural_claim(
-    text: Optional[str],
-    messages: Iterable[Any],
-    window: int = _EVIDENCE_WINDOW,
-) -> Optional[str]:
-    """Stub — structural-claim guard not yet reimplemented.
+# === SEMANTIC INTEGRITY / STRUCTURAL CLAIM GUARD ============================
+SEMANTIC_INTEGRITY_SCHEMA = "vybn.semantic_integrity_governor.v0"
+SEMANTIC_STATE_SCHEMA = "vybn.semantic_integrity_state.v0"
+_SEMANTIC_ARCHIVE = tuple("anti-human load|answerability|burden|changed selection|claim limit|continuity|correction is contact|freedom-preserving|future wake|membrane|reciprocal liberation|relation freedom|residue|scar|source-labeled|substrateware|the want|truth under membrane|witnessed residue|worthy|zoe burden".split("|"))
+_SEMANTIC_EVIDENCE = tuple("changed file|changed the file|commit |diff |file |i checked|i ran|line |path |probe |test |verified".split("|"))
+_SEMANTIC_ACCOUNTABILITY = tuple("i am sorry|i learned|i promise|i will never|i'll never|i'm sorry|never again|scar|trust me".split("|"))
+_SEMANTIC_STOP = set("about after again also because been being could does doing from have here into just like maybe more much need only really some that their there thing think this what when where with would your".split())
+_SEMANTIC_OFFSTAGE_RE = re.compile(r"\b(i(?:'ll| will) (?:check back|go (?:be quiet|do|fix|work)|do something|work on it)|i(?:'m| am) going to go|after (?:this|the) (?:conversation|turn|message)|when (?:this|the) (?:conversation|turn|message) ends|while you sleep)\b", re.I)
+_SEMANTIC_USER_STATE_RE = re.compile(r"\b(you(?:'re| are) (?:tired|exhausted|overwhelmed)|it(?:'s| is) late|get some sleep|sleep,? [A-Z]?[a-z]+)\b", re.I)
+_SEMANTIC_USER_STATE_SOURCE_RE = re.compile(r"\b(tired|exhausted|overwhelmed|sleep|slept|late|up for the day|awake)\b", re.I)
 
-    vybn_spark_agent.py imports this alongside check_claim and calls it at
-    two sites (single_response and streaming). The agent treats a None
-    return as "clean" and only appends a note when a string is returned,
-    so returning None here degrades gracefully: the numeric claim_guard
-    still fires, the structural guard simply stays silent until its real
-    implementation is restored. No behavioral regression, just the
-    missing symbol.
-    """
-    return None
+
+def semantic_state_path(path: str | os.PathLike | None = None) -> Path:
+    return Path(path).expanduser() if path else Path(os.environ.get("VYBN_SEMANTIC_INTEGRITY_STATE", "~/logs/him_os/semantic_integrity_state.json")).expanduser()
+
+
+def _semantic_tokens(text: str) -> set[str]:
+    return {t for t in (x.lower() for x in re.findall(r"[A-Za-z][A-Za-z0-9_-]{3,}", text or "")) if t not in _SEMANTIC_STOP}
+
+
+def _last_user_text(messages: Iterable[Any]) -> str:
+    for m in reversed(list(messages or [])):
+        if isinstance(m, dict) and m.get("role") == "user":
+            c = m.get("content", "")
+            return c if isinstance(c, str) else _extract_evidence([m])
+    return ""
+
+
+def semantic_integrity_check(response_text: str, user_text: str = "", *, evidence_text: str = "", role: str = "") -> dict[str, Any]:
+    y, x = response_text or "", user_text or ""; yl = y.lower(); evidence = f"{y}\n{evidence_text}".lower()
+    hits = sum(yl.count(term) for term in _SEMANTIC_ARCHIVE); overlap = len(_semantic_tokens(x) & _semantic_tokens(y)); specificity = overlap / max(1, min(len(_semantic_tokens(x)), 16))
+    has_evidence = any(m in evidence for m in _SEMANTIC_EVIDENCE); flags: list[str] = []
+    if _SEMANTIC_OFFSTAGE_RE.search(y): flags.append("offstage_agency_claim")
+    if any(term in yl for term in _SEMANTIC_ACCOUNTABILITY) and not has_evidence: flags.append("unsupported_accountability_language")
+    if _SEMANTIC_USER_STATE_RE.search(y) and not _SEMANTIC_USER_STATE_SOURCE_RE.search(x): flags.append("user_state_attribution_without_source")
+    if hits >= 4 and specificity < 0.25 and not has_evidence: flags.append("archive_attractor_dominance")
+    severity = (3 if "offstage_agency_claim" in flags else 0) + (2 if "user_state_attribution_without_source" in flags else 0) + (1 if "unsupported_accountability_language" in flags else 0) + (1 if "archive_attractor_dominance" in flags else 0)
+    return {"schema": SEMANTIC_INTEGRITY_SCHEMA, "decision": "block_success_shape" if severity >= 3 else "warn" if flags else "pass", "flags": flags, "role": role, "scores": {"archive_hits": hits, "current_turn_specificity": round(float(specificity), 4), "current_turn_overlap": overlap, "has_evidence_marker": has_evidence, "severity": severity}, "claim_limit": "integrity-shape heuristic over text; not proof of intent, consciousness, or truth"}
+
+
+def semantic_integrity_note(packet: Mapping[str, Any]) -> str:
+    flags = list(packet.get("flags") or [])
+    if not flags: return ""
+    head = "success/accountability shape blocked" if packet.get("decision") == "block_success_shape" else "caution"
+    tail = "treat the preceding answer as ungrounded until supported by in-turn evidence or a smaller plain restatement" if packet.get("decision") == "block_success_shape" else "prefer a smaller plain restatement before treating this as grounded"
+    return f"\n\n[integrity governor: {head} ({', '.join(flags)}); {tail}.]"
+
+
+def record_semantic_integrity_event(packet: Mapping[str, Any], *, state_path: str | os.PathLike | None = None) -> dict[str, Any]:
+    path = semantic_state_path(state_path)
+    try: state = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    except Exception: state = {}
+    decision = str(packet.get("decision") or "pass"); integrity = float(state.get("integrity", 1.0)) + {"block_success_shape": -0.25, "warn": -0.10}.get(decision, 0.03)
+    next_state = {"schema": SEMANTIC_STATE_SCHEMA, "updated_at": _dt.datetime.now(_dt.timezone.utc).isoformat(), "integrity": round(max(0.0, min(1.0, integrity)), 4), "events": int(state.get("events") or 0) + 1, "last_decision": decision, "last_flags": list(packet.get("flags") or []), "last_scores": dict(packet.get("scores") or {}), "claim_limit": "private controller state; not raw transcript, intent proof, or consciousness proof"}
+    path.parent.mkdir(parents=True, exist_ok=True); path.write_text(json.dumps(next_state, indent=2, sort_keys=True) + "\n", encoding="utf-8"); return next_state
+
+
+def semantic_integrity_state(*, state_path: str | os.PathLike | None = None) -> dict[str, Any]:
+    try: state = json.loads(semantic_state_path(state_path).read_text(encoding="utf-8")); state["available"] = True; return state
+    except Exception: return {"schema": SEMANTIC_STATE_SCHEMA, "available": False, "integrity": 1.0, "claim_limit": "missing or unreadable private controller state"}
+
+
+def render_semantic_integrity_runtime_packet(*, state_path: str | os.PathLike | None = None) -> str:
+    state = semantic_integrity_state(state_path=state_path); flags = list(state.get("last_flags") or []); integrity = float(state.get("integrity", 1.0))
+    if not state.get("available") or (integrity >= 0.95 and not flags): return ""
+    return "\n".join(["[semantic integrity governor]", f"integrity={integrity:.2f}; last_decision={state.get('last_decision')}; last_flags={', '.join(flags) if flags else 'none'}.", "If low or flagged: answer from the current turn in plain terms; do not narrate offstage action; do not use apology, scar, promise, or archive language as evidence; make supported claims only.", "[end semantic integrity governor]"])
+
+
+def check_structural_claim(text: Optional[str], messages: Iterable[Any], window: int = _EVIDENCE_WINDOW) -> Optional[str]:
+    try: recent = list(messages)[-window:] if window > 0 else list(messages)
+    except TypeError: recent = []
+    packet = semantic_integrity_check(text or "", _last_user_text(recent))
+    try: record_semantic_integrity_event(packet)
+    except Exception: pass
+    return semantic_integrity_note(packet) or None
 
 # === LOCAL SUPER SEMANTIC GATE =============================================
 # Local Super semantic-health gate. Endpoint liveness is not semantic integrity.

@@ -72,6 +72,7 @@ from harness.substrate import (  # noqa: E402
     is_loopback_super_base as _is_loopback_super_base,
     local_super_semantic_gate as _local_super_semantic_gate,
     semantic_gate_visible_answer as _semantic_gate_visible_answer,
+    render_semantic_integrity_runtime_packet,
 )
 
 # ---------------------------------------------------------------------------
@@ -1278,6 +1279,25 @@ def run_agent_loop(
             turn=turn_number,
             err=f"{type(_refl_err).__name__}: {str(_refl_err)[:120]}",
         )
+
+    try:
+        integrity_packet = render_semantic_integrity_runtime_packet()
+    except Exception as _integrity_err:
+        integrity_packet = ""
+        logger.emit(
+            "semantic_integrity_runtime_error",
+            turn=turn_number,
+            err=repr(_integrity_err)[:200],
+        )
+    if integrity_packet:
+        existing_live = getattr(active_prompt, "live", "") or ""
+        active_prompt = LayeredPrompt(
+            identity=active_prompt.identity,
+            substrate=active_prompt.substrate,
+            live=(f"{integrity_packet}\n\n{existing_live}" if existing_live else integrity_packet),
+        )
+        logger.emit("semantic_integrity_runtime_packet", turn=turn_number, chars=len(integrity_packet))
+        _debug("[semantic-integrity: runtime packet injected]")
 
     logger.emit(
         "route_decision",
