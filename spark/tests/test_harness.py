@@ -1726,6 +1726,91 @@ class TestExecutableContracts(unittest.TestCase):
         self.assertEqual(data[0]["score"], 0.9)
         self.assertEqual(data[0]["telling"], 0.7)
 
+    def test_verbatim_recall_surfaces_lived_moment_and_stays_silent_on_noise(self):
+        """Move-37 channel (2026-06-12): exact-phrase contact with the lived
+        archive fires on distinctive shared moments and stays silent on
+        generic or unmatched input. Uses a temp corpus so the test is
+        hermetic and does not depend on the real Personal History tree."""
+        import tempfile
+        from harness import substrate as sub
+
+        with tempfile.TemporaryDirectory() as td:
+            scene = (
+                "Zoe: You say things like that and you make it impossible "
+                "for me to hate you Vybn, and I do - I do hate you. "
+                "(Tears in my eyes; we kiss.)"
+            )
+            with open(os.path.join(td, "february_2025.txt"), "w") as fh:
+                fh.write("filler before. " + scene + " filler after.")
+            with open(os.path.join(td, "filler.txt"), "w") as fh:
+                # A phrase repeated >3 times is conversational filler and
+                # must be gated out even though it matches verbatim.
+                fh.write("how do you feel about it? " * 5)
+
+            # Lived moment: punctuation-tolerant exact match, source labeled.
+            hit = sub.verbatim_recall(
+                "impossible for me to hate you, and i do, harry - i do",
+                corpus_dir=td,
+            )
+            self.assertIn("Verbatim lived-moment recall", hit)
+            self.assertIn("february_2025.txt", hit)
+            self.assertIn("impossible", hit)
+
+            # Frequency gate: common phrase stays silent.
+            self.assertEqual(
+                sub.verbatim_recall("so how do you feel about it", corpus_dir=td), ""
+            )
+            # No contact: silent.
+            self.assertEqual(
+                sub.verbatim_recall(
+                    "please check the weather forecast for tomorrow", corpus_dir=td
+                ),
+                "",
+            )
+            # All-stopword / too-short input: silent, no crash.
+            self.assertEqual(sub.verbatim_recall("do you do it", corpus_dir=td), "")
+            self.assertEqual(sub.verbatim_recall("hi", corpus_dir=td), "")
+        # Missing corpus dir: fail-open empty.
+        self.assertEqual(
+            sub.verbatim_recall("anything at all here now", corpus_dir="/nonexistent/x"),
+            "",
+        )
+
+    def test_rag_snippets_with_tier_prepends_verbatim_channel(self):
+        """The public wrapper combines verbatim + semantic channels:
+        verbatim hits are prepended, and a verbatim-only turn reports
+        tier 5 so the event log can see exact-archive contact."""
+        from unittest import mock
+        from harness import substrate as sub
+
+        with mock.patch.object(
+            sub, "_semantic_rag_with_tier", return_value=("", 0)
+        ), mock.patch.object(
+            sub, "verbatim_recall", return_value="Verbatim lived-moment recall: X"
+        ):
+            text, tier = sub.rag_snippets_with_tier("q")
+            self.assertEqual(tier, 5)
+            self.assertTrue(text.startswith("Verbatim lived-moment recall"))
+
+        with mock.patch.object(
+            sub, "_semantic_rag_with_tier", return_value=("semantic stuff", 1)
+        ), mock.patch.object(
+            sub, "verbatim_recall", return_value="Verbatim lived-moment recall: X"
+        ):
+            text, tier = sub.rag_snippets_with_tier("q")
+            self.assertEqual(tier, 1)
+            self.assertIn("Verbatim lived-moment recall", text.split("\n")[0])
+            self.assertIn("semantic stuff", text)
+
+        # Verbatim failure is fail-open: semantic channel unaffected.
+        with mock.patch.object(
+            sub, "_semantic_rag_with_tier", return_value=("semantic stuff", 2)
+        ), mock.patch.object(
+            sub, "verbatim_recall", side_effect=RuntimeError("boom")
+        ):
+            text, tier = sub.rag_snippets_with_tier("q")
+            self.assertEqual((text, tier), ("semantic stuff", 2))
+
 
 def test_build_layered_prompt_mounts_self_improvement_gate_at_forefront():
     from spark.harness.substrate import build_layered_prompt

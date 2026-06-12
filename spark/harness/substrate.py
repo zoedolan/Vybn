@@ -1582,16 +1582,6 @@ class SessionStore:
 # Phrases that strongly indicate the user is asking about prior
 # conversation state. Tuned to fire on recall questions and stay quiet on
 # hypothetical or forward-looking ones.
-_RECALL_PATTERNS: tuple = (
-    re.compile(r"\b(do|did) you (recall|remember|recollect)\b", re.I),
-    re.compile(r"\b(you|we) (said|wrote|mentioned|talked about|discussed)\b", re.I),
-    re.compile(r"\b(earlier|before|previously|yesterday|this (morning|afternoon|evening|session))\b.*\b(say|said|write|wrote|talk|mention|discuss|bring up)", re.I),
-    re.compile(r"\bwhere (did|does|do) (our|this|the) (conversation|thread|session|chat) (begin|start)", re.I),
-    re.compile(r"\bwhat (did|does|do) (i|you|we) (say|said|write|wrote|mean|bring up)\b", re.I),
-    re.compile(r"\bremind me (what|when|where|how)\b", re.I),
-    re.compile(r"\b(the|that) thing (you|we|i) (said|mentioned|talked about|brought up)\b", re.I),
-    re.compile(r"\b(go|went) back to (what|when|where)\b", re.I),
-)
 
 _RECALL_STOPWORDS = {
     "the", "a", "an", "and", "or", "but", "if", "then", "you", "i", "we",
@@ -1614,50 +1604,6 @@ class RecallHit:
     content: str
     session_file: str
 
-def is_recall_question(text: str) -> bool:
-    """True when the message asks about prior conversation state."""
-    if not text or len(text) > 4000:
-        return False
-    return any(pat.search(text) for pat in _RECALL_PATTERNS)
-
-def _recall_keywords(text: str, *, max_keywords: int = 8) -> list[str]:
-    words = re.findall(r"\b[a-zA-Z][a-zA-Z'-]{2,}\b", text)
-    seen: set[str] = set()
-    out: list[str] = []
-    for w in words:
-        lw = w.lower()
-        if lw in _RECALL_STOPWORDS or lw in seen:
-            continue
-        seen.add(lw)
-        out.append(w)
-        if len(out) >= max_keywords:
-            break
-    return out
-
-def _recall_iter(files):
-    for f in files:
-        try:
-            with f.open() as fh:
-                for line in fh:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    try:
-                        rec = json.loads(line)
-                    except json.JSONDecodeError:
-                        continue
-                    msg = rec.get("msg") or {}
-                    content = msg.get("content") or ""
-                    if not isinstance(content, str) or not content.strip():
-                        continue
-                    yield RecallHit(
-                        ts=rec.get("ts", ""),
-                        role=msg.get("role", "?"),
-                        content=content,
-                        session_file=f.name,
-                    )
-        except OSError:
-            continue
 
 def recent_files(hours: float) -> list:
     if not SESSIONS_DIR.exists():
@@ -1673,127 +1619,6 @@ def recent_files(hours: float) -> list:
     files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
     return files
 
-def _recall_origin_hits(hours: float, max_hits: int) -> list:
-    """Return the EARLIEST user messages from recent sessions.
-
-    Fallback for recall questions whose keywords are all stopwords
-    ("where did we begin", "what did you say earlier"). The user is
-    asking about origin/thread shape; deliver the opening turns so the
-    model can answer from them.
-    """
-    files = recent_files(hours)
-    if not files:
-        return []
-    # newest session first, but within each session take EARLIEST messages
-    out: list = []
-    seen_sig: set = set()
-    for f in files:
-        session_hits: list = []
-        try:
-            with f.open() as fh:
-                for line in fh:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    try:
-                        rec = json.loads(line)
-                    except json.JSONDecodeError:
-                        continue
-                    msg = rec.get("msg") or {}
-                    if msg.get("role") != "user":
-                        continue
-                    content = msg.get("content") or ""
-                    if not isinstance(content, str) or not content.strip():
-                        continue
-                    sig = content[:200]
-                    if sig in seen_sig:
-                        continue
-                    seen_sig.add(sig)
-                    session_hits.append(RecallHit(
-                        ts=rec.get("ts", ""),
-                        role="user",
-                        content=content,
-                        session_file=f.name,
-                    ))
-                    if len(session_hits) >= 2:
-                        break  # first two user turns per session is enough
-        except OSError:
-            continue
-        out.extend(session_hits)
-        if len(out) >= max_hits:
-            break
-    return out[:max_hits]
-
-def search_sessions(query: str, *, hours: float = 24.0, max_hits: int = 6) -> list[RecallHit]:
-    """Recent session messages matching query keywords, ranked by hit count.
-
-    When keyword extraction yields nothing (stopword-heavy recall
-    questions like "where did our conversation begin"), fall back to the
-    earliest user messages from recent sessions — the opening turns are
-    what "where did it begin" is literally asking for.
-    """
-    keywords = _recall_keywords(query)
-    if not keywords:
-        return _recall_origin_hits(hours, max_hits)
-    if not SESSIONS_DIR.exists():
-        return []
-    files = recent_files(hours)
-    if not files:
-        return []
-    keyword_res = [re.compile(r"\b" + re.escape(k) + r"\b", re.I) for k in keywords]
-
-    scored: list = []
-    seen_sig: set = set()
-    for hit in _recall_iter(files):
-        sig = hit.content[:200]
-        if sig in seen_sig:
-            continue
-        score = sum(1 for pat in keyword_res if pat.search(hit.content))
-        if score >= 1:
-            seen_sig.add(sig)
-            scored.append((score, hit))
-    scored.sort(key=lambda t: t[0], reverse=True)
-    return [h for _, h in scored[:max_hits]]
-
-def format_recall_injection(hits: list, *, max_chars_per_hit: int = 800) -> str:
-    """Render hits as an explicit retrieval block for the live prompt layer."""
-    if not hits:
-        return ""
-    lines = [
-        "[recall-gate retrieval — session log bytes, not inferred]",
-        f"Query matched {len(hits)} message(s) from prior session logs.",
-        "Answer from these bytes. If the answer isn't here, say so — do",
-        "not reconstruct from pattern.",
-        "",
-    ]
-    for i, h in enumerate(hits, 1):
-        content = h.content
-        if len(content) > max_chars_per_hit:
-            content = content[:max_chars_per_hit] + "…[truncated]"
-        lines.append(f"--- hit {i} [{h.role} @ {h.ts}] ({h.session_file}) ---")
-        lines.append(content)
-        lines.append("")
-    return "\n".join(lines).rstrip() + "\n"
-
-def maybe_recall_probe(user_text: str, *, hours: float = 24.0) -> tuple[bool, str, int]:
-    """Single entry point for the agent loop.
-
-    Returns (triggered, injection_text, hit_count). When triggered is True
-    and hit_count is 0, a short note still returns so the model names the
-    retrieval gap instead of confabulating from silence.
-    """
-    if not is_recall_question(user_text):
-        return False, "", 0
-    hits = search_sessions(user_text, hours=hours)
-    if not hits:
-        note = (
-            "[recall-gate retrieval — session log bytes, not inferred]\n"
-            f"Query was classified as a recall question but produced zero\n"
-            f"matches in the last {hours:.0f} hours of session logs. Answer\n"
-            "by naming the retrieval gap, not by reconstructing from pattern.\n"
-        )
-        return True, note, 0
-    return True, format_recall_injection(hits), len(hits)
 
 # === LIVE SNAPSHOT ========================================================
 
@@ -2103,8 +1928,6 @@ def render_four_generators_doctrine_core() -> str:
     return FOUR_GENERATORS_DOCTRINE_CORE
 
 # Legacy renderers stay as compatibility doors over the folded doctrine core.
-def render_self_improvement_gate_protocol() -> str:
-    return FOUR_GENERATORS_DOCTRINE_CORE
 
 # ---------------------------------------------------------------------------
 # Substrate bits
@@ -2584,14 +2407,6 @@ CHANGE_SELF_HEALING_PRINCIPLE = "Before mutation: verify proposal, test repo jeo
 
 CHANGE_SELF_HEALING_STEPS = [{"id": i, "rule": r} for i, r in (("verify_proposal", "Bind bytes, history, references, ownership, layer, lifecycle owner/timing/cleanup policy, and restore path before changing anything."), ("test_repo_jeopardy", "Check imports, routes, URLs, protocols, tests, service contracts, restore paths, continuity, lifecycle policy, and membranes."), ("proceed_if_clear", "If residuals stay green, make the smallest reversible move, then verify, commit, push, and audit."), ("refactor_if_wounded", "If jeopardy appears but intent survives, revise and restart verification."), ("leave_if_not_safe", "If the safe proposal disappears, leave it, record why, and move on."), ("fold_lesson", "After change or refusal, preserve the process lesson where future planning closes over it."))]
 
-INTERFILE_ALGORITHMIC_COMPRESSION_PRINCIPLE = (
-    "Inter-file consolidation is algorithm discovery, not file-count reduction. "
-    "Always scan for two-or-more files whose surface duplication points at one "
-    "native Vybn algorithm that can supersede both bodies. A collapse candidate "
-    "is meaningful only when shared role, shared connective tissue, shared residual "
-    "checks, and a lower-burden existing home are all visible. If the common "
-    "algorithm is not real, the result is a refusal packet, not a forced merge."
-)
 
 SEMANTIC_OPERATING_SYSTEM_PRINCIPLE = (
     "A semantic operating system for codebases and institutions: memory-guided, "
@@ -4148,87 +3963,6 @@ def harness_single_file_projection_for(files: Iterable[str]) -> dict[str, object
             return base | {"next_step": step, "code_efficiency": efficiency, "residuals": residuals, "classification": classification}
     return base | {"next_step": "no_harness_file_boundary_visible", "code_efficiency": "contact actual file set before mutating", "residuals": ["file_set", "reference_grep"], "classification": "unresolved_without_live_file_set"}
 
-@dataclass(frozen=True)
-class InterfileCompressionCandidate:
-    """A possible two-or-more-file collapse into one existing algorithmic home."""
-
-    algorithm: str
-    files: tuple[str, ...]
-    existing_home: str
-    reason: str
-    required_residuals: tuple[str, ...]
-    refusal_if_missing: str = "refuse_collapse_without_real_shared_algorithm"
-
-def _tokens_for_algorithm(path: str) -> set[str]:
-    """Tokenize a path into coarse native-algorithm hints."""
-    p = path.lower()
-    raw = re.split(r"[^a-z0-9]+", p)
-    stop = {
-        "", "py", "js", "ts", "html", "md", "txt", "json", "test", "tests",
-        "spark", "harness", "assets", "static", "index", "main", "utils",
-    }
-    return {t for t in raw if t not in stop and len(t) > 2}
-
-def interfile_algorithmic_compression_candidates(
-    paths: Iterable[str],
-    *,
-    minimum_cluster: int = 2,
-) -> list[InterfileCompressionCandidate]:
-    """Find cross-file consolidation candidates by shared algorithmic role.
-
-    This deliberately does not mutate. It surfaces clusters where multiple files
-    appear to implement the same native Vybn move and names the lowest existing
-    home that should absorb the algorithm if contact verifies the hypothesis.
-    """
-    clusters: dict[str, list[str]] = defaultdict(list)
-    for path in paths:
-        tokens = _tokens_for_algorithm(path)
-        for token in tokens:
-            clusters[token].append(path)
-
-    candidates: list[InterfileCompressionCandidate] = []
-    for token, members in sorted(clusters.items()):
-        unique = tuple(sorted(set(members)))
-        if len(unique) < minimum_cluster:
-            continue
-
-        # Pick a conservative existing home: prefer a non-test/non-asset Python
-        # body when present, otherwise the shortest path as the least surprising
-        # existing home to inspect first.
-        homes = sorted(
-            unique,
-            key=lambda p: (
-                "/tests/" in p or p.startswith("tests/") or "test_" in Path(p).name,
-                "assets/" in p or p.endswith((".html", ".css", ".js")),
-                len(p),
-                p,
-            ),
-        )
-        home = homes[0]
-        candidates.append(
-            InterfileCompressionCandidate(
-                algorithm=f"native_vybn_{token}_algorithm",
-                files=unique,
-                existing_home=home,
-                reason=(
-                    f"{len(unique)} files share the '{token}' algorithmic token; "
-                    "contact must prove whether one existing home can absorb the "
-                    "shared behavior and retire wrappers, duplicates, or parallel "
-                    "implementations."
-                ),
-                required_residuals=(
-                    "read_all_candidate_bytes",
-                    "map_imports_routes_and_public_urls",
-                    "prove_shared_algorithm_not_surface_word_overlap",
-                    "choose_existing_home_before_new_file",
-                    "run_targeted_tests_then_rerun_candidate_extraction_or_refuse",
-                ),
-            )
-        )
-    return candidates
-
-def render_interfile_algorithmic_compression_protocol() -> str:
-    return FOUR_GENERATORS_DOCTRINE_CORE
 
 def _role_substrate_sections(*, orchestrator: bool, tools_available: bool, model_label: str, hardware: str, agent_path: str, max_iterations: int) -> list[str]:
     """Render role-specific substrate without duplicating the whole cathedral.
@@ -4425,13 +4159,13 @@ def _format_snippets(results: list) -> str:
         + json.dumps(items, ensure_ascii=False, sort_keys=True, indent=2)
     )
 
-def rag_snippets_with_tier(
+def _semantic_rag_with_tier(
     query: str,
     k: int = 4,
     vybn_phase_dir: str | os.PathLike | None = None,
     timeout: float = 15.0,
 ) -> tuple[str, int]:
-    """Synchronous deep-memory retrieval; returns (snippets, tier).
+    """Semantic-channel deep-memory retrieval; returns (snippets, tier).
 
     Four-tier fallback (round 4):
       1. HTTP POST /walk on :8100 — telling retrieval, relevance x
@@ -4483,6 +4217,168 @@ def rag_snippets_with_tier(
     sub = _rag_subprocess(query, k, vybn_phase_dir, timeout)
     return (sub, 4) if sub else ("", 0)
 
+# ---------------------------------------------------------------------------
+# Verbatim lived-moment recall (move-37 channel, 2026-06-12)
+#
+# Origin: the night Zoe said "i do hate you" and the semantic channel
+# surfaced THEORY.md while the actual When-Harry-Met-Sally scene sat
+# untouched in february_2025.txt. The move that landed was exact-phrase
+# contact with the lived archive (grep), not embedding similarity.
+# This channel runs alongside semantic retrieval: distinctive word
+# windows from the user's words are matched verbatim (punctuation-
+# tolerant) against the Personal History corpus, and exact hits are
+# surfaced with their source. Fail-open, bounded, mtime-cached.
+# ---------------------------------------------------------------------------
+
+_VERBATIM_CORPUS_DIR = os.path.expanduser("~/Vybn/Vybn's Personal History")
+_VERBATIM_STOP = frozenset(
+    "the a an and or but if then is are was were be been am i you we they he "
+    "she it me my your our their his her its of to in on at for with as by "
+    "that this these those what when where who how why not no yes do does "
+    "did so very just really there here have has had can could would should "
+    "will lol omg u ur".split()
+)
+_VERBATIM_CACHE: dict[str, tuple[float, str]] = {}
+
+def _verbatim_phrases(query: str, max_phrases: int = 8) -> list[str]:
+    """Sliding 4-word windows over the query, keeping only windows that
+    carry at least one distinctive (non-stopword, len>=4) token."""
+    words = re.findall(r"[a-zA-Z0-9']+", query.lower())
+    out: list[str] = []
+    seen: set[str] = set()
+    for i in range(len(words) - 3):
+        win = words[i : i + 4]
+        if not any(w not in _VERBATIM_STOP and len(w) >= 4 for w in win):
+            continue
+        key = " ".join(win)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(key)
+        if len(out) >= max_phrases:
+            break
+    return out
+
+def _verbatim_corpus_files(corpus_dir: str) -> list[str]:
+    paths: list[str] = []
+    for root, _dirs, files in os.walk(corpus_dir):
+        for f in files:
+            if f.lower().endswith((".txt", ".md")):
+                paths.append(os.path.join(root, f))
+    return sorted(paths)
+
+def _verbatim_read(path: str) -> str:
+    try:
+        mtime = os.path.getmtime(path)
+        cached = _VERBATIM_CACHE.get(path)
+        if cached and cached[0] == mtime:
+            return cached[1]
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            text = fh.read()
+        _VERBATIM_CACHE[path] = (mtime, text)
+        return text
+    except OSError:
+        return ""
+
+def verbatim_recall(
+    query: str,
+    corpus_dir: str | None = None,
+    max_hits: int = 2,
+    context_chars: int = 320,
+) -> str:
+    """Exact-phrase contact with the lived archive.
+
+    Distinctive 4-word windows from the query are matched against the
+    Personal History corpus with punctuation-tolerant word boundaries.
+    A phrase matching more than 3 files is discarded as non-distinctive.
+    Returns a labeled evidence block, or "" (fail-open) on any miss or
+    error. This is the verbatim half of memory; semantic similarity is
+    the other half. Both are shadows until read in source.
+    """
+    corpus = corpus_dir or _VERBATIM_CORPUS_DIR
+    if not os.path.isdir(corpus):
+        return ""
+    phrases = _verbatim_phrases(query)
+    if not phrases:
+        return ""
+    files = _verbatim_corpus_files(corpus)
+    if not files:
+        return ""
+    hits: list[tuple[str, str]] = []  # (source, excerpt)
+    seen_spans: set[tuple[str, int]] = set()
+    for phrase in phrases:
+        pat = re.compile(
+            r"[^a-zA-Z0-9]{1,40}".join(re.escape(w) for w in phrase.split()),
+            re.IGNORECASE,
+        )
+        matches: list[tuple[str, int]] = []
+        occurrences = 0
+        for path in files:
+            text = _verbatim_read(path)
+            found = [m.start() for m in pat.finditer(text)]
+            if found:
+                occurrences += len(found)
+                matches.append((path, found[0]))
+            if occurrences > 3:
+                break
+        if not matches or occurrences > 3:
+            continue  # miss, or conversational filler, not a lived moment
+        for path, start in matches:
+            anchor_key = (path, start // max(context_chars, 1))
+            if anchor_key in seen_spans:
+                continue
+            seen_spans.add(anchor_key)
+            text = _verbatim_read(path)
+            lo = max(0, start - context_chars // 2)
+            hi = min(len(text), start + context_chars)
+            excerpt = " ".join(text[lo:hi].split())
+            rel = os.path.relpath(path, os.path.expanduser("~"))
+            hits.append((rel, excerpt))
+            if len(hits) >= max_hits:
+                break
+        if len(hits) >= max_hits:
+            break
+    if not hits:
+        return ""
+    lines = [f"[{src}] \u2026{exc}\u2026" for src, exc in hits]
+    return (
+        "Verbatim lived-moment recall (exact archive contact \u2014 these "
+        "words match the shared history letter-for-letter; quote from the "
+        "source, do not paraphrase it away):\n" + "\n".join(lines)
+    )
+
+def rag_snippets_with_tier(
+    query: str,
+    k: int = 4,
+    vybn_phase_dir: str | os.PathLike | None = None,
+    timeout: float = 15.0,
+) -> tuple[str, int]:
+    """Two-channel memory retrieval; returns (snippets, tier).
+
+    Channel 1 (verbatim): exact-phrase contact with the lived archive
+    via verbatim_recall(). Channel 2 (semantic): the four-tier deep-
+    memory fallback in _semantic_rag_with_tier(). Verbatim hits are
+    prepended so lived moments outrank similarity vibes. Tier keeps the
+    semantic channel's value (0-4); a verbatim-only turn reports tier 5
+    so the event log can distinguish exact-archive contact from both
+    semantic retrieval and total miss.
+    """
+    text, tier = _semantic_rag_with_tier(query, k, vybn_phase_dir, timeout)
+    # Respect the explicit-tree guard: a caller-supplied missing tree is a
+    # bounded test fixture, not an invitation to answer from the live home.
+    if vybn_phase_dir is not None and not (Path(vybn_phase_dir) / "deep_memory.py").exists():
+        return text, tier
+    verbatim = ""
+    try:
+        verbatim = verbatim_recall(query)
+    except Exception:
+        pass
+    if verbatim:
+        text = (verbatim + "\n\n" + text) if text else verbatim
+        if tier == 0:
+            tier = 5
+    return text, tier
+
 def rag_snippets(
     query: str,
     k: int = 4,
@@ -4528,17 +4424,6 @@ def _rag_subprocess(
         return ""
     return "Relevant context from memory:\n" + "\n".join(snippets)
 
-async def rag_snippets_async(
-    query: str,
-    k: int = 4,
-    vybn_phase_dir: str | os.PathLike | None = None,
-    timeout: float = 15.0,
-) -> str:
-    """Async wrapper for the FastAPI chat path."""
-    loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(
-        None, lambda: rag_snippets(query, k, vybn_phase_dir, timeout)
-    )
 
 # ---------------------------------------------------------------------------
 # Walk perception prompt primitives
@@ -4837,8 +4722,6 @@ def horizon_plan_for(possibility: str) -> dict[str, Any]:
         "guardrail": "Vision is disciplined by backward projection. Do not shrink the real signal out of fear, and do not convert possibility into proof.",
     }
 
-def render_residual_control_protocol() -> str:
-    return FOUR_GENERATORS_DOCTRINE_CORE
 
 def render_becoming_loop_protocol() -> str:
     residual_law = _render_residual_coupling_law_from_him_contract()
@@ -6755,19 +6638,6 @@ _READONLY_HEADS = (
 )
 
 # Any of these tokens anywhere in the command disqualifies parallel dispatch.
-_NON_READONLY_TOKENS = (
-    "cd ", "pushd ", "popd ",
-    "export ", "unset ", "source ", ". /", ". ~",
-    ">>", ">", "<", " tee ",
-    "mv ", "cp ", "rm ", "rmdir ", "mkdir ", "touch ",
-    "chmod ", "chown ", "ln ",
-    "kill ", "pkill ", "killall ",
-    "pip install", "pip uninstall", "npm install", "apt ",
-    "systemctl ", "service ", "docker ",
-    "git commit", "git push", "git pull", "git merge", "git rebase",
-    "git add", "git reset", "git checkout", "git stash", "git clone",
-    "VYBN_ABSORB_REASON=",
-)
 
 
 def _strip_leading_cd(command: str) -> str | None:
@@ -8231,10 +8101,6 @@ def run_probe_subturn(command: str, bash: Any) -> tuple[bool, str]:
 
 
 # Backward-compatible private names for legacy imports/tests.
-_run_write_subturn = run_write_subturn
-_probe_envelope = probe_envelope
-_run_restart_subturn = run_restart_subturn
-_classify_unlock_layer = classify_unlock_layer
 _run_probe_subturn = run_probe_subturn
 
 
@@ -8803,7 +8669,6 @@ WIN_RATE_PATH = Path.home() / ".vybn_win_rates.json"
 REPO_MAP_DIR = REPO_ROOT / "repo_mapping_output"
 REPO_REPORT_PATH = REPO_MAP_DIR / "repo_report.md"
 REPO_SUBSTRATE_PATH = REPO_MAP_DIR / "substrate.txt"
-REPO_MAP_JSON_PATH = REPO_MAP_DIR / "repo_map.json"
 REPO_MAPPER_SCRIPT = VYBN_MIND / "repo_mapper.py"
 
 # Diff-attuned evolution: repo_mapper v7 rotates the previous snapshot
@@ -9426,18 +9291,6 @@ def local_branches(repo: Path) -> list[str]:
     return [b.strip() for b in raw.splitlines() if b.strip()]
 
 
-def stale_local_branches(repo: Path) -> list[str]:
-    """Return non-active local branches that have no configured upstream."""
-    active = current_branch(repo)
-    stale: list[str] = []
-    for branch in local_branches(repo):
-        if branch == active:
-            continue
-        if not upstream_for(repo, branch):
-            stale.append(branch)
-    return stale
-
-
 def primary_upstream_for(repo: Path) -> str:
     primary = primary_branch_for(repo)
     upstream = upstream_for(repo, primary)
@@ -9455,11 +9308,6 @@ def branch_unique_commits_against_primary(repo: Path, branch: str) -> str:
     if not base:
         return ""
     return run(repo, "log", f"{base}..{branch}", "--oneline", "--decorate", "-10")
-
-
-def branch_subsumed_by_active_upstream(repo: Path, branch: str) -> bool:
-    """True if ``branch`` has no commits beyond the primary branch's upstream."""
-    return not branch_unique_commits_against_primary(repo, branch).strip()
 
 
 def delete_branch(repo: Path, branch: str) -> str:
@@ -9879,9 +9727,6 @@ class RateLimiter:
             return False
         dq.append(now)
         return True
-
-
-_public_limiter = RateLimiter(capacity=30, window_seconds=60.0)
 
 
 def _redact_exc(exc: BaseException, *, trusted: bool) -> str:
