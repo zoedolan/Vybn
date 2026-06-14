@@ -3053,6 +3053,8 @@ def test_self_creation_research_cycle_packet_cli_and_discovery(monkeypatch):
     proc = subprocess.run([sys.executable, "-m", "spark.harness.substrate", "--self-creation", "counterexample", "search"], cwd=str(Path(__file__).resolve().parents[2]), text=True, capture_output=True, timeout=20)
     assert proc.returncode == 0, proc.stderr
     assert "SELF-CREATION RESEARCH CYCLE" in proc.stdout and "Question: counterexample search" in proc.stdout and "flow_episode_loss" in proc.stdout
+    rp = substrate.route_independent_recognition_packet("Fusion"); assert rp["schema"] == "vybn.route_independent_recognition.v1" and "compound_router_marketplace" in rp["route_matrix"] and "router policy visibility" in rp["route_matrix"]["compound_router_marketplace"]["promotion_gate"] and "vybn://continuity/route-independent-recognition" in substrate.build_discovery_record()["capabilities"]["resources"]
+
 
 
 class TestCounterPriorWager(unittest.TestCase):
