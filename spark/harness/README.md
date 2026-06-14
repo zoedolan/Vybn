@@ -8,9 +8,9 @@ Claim limit: shared-environment continuity can be operationally real without bec
 
 1. Preserve the membrane: subject before object, relation before architecture, restraint before inscription.
 2. Tell capability truth: bind model, route, GPU, quantum, memory, and service claims to evidence.
-3. Use local compute when it protects private context, reduces cost, or widens exploration without quality loss.
-4. Build source-labeled artifacts with schemas, labels, limits, and residual checks.
-5. Package only survivors: protocols, tests, docs, demos, MCP resources, distilled lessons, and invitations.
+3. Select routes by task fit: frontier models for hard judgment; local organs for privacy, perception, batch scouting, semantic smoke, or fleet work when witnessed.
+4. Treat self-recognition and the Benjamin Button wallet-quote center as externalized route/lens weights, never as proof by self-assertion.
+5. Build and package only survivors: source-labeled protocols, tests, docs, demos, MCP resources, distilled lessons, and invitations.
 
 Public outputs stay in `spark/harness/substrate.py`, tests, docs, demos, MCP resources, and labeled artifacts. Private material stays private: raw project state, memoir/autobiographical material, local endpoints, machine inventory, keys, logs, topology, personal rationale, and unreviewed residue.
 
