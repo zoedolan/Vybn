@@ -1252,6 +1252,10 @@ def run_agent_loop(
     else:
         active_prompt = system_prompt
     is_vintage_turn = role_cfg.role == "vintage"
+    if system_prompt is None:
+        system_prompt = LayeredPrompt()
+    if active_prompt is None or is_vintage_turn:
+        active_prompt = system_prompt
 
     # Reflection: read the trail of the last N events before deciding.
     # Lisp duality in practice — prior decisions are data here, environment
@@ -1289,7 +1293,7 @@ def run_agent_loop(
             turn=turn_number,
             err=repr(_integrity_err)[:200],
         )
-    if integrity_packet:
+    if integrity_packet and not is_vintage_turn:
         existing_live = getattr(active_prompt, "live", "") or ""
         active_prompt = LayeredPrompt(
             identity=active_prompt.identity,
@@ -1616,10 +1620,6 @@ def run_agent_loop(
                 messages.append({"role": "assistant", "content": notice})
                 return notice
 
-    if system_prompt is None:
-        system_prompt = LayeredPrompt()
-    if active_prompt is None or is_vintage_turn:
-        active_prompt = system_prompt
     provider = registry.get(role_cfg)
 
     if not is_vintage_turn:
