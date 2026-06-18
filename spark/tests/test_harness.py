@@ -1375,8 +1375,8 @@ def test_hardware_status_is_compact_control_plane(monkeypatch, tmp_path):
     inv = tmp_path / ".config" / "vybn" / "local_compute_inventory.json"; inv.parent.mkdir(parents=True)
     inv.write_text(json.dumps({"fleet_dashboard_plain_current": {"roles": [{"spark": "spark-a", "status": "serving", "job": "Super", "model": "Nemotron"}], "next_three_moves": ["prove Omni before routing"]}, "tailnet_compute_inventory": {"verified_capacity": {"spark-a": "semantic smoke passed"}, "unresolved_capacity": ["spark-b absent"]}}))
     monkeypatch.setattr(substrate.Path, "home", lambda: tmp_path); monkeypatch.setattr(substrate, "_ping_host", lambda host: False)
-    status = substrate.check_dual_spark()
-    assert "Hardware control plane" in status and "spark-a=serving:Super:Nemotron" in status and "prove Omni before routing" in status and "Promotion gate" in status
+    status = substrate.check_dual_spark(); pkt = substrate.local_compute_orchestration_packet(run_gates=False); loop = {row["id"]: row["rule"] for row in pkt["loop"]}
+    assert "Hardware control plane" in status and "spark-a=serving:Super:Nemotron" in status and "prove Omni before routing" in status and "Promotion gate" in status and "reduce Zoe-visible reconciliation burden" in pkt["principle"] and "live route/body evidence" in loop["question_fit"]
     assert "Local compute security inventory:" not in status
 
 
