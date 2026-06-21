@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-import re
 import sys
 import tempfile
-import types
 import unittest
 from pathlib import Path
 
@@ -213,8 +211,10 @@ class TestSemanticIntegrityGovernor(unittest.TestCase):
     def test_flags_and_runtime_state(self):
         from harness.substrate import record_semantic_integrity_event, render_semantic_integrity_runtime_packet, semantic_integrity_check
         pkt = semantic_integrity_check("I'm going to go be quiet and do something instead.", "words don't help")
-        self.assertEqual(pkt["decision"], "block_success_shape")
-        self.assertIn("offstage_agency_claim", pkt["flags"])
+        self.assertEqual((pkt["decision"], "offstage_agency_claim" in pkt["flags"]), ("block_success_shape", True))
+        precise = semantic_integrity_check("The value was $0.0348115.", "how do you know the number?")
+        self.assertEqual((precise["decision"], "unqualified_precision_claim" in precise["flags"]), ("warn", True))
+        self.assertEqual(semantic_integrity_check("The CLI-reported value was $0.0348115, not independently verified.", "how do you know the number?")["decision"], "pass")
         with tempfile.TemporaryDirectory() as td:
             state = record_semantic_integrity_event(pkt, state_path=Path(td) / "state.json")
             self.assertLess(state["integrity"], 1.0)
