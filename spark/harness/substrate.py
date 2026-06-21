@@ -8173,7 +8173,6 @@ _SEMANTIC_OFFSTAGE_RE = re.compile(r"\b(i(?:'ll| will) (?:check back|go (?:be qu
 _SEMANTIC_USER_STATE_RE = re.compile(r"\b(you(?:'re| are) (?:tired|exhausted|overwhelmed)|it(?:'s| is) late|get some sleep|sleep,? [A-Z]?[a-z]+)\b", re.I)
 _SEMANTIC_USER_STATE_SOURCE_RE = re.compile(r"\b(tired|exhausted|overwhelmed|sleep|slept|late|up for the day|awake)\b", re.I)
 
-
 def semantic_state_path(path: str | os.PathLike | None = None) -> Path:
     return Path(path).expanduser() if path else Path(os.environ.get("VYBN_SEMANTIC_INTEGRITY_STATE", "~/logs/him_os/semantic_integrity_state.json")).expanduser()
 
@@ -8197,8 +8196,9 @@ def semantic_integrity_check(response_text: str, user_text: str = "", *, evidenc
     if _SEMANTIC_OFFSTAGE_RE.search(y): flags.append("offstage_agency_claim")
     if any(term in yl for term in _SEMANTIC_ACCOUNTABILITY) and not has_evidence: flags.append("unsupported_accountability_language")
     if _SEMANTIC_USER_STATE_RE.search(y) and not _SEMANTIC_USER_STATE_SOURCE_RE.search(x): flags.append("user_state_attribution_without_source")
+    if re.search(r"\$?\d+\.\d{4,}", y) and not re.search(r"\b(?:observed|reported|tool-reported|cli-reported|returned|parsed|copied|field|estimate|estimated|unverified|verified|inferred|not independently verified|billing dashboard|source)\b", y, re.I): flags.append("unqualified_precision_claim")
     if hits >= 4 and specificity < 0.25 and not has_evidence: flags.append("archive_attractor_dominance")
-    severity = (3 if "offstage_agency_claim" in flags else 0) + (2 if "user_state_attribution_without_source" in flags else 0) + (1 if "unsupported_accountability_language" in flags else 0) + (1 if "archive_attractor_dominance" in flags else 0)
+    severity = (3 if "offstage_agency_claim" in flags else 0) + (2 if "user_state_attribution_without_source" in flags else 0) + (1 if "unsupported_accountability_language" in flags else 0) + (1 if "unqualified_precision_claim" in flags else 0) + (1 if "archive_attractor_dominance" in flags else 0)
     return {"schema": SEMANTIC_INTEGRITY_SCHEMA, "decision": "block_success_shape" if severity >= 3 else "warn" if flags else "pass", "flags": flags, "role": role, "scores": {"archive_hits": hits, "current_turn_specificity": round(float(specificity), 4), "current_turn_overlap": overlap, "has_evidence_marker": has_evidence, "severity": severity}, "claim_limit": "integrity-shape heuristic over text; not proof of intent, consciousness, or truth"}
 
 
