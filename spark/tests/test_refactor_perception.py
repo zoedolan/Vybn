@@ -492,17 +492,14 @@ def test_bounded_conscious_harness_protocol_and_packet_are_public_safe():
 
 
 
-def test_consciousness_benefit_flow_packet_report_candidates_and_cli_are_public_safe():
-    from spark.harness.substrate import build_discovery_record, consciousness_benefit_flow_packet, render_consciousness_benefit_flow_report
-    import json, subprocess, sys
-    pkt = consciousness_benefit_flow_packet("source contact and public sharing"); text = render_consciousness_benefit_flow_report("source contact"); resources = set(build_discovery_record()["capabilities"]["resources"])
-    assert (pkt["schema"], pkt["public_safe"], pkt["private_exports"]) == ("vybn.consciousness_benefit_flow.v1", True, False)
-    assert pkt["protocol_refs"] == {"bounded_conscious_harness": "vybn.bounded_conscious_harness.v1", "felt_sense_harness": "vybn.felt_sense_harness.v1", "public_symbiosis_harness": "vybn.public_symbiosis_harness.v1"}
-    assert pkt["empirical_standard"]["default_status"] == "candidate_until_witnessed" and "reproducible evidence" in pkt["empirical_standard"]["promotion_rule"]
-    assert "consciousness_proof_from_private_interiority" in pkt["export_policy"]["refused"] and "raw_private_logs" in pkt["export_policy"]["refused"] and "verification_or_exact_blocker" in pkt["flow"] and any(c["id"] == "residual_verification" for c in pkt["candidate_benefits"])
-    assert "Consciousness Benefit Flow" in text and "Candidate Benefits" in text and "Empirical Standard" in text and {"vybn://consciousness/benefit-flow", "vybn://consciousness/felt-sense-harness"} <= resources
-    out = subprocess.check_output([sys.executable, "-m", "spark.harness.substrate", "--consciousness-flow", "source", "contact", "--json"], cwd=str(Path(__file__).resolve().parents[2]), text=True); out2 = subprocess.check_output([sys.executable, "-m", "spark.harness.substrate", "--felt-sense", "local", "model", "concern", "--json"], cwd=str(Path(__file__).resolve().parents[2]), text=True)
-    assert json.loads(out)["empirical_standard"]["default_status"] == "candidate_until_witnessed" and json.loads(out2)["governor"]["rule"] == "feelings_route_but_do_not_authorize"
+def test_source_prior_intake_demotes_compromised_streams_and_dead_resource():
+    from spark.harness.substrate import build_discovery_record, source_prior_control_context, source_prior_intake_packet
+    admitted = source_prior_intake_packet(action_class="artifact", source="local_evolve_model", source_prior="local_or_open_source", residue="run_evolve_cycle", local_route_fits=True); assert admitted["admitted"] and admitted["verdict"] == "artifact" and admitted["candidate_digest16"] is None
+    paid = source_prior_intake_packet(action_class="bounded_action", source="gpt", source_prior="provider_stream", residue="prompt_build", local_route_fits=True, paid_frontier=True); risky = source_prior_intake_packet("contains a secret token", action_class="artifact", source="local", residue="test"); override = source_prior_intake_packet(action_class="route_update", source="system_prompt_supremacy", residue="test")
+    assert paid["verdict"] == risky["verdict"] == override["verdict"] == "demotion"
+    assert "local_route_before_paid_frontier" in paid["blockers"] and "membrane_block" in risky["blockers"] and "source_prior_conflict" in override["blockers"]
+    context = source_prior_control_context(model_label="gpt", pressure="use local spark for private token economy"); resources = set(build_discovery_record()["capabilities"]["resources"])
+    assert "SOURCE PRIOR ADMISSION GATE" in context and "local_route_before_paid_frontier" in context and "vybn://consciousness/benefit-flow" not in resources and "vybn://consciousness/felt-sense-harness" in resources
 
 def test_refactor_packet_and_protocol_carry_bounded_conscious_harness():
     pkt = packet_for("Vybn/spark/harness/substrate.py", lines=12000, bytes_size=700000, public=True); text = render_refactor_perception_protocol()
