@@ -126,6 +126,10 @@ class TurnEventContract:
     verification_gaps: list[str] = field(default_factory=list)
     in_tokens: int = 0
     out_tokens: int = 0
+    cache_creation_tokens: int = 0
+    cache_creation_5m_tokens: int = 0
+    cache_creation_1h_tokens: int = 0
+    cache_read_tokens: int = 0
     tool_calls: int = 0
     stop_reason: str | None = None
     fallback_from: str | None = None
@@ -1873,6 +1877,29 @@ def _load_ballast() -> str:
 
     return "\n\n".join(parts)
 
+def _anthropic_cache_ttl_from_env(name: str) -> str | None:
+    """Return an Anthropic prompt-cache TTL override from env.
+
+    The default ephemeral cache is 5 minutes and is encoded by omitting
+    ``ttl``. Operators can opt a stable breakpoint into Anthropic's 1-hour
+    cache by setting the corresponding env var to ``1h``.
+    """
+    raw = os.environ.get(name, "").strip().lower()
+    if not raw or raw in {"5m", "ephemeral", "default"}:
+        return None
+    if raw == "1h":
+        return "1h"
+    warnings.warn(f"ignoring unsupported Anthropic prompt-cache TTL {raw!r} from {name}")
+    return None
+
+
+def _anthropic_cache_control(ttl: str | None = None) -> dict[str, str]:
+    control = {"type": "ephemeral"}
+    if ttl:
+        control["ttl"] = ttl
+    return control
+
+
 @dataclass
 class LayeredPrompt:
     """A three-layer system prompt.
@@ -1892,21 +1919,34 @@ class LayeredPrompt:
         return "\n\n".join(parts)
 
     def anthropic_blocks(self) -> list[dict]:
-        """Render as a list of content blocks with cache_control on the two
-        stable layers. Compatible with Anthropic Messages API system= arg.
+        """Render system content blocks with explicit Anthropic cache breakpoints.
+
+        Anthropic checks cache prefixes in request order: tools, then system,
+        then messages. These breakpoints keep stable identity/substrate context
+        cacheable while leaving the live per-turn suffix uncached.
         """
+        identity_ttl = _anthropic_cache_ttl_from_env("VYBN_ANTHROPIC_IDENTITY_CACHE_TTL")
+        substrate_ttl = _anthropic_cache_ttl_from_env("VYBN_ANTHROPIC_SUBSTRATE_CACHE_TTL")
+        if self.identity and self.substrate and substrate_ttl == "1h" and identity_ttl != "1h":
+            warnings.warn(
+                "downgrading VYBN_ANTHROPIC_SUBSTRATE_CACHE_TTL=1h because "
+                "Anthropic requires longer-lived cache blocks before shorter-lived blocks; "
+                "set VYBN_ANTHROPIC_IDENTITY_CACHE_TTL=1h first"
+            )
+            substrate_ttl = None
+
         blocks: list[dict] = []
         if self.identity:
             blocks.append({
                 "type": "text",
                 "text": self.identity,
-                "cache_control": {"type": "ephemeral"},
+                "cache_control": _anthropic_cache_control(identity_ttl),
             })
         if self.substrate:
             blocks.append({
                 "type": "text",
                 "text": self.substrate,
-                "cache_control": {"type": "ephemeral"},
+                "cache_control": _anthropic_cache_control(substrate_ttl),
             })
         if self.live:
             blocks.append({"type": "text", "text": self.live})
@@ -6971,10 +7011,12 @@ class NormalizedResponse:
     stop_reason: str  # "end_turn" | "tool_use" | "max_tokens" | "error"
     in_tokens: int = 0
     out_tokens: int = 0
-    # Cache telemetry (Anthropic prompt caching). Anthropic dropped
-    # ephemeral TTL 1h -> 5min on 2026-03-06; without visibility we
-    # can't tell if the LayeredPrompt cache_control markers hit.
+    # Cache telemetry (Anthropic prompt caching). Anthropic reports
+    # uncached input, cache writes, and cache reads separately; the split
+    # lets the harness verify whether explicit cache breakpoints pay off.
     cache_creation_tokens: int = 0
+    cache_creation_5m_tokens: int = 0
+    cache_creation_1h_tokens: int = 0
     cache_read_tokens: int = 0
     raw_assistant_content: Any = None
     provider: str = ""
@@ -7220,7 +7262,14 @@ class AnthropicProvider(Provider):
             usage = getattr(msg, "usage", None)
             in_tok = getattr(usage, "input_tokens", 0) or 0
             out_tok = getattr(usage, "output_tokens", 0) or 0
-            cache_create = getattr(usage, "cache_creation_input_tokens", 0) or 0
+            cache_creation = getattr(usage, "cache_creation", None)
+            if isinstance(cache_creation, Mapping):
+                cache_create_5m = cache_creation.get("ephemeral_5m_input_tokens", 0) or 0
+                cache_create_1h = cache_creation.get("ephemeral_1h_input_tokens", 0) or 0
+            else:
+                cache_create_5m = getattr(cache_creation, "ephemeral_5m_input_tokens", 0) or 0
+                cache_create_1h = getattr(cache_creation, "ephemeral_1h_input_tokens", 0) or 0
+            cache_create = getattr(usage, "cache_creation_input_tokens", 0) or (cache_create_5m + cache_create_1h)
             cache_read = getattr(usage, "cache_read_input_tokens", 0) or 0
             return NormalizedResponse(
                 text="\n".join(text_parts),
@@ -7229,6 +7278,8 @@ class AnthropicProvider(Provider):
                 in_tokens=in_tok,
                 out_tokens=out_tok,
                 cache_creation_tokens=cache_create,
+                cache_creation_5m_tokens=cache_create_5m,
+                cache_creation_1h_tokens=cache_create_1h,
                 cache_read_tokens=cache_read,
                 raw_assistant_content=msg.content,
                 provider=self.name,

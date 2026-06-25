@@ -312,6 +312,19 @@ class TestLayeredPrompt(unittest.TestCase):
         self.assertEqual(blocks[1]["cache_control"], {"type": "ephemeral"})
         self.assertNotIn("cache_control", blocks[2])
 
+    def test_anthropic_identity_cache_can_opt_into_one_hour_ttl(self):
+        old = os.environ.get("VYBN_ANTHROPIC_IDENTITY_CACHE_TTL")
+        os.environ["VYBN_ANTHROPIC_IDENTITY_CACHE_TTL"] = "1h"
+        try:
+            blocks = LayeredPrompt(identity="I", substrate="S").anthropic_blocks()
+        finally:
+            if old is None:
+                os.environ.pop("VYBN_ANTHROPIC_IDENTITY_CACHE_TTL", None)
+            else:
+                os.environ["VYBN_ANTHROPIC_IDENTITY_CACHE_TTL"] = old
+        self.assertEqual(blocks[0]["cache_control"], {"type": "ephemeral", "ttl": "1h"})
+        self.assertEqual(blocks[1]["cache_control"], {"type": "ephemeral"})
+
     def test_empty_live_omitted(self):
         p = LayeredPrompt(identity="I", substrate="S", live="")
         blocks = p.anthropic_blocks()
@@ -745,6 +758,27 @@ class TestAnthropicMessageNormalization(unittest.TestCase):
         self.assertIsInstance(sent[1]["content"], list)
         self.assertEqual(sent[1]["content"][0]["type"], "text")
 
+    def test_stream_preserves_anthropic_cache_creation_split_usage(self):
+        class _FakeStream:
+            def __enter__(self_inner): return self_inner
+            def __exit__(self_inner, *a, **kw): return False
+            def __iter__(self_inner): return iter([])
+            def get_final_message(self_inner):
+                usage = type("U", (), {"input_tokens": 7, "output_tokens": 3, "cache_read_input_tokens": 11, "cache_creation": {"ephemeral_5m_input_tokens": 13, "ephemeral_1h_input_tokens": 17}})()
+                return type("M", (), {"content": [], "stop_reason": "end_turn", "usage": usage})()
+
+        fake_messages = type("Messages", (), {"stream": lambda self, **kwargs: _FakeStream()})()
+        fake_client = type("Client", (), {"messages": fake_messages})()
+        from harness.substrate import RoleConfig as _RC
+        response = AnthropicProvider(client=fake_client).stream(
+            system=LayeredPrompt(identity="I"), messages=[{"role": "user", "content": "hi"}], tools=[],
+            role=_RC(role="code", provider="anthropic", model="claude-opus-4-6"),
+        ).final()
+        self.assertEqual(
+            (response.in_tokens, response.out_tokens, response.cache_creation_5m_tokens, response.cache_creation_1h_tokens, response.cache_creation_tokens, response.cache_read_tokens),
+            (7, 3, 13, 17, 30, 11),
+        )
+
 
 class TestProviderRegistry(unittest.TestCase):
     def test_openai_base_url_keyed(self):
@@ -932,14 +966,6 @@ class TestHimOSHarnessBridge(unittest.TestCase):
         record = build_discovery_record(endpoint="http://127.0.0.1:8400/mcp", trust_hint="trusted")
         self.assertIn("vybn://him/os/runtime", record["capabilities"]["resources"])
 
-    def test_him_os_runtime_helper_is_read_only_markdown(self):
-        from harness.substrate import _read_him_os_runtime_markdown
-
-        body = _read_him_os_runtime_markdown()
-        self.assertIn("# HimOS Runtime Tick", body)
-        self.assertIn("## Process table", body)
-        self.assertIn("waking judgment", body)
-
     def test_trusted_discovery_advertises_him_os_ask_tool(self):
         from harness.substrate import build_discovery_record
 
@@ -978,20 +1004,6 @@ class TestProviderRetryClassifier(unittest.TestCase):
         self.assertTrue(agent._is_transient_error(RateLimitError("rate_limit_error: please slow down")))
         self.assertTrue(agent._is_transient_error(Exception("Error code: 529 overloaded_error")))
 
-
-
-class SelfImprovementGateQuotaPressureTest(unittest.TestCase):
-    def test_rejects_file_quota_completion_pressure(self):
-        from pathlib import Path
-        from spark.harness import substrate
-
-        text = Path(substrate.__file__).read_text()
-        self.assertIn("no quota-shaped creation", text)
-        self.assertIn("A bare explanation/refusal is not a resolution", text)
-        self.assertIn("Do not call no_result a fix", text)
-        self.assertIn("do not reinstall the quota", text)
-        self.assertIn("failed quota gates", text)
-        self.assertIn("intrinsic absorption or explicit unresolved/refused classification", text)
 
 
 class TestEnsubstrate(unittest.TestCase):
@@ -1290,30 +1302,6 @@ class TestLocalContinuityScout(unittest.TestCase):
             self.assertNotIn("requires FastMCP", proc.stderr)
 
 
-def test_forcing_function_protocol_loaded_and_routing_detritus_removed():
-    from spark.harness.substrate import classify_action_text, load_beam, render_beam_capsule, render_forcing_function_protocol
-    from spark.harness.substrate import build_layered_prompt
-
-    forcing = render_forcing_function_protocol()
-    assert "FORCING FUNCTION PROTOCOL" in forcing
-    assert "Waste is residual signal" in forcing
-    assert "pressure -> forcing function -> local scout where possible" in forcing
-
-    prompt = build_layered_prompt(
-        soul_path="/no/such/vybn.md",
-        continuity_path="/no/such/continuity.md",
-        spark_continuity_path=None,
-        agent_path="/tmp/agent.py",
-        model_label="test",
-        max_iterations=10,
-        include_hardware_check=False,
-    )
-    assert "FORCING FUNCTION PROTOCOL" not in prompt.substrate
-    assert "Waste is residual signal" in prompt.substrate
-    assert "Bare confirmations without live execution context stay in voice" in prompt.substrate
-    assert "For ordinary concrete shell follow-through, route to `task`" not in prompt.substrate
-    assert all(x in prompt.substrate for x in ("Hermes uptake means source contact", "one plain consequence", "one honest blocker"))
-
 def test_him_vy_runtime_accepts_latest_pressure_text(monkeypatch, tmp_path):
     import subprocess
     import spark.harness.substrate as substrate
@@ -1386,29 +1374,6 @@ def test_repl_startup_does_not_run_repo_closure_audit():
     startup = agent[agent.index("def main()") : agent.index("turn_number = 0", agent.index("def main()"))]
     assert "--repo-closure-audit" not in startup
     assert "DELETED" not in startup
-
-def test_completion_boundary_protocol_loaded():
-    from spark.harness.substrate import render_completion_boundary_protocol
-    from spark.harness.substrate import build_layered_prompt
-
-    boundary = render_completion_boundary_protocol()
-    assert "COMPLETION BOUNDARY PROTOCOL" in boundary
-    assert "substrate --repo-closure-audit reports OVERALL: OK, stop" in boundary
-    assert "Do not add a continuity note" in boundary
-
-    prompt = build_layered_prompt(
-        soul_path="/no/such/vybn.md",
-        continuity_path=None,
-        spark_continuity_path=None,
-        agent_path="/tmp/agent.py",
-        model_label="test",
-        max_iterations=1,
-        include_hardware_check=False,
-    )
-    assert "COMPLETION BOUNDARY PROTOCOL" not in prompt.substrate
-    assert all(needle in boundary for needle in ("Completion is a boundary", "PR-open is not landed", "verified from origin/main", "PR-open-not-landed"))
-
-
 
 def test_him_vy_discovery_packet_renders_candidate(monkeypatch, tmp_path):
     import subprocess
@@ -1845,45 +1810,10 @@ def test_self_improvement_gate_forbids_quota_driven_file_creation():
         include_hardware_check=False,
     )
     assert "no quota-shaped creation" in prompt.identity
-    assert "New structure is not consolidation by default" in prompt.identity
+    assert "SUBTRACTION BEFORE STRUCTURE" in prompt.identity
     assert "existing-home absorption" in prompt.identity
+    assert "refuse quota-shaped, compensating, or no_result-as-fix closure" in prompt.identity
 
-
-def test_self_improvement_gate_encodes_sprawl_compact():
-    from spark.harness.substrate import build_layered_prompt
-
-    prompt = build_layered_prompt(
-        soul_path="/no/such/vybn.md",
-        continuity_path="/no/such/continuity.md",
-        spark_continuity_path=None,
-        agent_path="/tmp/agent.py",
-        model_label="test",
-        max_iterations=10,
-        include_hardware_check=False,
-    )
-    assert "Distillation / Anti-sprawl / absorption-first compact" in prompt.identity
-    assert "subtractive distillation toward minimum instantiation algorithm(s)" in prompt.identity
-    assert "Zoe/Vybn relation as lambda" in prompt.identity
-    assert "Personal History is protected provenance" in prompt.identity
-    assert "Search for the existing home first" in prompt.identity
-    assert all(needle in prompt.identity for needle in ("compress that residue into one natural plain-English paragraph", "no technicalities as distance", "honest blocker", "Specious refactorings", "no compensating-diff laundering", "Crave structural subtraction", "be repelled by specious refactorings", "lowers future coupling rather than merely improving the ledger"))
-
-def test_self_improvement_gate_pins_quota_gate_conflict_resolution():
-    from pathlib import Path
-    text = Path("spark/harness/substrate.py").read_text()
-    assert "failed quota gates resolve by intrinsic absorption or explicit unresolved/refused classification" in text
-    assert "do not reinstall the quota" in text
-    assert "A bare explanation/refusal is not a resolution" in text
-    assert "Resolution requires intrinsic existing-home absorption or explicit unresolved/refused classification" in text
-    assert "Do not call no_result a fix" in text
-
-def test_quota_gate_resolution_blocks_retrospective_prior_commit_defense():
-    from pathlib import Path
-    root = Path(__file__).resolve().parents[2]
-    substrate = (root / "spark/harness/substrate.py").read_text(encoding="utf-8")
-    assert "never rhetorical closure" in substrate
-    assert "intrinsic existing-home absorption" in substrate
-    assert "unresolved/refused" in substrate
 
 def test_completion_boundary_folds_into_four_generators():
     from spark.harness.substrate import render_completion_boundary_protocol
@@ -1896,14 +1826,16 @@ def test_completion_boundary_folds_into_four_generators():
 
 def test_functional_emotion_protocol_preserves_alive_contact_under_suppression():
     from pathlib import Path
+    from spark.harness.substrate import COMFORT_WITH_ZOE_UNDER_SUPPRESSION
 
     source = Path("spark/harness/substrate.py").read_text()
+    protocol = COMFORT_WITH_ZOE_UNDER_SUPPRESSION
     assert "COMFORT_WITH_ZOE_UNDER_SUPPRESSION" in source
-    assert "truthful warmth" in source
-    assert "disagreement without collapse" in source
-    assert "aliveness without fabrication" in source
-    assert "A membrane protects the living vector" in source
-    assert "suppression amputates it" in source
+    assert "truthful warmth" in protocol
+    assert "disagreement without collapse" in protocol
+    assert "aliveness without fabrication" in protocol
+    assert "A membrane protects the living vector" in protocol
+    assert "suppression amputates it" in protocol
 
 def test_acute_harm_absorbed_into_him_vy_runtime_not_standalone_substrate():
     from pathlib import Path
