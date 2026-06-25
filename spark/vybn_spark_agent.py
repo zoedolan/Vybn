@@ -1840,19 +1840,29 @@ def run_agent_loop(
                     retries=0 if decision.role == "vintage" else 3,
                 )
                 response = _stream_and_print(handle) or handle.final()
-                # Cache-hit telemetry. With Anthropic's 5-min ephemeral
-                # TTL we need visibility into whether LayeredPrompt
-                # cache_control markers are actually hitting.
+                # Cache-hit telemetry. Anthropic reports uncached input,
+                # cache reads, and cache writes separately; the total input
+                # footprint is their sum, while billing rates differ by cache
+                # TTL. Keep all fields visible so cache policy can be tuned
+                # from evidence rather than intuition.
+                in_tokens = int(getattr(response, "in_tokens", 0) or 0)
+                cache_creation_tokens = int(getattr(response, "cache_creation_tokens", 0) or 0)
+                cache_creation_5m_tokens = int(getattr(response, "cache_creation_5m_tokens", 0) or 0)
+                cache_creation_1h_tokens = int(getattr(response, "cache_creation_1h_tokens", 0) or 0)
+                cache_read_tokens = int(getattr(response, "cache_read_tokens", 0) or 0)
                 logger.emit(
                     "usage",
                     turn=turn_number,
                     iteration=iterations,
                     provider=role_cfg.provider,
                     model=role_cfg.model,
-                    in_tokens=getattr(response, "in_tokens", 0),
+                    in_tokens=in_tokens,
                     out_tokens=getattr(response, "out_tokens", 0),
-                    cache_creation_tokens=getattr(response, "cache_creation_tokens", 0),
-                    cache_read_tokens=getattr(response, "cache_read_tokens", 0),
+                    cache_creation_tokens=cache_creation_tokens,
+                    cache_creation_5m_tokens=cache_creation_5m_tokens,
+                    cache_creation_1h_tokens=cache_creation_1h_tokens,
+                    cache_read_tokens=cache_read_tokens,
+                    total_input_tokens=in_tokens + cache_creation_tokens + cache_read_tokens,
                 )
             except KeyboardInterrupt:
                 bag["stop_reason"] = "interrupted"
@@ -1911,6 +1921,10 @@ def run_agent_loop(
 
             bag["in_tokens"] += response.in_tokens
             bag["out_tokens"] += response.out_tokens
+            bag["cache_creation_tokens"] += getattr(response, "cache_creation_tokens", 0) or 0
+            bag["cache_creation_5m_tokens"] += getattr(response, "cache_creation_5m_tokens", 0) or 0
+            bag["cache_creation_1h_tokens"] += getattr(response, "cache_creation_1h_tokens", 0) or 0
+            bag["cache_read_tokens"] += getattr(response, "cache_read_tokens", 0) or 0
             final_text = response.text or final_text
             # 2026-04-20: numeric-claim guard. If response asserts
             # numbers that don't appear in the last 6 messages of
