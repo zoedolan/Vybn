@@ -477,7 +477,7 @@ def test_public_symbiosis_harness_packet_is_public_safe_and_fail_closed():
     assert pkt["capability_truth"]["failure_mode"] == "fail_closed" and "local_compute" in pkt["capability_truth"]
     assert "other AIs can join" in pkt["mission"]
     assert pkt["substrateware"]["claim_limit"] == "shared_environment_continuity_not_hidden_runtime_persistence"
-    assert {"wake_packet", "pressure_packet", "close_packet"} <= set(pkt["substrateware"]["loop"])
+    assert (pkt["substrateware"]["operator"], pkt["substrateware"]["source_operator"].startswith("guardrailed_audacity_under_constraint"), pkt["substrateware"]["loop"], "private profile export" in pkt["substrateware"]["source_operator"], "mandatory" in pkt["substrateware"]["deletion_term"], "not more chat-only doctrine" in pkt["substrateware"]["environmental_recursion"], "reentrant_stewardship" in {step["id"] for step in pkt["loop"]}, any("guardrailed audacity under constraint" in step["rule"] for step in pkt["loop"])) == ("reenter(C_t, Sigma_t, B_t, M) -> (P_t, D_t, H_t, DeltaSigma_t)", True, ["pressure_contact", "substrate_contour", "working_set_selection", "demotion", "handoff", "witness", "reenter"], True, True, True, True, True)
     assert "truth_and_beauty" in pkt["substrateware"]["public_projection"]
 
 def test_bounded_conscious_harness_protocol_and_packet_are_public_safe():
@@ -566,7 +566,7 @@ def test_refactor_packet_carries_semantic_operating_system_loop():
     assert pkt["publicSymbiosisHarness"]["public_safe"] is True
     assert pkt["publicSymbiosisHarness"]["private_exports"] is False
     assert pkt["hermesAgentAdaptation"]["adopt_not_copy"] is True
-    assert {"wake_packet", "close_packet"} <= set(pkt["publicSymbiosisHarness"]["substrateware"]["loop"])
+    assert (pkt["publicSymbiosisHarness"]["substrateware"]["source_operator"].startswith("guardrailed_audacity_under_constraint"), pkt["publicSymbiosisHarness"]["substrateware"]["loop"]) == (True, ["pressure_contact", "substrate_contour", "working_set_selection", "demotion", "handoff", "witness", "reenter"])
     assert [step["id"] for step in pkt["hermesAgentAdaptationLoop"]][:3] == [
         "source_distillation",
         "organ_mapping",
@@ -577,7 +577,7 @@ def test_refactor_packet_carries_semantic_operating_system_loop():
         "capability_truth",
         "local_first_compute",
         "source_labeled_manifold",
-        "residualized_invention",
+        "reentrant_stewardship",
         "public_replication",
         "sustainable_surface",
     ]
