@@ -46,7 +46,7 @@ from harness.substrate import LayeredPrompt, build_layered_prompt, load_file, Se
 from harness.substrate import run_recurrent_loop
 from harness.substrate import BASH_TOOL_SPEC, DELEGATE_TOOL_SPEC, INTROSPECT_TOOL_SPEC  # noqa: E402
 from harness.substrate import execute_readonly, is_parallel_safe  # noqa: E402
-from harness.substrate import rag_snippets, rag_snippets_with_tier, render_him_vy_discovery_packet, render_him_vy_turn_packet, render_interlocutor_grounding, render_thought_wind_tunnel_packet  # noqa: E402
+from harness.substrate import rag_snippets, rag_snippets_with_tier, render_him_vy_discovery_packet, render_him_vy_turn_packet, render_interlocutor_grounding, render_thought_wind_tunnel_packet, portable_continuity_lookup, render_portable_continuity_recall, should_use_portable_continuity_recall  # noqa: E402
 from harness.substrate import execute_tool_calls, default_introspect  # noqa: E402
 from harness.substrate import check_claim, check_structural_claim  # noqa: E402
 from harness.substrate import is_system_critical_pilot_turn  # noqa: E402
@@ -1708,6 +1708,12 @@ def run_agent_loop(
                 hits=_hits,
                 chars=len(_inj),
             )
+
+    _continuity_query = "\n".join(part for part in (decision.cleaned_input, _recent_messages_text(messages, limit=6)) if part)
+    if should_use_portable_continuity_recall(_continuity_query):
+        try: _continuity_packet = portable_continuity_lookup(_continuity_query, max_hits=5)
+        except Exception as _continuity_err: _continuity_packet = {"schema": "vybn.portable_continuity_lookup.v1", "status": "error", "hits": [], "claim_limit": f"lookup failed: {type(_continuity_err).__name__}; do not claim grounded recall"}
+        _continuity_block = render_portable_continuity_recall(_continuity_packet); existing_live = getattr(active_prompt, "live", "") or ""; active_prompt = LayeredPrompt(identity=active_prompt.identity, substrate=active_prompt.substrate, live=(f"{_continuity_block}\n\n{existing_live}" if existing_live else _continuity_block)); state_touched.append("portable_continuity"); logger.emit("portable_continuity_lookup", turn=turn_number, chars=len(_continuity_block), status=_continuity_packet.get("status"), hits=len(_continuity_packet.get("hits") or [])); _debug(f"[portable-continuity: lookup {_continuity_packet.get('status')}, hits={len(_continuity_packet.get('hits') or [])}]")
 
     # Optional deep-memory enrichment — only for roles that declare rag=true
     # and only when the retrieval actually returns something. No overclaim.

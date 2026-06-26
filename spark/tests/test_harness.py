@@ -1291,6 +1291,13 @@ class TestLocalContinuityScout(unittest.TestCase):
         self.assertIn("fedcba9876543210", report)
         self.assertIn("not hidden subjective persistence", report)
 
+    def test_portable_continuity_lookup_sources_redacts_and_classifies(self):
+        from harness import substrate
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "sessions"; root.mkdir(); event_log = Path(td) / "agent_events.jsonl"; continuity = Path(td) / "current.md"; (root / "s.jsonl").write_text(json.dumps({"ts": "2026-06-26T18:42:24+00:00", "msg": {"role": "user", "content": "smart enough dumb enough grit perseverance " + ("tok" + "en=not-a-real-token")}}) + "\n", encoding="utf-8"); event_log.write_text(json.dumps({"ts": "2026-06-26T19:00:00", "event": "rag_hit", "detail": "grit perseverance recall path touched"}) + "\n", encoding="utf-8"); continuity.write_text("Earlier carrier: just smart enough to do it and just dumb enough to try.\n", encoding="utf-8"); pkt = substrate.portable_continuity_lookup("recall smart enough dumb enough grit perseverance", session_root=root, event_log=event_log, continuity_paths=[continuity], max_hits=5); miss = substrate.portable_continuity_lookup("no matching terms here", session_root=root, event_log=Path(td) / "missing.jsonl", continuity_paths=[])
+        rendered = json.dumps(pkt, sort_keys=True); report = substrate.render_portable_continuity_recall(miss)
+        self.assertEqual((pkt["status"], miss["status"]), ("hit", "miss")); self.assertIn("session_message", rendered); self.assertIn("event_log", rendered); self.assertIn("continuity_file", rendered); self.assertNotIn("not-a-real-token", rendered); self.assertIn("miss rule", report); self.assertIn("source map", report); self.assertTrue(substrate.should_use_portable_continuity_recall("@opus48 you sure?")); self.assertFalse(substrate.should_use_portable_continuity_recall("what color should the button be?"))
+
     def test_mcp_continuity_scout_cli_does_not_require_fastmcp(self):
         import subprocess
         import sys
@@ -1300,6 +1307,10 @@ class TestLocalContinuityScout(unittest.TestCase):
             self.assertEqual(proc.returncode, 0, proc.stderr)
             self.assertIn(needle, proc.stdout)
             self.assertNotIn("requires FastMCP", proc.stderr)
+        proc = subprocess.run([sys.executable, "-m", "spark.harness.substrate", "--portable-continuity", "remember", "recent", "work"], cwd=str(Path(__file__).resolve().parents[2]), text=True, capture_output=True, timeout=20)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertIn("Portable continuity lookup", proc.stdout)
+        self.assertNotIn("requires FastMCP", proc.stderr)
 
 
 def test_him_vy_runtime_accepts_latest_pressure_text(monkeypatch, tmp_path):

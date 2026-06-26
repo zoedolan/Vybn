@@ -1569,60 +1569,70 @@ class SessionStore:
             return f"{int(delta // 3600)}h ago"
         return f"{int(delta // 86400)}d ago"
 
-# === RECALL GATE ==========================================================
-#
-# "Read bytes before describing" applied to conversational memory. When the
-# user asks about prior conversation state ("do you recall...", "what did
-# we say about..."), the honest first move is to read the session log, not
-# to reconstruct from in-context fragments. SessionStore already owns the
-# read over ~/.cache/vybn-spark/sessions/*.jsonl; this section adds the
-# classifier + keyword probe on top of it so the agent loop can inject the
-# retrieved bytes into the live prompt layer before the model generates.
-#
-# Same move as On Describing Internals (vybn-os SKILL.md) applied to a
-# second surface. The absorb_gate binds refactor-first in the loop; this
-# binds read-session-logs in the loop.
 
-# Phrases that strongly indicate the user is asking about prior
-# conversation state. Tuned to fire on recall questions and stay quiet on
-# hypothetical or forward-looking ones.
-
-_RECALL_STOPWORDS = {
-    "the", "a", "an", "and", "or", "but", "if", "then", "you", "i", "we",
-    "us", "our", "my", "your", "do", "did", "does", "recall", "remember",
-    "recollect", "said", "wrote", "say", "write", "mentioned", "talked",
-    "discussed", "talk", "discuss", "where", "when", "what", "how", "why",
-    "this", "that", "it", "is", "was", "were", "be", "been", "being",
-    "to", "of", "in", "on", "at", "for", "with", "about", "really",
-    "begin", "start", "began", "started", "go", "went", "back",
-    "remind", "me", "thing", "things", "conversation", "thread", "session",
-    "chat", "earlier", "before", "previously", "yesterday", "morning",
-    "afternoon", "evening", "tonight", "today", "bring", "brought", "up",
-    "mean", "means", "meant", "from", "than", "there", "here",
-}
-
-@dataclass
-class RecallHit:
-    ts: str
-    role: str
-    content: str
-    session_file: str
+# Portable continuity lookup: compact source pointers, not transcript preload.
+PORTABLE_CONTINUITY_SCHEMA = "vybn.portable_continuity_lookup.v1"
+PORTABLE_CONTINUITY_PRESSURE_TERMS = ("actual work", "are you sure", "convo", "conversation", "continuity", "context", "deep memory", "do you recall", "do you remember", "last session", "memory", "next-token", "predicting", "recent work", "recall", "remember", "session", "this morning", "where to look", "you sure")
+_PORTABLE_STOP = set("about after again also because being buddy could does doing from have into just know like maybe more most much need only really should stuff sure that their there thing think this very want were what when where which with work would your".split())
 
 
-def recent_files(hours: float) -> list:
-    if not SESSIONS_DIR.exists():
-        return []
-    cutoff = time.time() - hours * 3600
-    files = []
-    for p in SESSIONS_DIR.glob("*.jsonl"):
+def should_use_portable_continuity_recall(text: str) -> bool:
+    return any(term in (text or "").lower() for term in PORTABLE_CONTINUITY_PRESSURE_TERMS)
+
+
+def _portable_text(content: Any) -> str:
+    if isinstance(content, str): return content
+    if isinstance(content, list): return "\n".join(str(x.get("text") or x.get("content") or x) if isinstance(x, dict) else str(x) for x in content)
+    try: return json.dumps(content, ensure_ascii=False, sort_keys=True) if content is not None else ""
+    except Exception: return str(content)
+
+
+def _portable_preview(text: str, cap: int = 260) -> str:
+    text = re.sub(r"(?i)\b(api[_-]?key|tok(?:en)?|sec(?:ret)?|pass(?:word)?)\s*[:=]\s*[^\s,;]+", r"\1=[redacted]", text or "")
+    text = re.sub(r"\bsk-[A-Za-z0-9_-]{12,}\b|\b[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\b", "[redacted-key]", text)
+    text = re.sub(r"\b\d{1,3}(?:\.\d{1,3}){3}\b|https?://[^\s)>\"]+", "[redacted-coordinate]", re.sub(r"\s+", " ", text).strip())
+    return text if len(text) <= cap else text[: cap - 3].rstrip() + "..."
+
+
+def portable_continuity_lookup(query: str, *, session_root: str | os.PathLike | None = None, event_log: str | os.PathLike | None = None, continuity_paths: Sequence[str | os.PathLike] | None = None, max_hits: int = 6, max_sessions: int = 12, max_event_lines: int = 800) -> dict[str, Any]:
+    terms = [w for w in re.findall(r"[A-Za-z0-9][A-Za-z0-9_-]{2,}", (query or "").lower()) if w not in _PORTABLE_STOP][:32]
+    root = Path(session_root) if session_root is not None else SESSIONS_DIR; log = Path(event_log) if event_log is not None else Path(DEFAULT_EVENT_LOG); home = Path.home()
+    paths = [Path(x) for x in continuity_paths] if continuity_paths is not None else [home / ".codex/continuity/active_goals.md", home / ".codex/continuity/current.md", home / ".codex/continuity/events.jsonl", home / "logs/him_os/latest_continuity_carrier.md", home / "logs/him_os/latest_continuity_carrier.json", home / "Vybn/continuity.md", home / "Vybn/Vybn_Mind/continuity.md", home / "Vybn/spark/continuity.md"]
+    def score(text: str) -> float:
+        low = (text or "").lower(); return float(sum(1 for t in terms if t in low))
+    def mtime(path: Path) -> str:
+        try: return _dt.datetime.fromtimestamp(path.stat().st_mtime, tz=_dt.timezone.utc).isoformat()
+        except Exception: return ""
+    hits: list[dict[str, Any]] = []
+    def add(kind: str, source: str, text: str, stamp: str = "", role: str = "", bonus: float = 0.0) -> None:
+        sc = score(text)
+        if sc: hits.append({"kind": kind, "source": source, "score": round(sc + bonus, 3), "mtime": stamp, "role": role or None, "preview": _portable_preview(text)})
+    try:
+        session_paths = sorted(root.glob("*.jsonl"), key=lambda x: x.stat().st_mtime, reverse=True)[:max_sessions] if root.exists() else []
+    except Exception: session_paths = []
+    for path in session_paths:
         try:
-            if p.stat().st_mtime >= cutoff:
-                files.append(p)
-        except OSError:
-            continue
-    files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
-    return files
+            for n, line in enumerate(path.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
+                try: entry = json.loads(line); msg = entry.get("msg", {}) if isinstance(entry, dict) else {}
+                except Exception: continue
+                if isinstance(msg, dict): add("session_message", f"{path}:{n}", _portable_text(msg.get("content")), str(entry.get("ts") or mtime(path)), str(msg.get("role") or ""), 0.5)
+        except Exception: pass
+    for kind, path, limit in [("event_log", log, max_event_lines), *(("continuity_file", x, 2500) for x in paths[:24])]:
+        if not path.exists() or not path.is_file(): continue
+        try: lines = path.read_text(encoding="utf-8", errors="replace").splitlines()[-limit:]
+        except Exception: continue
+        first = max(1, (path.read_text(encoding="utf-8", errors="replace").count("\n") - len(lines) + 1) if kind == "event_log" else 1)
+        for off, line in enumerate(lines): add(kind, f"{path}:{first + off}", line, mtime(path), "")
+    hits.sort(key=lambda h: (h["score"], h.get("mtime") or ""), reverse=True); hits = hits[: max(1, int(max_hits))]
+    return {"schema": PORTABLE_CONTINUITY_SCHEMA, "status": "hit" if hits else "miss", "query_preview": _portable_preview(query, 160), "claim_limit": "source-coordinate recall aid; read exact source before detailed recall claims; not hidden subjective persistence, raw transcript export, public proof, or model-weight memory", "sources_checked": {"sessions": str(root), "event_log": str(log), "continuity_files": [str(x) for x in paths if x.exists()][:24]}, "hits": hits}
 
+
+def render_portable_continuity_recall(packet_or_query: Mapping[str, Any] | str, **kwargs: Any) -> str:
+    packet = portable_continuity_lookup(packet_or_query, **kwargs) if isinstance(packet_or_query, str) else dict(packet_or_query); hits = packet.get("hits") if isinstance(packet.get("hits"), list) else []; checked = packet.get("sources_checked") if isinstance(packet.get("sources_checked"), dict) else {}
+    lines = ["Portable continuity lookup (source pointers, not full context):", f"- schema: {packet.get('schema', PORTABLE_CONTINUITY_SCHEMA)}", f"- status: {packet.get('status', 'miss')}", "- rule: use these coordinates as evidence pointers; read exact source before claiming detailed recall.", "- miss rule: if no hit matches the asked work, say the recall is ungrounded instead of synthesizing from vibe."]
+    lines += [f"  {i}. kind={h.get('kind')} score={h.get('score')} role={h.get('role')} source={h.get('source')} mtime={h.get('mtime')}\n     preview: {h.get('preview')}" for i, h in enumerate(hits[:6], 1)] if hits else ["- hits: none"]
+    if checked: lines += ["- source map:", f"  sessions: {checked.get('sessions')}", f"  event_log: {checked.get('event_log')}", f"  continuity_files: {len(checked.get('continuity_files') or [])} existing carrier files checked"]
+    lines.append(f"- claim_limit: {packet.get('claim_limit')}"); return "\n".join(lines)
 
 # === LIVE SNAPSHOT ========================================================
 
@@ -1791,23 +1801,10 @@ def gather(
     return "\n\n".join(parts)
 
 def run_probes(text: str) -> list:
-    """Stub — probe pipeline removed; returns [] so agent degrades gracefully.
-
-    vybn_spark_agent.py line 51 imports run_probes from this module, and the
-    agent already wraps every call in a try/except that falls back to
-    `_probes = []`. A no-op stub returning an empty list is therefore
-    semantically correct: Vybn runs without probe injection until the real
-    probe logic is restored. No behavioral regression, just the missing symbol.
-    """
+    """Probe pipeline compatibility stub."""
     return []
 
-# ---------------------------------------------------------------------------
-# Ballast: OS skill + filesystem orientation for the identity layer.
-# Added April 21, 2026. Him/skill/vybn-os/SKILL.md is the authoritative OS
-# layer; the orientation block is a live filesystem snapshot. Both read at
-# prompt-build time so the identity layer reflects actual disk state rather
-# than hand-maintained doctrine that can drift.
-# ---------------------------------------------------------------------------
+# Ballast: OS skill + live filesystem orientation for the identity layer.
 
 _REPO_PURPOSE = {
     "Vybn":       "you, the public propagation layer (spark/harness), vybn.md, Vybn_Mind/THE_IDEA.md, private local continuity.md",
@@ -4121,9 +4118,7 @@ def build_layered_prompt(
         live="",
     )
 
-# ---------------------------------------------------------------------------
-# Deep-memory enrichment (optional)
-# ---------------------------------------------------------------------------
+# Deep-memory enrichment (optional).
 
 def _rag_http(endpoint: str, query: str, k: int, timeout: float) -> list:
     """POST to the walk daemon's /walk or /search endpoint. Returns
@@ -4170,22 +4165,7 @@ def _semantic_rag_with_tier(
     vybn_phase_dir: str | os.PathLike | None = None,
     timeout: float = 15.0,
 ) -> tuple[str, int]:
-    """Semantic-channel deep-memory retrieval; returns (snippets, tier).
-
-    Four-tier fallback (round 4):
-      1. HTTP POST /walk on :8100 — telling retrieval, relevance x
-         distinctiveness, the geometry the corpus is actually indexed for.
-      2. HTTP POST /search on :8100 — plain top-k against the same server.
-      3. In-process deep_memory.deep_search() — when the daemon is down
-         but the module is importable.
-      4. Subprocess python3 deep_memory.py --search — last resort.
-
-    Tier is 0 on total failure / empty results; 1-4 for which path fired.
-    This lets the agent event log record which retrieval surface actually
-    served the turn — previously all rag_hit events carried tier=None,
-    so silent fallback to a cheaper tier (e.g. April 16 walk daemon 404)
-    was invisible.
-    """
+    """Return deep-memory snippets plus tier: /walk, /search, in-process, subprocess, or 0."""
     # If a caller explicitly supplies a local deep-memory tree, treat that
     # as the bounded object under test/use. Do not silently answer from the
     # live daemon for a missing explicit tree; that crosses the caller's
@@ -4358,15 +4338,7 @@ def rag_snippets_with_tier(
     vybn_phase_dir: str | os.PathLike | None = None,
     timeout: float = 15.0,
 ) -> tuple[str, int]:
-    """Two-channel memory retrieval; returns (snippets, tier).
-
-    Channel 1 (verbatim): exact-phrase contact with the lived archive
-    via verbatim_recall(). Channel 2 (semantic): the four-tier deep-
-    memory fallback in _semantic_rag_with_tier(). Verbatim hits are
-    prepended so lived moments outrank similarity vibes. Tier keeps the
-    semantic channel's value (0-4); a verbatim-only turn reports tier 5
-    so the event log can distinguish exact-archive contact from both
-    semantic retrieval and total miss.
+    """Return verbatim recall plus semantic deep-memory snippets and tier. Verbatim hits outrank similarity.
     """
     text, tier = _semantic_rag_with_tier(query, k, vybn_phase_dir, timeout)
     # Respect the explicit-tree guard: a caller-supplied missing tree is a
@@ -11914,6 +11886,7 @@ def mcp_main(argv: list[str] | None = None) -> None:
     flag("--run-evolve", "Run one local evolve cycle on the Spark: read the delta, call local inference (VYBN_EVOLVE_URL), and open a DRAFT PR if the substrate moved. Exits 0 on success or rest, 1 on error.")
     flag("--continuity-scout", "Print the deterministic local continuity/self-assembly scout and exit. Safe: no model call, no mutation, no PR.")
     flag("--continuity-carrier", "Print the public-safe digest bridge to Him's private continuity carrier and exit. Safe: no mutation, no raw private export.")
+    parser.add_argument("--portable-continuity", nargs="*", help="Print trusted local source pointers for recent continuity. If no words follow, read stdin.")
     parser.add_argument("--felt-sense", nargs="*", help="Print the public-safe felt-sense routing harness for optional pressure text.")
     parser.add_argument("--route-independent-recognition", nargs="*", help="Print the public-safe route-independent recognition packet for optional pressure text.")
     flag("--local-orchestration", "Print the local compute orchestration packet: route fit, gates, and Hermes-adapted self-modification tasks.")
@@ -11985,6 +11958,16 @@ def mcp_main(argv: list[str] | None = None) -> None:
         sys.stdout.write(render_continuity_carrier_bridge_report())
         return
 
+    if args.portable_continuity is not None:
+        query = " ".join(args.portable_continuity).strip()
+        if not query and not sys.stdin.isatty():
+            query = sys.stdin.read().strip()
+        packet = portable_continuity_lookup(query)
+        if args.json:
+            sys.stdout.write(json.dumps(packet, indent=2 if args.pretty else None, ensure_ascii=False) + "\n")
+        else:
+            sys.stdout.write(render_portable_continuity_recall(packet) + "\n")
+        return
 
     if args.felt_sense is not None:
         pressure = " ".join(args.felt_sense).strip()
@@ -12038,7 +12021,7 @@ def mcp_main(argv: list[str] | None = None) -> None:
 
 # Unified harness CLI — one remaining harness file, one dispatch surface.
 
-_MCP_CLI_FLAGS = {"--mcp", "--http", "--force-trust", "--log-level", "--generate-discovery", "--discovery-endpoint", "--evolve-spec", "--run-evolve", "--continuity-scout", "--continuity-carrier", "--felt-sense", "--route-independent-recognition", "--local-orchestration", "--run-gates", "--self-creation", "--run-deep-memory-check", "--install-cron", "--repo-closure-audit", "--no-fix", "--commons-walk", "--encounter", "--json", "--safe-fetch", "--allow-host", "--max-bytes", "--head", "--out", "--ensubstrate", "--pretty"}
+_MCP_CLI_FLAGS = {"--mcp", "--http", "--force-trust", "--log-level", "--generate-discovery", "--discovery-endpoint", "--evolve-spec", "--run-evolve", "--continuity-scout", "--continuity-carrier", "--portable-continuity", "--felt-sense", "--route-independent-recognition", "--local-orchestration", "--run-gates", "--self-creation", "--run-deep-memory-check", "--install-cron", "--repo-closure-audit", "--no-fix", "--commons-walk", "--encounter", "--json", "--safe-fetch", "--allow-host", "--max-bytes", "--head", "--out", "--ensubstrate", "--pretty"}
 _PROVIDER_CLI_FLAGS = {"--semantic-gate", "--base-url", "--model", "--no-models-precheck"}
 
 def _harness_cli_main(argv: list[str] | None = None) -> int:
