@@ -1621,6 +1621,7 @@ def run_agent_loop(
                 return notice
 
     provider = registry.get(role_cfg)
+    state_touched = ["session_messages"]
 
     if not is_vintage_turn:
         try:
@@ -1813,7 +1814,6 @@ def run_agent_loop(
         *("rag_structured_evidence" for _ in [0] if role_cfg.rag and not getattr(role_cfg, "lightweight", False)),
         *("tool_contract" for _ in [0] if tools),
     ]
-    state_touched = ["session_messages"]
     if role_cfg.rag and not getattr(role_cfg, "lightweight", False):
         state_touched.append("deep_memory")
     if tools:

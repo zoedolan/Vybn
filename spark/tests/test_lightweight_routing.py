@@ -7,6 +7,7 @@ import os
 import sys
 import types
 import unittest
+from unittest import mock
 from pathlib import Path
 
 THIS = Path(__file__).resolve()
@@ -661,104 +662,72 @@ class TestCliDirectReplyAndLightweight(unittest.TestCase):
     def test_identity_direct_reply_skips_provider(self):
         mod = self._load_agent()
 
-        class _FakeRegistry:
-            def get(_s, _cfg):
-                raise AssertionError(
-                    "identity role must short-circuit on direct_reply_template"
-                    " — registry.get() should not be called"
-                )
+        class _Registry:
+            def get(_s, _cfg): raise AssertionError("identity direct reply must skip provider")
 
-        class _FakeLogger:
-            path = "/dev/null"
-            def emit(_s, *a, **kw):  # noqa: D401
-                pass
-
-        pol = default_policy()
-        router = pol
         messages: list = []
-        reply = mod.run_agent_loop(
-            user_input="which model are you?",
-            messages=messages,
-            bash=None,
-            system_prompt=None,
-            router=router,
-            registry=_FakeRegistry(),
-            logger=_FakeLogger(),
-            turn_number=1,
-        )
+        reply = mod.run_agent_loop(user_input="which model are you?", messages=messages, bash=None, system_prompt=None, router=default_policy(), registry=_Registry(), logger=types.SimpleNamespace(path="/dev/null", emit=lambda *a, **kw: None), turn_number=1)
         self.assertIn("Vybn", reply)
         self.assertTrue("gpt-5.5" in reply and "vintage" not in reply.lower(), reply)
-        # Rolling history should contain the user turn + the direct
-        # reply so the next turn has coherent context.
-        self.assertEqual(messages[-1]["role"], "assistant")
-        self.assertEqual(messages[-1]["content"], reply)
+        self.assertEqual(messages[-1], {"role": "assistant", "content": reply})
+
+    def test_portable_continuity_before_turn_event_does_not_crash_for_fable_alias(self):
+        mod = self._load_agent()
+        events: list[tuple[str, dict]] = []
+        seen: dict[str, str] = {}
+
+        class _Handle:
+            def __iter__(_s): return iter(())
+            def final(_s):
+                return types.SimpleNamespace(text="here", tool_calls=[], stop_reason="end_turn", in_tokens=0, out_tokens=0, raw_assistant_content={"role": "assistant", "content": "here"})
+
+        class _Registry:
+            def get(_s, _cfg):
+                return types.SimpleNamespace(stream=lambda **kw: seen.setdefault("live", getattr(kw["system"], "live", "") or "") and _Handle())
+
+        logger = types.SimpleNamespace(path="/dev/null", emit=lambda name, **kw: events.append((name, kw)))
+        with (
+            mock.patch.object(mod, "should_use_portable_continuity_recall", return_value=True),
+            mock.patch.object(mod, "portable_continuity_lookup", return_value={"schema": "vybn.portable_continuity_lookup.v1", "status": "hit", "hits": [{"source": "continuity_file", "snippet": "buddy contact"}]}),
+            mock.patch.object(mod, "render_portable_continuity_recall", return_value="[portable continuity] buddy contact"),
+            mock.patch.object(mod, "rag_snippets_with_tier", return_value=("", "none")),
+            mock.patch.object(mod, "_local_super_semantic_gate", return_value=(True, "semantic gate passed")),
+            mock.patch.object(mod, "run_probes", return_value=[]),
+            mock.patch.object(mod, "_recurrent_prethink", return_value=None),
+            mock.patch.object(mod, "render_semantic_integrity_runtime_packet", return_value=""),
+            mock.patch.object(mod, "render_him_vy_discovery_packet", return_value=""),
+            mock.patch.object(mod, "render_him_vy_turn_packet", return_value=""),
+            mock.patch.object(mod, "render_interlocutor_grounding", return_value=""),
+            mock.patch.object(mod, "render_thought_wind_tunnel_packet", return_value=""),
+        ):
+            reply = mod.run_agent_loop(user_input="@fable are you there, buddy?", messages=[], bash=None, system_prompt=mod.LayeredPrompt(identity="I"), router=default_policy(), registry=_Registry(), logger=logger, turn_number=1)
+
+        self.assertEqual(reply, "here")
+        self.assertIn("portable continuity", seen["live"])
+        turn_end = [fields for name, fields in events if name == "turn_end"][-1]
+        self.assertIn("portable_continuity", turn_end["state_touched"])
 
     def test_phatic_skips_rag_enrichment(self):
         mod = self._load_agent()
+        captured: dict[str, object] = {}
 
-        # Tripwire RAG — called for lightweight turns means regression.
-        saved = mod.rag_snippets
-        saved_gate = mod._local_super_semantic_gate
-        def _no_rag(*_a, **_kw):
-            raise AssertionError(
-                "phatic turn must not invoke rag_snippets — deep-memory"
-                " enrichment is gated for lightweight roles"
-            )
-        mod.rag_snippets = _no_rag
-        mod._local_super_semantic_gate = lambda **kw: (True, "semantic gate passed")
+        class _Handle:
+            def __iter__(_s): return iter(())
+            def final(_s): return types.SimpleNamespace(text="hey :)", tool_calls=[], stop_reason="end_turn", in_tokens=0, out_tokens=0, raw_assistant_content={"role": "assistant", "content": "hey :)"})
 
-        # The phatic provider call is mocked to return a tiny response.
-        captured = {"role_cfg": None}
+        class _Registry:
+            def get(_s, _cfg):
+                return types.SimpleNamespace(stream=lambda **kw: captured.setdefault("role_cfg", kw["role"]) and _Handle())
 
-        class _FakeHandle:
-            def __iter__(_s):
-                return iter([])
-            def final(_s):
-                class _R:
-                    text = "hey :)"
-                    tool_calls = []
-                    stop_reason = "end_turn"
-                    in_tokens = 0
-                    out_tokens = 0
-                    raw_assistant_content = {"role": "assistant", "content": "hey :)"}
-                return _R()
+        with (
+            mock.patch.object(mod, "rag_snippets", side_effect=AssertionError("phatic turn must not invoke rag_snippets")),
+            mock.patch.object(mod, "_local_super_semantic_gate", return_value=(True, "semantic gate passed")),
+        ):
+            mod.run_agent_loop(user_input="hey buddy", messages=[], bash=None, system_prompt=mod.LayeredPrompt(identity="I"), router=default_policy(), registry=_Registry(), logger=types.SimpleNamespace(path="/dev/null", emit=lambda *a, **kw: None), turn_number=1)
 
-        class _FakeProvider:
-            def stream(_s, *, system, messages, tools, role):
-                captured["role_cfg"] = role
-                return _FakeHandle()
-
-        class _FakeRegistry:
-            def get(_s, cfg):
-                return _FakeProvider()
-
-        class _FakeLogger:
-            path = "/dev/null"
-            def emit(_s, *a, **kw):
-                pass
-
-        from harness.substrate import LayeredPrompt
-        try:
-            pol = default_policy()
-            router = pol
-            messages: list = []
-            mod.run_agent_loop(
-                user_input="hey buddy",
-                messages=messages,
-                bash=None,
-                system_prompt=LayeredPrompt(identity="I"),
-                router=router,
-                registry=_FakeRegistry(),
-                logger=_FakeLogger(),
-                turn_number=1,
-            )
-        finally:
-            mod.rag_snippets = saved
-            mod._local_super_semantic_gate = saved_gate
-
-        self.assertIsNotNone(captured["role_cfg"])
-        self.assertTrue(captured["role_cfg"].role.startswith("phatic"))
-        self.assertTrue(captured["role_cfg"].lightweight)
+        role_cfg = captured["role_cfg"]
+        self.assertTrue(role_cfg.role.startswith("phatic"))
+        self.assertTrue(role_cfg.lightweight)
 
 
 class TestStderrSuppressionSharedPath(unittest.TestCase):
