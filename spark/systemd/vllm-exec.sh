@@ -27,10 +27,14 @@
 set -euo pipefail
 
 CLUSTER="$HOME/spark-vllm-docker/launch-cluster.sh"
-NODES="SPARK_HEAD_LINK_LOCAL,SPARK_PEER_LINK_LOCAL"
+NODES="${VYBN_VLLM_CLUSTER_NODES:-}"
 
-# Base cluster args (--apply-mod may be appended below)
-CLUSTER_ARGS=( -n "$NODES" )
+# If nodes are unset, launch-cluster.sh auto-detects them.
+CLUSTER_ARGS=()
+if [[ -n "$NODES" ]]; then
+  [[ "$NODES" != *SPARK_* ]] || { echo "ERROR: placeholder VYBN_VLLM_CLUSTER_NODES: $NODES" >&2; exit 1; }
+  CLUSTER_ARGS+=( -n "$NODES" )
+fi
 
 # Apply the fp8 hybrid-wake patch whenever Super starts. The patch is
 # idempotent, targets the exact buggy function, and self-skips if vLLM has

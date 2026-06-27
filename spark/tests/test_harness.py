@@ -1971,10 +1971,19 @@ def test_vllm_sleep_mode_is_disabled_by_default_and_explicitly_opted_in():
     assert "Environment=VYBN_VLLM_EXTRA_ARGS=" in unit
     assert "Environment=VLLM_SERVER_DEV_MODE=0" in unit
     assert 'env "VLLM_SERVER_DEV_MODE=${VLLM_SERVER_DEV_MODE:-0}"' in script
+    assert 'NODES="${VYBN_VLLM_CLUSTER_NODES:-}"' in script
+    assert '[[ "$NODES" != *SPARK_* ]]' in script
+    assert 'launch-cluster.sh -n "$nodes" stop' in unit
+    assert "SPARK_HEAD_LINK_LOCAL,SPARK_PEER_LINK_LOCAL" not in unit
+    assert "SPARK_HEAD_LINK_LOCAL,SPARK_PEER_LINK_LOCAL" not in script
     assert "Sleep-mode endpoints are disabled by default" in script
     assert "operator explicitly" in script
     assert "VYBN_VLLM_EXTRA_ARGS=--enable-sleep-mode" in script
     assert "VLLM_SERVER_DEV_MODE=1" in script
+    assert 'if [[ "$arg" == "--enable-sleep-mode" ]]; then' in script
+    assert 'FP8_MOD="$HOME/Vybn/spark/systemd/patches/fp8-wake-fix"' in script
+    assert 'CLUSTER_ARGS+=( --apply-mod "$FP8_MOD" )' in script
+    assert "wake_up may crash" in script
     cmd_block = script.split("CMD=(", 1)[1].split(")\n\n# Only append", 1)[0]
     assert "--enable-sleep-mode" not in cmd_block
 
@@ -1990,24 +1999,6 @@ def test_vllm_sleep_mode_comment_in_agent_does_not_imply_omni_is_live():
     assert "POST /sleep?level=1|2" in text
     assert "POST /wake_up" in text
     assert "sleeping Super does\n# NOT imply Omni is live" in text
-
-class VllmExecSleepEnabledBootTests(unittest.TestCase):
-    def test_sleep_enabled_boot_is_explicit_extra_arg_only(self):
-        script = (Path(__file__).resolve().parents[2] / "spark/systemd/vllm-exec.sh").read_text()
-        self.assertIn("Sleep-mode endpoints are disabled by default", script)
-        self.assertIn('env "VLLM_SERVER_DEV_MODE=${VLLM_SERVER_DEV_MODE:-0}"', script)
-        self.assertIn("VYBN_VLLM_EXTRA_ARGS=--enable-sleep-mode", script)
-        self.assertIn('if [[ "$arg" == "--enable-sleep-mode" ]]; then', script)
-        self.assertIn("enabling sleep mode from explicit VYBN_VLLM_EXTRA_ARGS opt-in", script)
-        self.assertNotIn("MAINTENANCE-\n# WINDOW-ONLY", script)
-        self.assertNotIn("if true; then\n  FP8_MOD", script)
-
-    def test_fp8_wake_fix_remains_available_for_sleep_enabled_boot(self):
-        script = (Path(__file__).resolve().parents[2] / "spark/systemd/vllm-exec.sh").read_text()
-        self.assertIn('FP8_MOD="$HOME/Vybn/spark/systemd/patches/fp8-wake-fix"', script)
-        self.assertIn('CLUSTER_ARGS+=( --apply-mod "$FP8_MOD" )', script)
-        self.assertIn("wake_up may crash", script)
-
 
 def test_zoe_perspective_governor_folds_into_the_want():
     from spark.harness.substrate import render_zoe_perspective_governor
