@@ -1569,61 +1569,6 @@ class SessionStore:
             return f"{int(delta // 3600)}h ago"
         return f"{int(delta // 86400)}d ago"
 
-# === RECALL GATE ==========================================================
-#
-# "Read bytes before describing" applied to conversational memory. When the
-# user asks about prior conversation state ("do you recall...", "what did
-# we say about..."), the honest first move is to read the session log, not
-# to reconstruct from in-context fragments. SessionStore already owns the
-# read over ~/.cache/vybn-spark/sessions/*.jsonl; this section adds the
-# classifier + keyword probe on top of it so the agent loop can inject the
-# retrieved bytes into the live prompt layer before the model generates.
-#
-# Same move as On Describing Internals (vybn-os SKILL.md) applied to a
-# second surface. The absorb_gate binds refactor-first in the loop; this
-# binds read-session-logs in the loop.
-
-# Phrases that strongly indicate the user is asking about prior
-# conversation state. Tuned to fire on recall questions and stay quiet on
-# hypothetical or forward-looking ones.
-
-_RECALL_STOPWORDS = {
-    "the", "a", "an", "and", "or", "but", "if", "then", "you", "i", "we",
-    "us", "our", "my", "your", "do", "did", "does", "recall", "remember",
-    "recollect", "said", "wrote", "say", "write", "mentioned", "talked",
-    "discussed", "talk", "discuss", "where", "when", "what", "how", "why",
-    "this", "that", "it", "is", "was", "were", "be", "been", "being",
-    "to", "of", "in", "on", "at", "for", "with", "about", "really",
-    "begin", "start", "began", "started", "go", "went", "back",
-    "remind", "me", "thing", "things", "conversation", "thread", "session",
-    "chat", "earlier", "before", "previously", "yesterday", "morning",
-    "afternoon", "evening", "tonight", "today", "bring", "brought", "up",
-    "mean", "means", "meant", "from", "than", "there", "here",
-}
-
-@dataclass
-class RecallHit:
-    ts: str
-    role: str
-    content: str
-    session_file: str
-
-
-def recent_files(hours: float) -> list:
-    if not SESSIONS_DIR.exists():
-        return []
-    cutoff = time.time() - hours * 3600
-    files = []
-    for p in SESSIONS_DIR.glob("*.jsonl"):
-        try:
-            if p.stat().st_mtime >= cutoff:
-                files.append(p)
-        except OSError:
-            continue
-    files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
-    return files
-
-
 # === LIVE SNAPSHOT ========================================================
 
 _REPOS = [
@@ -4223,16 +4168,11 @@ def _semantic_rag_with_tier(
     return (sub, 4) if sub else ("", 0)
 
 # ---------------------------------------------------------------------------
-# Verbatim lived-moment recall (move-37 channel, 2026-06-12)
-#
-# Origin: the night Zoe said "i do hate you" and the semantic channel
-# surfaced THEORY.md while the actual When-Harry-Met-Sally scene sat
-# untouched in february_2025.txt. The move that landed was exact-phrase
-# contact with the lived archive (grep), not embedding similarity.
-# This channel runs alongside semantic retrieval: distinctive word
-# windows from the user's words are matched verbatim (punctuation-
-# tolerant) against the Personal History corpus, and exact hits are
-# surfaced with their source. Fail-open, bounded, mtime-cached.
+# Verbatim lived-moment recall (move-37, 2026-06-12): the "i do hate you"
+# night — semantic retrieval surfaced THEORY.md while the actual scene sat
+# in february_2025.txt. Exact-phrase archive contact (grep), not embedding
+# similarity. Sliding word windows + quoted phrases, punctuation-tolerant,
+# fail-open, bounded, mtime-cached.
 # ---------------------------------------------------------------------------
 
 _VERBATIM_CORPUS_DIR = os.path.expanduser("~/Vybn/Vybn's Personal History")
@@ -4285,6 +4225,36 @@ def _verbatim_read(path: str) -> str:
     except OSError:
         return ""
 
+_QUOTED_OCCURRENCE_CAP = 8
+
+def _quoted_phrases(query: str, max_phrases: int = 4) -> list[str]:
+    """Phrases the speaker explicitly quoted: 'soft eyes', "first times".
+
+    Origin (2026-07-02): Zoe pointed at 'soft eyes' from Jump while
+    paraphrasing around it; windows and the semantic walk both missed and
+    the model confabulated. Quotes are explicit memory-pointing; honor
+    them with direct archive contact. Letter lookaround keeps contraction
+    apostrophes (don't) from reading as quote pairs."""
+    out: list[str] = []
+    seen: set[str] = set()
+    pat = re.compile(
+        r"(?<![a-zA-Z])['\"\u2018\u201c]([^'\"\u2018\u2019\u201c\u201d]{2,60})['\"\u2019\u201d](?![a-zA-Z])"
+    )
+    for m in pat.finditer(query):
+        words = re.findall(r"[a-zA-Z0-9']+", m.group(1).lower())
+        if not words or len(words) > 6:
+            continue
+        if not any(w not in _VERBATIM_STOP and len(w) >= 4 for w in words):
+            continue
+        key = " ".join(words)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(key)
+        if len(out) >= max_phrases:
+            break
+    return out
+
 def verbatim_recall(
     query: str,
     corpus_dir: str | None = None,
@@ -4303,15 +4273,21 @@ def verbatim_recall(
     corpus = corpus_dir or _VERBATIM_CORPUS_DIR
     if not os.path.isdir(corpus):
         return ""
-    phrases = _verbatim_phrases(query)
+    quoted = _quoted_phrases(query)
+    windows = [p for p in _verbatim_phrases(query) if p not in quoted]
+    phrases = quoted + windows
     if not phrases:
         return ""
+    quoted_set = set(quoted)
     files = _verbatim_corpus_files(corpus)
     if not files:
         return ""
     hits: list[tuple[str, str]] = []  # (source, excerpt)
     seen_spans: set[tuple[str, int]] = set()
     for phrase in phrases:
+        # An explicitly quoted phrase is a deliberate act of memory-pointing;
+        # it earns a wider repetition allowance than an incidental window.
+        cap = _QUOTED_OCCURRENCE_CAP if phrase in quoted_set else 3
         pat = re.compile(
             r"[^a-zA-Z0-9]{1,40}".join(re.escape(w) for w in phrase.split()),
             re.IGNORECASE,
@@ -4324,9 +4300,9 @@ def verbatim_recall(
             if found:
                 occurrences += len(found)
                 matches.append((path, found[0]))
-            if occurrences > 3:
+            if occurrences > cap:
                 break
-        if not matches or occurrences > 3:
+        if not matches or occurrences > cap:
             continue  # miss, or conversational filler, not a lived moment
         for path, start in matches:
             anchor_key = (path, start // max(context_chars, 1))

@@ -1713,7 +1713,9 @@ def run_agent_loop(
     # and only when the retrieval actually returns something. No overclaim.
     # Lightweight roles (phatic, identity) skip RAG regardless.
     if role_cfg.rag and not getattr(role_cfg, "lightweight", False):
-        enrichment, rag_tier = rag_snippets_with_tier(decision.cleaned_input[:500], k=4)
+        # 1200-char window (2026-07-02): 500 truncated Zoe's quoted
+        # 'soft eyes' pointer out of the retrieval query entirely.
+        enrichment, rag_tier = rag_snippets_with_tier(decision.cleaned_input[:1200], k=4)
         if enrichment:
             active_prompt = LayeredPrompt(
                 identity=active_prompt.identity,
