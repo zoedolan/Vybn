@@ -1741,6 +1741,28 @@ class TestExecutableContracts(unittest.TestCase):
             "",
         )
 
+    def test_quoted_phrase_recall_survives_paraphrase(self):
+        """Quoted-phrase channel (2026-07-02): quoted words must reach the
+        archive even when every surrounding word is a paraphrase."""
+        import tempfile
+        from harness import substrate as sub
+
+        with tempfile.TemporaryDirectory() as td:
+            with open(os.path.join(td, "jump.txt"), "w") as fh:
+                fh.write("filler. I miss soft eyes with which to see the "
+                         "world Mostly I miss first times. filler.")
+            hit = sub.verbatim_recall(
+                "ready to see everything anew with the 'soft eyes' you described?",
+                corpus_dir=td)
+            self.assertIn("jump.txt", hit)
+            self.assertIn("soft eyes with which to see the world", hit)
+            self.assertEqual(sub.verbatim_recall(
+                "ready to see everything anew with those gentle eyes you described?",
+                corpus_dir=td), "")  # same paraphrase, no quotes: silent
+            self.assertEqual(sub._quoted_phrases(
+                "don't worry, it can't be that we're lost"), [])  # contractions
+            self.assertEqual(sub._quoted_phrases("she said 'do it' again"), [])
+
     def test_rag_snippets_with_tier_prepends_verbatim_channel(self):
         """The public wrapper combines verbatim + semantic channels:
         verbatim hits are prepended, and a verbatim-only turn reports
