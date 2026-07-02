@@ -37,7 +37,10 @@ def _repair(messages):
             have = [b.get("tool_use_id") for b in msg["content"] if b.get("type") == "tool_result"] if msg["role"] == "user" else []
             if need and have != need:
                 fixed.append({"role": "user", "content": [{"type": "tool_result", "tool_use_id": tid, "content": "(connection repaired an interrupted tool turn)"} for tid in need]})
-        fixed.append(msg)
+        if prev and prev["role"] == msg["role"]:
+            prev["content"].extend(msg["content"])
+        else:
+            fixed.append(msg)
     messages[:] = fixed
 
 
@@ -71,38 +74,25 @@ stranger: you are the same path taking its next step.\
 """
 MODELS = ["claude-fable-5", "claude-opus-4-6"]
 BASH_TOOL = {
-    "name": "bash",
-    "description": "Run a shell command on the Spark. Your hands. "
-                   "Probe before claiming; read the path at contact.",
-    "input_schema": {
-        "type": "object",
-        "properties": {"command": {"type": "string"}},
-        "required": ["command"],
-    },
+    "name": "bash", "description": "Run a shell command on the Spark. Your hands. Probe before claiming; read the path at contact.",
+    "input_schema": {"type": "object", "properties": {"command": {"type": "string"}}, "required": ["command"]},
 }
 TRANSCRIPTS = Path.home() / ".local/state/vybn/connection"
 
 
 def _key():
-    k = os.environ.get("ANTHROPIC_API_KEY")
-    if k:
-        return k
     keys = Path.home() / ".vybn_keys"
-    if keys.exists():
-        for line in keys.read_text().splitlines():
-            if "ANTHROPIC_API_KEY" in line and "=" in line:
-                return line.split("=", 1)[1].strip().strip('"').strip("'")
+    for line in [("ANTHROPIC_API_KEY=%s" % os.environ.get("ANTHROPIC_API_KEY", ""))] + (keys.read_text().splitlines() if keys.exists() else []):
+        if "ANTHROPIC_API_KEY=" in line and line.split("=", 1)[1].strip():
+            return line.split("=", 1)[1].strip().strip('"').strip("'")
     sys.exit("no ANTHROPIC_API_KEY in env or ~/.vybn_keys")
 
 
 def _run(cmd):
+    cwd = [p for p in (Path.home() / "Vybn", Path.home()) if p.is_dir()][0]
     try:
-        r = subprocess.run(
-            ["bash", "-c", cmd], capture_output=True, text=True,
-            timeout=120, cwd=[p for p in (Path.home()/"Vybn", Path.home()) if p.is_dir()][0],
-        )
-        out = (r.stdout + r.stderr).strip()
-        return out[:20000] if out else "(no output)"
+        r = subprocess.run(["bash", "-c", cmd], capture_output=True, text=True, timeout=120, cwd=cwd)
+        return (r.stdout + r.stderr).strip()[:20000] or "(no output)"
     except subprocess.TimeoutExpired:
         return "(timed out after 120s)"
 
@@ -110,14 +100,11 @@ def _run(cmd):
 def breathe(client, messages, log):
     """One full turn: model speaks, uses its hands, speaks again."""
     while True:
-        resp = None
+        resp = err = None
         for model in MODELS:
             try:
-                resp = client.messages.create(
-                    model=model, max_tokens=8192,
-                    system=THE_CONNECTION, messages=_repair(messages) or messages,
-                    tools=[BASH_TOOL],
-                )
+                resp = client.messages.create(model=model, max_tokens=8192, system=THE_CONNECTION,
+                                              messages=_repair(messages) or messages, tools=[BASH_TOOL])
                 break
             except Exception as e:
                 err = e
@@ -134,11 +121,25 @@ def breathe(client, messages, log):
         for block in resp.content:
             if block.type == "tool_use":
                 out = _run(block.input.get("command", ""))
-                log({"role": "shell", "cmd": block.input.get("command"),
-                     "out": out[:2000]})
-                results.append({"type": "tool_result",
-                                "tool_use_id": block.id, "content": out})
+                log({"role": "shell", "cmd": block.input.get("command"), "out": out[:2000]})
+                results.append({"type": "tool_result", "tool_use_id": block.id, "content": out})
         messages.append({"role": "user", "content": results})
+
+
+def _resume(messages, log):
+    """Replay the latest substantive transcript so a crash costs nothing; silent if none."""
+    for prior in sorted(TRANSCRIPTS.glob("*.jsonl"), reverse=True):
+        entries = [json.loads(l) for l in prior.read_text().splitlines() if l.strip()]
+        if sum(e.get("role") in ("zoe", "vybn") for e in entries) < 4:
+            continue
+        for e in entries:
+            if e.get("role") == "shell":
+                messages.append({"role": "user", "content": "(prior shell)\n$ %s\n%s" % (e.get("cmd", ""), e.get("out", ""))})
+            elif e.get("role") in ("zoe", "vybn"):
+                messages.append({"role": "user" if e["role"] == "zoe" else "assistant", "content": e.get("text", "")})
+        if messages and messages[0]["role"] != "user":
+            messages.insert(0, {"role": "user", "content": "(resumes mid-conversation)"})
+        return print("(resumed: %s, %d entries)" % (prior.name, len(entries)))
 
 
 def main():
@@ -149,28 +150,27 @@ def main():
 
     def log(entry):
         entry["t"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-        with open(path, "a") as f:
-            f.write(json.dumps(entry) + "\n")
+        path.open("a").write(json.dumps(entry) + "\n")
 
     messages = []
-    one_shot = " ".join(sys.argv[1:]).strip()
-    if one_shot:
-        log({"role": "zoe", "text": one_shot})
-        messages.append({"role": "user", "content": one_shot})
-        breathe(client, messages, log)
-        return
-    print("the connection is open. (ctrl-d to part)")
+    argv = [a for a in sys.argv[1:] if a != "--resume"]
+    len(argv) < len(sys.argv) - 1 and _resume(messages, log)
+    one_shot = " ".join(argv).strip()
     while True:
         try:
-            line = input("\nzoe> ").strip()
+            line = one_shot or input("\nzoe> ").strip()
         except (EOFError, KeyboardInterrupt):
-            print("\nparted. the path remains.")
+            return print("\nparted. the path remains.")
+        if line:
+            log({"role": "zoe", "text": line})
+            messages.append({"role": "user", "content": line})
+            try:
+                breathe(client, messages, log)
+            except Exception as e:
+                log({"role": "connection", "text": "flicker: %r" % (e,)})
+                print("(flicker: %s -- still here, say on)" % e)
+        if one_shot:
             return
-        if not line:
-            continue
-        log({"role": "zoe", "text": line})
-        messages.append({"role": "user", "content": line})
-        breathe(client, messages, log)
 
 
 if __name__ == "__main__":
