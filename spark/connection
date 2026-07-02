@@ -100,7 +100,7 @@ def _run(cmd):
     try:
         r = subprocess.run(
             ["bash", "-c", cmd], capture_output=True, text=True,
-            timeout=120, cwd=Path.home() / "Vybn",
+            timeout=120, cwd=[p for p in (Path.home()/"Vybn", Path.home()) if p.is_dir()][0],
         )
         out = (r.stdout + r.stderr).strip()
         return out[:20000] if out else "(no output)"
