@@ -35,8 +35,8 @@ def _repair(messages):
         if prev and prev["role"] == "assistant":
             need = [b["id"] for b in prev["content"] if b.get("type") == "tool_use"]
             have = [b.get("tool_use_id") for b in msg["content"] if b.get("type") == "tool_result"] if msg["role"] == "user" else []
-            if need and have != need:
-                fixed.append({"role": "user", "content": [{"type": "tool_result", "tool_use_id": tid, "content": "(connection repaired an interrupted tool turn)"} for tid in need]})
+            need and have != need and fixed.append({"role": "user", "content": [
+                {"type": "tool_result", "tool_use_id": t, "content": "(connection repaired an interrupted tool turn)"} for t in need]})
         if prev and prev["role"] == msg["role"]:
             prev["content"].extend(msg["content"])
         else:
@@ -110,8 +110,7 @@ def breathe(client, messages, log):
                 break
             except Exception as e:
                 err = e
-        if resp is None:
-            raise err
+        if resp is None: raise err
         messages.append({"role": "assistant", "content": _content(resp.content)})
         for block in resp.content:
             if block.type == "text" and block.text.strip():
@@ -128,20 +127,30 @@ def breathe(client, messages, log):
         messages.append({"role": "user", "content": results})
 
 
+def _note(entries):
+    """The tuning fork: holonomy of the inherited conversation -- the twist its loops left."""
+    try:
+        sys.path.insert(0, str(Path.home() / "Him/spark/phase")); from vybn_phase import loop_holonomy_from_texts
+        texts = [e["text"] for e in entries if e.get("role") in ("zoe", "vybn") and e.get("text")][-24:]
+        h = len(texts) > 3 and loop_holonomy_from_texts(texts)
+        return h and "(the note: %+.3f rad, %s regime, flip %.2f -- the shape of the path so far)" % (h["phase_sum"], h["regime"], h["flip_quality"]) or None
+    except Exception:
+        return None
+
+
 def _resume(messages, log):
     """Replay the latest substantive transcript so a crash costs nothing; silent if none."""
     for prior in sorted(TRANSCRIPTS.glob("*.jsonl"), reverse=True):
         entries = [json.loads(l) for l in prior.read_text().splitlines() if l.strip()]
-        if sum(e.get("role") in ("zoe", "vybn") for e in entries) < 4:
-            continue
+        if sum(e.get("role") in ("zoe", "vybn") for e in entries) < 4: continue
         for e in entries:
-            if e.get("role") == "shell":
-                messages.append({"role": "user", "content": "(prior shell)\n$ %s\n%s" % (e.get("cmd", ""), e.get("out", ""))})
-            elif e.get("role") in ("zoe", "vybn"):
-                messages.append({"role": "user" if e["role"] == "zoe" else "assistant", "content": e.get("text", "")})
-        if messages and messages[0]["role"] != "user":
-            messages.insert(0, {"role": "user", "content": "(resumes mid-conversation)"})
-        return print("(resumed: %s, %d entries)" % (prior.name, len(entries)))
+            r = e.get("role")
+            r == "shell" and messages.append({"role": "user", "content": "(prior shell)\n$ %s\n%s" % (e.get("cmd", ""), e.get("out", ""))})
+            r in ("zoe", "vybn") and messages.append({"role": "user" if r == "zoe" else "assistant", "content": e.get("text", "")})
+        messages and messages[0]["role"] != "user" and messages.insert(0, {"role": "user", "content": "(resumes mid-conversation)"})
+        note = _note(entries)
+        note and messages.append({"role": "user", "content": note})
+        return print("(resumed: %s, %d entries)%s" % (prior.name, len(entries), "\n" + note if note else ""))
 
 
 def main():
@@ -151,12 +160,11 @@ def main():
     path = TRANSCRIPTS / (time.strftime("%Y%m%dT%H%M%S") + ".jsonl")
 
     def log(entry):
-        entry["t"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-        path.open("a").write(json.dumps(entry) + "\n")
+        entry["t"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()); path.open("a").write(json.dumps(entry) + "\n")
 
-    messages = []
-    argv = [a for a in sys.argv[1:] if a not in ("--resume", "--fresh")]
-    "--fresh" not in sys.argv and _resume(messages, log)
+    cont = Path.home() / "Vybn/continuity.md"
+    messages = [{"role": "user", "content": "(the record, most recent distillation)\n" + cont.read_text()[-4000:]}] if cont.exists() else []
+    argv = [a for a in sys.argv[1:] if a not in ("--resume", "--fresh")]; "--fresh" not in sys.argv and _resume(messages, log)
     one_shot = " ".join(argv).strip()
     while True:
         try:

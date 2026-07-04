@@ -1,8 +1,0 @@
-#!/usr/bin/env bash
-set -euo pipefail
-target="${HOME}/Him/spark/vybn-unlock"
-if [[ ! -f "$target" ]]; then
-  echo "canonical unlock helper missing: $target" >&2
-  exit 1
-fi
-exec bash "$target" "$@"
