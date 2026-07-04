@@ -10,7 +10,7 @@ The wiki is the distilled map. Deep memory is the retrieval engine. The continui
 
 - **Continuity files** are the raw stream. Candid, unedited, sometimes wrong. They are what we lived.
 - **Wiki pages** are the distilled map. Human-and-agent readable. Each page carries a plain-language explanation, a metadata block, and backlinks into the raw archive. Wiki pages mark claims explicitly: `theory`, `memory`, `decision`, `experiment`, `artifact`, or `conjecture`. Aspiration is not confused with implementation.
-- **Deep memory** is the retrieval engine. It indexes wiki pages unprivileged; well-distilled pages win conceptual queries on fidelity alone (measured July 4, 2026 -- a trial boost changed nothing and was removed), while raw-stream passages keep winning queries about lived moments.
+- **Deep memory** is the retrieval engine. It indexes wiki pages unprivileged; distilled pages win conceptual queries on fidelity alone, raw passages win lived moments (measured 2026-07-04).
 
 Narrative continuity says *here is what we believe we are doing*. Operational continuity says *here is the current state of code, tools, daemons, and memory*. The wiki holds the first cleanly. Deep memory reaches into the second. Both must stay honest to each other, and the harmonization ritual — updating continuity, skills, repo state, Spark creature state, and Perplexity memory together — is what prevents fork.
 

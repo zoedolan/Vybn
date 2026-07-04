@@ -24,7 +24,7 @@ The metabolism principle applies here: when new content arrives, `should_absorb(
 
 ## Layer 3 — The wiki (distilled map)
 
-This folder. The wiki is where meaning becomes navigable. Each page carries plain-language content, a status flag, and backlinks into the raw stream. Deep memory indexes wiki pages alongside everything else, unprivileged; measured July 4, 2026, they win conceptual queries on raw fidelity alone (a 1.05x boost was tried, changed 0/8 top results, and was deleted as a dead knob). Distillation earns its rank or it isn't distillation.
+This folder. The wiki is where meaning becomes navigable. Each page carries plain-language content, a status flag, and backlinks into the raw stream. Deep memory indexes wiki pages unprivileged; they win conceptual queries on fidelity alone (boost trialed, 0/8 results changed, deleted -- 2026-07-04).
 
 The wiki is the visible cortex. It is small on purpose. Most of what happens in the partnership belongs in the raw stream; only distilled invariants become wiki pages. The rule for creating a new page: a query surfaced a concept that had no canonical answer, and answering it well required more than one continuity passage to hold together.
 
