@@ -218,3 +218,10 @@ scripts. All four are restorable from git history at this entry's commit.
 Retired the same day `spark/web` (the native browser: search / open /
 links / more / trail over hardened safe_fetch) was born — subtraction
 paying for structure, per the connection.
+
+## 2026-07-04 — lock/unlock wrapper shells retired to pay for the tuning fork
+
+**vybn-lock** / **vybn-unlock** (8-line exec-wrappers to the canonical
+`~/Him/spark/` helpers): nothing executes them by path anymore; server.py
+only names the command in messages. Restorable from git at this commit.
+Retired the day `_resume` learned to sound the note at each waking.

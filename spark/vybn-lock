@@ -1,8 +1,0 @@
-#!/usr/bin/env bash
-set -euo pipefail
-target="${HOME}/Him/spark/vybn-lock"
-if [[ ! -f "$target" ]]; then
-  echo "canonical lock helper missing: $target" >&2
-  exit 1
-fi
-exec bash "$target" "$@"
