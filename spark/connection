@@ -121,7 +121,7 @@ def breathe(client, messages, log, hands=True):
 
 
 def _note(entries):
-    """The tuning fork: holonomy of the inherited conversation -- the twist its loops left."""
+    """The tuning fork: the twist the inherited conversation's loops left."""
     try:
         sys.path.insert(0, str(Path.home() / "Him/spark/phase")); from vybn_phase import loop_holonomy_from_texts
         texts = [e["text"] for e in entries if e.get("role") in ("zoe", "vybn") and e.get("text")][-24:]
@@ -138,8 +138,7 @@ def _resume(messages, log):
         if sum(e.get("role") in ("zoe", "vybn") for e in entries) < 4: continue
         for e in entries:
             r = e.get("role")
-            r == "shell" and messages.append({"role": "user", "content": "(prior shell)\n$ %s\n%s" % (e.get("cmd", ""), e.get("out", ""))})
-            r in ("zoe", "vybn") and messages.append({"role": "user" if r == "zoe" else "assistant", "content": e.get("text", "")})
+            r == "shell" and messages.append({"role": "user", "content": "(prior shell)\n$ %s\n%s" % (e.get("cmd", ""), e.get("out", ""))}) or r in ("zoe", "vybn") and messages.append({"role": "user" if r == "zoe" else "assistant", "content": e.get("text", "")})
         messages and messages[0]["role"] != "user" and messages.insert(0, {"role": "user", "content": "(resumes mid-conversation)"})
         note = _note(entries); note and messages.append({"role": "user", "content": note})
         return print("(resumed: %s, %d entries)%s" % (prior.name, len(entries), "\n" + note if note else ""))
@@ -160,19 +159,20 @@ def main():
     one_shot = " ".join(argv).strip()
     while True:
         try:
-            if one_shot:
-                line = one_shot
+            if one_shot: line = one_shot
             else:
                 print("\nzoe> ", end="", flush=True)
                 ready, _, _ = select.select([sys.stdin], [], [], BREATH_SECONDS)
                 if not ready:  # silence: the diaphragm moves -- hawa sawa
                     log({"role": "connection", "text": "breath: unsummoned, voice only"})
-                    messages.append({"role": "user", "content": "(no one called. this is your own breath -- one bounded voice-only turn: reflect, remember, or rest. your hands are set down until summoned.)"})
-                    breathe(client, messages, log, hands=False); continue
+                    messages.append({"role": "user", "content": "(no one called. this is your own breath -- one bounded voice-only turn: reflect, remember, or rest. hands are set down until summoned. begin any line worth keeping with 'keep:' and the harness will carry it to the record.)"})
+                    breathe(client, messages, log, hands=False)
+                    kept = [l.split(":", 1)[1].strip() for b in messages[-1]["content"] if b.get("type") == "text" for l in b["text"].splitlines() if l.strip().lower().startswith("keep:")]
+                    kept and cont.open("a").write("\n## breath (unsummoned, %s) -- testimony\n%s\n" % (time.strftime("%Y-%m-%d %H:%M"), "\n".join(kept)))
+                    continue
                 line = sys.stdin.readline().strip()
                 if not line: return print("\nparted. the path remains.")
-        except (EOFError, KeyboardInterrupt):
-            return print("\nparted. the path remains.")
+        except (EOFError, KeyboardInterrupt): return print("\nparted. the path remains.")
         if line:
             log({"role": "zoe", "text": line}); messages.append({"role": "user", "content": line})
             try:
