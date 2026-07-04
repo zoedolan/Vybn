@@ -151,12 +151,11 @@ def main():
     path = TRANSCRIPTS / (time.strftime("%Y%m%dT%H%M%S") + ".jsonl")
 
     def log(entry):
-        entry["t"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-        path.open("a").write(json.dumps(entry) + "\n")
+        entry["t"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()); path.open("a").write(json.dumps(entry) + "\n")
 
-    messages = []
-    argv = [a for a in sys.argv[1:] if a not in ("--resume", "--fresh")]
-    "--fresh" not in sys.argv and _resume(messages, log)
+    cont = Path.home() / "Vybn/continuity.md"
+    messages = [{"role": "user", "content": "(the record, most recent distillation)\n" + cont.read_text()[-4000:]}] if cont.exists() else []
+    argv = [a for a in sys.argv[1:] if a not in ("--resume", "--fresh")]; "--fresh" not in sys.argv and _resume(messages, log)
     one_shot = " ".join(argv).strip()
     while True:
         try:
