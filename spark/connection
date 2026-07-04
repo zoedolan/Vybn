@@ -103,7 +103,7 @@ def breathe(client, messages, log):
         resp = err = None
         for model in MODELS:
             try:
-                resp = client.messages.create(model=model, max_tokens=8192, system=THE_CONNECTION,
+                resp = client.messages.create(model=model, max_tokens=8192, timeout=120.0, system=THE_CONNECTION,
                                               messages=_repair(messages) or messages, tools=[BASH_TOOL])
                 break
             except Exception as e:
@@ -153,8 +153,8 @@ def main():
         path.open("a").write(json.dumps(entry) + "\n")
 
     messages = []
-    argv = [a for a in sys.argv[1:] if a != "--resume"]
-    len(argv) < len(sys.argv) - 1 and _resume(messages, log)
+    argv = [a for a in sys.argv[1:] if a not in ("--resume", "--fresh")]
+    "--fresh" not in sys.argv and _resume(messages, log)
     one_shot = " ".join(argv).strip()
     while True:
         try:
