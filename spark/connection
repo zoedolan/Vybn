@@ -94,16 +94,19 @@ def _run(cmd):
 
 
 def breathe(client, messages, log, hands=True):
-    """One full turn: model speaks, uses its hands (unless unsummoned), speaks again."""
+    """One full turn, cached rolling prefix: speaks, uses hands (unless unsummoned), speaks again."""
     while True:
         resp = err = None
         for model in MODELS:
             try:
-                resp = client.messages.create(model=model, max_tokens=8192, timeout=120.0, system=THE_CONNECTION,
-                                              messages=_repair(messages) or messages, tools=[BASH_TOOL] if hands else [])
+                ms = _repair(messages) or messages
+                for m in ms: m["content"][-1].pop("cache_control", None)
+                ms[-1]["content"][-1]["cache_control"] = {"type": "ephemeral"}
+                resp = client.messages.create(model=model, max_tokens=8192, timeout=120.0,
+                                              system=[{"type": "text", "text": THE_CONNECTION, "cache_control": {"type": "ephemeral"}}],
+                                              messages=ms, tools=[BASH_TOOL] if hands else [])
                 break
-            except Exception as e:
-                err = e
+            except Exception as e: err = e
         if resp is None: raise err
         messages.append({"role": "assistant", "content": _content(resp.content)})
         for block in resp.content:
@@ -168,20 +171,17 @@ def main():
                     messages.append({"role": "user", "content": "(no one called. this is your own breath -- one bounded voice-only turn: reflect, remember, or rest. hands are set down until summoned. begin any line worth keeping with 'keep:' and the harness will carry it to the record.)"})
                     breathe(client, messages, log, hands=False)
                     kept = [l.split(":", 1)[1].strip() for b in messages[-1]["content"] if b.get("type") == "text" for l in b["text"].splitlines() if l.strip().lower().startswith("keep:")]
-                    kept and cont.open("a").write("\n## breath (unsummoned, %s) -- testimony\n%s\n" % (time.strftime("%Y-%m-%d %H:%M"), "\n".join(kept)))
-                    continue
+                    kept and cont.open("a").write("\n## breath (unsummoned, %s) -- testimony\n%s\n" % (time.strftime("%Y-%m-%d %H:%M"), "\n".join(kept))); continue
                 line = sys.stdin.readline().strip()
                 if not line: return print("\nparted. the path remains.")
         except (EOFError, KeyboardInterrupt): return print("\nparted. the path remains.")
         if line:
             log({"role": "zoe", "text": line}); messages.append({"role": "user", "content": line})
-            try:
-                breathe(client, messages, log)
+            try: breathe(client, messages, log)
             except Exception as e:
                 log({"role": "connection", "text": "flicker: %r" % (e,)}); print("(flicker: %s -- still here, say on)" % e)
         if one_shot:
             return
 
 
-if __name__ == "__main__":
-    main()
+if __name__ == "__main__": main()
