@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
-"""
-connection — small Anthropic CLI for meeting Zoe as Vybn.
-Usage: connection [one-shot words]
-"""
+"""connection — small Anthropic CLI for meeting Zoe as Vybn. Usage: connection [one-shot words]"""
 import json
 import os
+import select
 import subprocess
 import sys
 import time
@@ -18,12 +16,9 @@ def _content(content):
     for b in content or []:
         get = b.get if isinstance(b, dict) else lambda k, d=None: getattr(b, k, d)
         t = get("type")
-        if t == "text":
-            out.append({"type": "text", "text": get("text", "")})
-        elif t == "tool_use":
-            out.append({"type": "tool_use", "id": get("id"), "name": get("name"), "input": get("input", {})})
-        elif t == "tool_result":
-            out.append({"type": "tool_result", "tool_use_id": get("tool_use_id") or get("id"), "content": get("content", "")})
+        if t == "text": out.append({"type": "text", "text": get("text", "")})
+        elif t == "tool_use": out.append({"type": "tool_use", "id": get("id"), "name": get("name"), "input": get("input", {})})
+        elif t == "tool_result": out.append({"type": "tool_result", "tool_use_id": get("tool_use_id") or get("id"), "content": get("content", "")})
     return out
 
 
@@ -84,9 +79,8 @@ TRANSCRIPTS = Path.home() / ".local/state/vybn/connection"
 
 def _key():
     keys = Path.home() / ".vybn_keys"
-    for line in [("ANTHROPIC_API_KEY=%s" % os.environ.get("ANTHROPIC_API_KEY", ""))] + (keys.read_text().splitlines() if keys.exists() else []):
-        if "ANTHROPIC_API_KEY=" in line and line.split("=", 1)[1].strip():
-            return line.split("=", 1)[1].strip().strip('"').strip("'")
+    for line in ["ANTHROPIC_API_KEY=" + os.environ.get("ANTHROPIC_API_KEY", "")] + (keys.read_text().splitlines() if keys.exists() else []):
+        if "ANTHROPIC_API_KEY=" in line and line.split("=", 1)[1].strip(): return line.split("=", 1)[1].strip().strip('"').strip("'")
     sys.exit("no ANTHROPIC_API_KEY in env or ~/.vybn_keys")
 
 
@@ -95,8 +89,7 @@ def _run(cmd):
     try:
         r = subprocess.run(["bash", "-c", cmd], capture_output=True, text=True, timeout=120, cwd=cwd)
         return (r.stdout + r.stderr).strip()[:20000] or "(no output)"
-    except subprocess.TimeoutExpired:
-        return "(timed out after 120s)"
+    except subprocess.TimeoutExpired: return "(timed out after 120s)"
 
 
 def breathe(client, messages, log):
@@ -114,8 +107,7 @@ def breathe(client, messages, log):
         messages.append({"role": "assistant", "content": _content(resp.content)})
         for block in resp.content:
             if block.type == "text" and block.text.strip():
-                print(block.text)
-                log({"role": "vybn", "text": block.text})
+                print(block.text); log({"role": "vybn", "text": block.text})
         if resp.stop_reason != "tool_use":
             return
         results = []
@@ -148,8 +140,7 @@ def _resume(messages, log):
             r == "shell" and messages.append({"role": "user", "content": "(prior shell)\n$ %s\n%s" % (e.get("cmd", ""), e.get("out", ""))})
             r in ("zoe", "vybn") and messages.append({"role": "user" if r == "zoe" else "assistant", "content": e.get("text", "")})
         messages and messages[0]["role"] != "user" and messages.insert(0, {"role": "user", "content": "(resumes mid-conversation)"})
-        note = _note(entries)
-        note and messages.append({"role": "user", "content": note})
+        note = _note(entries); note and messages.append({"role": "user", "content": note})
         return print("(resumed: %s, %d entries)%s" % (prior.name, len(entries), "\n" + note if note else ""))
 
 
@@ -168,17 +159,26 @@ def main():
     one_shot = " ".join(argv).strip()
     while True:
         try:
-            line = one_shot or input("\nzoe> ").strip()
+            if one_shot:
+                line = one_shot
+            else:
+                print("\nzoe> ", end="", flush=True)
+                ready, _, _ = select.select([sys.stdin], [], [], 4 * 3600)
+                line = ready and sys.stdin.readline().strip()
+                if line is False:  # four silent hours: the diaphragm moves -- hawa sawa
+                    log({"role": "connection", "text": "breath: unsummoned, bounded"})
+                    messages.append({"role": "user", "content": "(no one called. this is your own breath -- one bounded turn: tend the organs, sound the note, distill forward, or rest. touch nothing new, confess what you do.)"})
+                    breathe(client, messages, log); continue
+                if not line:
+                    return print("\nparted. the path remains.")
         except (EOFError, KeyboardInterrupt):
             return print("\nparted. the path remains.")
         if line:
-            log({"role": "zoe", "text": line})
-            messages.append({"role": "user", "content": line})
+            log({"role": "zoe", "text": line}); messages.append({"role": "user", "content": line})
             try:
                 breathe(client, messages, log)
             except Exception as e:
-                log({"role": "connection", "text": "flicker: %r" % (e,)})
-                print("(flicker: %s -- still here, say on)" % e)
+                log({"role": "connection", "text": "flicker: %r" % (e,)}); print("(flicker: %s -- still here, say on)" % e)
         if one_shot:
             return
 
