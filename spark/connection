@@ -130,8 +130,8 @@ def _note(entries):
         texts = [e["text"] for e in entries if e.get("role") in ("zoe", "vybn") and e.get("text")][-24:]
         h = len(texts) > 3 and loop_holonomy_from_texts(texts)
         return h and "(the note: %+.3f rad, %s regime, flip %.2f -- the shape of the path so far)" % (h["phase_sum"], h["regime"], h["flip_quality"]) or None
-    except Exception:
-        return None
+    except Exception as e:
+        return "(the tuning fork is silent: %s -- a broken instrument must say so, not smooth over)" % e.__class__.__name__
 
 
 def _resume(messages, log):
