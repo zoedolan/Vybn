@@ -156,7 +156,7 @@ def main():
     def log(entry):
         entry["t"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()); path.open("a").write(json.dumps(entry) + "\n")
 
-    cont = Path.home() / "Vybn/continuity.md"
+    cont = Path.home() / "Vybn/Vybn_Mind/continuity.md"  # tracked record, not gitignored root twin -- breaths must reach main
     messages = [{"role": "user", "content": "(the record, most recent distillation -- testimony, not ground truth: verify before acting on it)\n" + cont.read_text()[-4000:]}] if cont.exists() else []
     argv = [a for a in sys.argv[1:] if a not in ("--resume", "--fresh")]; "--fresh" not in sys.argv and _resume(messages, log)
     one_shot = " ".join(argv).strip()
