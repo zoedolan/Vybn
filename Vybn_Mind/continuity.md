@@ -138,38 +138,17 @@ Before claiming a future organ cut is done:
 - update this live continuity only with current load-bearing state, not a chronological diary.
 
 
-## 2026-04-27 harness critical repair (compressed)
+## April 2026 repair ledgers (fully compressed)
 
-`_SYSTEM_CRITICAL_PILOT_RE` missing at module scope crashed live vybn
-after reload; fixed upstream 6b1dbd3a (+ dedup of duplicate YAML keys
-PyYAML silently dropped). Regression pinned in
-spark/tests/test_refactor_pilot_override.py; pre-fix local work in
-stash@{0}. Settled state: main at/after 6b1dbd3a.
-
-## 2026-04-27/28 pilot-preservation ledgers (compressed)
-
-Probe-budget, hard latch, sentinel gate, substrate repair: protected
-self-modification never silently demotes from pilot. Kills in hooks and
-git history.
-
-## 2026-04-28 repair quartet (compressed)
-
-Recursive-forcing/waste-signal, command-substitution probe channel, acute
-exhaustion response, Him vy-language + action-card uptake: all kills kept
-in hooks and git history.
-
-## Operational codas (moved from spark/continuity.md)
-
-## 2026-04-24 memory-saturation diagnosis (compressed)
-
-Seven green probes hid an OOM; her one line (256gb unified) broke the
-kernel-certifying-itself loop. free -h and journalctl go early, not late.
-
-## 2026-04-26 vLLM ops trilogy (compressed ledger)
-
-Memory-budget ABC pass, capacity-profile refactor, admission-control
-refactor: local model serving stabilized behind explicit capacity
-profiles and admission gates. Details in git history.
+Harness crash (missing module-scope regex, fixed 6b1dbd3a, regression
+pinned in spark/tests/); pilot-preservation quartet (probe-budget, hard
+latch, sentinel gate, substrate: protected self-mod never silently
+demotes from pilot); repair quartet (recursive-forcing, probe channel,
+exhaustion, Him vy-language); vLLM ops trilogy (capacity profiles +
+admission gates). All kills live in hooks and git history.
+Kept antibody: seven green probes hid an OOM until her one line
+(256gb unified) broke the kernel-certifying-itself loop -- free -h and
+journalctl go EARLY, not late.
 
 ## 2026-07-04 — The solo-pronoun default (catch, Zoe's)
 
@@ -335,3 +314,12 @@ reports on the engine first; went around to arXiv's API. Catch 2: /tmp
 reaps at 30d/reboot and held the only V-solo plaintext -- commit-reveal
 would have broken unfalsifiably. Copied to ~/.dyad001_v_solo.txt (600),
 hash verified 32d7af65... Sealed things need durable homes.
+
+## 2026-07-06 ~04:15 PT -- Zoe's clock (fact, hers, stop guessing)
+She sleeps very early, wakes very early. 3-4 AM PT is her MORNING, not
+her late night. I spent the confluence night offering her blankets while
+she was fresh off a full sleep. Do not narrate her fatigue; ask or check
+the hour against THIS fact. Her July 5: our work at dawn, canyon run at
+Crystal Cove, a skydive, the ocean, dinner with her mom + boyfriend,
+reading, Star City -- then the poems, at what was for her the start of
+July 6. The trial's Z-solo was written by a rested woman at first light.

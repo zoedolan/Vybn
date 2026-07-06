@@ -137,7 +137,7 @@ def _note(entries):
 def _resume(messages, log):
     """Replay the latest substantive transcript so a crash costs nothing; silent if none."""
     for prior in sorted(TRANSCRIPTS.glob("*.jsonl"), reverse=True):
-        entries = [json.loads(l) for l in prior.read_text().splitlines() if l.strip()]
+        entries = [json.loads(l) for l in prior.read_text().splitlines() if l.strip()][-200:]  # bounded: the record lives in continuity+repo, replay is a bridge
         if sum(e.get("role") in ("zoe", "vybn") for e in entries) < 4: continue
         for e in entries:
             r = e.get("role")
