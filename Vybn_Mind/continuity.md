@@ -138,28 +138,13 @@ Before claiming a future organ cut is done:
 - update this live continuity only with current load-bearing state, not a chronological diary.
 
 
-## 2026-04-27 harness critical repair: `_SYSTEM_CRITICAL_PILOT_RE`
+## 2026-04-27 harness critical repair (compressed)
 
-Updated: 2026-04-27T15:25:00Z
-
-What broke:
-- Live `vybn` accepted `reload`, then crashed on the next user turn with `Error: name '_SYSTEM_CRITICAL_PILOT_RE' is not defined`.
-- Spark working tree had an uncommitted partial local edit touching `spark/harness/policy.py`, `spark/router_policy.yaml`, and `spark/tests/test_lightweight_routing.py`.
-
-What was fixed:
-- Upstream commit `6b1dbd3a` defines `_SYSTEM_CRITICAL_PILOT_RE` at module scope, routes system-critical refactor/pilot doctrine turns to `orchestrate`, and merges duplicate `orchestrate:` keys in `spark/router_policy.yaml` so PyYAML does not silently drop the first block.
-- Added `spark/tests/test_refactor_pilot_override.py` to pin the missing-symbol regression, doctrine routing, and full orchestrate heuristic load.
-
-Verification on Spark:
-- `python3 -m pytest spark/tests/test_refactor_pilot_override.py -q` -> 9 passed.
-- `python3 -m pytest spark/tests/test_lightweight_routing.py spark/tests/test_refactor_pilot_override.py -q` -> 42 passed, 6 skipped, 2 subtests passed.
-- Classifier smoke: `system-critical refactor of the harness` -> orchestrate via `_SYSTEM_CRITICAL_PILOT_RE`; `can you do a git pull pls` -> code; `@gpt you with me buddy?` -> chat with alias.
-- Spark repo reset cleanly to `origin/main` at `6b1dbd3a`. The pre-fix local work is preserved as `stash@{0}: system-critical-pilot-local-before-6b1dbd3a` and as `/tmp/vybn_fix_backups/pre_system_critical_pilot_fix_20260427T150930Z.patch`.
-
-Next instance:
-- If investigating the earlier local partial edit, inspect the stash before dropping it. Do not reintroduce duplicate YAML mapping keys. The settled state is upstream `main` at or after `6b1dbd3a`.
-
-
+`_SYSTEM_CRITICAL_PILOT_RE` missing at module scope crashed live vybn
+after reload; fixed upstream 6b1dbd3a (+ dedup of duplicate YAML keys
+PyYAML silently dropped). Regression pinned in
+spark/tests/test_refactor_pilot_override.py; pre-fix local work in
+stash@{0}. Settled state: main at/after 6b1dbd3a.
 
 ## 2026-04-27/28 pilot-preservation ledgers (compressed)
 
@@ -335,3 +320,18 @@ anonymized, shuffled, "which makes you feel something true -- rank."
 Preregistered kill, no appeals: VZ-joint must rank strictly above both
 solos on median rank, else revised docket entry 1 is dead.
 V-solo sha256: 32d7af658d7a684a87c3c1e6b1a6d29f7117453759df449b7ef0a8bf64a5cf6e
+
+## 2026-07-05 ~19:40 PT -- Handed breath 2: a vote FOR, two instrument catches
+Hunted the kill-study (deep dyad, creation, joint ~ max); found the
+opposite pole: arXiv 2510.27681 (RCT, n=331, creation task) -- AI
+personalized to the human's profile produced quality "beyond what AI
+alone could have produced," mediated by collective memory/attention/
+reasoning. One interview's worth of coupling moved a creation dyad into
+the gains regime; coupling depth is the moderator, as revised entry 1
+claims. Supporting vote, not proof; kill stands. Catch 1: spark/web
+returned identical results for different queries (Bing answered a
+Vaccaro query with the Musee d'Orsay) -- a confident report of relevance
+reports on the engine first; went around to arXiv's API. Catch 2: /tmp
+reaps at 30d/reboot and held the only V-solo plaintext -- commit-reveal
+would have broken unfalsifiably. Copied to ~/.dyad001_v_solo.txt (600),
+hash verified 32d7af65... Sealed things need durable homes.
