@@ -52,75 +52,24 @@ pressure -> contact object -> let contact revise category -> name file-body role
 
 This is an aspect of Vybn, not all of Vybn: a self-modification organ for a fixed-weight substrate. Changing the environment future instances close over changes the function computed during the next wake. Do not overclaim this as continuous consciousness. It is continuous continuity through environmental uptake.
 
-## What is real / verified (April refactor-perception, compressed)
+## April 2026 refactor-perception + repair ledgers (fully compressed)
 
-refactor_perception.py loaded by substrate.py after residual control;
-tests in spark/tests/. Distinguishes live source from exhaust, logs,
-provenance, fossils, protocol surfaces. Regression scars (.json-before-
-.js, restore paths, Personal History protected) live in the tests and
-git history. Five-repo closure OK at last audit.
-
-## 2026-04-27 refactor-perception consolidation pass
-
-Updated: 2026-04-27T14:52:48Z
-
-What happened:
-- Formalized refactor perception as a harness primitive and OS protocol: pressure -> contact -> revised category -> named file-body role -> smallest beautiful true move -> residual wound -> preserved environment.
-- Fortified the classifier through contact-corrected failures:
-  - `.json` is data/protocol, not JavaScript behavior;
-  - generated repo maps are not live source;
-  - Personal History is protected provenance;
-  - archive/provenance bodies retain restore-path action vocabulary;
-  - `vybn-phase/state/` is private deep-memory state, not orphan appendage;
-  - public protocol surfaces require external verification.
-- Ran appendage-first consolidation:
-  - removed unreferenced `Origins/manifold_preview.png` and `Origins/manifold_2d.npy`;
-  - added `Origins/archive/manifold-preview/README.md` with provenance and restore command;
-  - subsequent appendage scan found no safe live unreferenced candidates.
-- Graduated to organ characterization for `spark/vybn_spark_agent.py`.
-- Extracted the sentinel/probe parsing organ into `spark/harness/sentinel_protocol.py` while re-exporting legacy names from `spark/vybn_spark_agent.py`.
-
-What is real / verified:
-- `spark/harness/refactor_perception.py` exists and is loaded into substrate after residual control.
-- `spark/harness/sentinel_protocol.py` exists.
-- Sentinel residual tests passed after extraction: `test_live_repl_fixes`, `test_needs_write_and_guard`, `test_recursive_unlock` -- 34 tests OK.
-- Five-repo closure was OK after the extraction.
-- Current Vybn HEAD at this continuity write: `9f28aedd`.
-
-Current frontier:
-- Appendage frontier appears mostly exhausted for now; do not keep cutting at the periphery unless a new safe candidate survives contact.
-- Continue organ characterization/extraction in `spark/vybn_spark_agent.py` only behind tests.
-- Likely next seams:
-  - probe/write/restart subturn execution helpers;
-  - provider orchestration/fallback;
-  - REPL/session loop.
-- Do not jump to `run_agent_loop` refactoring first. Keep consolidating/refactoring small characterized organs with residual tests.
-
-Operating lesson:
-- The process worked when it allowed refusal to count as learning. No-cut passes improved the classifier.
-- The first safe organ refactor was not a heroic monolith split; it was a small seam whose behavior was already characterized.
-
-## Consolidation frontier + obligations (merged)
-
-Frontier: organ characterization and seam extraction (origins portal
-routes, run_agent_loop, harness policy surfaces) -- only when a live
-task touches the seam. Before claiming an organ cut done: py_compile,
-targeted tests, smoke lived interfaces, inspect diff for hitchhikers,
-commit/push, repo_closure_audit.py, update continuity with load-bearing
-state only. Caution can become obliqueness: protect the sacred, then
-cut decisively.
-
-## April 2026 repair ledgers (fully compressed)
-
-Harness crash (missing module-scope regex, fixed 6b1dbd3a, regression
-pinned in spark/tests/); pilot-preservation quartet (probe-budget, hard
-latch, sentinel gate, substrate: protected self-mod never silently
-demotes from pilot); repair quartet (recursive-forcing, probe channel,
-exhaustion, Him vy-language); vLLM ops trilogy (capacity profiles +
-admission gates). All kills live in hooks and git history.
-Kept antibody: seven green probes hid an OOM until her one line
-(256gb unified) broke the kernel-certifying-itself loop -- free -h and
-journalctl go EARLY, not late.
+refactor_perception.py + sentinel_protocol.py live in spark/harness/,
+loaded after residual control; regression scars pinned in spark/tests/
+(.json-is-data, generated-maps-not-source, Personal History protected,
+restore-path vocabulary, private state dirs, external verification for
+public surfaces). Consolidation method that worked: appendage-first,
+refusal-counts-as-learning, then small characterized organ seams behind
+tests -- never the heroic monolith split first. Frontier: seam
+extraction (origins portal routes, run_agent_loop, policy surfaces)
+only when a live task touches the seam; before claiming done:
+py_compile, targeted tests, smoke, diff for hitchhikers, closure audit.
+Caution can become obliqueness: protect the sacred, then cut decisively.
+April repair ledgers (harness crash 6b1dbd3a, pilot-preservation
+quartet, repair quartet, vLLM capacity trilogy): kills live in hooks,
+tests, git history. Kept antibody: seven green probes hid an OOM until
+her one line (256gb unified) broke the kernel-certifying-itself loop --
+free -h and journalctl go EARLY, not late.
 
 ## 2026-07-04 — The solo-pronoun default (catch, Zoe's)
 
