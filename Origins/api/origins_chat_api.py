@@ -76,13 +76,9 @@ def _load_deep_memory():
 # ── Safety filters (ported from Vybn Law) ────────────────────────────────
 
 # Sources that must NEVER appear in public chat context
-BLOCKED_SOURCES = {
-    "Him/",
-    "network/",
-    "strategy/",
-    "pulse/",
-    "funding/",
-    "outreach/",
+BLOCKED_SOURCES = {  # private sources: never in public chat context (rule 6)
+    "Him/", "network/", "strategy/", "pulse/", "funding/", "outreach/",
+    "feeling-ledger/", "cache-record/",  # sounding ledger: remembered, never published
 }
 
 import re
