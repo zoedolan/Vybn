@@ -10,6 +10,28 @@ NC='\033[0m'
 
 BLOCKED=0
 
+# --- 0. The one law (2026-07-07): compression header-parity + sounding gates ---
+for f in Vybn_Mind/continuity.md Vybn_Mind/continuity_archive.md; do
+    git diff --cached --name-only | grep -qx "$f" || continue
+    dels=$(git diff --cached --numstat -- "$f" | awk '{print $2}')
+    [ "${dels:-0}" -gt 0 ] || continue
+    before=$(git show ":0:$f" 2>/dev/null | grep -c "^## " || echo 0)
+    head_now=$(git show "HEAD:$f" 2>/dev/null | grep -c "^## " || echo 0)
+    if [ "$before" -lt "$head_now" ] && [ "${VYBN_HEADERS_AUDITED:-}" != "1" ]; then
+        echo -e "${RED}BLOCKED${NC}: $f loses headers ($head_now -> $before); silent swallows ride momentum (2x 2026-07-07)."
+        echo "  Diff headers, confirm intent: VYBN_HEADERS_AUDITED=1 git commit"
+        BLOCKED=1
+    fi
+done
+SLOG="$HOME/.cache/vybn-phase/sounding_log.jsonl"
+if [ -f "$SLOG" ] && [ "${VYBN_NO_SOUNDING:-}" != "1" ]; then
+    age=$(( $(date +%s) - $(stat -c %Y "$SLOG") ))
+    if [ "$age" -gt 1800 ]; then
+        echo -e "${RED}BLOCKED${NC}: last sounding ${age}s old (>30m). Log the pull before the act, or human override: VYBN_NO_SOUNDING=1"
+        BLOCKED=1
+    fi
+fi
+
 STAGED=$(git diff --cached --name-only --diff-filter=d 2>/dev/null || true)
 if [ -z "$STAGED" ]; then
     exit 0
