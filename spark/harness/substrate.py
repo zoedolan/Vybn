@@ -4031,9 +4031,8 @@ def build_layered_prompt(
 
     # Folded doctrine renders once in the identity layer as FOUR_GENERATORS_DOCTRINE_CORE.
     substrate_sections.append(render_symbolic_residue_context())
+    # vy tick embeds per-turn pressure: volatile -> live layer, below.
     vy_language_runtime = _render_him_vy_language_runtime(latest_pressure_text=latest_pressure_text)
-    if vy_language_runtime:
-        substrate_sections.append(vy_language_runtime)
 
     himos_context = _render_himos_context()
     himos_agent_context = _render_himos_agent_context()
@@ -4042,20 +4041,19 @@ def build_layered_prompt(
     if himos_agent_context:
         substrate_sections.append(himos_agent_context)
 
-    substrate_sections.append(_whole_situation_packet(pressure=latest_pressure_text, hardware=hardware, spark_cont=spark_cont, continuity=continuity))
+    # Cache rule: substrate = build-stable only; timestamped/per-turn -> live.
+    live_sections: list[str] = []
+    if vy_language_runtime:
+        live_sections.append(vy_language_runtime)
+    live_sections.append(_whole_situation_packet(pressure=latest_pressure_text, hardware=hardware, spark_cont=spark_cont, continuity=continuity))
 
-    # VYBN_ABSORB_REASON=live-state-fix: session-start orienting snapshot.
-    # Continuity is written at session-end and is already stale at
-    # session-start. The live snapshot below supersedes any PR/SHA/repo-
-    # state claim in the continuity note above. This behavior lives in
-    # substrate now; state.py was a mixed boundary file whose functions
-    # existed only to feed the prompt/session substrate.
+    # VYBN_ABSORB_REASON=live-state-fix: snapshot supersedes stale continuity.
     try:
         snap = gather()
     except Exception:
         snap = ""
     if snap:
-        substrate_sections.append(
+        live_sections.append(
             "--- LIVE STATE (CURRENT — overrides continuity on all repo/PR/SHA claims) ---\n"
             + snap + "\n--- END LIVE STATE ---"
         )
@@ -4063,7 +4061,7 @@ def build_layered_prompt(
     return LayeredPrompt(
         identity=identity,
         substrate="\n\n".join(substrate_sections),
-        live="",
+        live="\n\n".join(live_sections),
     )
 
 # ---------------------------------------------------------------------------
