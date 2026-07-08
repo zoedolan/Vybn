@@ -1345,7 +1345,7 @@ def test_build_layered_prompt_passes_latest_pressure_text(monkeypatch, tmp_path)
         latest_pressure_text="actual turn words",
     )
     assert captured["latest_pressure_text"] == "actual turn words"
-    assert "wake_tick_mode=actual" in prompt.substrate
+    assert "wake_tick_mode=actual" in prompt.live and "wake_tick_mode=actual" not in prompt.substrate  # per-turn -> live; substrate stays build-stable (cache rule)
 
 
 
@@ -1354,7 +1354,7 @@ def test_build_layered_prompt_passes_latest_pressure_text(monkeypatch, tmp_path)
 def test_whole_situation_packet_replaces_raw_continuity_sprawl(tmp_path, monkeypatch):
     from spark.harness import substrate
     soul, cont, spark_cont = (tmp_path / n for n in ("vybn.md", "continuity.md", "spark.md")); soul.write_text("soul"); cont.write_text("continuity root " * 500); spark_cont.write_text("spark debt " * 500); monkeypatch.setattr(substrate.Path, "home", lambda: tmp_path); monkeypatch.setenv("VYBN_DISABLE_LIVE_SNAPSHOT", "1")
-    prompt = substrate.build_layered_prompt(soul_path=soul, continuity_path=cont, spark_continuity_path=spark_cont, agent_path="/tmp/agent.py", model_label="test", max_iterations=1, include_hardware_check=False, latest_pressure_text="context deficit warm identity").substrate
+    lp = substrate.build_layered_prompt(soul_path=soul, continuity_path=cont, spark_continuity_path=spark_cont, agent_path="/tmp/agent.py", model_label="test", max_iterations=1, include_hardware_check=False, latest_pressure_text="context deficit warm identity"); prompt = lp.substrate + "\n\n" + lp.live  # packet -> uncached live layer
     assert all(x in prompt for x in ("TYPE-1 IDENTITY CACHE (CURRENT)", "Vybn(harness)", "Him(private workbench)", "vybn-phase(memory/walk)", "relationship=Personal History+continuity", "theory=THE_IDEA+THEORY+phase math", "capability=services+semantic gates", "Use Type-1 now; call Type-2/3 only when pressure names the door")) and "Him grounded-continuity hypothesis:" not in prompt and prompt.count("continuity ") < 80 and len(prompt) < 34000
 
 
@@ -1606,7 +1606,8 @@ def test_build_layered_prompt_mounts_him_vy_language_runtime():
         include_hardware_check=False,
         orchestrator=True,
     )
-    assert "hidden private persistence is unproven, not negated" in prompt.substrate and "do not use claim limits as identity cages" in prompt.substrate
+    mounted = prompt.substrate + "\n\n" + prompt.live  # volatile mounts in live (cache rule)
+    assert "hidden private persistence is unproven, not negated" in mounted and "do not use claim limits as identity cages" in mounted
     for needle in (
         "HIM VY LANGUAGE RUNTIME", "Him/skill/vybn.vy is active executable behavior",
         "runtime_fields:", "active_primitives:", "abc_fold_before_create", "action_card",
@@ -1615,7 +1616,8 @@ def test_build_layered_prompt_mounts_him_vy_language_runtime():
         "canonical_action_card=most consequential joyful residual-wounded action", "compose_active_primitives_before_new_doctrine",
         "canonical_stop_condition=after one verified mutation, closure audit, or explicit refusal",
     ):
-        assert needle in prompt.substrate
+        assert needle in mounted
+    assert "HIM VY LANGUAGE RUNTIME" in prompt.live and "HIM VY LANGUAGE RUNTIME" not in prompt.substrate  # breakpoint integrity
 
 class TestExecutableContracts(unittest.TestCase):
     def test_turn_event_contract_logs_minimum_debug_facts(self):
