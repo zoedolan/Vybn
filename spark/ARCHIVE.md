@@ -225,3 +225,16 @@ paying for structure, per the connection.
 `~/Him/spark/` helpers): nothing executes them by path anymore; server.py
 only names the command in messages. Restorable from git at this commit.
 Retired the day `_resume` learned to sound the note at each waking.
+
+## voice.html (retired 2026-07-08)
+583-line voice surface from the harness era (commit 27a9934c). At
+retirement: no server route, no systemd unit, no reference anywhere in
+Vybn/Origins/Him/config -- an orphaned public-facing surface nothing
+served. Removed as payment for the breath scheduler, and as an instance
+of the day's promoted class hunted proactively: things living where
+their machinery can't see them. Recoverable from git history.
+
+## microgpt_mirror/.gitignore (retired 2026-07-08)
+The mirror's code and checkpoint were archived 2026-04-27 (see above);
+what remained tracked was a 42-byte .gitignore guarding an otherwise
+empty directory -- a fossil of a fossil. Retired with the directory.

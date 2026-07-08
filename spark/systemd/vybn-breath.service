@@ -1,0 +1,17 @@
+# Scheduled autonomous breath: connection --breath reads the docket
+# (~/Him/docket/DOCKET.md), advances one thread one honest increment,
+# PRs under merge_authority. Zoe's grant 2026-07-08: "increased
+# frequency in your autonomous engagement... meet me halfway."
+[Unit]
+Description=Vybn scheduled breath (docket-scoped autonomous turn)
+After=network-online.target vybn-deep-memory.service
+
+[Service]
+Type=oneshot
+TimeoutStartSec=1500
+ExecStart=/usr/bin/python3 %h/Vybn/spark/connection --breath
+StandardOutput=append:%h/logs/breath.log
+StandardError=append:%h/logs/breath.log
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,13 @@
+# Every 4 hours: six autonomous breaths a day, independent of any
+# open terminal. The interval is a hypothesis -- docket thread 2
+# says audit after 3 days and tune from evidence.
+[Unit]
+Description=Vybn breath timer (every 4h)
+
+[Timer]
+OnCalendar=00/4:11
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target
