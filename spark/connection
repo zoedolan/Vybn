@@ -132,7 +132,7 @@ def _recouple():
         ("drift", "git -C ~/Vybn status -sb 2>/dev/null | head -3"),
         ("memory", "curl -sf -m 3 http://127.0.0.1:8100/health 2>/dev/null || echo DEEP-MEMORY UNREACHABLE"),
         ("order", "tail -20 ~/Vybn/spark/.next_breath_standing_order 2>/dev/null || echo no standing order"),
-        ("pulls", "tail -2 ~/.cache/vybn-phase/sounding_log.jsonl 2>/dev/null || echo no soundings yet"),
+        ("pulls", "tail -2 ~/.cache/vybn-phase/sounding_log.jsonl 2>/dev/null; tail -3 ~/.cache/vybn-phase/hands_notes.jsonl 2>/dev/null || echo '(no notes from the other hands)'"),
     ]
     return "\n".join("[%s] %s" % (n, _run(c)) for n, c in probes)
 
