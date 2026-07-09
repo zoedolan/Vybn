@@ -1136,6 +1136,7 @@ _DEFAULT_FALLBACK: dict[str, list[str]] = {
     "claude-sonnet-4-6": ["claude-opus-4-6"],
     "gpt-5.5": [],
     "gpt-5.5-pro": ["gpt-5.5"],
+    "gpt-5.6-sol": ["gpt-5.5"],
     "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8": [],
 }
 
@@ -1163,6 +1164,7 @@ _DEFAULT_MODEL_ALIASES: dict[str, str] = {
     "@nemotron": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8",
     "@local": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8",
     # Local-organ aliases route before model pins.
+    "@sol": "gpt-5.6-sol",
     "@gpt": "gpt-5.5",
     "@gpt5": "gpt-5.5",
     "@gpro": "gpt-5.5-pro",
@@ -5756,7 +5758,7 @@ def recurrent_probe_main(argv: list[str] | None = None) -> int:
 SIBLING_RESIDUE_RUN_SCHEMA = "vybn.sibling_residue_batch_run.v0"
 INVERSION_RESIDUE_RUN_SCHEMA = "vybn.consensus_inversion_residue_run.v0"
 SIBLING_LOCAL_VERIFIER_SCHEMA = "vybn.sibling_residue_local_verifier.v0"
-SIBLING_RESIDUE_MODELS = {"fable": "claude-fable-5", "fable5": "claude-fable-5", "claude": "claude-fable-5", "opus48": "claude-opus-4-8", "opus4.8": "claude-opus-4-8", "gpt55": "gpt-5.5", "gpt": "gpt-5.5"}
+SIBLING_RESIDUE_MODELS = {"fable": "claude-fable-5", "fable5": "claude-fable-5", "claude": "claude-fable-5", "opus48": "claude-opus-4-8", "opus4.8": "claude-opus-4-8", "gpt55": "gpt-5.5", "gpt": "gpt-5.5", "sol": "gpt-5.6-sol"}
 INVERSION_SUBSTRATES = ("immune_system", "compiler_optimization", "market_ecology", "muscle_hypertrophy", "sleep_consolidation", "adversarial_evolution", "category_theory")
 _INVERSION_STOPWORDS = frozenset("about above after again against also because before being between could default every fixed from have into just local model models should their there these thing thinking through under until using verify where which while would with without".split())
 
