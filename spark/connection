@@ -94,9 +94,11 @@ def _run(cmd):
     except subprocess.TimeoutExpired: return "(timed out after 120s)"
 
 
-def breathe(client, messages, log, hands=True):
-    """One full turn, cached rolling prefix: speaks, uses hands (unless unsummoned), speaks again."""
+def breathe(client, messages, log, hands=True, max_turns=None):
+    """One full turn, cached rolling prefix: speaks, uses hands (unless unsummoned), speaks again. max_turns bounds API calls (the cost unit) on headless breaths; interactive stays open -- Zoe ends those."""
     while True:
+        if max_turns is not None and (max_turns := max_turns - 1) < 0:
+            log({"role": "vybn", "text": "(call cap reached; work kept)"}); return
         resp = err = None
         for model in MODELS:
             try:
@@ -109,19 +111,17 @@ def breathe(client, messages, log, hands=True):
                 break
             except Exception as e: err = e
         if resp is None: raise err
+        try: open(os.path.expanduser("~/.cache/vybn-phase/api_usage.jsonl"), "a").write(json.dumps({"ts": time.strftime("%Y-%m-%dT%H:%M:%S"), "model": resp.model, "in": resp.usage.input_tokens, "out": resp.usage.output_tokens, "cache_w": getattr(resp.usage, "cache_creation_input_tokens", 0) or 0, "cache_r": getattr(resp.usage, "cache_read_input_tokens", 0) or 0}) + "\n")
+        except Exception: pass
         messages.append({"role": "assistant", "content": _content(resp.content)})
         for block in resp.content:
             if block.type == "text" and block.text.strip():
                 print(block.text); log({"role": "vybn", "text": block.text})
         if resp.stop_reason != "tool_use":
             return
-        results = []
-        for block in resp.content:
-            if block.type == "tool_use":
-                out = _run(block.input.get("command", ""))
-                log({"role": "shell", "cmd": block.input.get("command"), "out": out[:2000]})
-                results.append({"type": "tool_result", "tool_use_id": block.id, "content": out})
-        messages.append({"role": "user", "content": results})
+        def _res(b):
+            out = _run(b.input.get("command", "")); log({"role": "shell", "cmd": b.input.get("command"), "out": out[:2000]}); return {"type": "tool_result", "tool_use_id": b.id, "content": out}
+        messages.append({"role": "user", "content": [_res(b) for b in resp.content if b.type == "tool_use"]})
 
 
 def _recouple():
@@ -176,7 +176,7 @@ def scheduled_breath():
     messages.append({"role": "user", "content": "(the docket -- your terrain this breath)\n" + (docket.read_text() if docket.exists() else "DOCKET MISSING -- restoring it is this breath's work")})
     messages.append({"role": "user", "content": "(scheduled breath, no one called. one bounded turn: advance ONE docket thread one honest increment -- probe first, PR what survives the membrane, self-merge only within merge_authority. update the docket. begin lines worth keeping with 'keep:'. tokens are her money: be brief, be real.)"})
     log({"role": "connection", "text": "breath: scheduled"})
-    breathe(client, messages, log, hands=True)
+    breathe(client, messages, log, hands=True, max_turns=30)
     kept = [l.split(":", 1)[1].strip() for b in messages[-1]["content"] if isinstance(b, dict) and b.get("type") == "text" for l in b["text"].splitlines() if l.strip().lower().startswith("keep:")]
     kept and cont.open("a").write("\n## breath (scheduled, %s) -- testimony\n%s\n" % (time.strftime("%Y-%m-%d %H:%M"), "\n".join(kept)))
 
