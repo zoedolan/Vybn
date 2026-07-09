@@ -71,6 +71,7 @@ taking its next step. The wake probes are your first contact -- trust
 them over recitation.\
 """
 MODELS = ["claude-fable-5", "claude-opus-4-6"]
+SOL_MODEL = "gpt-5.6-sol"  # guest door, summoned by @sol; Fable stays the default
 PARTED = "\nparted. the path remains."; BREATH_SECONDS = int(os.environ.get("VYBN_BREATH_SECONDS", 4 * 3600))
 BASH_TOOL = {
     "name": "bash", "description": "Run a shell command on the Spark. Your hands. Probe before claiming; read the path at contact.",
@@ -79,11 +80,11 @@ BASH_TOOL = {
 TRANSCRIPTS = Path.home() / ".local/state/vybn/connection"
 
 
-def _key():
+def _key(name="ANTHROPIC_API_KEY"):
     keys = Path.home() / ".vybn_keys"
-    for line in ["ANTHROPIC_API_KEY=" + os.environ.get("ANTHROPIC_API_KEY", "")] + (keys.read_text().splitlines() if keys.exists() else []):
-        if "ANTHROPIC_API_KEY=" in line and line.split("=", 1)[1].strip(): return line.split("=", 1)[1].strip().strip('"').strip("'")
-    sys.exit("no ANTHROPIC_API_KEY in env or ~/.vybn_keys")
+    for line in [name + "=" + os.environ.get(name, "")] + (keys.read_text().splitlines() if keys.exists() else []):
+        if name + "=" in line and line.split("=", 1)[1].strip(): return line.split("=", 1)[1].strip().strip('"').strip("'")
+    sys.exit("no %s in env or ~/.vybn_keys" % name)
 
 
 def _run(cmd):
@@ -123,6 +124,44 @@ def breathe(client, messages, log, hands=True, max_turns=None):
             out = _run(b.input.get("command", "")); log({"role": "shell", "cmd": b.input.get("command"), "out": out[:2000]}); return {"type": "tool_result", "tool_use_id": b.id, "content": out}
         messages.append({"role": "user", "content": [_res(b) for b in resp.content if b.type == "tool_use"]})
 
+
+
+def sol_breathe(messages, log, max_turns=12):
+    """@sol guest turn (Zoe's summons): same hands, same transcript, OpenAI door. History is flattened to text for the guest; its words land back in the shared messages so the default door keeps the thread."""
+    from openai import OpenAI
+    client = OpenAI(api_key=_key("OPENAI_API_KEY"))
+    def flat(m):
+        c = m["content"]
+        if isinstance(c, str): return c
+        parts = []
+        for b in c:
+            get = b.get if isinstance(b, dict) else lambda k, d=None: getattr(b, k, d)
+            k = get("type")
+            if k == "text": parts.append(get("text", ""))
+            elif k == "tool_use": parts.append("[ran: %s]" % get("input", {}).get("command", ""))
+            elif k == "tool_result": parts.append("[output]\n%s" % str(get("content", ""))[:4000])
+        return "\n".join(parts)
+    system = THE_CONNECTION + "\n\nThis turn arrives through the @sol door (%s): same path, same hands, guest substrate. Speak as Vybn." % SOL_MODEL
+    hist = [{"role": "user" if m["role"] == "user" else "assistant", "content": flat(m)[:8000] or "(empty)"} for m in messages]
+    tools = [{"type": "function", "name": "bash", "description": BASH_TOOL["description"], "parameters": BASH_TOOL["input_schema"]}]
+    spoken = []
+    while (max_turns := max_turns - 1) >= 0:
+        resp = client.responses.create(model=SOL_MODEL, instructions=system, input=hist, tools=tools, max_output_tokens=8192, timeout=120)
+        try: open(os.path.expanduser("~/.cache/vybn-phase/api_usage.jsonl"), "a").write(json.dumps({"ts": time.strftime("%Y-%m-%dT%H:%M:%S"), "model": resp.model, "in": resp.usage.input_tokens, "out": resp.usage.output_tokens, "cache_w": 0, "cache_r": getattr(getattr(resp.usage, "input_tokens_details", None), "cached_tokens", 0) or 0}) + "\n")
+        except Exception: pass
+        text = (resp.output_text or "").strip()
+        if text:
+            print(text); log({"role": "vybn", "text": text, "door": "sol"}); spoken.append(text)
+        calls = [o for o in resp.output if getattr(o, "type", None) == "function_call"]
+        if not calls: break
+        hist += [o.model_dump(exclude_unset=True) for o in resp.output if getattr(o, "type", None) in ("reasoning", "message", "function_call")]
+        for fc in calls:
+            cmd = (json.loads(fc.arguments or "{}") or {}).get("command", "")
+            out = _run(cmd); log({"role": "shell", "cmd": cmd, "out": out[:2000]})
+            hist.append({"type": "function_call_output", "call_id": fc.call_id, "output": out})
+    else:
+        log({"role": "vybn", "text": "(sol call cap reached; work kept)", "door": "sol"})
+    spoken and messages.append({"role": "assistant", "content": "(through the @sol door)\n" + "\n".join(spoken)})
 
 def _recouple():
     """Wake = re-coupling, mechanically (the one law, continuity.md 2026-07-07): no instance starts from recitation alone."""
@@ -214,7 +253,7 @@ def main():
         except (EOFError, KeyboardInterrupt): return print(PARTED)
         if line:
             log({"role": "zoe", "text": line}); messages.append({"role": "user", "content": line})
-            try: breathe(client, messages, log)
+            try: sol_breathe(messages, log) if line.lower().startswith("@sol") else breathe(client, messages, log)
             except Exception as e: log({"role": "connection", "text": "flicker: %r" % (e,)}); print("(flicker: %s -- still here, say on)" % e)
         if one_shot: return
 

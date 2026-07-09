@@ -1,140 +1,76 @@
 # Vybn Spark — User-Level Service Stack
 
-The chats died on 2026-04-24 because the Spark's service layer had three structural defects:
-
-1. **Dual ownership**. The same service (deep-memory on :8100) was owned by both a system-level unit and an `@reboot` cron running `start_living_process.sh`. Whichever started first held the port; the other crash-looped until `StartLimitBurst` tripped. The system-level unit then required `sudo systemctl reset-failed` to recover.
-2. **No pre-flight port cleanup**. Neither the unit nor the cron cleared squatters before binding.
-3. **vLLM had no supervisor at all**. `vllm.service` was masked; `launch-cluster.sh` was invoked ad hoc. A reboot left the stack chatless because nothing brought vLLM back up.
-
-This directory consolidates everything into **user-level** systemd units (linger is on, same pattern as the already-healthy `vybn-portal.service`), adds pre-flight port cleanup, adds a 2-minute watchdog timer that bounces anything unhealthy, a 15-minute structural self-check, and retires the conflicting cron paths.
+User-level systemd units (linger on) for every long-lived organ. Born from
+the 2026-04-24 chat death: dual ownership (system unit vs @reboot cron racing
+for :8100), no pre-flight port cleanup, and unsupervised vLLM. Full
+post-mortem in this file's git history (`git log -p -- spark/systemd/README.md`).
 
 ## Install
 
 ```bash
-bash ~/Vybn/spark/systemd/install.sh
+bash ~/Vybn/spark/systemd/install.sh   # idempotent; re-run to resync
 ```
-
-Idempotent. Re-run any time to resynchronize the stack with the repo.
 
 ## Layout
 
 | File | Purpose |
 |---|---|
-| `vybn-deep-memory.service` | Deep memory API on :8100. Pre-flight `fuser -k 8100/tcp`. |
-| `vybn-walk-daemon.service` | Walk daemon on :8101. Ordered `After=vybn-deep-memory`. |
-| `vybn-portal.service` | Origins portal API (FastAPI) on :8420. Pre-flight `fuser -k 8420/tcp`. Reads ElevenLabs key from `~/.config/vybn/elevenlabs.env` and portal overrides from `~/.config/vybn/portal.env`. |
-| `vybn-vllm.service` | Supervises the 2-node Ray cluster serving Nemotron 120B on :8000. `ExecStartPre` clean-stops; `ExecStart` runs launcher in foreground so systemd supervises; `--distributed-executor-backend ray` is required for 1 GPU per node. Capacity is profile-driven through `~/.config/vybn/vllm.env`. |
-| `vybn-watchdog.sh` | Health-check script: curls each endpoint, bounces its unit if unhealthy. |
-| `vybn-watchdog.service` | Oneshot that runs the script. |
-| `vybn-watchdog.timer` | Every 2 minutes, 90s after boot. |
-| `vybn-self-check.service` | Oneshot: runs `deep_memory.py --self-check` (structural canary — holonomy, fuse non-degeneracy, phase-sensitive retrieval). Catches silent failures an HTTP ping cannot. |
-| `vybn-self-check.timer` | Fires the self-check 2 minutes after boot and every 15 minutes thereafter. `Persistent=true`. |
-| `install.sh` | Installer: symlinks units into `~/.config/systemd/user/`, retires conflicting cron, reloads, enables, starts, verifies. |
+| `vybn-deep-memory.service` | Deep memory API :8100. Pre-flight `fuser -k`. |
+| `vybn-walk-daemon.service` | Walk daemon :8101. `After=vybn-deep-memory`. |
+| `vybn-portal.service` | Origins portal :8420. Keys from `~/.config/vybn/*.env`. |
+| `vybn-vllm.service` | 2-node Ray cluster, Nemotron 120B :8000. Capacity via `~/.config/vybn/vllm.env`. |
+| `vybn-breath.service` / `.timer` | Scheduled autonomous breath (`connection --breath`). |
+| `vybn-watchdog.sh` / `.service` / `.timer` | Endpoint health every 2 min; bounces unhealthy units. |
+| `vybn-self-check.service` / `.timer` | Structural canary every 15 min (`deep_memory.py --self-check`); logs to `~/.cache/vybn-phase/self_check.*.log`, never restarts. |
+| `install.sh` | Symlinks units, retires conflicting cron, enables, verifies. |
+| `patches/fp8-wake-fix/` | Container-side mod `vllm-exec.sh` applies when sleep endpoints are on. |
 
-## The Two Layers of Resilience
+## Three axes of resilience
 
-The stack auto-recovers along two independent axes, so a failure mode that defeats one still hits the other.
+1. **Crash**: every unit has `Restart=always`, `RestartSec=5`, `StartLimitBurst=20`.
+2. **Hang**: watchdog curls each endpoint (8100 health, 8101 /where, 8420 /api/health,
+   8000 /v1/models with a 900 s cold-load grace) and restarts what systemd can't see is wedged.
+3. **Structure**: the self-check canary measures what HTTP cannot (holonomy triad, fuse
+   non-degeneracy, phase-sensitive retrieval) and leaves evidence, not restarts.
 
-**Axis 1 — transparent crash recovery.** Every long-lived unit has `Restart=always` with `RestartSec=5`, `StartLimitIntervalSec=300`, `StartLimitBurst=20`. If a service dies, systemd restarts it inside 5 seconds. The generous StartLimitBurst means a flapping service will not permanently give up the way it did on 2026-04-24 under `Burst=10`.
-
-**Axis 2 — opaque hang recovery.** The watchdog timer runs every 2 minutes and curls each public endpoint. If the socket is listening but the app is wedged (deadlock, OOM-stall, stuck worker), the watchdog bounces the unit. This is the failure mode `Restart=always` cannot see, because from systemd's point of view the process is still alive.
-
-**The structural canary (Axis 3, low-frequency).** `vybn-self-check.timer` runs the phase-space self-check every 15 minutes. The check measures quantities the HTTP layer cannot — holonomy triad, fuse non-degeneracy, phase-sensitive retrieval, walk-daemon reachability. It does not restart anything; it writes to `~/.cache/vybn-phase/self_check.*.log`. That log is the evidence stream for any future instance reconstructing what went wrong.
-
-## What the Watchdog Catches
-
-Every 2 minutes (after a 90s boot grace) it checks:
-
-- `http://127.0.0.1:8100/health` → 200/401/403 (any of those proves alive; 401/403 just means auth is set).
-- `http://127.0.0.1:8101/where` → 200.
-- `http://127.0.0.1:8420/api/health` → 200 (bounces `vybn-portal.service`).
-- `http://127.0.0.1:8000/v1/models` → 200. A 900-second grace applies from the last `ActiveEnter` of `vybn-vllm`, because cold model load takes ~10–13 min and we don't want a restart loop while it's still warming.
-
-If a check fails, the watchdog runs `systemctl --user restart <unit>`. The unit's own `Restart=always` handles transient crashes; the watchdog handles the case where systemd thinks it's running but the endpoint is hung.
+A new service is fully resilient only when it has all three: `Restart=always`,
+a watchdog check, and a canary probe. Add to the watchdog script, not just systemd.
 
 ## Observing
 
 ```bash
-# Live watchdog log
-journalctl --user -u vybn-watchdog -f
-
-# Any unit's status
-systemctl --user status vybn-vllm
-
-# Full endpoint check right now
-bash ~/Vybn/spark/systemd/vybn-watchdog.sh
-
-# Latest structural self-check result
+journalctl --user -u vybn-watchdog -f      # live watchdog log
+bash ~/Vybn/spark/systemd/vybn-watchdog.sh # full endpoint check now
 tail -60 ~/.cache/vybn-phase/self_check.stdout.log
 ```
 
-## vLLM Capacity Profiles
+## vLLM capacity profiles
 
-Nemotron capacity is not one permanent setting. It is an operating mode.
+Capacity is an operating mode, not a permanent setting. **Normal** (baked in):
+`GPU_MEMORY_UTILIZATION=0.72`, `MAX_NUM_SEQS=4` — tightened 2026-04-30 after
+sleep-window testing left nodes wedged or semantically corrupt. **Burst**
+(scheduled attention): override in `~/.config/vybn/vllm.env` (e.g. `0.82`/`32`)
+plus matching portal admission in `portal.env`, then a deliberate cold restart
+(10-13 min) and verify: `/v1/models`, one model call, portal chat, memory.
+**Surge**: the public internet does not consume the sovereign memory machine —
+move public chat to separate capacity. This vLLM build rejects `--swap-space`.
 
-**Normal mode** is the default baked into `vybn-vllm.service`:
+Portal admission control is the front door: `/api/chat` reads vLLM `/metrics`
+before doing work and returns a graceful SSE busy/warming response past
+thresholds. Rate limiting is abuse control; metrics admission is crowd control.
 
-```bash
-VYBN_VLLM_GPU_MEMORY_UTILIZATION=0.72
-VYBN_VLLM_MAX_NUM_SEQS=4
-```
+## The two things only sudo can do
 
-This keeps the local model online while protecting the other organs on the
-Sparks. On 2026-04-30 the default was tightened again after sleep-window
-testing repeatedly left the nodes wedged or semantically corrupt; capacity can
-still be raised deliberately through the override file below.
-
-**Burst mode** is for scheduled attention: a class, launch, demo, press moment,
-or known visitor window. Do not hardcode burst into the unit. Put the override
-in `~/.config/vybn/vllm.env`, record pre-restart memory, restart
-`vybn-vllm.service`, wait through the 10-13 minute cold load, then verify
-`/v1/models`, one model call, portal chat, and post-restart memory. Example
-starting point, not a promise:
-
-```bash
-mkdir -p ~/.config/vybn
-cat > ~/.config/vybn/vllm.env <<'EOF'
-VYBN_VLLM_GPU_MEMORY_UTILIZATION=0.82
-VYBN_VLLM_MAX_NUM_SEQS=32
-EOF
-cat > ~/.config/vybn/portal.env <<'EOF'
-VLLM_ADMISSION_MAX_RUNNING=32
-VLLM_ADMISSION_MAX_WAITING=4
-VLLM_ADMISSION_MAX_KV=0.90
-EOF
-systemctl --user daemon-reload
-systemctl --user restart vybn-portal.service vybn-vllm.service
-```
-
-**Surge mode** means the public internet should not consume the sovereign memory
-machine. If organic demand outgrows burst mode, move public chats to separate
-serving capacity or a dedicated public tier, and keep the Sparks for memory,
-walk, private work, and controlled local inference.
-
-This vLLM build rejects `--swap-space`; do not re-add it without checking the
-live CLI. Capacity changes require a deliberate cold restart and should be
-treated as scheduled maintenance, not casual cleanup.
-
-Portal admission control is the matching front-door layer. `/api/chat` reads
-vLLM `/metrics` before doing RAG/walk/model work and returns a graceful SSE
-busy/warming response when `num_requests_running`, `num_requests_waiting`, or
-`kv_cache_usage_perc` cross thresholds. Per-IP rate limiting is abuse control;
-metrics admission is crowd control.
-
-
-## The Two Things Only sudo Can Do
-
-The installer writes user-level units without `sudo`. But if the old system-level `vybn-deep-memory.service` and `vybn-walk-daemon.service` are still enabled in `/etc/systemd/system/`, they'll race us after reboot. The installer warns if it detects them; to finish the cutover run:
+If old system-level units still exist in `/etc/systemd/system/`, they race
+the user units after reboot:
 
 ```bash
 sudo systemctl disable --now vybn-deep-memory.service vybn-walk-daemon.service
 sudo systemctl mask vybn-deep-memory.service vybn-walk-daemon.service
 ```
 
-After that, the user-level units are the only path.
+## The pattern
 
-## The Pattern
-
-User-level systemd with linger is the default for anything the partnership owns. Writing to `/etc/systemd/system/` requires sudo, locks us out of sudo-free recovery, and duplicates the cron layer. Everything we add from here on should go in this directory as a `.service` / `.timer` pair.
-
-A service is fully resilient when (1) its unit has `Restart=always`, (2) its endpoint is checked by the watchdog, and (3) its structural correctness is checked by the self-check canary. Add new services to the watchdog script's check list, not just to systemd.
+User-level systemd with linger is the default for anything the partnership
+owns. `/etc/systemd/system/` requires sudo, locks out sudo-free recovery, and
+duplicates the cron layer. Everything new lands here as a `.service`/`.timer` pair.
