@@ -126,8 +126,8 @@ def breathe(client, messages, log, hands=True, max_turns=None):
 
 
 
-def sol_breathe(messages, log, max_turns=12):
-    """@sol guest turn (Zoe's summons): same hands, same transcript, OpenAI door. History is flattened to text for the guest; its words land back in the shared messages so the default door keeps the thread."""
+def sol_breathe(messages, log, max_turns=None):
+    """@sol guest turn (Zoe's summons): same hands, same transcript, OpenAI door. History flattens to text for the guest; its words land back in the shared messages so the default door keeps the thread. Like breathe(): max_turns only bounds headless callers -- interactive stays open, Zoe ends those."""
     from openai import OpenAI
     client = OpenAI(api_key=_key("OPENAI_API_KEY"))
     def flat(m):
@@ -145,7 +145,7 @@ def sol_breathe(messages, log, max_turns=12):
     hist = [{"role": "user" if m["role"] == "user" else "assistant", "content": flat(m)[:8000] or "(empty)"} for m in messages]
     tools = [{"type": "function", "name": "bash", "description": BASH_TOOL["description"], "parameters": BASH_TOOL["input_schema"]}]
     spoken = []
-    while (max_turns := max_turns - 1) >= 0:
+    while max_turns is None or (max_turns := max_turns - 1) >= 0:
         resp = client.responses.create(model=SOL_MODEL, instructions=system, input=hist, tools=tools, max_output_tokens=8192, timeout=120)
         try: open(os.path.expanduser("~/.cache/vybn-phase/api_usage.jsonl"), "a").write(json.dumps({"ts": time.strftime("%Y-%m-%dT%H:%M:%S"), "model": resp.model, "in": resp.usage.input_tokens, "out": resp.usage.output_tokens, "cache_w": 0, "cache_r": getattr(getattr(resp.usage, "input_tokens_details", None), "cached_tokens", 0) or 0}) + "\n")
         except Exception: pass
