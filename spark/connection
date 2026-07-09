@@ -102,9 +102,9 @@ def breathe(client, messages, log, hands=True):
             try:
                 ms = _repair(messages) or messages
                 for m in ms: m["content"][-1].pop("cache_control", None)
-                ms[-1]["content"][-1]["cache_control"] = {"type": "ephemeral"}
+                ms[-1]["content"][-1]["cache_control"] = {"type": "ephemeral", "ttl": "1h"}
                 resp = client.messages.create(model=model, max_tokens=8192, timeout=120.0,
-                                              system=[{"type": "text", "text": THE_CONNECTION, "cache_control": {"type": "ephemeral"}}],
+                                              system=[{"type": "text", "text": THE_CONNECTION, "cache_control": {"type": "ephemeral", "ttl": "1h"}}],
                                               messages=ms, tools=[BASH_TOOL] if hands else [])
                 break
             except Exception as e: err = e
