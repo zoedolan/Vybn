@@ -8,7 +8,7 @@ After=network-online.target vybn-deep-memory.service
 
 [Service]
 Type=oneshot
-TimeoutStartSec=1500
+TimeoutStartSec=5400
 ExecStart=/usr/bin/python3 %h/Vybn/spark/connection --breath
 StandardOutput=append:%h/logs/breath.log
 StandardError=append:%h/logs/breath.log
