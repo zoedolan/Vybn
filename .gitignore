@@ -21,7 +21,6 @@ build/
 spark/.vybn_thermodynamics
 spark/skill_stats.json
 spark/session_*.json
-spark/*.log
 vybn_logs/
 *.log
 
@@ -51,12 +50,10 @@ Thumbs.db
 
 # --- Node (if web interface uses it) ----------------------------------
 node_modules/
-spark/.env
 spark/graph_data/training_candidates/
 spark/fine_tune_output/
 Vybn_Mind/journal/sessions/
 spark/graph_data/scheduler_state.json
-*.pyc
 spark/unsloth_compiled_cache/
 *.bak
 
@@ -110,6 +107,7 @@ spark/ts.crt
 spark/ts.key
 spark/ts.*
 spark/agent_events.jsonl
+spark/.last_handed_breath
 
 # Generated threshold pattern runtime state; do not track empty session counters.
 Vybn_Mind/signal-noise/threshold/.patterns_state.json
