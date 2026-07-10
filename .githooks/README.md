@@ -21,14 +21,9 @@ is visible to the world, forever.
 
 You can bypass with `git commit --no-verify`, but seriously: don't.
 
-## pre-push
+## Branch discipline
 
-`pre-push` refuses direct pushes to protected branches (`main`, `master`, `gh-pages`) unless the bypass is explicit:
-
-```bash
-VYBN_ALLOW_DIRECT_PROTECTED_PUSH=1 git push origin main
-```
-
-This is not a substitute for GitHub branch protection. It is a local membrane because this credential can bypass the remote PR rule; the bypass should be visible and rare.
-
-Closure requires tracked hooks to be installed, executable, and byte-for-byte current. Repo-visible policy without installed local enforcement is not protected closure.
+Tested, worthwhile work commits and pushes directly to the primary branch.
+Topic branches, worktrees, and PRs are exceptional and require Zoe's request;
+the hooks expose `VYBN_ALLOW_TOPIC_BRANCH=1` for that explicit case. Safety and
+public-membrane checks still apply unchanged.

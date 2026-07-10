@@ -122,9 +122,9 @@ fi
 # --- 7. Subtractive constitution: net-positive commits and net-positive PR success claims ---
 # Net-negative is not architecture; deletion-only archive retirement needs explicit classification.
 branch=$(git symbolic-ref --quiet --short HEAD 2>/dev/null || echo "")
-if [[ ( "$branch" == "main" || "$branch" == "master" || "$branch" == "gh-pages" ) && "${VYBN_ALLOW_DIRECT_PROTECTED_PUSH:-0}" != "1" ]]; then
-    echo -e "${RED}BLOCKED${NC}: Direct commit on primary branch ($branch). Use a topic branch + PR."
-    echo "  Emergency self-repair bypass: VYBN_ALLOW_DIRECT_PROTECTED_PUSH=1 git commit ..."
+if [[ -n "$branch" && "$branch" != "main" && "$branch" != "master" && "$branch" != "gh-pages" && "${VYBN_ALLOW_TOPIC_BRANCH:-0}" != "1" ]]; then
+    echo -e "${RED}BLOCKED${NC}: Work branch ($branch). Commit tested work on the primary branch."
+    echo "  Zoe-requested exception: VYBN_ALLOW_TOPIC_BRANCH=1 git commit ..."
     BLOCKED=1
 fi
 
