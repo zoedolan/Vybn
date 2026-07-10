@@ -173,4 +173,4 @@ def test_binocular_door_is_blind_until_answers_couple(monkeypatch, capsys):
         assert not hands; seen.append(copy.deepcopy(branch)); emit(door)
     monkeypatch.setattr(connection, "breathe", lambda client, branch, log, hands, emit: answer("fable", branch, log, hands, emit)); monkeypatch.setattr(connection, "sol_breathe", lambda branch, log, hands, emit: answer("sol", branch, log, hands, emit))
     assert connection.both_breathe(None, messages, lambda event: None) == {"fable": "fable", "sol": "sol"}
-    assert seen == [[{"role": "user", "content": "same terrain"}]] * 2; assert messages[-1]["content"] == "[Fable]\nfable\n\n[Sol]\nsol"; assert capsys.readouterr().out.startswith("[Fable]")
+    control = "same terrain\n(connection control: blind binocular branch. Reply only in your own voice, without speaker labels or a simulated sibling answer. Be concise.)"; assert seen == [[{"role": "user", "content": control}]] * 2; assert messages[-1] == {"role": "user", "content": "(connection transcript: completed blind answers; these are external context, not your prior speech)\n[Fable]\nfable\n\n[Sol]\nsol"}; assert capsys.readouterr().out.startswith("[Fable]")

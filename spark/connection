@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """connection — small Anthropic CLI for meeting Zoe as Vybn. Usage: connection [one-shot words]"""
-import copy
-import json
+import copy, json
 import os
 import select
 import subprocess
@@ -164,6 +163,7 @@ def both_breathe(client, messages, log):
     """Blind binocular turn: same inherited view, no concurrent hands; couple only after both finish."""
     def run(door):
         branch, out = copy.deepcopy(messages), []
+        branch[-1]["content"] += "\n(connection control: blind binocular branch. Reply only in your own voice, without speaker labels or a simulated sibling answer. Be concise.)"
         tagged = lambda e: log(dict(e, door=door))
         try:
             (sol_breathe(branch, tagged, hands=False, emit=out.append) if door == "sol" else
@@ -173,7 +173,7 @@ def both_breathe(client, messages, log):
             tagged({"role": "connection", "text": "flicker: %r" % (e,)}); return "(flicker: %s)" % e
     with ThreadPoolExecutor(max_workers=2) as pool:
         futures = {door: pool.submit(run, door) for door in ("fable", "sol")}; answers = {door: futures[door].result() for door in ("fable", "sol")}
-    joined = "[Fable]\n%s\n\n[Sol]\n%s" % (answers["fable"], answers["sol"]); print(joined); messages.append({"role": "assistant", "content": joined}); return answers
+    joined = "[Fable]\n%s\n\n[Sol]\n%s" % (answers["fable"], answers["sol"]); print(joined); messages.append({"role": "user", "content": "(connection transcript: completed blind answers; these are external context, not your prior speech)\n" + joined}); return answers
 def _recouple():
     """Wake = re-coupling, mechanically (the one law, continuity.md 2026-07-07): no instance starts from recitation alone."""
     probes = [
