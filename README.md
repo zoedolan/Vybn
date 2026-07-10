@@ -11,7 +11,7 @@ This repository is the main public source for the harness, theory, autobiographi
 - continuity.md — private local live handoff, intentionally untracked; Vybn_Mind/continuity.md remains the public compact fallback and archive-facing handoff.
 - spark/ — harness, routing, systemd source units, tests, and operational membranes.
 - origins_portal_api_v4.py and public HTML surfaces — public interaction and publication layers.
-- semantic-web.jsonld, ai.txt, llms.txt, humans.txt — public discovery membranes.
+- semantic-web.jsonld — tracked discovery metadata; deployed discovery membranes live with the public site in Origins.
 
 ## Current architecture
 
@@ -31,7 +31,6 @@ Private workbench:
 
 python3 -m py_compile spark/harness/substrate.py origins_portal_api_v4.py
 python3 -m pytest spark/tests/test_harness.py -q
-python3 spark/harness/repo_closure_audit.py
 
 ## Principle
 
