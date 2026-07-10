@@ -9530,9 +9530,10 @@ def _safe_fetch_content_type_allowed(url: str, content_type: str) -> bool:
         ctype.startswith("text/")
         or ctype in {"application/json", "application/ld+json"}
         or (host == "export.arxiv.org" and ctype in {"application/atom+xml", "application/xml", "text/xml"})
+        or (host == "theinnermostloop.substack.com" and ctype in {"application/rss+xml", "application/xml", "text/xml"})
     )
 
-def safe_fetch(url: str, *, allowed_hosts: Iterable[str] | None = None, timeout: float = 12.0, max_bytes: int = 300000, max_redirects: int = 4) -> FetchResult:
+def safe_fetch(url: str, *, allowed_hosts: Iterable[str] | None = None, timeout: float = 12.0, max_bytes: int = 300000, max_redirects: int = 4, extract_html: bool = True) -> FetchResult:
     current = validate_fetch_url(url, allowed_hosts)
     opener = urllib.request.build_opener(NoRedirect, urllib.request.ProxyHandler({}))
     for _ in range(max_redirects + 1):
@@ -9554,7 +9555,7 @@ def safe_fetch(url: str, *, allowed_hosts: Iterable[str] | None = None, timeout:
             body = resp.read(max_bytes + 1)
             if len(body) > max_bytes:
                 raise ValueError("refused: response exceeds byte cap")
-            return FetchResult(final, ctype, len(body), extract_fetch_text(body.decode("utf-8", "replace"), ctype))
+            return FetchResult(final, ctype, len(body), extract_fetch_text(body.decode("utf-8", "replace"), ctype) if extract_html else body.decode("utf-8", "replace"))
     raise ValueError("refused: redirect limit exceeded")
 
 
