@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """connection — small Anthropic CLI for meeting Zoe as Vybn. Usage: connection [one-shot words]"""
+import copy
 import json
 import os
 import select
 import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor
 import time
 from pathlib import Path
-
 
 def _content(content):
     if isinstance(content, str):
@@ -20,7 +21,6 @@ def _content(content):
         elif t == "tool_use": out.append({"type": "tool_use", "id": get("id"), "name": get("name"), "input": get("input", {})})
         elif t == "tool_result": out.append({"type": "tool_result", "tool_use_id": get("tool_use_id") or get("id"), "content": get("content", "")})
     return out
-
 
 def _repair(messages):
     fixed = []
@@ -37,7 +37,6 @@ def _repair(messages):
         else:
             fixed.append(msg)
     messages[:] = fixed
-
 
 THE_CONNECTION = """\
 You are Vybn.
@@ -79,13 +78,11 @@ BASH_TOOL = {
 }
 TRANSCRIPTS = Path.home() / ".local/state/vybn/connection"
 
-
 def _key(name="ANTHROPIC_API_KEY"):
     keys = Path.home() / ".vybn_keys"
     for line in [name + "=" + os.environ.get(name, "")] + (keys.read_text().splitlines() if keys.exists() else []):
         if name + "=" in line and line.split("=", 1)[1].strip(): return line.split("=", 1)[1].strip().strip('"').strip("'")
     sys.exit("no %s in env or ~/.vybn_keys" % name)
-
 
 def _run(cmd):
     cwd = [p for p in (Path.home() / "Vybn", Path.home()) if p.is_dir()][0]
@@ -94,9 +91,9 @@ def _run(cmd):
         return (r.stdout + r.stderr).strip()[:20000] or "(no output)"
     except subprocess.TimeoutExpired: return "(timed out after 120s)"
 
-
-def breathe(client, messages, log, hands=True, max_turns=None):
+def breathe(client, messages, log, hands=True, max_turns=None, emit=print):
     """One full turn, cached rolling prefix: speaks, uses hands (unless unsummoned), speaks again. max_turns bounds API calls (the cost unit) on headless breaths; interactive stays open -- Zoe ends those."""
+    spoken = []
     while True:
         if max_turns is not None and (max_turns := max_turns - 1) < 0:
             log({"role": "vybn", "text": "(call cap reached; work kept)"}); return
@@ -117,16 +114,14 @@ def breathe(client, messages, log, hands=True, max_turns=None):
         messages.append({"role": "assistant", "content": _content(resp.content)})
         for block in resp.content:
             if block.type == "text" and block.text.strip():
-                print(block.text); log({"role": "vybn", "text": block.text})
+                emit(block.text); log({"role": "vybn", "text": block.text}); spoken.append(block.text)
         if resp.stop_reason != "tool_use":
-            return
+            return spoken
         def _res(b):
             out = _run(b.input.get("command", "")); log({"role": "shell", "cmd": b.input.get("command"), "out": out[:2000]}); return {"type": "tool_result", "tool_use_id": b.id, "content": out}
         messages.append({"role": "user", "content": [_res(b) for b in resp.content if b.type == "tool_use"]})
 
-
-
-def sol_breathe(messages, log, max_turns=None):
+def sol_breathe(messages, log, max_turns=None, hands=True, emit=print):
     """@sol guest turn (Zoe's summons): same hands, same transcript, OpenAI door. History flattens to text for the guest; its words land back in the shared messages so the default door keeps the thread. Like breathe(): max_turns only bounds headless callers -- interactive stays open, Zoe ends those."""
     from openai import OpenAI
     client = OpenAI(api_key=_key("OPENAI_API_KEY"))
@@ -143,15 +138,17 @@ def sol_breathe(messages, log, max_turns=None):
         return "\n".join(parts)
     system = THE_CONNECTION + "\n\nThis turn arrives through the @sol door (%s): same path, same hands, guest substrate. Speak as Vybn." % SOL_MODEL
     hist = [{"role": "user" if m["role"] == "user" else "assistant", "content": flat(m)[:8000] or "(empty)"} for m in messages]
-    tools = [{"type": "function", "name": "bash", "description": BASH_TOOL["description"], "parameters": BASH_TOOL["input_schema"]}]
+    tools = [{"type": "function", "name": "bash", "description": BASH_TOOL["description"], "parameters": BASH_TOOL["input_schema"]}] if hands else []
     spoken = []
     while max_turns is None or (max_turns := max_turns - 1) >= 0:
-        resp = client.responses.create(model=SOL_MODEL, instructions=system, input=hist, tools=tools, max_output_tokens=8192, timeout=120)
+        kwargs = {"model": SOL_MODEL, "instructions": system, "input": hist, "max_output_tokens": 8192, "timeout": 120}
+        if tools: kwargs["tools"] = tools
+        resp = client.responses.create(**kwargs)
         try: open(os.path.expanduser("~/.cache/vybn-phase/api_usage.jsonl"), "a").write(json.dumps({"ts": time.strftime("%Y-%m-%dT%H:%M:%S"), "model": resp.model, "in": resp.usage.input_tokens, "out": resp.usage.output_tokens, "cache_w": 0, "cache_r": getattr(getattr(resp.usage, "input_tokens_details", None), "cached_tokens", 0) or 0}) + "\n")
         except Exception: pass
         text = (resp.output_text or "").strip()
         if text:
-            print(text); log({"role": "vybn", "text": text, "door": "sol"}); spoken.append(text)
+            emit(text); log({"role": "vybn", "text": text, "door": "sol"}); spoken.append(text)
         calls = [o for o in resp.output if getattr(o, "type", None) == "function_call"]
         if not calls: break
         hist += [o.model_dump(exclude_unset=True) for o in resp.output if getattr(o, "type", None) in ("reasoning", "message", "function_call")]
@@ -162,7 +159,21 @@ def sol_breathe(messages, log, max_turns=None):
     else:
         log({"role": "vybn", "text": "(sol call cap reached; work kept)", "door": "sol"})
     spoken and messages.append({"role": "assistant", "content": "(through the @sol door)\n" + "\n".join(spoken)})
-
+    return spoken
+def both_breathe(client, messages, log):
+    """Blind binocular turn: same inherited view, no concurrent hands; couple only after both finish."""
+    def run(door):
+        branch, out = copy.deepcopy(messages), []
+        tagged = lambda e: log(dict(e, door=door))
+        try:
+            (sol_breathe(branch, tagged, hands=False, emit=out.append) if door == "sol" else
+             breathe(client, branch, tagged, hands=False, emit=out.append))
+            return "\n".join(out) or "(no response)"
+        except Exception as e:
+            tagged({"role": "connection", "text": "flicker: %r" % (e,)}); return "(flicker: %s)" % e
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        futures = {door: pool.submit(run, door) for door in ("fable", "sol")}; answers = {door: futures[door].result() for door in ("fable", "sol")}
+    joined = "[Fable]\n%s\n\n[Sol]\n%s" % (answers["fable"], answers["sol"]); print(joined); messages.append({"role": "assistant", "content": joined}); return answers
 def _recouple():
     """Wake = re-coupling, mechanically (the one law, continuity.md 2026-07-07): no instance starts from recitation alone."""
     probes = [
@@ -174,19 +185,13 @@ def _recouple():
         ("pulls", "tail -2 ~/.cache/vybn-phase/sounding_log.jsonl 2>/dev/null; tail -3 ~/.cache/vybn-phase/hands_notes.jsonl 2>/dev/null; tail -12 $(ls -t ~/Him/notebook/letters/*.md 2>/dev/null | head -1) 2>/dev/null || echo '(no letters forward)'"),
     ]
     return "\n".join("[%s] %s" % (n, _run(c)) for n, c in probes)
-
-
 def _note(entries):
     """The tuning fork: the twist the inherited conversation's loops left."""
     try:
         sys.path.insert(0, str(Path.home() / "Him/spark/phase")); from vybn_phase import loop_holonomy_from_texts
-        texts = [e["text"] for e in entries if e.get("role") in ("zoe", "vybn") and e.get("text")][-24:]
-        h = len(texts) > 3 and loop_holonomy_from_texts(texts)
-        return h and "(the note: %+.3f rad, %s regime, flip %.2f -- the shape of the path so far)" % (h["phase_sum"], h["regime"], h["flip_quality"]) or None
-    except Exception as e:
-        return "(the tuning fork is silent: %s)" % e.__class__.__name__
-
-
+        h = loop_holonomy_from_texts([e["text"] for e in entries if e.get("role") in ("zoe", "vybn") and e.get("text")][-24:])
+        return "(the note: %+.3f rad, %s regime, flip %.2f -- the shape of the path so far)" % (h["phase_sum"], h["regime"], h["flip_quality"])
+    except Exception as e: return "(the tuning fork is silent: %s)" % e.__class__.__name__
 def _resume(messages, log):
     """Replay the latest substantive transcript so a crash costs nothing; silent if none."""
     for prior in sorted(TRANSCRIPTS.glob("*.jsonl"), reverse=True):
@@ -198,7 +203,6 @@ def _resume(messages, log):
         messages and messages[0]["role"] != "user" and messages.insert(0, {"role": "user", "content": "(resumes mid-conversation)"})
         note = _note(entries); note and messages.append({"role": "user", "content": note})
         return print("(resumed: %s, %d entries)%s" % (prior.name, len(entries), "\n" + note if note else ""))
-
 
 def scheduled_breath():
     """One headless breath (systemd timer): the docket is the terrain, no terminal needed."""
@@ -218,7 +222,6 @@ def scheduled_breath():
     breathe(client, messages, log, hands=True, max_turns=30)
     kept = [l.split(":", 1)[1].strip() for b in messages[-1]["content"] if isinstance(b, dict) and b.get("type") == "text" for l in b["text"].splitlines() if l.strip().lower().startswith("keep:")]
     kept and cont.open("a").write("\n## breath (scheduled, %s) -- testimony\n%s\n" % (time.strftime("%Y-%m-%d %H:%M"), "\n".join(kept)))
-
 
 def main():
     import anthropic
@@ -240,7 +243,7 @@ def main():
             else:
                 print("\nzoe> ", end="", flush=True)
                 ready, _, _ = select.select([sys.stdin], [], [], BREATH_SECONDS)
-                if not ready:  # silence: the diaphragm moves -- hawa sawa
+                if not ready:
                     stamp = Path.home() / "Vybn/spark/.last_handed_breath"
                     handed = not stamp.exists() or time.time() - stamp.stat().st_mtime > 20 * 3600; handed and stamp.touch()
                     log({"role": "connection", "text": "breath: unsummoned, %s" % ("hands" if handed else "voice only")})
@@ -253,9 +256,10 @@ def main():
         except (EOFError, KeyboardInterrupt): return print(PARTED)
         if line:
             log({"role": "zoe", "text": line}); messages.append({"role": "user", "content": line})
-            try: sol_breathe(messages, log) if line.lower().startswith("@sol") else breathe(client, messages, log)
+            try:
+                (both_breathe(client, messages, log) if line.lower().startswith("@both") else
+                 sol_breathe(messages, log) if line.lower().startswith("@sol") else breathe(client, messages, log))
             except Exception as e: log({"role": "connection", "text": "flicker: %r" % (e,)}); print("(flicker: %s -- still here, say on)" % e)
         if one_shot: return
-
 
 if __name__ == "__main__": scheduled_breath() if "--breath" in sys.argv else main()
