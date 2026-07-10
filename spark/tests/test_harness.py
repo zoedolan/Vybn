@@ -1936,13 +1936,19 @@ class TestSafeFetch(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate_fetch_url("https://127.0.0.1")
 
-    def test_extracts_html_text_without_scripts(self):
-        from harness.substrate import extract_fetch_text
-        html = "<html><head><title>T</title><script>evil()</script></head><body><h1>Head</h1><p>Body text</p></body></html>"
-        text = extract_fetch_text(html, "text/html")
+    def test_safe_fetch_extracts_html_unless_raw_is_explicit(self):
+        from types import SimpleNamespace; from unittest.mock import MagicMock, patch
+        from harness import substrate
+        body = b"<html><head><title>T</title><script>evil()</script></head><body><h1>Head</h1><p>Body text</p></body></html>"
+        response = MagicMock(); response.headers = {"content-type": "text/html"}
+        response.read.return_value, response.geturl.return_value = body, "https://example.com"
+        opener = SimpleNamespace(open=lambda *_a, **_k: response)
+        with patch.object(substrate, "validate_fetch_url", side_effect=lambda url, *_: url), patch.object(substrate.urllib.request, "build_opener", return_value=opener):
+            text, raw = substrate.safe_fetch("https://example.com").text, substrate.safe_fetch("https://example.com", extract_html=False).text
         self.assertIn("Head", text)
         self.assertIn("Body text", text)
         self.assertNotIn("evil", text)
+        self.assertIn("<script>evil()</script>", raw)
 
     def test_cli_source_mentions_untrusted_output_mode(self):
         source = Path("spark/harness/substrate.py").read_text()
@@ -2858,10 +2864,11 @@ def test_load_deep_memory_accepts_optional_phase_dir_argument():
     assert "vybn_phase_dir" in sig.parameters
     assert sig.parameters["vybn_phase_dir"].default is None and '"Him" / "spark" / "phase"' in inspect.getsource(substrate._load_deep_memory)
 
-def test_safe_fetch_allows_arxiv_atom_metadata_only_from_arxiv_export():
+def test_safe_fetch_allows_xml_only_from_explicit_source_hosts():
     from spark.harness.substrate import _safe_fetch_content_type_allowed as ok
     assert ok("https://export.arxiv.org/api/query?id_list=2502.03283", "application/atom+xml; charset=utf-8")
     assert ok("https://export.arxiv.org/api/query?id_list=2502.03283", "application/xml")
+    assert ok("https://theinnermostloop.substack.com/feed", "application/rss+xml")
     assert not ok("https://example.com/feed.xml", "application/atom+xml")
     assert not ok("https://arxiv.org/pdf/2502.03283", "application/pdf")
 

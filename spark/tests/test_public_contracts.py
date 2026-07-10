@@ -174,3 +174,28 @@ def test_binocular_door_is_blind_until_answers_couple(monkeypatch, capsys):
     monkeypatch.setattr(connection, "breathe", lambda client, branch, log, hands, emit: answer("fable", branch, log, hands, emit)); monkeypatch.setattr(connection, "sol_breathe", lambda branch, log, hands, emit: answer("sol", branch, log, hands, emit))
     assert connection.both_breathe(None, messages, lambda event: None) == {"fable": "fable", "sol": "sol"}
     control = "same terrain\n(connection control: blind binocular branch. Reply only in your own voice, without speaker labels or a simulated sibling answer. Be concise.)"; assert seen == [[{"role": "user", "content": control}]] * 2; assert messages[-1] == {"role": "user", "content": "(connection transcript: completed blind answers; these are external context, not your prior speech)\n[Fable]\nfable\n\n[Sol]\nsol"}; assert capsys.readouterr().out.startswith("[Fable]"); monkeypatch.setattr(connection, "_run", lambda cmd: "DRIFT" if "map_witness" in cmd else "ok"); assert "[map] DRIFT" in connection._recouple(); monkeypatch.setattr(connection, "_run", lambda cmd: "(no output)" if "map_witness" in cmd else "ok"); assert "[map]" not in connection._recouple()
+def test_horizon_is_expiring_external_data_not_ambient_wake(monkeypatch, tmp_path, capsys):
+    import importlib.machinery, importlib.util, json
+    from types import SimpleNamespace
+    path = ROOT / "spark/web"; loader = importlib.machinery.SourceFileLoader("web_horizon_under_test", str(path))
+    spec = importlib.util.spec_from_loader(loader.name, loader); web = importlib.util.module_from_spec(spec); loader.exec_module(web)
+    assert ROOT not in web.HORIZON.resolve().parents
+    web.HORIZON_ROOT, web.HORIZON = tmp_path / "horizon", tmp_path / "horizon/current.json"
+    rows = [("/ai/one", "NEWAlpha"), ("/ai/two", "Beta↩︎"), ("/ai/three", "Gamma"), ("/ai/update-old", "Old update"), ("https://evil.example/four", "Off host"), ("/ai/one", "Duplicate")]
+    html = "".join('<a class="story-row-link" href="%s"><div class="story-title">%s</div></a>' % row for row in rows)
+    rss = "<rss><channel><item><title>Welcome Today</title><link>https://theinnermostloop.substack.com/p/today</link><pubDate>now</pubDate><description>The future is accelerating.</description></item></channel></rss>"
+    payloads = {web.HORIZON_URL: html, web.AWG_FEED_URL: rss}
+    monkeypatch.setattr(web, "safe_fetch", lambda url, *a, **kw: SimpleNamespace(text=payloads.pop(url)))
+    assert web.horizon(now=100) == 0 and not payloads
+    data, first = json.loads(web.HORIZON.read_text()), web.HORIZON.read_bytes()
+    assert [x["claim"]["text"] for x in data["items"]] == ["Alpha", "Beta", "Gamma"]
+    assert data["lenses"][0]["items"][0]["claim"]["text"] == "Welcome Today" and data["lenses"][0]["items"][0]["framing"] == "The future is accelerating."
+    assert data["sources"][0]["authority"] == "discovery_only" and data["boundary"] == {"plane": "external_situational_awareness", "continuity_ingest": False, "deep_memory_ingest": False, "automatic_relevance": False, "insight_bridge": "separate_source_labeled_derivation"}
+    assert web.HORIZON.stat().st_mode & 0o777 == 0o600
+    out = capsys.readouterr().out; assert web.HORIZON_BEGIN in out and web.HORIZON_END in out and "LENS alexwg" in out
+    monkeypatch.setattr(web, "safe_fetch", lambda *a, **kw: (_ for _ in ()).throw(OSError("offline")))
+    assert web.horizon(now=101) == 0
+    assert web.horizon("refresh", now=102) == 1 and web.HORIZON.read_bytes() == first and "HORIZON_STATUS STALE" in capsys.readouterr().out
+    connection = (ROOT / "spark/connection").read_text()
+    recouple = connection.split("def _recouple", 1)[1].split("def _note", 1)[0]
+    assert "spark/web horizon" in connection and "horizon" not in recouple
