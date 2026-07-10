@@ -165,7 +165,7 @@ def test_origins_chat_uses_shared_zoe_source_scene_guard():
     assert "sec.zoe_source_scene_refusal_text()" in legacy
 
 def test_binocular_door_is_blind_until_answers_couple(monkeypatch, capsys):
-    import copy, importlib.machinery, importlib.util
+    import copy, importlib.machinery, importlib.util; prompt = (ROOT / "spark/connection").read_text(); assert all(x in prompt for x in ("Before each delegated act", "goal -> this step -> what Zoe will", "incidental defects move only"))
     path = ROOT / "spark/connection"; loader = importlib.machinery.SourceFileLoader("connection_under_test", str(path))
     spec = importlib.util.spec_from_loader(loader.name, loader); connection = importlib.util.module_from_spec(spec); loader.exec_module(connection)
     seen, messages = [], [{"role": "user", "content": "same terrain"}]
