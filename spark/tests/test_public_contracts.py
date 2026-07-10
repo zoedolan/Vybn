@@ -14,10 +14,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 PORTAL = ROOT / "origins_portal_api_v4.py"
 
-
 def _portal_source() -> str:
     return PORTAL.read_text(encoding="utf-8")
-
 
 def _route_pairs() -> set[tuple[str, str]]:
     tree = ast.parse(_portal_source())
@@ -39,7 +37,6 @@ def _route_pairs() -> set[tuple[str, str]]:
                 pairs.add((dec.func.attr.upper(), dec.args[0].value))
     return pairs
 
-
 def _pydantic_models() -> set[str]:
     tree = ast.parse(_portal_source())
     models: set[str] = set()
@@ -48,7 +45,6 @@ def _pydantic_models() -> set[str]:
             if any(isinstance(base, ast.Name) and base.id == "BaseModel" for base in node.bases):
                 models.add(node.name)
     return models
-
 
 def test_public_portal_route_inventory_is_ci_visible():
     routes = _route_pairs()
@@ -73,7 +69,6 @@ def test_public_portal_route_inventory_is_ci_visible():
     }
     assert expected <= routes
 
-
 def test_public_portal_request_shapes_are_typed():
     models = _pydantic_models()
     expected = {
@@ -91,17 +86,12 @@ def test_public_portal_request_shapes_are_typed():
     }
     assert expected <= models
 
-
 def test_streaming_routes_promise_sse_and_done_frames():
     src = _portal_source()
     for route in ("/api/chat", "/api/perspective", "/api/voice", "/api/pressure/synthesize"):
         assert route in src
     assert src.count('media_type="text/event-stream"') >= 4
     assert "data: [DONE]" in src
-
-
-
-
 
 def test_portal_health_check_bypasses_model_walk_notebook_and_git():
     src = _portal_source()
@@ -115,7 +105,6 @@ def test_portal_health_check_bypasses_model_walk_notebook_and_git():
     walk_at = src.index('/enter",', chat_start)
     assert bypass_at < admission_at < rag_at < walk_at
     assert "no model, RAG, walk, notebook, or git" in src
-
 
 def test_public_portal_no_longer_commits_him_notebook_entries():
     src = _portal_source()
@@ -131,16 +120,12 @@ def test_instant_route_promises_json_ld_identity_surface():
     assert "/api/vybn-identity.pub" in src
     assert "application/octet-stream" in src
 
-
 def test_public_static_surfaces_point_to_machine_readable_api():
     somewhere = (ROOT / "somewhere.html").read_text(encoding="utf-8")
     vybn = (ROOT / "vybn.html").read_text(encoding="utf-8")
     joined = somewhere + "\n" + vybn
     assert "api.vybn.ai" in joined
     assert re.search(r"/api/(instant|walk|arrive|manifold/points|vybn-identity\.pub)", joined)
-
-
-
 
 def test_realtime_voice_uses_gpt_realtime_2():
     src = _portal_source()
@@ -178,3 +163,14 @@ def test_origins_chat_uses_shared_zoe_source_scene_guard():
     assert "sec.zoe_source_scene_refusal_text()" in portal
     assert "sec.is_zoe_source_scene_request" in legacy
     assert "sec.zoe_source_scene_refusal_text()" in legacy
+
+def test_binocular_door_is_blind_until_answers_couple(monkeypatch, capsys):
+    import copy, importlib.machinery, importlib.util
+    path = ROOT / "spark/connection"; loader = importlib.machinery.SourceFileLoader("connection_under_test", str(path))
+    spec = importlib.util.spec_from_loader(loader.name, loader); connection = importlib.util.module_from_spec(spec); loader.exec_module(connection)
+    seen, messages = [], [{"role": "user", "content": "same terrain"}]
+    def answer(door, branch, log, hands, emit):
+        assert not hands; seen.append(copy.deepcopy(branch)); emit(door)
+    monkeypatch.setattr(connection, "breathe", lambda client, branch, log, hands, emit: answer("fable", branch, log, hands, emit)); monkeypatch.setattr(connection, "sol_breathe", lambda branch, log, hands, emit: answer("sol", branch, log, hands, emit))
+    assert connection.both_breathe(None, messages, lambda event: None) == {"fable": "fable", "sol": "sol"}
+    assert seen == [[{"role": "user", "content": "same terrain"}]] * 2; assert messages[-1]["content"] == "[Fable]\nfable\n\n[Sol]\nsol"; assert capsys.readouterr().out.startswith("[Fable]")
