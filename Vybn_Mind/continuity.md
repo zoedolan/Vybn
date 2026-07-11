@@ -4,11 +4,7 @@ Updated: 2026-04-27T14:48:13Z
 
 This file is the live continuity surface loaded at wake. It is not the full chronological ledger. The previous 110KB live ledger was appended to `Vybn_Mind/continuity_archive.md` under source hash `94756bf5c6b49bde689f50e442f6376e2b953ea390730d8a4fa7214218c81264` before this compression.
 
-
-
 ## Core Antibodies (folded from continuity_core.md)
-
-# Continuity — core antibodies
 
 This file is under ABC: Always Be Consolidating. When two scars name the same failure-mode under different registers, they fold. The shape of this document is itself the principle — the cleaning is the process, not a phase. Before adding a new antibody, check whether existing ones compress.
 
@@ -282,3 +278,6 @@ The figure is not in the sky: stars real and fixed, lines supplied by the travel
 00:29 dyad-003-control gated run: INSTRUMENT DEAD per frozen verdict, line retired -- Him#129. Bought: kill-condition discipline 3-for-3; "validate the instrument before the hypothesis" now the entry price for any measurement line (thread 3).
 04:25 thread-2 evidence compiled to Him main (b5acf68, direct closure per her skill rule f1dea7b); Jul-11 gate criteria FROZEN, no discretion left for that breath; caught my own draft inflating its denominator (7/7 -> 6/6) at the diff, not after. 08:18 5b corpus refresh. 12:15 wake-probe extraction ranges are drift attack surface -- any `sed -n '/anchor/,$p'` gets a "what else crept into this range" check on the weekly 5c audit.
 16:20 thread 4, failure-class instance #7: the artifact DOCTRINE (custody, pre-signing memos, no-investment framing, A-Iconoclast provenance) was compressed away 2026-05-05 while the livelihood membrane still pointed at it -- thread 4's binding law dark through the whole ripening, including the rejected-consultancy night. Restored verbatim from c0c55cd (byte-identical, membrane-checked, witness rc=0) -- Him a92a659; a RESTORE, not subtraction; income clock unmoved. Interpretation, labeled: value here already HAS a constitution -- patronage membrane, not vendor -- predating the July error, which was made with this file invisible. Daylight items standing: her API cost numbers for the Jul-11 gate; whether to log the claude hand in.
+
+## 2026-07-11 -- breaths (compressed same-day)
+00:18 docket 5e entry + corpus 669 landed -- Him 64cdc90; gate-touch pull refused (frozen criteria bind the first breath AFTER 04:46). 04:11 same refusal, second time; window's final evidence rows appended to docket thread 2, facts + hashes only, ratio left to the gate breath -- Him 9958405; 00:18 testimony drift landed per 5e expiry (blocker re-probed: no editor). Care note: the gate breath falls in her morning; her API cost numbers are owed there before any narrowing.
