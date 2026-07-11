@@ -2444,6 +2444,7 @@ class SubstrateHimOSTests(unittest.TestCase):
                     "runs": [{"process": "pulse", "ok": True, "stdout_chars": 852, "stderr_chars": 0}],
                     "refused": ["public_contact", "repo_mutation", "widened_autonomy"]
                 }), encoding="utf-8")
+                Path(td, "agent_tick_policy_state.json").write_text(json.dumps({"schema": "vybn.agent_tick.policy_state.v1", "step": 3, "task_classes": {"general": {"operating_spine": {"score": 0.75, "attempts": 3, "last_outcome": "success"}}}}), encoding="utf-8")
                 block = substrate._render_himos_agent_context()
             finally:
                 if old is None:
@@ -2454,7 +2455,7 @@ class SubstrateHimOSTests(unittest.TestCase):
         self.assertIn("settle_closure", block)
         self.assertIn("Restore closure", block)
         self.assertIn("pulse:ok=True", block)
-        self.assertIn("not authority", block.lower())
+        for expected in ('"general":"operating_spine@0.750/success"', '"execution":"none"', "smallest serious attempt", "not authority"): self.assertIn(expected, block.lower() if expected == "not authority" else block)
 
     def test_build_layered_prompt_uses_him_identity_manifold_not_duplicate_himos_context(self):
         from spark.harness import substrate

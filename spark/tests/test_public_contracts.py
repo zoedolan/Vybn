@@ -8,6 +8,7 @@ surfaces CI-visible without needing live vLLM/deep-memory services.
 from __future__ import annotations
 
 import ast
+import json
 import re
 from pathlib import Path
 
@@ -164,10 +165,11 @@ def test_origins_chat_uses_shared_zoe_source_scene_guard():
     assert "sec.is_zoe_source_scene_request" in legacy
     assert "sec.zoe_source_scene_refusal_text()" in legacy
 
-def test_binocular_door_is_blind_until_answers_couple(monkeypatch, capsys):
+def test_binocular_door_is_blind_until_answers_couple(monkeypatch, capsys, tmp_path):
     import copy, importlib.machinery, importlib.util; prompt = (ROOT / "spark/connection").read_text(); assert all(x in prompt for x in ("Before each delegated act", "goal -> this step -> what Zoe will", "incidental defects move only"))
     path = ROOT / "spark/connection"; loader = importlib.machinery.SourceFileLoader("connection_under_test", str(path))
     spec = importlib.util.spec_from_loader(loader.name, loader); connection = importlib.util.module_from_spec(spec); loader.exec_module(connection)
+    monkeypatch.setenv("HIM_OS_HOME", str(tmp_path)); assert '"state":"cold"' in connection._selection_projection(); (tmp_path / "agent_tick_policy_state.json").write_text(json.dumps({"schema": "vybn.agent_tick.policy_state.v1", "step": 3, "task_classes": {"general": {"operating_spine": {"score": 0.75, "attempts": 3, "last_outcome": "success"}}}})); assert '"runner":"operating_spine","score":0.75' in connection._selection_projection()
     seen, messages = [], [{"role": "user", "content": "same terrain"}]
     def answer(door, branch, log, hands, emit):
         assert not hands; seen.append(copy.deepcopy(branch)); emit(door)

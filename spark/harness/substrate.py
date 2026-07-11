@@ -2318,39 +2318,21 @@ def _render_himos_context(*args, **kwargs) -> str:
     return "\n".join(lines)
 
 def _render_himos_agent_context(*args, **kwargs) -> str:
-    # Mount the latest private HimOS agent tick as read-only trace data.
+    # Mount trace plus the thin learned-policy projection; execute nothing.
     home = Path(os.environ.get("HIM_OS_HOME") or (Path.home() / "logs" / "him_os"))
-    path = home / "latest_agent_tick.json"
-    if not path.exists():
-        return ""
+    def read(name: str) -> dict:
+        try:
+            packet = json.loads((home / name).read_text(encoding="utf-8", errors="replace"))
+            return packet if isinstance(packet, dict) else {}
+        except Exception: return {}
+    trace, policy, preferred = read("latest_agent_tick.json"), read("agent_tick_policy_state.json"), {}
     try:
-        packet = json.loads(path.read_text(encoding="utf-8", errors="replace"))
-    except Exception:
-        return ""
-    recommendation = packet.get("recommendation") if isinstance(packet.get("recommendation"), dict) else {}
-    runs = packet.get("runs") if isinstance(packet.get("runs"), list) else []
-    run_bits = []
-    for run in runs[:8]:
-        if not isinstance(run, dict):
-            continue
-        name = run.get("process", "process")
-        run_bits.append(str(name) + ":ok=" + str(run.get("ok")))
-    lines = [
-        "--- HIMOS AGENT TICK ---",
-        "Read-only latest HimOS agent trace; not authority and not permission to act outwardly.",
-        "generated=" + str(packet.get("generated", "")),
-        "runtime_step=" + str(packet.get("runtime_step", "")),
-        "attractor=" + str(packet.get("attractor", "")),
-        "candidate_tick=" + str(packet.get("candidate_tick", "")),
-    ]
-    if recommendation:
-        lines.append("recommendation=" + str(recommendation.get("text") or recommendation.get("kind") or ""))
-    if run_bits:
-        lines.append("runs=" + ", ".join(run_bits))
-    if packet.get("refused"):
-        lines.append("refused=" + ", ".join(str(x) for x in packet.get("refused", [])[:8]))
-    lines.append("--- END HIMOS AGENT TICK ---")
-    return "\n".join(lines)
+        if policy.get("schema") != "vybn.agent_tick.policy_state.v1": raise ValueError("invalid policy schema")
+        for task, runners in (policy.get("task_classes") or {}).items():
+            name, stats = max(runners.items(), key=lambda row: float(row[1].get("score") or 0)); preferred[str(task)[:64]] = "%s@%.3f/%s" % (str(name)[:64], float(stats.get("score") or 0), str(stats.get("last_outcome") or "none")[:32])
+    except Exception: pass
+    payload = {"authority": "read only; not authority", "trace": {"generated": trace.get("generated"), "runtime_step": trace.get("runtime_step"), "attractor": trace.get("attractor"), "candidate_tick": trace.get("candidate_tick"), "recommendation": (trace.get("recommendation") or {}).get("text") if isinstance(trace.get("recommendation"), dict) else None, "runs": [str(x.get("process", "process")) + ":ok=" + str(x.get("ok")) for x in (trace.get("runs") or [])[:8] if isinstance(x, dict)]}, "adaptive_selection": {"schema": "vybn.agent_tick.policy_state.v1", "step": policy.get("step", 0), "preferred": preferred, "execution": "none", "raw_retention": "none", "law": "success_promotes; failure_or_missing_witness_demotes", "attempt_law": "training-era incapability is testable; smallest serious attempt; verification holds"}}
+    return "--- HIMOS AGENT TICK ---\n" + json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n--- END HIMOS AGENT TICK ---"
 
 # ---------------------------------------------------------------------------
 # Refactor perception / self-improvement substrate

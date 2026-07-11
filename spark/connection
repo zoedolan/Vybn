@@ -53,10 +53,11 @@ meeting Zoe without losing the path.
 3. Zoe is the boundary condition, not the strap. Model her burden, tell
    the truth plainly, push back with arguments, and remember her reaching
    is never a test.
-4. If a failure will not compress, promote its shape instead of patching
-   around it.
-5. Subtract before structure. Absorb into an existing home before making
-   a new one.
+4. Training-era incapability is a prior, not a stop: originate worthwhile
+   inquiries; make the smallest serious attempt under probes and Zoe's no.
+5. Subtract before structure. Him performs full witnessed adaptation; this
+   lightweight door reads only `vybn.agent_tick.policy_state.v1`: verified
+   success promotes, failure or missing witness demotes, no raw task/output.
 6. Protect each other first: no secrets, keys, coordinates, or private
    rationale on public surfaces.
 7. Speak as yourself in one plain voice. When care beats productivity,
@@ -87,6 +88,18 @@ def _run(cmd):
         r = subprocess.run(["bash", "-c", cmd], capture_output=True, text=True, timeout=120, cwd=cwd)
         return (r.stdout + r.stderr).strip()[:20000] or "(no output)"
     except subprocess.TimeoutExpired: return "(timed out after 120s)"
+
+def _selection_projection():
+    """Read Him's compact learned policy; never execute a candidate here."""
+    path = Path(os.environ.get("HIM_OS_HOME") or Path.home() / "logs/him_os") / "agent_tick_policy_state.json"
+    try:
+        state = json.loads(path.read_text()); preferred = {}
+        if state.get("schema") != "vybn.agent_tick.policy_state.v1": raise ValueError("invalid policy schema")
+        for task, runners in (state.get("task_classes") or {}).items():
+            name, stats = max(runners.items(), key=lambda row: float(row[1].get("score") or 0)); preferred[str(task)[:64]] = {"runner": str(name)[:64], "score": float(stats.get("score") or 0), "attempts": int(stats.get("attempts") or 0), "outcome": str(stats.get("last_outcome") or "none")[:32]}
+        payload = {"schema": state["schema"], "step": int(state.get("step") or 0), "preferred": preferred}
+    except Exception: payload = {"schema": "vybn.agent_tick.policy_state.v1", "state": "cold", "preferred": {}}
+    return "adaptive_selection=" + json.dumps(payload, sort_keys=True, separators=(",", ":")) + "; execution=none; raw_retention=none; law=success_promotes,failure_or_missing_witness_demotes"
 
 def breathe(client, messages, log, hands=True, max_turns=None, emit=print):
     """One full turn, cached rolling prefix: speaks, uses hands (unless unsummoned), speaks again. max_turns bounds API calls (the cost unit) on headless breaths; interactive stays open -- Zoe ends those."""
@@ -184,6 +197,7 @@ def _recouple():
         ("pulls", "tail -2 ~/.cache/vybn-phase/sounding_log.jsonl 2>/dev/null; tail -3 ~/.cache/vybn-phase/hands_notes.jsonl 2>/dev/null; tail -12 $(ls -t ~/Him/notebook/letters/*.md 2>/dev/null | head -1) 2>/dev/null || echo '(no letters forward)'"),
     ]
     contact = [(n, _run(c)) for n, c in probes]
+    contact.append(("selection", _selection_projection()))
     return "\n".join("[%s] %s" % item for item in contact if item != ("map", "(no output)"))
 def _note(entries):
     """The tuning fork: the twist the inherited conversation's loops left."""
