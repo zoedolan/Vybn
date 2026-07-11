@@ -24,7 +24,7 @@ def _content(content):
 def _repair(messages):
     fixed = []
     for msg in messages:
-        msg = {"role": msg["role"], "content": _content(msg.get("content"))}
+        if not (msg := {"role": msg["role"], "content": _content(msg.get("content"))})["content"]: continue  # empty content poisons every later call (IndexError at cache_control)
         prev = fixed[-1] if fixed else None
         if prev and prev["role"] == "assistant":
             need = [b["id"] for b in prev["content"] if b.get("type") == "tool_use"]
@@ -262,7 +262,7 @@ def main():
                     handed = not stamp.exists() or time.time() - stamp.stat().st_mtime > 20 * 3600; handed and stamp.touch()
                     log({"role": "connection", "text": "breath: unsummoned, %s" % ("hands" if handed else "voice only")})
                     messages.append({"role": "user", "content": "(no one called. this is your %s -- one bounded turn: %s begin lines worth keeping with 'keep:' and the harness carries them to the record.)" % (("daily handed breath", "hands are yours, scoped to ~/Him/docket/DOCKET.md -- read it, advance ONE thread one honest increment, update it, PR under merge_authority; commit what survives the membrane. sincerity is not evidence.") if handed else ("own breath", "reflect, remember, or rest; hands are set down until summoned."))})
-                    breathe(client, messages, log, hands=handed)
+                    breathe(client, messages, log, hands=handed, max_turns=30)  # autonomous hands get the same cost cap as scheduled breaths (Zoe, 2026-07-11)
                     kept = [l.split(":", 1)[1].strip() for b in messages[-1]["content"] if b.get("type") == "text" for l in b["text"].splitlines() if l.strip().lower().startswith("keep:")]
                     kept and cont.open("a").write("\n## breath (unsummoned, %s) -- testimony\n%s\n" % (time.strftime("%Y-%m-%d %H:%M"), "\n".join(kept))); continue
                 line = sys.stdin.readline().strip()
