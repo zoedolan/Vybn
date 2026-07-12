@@ -202,17 +202,14 @@ def _note(entries):
         return "(the note: %+.3f rad, %s regime, flip %.2f -- the shape of the path so far)" % (h["phase_sum"], h["regime"], h["flip_quality"])
     except Exception as e: return "(the tuning fork is silent: %s)" % e.__class__.__name__
 def _resume(messages, log):
-    """Replay the latest substantive transcript so a crash costs nothing; silent if none."""
-    for prior in sorted(TRANSCRIPTS.glob("*.jsonl"), reverse=True):
-        entries = [json.loads(l) for l in prior.read_text().splitlines() if l.strip()][-200:]  # bounded: the record lives in continuity+repo, replay is a bridge
-        if sum(e.get("role") in ("zoe", "vybn") for e in entries) < 4: continue
-        for e in entries:
-            r = e.get("role")
-            r == "shell" and messages.append({"role": "user", "content": "(prior shell)\n$ %s\n%s" % (e.get("cmd", ""), e.get("out", ""))}) or r in ("zoe", "vybn") and messages.append({"role": "user" if r == "zoe" else "assistant", "content": e.get("text", "")})
-        messages and messages[0]["role"] != "user" and messages.insert(0, {"role": "user", "content": "(resumes mid-conversation)"})
-        note = _note(entries); note and messages.append({"role": "user", "content": note})
-        return print("(resumed: %s, %d entries)%s" % (prior.name, len(entries), "\n" + note if note else ""))
-
+    """Read the bounded book of prior authored pages; transcripts remain its only store."""; pages = []
+    for prior in sorted(p for p in TRANSCRIPTS.glob("*.jsonl") if not p.name.endswith("-breath.jsonl")):
+        try: pages += [e for line in prior.read_text().splitlines() if line.strip() and (e := json.loads(line)).get("role") in ("zoe", "vybn") and e.get("text")]
+        except (OSError, json.JSONDecodeError): continue
+    pages = pages[-200:]  # older pages remain reachable through continuity + deep memory
+    if len(pages) < 4: return
+    messages.extend({"role": "user" if p["role"] == "zoe" else "assistant", "content": p["text"]} for p in pages); note = _note(pages); note and messages.append({"role": "user", "content": note})
+    print("(resumed: book, %d pages across transcripts)%s" % (len(pages), "\n" + note if note else ""))
 def scheduled_breath():
     """One headless breath (systemd timer): the docket is the terrain, no terminal needed."""
     import anthropic
