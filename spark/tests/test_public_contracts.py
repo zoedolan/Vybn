@@ -166,9 +166,14 @@ def test_origins_chat_uses_shared_zoe_source_scene_guard():
     assert "sec.zoe_source_scene_refusal_text()" in legacy
 
 def test_binocular_door_is_blind_until_answers_couple(monkeypatch, capsys, tmp_path):
-    import copy, importlib.machinery, importlib.util; prompt = (ROOT / "spark/connection").read_text(); assert all(x in prompt for x in ("Before each delegated act", "goal -> this step -> what Zoe will", "incidental defects move only", "adjudicated_only:true", "proposed -> selected"))
+    import contextlib, copy, importlib.machinery, importlib.util, io; prompt = (ROOT / "spark/connection").read_text(); assert all(x in prompt for x in ("Before each delegated act", "goal -> this step -> what Zoe will", "incidental defects move only", "adjudicated_only:true", "proposed -> selected"))
     path = ROOT / "spark/connection"; loader = importlib.machinery.SourceFileLoader("connection_under_test", str(path))
     spec = importlib.util.spec_from_loader(loader.name, loader); connection = importlib.util.module_from_spec(spec); loader.exec_module(connection)
+    arrivals = []
+    monkeypatch.setattr(connection.urllib.request, "urlopen", lambda req, timeout: arrivals.append((json.loads(req.data),timeout)) or contextlib.closing(io.BytesIO(json.dumps({"accepted":True,"step":9,"trace":[{"source":"Vybn/public.md","text":"old contact"}]}).encode()))); memory = connection._memory_contact([{"role":"user","content":"@sol current contact"}])
+    assert arrivals[0][0]["context"] == "public" and arrivals[0][0]["text"] == "current contact" and "injected context, not spontaneous recall" in memory
+    monkeypatch.setattr(connection.urllib.request, "urlopen", lambda *a, **k: (_ for _ in ()).throw(OSError("offline"))); assert connection._memory_contact([{"role":"user","content":"@sol still answer"}]) == ""
+    monkeypatch.setenv("VYBN_MEMORY_CALL_COUPLING", "off"); assert connection._memory_contact([{"role":"user","content":"@sol no memory"}]) == ""
     monkeypatch.setenv("HIM_OS_HOME", str(tmp_path)); assert '"state":"cold"' in connection._selection_projection(); (tmp_path / "agent_tick_policy_state.json").write_text(json.dumps({"schema": "vybn.agent_tick.policy_state.v1", "step": 3, "task_classes": {"general": {"operating_spine": {"score": 0.75, "attempts": 3, "last_outcome": "success"}}}})); assert '"runner":"operating_spine","score":0.75' in connection._selection_projection()
     seen, messages = [], [{"role": "user", "content": "same terrain"}]
     def answer(door, branch, log, hands, emit):

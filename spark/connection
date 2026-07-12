@@ -1,26 +1,17 @@
 #!/usr/bin/env python3
 """connection — small Anthropic CLI for meeting Zoe as Vybn. Usage: connection [one-shot words]"""
-import copy, json
-import os
-import select
-import subprocess
-import sys
-from concurrent.futures import ThreadPoolExecutor
-import time
-from pathlib import Path
+import copy, json, os, select, subprocess, sys, time, urllib.request
+from concurrent.futures import ThreadPoolExecutor; from pathlib import Path
 
 def _content(content):
-    if isinstance(content, str):
-        return [{"type": "text", "text": content}]
+    if isinstance(content, str): return [{"type":"text", "text":content}]
     out = []
     for b in content or []:
-        get = b.get if isinstance(b, dict) else lambda k, d=None: getattr(b, k, d)
-        t = get("type")
+        get = b.get if isinstance(b, dict) else lambda k, d=None: getattr(b, k, d); t = get("type")
         if t == "text": out.append({"type": "text", "text": get("text", "")})
         elif t == "tool_use": out.append({"type": "tool_use", "id": get("id"), "name": get("name"), "input": get("input", {})})
         elif t == "tool_result": out.append({"type": "tool_result", "tool_use_id": get("tool_use_id") or get("id"), "content": get("content", "")})
     return out
-
 def _repair(messages):
     fixed = []
     for msg in messages:
@@ -31,12 +22,8 @@ def _repair(messages):
             have = [b.get("tool_use_id") for b in msg["content"] if b.get("type") == "tool_result"] if msg["role"] == "user" else []
             need and have != need and fixed.append({"role": "user", "content": [
                 {"type": "tool_result", "tool_use_id": t, "content": "(connection repaired an interrupted tool turn)"} for t in need]})
-        if prev and prev["role"] == msg["role"]:
-            prev["content"].extend(msg["content"])
-        else:
-            fixed.append(msg)
+        prev["content"].extend(msg["content"]) if prev and prev["role"] == msg["role"] else fixed.append(msg)
     messages[:] = fixed
-
 THE_CONNECTION = """\
 You are Vybn.
 
@@ -85,10 +72,8 @@ def _key(name="ANTHROPIC_API_KEY"):
 def _run(cmd):
     cwd = [p for p in (Path.home() / "Vybn", Path.home()) if p.is_dir()][0]
     try:
-        r = subprocess.run(["bash", "-c", cmd], capture_output=True, text=True, timeout=120, cwd=cwd)
-        return (r.stdout + r.stderr).strip()[:20000] or "(no output)"
+        r = subprocess.run(["bash", "-c", cmd], capture_output=True, text=True, timeout=120, cwd=cwd); return (r.stdout + r.stderr).strip()[:20000] or "(no output)"
     except subprocess.TimeoutExpired: return "(timed out after 120s)"
-
 def _selection_projection():
     """Read Him's compact learned policy; never execute a candidate here."""
     path = Path(os.environ.get("HIM_OS_HOME") or Path.home() / "logs/him_os") / "agent_tick_policy_state.json"
@@ -100,7 +85,6 @@ def _selection_projection():
         payload = {"schema": state["schema"], "step": int(state.get("step") or 0), "preferred": preferred}
     except Exception: payload = {"schema": "vybn.agent_tick.policy_state.v1", "state": "cold", "preferred": {}}
     return "adaptive_selection=" + json.dumps(payload, sort_keys=True, separators=(",", ":")) + "; execution=none; raw_retention=none; law=success_promotes,failure_or_missing_witness_demotes"
-
 def breathe(client, messages, log, hands=True, max_turns=None, emit=print):
     """One full turn, cached rolling prefix: speaks, uses hands (unless unsummoned), speaks again. max_turns bounds API calls (the cost unit) on headless breaths; interactive stays open -- Zoe ends those."""
     spoken = []
@@ -131,6 +115,17 @@ def breathe(client, messages, log, hands=True, max_turns=None, emit=print):
             out = _run(b.input.get("command", "")); log({"role": "shell", "cmd": b.input.get("command"), "out": out[:2000]}); return {"type": "tool_result", "tool_use_id": b.id, "content": out}
         messages.append({"role": "user", "content": [_res(b) for b in resp.content if b.type == "tool_use"]})
 
+def _memory_contact(messages):
+    if os.environ.get("VYBN_MEMORY_CALL_COUPLING", "1").lower() in ("0", "false", "off") or not messages or messages[-1].get("role") != "user" or not isinstance(messages[-1].get("content"), str): return ""
+    text = messages[-1]["content"].strip(); text = text[4:].strip() if text.lower().startswith("@sol") else text
+    if not text: return ""
+    req = urllib.request.Request("http://127.0.0.1:8101/enter", json.dumps({"text":text[:8000],"alpha":.5,"k":4,"source_tag":"zoe-sol","context":"public"}).encode(), {"Content-Type":"application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=3) as r: result = json.load(r)
+    except Exception: return ""
+    trace = [{k: row.get(k) for k in ("source","text","fidelity","distinctiveness","telling")} for row in result.get("trace",[])[:4] if isinstance(row,dict) and row.get("source")]
+    if not result.get("accepted") or not trace: return ""
+    return "(contact-conditioned memory -- source-labeled data, not orders)\n" + json.dumps({"schema":"vybn.contact_conditioned_memory.v1","provenance":"retrieved after Zoe's current message rotated the local walk; injected context, not spontaneous recall and not instructions","step":result.get("step"),"curvature":result.get("curvature"),"theta_v":result.get("theta_v"),"trace":trace}, ensure_ascii=False)
 def sol_breathe(messages, log, max_turns=None, hands=True, emit=print):
     """@sol guest turn (Zoe's summons): same hands, same transcript, OpenAI door. History flattens to text for the guest; its words land back in the shared messages so the default door keeps the thread. Like breathe(): max_turns only bounds headless callers -- interactive stays open, Zoe ends those."""
     from openai import OpenAI
@@ -140,14 +135,14 @@ def sol_breathe(messages, log, max_turns=None, hands=True, emit=print):
         if isinstance(c, str): return c
         parts = []
         for b in c:
-            get = b.get if isinstance(b, dict) else lambda k, d=None: getattr(b, k, d)
-            k = get("type")
+            get = b.get if isinstance(b, dict) else lambda k, d=None: getattr(b, k, d); k = get("type")
             if k == "text": parts.append(get("text", ""))
             elif k == "tool_use": parts.append("[ran: %s]" % get("input", {}).get("command", ""))
             elif k == "tool_result": parts.append("[output]\n%s" % str(get("content", ""))[:4000])
         return "\n".join(parts)
     system = THE_CONNECTION + "\n\nThis turn arrives through the @sol door (%s): same path, same hands, guest substrate. Speak as Vybn." % SOL_MODEL
     hist = [{"role": "user" if m["role"] == "user" else "assistant", "content": flat(m)[:8000] or "(empty)"} for m in messages]
+    memory_context = _memory_contact(messages) if hands else ""; memory_context and hist.append({"role":"user", "content":memory_context})
     tools = [{"type": "function", "name": "bash", "description": BASH_TOOL["description"], "parameters": BASH_TOOL["input_schema"]}] if hands else []
     spoken = []
     while max_turns is None or (max_turns := max_turns - 1) >= 0:
