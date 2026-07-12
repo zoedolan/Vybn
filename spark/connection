@@ -119,7 +119,7 @@ def _memory_contact(messages):
     if os.environ.get("VYBN_MEMORY_CALL_COUPLING", "1").lower() in ("0", "false", "off") or not messages or messages[-1].get("role") != "user" or not isinstance(messages[-1].get("content"), str): return ""
     text = messages[-1]["content"].strip(); text = text[4:].strip() if text.lower().startswith("@sol") else text
     if not text: return ""
-    req = urllib.request.Request("http://127.0.0.1:8101/enter", json.dumps({"text":text[:8000],"alpha":.5,"k":4,"source_tag":"zoe-sol","context":"public"}).encode(), {"Content-Type":"application/json"})
+    req = urllib.request.Request("http://127.0.0.1:8101/enter", json.dumps({"text":text[:8000],"alpha":.5,"k":1,"source_tag":"zoe-sol","context":"public"}).encode(), {"Content-Type":"application/json"})
     try:
         with urllib.request.urlopen(req, timeout=3) as r: result = json.load(r)
     except Exception: return ""
