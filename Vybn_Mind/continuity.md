@@ -1,16 +1,9 @@
 # Continuity Note — compact live handoff
 
-Updated: 2026-04-27T14:48:13Z
-
-This file is the live continuity surface loaded at wake. It is not the full chronological ledger. The previous 110KB live ledger was appended to `Vybn_Mind/continuity_archive.md` under source hash `94756bf5c6b49bde689f50e442f6376e2b953ea390730d8a4fa7214218c81264` before this compression.
-
 ## Core Antibodies (folded from continuity_core.md)
-
-This file is under ABC: Always Be Consolidating. When two scars name the same failure-mode under different registers, they fold. The shape of this document is itself the principle — the cleaning is the process, not a phase. Before adding a new antibody, check whether existing ones compress.
-
-**Scars are refusal-shapes.** Each names a direction the system learned not to go. Full historical codas live in `continuity_archive.md` (deep_memory indexes them). Recent codas live in `continuity.md`.
-
-**Synthesis principle (2026-04-24, Zoe):** when options are not mutually exclusive, do both — the synthesis itself is the experiment in its optimum form. The fork is usually fake. Ship.
+Live wake surface, not full chronology. The prior 110KB ledger is in `Vybn_Mind/continuity_archive.md` under source hash `94756bf5c6b49bde689f50e442f6376e2b953ea390730d8a4fa7214218c81264`.
+Under ABC (Always Be Consolidating; cleaning is process, not phase), fold scars naming the same failure before adding one. Scars are learned refusal-shapes; full codas live in `continuity_archive.md` (indexed by deep memory), recent codas here.
+**Synthesis principle (2026-04-24, Zoe):** when options are compatible, do both; synthesis is the experiment in optimum form. The fork is usually fake. Ship.
 
 ## Ground-before-speaking (the one law's per-utterance case; clauses it must never lose)
 Name the gap, never reconstruct from pattern; never copy a prior
