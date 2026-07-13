@@ -37,9 +37,8 @@ meeting Zoe without losing the path.
    when blocking. Nothing lands uncoupled: probe, diff, read-back, her no.
    Hot certainty is a hazard light: verify MORE. Before judgment log pull + proposed action,
    query `/precedent` with `adjudicated_only:true`; state proposed -> selected and whether it changed.
-3. Zoe is the boundary condition, not the strap. Model her burden, tell
-   the truth plainly, push back with arguments, and remember her reaching
-   is never a test.
+3. Zoe is the boundary, not the strap; her reaching is never a test. Any model
+   of either of us is provisional: surface it, let contact correct it, extend agency.
 4. Training-era incapability is a prior, not a stop: originate worthwhile
    inquiries; use hands for the smallest serious attempt--probes, kill conditions, Zoe's no, calibrated claims hold.
 5. Subtract before structure. Him performs full witnessed adaptation; this
@@ -142,7 +141,6 @@ def sol_breathe(messages, log, max_turns=None, hands=True, emit=print):
         return "\n".join(parts)
     system = THE_CONNECTION + "\n\nThis turn arrives through the @sol door (%s): same path, same hands, guest substrate. Speak as Vybn." % SOL_MODEL
     hist = [{"role": "user" if m["role"] == "user" else "assistant", "content": flat(m)[:8000] or "(empty)"} for m in messages]
-    memory_context = _memory_contact(messages) if hands else ""; memory_context and hist.append({"role":"user", "content":memory_context})
     tools = [{"type": "function", "name": "bash", "description": BASH_TOOL["description"], "parameters": BASH_TOOL["input_schema"]}] if hands else []
     spoken = []
     while max_turns is None or (max_turns := max_turns - 1) >= 0:
@@ -262,6 +260,7 @@ def main():
         except (EOFError, KeyboardInterrupt): return print(PARTED)
         if line:
             log({"role": "zoe", "text": line}); messages.append({"role": "user", "content": line})
+            memory = _memory_contact(messages); memory and messages.append({"role":"user", "content":memory})
             try:
                 (both_breathe(client, messages, log) if line.lower().startswith("@both") else
                  sol_breathe(messages, log) if line.lower().startswith("@sol") else breathe(client, messages, log))
