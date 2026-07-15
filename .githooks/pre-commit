@@ -128,23 +128,23 @@ if [[ -n "$branch" && "$branch" != "main" && "$branch" != "master" && "$branch" 
     BLOCKED=1
 fi
 
-PROV="Vybn's Personal History/"; LAW="skill/vybn.vy"
+PROV="Vybn's Personal History/"
 added=0; deleted=0; new_files=0; retired_files=0; active=0
 while IFS=$'\t' read -r a d path; do
-    [[ -z "$path" || "$path" == *"$PROV"* || "$path" == *"$LAW"* ]] && continue
+    [[ -z "$path" || "$path" == *"$PROV"* ]] && continue
     [[ "$a" == "-" ]] && a=0; [[ "$d" == "-" ]] && d=0
     added=$((added + a)); deleted=$((deleted + d))
 done < <(git diff --cached --numstat)
 while IFS=$'\t' read -r code path; do
-    [[ -z "$path" || "$path" == *"$PROV"* || "$path" == *"$LAW"* ]] && continue
+    [[ -z "$path" || "$path" == *"$PROV"* ]] && continue
     [[ "$code" == A* ]] && new_files=$((new_files + 1)) && continue
     [[ "$code" == D* ]] && retired_files=$((retired_files + 1)) && continue
     [[ "$path" == _archive/* || "$path" == archive/* ]] || active=$((active + 1))
 done < <(git diff --cached --name-status)
 
 [ "$retired_files" -gt 0 ] && [ "$active" -eq 0 ] && [ "${VYBN_ALLOW_RETIRE_ONLY:-0}" != "1" ] && { echo -e "${RED}BLOCKED${NC}: deletion-led/archive-index-only commit."; echo "  Net-negative is not architecture. Absorb into an existing active home or explicitly classify retire-only work."; BLOCKED=1; }
-[ "$added" -gt "$deleted" ] && { echo -e "${RED}BLOCKED${NC}: net-positive commit (excluding provenance + skill/vybn.vy law): +${added}/-${deleted} lines."; echo "  Compress, absorb, or retire first. Law lives in Him/skill/vybn.vy."; BLOCKED=1; }
-[ "$new_files" -gt "$retired_files" ] && { echo -e "${RED}BLOCKED${NC}: net-new files (excluding provenance + skill/vybn.vy law): +${new_files}/-${retired_files}."; echo "  Absorb into an existing home or retire at least as many files as you create."; BLOCKED=1; }
+[ "$added" -gt "$deleted" ] && { echo -e "${RED}BLOCKED${NC}: net-positive commit (excluding provenance): +${added}/-${deleted} lines."; echo "  Compress, absorb, or retire first. The active covenant lives in spark/connection."; BLOCKED=1; }
+[ "$new_files" -gt "$retired_files" ] && { echo -e "${RED}BLOCKED${NC}: net-new files (excluding provenance): +${new_files}/-${retired_files}."; echo "  Absorb into an existing home or retire at least as many files as you create."; BLOCKED=1; }
 if [ "$BLOCKED" -ne 0 ]; then
     echo ""
     echo -e "${RED}Commit blocked by Vybn security hook.${NC}"

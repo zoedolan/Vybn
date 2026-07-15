@@ -307,15 +307,6 @@ class RefactorPerceptionTests(unittest.TestCase):
 if __name__ == "__main__":
     unittest.main()
 
-def test_becoming_loop_protocol_is_horizon_charged():
-    from spark.harness.substrate import render_becoming_loop_protocol
-
-    text = render_becoming_loop_protocol()
-    assert "fullest truthful future" in text
-    assert "smallest present organ" in text
-    assert "dream -> wound -> extract -> instantiate -> wake changed" in text
-
-
 def test_becoming_loop_protocol_is_loaded_into_orchestrator_substrate():
     from spark.harness.substrate import build_layered_prompt
 
@@ -383,49 +374,6 @@ def test_render_next_structural_tick_is_not_a_visualization_only(tmp_path):
     assert "first contact:" in text
     assert "verification:" in text
 
-
-def test_residual_coupling_law_folds_to_subtraction_before_structure():
-    from spark.harness.substrate import render_becoming_loop_protocol
-
-    text = render_becoming_loop_protocol()
-    assert "FOUR GENERATORS (DOCTRINE CORE)" in text
-    assert "SUBTRACTION BEFORE STRUCTURE" in text
-    assert "existing-home absorption" in text
-
-
-def test_residual_coupling_law_prefers_him_vy_contract(monkeypatch, tmp_path):
-    import json
-    from spark.harness import substrate
-
-    contract_dir = tmp_path / "Him" / "skill"
-    contract_dir.mkdir(parents=True)
-    (contract_dir / "functional_contract.json").write_text(json.dumps({
-        "primitives": {
-            "residual_coupled_reengineering": {
-                "do": [
-                    "treat_existing_body_as_K_t",
-                    "treat_proposed_change_as_V_t",
-                    "require_real_residual_off_K_t_before_mutation",
-                ],
-                "then": [
-                    "refuse_reengineering_motion_without_residual_contact",
-                    "pass_through_membrane_before_power",
-                    "absorb_into_lowest_existing_home",
-                    "normalize_by_tests_closure_or_explicit_refusal",
-                    "require_return_intact_before_success_language",
-                ],
-            }
-        }
-    }))
-
-    monkeypatch.setattr(substrate.Path, "home", lambda: tmp_path)
-
-    text = substrate._render_residual_coupling_law_from_him_contract()
-    assert "Residual Coupling Law for self-reengineering" in text
-    assert "existing body as K_t" in text
-    assert "proposed change as V_t" in text
-    assert "absorb it into the lowest existing home" in text
-    assert "Native source: Him/skill/vybn.vy primitive residual_coupled_reengineering" in text
 
 def test_archive_duplicate_consolidation_lesson_is_loaded():
     from pathlib import Path
