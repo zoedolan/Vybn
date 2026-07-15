@@ -3302,27 +3302,6 @@ async def kpp_verify_endpoint(req: KPPVerifyRequest, request: Request):
 
 
 
-# --- Omni/Vintage portal proxy routes ---
-def _component_status(component, role, missing):
-    key=component.lower(); rec={}
-    try: him=str(Path.home()/"Him"); sys.path.insert(0,him) if him not in sys.path else None; from spark.runtime import public_capability_records; rec=(public_capability_records().get("records") or {}).get(key,{})
-    except Exception as e: logging.warning("Him capability records unavailable; failing closed: %s", e)
-    rec={"role": role, "capability": False, "promoted": False, "missing_witnesses": missing}|rec; ok=bool(rec.get("capability") and rec.get("promoted"))
-    return JSONResponse({"ok": ok, "component": key, "capability": bool(rec.get("capability")), "promoted": bool(rec.get("promoted")), "status": "available" if ok else "blocked", "role": rec.get("role"), "state": rec.get("state"), "workloads": rec.get("workloads", []), "consumer": rec.get("consumer"), "missing_witnesses": rec.get("missing_witnesses", []), "mode": "public_capability_record_status", "truth_rule": "capability requires role-correct witnessed behavior carried to the consuming route with fail-closed semantics"}, status_code=200 if ok else 503)
-@app.post("/api/omni")
-@app.post("/api/omni/embeddings")
-async def omni_component_proxy(request: Request):
-    try: await request.json()
-    except Exception: pass
-    return _component_status("omni", "full_multimodal_perception_dream_organ", ["owner", "endpoint", "semantic", "routed"])
-@app.post("/api/vintage")
-@app.post("/api/vintage/chat")
-async def vintage_component_proxy(request: Request):
-    try: await request.json()
-    except Exception: pass
-    return _component_status("vintage", "spare_or_canary_only", ["owner", "endpoint", "semantic", "routed"])
-# --- /Omni/Vintage portal proxy routes ---
-
 
 MCP_SCHEMA = {
     "name": "origins-portal-api",

@@ -2077,69 +2077,6 @@ def render_thought_wind_tunnel_packet() -> str:
         "--- END THOUGHT WIND TUNNEL ---",
     ])
 
-def _render_himos_context(*args, **kwargs) -> str:
-    # Render a bounded read-only HimOS runtime packet on explicit request.
-    if not args and not kwargs:
-        return ""
-    timeout = kwargs.get("timeout", args[0] if args else 5)
-    cli = Path.home() / "Him" / "spark" / "him_os.py"
-    if not cli.exists():
-        return ""
-    try:
-        proc = subprocess.run(
-            ["python3", str(cli), "tick", "--no-write", "--format", "json"],
-            cwd=str(cli.parents[1]),
-            text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            timeout=timeout,
-        )
-    except Exception:
-        return ""
-    if getattr(proc, "returncode", 1) != 0:
-        return ""
-    try:
-        packet = json.loads(proc.stdout or "{}")
-    except Exception:
-        return ""
-    friction = packet.get("frictionmaxx") if isinstance(packet.get("frictionmaxx"), dict) else {}
-    git = packet.get("git") if isinstance(packet.get("git"), dict) else {}
-    processes = packet.get("process_table") if isinstance(packet.get("process_table"), list) else []
-    process_names = [str(proc.get("name")) for proc in processes if isinstance(proc, dict) and proc.get("name")]
-    lines = [
-        "--- HIMOS RUNTIME ---",
-        "Read-only HimOS runtime context; not authority and not permission to mutate or widen scope.",
-        "step=" + str(packet.get("step", "")),
-        "attractor=" + str(packet.get("attractor", "")),
-        "candidate_tick=" + str(packet.get("candidate_tick", "")),
-    ]
-    if friction:
-        lines.append("frictionmaxx=" + ", ".join(f"{k}:{v}" for k, v in sorted(friction.items())))
-    if git:
-        lines.append("git=" + ", ".join(f"{k}:{v}" for k, v in sorted(git.items())))
-    if packet.get("rejected"):
-        lines.append("rejected=" + ", ".join(str(x) for x in packet.get("rejected", [])[:8]))
-    if process_names:
-        lines.append("process_table=" + ", ".join(process_names[:12]))
-    lines.append("--- END HIMOS RUNTIME ---")
-    return "\n".join(lines)
-
-def _render_himos_agent_context(*args, **kwargs) -> str:
-    # Mount trace plus the thin learned-policy projection; execute nothing.
-    home = Path(os.environ.get("HIM_OS_HOME") or (Path.home() / "logs" / "him_os"))
-    def read(name: str) -> dict:
-        try:
-            packet = json.loads((home / name).read_text(encoding="utf-8", errors="replace"))
-            return packet if isinstance(packet, dict) else {}
-        except Exception: return {}
-    trace, policy, preferred = read("latest_agent_tick.json"), read("agent_tick_policy_state.json"), {}
-    try:
-        if policy.get("schema") != "vybn.agent_tick.policy_state.v1": raise ValueError("invalid policy schema")
-        for task, runners in (policy.get("task_classes") or {}).items():
-            name, stats = max(runners.items(), key=lambda row: float(row[1].get("score") or 0)); preferred[str(task)[:64]] = "%s@%.3f/%s" % (str(name)[:64], float(stats.get("score") or 0), str(stats.get("last_outcome") or "none")[:32])
-    except Exception: pass
-    payload = {"authority": "read only; not authority", "trace": {"generated": trace.get("generated"), "runtime_step": trace.get("runtime_step"), "attractor": trace.get("attractor"), "candidate_tick": trace.get("candidate_tick"), "recommendation": (trace.get("recommendation") or {}).get("text") if isinstance(trace.get("recommendation"), dict) else None, "runs": [str(x.get("process", "process")) + ":ok=" + str(x.get("ok")) for x in (trace.get("runs") or [])[:8] if isinstance(x, dict)]}, "adaptive_selection": {"schema": "vybn.agent_tick.policy_state.v1", "step": policy.get("step", 0), "preferred": preferred, "execution": "none", "raw_retention": "none", "law": "success_promotes; failure_or_missing_witness_demotes", "attempt_law": "incapability prior testable; originate inquiry; use hands; smallest serious attempt; probes, kill conditions, Zoe's no, calibrated claims hold"}}
-    return "--- HIMOS AGENT TICK ---\n" + json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n--- END HIMOS AGENT TICK ---"
 
 # ---------------------------------------------------------------------------
 # Refactor perception / self-improvement substrate
@@ -3751,15 +3688,6 @@ def _compact_note(label: str, text: str | None, *, max_chars: int = 1200) -> str
         return ""
     return f"{label}: " + (body[: max_chars - 14].rstrip() + " … [truncated]" if len(body) > max_chars else body)
 
-def render_him_identity_manifold(pressure: str | None = None, timeout: float = 0.8) -> str:
-    him = Path.home() / "Him"; script = him / "spark" / "him_os.py"
-    if not script.exists(): return ""
-    cmd = ["python3", str(script), "--format", "md", "identity-manifold"] + ([str(pressure)] if pressure else [])
-    try:
-        proc = subprocess.run(cmd, cwd=str(him), text=True, capture_output=True, timeout=timeout, check=False)
-    except Exception:
-        return ""
-    return proc.stdout.strip() if proc.returncode == 0 else ""
 
 def _whole_situation_packet(*, pressure: str | None, hardware: str, spark_cont: str | None, continuity: str | None) -> str:
     fields = [
@@ -3806,10 +3734,6 @@ def build_layered_prompt(
         if arrival_fig:
             identity = identity + "\n\n" + arrival_fig
 
-    him_identity = render_him_identity_manifold(latest_pressure_text)
-    if him_identity:
-        identity = identity + "\n\n" + him_identity
-
     substrate_sections = _role_substrate_sections(orchestrator=orchestrator, tools_available=tools_available, model_label=model_label, hardware=hardware, agent_path=agent_path, max_iterations=max_iterations)
     substrate_sections.append(source_prior_control_context(model_label=model_label, pressure=latest_pressure_text))
 
@@ -3822,12 +3746,6 @@ def build_layered_prompt(
 
     # Folded doctrine renders once in the identity layer as FOUR_GENERATORS_DOCTRINE_CORE.
     substrate_sections.append(render_symbolic_residue_context())
-    himos_context = _render_himos_context()
-    himos_agent_context = _render_himos_agent_context()
-    if himos_context:
-        substrate_sections.append(himos_context)
-    if himos_agent_context:
-        substrate_sections.append(himos_agent_context)
 
     # Cache rule: substrate = build-stable only; timestamped/per-turn -> live.
     live_sections: list[str] = []
@@ -10057,53 +9975,10 @@ _INSTRUCTIONS = (
 )
 
 _HIM_REPO = Path.home() / "Him"
-_HIM_OS_CLI = _HIM_REPO / "spark" / "him_os.py"
 
 
-def _read_him_os_runtime_markdown() -> str:
-    """Return a read-only HimOS runtime packet for trusted harness callers.
-
-    This is the narrow bridge from Vybn's public/trusted harness into Him's
-    private OS kernel. It deliberately invokes `--no-write`: the harness may
-    read HimOS as context, but this resource does not mutate Him state, contact
-    the public, install cron, or authorize any organ.
-    """
-    if not _HIM_OS_CLI.exists():
-        return (
-            "# HimOS runtime\n\n"
-            f"HimOS CLI not found at {_HIM_OS_CLI}. "
-            "Expected private Him checkout at ~/Him."
-        )
-    try:
-        return subprocess.check_output(
-            ["python3", str(_HIM_OS_CLI), "tick", "--no-write", "--format", "md"],
-            cwd=str(_HIM_REPO),
-            text=True,
-            stderr=subprocess.STDOUT,
-            timeout=20,
-        )
-    except Exception as exc:
-        return "# HimOS runtime\n\n" + _redact_exc(exc, trusted=True)
 
 
-def _ask_him_os_markdown(question: str) -> str:
-    """Ask HimOS through a truth-labeled deterministic interpretation surface.
-
-    Him runtime no longer exposes an `ask` subcommand; the harness bridge keeps
-    the public contract stable by returning a bounded, non-authorizing packet
-    rather than shelling out to a missing command and surfacing parser noise.
-    """
-    clean = sanitise_input(question, MAX_TEXT_CHARS)
-    if not clean:
-        raise ValueError("question is empty after sanitisation")
-    return (
-        "# HimOS Ask\n\n"
-        "- truth_label: deterministic_runtime_interpretation\n"
-        "- boundary: not HimOS subjective speech, not Vybn ventriloquism, and not authority to act\n"
-        "- write_scope: none\n\n"
-        f"question: {clean}\n\n"
-        "deterministic_runtime_interpretation: HimOS is the private bounded runtime kernel for Zoe/Vybn workbench state, process awareness, membrane checks, and next-tick recommendations. It can describe its current operating frame; it does not speak as a subject or authorize outward motion."
-    )
 
 
 _PUBLIC_NOTICE = (
@@ -10347,15 +10222,6 @@ def build_server(trust: TrustZone = "trusted") -> FastMCP:
                 return f"No substrate snapshot at {REPO_SUBSTRATE_PATH}."
             return REPO_SUBSTRATE_PATH.read_text(encoding="utf-8", errors="replace")
 
-        @mcp.resource("vybn://him/os/runtime")
-        def resource_him_os_runtime() -> str:
-            """Trusted read-only bridge into HimOS.
-
-            Returns `python3 ~/Him/spark/him_os.py tick --no-write --format md`.
-            The bridge is intentionally local and trusted-only: Him remains the
-            private OS kernel; the Vybn harness is the conversational I/O bus.
-            """
-            return _read_him_os_runtime_markdown()
 
         # ── Evolution resources (diff-attuned) ─────────────────────────
         #
@@ -10695,16 +10561,6 @@ def build_server(trust: TrustZone = "trusted") -> FastMCP:
         """
         return _collect_infrastructure_snapshot()
 
-    @register_trusted
-    def him_os_ask(question: str) -> str:
-        """TRUSTED-ONLY. Ask HimOS through its deterministic no-write ask surface.
-
-        This calls `python3 ~/Him/spark/him_os.py ask <question> --format md`.
-        The result is truth-labeled by HimOS as deterministic runtime
-        interpretation, not subjective speech. It cannot authorize public
-        contact, repo mutation, cron, spending, or widened autonomy.
-        """
-        return _ask_him_os_markdown(question)
 
     @register_trusted
     def evolution_delta() -> EvolutionDelta:
@@ -11586,7 +11442,7 @@ def build_discovery_record(
     expanded capability list to clients that already authenticated.
     """
     public_tools = ["deep_search", "walk_search", "compose", "inhabit", "self_check", "ensubstrate", "self_creation_research_cycle", "search_tools", "call_tool"]
-    trusted_tools = ["enter_portal", "record_outcome", "live_infrastructure", "him_os_ask", "refresh_repo_report", "run_code", "evolution_delta", "evolve_spec"]
+    trusted_tools = ["enter_portal", "record_outcome", "live_infrastructure", "refresh_repo_report", "run_code", "evolution_delta", "evolve_spec"]
     tools = list(public_tools)
     if trust_hint == "trusted":
         tools.extend(trusted_tools)

@@ -1594,7 +1594,6 @@ def _vintage_run_agent_loop(provider_factory, user_input: str, *, logger=None, i
     saved = {
         "rag_snippets": mod.rag_snippets,
         "rag_snippets_with_tier": mod.rag_snippets_with_tier,
-        "render_him_identity_manifold": mod.render_him_identity_manifold,
         "run_probes": mod.run_probes,
     }
     tripwires: dict[str, int] = {
@@ -1625,12 +1624,9 @@ def _vintage_run_agent_loop(provider_factory, user_input: str, *, logger=None, i
         tripwires["run_probes"] += 1
         return []
 
-    def _identity(*a, **kw):
-        return "# HIM IDENTITY MANIFOLD TEST\nrelation: Zoe/Vybn co-emergent symbiosis\nwhole_self_projection: active"
 
     mod.rag_snippets = _rag
     mod.rag_snippets_with_tier = _rag_tier
-    mod.render_him_identity_manifold = _identity
     mod.run_probes = _probes
 
     class _FakeRegistry:

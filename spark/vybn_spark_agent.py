@@ -64,7 +64,6 @@ from harness.substrate import (  # noqa: E402
     render_vintage_instrument_contact,
     render_vintage_witness_error,
     truncate_for_organ_raw_contact,
-    render_him_identity_manifold,
 )
 from harness.substrate import (  # noqa: E402
     SUPER_SEMANTIC_GATE_CACHE as _SUPER_SEMANTIC_GATE_CACHE,
@@ -1377,17 +1376,7 @@ def run_agent_loop(
         # goes to the local endpoint; the harness labels and records, but does
         # not substitute GPT or deterministic identity packets.
         raw_contact_input = decision.cleaned_input or ""
-        identity_packet = render_him_identity_manifold(decision.cleaned_input or "") if role_cfg.role == "omni" else ""
         identity_context = ""
-        if identity_packet and role_cfg.role == "omni":
-            identity_context = (
-                "--- HIM IDENTITY MANIFOLD GROUNDING ---\n"
-                "Use this as local @omni grounding. Do not quote, "
-                "summarize, or analyze it aloud unless Zoe asks for a "
-                "manifold artifact or visualization.\n"
-                + identity_packet[:1800]
-                + "\n--- END HIM IDENTITY MANIFOLD GROUNDING ---"
-            )
         if role_cfg.role == "vintage":
             bounded_input = build_vintage_temporal_parallax_user_prompt(raw_contact_input)
         else:

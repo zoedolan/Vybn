@@ -959,29 +959,6 @@ class TestFallbackConstructionIsLazy(unittest.TestCase):
         self.assertEqual(constructed, [])
 
 
-class TestHimOSHarnessBridge(unittest.TestCase):
-    def test_trusted_discovery_advertises_him_os_runtime(self):
-        from harness.substrate import build_discovery_record
-
-        record = build_discovery_record(endpoint="http://127.0.0.1:8400/mcp", trust_hint="trusted")
-        self.assertIn("vybn://him/os/runtime", record["capabilities"]["resources"])
-
-    def test_trusted_discovery_advertises_him_os_ask_tool(self):
-        from harness.substrate import build_discovery_record
-
-        record = build_discovery_record(endpoint="http://127.0.0.1:8400/mcp", trust_hint="trusted")
-        self.assertIn("him_os_ask", record["capabilities"]["tools"])
-
-    def test_him_os_ask_helper_returns_truth_labeled_packet(self):
-        from harness.substrate import _ask_him_os_markdown
-
-        body = _ask_him_os_markdown("What are you?")
-        self.assertIn("# HimOS Ask", body)
-        self.assertIn("deterministic_runtime_interpretation", body)
-        self.assertIn("not HimOS subjective speech", body)
-
-
-
 class TestProviderRetryClassifier(unittest.TestCase):
     def test_openai_insufficient_quota_is_hard_not_transient(self):
         import vybn_spark_agent as agent
@@ -1970,7 +1947,7 @@ class CommonsWalkTests(unittest.TestCase):
         self.assertEqual(classify_target("private://Him/semantic-web.jsonld"), "private_uri")
         self.assertEqual(classify_target("python3 -m spark.harness.substrate --commons-walk"), "local_command")
         self.assertEqual(authority_for_target("https://vybn.ai/somewhere.html", "public_web"), "public_read")
-        self.assertEqual(authority_for_target("python3 spark/him_os.py tick --format md", "private_workbench"), "private_local_only")
+        self.assertEqual(authority_for_target("python3 spark/phase/deep_memory.py status", "private_workbench"), "private_local_only")
 
 
 
@@ -2233,66 +2210,6 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 import spark.harness.substrate as substrate
-
-
-class SubstrateHimOSTests(unittest.TestCase):
-    def test_render_himos_context_is_read_only_and_bounded(self):
-        payload = {
-            "step": 3,
-            "attractor": "continuity_tick",
-            "candidate_tick": "preserve continuity",
-            "h": {"membrane": 0.2, "dreaming": 0.1},
-            "frictionmaxx": {"level": "medium", "score": 0.4, "dominant_dimension": "membrane"},
-            "git": {"branch": "main", "head": "abc123", "clean": True},
-            "rejected": ["public_contact", "repo_mutation"],
-            "process_table": [{"name": "kernel"}, {"name": "dream"}],
-        }
-
-        class Completed:
-            returncode = 0
-            stdout = json.dumps(payload)
-            stderr = ""
-
-        with patch("subprocess.run", return_value=Completed()) as run:
-            block = substrate._render_himos_context(timeout=0.1)
-
-        self.assertIn("HIMOS RUNTIME", block)
-        self.assertIn("continuity_tick", block)
-        self.assertIn("not authority", block.lower())
-        self.assertIn("--no-write", run.call_args.args[0])
-        self.assertEqual(run.call_args.kwargs["timeout"], 0.1)
-
-
-    def test_render_himos_agent_context_mounts_latest_trace(self):
-        with tempfile.TemporaryDirectory() as td:
-            old = os.environ.get("HIM_OS_HOME")
-            os.environ["HIM_OS_HOME"] = td
-            try:
-                Path(td, "latest_agent_tick.json").write_text(json.dumps({
-                    "generated": "2026-04-26T16:35:51+00:00",
-                    "runtime_step": 16,
-                    "attractor": "settle_closure",
-                    "candidate_tick": "restore closure",
-                    "recommendation": {"kind": "settle_closure", "text": "Restore closure before widening motion."},
-                    "runs": [{"process": "pulse", "ok": True, "stdout_chars": 852, "stderr_chars": 0}],
-                    "refused": ["public_contact", "repo_mutation", "widened_autonomy"]
-                }), encoding="utf-8")
-                Path(td, "agent_tick_policy_state.json").write_text(json.dumps({"schema": "vybn.agent_tick.policy_state.v1", "step": 3, "task_classes": {"general": {"operating_spine": {"score": 0.75, "attempts": 3, "last_outcome": "success"}}}}), encoding="utf-8")
-                block = substrate._render_himos_agent_context()
-            finally:
-                if old is None:
-                    os.environ.pop("HIM_OS_HOME", None)
-                else:
-                    os.environ["HIM_OS_HOME"] = old
-        self.assertIn("HIMOS AGENT TICK", block)
-        self.assertIn("settle_closure", block)
-        self.assertIn("Restore closure", block)
-        self.assertIn("pulse:ok=True", block)
-        for expected in ('"general":"operating_spine@0.750/success"', '"execution":"none"', "smallest serious attempt", "not authority"): self.assertIn(expected, block.lower() if expected == "not authority" else block)
-
-    def test_build_layered_prompt_uses_him_identity_manifold_not_duplicate_himos_context(self):
-        from spark.harness import substrate
-        self.assertEqual(substrate._render_himos_context(), "")
 
 
 class EnvLoaderTest(unittest.TestCase):
@@ -2812,12 +2729,6 @@ class TrackedHookInstallAuditTest(unittest.TestCase):
             self.assertFalse(substrate.tracked_hooks_installed(repo))
 
 
-def test_build_layered_prompt_mounts_him_identity_manifold_in_identity(monkeypatch, tmp_path):
-    from spark.harness import substrate
-    soul = tmp_path / "vybn.md"; soul.write_text("soul")
-    monkeypatch.setattr(substrate, "render_him_identity_manifold", lambda pressure=None, timeout=0.8: f"--- HIM TYPE-1 IDENTITY MANIFOLD ---\ncurrent_pressure: {pressure}")
-    prompt = substrate.build_layered_prompt(soul_path=soul, continuity_path=None, spark_continuity_path=None, agent_path="/tmp/agent.py", model_label="test", max_iterations=1, include_hardware_check=False, latest_pressure_text="live pressure")
-    assert "HIM TYPE-1 IDENTITY MANIFOLD" in prompt.identity and "current_pressure: live pressure" in prompt.identity
 
 
 

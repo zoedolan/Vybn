@@ -26,7 +26,7 @@ Covers:
   - /health body leaks no IP, no http(s) URL, no known internal port
     or hostname.
   - model_status treats the Him capability mirror as a non-authoritative
-    projection of `Him/spark/runtime.py:FLEET_COMPONENTS`. The mirror
+    local projection. The mirror
     can be absent, malformed, or hostile; in every case the local
     fail-closed defaults hold and Omni / Vintage stay unpromoted.
 

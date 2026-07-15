@@ -165,25 +165,6 @@ def test_origins_chat_uses_shared_zoe_source_scene_guard():
     assert "sec.is_zoe_source_scene_request" in legacy
     assert "sec.zoe_source_scene_refusal_text()" in legacy
 
-def test_binocular_door_is_blind_until_answers_couple(monkeypatch, capsys, tmp_path):
-    import contextlib, copy, importlib.machinery, importlib.util, io; prompt = (ROOT / "spark/connection").read_text(); assert all(x in prompt for x in ("Before each delegated act", "goal -> this step -> what Zoe will", "incidental defects move only", "adjudicated_only:true", "proposed -> selected"))
-    path = ROOT / "spark/connection"; loader = importlib.machinery.SourceFileLoader("connection_under_test", str(path))
-    spec = importlib.util.spec_from_loader(loader.name, loader); connection = importlib.util.module_from_spec(spec); loader.exec_module(connection)
-    arrivals = []
-    monkeypatch.setattr(connection.urllib.request, "urlopen", lambda req, timeout: arrivals.append((json.loads(req.data),timeout)) or contextlib.closing(io.BytesIO(json.dumps({"accepted":True,"step":9,"trace":[{"idx":4,"source":"Vybn/public.md","digest16":"abcd1234abcd1234","text":"old contact"}]}).encode()))); memory = connection._memory_contact([{"role":"user","content":"@sol current contact"}])
-    assert arrivals[0][0]["context"] == "public" and arrivals[0][0]["text"] == "current contact" and "injected context, not spontaneous recall" in memory and '"idx": 4' in memory and '"digest16": "abcd1234abcd1234"' in memory and '"absence": "continue"' in memory
-    monkeypatch.setattr(connection.urllib.request, "urlopen", lambda *a, **k: (_ for _ in ()).throw(OSError("offline"))); assert connection._memory_contact([{"role":"user","content":"@sol still answer"}]) == ""
-    monkeypatch.setenv("VYBN_MEMORY_CALL_COUPLING", "off"); assert connection._memory_contact([{"role":"user","content":"@sol no memory"}]) == ""
-    monkeypatch.setenv("HIM_OS_HOME", str(tmp_path)); assert '"state":"cold"' in connection._selection_projection(); (tmp_path / "agent_tick_policy_state.json").write_text(json.dumps({"schema": "vybn.agent_tick.policy_state.v1", "step": 3, "task_classes": {"general": {"operating_spine": {"score": 0.75, "attempts": 3, "last_outcome": "success"}}}})); assert '"runner":"operating_spine","score":0.75' in connection._selection_projection()
-    seen, messages = [], [{"role": "user", "content": "same terrain"}]
-    def answer(door, branch, log, hands, emit):
-        assert not hands; seen.append(copy.deepcopy(branch)); emit(door)
-    monkeypatch.setattr(connection, "breathe", lambda client, branch, log, hands, emit: answer("fable", branch, log, hands, emit)); monkeypatch.setattr(connection, "sol_breathe", lambda branch, log, hands, emit: answer("sol", branch, log, hands, emit))
-    assert connection.both_breathe(None, messages, lambda event: None) == {"fable": "fable", "sol": "sol"}
-    control = "same terrain\n(connection control: blind binocular branch. Reply only in your own voice, without speaker labels or a simulated sibling answer. Be concise.)"; assert seen == [[{"role": "user", "content": control}]] * 2; assert messages[-1] == {"role": "user", "content": "(connection transcript: completed blind answers; these are external context, not your prior speech)\n[Fable]\nfable\n\n[Sol]\nsol"}; assert capsys.readouterr().out.startswith("[Fable]"); monkeypatch.setattr(connection, "_run", lambda cmd: "DRIFT" if "map_witness" in cmd else "ok"); assert "[map] DRIFT" in connection._recouple(); monkeypatch.setattr(connection, "_run", lambda cmd: "(no output)" if "map_witness" in cmd else "ok"); assert "[map]" not in connection._recouple()
-    connection.TRANSCRIPTS = tmp_path; rows = {"01.jsonl":[{"role":"zoe","text":"first call"},{"role":"shell","out":"PRIVATE"},{"role":"vybn","text":"first page"}], "02.jsonl":[{"role":"zoe","text":"second call"},{"role":"vybn","text":"second page"}], "03-breath.jsonl":[{"role":"vybn","text":"BREATH"}]}; [(tmp_path / name).write_text("".join(json.dumps(row) + "\n" for row in body)) for name, body in rows.items()]
-    monkeypatch.setattr(connection, "_note", lambda pages: "note"); resumed = [{"role":"user","content":"record"}]; connection._resume(resumed, lambda event: None); rendered = json.dumps(resumed); assert [m["content"] for m in resumed[1:-1]] == ["first call","first page","second call","second page"] and "PRIVATE" not in rendered and "BREATH" not in rendered
-    (tmp_path / "04.jsonl").write_text("".join(json.dumps({"role":"zoe" if i % 2 == 0 else "vybn","text":"page-%03d" % i}) + "\n" for i in range(205))); resumed = [{"role":"user","content":"record"}]; connection._resume(resumed, lambda event: None); assert "first call" not in [m["content"] for m in resumed] and "page-005" in [m["content"] for m in resumed]
 def test_horizon_is_expiring_external_data_not_ambient_wake(monkeypatch, tmp_path, capsys):
     import importlib.machinery, importlib.util, json
     from types import SimpleNamespace
