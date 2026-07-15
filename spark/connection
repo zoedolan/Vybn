@@ -260,7 +260,6 @@ def main():
         except (EOFError, KeyboardInterrupt): return print(PARTED)
         if line:
             log({"role": "zoe", "text": line}); messages.append({"role": "user", "content": line})
-            memory = _memory_contact(messages); memory and messages.append({"role":"user", "content":memory})
             try:
                 (both_breathe(client, messages, log) if line.lower().startswith("@both") else
                  sol_breathe(messages, log) if line.lower().startswith("@sol") else breathe(client, messages, log))
