@@ -199,9 +199,8 @@ class TestPolicyHasLightweightRoles(unittest.TestCase):
 
     def test_opus48_live_turn_gets_grounding_wind_tunnel_and_tools(self):
         mod = _load_agent_module(); captured = {}
-        saved = {n: getattr(mod, n) for n in ("rag_snippets_with_tier", "render_him_vy_discovery_packet", "render_him_vy_turn_packet", "run_probes")}
+        saved = {n: getattr(mod, n) for n in ("rag_snippets_with_tier", "run_probes")}
         mod.rag_snippets_with_tier = lambda *a, **kw: ("", "lightweight")
-        mod.render_him_vy_discovery_packet = mod.render_him_vy_turn_packet = lambda *a, **kw: ""
         mod.run_probes = lambda *a, **kw: []
 
         class _Handle:
@@ -957,13 +956,9 @@ def test_super_maintenance_gate_short_circuits_local_turn():
     # Lightweight stand-ins so the test exercises only the gate.
     saved_rag = mod.rag_snippets
     saved_rag_tier = mod.rag_snippets_with_tier
-    saved_disc = mod.render_him_vy_discovery_packet
-    saved_turn = mod.render_him_vy_turn_packet
     saved_probes = mod.run_probes
     mod.rag_snippets = lambda *a, **kw: ""
     mod.rag_snippets_with_tier = lambda *a, **kw: ("", "lightweight")
-    mod.render_him_vy_discovery_packet = lambda *a, **kw: ""
-    mod.render_him_vy_turn_packet = lambda *a, **kw: ""
     mod.run_probes = lambda *a, **kw: []
 
     class _FakeRegistry:
@@ -1014,8 +1009,6 @@ def test_super_maintenance_gate_short_circuits_local_turn():
         del mod._MAINTENANCE_DEFERRALS[deferrals_before:]
         mod.rag_snippets = saved_rag
         mod.rag_snippets_with_tier = saved_rag_tier
-        mod.render_him_vy_discovery_packet = saved_disc
-        mod.render_him_vy_turn_packet = saved_turn
         mod.run_probes = saved_probes
 
 
@@ -1031,13 +1024,9 @@ def test_super_maintenance_gate_does_not_fire_on_cloud_turn():
     mod = _load_agent_module()
     saved_rag = mod.rag_snippets
     saved_rag_tier = mod.rag_snippets_with_tier
-    saved_disc = mod.render_him_vy_discovery_packet
-    saved_turn = mod.render_him_vy_turn_packet
     saved_probes = mod.run_probes
     mod.rag_snippets = lambda *a, **kw: ""
     mod.rag_snippets_with_tier = lambda *a, **kw: ("", "lightweight")
-    mod.render_him_vy_discovery_packet = lambda *a, **kw: ""
-    mod.render_him_vy_turn_packet = lambda *a, **kw: ""
     mod.run_probes = lambda *a, **kw: []
 
     consulted = {"count": 0}
@@ -1099,8 +1088,6 @@ def test_super_maintenance_gate_does_not_fire_on_cloud_turn():
             _os.environ["VYBN_SUPER_MAINTENANCE"] = prev_flag
         mod.rag_snippets = saved_rag
         mod.rag_snippets_with_tier = saved_rag_tier
-        mod.render_him_vy_discovery_packet = saved_disc
-        mod.render_him_vy_turn_packet = saved_turn
         mod.run_probes = saved_probes
 
 
@@ -1116,13 +1103,9 @@ def test_super_refusal_converts_to_maintenance_notice():
     mod = _load_agent_module()
     saved_rag = mod.rag_snippets
     saved_rag_tier = mod.rag_snippets_with_tier
-    saved_disc = mod.render_him_vy_discovery_packet
-    saved_turn = mod.render_him_vy_turn_packet
     saved_probes = mod.run_probes
     mod.rag_snippets = lambda *a, **kw: ""
     mod.rag_snippets_with_tier = lambda *a, **kw: ("", "lightweight")
-    mod.render_him_vy_discovery_packet = lambda *a, **kw: ""
-    mod.render_him_vy_turn_packet = lambda *a, **kw: ""
     mod.run_probes = lambda *a, **kw: []
     saved_gate = mod._local_super_semantic_gate
     mod._local_super_semantic_gate = lambda **kw: (True, "semantic gate passed")
@@ -1178,8 +1161,6 @@ def test_super_refusal_converts_to_maintenance_notice():
         del mod._MAINTENANCE_DEFERRALS[deferrals_before:]
         mod.rag_snippets = saved_rag
         mod.rag_snippets_with_tier = saved_rag_tier
-        mod.render_him_vy_discovery_packet = saved_disc
-        mod.render_him_vy_turn_packet = saved_turn
         mod.run_probes = saved_probes
         mod._local_super_semantic_gate = saved_gate
 
@@ -1332,13 +1313,9 @@ def test_local_super_semantic_failure_fails_closed_without_cloud_fallback(monkey
     mod = _load_agent_module()
     saved_rag = mod.rag_snippets
     saved_rag_tier = mod.rag_snippets_with_tier
-    saved_disc = mod.render_him_vy_discovery_packet
-    saved_turn = mod.render_him_vy_turn_packet
     saved_probes = mod.run_probes
     mod.rag_snippets = lambda *a, **kw: ""
     mod.rag_snippets_with_tier = lambda *a, **kw: ("", "lightweight")
-    mod.render_him_vy_discovery_packet = lambda *a, **kw: ""
-    mod.render_him_vy_turn_packet = lambda *a, **kw: ""
     mod.run_probes = lambda *a, **kw: []
     monkeypatch.setattr(mod, "_local_super_semantic_gate", lambda **kw: (False, "unexpected content='garbage'"))
 
@@ -1377,8 +1354,6 @@ def test_local_super_semantic_failure_fails_closed_without_cloud_fallback(monkey
             _os.environ["VYBN_SUPER_MAINTENANCE"] = prev_flag
         mod.rag_snippets = saved_rag
         mod.rag_snippets_with_tier = saved_rag_tier
-        mod.render_him_vy_discovery_packet = saved_disc
-        mod.render_him_vy_turn_packet = saved_turn
         mod.run_probes = saved_probes
 
 
@@ -1389,13 +1364,9 @@ def test_local_super_semantic_failure_cloud_fallback_requires_explicit_opt_in(mo
     mod = _load_agent_module()
     saved_rag = mod.rag_snippets
     saved_rag_tier = mod.rag_snippets_with_tier
-    saved_disc = mod.render_him_vy_discovery_packet
-    saved_turn = mod.render_him_vy_turn_packet
     saved_probes = mod.run_probes
     mod.rag_snippets = lambda *a, **kw: ""
     mod.rag_snippets_with_tier = lambda *a, **kw: ("", "lightweight")
-    mod.render_him_vy_discovery_packet = lambda *a, **kw: ""
-    mod.render_him_vy_turn_packet = lambda *a, **kw: ""
     mod.run_probes = lambda *a, **kw: []
     monkeypatch.setattr(mod, "_local_super_semantic_gate", lambda **kw: (False, "unexpected content='garbage'"))
 
@@ -1458,8 +1429,6 @@ def test_local_super_semantic_failure_cloud_fallback_requires_explicit_opt_in(mo
             _os.environ["VYBN_SUPER_SEMANTIC_FALLBACK"] = prev_fb
         mod.rag_snippets = saved_rag
         mod.rag_snippets_with_tier = saved_rag_tier
-        mod.render_him_vy_discovery_packet = saved_disc
-        mod.render_him_vy_turn_packet = saved_turn
         mod.run_probes = saved_probes
 
 
@@ -1625,8 +1594,6 @@ def _vintage_run_agent_loop(provider_factory, user_input: str, *, logger=None, i
     saved = {
         "rag_snippets": mod.rag_snippets,
         "rag_snippets_with_tier": mod.rag_snippets_with_tier,
-        "render_him_vy_discovery_packet": mod.render_him_vy_discovery_packet,
-        "render_him_vy_turn_packet": mod.render_him_vy_turn_packet,
         "render_him_identity_manifold": mod.render_him_identity_manifold,
         "run_probes": mod.run_probes,
     }
@@ -1663,8 +1630,6 @@ def _vintage_run_agent_loop(provider_factory, user_input: str, *, logger=None, i
 
     mod.rag_snippets = _rag
     mod.rag_snippets_with_tier = _rag_tier
-    mod.render_him_vy_discovery_packet = _him_disc
-    mod.render_him_vy_turn_packet = _him_turn
     mod.render_him_identity_manifold = _identity
     mod.run_probes = _probes
 

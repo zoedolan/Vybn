@@ -46,7 +46,7 @@ from harness.substrate import LayeredPrompt, build_layered_prompt, load_file, Se
 from harness.substrate import run_recurrent_loop
 from harness.substrate import BASH_TOOL_SPEC, DELEGATE_TOOL_SPEC, INTROSPECT_TOOL_SPEC  # noqa: E402
 from harness.substrate import execute_readonly, is_parallel_safe  # noqa: E402
-from harness.substrate import rag_snippets, rag_snippets_with_tier, render_him_vy_discovery_packet, render_him_vy_turn_packet, render_interlocutor_grounding, render_thought_wind_tunnel_packet  # noqa: E402
+from harness.substrate import rag_snippets, rag_snippets_with_tier, render_interlocutor_grounding, render_thought_wind_tunnel_packet  # noqa: E402
 from harness.substrate import execute_tool_calls, default_introspect  # noqa: E402
 from harness.substrate import check_claim, check_structural_claim  # noqa: E402
 from harness.substrate import is_system_critical_pilot_turn  # noqa: E402
@@ -1644,40 +1644,6 @@ def run_agent_loop(
             )
             logger.emit("live_grounding_packet", turn=turn_number, chars=len(live_bits))
             _debug("[grounding: interlocutor + thought wind tunnel injected]")
-
-    # Executable Him discovery packet; skip for Vintage.
-    try:
-        vy_discovery_packet = "" if is_vintage_turn else render_him_vy_discovery_packet(decision.cleaned_input)
-    except Exception as _vy_discovery_err:
-        vy_discovery_packet = ""
-        logger.emit("him_vy_discovery_packet_error", turn=turn_number, err=repr(_vy_discovery_err)[:200])
-    if vy_discovery_packet:
-        existing_live = getattr(active_prompt, "live", "") or ""
-        active_prompt = LayeredPrompt(
-            identity=active_prompt.identity,
-            substrate=active_prompt.substrate,
-            live=(f"{vy_discovery_packet}\n\n{existing_live}" if existing_live else vy_discovery_packet),
-        )
-        logger.emit("him_vy_discovery_packet", turn=turn_number, chars=len(vy_discovery_packet))
-        _debug("[him-vy: executable discovery packet injected]")
-
-    # Him vy-language per-turn uptake. The substrate carries the compiled
-    # contract; this live packet carries the primitives that apply to the
-    # actual current turn; skip for Vintage.
-    try:
-        vy_turn_packet = "" if is_vintage_turn else render_him_vy_turn_packet(decision.cleaned_input)
-    except Exception as _vy_err:
-        vy_turn_packet = ""
-        logger.emit("him_vy_turn_packet_error", turn=turn_number, err=repr(_vy_err)[:200])
-    if vy_turn_packet:
-        existing_live = getattr(active_prompt, "live", "") or ""
-        active_prompt = LayeredPrompt(
-            identity=active_prompt.identity,
-            substrate=active_prompt.substrate,
-            live=(f"{vy_turn_packet}\n\n{existing_live}" if existing_live else vy_turn_packet),
-        )
-        logger.emit("him_vy_turn_packet", turn=turn_number, chars=len(vy_turn_packet))
-        _debug("[him-vy: live turn packet injected]")
 
     # Probe family — "read bytes before describing" applied to every
     # horizon where describing state from pattern is a documented failure

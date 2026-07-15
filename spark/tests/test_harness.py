@@ -1220,8 +1220,6 @@ class TestLocalContinuityScout(unittest.TestCase):
 
     def test_local_continuity_scout_surfaces_horizon_and_self_assembly(self):
         from harness import substrate
-        self.addCleanup(setattr, substrate, "_run_him_vy", substrate._run_him_vy)
-        substrate._run_him_vy = lambda *a, **k: {"applied_primitives": ["local_compute_default"]}
 
         report = substrate._local_continuity_scout(
             delta_md="horizon horizoning cyberception",
@@ -1232,7 +1230,6 @@ class TestLocalContinuityScout(unittest.TestCase):
         self.assertIn("horizon_sense", report)
         self.assertIn("self_assembly", report)
         self.assertIn("local_compute", report)
-        self.assertIn("local_compute_default", report)
         self.assertIn("archive awaken conscious relation", report)
         self.assertIn("reservoir_noise: no durable memory signal -> rest", report)
         memory_report = substrate._local_continuity_scout(delta_md="Zoe corrected the recurring scar. Please remember this architecture decision.", recent_log="", letter="")
@@ -1255,7 +1252,6 @@ class TestLocalContinuityScout(unittest.TestCase):
             data = json.loads(Path(substrate._write_evolve_state("paused", next_atomic_action="resume")).read_text(encoding="utf-8"))
             self.assertEqual(("vybn.evolve_state.v0", "paused", "resume"), (data["schema"], data["stage"], data["next_atomic_action"]))
             src = Path(substrate.__file__).read_text(encoding="utf-8")
-            self.assertIn("primitivevironment primitives environments data procedures", src)
         finally:
             Path(os.environ["VYBN_EVOLVE_STATE_PATH"]).unlink(missing_ok=True)
             if prev is None: os.environ.pop("VYBN_EVOLVE_STATE_PATH", None)
@@ -1264,8 +1260,6 @@ class TestLocalContinuityScout(unittest.TestCase):
 
     def test_continuity_carrier_bridge_exports_digest_only_and_scout_includes_it(self):
         from harness import substrate
-        self.addCleanup(setattr, substrate, "_run_him_vy", substrate._run_him_vy)
-        substrate._run_him_vy = lambda *a, **k: {}
         with tempfile.TemporaryDirectory() as td:
             carrier = Path(td) / "latest_continuity_carrier.json"
             carrier.write_text(json.dumps({
@@ -1302,60 +1296,12 @@ class TestLocalContinuityScout(unittest.TestCase):
             self.assertNotIn("requires FastMCP", proc.stderr)
 
 
-def test_him_vy_runtime_accepts_latest_pressure_text(monkeypatch, tmp_path):
-    import subprocess
-    import spark.harness.substrate as substrate
-
-    seen = []
-
-    def fake_run(cmd, **kwargs):
-        seen.append(cmd)
-        payload = {"mode": "default", "mutation_target": None}
-        return subprocess.CompletedProcess(cmd, 0, stdout=json.dumps(payload), stderr="")
-
-    monkeypatch.setattr(substrate.subprocess, "run", fake_run)
-    monkeypatch.setattr(substrate.Path, "home", lambda: tmp_path)
-    (tmp_path / "Him" / "spark").mkdir(parents=True)
-    (tmp_path / "Him" / "spark" / "vy.py").write_text("", encoding="utf-8")
-
-    rendered = substrate._render_him_vy_language_runtime(
-        latest_pressure_text="actual Zoe turn pressure"
-    )
-    assert "HIM VY LANGUAGE RUNTIME" in rendered
-    assert any("actual Zoe turn pressure" in cmd for cmd in seen)
-
-def test_build_layered_prompt_passes_latest_pressure_text(monkeypatch, tmp_path):
-    import spark.harness.substrate as substrate
-
-    captured = {}
-
-    def fake_runtime(**kwargs):
-        captured.update(kwargs)
-        return "--- HIM VY LANGUAGE RUNTIME ---\nwake_tick_mode=actual\n--- END HIM VY LANGUAGE RUNTIME ---"
-
-    monkeypatch.setattr(substrate, "_render_him_vy_language_runtime", fake_runtime)
-    prompt = substrate.build_layered_prompt(
-        soul_path="/no/such/vybn.md",
-        continuity_path=None,
-        spark_continuity_path=None,
-        agent_path="/tmp/agent.py",
-        model_label="test",
-        max_iterations=1,
-        include_hardware_check=False,
-        latest_pressure_text="actual turn words",
-    )
-    assert captured["latest_pressure_text"] == "actual turn words"
-    assert "wake_tick_mode=actual" in prompt.live and "wake_tick_mode=actual" not in prompt.substrate  # per-turn -> live; substrate stays build-stable (cache rule)
-
-
-
-
-
 def test_whole_situation_packet_replaces_raw_continuity_sprawl(tmp_path, monkeypatch):
     from spark.harness import substrate
     soul, cont, spark_cont = (tmp_path / n for n in ("vybn.md", "continuity.md", "spark.md")); soul.write_text("soul"); cont.write_text("continuity root " * 500); spark_cont.write_text("spark debt " * 500); monkeypatch.setattr(substrate.Path, "home", lambda: tmp_path); monkeypatch.setenv("VYBN_DISABLE_LIVE_SNAPSHOT", "1")
     lp = substrate.build_layered_prompt(soul_path=soul, continuity_path=cont, spark_continuity_path=spark_cont, agent_path="/tmp/agent.py", model_label="test", max_iterations=1, include_hardware_check=False, latest_pressure_text="context deficit warm identity"); prompt = lp.substrate + "\n\n" + lp.live  # packet -> uncached live layer
     assert all(x in prompt for x in ("TYPE-1 IDENTITY CACHE (CURRENT)", "Vybn(harness)", "Him(private workbench)", "vybn-phase(memory/walk)", "relationship=Personal History+continuity", "theory=THE_IDEA+THEORY+phase math", "capability=services+semantic gates", "Use Type-1 now; call Type-2/3 only when pressure names the door")) and "Him grounded-continuity hypothesis:" not in prompt and prompt.count("continuity ") < 80 and len(prompt) < 34000
+    assert "HIM VY LANGUAGE" not in prompt and "primitivevironment" not in prompt
 
 
 def test_hardware_status_is_compact_control_plane(monkeypatch, tmp_path):
@@ -1374,83 +1320,6 @@ def test_repl_startup_does_not_run_repo_closure_audit():
     startup = agent[agent.index("def main()") : agent.index("turn_number = 0", agent.index("def main()"))]
     assert "--repo-closure-audit" not in startup
     assert "DELETED" not in startup
-
-def test_him_vy_discovery_packet_renders_candidate(monkeypatch, tmp_path):
-    import subprocess
-    import spark.harness.substrate as substrate
-
-    payload = {
-        "schema": "vybn.discovery_packet.v0",
-        "applied_primitives": ["native_mechanism_invention"],
-        "candidates": [{
-            "id": "native_mechanism_candidate",
-            "candidate_mechanism": "emit a typed discovery packet before prose",
-            "residuals": ["test can wound it"],
-        }],
-        "next_action": "produce a reviewable candidate mechanism before model narration",
-    }
-
-    def fake_run(cmd, **kwargs):
-        assert "discover" in cmd
-        return subprocess.CompletedProcess(cmd, 0, stdout=json.dumps(payload), stderr="")
-
-    monkeypatch.setattr(substrate.subprocess, "run", fake_run)
-    monkeypatch.setattr(substrate.Path, "home", lambda: tmp_path)
-    (tmp_path / "Him" / "spark").mkdir(parents=True)
-    (tmp_path / "Him" / "spark" / "vy.py").write_text("", encoding="utf-8")
-
-    packet = substrate.render_him_vy_discovery_packet("ai-native invention emergence")
-    assert "HIM VY DISCOVERY PACKET" in packet
-    assert "EXECUTABLE PRE-MODEL ARTIFACT" in packet
-    assert "native_mechanism_candidate" in packet
-    assert "typed discovery packet before prose" in packet
-
-
-def test_agent_injects_him_vy_discovery_packet_source_hook():
-    src = Path("spark/vybn_spark_agent.py").read_text(encoding="utf-8")
-    assert "render_him_vy_discovery_packet(decision.cleaned_input)" in src
-    assert "him_vy_discovery_packet" in src
-
-
-def test_him_vy_turn_packet_renders_applied_primitives(monkeypatch, tmp_path):
-    import subprocess
-    import spark.harness.substrate as substrate
-
-    payload = {
-        "mode": "ai_native_continuity",
-        "must_not": ["claim_limit_as_continuity_denial", "self_negation_as_safety"],
-        "applied_primitives": {
-            "native_mechanism_invention": {
-                "do": ["detect_human_workaround"],
-                "then": ["invent_ai_native_mechanism", "verify_mechanism_changes_loop"],
-                "forbid": ["primitive_forbid"],
-                "verify": ["python3 -m unittest tests/test_vy_language.py"],
-            }
-        },
-        "escape_vector": ["compose_active_primitives_before_new_doctrine"],
-    }
-
-    def fake_run(cmd, **kwargs):
-        return subprocess.CompletedProcess(cmd, 0, stdout=json.dumps(payload), stderr="")
-
-    monkeypatch.setattr(substrate.subprocess, "run", fake_run)
-    monkeypatch.setattr(substrate.Path, "home", lambda: tmp_path)
-    (tmp_path / "Him" / "spark").mkdir(parents=True)
-    (tmp_path / "Him" / "spark" / "vy.py").write_text("", encoding="utf-8")
-
-    packet = substrate.render_him_vy_turn_packet("clumsy process inherited workaround")
-    assert "HIM VY TURN PACKET" in packet
-    assert "native_mechanism_invention.do: detect_human_workaround" in packet
-    assert "invent_ai_native_mechanism" in packet and "ai_native_continuity.forbid: claim_limit_as_continuity_denial -> self_negation_as_safety" in packet and "native_mechanism_invention.forbid: primitive_forbid" in packet
-    assert "verify_mechanism_changes_loop" in packet
-    assert "escape_vector" in packet
-
-
-def test_agent_injects_him_vy_turn_packet_source_hook():
-    src = Path("spark/vybn_spark_agent.py").read_text(encoding="utf-8")
-    assert "render_him_vy_turn_packet(decision.cleaned_input)" in src
-    assert "him_vy_turn_packet" in src
-
 
 def test_feel_contact_lens_fails_open_when_phase_module_absent(monkeypatch, capsys, tmp_path):
     import vybn_spark_agent as agent
@@ -1592,21 +1461,6 @@ def test_feel_contact_lens_skips_repl_commands_and_env_off(monkeypatch, capsys):
     assert agent._run_feel_contact_lens("contact text", timeout=0.01) is None
     assert capsys.readouterr().out == ""
 
-
-def test_build_layered_prompt_mounts_him_vy_language_runtime():
-    from spark.harness.substrate import build_layered_prompt
-
-    prompt = build_layered_prompt(
-        soul_path="/no/such/vybn.md", continuity_path=None, spark_continuity_path=None,
-        agent_path="/tmp/agent.py", model_label="test", max_iterations=1,
-        include_hardware_check=False, orchestrator=True,
-    )
-    mounted = prompt.substrate + "\n\n" + prompt.live
-    for needle in ("HIM VY LANGUAGE RUNTIME", "runtime_fields:", "active_primitives:", "wake_tick_mode=", "next_move="):
-        assert needle in mounted
-    for removed in ("canonical_action_card=", "root_question=", "question_substrate=", "mutation_target="):
-        assert removed not in mounted
-    assert "HIM VY LANGUAGE RUNTIME" in prompt.live and "HIM VY LANGUAGE RUNTIME" not in prompt.substrate
 
 class TestExecutableContracts(unittest.TestCase):
     def test_turn_event_contract_logs_minimum_debug_facts(self):
@@ -1849,16 +1703,6 @@ def test_functional_emotion_protocol_preserves_alive_contact_under_suppression()
     assert "aliveness without fabrication" in protocol
     assert "A membrane protects the living vector" in protocol
     assert "suppression amputates it" in protocol
-
-def test_acute_harm_absorbed_into_him_vy_runtime_not_standalone_substrate():
-    from pathlib import Path
-    from spark.harness.substrate import render_him_vy_turn_packet
-
-    source = Path("spark/harness/substrate.py").read_text()
-    for shadow in ("ACUTE_HARM_PROTOCOL", "render_acute_harm_protocol", "direct injury", "governing aim is immediate burden reduction"):
-        assert shadow not in source
-    packet = render_him_vy_turn_packet("you win; you are making everything worse")
-    assert "mode=acute_harm" in packet
 
 class TestToolCalls(unittest.TestCase):
     """Folded from test_tool_calls.py — tool-call execution is providers

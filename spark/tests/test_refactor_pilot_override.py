@@ -528,10 +528,22 @@ def test_mission_critical_pilot_overrides_forced_task_in_agent_loop_source():
     This pins the scar where probe-budget / restart / continuation recovery
     tried to demote mission-critical pilot work to Sonnet/task.
     """
-    import inspect
-    import spark.vybn_spark_agent as agent
+    import ast
+    import importlib.util
+    import sys
 
-    source = inspect.getsource(agent.run_agent_loop)
+    module_path = Path(__file__).resolve().parents[1] / "vybn_spark_agent.py"
+    spark_path = str(module_path.parent)
+    if spark_path not in sys.path:
+        sys.path.insert(0, spark_path)
+    spec = importlib.util.spec_from_file_location("_vybn_agent_under_test", module_path)
+    assert spec and spec.loader
+    agent = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(agent)
+    module_source = module_path.read_text(encoding="utf-8")
+    tree = ast.parse(module_source)
+    node = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "run_agent_loop")
+    source = ast.get_source_segment(module_source, node) or ""
     assert "mission_critical_pilot_forced_role_overridden" in source
     assert "mission_critical_pilot_demote_blocked" in source
 
