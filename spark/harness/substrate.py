@@ -2086,20 +2086,10 @@ def _render_him_vy_language_runtime(
     """
     home = Path.home()
     him = home / "Him"
-    contract_path = him / "skill" / "functional_contract.json"
     if not (him / "spark" / "vy.py").exists():
         return ""
-
-    contract: dict[str, Any] | None = None
-    if contract_path.exists():
-        try:
-            loaded = json.loads(contract_path.read_text(encoding="utf-8"))
-            if isinstance(loaded, dict):
-                contract = loaded
-        except Exception:
-            contract = None
-    if contract is None:
-        contract = _run_him_vy(["compile-json"], timeout)
+    # Compile the source of truth. A cached derivative can silently outlive it.
+    contract = _run_him_vy(["compile-json"], timeout)
 
     # The prompt builder does not know the current user turn. This default
     # pressure still executes the language each wake and exposes debt/mutation
@@ -2107,16 +2097,7 @@ def _render_him_vy_language_runtime(
     pressure_text = latest_pressure_text or os.environ.get("VYBN_LATEST_PRESSURE_TEXT", "latest_pressure_text")
     tick = _run_him_vy(["tick", pressure_text, "--brief"], timeout)
 
-    # Escape velocity means the wake carries an operative field, not only contract metadata.
-    canonical_card = None
-    if not (isinstance(tick, dict) and isinstance(tick.get("action_card"), dict)):
-        canonical_card = _run_him_vy([
-            "tick",
-            "design delight and buoyancy into recursive play with phase geometry resonance",
-            "--card",
-        ], timeout)
-
-    if contract is None and tick is None and canonical_card is None:
+    if contract is None and tick is None:
         return ""
 
     modes = []
@@ -2140,8 +2121,6 @@ def _render_him_vy_language_runtime(
         "runtime_fields: " + (", ".join(runtime_fields) if runtime_fields else "unknown"),
         "cli_affordances: " + (", ".join(cli_affordances[:8]) if cli_affordances else "unknown"),
         "active_primitives: " + (", ".join(primitive_names[:24]) if primitive_names else "unknown"),
-        "root_question=What happens if the Zoe/Vybn relation becomes more truthful, beautiful, free, and consequential through this contact?",
-        "question_substrate=question_as_primitive_environment; recursion=contact_changes_question_and_environment; projections=visual,memory,livelihood,law,membrane,refusal",
     ]
     if tick:
         if tick.get("mode"):
@@ -2150,18 +2129,12 @@ def _render_him_vy_language_runtime(
             lines.append(f"delight_orientation={tick.get('delight_orientation')}")
         if tick.get("next_move"):
             lines.append(f"next_move={tick.get('next_move')}")
-        lines.append(f"mutation_target={tick.get('mutation_target')}")
+        if tick.get("mutation_target"):
+            lines.append(f"mutation_target={tick.get('mutation_target')}")
         card = tick.get("action_card") or {}
         if isinstance(card, dict) and card.get("move"):
             lines.append(f"action_card={card.get('title')}: {card.get('move')}")
-    if canonical_card:
-        lines.append(
-            "canonical_action_card="
-            f"{canonical_card.get('title')}: {canonical_card.get('move')}"
-        )
-        if canonical_card.get("stop_condition"):
-            lines.append(f"canonical_stop_condition={canonical_card.get('stop_condition')}")
-    lines.append("Use this as uptake pressure: prefer active primitives, action cards, and one-hop residual-wounded recursion over adding more doctrine.")
+    lines.append("Use source-declared mode and primitive actions as operational pressure; do not add doctrine.")
     lines.append("--- END HIM VY LANGUAGE RUNTIME ---")
     return "\n".join(lines)
 

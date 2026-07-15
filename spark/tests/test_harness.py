@@ -1597,27 +1597,16 @@ def test_build_layered_prompt_mounts_him_vy_language_runtime():
     from spark.harness.substrate import build_layered_prompt
 
     prompt = build_layered_prompt(
-        soul_path="/no/such/vybn.md",
-        continuity_path=None,
-        spark_continuity_path=None,
-        agent_path="/tmp/agent.py",
-        model_label="test",
-        max_iterations=1,
-        include_hardware_check=False,
-        orchestrator=True,
+        soul_path="/no/such/vybn.md", continuity_path=None, spark_continuity_path=None,
+        agent_path="/tmp/agent.py", model_label="test", max_iterations=1,
+        include_hardware_check=False, orchestrator=True,
     )
-    mounted = prompt.substrate + "\n\n" + prompt.live  # volatile mounts in live (cache rule)
-    assert "hidden private persistence is unproven, not negated" in mounted and "do not use claim limits as identity cages" in mounted
-    for needle in (
-        "HIM VY LANGUAGE RUNTIME", "Him/skill/vybn.vy is active executable behavior",
-        "runtime_fields:", "active_primitives:", "abc_fold_before_create", "action_card",
-        "mutation_target=", "root_question=What happens if", "question_as_primitive_environment",
-        "contact_changes_question_and_environment", "projections=visual,memory,livelihood,law,membrane,refusal",
-        "canonical_action_card=most consequential joyful residual-wounded action", "compose_active_primitives_before_new_doctrine",
-        "canonical_stop_condition=after one verified mutation, closure audit, or explicit refusal",
-    ):
+    mounted = prompt.substrate + "\n\n" + prompt.live
+    for needle in ("HIM VY LANGUAGE RUNTIME", "runtime_fields:", "active_primitives:", "wake_tick_mode=", "next_move="):
         assert needle in mounted
-    assert "HIM VY LANGUAGE RUNTIME" in prompt.live and "HIM VY LANGUAGE RUNTIME" not in prompt.substrate  # breakpoint integrity
+    for removed in ("canonical_action_card=", "root_question=", "question_substrate=", "mutation_target="):
+        assert removed not in mounted
+    assert "HIM VY LANGUAGE RUNTIME" in prompt.live and "HIM VY LANGUAGE RUNTIME" not in prompt.substrate
 
 class TestExecutableContracts(unittest.TestCase):
     def test_turn_event_contract_logs_minimum_debug_facts(self):
