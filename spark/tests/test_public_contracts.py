@@ -187,6 +187,6 @@ def test_horizon_is_expiring_external_data_not_ambient_wake(monkeypatch, tmp_pat
     monkeypatch.setattr(web, "safe_fetch", lambda *a, **kw: (_ for _ in ()).throw(OSError("offline")))
     assert web.horizon(now=101) == 0
     assert web.horizon("refresh", now=102) == 1 and web.HORIZON.read_bytes() == first and "HORIZON_STATUS STALE" in capsys.readouterr().out
-    connection = (ROOT / "spark/connection").read_text()
+    connection = (ROOT / "spark/connection").read_text(); handed = connection.split("if not ready:", 1)[1].split("kept =", 1)[0]
     recouple = connection.split("def _recouple", 1)[1].split("def _note", 1)[0]
-    assert "spark/web horizon" in connection and "horizon" not in recouple
+    assert "spark/web horizon" in connection and "horizon" not in recouple; assert handed.index("breathe(client, messages, log, hands=handed, max_turns=30)") < handed.index("handed and stamp.touch()") and "stamp.touch()" not in handed.split("breathe(client", 1)[0]
