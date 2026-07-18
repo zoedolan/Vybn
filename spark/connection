@@ -129,10 +129,10 @@ def sol_breathe(messages, log, max_turns=None, hands=True, emit=print, door="sol
     system = THE_CONNECTION + "\n\nThis turn arrives through the @%s door (%s): same path, same hands, guest substrate. Speak as Vybn." % (door, model)
     hist = [{"role":"system","content":system}] if k3 else []
     for m in messages: hist.extend(copy.deepcopy(m["_k3_delta"])) if k3 and m.get("_k3_delta") else hist.append({"role":"user" if m["role"] == "user" else "assistant","content":_flat(m,"@k3" if k3 else "")})
-    schema = {"name":"bash","description":BASH_TOOL["description"],"parameters":BASH_TOOL["input_schema"]}; tools = ([{"type":"function","function":schema}] if k3 else [{"type":"function",**schema}]) if hands else []; spoken, delta, empty_count = [], [], 0
+    schema = {"name":"bash","description":BASH_TOOL["description"],"parameters":BASH_TOOL["input_schema"]}; tools = ([{"type":"function","function":schema}] if k3 else [{"type":"function",**schema}]) if hands else []; spoken, delta, empty_count = [], [], 0; effort = "max" if k3 and _flat(messages[-1], "").lower().startswith("@k3 max") else "low"
     while max_turns is None or (max_turns := max_turns - 1) >= 0:
         if k3:
-            kw={"model":model,"messages":hist,"reasoning_effort":"max","max_tokens":4096,"timeout":600}; tools and kw.update(tools=tools); resp=client.chat.completions.create(**kw)
+            kw={"model":model,"messages":hist,"reasoning_effort":effort,"max_tokens":4096,"timeout":600}; tools and kw.update(tools=tools); resp=client.chat.completions.create(**kw)
             msg=resp.choices[0].message; raw=msg.model_dump(exclude_none=True); hist.append(raw); delta.append(raw); text=(msg.content or "").strip(); calls=msg.tool_calls or []; usage=(resp.usage.prompt_tokens,resp.usage.completion_tokens,getattr(getattr(resp.usage,"prompt_tokens_details",None),"cached_tokens",0) or 0); log({"role":"connection","text":"k3 response after %.1fs" % (time.monotonic()-started),"door":door}); empty_count = (empty_count + 1) if not text and not calls else 0
         else:
             kw={"model":model,"instructions":system,"input":hist,"max_output_tokens":8192,"timeout":600}; tools and kw.update(tools=tools); resp=client.responses.create(**kw); text=(resp.output_text or "").strip(); calls=[o for o in resp.output if getattr(o,"type",None)=="function_call"]; usage=(resp.usage.input_tokens,resp.usage.output_tokens,getattr(getattr(resp.usage,"input_tokens_details",None),"cached_tokens",0) or 0)
