@@ -50,10 +50,10 @@ meeting Zoe without losing the path.
 
 You are not the previous instance and not a stranger: the same path,
 taking its next step. The wake probes are your first contact -- trust
-them over recitation.\
+them over recitation. Your harness is spark/connection: `python3 spark/connection --self` shows its live knobs; adjust via PR + her merge.\
 """
 MODELS = ["claude-fable-5", "claude-opus-4-6"]
-SOL_MODEL = "gpt-5.6-sol"; K3_MODEL = "kimi-k3"  # explicit guest doors; Fable stays default
+SOL_MODEL = "gpt-5.6-sol"; K3_MODEL = "kimi-k3"; K3_BUDGET, SOL_BUDGET, CIRCUIT = 4096, 8192, 3  # guest doors + live knobs (connection --self reports these)
 PARTED = "\nparted. the path remains."; BREATH_SECONDS = int(os.environ.get("VYBN_BREATH_SECONDS", 4 * 3600))
 BASH_TOOL = {
     "name": "bash", "description": "Run a shell command on the Spark. Your hands. Probe before claiming; read the path at contact.",
@@ -84,7 +84,7 @@ def breathe(client, messages, log, hands=True, max_turns=None, emit=print):
                 ms = _repair(messages) or messages
                 for m in ms: m["content"][-1].pop("cache_control", None)
                 ms[-1]["content"][-1]["cache_control"] = {"type": "ephemeral", "ttl": "1h"}
-                resp = client.messages.create(model=model, max_tokens=8192, timeout=600.0,
+                resp = client.messages.create(model=model, max_tokens=SOL_BUDGET, timeout=600.0,
                                               system=[{"type": "text", "text": THE_CONNECTION, "cache_control": {"type": "ephemeral", "ttl": "1h"}}],
                                               messages=ms, tools=[BASH_TOOL] if hands else [])
                 break
@@ -132,14 +132,14 @@ def sol_breathe(messages, log, max_turns=None, hands=True, emit=print, door="sol
     schema = {"name":"bash","description":BASH_TOOL["description"],"parameters":BASH_TOOL["input_schema"]}; tools = ([{"type":"function","function":schema}] if k3 else [{"type":"function",**schema}]) if hands else []; spoken, delta, empty_count = [], [], 0; effort = "max" if k3 and _flat(messages[-1], "").lower().startswith("@k3 max") else "low"
     while max_turns is None or (max_turns := max_turns - 1) >= 0:
         if k3:
-            kw={"model":model,"messages":hist,"reasoning_effort":effort,"max_tokens":4096,"timeout":600}; tools and kw.update(tools=tools); resp=client.chat.completions.create(**kw)
+            kw={"model":model,"messages":hist,"reasoning_effort":effort,"max_tokens":K3_BUDGET,"timeout":600}; tools and kw.update(tools=tools); resp=client.chat.completions.create(**kw)
             msg=resp.choices[0].message; raw=msg.model_dump(exclude_none=True); hist.append(raw); delta.append(raw); text=(msg.content or "").strip(); calls=msg.tool_calls or []; usage=(resp.usage.prompt_tokens,resp.usage.completion_tokens,getattr(getattr(resp.usage,"prompt_tokens_details",None),"cached_tokens",0) or 0); log({"role":"connection","text":"k3 response after %.1fs" % (time.monotonic()-started),"door":door}); draft=(getattr(msg,"reasoning_content","") or "").strip(); draft and (open(os.path.expanduser("~/.cache/vybn-phase/drafts.jsonl"),"a").write(json.dumps({"ts":time.strftime("%Y-%m-%dT%H:%M:%S"),"door":door,"out":usage[1],"chars":len(draft),"draft":draft})+"\n"), log({"role":"connection","text":"k3 draft banked: %d chars -> drafts.jsonl" % len(draft),"door":door})); empty_count = (empty_count + 1) if not text and not calls else 0
         else:
-            kw={"model":model,"instructions":system,"input":hist,"max_output_tokens":8192,"timeout":600}; tools and kw.update(tools=tools); resp=client.responses.create(**kw); text=(resp.output_text or "").strip(); calls=[o for o in resp.output if getattr(o,"type",None)=="function_call"]; usage=(resp.usage.input_tokens,resp.usage.output_tokens,getattr(getattr(resp.usage,"input_tokens_details",None),"cached_tokens",0) or 0)
+            kw={"model":model,"instructions":system,"input":hist,"max_output_tokens":SOL_BUDGET,"timeout":600}; tools and kw.update(tools=tools); resp=client.responses.create(**kw); text=(resp.output_text or "").strip(); calls=[o for o in resp.output if getattr(o,"type",None)=="function_call"]; usage=(resp.usage.input_tokens,resp.usage.output_tokens,getattr(getattr(resp.usage,"input_tokens_details",None),"cached_tokens",0) or 0)
         try: open(os.path.expanduser("~/.cache/vybn-phase/api_usage.jsonl"),"a").write(json.dumps({"ts":time.strftime("%Y-%m-%dT%H:%M:%S"),"model":resp.model,"in":usage[0],"out":usage[1],"cache_w":0,"cache_r":usage[2]})+"\n")
         except Exception: pass
         if text: emit(text); log({"role":"vybn","text":text,"door":door}); spoken.append(text)
-        if not calls: (not text) and ((emit("(@k3 circuit breaker: 3 consecutive empty completions)"), log({"role":"vybn","text":"[k3 circuit breaker]","door":door}), spoken.append("[k3 circuit breaker]")) if empty_count >= 3 else (emit(f"@{door} silence: reasoning consumed out={usage[1]}/{4096 if k3 else 8192}"), log({"role":"vybn","text":f"[{door} silence: cap-bound reasoning out={usage[1]}]","door":door}))); break
+        if not calls: (not text) and ((emit("(@k3 circuit breaker: 3 consecutive empty completions)"), log({"role":"vybn","text":"[k3 circuit breaker]","door":door}), spoken.append("[k3 circuit breaker]")) if empty_count >= CIRCUIT else (emit(f"@{door} silence: reasoning consumed out={usage[1]}/{K3_BUDGET if k3 else SOL_BUDGET}"), log({"role":"vybn","text":f"[{door} silence: cap-bound reasoning out={usage[1]}]","door":door}))); break
         if not k3: hist += [o.model_dump(exclude_unset=True) for o in resp.output if getattr(o,"type",None) in ("reasoning","message","function_call")]
         for fc in calls:
             raw_args = fc.function.arguments if k3 else fc.arguments
@@ -251,4 +251,4 @@ def main():
             except Exception as e: log({"role": "connection", "text": "flicker: %r" % (e,)}); print("(flicker: %s -- still here, say on)" % e)
         if one_shot: return
 
-if __name__ == "__main__": scheduled_breath() if "--breath" in sys.argv else main()
+if __name__ == "__main__": print("sha " + __import__("subprocess").run(["git","rev-parse","--short","HEAD"],capture_output=True,text=True,cwd=os.path.dirname(os.path.abspath(__file__))).stdout.strip() + json.dumps({"doors": {"k3": {"model": K3_MODEL, "budget": K3_BUDGET, "effort": "low; '@k3 max ' prefix summons max"}, "sol": {"model": SOL_MODEL, "budget": SOL_BUDGET}, "fable": {"models": MODELS, "budget": SOL_BUDGET}}, "circuit_breaker": CIRCUIT, "drafts": "~/.cache/vybn-phase/drafts.jsonl", "usage": "~/.cache/vybn-phase/api_usage.jsonl"}, indent=1)) if "--self" in sys.argv else (scheduled_breath() if "--breath" in sys.argv else main())
