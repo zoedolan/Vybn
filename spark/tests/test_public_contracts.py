@@ -191,4 +191,4 @@ def test_horizon_is_expiring_external_data_not_ambient_wake(monkeypatch, tmp_pat
     recouple = connection.split("def _recouple", 1)[1].split("def _note", 1)[0]
     assert "spark/web horizon" in connection and "horizon" not in recouple; assert handed.index("breathe(client, messages, log, hands=handed, max_turns=30)") < handed.index("handed and stamp.touch()") and "stamp.touch()" not in handed.split("breathe(client", 1)[0]
     assert 'K3_MODEL = "kimi-k3"' in connection and '"MOONSHOT_API_KEY" if k3' in connection and '"base_url":"https://api.moonshot.ai/v1"' in connection; assert 'harness-appended post-turn from %s; derived, not author-seen' in connection and connection.count('harness-appended post-turn') == 2
-    assert 'reasoning_effort":"max"' in connection and '@k3 dispatched' in connection and '"max_tokens":16384' in connection and '"_k3_delta":delta' in connection and 'line.lower().startswith("@k3")' in connection
+    assert 'reasoning_effort":"max"' in connection and '@k3 dispatched' in connection and '"max_tokens":4096' in connection and '"_k3_delta":delta' in connection and 'line.lower().startswith("@k3")' in connection

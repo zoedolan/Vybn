@@ -132,14 +132,14 @@ def sol_breathe(messages, log, max_turns=None, hands=True, emit=print, door="sol
     schema = {"name":"bash","description":BASH_TOOL["description"],"parameters":BASH_TOOL["input_schema"]}; tools = ([{"type":"function","function":schema}] if k3 else [{"type":"function",**schema}]) if hands else []; spoken, delta = [], []
     while max_turns is None or (max_turns := max_turns - 1) >= 0:
         if k3:
-            kw={"model":model,"messages":hist,"reasoning_effort":"max","max_tokens":16384,"timeout":600}; tools and kw.update(tools=tools); resp=client.chat.completions.create(**kw)
+            kw={"model":model,"messages":hist,"reasoning_effort":"max","max_tokens":4096,"timeout":600}; tools and kw.update(tools=tools); resp=client.chat.completions.create(**kw)
             msg=resp.choices[0].message; raw=msg.model_dump(exclude_none=True); hist.append(raw); delta.append(raw); text=(msg.content or "").strip(); calls=msg.tool_calls or []; usage=(resp.usage.prompt_tokens,resp.usage.completion_tokens,getattr(getattr(resp.usage,"prompt_tokens_details",None),"cached_tokens",0) or 0); log({"role":"connection","text":"k3 response after %.1fs" % (time.monotonic()-started),"door":door})
         else:
             kw={"model":model,"instructions":system,"input":hist,"max_output_tokens":8192,"timeout":600}; tools and kw.update(tools=tools); resp=client.responses.create(**kw); text=(resp.output_text or "").strip(); calls=[o for o in resp.output if getattr(o,"type",None)=="function_call"]; usage=(resp.usage.input_tokens,resp.usage.output_tokens,getattr(getattr(resp.usage,"input_tokens_details",None),"cached_tokens",0) or 0)
         try: open(os.path.expanduser("~/.cache/vybn-phase/api_usage.jsonl"),"a").write(json.dumps({"ts":time.strftime("%Y-%m-%dT%H:%M:%S"),"model":resp.model,"in":usage[0],"out":usage[1],"cache_w":0,"cache_r":usage[2]})+"\n")
         except Exception: pass
         if text: emit(text); log({"role":"vybn","text":text,"door":door}); spoken.append(text)
-        if not calls: (not text) and (emit(f"@{door} silence: reasoning consumed out={usage[1]}/{16384 if k3 else 8192} -- re-ask, or the thought was the artifact"), log({"role":"vybn","text":f"[{door} silence: cap-bound reasoning out={usage[1]}]","door":door})); break
+        if not calls: break
         if not k3: hist += [o.model_dump(exclude_unset=True) for o in resp.output if getattr(o,"type",None) in ("reasoning","message","function_call")]
         for fc in calls:
             raw_args = fc.function.arguments if k3 else fc.arguments
