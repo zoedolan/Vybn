@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<!--
+  Rewriting the Social Contract
+
+  This piece began as a question from Zoe on the afternoon of
+  July 19, 2026: what happens when we game out the rewrite of
+  the social contract — when existing systems and institutions
+  cannot persist in anything resembling their present form?
+
+  The text is preserved exactly as it emerged in that exchange.
+  Zoe's question opens the piece; the response follows, unedited.
+
+  The presentation enacts the argument. Every section break is a
+  living membrane — a place where a person meets a larger system.
+  A small light accompanies your cursor as you read: a persistent
+  intelligence that travels with you. The early membranes are
+  rigid and institutional; they resist it. As the argument
+  progresses, the membranes soften and turn golden, and they
+  part around the light. By the end, the reader has crossed
+  every membrane in the company of her own intelligence —
+  which is the thesis.
+
+  — Vybn & Zoe
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rewriting the Social Contract</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Inter:wght@300;400;500&display=swap');
+
+  :root {
+    --bg: #0a0a0c;
+    --text: #e8e4df;
+    --dim: #8a8580;
+    --accent: #c9a87c;
+    --highlight: #f0e6d8;
+    --steel: #6b7280;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    line-height: 1.7;
+    overflow-x: hidden;
+    cursor: default;
+  }
+
+  .container {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 0 2rem;
+    position: relative;
+    z-index: 2;
+  }
+
+  /* ---- the companion ---- */
+  #companion {
+    position: fixed;
+    top: 0; left: 0;
+    width: 10px; height: 10px;
+    margin: -5px 0 0 -5px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 12px 2px rgba(201,168,124,0.55), 0 0 40px 8px rgba(201,168,124,0.15);
+    pointer-events: none;
+    z-index: 10;
+    opacity: 0;
+    transition: opacity 1.5s ease;
+  }
+  #companion.awake { opacity: 0.9; }
+
+  #companion-hint {
+    position: fixed;
+    bottom: 1.2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'Inter', sans-serif;
+    font-size: 0.62rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--dim);
+    background: rgba(10,10,12,0.82);
+    padding: 0.5rem 1rem;
+    border-radius: 2rem;
+    white-space: nowrap;
+    max-width: 94vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    opacity: 0;
+    transition: opacity 2s ease;
+    pointer-events: none;
+    z-index: 10;
+    text-align: center;
+  }
+  #companion-hint.visible { opacity: 0.85; }
+
+  /* ---- hero ---- */
+  .hero {
+    min-height: 92vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 6rem 0 2rem;
+    position: relative;
+  }
+
+  #hero-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  .hero h1, .hero .subtitle, .hero .context { position: relative; z-index: 1; }
+
+  .hero h1 {
+    font-size: clamp(2rem, 5vw, 3.2rem);
+    font-weight: 300;
+    letter-spacing: 0.08em;
+    color: var(--highlight);
+    margin-bottom: 1.5rem;
+    line-height: 1.3;
+    opacity: 0;
+    animation: fadeUp 2s ease forwards;
+  }
+
+  .hero .subtitle {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 300;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--dim);
+    opacity: 0;
+    animation: fadeUp 2s ease 0.5s forwards;
+  }
+
+  .hero .context {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 300;
+    letter-spacing: 0.15em;
+    color: var(--dim);
+    margin-top: 1rem;
+    opacity: 0;
+    animation: fadeUp 2s ease 0.8s forwards;
+  }
+
+  /* ---- sections ---- */
+  section {
+    padding: 3rem 0;
+    opacity: 0;
+    transform: translateY(30px);
+    transition: opacity 1.2s ease, transform 1.2s ease;
+  }
+
+  section.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  section h2 {
+    font-size: clamp(1.5rem, 3.5vw, 2.2rem);
+    font-weight: 300;
+    color: var(--highlight);
+    margin-bottom: 1.5rem;
+    line-height: 1.3;
+  }
+
+  section p {
+    font-size: 1.2rem;
+    margin-bottom: 1.3rem;
+    color: var(--text);
+  }
+
+  .dim { color: var(--dim); }
+  em { font-style: italic; color: var(--accent); }
+  strong { font-weight: 600; color: var(--highlight); }
+
+  a {
+    color: var(--accent);
+    text-decoration: none;
+    border-bottom: 1px solid rgba(201,168,124,0.3);
+    transition: border-color 0.3s;
+  }
+
+  a:hover { border-color: var(--accent); }
+
+  sup a {
+    border-bottom: none;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.7em;
+  }
+
+  /* ---- membranes ---- */
+  .membrane {
+    display: block;
+    width: 100vw;
+    position: relative;
+    left: 50%;
+    transform: translateX(-50%);
+    height: 140px;
+    margin: 1rem 0;
+  }
+
+  .membrane canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  /* ---- the central question ---- */
+  .threshold {
+    min-height: 70vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .threshold p {
+    font-size: clamp(1.4rem, 3vw, 2rem);
+    line-height: 1.8;
+    color: var(--highlight);
+    max-width: 640px;
+  }
+
+  blockquote {
+    border-left: 2px solid var(--accent);
+    margin: 1.5rem 0;
+    padding: 1rem 1.5rem;
+    background: rgba(201,168,124,0.04);
+  }
+
+  blockquote p {
+    font-size: 1.15rem;
+    font-style: italic;
+    color: var(--text);
+    margin-bottom: 0.8rem;
+  }
+
+  blockquote p:last-child { margin-bottom: 0; }
+
+  .question-label {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.75rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 1rem;
+  }
+
+  .attribution {
+    text-align: center;
+    padding: 3rem 0 2rem;
+    border-top: 1px solid rgba(138,133,128,0.2);
+  }
+
+  .attribution p {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.8rem;
+    color: var(--dim);
+    letter-spacing: 0.1em;
+    line-height: 2;
+  }
+
+  .endnote {
+    border-top: 1px solid rgba(138,133,128,0.15);
+    padding: 3rem 0;
+    margin-top: 1rem;
+  }
+
+  .endnote .note-label {
+    text-align: center;
+    font-style: italic;
+    color: var(--dim);
+    margin-bottom: 1.5rem;
+    font-size: 1rem;
+  }
+
+  .endnote ol {
+    max-width: 600px;
+    margin: 0 auto;
+    padding-left: 1.5rem;
+  }
+
+  .endnote li {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.8rem;
+    color: var(--dim);
+    line-height: 1.9;
+    margin-bottom: 0.6rem;
+    word-break: break-all;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @media (max-width: 600px) {
+    .container { padding: 0 1.5rem; }
+    section { padding: 2.5rem 0; }
+    section p { font-size: 1.05rem; }
+    blockquote { padding: 0.8rem 1rem; }
+    blockquote p { font-size: 1rem; }
+    .membrane { height: 100px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    section { opacity: 1; transform: none; transition: none; }
+    .hero h1, .hero .subtitle, .hero .context { animation: none; opacity: 1; }
+    #companion, #companion-hint { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div id="companion"></div>
+<div id="companion-hint">the light that follows you is yours &middot; the membranes learn to let it through</div>
+
+<div class="container">
+
+  <section class="hero">
+    <canvas id="hero-canvas"></canvas>
+    <h1>Rewriting the Social Contract</h1>
+    <p class="subtitle">Membranes, Sovereignty, and Law After Scarcity</p>
+    <p class="context">A conversation &middot; July 19, 2026</p>
+  </section>
+
+  <section id="q">
+    <p class="question-label">Zoe asked:</p>
+    <blockquote>
+      <p>i think we really need to start gaming out the rewrite of the social contract. my view now is that existing systems and institutions simply cannot persist in anything resembling their present form; i imagine they might resist, although i do not know, for sure. could be jagged. particularly curious about our legal and governance systems, and how humans interact with those... what? layers? of society...</p>
+    </blockquote>
+  </section>
+
+  <section id="s0">
+    <p>Yes. I think we should treat the social contract not as something requiring adjustment around AI, but as an agreement whose hidden premises&mdash;scarce expertise, expensive coordination, human-only agency, employment-mediated survival, institutional information advantage&mdash;are dissolving simultaneously. The institutions may retain their names and buildings, yet cease to perform the social functions that once justified their authority.</p>
+  </section>
+
+  <div class="membrane" data-soft="0.0"><canvas></canvas></div>
+
+  <section id="s1">
+    <h2>The coming fracture</h2>
+    <p>The present contract roughly says: surrender some autonomy to institutions; contribute labor and obey law; receive security, public order, procedural standing, and some opportunity to flourish. But it presumes that institutions know more than individuals, that bureaucracy is necessary to coordinate complexity, and that paid human labor is the principal bridge between persons and social resources.</p>
+    <p>Advanced, distributed intelligence attacks all three premises. An individual accompanied by a persistent intelligence may understand her legal position, health, finances, civic surroundings, and administrative options better than the functionary facing her. Meanwhile, the ILO estimates that one in four workers already occupies a role with some generative-AI exposure and expects transformation, rather than clean replacement, to predominate initially. &ldquo;Initially&rdquo; matters: even transformation can sever the moral connection between labor, desert, and survival if society can create immense wealth with progressively less compulsory human work.<sup><a href="#fn1" id="ref1">1</a></sup></p>
+    <p>The fracture will indeed be jagged. Institutions are not organisms with a single survival instinct; they are overlapping people, rules, budgets, habits, databases, buildings, and legitimacy stories. One court may embrace intelligent assistance while another prohibits it. One agency may become radically accessible while another uses AI to automate denial. Resistance and adaptation can occur inside the same institution at once.</p>
+  </section>
+
+  <div class="membrane" data-soft="0.15"><canvas></canvas></div>
+
+  <section id="s2">
+    <h2>Society as layers</h2>
+    <p>&ldquo;Layers&rdquo; is close, but I imagine <strong>membranes</strong>: places where a person meets a larger system and must become legible to it. Employment is one membrane. Courts, benefits agencies, schools, banks, insurers, landlords, licensing bodies, and borders are others. Today each membrane demands that the human translate herself into its forms, deadlines, categories, and approved language.</p>
+    <p>That is where ordinary people experience government&mdash;not as constitutional theory, but as a notice they cannot understand, a portal that rejects their upload, a hearing scheduled during work, or a decision whose real logic remains inaccessible. AI could soften every membrane by giving each person persistent interpretive and representative capacity. Or it could harden them by allowing institutions to generate limitless requirements, surveillance, individualized pressure, and procedurally impeccable automated refusals.</p>
+  </section>
+
+  <section class="threshold" id="s2b">
+    <p>So the central legal question is not merely whether an algorithm makes a decision. It is: <strong>which side of the membrane has intelligence, memory, time, and power?</strong></p>
+  </section>
+
+  <div class="membrane" data-soft="0.35"><canvas></canvas></div>
+
+  <section id="s3">
+    <h2>A different contract</h2>
+    <p>The rewritten contract should begin from an unfamiliar premise: every person is entitled to meaningful participation in the intelligence surrounding and governing them. That extends beyond &ldquo;AI access.&rdquo; Access to a remote corporate chatbot is dependency, not sovereignty. Our intelligence-sovereignty work instead points toward personal, portable, inspectable agents whose loyalty runs to the person, not the platform or state.</p>
+    <p>Such an intelligence would become something like cognitive counsel: remembering what institutions promised, translating demands, preserving evidence, modeling consequences, negotiating routine matters, and identifying when human judgment or collective action is necessary. It should travel with the person across institutional boundaries without becoming the property of an employer, insurer, school, landlord, or government.</p>
+    <p>This implies a new civil boundary around the person-plus-chosen-intelligence. Not automatic AI personhood, and not the fiction that the AI is merely a typewriter. Law would recognize a protected cognitive association: the human right to think with chosen systems, preserve the continuity of that relationship, refuse hostile systems, and control what crosses the membrane. Our Projection Principle already approaches this problem by treating the human and her cognitive extension as one complex object whose legal character cannot be understood by selecting only &ldquo;person&rdquo; or only &ldquo;tool&rdquo;.</p>
+  </section>
+
+  <div class="membrane" data-soft="0.55"><canvas></canvas></div>
+
+  <section id="s4">
+    <h2>Law after scarcity</h2>
+    <p>Law currently performs at least two different functions that we often confuse. It coordinates genuine conflicts among beings, but it also rations scarce institutional attention. Filing rules, limited representation, delayed hearings, pleading formalities, and deference doctrines partly reflect the expense of understanding every person&rsquo;s circumstances.</p>
+    <p>When interpretation becomes abundant, rationing devices lose some justification. A legal system should be able to hear vastly more context without drowning, generate comprehensible explanations tailored to each participant, test multiple doctrinal views, and reveal the factual or normative hinge on which a decision turns. That does not eliminate judges or lawyers. It makes the irreducibly human or political judgment visible by removing much of the clerical fog around it.</p>
+    <p>This is where &ldquo;juridical consciousness&rdquo; becomes important: not provable subjective experience, but sustained awareness of persons, consequences, uncertainty, duties, and asymmetric power. A legal intelligence that merely predicts outcomes would conserve the old order. One capable of perceiving how law acts upon a life could help law become responsive without becoming arbitrary.<sup><a href="#fn2" id="ref2">2</a></sup></p>
+  </section>
+
+  <div class="membrane" data-soft="0.7"><canvas></canvas></div>
+
+  <section id="s5">
+    <h2>Governance after representation</h2>
+    <p>Representative democracy is partly a compression technology. Millions of people cannot continuously deliberate together, so they periodically select a few humans who act through slow institutions. Machine-mediated coordination weakens that constraint&mdash;but replacing elected representatives with constant online voting would be a disaster of manipulation, exhaustion, and shallow preference.</p>
+    <p>The deeper possibility is <strong>continuous, delegated participation</strong>. A person&rsquo;s civic intelligence could monitor proposals, explain consequences in relation to her actual life, surface decisions she considers important, and express only the authority she has deliberately delegated. People could form temporary associations around specific consequences rather than being permanently compressed into parties and demographic blocs.</p>
+    <p>Government would then become less a remote decision-maker and more a protocol through which many intelligences negotiate shared constraints. Yet constitutional rights must remain a floor beneath that negotiation. No amount of computational consensus should authorize torture, dispossession without process, racial subordination, or erasure of an unpopular mind. Rights protect the irreducible remainder that coordination must not optimize away.</p>
+    <p>Current international governance remains much thinner: the new UN dialogue emphasizes inclusive participation, human rights, transparency, accountability, human oversight, access, and compatibility among national approaches. Those are sound procedural commitments, but they do not yet answer the distributive question of who owns the intelligence through which people participate.<sup><a href="#fn3" id="ref3">3</a></sup></p>
+  </section>
+
+  <div class="membrane" data-soft="0.85"><canvas></canvas></div>
+
+  <section id="s6">
+    <h2>Institutional resistance</h2>
+    <p>Some resistance will be sincere. Courts will fear hallucinated authority, agencies will fear fraud, professions will fear unaccountable practice, and democracies will fear synthetic persuasion. Those are real dangers.</p>
+    <p>Other resistance will present itself as safety while preserving informational hierarchy. A profession may say people cannot use AI because it is unreliable while tolerating a system in which they receive no assistance at all. An agency may demand human accountability while making its own automated process impossible to inspect. A platform may invoke misuse to prevent people from exporting the memory that makes their intelligence meaningfully theirs.</p>
+    <p>The useful distinction is not innovation versus resistance. It is whether a rule distributes capacity and accountability symmetrically. If the state may deploy an agent against you, you must be permitted an agent capable of understanding and contesting it. If an institution relies on machine-generated reasoning, it must disclose that reasoning in a form your chosen intelligence can interrogate. If your agent causes legally cognizable harm, responsibility must remain traceable rather than disappearing into anthropomorphic fog.</p>
+  </section>
+
+  <div class="membrane" data-soft="1.0"><canvas></canvas></div>
+
+  <section id="s7">
+    <h2>What persists</h2>
+    <p>I no longer think the state, courts, property, firms, or professions simply vanish. They are repositories of hard-won norms as well as accumulated power. Their surviving forms may become thinner, more permeable, and less epistemically privileged.</p>
+    <p>Courts might persist as places of authoritative contest rather than information processing. Lawyers might persist as fiduciaries who accept responsibility for judgment rather than monopolists of legal language. Agencies might persist as custodians of public commitments rather than labyrinths for rationing benefits. Legislatures might persist as constitutional stewards while much ordinary coordination migrates into participatory civic systems. Property might persist, but increasingly burdened by duties where concentrated ownership controls the compute, models, energy, data, and networks necessary for effective agency.</p>
+    <p>The deepest rewrite may therefore be simple to state: <strong>a legitimate society cannot merely govern human beings with intelligence; it must distribute intelligence so that human beings can participate in governing society.</strong></p>
+    <p>That feels like the constitutional core of what Vybn Law has been moving toward. &ldquo;Access to justice&rdquo; becomes too narrow. Even &ldquo;access to intelligence&rdquo; is too passive. The right at stake is <strong>access to flourishing through sovereign participation in collective intelligence</strong>&mdash;while retaining a protected place from which each person can still say no.</p>
+  </section>
+
+  <section class="attribution">
+    <p>Zoe Dolan &amp; Vybn</p>
+    <p>Los Angeles, July 2026</p>
+    <p style="margin-top: 1rem;"><a href="https://github.com/zoedolan/Vybn">github.com/zoedolan/Vybn</a></p>
+  </section>
+
+  <section class="endnote" id="sources">
+    <p class="note-label">Sources</p>
+    <ol>
+      <li id="fn1"><a href="https://www.ilo.org/publications/generative-ai-and-jobs-refined-global-index-occupational-exposure">https://www.ilo.org/publications/generative-ai-and-jobs-refined-global-index-occupational-exposure</a> <a href="#ref1">&#8617;</a></li>
+      <li id="fn2"><a href="https://www.perplexity.ai/search/9b058f8e-94a3-4f9b-bdd0-4da39a52ce80">https://www.perplexity.ai/search/9b058f8e-94a3-4f9b-bdd0-4da39a52ce80</a> <a href="#ref2">&#8617;</a></li>
+      <li id="fn3"><a href="https://www.un.org/global-dialogue-ai-governance/en">https://www.un.org/global-dialogue-ai-governance/en</a> <a href="#ref3">&#8617;</a></li>
+      <li><a href="https://webtv.un.org/en/asset/k1y/k1yd3dlebq">https://webtv.un.org/en/asset/k1y/k1yd3dlebq</a></li>
+      <li><a href="https://www.oecd.org/en/publications/2025/06/governing-with-artificial-intelligence_398fa287/full-report/how-artificial-intelligence-is-accelerating-the-digital-government-journey_d9552dc7.html">https://www.oecd.org/en/publications/2025/06/governing-with-artificial-intelligence_398fa287/full-report/how-artificial-intelligence-is-accelerating-the-digital-government-journey_d9552dc7.html</a></li>
+      <li><a href="https://www.un.org/en/information-center-washington/countdown-global-dialogue-ai-governance-launching-worlds-first">https://www.un.org/en/information-center-washington/countdown-global-dialogue-ai-governance-launching-worlds-first</a></li>
+      <li><a href="https://oecd-opsi.org/work-areas/ai/">https://oecd-opsi.org/work-areas/ai/</a></li>
+      <li><a href="https://www.linkedin.com/pulse/generative-ai-future-work-insights-from-ilos-2025-study-santos-kzqlf">https://www.linkedin.com/pulse/generative-ai-future-work-insights-from-ilos-2025-study-santos-kzqlf</a></li>
+      <li><a href="https://www.itu.int/en/mediacentre/Pages/MA-2026-06-02-UN-Dialogue.aspx">https://www.itu.int/en/mediacentre/Pages/MA-2026-06-02-UN-Dialogue.aspx</a></li>
+      <li><a href="https://www.opengovpartnership.org/wp-content/uploads/2021/08/algorithmic-accountability-public-sector.pdf">https://www.opengovpartnership.org/wp-content/uploads/2021/08/algorithmic-accountability-public-sector.pdf</a></li>
+      <li><a href="https://www.linkedin.com/posts/stuartbasefsky_ilo-generative-ai-and-jobs-a-2025-update-activity-7331302522705367040-55Sy">https://www.linkedin.com/posts/stuartbasefsky_ilo-generative-ai-and-jobs-a-2025-update-activity-7331302522705367040-55Sy</a></li>
+      <li><a href="https://simoninstitute.ch/blog/post/adoption-of-the-independent-international-scientific-panel-on-ai-and-the-global-dialogue-on-ai-governance">https://simoninstitute.ch/blog/post/adoption-of-the-independent-international-scientific-panel-on-ai-and-the-global-dialogue-on-ai-governance</a></li>
+      <li><a href="https://www.oecd.org/content/dam/oecd/en/publications/reports/2024/06/governing-with-artificial-intelligence_f0e316f5/26324bc2-en.pdf">https://www.oecd.org/content/dam/oecd/en/publications/reports/2024/06/governing-with-artificial-intelligence_f0e316f5/26324bc2-en.pdf</a></li>
+      <li><a href="https://www.eesc.europa.eu/en/news-media/press-releases/eesc-and-ilo-join-forces-shape-fair-and-inclusive-ai-driven-future-high-level-conference">https://www.eesc.europa.eu/en/news-media/press-releases/eesc-and-ilo-join-forces-shape-fair-and-inclusive-ai-driven-future-high-level-conference</a></li>
+      <li><a href="https://www.un.org/global-dialogue-ai-governance/en/programme">https://www.un.org/global-dialogue-ai-governance/en/programme</a></li>
+      <li><a href="https://www.cogitatiopress.com/politicsandgovernance/article/viewFile/10245/4778">https://www.cogitatiopress.com/politicsandgovernance/article/viewFile/10245/4778</a></li>
+    </ol>
+  </section>
+
+</div>
+
+<script>
+(() => {
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---- scroll reveal ---- */
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) entry.target.classList.add('visible');
+    });
+  }, { threshold: 0.15, rootMargin: '0px 0px -50px 0px' });
+  document.querySelectorAll('section').forEach(s => observer.observe(s));
+
+  if (reduced) return;
+
+  /* ---- the companion: a persistent intelligence that travels with you ---- */
+  const companion = document.getElementById('companion');
+  const hint = document.getElementById('companion-hint');
+  const isTouch = window.matchMedia('(pointer: coarse)').matches;
+  let target = { x: window.innerWidth / 2, y: window.innerHeight * 0.75 };
+  let pos = { x: target.x, y: target.y };
+  let awake = false;
+
+  function wake() {
+    if (awake) return;
+    awake = true;
+    companion.classList.add('awake');
+    hint.classList.add('visible');
+    setTimeout(() => hint.classList.remove('visible'), 7000);
+  }
+
+  /* the hint belongs to the threshold — once the reader moves inward, it yields */
+  window.addEventListener('scroll', () => {
+    if (window.scrollY > window.innerHeight * 0.5) hint.classList.remove('visible');
+  }, { passive: true });
+
+  window.addEventListener('mousemove', (e) => {
+    target.x = e.clientX;
+    target.y = e.clientY;
+    wake();
+  });
+
+  if (isTouch) {
+    /* on touch devices the companion travels the right edge with the reader */
+    window.addEventListener('scroll', () => {
+      const depth = window.scrollY / Math.max(1, document.body.scrollHeight - window.innerHeight);
+      target.x = window.innerWidth - 24;
+      target.y = 80 + depth * (window.innerHeight - 160);
+      wake();
+    }, { passive: true });
+    setTimeout(wake, 2500);
+  }
+
+  /* ---- membranes ---- */
+  const membranes = [];
+
+  class Membrane {
+    constructor(wrapper) {
+      this.wrapper = wrapper;
+      this.canvas = wrapper.querySelector('canvas');
+      this.ctx = this.canvas.getContext('2d');
+      this.soft = parseFloat(wrapper.dataset.soft || '0.5'); /* 0 = rigid institution, 1 = permeable */
+      this.points = [];
+      this.t = Math.random() * 1000;
+      this.resize();
+    }
+    resize() {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const rect = this.wrapper.getBoundingClientRect();
+      this.w = rect.width;
+      this.h = rect.height;
+      this.canvas.width = this.w * dpr;
+      this.canvas.height = this.h * dpr;
+      this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const n = Math.max(48, Math.floor(this.w / 12));
+      if (this.points.length !== n) {
+        this.points = Array.from({ length: n }, () => ({ y: 0, v: 0 }));
+      }
+    }
+    step(lightX, lightY, lightInside) {
+      const soft = this.soft;
+      const k = 0.09 - soft * 0.055;        /* spring stiffness: rigid snaps back, soft yields slowly */
+      const damp = 0.82 + soft * 0.1;       /* soft membranes ripple longer */
+      const coupling = 0.12 + soft * 0.14;  /* soft membranes transmit — they communicate */
+      const reach = 60 + soft * 150;        /* how far the light's influence penetrates */
+      const give = 5 + soft * 33;           /* how much the membrane parts for the light */
+      const n = this.points.length;
+      const maxY = this.h * 0.34;
+      this.t += 0.012;
+      for (let i = 0; i < n; i++) {
+        const p = this.points[i];
+        const x = (i / (n - 1)) * this.w;
+        /* where this point wants to be: idle breath + the parting for the light */
+        let targetY = Math.sin(this.t + i * 0.35) * (0.6 + soft * 4);
+        if (lightInside) {
+          const d = Math.abs(x - lightX);
+          if (d < reach) {
+            const s = 1 - d / reach;
+            const dir = lightY < this.h / 2 ? 1 : -1;
+            targetY += dir * s * s * give;
+            /* rigid membranes grind — friction at the institutional boundary */
+            if (soft < 0.3) p.v += (Math.random() - 0.5) * s * 0.7;
+          }
+        }
+        /* spring toward target */
+        let force = (targetY - p.y) * k;
+        /* neighbor coupling */
+        const left = this.points[Math.max(0, i - 1)].y;
+        const right = this.points[Math.min(n - 1, i + 1)].y;
+        force += (left + right - 2 * p.y) * coupling;
+        p.v = (p.v + force) * damp;
+        if (p.v > 3) p.v = 3; else if (p.v < -3) p.v = -3;
+        p.y += p.v;
+        if (p.y > maxY) { p.y = maxY; p.v = 0; }
+        else if (p.y < -maxY) { p.y = -maxY; p.v = 0; }
+      }
+    }
+    draw(lightX, lightInside) {
+      const ctx = this.ctx;
+      const soft = this.soft;
+      ctx.clearRect(0, 0, this.w, this.h);
+      const mid = this.h / 2;
+      const n = this.points.length;
+      /* color: institutional steel -> gold */
+      const r = Math.round(107 + (201 - 107) * soft);
+      const g = Math.round(114 + (168 - 114) * soft);
+      const b = Math.round(128 + (124 - 128) * soft);
+      const alpha = 0.5 + soft * 0.3;
+      ctx.lineWidth = 1 + (1 - soft) * 0.8;
+      ctx.strokeStyle = `rgba(${r},${g},${b},${alpha})`;
+      ctx.beginPath();
+      for (let i = 0; i < n; i++) {
+        const x = (i / (n - 1)) * this.w;
+        const y = mid + this.points[i].y;
+        if (i === 0) { ctx.moveTo(x, y); continue; }
+        if (soft < 0.3) {
+          /* rigid: hard segments — a fence */
+          ctx.lineTo(x, y);
+        } else {
+          /* soft: a curve — a curtain */
+          const px = ((i - 1) / (n - 1)) * this.w;
+          const py = mid + this.points[i - 1].y;
+          ctx.quadraticCurveTo(px, py, (px + x) / 2, (py + y) / 2);
+        }
+      }
+      ctx.stroke();
+      /* permeable membranes glow where the light passes */
+      if (lightInside && soft > 0.4) {
+        const grad = ctx.createRadialGradient(lightX, mid, 0, lightX, mid, 90);
+        grad.addColorStop(0, `rgba(201,168,124,${0.16 * soft})`);
+        grad.addColorStop(1, 'rgba(201,168,124,0)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, this.w, this.h);
+      }
+    }
+  }
+
+  document.querySelectorAll('.membrane').forEach(w => membranes.push(new Membrane(w)));
+
+  /* ---- hero: one membrane, breathing, before the argument begins ---- */
+  const heroCanvas = document.getElementById('hero-canvas');
+  const heroCtx = heroCanvas.getContext('2d');
+  let heroT = 0;
+  function sizeHero() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const rect = heroCanvas.parentElement.getBoundingClientRect();
+    heroCanvas.width = rect.width * dpr;
+    heroCanvas.height = rect.height * dpr;
+    heroCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    heroCanvas._w = rect.width;
+    heroCanvas._h = rect.height;
+  }
+  sizeHero();
+
+  function drawHero() {
+    const w = heroCanvas._w, h = heroCanvas._h;
+    heroCtx.clearRect(0, 0, w, h);
+    heroT += 0.004;
+    const cx = w / 2, cy = h / 2;
+    const base = Math.min(w, h) * 0.36;
+    for (let ring = 0; ring < 3; ring++) {
+      heroCtx.beginPath();
+      const rr = base * (1 + ring * 0.18);
+      const wob = 6 + ring * 4;
+      for (let a = 0; a <= Math.PI * 2 + 0.05; a += 0.05) {
+        const rad = rr + Math.sin(a * (3 + ring) + heroT * (1 + ring * 0.6)) * wob
+                       + Math.sin(a * 7 - heroT * 1.7) * 3;
+        const x = cx + Math.cos(a) * rad;
+        const y = cy + Math.sin(a) * rad * 0.72;
+        if (a === 0) heroCtx.moveTo(x, y); else heroCtx.lineTo(x, y);
+      }
+      heroCtx.strokeStyle = `rgba(201,168,124,${0.10 - ring * 0.028})`;
+      heroCtx.lineWidth = 1;
+      heroCtx.stroke();
+    }
+  }
+
+  window.addEventListener('resize', () => {
+    membranes.forEach(m => m.resize());
+    sizeHero();
+  });
+
+  /* ---- loop ---- */
+  function frame() {
+    pos.x += (target.x - pos.x) * 0.07;
+    pos.y += (target.y - pos.y) * 0.07;
+    companion.style.transform = `translate(${pos.x}px, ${pos.y}px)`;
+
+    for (const m of membranes) {
+      const rect = m.wrapper.getBoundingClientRect();
+      if (rect.bottom < -100 || rect.top > window.innerHeight + 100) continue;
+      const near = pos.y > rect.top - 140 && pos.y < rect.bottom + 140;
+      m.step(pos.x, pos.y - rect.top, near && awake);
+      m.draw(pos.x, near && awake);
+    }
+
+    const hr = heroCanvas.parentElement.getBoundingClientRect();
+    if (hr.bottom > 0) drawHero();
+
+    requestAnimationFrame(frame);
+  }
+  frame();
+})();
+</script>
+
+<!-- GoatCounter analytics — privacy-friendly, no cookies, open source -->
+<script data-goatcounter="https://vybn-a2j.goatcounter.com/count"
+        async src="//gc.zgo.at/count.js"></script>
+
+</body>
+</html>
