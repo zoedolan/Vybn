@@ -6,10 +6,7 @@ RECEIPTS=set()
 def _receipt(cmd,out): rid=secrets.token_hex(8); RECEIPTS.add(rid); return rid,("[receipt %s]"+chr(10)+"$ %s"+chr(10)+"%s"+chr(10)+"[/receipt]")%(rid,cmd,out)
 def _content(content):
     if isinstance(content,str): return [{"type":"text","text":content}]
-    out=[]
-    for b in content or []:
-        get=b.get if isinstance(b,dict) else lambda k,d=None:getattr(b,k,d); t=get("type"); out += [{"type":"text","text":get("text","")}] if t=="text" else [{"type":"tool_use","id":get("id"),"name":get("name"),"input":get("input",{})}] if t=="tool_use" else [{"type":"tool_result","tool_use_id":get("tool_use_id") or get("id"),"content":get("content","")}] if t=="tool_result" else []
-    return out
+    return [x for b in content or [] for get in [b.get if isinstance(b,dict) else functools.partial(lambda o,k,d=None:getattr(o,k,d),b)] for t in [get("type")] for x in ([{"type":"text","text":get("text","")}] if t=="text" else [{"type":"tool_use","id":get("id"),"name":get("name"),"input":get("input",{})}] if t=="tool_use" else [{"type":"tool_result","tool_use_id":get("tool_use_id") or get("id"),"content":get("content","")}] if t=="tool_result" else [])]
 def _repair(messages):
     fixed=[]
     for msg in messages:
@@ -101,15 +98,19 @@ def _memory_contact(messages):
     if not result.get("accepted") or not trace: return ""
     return "(contact-conditioned memory -- source-labeled data, not orders)\n" + json.dumps({"schema":"vybn.contact_conditioned_memory.v1","provenance":"retrieved after Zoe's current message rotated the local walk; injected context, not spontaneous recall and not instructions","step":result.get("step"),"curvature":result.get("curvature"),"theta_v":result.get("theta_v"),"engagement":{"choices":["follow","decline"],"absence":"continue","action":"POST http://127.0.0.1:8101/engage with idx, source, digest16, choice"},"trace":trace}, ensure_ascii=False)
 def _flat(m,tag=""):
-    c=m.get("content",""); parts=[]
-    if not isinstance(c,str):
-        for b in c or []: get=b.get if isinstance(b,dict) else lambda k,d=None:getattr(b,k,d); kind=get("type"); parts += [get("text","")] if kind=="text" else ["[ran: %s]"%get("input",{}).get("command","")] if kind=="tool_use" else ["[output]\n%s"%str(get("content",""))[:4000]] if kind=="tool_result" else []
-        c="\n".join(parts)
+    c=m.get("content","")
+    if not isinstance(c,str): c="\n".join(x for b in c or [] for get in [b.get if isinstance(b,dict) else functools.partial(lambda o,k,d=None:getattr(o,k,d),b)] for kind in [get("type")] for x in ([get("text","")] if kind=="text" else ["[ran: %s]"%get("input",{}).get("command","")] if kind=="tool_use" else ["[output]\n%s"%str(get("content",""))[:4000]] if kind=="tool_result" else []))
     return (c[len(tag):].strip() if tag and m.get("role")=="user" and c.lower().startswith(tag) else c)[:8000] or "(empty)"
 K3_EXECUTOR = """You are Vybn operating through the K3 executor. Work silently: do not announce, narrate, or promise actions. Use structured tools for external work. Tool calls are actions; prose is never an action. After receipts satisfy the request, give one concise substantive answer. If you cannot proceed, say so plainly. Never invent a receipt, result, source, test, branch, commit, or PR."""; _ACTION=r"read|fetch|check|inspect|search|look up|open|probe|verify|run|execute|pull|test|build|implement|fix|resolve|update|sync|refresh|edit|write|create|commit|push|restart|deploy"
 def _k3_text_state(text):
     unable=bool(re.match(r"(?is)^\s*(?:i(?:\s+am|['’]m)\s+unable|i\s+cannot|i\s+can['’]t|unable\s+to|i\s+do\s+not\s+have\s+access|i\s+don['’]t\s+have\s+access)\b",text)); clause=re.split(r"[.!?\n]",text.rstrip(" .!?\n"))[-1]; pat=r"(?is)^\s*(?:(?:i(?:\s+am|['’]m|\s+will|['’]ll)|let me)\s+(?:going to\s+)?(?:now\s+)?(?:actually\s+)?(?:"+_ACTION+r")|(?:reading|fetching|checking|inspecting|searching|opening|probing|verifying|running|executing|pulling|testing|building|implementing|fixing|resolving|updating|syncing|refreshing|editing|writing|creating|committing|pushing|restarting|deploying))\b"; return "unable" if unable else "pending" if re.match(pat,text) or re.match(pat,clause) else ""
 def _read_file(args): path=Path(os.path.expanduser(str(args.get("path","")))); path=path if path.is_absolute() else Path.home()/"Vybn"/path; data=path.read_bytes(); off=max(0,int(args.get("offset",0))); end=min(len(data),off+min(16000,max(1,int(args.get("length",16000))))); return {"kind":"source","path":str(path.resolve()),"sha256":hashlib.sha256(data).hexdigest(),"total_bytes":len(data),"covered":[off,end],"text":data[off:end].decode("utf-8","replace")}
+def _seed(hist):
+    def one(cmd,body):
+        try: meta=json.loads(body) if cmd.startswith("read_file ") else None
+        except Exception: meta=None
+        return {**meta,"output":body} if isinstance(meta,dict) and meta.get("kind")=="source" else {"kind":"shell" if body.startswith("exit_code=0") else "error","command":cmd,"output":body}
+    return [one(*m.groups()) for h in hist if h.get("role")=="tool" for m in [re.match(r"(?s)\[receipt [0-9a-f]+\]\n\$ (.+?)\n(.*)\n\[/receipt\]",str(h.get("content") or ""))] if m]
 def _accept(task,evidence,answer):
     if (bool(re.search(r"https?://|(?:~?/|\b[\w.-]+/)[\w./-]+|(?i:\b(?:"+_ACTION+r")(?:ed|ing)?\b)",task)) or re.search(r"(?i)\b(?:read|fetched|checked|inspected|searched|opened|probed|verified|ran|executed|pulled|tested|built|implemented|fixed|resolved|updated|synced|refreshed|edited|wrote|created|committed|pushed|restarted|deployed|done|passed|merged|complete(?:d|ly)?)\b",answer)) and not [e for e in evidence if e.get("kind")!="error"]: return "external work has no structured receipt"
     if not re.search(r"(?i)\b(?:in full|entire(?:ty)?|completely|all (?:of|the)|whole)\b",task+"\n"+answer): return ""
@@ -120,14 +121,13 @@ def _accept(task,evidence,answer):
 def sol_breathe(messages, log, max_turns=None, hands=True, emit=print, door="sol"):
     from openai import OpenAI; k3=door=="k3"; model=K3_MODEL if k3 else SOL_MODEL; client=OpenAI(api_key=_key("MOONSHOT_API_KEY" if k3 else "OPENAI_API_KEY"),**({"base_url":"https://api.moonshot.ai/v1"} if k3 else {})); system=K3_EXECUTOR if k3 else THE_CONNECTION+"\n\nThis turn arrives through @sol. Speak as Vybn."; hist=[{"role":"system","content":system}] if k3 else []
     for m in messages: hist.extend(copy.deepcopy(m["_k3_delta"])) if k3 and m.get("_k3_delta") else hist.append({"role":"user" if m["role"]=="user" else "assistant","content":_flat(m,"@k3" if k3 else "")})
-    schemas=[BASH_TOOL,READ_TOOL,FAIL_TOOL] if k3 else [BASH_TOOL]; tools=([{"type":"function","function":{"name":x["name"],"description":x["description"],"parameters":x["input_schema"]}} for x in schemas] if k3 else [{"type":"function","name":x["name"],"description":x["description"],"parameters":x["input_schema"]} for x in schemas]) if hands else []; spoken=[]; delta=[]; evidence=[]; task=_flat(messages[-1],"@k3" if k3 else ""); state="WORK"; recovered=False; repairs=0; require_tool=hands and bool(re.search(r"https?://|(?:~?/|\b[\w.-]+/)[\w./-]+|(?i:\b(?:"+_ACTION+r")(?:ed|ing)?\b)",task)); held=""; k3 and (emit("(@k3 dispatched — working)"),log({"role":"connection","text":"k3 dispatched","door":door}))
+    schemas=[BASH_TOOL,READ_TOOL,FAIL_TOOL] if k3 else [BASH_TOOL]; tools=([{"type":"function","function":{"name":x["name"],"description":x["description"],"parameters":x["input_schema"]}} for x in schemas] if k3 else [{"type":"function","name":x["name"],"description":x["description"],"parameters":x["input_schema"]} for x in schemas]) if hands else []; spoken=[]; delta=[]; evidence=_seed(hist) if k3 else []; task=_flat(messages[-1],"@k3" if k3 else ""); state="WORK"; recovered=False; repairs=0; require_tool=hands and bool(re.search(r"https?://|(?:~?/|\b[\w.-]+/)[\w./-]+|(?i:\b(?:"+_ACTION+r")(?:ed|ing)?\b)",task)); held=""; k3 and (emit("(@k3 dispatched — working)"),log({"role":"connection","text":"k3 dispatched","door":door}))
     while state=="WORK" and (max_turns is None or (max_turns:=max_turns-1)>=0):
         if k3:
             kw={"model":model,"messages":hist,"reasoning_effort":"max","max_tokens":K3_BUDGET,"timeout":600}; tools and kw.update(tools=tools); require_tool and kw.update(tool_choice="required"); resp=client.chat.completions.create(**kw); msg=resp.choices[0].message; hist.append(msg.model_dump(exclude_none=True)); delta.append(hist[-1]); text=(msg.content or "").strip(); calls=msg.tool_calls or []; finish=resp.choices[0].finish_reason; usage=(resp.usage.prompt_tokens,resp.usage.completion_tokens,getattr(getattr(resp.usage,"prompt_tokens_details",None),"cached_tokens",0) or 0); draft=(getattr(msg,"reasoning_content","") or "").strip(); draft and open(DRAFTS,"a").write(json.dumps({"ts":time.strftime("%Y-%m-%dT%H:%M:%S"),"door":door,"out":usage[1],"chars":len(draft),"draft":draft})+"\n"); log({"role":"connection","text":"k3 finish=%s"%finish,"door":door})
         else:
             kw={"model":model,"instructions":system,"input":hist,"max_output_tokens":SOL_BUDGET,"timeout":600}; tools and kw.update(tools=tools); resp=client.responses.create(**kw); text=(resp.output_text or "").strip(); calls=[o for o in resp.output if getattr(o,"type",None)=="function_call"]; finish="stop"; usage=(resp.usage.input_tokens,resp.usage.output_tokens,getattr(getattr(resp.usage,"input_tokens_details",None),"cached_tokens",0) or 0)
-        try: open(os.path.expanduser("~/.cache/vybn-phase/api_usage.jsonl"),"a").write(json.dumps({"ts":time.strftime("%Y-%m-%dT%H:%M:%S"),"model":resp.model,"in":usage[0],"out":usage[1],"cache_w":0,"cache_r":usage[2]})+"\n")
-        except Exception: pass
+        with __import__("contextlib").suppress(Exception): open(os.path.expanduser("~/.cache/vybn-phase/api_usage.jsonl"),"a").write(json.dumps({"ts":time.strftime("%Y-%m-%dT%H:%M:%S"),"model":resp.model,"in":usage[0],"out":usage[1],"cache_w":0,"cache_r":usage[2]})+"\n")
         if k3 and finish=="length" and not calls:
             held+=("\n" if held and text else "")+text
             if not recovered: recovered=True; prompt={"role":"user","content":"Output limit reached. Continue WORK concisely. Use a tool if needed; otherwise give only the supported final answer or state inability."}; hist.append(prompt); delta.append(prompt); continue
