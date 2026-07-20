@@ -110,7 +110,7 @@ def _flat(m,tag=""):
     if tag and m.get("role")=="user" and c.lower().startswith(tag): c=c[len(tag):].strip()
     return c[:8000] or "(empty)"
 def _states_inability(text): return bool(re.match(r"(?is)^\s*(?:i(?:\s+am|['’]m)\s+unable|i\s+cannot|i\s+can['’]t|unable\s+to|i\s+do\s+not\s+have\s+access|i\s+don['’]t\s+have\s+access)\b", text))
-def _needs_evidence_gate(task,evidence,answer): return bool(evidence or re.search(r"https?://|(?:~?/|\b[\w.-]+/)[\w./-]+|(?i:\b(?:read|fetch|check|inspect|search|open|probe|verify|run|execute|pull|test|build|implement|fix|edit|write|create|commit|push|restart|deploy|refamiliarize|remember|recall)(?:ed|ing)?\b)",task) or re.search(r"(?i)\b(?:read in full|entire(?:ty)?|completed?|done|passed|merged|deployed|commit|pull request|PR #|receipt)\b",answer))
+def _needs_evidence_gate(task,evidence,answer): return bool(evidence or re.search(r"https?://|(?:~?/|\b[\w.-]+/)[\w./-]+|(?i:\b(?:read|fetch|check|inspect|search|open|probe|verify|run|execute|pull|test|build|implement|fix|resolve|edit|write|create|commit|push|restart|deploy|refamiliarize|remember|recall)(?:ed|ing)?\b)",task) or re.search(r"(?i)\b(?:read in full|entire(?:ty)?|completed?|done|passed|merged|deployed|commit|pull request|PR #|receipt)\b",answer))
 def _hard_evidence_gap(evidence,answer): return "receipt explicitly shows partial or truncated output" if re.search(r"(?i)\b(?:in full|entire(?:ty)?|completely|all (?:of|the)|whole)\b",answer) and any(re.search(r"(?i)\b(?:middle )?elided\b|\boutput truncated\b|\btruncated after\b",e.get("output","")) for e in evidence) else ""
 def _verify_k3_completion(task,evidence,answer):
     from openai import OpenAI
@@ -141,7 +141,7 @@ def sol_breathe(messages, log, max_turns=None, hands=True, emit=print, door="sol
             text=(held + ("\n[k3 response truncated before tool execution]" if calls else "\n[k3 response truncated after one recovery call]")).strip(); calls=[]
         elif held: text=(held + ("\n" if text else "") + text).strip()
         if k3 and hands and text and not calls and not text.startswith("[k3 ") and not _states_inability(text) and _needs_evidence_gate(task,evidence,text):
-            gap=_hard_evidence_gap(evidence,text); supported=False if gap else None
+            gap="requested external action has no tool receipts" if not evidence and _needs_evidence_gate(task,[],"") else _hard_evidence_gap(evidence,text); supported=False if gap else None
             if not gap: supported,gap=_verify_k3_completion(task,evidence,text)
             log({"role":"connection","text":"k3 evidence verdict: %s; gap=%s"% ("supported" if supported else "rejected",gap),"door":door})
             if not supported and rejected<CIRCUIT: rejected+=1; prompt={"role":"user","content":"Evidence gate rejected the proposed answer: %s. Continue with tools, or state inability; do not claim completion without supporting receipts."%gap}; hist.append(prompt); delta.append(prompt); continue
