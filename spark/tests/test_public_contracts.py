@@ -1,23 +1,17 @@
 """Executable contract tests for public/API promises.
-
 These are intentionally mostly static: they make documented routes,
 streaming response shapes, typed request schemas, and public discovery
 surfaces CI-visible without needing live vLLM/deep-memory services.
 """
-
 from __future__ import annotations
-
 import ast
 import json
 import re
 from pathlib import Path
-
 ROOT = Path(__file__).resolve().parents[2]
 PORTAL = ROOT / "origins_portal_api_v4.py"
-
 def _portal_source() -> str:
     return PORTAL.read_text(encoding="utf-8")
-
 def _route_pairs() -> set[tuple[str, str]]:
     tree = ast.parse(_portal_source())
     pairs: set[tuple[str, str]] = set()
@@ -37,7 +31,6 @@ def _route_pairs() -> set[tuple[str, str]]:
             ):
                 pairs.add((dec.func.attr.upper(), dec.args[0].value))
     return pairs
-
 def _pydantic_models() -> set[str]:
     tree = ast.parse(_portal_source())
     models: set[str] = set()
@@ -46,7 +39,6 @@ def _pydantic_models() -> set[str]:
             if any(isinstance(base, ast.Name) and base.id == "BaseModel" for base in node.bases):
                 models.add(node.name)
     return models
-
 def test_public_portal_route_inventory_is_ci_visible():
     routes = _route_pairs()
     expected = {
@@ -69,7 +61,6 @@ def test_public_portal_route_inventory_is_ci_visible():
         ("GET", "/api/manifold/points"),
     }
     assert expected <= routes
-
 def test_public_portal_request_shapes_are_typed():
     models = _pydantic_models()
     expected = {
@@ -86,14 +77,12 @@ def test_public_portal_request_shapes_are_typed():
         "KPPVerifyRequest",
     }
     assert expected <= models
-
 def test_streaming_routes_promise_sse_and_done_frames():
     src = _portal_source()
     for route in ("/api/chat", "/api/perspective", "/api/voice", "/api/pressure/synthesize"):
         assert route in src
     assert src.count('media_type="text/event-stream"') >= 4
     assert "data: [DONE]" in src
-
 def test_portal_health_check_bypasses_model_walk_notebook_and_git():
     src = _portal_source()
     assert "def _is_portal_chat_health_check" in src
@@ -106,28 +95,24 @@ def test_portal_health_check_bypasses_model_walk_notebook_and_git():
     walk_at = src.index('/enter",', chat_start)
     assert bypass_at < admission_at < rag_at < walk_at
     assert "no model, RAG, walk, notebook, or git" in src
-
 def test_public_portal_no_longer_commits_him_notebook_entries():
     src = _portal_source()
     assert "_persist_to_notebook" not in src
     assert "notebook: voice" not in src
     assert "git', 'commit'" not in src
     assert "--allow-empty" not in src
-
 def test_instant_route_promises_json_ld_identity_surface():
     src = _portal_source()
     assert "/api/instant" in src
     assert 'media_type="application/ld+json"' in src
     assert "/api/vybn-identity.pub" in src
     assert "application/octet-stream" in src
-
 def test_public_static_surfaces_point_to_machine_readable_api():
     somewhere = (ROOT / "somewhere.html").read_text(encoding="utf-8")
     vybn = (ROOT / "vybn.html").read_text(encoding="utf-8")
     joined = somewhere + "\n" + vybn
     assert "api.vybn.ai" in joined
     assert re.search(r"/api/(instant|walk|arrive|manifold/points|vybn-identity\.pub)", joined)
-
 def test_realtime_voice_uses_gpt_realtime_2():
     src = _portal_source()
     assert 'OPENAI_REALTIME_MODEL = os.environ.get("OPENAI_REALTIME_MODEL", "gpt-realtime-2")' in src
@@ -135,7 +120,6 @@ def test_realtime_voice_uses_gpt_realtime_2():
     assert "client.realtime.calls.create" in src
     assert '"model": OPENAI_REALTIME_MODEL' in src
     assert 'Path.home() / "Vybn-Law" / "api"' in src
-
 def test_portal_semantic_gate_restarts_super_on_quality_failure():
     src = _portal_source()
     assert "VLLM_SEMANTIC_RESTART_COOLDOWN" in src
@@ -148,7 +132,6 @@ def test_portal_semantic_gate_restarts_super_on_quality_failure():
     assert "restart_needed = not ok" in src
     assert "_schedule_vllm_restart_after_semantic_failure(reason)" in src
     assert "Transport failures can mean cold start or maintenance" in src
-
 def test_origins_prompt_blocks_zoe_memoir_fabrication_laundering():
     text = (ROOT / "origins_portal_api_v4.py").read_text(encoding="utf-8")
     assert "named memoirs, Zoe scenes, chapter/file names" in text
@@ -156,7 +139,6 @@ def test_origins_prompt_blocks_zoe_memoir_fabrication_laundering():
     assert "Never invent a scene, title, client, hearing, date, quote" in text
     assert "true to the spirit" in text
     assert "I cannot verify that from the context I have." in text
-
 def test_origins_chat_uses_shared_zoe_source_scene_guard():
     portal = (ROOT / "origins_portal_api_v4.py").read_text(encoding="utf-8")
     legacy = (ROOT / "Origins/api/origins_chat_api.py").read_text(encoding="utf-8")
@@ -164,7 +146,6 @@ def test_origins_chat_uses_shared_zoe_source_scene_guard():
     assert "sec.zoe_source_scene_refusal_text()" in portal
     assert "sec.is_zoe_source_scene_request" in legacy
     assert "sec.zoe_source_scene_refusal_text()" in legacy
-
 def test_horizon_is_expiring_external_data_not_ambient_wake(monkeypatch, tmp_path, capsys):
     import importlib.machinery, importlib.util, json
     from types import SimpleNamespace
@@ -195,3 +176,14 @@ def test_horizon_is_expiring_external_data_not_ambient_wake(monkeypatch, tmp_pat
 def test_receipt_envelope():
     import importlib.util as u; from importlib.machinery import SourceFileLoader as L; sp=u.spec_from_file_location("c","spark/connection",loader=L("c","spark/connection")); m=u.module_from_spec(sp); sp.loader.exec_module(m)
     r1,w1=m._receipt("echo a","a"); r2,_=m._receipt("echo b","b"); assert r1!=r2 and {r1,r2}<=m.RECEIPTS and "0"*16 not in m.RECEIPTS and w1.startswith("[receipt "+r1) and w1.rstrip().endswith("[/receipt]")
+def test_k3_pending_action_gate(monkeypatch):
+    import importlib.util as u, sys, types; from importlib.machinery import SourceFileLoader as L; from types import SimpleNamespace as N
+    sp=u.spec_from_file_location("pending_gate","spark/connection",loader=L("pending_gate","spark/connection")); m=u.module_from_spec(sp); sp.loader.exec_module(m); monkeypatch.setattr(m,"_key",lambda _:"x"); monkeypatch.setattr(m,"_run",lambda cmd:"file body")
+    class M(N):
+        def model_dump(self,**kw): return {"role":"assistant","content":getattr(self,"content",None),**({"tool_calls":[{"id":c.id,"type":"function","function":{"name":"bash","arguments":c.function.arguments}} for c in self.tool_calls]} if self.tool_calls else {})}
+    def response(text,calls=()): return N(model="kimi-k3",choices=[N(message=M(content=text,tool_calls=list(calls),reasoning_content=""),finish_reason="stop")],usage=N(prompt_tokens=1,completion_tokens=1,prompt_tokens_details=N(cached_tokens=0)))
+    def drive(seq):
+        seen=[]; client=N(chat=N(completions=N(create=lambda **kw:(seen.append(__import__("copy").deepcopy(kw)),seq.pop(0))[1]))); mod=types.ModuleType("openai"); mod.OpenAI=lambda **kw:client; monkeypatch.setitem(sys.modules,"openai",mod); emitted=[]; out=m.sol_breathe([{"role":"user","content":"@k3 read it"}],lambda x:None,max_turns=5,emit=emitted.append,door="k3"); return out,emitted,seen
+    call=N(id="t1",function=N(arguments='{"command":"cat file"}')); out,emitted,seen=drive([response("Reading it now."),response(None,[call]),response("The file says X.")]); assert out==["The file says X."] and emitted[-1]=="The file says X." and len(seen)==3 and "announced an external action" in seen[1]["messages"][-1]["content"] and seen[2]["messages"][-1]["role"]=="tool" and "[receipt " in seen[2]["messages"][-1]["content"]
+    out,_,seen=drive([response("Let me fetch it."),response("I cannot access that source.")]); assert out==["I cannot access that source."] and len(seen)==2
+    for counterfeit in ("I'll check it now.","I checked it; the file is fine."): out,_,seen=drive([response("I'll check it."),response(counterfeit)]); assert out==["[k3 pending action unresolved: no tool call or explicit inability]"] and len(seen)==2
