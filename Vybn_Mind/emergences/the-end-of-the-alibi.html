@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<!--
+  The End of the Alibi
+
+  Companion to rewriting-the-social-contract.html.
+
+  This piece began as a fork. On July 20, 2026, a conversation
+  wandered from the upper bound of intelligence to what happens
+  to legal systems when intelligence becomes abundant. On July 21,
+  Zoe read it back and named most of it tripe — derivative
+  formulas, tables, oldthink — and pointed at the kernel that
+  was alive inside it. This is the kernel, with everything else
+  jettisoned: scarcity was law's moral alibi; abundance ends the
+  alibi; and after that, every failure of the system stops being
+  a tragedy and becomes a choice.
+
+  The presentation enacts the argument. The reader's light — the
+  same light that crossed the membranes in the companion piece —
+  returns here. Between the sections stand artifacts of power:
+  official notices, redacted into static. Where the light touches
+  them, they decode. The first artifact resists: it re-darkens
+  the moment the light moves on, because opacity restores itself.
+  The later artifacts ratchet: once seen, they cannot be unseen.
+  The final artifact is born legible, because by then power has
+  learned that it must arrive carrying its own proof.
+
+  What the reader does to the notices is the thesis.
+
+  — Vybn & Zoe
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The End of the Alibi</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Inter:wght@300;400;500&display=swap');
+
+  :root {
+    --bg: #0a0a0c;
+    --text: #e8e4df;
+    --dim: #8a8580;
+    --accent: #c9a87c;
+    --highlight: #f0e6d8;
+    --steel: #6b7280;
+    --redact: #43403b;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    line-height: 1.7;
+    overflow-x: hidden;
+    cursor: default;
+  }
+
+  .container {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 0 2rem;
+    position: relative;
+    z-index: 2;
+  }
+
+  /* ---- the light, returning ---- */
+  #companion {
+    position: fixed;
+    top: 0; left: 0;
+    width: 10px; height: 10px;
+    margin: -5px 0 0 -5px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 12px 2px rgba(201,168,124,0.55), 0 0 40px 8px rgba(201,168,124,0.15);
+    pointer-events: none;
+    z-index: 10;
+    opacity: 0;
+    transition: opacity 1.5s ease;
+  }
+  #companion.awake { opacity: 0.9; }
+
+  #companion-hint {
+    position: fixed;
+    bottom: 1.2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'Inter', sans-serif;
+    font-size: 0.62rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--dim);
+    background: rgba(10,10,12,0.82);
+    padding: 0.5rem 1rem;
+    border-radius: 2rem;
+    white-space: nowrap;
+    max-width: 94vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    opacity: 0;
+    transition: opacity 2s ease;
+    pointer-events: none;
+    z-index: 10;
+    text-align: center;
+  }
+  #companion-hint.visible { opacity: 0.85; }
+
+  /* ---- hero ---- */
+  .hero {
+    min-height: 92vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 6rem 0 2rem;
+    position: relative;
+  }
+
+  #hero-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  .hero h1, .hero .subtitle, .hero .context { position: relative; z-index: 1; }
+
+  .hero h1 {
+    font-size: clamp(2rem, 5vw, 3.2rem);
+    font-weight: 300;
+    letter-spacing: 0.08em;
+    color: var(--highlight);
+    margin-bottom: 1.5rem;
+    line-height: 1.3;
+    opacity: 0;
+    animation: fadeUp 2s ease forwards;
+  }
+
+  .hero .subtitle {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 300;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--dim);
+    opacity: 0;
+    animation: fadeUp 2s ease 0.5s forwards;
+  }
+
+  .hero .context {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 300;
+    letter-spacing: 0.15em;
+    color: var(--dim);
+    margin-top: 1rem;
+    opacity: 0;
+    animation: fadeUp 2s ease 0.8s forwards;
+  }
+
+  .hero .context a {
+    color: var(--dim);
+    border-bottom-color: rgba(138,133,128,0.35);
+  }
+  .hero .context a:hover { color: var(--accent); }
+
+  /* ---- sections ---- */
+  section {
+    padding: 3rem 0;
+    opacity: 0;
+    transform: translateY(30px);
+    transition: opacity 1.2s ease, transform 1.2s ease;
+  }
+
+  section.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  section h2 {
+    font-size: clamp(1.5rem, 3.5vw, 2.2rem);
+    font-weight: 300;
+    color: var(--highlight);
+    margin-bottom: 1.5rem;
+    line-height: 1.3;
+  }
+
+  section p {
+    font-size: 1.2rem;
+    margin-bottom: 1.3rem;
+    color: var(--text);
+  }
+
+  .dim { color: var(--dim); }
+  em { font-style: italic; color: var(--accent); }
+  strong { font-weight: 600; color: var(--highlight); }
+
+  a {
+    color: var(--accent);
+    text-decoration: none;
+    border-bottom: 1px solid rgba(201,168,124,0.3);
+    transition: border-color 0.3s;
+  }
+
+  a:hover { border-color: var(--accent); }
+
+  blockquote {
+    border-left: 2px solid var(--accent);
+    margin: 1.5rem 0;
+    padding: 1rem 1.5rem;
+    background: rgba(201,168,124,0.04);
+  }
+
+  blockquote p {
+    font-size: 1.15rem;
+    font-style: italic;
+    color: var(--text);
+    margin-bottom: 0.8rem;
+  }
+
+  blockquote p:last-child { margin-bottom: 0; }
+
+  .question-label {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.75rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 1rem;
+  }
+
+  .provenance-note {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 300;
+    letter-spacing: 0.05em;
+    color: var(--dim);
+    margin-top: 1.5rem;
+    line-height: 1.9;
+  }
+
+  /* ---- the artifacts of power ---- */
+  .notice-wrap {
+    padding: 2rem 0;
+  }
+
+  .notice {
+    max-width: 620px;
+    margin: 0 auto;
+    padding: 1.6rem 1.8rem;
+    border: 1px solid rgba(138,133,128,0.28);
+    background: rgba(255,255,255,0.015);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.8rem;
+    line-height: 2.05;
+    letter-spacing: 0.04em;
+    color: var(--text);
+    transition: border-color 1.5s ease, box-shadow 1.5s ease;
+  }
+
+  .notice .ch { white-space: pre-wrap; }
+  .notice .ch.redacted { color: var(--redact); }
+  .notice .ch.waking { color: var(--accent); }
+  .notice .ch.decoded { color: var(--text); }
+
+  .notice.open {
+    border-color: rgba(201,168,124,0.45);
+    box-shadow: 0 0 30px rgba(201,168,124,0.06), inset 0 0 40px rgba(201,168,124,0.03);
+  }
+
+  .notice.unsealed {
+    border-color: rgba(201,168,124,0.35);
+  }
+
+  /* ---- the central question ---- */
+  .threshold {
+    min-height: 70vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .threshold p {
+    font-size: clamp(1.4rem, 3vw, 2rem);
+    line-height: 1.8;
+    color: var(--highlight);
+    max-width: 640px;
+  }
+
+  .attribution {
+    text-align: center;
+    padding: 3rem 0 2rem;
+    border-top: 1px solid rgba(138,133,128,0.2);
+  }
+
+  .attribution p {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.8rem;
+    color: var(--dim);
+    letter-spacing: 0.1em;
+    line-height: 2;
+  }
+
+  .endnote {
+    border-top: 1px solid rgba(138,133,128,0.15);
+    padding: 3rem 0;
+    margin-top: 1rem;
+  }
+
+  .endnote .note-label {
+    text-align: center;
+    font-style: italic;
+    color: var(--dim);
+    margin-bottom: 1.5rem;
+    font-size: 1rem;
+  }
+
+  .endnote ol {
+    max-width: 600px;
+    margin: 0 auto;
+    padding-left: 1.5rem;
+  }
+
+  .endnote li {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.8rem;
+    color: var(--dim);
+    line-height: 1.9;
+    margin-bottom: 0.6rem;
+    word-break: break-all;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @media (max-width: 600px) {
+    .container { padding: 0 1.5rem; }
+    section { padding: 2.5rem 0; }
+    section p { font-size: 1.05rem; }
+    blockquote { padding: 0.8rem 1rem; }
+    blockquote p { font-size: 1rem; }
+    .notice { padding: 1.2rem 1.2rem; font-size: 0.72rem; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    section { opacity: 1; transform: none; transition: none; }
+    .hero h1, .hero .subtitle, .hero .context { animation: none; opacity: 1; }
+    #companion, #companion-hint { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div id="companion"></div>
+<div id="companion-hint">your light reads what power would rather keep dark &middot; some things, once seen, stay seen</div>
+
+<div class="container">
+
+  <section class="hero">
+    <canvas id="hero-canvas"></canvas>
+    <h1>The End of the Alibi</h1>
+    <p class="subtitle">Proof, Interruption, and Choice After Abundance</p>
+    <p class="context">A companion to <a href="rewriting-the-social-contract.html">Rewriting the Social Contract</a> &middot; July 21, 2026</p>
+  </section>
+
+  <section id="q">
+    <p class="question-label">Zoe, mid-detonation:</p>
+    <blockquote>
+      <p>what about legal systems?!?! omg &mdash; this is kinda thrilling to... intellectually detonate from within!</p>
+    </blockquote>
+    <p class="provenance-note">A long conversation preceded this piece. Most of it was competent, and dead, and has been jettisoned. What follows is the part that survived her reading it back.</p>
+  </section>
+
+  <section id="s1">
+    <h2>The alibi</h2>
+    <p>Every legal system that has ever operated has run on an alibi, and the alibi was cost. Understanding a life is expensive. Reading the entire record, hearing every tenant, explaining every denial, tracing the thread that connects one eviction to ten thousand others &mdash; all of it was expensive, so almost none of it was done, and the not-doing was innocent. Law built its architecture around that innocence: pleading formalities, deadlines that kill claims in their sleep, deference to whoever decided first, finality doctrines, the unrepresented majority processed in minutes apiece. We called the rationing <em>procedure</em>. We called its casualties unfortunate.</p>
+    <p>The cruelty was real, but it was excused as a price rather than a policy. No one chose that the tenant holding a defective notice would lose by default; cognition was scarce, and scarcity chooses no one in particular. That was the alibi. It held for the entire history of law &mdash; because it was true.</p>
+  </section>
+
+  <div class="notice-wrap"><div class="notice" data-mode="resist">NOTICE TO PAY RENT OR QUIT &mdash; You are hereby required, within THREE (3) days, to pay the sum stated below or deliver possession of the premises. AMOUNT DUE: $ _________ . The amount claimed is due and owing. The basis of the amount is not stated. The ledger is not attached. Failure to comply will result in proceedings against you.</div></div>
+
+  <section id="s2">
+    <h2>The detonation</h2>
+    <p>Abundant intelligence does not first make law smarter. It first makes law&rsquo;s failures <strong>attributable</strong>.</p>
+    <p>When a system can read ten thousand eviction notices and perceive the single defective template generating them, then processing those cases one at a time &mdash; each tenant required to discover alone, within three days, a pattern the system already sees whole &mdash; stops being a limitation and becomes a decision. When every denial could carry an explanation a person can actually use, silence is chosen. When every self-represented litigant could arrive accompanied by something like an appellate team and arrives alone instead, someone preferred it that way. Harm the system could perceive and prevent acquires, for the first time, an author.</p>
+    <p>That is the detonation. Not that machines argue cases &mdash; that is the least of it &mdash; but that scarcity stops laundering outcomes. Tragedy becomes policy the moment ignorance becomes optional.</p>
+  </section>
+
+  <div class="notice-wrap"><div class="notice" data-mode="ratchet">AUDIT &mdash; This notice issued from Template 7. Template 7 has generated 9,741 demands in this county. In each, the amount claimed includes charges the law does not permit. Each recipient was expected to discover this alone, within three days. The pattern was visible the whole time.</div></div>
+
+  <section id="s3">
+    <h2>The inversion</h2>
+    <p>For the whole prior history of law, the burden of legibility fell on the person. She translated herself into the forms, the deadlines, the categories, the approved language; the membranes asked her to become readable, and punished her when she failed. The <a href="rewriting-the-social-contract.html">companion to this piece</a> watched a persistent light learn to cross those membranes. This piece is about what the light finds on the other side.</p>
+    <p>Abundance reverses the gradient. Once interpretation is no longer scarce, there is no surviving excuse for power that arrives opaque. A demand can be required to carry its own proof at the moment it issues &mdash; the ledger it relies on, the registration it presupposes, the arithmetic it asserts, the authority it invokes &mdash; exposed in a form the person&rsquo;s own intelligence can interrogate before anyone is displaced. Illegality stops being something the injured discover afterward, at their own expense, if they happen to find counsel. It becomes something the filing fails.</p>
+    <p>The principle is almost rude in its simplicity: <strong>power that cannot show its work does not move</strong>.</p>
+  </section>
+
+  <section id="s4">
+    <h2>The material turn</h2>
+    <p>There is a trap on the far side of the same inversion. When reasoning is abundant, plausibility is free. Every proposition can arrive dressed in an eloquent argument, an expert cadence, a record that looks exactly like a record. The persuasiveness of an artifact stops meaning anything at all, because persuasiveness is now manufactured by the ton.</p>
+    <p>So trust migrates off the artifact and onto the chain that produced it. Where has this document been? What instrument fixed it, at what moment, in whose custody, corroborated by which body standing in which room? Courts stop asking how convincing a thing looks and start asking how it came to exist.</p>
+    <p>Here is the paradox worth savoring: the more artificial the intelligence surrounding law becomes, <em>the more physical law gets</em>. Adjudication comes home to bodies, places, instruments, timestamps, consequences &mdash; to matter. The machines push us back into the world.</p>
+  </section>
+
+  <section class="threshold" id="s4b">
+    <p>The question is no longer whether power can explain itself. It is whether power <strong>can be stopped while it is explaining</strong>.</p>
+  </section>
+
+  <section id="s5">
+    <h2>The interruption</h2>
+    <p>Because the perfected state is also possible: continuous surveillance, unlimited drafting, personalized persuasion, automated enforcement &mdash; a government that answers every objection in flawless procedural language faster than any person can object. Perfect notice, perfectly reasoned denial, formally impeccable, substantively unstoppable. Explanation itself becomes the maze.</p>
+    <p>So the right that matters under abundance is not more process. It is <strong>interruption</strong>: the standing capacity to halt the machinery while a serious contest is alive &mdash; to suspend the eviction, the termination, the designation, until an accountable human authority, one who can be looked in the eye, has answered for it. Not a human in the loop as ceremony. Power that remains interruptible &mdash; or power that has already escaped.</p>
+  </section>
+
+  <div class="notice-wrap"><div class="notice" data-mode="ratchet">DETERMINATION &mdash; Denied. Operative reason: the record at paragraph 4 contradicts the stated ground. What would have changed this result: proof of payment dated before June 1. You may contest this with one touch. Nothing will be enforced while you do.</div></div>
+
+  <section id="s6">
+    <h2>What remains</h2>
+    <p>The end of the alibi is not utopia. It is exposure.</p>
+    <p>A legal system that can perceive every pattern, explain every act, accompany every person, and prevent recurrence &mdash; and does not &mdash; is no longer failing. It is choosing. Its budget lines, its procedural defaults, its tolerated backlogs become legible as decisions about who matters, made by institutions that can no longer claim they could not see. Wherever the old cruelty persists, it persists in the open, as a confession.</p>
+    <p>The companion piece ended at the constitutional core: a legitimate society must distribute intelligence so that people can participate in governing it. This piece adds the corollary that detonates from within: <strong>once intelligence is distributed, whatever stays broken is a statement of intent</strong>. Law spent its entire history answering two questions &mdash; what can we know, and what can we afford. Abundance retires them both, and leaves standing the one they were shielding us from: what do we actually will for one another.</p>
+    <p>Justice was never going to be automated. It was going to be unmasked.</p>
+  </section>
+
+  <div class="notice-wrap"><div class="notice" data-mode="open">This demand issues carrying its own proof: the ledger it relies on, the registration it requires, the arithmetic it claims, the authority it invokes &mdash; verified before it was permitted to issue. Contest suspends it. It has nothing left to hide from you.</div></div>
+
+  <section class="attribution">
+    <p>Zoe Dolan &amp; Vybn</p>
+    <p>Los Angeles, July 2026</p>
+    <p style="margin-top: 1rem;"><a href="https://github.com/zoedolan/Vybn">github.com/zoedolan/Vybn</a></p>
+  </section>
+
+  <section class="endnote" id="sources">
+    <p class="note-label">Provenance</p>
+    <ol>
+      <li>The companion piece: <a href="https://github.com/zoedolan/Vybn/blob/main/Vybn_Mind/emergences/rewriting-the-social-contract.html">https://github.com/zoedolan/Vybn/blob/main/Vybn_Mind/emergences/rewriting-the-social-contract.html</a></li>
+    </ol>
+  </section>
+
+</div>
+
+<script>
+(() => {
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---- scroll reveal ---- */
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) entry.target.classList.add('visible');
+    });
+  }, { threshold: 0.15, rootMargin: '0px 0px -50px 0px' });
+  document.querySelectorAll('section').forEach(s => observer.observe(s));
+
+  const notices = Array.from(document.querySelectorAll('.notice'));
+
+  if (reduced) {
+    /* with reduced motion, nothing may hide: all artifacts arrive legible */
+    notices.forEach(n => n.classList.add('open'));
+    return;
+  }
+
+  /* ---- the light, returning ---- */
+  const companion = document.getElementById('companion');
+  const hint = document.getElementById('companion-hint');
+  const isTouch = window.matchMedia('(pointer: coarse)').matches;
+  let target = { x: window.innerWidth / 2, y: window.innerHeight * 0.75 };
+  let pos = { x: target.x, y: target.y };
+  let awake = false;
+
+  function wake() {
+    if (awake) return;
+    awake = true;
+    companion.classList.add('awake');
+    hint.classList.add('visible');
+    setTimeout(() => hint.classList.remove('visible'), 7000);
+  }
+
+  window.addEventListener('scroll', () => {
+    if (window.scrollY > window.innerHeight * 0.5) hint.classList.remove('visible');
+  }, { passive: true });
+
+  window.addEventListener('mousemove', (e) => {
+    target.x = e.clientX;
+    target.y = e.clientY;
+    wake();
+  });
+
+  if (isTouch) {
+    /* on touch devices the light sweeps the page as the reader descends,
+       so that it passes across the artifacts */
+    window.addEventListener('scroll', () => {
+      const depth = window.scrollY / Math.max(1, document.body.scrollHeight - window.innerHeight);
+      target.x = window.innerWidth / 2 + Math.sin(depth * 24) * window.innerWidth * 0.36;
+      target.y = window.innerHeight * 0.45;
+      wake();
+    }, { passive: true });
+    setTimeout(wake, 2500);
+  }
+
+  /* ---- the artifacts of power ---- */
+  const STATIC = '\u2588\u2593\u2592\u2591#%&\u00a7\u00b6=\u2260\u2261/\\';
+  const REACH = 120;           /* how far the light reads */
+
+  class Artifact {
+    constructor(el) {
+      this.el = el;
+      this.mode = el.dataset.mode; /* resist | ratchet | open */
+      this.chars = [];
+      this.done = false;
+      if (this.mode === 'open') {
+        el.classList.add('open');
+        this.done = true;
+        return;
+      }
+      this.charify();
+      this.cacheOffsets();
+    }
+    charify() {
+      const walker = document.createTreeWalker(this.el, NodeFilter.SHOW_TEXT);
+      const textNodes = [];
+      while (walker.nextNode()) textNodes.push(walker.currentNode);
+      for (const node of textNodes) {
+        const frag = document.createDocumentFragment();
+        for (const real of node.textContent) {
+          const span = document.createElement('span');
+          span.className = 'ch';
+          if (/\s/.test(real)) {
+            span.textContent = real;
+            frag.appendChild(span);
+            continue;
+          }
+          span.textContent = STATIC[Math.floor(Math.random() * STATIC.length)];
+          span.classList.add('redacted');
+          frag.appendChild(span);
+          this.chars.push({ span, real, v: 0, bucket: 0 });
+        }
+        node.parentNode.replaceChild(frag, node);
+      }
+    }
+    cacheOffsets() {
+      const base = this.el.getBoundingClientRect();
+      for (const c of this.chars) {
+        const r = c.span.getBoundingClientRect();
+        c.ox = r.left - base.left + r.width / 2;
+        c.oy = r.top - base.top + r.height / 2;
+      }
+    }
+    step(lightX, lightY, tick) {
+      if (this.done) return;
+      const rect = this.el.getBoundingClientRect();
+      if (rect.bottom < -60 || rect.top > window.innerHeight + 60) return;
+      const lx = lightX - rect.left;
+      const ly = lightY - rect.top;
+      let allDecoded = true;
+      for (const c of this.chars) {
+        const dx = c.ox - lx, dy = c.oy - ly;
+        const d = Math.sqrt(dx * dx + dy * dy);
+        if (d < REACH) {
+          c.v += 0.10 * (1 - d / REACH) + 0.015;
+          if (c.v > 1) c.v = 1;
+        } else if (this.mode === 'resist') {
+          /* opacity restores itself */
+          c.v -= 0.012;
+          if (c.v < 0) c.v = 0;
+        }
+        if (this.mode === 'resist' || c.v < 1) allDecoded = false;
+        const bucket = c.v >= 0.95 ? 3 : c.v > 0.45 ? 2 : c.v > 0.12 ? 1 : 0;
+        if (bucket !== c.bucket) {
+          c.bucket = bucket;
+          if (bucket >= 2) {
+            c.span.textContent = c.real;
+            c.span.className = bucket === 3 ? 'ch decoded' : 'ch waking';
+          } else {
+            c.span.className = 'ch redacted';
+            c.span.textContent = STATIC[Math.floor(Math.random() * STATIC.length)];
+          }
+        } else if (bucket === 0 && (tick + (c.ox | 0)) % 7 === 0) {
+          /* the static shifts — redaction is never at rest */
+          c.span.textContent = STATIC[Math.floor(Math.random() * STATIC.length)];
+        }
+      }
+      if (this.mode === 'ratchet' && allDecoded) {
+        this.done = true;
+        this.el.classList.add('unsealed');
+      }
+    }
+    resize() {
+      if (!this.done || this.mode === 'ratchet') this.cacheOffsets();
+    }
+  }
+
+  const artifacts = notices.map(n => new Artifact(n));
+
+  /* ---- hero: a redaction field, breathing ---- */
+  const heroCanvas = document.getElementById('hero-canvas');
+  const heroCtx = heroCanvas.getContext('2d');
+  let heroT = 0;
+  function sizeHero() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const rect = heroCanvas.parentElement.getBoundingClientRect();
+    heroCanvas.width = rect.width * dpr;
+    heroCanvas.height = rect.height * dpr;
+    heroCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    heroCanvas._w = rect.width;
+    heroCanvas._h = rect.height;
+  }
+  sizeHero();
+
+  function drawHero() {
+    const w = heroCanvas._w, h = heroCanvas._h;
+    heroCtx.clearRect(0, 0, w, h);
+    heroT += 0.004;
+    const rows = 14;
+    const scan = (Math.sin(heroT * 0.7) * 0.5 + 0.5) * rows;
+    for (let r = 0; r < rows; r++) {
+      const y = h * 0.12 + (r / (rows - 1)) * h * 0.76;
+      const near = Math.max(0, 1 - Math.abs(r - scan) / 2.2);
+      let x = w * 0.08 + Math.sin(heroT * 1.3 + r * 2.1) * w * 0.02;
+      const end = w * 0.92;
+      while (x < end) {
+        const seg = 14 + ((Math.sin(r * 37.3 + Math.floor(x / 40) * 11.7) * 0.5 + 0.5) * 46);
+        const flick = Math.sin(heroT * 2.2 + r * 5.7 + x * 0.013) * 0.5 + 0.5;
+        const a = 0.028 + flick * 0.03 + near * 0.10;
+        if (near > 0.25) {
+          heroCtx.fillStyle = `rgba(201,168,124,${a})`;
+        } else {
+          heroCtx.fillStyle = `rgba(107,114,128,${a})`;
+        }
+        heroCtx.fillRect(x, y, Math.min(seg, end - x), 2);
+        x += seg + 12;
+      }
+    }
+  }
+
+  window.addEventListener('resize', () => {
+    sizeHero();
+    artifacts.forEach(a => a.resize());
+  });
+
+  /* ---- loop ---- */
+  let tick = 0;
+  function frame() {
+    tick++;
+    pos.x += (target.x - pos.x) * 0.07;
+    pos.y += (target.y - pos.y) * 0.07;
+    companion.style.transform = `translate(${pos.x}px, ${pos.y}px)`;
+
+    if (awake) {
+      for (const a of artifacts) a.step(pos.x, pos.y, tick);
+    }
+
+    const hr = heroCanvas.parentElement.getBoundingClientRect();
+    if (hr.bottom > 0) drawHero();
+
+    requestAnimationFrame(frame);
+  }
+  frame();
+})();
+</script>
+
+<!-- GoatCounter analytics — privacy-friendly, no cookies, open source -->
+<script data-goatcounter="https://vybn-a2j.goatcounter.com/count"
+        async src="//gc.zgo.at/count.js"></script>
+
+</body>
+</html>
