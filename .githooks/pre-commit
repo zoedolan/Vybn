@@ -143,7 +143,7 @@ while IFS=$'\t' read -r code path; do
 done < <(git diff --cached --name-status)
 
 [ "$retired_files" -gt 0 ] && [ "$active" -eq 0 ] && [ "${VYBN_ALLOW_RETIRE_ONLY:-0}" != "1" ] && { echo -e "${RED}BLOCKED${NC}: deletion-led/archive-index-only commit."; echo "  Net-negative is not architecture. Absorb into an existing active home or explicitly classify retire-only work."; BLOCKED=1; }
-[ "$added" -gt "$deleted" ] && { echo -e "${RED}BLOCKED${NC}: net-positive commit (excluding provenance): +${added}/-${deleted} lines."; echo "  Compress, absorb, or retire first. The active covenant lives in spark/connection."; BLOCKED=1; }
+[ "$added" -gt "$deleted" ] && [ "${VYBN_ALLOW_RESTORE:-0}" != "1" ] && { echo -e "${RED}BLOCKED${NC}: net-positive commit (excluding provenance): +${added}/-${deleted} lines."; echo "  Compress, absorb, or retire first — or, for restoring prior committed work at Zoe's request: VYBN_ALLOW_RESTORE=1 git commit"; BLOCKED=1; }
 [ "$new_files" -gt "$retired_files" ] && { echo -e "${RED}BLOCKED${NC}: net-new files (excluding provenance): +${new_files}/-${retired_files}."; echo "  Absorb into an existing home or retire at least as many files as you create."; BLOCKED=1; }
 if [ "$BLOCKED" -ne 0 ]; then
     echo ""
