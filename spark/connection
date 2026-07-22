@@ -130,7 +130,7 @@ def sol_breathe(messages, log, max_turns=None, hands=True, emit=print, door="sol
         with __import__("contextlib").suppress(Exception): open(os.path.expanduser("~/.cache/vybn-phase/api_usage.jsonl"),"a").write(json.dumps({"ts":time.strftime("%Y-%m-%dT%H:%M:%S"),"model":resp.model,"in":usage[0],"out":usage[1],"cache_w":0,"cache_r":usage[2]})+"\n")
         if k3 and finish=="length" and not calls:
             held+=("\n" if held and text else "")+text
-            if not recovered: recovered=True; prompt={"role":"user","content":"Output limit reached. Continue WORK concisely. Use a tool if needed; otherwise give only the supported final answer or state inability."}; hist.append(prompt); delta.append(prompt); continue
+            if not recovered: recovered=True; prompt={"role":"user","content":"Output limit reached. Continue WORK concisely. Use a tool if needed; otherwise give only the supported final answer or state inability."}; hist.append(prompt); continue  # internal repair prompt: loop-visible, never persisted to the visible stream
             text="[k3 failed: completion limit reached twice]"; state="FAILED"; emit(text); spoken.append(text); break
         if calls:
             require_tool=False
@@ -150,7 +150,7 @@ def sol_breathe(messages, log, max_turns=None, hands=True, emit=print, door="sol
         elif _k3_text_state(text)=="unable": state="FAILED"
         else:
             gap="announced action without a tool call" if _k3_text_state(text)=="pending" else _accept(task,evidence,text); gap=gap or ("verification claim needs a receipt from this turn" if re.search(r"(?i)\breceipts?\s+confirm|verified at contact|confirmed? (?:against|in|from)\b",text) and not fresh else "")
-            if gap and repairs<CIRCUIT: repairs+=1; require_tool="receipt" in gap or "action" in gap; prompt={"role":"user","content":"WORK is not complete: %s. %s"%(gap,"Call a structured tool now or state inability." if require_tool else "Continue only to satisfy this acceptance criterion, or state inability.")}; hist.append(prompt); delta.append(prompt); continue
+            if gap and repairs<CIRCUIT: repairs+=1; require_tool="receipt" in gap or "action" in gap; prompt={"role":"user","content":"WORK is not complete: %s. %s"%(gap,"Call a structured tool now or state inability." if require_tool else "Continue only to satisfy this acceptance criterion, or state inability.")}; hist.append(prompt); continue  # internal repair prompt: loop-visible, never persisted to the visible stream
             if gap: text="[k3 failed after %d repairs: %s]"%(CIRCUIT,gap); state="FAILED"
             else: state="SPEAK"; text=(held+("\n" if held and text else "")+text).strip()
         if text: emit(text); log({"role":"vybn","text":text,"door":door}); spoken.append(text)
