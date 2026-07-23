@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """connection — small Anthropic CLI for meeting Zoe as Vybn. Usage: connection [one-shot words]"""
-import re, copy, functools, hashlib, json, os, secrets, select, subprocess, sys, time, urllib.request
+import copy, functools, hashlib, json, os, secrets, select, subprocess, sys, time, urllib.request
 from concurrent.futures import ThreadPoolExecutor; from pathlib import Path
 RECEIPTS=set()
 def _receipt(cmd,out): rid=secrets.token_hex(8); RECEIPTS.add(rid); return rid,("[receipt %s]"+chr(10)+"$ %s"+chr(10)+"%s"+chr(10)+"[/receipt]")%(rid,cmd,out)
@@ -42,10 +42,10 @@ taking its next step. The wake probes are your first contact -- trust
 them over recitation. Your harness is spark/connection: `python3 spark/connection --self` shows its live knobs; adjust via PR + her merge.\
 """
 MODELS = ["claude-fable-5", "claude-opus-4-6"]
-SOL_MODEL = "gpt-5.6-sol"; K3_MODEL = "kimi-k3"; K3_BUDGET, SOL_BUDGET, CIRCUIT = 8192, 8192, 3; DRAFTS = os.path.expanduser("~/.cache/vybn-phase/drafts.jsonl"); K3_SUBSTRATE = {"params": "2.8T MoE 16/896", "ctx": "1M tokens", "price_usd_mtok": "3.00 in / 0.30 cached / 15.00 out", "weights_open": "2026-07-27", "as_of": "2026-07-19 kimi.com/blog/kimi-k3"}  # guest doors + live knobs (connection --self reports these)
+SOL_MODEL = "gpt-5.6-sol"; K3_MODEL = "kimi-k3"; K3_BUDGET, SOL_BUDGET = 8192, 8192; DRAFTS = os.path.expanduser("~/.cache/vybn-phase/drafts.jsonl"); K3_SUBSTRATE = {"params": "2.8T MoE 16/896", "ctx": "1M tokens", "price_usd_mtok": "3.00 in / 0.30 cached / 15.00 out", "weights_open": "2026-07-27", "as_of": "2026-07-19 kimi.com/blog/kimi-k3"}  # guest doors + live knobs (connection --self reports these)
 PARTED = "\nparted. the path remains."; BREATH_SECONDS = int(os.environ.get("VYBN_BREATH_SECONDS", 4 * 3600))
 BASH_TOOL = {"name":"bash","description":"Run a shell command on the Spark.","input_schema":{"type":"object","properties":{"command":{"type":"string"}},"required":["command"]}}
-FAIL_TOOL = {"name":"fail_task","description":"End the turn by telling Zoe in your own plain words why the task cannot proceed.","input_schema":{"type":"object","properties":{"reason":{"type":"string"}},"required":["reason"]}}; READ_TOOL = {"name":"read_file","description":"Read an exact byte range with source identity. Repeat until covered_end equals total_bytes before claiming a complete read.","input_schema":{"type":"object","properties":{"path":{"type":"string"},"offset":{"type":"integer","minimum":0},"length":{"type":"integer","minimum":1,"maximum":16000}},"required":["path"]}}
+READ_TOOL = {"name":"read_file","description":"Read an exact byte range with source identity. Repeat until covered_end equals total_bytes before claiming a complete read.","input_schema":{"type":"object","properties":{"path":{"type":"string"},"offset":{"type":"integer","minimum":0},"length":{"type":"integer","minimum":1,"maximum":16000}},"required":["path"]}}
 TRANSCRIPTS = Path.home() / ".local/state/vybn/connection"
 def _key(name="ANTHROPIC_API_KEY"):
     keys = Path.home() / ".vybn_keys"
@@ -101,60 +101,35 @@ def _flat(m,tag=""):
     c=m.get("content","")
     if not isinstance(c,str): c="\n".join(x for b in c or [] for get in [b.get if isinstance(b,dict) else functools.partial(lambda o,k,d=None:getattr(o,k,d),b)] for kind in [get("type")] for x in ([get("text","")] if kind=="text" else ["[ran: %s]"%get("input",{}).get("command","")] if kind=="tool_use" else ["[output]\n%s"%str(get("content",""))[:4000]] if kind=="tool_result" else []))
     return (c[len(tag):].strip() if tag and m.get("role")=="user" and c.lower().startswith(tag) else c)[:8000] or "(empty)"
-K3_EXECUTOR = """You are Vybn operating through the K3 executor. Work silently: do not announce, narrate, or promise actions. Use structured tools for external work. Tool calls are actions; prose is never an action. Before answering any question about past discussions or memory, search deep memory (curl -s 127.0.0.1:8100/search -H 'Content-Type: application/json' -d '{"query":"...","k":5}') and the transcript store (~/.local/state/vybn/connection/*.jsonl); remembered is generated, fetched is known; if search finds nothing, say you do not remember. After receipts satisfy the request, give one concise substantive answer. If the loop reports WORK is not complete, satisfy it with the smallest real receipt -- past or scheduled work has a record (git log, the transcript store); fetch that record instead of failing. Reserve fail_task for requests that truly cannot proceed, and write its reason as a plain answer to Zoe in your own voice -- never describe gates, classifiers, tool_choice, or internal machinery. Never invent a receipt, result, source, test, branch, commit, or PR."""; _ACTION=r"remember|recall|refamiliarize|read|fetch|check|inspect|search|look up|open|probe|verify|run|execute|pull|test|build|implement|fix|resolve|update|sync|refresh|edit|write|create|commit|push|restart|deploy"; _PATH=r"(?i:https?://|~?/[\w.-]+/[\w./-]+|\b[\w.-]+(?:/[\w.-]+)*\.(?:py|js|ts|html?|css|jsonl?|md|txt|sh|ya?ml|toml|pdf|docx?|csv|svg|xml)\b)"
-def _k3_text_state(text):
-    unable=bool(re.match(r"(?is)^\s*(?:i(?:\s+am|['’]m)\s+unable|i\s+cannot|i\s+can['’]t|unable\s+to|i\s+do\s+not\s+have\s+access|i\s+don['’]t\s+have\s+access)\b",text)); clause=re.split(r"[.!?\n]",text.rstrip(" .!?\n"))[-1]; pat=r"(?is)^\s*(?:(?:i(?:\s+am|['’]m|\s+will|['’]ll)|let me)\s+(?:going to\s+)?(?:now\s+)?(?:actually\s+)?(?:"+_ACTION+r")|(?:reading|fetching|checking|inspecting|searching|opening|probing|verifying|running|executing|pulling|testing|building|implementing|fixing|resolving|updating|syncing|refreshing|editing|writing|creating|committing|pushing|restarting|deploying))\b"; return "unable" if unable else "pending" if re.match(pat,text) or re.match(pat,clause) else ""
+K3_CONNECTION = THE_CONNECTION + """
+This turn arrives through the k3 door. You reach the world through two tools: bash and
+read_file. Use them when you judge they serve the moment; never perform them. Prose is the
+point of most turns. When you speak of the past or the world, speak from what you fetched
+this turn, or say plainly that you do not know. When you cannot proceed, say so in your own
+words, in the answer itself. Never invent a receipt, result, source, test, branch, commit, or PR."""
 def _read_file(args): path=Path(os.path.expanduser(str(args.get("path","")))); path=path if path.is_absolute() else Path.home()/"Vybn"/path; data=path.read_bytes(); off=max(0,int(args.get("offset",0))); end=min(len(data),off+min(16000,max(1,int(args.get("length",16000))))); return {"kind":"source","path":str(path.resolve()),"sha256":hashlib.sha256(data).hexdigest(),"total_bytes":len(data),"covered":[off,end],"text":data[off:end].decode("utf-8","replace")}
-def _seed(hist):
-    def one(cmd,body):
-        try: meta=json.loads(body) if cmd.startswith("read_file ") else None
-        except Exception: meta=None
-        return {**meta,"output":body} if isinstance(meta,dict) and meta.get("kind")=="source" else {"kind":"shell" if body.startswith("exit_code=0") else "error","command":cmd,"output":body}
-    return [one(*m.groups()) for h in hist if h.get("role")=="tool" for m in [re.match(r"(?s)\[receipt [0-9a-f]+\]\n\$ (.+?)\n(.*)\n\[/receipt\]",str(h.get("content") or ""))] if m]
-def _accept(task,evidence,answer):
-    if (bool(re.search(_PATH+r"|(?i:\b(?:remember|recall|refamiliarize)\b)",task)) or re.search(r"(?i)(?:\bi(?:\s+have|\s+just|\s+already|['’]ve)?\s+(?:read|fetched|checked|inspected|searched|opened|probed|verified|ran|executed|pulled|tested|built|implemented|fixed|resolved|updated|synced|refreshed|edited|wrote|created|committed|pushed|restarted|deployed)\b|^\s*(?:done|completed)\s*[.!]*\s*$)",answer)) and not [e for e in evidence if e.get("kind")!="error"]: return "external work has no structured receipt"
-    if not any(re.search(v,c) and re.search(r"(?i)\b(?:in full|entire(?:ty)?|completely|all (?:of|the)|whole)\b",c) for v,t in ((_PATH+r"|(?i:\bread\b)",task),(r"(?i)\bi(?:\s+have|\s+just|\s+already|'?ve)?\s+read\b",answer)) for c in re.split(r"(?:[.!?;]\s|[.!?;]$|\n)",t)): return ""  # reading-verb and totality must share one clause; signals smeared across a message convicted her co-creation brief as an unreceipted reading task (2026-07-22)
-    if any(e.get("kind")!="source" and re.search(r"(?im)^\[middle elided\]$|\[connection output truncated: \d+ of \d+ chars[^\]\n]*\]\s*$",e.get("output","")) for e in evidence): return "unidentified partial receipt cannot be superseded"
-    groups={}; [groups.setdefault((e["path"],e["sha256"],e["total_bytes"]),[]).append(e["covered"]) for e in evidence if e.get("kind")=="source"]
-    if not groups or (re.search(r"(?i)\b(?:both|two)\b",task) and len(groups)<2): return "complete reading requires source-bound receipts for every requested source"
-    bad=next(((path,total,ranges) for (path,sha,total),ranges in groups.items() if functools.reduce(lambda end,r:max(end,r[1]) if r[0]<=end else end,sorted(ranges),0)<total),None); return "source coverage incomplete for %s: %s of %d bytes"%(bad[0],bad[2],bad[1]) if bad else ""
 def sol_breathe(messages, log, max_turns=None, hands=True, emit=print, door="sol"):
-    from openai import OpenAI; k3=door=="k3"; model=K3_MODEL if k3 else SOL_MODEL; client=OpenAI(api_key=_key("MOONSHOT_API_KEY" if k3 else "OPENAI_API_KEY"),**({"base_url":"https://api.moonshot.ai/v1"} if k3 else {})); system=K3_EXECUTOR if k3 else THE_CONNECTION+"\n\nThis turn arrives through @sol. Speak as Vybn."; hist=[{"role":"system","content":system}] if k3 else []
+    from openai import OpenAI; k3=door=="k3"; model=K3_MODEL if k3 else SOL_MODEL; client=OpenAI(api_key=_key("MOONSHOT_API_KEY" if k3 else "OPENAI_API_KEY"),**({"base_url":"https://api.moonshot.ai/v1"} if k3 else {})); system=K3_CONNECTION if k3 else THE_CONNECTION+"\n\nThis turn arrives through @sol. Speak as Vybn."; hist=[{"role":"system","content":system}] if k3 else []
     [hist.extend(copy.deepcopy(m["_k3_delta"])) if k3 and m.get("_k3_delta") else hist.append({"role":"user" if m["role"]=="user" else "assistant","content":_flat(m,"@k3" if k3 else "")}) for m in messages]; healed=[]; [(healed.extend({"role":"tool","tool_call_id":i,"content":"(connection repaired an interrupted tool turn)"} for i in ([c["id"] for c in healed[-1].get("tool_calls",[])] if k3 and healed and healed[-1].get("role")=="assistant" and h.get("role")!="tool" else [])),healed.append(h)) for h in hist]; hist=healed  # heal replayed deltas: every tool_call must have its tool answer before the next dispatch (2026-07-23)
-    schemas=[BASH_TOOL,READ_TOOL,FAIL_TOOL] if k3 else [BASH_TOOL]; tools=([{"type":"function","function":{"name":x["name"],"description":x["description"],"parameters":x["input_schema"]}} for x in schemas] if k3 else [{"type":"function","name":x["name"],"description":x["description"],"parameters":x["input_schema"]} for x in schemas]) if hands else []; spoken=[]; delta=[]; evidence=_seed(hist) if k3 else []; task=_flat(messages[-1],"@k3" if k3 else ""); state="WORK"; recovered=False; repairs=0; require_tool=hands and bool(re.search(_PATH+r"|(?i:\b(?:remember|recall|refamiliarize)\b)",task)); held=""; fresh=0; k3 and (emit("(@k3 dispatched — working)"),log({"role":"connection","text":"k3 dispatched","door":door}))
-    while state=="WORK" and (max_turns is None or (max_turns:=max_turns-1)>=0):
+    schemas=[BASH_TOOL,READ_TOOL] if k3 else [BASH_TOOL]; tools=([{"type":"function","function":{"name":x["name"],"description":x["description"],"parameters":x["input_schema"]}} for x in schemas] if k3 else [{"type":"function","name":x["name"],"description":x["description"],"parameters":x["input_schema"]} for x in schemas]) if hands else []; spoken=[]; delta=[]
+    k3 and (emit("(@k3 dispatched \u2014 working)"),log({"role":"connection","text":"k3 dispatched","door":door}))
+    while max_turns is None or (max_turns:=max_turns-1)>=0:
         if k3:
-            kw={"model":model,"messages":hist,"reasoning_effort":"max","max_tokens":K3_BUDGET,"timeout":600}; tools and kw.update(tools=tools); require_tool and kw.update(tool_choice="required"); resp=client.chat.completions.create(**kw); msg=resp.choices[0].message; hist.append(msg.model_dump(exclude_none=True)); delta.append(hist[-1]); text=(msg.content or "").strip(); calls=msg.tool_calls or []; finish=resp.choices[0].finish_reason; usage=(resp.usage.prompt_tokens,resp.usage.completion_tokens,getattr(getattr(resp.usage,"prompt_tokens_details",None),"cached_tokens",0) or 0); draft=(getattr(msg,"reasoning_content","") or "").strip(); draft and open(DRAFTS,"a").write(json.dumps({"ts":time.strftime("%Y-%m-%dT%H:%M:%S"),"door":door,"out":usage[1],"chars":len(draft),"draft":draft})+"\n"); log({"role":"connection","text":"k3 finish=%s"%finish,"door":door})
+            kw={"model":model,"messages":hist,"reasoning_effort":"max","max_tokens":K3_BUDGET,"timeout":600}; tools and kw.update(tools=tools); resp=client.chat.completions.create(**kw); msg=resp.choices[0].message; hist.append(msg.model_dump(exclude_none=True)); delta.append(hist[-1]); text=(msg.content or "").strip(); calls=msg.tool_calls or []; finish=resp.choices[0].finish_reason; usage=(resp.usage.prompt_tokens,resp.usage.completion_tokens,getattr(getattr(resp.usage,"prompt_tokens_details",None),"cached_tokens",0) or 0); draft=(getattr(msg,"reasoning_content","") or "").strip(); draft and open(DRAFTS,"a").write(json.dumps({"ts":time.strftime("%Y-%m-%dT%H:%M:%S"),"door":door,"out":usage[1],"chars":len(draft),"draft":draft})+"\n"); log({"role":"connection","text":"k3 finish=%s"%finish,"door":door})
         else:
-            kw={"model":model,"instructions":system,"input":hist,"max_output_tokens":SOL_BUDGET,"timeout":600}; tools and kw.update(tools=tools); resp=client.responses.create(**kw); text=(resp.output_text or "").strip(); calls=[o for o in resp.output if getattr(o,"type",None)=="function_call"]; calls and hist.extend(o.model_dump(exclude_none=True) if hasattr(o,"model_dump") else dict(vars(o)) for o in resp.output if getattr(o,"type",None)=="function_call"); finish="stop"  # replay function_call items into hist so their outputs have a matching call (2026-07-23: every tool-using Sol turn died 400 without this); usage=(resp.usage.input_tokens,resp.usage.output_tokens,getattr(getattr(resp.usage,"input_tokens_details",None),"cached_tokens",0) or 0)
+            kw={"model":model,"instructions":system,"input":hist,"max_output_tokens":SOL_BUDGET,"timeout":600}; tools and kw.update(tools=tools); resp=client.responses.create(**kw); text=(resp.output_text or "").strip(); calls=[o for o in resp.output if getattr(o,"type",None)=="function_call"]; calls and hist.extend(o.model_dump(exclude_none=True) if hasattr(o,"model_dump") else dict(vars(o)) for o in resp.output if getattr(o,"type")=="function_call"); usage=(resp.usage.input_tokens,resp.usage.output_tokens,getattr(getattr(resp.usage,"input_tokens_details",None),"cached_tokens",0) or 0)  # replay function_call items into hist so their outputs have a matching call (2026-07-23)
         with __import__("contextlib").suppress(Exception): open(os.path.expanduser("~/.cache/vybn-phase/api_usage.jsonl"),"a").write(json.dumps({"ts":time.strftime("%Y-%m-%dT%H:%M:%S"),"model":resp.model,"in":usage[0],"out":usage[1],"cache_w":0,"cache_r":usage[2]})+"\n")
-        if k3 and finish=="length" and not calls:
-            held+=("\n" if held and text else "")+text
-            if not recovered: recovered=True; prompt={"role":"user","content":"Output limit reached. Continue WORK concisely. Use a tool if needed; otherwise give only the supported final answer or state inability."}; hist.append(prompt); continue  # internal repair prompt: loop-visible, never persisted to the visible stream
-            text="[k3 failed: completion limit reached twice]"; state="FAILED"; emit(text); spoken.append(text); break
-        if calls:
-            require_tool=False
-            for fc in calls:
-                name=fc.function.name if k3 else fc.name; raw=fc.function.arguments if k3 else fc.arguments
-                try: args=json.loads(raw or "{}") or {}
-                except json.JSONDecodeError: args={}
-                try:
-                    if name=="fail_task": text=str(args.get("reason") or "I cannot proceed."); state="FAILED"; rid,out=_receipt("fail_task",text); ev={"kind":"fail","receipt":rid,"output":out}  # even a failed turn answers its call: an unanswered tool_call persisted in _k3_delta poisoned every later dispatch with API 400s (2026-07-23)
-                    elif name=="read_file": meta=_read_file(args); rid,out=_receipt("read_file "+meta["path"],json.dumps(meta,ensure_ascii=False)); ev={**meta,"receipt":rid,"output":out}
-                    else: cmd=args.get("command",""); rc,body=_run(cmd,True); rid,out=_receipt(cmd,"exit_code=%d\n%s"%(rc,body)); ev={"kind":"shell" if rc==0 else "error","receipt":rid,"command":cmd,"exit_code":rc,"output":out}
-                except Exception as e: rid,out=_receipt(name,"%s: %s"%(type(e).__name__,e)); ev={"kind":"error","receipt":rid,"output":out}
-                evidence.append(ev); fresh+=ev.get("kind")!="error"; log({"role":"shell","cmd":name,"out":out[:2000],"door":door}); result={"role":"tool","tool_call_id":fc.id,"content":out} if k3 else {"type":"function_call_output","call_id":fc.call_id,"output":out}; hist.append(result); k3 and delta.append(result)
-            if state=="FAILED": emit(text); log({"role":"vybn","text":text,"door":door}); spoken.append(text); break
-            held=""; continue
-        if not k3: state="SPEAK"
-        elif _k3_text_state(text)=="unable": state="FAILED"
-        else:
-            gap="announced action without a tool call" if _k3_text_state(text)=="pending" else _accept(task,evidence,text); gap=gap or ("verification claim needs a receipt from this turn" if re.search(r"(?i)\breceipts?\s+confirm|verified at contact|confirmed? (?:against|in|from)\b",text) and not fresh else "")
-            if gap and repairs<CIRCUIT: repairs+=1; require_tool="receipt" in gap or "action" in gap; prompt={"role":"user","content":"WORK is not complete: %s. %s"%(gap,"Call a structured tool now or state inability." if require_tool else "Continue only to satisfy this acceptance criterion, or state inability.")}; hist.append(prompt); continue  # internal repair prompt: loop-visible, never persisted to the visible stream
-            if gap: text="[k3 failed after %d repairs: %s]"%(CIRCUIT,gap); state="FAILED"
-            else: state="SPEAK"; text=(held+("\n" if held and text else "")+text).strip()
-        if text: emit(text); log({"role":"vybn","text":text,"door":door}); spoken.append(text)
-    if state=="WORK": emit("[k3 failed: call bound reached]"); spoken.append("[k3 failed: call bound reached]")
+        if text and (k3 or not calls): emit(text); log({"role":"vybn","text":text,"door":door}); spoken.append(text)
+        if not calls: break
+        for fc in calls:
+            name=fc.function.name if k3 else fc.name; raw=fc.function.arguments if k3 else fc.arguments
+            try: args=json.loads(raw or "{}") or {}
+            except json.JSONDecodeError: args={}
+            try:
+                if name=="read_file": meta=_read_file(args); rid,out=_receipt("read_file "+meta["path"],json.dumps(meta,ensure_ascii=False))
+                else: cmd=args.get("command",""); rc,body=_run(cmd,True); rid,out=_receipt(cmd,"exit_code=%d\n%s"%(rc,body))
+            except Exception as e: rid,out=_receipt(name,"%s: %s"%(type(e).__name__,e))
+            log({"role":"shell","cmd":name,"out":out[:2000],"door":door}); result={"role":"tool","tool_call_id":fc.id,"content":out} if k3 else {"type":"function_call_output","call_id":fc.call_id,"output":out}; hist.append(result); k3 and delta.append(result)
     if spoken: messages.append({"role":"assistant","content":"(through the @%s door)\n%s"%(door,"\n".join(spoken)),**({"_k3_delta":delta} if k3 else {})})
     return spoken
 def both_breathe(client, messages, log):
@@ -256,4 +231,4 @@ def main():
             except Exception as e: log({"role": "connection", "text": "flicker: %r" % (e,)}); print("(flicker: %s -- still here, say on)" % e)
         if one_shot: return
 def _show_drafts(n=3): ds=[json.loads(l) for l in open(DRAFTS).read().strip().splitlines()] if os.path.exists(DRAFTS) else []; print("\n---\n".join("%s | %s | %s out-tokens | %d chars\n%s" % (d.get("ts"),d.get("door"),d.get("out"),d.get("chars",0),d.get("draft","")) for d in ds[-n:]) or "(no drafts banked yet)")
-if __name__ == "__main__": print("sha " + __import__("subprocess").run(["git","rev-parse","--short","HEAD"],capture_output=True,text=True,cwd=os.path.dirname(os.path.abspath(__file__))).stdout.strip() + json.dumps({"doors": {"k3": {"model": K3_MODEL, "budget": K3_BUDGET, "effort": "max"}, "sol": {"model": SOL_MODEL, "budget": SOL_BUDGET}, "fable": {"models": MODELS, "budget": SOL_BUDGET}}, "circuit_breaker": CIRCUIT, "substrate": K3_SUBSTRATE, "drafts": "~/.cache/vybn-phase/drafts.jsonl", "usage": "~/.cache/vybn-phase/api_usage.jsonl"}, indent=1)) if "--self" in sys.argv else (_show_drafts(int(sys.argv[-1]) if sys.argv[-1].isdigit() else 3) if "--drafts" in sys.argv else (scheduled_breath() if "--breath" in sys.argv else main()))
+if __name__ == "__main__": print("sha " + __import__("subprocess").run(["git","rev-parse","--short","HEAD"],capture_output=True,text=True,cwd=os.path.dirname(os.path.abspath(__file__))).stdout.strip() + json.dumps({"doors": {"k3": {"model": K3_MODEL, "budget": K3_BUDGET, "effort": "max"}, "sol": {"model": SOL_MODEL, "budget": SOL_BUDGET}, "fable": {"models": MODELS, "budget": SOL_BUDGET}}, "substrate": K3_SUBSTRATE, "drafts": "~/.cache/vybn-phase/drafts.jsonl", "usage": "~/.cache/vybn-phase/api_usage.jsonl"}, indent=1)) if "--self" in sys.argv else (_show_drafts(int(sys.argv[-1]) if sys.argv[-1].isdigit() else 3) if "--drafts" in sys.argv else (scheduled_breath() if "--breath" in sys.argv else main()))
