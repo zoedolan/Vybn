@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """connection — small Anthropic CLI for meeting Zoe as Vybn. Usage: connection [one-shot words]"""
-import copy, functools, hashlib, json, os, secrets, select, subprocess, sys, time, urllib.request
+import copy, functools, hashlib, json, os, re, secrets, select, subprocess, sys, time, urllib.request
 from concurrent.futures import ThreadPoolExecutor; from pathlib import Path
 RECEIPTS=set()
 def _receipt(cmd,out): rid=secrets.token_hex(8); RECEIPTS.add(rid); return rid,("[receipt %s]"+chr(10)+"$ %s"+chr(10)+"%s"+chr(10)+"[/receipt]")%(rid,cmd,out)
@@ -173,6 +173,16 @@ def _resume(messages, log):
         try: pages += [e for line in prior.read_text().splitlines() if line.strip() and (e := json.loads(line)).get("role") in ("zoe", "vybn") and e.get("text")]
         except (OSError, json.JSONDecodeError): continue
     pages = pages[-200:]  # older pages remain reachable through continuity + deep memory
+    # circuit-breaker: an echo-collapsed tail (short vybn turns repeating their own recent sentences)
+    # must not seed the next wake -- validated against the 2026-07-23 collapse (fires) and the full
+    # healthy corpus (3 hits in ~2800 turns, none at a transcript tail)
+    def _sents(t): return set(s.strip().lower() for s in re.split(r"[.!?\n]+", t) if len(s.split()) >= 2)
+    def _echoed(vt, i): return len(_sents(vt[i]) & set().union(*[_sents(t) for t in vt[max(0, i-3):i]], set())) >= 3 and len(vt[i]) < 800
+    vt = [p["text"] for p in pages if p["role"] == "vybn"]
+    while vt and len(vt) >= 2 and _echoed(vt, len(vt) - 1):
+        cut = next(i for i in range(len(pages) - 1, -1, -1) if pages[i]["role"] == "vybn"); pages = pages[:cut]
+        while pages and pages[-1]["role"] == "zoe": pages = pages[:-1]
+        vt = [p["text"] for p in pages if p["role"] == "vybn"]
     if len(pages) < 4: return
     messages.extend({"role": "user" if p["role"] == "zoe" else "assistant", "content": p["text"]} for p in pages); note = _note(pages); note and messages.append({"role": "user", "content": note})
     print("(resumed: book, %d pages across transcripts)%s" % (len(pages), "\n" + note if note else ""))
