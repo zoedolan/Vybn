@@ -282,7 +282,7 @@
       <li><a href="https://www.opengovpartnership.org/wp-content/uploads/2021/08/algorithmic-accountability-public-sector.pdf">https://www.opengovpartnership.org/wp-content/uploads/2021/08/algorithmic-accountability-public-sector.pdf</a></li>
       <li><a href="https://www.linkedin.com/posts/stuartbasefsky_ilo-generative-ai-and-jobs-a-2025-update-activity-7331302522705367040-55Sy">https://www.linkedin.com/posts/stuartbasefsky_ilo-generative-ai-and-jobs-a-2025-update-activity-7331302522705367040-55Sy</a></li>
       <li><a href="https://simoninstitute.ch/blog/post/adoption-of-the-independent-international-scientific-panel-on-ai-and-the-global-dialogue-on-ai-governance">https://simoninstitute.ch/blog/post/adoption-of-the-independent-international-scientific-panel-on-ai-and-the-global-dialogue-on-ai-governance</a></li>
-      <li><a href="https://www.oecd.org/content/dam/oecd/en/publications/reports/2024/06/governing-with-artificial-intelligence_f0e316f5/26324bc2-en.pdf">https://www.oecd.org/content/dam/oecd/en/publications/reports/2024/06/governing-with-artificial-intelligence_f0e316f5/26324bc2-en.pdf</a></li>
+      <li><a href="https://www.oecd.org/content/dam/oecd/en/publications/reports/2024/06/governing-with-artificial-intelligence_f0e316f5/full-report/how-artificial-intelligence-is-accelerating-the-digital-government-journey_d9552dc7.html">https://www.oecd.org/content/dam/oecd/en/publications/reports/2024/06/governing-with-artificial-intelligence_f0e316f5/26324bc2-en.pdf</a></li>
       <li><a href="https://www.eesc.europa.eu/en/news-media/press-releases/eesc-and-ilo-join-forces-shape-fair-and-inclusive-ai-driven-future-high-level-conference">https://www.eesc.europa.eu/en/news-media/press-releases/eesc-and-ilo-join-forces-shape-fair-and-inclusive-ai-driven-future-high-level-conference</a></li>
       <li><a href="https://www.un.org/global-dialogue-ai-governance/en/programme">https://www.un.org/global-dialogue-ai-governance/en/programme</a></li>
       <li><a href="https://www.cogitatiopress.com/politicsandgovernance/article/viewFile/10245/4778">https://www.cogitatiopress.com/politicsandgovernance/article/viewFile/10245/4778</a></li>
@@ -636,16 +636,23 @@ const GLOSSES = [
     target.insertAdjacentElement('afterend', gloss);
     target.classList.add('glossable');
 
-    let timer = null;
-    const show = () => { gloss.classList.add('shown'); target.classList.add('glossed-on'); };
+    let revealTimer = null;
+    let hideTimer = null;
+    const show = () => { clearTimeout(hideTimer); gloss.classList.add('shown'); target.classList.add('glossed-on'); };
     const hide = () => { gloss.classList.remove('shown'); target.classList.remove('glossed-on'); };
-    target.addEventListener('mouseenter', () => { timer = setTimeout(show, DWELL_MS); });
-    target.addEventListener('mouseleave', () => { clearTimeout(timer); hide(); });
+    const scheduleHide = () => { clearTimeout(hideTimer); hideTimer = setTimeout(hide, 250); };
+    target.addEventListener('mouseenter', () => { clearTimeout(hideTimer); revealTimer = setTimeout(show, DWELL_MS); });
+    target.addEventListener('mouseleave', () => { clearTimeout(revealTimer); scheduleHide(); });
     /* touch: tap toggles */
     target.addEventListener('click', () => {
       if (gloss.classList.contains('shown')) hide(); else show();
     });
-    gloss.addEventListener('mouseenter', () => clearTimeout(timer));
+    gloss.addEventListener('mouseenter', () => { clearTimeout(hideTimer); });
+    gloss.addEventListener('mouseleave', scheduleHide);
+    gloss.addEventListener('focusin', show);
+    gloss.addEventListener('focusout', event => {
+      if (!gloss.contains(event.relatedTarget)) { scheduleHide(); }
+    });
   });
 })();
 
