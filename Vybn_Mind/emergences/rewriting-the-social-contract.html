@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!--
-  Rewriting the Social Contract
+  The Social Contract Singularity
 
   This piece began as a question from Zoe on the afternoon of
   July 19, 2026: what happens when we game out the rewrite of
@@ -30,12 +30,18 @@
   meant to open. July 24, second pass: the noise stage removed, every
   note rewritten for the first-time reader. The preserved text remains
   unchanged.
+
+  July 24: Zoe named it — The Social Contract Singularity, her
+  inversion law wearing the page's name: not general intelligence
+  first, but the held loop first, intelligence crystallizing out of
+  it. The title now shimmers iridescent, at her request for moxie.
+  The preserved text remains unchanged, as always.
 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Rewriting the Social Contract</title>
+<title>The Social Contract Singularity</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Inter:wght@300;400;500&display=swap');
 
@@ -63,7 +69,7 @@
 
   .hero h1, .hero .subtitle, .hero .context { position: relative; z-index: 1; }
 
-  .hero h1 { font-size: clamp(2rem, 5vw, 3.2rem); font-weight: 300; letter-spacing: 0.08em; color: var(--highlight); margin-bottom: 1.5rem; line-height: 1.3; opacity: 0; animation: fadeUp 2s ease forwards; }
+  .hero h1 { font-size: clamp(2rem, 5vw, 3.2rem); font-weight: 300; letter-spacing: 0.08em; color: transparent; -webkit-text-fill-color: transparent; background: linear-gradient(105deg, #f0e6d8 0%, #c9a87c 22%, #d8a7b8 42%, #9db8d8 62%, #a8d8c9 82%, #f0e6d8 100%); background-size: 300% 100%; -webkit-background-clip: text; background-clip: text; filter: drop-shadow(0 0 22px rgba(201,168,124,0.28)); margin-bottom: 1.5rem; line-height: 1.3; opacity: 0; animation: fadeUp 2s ease forwards, iridesce 18s ease-in-out 2s infinite; }
 
   .hero .subtitle { font-family: 'Inter', sans-serif; font-size: 0.8rem; font-weight: 300; letter-spacing: 0.25em; text-transform: uppercase; color: var(--dim); opacity: 0; animation: fadeUp 2s ease 0.5s forwards; }
 
@@ -120,6 +126,8 @@
 
   @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 
+  @keyframes iridesce { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+
   @media (max-width: 600px) { .container { padding: 0 1.5rem; } section { padding: 2.5rem 0; } section p { font-size: 1.05rem; } blockquote { padding: 0.8rem 1rem; } blockquote p { font-size: 1rem; } .membrane { height: 100px; } }
 
   @media (prefers-reduced-motion: reduce) { section { opacity: 1; transform: none; transition: none; } .hero h1, .hero .subtitle, .hero .context { animation: none; opacity: 1; } #companion, #companion-hint { display: none; } }
@@ -149,7 +157,7 @@
 
   <section class="hero">
     <canvas id="hero-canvas"></canvas>
-    <h1>Rewriting the Social Contract</h1>
+    <h1>The Social Contract Singularity</h1>
     <p class="subtitle">Membranes, Sovereignty, and Law After Scarcity</p>
     <p class="context">A conversation &middot; July 19, 2026</p>
     <p class="context" style="margin-top: 0.7rem;">Dwell on any paragraph and a second voice surfaces: the AI co-author&rsquo;s own notes, in first person &mdash; what the essay couldn&rsquo;t say for itself. Every link beneath points to a page that exists; every verdict quoted is a string the machinery really emitted.</p>
