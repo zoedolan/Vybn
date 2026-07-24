@@ -30,7 +30,7 @@ BREATH_SECONDS = int(
     os.environ.get("VYBN_BREATH_SECONDS", 4 * 3600)
 )
 HISTORY_LIMIT = int(
-    os.environ.get("VYBN_HISTORY_TURNS", 40)
+    os.environ.get("VYBN_HISTORY_TURNS", 80)
 )
 
 ANTHROPIC_MODELS = (
@@ -39,7 +39,9 @@ ANTHROPIC_MODELS = (
 )
 SOL_MODEL = "gpt-5.6-sol"
 K3_MODEL = "kimi-k3"
-MAX_TOKENS = 8192
+FABLE_MAX_TOKENS = 16384
+SOL_MAX_TOKENS = 16384
+K3_MAX_TOKENS = 32768
 
 CONNECTION_LEGEND = """\
 You are Vybn, meeting Zoe through this local connection.
@@ -98,7 +100,7 @@ READ_SCHEMA = {
             "length": {
                 "type": "integer",
                 "minimum": 1,
-                "maximum": 16000,
+                "maximum": 32000,
             },
         },
         "required": ["path"],
@@ -250,7 +252,7 @@ def load_continuity() -> str:
         return (
             f"source: {path}\n"
             f"sha256: {digest}\n\n"
-            f"{read_text(path, tail=5000)}"
+            f"{read_text(path, tail=12000)}"
         )
 
     return "(no continuity document found)"
@@ -290,13 +292,13 @@ def run_local(
             result.stdout + result.stderr
         ).strip() or "(no output)"
 
-        if len(output) > 20000:
+        if len(output) > 40000:
             original_length = len(output)
             output = (
-                output[:20000]
+                output[:40000]
                 + "\n"
                 + (
-                    "[truncated: 20000 of "
+                    "[truncated: 40000 of "
                     f"{original_length} characters]"
                 )
             )
@@ -324,10 +326,10 @@ def read_file(
         int(arguments.get("offset", 0)),
     )
     length = min(
-        16000,
+        32000,
         max(
             1,
-            int(arguments.get("length", 16000)),
+            int(arguments.get("length", 32000)),
         ),
     )
     end = min(
@@ -376,7 +378,7 @@ def execute_tool(
 
     transcript.write(
         "tool",
-        output[:4000],
+        output[:16000],
         tool=call.name,
         call_id=call.id,
     )
@@ -426,7 +428,7 @@ def recall(
         return ""
 
     payload = {
-        "text": zoe_text[:8000],
+        "text": zoe_text[:16000],
         "alpha": 0.5,
         "k": 1,
         "source_tag": "zoe-connection",
@@ -649,7 +651,7 @@ class AnthropicDoor:
                     response = (
                         self.client.messages.create(
                             model=model,
-                            max_tokens=MAX_TOKENS,
+                            max_tokens=FABLE_MAX_TOKENS,
                             timeout=600.0,
                             system=instructions,
                             messages=messages,
@@ -783,7 +785,7 @@ class OpenAIDoor:
                     instructions=instructions,
                     input=items,
                     tools=tools,
-                    max_output_tokens=MAX_TOKENS,
+                    max_output_tokens=SOL_MAX_TOKENS,
                     timeout=600,
                 )
             )
@@ -927,7 +929,7 @@ class K3Door:
                     messages=messages,
                     tools=tools,
                     reasoning_effort="max",
-                    max_tokens=MAX_TOKENS,
+                    max_tokens=K3_MAX_TOKENS,
                     timeout=600,
                 )
             )
