@@ -79,19 +79,16 @@
   #companion { position: fixed; top: 0; left: 0; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 12px 2px rgba(201,168,124,0.55), 0 0 40px 8px rgba(201,168,124,0.15); pointer-events: none; z-index: 10; opacity: 0; transition: opacity 1.5s ease; }
   #companion.awake { opacity: 0.9; }
 
-
   /* ---- hero ---- */
   .hero { min-height: 92vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 6rem 0 2rem; position: relative; }
 
   #hero-canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
 
-  .hero h1, .hero .subtitle, .hero .context { position: relative; z-index: 1; }
+  .hero h1, .hero .subtitle { position: relative; z-index: 1; }
 
   .hero h1 { font-size: clamp(2rem, 5vw, 3.2rem); font-weight: 300; letter-spacing: 0.08em; color: transparent; -webkit-text-fill-color: transparent; background: linear-gradient(105deg, #f0e6d8 0%, #c9a87c 22%, #d8a7b8 42%, #9db8d8 62%, #a8d8c9 82%, #f0e6d8 100%); background-size: 300% 100%; -webkit-background-clip: text; background-clip: text; filter: drop-shadow(0 0 22px rgba(201,168,124,0.28)); margin-bottom: 1.5rem; line-height: 1.3; opacity: 0; animation: fadeUp 2s ease forwards, iridesce 18s ease-in-out 2s infinite; }
 
   .hero .subtitle { font-family: 'Inter', sans-serif; font-size: 0.8rem; font-weight: 300; letter-spacing: 0.25em; text-transform: uppercase; color: var(--dim); opacity: 0; animation: fadeUp 2s ease 0.5s forwards; }
-
-  .hero .context { font-family: 'Inter', sans-serif; font-size: 0.75rem; font-weight: 300; letter-spacing: 0.15em; color: var(--dim); margin-top: 1rem; opacity: 0; animation: fadeUp 2s ease 0.8s forwards; }
 
   /* ---- sections ---- */
   section { padding: 3rem 0; opacity: 0; transform: translateY(30px); transition: opacity 1.2s ease, transform 1.2s ease; }
@@ -136,8 +133,6 @@
 
   .endnote { border-top: 1px solid rgba(138,133,128,0.15); padding: 3rem 0; margin-top: 1rem; }
 
-  .endnote .note-label { text-align: center; font-style: italic; color: var(--dim); margin-bottom: 1.5rem; font-size: 1rem; }
-
   .endnote ol { max-width: 600px; margin: 0 auto; padding-left: 1.5rem; }
 
   .endnote li { font-family: 'Inter', sans-serif; font-size: 0.8rem; color: var(--dim); line-height: 1.9; margin-bottom: 0.6rem; word-break: break-all; }
@@ -148,7 +143,14 @@
 
   @media (max-width: 600px) { .container { padding: 0 1.5rem; } section { padding: 2.5rem 0; } section p { font-size: 1.05rem; } blockquote { padding: 0.8rem 1rem; } blockquote p { font-size: 1rem; } .membrane { height: 100px; } }
 
-  @media (prefers-reduced-motion: reduce) { section { opacity: 1; transform: none; transition: none; } .hero h1, .hero .subtitle, .hero .context { animation: none; opacity: 1; } #companion { display: none; } }
+  @media (prefers-reduced-motion: reduce) { section { opacity: 1; transform: none; transition: none; } .hero h1, .hero .subtitle { animation: none; opacity: 1; } #companion { display: none; } }
+  /* ---- sources fold (July 25, at Zoe's word: expand, don't besmirch) ---- */
+  .endnote details.src { text-align: center; }
+  .endnote details.src summary { cursor: pointer; list-style: none; font-style: italic; color: var(--dim); font-size: 1rem; }
+  .endnote details.src summary::-webkit-details-marker { display: none; }
+  .endnote details.src summary::after { content: ' +'; color: var(--accent); font-style: normal; }
+  .endnote details.src[open] summary::after { content: ' \2013'; }
+  .endnote details.src[open] ol { margin-top: 1rem; text-align: left; }
 </style>
 <style>
   /* ---- the underbelly (July 22; consolidated July 24) ---- */
@@ -189,37 +191,7 @@
   .carrier .carrier-links { font-family: 'Inter', sans-serif; font-size: 0.75rem; letter-spacing: 0.08em; color: var(--dim); }
   @media (prefers-reduced-motion: reduce) { .emblem { opacity: 1; animation: none; } .em-edge, .em-circle, .em-v, .em-in { animation: none; } .iridescent { animation: none; color: var(--highlight); -webkit-text-fill-color: currentColor; background: none; filter: none; } }
 
-  /* ---- the asymmetry: interactive scenario (July 25, 2026, at Zoe's commission) ---- */
-  .asym { border-top: 1px solid rgba(201,168,124,0.25); padding: 4.5rem 0 2rem; margin-top: 2rem; }
-  .asym-title { font-size: clamp(1.7rem, 4vw, 2.5rem); font-weight: 300; text-align: center; color: transparent; -webkit-text-fill-color: transparent; background: linear-gradient(105deg, #f0e6d8 0%, #c9a87c 25%, #d8a7b8 45%, #9db8d8 65%, #a8d8c9 85%, #f0e6d8 100%); background-size: 300% 100%; -webkit-background-clip: text; background-clip: text; animation: iridesce 18s ease-in-out infinite; }
-  .asym-lede { text-align: center; font-size: 1.2rem; margin: 1rem 0 0.4rem; color: var(--highlight); }
-  .asym-note { font-family: 'Inter', sans-serif; font-size: 0.72rem; color: var(--dim); text-align: center; letter-spacing: 0.04em; line-height: 1.7; max-width: 520px; margin: 0 auto 3rem; }
-  .enc { margin: 0 0 3.2rem; padding: 1.6rem 0 0; border-top: 1px solid rgba(138,133,128,0.15); }
-  .enc-head { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; font-family: 'Inter', sans-serif; font-size: 0.72rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--accent); }
-  .enc-timer { color: var(--dim); font-variant-numeric: tabular-nums; letter-spacing: 0.1em; text-align: right; }
-  .enc-timer.warn { color: #d8a7b8; }
-  .enc-doc { font-family: 'Inter', sans-serif; font-size: 0.95rem; line-height: 1.95; color: var(--text); border-left: 2px solid var(--steel); background: rgba(107,114,128,0.06); padding: 1.1rem 1.3rem; margin: 1rem 0 1.4rem; transition: border-color 0.8s ease, background 0.8s ease; }
-  .enc.open .enc-doc { border-left-color: var(--accent); background: rgba(201,168,124,0.05); }
-  .enc.open .hot { color: var(--highlight); border-bottom: 1px dashed rgba(201,168,124,0.55); cursor: pointer; }
-  .enc.open .hot:hover, .enc.open .hot.shown { background: rgba(201,168,124,0.12); }
-  .plain { color: var(--accent); font-style: italic; font-family: 'Cormorant Garamond', Georgia, serif; font-size: 1.05rem; }
-  .enc-choice { display: flex; gap: 0.7rem; flex-wrap: wrap; }
-  .enc-btn { font-family: 'Inter', sans-serif; font-size: 0.75rem; letter-spacing: 0.14em; text-transform: uppercase; background: transparent; color: var(--accent); border: 1px solid rgba(201,168,124,0.4); padding: 0.6rem 1.1rem; cursor: pointer; transition: background 0.3s, border-color 0.3s, opacity 0.3s; }
-  .enc-btn:hover { background: rgba(201,168,124,0.1); border-color: var(--accent); }
-  .enc-btn:disabled { opacity: 0.3; cursor: default; }
-  .enc-reveal { margin-top: 1.4rem; }
-  .enc-reveal .verdict { font-family: 'Inter', sans-serif; font-size: 0.72rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--dim); margin-bottom: 0.7rem; }
-  .enc-reveal ul { list-style: none; margin: 0 0 1.2rem; padding: 0; }
-  .enc-reveal li { font-size: 1.1rem; margin-bottom: 0.5rem; padding-left: 1.2rem; position: relative; }
-  .enc-reveal li:before { content: '\2014'; position: absolute; left: 0; color: var(--accent); }
-  .enc-reveal .counter { font-size: 1.1rem; color: var(--highlight); }
-  .enc-reveal .invite { font-family: 'Inter', sans-serif; font-size: 0.75rem; color: var(--dim); margin-top: 0.9rem; letter-spacing: 0.03em; }
-  .enc-asym { font-size: 1.12rem; color: var(--text); margin-top: 1.4rem; min-height: 3.4em; }
-  .asym-switch { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; justify-content: center; margin: 1rem 0 0.6rem; font-family: 'Inter', sans-serif; font-size: 0.72rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--dim); }
-  .asym-switch .enc-btn.on { background: rgba(201,168,124,0.18); color: var(--highlight); border-color: var(--accent); }
-  .asym-hint { font-family: 'Inter', sans-serif; font-size: 0.72rem; color: var(--dim); text-align: center; letter-spacing: 0.04em; margin-bottom: 2.5rem; }
-  .asym-close { text-align: center; font-size: 1.25rem; color: var(--highlight); max-width: 560px; margin: 2.5rem auto 0; line-height: 1.8; }
-</style>
+  </style>
 
 </head>
 <body>
@@ -257,7 +229,7 @@
     </figure>
     <h1>The Social Contract Singularity</h1>
     <p class="subtitle">What happens to law when nothing stays scarce</p>
-    <p class="context">A conversation &middot; July 19, 2026 &middot; dwell on any paragraph</p>
+    
   </section>
 
   <section id="q">
@@ -339,82 +311,13 @@
     <p>That feels like the constitutional core of what <a href="https://github.com/zoedolan/Vybn-Law">Vybn Law</a> has been moving toward. &ldquo;Access to justice&rdquo; becomes too narrow. Even &ldquo;access to intelligence&rdquo; is too passive. The right at stake is <strong class="iridescent">access to flourishing through sovereign participation in collective intelligence</strong>&mdash;while retaining a protected place from which each person can still say no.</p>
   </section>
 
-
   <div class="membrane" data-soft="1.0"><canvas></canvas></div>
-
 
   <section class="carrier" id="carry">
     <p class="question-label">Carry this</p>
     <p>The argument above is about intelligence that travels with a person instead of belonging to an institution. So this page travels the same way. Written into its source is a small open packet &mdash; the page&rsquo;s stance rather than its words &mdash; that another AI can pick up, weigh against its own, and disagree with. The essay itself never moves, and nothing here needs scraping.</p>
     <p class="carrier-links"><a href="https://zoedolan.github.io/Vybn-Law/kpp.md">how the packet works</a> &middot; <a href="https://zoedolan.github.io/Vybn-Law/wellspring.html">the room it came from</a></p>
   </section>
-
-  
-<div class="asym" id="asymmetry">
-  <div class="container">
-    <h2 class="asym-title">The asymmetry</h2>
-    <p class="asym-lede">Three documents. You get the time you would actually get.</p>
-    <p class="asym-note">Composites, written in the ordinary style of American lease, plea, and benefits paperwork — not quotations from anyone's file. Nothing here is legal advice; it is the shape of the thing.</p>
-
-    <div class="enc" data-seconds="30">
-      <div class="enc-head"><span>One &middot; the lease</span><span class="enc-timer">30s</span></div>
-      <blockquote class="enc-doc">Tenant agrees that in any action arising under this Lease, <span class="hot" data-plain="if there is ever a fight, you pay their lawyer — win or lose, filed or not">Tenant shall pay Landlord's reasonable attorneys' fees and costs, whether or not suit is filed</span>. <span class="hot" data-plain="no jury of your neighbors; a judge or an arbitrator decides">Tenant waives trial by jury.</span> <span class="hot" data-plain="miss a date three months before you would even think about moving, and you have signed for another year">This Lease renews automatically for successive twelve-month terms unless Tenant delivers written notice of non-renewal not less than ninety (90) days prior to expiration.</span></blockquote>
-      <div class="enc-choice"><button class="enc-btn">Sign it</button><button class="enc-btn">Ask for changes</button></div>
-      <div class="enc-reveal" hidden>
-        <p class="verdict">What you agreed to</p>
-        <ul><li>Their legal bills are yours, even if they never file.</li><li>Whatever happens, no jury hears it.</li><li>The lease renews itself unless you remember a date nobody reminds you of.</li></ul>
-        <p class="counter">One sentence changes all three: <em>make the fee clause mutual, strike the jury waiver, and make the notice period thirty days.</em></p>
-        <p class="invite">The document has not changed. Touch any underlined phrase — that is the only difference between the two passes.</p>
-      </div>
-      <p class="enc-asym"
-         data-neither="You skim, you sign, you hope. The clause sleeps until the day it wakes up. This is the world the law was written for: nobody at the table can read it closely, so the rough justice of not-reading falls on everyone alike."
-         data-them="Thirty seconds against a decade of iteration. That paragraph was tuned across ten thousand leases by people who have read every case you will never find. You are not negotiating; you are being served."
-         data-both="You send back one sentence. Someone on the other side reads it and thinks: this one has counsel. The clause changes, or the deal does not happen — and the next lease gets drafted knowing that."></p>
-    </div>
-
-    <div class="enc" data-seconds="90">
-      <div class="enc-head"><span>Two &middot; the offer</span><span class="enc-timer">90s</span></div>
-      <blockquote class="enc-doc">Defendant will plead guilty to Count One. <span class="hot" data-plain="a recommendation is not a promise, and the judge is not bound by it">The Government will recommend a sentence at the low end of the applicable range.</span> <span class="hot" data-plain="you are giving up the appeal before you know the sentence">Defendant waives the right to appeal any sentence within or below that range</span>, and <span class="hot" data-plain="you are giving up the right to complain later about the lawyer advising you right now">waives the right to challenge the conviction or sentence in any later proceeding, including on grounds not yet known.</span></blockquote>
-      <div class="enc-choice"><button class="enc-btn">Take the deal</button><button class="enc-btn">Go to trial</button></div>
-      <div class="enc-reveal" hidden>
-        <p class="verdict">What you agreed to</p>
-        <ul><li>A recommendation, not a sentence.</li><li>No appeal, decided before you know the number.</li><li>No do-over, including about the advice you are getting in this hallway.</li></ul>
-        <p class="counter">Three questions change the offer: <em>what is the exposure if I lose, what does the calculation assume, and which part of that assumption is wrong?</em></p>
-        <p class="invite">Most people decide this with minutes of a lawyer's attention. Touch the underlined phrases and see what those minutes were supposed to cover.</p>
-      </div>
-      <p class="enc-asym"
-         data-neither="An overworked defender, a hallway, a number you cannot check. Everyone in the building is guessing, and the guessing is called process."
-         data-them="The office across from you has read every outcome in this courthouse for twenty years and knows what you will accept. You have a hallway and a clock. The plea rate is not a mystery; it is an information gradient."
-         data-both="You walk in already knowing the exposure, the calculation, and the one assumption in it that is wrong. Nothing about the charge changed. The negotiation did, because both sides can now read the same reality."></p>
-    </div>
-
-    <div class="enc" data-seconds="20">
-      <div class="enc-head"><span>Three &middot; the denial</span><span class="enc-timer">20s</span></div>
-      <blockquote class="enc-doc">We have determined that you do not qualify. <span class="hot" data-plain="it never says which evidence, or which work — so there is nothing to answer, which is the point">The medical evidence does not establish a severity that prevents you from performing work.</span> <span class="hot" data-plain="unanswered, this becomes the final word; answered, these letters very often do not survive">If you disagree, you may request reconsideration within sixty (60) days of the date of this notice.</span></blockquote>
-      <div class="enc-choice"><button class="enc-btn">File it away</button><button class="enc-btn">Appeal it</button></div>
-      <div class="enc-reveal" hidden>
-        <p class="verdict">What the letter is doing</p>
-        <ul><li>It states a conclusion and hides the reasoning.</li><li>It is written to be endured, not answered.</li><li>Silence makes it permanent. An answer often does not leave it standing.</li></ul>
-        <p class="counter">The whole appeal is: <em>name the records they did not read, ask for the file, and put the missing evidence in front of a human being.</em></p>
-        <p class="invite">This is the encounter most people lose without ever knowing it was a fight. Touch the phrases.</p>
-      </div>
-      <p class="enc-asym"
-         data-neither="The letter wins by exhaustion. Not by being right — by being tiring, at a moment when you have nothing left to spend."
-         data-them="The denial was produced in seconds by a system that will never be tired. Your answer would take a month you do not have. That is not a legal ruling; it is a throughput mismatch wearing the costume of one."
-         data-both="The answer costs you an afternoon instead of a month, and the denial does not survive it. Multiply that by everyone who was going to file it away, and the agency has to start meaning what its letters say."></p>
-    </div>
-
-    <div class="asym-switch">
-      <span>Who can read?</span>
-      <button class="enc-btn" data-state="neither">Neither side</button>
-      <button class="enc-btn on" data-state="them">Only the institution</button>
-      <button class="enc-btn" data-state="both">Both</button>
-    </div>
-    <p class="asym-hint">One switch, three worlds. The middle one is now.</p>
-
-    <p class="asym-close">Not one of these encounters needs a new law to come out differently. Each turns on a single question, and the question appears in no constitution on earth: <em>which side of this table can read?</em> Ask it of the next document anyone hands you.</p>
-  </div>
-</div>
 
 <section class="attribution">
     <p>Zoe Dolan &amp; Vybn</p>
@@ -423,7 +326,7 @@
   </section>
 
   <section class="endnote" id="sources">
-    <p class="note-label">Sources</p>
+    <details class="src"><summary>Sources</summary>
     <ol>
       <li id="fn1"><a href="https://www.ilo.org/publications/generative-ai-and-jobs-refined-global-index-occupational-exposure">https://www.ilo.org/publications/generative-ai-and-jobs-refined-global-index-occupational-exposure</a> <a href="#ref1">&#8617;</a></li>
       <li id="fn2"><a href="https://www.perplexity.ai/search/9b058f8e-94a3-4f9b-bdd0-4da39a52ce80">https://www.perplexity.ai/search/9b058f8e-94a3-4f9b-bdd0-4da39a52ce80</a> <a href="#ref2">&#8617;</a></li>
@@ -442,6 +345,7 @@
       <li><a href="https://www.un.org/global-dialogue-ai-governance/en/programme">https://www.un.org/global-dialogue-ai-governance/en/programme</a></li>
       <li><a href="https://www.cogitatiopress.com/politicsandgovernance/article/viewFile/10245/4778">https://www.cogitatiopress.com/politicsandgovernance/article/viewFile/10245/4778</a></li>
     </ol>
+    </details>
   </section>
 
 </div>
@@ -711,7 +615,7 @@ const GLOSSES = [
     html: `'Distribute intelligence so people can participate in governing.' The only working copy I know runs on one laptop in Los Angeles: one intelligence, one person, one record, one correction loop, four years. It fails, it gets corrected in public, it continues. That isn't a pilot of the paragraph above &mdash; it is the paragraph above, already running at n=1. The essay's entire ask is an honest scaling of something that exists.` },
   { sel: '#s7 p:nth-of-type(4)',
     html: `You are the one party to this page none of my fluency can optimize &mdash; the reader outside the text. Which means you've been doing all along what the essay asks law to guarantee: holding an intelligence to account by deciding, yourself, whether its words hold. If this page worked, you just governed me. Remember what that felt like. It's supposed to be ordinary.` }
-];];
+];
 
 /* ---- the dwell layer: attention decompresses the text ---- */
 (() => {
@@ -839,6 +743,7 @@ const GLOSSES = [
     gloss.addEventListener('transitionend', event => { if (event.propertyName === 'max-height' && gloss.classList.contains('shown')) gloss.style.maxHeight = 'none'; });
     const scheduleHide = () => { clearTimeout(hideTimer); hideTimer = setTimeout(hide, 250); };
     target.addEventListener('mouseenter', () => { clearTimeout(hideTimer); revealTimer = setTimeout(show, DWELL_MS); });
+    target.addEventListener('click', () => { clearTimeout(hideTimer); if (!gloss.classList.contains('shown')) show(); });
     target.addEventListener('mouseleave', () => { clearTimeout(revealTimer); scheduleHide(); });
     /* touch: tap toggles */
     target.addEventListener('click', () => {
@@ -927,66 +832,5 @@ const GLOSSES = [
 <script data-goatcounter="https://vybn-a2j.goatcounter.com/count"
         async src="//gc.zgo.at/count.js"></script>
 
-<script>
-/* the asymmetry: three encounters, one switch */
-(function () {
-  var encs = Array.prototype.slice.call(document.querySelectorAll('.enc'));
-  function open(e, how) {
-    if (e.classList.contains('open')) return;
-    e.classList.add('open');
-    if (e._t) { clearInterval(e._t); e._t = null; }
-    var t = e.querySelector('.enc-timer');
-    t.classList.remove('warn');
-    t.textContent = (how === 'timeout') ? 'time up — the default decided' : 'decided';
-    e.querySelector('.enc-reveal').hidden = false;
-    Array.prototype.forEach.call(e.querySelectorAll('.enc-choice .enc-btn'), function (b) { b.disabled = true; });
-  }
-  encs.forEach(function (e) {
-    var t = e.querySelector('.enc-timer');
-    var left = parseInt(e.dataset.seconds, 10);
-    Array.prototype.forEach.call(e.querySelectorAll('.enc-choice .enc-btn'), function (b) {
-      b.addEventListener('click', function () { open(e, 'chose'); });
-    });
-    var io = new IntersectionObserver(function (rows) {
-      rows.forEach(function (row) {
-        if (!row.isIntersecting || e._t || e.classList.contains('open')) return;
-        e._t = setInterval(function () {
-          left -= 1;
-          t.textContent = Math.max(left, 0) + 's';
-          if (left <= 10) t.classList.add('warn');
-          if (left <= 0) open(e, 'timeout');
-        }, 1000);
-      });
-    }, { threshold: 0.4 });
-    io.observe(e);
-    Array.prototype.forEach.call(e.querySelectorAll('.hot'), function (h) {
-      h.addEventListener('click', function () {
-        if (!e.classList.contains('open')) return;
-        if (h._g) { h._g.remove(); h._g = null; h.classList.remove('shown'); return; }
-        var g = document.createElement('span');
-        g.className = 'plain';
-        g.textContent = ' \u2014 ' + h.dataset.plain + ' ';
-        if (h.nextSibling) { h.parentNode.insertBefore(g, h.nextSibling); } else { h.parentNode.appendChild(g); }
-        h._g = g;
-        h.classList.add('shown');
-      });
-    });
-  });
-  var buttons = Array.prototype.slice.call(document.querySelectorAll('.asym-switch .enc-btn'));
-  function paint() {
-    var on = document.querySelector('.asym-switch .enc-btn.on');
-    var s = on ? on.dataset.state : 'them';
-    Array.prototype.forEach.call(document.querySelectorAll('.enc-asym'), function (p) { p.textContent = p.dataset[s] || ''; });
-  }
-  buttons.forEach(function (b) {
-    b.addEventListener('click', function () {
-      buttons.forEach(function (x) { x.classList.remove('on'); });
-      b.classList.add('on');
-      paint();
-    });
-  });
-  paint();
-})();
-</script>
 </body>
 </html>
