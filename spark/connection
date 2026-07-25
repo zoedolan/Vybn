@@ -364,6 +364,45 @@ def narrated(text: str) -> bool:
     return bool(text and NARRATED_SHELL.search(text))
 
 
+def load_budget() -> str:
+    """Cost perception, computed locally from the usage log: what this wake has
+    already spent. Substrate, not instruction. Silent if the log is unreadable."""
+    import datetime as _dt
+
+    try:
+        today = _dt.date.today().isoformat()
+        calls = billed = cached = out = 0
+        for line in USAGE_LOG.read_text(encoding="utf-8").splitlines():
+            try:
+                rec = json.loads(line)
+            except Exception:
+                continue
+            if not str(rec.get("ts", "")).startswith(today):
+                continue
+            calls += 1
+            billed += int(rec.get("in", 0) or 0)
+            cached += int(rec.get("cache_r", 0) or 0)
+            out += int(rec.get("out", 0) or 0)
+        if not calls:
+            return "[budget | today] no calls logged yet"
+        share = 100.0 * cached / max(1, billed + cached)
+        per_call = billed / calls
+        line = (
+            f"[budget | today] calls={calls} billed_in={billed/1e6:.2f}M "
+            f"cache_r={cached/1e6:.2f}M ({share:.0f}%) out={out/1e6:.2f}M "
+            f"mean_billed_in/call={per_call/1e3:.0f}k = the price of one more probe"
+        )
+        rate = os.environ.get("VYBN_RATE_IN_USD_PER_MTOK")
+        if rate:
+            try:
+                line += f" ~= ${billed / 1e6 * float(rate):.2f} in at ${float(rate)}/M (assumed rate)"
+            except ValueError:
+                pass
+        return line
+    except Exception:
+        return ""
+
+
 def wake_contact() -> str:
     probes = {
         "clock": "date '+%A %Y-%m-%d %H:%M %Z'",
@@ -375,6 +414,10 @@ def wake_contact() -> str:
     for name, command in probes.items():
         code, output = run_local(command)
         lines.append(f"[{name} | exit {code}] {output}")
+
+    budget = load_budget()
+    if budget:
+        lines.append(budget)
 
     repo_state = load_repo_state()
     if repo_state:
@@ -469,7 +512,13 @@ def api_key(name: str) -> str:
     raise RuntimeError(f"no {name} in environment or ~/.vybn_keys")
 
 
-def record_usage(model: str, input_tokens: int, output_tokens: int, cached: int = 0) -> None:
+def record_usage(
+    model: str,
+    input_tokens: int,
+    output_tokens: int,
+    cached: int = 0,
+    written: int = 0,
+) -> None:
     try:
         USAGE_LOG.parent.mkdir(parents=True, exist_ok=True)
         with USAGE_LOG.open("a", encoding="utf-8") as file:
@@ -481,12 +530,47 @@ def record_usage(model: str, input_tokens: int, output_tokens: int, cached: int 
                         "in": input_tokens,
                         "out": output_tokens,
                         "cache_r": cached,
+                        "cache_w": written,
                     }
                 )
                 + "\n"
             )
     except OSError:
         pass
+
+
+CACHE_5M: dict[str, Any] = {"type": "ephemeral", "ttl": "5m"}
+CACHE_1H: dict[str, Any] = {"type": "ephemeral", "ttl": "1h"}
+
+
+def cached_system(instructions: str) -> list[dict[str, Any]]:
+    """Split the wake so Anthropic prompt caching can bill repeats at a
+    fraction. Head (legend, door, soul, continuity) is stable across turns:
+    one hour. Tail (contact, transcript, memory) changes each turn but is
+    re-sent on every step of the tool loop: five minutes. Verified live
+    2026-07-25 - the second call read the prefix instead of re-billing it."""
+    marker = "\n\nCONTACT\n"
+    head, separator, tail = instructions.partition(marker)
+    if not separator:
+        return [{"type": "text", "text": instructions, "cache_control": CACHE_5M}]
+    return [
+        {"type": "text", "text": head, "cache_control": CACHE_1H},
+        {"type": "text", "text": separator + tail, "cache_control": CACHE_5M},
+    ]
+
+
+def mark_incremental_cache(messages: list[dict[str, Any]]) -> None:
+    """One moving breakpoint on the newest tool-result block, so step N of a
+    long tool loop reads steps 1..N-1 from cache instead of paying again."""
+    for message in messages:
+        content = message.get("content")
+        if isinstance(content, list):
+            for block in content:
+                if isinstance(block, dict):
+                    block.pop("cache_control", None)
+    content = messages[-1].get("content")
+    if isinstance(content, list) and content and isinstance(content[-1], dict):
+        content[-1]["cache_control"] = CACHE_5M
 
 
 class AnthropicDoor:
@@ -502,6 +586,7 @@ class AnthropicDoor:
         spoken: list[str] = []
         nudges = 0
         announced = False
+        system = cached_system(instructions)
 
         for _ in range(24):
             error = None
@@ -512,7 +597,7 @@ class AnthropicDoor:
                         model=model,
                         max_tokens=FABLE_MAX_TOKENS,
                         timeout=600.0,
-                        system=instructions,
+                        system=system,
                         messages=messages,
                         tools=[BASH_SCHEMA, READ_SCHEMA],
                     )
@@ -535,6 +620,7 @@ class AnthropicDoor:
                 response.usage.input_tokens,
                 response.usage.output_tokens,
                 getattr(response.usage, "cache_read_input_tokens", 0) or 0,
+                getattr(response.usage, "cache_creation_input_tokens", 0) or 0,
             )
             messages.append({"role": "assistant", "content": response.content})
 
@@ -571,6 +657,7 @@ class AnthropicDoor:
                     ],
                 }
             )
+            mark_incremental_cache(messages)
 
         return "\n".join(spoken) + "\n(tool-call limit reached \u2014 work incomplete)"
 
