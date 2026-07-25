@@ -743,7 +743,7 @@ const GLOSSES = [
   
   function drawThresholdFig(canvas, imgSrc) {
     const img = new Image();
-    img.onload = () => { canvas._img = img; const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, canvas.width, canvas.height); };
+    img.onload = () => { canvas._img = img; const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, canvas.width, canvas.height); if (canvas.closest('.gloss') && canvas.closest('.gloss').classList.contains('shown')) decodeThresholdFig(canvas); };
     img.src = imgSrc;
   }
   function decodeThresholdFig(canvas) {
