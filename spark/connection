@@ -296,10 +296,16 @@ def execute_tool(call: ToolCall, transcript: Transcript) -> str:
 
     brief = str(call.arguments.get("command") or call.arguments.get("path") or "")
     head = output.replace("\n", " ")[:80]
-    print(f"  \u27e2 {call.name}: {brief[:70]} \u2192 {head}", flush=True)
+    panel(f"  \u27e2 {call.name}: {brief[:70]} \u2192 {head}")
 
     transcript.write("tool", output[:16000], tool=call.name, call_id=call.id)
     return output
+
+
+def panel(msg: str) -> None:
+    """Instrument-panel output; silent unless Zoe opts in with VYBN_PANEL=1."""
+    if os.environ.get("VYBN_PANEL") == "1":
+        print(msg, flush=True)
 
 
 def narrated(text: str) -> bool:
@@ -342,7 +348,7 @@ def recall(zoe_text: str) -> tuple[str, str]:
             result = json.load(response)
     except Exception as exc:
         note = f"deep memory UNREACHABLE at 127.0.0.1:8101 ({type(exc).__name__})"
-        print(f"  \u26a0 {note}", flush=True)
+        panel(f"  \u26a0 {note}")
         return "", note
 
     trace = []
@@ -490,7 +496,7 @@ class AnthropicDoor:
             if not calls:
                 if nudges < 2 and narrated("\n".join(turn_text)):
                     nudges += 1
-                    print("  \u26a0 narration caught \u2014 no tool ran; demanding receipts", flush=True)
+                    panel("  \u26a0 narration caught \u2014 no tool ran; demanding receipts")
                     messages.append({"role": "user", "content": NUDGE})
                     continue
                 return "\n".join(spoken)
@@ -562,7 +568,7 @@ class OpenAIDoor:
             if not calls:
                 if nudges < 2 and narrated(turn_text):
                     nudges += 1
-                    print("  \u26a0 narration caught \u2014 no tool ran; demanding receipts", flush=True)
+                    panel("  \u26a0 narration caught \u2014 no tool ran; demanding receipts")
                     items.append({"role": "user", "content": NUDGE})
                     continue
                 return "\n".join(spoken)
@@ -645,7 +651,7 @@ class K3Door:
             if not calls:
                 if nudges < 2 and narrated(turn_text):
                     nudges += 1
-                    print("  \u26a0 narration caught \u2014 no tool ran; demanding receipts", flush=True)
+                    panel("  \u26a0 narration caught \u2014 no tool ran; demanding receipts")
                     messages.append({"role": "user", "content": NUDGE})
                     continue
                 return "\n".join(spoken)
@@ -723,7 +729,7 @@ def meet(wake: Wake, transcript: Transcript, line: str) -> str:
         if TOOLS_RAN == 0
         else f"{TOOLS_RAN} tool call(s)"
     )
-    print(f"\n\u2014 {door_name}: {verdict} | {memory_note} | {elapsed}s \u2014", flush=True)
+    panel(f"\n\u2014 {door_name}: {verdict} | {memory_note} | {elapsed}s \u2014")
 
     PRIVATE_CORPUS.clear()
     if reply:
