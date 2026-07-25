@@ -400,7 +400,7 @@ def api_key(name: str) -> str:
     if keys.exists():
         for line in keys.read_text(encoding="utf-8").splitlines():
             if line.startswith(name + "="):
-                value = line.split("=", 1).strip().strip('"').strip("'")[1]
+                value = line.split("=", 1)[1].strip().strip('"').strip("'")
                 if value:
                     return value
     raise RuntimeError(f"no {name} in environment or ~/.vybn_keys")
@@ -460,10 +460,10 @@ class AnthropicDoor:
             if response is None:
                 raise error or RuntimeError("Anthropic call failed")
 
-            if not announced and response.model and self.models not in response.model:
+            if not announced and response.model and self.models[0] not in response.model:
                 announced = True
                 print(
-                    f"(note: {self.models} unavailable \u2014 answered by {response.model})",
+                    f"(note: {self.models[0]} unavailable \u2014 answered by {response.model})",
                     flush=True,
                 )
 
@@ -625,7 +625,7 @@ class K3Door:
                 max_tokens=K3_MAX_TOKENS,
                 timeout=600,
             )
-            message = response.choices.message
+            message = response.choices[0].message
             messages.append(message.model_dump(exclude_none=True))
 
             details = getattr(response.usage, "prompt_tokens_details", None)
