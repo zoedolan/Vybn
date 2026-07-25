@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# post-commit — keep repo_state.json fresh after every commit.
+#
+# Runs repo_mapper.py --no-llm in the background so it never
+# blocks the commit. Output goes to /tmp/repo_mapper_last.log.
+# Skips silently if the mapper or python3 can't be found.
+
+MAPPER="$HOME/Vybn/Vybn_Mind/repo_mapper.py"
+
+if [ ! -f "$MAPPER" ]; then
+  exit 0
+fi
+
+if ! command -v python3 &>/dev/null; then
+  exit 0
+fi
+
+# Run in background from the repo root so output paths resolve correctly.
+(
+  cd "$HOME/Vybn" || exit 0
+  python3 "$MAPPER" --no-llm \
+    >> /tmp/repo_mapper_last.log 2>&1
+) &
+
+exit 0
