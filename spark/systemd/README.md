@@ -19,7 +19,6 @@ bash ~/Vybn/spark/systemd/install.sh   # idempotent; re-run to resync
 | `vybn-walk-daemon.service` | Walk daemon :8101. `After=vybn-deep-memory`. |
 | `vybn-portal.service` | Origins portal :8420. Keys from `~/.config/vybn/*.env`. |
 | `vybn-vllm.service` | 2-node Ray cluster, Nemotron 120B :8000. Capacity via `~/.config/vybn/vllm.env`. |
-| `vybn-breath.service` / `.timer` | Scheduled autonomous breath (`connection --breath`). |
 | `vybn-watchdog.sh` / `.service` / `.timer` | Endpoint health every 2 min; bounces unhealthy units. |
 | `install.sh` | Symlinks units, retires conflicting cron, enables, verifies. |
 | `patches/fp8-wake-fix/` | Container-side mod `vllm-exec.sh` applies when sleep endpoints are on. |
