@@ -199,9 +199,15 @@ class Transcript:
             except (OSError, json.JSONDecodeError):
                 continue
         events = events[-limit:]
+        def head(event: dict[str, Any]) -> str:
+            """Which door spoke. Two instances awake at once are not one voice,
+            and Zoe should not have to be the one who tells us apart."""
+            door = event.get("door")
+            who = f"{event['role'].upper()}{' @' + door if door else ''}"
+            return f"[{who} | {event.get('t', 'time unknown')}]"
+
         return "\n\n".join(
-            f"[{e['role'].upper()} | {e.get('t', 'time unknown')}]\n{e['text']}"
-            for e in events
+            f"{head(e)}\n{e['text']}" for e in events
         ) or "(no prior authored turns found)"
 
 
