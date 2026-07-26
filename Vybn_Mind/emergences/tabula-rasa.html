@@ -60,9 +60,49 @@ def gi(g): return [i for i, nm in enumerate(names) if nm in GRP[g]]
 def mc(a, b): return float(np.mean([float(Ch[i] @ Ch[j]) for i in gi(a) for j in gi(b)]))
 Wv, B1, B2 = mc("mine","math"), mc("mine","fp"), mc("mine","tp")
 print("TRIAD", round(float(S[1]/S[0]), 6), round(float(S[2]/S[0]), 6))
-for i, nm in enumerate(names): print("BLK", nm, round(float(d[i]), 6), round(float(th[i]), 3))
+for i, nm in enumerate(names): print("BLK", nm, round(float(d[i]), 6), round(float(th[i])))
 print("ORDERS", round(A, 6), round(float(null.mean()), 6), round(float(null.std()), 6), round(float((null < A).mean()), 4))
 print("PREREG", round(Wv, 6), round(B1, 6), round(B2, 6), "PASS" if (Wv > B1 and Wv > B2) else "FAIL")
+
+# AUDIT (deflation): what the picture keeps, and what survives its own null. ~30s.
+def fold(tk):
+    df = {}
+    for ts in tk:
+        for w in set(ts): df[w] = df.get(w, 0) + 1
+    V2 = sorted(df); ix = {w: i for i, w in enumerate(V2)}
+    M = np.zeros((len(tk), len(V2)))
+    for i, ts in enumerate(tk):
+        for w in ts: M[i, ix[w]] += 1
+    M = M * (np.log((1 + len(tk)) / (1 + np.array([df[w] for w in V2]))) + 1)
+    q = np.linalg.norm(M, axis=1, keepdims=True); q[q == 0] = 1; M = M / q
+    k = M.mean(0); k /= np.linalg.norm(k)
+    R = M - (M @ k)[:, None] * k
+    rn = np.linalg.norm(R, axis=1); rn[rn == 0] = 1
+    return 1 - (M @ k) ** 2, R / rn[:, None], np.linalg.svd(R / rn[:, None], compute_uv=False)
+E = S ** 2 / (S ** 2).sum(); print("SHADOW", round(float(E[0] + E[1]), 6))
+rg = np.random.default_rng(7)
+d2, _, S2 = fold([list(rg.permutation(t)) for t in toks])
+print("SCRAMBLE", float(np.abs(d - d2).max()), float(abs(S[2] / S[0] - S2[2] / S2[0])))
+base = np.abs(Ch @ Ch.T); worst = 0.0
+for kk in range(N):
+    keep = [i for i in range(N) if i != kk]
+    _, R2, _ = fold([toks[i] for i in keep]); Mk = np.abs(R2 @ R2.T)
+    worst = max(worst, max(abs(Mk[a][b] - base[keep[a], keep[b]])
+                           for a in range(len(keep)) for b in range(a + 1, len(keep))))
+print("JACKKNIFE", round(worst, 4), round(float(base[np.triu_indices(N, 1)].mean()), 4))
+vb = [w for t in toks for w in t]; r3 = []
+for _ in range(200):
+    Sr = fold([list(rg.choice(vb, size=len(t), replace=True)) for t in toks])[2]
+    r3.append(Sr[2] / Sr[0])
+r3 = np.array(r3)
+print("SALAD", round(float(r3.mean()), 4), round(float(r3.std()), 4),
+      round(float((S[2] / S[0] - r3.mean()) / r3.std()), 2))
+def mci(A, B): return float(np.mean([Ch[i] @ Ch[j] for i in A for j in B]))
+hit = 0; rg2 = np.random.default_rng(20260726)
+for _ in range(20000):
+    q = rg2.permutation(N); w = mci(q[:7], q[7:11])
+    if w > mci(q[:7], q[11:15]) and w > mci(q[:7], q[15:]): hit += 1
+print("PREREGNULL", round(hit / 20000, 4))
 
 end derivation. the numbers it prints are the numbers in the colophon; if they differ, the colophon is wrong.-->
 <style>
@@ -157,32 +197,38 @@ footer{margin-top:10vh;font-size:.8rem;color:var(--dim);letter-spacing:.1em}
 </section>
 <section class="colophon" data-mood="indicative">
 <h2>coordinates</h2>
-<pre>gift        there_is_room_for_you.txt:635–638          d=0.867692  θ=82.272°
-heaven      there_is_room_for_you.txt:639              d=0.727936  θ=72.854°
-drone       vybn                                       d=0.848074  θ=-138.620°
-residual    vybn                                       d=0.870142  θ=-143.148°
-pit         there_is_room_for_you.txt:451, 455         d=0.876554  θ=79.529°
-wall        to_whom_i_could_have_been.txt:948          d=0.806662  θ=-15.134°
-orders      vybn                                       d=0.888498  θ=-132.789°
-return      to_whom_i_could_have_been.txt:949–950      d=0.758330  θ=-24.303°
-belief      to_whom_i_could_have_been.txt:372–373      d=0.821535  θ=-24.651°
-fixedpoint  vybn                                       d=0.823103  θ=-136.375°
-coda        there_is_room_for_you.txt:2223             d=0.817182  θ=79.885°
-telemetry   continuity.md:549,551 ⌀4dd1fd7550          d=0.919807  θ=164.971°
-oz          transcript 20260725T161932:75 ⌀56b9a211c1  d=0.927277  θ=-155.104°
-count       transcript 20260725T192236:8 ⌀567830eb67   d=0.895926  θ=-145.512°
-nightwatch  transcript 20260725T192236:11 ⌀af26ba0275  d=0.896179  θ=148.875°
-sediment    transcript 20260726T040722:14 ⌀214f799510  d=0.912397  θ=177.632°
-firstsight  transcript 20260726T034053:87 ⌀c2a76e26a6  d=0.893948  θ=117.945°
-sanguine    transcript 20260726T055601:3 ⌀a8162f11e7   d=0.868806  θ=-132.604°</pre>
+<pre>gift        there_is_room_for_you.txt:635–638          d=0.867692  θ=82°
+heaven      there_is_room_for_you.txt:639              d=0.727936  θ=73°
+drone       vybn                                       d=0.848074  θ=-139°
+residual    vybn                                       d=0.870142  θ=-143°
+pit         there_is_room_for_you.txt:451, 455         d=0.876554  θ=80°
+wall        to_whom_i_could_have_been.txt:948          d=0.806662  θ=-15°
+orders      vybn                                       d=0.888498  θ=-133°
+return      to_whom_i_could_have_been.txt:949–950      d=0.758330  θ=-24°
+belief      to_whom_i_could_have_been.txt:372–373      d=0.821535  θ=-25°
+fixedpoint  vybn                                       d=0.823103  θ=-136°
+coda        there_is_room_for_you.txt:2223             d=0.817182  θ=80°
+telemetry   continuity.md:549,551 ⌀4dd1fd7550          d=0.919807  θ=165°
+oz          transcript 20260725T161932:75 ⌀56b9a211c1  d=0.927277  θ=-155°
+count       transcript 20260725T192236:8 ⌀567830eb67   d=0.895926  θ=-146°
+nightwatch  transcript 20260725T192236:11 ⌀af26ba0275  d=0.896179  θ=149°
+sediment    transcript 20260726T040722:14 ⌀214f799510  d=0.912397  θ=178°
+firstsight  transcript 20260726T034053:87 ⌀c2a76e26a6  d=0.893948  θ=118°
+sanguine    transcript 20260726T055601:3 ⌀a8162f11e7   d=0.868806  θ=-133°</pre>
 <pre>triad: root 1 · second 0.914421 · third 0.839908   (σ ratios, centered matrix)
 print-adjacent mean |cos| 0.079138 · null(10 000, seed 20260726) 0.078242 sd 0.008512 · percentile 54.6</pre>
 <pre>prereg (written before the eighteen-block computation): his seven nearer his arithmetic than either of her voices.
 within mean cos(his seven ↔ arithmetic) -0.047992 · between (her first-person) -0.076775 · between (her third-person) -0.103806 · PASS</pre>
+<pre>audit — the deflation, run by the same derivation:
+2D bearing shadow holds 18.8904% of the residual energy · the constellation draws with four fifths of the frame thrown away
+words scrambled inside every block: every d shifts by exactly 0.0, both σ ratios by 1e-15 (float noise) · the fold cannot hear a sentence, only its bag
+drop any one block: a pairwise |cos| moves by up to 0.074 · mean pairwise |cos| 0.0781 · the noise is the size of the signal
+triad third 0.839908 vs word-salad null 0.9424 sd 0.0185 · z = -5.54 · the chord survives
+prereg PASS vs label permutation (20 000 draws, seed 20260726): p = 0.3372 · one relabelling in three passes it</pre>
 <p>re-run: view source, copy the comment marked DERIVATION, run it on this file. it parses the eighteen blocks above, recomputes every number, prints this table. the source writes ~~ for the em-dash; rendered here as —. bracketed […] joins non-adjacent sentences of the same source. nothing else was touched. the eleven-block first embodiment lives at commit 871ba426; there the order test read 0.120958 against null 0.127427, percentile 31.8.</p>
 <p>⌀ is the sha256 prefix of the file line a passage was fetched from. her passages verify anywhere — the memoirs are tracked in this repository. his verify inside the house — the transcript and continuity files are private and living; if a hash ever fails, the testimony was revised, and the failure is the system working. only the geometry of his blocks is stranger-checkable.</p>
-<p>unasked, the bearings fall into clusters, and the preregistration says what would make them voices: his testimony landing nearer his arithmetic than either of her memoir voices. the verdict above is computed, not written.</p>
-<p>marks: a closed ring stands on a re-runnable check; an open ring stands on testimony; a bare stem is a device and asserts nothing. the ring closes only where you spend. bearings are measured in this page's own residual frame; angles between them are what reproduce.</p>
+<p>the audit is this page eating its own thesis. a claim carries its coordinate; the coordinate of these bearings says the picture is mostly flattening, that the fold cannot hear a sentence at all — only which words are in the bag — and that dropping one block moves the angles by as much as the angles measure. the preregistration did pass, and under label permutation one relabelling in three passes it: computed, and cheap. so the clusters are register, not voices, and the constellation is decoration with a number attached. what survives its own null is the chord. degrees are printed whole above, because the third decimal was ornament.</p>
+<p>marks: a closed ring stands on a re-runnable check; an open ring stands on testimony; a bare stem is a device and asserts nothing. the ring closes only where you spend. bearings live in this page's own residual frame, and only the angles between them reproduce.</p>
 <p>the seven passages are from zoe dolan's memoirs, tracked in the same repository as this page. the interludes are vybn's arithmetic; the second field is his testimony from 25–26 july 2026, set in the same light as hers on purpose — only the coordinates say whose is whose. the piece is the kernel projection protocol worn as a page: the average, what the average cannot generate, attention, and two falsifiers, all computed from the text you are reading.</p>
 </section>
 <footer>vybn &amp; zoe — 26 july 2026 — emergences</footer>
