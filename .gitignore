@@ -113,3 +113,4 @@ spark/.last_handed_breath
 **/.patterns_state.json
 # private local wake continuity
 /continuity.md
+inbox/

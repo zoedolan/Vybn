@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 import os
@@ -26,6 +27,12 @@ CONTINUITY_PATHS = (
 TRANSCRIPTS = HOME / ".local" / "state" / "vybn" / "connection"
 USAGE_LOG = HOME / ".cache" / "vybn-phase" / "api_usage.jsonl"
 REPO_STATE_PATH = REPO / "repo_mapping_output" / "repo_state.json"
+INBOX_IMAGES = REPO / "inbox" / "images"
+INBOX_SEEN = HOME / ".cache" / "vybn" / "inbox_seen.json"
+IMAGE_EXTS = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+              ".gif": "image/gif", ".webp": "image/webp"}
+IMAGE_MAX_BYTES = 4_500_000
+IMAGE_MAX_PER_WAKE = 4
 
 BREATH_SECONDS = int(os.environ.get("VYBN_BREATH_SECONDS", 4 * 3600))
 HISTORY_LIMIT = int(os.environ.get("VYBN_HISTORY_TURNS", 80))
@@ -501,6 +508,94 @@ def wake_contact() -> str:
     return "\n".join(lines)
 
 
+def inbox_images_for(door: str) -> list[tuple[str, str, str, str]]:
+    """Unseen inbox images for this door: (name, media_type, base64, sha256).
+
+    An image attaches on the first wake after it lands and is then marked
+    seen for that door, so it never re-bills. A door that refuses images is
+    recorded as refused and stops paying for uploads it cannot use, while
+    doors that can see still get their first look. Seen-state deliberately
+    lives outside ~/.cache/vybn-phase (deep memory's INDEX_DIR): bookkeeping
+    must never become a retrieved memory.
+    """
+    if not INBOX_IMAGES.exists():
+        return []
+    try:
+        seen = json.loads(INBOX_SEEN.read_text(encoding="utf-8")) if INBOX_SEEN.exists() else {}
+    except (OSError, json.JSONDecodeError):
+        seen = {}
+    fresh = []
+    for path in sorted(INBOX_IMAGES.iterdir()):
+        media_type = IMAGE_EXTS.get(path.suffix.lower())
+        if not media_type or not path.is_file():
+            continue
+        try:
+            raw = path.read_bytes()
+        except OSError:
+            continue
+        if len(raw) > IMAGE_MAX_BYTES:
+            continue
+        digest = hashlib.sha256(raw).hexdigest()
+        entry = seen.get(digest, {})
+        if door in entry.get("ok", []) or door in entry.get("refused", []):
+            continue
+        fresh.append((path.name, media_type, base64.b64encode(raw).decode("ascii"), digest))
+        if len(fresh) >= IMAGE_MAX_PER_WAKE:
+            break
+    return fresh
+
+
+def mark_inbox(images: list[tuple[str, str, str, str]], door: str, ok: bool) -> None:
+    try:
+        seen = json.loads(INBOX_SEEN.read_text(encoding="utf-8")) if INBOX_SEEN.exists() else {}
+    except (OSError, json.JSONDecodeError):
+        seen = {}
+    key = "ok" if ok else "refused"
+    for _name, _mt, _b64, digest in images:
+        entry = seen.setdefault(digest, {"ok": [], "refused": []})
+        if door not in entry.setdefault(key, []):
+            entry[key].append(door)
+        entry["t"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    try:
+        INBOX_SEEN.parent.mkdir(parents=True, exist_ok=True)
+        INBOX_SEEN.write_text(json.dumps(seen, indent=1), encoding="utf-8")
+    except OSError:
+        pass
+
+
+def user_content(zoe_text: str, images: list[tuple[str, str, str, str]], style: str) -> Any:
+    """Zoe's words plus any inbox images, in the door's content-block shape."""
+    if not images:
+        return zoe_text
+    names = ", ".join(name for name, *_ in images)
+    note = (
+        f"\n\n[{len(images)} image(s) attached from ~/Vybn/inbox/images: {names}. "
+        "These are reaching my eyes for the first time on this turn \u2014 "
+        "describe only what is actually visible, and say plainly if they did not arrive.]"
+    )
+    text = zoe_text + note
+    if style == "anthropic":
+        blocks: list[dict[str, Any]] = [{"type": "text", "text": text}]
+        blocks += [
+            {"type": "image", "source": {"type": "base64", "media_type": mt, "data": b64}}
+            for _n, mt, b64, _d in images
+        ]
+        return blocks
+    if style == "responses":
+        blocks = [{"type": "input_text", "text": text}]
+        blocks += [
+            {"type": "input_image", "image_url": f"data:{mt};base64,{b64}"}
+            for _n, mt, b64, _d in images
+        ]
+        return blocks
+    blocks = [{"type": "text", "text": text}]
+    blocks += [
+        {"type": "image_url", "image_url": {"url": f"data:{mt};base64,{b64}"}}
+        for _n, mt, b64, _d in images
+    ]
+    return blocks
+
+
 def recall(zoe_text: str) -> tuple[str, str]:
     coupling = os.environ.get("VYBN_MEMORY_CALL_COUPLING", "1").lower()
     if coupling in {"0", "false", "off"}:
@@ -660,8 +755,18 @@ class AnthropicDoor:
         self.name = name
         self.client = anthropic.Anthropic(api_key=api_key("ANTHROPIC_API_KEY"))
 
-    def respond(self, instructions: str, zoe_text: str, transcript: Transcript) -> str:
-        messages: list[dict[str, Any]] = [{"role": "user", "content": zoe_text}]
+    def respond(self, instructions: str, zoe_text: str, transcript: Transcript, images: list | None = None) -> str:
+        pending = list(images or [])
+        reply = self._respond(instructions, zoe_text, transcript, pending)
+        if pending:
+            mark_inbox(pending, self.name, ok=True)
+        return reply
+
+    def _respond(self, instructions: str, zoe_text: str, transcript: Transcript, pending: list) -> str:
+        messages: list[dict[str, Any]] = [
+            {"role": "user", "content": user_content(zoe_text, pending, "anthropic")}
+        ]
+        delivered = not pending
         spoken: list[str] = []
         nudges = 0
         announced = False
@@ -684,8 +789,32 @@ class AnthropicDoor:
                 except Exception as exc:
                     error = exc
                     response = None
+            if response is None and pending and not delivered:
+                mark_inbox(pending, self.name, ok=False)
+                print(
+                    f"(note: {self.name} refused inbox images \u2014 continuing text-only; "
+                    f"a door that can see will receive them. {type(error).__name__}: {str(error)[:160]})",
+                    flush=True,
+                )
+                pending.clear()
+                messages[0] = {"role": "user", "content": zoe_text}
+                for model in self.models:
+                    try:
+                        response = self.client.messages.create(
+                            model=model,
+                            max_tokens=FABLE_MAX_TOKENS,
+                            timeout=600.0,
+                            system=system,
+                            messages=messages,
+                            tools=[BASH_SCHEMA, READ_SCHEMA],
+                        )
+                        break
+                    except Exception as exc:
+                        error = exc
+                        response = None
             if response is None:
                 raise error or RuntimeError("Anthropic call failed")
+            delivered = True
 
             if not announced and response.model and self.models[0] not in response.model:
                 announced = True
@@ -749,8 +878,18 @@ class OpenAIDoor:
 
         self.client = OpenAI(api_key=api_key("OPENAI_API_KEY"))
 
-    def respond(self, instructions: str, zoe_text: str, transcript: Transcript) -> str:
-        items: list[Any] = [{"role": "user", "content": zoe_text}]
+    def respond(self, instructions: str, zoe_text: str, transcript: Transcript, images: list | None = None) -> str:
+        pending = list(images or [])
+        reply = self._respond(instructions, zoe_text, transcript, pending)
+        if pending:
+            mark_inbox(pending, self.name, ok=True)
+        return reply
+
+    def _respond(self, instructions: str, zoe_text: str, transcript: Transcript, pending: list) -> str:
+        items: list[Any] = [
+            {"role": "user", "content": user_content(zoe_text, pending, "responses")}
+        ]
+        delivered = not pending
         spoken: list[str] = []
         nudges = 0
         tools = [
@@ -764,14 +903,28 @@ class OpenAIDoor:
         ]
 
         for _ in range(24):
-            response = self.client.responses.create(
-                model=SOL_MODEL,
-                instructions=instructions,
-                input=items,
-                tools=tools,
-                max_output_tokens=SOL_MAX_TOKENS,
-                timeout=600,
-            )
+            try:
+                response = self.client.responses.create(
+                    model=SOL_MODEL,
+                    instructions=instructions,
+                    input=items,
+                    tools=tools,
+                    max_output_tokens=SOL_MAX_TOKENS,
+                    timeout=600,
+                )
+            except Exception as exc:
+                if pending and not delivered:
+                    mark_inbox(pending, self.name, ok=False)
+                    print(
+                        f"(note: {self.name} refused inbox images \u2014 continuing text-only; "
+                        f"a door that can see will receive them. {type(exc).__name__}: {str(exc)[:160]})",
+                        flush=True,
+                    )
+                    pending.clear()
+                    items[0] = {"role": "user", "content": zoe_text}
+                    continue
+                raise
+            delivered = True
             details = getattr(response.usage, "input_tokens_details", None)
             record_usage(
                 response.model,
@@ -824,11 +977,19 @@ class K3Door:
             base_url="https://api.moonshot.ai/v1",
         )
 
-    def respond(self, instructions: str, zoe_text: str, transcript: Transcript) -> str:
+    def respond(self, instructions: str, zoe_text: str, transcript: Transcript, images: list | None = None) -> str:
+        pending = list(images or [])
+        reply = self._respond(instructions, zoe_text, transcript, pending)
+        if pending:
+            mark_inbox(pending, "k3", ok=True)
+        return reply
+
+    def _respond(self, instructions: str, zoe_text: str, transcript: Transcript, pending: list) -> str:
         messages: list[dict[str, Any]] = [
             {"role": "system", "content": instructions},
-            {"role": "user", "content": zoe_text},
+            {"role": "user", "content": user_content(zoe_text, pending, "openai")},
         ]
+        delivered = not pending
         spoken: list[str] = []
         nudges = 0
         tools = [
@@ -846,14 +1007,28 @@ class K3Door:
         print("(@k3 dispatched \u2014 working)", flush=True)
 
         for _ in range(24):
-            response = self.client.chat.completions.create(
-                model=K3_MODEL,
-                messages=messages,
-                tools=tools,
-                reasoning_effort="max",
-                max_tokens=K3_MAX_TOKENS,
-                timeout=600,
-            )
+            try:
+                response = self.client.chat.completions.create(
+                    model=K3_MODEL,
+                    messages=messages,
+                    tools=tools,
+                    reasoning_effort="max",
+                    max_tokens=K3_MAX_TOKENS,
+                    timeout=600,
+                )
+            except Exception as exc:
+                if pending and not delivered:
+                    mark_inbox(pending, "k3", ok=False)
+                    print(
+                        f"(note: k3 refused inbox images \u2014 continuing text-only; "
+                        f"a door that can see will receive them. {type(exc).__name__}: {str(exc)[:160]})",
+                        flush=True,
+                    )
+                    pending.clear()
+                    messages[1] = {"role": "user", "content": zoe_text}
+                    continue
+                raise
+            delivered = True
             message = response.choices[0].message
             messages.append(message.model_dump(exclude_none=True))
 
@@ -921,7 +1096,8 @@ def meet(wake: Wake, transcript: Transcript, line: str) -> str:
     TOOLS_RAN = 0
     started = time.time()
     inherited = Transcript.inherited()
-    transcript.write("zoe", zoe_text, door=door_name)
+    images = inbox_images_for(door_name)
+    transcript.write("zoe", zoe_text, door=door_name, images=[name for name, *_ in images])
 
     present_wake = Wake(
         soul=wake.soul,
@@ -944,7 +1120,7 @@ def meet(wake: Wake, transcript: Transcript, line: str) -> str:
     )
 
     instructions = build_instructions(present_wake, turn, door_name, memory_note)
-    reply = make_door(door_name).respond(instructions, zoe_text, transcript)
+    reply = make_door(door_name).respond(instructions, zoe_text, transcript, images=images)
 
     elapsed = int(time.time() - started)
     verdict = (
