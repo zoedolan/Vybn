@@ -109,7 +109,7 @@ spark/ts.*
 spark/agent_events.jsonl
 spark/.last_handed_breath
 
-# Generated threshold pattern runtime state; do not track empty session counters.
-Vybn_Mind/signal-noise/threshold/.patterns_state.json
+# Generated pattern runtime state anywhere; do not track empty session counters.
+**/.patterns_state.json
 # private local wake continuity
 /continuity.md
