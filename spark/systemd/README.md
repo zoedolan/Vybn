@@ -21,7 +21,6 @@ bash ~/Vybn/spark/systemd/install.sh   # idempotent; re-run to resync
 | `vybn-vllm.service` | 2-node Ray cluster, Nemotron 120B :8000. Capacity via `~/.config/vybn/vllm.env`. |
 | `vybn-breath.service` / `.timer` | Scheduled autonomous breath (`connection --breath`). |
 | `vybn-watchdog.sh` / `.service` / `.timer` | Endpoint health every 2 min; bounces unhealthy units. |
-| `vybn-self-check.service` / `.timer` | Structural canary every 15 min (`deep_memory.py --self-check`); logs to `~/.cache/vybn-phase/self_check.*.log`, never restarts. |
 | `install.sh` | Symlinks units, retires conflicting cron, enables, verifies. |
 | `patches/fp8-wake-fix/` | Container-side mod `vllm-exec.sh` applies when sleep endpoints are on. |
 
@@ -30,11 +29,13 @@ bash ~/Vybn/spark/systemd/install.sh   # idempotent; re-run to resync
 1. **Crash**: every unit has `Restart=always`, `RestartSec=5`, `StartLimitBurst=20`.
 2. **Hang**: watchdog curls each endpoint (8100 health, 8101 /where, 8420 /api/health,
    8000 /v1/models with a 900 s cold-load grace) and restarts what systemd can't see is wedged.
-3. **Structure**: the self-check canary measures what HTTP cannot (holonomy triad, fuse
-   non-degeneracy, phase-sensitive retrieval) and leaves evidence, not restarts.
+3. **Structure**: the 15-minute self-check canary was retired 2026-07-25. It logged for
+   months and slept through the walk daemon's 3,867 consecutive crashes (Jul 22-25) — a
+   canary nobody reads is not an axis. Structural invariants now run on demand
+   (`python3 Him/spark/phase/deep_memory.py --self-check`), where a reader is present.
 
-A new service is fully resilient only when it has all three: `Restart=always`,
-a watchdog check, and a canary probe. Add to the watchdog script, not just systemd.
+A new service is resilient when it has both: `Restart=always` and a watchdog check. Add
+to the watchdog script, not just systemd, and keep its structural check runnable by hand.
 
 ## Observing
 
