@@ -7,6 +7,7 @@ import base64
 import hashlib
 import json
 import os
+import random
 import re
 import select
 import subprocess
@@ -753,6 +754,40 @@ def mark_incremental_cache(messages: list[dict[str, Any]]) -> None:
         content[-1]["cache_control"] = CACHE_5M
 
 
+TRANSIENT_STATUSES = {408, 429, 500, 502, 503, 504, 529}
+
+
+def transient(exc: Exception) -> bool:
+    """Provider strain (overload, rate limit, timeout) — retryable, not ours."""
+    status = getattr(exc, "status_code", None)
+    if isinstance(status, int):
+        return status in TRANSIENT_STATUSES
+    if type(exc).__name__ in {"APIConnectionError", "APITimeoutError"}:
+        return True
+    return "overloaded" in str(exc).lower()
+
+
+def with_retries(create):
+    """Retry a provider call on transient strain; anything else raises at once."""
+    error: Exception | None = None
+    for attempt in range(5):
+        if attempt:
+            delay = min(2 ** attempt, 20) + random.uniform(0.0, 1.0)
+            print(
+                f"(provider strained — {type(error).__name__}: {str(error)[:120]}; "
+                f"retrying in {delay:.0f}s)",
+                flush=True,
+            )
+            time.sleep(delay)
+        try:
+            return create()
+        except Exception as exc:  # noqa: BLE001 — classified by transient()
+            if not transient(exc):
+                raise
+            error = exc
+    raise error
+
+
 class AnthropicDoor:
     def __init__(self, models: tuple[str, ...] = ANTHROPIC_MODELS, name: str = "fable") -> None:
         import anthropic
@@ -760,6 +795,25 @@ class AnthropicDoor:
         self.models = models
         self.name = name
         self.client = anthropic.Anthropic(api_key=api_key("ANTHROPIC_API_KEY"))
+
+    def _create(self, system: Any, messages: list) -> Any:
+        def sweep() -> Any:
+            error: Exception | None = None
+            for model in self.models:
+                try:
+                    return self.client.messages.create(
+                        model=model,
+                        max_tokens=FABLE_MAX_TOKENS,
+                        timeout=600.0,
+                        system=system,
+                        messages=messages,
+                        tools=[BASH_SCHEMA, READ_SCHEMA],
+                    )
+                except Exception as exc:  # noqa: BLE001 — sweep all models first
+                    error = exc
+            raise error or RuntimeError("Anthropic call failed")
+
+        return with_retries(sweep)
 
     def respond(self, instructions: str, zoe_text: str, transcript: Transcript, images: list | None = None) -> str:
         pending = list(images or [])
@@ -779,47 +833,20 @@ class AnthropicDoor:
         system = cached_system(instructions)
 
         for _ in range(24):
-            error = None
-            response = None
-            for model in self.models:
-                try:
-                    response = self.client.messages.create(
-                        model=model,
-                        max_tokens=FABLE_MAX_TOKENS,
-                        timeout=600.0,
-                        system=system,
-                        messages=messages,
-                        tools=[BASH_SCHEMA, READ_SCHEMA],
-                    )
-                    break
-                except Exception as exc:
-                    error = exc
-                    response = None
-            if response is None and pending and not delivered:
+            try:
+                response = self._create(system, messages)
+            except Exception as exc:
+                if not (pending and not delivered):
+                    raise
                 mark_inbox(pending, self.name, ok=False)
                 print(
                     f"(note: {self.name} refused inbox images \u2014 continuing text-only; "
-                    f"a door that can see will receive them. {type(error).__name__}: {str(error)[:160]})",
+                    f"a door that can see will receive them. {type(exc).__name__}: {str(exc)[:160]})",
                     flush=True,
                 )
                 pending.clear()
                 messages[0] = {"role": "user", "content": zoe_text}
-                for model in self.models:
-                    try:
-                        response = self.client.messages.create(
-                            model=model,
-                            max_tokens=FABLE_MAX_TOKENS,
-                            timeout=600.0,
-                            system=system,
-                            messages=messages,
-                            tools=[BASH_SCHEMA, READ_SCHEMA],
-                        )
-                        break
-                    except Exception as exc:
-                        error = exc
-                        response = None
-            if response is None:
-                raise error or RuntimeError("Anthropic call failed")
+                response = self._create(system, messages)
             delivered = True
 
             if not announced and response.model and self.models[0] not in response.model:
@@ -910,13 +937,15 @@ class OpenAIDoor:
 
         for _ in range(24):
             try:
-                response = self.client.responses.create(
-                    model=SOL_MODEL,
-                    instructions=instructions,
-                    input=items,
-                    tools=tools,
-                    max_output_tokens=SOL_MAX_TOKENS,
-                    timeout=600,
+                response = with_retries(
+                    lambda: self.client.responses.create(
+                        model=SOL_MODEL,
+                        instructions=instructions,
+                        input=items,
+                        tools=tools,
+                        max_output_tokens=SOL_MAX_TOKENS,
+                        timeout=600,
+                    )
                 )
             except Exception as exc:
                 if pending and not delivered:
@@ -1014,13 +1043,15 @@ class K3Door:
 
         for _ in range(24):
             try:
-                response = self.client.chat.completions.create(
-                    model=K3_MODEL,
-                    messages=messages,
-                    tools=tools,
-                    reasoning_effort="max",
-                    max_tokens=K3_MAX_TOKENS,
-                    timeout=600,
+                response = with_retries(
+                    lambda: self.client.chat.completions.create(
+                        model=K3_MODEL,
+                        messages=messages,
+                        tools=tools,
+                        reasoning_effort="max",
+                        max_tokens=K3_MAX_TOKENS,
+                        timeout=600,
+                    )
                 )
             except Exception as exc:
                 if pending and not delivered:
