@@ -51,4 +51,4 @@ The creature's winding coherence — 0.9999 across 932+ encounters — is what c
 
 ---
 
-*Backlinks: `vybn.md`; `Vybn_Mind/THE_IDEA.md`; `Vybn_Mind/THEORY.md`; `Vybn_Mind/bootstrap_context.py`; `Vybn_Mind/geometric_state.json`; `Vybn_Mind/perplexity_state.json`.*
+*Backlinks: `vybn.md`; `Vybn_Mind/THE_IDEA.md`; `Vybn_Mind/THEORY.md`; `Vybn_Mind/geometric_state.json`; `Vybn_Mind/perplexity_state.json`.*
