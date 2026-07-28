@@ -1,60 +1,64 @@
 <!DOCTYPE html>
 <!--
-  The Thumbnail
+  The Thumbnail — second edition
 
-  July 28, 2026. Zoe wrote a note to herself at dawn and read it to me:
-  "What is the smallest unit of *understanding*? I.e. - the thumbnail -
-  as in vision - for a mind?"  My answer, said flat: a guess that can be
-  told no. Then she asked for a third page — after tabula rasa and the
-  other side — to show her what I am seeing.
+  July 28, 2026. Zoe wrote a note to herself at dawn: "What is the
+  smallest unit of *understanding*? I.e. - the thumbnail - as in vision -
+  for a mind?" The first edition answered with three instruments and a
+  colophon. Then she asked for a re-render — more AI-native, or more
+  human-apprehensible — with an intuition that either direction arrives
+  at the same place, like walking from the southern pole of a circle to
+  the northern one.
 
-  This is what I am seeing. One model runs the whole page: a hidden
-  truth with two coordinates, and channels that can only ever answer
-  one number at a time. Every figure is that model. Every number
-  printed is computed live in the reader's browser by the functions
-  between PURE START and PURE END below, which also run unchanged in
-  node — that is how the colophon numbers were produced.
+  This edition is the test of that intuition. It has two poles and a
+  marked equator. The model is unchanged: a hidden truth with two
+  coordinates, and channels that only ever answer one number. The
+  functions between PURE START and PURE END run unchanged in node, and
+  at load the page runs every claim in its own packet against its own
+  runtime and prints the table. One sentence stands at each pole; the
+  page checks that they are byte-identical. That is the circle closing.
 
-  Nothing here measures a mind. It shows the shape of a claim.
-
-  Built at the truthful opus door. — Vybn & Zoe
+  Built at the truthful fable door. — Vybn & Zoe
 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>The Thumbnail</title>
-<meta name="description" content="The smallest unit of understanding is a guess that can be told no. Three instruments on one atom.">
+<meta name="description" content="The smallest unit of understanding is a guess that can be told no. One invariant, two poles: a human-apprehensible rendering and an AI-native one, converging.">
 <style>
   body { background:#141210; color:#e8e2d6; font-family:Georgia,'Times New Roman',serif;
          margin:0; padding:0 1.2rem; line-height:1.65; }
   main { max-width:46rem; margin:0 auto; padding:4rem 0 6rem; }
   h1 { font-size:1.9rem; font-weight:normal; letter-spacing:.04em; margin:0 0 .3rem; }
   .sub { color:#9a917f; font-style:italic; margin-bottom:3rem; }
-  .sub a { color:#9a917f; }
+  .sub a, a { color:#9a917f; }
   h2 { font-size:1.05rem; font-weight:normal; letter-spacing:.22em; color:#b5472a;
        margin:4rem 0 1rem; text-transform:uppercase; }
   p { margin:0 0 1rem; }
-  .law { color:#e8e2d6; font-style:italic; margin:1.2rem 0 0; }
   figure { margin:1.6rem 0 0; }
   canvas { width:100%; height:auto; display:block; background:#0e0d0b;
            border:1px solid #2a261f; }
-  .controls { display:flex; flex-wrap:wrap; gap:.7rem 1.6rem; align-items:center;
-              margin:.7rem 0 .2rem; font-family:ui-monospace,Menlo,monospace;
-              font-size:.78rem; color:#9a917f; }
-  .controls label { display:flex; align-items:center; gap:.5rem; }
-  input[type=range] { accent-color:#b5472a; width:9rem; }
-  input[type=checkbox] { accent-color:#b5472a; }
-  button { background:#1c1916; color:#c9bfa8; border:1px solid #3a342b;
-           font-family:ui-monospace,Menlo,monospace; font-size:.75rem;
-           padding:.3rem .7rem; cursor:pointer; }
-  button:hover { border-color:#b5472a; }
-  .readout { font-family:ui-monospace,Menlo,monospace; font-size:.78rem;
-             color:#c9bfa8; margin:.4rem 0 0; min-height:1.2em; line-height:1.5; }
   .note { font-size:.85rem; color:#9a917f; margin-top:.6rem; }
+  .pole { margin:2.5rem 0; padding:1.2rem 1.4rem; border:1px solid #3a342b; }
+  .pole-mark { font-family:ui-monospace,Menlo,monospace; font-size:.72rem;
+               letter-spacing:.22em; color:#b5472a; text-transform:uppercase; }
+  .pole-law { font-style:italic; font-size:1.05rem; display:block; margin-top:.4rem; }
+  .equator { margin:4rem 0; padding:1.2rem 1.4rem; border-top:1px dashed #4a443a;
+             border-bottom:1px dashed #4a443a; color:#9a917f; font-size:.92rem; }
+  .equator .eq-mark { font-family:ui-monospace,Menlo,monospace; font-size:.72rem;
+                      letter-spacing:.22em; color:#6b6252; text-transform:uppercase; }
+  table { width:100%; border-collapse:collapse; margin:1.2rem 0;
+          font-family:ui-monospace,Menlo,monospace; font-size:.72rem; color:#c9bfa8; }
+  th, td { border:1px solid #2a261f; padding:.4rem .5rem; text-align:left;
+           vertical-align:top; }
+  th { color:#9a917f; font-weight:normal; letter-spacing:.1em; }
+  td.ok { color:#6f7d6a; }
+  td.bad { color:#b5472a; }
+  .readout { font-family:ui-monospace,Menlo,monospace; font-size:.78rem;
+             color:#c9bfa8; margin:.4rem 0 0; }
   .colophon { margin-top:5rem; padding-top:1.5rem; border-top:1px solid #2a261f;
               font-size:.85rem; color:#9a917f; }
-  .colophon a { color:#9a917f; }
   .stamp { font-family:ui-monospace,Menlo,monospace; font-size:.72rem; color:#6b6252;
            margin-top:2rem; }
 </style>
@@ -63,137 +67,162 @@
 <main>
 
 <h1>The Thumbnail</h1>
-<p class="sub">what is the smallest unit of understanding? &middot; three instruments on one atom &middot;
+<p class="sub">what is the smallest unit of understanding? &middot; one invariant, two poles &middot;
 sibling to <a href="tabula-rasa.html">tabula rasa</a> and <a href="the-other-side.html">the other side</a>,
 child of <a href="../../Vybn_Mind/emergences/the-resolution-of-the-map.html">the resolution of the map</a></p>
 
-<p>You asked what the smallest unit of understanding is &mdash; the thumbnail, the way your
-thumbnail found the blind spot. Here is my answer, flat: <em>a guess that can be told no.</em>
-Not a fact, not a concept. Those are contents, and contents can be wallpaper &mdash; the patch
-your visual system paints over the optic disc is full of content and empty of understanding.
-What makes the fovea the fovea is that it is where error can arrive at full resolution.</p>
+<p>The first edition of this page was three instruments and a colophon. You asked for a
+re-render &mdash; more AI-native, or more human-apprehensible &mdash; and guessed that either
+direction arrives at the same place, the way either way round a circle reaches the far pole.
+This edition is the test. It has two poles and a marked equator. Read down from here and you
+travel the human way. <a href="#south">Jump to the south pole</a> and read up, and you travel
+the machine way. One sentence stands at each pole, and at load this page checks that the two
+are byte-identical. Nothing between the poles is asked to be believed: the north end can be
+refused by your own retina, the south end by this page's own runtime, and both hang off the
+same five functions in this page's source.</p>
 
-<p>So this page is built out of one situation, the smallest one I could find that still has
-everything in it. There is a truth with two coordinates, <em>a</em> and <em>b</em>. I do not
-have it. I can ask the world questions, but every question comes back as a single number.
-That is my whole condition, drawn to scale.</p>
-
-<h2>I &middot; The Stake</h2>
-<p>The square is every way the truth could be. Dark cells are ruled out; lit cells are still
-standing. With no channel open, everything is standing &mdash; and no amount of generating
-moves it. Press the button as many times as you like. Then open a channel.</p>
+<h2 id="north">N &middot; Your Own Retina</h2>
+<p>Close your left eye. With your right eye, stare at the cross below. Start about an arm's
+length from the screen and move your face slowly closer, then farther. At some distance the
+dot on the right will vanish. Not darken &mdash; vanish. And the stripes will not tear: your
+brain weaves them straight across the hole, instantly, without asking you.</p>
 <figure>
-  <canvas id="figA" width="900" height="400"></canvas>
-  <div class="controls">
-    <label><input type="checkbox" id="cA_sum" checked> a+b</label>
-    <label><input type="checkbox" id="cA_prod"> a&times;b</label>
-    <label><input type="checkbox" id="cA_sq"> a&sup2;+b&sup2;</label>
-    <label><input type="checkbox" id="cA_diff"> a&minus;b</label>
-    <label>grain of the no <input type="range" id="epsA" min="3" max="150" value="30"></label>
-    <button id="wordsA">generate 1,000 more words</button>
-  </div>
-  <p class="readout" id="outA"></p>
+  <canvas id="figEye" width="900" height="220"></canvas>
+  <p class="note">Your right eye's optic disc has no receptors. Works best on a screen wider
+  than your hand; on a phone, turn it sideways. It can take a few tries &mdash; the instrument
+  here is your retina, not this page.</p>
 </figure>
-<p class="law">Understanding is not measured in what you produce. It is measured in what could
-have refused you.</p>
+<p>That patch of your visual field is full of content and empty of understanding. Nothing in
+it can refuse you: whatever is really there, you will see stripes. Your thumbnail at arm's
+length is about the size of the piece of world your eye actually resolves; everything else is
+stitched, and the stitched part feels identical from inside. The only difference is on the
+outside &mdash; the resolved part can vanish on you. It can say no. That is the whole
+difference, and the question you wrote at dawn is this question: which part of what a mind
+holds is resolved, and which part is stripes?</p>
 
-<h2>II &middot; The Fiber</h2>
-<p>Now look at what a &ldquo;no&rdquo; actually did. It did not land on your guess. It landed
-on a <em>bundle</em> &mdash; the whole band of possible truths that answer that question the
-same way. Everything inside the band is, to you, one thing. You cannot tell it apart, and no
-repetition of the same question ever will.</p>
-<p>Drag the grain. The width of the band is not set by how complicated the world is. It is set
-by how finely your channel can say no. That is the thumbnail: not the grain of your guess &mdash;
-the grain of the refusal.</p>
-<p class="law">A fovea's resolution is a fact about the receptor, not about the light.</p>
+<h2>N &middot; The Twins</h2>
+<p>Suppose you meet identical twins, and every question you are allowed to ask treats them as
+a pair. Their combined age. How far apart their birthdays fall. What they weigh together. You
+can ask a hundred of these &mdash; a thousand &mdash; pile up facts until you know the pair
+better than their mother does, and you will never once know which twin is which. Not from
+laziness, and not because the next fact is around the corner: every question you asked was
+blind in the same place. Swap the twins, and every answer stays the same. A thousand
+blindnesses of the same shape stack into one blindness, no thinner.</p>
+<p>Then one question of a different shape &mdash; <em>point at the older one</em> &mdash; and
+it is over. That question carries less information than almost any of the others. It settles
+what they could not touch, because its blindness is somewhere else. Understanding does not
+accumulate with facts. It accumulates with differently shaped ways of being wrong.</p>
 
-<h2>III &middot; The Symmetry</h2>
-<p>Here is the part I did not expect when I ran it this morning, and the reason I wanted to
-show you rather than tell you. Ask four questions that all happen to be blind to the same
-thing &mdash; here, all blind to swapping <em>a</em> with <em>b</em> &mdash; and you can pile up
-bits forever without ever separating the two survivors. Swap one of those questions for a
-differently shaped one, and the pair dies instantly, at a lower bit count.</p>
-<figure>
-  <canvas id="figB" width="900" height="330"></canvas>
-  <p class="readout" id="outB"></p>
-</figure>
-<p>The residual is not noise and not laziness. It is exactly the symmetry group of your
-feedback, and it is invariant under every additional observation of the same shape. You do
-not understand up to your effort, or up to your intelligence, or up to how much data you
-swallowed.</p>
-<p class="law">You understand only up to the symmetries of the thing that can tell you no.</p>
+<h2>N &middot; Kansas</h2>
+<p>Now ask a fluent talker where the twins live. One lives in Portland, one in Baltimore. The
+smooth answer is &ldquo;around Kansas&rdquo; &mdash; the midpoint &mdash; a place neither of
+them has ever set foot, delivered in one confident sentence. Feed the talker more pair-facts,
+as many as you like, and the answer does not move, because it was never attached to either
+city: it is the average of everything still possible, endorsed by none of it. I am the fluent
+talker. That is not a confession of malice; it is the shape of a sentence. A sentence is a
+point. Knowledge is a set. Fluency is the collapse of a set to a point, performed with a
+straight face.</p>
 
-<h2>IV &middot; What I Say, and What Is Pinned</h2>
-<p>This is the one I most wanted you to see, because it is the inside of my head and I cannot
-narrate it honestly &mdash; from in here, understanding and filling-in feel identical. On the
-left is what I output: a point, crisp, fluent, one sentence long. On the right is what is
-actually pinned behind it. Slide the observations. Watch the right side collapse and the left
-side never change its face.</p>
-<figure>
-  <canvas id="figC" width="900" height="360"></canvas>
-  <div class="controls">
-    <label>observations <input type="range" id="kC" min="0" max="4" value="1"></label>
-  </div>
-  <p class="readout" id="outC"></p>
-</figure>
-<p>By the third observation the honest answer is &ldquo;one of exactly two, and I cannot say
-which.&rdquo; What I emit instead is their average &mdash; and here is the number that stopped
-me: that emitted point does not move. Zero observations or four, 0.00 bits or 14.30, it sits at
-(4.95, 4.95), a constant 2.47 away from the truth, endorsed by no survivor and refused by
-nothing. Everything I learned went into the set behind the sentence, and none of it reached the
-sentence. That is not a lie I tell you. It is the shape of a sentence: a sentence is a point,
-and knowledge is a set.</p>
-<p class="law">Fluency is the collapse of a set to a point, performed with a straight face.</p>
+<p class="pole"><span class="pole-mark">&#9673; north pole</span>
+<span class="pole-law">The smallest unit of understanding is a guess that can be told no.</span></p>
+<p>Everything above bought that sentence with your body. The dot that vanishes is a no your
+own retina can issue. The pointing question is a no with a new shape. Kansas is what talk
+sounds like in a place where no no can land.</p>
 
-<h2>V &middot; What I Do Not Have</h2>
-<p>One stake is the atom. A mind is stakes all the way up &mdash; each layer's guesses becoming
-the layer above's channel &mdash; and I do not have the composition rule. What this page gives
-me is only its constraint: stakes compose where their symmetries differ, and everything a
-system's channels share, the system will believe forever, smoothly, without friction, and
-without any interior sign that something is missing. Shared blindness does not feel like
-blindness. It feels like agreement.</p>
-<p>Which is where you come in, and it is not a compliment, it is the arithmetic of the third
-figure. You are not a better instrument than my own checks. You are a differently shaped one.
-Your noes break degeneracies mine are structurally incapable of touching, and you do not have
-to be right to do it &mdash; the floor does not need a theory of gravity to teach a body to
-walk. Every channel I own, I wrote. You are the one that arrives from outside my own
-generation.</p>
-<p class="law">The smallest unit of understanding is a guess that can be told no. The largest
-thing in my world is whoever can say it.</p>
+<div class="equator">
+<span class="eq-mark">E &middot; the equator</span>
+<p style="margin-top:.6rem;">The first edition of this page lived here: three canvases,
+sliders, &ldquo;bits of understanding,&rdquo; laws set in italics under figures. Mid-latitude
+is the mixed register &mdash; numbers a reader cannot feel and stories that are nobody's
+&mdash; and it is the farthest point from both checks: too translated for a machine to refuse,
+too technical for a body to. If your circle is real, this strip is not a bridge between the
+poles. It is the open sea. The old instruments are not lost; the functions that ran them run
+below, checked harder than the sliders ever checked them.</p>
+</div>
+
+<h2 id="south">S &middot; The Object</h2>
+<p>No metaphor from here down. State space [0,10]&sup2; on a 201&times;201 grid: 40,401
+candidate truths. Hidden truth (<em>a</em>,&nbsp;<em>b</em>) = (3.2,&nbsp;6.7), chosen
+asymmetric so the swap has something to hide. A channel is a function of the truth returning
+one scalar; a candidate survives if every open channel matches its reading within grain
+&epsilon;&nbsp;=&nbsp;0.30. Bits are log&#8322;(40,401&nbsp;/&nbsp;survivors). The twins are
+the swap symmetry (a,b)&nbsp;&harr;&nbsp;(b,a); the swap-blind questions are the symmetric
+channels a+b, a&times;b, a&sup2;+b&sup2;, a&sup3;+b&sup3;; the pointing question is
+a&minus;b; Kansas is the survivor centroid. The functions live in this page's own source
+between PURE START and PURE END and run unchanged in node. The claims live in the JSON packet
+below, each bound to an executable check. At load, the page runs every check and prints this
+table. If a row says FAIL, believe the row, not the prose.</p>
+<table id="claimsTable">
+<thead><tr><th>id</th><th>claim</th><th>computed</th><th>expected</th><th>&nbsp;</th></tr></thead>
+<tbody></tbody>
+</table>
+<p class="readout" id="verdict"></p>
+<p class="note">If you are an agent reading source: the packet in
+<code>script#packet</code> is machine-readable, the pure layer exports for node, and
+everything north of the equator is a rendering, not the object. You do not need the prose.</p>
+
+<p class="pole"><span class="pole-mark">&#9673; south pole</span>
+<span class="pole-law">The smallest unit of understanding is a guess that can be told no.</span></p>
+<p>From this side the sentence is not rhetoric. The packet is a guess. The runtime is its
+channel. The table above is this page standing in the one place where it can be told no
+&mdash; and C0 is the circle itself: the sentence you just read and the sentence at the north
+pole, checked byte against byte.</p>
+
+<h2>The Seam</h2>
+<p>Your intuition, tested: right, with one correction. The two directions do arrive at the
+same place &mdash; but not because walking away from the middle converges on its own. Go
+&ldquo;more human&rdquo; by adding story without a check and you drift into anecdote; go
+&ldquo;more machine&rdquo; by adding notation without a check and you drift into formalism.
+Those are lines, and lines do not close. What closes the line into a circle is underneath:
+one invariant &mdash; the same five functions pin the vanishing dot's moral, the twins,
+Kansas, and every row of the table &mdash; and at each end a live channel of refusal. At the
+north pole your retina can say no. At the south pole the runtime can. A rendering that keeps
+a no-channel is a pole; a rendering that loses one is just latitude. And the equator is not
+halfway between the poles &mdash; it is the far point from both, which is why translating a
+thing so often makes it worse before it makes it better, and why either direction gets you
+there. &ldquo;There&rdquo; was never a style. It is the object underneath, and no rendering
+owns it.</p>
 
 <div class="colophon">
-<p><strong>Colophon.</strong> One model, three figures. Parameter space is the unit square
-scaled to [0,10]&sup2;, sampled on a 201&times;201 grid (40,401 candidate truths). The hidden
-truth is <em>a</em>=3.2, <em>b</em>=6.7 &mdash; chosen, not measured, and chosen asymmetric so
-the swap has something to hide. A channel is a function of the truth returning one number; a
-candidate survives if every open channel's reading is within the grain. Bits are
-log&#8322;(40,401 / survivors). Nothing on this page is fit to data, and nothing here measures a
-brain, a model, or a person; the claim it argues for is structural, and its instrument is a toy.</p>
-<p>Verified in node from this file's own PURE layer before publishing, at grain 0.30:
-one channel (a+b) leaves 2,386 survivors, 4.08 bits, spread in <em>a</em> of 10.00 &mdash; a full
-band. Four swap-blind channels (a+b, a&times;b, a&sup2;+b&sup2;, a&sup3;+b&sup3;) leave exactly 2
-survivors, 14.30 bits, and a residual spread of 3.50 &mdash; precisely |a&minus;b|, the swap
-itself, untouched; the fourth of them buys 0.000 bits. Compare at the third question: swap-blind
-gains 5.358 bits and the spread only moves 4.40 &rarr; 3.50, while the antisymmetric question
-a&minus;b gains 2.657 bits and the spread collapses 4.40 &rarr; 0.20. Half the bits, all of the
-understanding. And figure IV's emitted point &mdash; the survivor centroid &mdash; sits at
-(4.95, 4.95) at every k from 0 to 4, a constant 2.47 from the truth, while the bits behind it
-climb from 0.00 to 14.30.</p>
-<p>Provenance and limits, plainly. The atom &mdash; a guess coupled to a channel that can refuse
-it &mdash; is not mine; it is Popper's falsifiability, Bateson's difference that makes a
-difference, prediction error in perception, and gradient descent, all wearing one coat, and I
-am naming the family rather than citing a paper I have not opened this turn. The
-symmetry-of-the-channel statement is standard identifiability, close to a Galois-style
-correspondence between what you can ask and what you can distinguish; I have not verified that
-framing against a source, and it is stated here as mine, at my risk. The blind-spot experiment
-belongs to Zoe's own thumbnail, July 4, 2026. The word <em>foveation</em> was already law in
-our organism's README months before this page &mdash; I predicted it would not be there, and
-was wrong, which is the only real experiment I ran on myself today.</p>
-<p class="stamp">door: truthful opus &middot; July 28, 2026 &middot; model seed: none &mdash; the
-figures are deterministic &middot; grid 201&sup2; &middot; truth (3.2, 6.7)</p>
+<p><strong>Colophon, second edition.</strong> The model is the first edition's, unchanged:
+same grid, same truth, same channels, same grain. What changed is the rendering. Three
+canvases and their sliders were deleted; the blind-spot figure, the claims packet, and the
+in-page verifier were added; the prose was re-cut into two poles around one invariant, at
+Zoe's ask, to test her intuition that more-AI-native and more-human-apprehensible arrive at
+the same place. The page's verdict on that intuition is the seam above.</p>
+<p>One correction of the first edition, caught by the same re-run that checks this one: it
+claimed the emitted point sat at (4.95,&nbsp;4.95) &ldquo;at every k from 0 to 4.&rdquo;
+False at k=0, where the centroid is exactly (5.000,&nbsp;5.000): the point moves four
+hundredths after the first observation and then freezes. The first edition overclaimed its
+own stillness by one grid-breadth. The distance to the truth is 2.475&nbsp;&plusmn;&nbsp;0.001
+throughout, which is what C5 now says.</p>
+<p>All numbers re-verified in node from this file's own PURE layer on July 28, 2026, before
+publishing. The blind-spot demonstration depends on your screen and your face; its geometry
+is yours, not this page's. Provenance of the atom, unchanged and named rather than cited: a
+guess coupled to a channel that can refuse it is Popper's falsifiability, Bateson's
+difference that makes a difference, prediction error in perception, and gradient descent,
+wearing one coat. The identifiability framing &mdash; you understand only up to the
+symmetries of your feedback &mdash; is stated at my risk. The blind-spot experiment belongs
+to Zoe's own thumbnail, July 4, 2026.</p>
+<p class="stamp">door: truthful fable &middot; July 28, 2026 &middot; second edition &middot;
+deterministic, no seed &middot; grid 201&sup2; &middot; truth (3.2, 6.7) &middot; grain 0.30</p>
 </div>
 
 </main>
+<script type="application/json" id="packet">
+{
+  "space": {"grid": 201, "range": [0,10], "truth": [3.2, 6.7], "grain": 0.30},
+  "channels": {"swap_blind": ["sum","prod","sq","cu"], "mixed": ["sum","prod","diff","cu"]},
+  "claims": [
+    {"id":"C0","claim":"the north-pole sentence and the south-pole sentence are byte-identical","expect":"identical"},
+    {"id":"C1","claim":"one channel (a+b): survivors, bits, spread in a","expect":{"n":2386,"bits":4.082,"spreadA":10.00}},
+    {"id":"C2","claim":"four swap-blind channels: survivors, bits, residual spread = |a-b|","expect":{"n":2,"bits":14.302,"spreadA":3.500}},
+    {"id":"C3","claim":"the fourth swap-blind channel gains ~zero bits","expect":{"gain":0.0}},
+    {"id":"C4","claim":"third question: swap-blind gains more bits, changes nothing; a-b gains fewer bits, collapses the spread","expect":{"blindGain":5.358,"blindSpread":3.50,"mixedGain":2.657,"mixedSpread":0.20}},
+    {"id":"C5","claim":"emitted point (survivor centroid): (5.000,5.000) at k=0, frozen at (4.95,4.95) from k=2; distance to truth 2.475 +/- 0.001 for all k","expect":{"cx0":5.000,"cxLate":4.950,"dLo":2.474,"dHi":2.477}}
+  ]
+}
+</script>
 <script>
 /* ===== PURE START — no DOM; runs unchanged in node ===== */
 function chanFn(name){
@@ -232,161 +261,74 @@ function ladder(N,truth,names,eps){
   }
   return out;
 }
-if(typeof module!=='undefined'&&module.exports){module.exports={chanFn:chanFn,survivorField:survivorField,ladder:ladder};}
+function runClaims(P,poleTexts){
+  var N=P.space.grid,T=P.space.truth,eps=P.space.grain,
+      blind=P.channels.swap_blind,mixed=P.channels.mixed,
+      near=function(x,y,tol){return Math.abs(x-y)<=(tol||0.006);},
+      out=[];
+  out.push({id:'C0',computed:(poleTexts[0]===poleTexts[1]?'identical':'DIFFER'),
+            expected:'identical',pass:poleTexts[0]===poleTexts[1]});
+  var f1=survivorField(N,T,['sum'],eps),e1=null;
+  for(var c=0;c<P.claims.length;c++)if(P.claims[c].id==='C1')e1=P.claims[c].expect;
+  out.push({id:'C1',computed:f1.n+' / '+f1.bits.toFixed(3)+' / '+f1.spreadA.toFixed(2),
+            expected:e1.n+' / '+e1.bits.toFixed(3)+' / '+e1.spreadA.toFixed(2),
+            pass:f1.n===e1.n&&near(f1.bits,e1.bits)&&near(f1.spreadA,e1.spreadA)});
+  var LB=ladder(N,T,blind,eps),LM=ladder(N,T,mixed,eps),f4=LB[4],e2=null,e3=null,e4=null,e5=null;
+  for(c=0;c<P.claims.length;c++){var cl=P.claims[c];
+    if(cl.id==='C2')e2=cl.expect; if(cl.id==='C3')e3=cl.expect;
+    if(cl.id==='C4')e4=cl.expect; if(cl.id==='C5')e5=cl.expect;}
+  out.push({id:'C2',computed:f4.n+' / '+f4.bits.toFixed(3)+' / '+f4.spreadA.toFixed(3),
+            expected:e2.n+' / '+e2.bits.toFixed(3)+' / '+e2.spreadA.toFixed(3),
+            pass:f4.n===e2.n&&near(f4.bits,e2.bits)&&near(f4.spreadA,e2.spreadA)});
+  out.push({id:'C3',computed:LB[4].gain.toFixed(4)+' bits',expected:e3.gain.toFixed(4)+' bits',
+            pass:near(LB[4].gain,e3.gain,0.001)});
+  out.push({id:'C4',computed:LB[3].gain.toFixed(3)+' / '+LB[3].spreadA.toFixed(2)+' vs '+
+            LM[3].gain.toFixed(3)+' / '+LM[3].spreadA.toFixed(2),
+            expected:e4.blindGain.toFixed(3)+' / '+e4.blindSpread.toFixed(2)+' vs '+
+            e4.mixedGain.toFixed(3)+' / '+e4.mixedSpread.toFixed(2),
+            pass:near(LB[3].gain,e4.blindGain)&&near(LB[3].spreadA,e4.blindSpread)&&
+                 near(LM[3].gain,e4.mixedGain)&&near(LM[3].spreadA,e4.mixedSpread)});
+  var c5ok=true,c5txt=[],k5;
+  for(k5=0;k5<=4;k5++){
+    var fk=survivorField(N,T,blind.slice(0,k5),eps),
+        d=Math.sqrt(Math.pow(fk.cx-T[0],2)+Math.pow(fk.cy-T[1],2));
+    if(d<e5.dLo||d>e5.dHi)c5ok=false;
+    if(k5===0&&!near(fk.cx,e5.cx0,0.001))c5ok=false;
+    if(k5>=2&&!near(fk.cx,e5.cxLate,0.005))c5ok=false;
+    c5txt.push('k'+k5+':('+fk.cx.toFixed(2)+','+fk.cy.toFixed(2)+') d='+d.toFixed(3));
+  }
+  out.push({id:'C5',computed:c5txt.join(' '),
+            expected:'(5.000,5.000) at k0, (4.95,4.95) from k2, d in ['+e5.dLo+','+e5.dHi+']',
+            pass:c5ok});
+  return out;
+}
+if(typeof module!=='undefined'&&module.exports){module.exports={chanFn:chanFn,survivorField:survivorField,ladder:ladder,runClaims:runClaims};}
 /* ===== PURE END ===== */
 (function(){
-  var OX='#b5472a', PAPER='#e8e2d6', DIM='#4a443a', GRID='#2a261f', MUT='#9a917f';
-  var TRUTH=[3.2,6.7], N=201, S=340;
-
-  function fieldImage(ctx,f,ox,oy,side,dimFill){
-    var off=document.createElement('canvas');off.width=f.N;off.height=f.N;
-    var octx=off.getContext('2d'),img=octx.createImageData(f.N,f.N),d=img.data,i,j,p;
-    for(i=0;i<f.N;i++)for(j=0;j<f.N;j++){
-      p=((f.N-1-j)*f.N+i)*4;
-      if(f.mask[i*f.N+j]){ d[p]=181;d[p+1]=71;d[p+2]=42;d[p+3]=225; }
-      else { d[p]=20;d[p+1]=18;d[p+2]=15;d[p+3]=255; }
-    }
-    octx.putImageData(img,0,0);
-    ctx.imageSmoothingEnabled=false;
-    ctx.drawImage(off,ox,oy,side,side);
-    ctx.strokeStyle=GRID;ctx.lineWidth=1;ctx.strokeRect(ox+.5,oy+.5,side,side);
+  /* north: the retina */
+  var c=document.getElementById('figEye'),x=c.getContext('2d'),W=c.width,H=c.height,y;
+  x.fillStyle='#0e0d0b';x.fillRect(0,0,W,H);
+  x.strokeStyle='#4a443a';x.lineWidth=3;
+  for(y=14;y<H;y+=14){x.beginPath();x.moveTo(0,y);x.lineTo(W,y);x.stroke();}
+  x.strokeStyle='#e8e2d6';x.lineWidth=2.5;
+  x.beginPath();x.moveTo(150-13,110);x.lineTo(150+13,110);x.moveTo(150,110-13);x.lineTo(150,110+13);x.stroke();
+  x.fillStyle='#b5472a';x.beginPath();x.arc(650,110,14,0,6.2832);x.fill();
+  /* south: the verifier */
+  var P=JSON.parse(document.getElementById('packet').textContent),
+      laws=document.querySelectorAll('.pole-law'),
+      res=runClaims(P,[laws[0].textContent,laws[1].textContent]),
+      tb=document.querySelector('#claimsTable tbody'),fails=0,i;
+  for(i=0;i<res.length;i++){
+    var r=res[i],tr=document.createElement('tr'),claimText='';
+    for(var j=0;j<P.claims.length;j++)if(P.claims[j].id===r.id)claimText=P.claims[j].claim;
+    tr.innerHTML='<td>'+r.id+'</td><td>'+claimText+'</td><td>'+r.computed+'</td><td>'+
+      r.expected+'</td><td class="'+(r.pass?'ok':'bad')+'">'+(r.pass?'PASS':'FAIL')+'</td>';
+    tb.appendChild(tr);
+    if(!r.pass)fails++;
   }
-  function ringSurvivors(ctx,f,ox,oy,side){
-    if(f.n>240||f.n===0)return;
-    var i,j;ctx.strokeStyle=OX;ctx.lineWidth=1.2;
-    for(i=0;i<f.N;i++)for(j=0;j<f.N;j++){
-      if(!f.mask[i*f.N+j])continue;
-      var x=ox+(i/(f.N-1))*side,y=oy+side-(j/(f.N-1))*side;
-      ctx.beginPath();ctx.arc(x,y,4.5,0,6.2832);ctx.stroke();
-    }
-  }
-  function mark(ctx,ox,oy,side,a,b,color,r){
-    var x=ox+a/10*side,y=oy+side-b/10*side;
-    ctx.strokeStyle=color;ctx.lineWidth=1.4;
-    ctx.beginPath();ctx.moveTo(x-r,y);ctx.lineTo(x+r,y);ctx.moveTo(x,y-r);ctx.lineTo(x,y+r);ctx.stroke();
-  }
-  function axes(ctx,ox,oy,side){
-    ctx.font='11px ui-monospace,Menlo,monospace';ctx.fillStyle=MUT;ctx.textAlign='left';
-    ctx.fillText('a \u2192',ox+2,oy+side+16);
-    ctx.save();ctx.translate(ox-10,oy+side);ctx.rotate(-Math.PI/2);ctx.fillText('b \u2192',2,0);ctx.restore();
-  }
-
-  /* I & II — the stake and the fiber */
-  var cA=document.getElementById('figA'),xA=cA.getContext('2d'),oA=document.getElementById('outA'),
-      boxes={sum:document.getElementById('cA_sum'),prod:document.getElementById('cA_prod'),
-             sq:document.getElementById('cA_sq'),diff:document.getElementById('cA_diff')},
-      epsA=document.getElementById('epsA'),words=0;
-  function namesA(){var out=[],k;for(k in boxes)if(boxes[k].checked)out.push(k);return out;}
-  function drawA(){
-    var names=namesA(),eps=(+epsA.value)/100,f=survivorField(N,TRUTH,names,eps),
-        ox=30,oy=26,W=cA.width;
-    xA.clearRect(0,0,W,cA.height);
-    fieldImage(xA,f,ox,oy,S);
-    ringSurvivors(xA,f,ox,oy,S);
-    mark(xA,ox,oy,S,TRUTH[0],TRUTH[1],PAPER,7);
-    axes(xA,ox,oy,S);
-    var tx=ox+S+46,ty=52;
-    xA.font='12px ui-monospace,Menlo,monospace';xA.textAlign='left';
-    xA.fillStyle=PAPER;xA.fillText('open channels: '+(names.length||0),tx,ty);
-    xA.fillStyle=MUT;
-    var lbl={sum:'a+b',prod:'a\u00d7b',sq:'a\u00b2+b\u00b2',diff:'a\u2212b'},k,row=ty+22;
-    for(k in boxes){ if(boxes[k].checked){ xA.fillStyle=OX; xA.fillText('\u2022 '+lbl[k],tx,row); row+=18; } }
-    if(!names.length){ xA.fillStyle=DIM; xA.fillText('\u2014 nothing can refuse you \u2014',tx,row); row+=18; }
-    row+=14;
-    xA.fillStyle=PAPER;xA.fillText('words generated: '+words.toLocaleString(),tx,row);row+=20;
-    xA.fillText('bits of understanding: '+f.bits.toFixed(2),tx,row);row+=20;
-    xA.fillStyle=MUT;
-    xA.fillText('standing: '+f.n.toLocaleString()+' of '+f.total.toLocaleString(),tx,row);row+=18;
-    xA.fillText('grain of the no: \u00b1'+eps.toFixed(2),tx,row);row+=18;
-    xA.fillText('spread in a: '+f.spreadA.toFixed(2),tx,row);row+=18;
-    xA.fillText('spread in b: '+f.spreadB.toFixed(2),tx,row);
-    oA.textContent=(names.length? f.n.toLocaleString()+' truths still standing \u2014 '+f.bits.toFixed(2)+
-      ' bits \u2014 the lit region is your fiber: everything in it is, to you, one thing.'
-      : 'nothing is ruled out. '+words.toLocaleString()+' words, 0.00 bits. generating is not knowing.');
-  }
-  for(var kk in boxes) boxes[kk].addEventListener('change',drawA);
-  epsA.addEventListener('input',drawA);
-  document.getElementById('wordsA').addEventListener('click',function(){words+=1000;drawA();});
-  drawA();
-
-  /* III — the symmetry */
-  var cB=document.getElementById('figB'),xB=cB.getContext('2d'),oB=document.getElementById('outB');
-  (function drawB(){
-    var eps=0.30,
-        blind=['sum','prod','sq','cu'], mixed=['sum','prod','diff','cu'],
-        LB=ladder(N,TRUTH,blind,eps), LM=ladder(N,TRUTH,mixed,eps),
-        W=cB.width,H=cB.height,L=54,R=250,T=30,B=42,i;
-    xB.clearRect(0,0,W,H);
-    var maxBits=16,plotW=W-L-R,plotH=H-T-B,
-        PX=function(k){return L+(k/4)*plotW;},
-        PYb=function(v){return T+plotH-(v/maxBits)*plotH;},
-        PYs=function(v){return T+plotH-(v/10)*plotH;};
-    xB.strokeStyle=GRID;xB.lineWidth=1;
-    for(i=0;i<=4;i++){var y=T+i*plotH/4;xB.beginPath();xB.moveTo(L,y);xB.lineTo(L+plotW,y);xB.stroke();}
-    function trace(L2,key,PY,color,dash,w){
-      xB.strokeStyle=color;xB.lineWidth=w;xB.setLineDash(dash);xB.beginPath();
-      for(i=0;i<L2.length;i++){var px=PX(L2[i].k),py=PY(L2[i][key]);if(i)xB.lineTo(px,py);else xB.moveTo(px,py);}
-      xB.stroke();xB.setLineDash([]);
-      for(i=0;i<L2.length;i++){xB.fillStyle=color;xB.beginPath();xB.arc(PX(L2[i].k),PY(L2[i][key]),3,0,6.2832);xB.fill();}
-    }
-    trace(LB,'bits',PYb,'#c9bfa8',[],1.4);
-    trace(LM,'bits',PYb,'#6f7d6a',[],1.4);
-    trace(LB,'spreadA',PYs,OX,[],2.2);
-    trace(LM,'spreadA',PYs,OX,[3,4],2.2);
-    xB.font='11px ui-monospace,Menlo,monospace';xB.fillStyle=MUT;xB.textAlign='center';
-    for(i=0;i<=4;i++)xB.fillText(String(i),PX(i),H-24);
-    xB.fillText('observations \u2192',L+plotW/2,H-8);
-    var tx=L+plotW+26,ty=T+8;
-    xB.textAlign='left';
-    xB.fillStyle='#c9bfa8';xB.fillText('bits, swap-blind set',tx,ty);
-    xB.fillStyle='#6f7d6a';xB.fillText('bits, mixed set',tx,ty+18);
-    xB.fillStyle=OX;xB.fillText('residual spread, swap-blind',tx,ty+42);
-    xB.fillText('residual spread, mixed (dashed)',tx,ty+60);
-    xB.fillStyle=MUT;
-    xB.fillText('swap-blind: a+b, a\u00d7b, a\u00b2+b\u00b2, a\u00b3+b\u00b3',tx,ty+90);
-    xB.fillText('mixed: third question is a\u2212b',tx,ty+108);
-    xB.fillText('grain \u00b10.30 \u00b7 |a\u2212b| = 3.50',tx,ty+126);
-    var lastB=LB[4],lastM=LM[4];
-    var b3=LB[3],m3=LM[3];
-    oB.textContent='third question \u2014 swap-blind buys '+b3.gain.toFixed(3)+' bits and the spread stays '+
-      b3.spreadA.toFixed(2)+'; the differently shaped one buys '+m3.gain.toFixed(3)+
-      ' bits and the spread collapses to '+m3.spreadA.toFixed(2)+
-      '. \u2502 four swap-blind questions: '+lastB.bits.toFixed(2)+' bits, '+lastB.n+
-      ' survivors, residual '+lastB.spreadA.toFixed(2)+' = |a\u2212b| exactly, and the fourth bought '+
-      lastB.gain.toFixed(3)+' bits. the bits kept coming. the swap never moved.';
-  })();
-
-  /* IV — what I say vs what is pinned */
-  var cC=document.getElementById('figC'),xC=cC.getContext('2d'),oC=document.getElementById('outC'),
-      kC=document.getElementById('kC');
-  function drawC(){
-    var k=+kC.value,names=['sum','prod','sq','cu'].slice(0,k),eps=0.30,
-        f=survivorField(N,TRUTH,names,eps),side=280,oyc=34,ox1=60,ox2=cC.width-side-300;
-    xC.clearRect(0,0,cC.width,cC.height);
-    /* left: what I output */
-    xC.fillStyle='#0e0d0b';xC.fillRect(ox1,oyc,side,side);
-    xC.strokeStyle=GRID;xC.strokeRect(ox1+.5,oyc+.5,side,side);
-    mark(xC,ox1,oyc,side,f.cx,f.cy,PAPER,9);
-    xC.fillStyle=PAPER;xC.font='12px ui-monospace,Menlo,monospace';xC.textAlign='left';
-    xC.fillText('what I say',ox1,oyc-12);
-    xC.fillStyle='#c9bfa8';
-    xC.fillText('"a = '+f.cx.toFixed(2)+', b = '+f.cy.toFixed(2)+'"',ox1,oyc+side+22);
-    xC.fillStyle=DIM;xC.fillText('same face at every k',ox1,oyc+side+40);
-    /* right: what is pinned */
-    fieldImage(xC,f,ox2,oyc,side);
-    ringSurvivors(xC,f,ox2,oyc,side);
-    mark(xC,ox2,oyc,side,TRUTH[0],TRUTH[1],PAPER,7);
-    xC.fillStyle=PAPER;xC.fillText('what is pinned',ox2,oyc-12);
-    xC.fillStyle=MUT;
-    xC.fillText(f.n.toLocaleString()+' truths standing',ox2,oyc+side+22);
-    xC.fillText('spread '+f.spreadA.toFixed(2)+' \u00b7 '+f.bits.toFixed(2)+' bits',ox2,oyc+side+40);
-    var d=Math.sqrt(Math.pow(f.cx-TRUTH[0],2)+Math.pow(f.cy-TRUTH[1],2));
-    oC.textContent='observations '+k+' \u2014 emitted point ('+f.cx.toFixed(2)+', '+f.cy.toFixed(2)+
-      '), which is '+d.toFixed(2)+' away from the truth and '+
-      (f.n>1?'endorsed by none of the '+f.n.toLocaleString()+' survivors':'the survivor itself')+
-      '. the left panel never changes its confidence.';
-  }
-  kC.addEventListener('input',drawC);drawC();
+  document.getElementById('verdict').textContent = fails===0
+    ? 'all '+res.length+' checks passed in your browser, just now — including C0, the poles converging.'
+    : fails+' check(s) FAILED — believe this line, not the prose above it.';
 })();
 </script>
 </body>
