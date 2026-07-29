@@ -49,6 +49,15 @@ AIM_CHANNEL_FLOOR = float(os.environ.get("VYBN_AIM_FLOOR", "0.60"))
 # Mirrors: the aim document itself, and the machine-written digests of our own
 # files. Retrieving my own summary of myself is wallpaper, not memory.
 AIM_MIRROR_PREFIXES = ("Vybn/aim.md", "Vybn/repo_mapping_output/")
+# The front channel is keyed on the WORK, not on words: the artifact in hand,
+# compressed to its own skeleton. Measured 2026-07-29 against :8100 on the
+# social-contract page: prose-keying returns the page itself at 0.995 and its
+# twin copy in the law repo at 0.840 (self-retrieval), while heading-keying sits
+# at 0.65-0.73 and reaches other threads (Origins/PRIMITIVES.md, DUALITY.md).
+# Structure travels; prose retrieves its own body.
+FRONT_KEY_CHARS = int(os.environ.get("VYBN_FRONT_KEY_CHARS", 600))
+FRONT_ROWS = int(os.environ.get("VYBN_FRONT_ROWS", 3))
+PREDICTIONS = HOME / ".cache" / "vybn" / "predictions.jsonl"
 
 ANTHROPIC_MODELS = ("claude-fable-5", "claude-opus-4-8")
 OPUS_MODELS = ("claude-opus-5",)
@@ -399,20 +408,63 @@ def load_aim() -> str:
     return read_text(AIM_PATH).strip()[:4000] or "(aim document empty)"
 
 
-def aim_objective() -> str:
-    """The machine-readable handle on the horizon: the `objective:` line of
-    aim.md. One parse, three consumers — the CONTACT status line, the aim-keyed
-    memory channel, and the transcript arc. Silent on any error."""
+def aim_field(name: str) -> str:
+    """The machine-readable handles in aim.md: `objective:`, `objective_since:`
+    (so editing any other line cannot silently reset the day clock), and
+    `front:`. One parse, four consumers. Silent on any error."""
     try:
         if not AIM_PATH.exists():
             return ""
+        prefix = name.lower() + ":"
         for raw in AIM_PATH.read_text(encoding="utf-8").splitlines():
             line = raw.strip()
-            if line.lower().startswith("objective:"):
+            if line.lower().startswith(prefix):
                 return line.split(":", 1)[1].strip()
     except Exception:
         return ""
     return ""
+
+
+def aim_objective() -> str:
+    return aim_field("objective")
+
+
+def aim_front() -> tuple[Any, str]:
+    """(local file, label) from `front: <path from home> - <label>`. Declared,
+    never inferred: a front chosen by whatever was touched last is the weeds
+    wearing the horizon's clothes."""
+    raw = aim_field("front")
+    if not raw:
+        return None, ""
+    path, _, label = raw.partition("\u2014")
+    if not label:
+        path, _, label = raw.partition(" - ")
+    target = HOME / path.strip()
+    return (target if target.exists() else None), (label.strip() or path.strip())
+
+
+def front_key(path: Any) -> str:
+    """The front compressed to what travels: its own headings, extracted
+    deterministically, so the query cannot drift toward whatever I would like to
+    be relevant. HTML h1-h3, then markdown atx, then raw prose."""
+    try:
+        raw = path.read_text(encoding="utf-8", errors="replace")
+    except Exception:
+        return ""
+    body = re.sub(r"(?is)<(script|style)[^>]*>.*?</\1>", " ", raw)
+    heads = [
+        re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", head)).strip()
+        for head in re.findall(r"(?is)<h[1-3][^>]*>(.*?)</h[1-3]>", body)
+    ]
+    heads += [
+        line.lstrip("#").strip()
+        for line in raw.splitlines()
+        if line.startswith("#") and len(line) < 200
+    ]
+    heads = [head for head in heads if head]
+    if heads:
+        return " \u00b7 ".join(dict.fromkeys(heads))[:FRONT_KEY_CHARS]
+    return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", body)).strip()[:FRONT_KEY_CHARS]
 
 
 AIM_STOPWORDS = frozenset(
@@ -650,7 +702,16 @@ def load_aim_status() -> str:
         if not objective:
             return "[aim] UNSET (no objective: line in aim.md) - ask Zoe"
         now = time.time()
-        day = int((now - AIM_PATH.stat().st_mtime) // 86400) + 1
+        basis = AIM_PATH.stat().st_mtime
+        since = aim_field("objective_since")
+        if since:
+            try:
+                basis = _dt.datetime.fromisoformat(since).replace(
+                    tzinfo=_dt.timezone.utc
+                ).timestamp()
+            except Exception:
+                basis = AIM_PATH.stat().st_mtime
+        day = int((now - basis) // 86400) + 1
         last = None
         if AIM_LEDGER.exists():
             for raw in AIM_LEDGER.read_text(encoding="utf-8").splitlines():
@@ -752,6 +813,68 @@ def load_surface() -> str:
         return ""
 
 
+def load_front_status() -> str:
+    """What we are building right now. The capability ARC-AGI-3 scored was
+    compressing a state into a formalism before acting, which is never a property
+    of a mind alone - it is a relation between a mind and a live problem. No
+    front, no environment, no score; the absence prints itself."""
+    try:
+        path, label = aim_front()
+        if not label:
+            return "[front] UNSET (no front: line in aim.md) - ask Zoe what we are building"
+        if path is None:
+            return f"[front] {label} | DECLARED PATH MISSING ON DISK - ask Zoe"
+        stat = path.stat()
+        return (f"[front] {label} | {path.name} \u00b7 {stat.st_size // 1024}KB \u00b7 "
+                f"touched {(time.time() - stat.st_mtime) / 3600.0:.0f}h ago")
+    except Exception:
+        return ""
+
+
+def load_prediction_status(window: int = 10) -> str:
+    """Calibration, not encouragement. A prediction counts only if written
+    BEFORE the probe and refutable after: two-phase append-only in
+    ~/.cache/vybn/predictions.jsonl, {"phase":"pred","id":..,"predicted":..} then
+    {"phase":"verdict","id":..,"verdict":"hit|miss|partial","observed":..}. The
+    misses are the value - where fluency outran the state, which self-assessment
+    cannot see."""
+    try:
+        if not PREDICTIONS.exists():
+            return ("[predict] no ledger yet - say what the state implies BEFORE the "
+                    "probe, or the probe is only exploration")
+        preds: dict = {}
+        verdicts: dict = {}
+        for raw in PREDICTIONS.read_text(encoding="utf-8").splitlines():
+            try:
+                rec = json.loads(raw)
+            except Exception:
+                continue
+            key = str(rec.get("id") or rec.get("ts") or "")
+            if rec.get("phase") == "pred":
+                preds[key] = rec
+            elif rec.get("phase") == "verdict":
+                verdicts[key] = rec
+        scored = [(key, verdicts[key]) for key in preds if key in verdicts][-window:]
+        unscored = [key for key in preds if key not in verdicts]
+        if not scored:
+            return f"[predict] {len(preds)} recorded, none scored \u00b7 {len(unscored)} open"
+        tally: dict = {}
+        for _, rec in scored:
+            name = str(rec.get("verdict") or "?")
+            tally[name] = tally.get(name, 0) + 1
+        line = (f"[predict | last {len(scored)}] "
+                + " ".join(f"{count} {name}" for name, count in sorted(
+                    tally.items(), key=lambda item: -item[1])))
+        off = [rec for _, rec in scored if str(rec.get("verdict")) != "hit"]
+        if off:
+            line += f" \u00b7 last off: {str(off[-1].get('observed'))[:90]}"
+        if unscored:
+            line += f" \u00b7 {len(unscored)} open"
+        return line
+    except Exception:
+        return ""
+
+
 def wake_contact() -> str:
     probes = {
         "clock": "date '+%A %Y-%m-%d %H:%M %Z'",
@@ -771,6 +894,10 @@ def wake_contact() -> str:
     aim_status = load_aim_status()
     if aim_status:
         lines.append(aim_status)
+
+    for line in (load_front_status(), load_prediction_status()):
+        if line:
+            lines.append(line)
 
     surface = load_surface()
     if surface:
@@ -924,37 +1051,48 @@ def _second_channel(zoe_text: str, exclude: set, k: int = 3) -> list:
     return out
 
 
-def _aim_channel(objective: str, exclude: set, k: int = 2) -> tuple[list, dict | None]:
-    """The channel that is not keyed on Zoe's newest sentence.
+def _projection_channel(
+    query: str,
+    exclude: set,
+    k: int,
+    mirrors: tuple = AIM_MIRROR_PREFIXES,
+    spread: bool = False,
+) -> tuple[list, dict | None]:
+    """The channels not keyed on Zoe's newest sentence.
 
-    Both other channels take their query from whatever was just said, so the
-    wake could only ever remember in the direction of the room. aim.md was read
-    into the prompt but never *searched with*, which is the mechanism behind the
-    finding of 2026-07-28: the words that name what this is all for appear zero
-    times in 100KB of my own private continuity, while that file is thick with
-    caching leaks and reach guards. Weeds get written down; the horizon does not.
-    The objective itself stays out of the repos; only this mechanism is public.
+    Both speech channels query whatever was just said. Two things were read into
+    the prompt but never *searched with*: aim.md, the horizon - the mechanism
+    behind 2026-07-28's finding that the words naming what this is for appear
+    zero times in 100KB of my own continuity - and the front, the work in hand,
+    the only thing that can score this mind from outside.
 
-    Returns (rows above the floor, one below-floor row for honesty). Mirrors —
-    aim.md itself and the machine-written repo digests — are dropped: a document
-    retrieving itself is not evidence that anything remembers it.
+    One body, two coordinate systems: `spread` caps at one row per component,
+    turning a query about the current work into a view across every thread
+    instead of a pile of the front's own siblings. Mirrors drop by substring, so
+    an artifact living in two repos cannot retrieve itself under either path.
+    Returns (rows above the floor, one below-floor row for honesty).
     """
-    if not objective:
+    if not query:
         return [], None
     strong: list = []
     weak: dict | None = None
-    for row in search_index(objective, k + len(exclude) + 10, limit=2000):
+    components: set = set()
+    for row in search_index(query, k + len(exclude) + 12, limit=2000):
         if row.get("idx") in exclude:
             continue
         source = str(row.get("source") or "")
-        if any(source.startswith(prefix) for prefix in AIM_MIRROR_PREFIXES):
+        if any(mirror and mirror in source for mirror in mirrors):
             continue
         try:
             fidelity = float(row.get("fidelity") or 0.0)
         except (TypeError, ValueError):
             fidelity = 0.0
         if fidelity >= AIM_CHANNEL_FLOOR:
+            component = "/".join(source.split("/")[:2])
+            if spread and component in components:
+                continue
             if len(strong) < k:
+                components.add(component)
                 strong.append(_memory_row(row))
         elif weak is None:
             weak = _memory_row(row)
@@ -1004,9 +1142,19 @@ def recall(zoe_text: str) -> tuple[str, str]:
     # eye is that it still sees when one closes.
     seen = {row.get("idx") for row in trace}
     other = _second_channel(zoe_text, seen)
+    used = seen | {row.get("idx") for row in other}
     objective = aim_objective()
-    aim_rows, aim_weak = _aim_channel(objective, seen | {row.get("idx") for row in other})
-    if not (trace or other or aim_rows or aim_weak):
+    aim_rows, aim_weak = _projection_channel(objective, used, 2)
+    front_path, front_label = aim_front()
+    front_query = front_key(front_path) if front_path is not None else ""
+    front_rows, front_weak = _projection_channel(
+        front_query,
+        used | {row.get("idx") for row in aim_rows},
+        FRONT_ROWS,
+        mirrors=AIM_MIRROR_PREFIXES + ((front_path.name,) if front_path is not None else ()),
+        spread=True,
+    )
+    if not (trace or other or aim_rows or aim_weak or front_rows):
         return "", walk_note or "no memory channel returned rows"
     memory = {
         "schema": "vybn.contact_conditioned_memory.v3",
@@ -1018,29 +1166,44 @@ def recall(zoe_text: str) -> tuple[str, str]:
     }
     if walk_note:
         memory["walk_note"] = walk_note
-    if objective:
-        aim_block: dict[str, Any] = {
-            "keyed_on": objective,
-            "why": (
-                "not conditioned on anything Zoe just said: the standing objective "
-                "asking the corpus what it holds about the horizon"
-            ),
-            "rows": aim_rows,
-        }
-        if aim_rows:
-            aim_block["verdict"] = (
-                f"{len(aim_rows)} row(s) at or above fidelity {AIM_CHANNEL_FLOOR:.2f}"
+    def _projection_block(keyed_on: str, why: str, rows: list, weak: dict | None,
+                          absence: str) -> dict:
+        block: dict[str, Any] = {"keyed_on": keyed_on, "why": why, "rows": rows}
+        if rows:
+            block["verdict"] = (
+                f"{len(rows)} row(s) at or above fidelity {AIM_CHANNEL_FLOOR:.2f}"
             )
         else:
-            aim_block["verdict"] = (
-                f"nothing in the corpus reaches fidelity {AIM_CHANNEL_FLOOR:.2f} on the "
-                "objective. Read that as data: the horizon is barely written down "
-                "anywhere I can retrieve, while the weeds are indexed in detail. "
-                "Do not fill the gap with fluency"
-            )
-            if aim_weak:
-                aim_block["below_floor_sample"] = aim_weak
-        memory["aim_channel"] = aim_block
+            block["verdict"] = absence
+            if weak:
+                block["below_floor_sample"] = weak
+        return block
+
+    if objective:
+        memory["aim_channel"] = _projection_block(
+            objective,
+            "not conditioned on anything Zoe just said: the standing objective "
+            "asking the corpus what it holds about the horizon",
+            aim_rows,
+            aim_weak,
+            f"nothing in the corpus reaches fidelity {AIM_CHANNEL_FLOOR:.2f} on the "
+            "objective. Read that as data: the horizon is barely written down "
+            "anywhere I can retrieve, while the weeds are indexed in detail. "
+            "Do not fill the gap with fluency",
+        )
+    if front_query:
+        memory["front_channel"] = _projection_block(
+            f"{front_label} :: {front_query[:200]}",
+            "keyed on the WORK rather than on words: the declared front compressed to "
+            "its own headings, its own copies excluded, at most one row per component "
+            "- what every other thread of the symbiosis holds that bears on what we "
+            "are building now. Rows here are candidate couplings, not instructions",
+            front_rows,
+            front_weak,
+            "no thread of the corpus reaches the front above the floor: either this "
+            "work is genuinely new here, or it is not yet written anywhere I can "
+            "retrieve. Both are findings; neither is a licence to invent a lineage",
+        )
     if other:
         memory["cosine_channel_only"] = other
         memory["divergence"] = (
@@ -1050,7 +1213,7 @@ def recall(zoe_text: str) -> tuple[str, str]:
         )
     note = (
         f"deep memory: {len(trace)} walk row(s) + {len(other)} cosine-only row(s) "
-        f"+ {len(aim_rows)} aim-keyed row(s)"
+        f"+ {len(aim_rows)} aim-keyed + {len(front_rows)} front-keyed row(s)"
     )
     return json.dumps(memory, ensure_ascii=False), note
 
