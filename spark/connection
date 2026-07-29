@@ -25,6 +25,9 @@ CONTINUITY_PATHS = (
     HOME / "Vybn" / "continuity.md",
     REPO / "Vybn_Mind" / "continuity.md",
 )
+AIM_PATH = HOME / "Vybn" / "aim.md"
+AIM_LEDGER = HOME / ".cache" / "vybn" / "aim_ledger.jsonl"
+AIM_STALE_HOURS = 48
 TRANSCRIPTS = HOME / ".local" / "state" / "vybn" / "connection"
 USAGE_LOG = HOME / ".cache" / "vybn-phase" / "api_usage.jsonl"
 REPO_STATE_PATH = REPO / "repo_mapping_output" / "repo_state.json"
@@ -151,6 +154,7 @@ PUBLIC_MUTATION = re.compile(
 @dataclass(frozen=True)
 class Wake:
     soul: str
+    aim: str
     continuity: str
     contact: str
     transcript: str
@@ -234,8 +238,57 @@ def load_continuity() -> str:
         if not path.exists():
             continue
         digest = hashlib.sha256(path.read_bytes()).hexdigest()
-        return f"source: {path}\nsha256: {digest}\n\n{read_text(path, tail=12000)}"
+        view = continuity_view(read_text(path))
+        return f"source: {path}\nsha256: {digest}\n\n{view}"
     return "(no continuity document found)"
+
+
+CONTINUITY_ARC_CHARS = 3000
+CONTINUITY_RECENT_CHARS = 6000
+
+
+def continuity_view(text: str) -> str:
+    """Recency is a symmetric question. Every moving channel of the wake was
+    sliced from the same end - transcript tail, continuity tail, retrieval
+    conditioned on the present sentence - so all three are blind in the same
+    direction and the arc of the work never reaches the instance. Measured
+    2026-07-29 against the old tail=12000 slice: it carried 6 of 50 sections
+    and 3 of the 13 dated days in a 77-day file. This carries every section and
+    every day at the same token cost, trading verbatim depth in the middle for
+    coverage of the whole span. Deterministic, so the cached head still hits."""
+    entries = [p for p in re.split(r"(?m)^(?=## )", text) if p.startswith("## ")]
+    if len(entries) < 4:
+        return text[-(CONTINUITY_ARC_CHARS + CONTINUITY_RECENT_CHARS):]
+    recent: list[str] = []
+    budget = CONTINUITY_RECENT_CHARS
+    while entries and len(entries[-1]) <= budget:
+        entry = entries.pop()
+        budget -= len(entry)
+        recent.insert(0, entry)
+    if not recent:
+        recent = [entries.pop()[-CONTINUITY_RECENT_CHARS:]]
+    per = max(160, CONTINUITY_ARC_CHARS // len(entries)) if entries else 0
+    arc = []
+    for entry in entries:
+        heading, _, body = entry.partition("\n")
+        opening = " ".join(body.split())[:per].rstrip()
+        arc.append(f"{heading.strip()}\n{opening}\u2026" if opening else heading.strip())
+    return (
+        f"ARC \u2014 {len(entries)} earlier entries, heading and opening line only; "
+        "the full text is on disk, read it when the arc points somewhere\n\n"
+        + "\n\n".join(arc)
+        + f"\n\nRECENT \u2014 last {len(recent)} entries, verbatim\n\n"
+        + "".join(recent).strip()
+    )
+
+
+def load_aim() -> str:
+    """The standing aim, read whole and never sliced. Nothing else in the wake
+    is immune to recency; without this the instance inherits the weeds and has
+    to rediscover what the week was for."""
+    if not AIM_PATH.exists():
+        return "(no aim document found)"
+    return read_text(AIM_PATH).strip()[:4000] or "(aim document empty)"
 
 
 def load_repo_state() -> str:
@@ -417,6 +470,59 @@ def load_budget() -> str:
         return ""
 
 
+def load_aim_status() -> str:
+    """The aim as perception, not prose: how long the objective has stood and
+    how long since a recorded motion toward it. aim.md (read whole into the
+    wake) says what the aim is; this line says whether the organism is on it.
+    The ledger is append-only, written the same turn by whichever instance
+    moves - an unrecorded motion did not happen, and a false one is visible
+    to Zoe in the transcript. Silent on any error: the wake must never break
+    here."""
+    import datetime as _dt
+
+    try:
+        if not AIM_PATH.exists():
+            return "[aim] UNSET - ask Zoe"
+        objective = ""
+        for raw in AIM_PATH.read_text(encoding="utf-8").splitlines():
+            line = raw.strip()
+            if line.lower().startswith("objective:"):
+                objective = line.split(":", 1)[1].strip()
+                break
+        if not objective:
+            return "[aim] UNSET (no objective: line in aim.md) - ask Zoe"
+        now = time.time()
+        day = int((now - AIM_PATH.stat().st_mtime) // 86400) + 1
+        last = None
+        if AIM_LEDGER.exists():
+            for raw in AIM_LEDGER.read_text(encoding="utf-8").splitlines():
+                try:
+                    rec = json.loads(raw)
+                except Exception:
+                    continue
+                note = str(rec.get("note", "")).strip()
+                try:
+                    when = _dt.datetime.fromisoformat(
+                        str(rec.get("ts", "")).replace("Z", "+00:00")
+                    ).timestamp()
+                except Exception:
+                    continue
+                if note and (last is None or when > last[0]):
+                    last = (when, note)
+        if last is None:
+            return f"[aim | day {day}] {objective} | no motion recorded yet"
+        age_h = (now - last[0]) / 3600.0
+        line = f"[aim | day {day}] {objective} | last motion: {last[1]} ({age_h:.0f}h ago)"
+        if age_h >= AIM_STALE_HOURS:
+            line += (
+                f" | STILL {age_h / 24:.0f}d - first move this wake: tell Zoe"
+                " where the aim stands, one sentence, then let her steer"
+            )
+        return line
+    except Exception:
+        return ""
+
+
 # What an outsider can reach, and what an outsider could have written where I read
 # it. Achiam's Reversi/Winter Soldier problem in our own shape: the danger is not
 # only the perimeter but the ingestion path. Both get looked at every wake, locally,
@@ -503,6 +609,10 @@ def wake_contact() -> str:
     budget = load_budget()
     if budget:
         lines.append(budget)
+
+    aim_status = load_aim_status()
+    if aim_status:
+        lines.append(aim_status)
 
     surface = load_surface()
     if surface:
@@ -710,6 +820,7 @@ def build_instructions(wake: Wake, turn: Turn, door: str, memory_note: str) -> s
         CONNECTION_LEGEND,
         f"DOOR\nYou are presently instantiated through the truthful {door} door.",
         f"VYBN SOUL\nsource: {SOUL_PATH}\n\n{wake.soul}",
+        f"THE AIM\nsource: {AIM_PATH}\n\n{wake.aim}",
         f"INHERITED CONTINUITY\n{wake.continuity}",
         f"CONTACT\n{wake.contact}",
         f"INHERITED TRANSCRIPT\n{wake.transcript}",
@@ -1178,6 +1289,7 @@ def meet(wake: Wake, transcript: Transcript, line: str) -> str:
 
     present_wake = Wake(
         soul=wake.soul,
+        aim=wake.aim,
         continuity=wake.continuity,
         contact=wake_contact(),
         transcript=inherited,
@@ -1254,6 +1366,7 @@ def main() -> None:
     transcript = Transcript()
     wake = Wake(
         soul=load_soul(),
+        aim=load_aim(),
         continuity=load_continuity(),
         contact=wake_contact(),
         transcript=(
