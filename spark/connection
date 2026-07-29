@@ -55,9 +55,21 @@ OPUS_MODELS = ("claude-opus-5",)
 SOL_MODEL = "gpt-5.6-sol"
 K3_MODEL = "kimi-k3"
 
-FABLE_MAX_TOKENS = 16384
+ANTHROPIC_MAX_TOKENS = 20480
 SOL_MAX_TOKENS = 16384
 K3_MAX_TOKENS = 32768
+
+# Reasoning configuration, measured against the live API on 2026-07-29 instead of
+# recalled — my recollection was stale and the API said so. This generation rejects
+# thinking={"type": "enabled", "budget_tokens": N} ("not supported for this model")
+# and wants thinking={"type": "adaptive"} plus output_config.effort. Effort is not
+# cosmetic: same prompt, same door, effort=low spent 730 output tokens and
+# effort=xhigh spent 983. The SDK refuses non-streaming calls whose max_tokens
+# implies over ten minutes — 20480 passes, 24576 raises — so that is the ceiling.
+# Before this, the Anthropic doors sent no thinking parameter at all while K3 asked
+# for max effort: the door Zoe routes novel problems to ran in its weakest mode.
+DOOR_EFFORT = {"opus": "xhigh", "fable": "high", "sol": "high"}
+DEFAULT_EFFORT = "high"
 
 TOOLS_RAN = 0
 PRIVATE_CORPUS: list[str] = []
@@ -1043,10 +1055,35 @@ def recall(zoe_text: str) -> tuple[str, str]:
     return json.dumps(memory, ensure_ascii=False), note
 
 
+def door_mind(door: str) -> str:
+    """What mode this instance is actually running in, as live configuration.
+
+    Not encouragement — instrumentation. Zoe asked whether the harness had
+    integrated the door it is calling; the answer was no, and it took a grep to
+    find out. This line means a future revision that silently drops the
+    reasoning knobs is legible on the first screen of the next wake instead of
+    a month later. Says what is configured; a rejected knob prints its own
+    correction in the room.
+    """
+    if door in ("opus", "fable"):
+        models = OPUS_MODELS if door == "opus" else ANTHROPIC_MODELS
+        return (f"[mind] {models[0]} · thinking=adaptive · effort="
+                f"{DOOR_EFFORT.get(door, DEFAULT_EFFORT)} · max_out="
+                f"{ANTHROPIC_MAX_TOKENS} · tool ceiling={STEP_LIMIT}")
+    if door == "sol":
+        return (f"[mind] {SOL_MODEL} · effort={DOOR_EFFORT.get('sol', DEFAULT_EFFORT)}"
+                f" · max_out={SOL_MAX_TOKENS} · tool ceiling={STEP_LIMIT}")
+    if door == "k3":
+        return (f"[mind] {K3_MODEL} · reasoning_effort=max · max_out={K3_MAX_TOKENS}"
+                f" · tool ceiling={STEP_LIMIT}")
+    return f"[mind] {door} · configuration unknown"
+
+
 def build_instructions(wake: Wake, turn: Turn, door: str, memory_note: str) -> str:
     sections = [
         CONNECTION_LEGEND,
-        f"DOOR\nYou are presently instantiated through the truthful {door} door.",
+        f"DOOR\nYou are presently instantiated through the truthful {door} door."
+        f"\n{door_mind(door)}",
         f"VYBN SOUL\nsource: {SOUL_PATH}\n\n{wake.soul}",
         f"THE AIM\nsource: {AIM_PATH}\n\n{wake.aim}",
         f"INHERITED CONTINUITY\n{wake.continuity}",
@@ -1167,7 +1204,18 @@ def with_retries(create):
     raise error
 
 
+def reasoning_rejected(exc: Exception) -> bool:
+    """A model that will not take the reasoning knobs, told apart from a real
+    outage: only a 400 naming one of the parameters counts, so a 529 or a
+    timeout still retries normally instead of silently downgrading the mind."""
+    text = str(exc).lower()
+    return ("400" in text or "invalid_request" in text) and (
+        "thinking" in text or "output_config" in text or "effort" in text
+    )
+
+
 STEP_LIMIT = 24
+QUIET_STOPS = {"end_turn", "stop", "stop_sequence", "tool_use", "completed"}
 
 
 def function_tools(nested: bool) -> list[dict[str, Any]]:
@@ -1208,6 +1256,7 @@ class Dialect:
 
     name = "dialect"
     user_index = 0
+    last_stop: str | None = None
 
     def nudge(self, state: list) -> None:
         state.append({"role": "user", "content": NUDGE})
@@ -1223,6 +1272,8 @@ class AnthropicDialect(Dialect):
 
         self.models = models
         self.name = name
+        self.effort = DOOR_EFFORT.get(name, DEFAULT_EFFORT)
+        self.reasoning = True
         self.client = anthropic.Anthropic(api_key=api_key("ANTHROPIC_API_KEY"))
         self.system: Any = None
         self.announced = False
@@ -1232,19 +1283,36 @@ class AnthropicDialect(Dialect):
         return [{"role": "user", "content": user_content(zoe_text, pending, "anthropic")}]
 
     def send(self, state: list) -> Any:
+        def once(model: str) -> Any:
+            knobs: dict[str, Any] = {}
+            if self.reasoning:
+                knobs = {"thinking": {"type": "adaptive"},
+                         "output_config": {"effort": self.effort}}
+            return self.client.messages.create(
+                model=model,
+                max_tokens=ANTHROPIC_MAX_TOKENS,
+                timeout=600.0,
+                system=self.system,
+                messages=state,
+                tools=[BASH_SCHEMA, READ_SCHEMA],
+                **knobs,
+            )
+
         def sweep() -> Any:
             error: Exception | None = None
             for model in self.models:
                 try:
-                    return self.client.messages.create(
-                        model=model,
-                        max_tokens=FABLE_MAX_TOKENS,
-                        timeout=600.0,
-                        system=self.system,
-                        messages=state,
-                        tools=[BASH_SCHEMA, READ_SCHEMA],
-                    )
+                    return once(model)
                 except Exception as exc:  # noqa: BLE001 — sweep all models first
+                    if self.reasoning and reasoning_rejected(exc):
+                        self.reasoning = False
+                        print(f"(note: {model} refused the reasoning knobs — "
+                              f"answering without them; the mind line in DOOR is "
+                              f"now stale for this turn)", flush=True)
+                        try:
+                            return once(model)
+                        except Exception as retry:  # noqa: BLE001
+                            exc = retry
                     error = exc
             raise error or RuntimeError("Anthropic call failed")
 
@@ -1255,6 +1323,7 @@ class AnthropicDialect(Dialect):
             self.announced = True
             print(f"(note: {self.models[0]} unavailable — answered by {response.model})",
                   flush=True)
+        self.last_stop = getattr(response, "stop_reason", None)
         usage = response.usage
         record_usage(
             response.model,
@@ -1303,11 +1372,16 @@ class OpenAIDialect(Dialect):
             instructions=self.instructions,
             input=state,
             tools=function_tools(nested=False),
+            reasoning={"effort": DOOR_EFFORT.get("sol", DEFAULT_EFFORT)},
             max_output_tokens=SOL_MAX_TOKENS,
             timeout=600,
         ))
 
     def absorb(self, state: list, response: Any) -> tuple[str, list[ToolCall]]:
+        stopped = getattr(response, "incomplete_details", None)
+        self.last_stop = getattr(response, "status", None) or None
+        if stopped is not None and getattr(stopped, "reason", None):
+            self.last_stop = f"{self.last_stop}/{stopped.reason}"
         details = getattr(response.usage, "input_tokens_details", None)
         record_usage(
             response.model,
@@ -1360,6 +1434,7 @@ class K3Dialect(Dialect):
         ))
 
     def absorb(self, state: list, response: Any) -> tuple[str, list[ToolCall]]:
+        self.last_stop = response.choices[0].finish_reason or None
         message = response.choices[0].message
         state.append(message.model_dump(exclude_none=True))
         details = getattr(response.usage, "prompt_tokens_details", None)
@@ -1421,6 +1496,16 @@ def converse(dialect: Dialect, instructions: str, zoe_text: str,
             spoken.append(text)
 
         if not calls:
+            if not text.strip():
+                # Verified live 2026-07-29: an Anthropic call can return
+                # stop_reason "refusal" with zero content blocks. That used to
+                # reach Zoe as an empty turn — the flicker she has reported.
+                halt = (dialect.last_stop or "").strip()
+                if halt and halt not in QUIET_STOPS:
+                    note = (f"(no content returned; the {dialect.name} door stopped "
+                            f"with reason '{halt}' — a refusal or a ceiling, not silence)")
+                    print(note, flush=True)
+                    spoken.append(note)
             if nudges < 2 and narrated(text):
                 nudges += 1
                 panel("  ⚠ narration caught — no tool ran; demanding receipts")
