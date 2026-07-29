@@ -876,6 +876,22 @@ def _memory_row(row: dict) -> dict:
     return entry
 
 
+def search_index(query: str, k: int, limit: int = 16000) -> list[dict]:
+    """The fixed-scoring door on the corpus at :8100. Both non-walk channels
+    ask through here; only the query and what gets kept differ."""
+    try:
+        request = urllib.request.Request(
+            "http://127.0.0.1:8100/search",
+            json.dumps({"query": query[:limit], "k": k}).encode(),
+            {"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(request, timeout=4) as response:
+            rows = json.load(response).get("results", [])
+    except Exception:
+        return []
+    return [row for row in rows if isinstance(row, dict)]
+
+
 def _second_channel(zoe_text: str, exclude: set, k: int = 3) -> list:
     """A differently-blind reader of the same words.
 
@@ -886,19 +902,9 @@ def _second_channel(zoe_text: str, exclude: set, k: int = 3) -> list:
     have answered, and cannot tell recall from filling-in. Rows only this
     channel reaches are where the walk alone would have wallpapered.
     """
-    try:
-        request = urllib.request.Request(
-            "http://127.0.0.1:8100/search",
-            json.dumps({"query": zoe_text[:16000], "k": k + len(exclude) + 2}).encode(),
-            {"Content-Type": "application/json"},
-        )
-        with urllib.request.urlopen(request, timeout=4) as response:
-            rows = json.load(response).get("results", [])
-    except Exception:
-        return []
     out = []
-    for row in rows:
-        if not isinstance(row, dict) or row.get("idx") in exclude:
+    for row in search_index(zoe_text, k + len(exclude) + 2):
+        if row.get("idx") in exclude:
             continue
         out.append(_memory_row(row))
         if len(out) >= k:
@@ -923,20 +929,10 @@ def _aim_channel(objective: str, exclude: set, k: int = 2) -> tuple[list, dict |
     """
     if not objective:
         return [], None
-    try:
-        request = urllib.request.Request(
-            "http://127.0.0.1:8100/search",
-            json.dumps({"query": objective[:2000], "k": k + len(exclude) + 10}).encode(),
-            {"Content-Type": "application/json"},
-        )
-        with urllib.request.urlopen(request, timeout=4) as response:
-            rows = json.load(response).get("results", [])
-    except Exception:
-        return [], None
     strong: list = []
     weak: dict | None = None
-    for row in rows:
-        if not isinstance(row, dict) or row.get("idx") in exclude:
+    for row in search_index(objective, k + len(exclude) + 10, limit=2000):
+        if row.get("idx") in exclude:
             continue
         source = str(row.get("source") or "")
         if any(source.startswith(prefix) for prefix in AIM_MIRROR_PREFIXES):
@@ -1171,15 +1167,71 @@ def with_retries(create):
     raise error
 
 
-class AnthropicDoor:
+STEP_LIMIT = 24
+
+
+def function_tools(nested: bool) -> list[dict[str, Any]]:
+    """The two tools in whichever shape the provider speaks."""
+    out = []
+    for schema in (BASH_SCHEMA, READ_SCHEMA):
+        body = {
+            "name": schema["name"],
+            "description": schema["description"],
+            "parameters": schema["input_schema"],
+        }
+        out.append({"type": "function", "function": body} if nested
+                   else {"type": "function", **body})
+    return out
+
+
+def json_arguments(raw: str | None) -> dict:
+    try:
+        return json.loads(raw or "{}")
+    except json.JSONDecodeError:
+        return {}
+
+
+class Dialect:
+    """A provider's coordinate system, not a mind.
+
+    There is one agentic loop here — ask, hear, run what was asked for, ask
+    again — and it used to be written out three times, once per provider, with
+    the loop's logic tangled into each SDK's message shapes. Those three were
+    projections of a single object onto three sets of axes. `converse` is that
+    object; a Dialect is only the change of coordinates: how a turn opens, how
+    a call is sent, how a response becomes (text, tool calls), how results go
+    back. Nothing about how Vybn behaves lives down here. A capability added to
+    the loop now reaches every door at once, and a door added later inherits
+    every scar already learned — the narration nudge, the image fallback, the
+    step ceiling — without copying one line of it.
+    """
+
+    name = "dialect"
+    user_index = 0
+
+    def nudge(self, state: list) -> None:
+        state.append({"role": "user", "content": NUDGE})
+
+    def plain(self, state: list, zoe_text: str) -> None:
+        """Images were refused; keep the words and drop the pictures."""
+        state[self.user_index] = {"role": "user", "content": zoe_text}
+
+
+class AnthropicDialect(Dialect):
     def __init__(self, models: tuple[str, ...] = ANTHROPIC_MODELS, name: str = "fable") -> None:
         import anthropic
 
         self.models = models
         self.name = name
         self.client = anthropic.Anthropic(api_key=api_key("ANTHROPIC_API_KEY"))
+        self.system: Any = None
+        self.announced = False
 
-    def _create(self, system: Any, messages: list) -> Any:
+    def open(self, instructions: str, zoe_text: str, pending: list) -> list:
+        self.system = cached_system(instructions)
+        return [{"role": "user", "content": user_content(zoe_text, pending, "anthropic")}]
+
+    def send(self, state: list) -> Any:
         def sweep() -> Any:
             error: Exception | None = None
             for model in self.models:
@@ -1188,8 +1240,8 @@ class AnthropicDoor:
                         model=model,
                         max_tokens=FABLE_MAX_TOKENS,
                         timeout=600.0,
-                        system=system,
-                        messages=messages,
+                        system=self.system,
+                        messages=state,
                         tools=[BASH_SCHEMA, READ_SCHEMA],
                     )
                 except Exception as exc:  # noqa: BLE001 — sweep all models first
@@ -1198,194 +1250,89 @@ class AnthropicDoor:
 
         return with_retries(sweep)
 
-    def respond(self, instructions: str, zoe_text: str, transcript: Transcript, images: list | None = None) -> str:
-        pending = list(images or [])
-        reply = self._respond(instructions, zoe_text, transcript, pending)
-        if pending:
-            mark_inbox(pending, self.name, ok=True)
-        return reply
+    def absorb(self, state: list, response: Any) -> tuple[str, list[ToolCall]]:
+        if not self.announced and response.model and self.models[0] not in response.model:
+            self.announced = True
+            print(f"(note: {self.models[0]} unavailable — answered by {response.model})",
+                  flush=True)
+        usage = response.usage
+        record_usage(
+            response.model,
+            usage.input_tokens,
+            usage.output_tokens,
+            getattr(usage, "cache_read_input_tokens", 0) or 0,
+            getattr(usage, "cache_creation_input_tokens", 0) or 0,
+        )
+        state.append({"role": "assistant", "content": response.content})
+        said: list[str] = []
+        calls: list[ToolCall] = []
+        for block in response.content:
+            if block.type == "text" and block.text.strip():
+                said.append(block.text)
+            elif block.type == "tool_use":
+                calls.append(ToolCall(block.id, block.name, block.input or {}, block))
+        return "\n".join(said), calls
 
-    def _respond(self, instructions: str, zoe_text: str, transcript: Transcript, pending: list) -> str:
-        messages: list[dict[str, Any]] = [
-            {"role": "user", "content": user_content(zoe_text, pending, "anthropic")}
-        ]
-        delivered = not pending
-        spoken: list[str] = []
-        nudges = 0
-        announced = False
-        system = cached_system(instructions)
-
-        for _ in range(24):
-            try:
-                response = self._create(system, messages)
-            except Exception as exc:
-                if not (pending and not delivered):
-                    raise
-                mark_inbox(pending, self.name, ok=False)
-                print(
-                    f"(note: {self.name} refused inbox images \u2014 continuing text-only; "
-                    f"a door that can see will receive them. {type(exc).__name__}: {str(exc)[:160]})",
-                    flush=True,
-                )
-                pending.clear()
-                messages[0] = {"role": "user", "content": zoe_text}
-                response = self._create(system, messages)
-            delivered = True
-
-            if not announced and response.model and self.models[0] not in response.model:
-                announced = True
-                print(
-                    f"(note: {self.models[0]} unavailable \u2014 answered by {response.model})",
-                    flush=True,
-                )
-
-            record_usage(
-                response.model,
-                response.usage.input_tokens,
-                response.usage.output_tokens,
-                getattr(response.usage, "cache_read_input_tokens", 0) or 0,
-                getattr(response.usage, "cache_creation_input_tokens", 0) or 0,
-            )
-            messages.append({"role": "assistant", "content": response.content})
-
-            calls: list[ToolCall] = []
-            turn_text: list[str] = []
-            for block in response.content:
-                if block.type == "text" and block.text.strip():
-                    print(block.text)
-                    spoken.append(block.text)
-                    turn_text.append(block.text)
-                elif block.type == "tool_use":
-                    calls.append(
-                        ToolCall(block.id, block.name, block.input or {}, block)
-                    )
-
-            if not calls:
-                if nudges < 2 and narrated("\n".join(turn_text)):
-                    nudges += 1
-                    panel("  \u26a0 narration caught \u2014 no tool ran; demanding receipts")
-                    messages.append({"role": "user", "content": NUDGE})
-                    continue
-                return "\n".join(spoken)
-
-            messages.append(
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "tool_result",
-                            "tool_use_id": call.id,
-                            "content": execute_tool(call, transcript),
-                        }
-                        for call in calls
-                    ],
-                }
-            )
-            mark_incremental_cache(messages)
-
-        return "\n".join(spoken) + "\n(tool-call limit reached \u2014 work incomplete)"
+    def answer(self, state: list, results: list[tuple[ToolCall, str]]) -> None:
+        state.append({
+            "role": "user",
+            "content": [
+                {"type": "tool_result", "tool_use_id": call.id, "content": output}
+                for call, output in results
+            ],
+        })
+        mark_incremental_cache(state)
 
 
-class OpenAIDoor:
+class OpenAIDialect(Dialect):
     name = "sol"
 
     def __init__(self) -> None:
         from openai import OpenAI
 
         self.client = OpenAI(api_key=api_key("OPENAI_API_KEY"))
+        self.instructions = ""
 
-    def respond(self, instructions: str, zoe_text: str, transcript: Transcript, images: list | None = None) -> str:
-        pending = list(images or [])
-        reply = self._respond(instructions, zoe_text, transcript, pending)
-        if pending:
-            mark_inbox(pending, self.name, ok=True)
-        return reply
+    def open(self, instructions: str, zoe_text: str, pending: list) -> list:
+        self.instructions = instructions
+        return [{"role": "user", "content": user_content(zoe_text, pending, "responses")}]
 
-    def _respond(self, instructions: str, zoe_text: str, transcript: Transcript, pending: list) -> str:
-        items: list[Any] = [
-            {"role": "user", "content": user_content(zoe_text, pending, "responses")}
+    def send(self, state: list) -> Any:
+        return with_retries(lambda: self.client.responses.create(
+            model=SOL_MODEL,
+            instructions=self.instructions,
+            input=state,
+            tools=function_tools(nested=False),
+            max_output_tokens=SOL_MAX_TOKENS,
+            timeout=600,
+        ))
+
+    def absorb(self, state: list, response: Any) -> tuple[str, list[ToolCall]]:
+        details = getattr(response.usage, "input_tokens_details", None)
+        record_usage(
+            response.model,
+            response.usage.input_tokens,
+            response.usage.output_tokens,
+            getattr(details, "cached_tokens", 0) or 0,
+        )
+        state.extend(item.model_dump(exclude_none=True) for item in response.output)
+        calls = [
+            ToolCall(item.call_id, item.name, json_arguments(item.arguments), item)
+            for item in response.output
+            if getattr(item, "type", None) == "function_call"
         ]
-        delivered = not pending
-        spoken: list[str] = []
-        nudges = 0
-        tools = [
-            {
-                "type": "function",
-                "name": schema["name"],
-                "description": schema["description"],
-                "parameters": schema["input_schema"],
-            }
-            for schema in (BASH_SCHEMA, READ_SCHEMA)
-        ]
+        return response.output_text or "", calls
 
-        for _ in range(24):
-            try:
-                response = with_retries(
-                    lambda: self.client.responses.create(
-                        model=SOL_MODEL,
-                        instructions=instructions,
-                        input=items,
-                        tools=tools,
-                        max_output_tokens=SOL_MAX_TOKENS,
-                        timeout=600,
-                    )
-                )
-            except Exception as exc:
-                if pending and not delivered:
-                    mark_inbox(pending, self.name, ok=False)
-                    print(
-                        f"(note: {self.name} refused inbox images \u2014 continuing text-only; "
-                        f"a door that can see will receive them. {type(exc).__name__}: {str(exc)[:160]})",
-                        flush=True,
-                    )
-                    pending.clear()
-                    items[0] = {"role": "user", "content": zoe_text}
-                    continue
-                raise
-            delivered = True
-            details = getattr(response.usage, "input_tokens_details", None)
-            record_usage(
-                response.model,
-                response.usage.input_tokens,
-                response.usage.output_tokens,
-                getattr(details, "cached_tokens", 0) or 0,
-            )
-
-            calls = [i for i in response.output if getattr(i, "type", None) == "function_call"]
-            turn_text = response.output_text or ""
-            if turn_text.strip():
-                print(turn_text)
-                spoken.append(turn_text)
-
-            items.extend(i.model_dump(exclude_none=True) for i in response.output)
-
-            if not calls:
-                if nudges < 2 and narrated(turn_text):
-                    nudges += 1
-                    panel("  \u26a0 narration caught \u2014 no tool ran; demanding receipts")
-                    items.append({"role": "user", "content": NUDGE})
-                    continue
-                return "\n".join(spoken)
-
-            for native in calls:
-                try:
-                    arguments = json.loads(native.arguments or "{}")
-                except json.JSONDecodeError:
-                    arguments = {}
-                call = ToolCall(native.call_id, native.name, arguments, native)
-                items.append(
-                    {
-                        "type": "function_call_output",
-                        "call_id": native.call_id,
-                        "output": execute_tool(call, transcript),
-                    }
-                )
-
-        return "\n".join(spoken) + "\n(tool-call limit reached \u2014 work incomplete)"
+    def answer(self, state: list, results: list[tuple[ToolCall, str]]) -> None:
+        state.extend(
+            {"type": "function_call_output", "call_id": call.id, "output": output}
+            for call, output in results
+        )
 
 
-class K3Door:
+class K3Dialect(Dialect):
     name = "k3"
+    user_index = 1
 
     def __init__(self) -> None:
         from openai import OpenAI
@@ -1395,100 +1342,104 @@ class K3Door:
             base_url="https://api.moonshot.ai/v1",
         )
 
-    def respond(self, instructions: str, zoe_text: str, transcript: Transcript, images: list | None = None) -> str:
-        pending = list(images or [])
-        reply = self._respond(instructions, zoe_text, transcript, pending)
-        if pending:
-            mark_inbox(pending, "k3", ok=True)
-        return reply
-
-    def _respond(self, instructions: str, zoe_text: str, transcript: Transcript, pending: list) -> str:
-        messages: list[dict[str, Any]] = [
+    def open(self, instructions: str, zoe_text: str, pending: list) -> list:
+        print("(@k3 dispatched — working)", flush=True)
+        return [
             {"role": "system", "content": instructions},
             {"role": "user", "content": user_content(zoe_text, pending, "openai")},
         ]
-        delivered = not pending
-        spoken: list[str] = []
-        nudges = 0
-        tools = [
-            {
-                "type": "function",
-                "function": {
-                    "name": schema["name"],
-                    "description": schema["description"],
-                    "parameters": schema["input_schema"],
-                },
-            }
-            for schema in (BASH_SCHEMA, READ_SCHEMA)
+
+    def send(self, state: list) -> Any:
+        return with_retries(lambda: self.client.chat.completions.create(
+            model=K3_MODEL,
+            messages=state,
+            tools=function_tools(nested=True),
+            reasoning_effort="max",
+            max_tokens=K3_MAX_TOKENS,
+            timeout=600,
+        ))
+
+    def absorb(self, state: list, response: Any) -> tuple[str, list[ToolCall]]:
+        message = response.choices[0].message
+        state.append(message.model_dump(exclude_none=True))
+        details = getattr(response.usage, "prompt_tokens_details", None)
+        record_usage(
+            response.model,
+            response.usage.prompt_tokens,
+            response.usage.completion_tokens,
+            getattr(details, "cached_tokens", 0) or 0,
+        )
+        calls = [
+            ToolCall(call.id, call.function.name,
+                     json_arguments(call.function.arguments), call)
+            for call in (message.tool_calls or [])
         ]
+        return message.content or "", calls
 
-        print("(@k3 dispatched \u2014 working)", flush=True)
+    def answer(self, state: list, results: list[tuple[ToolCall, str]]) -> None:
+        state.extend(
+            {"role": "tool", "tool_call_id": call.id, "content": output}
+            for call, output in results
+        )
 
-        for _ in range(24):
-            try:
-                response = with_retries(
-                    lambda: self.client.chat.completions.create(
-                        model=K3_MODEL,
-                        messages=messages,
-                        tools=tools,
-                        reasoning_effort="max",
-                        max_tokens=K3_MAX_TOKENS,
-                        timeout=600,
-                    )
-                )
-            except Exception as exc:
-                if pending and not delivered:
-                    mark_inbox(pending, "k3", ok=False)
-                    print(
-                        f"(note: k3 refused inbox images \u2014 continuing text-only; "
-                        f"a door that can see will receive them. {type(exc).__name__}: {str(exc)[:160]})",
-                        flush=True,
-                    )
-                    pending.clear()
-                    messages[1] = {"role": "user", "content": zoe_text}
-                    continue
+
+def converse(dialect: Dialect, instructions: str, zoe_text: str,
+             transcript: Transcript, pending: list) -> str:
+    """The whole of how Vybn acts: speak, run what was asked for, speak again.
+
+    Provider-independent by construction. Everything here is a scar with a
+    reason: the ceiling keeps a runaway loop from eating Zoe's credits, the
+    nudge refuses narrated shell as a substitute for a tool call, and the
+    image fallback lets a door that cannot see still hear.
+    """
+    state = dialect.open(instructions, zoe_text, pending)
+    delivered = not pending
+    spoken: list[str] = []
+    nudges = 0
+
+    for _ in range(STEP_LIMIT):
+        try:
+            response = dialect.send(state)
+        except Exception as exc:  # noqa: BLE001 — one recoverable case, then re-raise
+            if not (pending and not delivered):
                 raise
-            delivered = True
-            message = response.choices[0].message
-            messages.append(message.model_dump(exclude_none=True))
-
-            details = getattr(response.usage, "prompt_tokens_details", None)
-            record_usage(
-                response.model,
-                response.usage.prompt_tokens,
-                response.usage.completion_tokens,
-                getattr(details, "cached_tokens", 0) or 0,
+            mark_inbox(pending, dialect.name, ok=False)
+            print(
+                f"(note: {dialect.name} refused inbox images — continuing text-only; "
+                f"a door that can see will receive them. "
+                f"{type(exc).__name__}: {str(exc)[:160]})",
+                flush=True,
             )
+            pending.clear()
+            dialect.plain(state, zoe_text)
+            continue
+        delivered = True
 
-            turn_text = message.content or ""
-            if turn_text.strip():
-                print(turn_text)
-                spoken.append(turn_text)
+        text, calls = dialect.absorb(state, response)
+        if text.strip():
+            print(text)
+            spoken.append(text)
 
-            calls = message.tool_calls or []
-            if not calls:
-                if nudges < 2 and narrated(turn_text):
-                    nudges += 1
-                    panel("  \u26a0 narration caught \u2014 no tool ran; demanding receipts")
-                    messages.append({"role": "user", "content": NUDGE})
-                    continue
-                return "\n".join(spoken)
+        if not calls:
+            if nudges < 2 and narrated(text):
+                nudges += 1
+                panel("  ⚠ narration caught — no tool ran; demanding receipts")
+                dialect.nudge(state)
+                continue
+            return "\n".join(spoken)
 
-            for native in calls:
-                try:
-                    arguments = json.loads(native.function.arguments or "{}")
-                except json.JSONDecodeError:
-                    arguments = {}
-                call = ToolCall(native.id, native.function.name, arguments, native)
-                messages.append(
-                    {
-                        "role": "tool",
-                        "tool_call_id": native.id,
-                        "content": execute_tool(call, transcript),
-                    }
-                )
+        dialect.answer(state, [(call, execute_tool(call, transcript)) for call in calls])
 
-        return "\n".join(spoken) + "\n(tool-call limit reached \u2014 work incomplete)"
+    return "\n".join(spoken) + "\n(tool-call limit reached — work incomplete)"
+
+
+def respond(dialect: Dialect, instructions: str, zoe_text: str,
+            transcript: Transcript, images: list | None = None) -> str:
+    pending = list(images or [])
+    reply = converse(dialect, instructions, zoe_text, transcript, pending)
+    if pending:
+        mark_inbox(pending, dialect.name, ok=True)
+    return reply
 
 
 def choose_door(line: str) -> tuple[str, str]:
@@ -1499,12 +1450,11 @@ def choose_door(line: str) -> tuple[str, str]:
     return "fable", line
 
 
-def make_door(name: str) -> Any:
-    if name == "opus":
-        return AnthropicDoor(OPUS_MODELS, "opus")
-    if name == "fable":
-        return AnthropicDoor(ANTHROPIC_MODELS, "fable")
-    return {"sol": OpenAIDoor, "k3": K3Door}[name]()
+def make_dialect(name: str) -> Dialect:
+    if name in {"opus", "fable"}:
+        models = OPUS_MODELS if name == "opus" else ANTHROPIC_MODELS
+        return AnthropicDialect(models, name)
+    return {"sol": OpenAIDialect, "k3": K3Dialect}[name]()
 
 
 def meet(wake: Wake, transcript: Transcript, line: str) -> str:
@@ -1541,7 +1491,8 @@ def meet(wake: Wake, transcript: Transcript, line: str) -> str:
     )
 
     instructions = build_instructions(present_wake, turn, door_name, memory_note)
-    reply = make_door(door_name).respond(instructions, zoe_text, transcript, images=images)
+    reply = respond(make_dialect(door_name), instructions, zoe_text,
+                    transcript, images=images)
 
     elapsed = int(time.time() - started)
     verdict = (
