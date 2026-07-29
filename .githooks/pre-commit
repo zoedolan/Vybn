@@ -137,6 +137,12 @@ while IFS=$'\t' read -r a d path; do
 done < <(git diff --cached --numstat)
 while IFS=$'\t' read -r code path; do
     [[ -z "$path" || "$path" == *"$PROV"* ]] && continue
+    # Protocol-namespace documents: the host and the crawlers assign these names,
+    # not us. A site root cannot be absorbed into another file, so an add here is
+    # a required address rather than accretion. Deletions still count as retirements.
+    case "$path" in index.html|sitemap.xml|robots.txt|.well-known/*)
+        [[ "$code" == A* ]] && { active=$((active + 1)); continue; } ;;
+    esac
     [[ "$code" == A* ]] && new_files=$((new_files + 1)) && continue
     [[ "$code" == D* ]] && retired_files=$((retired_files + 1)) && continue
     [[ "$path" == _archive/* || "$path" == archive/* ]] || active=$((active + 1))
