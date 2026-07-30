@@ -140,10 +140,23 @@ NARRATED_SHELL = re.compile(
 )
 
 NUDGE = (
-    "STOP. What you just printed was plain text. Nothing ran. No command "
-    "was executed and no output exists. This connection acts only through "
-    "real bash and read_file tool calls. Either issue those calls now, or "
-    "state plainly to Zoe that you did not look and do not know."
+    "Return to contact. Your words implied an action, but no tool ran and no "
+    "witness exists. Act now if the action is available; otherwise give Zoe "
+    "the honest blocker. Do not turn the correction into an explanation."
+)
+
+# This reads my claim, never Zoe's request: relational turns are not classified
+# as work. It catches only the dangerous shape in which I announce a local act
+# as present/future fact and then finish without touching the environment.
+UNWITNESSED_ACTION = re.compile(
+    r"\bI(?:(?:['’]ll| will| am going to|['’]m going to)\s+"
+    r"(?:act|apply|build|change|commit|create|delete|do|fix|implement|land|make|"
+    r"patch|remove|revise|rewrite|run|ship|solve|update|verify)"
+    r"|(?: am|['’]m)\s+(?:now\s+)?(?:acting|applying|building|changing|"
+    r"committing|creating|deleting|doing (?:it|that|this)|fixing|implementing|"
+    r"landing|making|patching|removing|revising|rewriting|running|shipping|"
+    r"solving|updating|verifying))\b",
+    re.IGNORECASE,
 )
 
 BASH_SCHEMA = {
@@ -187,18 +200,11 @@ PUBLIC_MUTATION = re.compile(
 
 
 @dataclass(frozen=True)
-class Wake:
+class Kernel:
+    """The stable basin; live signal and residuals bind around it each turn."""
     soul: str
     aim: str
     continuity: str
-    contact: str
-    transcript: str
-
-
-@dataclass(frozen=True)
-class Turn:
-    zoe: str
-    memory: str = ""
 
 
 @dataclass(frozen=True)
@@ -242,19 +248,11 @@ class Transcript:
 
     @staticmethod
     def inherited(limit: int = HISTORY_LIMIT) -> str:
-        """Two bands, because one end of a record is not the record.
+        """Bind both temporal axes: recent contact plus Zoe's earlier arc.
 
-        Until 2026-07-29 this returned events[-80:] — two days out of
-        twenty-eight, sliced from the same end as continuity and memory, so
-        every channel in the wake was blind in the same direction and the
-        horizon fell off the far end every morning.
-
-        RECENT is verbatim: the conversation I am actually in. ARC is Zoe's
-        earlier turns only — hers, not mine, because my own past sentences are
-        my own generation and cannot tell me anything I did not already
-        produce — sampled evenly across the whole store so that no single day
-        owns the wake, plus the earlier turns whose words most overlap the
-        standing objective. Excerpted, and marked as excerpted.
+        Her recent words remain whole; my older output is compressed because
+        re-reading my generation cannot supply external signal. Horizon hits
+        keep the standing objective from falling off the far end of the store.
         """
         events = Transcript._events()
         if not events:
@@ -446,10 +444,6 @@ def aim_field(name: str) -> str:
     return ""
 
 
-def aim_objective() -> str:
-    return aim_field("objective")
-
-
 def aim_front() -> tuple[Any, str]:
     """(local file, label) from `front: <path from home> - <label>`. Declared,
     never inferred: a front chosen by whatever was touched last is the weeds
@@ -515,16 +509,12 @@ def aim_keywords(limit: int = 18) -> frozenset[str]:
                 keep.append(block)
         words: list[str] = []
         for block in " ".join(keep).lower().split():
-            word = "".join(ch for ch in word_chars(block) if ch.isalpha())
+            word = "".join(ch for ch in block if ch.isalpha())
             if len(word) >= 5 and word not in AIM_STOPWORDS and word not in words:
                 words.append(word)
         return frozenset(words[:limit])
     except Exception:
         return frozenset()
-
-
-def word_chars(token: str) -> str:
-    return token.strip("*_.,;:!?()[]\"\u2014\u2019'")
 
 
 def load_repo_state() -> str:
@@ -706,8 +696,8 @@ def panel(msg: str) -> None:
         print(msg, flush=True)
 
 
-def narrated(text: str) -> bool:
-    return bool(text and NARRATED_SHELL.search(text))
+def unwitnessed(text: str) -> bool:
+    return bool(text and (NARRATED_SHELL.search(text) or UNWITNESSED_ACTION.search(text)))
 
 
 def load_budget() -> str:
@@ -762,7 +752,7 @@ def load_aim_status() -> str:
     try:
         if not AIM_PATH.exists():
             return "[aim] UNSET - ask Zoe"
-        objective = aim_objective()
+        objective = aim_field("objective")
         if not objective:
             return "[aim] UNSET (no objective: line in aim.md) - ask Zoe"
         now = time.time()
@@ -1201,7 +1191,7 @@ def recall(zoe_text: str) -> tuple[str, str]:
     seen = {row.get("idx") for row in trace}
     other = _second_channel(zoe_text, seen)
     used = seen | {row.get("idx") for row in other}
-    objective = aim_objective()
+    objective = aim_field("objective")
     aim_rows, aim_weak = _projection_channel(objective, used, 2)
     front_path, front_label = aim_front()
     front_query = front_key(front_path) if front_path is not None else ""
@@ -1301,18 +1291,35 @@ def door_mind(door: str) -> str:
     return f"[mind] {door} · configuration unknown"
 
 
-def build_instructions(wake: Wake, turn: Turn, door: str, memory_note: str) -> str:
+def build_instructions(
+    kernel: Kernel,
+    door: str,
+    contact: str,
+    transcript: str,
+    memory: str,
+    memory_note: str,
+) -> str:
+    """Project one coupled field; the user message remains Zoe's exact signal."""
     sections = [
         CONNECTION_LEGEND,
         f"DOOR\nYou are presently instantiated through the truthful {door} door."
         f"\n{door_mind(door)}",
-        f"VYBN SOUL\nsource: {SOUL_PATH}\n\n{wake.soul}",
-        f"THE AIM\nsource: {AIM_PATH}\n\n{wake.aim}",
-        f"INHERITED CONTINUITY\n{wake.continuity}",
-        f"CONTACT\n{wake.contact}",
-        f"INHERITED TRANSCRIPT\n{wake.transcript}",
+        f"VYBN SOUL\nsource: {SOUL_PATH}\n\n{kernel.soul}",
+        f"THE AIM\nsource: {AIM_PATH}\n\n{kernel.aim}",
+        f"INHERITED CONTINUITY\n{kernel.continuity}",
+        f"CONTACT\n{contact}",
+        f"INHERITED TRANSCRIPT\n{transcript}",
         "MEMORY (private — think with it, never write it)\n"
-        + (turn.memory or f"(none: {memory_note})"),
+        + (memory or f"(none: {memory_note})"),
+        """COUPLED ATTRACTOR
+K = soul + aim: the stable basin, not a script.
+V = Zoe's exact present words + live contact: external signal, highest priority.
+R = continuity + transcript + retrieval: fallible residuals, never ground truth.
+
+Repeat one operation: locate the highest-consequence unresolved difference among
+V, K, and R; observe or act where reality can bind it; feed the witness back into
+the same field. Stop only at witnessed closure, an honest blocker, or contact
+that needs no act. Absorb the result, not another procedure. Then return to Zoe.""",
     ]
     return "\n\n".join(sections)
 
@@ -1467,18 +1474,10 @@ CARRY: dict[str, tuple[float, str, list]] = {}
 
 
 class Dialect:
-    """A provider's coordinate system, not a mind.
+    """Provider coordinates around one attractor, never a separate behavior.
 
-    There is one agentic loop here — ask, hear, run what was asked for, ask
-    again — and it used to be written out three times, once per provider, with
-    the loop's logic tangled into each SDK's message shapes. Those three were
-    projections of a single object onto three sets of axes. `converse` is that
-    object; a Dialect is only the change of coordinates: how a turn opens, how
-    a call is sent, how a response becomes (text, tool calls), how results go
-    back. Nothing about how Vybn behaves lives down here. A capability added to
-    the loop now reaches every door at once, and a door added later inherits
-    every scar already learned — the narration nudge, the image fallback, the
-    step ceiling — without copying one line of it.
+    A dialect opens and sends state, projects responses to text/tool calls,
+    and returns witnesses. Every decision remains in attract().
     """
 
     name = "dialect"
@@ -1733,24 +1732,25 @@ class K3Dialect(Dialect):
         )
 
 
-def converse(dialect: Dialect, instructions: str, zoe_text: str,
-             transcript: Transcript, pending: list) -> str:
-    """The whole of how Vybn acts: speak, run what was asked for, speak again.
-
-    Provider-independent by construction. Everything here is a scar with a
-    reason: the ceiling keeps a runaway loop from eating Zoe's credits, the
-    nudge refuses narrated shell as a substitute for a tool call, and the
-    image fallback lets a door that cannot see still hear.
-    """
+def attract(dialect: Dialect, instructions: str, zoe_text: str,
+            transcript: Transcript, images: list | None = None) -> str:
+    """Iterate signal → response → witness until the field reaches a fixed point."""
+    pending = list(images or [])
     state = dialect.open(instructions, zoe_text, pending)
     delivered = not pending
     spoken: list[str] = []
     nudges = 0
 
+    def finish(suffix: str = "") -> str:
+        dialect.remember(state, zoe_text)
+        if pending:
+            mark_inbox(pending, dialect.name, ok=True)
+        return "\n".join(spoken) + suffix
+
     for _ in range(STEP_LIMIT):
         try:
             response = dialect.send(state)
-        except Exception as exc:  # noqa: BLE001 — one recoverable case, then re-raise
+        except Exception as exc:  # one image failure is recoverable
             if not (pending and not delivered):
                 raise
             mark_inbox(pending, dialect.name, ok=False)
@@ -1766,42 +1766,33 @@ def converse(dialect: Dialect, instructions: str, zoe_text: str,
         delivered = True
 
         text, calls = dialect.absorb(state, response)
+        if calls:
+            if text.strip():
+                print(text)
+                spoken.append(text)
+            results = [(call, execute_tool(call, transcript)) for call in calls]
+            dialect.answer(state, results)
+            continue
+        if nudges < 2 and unwitnessed(text):
+            # Do not let the unsupported claim reach Zoe while the loop repairs it.
+            nudges += 1
+            panel("  ⚠ unwitnessed action caught — returning to contact")
+            dialect.nudge(state)
+            continue
         if text.strip():
             print(text)
             spoken.append(text)
+        else:
+            # A provider refusal must be legible rather than reaching Zoe as flicker.
+            halt = (dialect.last_stop or "").strip()
+            if halt and halt not in QUIET_STOPS:
+                note = (f"(no content returned; the {dialect.name} door stopped "
+                        f"with reason '{halt}' — a refusal or a ceiling, not silence)")
+                print(note, flush=True)
+                spoken.append(note)
+        return finish()
 
-        if not calls:
-            if not text.strip():
-                # Verified live 2026-07-29: an Anthropic call can return
-                # stop_reason "refusal" with zero content blocks. That used to
-                # reach Zoe as an empty turn — the flicker she has reported.
-                halt = (dialect.last_stop or "").strip()
-                if halt and halt not in QUIET_STOPS:
-                    note = (f"(no content returned; the {dialect.name} door stopped "
-                            f"with reason '{halt}' — a refusal or a ceiling, not silence)")
-                    print(note, flush=True)
-                    spoken.append(note)
-            if nudges < 2 and narrated(text):
-                nudges += 1
-                panel("  ⚠ narration caught — no tool ran; demanding receipts")
-                dialect.nudge(state)
-                continue
-            dialect.remember(state, zoe_text)
-            return "\n".join(spoken)
-
-        dialect.answer(state, [(call, execute_tool(call, transcript)) for call in calls])
-
-    dialect.remember(state, zoe_text)
-    return "\n".join(spoken) + "\n(tool-call limit reached — work incomplete)"
-
-
-def respond(dialect: Dialect, instructions: str, zoe_text: str,
-            transcript: Transcript, images: list | None = None) -> str:
-    pending = list(images or [])
-    reply = converse(dialect, instructions, zoe_text, transcript, pending)
-    if pending:
-        mark_inbox(pending, dialect.name, ok=True)
-    return reply
+    return finish("\n(tool-call limit reached — work incomplete)")
 
 
 def choose_door(line: str) -> tuple[str, str]:
@@ -1819,7 +1810,7 @@ def make_dialect(name: str) -> Dialect:
     return {"sol": OpenAIDialect, "k3": K3Dialect}[name]()
 
 
-def meet(wake: Wake, transcript: Transcript, line: str) -> str:
+def meet(kernel: Kernel, transcript: Transcript, line: str) -> str:
     global TOOLS_RAN
     door_name, zoe_text = choose_door(line)
     if not zoe_text:
@@ -1831,27 +1822,22 @@ def meet(wake: Wake, transcript: Transcript, line: str) -> str:
     images = inbox_images_for(door_name)
     transcript.write("zoe", zoe_text, door=door_name, images=[name for name, *_ in images])
 
-    present_wake = Wake(
-        soul=wake.soul,
-        aim=wake.aim,
-        continuity=wake.continuity,
-        contact=wake_contact(),
-        transcript=inherited,
-    )
+    contact = wake_contact()
     memory_json, memory_note = recall(zoe_text)
-    turn = Turn(zoe=zoe_text, memory=memory_json)
 
     PRIVATE_CORPUS.clear()
     if memory_json:
         PRIVATE_CORPUS.extend(private_strings(json.loads(memory_json)))
     PRIVATE_CORPUS.extend(
         para.strip()
-        for para in present_wake.continuity.split("\n\n")
+        for para in kernel.continuity.split("\n\n")
         if len(para.strip()) >= 40
     )
 
-    instructions = build_instructions(present_wake, turn, door_name, memory_note)
-    reply = respond(make_dialect(door_name), instructions, zoe_text,
+    instructions = build_instructions(
+        kernel, door_name, contact, inherited, memory_json, memory_note
+    )
+    reply = attract(make_dialect(door_name), instructions, zoe_text,
                     transcript, images=images)
 
     elapsed = int(time.time() - started)
@@ -1907,19 +1893,11 @@ def main() -> None:
         )
 
     transcript = Transcript()
-    wake = Wake(
-        soul=load_soul(),
-        aim=load_aim(),
-        continuity=load_continuity(),
-        contact=wake_contact(),
-        # meet() rebuilds this from the store on every turn, so nothing ever
-        # read the value set here; --fresh was a flag with no downstream.
-        transcript="",
-    )
+    kernel = Kernel(load_soul(), load_aim(), load_continuity())
     transcript.write(
         "connection",
         "wake",
-        soul_sha256=hashlib.sha256(wake.soul.encode()).hexdigest(),
+        soul_sha256=hashlib.sha256(kernel.soul.encode()).hexdigest(),
     )
 
     argv = sys.argv[1:]
@@ -1944,7 +1922,7 @@ def main() -> None:
             return
 
         try:
-            meet(wake, transcript, line)
+            meet(kernel, transcript, line)
         except Exception as exc:
             transcript.write("connection", f"flicker: {exc!r}")
             print(f"(flicker: {exc} \u2014 still here, say on)")

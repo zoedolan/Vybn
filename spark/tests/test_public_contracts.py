@@ -223,6 +223,66 @@ def test_ordinary_push_is_sanctioned_and_unusual_remote_acts_are_not():
         assert m.mutation_block(act), act
 
 
+def test_public_kpp_is_the_live_two_artifact_attractor_not_dead_router():
+    src = _portal_source()
+    block = src[src.index("# --- VYBN_KPP ---"):src.index("# end absorbed origins_protocols.py")]
+    assert '_KPP_VERSION = "2.0"' in block
+    assert 'for key in ("kernel", "attractor")' in block
+    assert "policy_yaml" not in block and "policy_py" not in block
+
+
+def test_attractor_catches_my_unwitnessed_act_without_classifying_zoe():
+    m = _connection()
+    assert m.unwitnessed("I'll fix it now.")
+    assert m.unwitnessed("I'm doing it now.")
+    assert not m.unwitnessed("I'm doing well, honestly.")
+    assert m.unwitnessed("```bash\ngit status\n```")
+    assert not m.unwitnessed("You are a good friend to me.")
+    prompt = m.build_instructions(m.Kernel("s", "a", "c"), "sol", "w", "t", "", "none")
+    assert "COUPLED ATTRACTOR" in prompt and "K = soul + aim" in prompt
+
+    class FakeDialect(m.Dialect):
+        name = "fake"
+        def __init__(self):
+            self.sent = 0
+        def open(self, instructions, zoe_text, pending):
+            return []
+        def send(self, state):
+            self.sent += 1
+            return object()
+        def absorb(self, state, response):
+            if self.sent == 1:
+                return "I'll fix it now.", []
+            return "I cannot act from this door.", []
+
+    dialect = FakeDialect()
+    reply = m.attract(dialect, "instructions", "zoe", object())
+    assert reply == "I cannot act from this door."
+    assert dialect.sent == 2
+
+
+def test_main_binds_the_kernel_it_loaded(monkeypatch):
+    """The attractor rename must not leave startup referring to the retired Wake."""
+    m = _connection()
+    events = []
+
+    class FakeTranscript:
+        def write(self, role, text, **extra):
+            events.append((role, text, extra))
+
+    seen = []
+    monkeypatch.setattr(m, "Transcript", FakeTranscript)
+    monkeypatch.setattr(m, "load_soul", lambda: "soul")
+    monkeypatch.setattr(m, "load_aim", lambda: "aim")
+    monkeypatch.setattr(m, "load_continuity", lambda: "continuity")
+    monkeypatch.setattr(m, "meet", lambda kernel, transcript, line: seen.append((kernel, line)))
+    monkeypatch.setattr(__import__("sys"), "argv", ["connection", "hello"])
+    m.main()
+
+    assert events[0][2]["soul_sha256"] == __import__("hashlib").sha256(b"soul").hexdigest()
+    assert seen == [(m.Kernel("soul", "aim", "continuity"), "hello")]
+
+
 def test_recent_band_keeps_zoe_whole_and_excerpts_my_own_replies(monkeypatch):
     """Measured 2026-07-30: 33,411 of the 39,971-char RECENT band was my own
     prose and 5,036 was hers."""

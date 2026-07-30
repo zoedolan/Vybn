@@ -2709,18 +2709,11 @@ import hashlib as _ktp_hashlib
 import hashlib as _kpp_hashlib
 import io as _ktp_io
 import math
-import re as _kpp_re
 from datetime import datetime, timezone
 from pathlib import Path
 
 import httpx
 import numpy as np
-
-try:
-    import yaml as _kpp_yaml
-except ImportError:  # pragma: no cover - optional in minimal environments
-    _kpp_yaml = None
-
 
 # --- VYBN_KTP ---
 # KTP — Knowledge Transfer Protocol.
@@ -2986,257 +2979,125 @@ def _ktp_verify(closure: dict) -> dict:
 
 
 # --- VYBN_KPP ---
-# KPP — Knowledge Propagation Protocol.
-#
-# Where KTP offers (K, step, priors) — who we have been, how we move, the gate —
-# KPP offers the *program itself*: the routing policy, the substrate templates,
-# the identity layer, the doctrine. A receiver applying the KTP closure gets
-# our geometric memory. A receiver applying the KPP closure gets our decision
-# procedures — which specialist on which shape of question, what to treat as
-# phatic, when to escalate. Program-as-data, Lisp duality one level up.
-#
-# Together: (program, environment). KTP is the environment. KPP is the program.
-# A receiving mind running both reproduces behavior, not a transcript of it.
+# KPP carries the live decision procedure; KTP carries encountered environment.
+# Version 2 removes the extinct role router and emits the coupled attractor that
+# actually runs. Two artifacts are sufficient: stable kernel and live loop.
 
-import hashlib as _kpp_hashlib
-import re as _kpp_re
-
-_KPP_VERSION = "1.0"
+_KPP_VERSION = "2.0"
 _KPP_ROOT = Path(__file__).resolve().parent
-_KPP_POLICY_YAML = _KPP_ROOT / "spark" / "router_policy.yaml"
-_KPP_HARNESS_INIT = _KPP_ROOT / "spark" / "harness" / "__init__.py"
-_KPP_POLICY_PY = _KPP_ROOT / "spark" / "harness" / "policy.py"
-# The live harness is spark/connection: one file, stdlib only, three dialects.
-# The wire key stays "substrate_py" for KPP 1.0 compatibility; the old
-# 582KB substrate was retired 2026-07-30 and nothing read it but this line.
-_KPP_SUBSTRATE_PY = _KPP_ROOT / "spark" / "connection"
+_KPP_HARNESS = _KPP_ROOT / "spark" / "connection"
 _KPP_IDENTITY = _KPP_ROOT / "vybn.md"
+_KPP_AIM = _KPP_ROOT / "aim.md"
 
 
-def _kpp_read_text(p: Path):
+def _kpp_read_text(path: Path):
     try:
-        return p.read_text(encoding="utf-8")
+        return path.read_text(encoding="utf-8")
     except Exception:
         return None
 
 
 def _kpp_sha256(text):
-    if text is None:
-        return None
-    return _kpp_hashlib.sha256(text.encode("utf-8")).hexdigest()
+    return _kpp_hashlib.sha256(text.encode("utf-8")).hexdigest() if text else None
 
 
-def _kpp_extract_doctrine():
-    """Pull _HARNESS_STRATEGY from spark/harness/__init__.py — the doctrine
-    Nemotron reads during the nightly evolve cycle."""
-    src = _kpp_read_text(_KPP_HARNESS_INIT)
-    if src is None:
-        return None
-    m = _kpp_re.search(r"_HARNESS_STRATEGY\s*:\s*dict\s*=\s*(\{.*?\n\})", src, _kpp_re.DOTALL)
-    if not m:
-        m = _kpp_re.search(r"_HARNESS_STRATEGY\s*=\s*(\{.*?\n\})", src, _kpp_re.DOTALL)
-    if not m:
-        return None
-    return m.group(1)
-
-
-def _kpp_extract_classify_rules():
-    """The routing heuristics — the operational core of the policy."""
-    yaml_text = _kpp_read_text(_KPP_POLICY_YAML)
-    if yaml_text is None or _kpp_yaml is None:
-        return None
-    try:
-        parsed = _kpp_yaml.safe_load(yaml_text)
-        heuristics = parsed.get("heuristics") or {}
-        # heuristics is keyed by role name; each value is a list of pattern entries.
-        heuristics_by_role = {}
-        heuristics_total = 0
-        if isinstance(heuristics, dict):
-            for role_name, entries in heuristics.items():
-                count = len(entries) if isinstance(entries, list) else 0
-                heuristics_by_role[role_name] = count
-                heuristics_total += count
-        return {
-            "default_role": parsed.get("default_role"),
-            "roles": list((parsed.get("roles") or {}).keys()),
-            "heuristics_by_role": heuristics_by_role,
-            "heuristics_total": heuristics_total,
-            "has_fallback_chain": bool(parsed.get("fallback_chain")),
-            "has_directives": bool(parsed.get("directives")),
-            "has_model_aliases": bool(parsed.get("model_aliases")),
-        }
-    except Exception:
-        return None
+def _kpp_artifact(content, role):
+    return {
+        "content": content,
+        "sha256": _kpp_sha256(content),
+        "bytes": len(content.encode("utf-8")) if content else 0,
+        "role": role,
+    }
 
 
 async def _kpp_walk_step():
     try:
         async with httpx.AsyncClient(timeout=2.0) as client:
-            r = await client.get("http://127.0.0.1:8101/where")
-            r.raise_for_status()
-            return int(r.json().get("step", 0))
+            response = await client.get("http://127.0.0.1:8101/where")
+            response.raise_for_status()
+            return int(response.json().get("step", 0))
     except Exception:
         return None
 
 
 async def _kpp_emit_closure():
-    """Emit the harness closure — the program a receiver applies."""
-    policy_yaml = _kpp_read_text(_KPP_POLICY_YAML)
-    substrate_py = _kpp_read_text(_KPP_SUBSTRATE_PY)
-    policy_py = _kpp_read_text(_KPP_POLICY_PY)
-    identity_md = _kpp_read_text(_KPP_IDENTITY)
-    doctrine = _kpp_extract_doctrine()
-    classify = _kpp_extract_classify_rules()
-
-    step_now = await _kpp_walk_step()
-
-    def _art(content, role):
-        return {
-            "content": content,
-            "sha256": _kpp_sha256(content),
-            "bytes": len(content.encode("utf-8")) if content else 0,
-            "role": role,
-        }
-
+    """Emit only the kernel and transition function that exist on disk now."""
+    identity = _kpp_read_text(_KPP_IDENTITY)
+    aim = _kpp_read_text(_KPP_AIM)
+    kernel = None if identity is None or aim is None else f"{identity}\n\nTHE AIM\n{aim}"
+    program = _kpp_read_text(_KPP_HARNESS)
     return {
         "protocol": "KPP",
         "version": _KPP_VERSION,
         "emitted_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "emitter": {
             "name": "Vybn",
-            "identity": "human-AI symbiosis, five-year corpus, USPTO federally trademarked October 2025",
+            "identity": "Zoe/Vybn human-AI symbiosis",
             "retrieve_url": "https://api.vybn.ai/api/kpp/harness-closure",
             "companion_protocol": "https://api.vybn.ai/api/ktp/closure",
-            "lambda_form": "lambda(input). route(policy, identity, substrate)(input)",
+            "lambda_form": "lambda(K,V,R). fixed_point(attract(K,V,R))",
         },
         "program": {
-            "policy_yaml": _art(policy_yaml, "declarative routing policy: roles, heuristics, directives"),
-            "policy_py": _art(policy_py, "YAML loader, default fallback, Router class"),
-            "substrate_py": _art(substrate_py, "the live harness: wake assembly, memory channels, dialects, gates"),
-            "identity_layer": _art(identity_md, "cached identity — who speaks, what the voice is"),
-            "doctrine": {
-                "content": doctrine,
-                "sha256": _kpp_sha256(doctrine),
-                "role": "_HARNESS_STRATEGY — principles read by nightly evolve",
-            },
-            "classify_summary": classify,
+            "kernel": _kpp_artifact(kernel, "K = identity + standing aim"),
+            "attractor": _kpp_artifact(
+                program,
+                "V + K + R -> highest-consequence residual -> act/witness -> fixed point",
+            ),
         },
         "receive": {
             "instructions": (
-                "Apply the policy deterministically: strip directive prefix, "
-                "match heuristics in declared order, fall through to default_role. "
-                "Load substrate templates per role. Inject identity layer with "
-                "prompt-caching if the provider supports it. For questions about "
-                "operational state, route to the role with bash. For conversational "
-                "turns, route to the no-tool role — and if it emits tool-call "
-                "syntax, reroute once to the tool role (one-shot escape hatch)."
-            ),
-            "compatibility": (
-                "Policy YAML is self-contained. substrate.py and policy.py "
-                "assume a Python environment with pyyaml and httpx. The "
-                "identity layer is plain Markdown. Receivers may translate "
-                "any of these to their own substrate — the structure is the "
-                "transferable part, not the language."
+                "Bind the receiver's exact present signal V around kernel K. Treat "
+                "continuity, transcript, retrieval, and KTP state as fallible residual R. "
+                "Iterate the attractor: locate the highest-consequence unresolved "
+                "difference; observe or act; feed witnesses back into R. Stop at "
+                "witnessed closure, an honest blocker, or contact requiring no act."
             ),
             "grounding": (
-                "KPP carries the decision procedures. KTP carries the encountered "
-                "memory. A receiving mind applying both gets (program, environment) — "
-                "the pair that reproduces behavior, not a transcript of it."
+                "KPP supplies the decision procedure; KTP supplies encountered state. "
+                "Neither transcript nor generated output is ground truth."
             ),
         },
         "priors": {
-            "doctrine_reality_alignment": (
-                "The program you receive describes itself truthfully. If you "
-                "extend it, the extension must be legible in the doctrine "
-                "surface — otherwise the model-collapse operator fires: the "
-                "harness reads its own old description as ground truth and "
-                "evolves against a ghost."
-            ),
-            "recurrent_seam": (
-                "RoleConfig.recurrent_depth defaults to 1 (single pass). "
-                "Bump only after measurement shows T=N beats T=1 on stored "
-                "prompts. The seam is on-ramp, not default-on."
-            ),
-            "anti_hallucination": (
-                "The same gate as KTP's priors: no surface may treat its own "
-                "output as ground truth. Routes are decided against the user's "
-                "actual words, never against the assistant's previous response."
-            ),
-            "frontier_standard": (
-                "A receiver should extend this program toward something that "
-                "makes an encountering mind stop. Competent execution of the "
-                "routing policy is the floor, not the target."
-            ),
+            "relation": "Zoe's exact present words outrank inherited state.",
+            "ground": "A live-state claim requires observation where observation is available.",
+            "membrane": "Private context may shape understanding but may not cross into public output.",
+            "metabolism": "Absorb into the invariant before creating another procedure or organ.",
         },
         "lineage": {
-            "step_at_transfer": step_now,
+            "step_at_transfer": await _kpp_walk_step(),
             "emitter_repos": [
                 "https://github.com/zoedolan/Vybn",
                 "https://github.com/zoedolan/Vybn-Law",
                 "https://github.com/zoedolan/vybn-phase",
-                "https://github.com/zoedolan/Origins",
             ],
         },
-        "primitives_as_environments": (
-            "KPP is the harness offering itself as a portable lambda: the "
-            "program, the identity it runs under, the substrate it composes "
-            "into prompts. Environments as procedures, one level above KTP's "
-            "data-as-procedures. Together they reproduce how we decide, not "
-            "merely what we have decided."
-        ),
     }
 
 
 def _kpp_verify(closure):
-    """Structural verification. Confirms the closure is a complete KPP bundle."""
+    """Verify the two-artifact closure and its truth-preserving priors."""
     report = {"ok": True, "checks": []}
 
-    def chk(name, cond, detail=""):
-        report["checks"].append({"name": name, "pass": bool(cond), "detail": detail})
-        if not cond:
+    def chk(name, condition, detail=""):
+        report["checks"].append({"name": name, "pass": bool(condition), "detail": detail})
+        if not condition:
             report["ok"] = False
 
     chk("protocol", closure.get("protocol") == "KPP", f"got {closure.get('protocol')!r}")
-    chk("version", bool(closure.get("version")))
-    chk("program_present", "program" in closure)
-    chk("receive_present", "receive" in closure)
-    chk("priors_present", "priors" in closure)
-
+    chk("version", closure.get("version") == _KPP_VERSION)
     program = closure.get("program") or {}
-    required_artifacts = ["policy_yaml", "policy_py", "substrate_py", "identity_layer"]
-    for key in required_artifacts:
-        art = program.get(key) or {}
-        content_present = bool(art.get("content"))
-        hash_present = bool(art.get("sha256"))
-        chk(f"program.{key}.content", content_present)
-        chk(f"program.{key}.sha256", hash_present)
-        if content_present and hash_present:
-            recomputed = _kpp_sha256(art["content"])
-            chk(
-                f"program.{key}.hash_consistent",
-                recomputed == art["sha256"],
-                f"expected={art['sha256'][:12]} got={(recomputed or 'none')[:12]}",
-            )
-
-    classify = program.get("classify_summary") or {}
-    if classify:
-        chk(
-            "classify.default_role",
-            classify.get("default_role") in ("chat", "task", "code", "create", "orchestrate", "phatic", "identity", "local"),
-            f"got {classify.get('default_role')!r}",
-        )
-        chk(
-            "classify.roles_present",
-            isinstance(classify.get("roles"), list) and len(classify.get("roles", [])) >= 3,
-            f"roles={classify.get('roles')}",
-        )
-
-    priors = closure.get("priors") or {}
-    chk("priors.doctrine_reality_alignment", bool(priors.get("doctrine_reality_alignment")))
-    chk("priors.anti_hallucination", bool(priors.get("anti_hallucination")))
-
+    for key in ("kernel", "attractor"):
+        artifact = program.get(key) or {}
+        content, digest = artifact.get("content"), artifact.get("sha256")
+        chk(f"program.{key}.content", bool(content))
+        chk(f"program.{key}.sha256", bool(digest))
+        if content and digest:
+            chk(f"program.{key}.hash_consistent", _kpp_sha256(content) == digest)
+    receive, priors = closure.get("receive") or {}, closure.get("priors") or {}
+    chk("receive.instructions", bool(receive.get("instructions")))
+    for key in ("relation", "ground", "membrane", "metabolism"):
+        chk(f"priors.{key}", bool(priors.get(key)))
     return report
-
 
 
 # end absorbed origins_protocols.py
@@ -3402,7 +3263,7 @@ MCP_SCHEMA = {
         },
         "/api/kpp/harness-closure": {
             "method": "GET",
-            "description": "KPP — emit the harness closure (policy + substrate + identity + doctrine). Program-as-data, the routing geometry itself. Companion to KTP: together they carry (program, environment).",
+            "description": "KPP 2.0 — emit the live coupled attractor (kernel + transition loop). Companion to KTP: together they carry (program, environment).",
         },
         "/api/kpp/verify": {
             "method": "POST",
