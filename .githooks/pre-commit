@@ -140,7 +140,7 @@ while IFS=$'\t' read -r code path; do
     # Protocol-namespace documents: the host and the crawlers assign these names,
     # not us. A site root cannot be absorbed into another file, so an add here is
     # a required address rather than accretion. Deletions still count as retirements.
-    case "$path" in index.html|sitemap.xml|robots.txt|.well-known/*)
+    case "$path" in index.html|sitemap.xml|robots.txt|.well-known/*|.github/FUNDING.yml)
         [[ "$code" == A* ]] && { active=$((active + 1)); continue; } ;;
     esac
     [[ "$code" == A* ]] && new_files=$((new_files + 1)) && continue
