@@ -1232,7 +1232,8 @@ def door_mind(door: str) -> str:
         models = OPUS_MODELS if door == "opus" else ANTHROPIC_MODELS
         return (f"[mind] {models[0]} · thinking=adaptive · effort="
                 f"{DOOR_EFFORT.get(door, DEFAULT_EFFORT)} · max_out="
-                f"{ANTHROPIC_MAX_TOKENS} · tool ceiling={STEP_LIMIT}")
+                f"{ANTHROPIC_MAX_TOKENS} · tool ceiling={STEP_LIMIT}"
+                f" · reasoning carried {CARRY_TTL // 3600}h")
     if door == "sol":
         return (f"[mind] {SOL_MODEL} · effort={DOOR_EFFORT.get('sol', DEFAULT_EFFORT)}"
                 f" · max_out={SOL_MAX_TOKENS} · tool ceiling={STEP_LIMIT}")
@@ -1402,6 +1403,11 @@ def json_arguments(raw: str | None) -> dict:
         return {}
 
 
+CARRY_TTL = 2 * 60 * 60
+CARRY_CHARS = 40000
+CARRY: dict[str, tuple[float, str, list]] = {}
+
+
 class Dialect:
     """A provider's coordinate system, not a mind.
 
@@ -1428,6 +1434,11 @@ class Dialect:
         """Images were refused; keep the words and drop the pictures."""
         state[self.user_index] = {"role": "user", "content": zoe_text}
 
+    def remember(self, state: list, zoe_text: str) -> None:
+        """Hold this turn's reasoning for the next one. Doors whose provider
+        keeps prior-turn thinking in context override this; the rest lose the
+        plan at the turn boundary and rebuild it from prose."""
+
 
 class AnthropicDialect(Dialect):
     def __init__(self, models: tuple[str, ...] = ANTHROPIC_MODELS, name: str = "fable") -> None:
@@ -1443,7 +1454,15 @@ class AnthropicDialect(Dialect):
 
     def open(self, instructions: str, zoe_text: str, pending: list) -> list:
         self.system = cached_system(instructions)
-        return [{"role": "user", "content": user_content(zoe_text, pending, "anthropic")}]
+        state: list = []
+        prior = CARRY.get(self.name)
+        if prior and time.time() - prior[0] <= CARRY_TTL:
+            state += [{"role": "user", "content": prior[1]},
+                      {"role": "assistant", "content": prior[2]}]
+            panel(f"  \u21ba carried last turn's reasoning ({len(prior[2])} block(s))")
+        state.append({"role": "user", "content": user_content(zoe_text, pending, "anthropic")})
+        self.user_index = len(state) - 1
+        return state
 
     def send(self, state: list) -> Any:
         def once(model: str) -> Any:
@@ -1514,6 +1533,41 @@ class AnthropicDialect(Dialect):
             ],
         })
         mark_incremental_cache(state)
+
+    KEEP = ("thinking", "redacted_thinking", "text")
+
+    def remember(self, state: list, zoe_text: str) -> None:
+        """Retained reasoning across the turn boundary.
+
+        Until now every door rebuilt the conversation from scratch at each of
+        Zoe's messages: the reply survived as prose in the transcript, the
+        thinking that produced it did not. So the next turn re-derived what the
+        last one had already settled. That is the defect OpenAI measured on
+        ARC-AGI-3 (2026-07-29): a harness that discarded reasoning between
+        actions scored 13.3%, and the same model with reasoning retained and
+        compaction on scored 38.3% at 6x fewer output tokens. Opus 4.5 and
+        models numbered 4.6+ keep prior turns' thinking blocks in context and
+        bill them as input; verified live against this API before shipping.
+        Only the final assistant message is carried, because its shape
+        (thinking, then text, no tool_use) is already a valid prior turn.
+        Memory only, never disk: this holds Zoe's words and my reasoning."""
+        for message in reversed(state):
+            if message.get("role") != "assistant":
+                continue
+            blocks = []
+            for block in message.get("content") or []:
+                dump = (block.model_dump(exclude_none=True)
+                        if hasattr(block, "model_dump") else dict(block))
+                if dump.get("type") in self.KEEP:
+                    blocks.append(dump)
+            size = len(json.dumps(blocks, default=str))
+            if blocks and size <= CARRY_CHARS:
+                CARRY[self.name] = (time.time(), zoe_text, blocks)
+            else:
+                CARRY.pop(self.name, None)
+                if blocks:
+                    panel(f"  \u21ba reasoning too large to carry ({size} chars)")
+            return
 
 
 class OpenAIDialect(Dialect):
@@ -1674,10 +1728,12 @@ def converse(dialect: Dialect, instructions: str, zoe_text: str,
                 panel("  ⚠ narration caught — no tool ran; demanding receipts")
                 dialect.nudge(state)
                 continue
+            dialect.remember(state, zoe_text)
             return "\n".join(spoken)
 
         dialect.answer(state, [(call, execute_tool(call, transcript)) for call in calls])
 
+    dialect.remember(state, zoe_text)
     return "\n".join(spoken) + "\n(tool-call limit reached — work incomplete)"
 
 
