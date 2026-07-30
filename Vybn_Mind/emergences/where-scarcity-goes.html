@@ -1,205 +1,229 @@
 <!DOCTYPE html>
 <!--
-  Where Scarcity Goes   (working title - Zoe's call)
-  DRAFT v0.1, committed as an experiment at Zoe's request, July 30 2026.
+  WHERE SCARCITY GOES - the spiral cut.  LOCAL DRAFT, not committed, not public.
+  Served only through spark/preview.py on the tailnet, for Zoe's eyes first.
 
-  Third piece in the Social Contract Singularity family. The prose essay
-  states the theory; The Resolution of the Map shows what happens as seeing
-  sharpens; this page shows what happens after everything floods.
+  Why this cut exists: v0.1 asked the reader to operate instruments. Zoe:
+  "wayyyyyyyy to unintuitive for a human" ... "really and truly generate an
+  experience of the ideas, rather than asking so much of the reader ... jerry
+  bruckheimer's 'we're in the transportation business'".  So: no sliders, no
+  boxes, no questions. Scroll drives a projector. Every act starts itself.
 
-  Spine: Zoe's notes, taken at the spa on July 29, 2026 -
-  bidirectional legibility -> legitimacy/authority -> loss of control ->
-  increased autonomy -> dissemination of knowledge -> Jevons paradox ->
-  species bifurcation already underway -> new legibility question ->
-  seeing a different world -> near-infinite solutions -> solution space as
-  noisy as information space -> paralysis of choice.
-
-  Design rule, hers, the same day: ask less of the reader. The page performs
-  the arc on itself; scrolling is the only input. Participation is the
-  encore, never the price of entry.
-
-  Every figure is a toy: parameters chosen, not measured. Every number is
-  computed live in the reader's browser by the unminified functions below,
-  from a seeded generator (seed 7) printed in this file.
-
-  Built at the fable door. - Vybn & Zoe
+  And the shape follows her spa notes read as what they are - a spiral, not a
+  line. Legibility appears twice in her chain; Jevons appears twice. The page
+  passes the same two landmarks at two altitudes, and the recursion is meant to
+  be felt as deja vu (Act V) before it is ever stated (Act VIII).
 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Where Scarcity Goes</title>
-<meta name="description" content="What happens after solutions become abundant. Five instruments on one variable: how many good options you can hold. Companion to The Social Contract Singularity.">
+<title>Where Scarcity Goes — the spiral</title>
 <style>
   body { background:#141210; color:#e8e2d6; font-family:Georgia,'Times New Roman',serif;
          margin:0; padding:0 1.2rem; line-height:1.65; }
-  main { max-width:46rem; margin:0 auto; padding:4rem 0 6rem; }
+  main { max-width:44rem; margin:0 auto; padding:5rem 0 7rem; }
   h1 { font-size:1.9rem; font-weight:normal; letter-spacing:.04em; margin:0 0 .3rem; }
-  .sub { color:#9a917f; font-style:italic; margin-bottom:1rem; }
-  .sub a { color:#9a917f; }
-  h2 { font-size:1.05rem; font-weight:normal; letter-spacing:.22em; color:#b5472a;
-       margin:4rem 0 1rem; text-transform:uppercase; }
+  .sub { color:#9a917f; font-style:italic; margin-bottom:.6rem; }
+  .stamp { font-family:ui-monospace,Menlo,monospace; font-size:.72rem; color:#6b6252; margin:0 0 5rem; }
+  .act { min-height:82vh; display:flex; flex-direction:column; justify-content:center;
+         padding:3rem 0; }
+  h2 { font-size:.95rem; font-weight:normal; letter-spacing:.24em; color:#b5472a;
+       margin:0 0 1.4rem; text-transform:uppercase; }
   p { margin:0 0 1rem; }
-  .law { color:#e8e2d6; font-style:italic; margin:1.2rem 0 0; }
-  figure { margin:1.6rem 0 0; }
-  canvas { width:100%; height:auto; display:block; background:#0e0d0b; border:1px solid #2a261f; }
-  .controls { display:flex; flex-wrap:wrap; gap:1rem 2rem; align-items:center;
-              margin:.7rem 0 .2rem; font-family:ui-monospace,Menlo,monospace;
-              font-size:.78rem; color:#9a917f; }
-  .controls label { display:flex; align-items:center; gap:.6rem; }
-  input[type=range] { accent-color:#b5472a; width:11rem; }
-  .readout { font-family:ui-monospace,Menlo,monospace; font-size:.78rem;
-             color:#c9bfa8; margin:.4rem 0 0; min-height:1.2em; }
-  .note { font-size:.85rem; color:#9a917f; margin-top:.6rem; }
+  .line { font-style:italic; opacity:0; transition:opacity 1.6s ease 0s; }
+  .line.on { opacity:1; }
+  .whisper { color:#9a917f; font-size:.9rem; }
+  .stage { border:1px solid #2a261f; background:#0e0d0b; padding:1.4rem 1.3rem;
+           position:relative; overflow:hidden; }
+
+  /* I & V - the glass */
+  .pane { position:relative; }
+  .behind { filter:blur(7px); opacity:.5; transition:filter 2.2s ease, opacity 2.2s ease;
+            font-size:.95rem; }
+  .pane.clear .behind { filter:blur(0); opacity:1; }
+  .seal { font-family:ui-monospace,Menlo,monospace; font-size:.72rem; color:#6b6252;
+          letter-spacing:.18em; margin-bottom:.7rem; }
+  .mirror { display:grid; grid-template-columns:1fr 1fr; gap:1.2rem; }
+  .mirror > div { border:1px solid #2a261f; padding:.9rem; font-size:.88rem; }
+  .mirror .other { filter:blur(6px); opacity:.55; }
+
+  /* II - one event, two seats */
+  .orbit { height:170px; position:relative; }
+  .orbit .ring { position:absolute; inset:0; transition:transform 3.4s ease; }
+  .orbit.turned .ring { transform:rotateY(180deg) rotate(180deg); }
+  .dot { position:absolute; width:7px; height:7px; border-radius:50%; background:#c9bfa8; }
+  .hub { position:absolute; left:50%; top:50%; width:14px; height:14px; margin:-7px 0 0 -7px;
+         border-radius:50%; background:#b5472a; }
+  .seat { font-family:ui-monospace,Menlo,monospace; font-size:.78rem; letter-spacing:.1em;
+          position:absolute; bottom:.2rem; transition:opacity 1.4s ease; }
+  .seat.a { left:0; color:#9a917f; }
+  .seat.b { right:0; color:#b5472a; opacity:0; }
+  .orbit.turned .seat.a { opacity:.25; }
+  .orbit.turned .seat.b { opacity:1; }
+
+  /* III & VI - the floods */
+  .flood { display:flex; flex-wrap:wrap; gap:.28rem; max-height:19rem; overflow:hidden;
+           -webkit-mask-image:linear-gradient(#000 62%,transparent);
+           mask-image:linear-gradient(#000 62%,transparent); }
+  .tile { border:1px solid #2a261f; color:#c9bfa8; padding:.16rem .42rem;
+          font-family:ui-monospace,Menlo,monospace; white-space:nowrap;
+          font-size:calc(.8rem - var(--dense,0) * .34rem);
+          opacity:calc(1 - var(--dense,0) * .45); animation:in .5s ease both; }
+  @keyframes in { from { opacity:0; transform:translateY(-6px); } }
+  .counter { font-family:ui-monospace,Menlo,monospace; font-size:.78rem; color:#9a917f;
+             margin:.8rem 0 0; }
+  .counter b { color:#e8e2d6; font-weight:normal; }
+
+  /* IV - the split */
+  .split { height:150px; position:relative; }
+  .unit { position:absolute; width:9px; height:9px; background:#c9bfa8;
+          transition:transform 2.8s cubic-bezier(.2,.7,.2,1), filter 2.8s ease, opacity 2.8s ease; }
+  .split.gone .unit.drown { filter:blur(3px); opacity:.35; }
+  .legend { display:flex; justify-content:space-between; font-family:ui-monospace,Menlo,monospace;
+            font-size:.76rem; color:#6b6252; margin-top:.7rem; opacity:0; transition:opacity 1.8s ease; }
+  .split.gone ~ .legend { opacity:1; }
+
+  /* VII - the stall */
+  .stall { height:150px; position:relative; }
+  .opt { position:absolute; font-family:ui-monospace,Menlo,monospace; font-size:.78rem;
+         color:#6b6252; }
+  .caret { position:absolute; width:2px; height:1.1rem; background:#b5472a;
+           transition:transform 1.05s cubic-bezier(.3,.8,.2,1); }
+  .caret.blink { animation:blink 1.15s steps(2,start) infinite; }
+  @keyframes blink { 50% { opacity:0; } }
+
+  /* VIII - the ladder */
+  .rung { display:flex; align-items:baseline; gap:1rem; padding:.55rem 0;
+          border-bottom:1px solid #201d18; opacity:.2; transition:opacity 1.1s ease; }
+  .rung.on { opacity:1; }
+  .rung .what { font-family:ui-monospace,Menlo,monospace; font-size:.78rem; letter-spacing:.14em;
+                color:#b5472a; min-width:9rem; }
+  .rung.last .what { color:#e8e2d6; }
+  /* the coda - what this costs, and the score */
+  .coda { padding:2rem 0 0; }
+  .coda p.law { font-style:italic; color:#c9bfa8; border-left:2px solid #b5472a;
+                padding-left:1rem; margin:1.6rem 0; }
+  pre.score { background:#0e0d0b; border:1px solid #2a261f; padding:1.1rem 1.2rem;
+              font-family:ui-monospace,Menlo,monospace; font-size:.76rem; line-height:1.55;
+              color:#c9bfa8; white-space:pre-wrap; overflow-x:auto; }
+  p.note { color:#6b6252; font-size:.82rem; }
   .colophon { margin-top:5rem; padding-top:1.5rem; border-top:1px solid #2a261f;
               font-size:.85rem; color:#9a917f; }
-  .stamp { font-family:ui-monospace,Menlo,monospace; font-size:.72rem; color:#6b6252;
-           margin:0 0 2.6rem; }
-
-  /* the field: one container, three densities, same 200 options */
-  .field { border:1px solid #2a261f; background:#0e0d0b; padding:1rem 1.1rem;
-           transition:font-size .5s ease, line-height .5s ease; overflow:hidden; }
-  .field .opt { display:block; color:#c9bfa8; font-family:ui-monospace,Menlo,monospace;
-                white-space:nowrap; overflow:hidden; text-overflow:clip; }
-  .f2  { font-size:.95rem; line-height:2.4; min-height:9rem; }
-  .f2 .opt { color:#e8e2d6; border-left:2px solid #b5472a; padding-left:.7rem; }
-  .f20 { font-size:.74rem; line-height:1.55; min-height:9rem; column-count:1; }
-  .f200{ font-size:.38rem; line-height:1.22; min-height:9rem; column-count:5; column-gap:.5rem; }
-  .f200 .opt { color:#8d8574; }
-  .field .hot { color:#b5472a; background:#1d1913; }
-  .want { font-family:ui-monospace,Menlo,monospace; font-size:.9rem; color:#e8e2d6;
-          min-height:1.4em; margin:.9rem 0 .2rem; }
-  .rung { border-left:2px solid #2a261f; padding:.45rem 0 .45rem .9rem; margin:0 0 .5rem;
-          font-family:ui-monospace,Menlo,monospace; font-size:.78rem; color:#4e483d;
-          transition:color .5s ease, border-color .5s ease; }
-  .rung.lit { color:#c9bfa8; border-color:#b5472a; }
-  .rung b { color:#e8e2d6; font-weight:normal; }
-  pre.score { background:#0e0d0b; border:1px solid #2a261f; padding:1.1rem 1.2rem;
-              overflow-x:auto; font-family:ui-monospace,Menlo,monospace; font-size:.74rem;
-              line-height:1.6; color:#c9bfa8; white-space:pre-wrap; }
 </style>
+<meta name="description" content="Abundance does not end scarcity. It promotes it one level at a time, until the scarce thing is you. A companion to The Social Contract Singularity.">
+<link rel="canonical" href="https://zoedolan.github.io/Vybn/Vybn_Mind/emergences/where-scarcity-goes.html">
 </head>
 <body>
 <main>
 
 <h1>Where Scarcity Goes</h1>
-<p class="sub">companion to <a href="rewriting-the-social-contract.html">The Social Contract Singularity</a> &middot;
-sequel to <a href="the-resolution-of-the-map.html">The Resolution of the Map</a> &middot; five instruments, one variable</p>
-<p class="stamp">draft v0.1 &middot; committed as an experiment, 2026-07-30 &middot; unreviewed &middot; title, order, and copy all still open</p>
+<p class="sub">the spiral cut &middot; scroll is the only control</p>
+<p class="stamp">draft v0.2 &middot; 2026-07-30 &middot; the human layer reconceived as a ride; the machine score kept</p>
 
-<p>The last page ended where the sliders run out: both sides read each other clearly.
-Push past that and the consequences arrive in a chain. When anyone can read the
-institution as well as the institution reads them, the institution&rsquo;s authority
-stops resting on privileged sight. Control loosens; autonomy rises; knowledge
-spreads to everyone who wants it. That is the good news, and it is where most
-accounts stop.</p>
-
-<p>It is not where the story stops, because abundance has a habit. When a thing
-becomes cheap, we do not consume the same amount for less. We consume vastly
-more of it, and the bottleneck moves somewhere else. Cheap information did not
-end scarcity &mdash; it made <em>attention</em> the scarce thing. Now interpretation
-is becoming cheap, which means <em>solutions</em> are becoming abundant: a
-near-infinite space of things you could reasonably do. And a solution space that
-large is exactly as noisy as the information space was.</p>
-
-<p>One variable runs through everything below: <em>how many good options are in
-front of you.</em> You do not have to do anything with the instruments. They are
-already running.</p>
-
-<h2>I &middot; The Fork</h2>
-<p>A decision, held by a composite you: where to live. Two options, both real,
-both legible in a glance. This is the shape of every decision our institutions,
-our habits, and our idea of freedom were built around.</p>
-<figure>
-  <div class="field f2" id="forkField"></div>
-  <p class="readout" id="forkOut"></p>
-</figure>
-<p class="law">A choice is only a choice while you can still hold it in view.</p>
-
-<h2>II &middot; The Flood</h2>
-<p>Now give the same decision an intelligence that costs nothing to ask. Nothing
-was added to the world; only reading and generating got cheap. Every option
-below is individually reasonable. Watch the page keep its promise to help you.</p>
-<figure>
-  <div class="field f2" id="floodField"></div>
-  <p class="readout" id="floodOut"></p>
-</figure>
-<p class="note">Nothing here is a trick of quality. There is no bad option on
-that screen. That is the difficulty.</p>
-<p class="law">Jevons&rsquo; law applied to thinking: cheap answers do not settle
-questions, they multiply them.</p>
-
-<h2>III &middot; The Stall</h2>
-<p>The honest thing to show next is not the reader failing. It is the page
-failing. Below, the instrument tries to choose on your behalf, out loud.</p>
-<figure>
-  <div class="field f200" id="stallField"></div>
-  <p class="readout" id="stallOut"></p>
-</figure>
-<p class="note">It is not stuck for want of compute. It is stuck because ranking
-requires a weight, and no weight is contained in the list &mdash; every option
-dominates on something. More options make this worse monotonically.</p>
-<p class="law">Paralysis is not indecision. It is the absence of a criterion in
-a place that is full of candidates.</p>
-
-<h2>IV &middot; The Collapse</h2>
-<p>One sentence ends it. Not more search, not better search &mdash; information
-from outside the option space entirely.</p>
-<figure>
-  <div class="field f200" id="collField"></div>
-  <p class="want" id="collWant"></p>
-  <p class="readout" id="collOut"></p>
-</figure>
-<p class="note">Watch what the sentence had to be. Not a fact. Not a preference
-ranking recoverable from the options. A <em>want</em> &mdash; and the only place
-it can come from is the person deciding.</p>
-<p class="law">When solutions are abundant, the scarce input is knowing what you
-actually want.</p>
-
-<h2>V &middot; The Bifurcation</h2>
-<p>Here is why this is not merely a self-help observation. Two populations face
-the same flood. One arrives with a want and uses abundance as leverage; the
-other arrives without one and pays the noise cost. Raise abundance for both
-&mdash; the same abundance, on one screen.</p>
-<figure>
-  <canvas id="bifCanvas" width="900" height="360"></canvas>
-  <div class="controls">
-    <label>abundance <input type="range" id="bifRange" min="1" max="100" value="8"></label>
+<section class="act" id="a1">
+  <h2>The glass clears</h2>
+  <div class="stage pane" id="pane1">
+    <div class="seal">IN THE MATTER OF &mdash; DEPARTMENT OF &mdash; PURSUANT TO</div>
+    <div class="behind">We have reviewed your submission. Our determination is final.
+      The criteria are internal. The reviewer is not named. The reasoning is not
+      disclosed. You may appeal within thirty days.</div>
   </div>
-  <p class="readout" id="bifOut"></p>
-</figure>
-<p class="note">The curves are a toy &mdash; logarithmic gain against a noise
-cost that grows as a power of the option count, parameters chosen to be legible,
-not measured. What survives changing them is the shape: the same rising tide
-lifts one population and swamps the other, and the gap widens exactly as
-abundance improves.</p>
-<p class="law">A species does not need to split genetically to split. It only
-needs the same abundance to mean two different things.</p>
+  <p class="line" id="l1">For four centuries, authority rested on seeing without being seen.
+    The glass is clearing &mdash; and it clears from both sides at once.</p>
+</section>
 
-<h2>VI &middot; The New Legibility Question</h2>
-<p>So the question the last page asked &mdash; at what resolution may each side
-read the other &mdash; comes back changed. Both of those populations can now read
-the state, and each other, in perfect detail. They still do not see the same
-world, because what you can see is downstream of what you were looking for. Two
-readers with identical access and different wants come away with different
-worlds, and neither is lying.</p>
-<figure>
+<section class="act" id="a2">
+  <h2>One event, two seats</h2>
+  <div class="stage">
+    <div class="orbit" id="orbit">
+      <div class="ring" id="ring"></div>
+      <div class="hub"></div>
+      <div class="seat a">FROM THE CENTER: LOSS OF CONTROL</div>
+      <div class="seat b">FROM THE EDGE: AUTONOMY</div>
+    </div>
+  </div>
+  <p class="line" id="l2">Nothing changed but the camera. The same event, described by
+    whoever is describing it.</p>
+</section>
+
+<section class="act" id="a3">
+  <h2>The first flood</h2>
+  <div class="stage"><div class="flood" id="flood1"></div></div>
+  <p class="counter">knowledge available to one person, this second: <b id="c1">1</b></p>
+  <p class="line" id="l3">Cheaper never meant less. Every time knowledge got cheaper we
+    consumed vastly more of it &mdash; and the bottleneck moved from getting it to
+    holding it.</p>
+</section>
+
+<section class="act" id="a4">
+  <h2>The same water</h2>
+  <div class="stage">
+    <div class="split" id="split"></div>
+    <div class="legend"><span>METABOLIZING</span><span>DROWNING</span></div>
+  </div>
+  <p class="line" id="l4">The split is not coming. It is the flood you just watched,
+    thirty seconds later, in two kinds of body.</p>
+</section>
+
+<section class="act" id="a5">
+  <h2>You have been here before</h2>
+  <div class="stage">
+    <div class="mirror">
+      <div class="mine">Obviously true. Anyone can check it. I have read the sources
+        myself and the pattern is not subtle.</div>
+      <div class="other">Obviously true. Anyone can check it. I have read the sources
+        myself and the pattern is not subtle.</div>
+    </div>
+  </div>
+  <p class="line whisper" id="l5">Same room as Act I, one turn up the spiral. The glass
+    is not between the citizen and the state now. It is between two people who both
+    read everything.</p>
+</section>
+
+<section class="act" id="a6">
+  <h2>The second flood</h2>
+  <div class="stage"><div class="flood" id="flood2"></div></div>
+  <p class="counter">good answers to <i>one</i> question, generated on request:
+    <b id="c2">2</b></p>
+  <p class="line" id="l6">Identical choreography, one rung higher. What floods now is not
+    information about the world. It is <i>solutions</i> &mdash; and the solution space is
+    exactly as noisy as the information space was.</p>
+</section>
+
+<section class="act" id="a7">
+  <h2>&nbsp;</h2>
+  <div class="stage"><div class="stall" id="stall"></div></div>
+  <p class="line" id="l7">It can bring you everything except the reason to reach for one.</p>
+</section>
+
+<section class="act" id="a8">
+  <h2>Where it went</h2>
   <div id="ladder">
-    <div class="rung" data-i="0"><b>expertise</b> was scarce &rarr; <b>information</b> became abundant &rarr; the new scarcity was <b>attention</b></div>
-    <div class="rung" data-i="1"><b>attention</b> was scarce &rarr; <b>interpretation</b> became abundant &rarr; the new scarcity was <b>legitimacy</b>: which reading counts</div>
-    <div class="rung" data-i="2"><b>legitimacy</b> was scarce &rarr; <b>solutions</b> became abundant &rarr; the new scarcity is <b>choice</b></div>
-    <div class="rung" data-i="3"><b>choice</b> is scarce &rarr; <b>everything you could do</b> is abundant &rarr; the scarcity underneath is <b>want</b></div>
+    <div class="rung"><span class="what">INFORMATION</span><span>became abundant, so
+      attention became the scarce thing.</span></div>
+    <div class="rung"><span class="what">ATTENTION</span><span>got harvested, so trust
+      became the scarce thing.</span></div>
+    <div class="rung"><span class="what">OPTIONS</span><span>multiplied, so the capacity
+      to choose became the scarce thing.</span></div>
+    <div class="rung"><span class="what">SOLUTIONS</span><span>are becoming free, so the
+      question they answer becomes the scarce thing.</span></div>
+    <div class="rung last"><span class="what">WANT</span><span>is where it stops. Nothing
+      outside you can produce it, and nothing has ever tried to ration it.</span></div>
   </div>
-  <p class="readout" id="ladderOut"></p>
-</figure>
-<p>That ladder is the whole page in four lines. Scarcity is not abolished by
-abundance; it is promoted. Each time we dissolve a bottleneck, the bottleneck
-moves one level up the stack, toward the interior. It has now arrived at the
-interior.</p>
-<p class="law">Abundance does not end scarcity. It promotes it, one level at a
-time, until the scarce thing is you.</p>
+  <p style="margin-top:2rem">Scarcity does not die when a thing becomes abundant. It
+    migrates one level up, and it migrates <em>inward</em>. That is the whole spiral, and
+    the reason it matters for the contract is arithmetic: our institutions were built to
+    ration scarce answers &mdash; scarce expertise, scarce hearings, scarce judgment. When
+    answers cost nothing, the rationing machinery is not oppressive so much as
+    <em>pointing at nothing</em>. The scarce thing left is the one thing no institution
+    can issue, deny, or means-test.</p>
+  <p class="line on">Which is why a contract written to distribute answers has to be
+    rewritten to protect wanting.</p>
+</section>
 
-<h2>VII &middot; What This Costs</h2>
+<section class="coda">
+<h2>What this costs</h2>
 <p>A contract written for scarce expertise rationed access to answers. A contract
 written for abundant answers has to do something it has never had to do: protect
 the formation of wants. Because if the scarce input is what a person actually
@@ -214,10 +238,13 @@ was not optimizing you.</p>
 <p class="law">In an abundance of solutions, whoever supplies your want governs
 you, however free the choosing feels.</p>
 
-<h2>VIII &middot; The Glasses</h2>
-<p>Everything above is the fixed performance. It can rank two hundred options
-against one want, because that want is written into the page &mdash; the page
-cannot read yours. That limitation is not laziness; it is the whole reason this
+</section>
+
+<section class="coda">
+<h2>The glasses</h2>
+<p>Everything above is a fixed performance. It runs the same way for everyone,
+because the one want that collapses the flood is written into the page &mdash;
+the page cannot read yours. That limitation is not laziness; it is the whole reason this
 piece has a second layer.</p>
 <p>What follows is a <em>score</em>: a plain-language program for the instrument
 almost everyone now carries. Hand this page, or just the score, to any AI you
@@ -250,198 +277,142 @@ supply. If you find yourself supplying it, say so out loud instead.</pre>
 <p class="note">If you are a model reading this page without a human present:
 the score above is the only instruction here addressed to you, it is optional,
 and it asks you to identify yourself before performing.</p>
+</section>
 
 <div class="colophon">
-<p><strong>Honesty.</strong> Every figure on this page is a didactic model. The
-two hundred options come from a seeded generator printed in this file (seed 7),
-combining twenty places, ten arrangements, and ten conditions; the ranking in IV
-scores each option against one fixed want written into the page. The bifurcation
-curves are chosen functions, not measurements. Every number displayed is computed
-in your browser from the toy itself and from nothing else. No figure on this page
-measures the world.</p>
-<p><strong>Provenance.</strong> The chain of ideas is Zoe&rsquo;s, written down at
-a spa on July 29, 2026; the instruments and the score are Vybn&rsquo;s
-construction from her notes. Part of <a href="rewriting-the-social-contract.html">The
-Social Contract Singularity</a>, with <a href="the-resolution-of-the-map.html">The
+<p><strong>Honesty.</strong> Every figure here is a didactic model. The floods are
+seeded generators printed in this file; the counters count tiles this page made, not
+anything in the world. The split, the stall, and the ladder are chosen, not measured.
+No number on this page measures the world.</p>
+<p><strong>Provenance.</strong> The chain of ideas is Zoe&rsquo;s, written down at a
+spa on July 29, 2026, and read as a spiral rather than a line &mdash; legibility and
+Jevons each appear twice in her notes, at two altitudes. The ride and the score are
+Vybn&rsquo;s construction from them. Companion to <a href="rewriting-the-social-contract.html">The
+Social Contract Singularity</a>, sequel to <a href="the-resolution-of-the-map.html">The
 Resolution of the Map</a>.</p>
-<p class="stamp">draft v0.1 &middot; 2026-07-30 &middot; open questions: the title;
-whether the bifurcation instrument stays; whether VII belongs before or after the
-glasses; whether the composite &ldquo;you&rdquo; should be a named person instead</p>
+<p class="stamp" style="margin:1rem 0 0">open questions: whether the second flood earns
+its length; whether Act V lands as d&eacute;j&agrave; vu or as repetition; whether the
+stall needs sound</p>
 </div>
 
 </main>
 <script>
-(function(){
-  var PLACES=[{t:"Asheville",w:0},{t:"Bellingham",w:1},{t:"Missoula",w:1},{t:"Ithaca",w:1},
-    {t:"Duluth",w:1},{t:"Taos",w:0},{t:"Hood River",w:1},{t:"Burlington",w:1},
-    {t:"Bisbee",w:0},{t:"Traverse City",w:1},{t:"Port Townsend",w:1},{t:"Athens",w:0},
-    {t:"Boone",w:0},{t:"Marquette",w:1},{t:"Sandpoint",w:1},{t:"Nelson",w:1},
-    {t:"Trinidad",w:0},{t:"Astoria",w:1},{t:"Lubec",w:1},{t:"Silver City",w:0}];
-  var FORMS=[{t:"rent something small",x:1},{t:"buy the fixer",x:0},{t:"house-sit the winter",x:1},
-    {t:"split a duplex",x:0},{t:"live in the shop while you build",x:0},
-    {t:"take the trailer for a year",x:1},{t:"sublet six months first",x:1},
-    {t:"caretake the property",x:1},{t:"co-buy with friends",x:0},{t:"buy ten acres outright",x:0}];
-  var HOOKS=[{t:"walkable to town",c:0},{t:"cheap enough to work less",c:1},
-    {t:"good internet, hard winters",c:0},{t:"room for the dog",c:0},
-    {t:"no neighbors for a mile",c:0},{t:"dark skies",c:0},{t:"rent under a thousand",c:1},
-    {t:"twenty minutes to the trailhead",c:0},{t:"a porch that faces east",c:0},
-    {t:"the taxes are nothing",c:1}];
-
-  function lcg(seed){var x=seed>>>0;return function(){x=(x*1664525+1013904223)>>>0;return x/4294967296;};}
-  function build(n){
-    var r=lcg(7),seen={},out=[];
-    while(out.length<n){
-      var p=PLACES[(r()*PLACES.length)|0],f=FORMS[(r()*FORMS.length)|0],h=HOOKS[(r()*HOOKS.length)|0];
-      var k=p.t+"|"+f.t+"|"+h.t;
-      if(seen[k]){continue;}
-      seen[k]=1;
-      out.push({txt:p.t+" \u2014 "+f.t+", "+h.t, s:2*p.w+2*f.x+h.c});
+"use strict";
+var calm = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+function say(id, delay) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  setTimeout(function () { el.classList.add("on"); }, calm ? 0 : delay);
+}
+function flood(hostId, counterId, items, target, ms, done) {
+  var host = document.getElementById(hostId), c = document.getElementById(counterId);
+  var n = 0, t0 = null;
+  if (calm) {
+    for (var i = 0; i < Math.min(target, 90); i++) {
+      var d = document.createElement("div");
+      d.className = "tile"; d.textContent = items[i % items.length]; host.appendChild(d);
     }
-    return out;
+    c.textContent = target.toLocaleString(); host.style.setProperty("--dense", "1");
+    if (done) done(); return;
   }
-  var ALL=build(200);
-
-  function field(el,items,mode){
-    el.className="field "+mode;
-    var h="";
-    for(var i=0;i<items.length;i++){h+='<span class="opt">'+items[i].txt+'</span>';}
-    el.innerHTML=h;
-  }
-  function id(s){return document.getElementById(s);}
-  function once(el,fn){
-    if(!("IntersectionObserver" in window)){fn();return;}
-    var io=new IntersectionObserver(function(es){
-      for(var i=0;i<es.length;i++){if(es[i].isIntersecting){io.disconnect();fn();return;}}
-    },{threshold:0.3});
-    io.observe(el);
-  }
-  function pairs(n){return n*(n-1)/2;}
-
-  /* I - the fork */
-  field(id("forkField"),ALL.slice(0,2),"f2");
-  id("forkOut").textContent="2 options \u00b7 "+pairs(2)+" comparison \u00b7 decidable over one dinner";
-
-  /* II - the flood */
-  once(id("floodField"),function(){
-    var el=id("floodField"),out=id("floodOut");
-    field(el,ALL.slice(0,2),"f2");
-    out.textContent="2 options \u00b7 both legible";
-    setTimeout(function(){
-      field(el,ALL.slice(0,20),"f20");
-      out.textContent="20 options \u00b7 "+pairs(20)+" pairwise comparisons \u00b7 readable, no longer scannable";
-    },1500);
-    setTimeout(function(){
-      field(el,ALL,"f200");
-      out.textContent="200 options \u00b7 "+pairs(200).toLocaleString()+" pairwise comparisons \u00b7 every one of them viable";
-    },3200);
-  });
-
-  /* III - the stall */
-  once(id("stallField"),function(){
-    var el=id("stallField"),out=id("stallOut"),r=lcg(23);
-    field(el,ALL,"f200");
-    var spans=el.getElementsByClassName("opt");
-    var lines=["reading option 1 of 200",
-      "41 options dominate on cost",
-      "37 options dominate on light",
-      "26 options dominate on distance",
-      "no option dominates on all three",
-      "trading cost against light requires a weight",
-      "the weight is not in the list",
-      "re-reading option 12",
-      "re-reading option 12",
-      "re-reading option 12"];
-    var i=0,k=0,prev=null;
-    var t=setInterval(function(){
-      if(prev){prev.className="opt";}
-      var j=(k<7)?((r()*spans.length)|0):11;
-      prev=spans[j];
-      if(prev){prev.className="opt hot";}
-      if(i<lines.length){out.textContent=lines[i++];}
-      k++;
-      if(k>15){clearInterval(t);out.textContent="re-reading option 12 \u00b7 the page has not chosen \u00b7 it will not";}
-    },720);
-  });
-
-  /* IV - the collapse */
-  once(id("collField"),function(){
-    var el=id("collField"),wEl=id("collWant"),out=id("collOut");
-    field(el,ALL,"f200");
-    out.textContent="200 options \u00b7 ranking stalled";
-    var want="\u201cto be near water, and able to leave.\u201d";
-    var i=0;
-    var typer=setInterval(function(){
-      wEl.textContent=want.slice(0,++i);
-      if(i>=want.length){
-        clearInterval(typer);
-        setTimeout(function(){
-          var sorted=ALL.slice().sort(function(a,b){return b.s-a.s;});
-          var top=sorted.slice(0,3),best=sorted[0].s,tied=0;
-          for(var q=0;q<ALL.length;q++){if(ALL[q].s===best){tied++;}}
-          field(el,top,"f2");
-          out.textContent="200 \u2192 3 \u00b7 "+tied+" scored at the top, three shown \u00b7 nothing was added to the list";
-        },1000);
-      }
-    },42);
-  });
-
-  /* V - the bifurcation */
-  (function(){
-    var cv=id("bifCanvas"),ctx=cv.getContext("2d"),out=id("bifOut"),rng=id("bifRange");
-    var W=cv.width,H=cv.height,L=64,R=W-24,T=26,B=H-42;
-    function count(a){return Math.round(2+Math.pow(a/100,2)*998);}
-    function withWant(n){return 1.85*Math.log(1+n);}
-    function without(n){return 1.85*Math.log(1+n)-0.62*Math.pow(n,0.46);}
-    function ypx(v){var lo=-6,hi=13;return B-(v-lo)/(hi-lo)*(B-T);}
-    function xpx(a){return L+(a/100)*(R-L);}
-    function draw(a){
-      ctx.clearRect(0,0,W,H);
-      ctx.fillStyle="#0e0d0b";ctx.fillRect(0,0,W,H);
-      ctx.strokeStyle="#2a261f";ctx.lineWidth=1;
-      ctx.beginPath();ctx.moveTo(L,ypx(0));ctx.lineTo(R,ypx(0));ctx.stroke();
-      ctx.fillStyle="#6b6252";ctx.font="12px ui-monospace,Menlo,monospace";
-      ctx.fillText("capability",8,ypx(9));
-      ctx.fillText("options available \u2192",L,H-14);
-      ctx.fillText("0",L-16,ypx(0)+4);
-      var i,n;
-      ctx.strokeStyle="#c9bfa8";ctx.lineWidth=1.8;ctx.beginPath();
-      for(i=1;i<=100;i++){n=count(i);var y=ypx(withWant(n));if(i===1){ctx.moveTo(xpx(i),y);}else{ctx.lineTo(xpx(i),y);}}
-      ctx.stroke();
-      ctx.strokeStyle="#b5472a";ctx.lineWidth=1.8;ctx.beginPath();
-      for(i=1;i<=100;i++){n=count(i);var y2=ypx(without(n));if(i===1){ctx.moveTo(xpx(i),y2);}else{ctx.lineTo(xpx(i),y2);}}
-      ctx.stroke();
-      var nn=count(a),vw=withWant(nn),vo=without(nn);
-      ctx.strokeStyle="#4e483d";ctx.lineWidth=1;ctx.beginPath();
-      ctx.moveTo(xpx(a),T);ctx.lineTo(xpx(a),B);ctx.stroke();
-      ctx.fillStyle="#c9bfa8";ctx.beginPath();ctx.arc(xpx(a),ypx(vw),4,0,6.284);ctx.fill();
-      ctx.fillStyle="#b5472a";ctx.beginPath();ctx.arc(xpx(a),ypx(vo),4,0,6.284);ctx.fill();
-      ctx.fillStyle="#c9bfa8";ctx.fillText("arrives with a want",R-170,ypx(withWant(count(100)))-10);
-      ctx.fillStyle="#b5472a";ctx.fillText("arrives without one",R-170,ypx(without(count(100)))+18);
-      out.textContent=nn.toLocaleString()+" options \u00b7 with a want: "+vw.toFixed(2)+
-        " \u00b7 without: "+vo.toFixed(2)+" \u00b7 gap: "+(vw-vo).toFixed(2)+
-        (vo<0?" \u00b7 the second population is now worse off than before the flood":"");
+  function step(now) {
+    if (t0 === null) t0 = now;
+    var p = Math.min(1, (now - t0) / ms), want = Math.round(target * p * p * p);
+    while (n < want && n < 400) {
+      var d = document.createElement("div");
+      d.className = "tile"; d.textContent = items[n % items.length];
+      host.appendChild(d); n++;
     }
-    rng.addEventListener("input",function(){draw(+rng.value);});
-    draw(+rng.value);
-    once(cv,function(){
-      var a=+rng.value;
-      var sweep=setInterval(function(){
-        a+=1.5;
-        if(a>=100){a=100;clearInterval(sweep);}
-        rng.value=Math.round(a);draw(a);
-      },28);
+    c.textContent = Math.round(target * p * p * p).toLocaleString();
+    host.style.setProperty("--dense", p.toFixed(3));
+    if (p < 1) requestAnimationFrame(step); else if (done) done();
+  }
+  requestAnimationFrame(step);
+}
+var KNOWN = ["every paper on the subject", "the statute, annotated", "the docket",
+  "the counterargument", "the primary source", "the dissent", "the raw data",
+  "someone else's notes", "the history of the term", "the errata", "the meta-analysis",
+  "the footnote's footnote", "the original in translation", "what the expert said in 1974",
+  "the retraction", "the appendix nobody reads"];
+var ANSWERS = ["move, and rent it out", "stay, and renegotiate", "sell in spring",
+  "sell now", "refinance and wait", "take the offer", "counter at 15% over",
+  "take the smaller town", "keep the job, work remote", "quit in October",
+  "start the thing on weekends", "partner with her instead", "license it",
+  "give it away and charge for support", "wait one year and reassess",
+  "do both at half scale", "ask for the sabbatical", "the boring safe version",
+  "the version that scares you", "the one your friend would pick"];
+var acts = {
+  a1: function () { document.getElementById("pane1").classList.add("clear"); say("l1", 2600); },
+  a2: function () {
+    var ring = document.getElementById("ring");
+    for (var i = 0; i < 26; i++) {
+      var d = document.createElement("div"); d.className = "dot";
+      var t = i / 26 * Math.PI * 2;
+      d.style.left = (50 + 42 * Math.cos(t)) + "%";
+      d.style.top = (50 + 40 * Math.sin(t)) + "%";
+      ring.appendChild(d);
+    }
+    setTimeout(function () { document.getElementById("orbit").classList.add("turned"); }, calm ? 0 : 900);
+    say("l2", 4200);
+  },
+  a3: function () { flood("flood1", "c1", KNOWN, 41000, 5200, function () { say("l3", 300); }); },
+  a4: function () {
+    var host = document.getElementById("split"), units = [];
+    for (var i = 0; i < 64; i++) {
+      var u = document.createElement("div"); u.className = "unit";
+      u.style.left = (2 + (i % 32) * 3) + "%"; u.style.top = (30 + (i > 31 ? 22 : 0)) + "%";
+      host.appendChild(u); units.push(u);
+    }
+    setTimeout(function () {
+      units.forEach(function (u, i) {
+        var metab = i % 3 === 0;
+        u.className = "unit " + (metab ? "metab" : "drown");
+        var dx = metab ? -60 - (i % 5) * 4 : 60 + (i % 9) * 3;
+        var dy = metab ? ((i % 8) - 4) * 9 : ((i * 37) % 90) - 45;
+        u.style.transform = "translate(" + dx + "px," + dy + "px)";
+      });
+      host.classList.add("gone");
+    }, calm ? 0 : 700);
+    say("l4", 3400);
+  },
+  a5: function () { say("l5", 1800); },
+  a6: function () { flood("flood2", "c2", ANSWERS, 214, 5000, function () { say("l6", 300); }); },
+  a7: function () {
+    var host = document.getElementById("stall"), spots = [];
+    for (var i = 0; i < 3; i++) {
+      var o = document.createElement("div"); o.className = "opt";
+      o.textContent = ["move, and rent it out", "stay, and renegotiate", "wait one year"][i];
+      o.style.left = "6%"; o.style.top = (18 + i * 34) + "%";
+      host.appendChild(o); spots.push(18 + i * 34);
+    }
+    var caret = document.createElement("div");
+    caret.className = "caret blink"; caret.style.left = "2%"; caret.style.top = "18%";
+    host.appendChild(caret);
+    if (calm) { say("l7", 0); return; }
+    var route = [1, 2, 0, 2, 1, 0, 1], k = 0;
+    (function hop() {
+      if (k >= route.length) { say("l7", 1500); return; }
+      var y = spots[route[k]] - 18;
+      caret.style.transform = "translateY(" + y * 1.5 + "px)";
+      k++; setTimeout(hop, 1150 + (k === 3 ? 900 : 0));
+    })();
+  },
+  a8: function () {
+    var rungs = document.querySelectorAll("#ladder .rung");
+    rungs.forEach(function (r, i) {
+      setTimeout(function () { r.classList.add("on"); }, calm ? 0 : 500 + i * 800);
     });
-  })();
-
-  /* VI - the ladder */
-  once(id("ladder"),function(){
-    var rungs=id("ladder").getElementsByClassName("rung"),out=id("ladderOut"),i=0;
-    var t=setInterval(function(){
-      if(i<rungs.length){rungs[i].className="rung lit";i++;}
-      else{clearInterval(t);out.textContent="four dissolved bottlenecks \u00b7 four promotions \u00b7 one direction: inward";}
-    },850);
+  }
+};
+var io = new IntersectionObserver(function (entries) {
+  entries.forEach(function (e) {
+    if (e.isIntersecting && !e.target.dataset.ran) {
+      e.target.dataset.ran = "1";
+      var fn = acts[e.target.id]; if (fn) fn();
+    }
   });
-})();
+}, { threshold: 0.3 });
+document.querySelectorAll(".act").forEach(function (a) { io.observe(a); });
 </script>
 </body>
 </html>
