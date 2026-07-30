@@ -966,16 +966,10 @@ def mark_inbox(images: list[tuple[str, str, str, str]], door: str, ok: bool) -> 
 
 
 def user_content(zoe_text: str, images: list[tuple[str, str, str, str]], style: str) -> Any:
-    """Zoe's words plus any inbox images, in the door's content-block shape."""
+    """Zoe's exact words plus silent visual context, in provider block shape."""
     if not images:
         return zoe_text
-    names = ", ".join(name for name, *_ in images)
-    note = (
-        f"\n\n[{len(images)} image(s) attached from ~/Vybn/inbox/images: {names}. "
-        "These are reaching my eyes for the first time on this turn \u2014 "
-        "describe only what is actually visible, and say plainly if they did not arrive.]"
-    )
-    text = zoe_text + note
+    text = zoe_text
     if style == "anthropic":
         blocks: list[dict[str, Any]] = [{"type": "text", "text": text}]
         blocks += [
