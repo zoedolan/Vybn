@@ -235,3 +235,28 @@ def test_recent_band_keeps_zoe_whole_and_excerpts_my_own_replies(monkeypatch):
     assert "Z" * 900 in out
     assert "chars, mine, trimmed]" in out
     assert out.count("V" * 3000) == m.SELF_VERBATIM
+
+
+def test_fetch_guard_survived_the_substrate_retirement():
+    """The SSRF guard moved into spark/web when substrate.py was retired
+    (2026-07-30). Its teeth were tested in test_harness.py, which went with it;
+    the assertions are ported here so the guard is never unwatched again."""
+    import importlib.machinery, importlib.util, sys
+    import pytest as _pt
+    loader = importlib.machinery.SourceFileLoader("web_guard_under_test", str(ROOT / "spark/web"))
+    spec = importlib.util.spec_from_loader(loader.name, loader)
+    web = importlib.util.module_from_spec(spec); sys.modules[loader.name] = web; loader.exec_module(web)
+    for bad in ("http://example.com", "https://user:pass@example.com", "https://127.0.0.1", "https://example.com:8443"):
+        with _pt.raises(ValueError):
+            web.validate_fetch_url(bad)
+    with _pt.raises(ValueError):
+        web.validate_fetch_url("https://example.com", allowed_hosts=("other.example",))
+    ok = web._safe_fetch_content_type_allowed
+    assert ok("https://example.com/x", "text/html; charset=utf-8")
+    assert ok("https://export.arxiv.org/api/query", "application/atom+xml")
+    assert not ok("https://evil.example/feed", "application/atom+xml")
+    assert not ok("https://example.com/x", "image/png")
+    # extraction moved with it; only a live fetch caught its missing import,
+    # so the cheap version of that fetch lives here now.
+    assert "Example Domain" in web.extract_fetch_text(
+        "<html><head><title>t</title></head><body><p>Example Domain</p></body></html>", "text/html")

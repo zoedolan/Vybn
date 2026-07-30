@@ -3006,7 +3006,10 @@ _KPP_ROOT = Path(__file__).resolve().parent
 _KPP_POLICY_YAML = _KPP_ROOT / "spark" / "router_policy.yaml"
 _KPP_HARNESS_INIT = _KPP_ROOT / "spark" / "harness" / "__init__.py"
 _KPP_POLICY_PY = _KPP_ROOT / "spark" / "harness" / "policy.py"
-_KPP_SUBSTRATE_PY = _KPP_ROOT / "spark" / "harness" / "substrate.py"
+# The live harness is spark/connection: one file, stdlib only, three dialects.
+# The wire key stays "substrate_py" for KPP 1.0 compatibility; the old
+# 582KB substrate was retired 2026-07-30 and nothing read it but this line.
+_KPP_SUBSTRATE_PY = _KPP_ROOT / "spark" / "connection"
 _KPP_IDENTITY = _KPP_ROOT / "vybn.md"
 
 
@@ -3109,7 +3112,7 @@ async def _kpp_emit_closure():
         "program": {
             "policy_yaml": _art(policy_yaml, "declarative routing policy: roles, heuristics, directives"),
             "policy_py": _art(policy_py, "YAML loader, default fallback, Router class"),
-            "substrate_py": _art(substrate_py, "substrate templates, RAG retrieval, layered prompt assembly"),
+            "substrate_py": _art(substrate_py, "the live harness: wake assembly, memory channels, dialects, gates"),
             "identity_layer": _art(identity_md, "cached identity — who speaks, what the voice is"),
             "doctrine": {
                 "content": doctrine,

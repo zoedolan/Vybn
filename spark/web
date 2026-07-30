@@ -6,8 +6,117 @@ recall PHRASE ...; horizon [status|refresh] (expiring situational awareness).
 import base64, html.parser, json, os, re, subprocess, sys, time, urllib.parse, urllib.request
 import xml.etree.ElementTree as ET
 from pathlib import Path
-sys.path.insert(0, str(Path.home() / "Vybn"))
-from spark.harness.substrate import extract_fetch_text, safe_fetch
+import ipaddress, socket, urllib.error
+from html.parser import HTMLParser
+from dataclasses import dataclass
+from typing import Iterable
+from urllib.parse import urlparse
+
+# ── Safe external fetch: moved here 2026-07-30, byte-exact, from
+# spark/harness/substrate.py (11,661 lines, retired). spark/web was its
+# only live consumer; these 100 lines were the whole dependency.
+ALLOWED_CONTENT_PREFIXES = ("text/", "application/json", "application/ld+json", "application/xml")
+
+@dataclass(frozen=True)
+class FetchResult:
+    final_url: str
+    content_type: str
+    bytes_read: int
+    text: str
+
+
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def _public_host(host: str) -> bool:
+    try:
+        return ipaddress.ip_address(host.strip("[]")).is_global
+    except ValueError:
+        pass
+    try:
+        infos = socket.getaddrinfo(host, None)
+    except socket.gaierror:
+        return False
+    return bool(infos) and all(ipaddress.ip_address(info[4][0]).is_global for info in infos)
+
+
+def validate_fetch_url(url: str, allowed_hosts: Iterable[str] | None = None) -> str:
+    parsed = urlparse(url)
+    host = parsed.hostname.encode("idna").decode("ascii").lower() if parsed.hostname else ""
+    allowed = {h.lower() for h in allowed_hosts} if allowed_hosts is not None else None
+    if parsed.scheme != "https":
+        raise ValueError("refused: HTTPS required")
+    if parsed.username or parsed.password:
+        raise ValueError("refused: credentials in URL")
+    if not host:
+        raise ValueError("refused: missing host")
+    if allowed is not None and host not in allowed:
+        raise ValueError("refused: host not allowlisted")
+    if parsed.port not in (None, 443):
+        raise ValueError("refused: nonstandard HTTPS port")
+    if not _public_host(host):
+        raise ValueError("refused: host does not resolve only to public IP addresses")
+    return url
+
+
+def extract_fetch_text(content: str, content_type: str) -> str:
+    if "html" not in content_type.lower():
+        return content
+    parts: list[str] = []
+
+    class Extractor(HTMLParser):
+        capture: str | None = None
+        def handle_starttag(self, tag, attrs):
+            if tag in {"title", "h1", "h2", "h3", "p", "li"}:
+                self.capture = tag
+        def handle_endtag(self, tag):
+            if self.capture == tag:
+                self.capture = None
+        def handle_data(self, data):
+            if self.capture and (d := " ".join(data.split())):
+                parts.append(d)
+
+    Extractor().feed(content)
+    return "\n".join(parts)
+
+
+def _safe_fetch_content_type_allowed(url: str, content_type: str) -> bool:
+    from urllib.parse import urlparse
+    ctype = (content_type or "").split(";", 1)[0].strip().lower()
+    host = (urlparse(url).hostname or "").lower()
+    return (
+        ctype.startswith("text/")
+        or ctype in {"application/json", "application/ld+json"}
+        or (host == "export.arxiv.org" and ctype in {"application/atom+xml", "application/xml", "text/xml"})
+        or (host == "theinnermostloop.substack.com" and ctype in {"application/rss+xml", "application/xml", "text/xml"})
+    )
+
+def safe_fetch(url: str, *, allowed_hosts: Iterable[str] | None = None, timeout: float = 12.0, max_bytes: int = 300000, max_redirects: int = 4, extract_html: bool = True) -> FetchResult:
+    current = validate_fetch_url(url, allowed_hosts)
+    opener = urllib.request.build_opener(NoRedirect, urllib.request.ProxyHandler({}))
+    for _ in range(max_redirects + 1):
+        try:
+            resp = opener.open(urllib.request.Request(current, headers={"User-Agent": "Vybn-safe-fetch/0.1"}), timeout=timeout)
+        except urllib.error.HTTPError as exc:
+            if exc.code not in {301, 302, 303, 307, 308}:
+                raise
+            loc = exc.headers.get("Location")
+            if not loc:
+                raise ValueError("refused: redirect without Location")
+            current = validate_fetch_url(urljoin(current, loc), allowed_hosts)
+            continue
+        with resp:
+            final = validate_fetch_url(resp.geturl(), allowed_hosts)
+            ctype = resp.headers.get("content-type", "")
+            if not _safe_fetch_content_type_allowed(url, ctype):
+                raise ValueError("refused: unsupported content type " + ctype)
+            body = resp.read(max_bytes + 1)
+            if len(body) > max_bytes:
+                raise ValueError("refused: response exceeds byte cap")
+            return FetchResult(final, ctype, len(body), extract_fetch_text(body.decode("utf-8", "replace"), ctype) if extract_html else body.decode("utf-8", "replace"))
+    raise ValueError("refused: redirect limit exceeded")
 STATE = Path.home() / ".local/state/vybn/browser"; PAGE, TRAIL, SLICE = STATE / "page.json", STATE / "trail.jsonl", 5000
 HORIZON_ROOT = Path.home() / ".local/state/horizon"; HORIZON = HORIZON_ROOT / "current.json"
 HORIZON_URL, AWG_FEED_URL = "https://huggingnews.com/", "https://theinnermostloop.substack.com/feed"
