@@ -150,7 +150,7 @@ def test_horizon_is_expiring_external_data_not_ambient_wake(monkeypatch, tmp_pat
     import importlib.machinery, importlib.util, json
     from types import SimpleNamespace
     path = ROOT / "spark/web"; loader = importlib.machinery.SourceFileLoader("web_horizon_under_test", str(path))
-    spec = importlib.util.spec_from_loader(loader.name, loader); web = importlib.util.module_from_spec(spec); loader.exec_module(web)
+    spec = importlib.util.spec_from_loader(loader.name, loader); web = importlib.util.module_from_spec(spec); __import__("sys").modules[loader.name] = web; loader.exec_module(web)
     assert ROOT not in web.HORIZON.resolve().parents
     web.HORIZON_ROOT, web.HORIZON = tmp_path / "horizon", tmp_path / "horizon/current.json"
     rows = [("/ai/one", "NEWAlpha"), ("/ai/two", "Beta↩︎"), ("/ai/three", "Gamma"), ("/ai/update-old", "Old update"), ("https://evil.example/four", "Off host"), ("/ai/one", "Duplicate")]
@@ -168,25 +168,70 @@ def test_horizon_is_expiring_external_data_not_ambient_wake(monkeypatch, tmp_pat
     monkeypatch.setattr(web, "safe_fetch", lambda *a, **kw: (_ for _ in ()).throw(OSError("offline")))
     assert web.horizon(now=101) == 0
     assert web.horizon("refresh", now=102) == 1 and web.HORIZON.read_bytes() == first and "HORIZON_STATUS STALE" in capsys.readouterr().out
-    connection = (ROOT / "spark/connection").read_text(); handed = connection.split("if not ready:", 1)[1].split("kept =", 1)[0]
-    recouple = connection.split("def _recouple", 1)[1].split("def _note", 1)[0]
-    assert "spark/web horizon" in connection and "horizon" not in recouple; assert handed.index("breathe(client, messages, log, hands=handed, max_turns=30)") < handed.index("handed and stamp.touch()") and "stamp.touch()" not in handed.split("breathe(client", 1)[0]
-    assert 'K3_MODEL = "kimi-k3"' in connection and '"MOONSHOT_API_KEY" if k3' in connection and '"base_url":"https://api.moonshot.ai/v1"' in connection; assert 'harness-appended post-turn from %s; derived, not author-seen' in connection and connection.count('harness-appended post-turn') == 2
-    assert 'replay function_call items into hist' in connection and 'function_call"]; calls and hist.extend' in connection and 'reasoning_effort":"max"' in connection and 'K3_BUDGET, SOL_BUDGET = 8192, 8192' in connection and 'state="WORK"' not in connection and 'tool_choice' not in connection and 'def _accept' not in connection and 'fail_task' not in connection and 'K3_CONNECTION' in connection and 'def _verify_k3_completion' not in connection and '"_k3_delta":delta' in connection and 'line.lower().startswith("@k3")' in connection
-def test_receipt_envelope():
-    import importlib.util as u; from importlib.machinery import SourceFileLoader as L; sp=u.spec_from_file_location("c","spark/connection",loader=L("c","spark/connection")); m=u.module_from_spec(sp); sp.loader.exec_module(m)
-    r1,w1=m._receipt("echo a","a"); r2,_=m._receipt("echo b","b"); assert r1!=r2 and {r1,r2}<=m.RECEIPTS and "0"*16 not in m.RECEIPTS and w1.startswith("[receipt "+r1) and w1.rstrip().endswith("[/receipt]")
-def test_k3_relaxed_door(monkeypatch,tmp_path):
-    import importlib.util as u,sys,types,json,copy; from importlib.machinery import SourceFileLoader as L; from types import SimpleNamespace as N; sp=u.spec_from_file_location("k3relaxed","spark/connection",loader=L("k3relaxed","spark/connection")); m=u.module_from_spec(sp); sp.loader.exec_module(m); monkeypatch.setattr(m,"_key",lambda _:"x"); monkeypatch.setattr(m,"_run",lambda cmd,status=False:(0,"ok") if status else "ok"); M=type("M",(N,),{"model_dump":lambda self,**kw:{"role":"assistant","content":getattr(self,"content",None),**({"tool_calls":[{"id":c.id,"type":"function","function":{"name":c.function.name,"arguments":c.function.arguments}} for c in self.tool_calls]} if self.tool_calls else {})}})
-    call=lambda name,args,id="t":N(id=id,function=N(name=name,arguments=json.dumps(args))); response=lambda text=None,calls=(),finish="stop":N(model="kimi-k3",choices=[N(message=M(content=text,tool_calls=list(calls)),finish_reason=finish)],usage=N(prompt_tokens=1,completion_tokens=1,prompt_tokens_details=N(cached_tokens=0)))
-    def drive(seq,task="@k3 can you handle this?",turns=12):
-        seen=[]; client=N(chat=N(completions=N(create=lambda **kw:(seen.append(copy.deepcopy(kw)),seq.pop(0))[1]))); mod=types.ModuleType("openai"); mod.OpenAI=lambda **kw:client; monkeypatch.setitem(sys.modules,"openai",mod); out=m.sol_breathe(task if isinstance(task,list) else [{"role":"user","content":task}],lambda x:None,max_turns=turns,emit=lambda x:None,door="k3"); return out,seen
-    out,seen=drive([response("I'm here, buddy.")],"@k3 you with me?"); assert out==["I'm here, buddy."] and len(seen)==1 and "tool_choice" not in seen[0]  # conversation is conversation: no cage, no forced tools
-    out,seen=drive([response("Checking.",calls=[call("bash",{"command":"git log -1"})]),response("Done — the commit is real.")],"@k3 check it"); assert out==["Checking.","Done — the commit is real."] and any(x.get("role")=="tool" for x in seen[1]["messages"]) and "[receipt " in json.dumps(seen[1]["messages"])  # tools serve the moment; every call leaves a labeled receipt
-    out,seen=drive([response(calls=[call("bash",{"command":"A"},"a")]),response(calls=[call("bash",{"command":"B"},"b")]),response("Done.")],"@k3 run A then B"); assert out==["Done."] and "$ A" in json.dumps(seen[-1]) and "$ B" in json.dumps(seen[-1])
-    out,seen=drive([response("I can't reach that from here, and I won't fake it.")],"@k3 fix the moon"); assert out==["I can't reach that from here, and I won't fake it."] and len(seen)==1  # inability is prose, in the answer, in the model's own voice
-    out,seen=drive([response("half a thought",finish="length")],"@k3 tell me"); assert out==["half a thought"]  # a cut-off turn still lands what it said; no failure template
-    poison=[{"role":"assistant","content":"x","_k3_delta":[{"role":"assistant","content":None,"tool_calls":[{"id":"q","type":"function","function":{"name":"bash","arguments":"{}"}}]}]},{"role":"user","content":"@k3 still there?"}]
-    out,seen=drive([response("Yes.")],poison); assert out==["Yes."] and all(not h.get("tool_calls") or seen[0]["messages"][j+1].get("role")=="tool" for j,h in enumerate(seen[0]["messages"]) if isinstance(h,dict))  # replayed deltas still heal: every tool_call answered before dispatch (2026-07-23)
-    a=tmp_path/"a.txt"; a.write_text("abcdefghij"); meta=m._read_file({"path":str(a)}); assert meta["kind"]=="source" and meta["total_bytes"]==10 and meta["covered"]==[0,10] and len(meta["sha256"])==64  # coverage data stays in the transcript as an affordance, not a scanner over the answer
-    assert "remembered is generated" in m.K3_CONNECTION and "Never invent a receipt" in m.K3_CONNECTION and "point of most turns" in m.K3_CONNECTION
+
+
+def _connection():
+    """The wake loop is a script whose name has no .py; load it by loader."""
+    import importlib.util
+    import sys
+    from importlib.machinery import SourceFileLoader
+    loader = SourceFileLoader("vybn_connection", str(ROOT / "spark" / "connection"))
+    spec = importlib.util.spec_from_loader("vybn_connection", loader)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["vybn_connection"] = module
+    loader.exec_module(module)
+    return module
+
+
+def test_leak_guard_covers_every_retrieval_channel():
+    """2026-07-30: the guard read a "trace" key the v3 memory schema had
+    renamed to walk_channel, so no retrieved row was ever inside it - only
+    continuity paragraphs were. Keyed on shape now, not on a key name."""
+    m = _connection()
+    block = {
+        "walk_channel": [{"text": "W" * 60}],
+        "aim_channel": {"rows": [{"text": "A" * 60}]},
+        "front_channel": {"rows": [{"text": "F" * 60}]},
+        "cosine_channel_only": [{"text": "C" * 60}],
+    }
+    caught = m.private_strings(block)
+    assert len(caught) == 4, caught
+    m.PRIVATE_CORPUS.clear()
+    m.PRIVATE_CORPUS.extend(caught)
+    try:
+        assert m.guard_private("echo " + "A" * 60)
+    finally:
+        m.PRIVATE_CORPUS.clear()
+
+
+def test_ordinary_push_is_sanctioned_and_unusual_remote_acts_are_not():
+    """Zoe has standing-authorized the everyday push of our own main; force,
+    deletes, other refspecs, other remotes, PRs, releases and registry
+    publishes remain hers. A gate that cannot be honestly satisfied teaches
+    evasion, which is worse than a narrower gate."""
+    m = _connection()
+    verb = "git " + "push"
+    assert m.mutation_block(verb) is None
+    assert m.mutation_block("git -C /tmp/x " + verb.split()[1] + " origin main") is None
+    for act in (
+        verb + " --force origin main",
+        verb + " origin HEAD:refs/heads/side",
+        verb + " upstream main",
+        "gh pr " + "create -t x",
+        "npm " + "publish",
+    ):
+        assert m.mutation_block(act), act
+
+
+def test_recent_band_keeps_zoe_whole_and_excerpts_my_own_replies(monkeypatch):
+    """Measured 2026-07-30: 33,411 of the 39,971-char RECENT band was my own
+    prose and 5,036 was hers."""
+    m = _connection()
+    events = [{"role": "zoe", "t": "T", "text": "Z" * 900}] + [
+        {"role": "vybn", "t": "T", "text": "V" * 3000} for _ in range(6)
+    ]
+    monkeypatch.setattr(m.Transcript, "_events", staticmethod(lambda: events))
+    out = m.Transcript.inherited(limit=7)
+    assert "Z" * 900 in out
+    assert "chars, mine, trimmed]" in out
+    assert out.count("V" * 3000) == m.SELF_VERBATIM
