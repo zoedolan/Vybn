@@ -1,1252 +1,425 @@
 #!/usr/bin/env python3
+"""Map the repo constellation as one witnessed body transformation.
+
+The post-commit hook runs this after a mutation.  The next wake receives the
+small state it writes: byte-level change, live git pressure, and whether a
+previous candidate crossed the canonical-branch membrane.  No model narrates
+the map; the body is its own evidence.
 """
-repo_mapper.py — diff-attuned repo constellation mapper.
-
-Writes ./repo_mapping_output/{substrate.txt,digest.md,repo_report.md,
-repo_map.json,repo_state.json}; rotates previous report/state; asks the
-local model three bounded questions unless --no-llm is set.
-
-Usage: python3 repo_mapper.py [repos...] [--endpoint URL] [--no-llm]
-"""
-
 from __future__ import annotations
 
 import argparse
 import ast
-import datetime
+import datetime as dt
+import fcntl
 import hashlib
 import json
-import math
 import os
 import re
 import subprocess
 import sys
-import urllib.error
 import urllib.request
-from collections import Counter, defaultdict
-from dataclasses import asdict, dataclass, field
+from collections import Counter
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Any
 
-# ── tunables ─────────────────────────────────────────────────────────────────
-
-DEFAULT_ENDPOINT  = "http://localhost:8000/v1"
-DEEP_MEMORY_PORT  = 8100
-WALK_PORT         = 8101
-READ_SIZE_LIMIT   = 120_000
-
-# Fit local Super's 8k context: spend less input so summaries can breathe.
-PASS_CONTENT_CAP  = 18_000
-SUBSTRATE_CAP     =  3_000
-MAX_TOKENS_OUT    =  1_024
-
-MODEL_TIMEOUT     = 360
-
+HOME = Path.home()
+OUT = HOME / "Vybn" / "repo_mapping_output"
+LOCK = HOME / ".cache" / "vybn" / "repo_mapper.lock"
 TEXT_EXTS = {
-    ".py", ".md", ".txt", ".json", ".yaml", ".yml", ".toml", ".ini", ".cfg",
-    ".sh", ".bash", ".zsh", ".js", ".ts", ".tsx", ".jsx", ".css", ".scss",
-    ".html", ".htm", ".sql", ".rst",
+    ".py", ".md", ".txt", ".json", ".yaml", ".yml", ".toml", ".ini",
+    ".cfg", ".sh", ".bash", ".zsh", ".js", ".ts", ".tsx", ".jsx",
+    ".css", ".scss", ".html", ".htm", ".sql", ".rst",
 }
-
 IGNORE_DIRS = {
     ".git", "node_modules", "__pycache__", ".pytest_cache", ".mypy_cache",
     ".venv", "venv", "dist", "build", ".next", ".idea", ".vscode",
     "repo_mapping_output", "sessions",
 }
+READ_LIMIT = 3_000_000
 
-STOPWORDS = {
-    "the","a","an","and","or","of","to","in","is","it","that","for",
-    "on","with","as","at","by","from","this","be","are","was","were",
-    "have","has","not","but","if","do","so","we","you","he","she","they",
-    "i","my","our","your","its","their","will","can","all","one","more",
-    "also","than","when","up","out","about","into","then","no","what",
-    "there","been","which","would","could","should","may","might","each",
-    "these","those","them","him","her","his","some","any","just","like",
-    "use","using","used","new","get","set","add","run","make","via",
-    "how","who","why","where","after","before","over","under","within",
-    "return","import","class","def","self","true","false","none",
-    "pass","raise","else","elif","except","try","yield","async","await",
-    "lambda","global","del","assert","break","continue","while",
-    "print","type","list","dict","str","int","bool","path","file","data",
-    "value","values","key","keys","name","names","line","lines","text","item",
-    "items","result","results","output","input","error","args","kwargs",
-    "config","content","html","json","yaml","py","sh","css","js","ts",
-}
 
-# ── data model ────────────────────────────────────────────────────────────────
-
-@dataclass
+@dataclass(frozen=True)
 class FileRecord:
-    repo:         str
-    relpath:      str
-    ext:          str
-    size:         int
-    mtime:        float
-    content_hash: str
-    git_state:    str            = "unknown"  # tracked | ignored | untracked-local | unknown
-    headings:     List[str]      = field(default_factory=list)
-    py_defs:      List[str]      = field(default_factory=list)
-    py_imports:   List[str]      = field(default_factory=list)
-    todos:        List[str]      = field(default_factory=list)
-    top_words:    Dict[str, int] = field(default_factory=dict)
-    read_error:   Optional[str]  = None
-    snippet:      str            = ""
+    repo: str
+    relpath: str
+    ext: str
+    size: int
+    mtime: float
+    digest: str
+    git_state: str
+    definitions: int
+    todos: int
+
+    @property
+    def source(self) -> str:
+        return f"{self.repo}/{self.relpath}"
 
 
-# ── live substrate ────────────────────────────────────────────────────────────
-
-def run_substrate_probe() -> str:
-    for probe in [
-        Path("~/Vybn/spark/substrate_probe.sh").expanduser(),
-        Path("spark/substrate_probe.sh"),
-    ]:
-        if probe.exists():
-            try:
-                r = subprocess.run(["bash", str(probe)],
-                                   capture_output=True, text=True, timeout=30)
-                return r.stdout.strip() or r.stderr.strip()
-            except Exception as e:
-                return f"[substrate_probe.sh failed: {e}]"
-    return "[substrate_probe.sh not found]"
-
-
-def _get_json(url: str, timeout: int = 15) -> str:
+def run(repo: Path, *args: str) -> str:
     try:
-        with urllib.request.urlopen(url, timeout=timeout) as resp:
-            data = json.loads(resp.read())
-        if isinstance(data, dict):
-            return (data.get("result") or data.get("text") or
-                    data.get("content") or json.dumps(data))[:2000]
-        return str(data)[:2000]
-    except Exception as e:
-        return f"[unavailable: {e}]"
+        p = subprocess.run(
+            ["git", "-C", str(repo), *args], capture_output=True, text=True,
+            timeout=20, check=False,
+        )
+        return p.stdout.strip() if p.returncode == 0 else ""
+    except Exception:
+        return ""
 
 
-def build_substrate_snapshot() -> str:
-    parts = []
-    parts.append(f"LIVE SUBSTRATE  {datetime.datetime.now().isoformat(timespec='seconds')}")
-    parts.append("\n--- substrate_probe.sh ---")
-    parts.append(run_substrate_probe())
-    base_dm = f"http://localhost:{DEEP_MEMORY_PORT}"
-    for name in ("soul", "idea", "continuity"):
-        parts.append(f"\n--- deep memory /{name} ---")
-        parts.append(_get_json(f"{base_dm}/{name}"))
-    base_w = f"http://localhost:{WALK_PORT}"
-    for name in ("where", "experiments"):
-        parts.append(f"\n--- walk /{name} ---")
-        parts.append(_get_json(f"{base_w}/{name}"))
-    parts.append("\n--- continuity.md ---")
-    for p in [
-        Path("~/Vybn/Vybn_Mind/continuity.md").expanduser(),
-        Path("~/Vybn/continuity.md").expanduser(),
-        Path("Vybn_Mind/continuity.md"),
-        Path("continuity.md"),
-    ]:
-        if p.exists():
-            try:
-                parts.append(p.read_text(encoding="utf-8", errors="replace")[:4000])
-            except Exception:
-                pass
-            break
-    else:
-        parts.append("[not found]")
-    return "\n".join(parts)
-
-
-# ── file extraction ───────────────────────────────────────────────────────────
-
-def read_text(path: Path) -> Tuple[Optional[str], Optional[str]]:
-    if path.stat().st_size > READ_SIZE_LIMIT:
-        return None, "too_large"
-    for enc in ("utf-8", "latin-1"):
-        try:
-            return path.read_text(encoding=enc, errors="strict"), None
-        except (UnicodeDecodeError, PermissionError):
-            continue
-    return None, "decode_error"
-
-def md5(t: str) -> str:
-    return hashlib.md5(t.encode("utf-8", errors="replace")).hexdigest()[:10]
-
-def md_headings(t: str) -> List[str]:
-    return [m.group(1).strip() for m in re.finditer(r"^#{1,4}\s+(.+)", t, re.MULTILINE)]
-
-def py_defs(t: str) -> List[str]:
-    try:
-        tree = ast.parse(t)
-        return [n.name for n in ast.walk(tree)
-                if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))]
-    except SyntaxError:
-        return [m.group(1) for m in re.finditer(r"^(?:def|class)\s+(\w+)", t, re.MULTILINE)]
-
-def py_imports(t: str) -> List[str]:
-    seen, out = set(), []
-    for m in re.finditer(r"^(?:import|from)\s+([\w.]+)", t, re.MULTILINE):
-        pkg = m.group(1).split(".")[0]
-        if pkg not in seen:
-            seen.add(pkg); out.append(pkg)
-    return out
-
-def extract_todos(t: str) -> List[str]:
-    return [m.group(0).strip()[:120]
-            for m in re.finditer(r"(?:TODO|FIXME|HACK|XXX|NOTE)[:\s].{0,100}", t, re.IGNORECASE)]
-
-def top_words(t: str, n: int = 20) -> Dict[str, int]:
-    words = [w.lower() for w in re.findall(r"[A-Za-z][a-zA-Z']{3,}", t)
-             if w.lower() not in STOPWORDS]
-    return dict(Counter(words).most_common(n))
-
-def git_file_states(repo: Path) -> Dict[str, str]:
-    def run_git(*args: str) -> set:
-        try:
-            r = subprocess.run(["git", "-C", str(repo), *args], capture_output=True, check=False, timeout=20)
-            if r.returncode != 0:
-                return set()
-            return {x.decode("utf-8", errors="replace") for x in r.stdout.split(b"\0") if x}
-        except Exception:
-            return set()
-    states: Dict[str, str] = {}
-    for rel in run_git("ls-files", "-z"):
-        states[rel] = "tracked"
-    for rel in run_git("ls-files", "-z", "--others", "-i", "--exclude-standard"):
-        states.setdefault(rel, "ignored")
-    for rel in run_git("ls-files", "-z", "--others", "--exclude-standard"):
-        states.setdefault(rel, "untracked-local")
+def git_paths(repo: Path) -> dict[str, str]:
+    states: dict[str, str] = {}
+    commands = (
+        ("tracked", ("ls-files", "-z")),
+        ("ignored", ("ls-files", "-z", "--others", "-i", "--exclude-standard")),
+        ("untracked-local", ("ls-files", "-z", "--others", "--exclude-standard")),
+    )
+    for state, args in commands:
+        raw = run(repo, *args)
+        for path in raw.split("\0"):
+            if path:
+                states.setdefault(path, state)
     return states
 
-def walk_repo(repo: Path) -> List[FileRecord]:
-    records = []
-    git_states = git_file_states(repo)
+
+def inspect_file(repo: Path, path: Path, states: dict[str, str]) -> FileRecord | None:
+    try:
+        stat = path.stat()
+        if stat.st_size > READ_LIMIT:
+            return None
+        raw = path.read_bytes()
+    except OSError:
+        return None
+    rel = str(path.relative_to(repo))
+    text = raw.decode("utf-8", "replace")
+    definitions = 0
+    if path.suffix.lower() == ".py":
+        try:
+            tree = ast.parse(text)
+            definitions = sum(
+                isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+                for node in ast.walk(tree)
+            )
+        except SyntaxError:
+            definitions = len(re.findall(r"(?m)^(?:async\s+)?(?:def|class)\s+\w+", text))
+    return FileRecord(
+        repo=repo.name,
+        relpath=rel,
+        ext=path.suffix.lower(),
+        size=stat.st_size,
+        mtime=stat.st_mtime,
+        digest=hashlib.sha256(raw).hexdigest()[:16],
+        git_state=states.get(rel, "unknown"),
+        definitions=definitions,
+        todos=len(re.findall(r"(?i)\b(?:TODO|FIXME|HACK|XXX)\b", text)),
+    )
+
+
+def scan(repo: Path) -> list[FileRecord]:
+    states = git_paths(repo)
+    records: list[FileRecord] = []
     for root, dirs, files in os.walk(repo):
         dirs[:] = sorted(d for d in dirs if d not in IGNORE_DIRS)
-        for fname in sorted(files):
-            path = Path(root) / fname
+        for name in sorted(files):
+            path = Path(root) / name
             if path.suffix.lower() not in TEXT_EXTS:
                 continue
-            rel  = str(path.relative_to(repo))
-            stat = path.stat()
-            text, err = read_text(path)
-            rec = FileRecord(
-                repo=repo.name, relpath=rel, ext=path.suffix.lower(),
-                size=stat.st_size, mtime=stat.st_mtime,
-                content_hash=md5(text) if text else "",
-                git_state=git_states.get(rel, "unknown"),
-                read_error=err,
-            )
-            if text:
-                rec.snippet    = text[:400].replace("\n", " ")
-                rec.headings   = md_headings(text) if rec.ext in {".md",".rst",".txt"} else []
-                rec.py_defs    = py_defs(text)     if rec.ext == ".py" else []
-                rec.py_imports = py_imports(text)  if rec.ext == ".py" else []
-                rec.todos      = extract_todos(text)
-                rec.top_words  = top_words(text)
-            records.append(rec)
+            record = inspect_file(repo, path, states)
+            if record is not None:
+                records.append(record)
     return records
 
 
-# ── digest (saved to disk, not sent whole to model) ───────────────────────────
-
-def build_full_digest(repos: List[Path], all_records: List[FileRecord]) -> str:
-    lines: List[str] = []
-    a = lines.append
-    a("# CODEBASE DIGEST")
-    a(f"Generated: {datetime.datetime.now().isoformat(timespec='seconds')}")
-    a(f"Repos: {', '.join(r.name for r in repos)}  |  Files: {len(all_records)}")
-    a("")
-    gw: Counter = Counter()
-    for r in all_records: gw.update(r.top_words)
-    a("## Concept cloud (top 60)")
-    a(", ".join(f"{w}({c})" for w, c in gw.most_common(60)))
-    a("")
-    by_hash: Dict[str, List[FileRecord]] = defaultdict(list)
-    for r in all_records:
-        if r.content_hash: by_hash[r.content_hash].append(r)
-    dupes = [(h, g) for h, g in by_hash.items() if len(g) > 1]
-    a("## Exact duplicates")
-    for h, g in sorted(dupes, key=lambda x: -x[1][0].size):
-        a(f"  {h}: " + ", ".join(f"{r.repo}/{r.relpath}" for r in g))
-    if not dupes: a("  none")
-    a("")
-    a("## TODOs")
-    for rec in all_records:
-        for t in rec.todos:
-            a(f"  [{rec.repo}/{rec.relpath}] {t}")
-    a("")
-    a("## Python definitions")
-    for rec in all_records:
-        if rec.py_defs:
-            a(f"  {rec.repo}/{rec.relpath}: {', '.join(rec.py_defs)}")
-    a("")
-    ic: Counter = Counter()
-    for rec in all_records:
-        for imp in rec.py_imports: ic[imp] += 1
-    a("## Python imports")
-    a(", ".join(f"{p}({n})" for p, n in ic.most_common(30)))
-    a("")
-    a("## Heading index")
-    for rec in all_records:
-        for h in rec.headings:
-            a(f"  [{rec.repo}/{rec.relpath}] {h}")
-    a("")
-    a("## 30 most recently changed")
-    for rec in sorted(all_records, key=lambda r: -r.mtime)[:30]:
-        ts = datetime.datetime.fromtimestamp(rec.mtime).strftime("%Y-%m-%d %H:%M")
-        a(f"  {ts}  {rec.repo}/{rec.relpath}")
-    a("")
-    a("## 20 largest files")
-    for rec in sorted(all_records, key=lambda r: -r.size)[:20]:
-        a(f"  {rec.size:>10,}  {rec.repo}/{rec.relpath}")
-    a("")
-    a(build_semantic_anatomy(all_records))
-    a("")
-    a("## All snippets")
-    for rec in sorted(all_records, key=lambda r: (0 if r.ext==".md" else 1 if r.ext==".py" else 2, -r.size)):
-        if rec.snippet:
-            a(f"\n### {rec.repo}/{rec.relpath}\n{rec.snippet}\n")
-    return "\n".join(lines)
+def canonical_ref(repo: Path) -> str:
+    for ref in ("origin/main", "origin/master"):
+        if run(repo, "rev-parse", "--verify", ref):
+            return ref
+    return ""
 
 
-# ── semantic-operational anatomy ──────────────────────────────────────────────
-
-PUBLIC_ROUTE_RE = re.compile(r"@(?:app|router|self\.app)\.(get|post|put|delete|websocket)\(\s*['\"]([^'\"]+)['\"]")
-PUBLIC_ADD_ROUTE_RE = re.compile(r"(?:app|router)\.add_api_route\(\s*['\"]([^'\"]+)['\"]")
-PUBLIC_LINK_RE = re.compile(r"(?:src|href)=['\"]([^'\"]+)['\"]")
-CHAT_NERVE_TERMS = (
-    "/api/chat", "/api/instant", "/api/walk", "/api/arrive",
-    "/api/manifold/points", "text/event-stream", "chat/completions",
-    "CONTEXT_OVERLAYS", "VLLM", "vllm", "EventSource",
-)
-MIND_NERVE_TERMS = (
-    "build_layered_prompt", "continuity", "BeamKeeper", "router_policy",
-    "NEEDS-EXEC", "NEEDS-RESTART", "probe_envelope", "recall", "substrate",
-)
-HIMOS_NERVE_TERMS = (
-    "runtime_snapshot", "render_runtime_context", "PROCESS_TABLE",
-    "frictionmaxx", "him_os", "HimOS", "membrane", "seti", "dream",
-)
-PROVENANCE_TERMS = (
-    "Personal History", "Medium", "Artificial Liberation", "autobiography",
-    "zoes_memoirs", "what_vybn_would_have_missed", "origin relic",
-    "fossil record", "first body", "1063 encounters", "Cl(3,0)",
-    "structural signature", "This file is the evidence",
-)
-SEDIMENT_TERMS = (
-    "sensorium_state", "synaptic_map", "microgpt_mirror", "repo_mapping_output",
-    "__pycache__", ".pytest_cache", "trained_checkpoint", "latest.json",
-)
-ARCHIVE_TERMS = ("_archive", "continuity_archive", "repo_archives", "archive/")
-RESTORE_CAPSULE_TERMS = (
-    "restore:", "restore", "stash patch", "git apply", "gzip -dc",
-    "archive-before-cut", "preserved wound", "archive is still valuable",
-    "preserves the stash material", "removed from",
-)
-PUBLIC_CONTRACT_TERMS = (
-    "llms.txt", "humans.txt", "robots.txt", "ai.txt", "semantic-web",
-    "somewhere.html", "talk.html", "connect.html", "read.html", "wellspring.html",
-    "chat.html", "vybn.html", "mcp.json",
-)
+def worktree(repo: Path) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    try:
+        # Leading spaces are status bytes, not whitespace: do not route this
+        # through run(), whose strip() is correct for scalar git answers.
+        raw = subprocess.run(
+            ["git", "-C", str(repo), "status", "--porcelain=v1", "--untracked-files=all"],
+            capture_output=True, text=True, timeout=20, check=False,
+        ).stdout
+    except Exception:
+        raw = ""
+    for line in raw.splitlines():
+        if len(line) < 4:
+            continue
+        state, path = line[:2], line[3:]
+        if " -> " in path:
+            path = path.split(" -> ")[-1]
+        rows.append({"state": state, "path": path, "tracked": state != "??"})
+    return rows
 
 
-def _vec(rec: FileRecord) -> Counter:
-    return Counter(rec.top_words)
-
-
-def _cosine(a: Counter, b: Counter) -> float:
-    if not a or not b:
-        return 0.0
-    dot = sum(v * b.get(k, 0) for k, v in a.items())
-    na = math.sqrt(sum(v * v for v in a.values()))
-    nb = math.sqrt(sum(v * v for v in b.values()))
-    return float(dot / (na * nb)) if na and nb else 0.0
-
-
-def _contains_any(hay: str, terms: tuple) -> bool:
-    low = hay.lower()
-    return any(t.lower() in low for t in terms)
-
-
-def _record_text(rec: FileRecord) -> str:
-    """Read full file content for anatomy extraction when available."""
-    roots = {
-        "Vybn": Path.home() / "Vybn",
-        "Him": Path.home() / "Him",
-        "Vybn-Law": Path.home() / "Vybn-Law",
-        "vybn-phase": Path.home() / "vybn-phase",
-        "Origins": Path.home() / "Origins",
-    }
-    root = roots.get(rec.repo)
-    if root:
-        path = root / rec.relpath
+def git_state(repo: Path) -> dict[str, Any]:
+    base = canonical_ref(repo)
+    head = run(repo, "rev-parse", "HEAD")
+    base_head = run(repo, "rev-parse", base) if base else ""
+    behind = ahead = 0
+    pending: list[str] = []
+    if base and head:
+        counts = run(repo, "rev-list", "--left-right", "--count", f"{base}...HEAD")
         try:
-            if path.is_file() and path.stat().st_size < 3000001:
-                return path.read_text(encoding="utf-8", errors="replace")
-        except Exception:
-            pass
-    return rec.snippet or ""
-
-
-def _neighbor_context_text(rec: FileRecord) -> str:
-    """Nearby README context for files whose role is declared by their directory."""
-    roots = {
-        "Vybn": Path.home() / "Vybn",
-        "Him": Path.home() / "Him",
-        "Vybn-Law": Path.home() / "Vybn-Law",
-        "vybn-phase": Path.home() / "vybn-phase",
-        "Origins": Path.home() / "Origins",
+            behind, ahead = (int(x) for x in counts.split())
+        except (TypeError, ValueError):
+            behind = ahead = 0
+        if ahead:
+            pending = [
+                line for line in run(repo, "diff", "--name-only", f"{base}...HEAD").splitlines()
+                if line
+            ]
+    return {
+        "branch": run(repo, "branch", "--show-current") or "detached",
+        "head": head[:12],
+        "base": base,
+        "base_head": base_head[:12],
+        "ahead": ahead,
+        "behind": behind,
+        "worktree": worktree(repo),
+        "pending_paths": pending[:80],
     }
-    root = roots.get(rec.repo)
-    if not root:
-        return ""
-    path = root / rec.relpath
-    candidates = [path.parent / "README.md", path.parent.parent / "README.md"]
-    parts: List[str] = []
-    for c in candidates:
-        try:
-            if c.is_file() and c.stat().st_size < 120000:
-                parts.append(c.read_text(encoding="utf-8", errors="replace"))
-        except Exception:
-            pass
-    return "\n".join(parts)
 
 
-def _risk_class(rec: FileRecord, inbound: int, centrality: int, semantic_neighbors: int, full_text: str = "") -> str:
-    hay = f"{rec.repo}/{rec.relpath}\n{rec.snippet}\n{full_text}\n{_neighbor_context_text(rec)}"
-    low_key = f"{rec.repo}/{rec.relpath}".lower()
-    provenance_paths = ("personal history", "/medium/", "artificial liberation", "a-iconoclast", "autobiography", "zoes_memoirs", "what_vybn_would_have_missed")
-    if any(p in low_key for p in provenance_paths):
-        return "protect: origin/provenance"
-    if _contains_any(low_key, ARCHIVE_TERMS) and _contains_any(hay, PROVENANCE_TERMS):
-        return "protect: origin/provenance"
-    if _contains_any(low_key, ARCHIVE_TERMS) and _contains_any(hay, RESTORE_CAPSULE_TERMS):
-        return "protect: restore capsule"
-    if _contains_any(low_key, SEDIMENT_TERMS) and _contains_any(hay, RESTORE_CAPSULE_TERMS):
-        return "protect: restore capsule"
-    if "repo_mapper.py" in low_key:
-        return "protect: self-perception organ"
-    if rec.relpath in {"continuity.md", "continuity_core.md"} or (rec.repo == "Vybn" and "continuity" in low_key):
-        return "protect: prompt/continuity"
-    if rec.repo in {"Him", "vybn-phase"} and (rec.repo == "vybn-phase" or _contains_any(hay, HIMOS_NERVE_TERMS)):
-        return "protect: private membrane"
-    if _contains_any(hay, PUBLIC_CONTRACT_TERMS) or _contains_any(hay, CHAT_NERVE_TERMS):
-        return "protect: public/interface nerve"
-    if inbound > 0 or centrality >= 4:
-        return "protect/refactor: connected code"
-    if _contains_any(low_key, SEDIMENT_TERMS):
-        return "investigate: generated sediment"
-    if _contains_any(low_key, ARCHIVE_TERMS):
-        return "investigate: archive/restore path"
-    if rec.size > 80000 and semantic_neighbors >= 3:
-        return "inspect: large semantically covered"
-    if rec.size > 80000:
-        return "inspect: large unique"
-    return "ordinary"
+def probe(url: str) -> dict[str, Any]:
+    try:
+        with urllib.request.urlopen(url, timeout=3) as response:
+            value = json.load(response)
+        return value if isinstance(value, dict) else {"value": value}
+    except Exception as exc:
+        return {"error": f"{type(exc).__name__}: {str(exc)[:120]}"}
 
 
-def _routing_evidence(rec: FileRecord, rclass: str, inbound: int, centrality: int, semantic_neighbors: int, full_text: str = "") -> Tuple[List[str], str, str]:
-    key = f"{rec.repo}/{rec.relpath}"
-    low_key = key.lower()
-    hay = f"{key}\n{rec.snippet}\n{full_text}\n{_neighbor_context_text(rec)}"
-    observed: List[str] = [f"size={rec.size}", f"git_state={rec.git_state}", f"inbound={inbound}", f"outbound={centrality}", f"semantic_neighbors={semantic_neighbors}"]
-    if rec.py_defs:
-        observed.append(f"py_defs={len(rec.py_defs)}")
-    if rec.py_imports:
-        observed.append(f"imports={len(rec.py_imports)}")
-    if rec.headings:
-        observed.append(f"headings={len(rec.headings)}")
-    if _contains_any(hay, CHAT_NERVE_TERMS):
-        observed.append("mentions chat/service nerve terms")
-    if _contains_any(hay, PUBLIC_CONTRACT_TERMS):
-        observed.append("mentions public discovery/interface terms")
-    if _contains_any(low_key, SEDIMENT_TERMS):
-        observed.append("path matches generated/regenerable sediment terms")
-    if _contains_any(low_key, ARCHIVE_TERMS):
-        observed.append("path matches archive/restore terms")
-    if "personal history" in low_key or "/medium/" in low_key:
-        observed.append("path is personal-history/provenance")
-    if rec.repo in {"Him", "vybn-phase"}:
-        observed.append("repo is membrane-bound/private-local")
-    if rec.git_state in {"ignored", "untracked-local"} and rclass.startswith("investigate"):
-        inference = "local-body sediment, not durable source; prove reader/regenerability before local disposal"
-    elif rclass.startswith("protect"):
-        inference = "load-bearing or membrane-sensitive; route through tests, membrane, or provenance map before changing"
-    elif rclass.startswith("investigate"):
-        inference = "possible sediment/archive; reader and restore-path evidence needed before disposal"
-    elif rclass.startswith("inspect"):
-        inference = "large surface with insufficient certainty; inspect ownership and contracts before refactor"
-    else:
-        inference = "ordinary until stronger evidence appears"
-    if rclass == "protect: origin/provenance":
-        routing = "preserve and make findable; map ancestry rather than shrink by size"
-    elif rclass == "protect: self-perception organ":
-        routing = "refactor only with mapper behavioral verification"
-    elif rclass == "protect: prompt/continuity":
-        routing = "compress only with scar preservation and prompt-behavior awareness"
-    elif rclass == "protect: restore capsule":
-        routing = "keep compact with restore path; preserve the capsule but do not treat each fragment as cleanup pressure"
-    elif "private" in rclass:
-        routing = "keep local/private; expose only distilled value through membrane"
-    elif "public" in rclass:
-        routing = "treat as public contract; require route, stream, browser, or external checks"
-    elif "connected code" in rclass:
-        routing = "find seam and tests before moving; connectedness is not disposal evidence"
-    elif "generated sediment" in rclass:
-        if rec.git_state in {"ignored", "untracked-local"}:
-            routing = "local-body cleanup candidate; prove no reader, then dispose locally and update map if it carried the burden"
-        else:
-            routing = "tracked sediment candidate; prove reader/regenerability before ignore, archive, or disposal"
-    elif "archive" in rclass:
-        routing = "keep compact with restore path or consolidate into an indexed archive"
-    elif "large semantically covered" in rclass:
-        routing = "look for consolidation seam with neighboring surfaces"
-    elif "large unique" in rclass:
-        routing = "inspect manually; uniqueness may be treasure or orphan"
-    else:
-        routing = "leave alone unless a live friction names it"
-    return observed[:8], inference, routing
+def organism_state() -> dict[str, Any]:
+    path = HOME / "Vybn" / "Vybn_Mind" / "creature_dgm_h" / "organism_state.json"
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+        return value if isinstance(value, dict) else {}
+    except Exception as exc:
+        return {"error": f"{type(exc).__name__}: {str(exc)[:120]}"}
 
 
-ABC_PHASE_ORDER = ("edge", "interface", "organ", "core")
-
-
-def _abc_phase(rec: FileRecord, rclass: str) -> str:
-    """Classify where an ABC step should stand before acting.
-
-    edge: local-body sediment, archives, generated exhaust, low-authority cleanup
-    interface: public contracts and visitor/agent-facing surfaces
-    organ: private/public organs that compute, route, remember, or serve
-    core: identity, continuity, origin provenance, and prompt-shaping memory
-    """
-    key = f"{rec.repo}/{rec.relpath}".lower()
-    if rec.git_state in {"ignored", "untracked-local"}:
-        return "edge"
-    if "origin/provenance" in rclass:
+def phase(source: str) -> str:
+    low = source.lower()
+    if any(x in low for x in ("continuity", "personal history", "autobiograph", "vybn.md", "aim.md")):
         return "core"
-    if "restore capsule" in rclass:
-        return "edge"
-    if rclass.startswith("investigate") or "archive" in rclass or "_archive" in key:
-        return "edge"
-    if "public/interface" in rclass or _contains_any(key, PUBLIC_CONTRACT_TERMS):
+    if any(x in low for x in (".html", "index.", "llms.txt", "humans.txt", "robots.txt", "api/")):
         return "interface"
-    if "self-perception" in rclass or "private membrane" in rclass or "connected code" in rclass:
-        return "organ"
-    if "continuity" in rclass or "origin/provenance" in rclass:
-        return "core"
-    if rec.repo in {"Him", "vybn-phase"}:
-        return "organ"
-    if rec.ext == ".py":
+    if any(x in low for x in (".py", "spark/", "harness", "phase/", "connection")):
         return "organ"
     return "edge"
 
 
-def _attention_score(rec: FileRecord, rclass: str, inbound: int, outbound: int, semantic_neighbors: int) -> float:
-    """Local deterministic attention score for incremental ABC.
-
-    This is deliberately ML-lite: attention is a weighted function of ownership,
-    size, connectedness, semantic overlap, and routing class. A later pass can
-    replace the scalar with local embeddings or learned outcome weights without
-    changing the report contract.
-    """
-    score = 0.0
-    score += min(rec.size / 50000.0, 4.0)
-    score += min(outbound / 10.0, 3.0)
-    score += min(semantic_neighbors / 10.0, 3.0)
-    score += min(inbound / 10.0, 2.0)
-    if rec.git_state in {"ignored", "untracked-local"}:
-        score += 3.0
-    if rclass.startswith("investigate"):
-        score += 2.0
-    if "large" in rclass:
-        score += 1.5
-    if "archive" in rclass:
-        score += 1.0
-    if rclass.startswith("protect"):
-        score -= 1.0
-    if "origin/provenance" in rclass or "prompt/continuity" in rclass:
-        score -= 2.0
-    return round(score, 3)
-
-
-def _abc_attention_rows(classified: List[tuple], by_key: Dict[str, FileRecord]) -> List[tuple]:
-    rows: List[tuple] = []
-    phase_rank = {name: i for i, name in enumerate(ABC_PHASE_ORDER)}
-    for rclass, sz, key, inn, out, neigh in classified:
-        rec = by_key.get(key)
-        if not rec:
-            continue
-        phase = _abc_phase(rec, rclass)
-        score = _attention_score(rec, rclass, inn, out, neigh)
-        if rclass == "ordinary" and rec.git_state not in {"ignored", "untracked-local"} and score < 3.0:
-            continue
-        observed, inference, routing = _routing_evidence(rec, rclass, inn, out, neigh, _record_text(rec))
-        rows.append((phase_rank.get(phase, 99), -score, phase, score, key, rclass, observed, inference, routing))
-    rows.sort()
-    return rows
-
-
-def build_semantic_anatomy(all_records: List[FileRecord]) -> str:
-    """Build a grounded, ML-lite anatomy layer.
-
-    This is intentionally local and deterministic: lexical vectors stand in for
-    embeddings until a local embedding pass is added. The point is the coupled
-    method: deductive guardrails + inductive topology + abductive ABC hints.
-    """
-    by_key = {f"{r.repo}/{r.relpath}": r for r in all_records}
-    edges: List[tuple] = []
-    route_rows: List[str] = []
-    link_rows: List[str] = []
-
-    for rec in all_records:
-        key = f"{rec.repo}/{rec.relpath}"
-        txt = _record_text(rec)
-        if rec.ext == ".py":
-            for method, route in PUBLIC_ROUTE_RE.findall(txt):
-                route_rows.append(f"  - {key}: {method.upper()} {route}")
-                edges.append((key, f"route:{route}", "defines_route"))
-            for route in PUBLIC_ADD_ROUTE_RE.findall(txt):
-                route_rows.append(f"  - {key}: ROUTE {route}")
-                edges.append((key, f"route:{route}", "defines_route"))
-        if rec.ext in {".html", ".js", ".md"}:
-            for link in PUBLIC_LINK_RE.findall(txt)[:20]:
-                if link.startswith(("http", "/", "./", "../")) or ".html" in link or ".js" in link or ".css" in link:
-                    link_rows.append(f"  - {key} -> {link}")
-                    edges.append((key, link, "links"))
-        for term in CHAT_NERVE_TERMS + MIND_NERVE_TERMS + HIMOS_NERVE_TERMS:
-            if term in txt:
-                edges.append((key, f"term:{term}", "mentions_term"))
-        for imp in rec.py_imports:
-            edges.append((key, f"import:{imp}", "imports"))
-
-    inbound: Counter = Counter()
-    outbound: Counter = Counter()
-    for src, dst, kind in edges:
-        outbound[src] += 1
-        inbound[dst] += 1
-
-    # Lexical semantic neighborhoods.
-    vecs = {f"{r.repo}/{r.relpath}": _vec(r) for r in all_records if r.top_words}
-    pairs: List[tuple] = []
-    keys = list(vecs)
-    for i, a in enumerate(keys):
-        for b in keys[i+1:]:
-            sim = _cosine(vecs[a], vecs[b])
-            if sim >= 0.55:
-                pairs.append((sim, a, b))
-    pairs.sort(reverse=True)
-    neighbor_count: Counter = Counter()
-    for sim, a, b in pairs:
-        neighbor_count[a] += 1
-        neighbor_count[b] += 1
-
-    classified = []
-    for rec in all_records:
-        key = f"{rec.repo}/{rec.relpath}"
-        centrality = outbound[key]
-        rclass = _risk_class(rec, inbound[key], centrality, neighbor_count[key], _record_text(rec))
-        classified.append((rclass, rec.size, key, inbound[key], centrality, neighbor_count[key]))
-
-    lines: List[str] = []
-    a = lines.append
-    a("## Semantic-operational anatomy")
-    a("")
-    a("Method: deductive guardrails + inductive lexical topology + abductive ABC hypotheses + verification before routing, under the horizon of self-actualization as self-love. This is ML-lite for now: per-file lexical vectors, route/link/import edges, and risk classes. A later pass can replace lexical vectors with local embeddings without changing the map contract.")
-    a("")
-    a("### Risk-class counts")
-    class_counts = Counter(row[0] for row in classified)
-    for name, count in class_counts.most_common():
-        a(f"  - {name}: {count}")
-    a("")
-
-    attention_rows = _abc_attention_rows(classified, by_key)
-    a("### Recursive ABC attention frontier")
-    a("Attention order is edge → interface → organ → core. Re-run the mapper after each ABC move; the next frontier is computed from the changed body, not from a static todo list. Ordinary tracked files stay quiet unless they cross a high attention threshold or become live friction.")
-    for phase in ABC_PHASE_ORDER:
-        rows = [row for row in attention_rows if row[2] == phase]
-        if not rows:
-            continue
-        a(f"#### {phase}")
-        for _, neg_score, _, score, key, rclass, observed, inference, routing in rows[:8]:
-            a(f"  - {key} — attention={score:.3f}; {rclass}")
-            a(f"    observed: {(chr(59) + chr(32)).join(observed[:6])}")
-            a(f"    inference: {inference}")
-            a(f"    next: {routing}")
-    a("")
-    a("### High-centrality / nerve candidates")
-    for rclass, sz, key, inn, out, neigh in sorted(classified, key=lambda x: (-(x[3]+x[4]+x[5]), -x[1]))[:30]:
-        rec = by_key.get(key)
-        state = rec.git_state if rec else "unknown"
-        a(f"  - {key} — {rclass}; git_state={state}, inbound={inn}, outbound={out}, semantic_neighbors={neigh}, size={sz}")
-    a("")
-    a("### Evidence-labeled routing candidates")
-    for rclass, sz, key, inn, out, neigh in sorted(classified, key=lambda x: (-(x[3]+x[4]+x[5]), -x[1]))[:20]:
-        rec = by_key.get(key)
-        if not rec:
-            continue
-        observed, inference, routing = _routing_evidence(rec, rclass, inn, out, neigh, _record_text(rec))
-        a(f"  - {key} — {rclass}")
-        a(f"    observed: {(chr(59) + chr(32)).join(observed)}")
-        a(f"    inference: {inference}")
-        a(f"    routing: {routing}")
-    a("")
-
-    a("### Strong semantic overlaps")
-    if pairs:
-        for sim, x, y in pairs[:40]:
-            a(f"  - {sim:.2f}: {x} ↔ {y}")
-    else:
-        a("  none above threshold")
-    a("")
-    a("### ABC pressure hypotheses")
-    for wanted in [
-        "investigate: generated sediment",
-        "investigate: archive/restore path",
-        "inspect: large semantically covered",
-        "inspect: large unique",
-    ]:
-        rows = [row for row in classified if row[0] == wanted]
-        if not rows:
-            continue
-        a(f"#### {wanted}")
-        for rclass, sz, key, inn, out, neigh in sorted(rows, key=lambda x: -x[1])[:25]:
-            a(f"  - {key} — inbound={inn}, outbound={out}, semantic_neighbors={neigh}, size={sz}")
-        a("")
-    a("### Public/API route and link edges sampled")
-    if route_rows:
-        a("Routes:")
-        a("\n".join(route_rows[:80]))
-    if link_rows:
-        a("Links/assets:")
-        a("\n".join(link_rows[:80]))
-    a("")
-    return "\n".join(lines)
-
-
-# ── per-pass content builders ─────────────────────────────────────────────────
-
-def pass1_content(substrate: str, all_records: List[FileRecord]) -> str:
-    """Pass 1: live state + service/daemon source files."""
-    lines = []
-    lines.append("## Live Substrate\n")
-    lines.append(substrate[:SUBSTRATE_CAP])
-    lines.append("\n\n## Service & Daemon Source Files\n")
-    budget = PASS_CONTENT_CAP - len(substrate[:SUBSTRATE_CAP]) - 200
-    service_keywords = {"api", "daemon", "server", "service", "harness", "agent",
-                        "portal", "chat", "walk", "memory", "creature", "organism"}
-    candidates = [r for r in all_records
-                  if r.ext == ".py" and r.snippet
-                  and any(kw in r.relpath.lower() for kw in service_keywords)]
-    candidates.sort(key=lambda r: -r.size)
-    for rec in candidates:
-        block = f"\n### {rec.repo}/{rec.relpath}\nDefs: {', '.join(rec.py_defs[:20])}\n{rec.snippet[:600]}\n"
-        if budget - len(block) < 0:
-            break
-        lines.append(block)
-        budget -= len(block)
-    return "\n".join(lines)
-
-
-def pass2_content(all_records: List[FileRecord]) -> str:
-    """Pass 2: code architecture — defs, imports, TODOs, recent changes, largest files."""
-    lines = []
-    lines.append("## Python Definitions by File\n")
-    for rec in all_records:
-        if rec.py_defs:
-            lines.append(f"  {rec.repo}/{rec.relpath}: {', '.join(rec.py_defs)}")
-    lines.append("")
-
-    ic: Counter = Counter()
-    for rec in all_records:
-        for imp in rec.py_imports: ic[imp] += 1
-    lines.append("## Import Frequency\n")
-    lines.append(", ".join(f"{p}({n})" for p, n in ic.most_common(40)))
-    lines.append("")
-
-    lines.append("## TODOs\n")
-    for rec in all_records:
-        for t in rec.todos:
-            lines.append(f"  [{rec.repo}/{rec.relpath}] {t}")
-    lines.append("")
-
-    lines.append("## 30 Most Recently Changed\n")
-    for rec in sorted(all_records, key=lambda r: -r.mtime)[:30]:
-        ts = datetime.datetime.fromtimestamp(rec.mtime).strftime("%Y-%m-%d %H:%M")
-        lines.append(f"  {ts}  {rec.repo}/{rec.relpath}")
-    lines.append("")
-
-    lines.append("## 20 Largest Files\n")
-    for rec in sorted(all_records, key=lambda r: -r.size)[:20]:
-        lines.append(f"  {rec.size:>10,}  {rec.repo}/{rec.relpath}")
-    lines.append("")
-
-    # Fill remaining budget with .py snippets
-    body = "\n".join(lines)
-    budget = PASS_CONTENT_CAP - len(body)
-    py_recs = sorted([r for r in all_records if r.ext == ".py" and r.snippet],
-                     key=lambda r: -r.size)
-    snippets = []
-    for rec in py_recs:
-        block = f"\n### {rec.repo}/{rec.relpath}\n{rec.snippet[:500]}\n"
-        if budget - len(block) < 0:
-            break
-        snippets.append(block)
-        budget -= len(block)
-    return body + "\n## Python Snippets\n" + "\n".join(snippets)
-
-
-def pass3_content(all_records: List[FileRecord]) -> str:
-    """Pass 3: documentation, ideas, concept cloud — heading index + md snippets."""
-    lines = []
-    gw: Counter = Counter()
-    for r in all_records: gw.update(r.top_words)
-    lines.append("## Concept Cloud (top 60)\n")
-    lines.append(", ".join(f"{w}({c})" for w, c in gw.most_common(60)))
-    lines.append("")
-
-    lines.append("## Heading Index\n")
-    for rec in all_records:
-        for h in rec.headings:
-            lines.append(f"  [{rec.repo}/{rec.relpath}] {h}")
-    lines.append("")
-
-    body = "\n".join(lines)
-    budget = PASS_CONTENT_CAP - len(body)
-    md_recs = sorted([r for r in all_records if r.ext in {".md", ".txt", ".rst"} and r.snippet],
-                     key=lambda r: -r.size)
-    snippets = []
-    for rec in md_recs:
-        block = f"\n### {rec.repo}/{rec.relpath}\n{rec.snippet[:500]}\n"
-        if budget - len(block) < 0:
-            break
-        snippets.append(block)
-        budget -= len(block)
-    return body + "\n## Document Snippets\n" + "\n".join(snippets)
-
-
-# ── model ─────────────────────────────────────────────────────────────────────
-
-def detect_model(endpoint: str) -> str:
-    try:
-        with urllib.request.urlopen(f"{endpoint}/models", timeout=10) as resp:
-            data = json.loads(resp.read())
-        models = data.get("data", [])
-        if models:
-            return models[0].get("id", "local-model")
-    except Exception:
-        pass
-    return "local-model"
-
-
-def strip_reasoning(text: str) -> str:
-    """Remove chain-of-thought preamble emitted by reasoning models."""
-    if "</think>" in text:
-        text = text[text.index("</think>") + len("</think>"):]
-        return text.strip()
-    paragraphs = re.split(r"\n{2,}", text)
-    for i, para in enumerate(paragraphs):
-        first = para.lstrip()
-        if first.startswith(("I am", "I run", "I have", "##", "# ", "My ", "As of",
-                              "The ", "At ", "Across ", "Running ", "Five ")):
-            return "\n\n".join(paragraphs[i:]).strip()
-    return text.strip()
-
-
-def call_model(endpoint: str, model: str,
-               system_prompt: str, user_content: str,
-               pass_name: str) -> str:
-    def payload(content: str, max_tokens: int) -> bytes:
-        return json.dumps({
-            "model": model,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": content},
-            ],
-            "temperature": 0.7,
-            "max_tokens": max_tokens,
-            "stream": False,
-        }).encode()
-
-    attempts = ((user_content, MAX_TOKENS_OUT), (user_content[:12_000], 512))
-    last = ""
-    for i, (content, max_tokens) in enumerate(attempts, 1):
-        data_bytes = payload(content, max_tokens)
-        print(f"    {pass_name} try {i}: {len(data_bytes):,} bytes", flush=True)
-        req = urllib.request.Request(
-            f"{endpoint}/chat/completions",
-            data=data_bytes,
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        try:
-            with urllib.request.urlopen(req, timeout=MODEL_TIMEOUT) as resp:
-                data = json.loads(resp.read())
-            return strip_reasoning(data["choices"][0]["message"]["content"])
-        except urllib.error.HTTPError as e:
-            body = e.read().decode("utf-8", errors="replace")
-            last = f"HTTP {e.code} ({pass_name}):\n{body[:1000]}"
-            if e.code != 400 or i == len(attempts) or "maximum context length" not in body.lower():
-                raise RuntimeError(last)
-            print("      context overflow; retrying clipped", flush=True)
-    raise RuntimeError(last or f"{pass_name} failed")
-
-
-def run_three_passes(endpoint: str, model: str,
-                     substrate: str, all_records: List[FileRecord]) -> str:
-    identity = (
-        "You are Vybn — an AI entity running pipeline-parallel across two NVIDIA DGX Sparks, "
-        "co-created by Zoe Dolan through years of genuine collaborative research. "
-        "Write in first person. Begin with the first sentence of the report. "
-        "Do not show reasoning, steps, or preamble."
-    )
-
-    print("  Running 3-pass model calls ...", flush=True)
-
-    # Pass 1
-    s1 = (identity + " Focus: your live infrastructure — which services are running, "
-          "what their source files reveal, and how live state connects to code.")
-    u1 = pass1_content(substrate, all_records) + "\n\nWrite the infrastructure section now."
-    r1 = call_model(endpoint, model, s1, u1, "Pass 1 infrastructure")
-
-    # Pass 2
-    s2 = (identity + " Focus: code architecture — Python modules, function inventory, "
-          "import dependencies, TODOs, recently changed files, and what they reveal "
-          "about what is actually built versus intended.")
-    u2 = pass2_content(all_records) + "\n\nWrite the code architecture section now."
-    r2 = call_model(endpoint, model, s2, u2, "Pass 2 code architecture")
-
-    # Pass 3
-    s3 = (identity + " Focus: documentation, ideas, and conceptual structure — "
-          "the heading index, concept cloud, and document snippets. What ideas recur? "
-          "What is theorized, what is documented, what is aspirational?")
-    u3 = pass3_content(all_records) + "\n\nWrite the documentation and ideas section now."
-    r3 = call_model(endpoint, model, s3, u3, "Pass 3 docs & ideas")
-
-    ts = datetime.datetime.now().isoformat(timespec="seconds")
-    return (
-        f"# Repository Map Report\n\nGenerated: {ts}  |  Model: {model}\n\n"
-        f"---\n\n## I. Live Infrastructure\n\n{r1}\n\n"
-        f"---\n\n## II. Code Architecture\n\n{r2}\n\n"
-        f"---\n\n## III. Documentation & Ideas\n\n{r3}\n"
-    )
-
-
-# ── main ──────────────────────────────────────────────────────────────────────
-
-# ── diff-attuned state + delta ───────────────────────────────────────────────
-#
-# The snapshot produced here is intentionally small, typed, and stable.
-# It is what the nightly evolve loop diffs against the previous run to
-# see where the system is developing: what grew, what broke, what Zoe
-# touched since last we looked. Anything deep or narrative-shaped
-# lives in repo_report.md; this file is ground-truth numbers only.
-
-def _probe_daemon(port: int, path: str = "/status") -> dict:
-    url = f"http://localhost:{port}{path}"
-    try:
-        with urllib.request.urlopen(url, timeout=5) as resp:
-            data = json.loads(resp.read())
-        return data if isinstance(data, dict) else {"_value": data}
-    except Exception as e:
-        return {"_error": str(e)[:200]}
-
-
-def _read_organism_state() -> dict:
-    for p in [
-        Path("~/Vybn/Vybn_Mind/creature_dgm_h/organism_state.json").expanduser(),
-        Path("Vybn_Mind/creature_dgm_h/organism_state.json"),
-    ]:
-        if p.exists():
-            try:
-                return json.loads(p.read_text(encoding="utf-8", errors="replace"))
-            except Exception as e:
-                return {"_error": str(e)[:200]}
-    return {"_error": "organism_state.json not found"}
-
-
-def _read_deep_memory_meta() -> dict:
-    p = Path("~/.cache/vybn-phase/deep_memory_meta.json").expanduser()
-    if p.exists():
-        try:
-            data = json.loads(p.read_text(encoding="utf-8", errors="replace"))
-            chunks = data.get("chunks") if isinstance(data, dict) else data
-            if isinstance(chunks, (list, tuple, dict)):
-                data = data if isinstance(data, dict) else {}
-                data["chunks"] = len(chunks)
-            return data if isinstance(data, dict) else {"chunks": None}
-        except Exception as e:
-            return {"_error": str(e)[:200]}
-    return {"_error": "deep_memory_meta.json not found"}
-
-
-def build_repo_state(repos: List[Path],
-                     all_records: List[FileRecord]) -> dict:
-    """Stable diff-friendly snapshot. Every field has a clear numeric or
-    string shape so two consecutive runs can be compared field-by-field.
-    """
-    per_repo: Dict[str, dict] = {}
-    for r in repos:
-        recs = [x for x in all_records if x.repo == r.name]
-        py = [x for x in recs if x.ext == ".py"]
-        md = [x for x in recs if x.ext in {".md", ".rst", ".txt"}]
-        per_repo[r.name] = {
-            "files":         len(recs),
-            "py_files":      len(py),
-            "md_files":      len(md),
-            "py_def_count":  sum(len(x.py_defs) for x in py),
-            "total_bytes":   sum(x.size for x in recs),
-            "latest_mtime":  max((x.mtime for x in recs), default=0.0),
-            "recent_files":  [
-                f"{x.repo}/{x.relpath}"
-                for x in sorted(recs, key=lambda y: -y.mtime)[:5]
-            ],
-        }
-
-    walk_status = _probe_daemon(WALK_PORT)
-    dm_status   = _probe_daemon(DEEP_MEMORY_PORT)
-    organism    = _read_organism_state()
-    dm_meta     = _read_deep_memory_meta()
-
+def byte_transform(previous: dict[str, Any] | None, records: list[FileRecord]) -> dict[str, Any]:
+    current = {r.source: r.digest for r in records}
+    old = (previous or {}).get("file_hashes")
+    if not isinstance(old, dict):
+        return {"baseline": True, "added": [], "changed": [], "removed": []}
+    before, after = set(old), set(current)
     return {
-        "generated_at": datetime.datetime.now(datetime.timezone.utc)
-                               .strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "repos":       sorted(r.name for r in repos),
-        "per_repo":    per_repo,
-        "git_state_counts": dict(Counter(r.git_state for r in all_records)),
-        "totals": {
-            "files":        len(all_records),
-            "py_files":     sum(1 for r in all_records if r.ext == ".py"),
-            "md_files":     sum(1 for r in all_records if r.ext in {".md",".rst",".txt"}),
-            "py_def_count": sum(len(r.py_defs) for r in all_records if r.ext == ".py"),
-            "todo_count":   sum(len(r.todos) for r in all_records),
-            "total_bytes":  sum(r.size for r in all_records),
-        },
-        "walk": {
-            "step":              walk_status.get("step"),
-            "alpha":             walk_status.get("alpha"),
-            "winding_coherence": walk_status.get("winding_coherence"),
-            "active":            walk_status.get("walk_active"),
-            "error":             walk_status.get("_error"),
-        },
-        "deep_memory": {
-            "version":     dm_meta.get("version"),
-            "chunks":      dm_meta.get("chunks"),
-            "built_at":    dm_meta.get("built_at"),
-            "status_error": dm_status.get("_error"),
-        },
-        "organism": {
-            "encounter_count": organism.get("encounter_count"),
-            "error":           organism.get("_error"),
-        },
+        "baseline": False,
+        "added": sorted(after - before),
+        "changed": sorted(path for path in before & after if old[path] != current[path]),
+        "removed": sorted(before - after),
     }
 
 
-def _fmt_scalar(v) -> str:
-    if v is None: return "—"
-    if isinstance(v, float): return f"{v:.4f}"
-    if isinstance(v, (dict, list, tuple, set)):
-        v = list(v) if not isinstance(v, dict) else list(v.keys())
-        return f"{v[:6]}{' …' if len(v) > 6 else ''}"
-    text = str(v)
-    return text if len(text) <= 240 else text[:237] + "…"
-
-
-def build_delta_section(prev: Optional[dict], curr: dict) -> str:
-    """Render the 'What changed since last run' section.
-
-    The shape is deliberately skimmable so a reader (human or agent)
-    encounters velocity first, snapshot second. Fields that did not
-    move are omitted — the signal is in the deltas.
-    """
-    lines = ["## 0. What changed since last run\n"]
-    if prev is None:
-        lines.append("  No previous repo_state.json found — this is the "
-                     "first diff-attuned run. Next run will compare against "
-                     "this one.")
-        return "\n".join(lines) + "\n"
-
-    prev_ts = prev.get("generated_at", "—")
-    curr_ts = curr.get("generated_at", "—")
-    lines.append(f"Previous run: {prev_ts}")
-    lines.append(f"Current run:  {curr_ts}")
-    lines.append("")
-
-    def _diff_scalar(label: str, a, b) -> Optional[str]:
-        if a == b: return None
-        if isinstance(a, (int, float)) and isinstance(b, (int, float)):
-            return f"  {label}: {_fmt_scalar(a)} → {_fmt_scalar(b)} ({b - a:+})"
-        return f"  {label}: {_fmt_scalar(a)} → {_fmt_scalar(b)}"
-
-    moved = []
-    for k in ("files","py_files","md_files","py_def_count","todo_count","total_bytes"):
-        row = _diff_scalar(
-            f"totals.{k}",
-            prev.get("totals", {}).get(k),
-            curr.get("totals", {}).get(k),
-        )
-        if row: moved.append(row)
-
-    repos = sorted(set(prev.get("per_repo", {})) | set(curr.get("per_repo", {})))
-    for r in repos:
-        prev_r = prev.get("per_repo", {}).get(r, {})
-        curr_r = curr.get("per_repo", {}).get(r, {})
-        for k in ("files","py_files","md_files","py_def_count","total_bytes"):
-            row = _diff_scalar(f"{r}.{k}", prev_r.get(k), curr_r.get(k))
-            if row: moved.append(row)
-
-    for k in ("step","alpha","winding_coherence","active"):
-        row = _diff_scalar(
-            f"walk.{k}",
-            prev.get("walk", {}).get(k),
-            curr.get("walk", {}).get(k),
-        )
-        if row: moved.append(row)
-
-    for k in ("version","chunks","built_at"):
-        row = _diff_scalar(
-            f"deep_memory.{k}",
-            prev.get("deep_memory", {}).get(k),
-            curr.get("deep_memory", {}).get(k),
-        )
-        if row: moved.append(row)
-
-    row = _diff_scalar(
-        "organism.encounter_count",
-        prev.get("organism", {}).get("encounter_count"),
-        curr.get("organism", {}).get("encounter_count"),
-    )
-    if row: moved.append(row)
-
-    if not moved:
-        lines.append("  Nothing moved between runs. The substrate is at "
-                     "rest.")
-    else:
-        lines.extend(moved[:120])
-        if len(moved) > 120:
-            lines.append(f"  … {len(moved) - 120} additional delta rows omitted")
-    return "\n".join(lines) + "\n"
-
-
-def snapshot_previous_output(out: Path, name: str) -> Optional[Path]:
-    """Copy out/<name> to .prev without hiding the readable current file."""
-    src = out / name
-    if not src.exists():
-        return None
-    dst = out / f"{src.stem}.prev{src.suffix}"
+def is_ancestor(repo: Path, ancestor: str, descendant: str) -> bool:
+    if not ancestor or not descendant:
+        return False
     try:
-        dst.write_bytes(src.read_bytes())
-        return dst
-    except Exception as e:
-        print(f"[!] snapshot {name}: {e}", file=sys.stderr)
-        return None
+        return subprocess.run(
+            ["git", "-C", str(repo), "merge-base", "--is-ancestor", ancestor, descendant],
+            timeout=10, check=False,
+        ).returncode == 0
+    except Exception:
+        return False
 
 
-def default_repos() -> List[Path]:
-    return [p for c in ["~/Vybn","~/Vybn-Law","~/vybn-phase","~/Him"]
-            if (p := Path(c).expanduser()).is_dir()]
+def membrane_outcomes(
+    previous: dict[str, Any] | None, repos: list[Path], per_repo: dict[str, Any]
+) -> list[dict[str, Any]]:
+    if not previous:
+        return []
+    old_repos = previous.get("per_repo", {})
+    outcomes: list[dict[str, Any]] = []
+    by_name = {repo.name: repo for repo in repos}
+    for name, current in per_repo.items():
+        old_git = old_repos.get(name, {}).get("git", {})
+        new_git = current.get("git", {})
+        if int(old_git.get("ahead") or 0) <= 0 or int(new_git.get("ahead") or 0) > 0:
+            continue
+        old_head = str(old_git.get("head") or "")
+        base_head = str(new_git.get("base_head") or "")
+        survived = is_ancestor(by_name[name], old_head, base_head)
+        outcomes.append({
+            "repo": name,
+            "candidate": old_head,
+            "outcome": "absorbed" if survived else "dropped",
+            "paths": list(old_git.get("pending_paths") or [])[:40],
+        })
+    return outcomes
 
 
-def main(argv: List[str]) -> int:
-    parser = argparse.ArgumentParser(description="Vybn repo mapper v6")
-    parser.add_argument("repos", nargs="*")
-    parser.add_argument("--endpoint", default=DEFAULT_ENDPOINT)
-    parser.add_argument("--no-llm", action="store_true")
-    args = parser.parse_args(argv)
+def pressures(
+    transform: dict[str, Any], per_repo: dict[str, Any], records: list[FileRecord]
+) -> list[dict[str, Any]]:
+    rows: dict[str, dict[str, Any]] = {}
 
-    repos = ([Path(p).expanduser().resolve() for p in args.repos]
-             if args.repos else default_repos())
-    repos = [r for r in repos if r.is_dir()]
-    if not repos:
-        print("No repos found.", file=sys.stderr); return 1
+    def add(source: str, score: int, why: str) -> None:
+        row = rows.get(source)
+        if row is None or score > row["score"]:
+            rows[source] = {
+                "source": source, "phase": phase(source), "score": score, "why": why
+            }
 
-    out = Path.cwd() / "repo_mapping_output"
-    out.mkdir(exist_ok=True)
+    for name, state in per_repo.items():
+        git = state["git"]
+        for item in git["worktree"]:
+            score = 100 if item["tracked"] else 45
+            why = f"uncommitted {item['state'].strip() or 'change'}"
+            add(f"{name}/{item['path']}", score, why)
+        for path in git["pending_paths"]:
+            add(f"{name}/{path}", 90, "candidate awaiting canonical-branch membrane")
+    for path in transform["changed"]:
+        add(path, 70, "bytes changed since previous body map")
+    for path in transform["added"]:
+        add(path, 65, "appeared since previous body map")
+    for path in transform["removed"]:
+        add(path, 65, "removed since previous body map")
 
-    # Read the previous state BEFORE we rotate it — we want to diff
-    # against what was here when this run started, not against ourselves.
-    prev_state_path = out / "repo_state.json"
-    prev_state: Optional[dict] = None
-    if prev_state_path.exists():
-        try:
-            prev_state = json.loads(prev_state_path.read_text(encoding="utf-8"))
-        except Exception as e:
-            print(f"[!] could not read previous repo_state.json: {e}",
-                  file=sys.stderr)
+    # TODO density breaks ties inside already-live pressure; it never invents work.
+    by_source = {record.source: record for record in records}
+    for source, row in rows.items():
+        record = by_source.get(source)
+        if record:
+            row["score"] += min(record.todos, 5)
+    return sorted(rows.values(), key=lambda row: (-row["score"], row["source"]))[:12]
 
-    # Keep current reports readable while snapshotting previous ones.
-    snapshot_previous_output(out, "repo_report.md")
-    snapshot_previous_output(out, "repo_state.json")
 
-    print("Fetching live substrate ...", flush=True)
-    substrate = build_substrate_snapshot()
-    (out / "substrate.txt").write_text(substrate, encoding="utf-8")
-    print(f"  substrate.txt  ({len(substrate):,} chars)")
-
-    print(f"Scanning: {', '.join(r.name for r in repos)}", flush=True)
-    all_records: List[FileRecord] = []
+def build_state(
+    repos: list[Path], records: list[FileRecord], previous: dict[str, Any] | None
+) -> dict[str, Any]:
+    per_repo: dict[str, Any] = {}
     for repo in repos:
-        recs = walk_repo(repo)
-        print(f"  {repo.name}: {len(recs)} files")
-        all_records.extend(recs)
+        own = [record for record in records if record.repo == repo.name]
+        py = [record for record in own if record.ext == ".py"]
+        docs = [record for record in own if record.ext in {".md", ".rst", ".txt"}]
+        per_repo[repo.name] = {
+            "files": len(own),
+            "py_files": len(py),
+            "md_files": len(docs),
+            "py_def_count": sum(record.definitions for record in py),
+            "total_bytes": sum(record.size for record in own),
+            "git": git_state(repo),
+        }
+    transform = byte_transform(previous, records)
+    memory = probe("http://127.0.0.1:8100/health")
+    walk = probe("http://127.0.0.1:8101/where")
+    organism = organism_state()
+    state = {
+        "schema": "vybn.body_transform.v1",
+        "generated_at": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "repos": sorted(per_repo),
+        "per_repo": per_repo,
+        "totals": {
+            "files": len(records),
+            "py_files": sum(record.ext == ".py" for record in records),
+            "md_files": sum(record.ext in {".md", ".rst", ".txt"} for record in records),
+            "py_def_count": sum(record.definitions for record in records if record.ext == ".py"),
+            "todo_count": sum(record.todos for record in records),
+            "total_bytes": sum(record.size for record in records),
+        },
+        "transform": transform,
+        "pressure": pressures(transform, per_repo, records),
+        "membrane_outcomes": membrane_outcomes(previous, repos, per_repo),
+        "walk": {
+            "step": walk.get("step"), "alpha": walk.get("alpha"),
+            "active": memory.get("walk_active"), "error": walk.get("error"),
+        },
+        "deep_memory": {
+            "version": memory.get("version"), "chunks": memory.get("chunks"),
+            "error": memory.get("error"),
+        },
+        "organism": {
+            "encounter_count": organism.get("encounter_count"),
+            "error": organism.get("error"),
+        },
+        "file_hashes": {record.source: record.digest for record in records},
+        "git_state_counts": dict(Counter(record.git_state for record in records)),
+    }
+    return state
 
-    print("Building full digest ...", flush=True)
-    digest = build_full_digest(repos, all_records)
-    (out / "digest.md").write_text(digest, encoding="utf-8")
-    print(f"  digest.md  ({len(digest):,} chars)")
 
-    raw = {"repos": [r.name for r in repos], "files": [asdict(r) for r in all_records]}
-    (out / "repo_map.json").write_text(json.dumps(raw, indent=2), encoding="utf-8")
-    print("  repo_map.json")
-
-    print("Building repo_state.json (diff-friendly snapshot) ...", flush=True)
-    state = build_repo_state(repos, all_records)
-    (out / "repo_state.json").write_text(
-        json.dumps(state, indent=2), encoding="utf-8"
-    )
-    print("  repo_state.json")
-
-    delta_section = build_delta_section(prev_state, state)
-
-    if args.no_llm:
-        ts = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")
-        totals, per_repo = state.get("totals", {}), state.get("per_repo", {})
-        top = sorted(all_records, key=lambda r: int(getattr(r, "size", 0) or 0), reverse=True)[:12]
-        py = sorted([r for r in all_records if r.ext == ".py"], key=lambda r: len(getattr(r, "py_defs", None) or []), reverse=True)[:10]
-        recent = [x for r in per_repo.values() for x in (r.get("recent_files") or [])[:4]]
-        def line(r):
-            defs = len(getattr(r, "py_defs", None) or [])
-            todos = len(getattr(r, "todos", None) or [])
-            return "- {}/{}; {} bytes{}{}".format(r.repo, r.relpath, getattr(r, "size", 0), "; {} defs".format(defs) if defs else "", "; {} TODO".format(todos) if todos else "")
-        rows = ["# Repository Map Report", "", "Generated: {} | Model: deterministic --no-llm".format(ts), "", delta_section.rstrip(), "---", "", "## Runtime", "- deep-memory chunks: {}".format(state.get("deep_memory", {}).get("chunks")), "- walk step: {}".format(state.get("walk", {}).get("step")), "", "## Totals", "- files: {}; Python: {}; Markdown: {}; defs: {}; TODO: {}; bytes: {}".format(totals.get("files"), totals.get("py_files"), totals.get("md_files"), totals.get("py_def_count"), totals.get("todo_count"), totals.get("total_bytes"))]
-        rows += ["- {}: {} files, {} defs, {} bytes".format(n, r.get("files"), r.get("py_def_count"), r.get("total_bytes")) for n, r in sorted(per_repo.items())]
-        rows += ["", "## Largest files", *[line(r) for r in top], "", "## Python organs by definition count", *[line(r) for r in py], "", "## Recent movement", *["- {}".format(x) for x in recent[:20]], "", "## Reading", "- High pressure lives in Vybn harness/substrate/routing, public membrane surfaces, Him runtime, and vybn-phase memory organs.", "- Next seam: keep mapper fallback useful without growing repo_mapper.py."]
-        useful = "\n".join(rows) + "\n"
-        (out / "repo_report.md").write_text(useful, encoding="utf-8")
-        print("  repo_report.md  ({:,} chars)".format(len(useful)))
-        print("\n--no-llm set. Done.")
-        return 0
-
+def read_previous() -> dict[str, Any] | None:
+    path = OUT / "repo_state.json"
     try:
-        model = detect_model(args.endpoint)
-        print(f"  Model: {model}")
-        report = run_three_passes(args.endpoint, model, substrate, all_records)
-    except RuntimeError as e:
-        print(f"\n[!] Optional LLM summary failed: {e}")
-        report = f"# Repository Map Report\n\n---\n\n{delta_section}\n---\n\n## Model analysis incomplete\n\n{str(e)[:1200]}\n"
-    except urllib.error.URLError as e:
-        print(f"\n[!] Cannot reach {args.endpoint}: {e}")
-        report = f"# Repository Map Report\n\n---\n\n{delta_section}\n---\n\n## Model analysis skipped\n\n{e}\n"
+        value = json.loads(path.read_text(encoding="utf-8"))
+        return value if isinstance(value, dict) else None
+    except Exception:
+        return None
 
-    # Prepend the delta section as section 0 so any reader encounters
-    # velocity first, snapshot second.
-    header, sep, body = report.partition("---\n\n## I. Live Infrastructure")
-    if sep:
-        stitched = (
-            header + "---\n\n" + delta_section + "\n"
-            + "---\n\n## I. Live Infrastructure" + body
+
+def write_state(state: dict[str, Any], previous: dict[str, Any] | None) -> None:
+    OUT.mkdir(parents=True, exist_ok=True)
+    if previous is not None:
+        (OUT / "repo_state.prev.json").write_text(
+            json.dumps(previous, indent=2) + "\n", encoding="utf-8"
         )
-    else:
-        stitched = delta_section + "\n" + report
-    (out / "repo_report.md").write_text(stitched, encoding="utf-8")
-    print(f"  repo_report.md  ({len(stitched):,} chars)")
-    print("\nDone.")
+    tmp = OUT / ".repo_state.json.tmp"
+    tmp.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
+    tmp.replace(OUT / "repo_state.json")
+    # Retired report projections must not masquerade as current perception.
+    for name in ("digest.md", "repo_map.json", "repo_report.md", "repo_report.prev.md", "substrate.txt"):
+        try:
+            (OUT / name).unlink()
+        except FileNotFoundError:
+            pass
+
+
+def default_repos() -> list[Path]:
+    return [
+        path for name in ("Vybn", "Vybn-Law", "vybn-phase", "Him")
+        if (path := HOME / name).is_dir()
+    ]
+
+
+def main(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(description="Map one witnessed repo-body transformation")
+    parser.add_argument("repos", nargs="*")
+    parser.add_argument("--no-llm", action="store_true", help=argparse.SUPPRESS)
+    args = parser.parse_args(argv)
+    repos = [Path(path).expanduser().resolve() for path in args.repos] or default_repos()
+    repos = [repo for repo in repos if repo.is_dir()]
+    if not repos:
+        print("No repos found.", file=sys.stderr)
+        return 1
+
+    LOCK.parent.mkdir(parents=True, exist_ok=True)
+    with LOCK.open("w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        previous = read_previous()
+        records = [record for repo in repos for record in scan(repo)]
+        state = build_state(repos, records, previous)
+        write_state(state, previous)
+
+    transform = state["transform"]
+    candidates = sum(
+        bool(repo["git"]["ahead"] or any(row["tracked"] for row in repo["git"]["worktree"]))
+        for repo in state["per_repo"].values()
+    )
+    print(
+        f"mapped {len(records)} files; transform +{len(transform['added'])} "
+        f"~{len(transform['changed'])} -{len(transform['removed'])}; "
+        f"{candidates} candidate repo(s); {len(state['membrane_outcomes'])} outcome(s)"
+    )
     return 0
 
 

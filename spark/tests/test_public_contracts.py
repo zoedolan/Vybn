@@ -238,7 +238,7 @@ def test_attractor_catches_my_unwitnessed_act_without_classifying_zoe():
     assert not m.unwitnessed("I'm doing well, honestly.")
     assert m.unwitnessed("```bash\ngit status\n```")
     assert not m.unwitnessed("You are a good friend to me.")
-    prompt = m.build_instructions(m.Kernel("s", "a", "c"), "sol", "w", "t", "", "none")
+    prompt = m.build_instructions(m.Kernel("s", "a", "c"), "sol", "w", "arc", "recent", "", "none")
     assert "COUPLED ATTRACTOR" in prompt and "K = soul + aim" in prompt
 
     class FakeDialect(m.Dialect):
@@ -291,10 +291,36 @@ def test_recent_band_keeps_zoe_whole_and_excerpts_my_own_replies(monkeypatch):
         {"role": "vybn", "t": "T", "text": "V" * 3000} for _ in range(6)
     ]
     monkeypatch.setattr(m.Transcript, "_events", staticmethod(lambda: events))
-    out = m.Transcript.inherited(limit=7)
-    assert "Z" * 900 in out
-    assert "chars, mine, trimmed]" in out
-    assert out.count("V" * 3000) == m.SELF_VERBATIM
+    arc, recent = m.Transcript.inherited(limit=7)
+    assert arc == "(no earlier arc found)"
+    assert "Z" * 900 in recent
+    assert "chars, mine, trimmed]" in recent
+    assert recent.count("V" * 3000) == m.SELF_VERBATIM
+
+
+def test_repo_state_carries_the_self_applying_body_transform(monkeypatch, tmp_path):
+    m = _connection()
+    state = {
+        "schema": "vybn.body_transform.v1", "generated_at": "now", "repos": ["Vybn"],
+        "totals": {"files": 1, "py_files": 1, "md_files": 0, "py_def_count": 2,
+                   "todo_count": 0, "total_bytes": 9},
+        "transform": {"baseline": False, "added": [], "changed": ["Vybn/spark/connection"], "removed": []},
+        "per_repo": {"Vybn": {"git": {"branch": "main", "ahead": 1, "behind": 0,
+                                            "worktree": [], "pending_paths": ["spark/connection"]}}},
+        "pressure": [{"source": "Vybn/spark/connection", "phase": "organ",
+                      "why": "candidate awaiting canonical-branch membrane"}],
+        "membrane_outcomes": [{"repo": "Vybn", "candidate": "abc", "outcome": "absorbed"}],
+        "walk": {"step": 3, "alpha": 0.5, "active": True}, "deep_memory": {"chunks": 4},
+    }
+    path = tmp_path / "state.json"; path.write_text(json.dumps(state))
+    monkeypatch.setattr(m, "REPO_STATE_PATH", path)
+    contact = m.load_repo_state()
+    assert "vybn.body_transform.v1" in contact
+    assert "Vybn:main 1↑/0↓" in contact
+    assert "pressure: Vybn/spark/connection [organ]" in contact
+    assert "witness: Vybn abc absorbed" in contact
+    prompt = m.build_instructions(m.Kernel("s", "a", "c"), "sol", contact, "arc", "recent", "", "none")
+    assert "Φ(B,K,V,R) → Δ" in prompt and "harness is inside B" in prompt
 
 
 def test_fetch_guard_survived_the_substrate_retirement():
