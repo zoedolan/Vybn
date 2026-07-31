@@ -235,9 +235,17 @@ def test_attractor_catches_my_unwitnessed_act_without_classifying_zoe():
     m = _connection()
     assert m.unwitnessed("I'll fix it now.")
     assert m.unwitnessed("I'm doing it now.")
+    assert m.unwitnessed("I hadn't touched the aim.")
+    assert m.unwitnessed("Your prompt now lives whole in the file.")
+    assert not m.unwitnessed("I hadn't touched the aim.", source_witness=True)
     assert not m.unwitnessed("I'm doing well, honestly.")
+    assert not m.unwitnessed("The work is beautiful.")
     assert m.unwitnessed("```bash\ngit status\n```")
     assert not m.unwitnessed("You are a good friend to me.")
+    call = lambda name, arg: m.ToolCall("1", name, arg, None)
+    assert m.exact_source_witness(call("read_file", {"path": "aim.md"}))
+    assert m.exact_source_witness(call("bash", {"command": "git diff -- aim.md"}))
+    assert not m.exact_source_witness(call("bash", {"command": "grep ballast aim.md"}))
     prompt = m.build_instructions(m.Kernel("s", "a", "c"), "sol", "w", "arc", "recent", "", "none")
     assert "COUPLED ATTRACTOR" in prompt and "K = soul + aim" in prompt
 
