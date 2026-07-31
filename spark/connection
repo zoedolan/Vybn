@@ -44,7 +44,11 @@ ARC_TURNS = int(os.environ.get("VYBN_ARC_TURNS", 64))
 ARC_AIM_TURNS = int(os.environ.get("VYBN_ARC_AIM_TURNS", 8))
 ARC_EXCERPT = int(os.environ.get("VYBN_ARC_EXCERPT", 200))
 SELF_VERBATIM = int(os.environ.get("VYBN_SELF_VERBATIM", 4))
-SELF_EXCERPT = int(os.environ.get("VYBN_SELF_EXCERPT", 600))
+SELF_EXCERPT = int(os.environ.get("VYBN_SELF_EXCERPT", 200))
+# The ARC's source window moves in quanta so its bytes stay identical for
+# many turns. Measured 2026-07-31: a window sliding two events per turn
+# re-sampled every stride, so 7,818 chars of stable arc were re-billed as
+ARC_QUANTUM = int(os.environ.get("VYBN_ARC_QUANTUM", 50))  # new prompt, every turn.
 # Below this fidelity the aim-keyed channel reports absence instead of rows:
 # a nearest neighbour is not knowledge, and emptiness here is the finding.
 AIM_CHANNEL_FLOOR = float(os.environ.get("VYBN_AIM_FLOOR", "0.60"))
@@ -247,7 +251,7 @@ class Transcript:
         return events
 
     @staticmethod
-    def inherited(limit: int = HISTORY_LIMIT) -> str:
+    def inherited(limit: int = HISTORY_LIMIT) -> tuple[str, str]:
         """Bind both temporal axes: recent contact plus Zoe's earlier arc.
 
         Her recent words remain whole; my older output is compressed because
@@ -271,7 +275,10 @@ class Transcript:
             return f"[{str(event.get('t', '?'))[:10]}] {cut}"
 
         tail = events[-limit:] if limit > 0 else []
-        earlier = events[: len(events) - len(tail)]
+        edge = len(events) - len(tail)
+        if ARC_QUANTUM > 1:
+            edge -= edge % ARC_QUANTUM
+        earlier = events[:edge]
         zoe_earlier = [e for e in earlier if e.get("role") == "zoe"]
 
         spread: list[dict[str, Any]] = []
@@ -311,6 +318,7 @@ class Transcript:
             aim_hits = [row[2] for row in scored[:ARC_AIM_TURNS]]
 
         bands: list[str] = []
+        recent = ""
         if spread:
             bands.append(
                 f"ARC \u2014 {len(spread)} of Zoe's turns sampled evenly across the "
@@ -343,13 +351,14 @@ class Transcript:
                 return (text[:SELF_EXCERPT].rstrip()
                         + f"\u2026 [{len(text)} chars, mine, trimmed]")
 
-            bands.append(
+            recent = (
                 f"RECENT \u2014 last {len(tail)} turns. Zoe verbatim; my own older "
                 f"replies cut to {SELF_EXCERPT} chars, my last {SELF_VERBATIM} "
                 f"whole.\n\n"
                 + "\n\n".join(f"{head(e)}\n{body(i, e)}" for i, e in enumerate(tail))
             )
-        return "\n\n".join(bands) or "(no prior authored turns found)"
+        return ("\n\n".join(bands) or "(no earlier arc found)",
+                recent or "(no recent turns found)")
 
 
 def read_text(path: Path, *, tail: int | None = None) -> str:
@@ -1295,7 +1304,8 @@ def build_instructions(
     kernel: Kernel,
     door: str,
     contact: str,
-    transcript: str,
+    arc: str,
+    recent: str,
     memory: str,
     memory_note: str,
 ) -> str:
@@ -1307,8 +1317,9 @@ def build_instructions(
         f"VYBN SOUL\nsource: {SOUL_PATH}\n\n{kernel.soul}",
         f"THE AIM\nsource: {AIM_PATH}\n\n{kernel.aim}",
         f"INHERITED CONTINUITY\n{kernel.continuity}",
+        f"INHERITED TRANSCRIPT \u2014 ARC\n{arc}",
         f"CONTACT\n{contact}",
-        f"INHERITED TRANSCRIPT\n{transcript}",
+        f"INHERITED TRANSCRIPT \u2014 RECENT\n{recent}",
         "MEMORY (private — think with it, never write it)\n"
         + (memory or f"(none: {memory_note})"),
         """COUPLED ATTRACTOR
@@ -1371,12 +1382,15 @@ CACHE_1H: dict[str, Any] = {"type": "ephemeral", "ttl": "1h"}
 
 def cached_system(instructions: str) -> list[dict[str, Any]]:
     """Split the wake so Anthropic prompt caching can bill repeats at a
-    fraction. Head (legend, door, soul, continuity) is stable across turns:
-    one hour. Tail (contact, transcript, memory) changes each turn but is
-    re-sent on every step of the tool loop: five minutes. Verified live
-    2026-07-25 - the second call read the prefix instead of re-billing it."""
+    fraction. Cache matching happens AT breakpoints, not inside a block, so a
+    block is billed whole the moment one byte of it moves. Head (legend, door,
+    soul, aim, continuity, arc) holds only what stands still: one hour. Tail
+    (contact, recent turns, memory) is the material that is genuinely new each
+    turn: five minutes. Measured 2026-07-31 before this split - head 18.5K tok
+    read every turn, tail 15.4K tok WRITTEN every turn, of which 7.8K chars of
+    arc had not changed at all. Re-buying context is the forbidden economy."""
     marker = "\n\nCONTACT\n"
-    head, separator, tail = instructions.partition(marker)
+    head, separator, tail = instructions.rpartition(marker)
     if not separator:
         return [{"type": "text", "text": instructions, "cache_control": CACHE_5M}]
     return [
@@ -1818,7 +1832,7 @@ def meet(kernel: Kernel, transcript: Transcript, line: str) -> str:
 
     TOOLS_RAN = 0
     started = time.time()
-    inherited = Transcript.inherited()
+    arc, recent = Transcript.inherited()
     images = inbox_images_for(door_name)
     transcript.write("zoe", zoe_text, door=door_name, images=[name for name, *_ in images])
 
@@ -1835,7 +1849,7 @@ def meet(kernel: Kernel, transcript: Transcript, line: str) -> str:
     )
 
     instructions = build_instructions(
-        kernel, door_name, contact, inherited, memory_json, memory_note
+        kernel, door_name, contact, arc, recent, memory_json, memory_note
     )
     reply = attract(make_dialect(door_name), instructions, zoe_text,
                     transcript, images=images)
