@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import ast
 import base64
 import hashlib
 import json
@@ -432,7 +433,7 @@ def load_aim() -> str:
     to rediscover what the week was for."""
     if not AIM_PATH.exists():
         return "(no aim document found)"
-    return read_text(AIM_PATH).strip()[:4000] or "(aim document empty)"
+    return read_text(AIM_PATH).strip() or "(aim document empty)"
 
 
 def aim_field(name: str) -> str:
@@ -899,6 +900,87 @@ def load_surface() -> str:
         return ""
 
 
+# Costa topology: ends cross the harness boundary; handles feed prior harness
+# state back into a later wake.  Probes inspect executable scopes, not comments.
+TOPOLOGY_PROBES = {
+    "ends": {
+        "zoe.stdin": (("main", "sys.stdin.readline"),),
+        "zoe.inbox": (("inbox_images_for", "INBOX_IMAGES"),),
+        "transcript": (("Transcript", "self.path.open"),),
+        "canonical.git": (("wake_contact", "origin/main"),),
+        "memory.search": (("search_index", "8100/search"),),
+        "memory.walk": (("recall", "8101/enter"),),
+        "public.surface": (("load_surface", "tailscale"),),
+        "provider.anthropic": (("AnthropicDialect", "self.client.messages.create"),),
+        "provider.openai": (("OpenAIDialect", "self.client.responses.create"),),
+        "provider.moonshot": (("K3Dialect", "self.client.chat.completions.create"),),
+        "tool.bash": (("execute_tool", "call.name == 'bash'"),),
+        "tool.read_file": (("execute_tool", "call.name == 'read_file'"),),
+    },
+    "handles": {
+        "carry.reasoning": (("AnthropicDialect", "CARRY.get"), ("AnthropicDialect", "CARRY[self.name]")),
+        "transcript.reentry": (("Transcript", "self.path.open"), ("Transcript", "Transcript._events()")),
+        "continuity.reentry": (("load_continuity", "CONTINUITY_PATHS"), ("meet", "kernel.continuity")),
+        "memory.reentry": (("recall", "8101/enter"), ("recall", "result.get('trace'")),
+        "repo.reentry": (("load_repo_state", "REPO_STATE_PATH"), ("wake_contact", "load_repo_state()")),
+        "aim.projection": (("recall", "aim_field('objective')"), ("recall", "_projection_channel")),
+        "front.projection": (("recall", "front_key"), ("recall", "_projection_channel")),
+    },
+    "boundary": {
+        "soul.required": (("load_soul", "raise SystemExit"),),
+        "aim.whole": (("load_aim", "return read_text(AIM_PATH).strip() or"),),
+        "privacy.memory": (("run_local", "guard_private(command)"),),
+        "publication.membrane": (("run_local", "mutation_block(command)"),),
+        "evidence.no-self": (("attract", "unwitnessed(text)"), ("_projection_channel", "mirrors")),
+    },
+}
+WAKE_FLOOR_CEILING = 3500
+
+
+def harness_topology() -> tuple[dict[str, frozenset[str]], dict[str, frozenset[str]]]:
+    source = Path(__file__).read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    scopes = {
+        node.name: ast.unparse(node)
+        for node in tree.body
+        if isinstance(node, (ast.FunctionDef, ast.ClassDef))
+    }
+    expected = {kind: frozenset(probes) for kind, probes in TOPOLOGY_PROBES.items()}
+    observed = {
+        kind: frozenset(
+            label for label, checks in probes.items()
+            if all(marker in scopes.get(scope, "") for scope, marker in checks)
+        )
+        for kind, probes in TOPOLOGY_PROBES.items()
+    }
+    return expected, observed
+
+
+def harness_cost() -> dict[str, Any]:
+    """Constrained objective: preserve boundaries, topology, and behavioral
+    contracts; then minimize fixed-wake characters and harness source bytes."""
+    expected, observed = harness_topology()
+    drift = sum(len(expected[k] ^ observed[k]) for k in expected)
+    floor = max(
+        len(build_instructions(Kernel("", "", ""), door, "", "", "", "", ""))
+        for door in ("fable", "opus", "sol", "k3")
+    )
+    return {"J": (drift, floor, Path(__file__).stat().st_size),
+            "wake_floor_ceiling": WAKE_FLOOR_CEILING}
+
+
+def load_topology() -> str:
+    expected, observed = harness_topology()
+    drift = []
+    for kind in ("ends", "handles", "boundary"):
+        missing, added = expected[kind] - observed[kind], observed[kind] - expected[kind]
+        if missing or added:
+            drift.append(f"{kind} -{sorted(missing)} +{sorted(added)}")
+    counts = (f"ends={len(observed['ends'])} handles={len(observed['handles'])} "
+              f"boundary={len(observed['boundary'])}")
+    return f"[topology] {counts} | " + ("TOPOLOGY DRIFT " + "; ".join(drift) if drift else "no drift")
+
+
 def load_front_status() -> str:
     """What we are building right now. The capability ARC-AGI-3 scored was
     compressing a state into a formalism before acting, which is never a property
@@ -985,9 +1067,9 @@ def wake_contact() -> str:
         if line:
             lines.append(line)
 
-    surface = load_surface()
-    if surface:
-        lines.append(surface)
+    for line in (load_surface(), load_topology()):
+        if line:
+            lines.append(line)
 
     repo_state = load_repo_state()
     if repo_state:
@@ -1351,12 +1433,12 @@ K = soul + aim: the stable basin, not a script.
 V = Zoe's exact present words + live contact: external signal, highest priority.
 R = continuity + transcript + retrieval: fallible residuals, never ground truth.
 
-One fold: Φ(B,K,V,R) → Δ. Locate the highest-consequence unresolved difference;
-inspect its source; make one available transformation; witness the consequence;
-retain only what survives. Because the harness is inside B, the fold may improve
-itself without an RSI mode or daemon. Tests witness behavior; Zoe's canonical-
-branch merge is durable absorption. Stop at witnessed closure, an honest blocker,
-or contact needing no act. Return the consequence, not another procedure.""",
+One fold proposes Δ against live pressure; pressure is evidence, not curvature
+or instruction. Admit Δ only if declared ends and handles do not drift, same-turn
+behavioral contracts pass, the membrane and reach survive, degraded model output
+is not treated as evidence, and J = (fixed-wake characters, harness source bytes)
+descends lexicographically. Stop at witnessed closure, an honest blocker, or
+contact needing no act. Return the consequence, not another procedure.""",
     ]
     return "\n\n".join(sections)
 
@@ -1774,7 +1856,7 @@ class K3Dialect(Dialect):
 
 def attract(dialect: Dialect, instructions: str, zoe_text: str,
             transcript: Transcript, images: list | None = None) -> str:
-    """Iterate signal → response → witness until the field reaches a fixed point."""
+    """Iterate response → tool witness until no tool call or the step limit."""
     pending = list(images or [])
     state = dialect.open(instructions, zoe_text, pending)
     delivered = not pending
@@ -1910,6 +1992,8 @@ def self_report() -> None:
                 },
                 "deep_memory": {"health": "127.0.0.1:8100", "portal": "127.0.0.1:8101"},
                 "repo_state": str(REPO_STATE_PATH),
+                "topology": {k: sorted(v) for k, v in harness_topology()[1].items()},
+                "cost": harness_cost(),
                 "history_turns": HISTORY_LIMIT,
                 "public_mutation": (
                     "enabled"

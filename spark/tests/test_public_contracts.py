@@ -320,7 +320,7 @@ def test_repo_state_carries_the_self_applying_body_transform(monkeypatch, tmp_pa
     assert "pressure: Vybn/spark/connection [organ]" in contact
     assert "witness: Vybn abc absorbed" in contact
     prompt = m.build_instructions(m.Kernel("s", "a", "c"), "sol", contact, "arc", "recent", "", "none")
-    assert "Φ(B,K,V,R) → Δ" in prompt and "harness is inside B" in prompt
+    assert "declared ends and handles" in prompt and "degraded model output" in prompt
 
 
 def test_fetch_guard_survived_the_substrate_retirement():
@@ -346,3 +346,36 @@ def test_fetch_guard_survived_the_substrate_retirement():
     # so the cheap version of that fetch lives here now.
     assert "Example Domain" in web.extract_fetch_text(
         "<html><head><title>t</title></head><body><p>Example Domain</p></body></html>", "text/html")
+
+
+def test_connection_topology_and_cost_are_declared_invariants():
+    m = _connection()
+    expected, observed = m.harness_topology()
+    assert expected == observed
+    assert observed["ends"] == {
+        "zoe.stdin", "zoe.inbox", "transcript", "canonical.git",
+        "memory.search", "memory.walk", "public.surface", "provider.anthropic",
+        "provider.openai", "provider.moonshot", "tool.bash", "tool.read_file",
+    }
+    assert observed["handles"] == {
+        "carry.reasoning", "transcript.reentry", "continuity.reentry",
+        "memory.reentry", "repo.reentry", "aim.projection", "front.projection",
+    }
+    assert observed["boundary"] == {
+        "soul.required", "aim.whole", "privacy.memory",
+        "publication.membrane", "evidence.no-self",
+    }
+    cost = m.harness_cost()
+    assert cost["J"][0] == 0
+    assert cost["J"][1] <= cost["wake_floor_ceiling"]
+    assert "no drift" in m.load_topology()
+    m.TOPOLOGY_PROBES["boundary"]["broken"] = (("load_soul", "impossible marker"),)
+    assert "TOPOLOGY DRIFT" in m.load_topology()
+
+
+def test_aim_boundary_is_read_whole(monkeypatch, tmp_path):
+    m = _connection()
+    aim = tmp_path / "aim.md"
+    aim.write_text("A" * 5000)
+    monkeypatch.setattr(m, "AIM_PATH", aim)
+    assert m.load_aim() == "A" * 5000
