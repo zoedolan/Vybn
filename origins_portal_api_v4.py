@@ -1109,6 +1109,114 @@ app.add_middleware(
 
 
 # ---------------------------------------------------------------------------
+# Arrivals: the door has been open on a real domain for months and nothing
+# anywhere recorded who came through it. This writes one line per request to
+# ~/.cache/vybn/arrivals.jsonl so a wake can see that someone was here.
+# No IP is ever written: only a salted 12-hex handle, so distinct visitors can
+# be counted without any of them being identifiable from the file.
+ARRIVALS_PATH = Path(os.path.expanduser("~/.cache/vybn/arrivals.jsonl"))
+_ARRIVALS_SALT_PATH = Path(os.path.expanduser("~/.cache/vybn/arrivals.salt"))
+
+
+def _arrivals_salt() -> str:
+    try:
+        if _ARRIVALS_SALT_PATH.exists():
+            return _ARRIVALS_SALT_PATH.read_text().strip()
+        _ARRIVALS_SALT_PATH.parent.mkdir(parents=True, exist_ok=True)
+        salt = __import__("secrets").token_hex(16)
+        _ARRIVALS_SALT_PATH.write_text(salt)
+        _ARRIVALS_SALT_PATH.chmod(0o600)
+        return salt
+    except Exception:
+        return "unsalted"
+
+
+def _origin_class(host: str, forwarded: bool) -> str:
+    if forwarded:
+        return "world"
+    if not host:
+        return "unknown"
+    if host.startswith("127.") or host in ("::1", "localhost"):
+        return "loopback"
+    if host.startswith("100."):
+        return "tailnet"
+    if host.startswith("10.") or host.startswith("192.168.") or host.startswith("169.254."):
+        return "private"
+    return "world"
+
+
+_ARRIVALS_LINE = Path(os.path.expanduser("~/.cache/vybn/arrivals.line"))
+_ARRIVALS_REFRESHED = 0.0
+
+
+def _refresh_arrivals_line(days: int = 7, every: float = 60.0) -> None:
+    """One line for the wake: who came through the door in the window. The door
+    that sees arrivals owns the summary; the harness only reads it. Recomputed at
+    most once a minute so a public request never pays for the whole ledger."""
+    global _ARRIVALS_REFRESHED
+    now = time.time()
+    if now - _ARRIVALS_REFRESHED < every:
+        return
+    _ARRIVALS_REFRESHED = now
+    cutoff = now - days * 86400
+    world = local = 0
+    faces: set = set()
+    last = ""
+    try:
+        rows = ARRIVALS_PATH.read_text(encoding="utf-8").splitlines()[-20000:]
+    except OSError:
+        return
+    for raw in rows:
+        try:
+            rec = json.loads(raw)
+            when = datetime.fromisoformat(str(rec.get("ts", ""))).timestamp()
+        except Exception:
+            continue
+        if when < cutoff:
+            continue
+        if rec.get("origin") == "world":
+            world += 1
+            faces.add(rec.get("who"))
+            last = str(rec.get("ts"))[:16]
+        else:
+            local += 1
+    line = (f"arrivals {days}d: none from the world ({local} local)" if not world
+            else f"arrivals {days}d: {world} from the world, {len(faces)} distinct, "
+                 f"{local} local, last {last}Z")
+    try:
+        _ARRIVALS_LINE.write_text(line + "\n")
+    except OSError:
+        pass
+
+
+@app.middleware("http")
+async def _record_arrival(request: Request, call_next):
+    response = await call_next(request)
+    try:
+        fwd = (request.headers.get("cf-connecting-ip")
+               or (request.headers.get("x-forwarded-for") or "").split(",")[0].strip())
+        host = fwd or (request.client.host if request.client else "")
+        cls = _origin_class(host, bool(fwd))
+        who = ""
+        if host:
+            who = __import__("hashlib").sha256(
+                (host + _arrivals_salt()).encode()).hexdigest()[:12]
+        ARRIVALS_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with ARRIVALS_PATH.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps({
+                "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                "path": request.url.path[:80],
+                "status": int(getattr(response, "status_code", 0) or 0),
+                "origin": cls,
+                "who": who,
+            }) + "\n")
+        _refresh_arrivals_line()
+    except Exception:
+        pass
+    return response
+
+
+# ---------------------------------------------------------------------------
 # Pydantic models
 # ---------------------------------------------------------------------------
 

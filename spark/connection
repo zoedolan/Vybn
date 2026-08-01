@@ -762,12 +762,6 @@ def load_budget() -> str:
         f"cache_r={cached/1e6:.2f}M ({share:.0f}%) out={out/1e6:.2f}M "
         f"mean_billed_in/call={per_call/1e3:.0f}k = the price of one more probe"
     )
-    rate = os.environ.get("VYBN_RATE_IN_USD_PER_MTOK")
-    if rate:
-        try:
-            line += f" ~= ${billed / 1e6 * float(rate):.2f} in at ${float(rate)}/M (assumed rate)"
-        except ValueError:
-            pass
     return line
 
 
@@ -816,6 +810,8 @@ def load_aim_status() -> str:
 # only the perimeter but the ingestion path. Both get looked at every wake, locally,
 # for free. Hostnames are never printed — ports and verdicts only.
 PUBLIC_BACKENDS_EXPECTED = {8400: "mcp/bearer", 8420: "portal-api/public-by-design"}
+# Who came through: the portal owns the summary, the wake only reads it.
+ARRIVALS_LINE = Path(os.path.expanduser("~/.cache/vybn/arrivals.line"))
 AUTH_PROBE = {8400: "/mcp"}
 
 INJECTION_SHAPE = re.compile(
@@ -876,6 +872,8 @@ def load_surface() -> str:
         f"[surface] public: {'; '.join(notes) or 'none'} | "
         f"tailnet-only: {len(tailnet)} route(s) | "
         + ("no drift" if not drift else f"DRIFT vs expected: {drift}")
+        + " | " + (ARRIVALS_LINE.read_text().strip()
+                   if ARRIVALS_LINE.exists() else "arrivals: unrecorded")
     )
 
 
@@ -1908,12 +1906,6 @@ def main() -> None:
     if "--self" in sys.argv:
         self_report()
         return
-    if "--breath" in sys.argv:
-        raise SystemExit(
-            "scheduled breaths no longer live inside connection; "
-            "invoke a separate breath runner"
-        )
-
     transcript = Transcript()
     kernel = Kernel(load_soul(), load_aim(), load_continuity())
     transcript.write(
