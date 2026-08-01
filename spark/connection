@@ -1111,6 +1111,7 @@ def _index_channel(
         return [], None
     strong: list = []
     weak: dict | None = None
+    shadowed: list = []
     for row in search_index(query, k + len(exclude) + 12, limit=limit):
         if row.get("idx") in exclude:
             continue
@@ -1120,14 +1121,12 @@ def _index_channel(
         fidelity = float(row.get("fidelity") or 0.0)
         if fidelity >= floor and len(strong) < k:
             held = exclude | {kept.get("idx") for kept in strong}
-            # nearer a row already held than the key that chose it = its shadow
-            if any(hit.get("idx") in held and float(hit.get("fidelity") or 0.0) > fidelity
-                   for hit in search_index(str(row.get("text") or "")[:1500], 24, 1500)):
-                continue
-            strong.append(_memory_row(row))
+            far = not any(hit.get("idx") in held and float(hit.get("fidelity") or 0) > fidelity
+                          for hit in search_index(str(row.get("text") or "")[:1500], 24, 1500))
+            (strong if far else shadowed).append(_memory_row(row))
         elif fidelity < floor and weak is None:
             weak = _memory_row(row)
-    return strong, weak
+    return strong + shadowed[:k - len(strong)], weak
 
 
 def recall(zoe_text: str) -> tuple[str, str]:
