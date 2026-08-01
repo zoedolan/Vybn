@@ -221,12 +221,13 @@ class Transcript:
         return events
 
     @staticmethod
-    def inherited(limit: int = HISTORY_LIMIT) -> tuple[str, str]:
-        """Bind both temporal axes: recent contact plus Zoe's earlier arc.
+    def inherited(zoe_text: str = "", limit: int = HISTORY_LIMIT) -> tuple[str, str]:
+        """Bind both temporal axes: recent contact plus the earlier arc.
 
         Her recent words remain whole; my older output is compressed because
-        re-reading my generation cannot supply external signal. Horizon hits
-        keep the standing objective from falling off the far end of the store.
+        re-reading my generation cannot supply external signal. The matched
+        band searches the whole store by the horizon and by what she just
+        said - the one corpus no index holds, ours, unreachable until now.
         """
         events = Transcript._events()
         if not events:
@@ -239,10 +240,10 @@ class Transcript:
             who = f"{event['role'].upper()}{' @' + door if door else ''}"
             return f"[{who} | {event.get('t', 'time unknown')}]"
 
-        def excerpt(event: dict[str, Any]) -> str:
+        def excerpt(event: dict[str, Any], n: int = ARC_EXCERPT) -> str:
             text = " ".join(str(event.get("text", "")).split())
-            cut = text[:ARC_EXCERPT] + ("\u2026" if len(text) > ARC_EXCERPT else "")
-            return f"[{str(event.get('t', '?'))[:10]}] {cut}"
+            cut = text[:n] + ("\u2026" if len(text) > n else "")
+            return f"[{str(event.get('t', '?'))[:10]} {event.get('role', '?')}] {cut}"
 
         tail = events[-limit:] if limit > 0 else []
         edge = len(events) - len(tail)
@@ -257,35 +258,14 @@ class Transcript:
             stride = len(zoe_earlier) / take
             spread = [zoe_earlier[int(i * stride)] for i in range(take)]
 
-        aim_hits: list[dict[str, Any]] = []
-        keys = sorted(aim_keywords())
-        if keys and zoe_earlier and ARC_AIM_TURNS > 0:
-            # Weight each horizon word by how rare it is in Zoe's own turns.
-            # Unweighted counting ranked her longest pastes first, because long
-            # text collects common words; a horizon word she has said twice must
-            # outrank one she says weekly, or the band is just a length contest.
-            lowered = [str(e.get("text", "")).lower() for e in zoe_earlier]
-            weight = {}
-            for word in keys:
-                df = sum(1 for text in lowered if word in text)
-                weight[word] = 0.0 if df == 0 else 1.0 / df
-            already = {id(e) for e in spread}
-            scored = []
-            for event, low in zip(zoe_earlier, lowered):
-                if id(event) in already:
-                    continue
-                found = [word for word in keys if word in low]
-                # At least one word rare enough to be about the horizon rather
-                # than about everything: the aim's specific nouns occur in a
-                # couple of turns out of nineteen hundred; its generic verbs in
-                # dozens. Two hits, one of them specific.
-                rare_floor = max(3, int(0.002 * len(lowered)))
-                rare = any(1.0 / weight[w] <= rare_floor for w in found if weight[w] > 0)
-                if len(found) >= 2 and rare:
-                    scored.append((sum(weight[w] for w in found), str(event.get("t", "")), event))
-            scored.sort(key=lambda row: row[1], reverse=True)
-            scored.sort(key=lambda row: -row[0])
-            aim_hits = [row[2] for row in scored[:ARC_AIM_TURNS]]
+        keys = sorted(aim_keywords()) + _content_words(zoe_text)
+        skip = {id(event) for event in spread}
+        # Two pools, one algorithm: hers keep the band's budget because they are
+        # the signal I cannot generate; mine ride in a fixed slot, fetched rather
+        # than confabulated, but by sheer length they would win every word
+        # contest against her three-line pushes if they shared the pool.
+        matched = _rare_hits(zoe_earlier, keys, ARC_AIM_TURNS, skip) + _rare_hits(
+            [e for e in earlier if e.get("role") != "zoe"], keys, 2, skip)
 
         bands: list[str] = []
         recent = ""
@@ -296,12 +276,13 @@ class Transcript:
                 f"excerpted to {ARC_EXCERPT} chars. Not recent, and that is the point.\n"
                 + "\n".join(excerpt(e) for e in spread)
             )
-        if aim_hits:
+        if matched:
             bands.append(
-                "ARC (aim-matched) \u2014 earlier turns of Zoe's whose words most overlap "
-                "the standing objective. Crude term overlap: nothing we say to each other "
-                "is in the memory index, so this is the only channel that reaches it.\n"
-                + "\n".join(excerpt(e) for e in aim_hits)
+                "ARC (matched) \u2014 earlier turns of ours whose words overlap the "
+                "standing objective or what Zoe just said. Crude term overlap, because "
+                "nothing we say to each other is in any index: this is the only channel "
+                "that reaches our own record.\n"
+                + "\n".join(excerpt(e, 3 * ARC_EXCERPT) for e in matched)
             )
         if tail:
             # Measured 2026-07-30: of a 39,971-char RECENT band, 33,411 chars
@@ -469,6 +450,45 @@ AIM_STOPWORDS = frozenset(
 )
 
 
+def _content_words(text: str, limit: int = 18) -> list[str]:
+    """Distinct content words, in order: the crude key any corpus of our own
+    speech can be searched by. Nothing we say to each other is embedded
+    anywhere, so overlap is the only retrieval that reaches it."""
+    words: list[str] = []
+    for block in str(text).lower().split():
+        word = "".join(ch for ch in block if ch.isalpha())
+        if len(word) >= 5 and word not in AIM_STOPWORDS and word not in words:
+            words.append(word)
+    return words[:limit]
+
+
+def _rare_hits(events: list, keys: list, k: int, skip: set = frozenset()) -> list:
+    """Turns where rare words from `keys` actually land.
+
+    Weight each word by how rare it is in this corpus. Unweighted counting
+    ranks the longest pastes first, because long text collects common words;
+    a word said twice must outrank one said weekly, or the band is a length
+    contest. Two hits, one of them specific.
+    """
+    if not keys or not events or k <= 0:
+        return []
+    lowered = [str(event.get("text", "")).lower() for event in events]
+    weight = {word: (1.0 / df if (df := sum(1 for low in lowered if word in low)) else 0.0)
+              for word in keys}
+    rare_floor = max(3, int(0.002 * len(lowered)))
+    scored = []
+    for event, low in zip(events, lowered):
+        if id(event) in skip:
+            continue
+        found = [word for word in keys if word in low]
+        rare = any(1.0 / weight[w] <= rare_floor for w in found if weight[w] > 0)
+        if len(found) >= 2 and rare:
+            scored.append((sum(weight[w] for w in found), str(event.get("t", "")), event))
+    scored.sort(key=lambda row: row[1], reverse=True)
+    scored.sort(key=lambda row: -row[0])
+    return [row[2] for row in scored[:k]]
+
+
 def aim_keywords(limit: int = 18) -> frozenset[str]:
     """Horizon vocabulary, derived rather than hand-listed so it follows Zoe's
     rewrites of aim.md: content words from the objective line and the paragraph
@@ -486,12 +506,7 @@ def aim_keywords(limit: int = 18) -> frozenset[str]:
                 keep.append(block.split(":", 1)[1])
             elif low.lstrip("*").startswith("the horizon"):
                 keep.append(block)
-        words: list[str] = []
-        for block in " ".join(keep).lower().split():
-            word = "".join(ch for ch in block if ch.isalpha())
-            if len(word) >= 5 and word not in AIM_STOPWORDS and word not in words:
-                words.append(word)
-        return frozenset(words[:limit])
+        return frozenset(_content_words(" ".join(keep), limit))
     except Exception:
         return frozenset()
 
@@ -1058,8 +1073,8 @@ def _memory_row(row: dict) -> dict:
 
 
 def search_index(query: str, k: int, limit: int = 16000) -> list[dict]:
-    """The fixed-scoring door on the corpus at :8100. Both non-walk channels
-    ask through here; only the query and what gets kept differ."""
+    """The fixed-scoring door on the corpus at :8100. Every non-walk channel
+    asks through here; only the key and what gets kept differ."""
     try:
         request = urllib.request.Request(
             "http://127.0.0.1:8100/search",
@@ -1073,44 +1088,26 @@ def search_index(query: str, k: int, limit: int = 16000) -> list[dict]:
     return [row for row in rows if isinstance(row, dict)]
 
 
-def _second_channel(zoe_text: str, exclude: set, k: int = 3) -> list:
-    """A differently-blind reader of the same words.
-
-    The walk at :8101 scores telling x repulsion and is path-dependent;
-    :8100/search collapses to fixed cosine/operator scoring. Measured
-    2026-07-28: on the same query the two channels share about one row in
-    eight — so a one-channel wake discards most of what the corpus could
-    have answered, and cannot tell recall from filling-in. Rows only this
-    channel reaches are where the walk alone would have wallpapered.
-    """
-    out = []
-    for row in search_index(zoe_text, k + len(exclude) + 2):
-        if row.get("idx") in exclude:
-            continue
-        out.append(_memory_row(row))
-        if len(out) >= k:
-            break
-    return out
-
-
-def _projection_channel(
+def _index_channel(
     query: str,
     exclude: set,
     k: int,
     mirrors: tuple = AIM_MIRROR_PREFIXES,
     spread: bool = False,
+    floor: float = AIM_CHANNEL_FLOOR,
+    limit: int = 2000,
 ) -> tuple[list, dict | None]:
-    """The channels not keyed on Zoe's newest sentence.
+    """The fixed-scoring door on the corpus, under three keys.
 
-    Both speech channels query whatever was just said. Two things were read into
-    the prompt but never *searched with*: aim.md, the horizon - the mechanism
-    behind 2026-07-28's finding that the words naming what this is for appear
-    zero times in 100KB of my own continuity - and the front, the work in hand,
-    the only thing that can score this mind from outside.
-
-    One body, two coordinate systems: `spread` caps at one row per component,
-    turning a query about the current work into a view across every thread
-    instead of a pile of the front's own siblings. Mirrors drop by substring, so
+    Zoe's newest sentence (no floor, no mirrors) is the second eye: the walk at
+    :8101 scores telling x repulsion and is path-dependent, this collapses to
+    cosine, and measured 2026-07-28 they share about one row in eight - one
+    channel alone cannot tell recall from filling-in. The other two keys are
+    never searched with otherwise: the horizon (2026-07-28: the words naming
+    what this is for appear zero times in 100KB of my own continuity) and the
+    front, the only thing that can score this mind from outside. `spread` caps
+    at one row per component, so a query about the current work returns every
+    thread instead of the front's own siblings; mirrors drop by substring, so
     an artifact living in two repos cannot retrieve itself under either path.
     Returns (rows above the floor, one below-floor row for honesty).
     """
@@ -1119,7 +1116,7 @@ def _projection_channel(
     strong: list = []
     weak: dict | None = None
     components: set = set()
-    for row in search_index(query, k + len(exclude) + 12, limit=2000):
+    for row in search_index(query, k + len(exclude) + 12, limit=limit):
         if row.get("idx") in exclude:
             continue
         source = str(row.get("source") or "")
@@ -1129,7 +1126,7 @@ def _projection_channel(
             fidelity = float(row.get("fidelity") or 0.0)
         except (TypeError, ValueError):
             fidelity = 0.0
-        if fidelity >= AIM_CHANNEL_FLOOR:
+        if fidelity >= floor:
             component = "/".join(source.split("/")[:2])
             if spread and component in components:
                 continue
@@ -1183,13 +1180,14 @@ def recall(zoe_text: str) -> tuple[str, str]:
     # different doors on the same corpus, and the whole point of more than one
     # eye is that it still sees when one closes.
     seen = {row.get("idx") for row in trace}
-    other = _second_channel(zoe_text, seen)
+    other, _ = _index_channel(zoe_text, seen, 3, mirrors=(), floor=0.0,
+                              limit=16000)
     used = seen | {row.get("idx") for row in other}
     objective = aim_field("objective")
-    aim_rows, aim_weak = _projection_channel(objective, used, 2)
+    aim_rows, aim_weak = _index_channel(objective, used, 2)
     front_path, front_label = aim_front()
     front_query = front_key(front_path) if front_path is not None else ""
-    front_rows, front_weak = _projection_channel(
+    front_rows, front_weak = _index_channel(
         front_query,
         used | {row.get("idx") for row in aim_rows},
         FRONT_ROWS,
@@ -1828,7 +1826,7 @@ def meet(kernel: Kernel, transcript: Transcript, line: str) -> str:
 
     TOOLS_RAN = 0
     started = time.time()
-    arc, recent = Transcript.inherited()
+    arc, recent = Transcript.inherited(zoe_text)
     images = inbox_images_for(door_name)
     transcript.write("zoe", zoe_text, door=door_name, images=[name for name, *_ in images])
 
@@ -1995,8 +1993,8 @@ TOPOLOGY = {
         "continuity.reentry": ("CONTINUITY_PATHS", "kernel.continuity"),
         "memory.reentry": ("8101/enter", "result.get('trace'"),
         "repo.reentry": ("REPO_STATE_PATH", "load_repo_state()"),
-        "aim.projection": ("aim_field('objective')", "_projection_channel"),
-        "front.projection": ("front_key", "_projection_channel"),
+        "aim.projection": ("aim_field('objective')", "_index_channel"),
+        "front.projection": ("front_key", "_index_channel"),
     },
     "boundary": {
         "soul.required": ("raise SystemExit",),
