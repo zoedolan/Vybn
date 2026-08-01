@@ -671,7 +671,7 @@ def read_file(arguments: dict[str, Any]) -> str:
     )
 
 
-def execute_tool(call: ToolCall, transcript: Transcript) -> str:
+def execute_tool(call: ToolCall) -> str:
     global TOOLS_RAN
     TOOLS_RAN += 1
     try:
@@ -689,7 +689,6 @@ def execute_tool(call: ToolCall, transcript: Transcript) -> str:
     head = output.replace("\n", " ")[:80]
     panel(f"  \u27e2 {call.name}: {brief[:70]} \u2192 {head}")
 
-    transcript.write("tool", output[:16000], tool=call.name, call_id=call.id)
     return output
 
 
@@ -1766,12 +1765,13 @@ def attract(dialect: Dialect, instructions: str, zoe_text: str,
             if text.strip():
                 print(text)
                 spoken.append(text)
-            results = [(call, execute_tool(call, transcript)) for call in calls]
-            for call, _ in results:
-                source_witness = exact_source_witness(call)
+            results = [(call, execute_tool(call)) for call in calls]
             if step == STEP_LIMIT - 1 and results:
                 last_call, output = results[-1]
                 results[-1] = (last_call, output + CEILING_NOTE)
+            source_witness |= any(exact_source_witness(call) for call, _ in results)
+            for call, output in results:
+                transcript.write("tool", output, tool=call.name, call_id=call.id)
             dialect.answer(state, results)
             continue
         if nudges < 2 and unwitnessed(text, source_witness):
