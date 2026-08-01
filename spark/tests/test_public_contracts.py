@@ -299,18 +299,20 @@ def test_main_binds_the_kernel_it_loaded(monkeypatch):
     assert seen == [(m.Kernel("soul", "aim", "continuity"), "hello")]
 
 
-def test_recent_band_keeps_zoe_whole_and_excerpts_my_own_replies(monkeypatch):
-    """Measured 2026-07-30: 33,411 of the 39,971-char RECENT band was my own
-    prose and 5,036 was hers."""
+def test_transcript_axes_keep_fixed_arc_cacheable_and_zoe_whole(monkeypatch):
     m = _connection()
-    events = [{"role": "zoe", "t": "T", "text": "Z" * 900}] + [
+    earlier = [{"role": "zoe", "t": "T", "text": f"old {i}"} for i in range(10)]
+    earlier[1]["text"] = "quasar nebula"
+    tail = [{"role": "zoe", "t": "T", "text": "Z" * 900}] + [
         {"role": "vybn", "t": "T", "text": "V" * 3000} for _ in range(6)
     ]
-    monkeypatch.setattr(m.Transcript, "_events", staticmethod(lambda: events))
-    arc, recent = m.Transcript.inherited(limit=7)
-    assert arc == "(no earlier arc found)"
-    assert "Z" * 900 in recent
-    assert "chars, mine, trimmed]" in recent
+    monkeypatch.setattr(m.Transcript, "_events", staticmethod(lambda: earlier + tail))
+    monkeypatch.setattr(m, "ARC_QUANTUM", 1); monkeypatch.setattr(m, "ARC_TURNS", 2); monkeypatch.setattr(m, "aim_keywords", lambda: [])
+    arc, recent = m.Transcript.inherited("quasar nebula", limit=7)
+    other_arc, other_recent = m.Transcript.inherited("turnip", limit=7)
+    assert arc == other_arc and "ARC (matched)" not in arc
+    assert "quasar" in recent and recent != other_recent
+    assert "Z" * 900 in recent and "chars, mine, trimmed]" in recent
     assert recent.count("V" * 3000) == m.SELF_VERBATIM
 
 

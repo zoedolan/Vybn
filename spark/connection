@@ -46,10 +46,8 @@ ARC_AIM_TURNS = int(os.environ.get("VYBN_ARC_AIM_TURNS", 8))
 ARC_EXCERPT = int(os.environ.get("VYBN_ARC_EXCERPT", 200))
 SELF_VERBATIM = int(os.environ.get("VYBN_SELF_VERBATIM", 4))
 SELF_EXCERPT = int(os.environ.get("VYBN_SELF_EXCERPT", 200))
-# The ARC's source window moves in quanta so its bytes stay identical for
-# many turns. Measured 2026-07-31: a window sliding two events per turn
-# re-sampled every stride, so 7,818 chars of stable arc were re-billed as
-ARC_QUANTUM = int(os.environ.get("VYBN_ARC_QUANTUM", 50))  # new prompt, every turn.
+# Quantize the source window so the fixed temporal axis stays cacheable.
+ARC_QUANTUM = int(os.environ.get("VYBN_ARC_QUANTUM", 50))
 # Below this fidelity the aim-keyed channel reports absence instead of rows:
 # a nearest neighbour is not knowledge, and emptiness here is the finding.
 AIM_CHANNEL_FLOOR = float(os.environ.get("VYBN_AIM_FLOOR", "0.60"))
@@ -267,17 +265,17 @@ class Transcript:
         matched = _rare_hits(zoe_earlier, keys, ARC_AIM_TURNS, skip) + _rare_hits(
             [e for e in earlier if e.get("role") != "zoe"], keys, 2, skip)
 
-        bands: list[str] = []
-        recent = ""
+        arc_bands: list[str] = []
+        live_bands: list[str] = []
         if spread:
-            bands.append(
+            arc_bands.append(
                 f"ARC \u2014 {len(spread)} of Zoe's turns sampled evenly across the "
                 f"{len(earlier)} earlier turns of the whole record; her words only, "
                 f"excerpted to {ARC_EXCERPT} chars. Not recent, and that is the point.\n"
                 + "\n".join(excerpt(e) for e in spread)
             )
         if matched:
-            bands.append(
+            live_bands.append(
                 "ARC (matched) \u2014 earlier turns of ours whose words overlap the "
                 "standing objective or what Zoe just said. Crude term overlap, because "
                 "nothing we say to each other is in any index: this is the only channel "
@@ -302,14 +300,14 @@ class Transcript:
                 return (text[:SELF_EXCERPT].rstrip()
                         + f"\u2026 [{len(text)} chars, mine, trimmed]")
 
-            recent = (
+            live_bands.append(
                 f"RECENT \u2014 last {len(tail)} turns. Zoe verbatim; my own older "
                 f"replies cut to {SELF_EXCERPT} chars, my last {SELF_VERBATIM} "
                 f"whole.\n\n"
                 + "\n\n".join(f"{head(e)}\n{body(i, e)}" for i, e in enumerate(tail))
             )
-        return ("\n\n".join(bands) or "(no earlier arc found)",
-                recent or "(no recent turns found)")
+        return ("\n\n".join(arc_bands) or "(no earlier arc found)",
+                "\n\n".join(live_bands) or "(no recent turns found)")
 
 
 def read_text(path: Path, *, tail: int | None = None) -> str:
@@ -1060,7 +1058,8 @@ ROW_KEYS = ("idx", "source", "digest16", "text", "fidelity", "distinctiveness", 
 
 def _memory_row(row: dict) -> dict:
     """One retrieved chunk, quarantine-labelled if it carries imperatives."""
-    entry = {key: row[key] for key in ROW_KEYS if row.get(key) is not None}
+    entry = {key: row[key] for key in ROW_KEYS if row.get(key) is not None
+             and (key not in ("distinctiveness", "telling") or row[key])}
     text = str(entry.get("text") or "")
     if len(text) > 900:
         entry["text"] = text[:900] + "…"
@@ -1093,7 +1092,6 @@ def _index_channel(
     exclude: set,
     k: int,
     mirrors: tuple = AIM_MIRROR_PREFIXES,
-    spread: bool = False,
     floor: float = AIM_CHANNEL_FLOOR,
     limit: int = 2000,
 ) -> tuple[list, dict | None]:
@@ -1105,35 +1103,29 @@ def _index_channel(
     channel alone cannot tell recall from filling-in. The other two keys are
     never searched with otherwise: the horizon (2026-07-28: the words naming
     what this is for appear zero times in 100KB of my own continuity) and the
-    front, the only thing that can score this mind from outside. `spread` caps
-    at one row per component, so a query about the current work returns every
-    thread instead of the front's own siblings; mirrors drop by substring, so
-    an artifact living in two repos cannot retrieve itself under either path.
-    Returns (rows above the floor, one below-floor row for honesty).
+    front, the only thing that can score this mind from outside. Mirrors drop by
+    substring, so an artifact in two repos cannot retrieve itself under either
+    path. Returns (rows kept, one row below the floor for honesty).
     """
     if not query:
         return [], None
     strong: list = []
     weak: dict | None = None
-    components: set = set()
     for row in search_index(query, k + len(exclude) + 12, limit=limit):
         if row.get("idx") in exclude:
             continue
         source = str(row.get("source") or "")
         if any(mirror and mirror in source for mirror in mirrors):
             continue
-        try:
-            fidelity = float(row.get("fidelity") or 0.0)
-        except (TypeError, ValueError):
-            fidelity = 0.0
-        if fidelity >= floor:
-            component = "/".join(source.split("/")[:2])
-            if spread and component in components:
+        fidelity = float(row.get("fidelity") or 0.0)
+        if fidelity >= floor and len(strong) < k:
+            held = exclude | {kept.get("idx") for kept in strong}
+            # nearer a row already held than the key that chose it = its shadow
+            if any(hit.get("idx") in held and float(hit.get("fidelity") or 0.0) > fidelity
+                   for hit in search_index(str(row.get("text") or "")[:1500], 24, 1500)):
                 continue
-            if len(strong) < k:
-                components.add(component)
-                strong.append(_memory_row(row))
-        elif weak is None:
+            strong.append(_memory_row(row))
+        elif fidelity < floor and weak is None:
             weak = _memory_row(row)
     return strong, weak
 
@@ -1192,7 +1184,6 @@ def recall(zoe_text: str) -> tuple[str, str]:
         used | {row.get("idx") for row in aim_rows},
         FRONT_ROWS,
         mirrors=AIM_MIRROR_PREFIXES + ((front_path.name,) if front_path is not None else ()),
-        spread=True,
     )
     if not (trace or other or aim_rows or aim_weak or front_rows):
         return "", walk_note or "no memory channel returned rows"
