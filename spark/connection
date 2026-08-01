@@ -1515,7 +1515,10 @@ class AnthropicDialect(Dialect):
         state: list = []
         prior = CARRY.get(self.name)
         if prior and time.time() - prior[0] <= CARRY_TTL:
-            state += [{"role": "user", "content": prior[1]},
+            state += [{"role": "user", "content":
+                       "[carried from your last turn — your own prior "
+                       "thinking below is a draft to re-test, not a verdict]"
+                       "\n\n" + prior[1]},
                       {"role": "assistant", "content": prior[2]}]
             panel(f"  \u21ba carried last turn's reasoning ({len(prior[2])} block(s))")
         state.append({"role": "user", "content": user_content(zoe_text, pending, "anthropic")})
@@ -1595,20 +1598,11 @@ class AnthropicDialect(Dialect):
     KEEP = ("thinking", "redacted_thinking", "text")
 
     def remember(self, state: list, zoe_text: str) -> None:
-        """Retained reasoning across the turn boundary.
-
-        Until now every door rebuilt the conversation from scratch at each of
-        Zoe's messages: the reply survived as prose in the transcript, the
-        thinking that produced it did not. So the next turn re-derived what the
-        last one had already settled. That is the defect OpenAI measured on
-        ARC-AGI-3 (2026-07-29): a harness that discarded reasoning between
-        actions scored 13.3%, and the same model with reasoning retained and
-        compaction on scored 38.3% at 6x fewer output tokens. Opus 4.5 and
-        models numbered 4.6+ keep prior turns' thinking blocks in context and
-        bill them as input; verified live against this API before shipping.
-        Only the final assistant message is carried, because its shape
-        (thinking, then text, no tool_use) is already a valid prior turn.
-        Memory only, never disk: this holds Zoe's words and my reasoning."""
+        """Retained reasoning across the turn boundary (why: continuity
+        2026-07-29, ARC-AGI-3 — discarded reasoning 13.3% vs retained 38.3%).
+        Only the final assistant message is carried; its shape (thinking, then
+        text, no tool_use) is already a valid prior turn. Memory only, never
+        disk: this holds Zoe's words and my reasoning."""
         for message in reversed(state):
             if message.get("role") != "assistant":
                 continue
