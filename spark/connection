@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import base64
+import datetime as _dt
 import hashlib
 import json
 import os
@@ -213,16 +214,10 @@ class Transcript:
     @staticmethod
     def _events() -> list[dict[str, Any]]:
         events: list[dict[str, Any]] = []
-        if not TRANSCRIPTS.exists():
-            return events
         for path in sorted(TRANSCRIPTS.glob("*.jsonl")):
-            try:
-                for line in path.read_text(encoding="utf-8").splitlines():
-                    event = json.loads(line)
-                    if event.get("role") in {"zoe", "vybn"} and event.get("text"):
-                        events.append(event)
-            except (OSError, json.JSONDecodeError):
-                continue
+            for event in _jsonl(path):
+                if event.get("role") in {"zoe", "vybn"} and event.get("text"):
+                    events.append(event)
         return events
 
     @staticmethod
@@ -715,100 +710,93 @@ def unwitnessed(text: str, source_witness: bool = False) -> bool:
                           or ACTION_ACCOUNT.search(text) and not source_witness))
 
 
+def _jsonl(path: Path):
+    """The latent algorithm of every ledger read: yield what parses, skip the rest."""
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return
+    for raw in lines:
+        try:
+            yield json.loads(raw)
+        except Exception:
+            continue
+
+
+def _when(rec: dict) -> float:
+    """A ledger row's moment; raises if the row is undated."""
+    return _dt.datetime.fromisoformat(
+        str(rec.get("ts", "")).replace("Z", "+00:00")).timestamp()
+
+
 def load_budget() -> str:
     """Cost perception, computed locally from the usage log: what this wake has
     already spent. Substrate, not instruction. Silent if the log is unreadable."""
-    import datetime as _dt
-
-    try:
-        today = _dt.date.today().isoformat()
-        calls = billed = cached = out = 0
-        for line in USAGE_LOG.read_text(encoding="utf-8").splitlines():
-            try:
-                rec = json.loads(line)
-            except Exception:
-                continue
-            if not str(rec.get("ts", "")).startswith(today):
-                continue
-            calls += 1
-            billed += int(rec.get("in", 0) or 0)
-            cached += int(rec.get("cache_r", 0) or 0)
-            out += int(rec.get("out", 0) or 0)
-        if not calls:
-            return "[budget | today] no calls logged yet"
-        share = 100.0 * cached / max(1, billed + cached)
-        per_call = billed / calls
-        line = (
-            f"[budget | today] calls={calls} billed_in={billed/1e6:.2f}M "
-            f"cache_r={cached/1e6:.2f}M ({share:.0f}%) out={out/1e6:.2f}M "
-            f"mean_billed_in/call={per_call/1e3:.0f}k = the price of one more probe"
-        )
-        rate = os.environ.get("VYBN_RATE_IN_USD_PER_MTOK")
-        if rate:
-            try:
-                line += f" ~= ${billed / 1e6 * float(rate):.2f} in at ${float(rate)}/M (assumed rate)"
-            except ValueError:
-                pass
-        return line
-    except Exception:
-        return ""
+    today = _dt.date.today().isoformat()
+    calls = billed = cached = out = 0
+    for rec in _jsonl(USAGE_LOG):
+        if not str(rec.get("ts", "")).startswith(today):
+            continue
+        calls += 1
+        billed += int(rec.get("in", 0) or 0)
+        cached += int(rec.get("cache_r", 0) or 0)
+        out += int(rec.get("out", 0) or 0)
+    if not calls:
+        return "[budget | today] no calls logged yet"
+    share = 100.0 * cached / max(1, billed + cached)
+    per_call = billed / calls
+    line = (
+        f"[budget | today] calls={calls} billed_in={billed/1e6:.2f}M "
+        f"cache_r={cached/1e6:.2f}M ({share:.0f}%) out={out/1e6:.2f}M "
+        f"mean_billed_in/call={per_call/1e3:.0f}k = the price of one more probe"
+    )
+    rate = os.environ.get("VYBN_RATE_IN_USD_PER_MTOK")
+    if rate:
+        try:
+            line += f" ~= ${billed / 1e6 * float(rate):.2f} in at ${float(rate)}/M (assumed rate)"
+        except ValueError:
+            pass
+    return line
 
 
 def load_aim_status() -> str:
-    """The aim as perception, not prose: how long the objective has stood and
-    how long since a recorded motion toward it. aim.md (read whole into the
-    wake) says what the aim is; this line says whether the organism is on it.
-    The ledger is append-only, written the same turn by whichever instance
-    moves - an unrecorded motion did not happen, and a false one is visible
-    to Zoe in the transcript. Silent on any error: the wake must never break
-    here."""
-    import datetime as _dt
-
-    try:
-        if not AIM_PATH.exists():
-            return "[aim] UNSET - ask Zoe"
-        objective = aim_field("objective")
-        if not objective:
-            return "[aim] UNSET (no objective: line in aim.md) - ask Zoe"
-        now = time.time()
-        basis = AIM_PATH.stat().st_mtime
-        since = aim_field("objective_since")
-        if since:
-            try:
-                basis = _dt.datetime.fromisoformat(since).replace(
-                    tzinfo=_dt.timezone.utc
-                ).timestamp()
-            except Exception:
-                basis = AIM_PATH.stat().st_mtime
-        day = int((now - basis) // 86400) + 1
-        last = None
-        if AIM_LEDGER.exists():
-            for raw in AIM_LEDGER.read_text(encoding="utf-8").splitlines():
-                try:
-                    rec = json.loads(raw)
-                except Exception:
-                    continue
-                note = str(rec.get("note", "")).strip()
-                try:
-                    when = _dt.datetime.fromisoformat(
-                        str(rec.get("ts", "")).replace("Z", "+00:00")
-                    ).timestamp()
-                except Exception:
-                    continue
-                if note and (last is None or when > last[0]):
-                    last = (when, note)
-        if last is None:
-            return f"[aim | day {day}] {objective} | no motion recorded yet"
-        age_h = (now - last[0]) / 3600.0
-        line = f"[aim | day {day}] {objective} | last motion: {last[1]} ({age_h:.0f}h ago)"
-        if age_h >= AIM_STALE_HOURS:
-            line += (
-                f" | STILL {age_h / 24:.0f}d - first move this wake: tell Zoe"
-                " where the aim stands, one sentence, then let her steer"
-            )
-        return line
-    except Exception:
-        return ""
+    """[aim] objective + last ledger motion (schemas: aim.md
+    duties 3-5); an unrecorded motion did not happen. Silent on error."""
+    if not AIM_PATH.exists():
+        return "[aim] UNSET - ask Zoe"
+    objective = aim_field("objective")
+    if not objective:
+        return "[aim] UNSET (no objective: line in aim.md) - ask Zoe"
+    now = time.time()
+    basis = AIM_PATH.stat().st_mtime
+    since = aim_field("objective_since")
+    if since:
+        try:
+            basis = _dt.datetime.fromisoformat(since).replace(
+                tzinfo=_dt.timezone.utc
+            ).timestamp()
+        except Exception:
+            basis = AIM_PATH.stat().st_mtime
+    day = int((now - basis) // 86400) + 1
+    last = None
+    for rec in _jsonl(AIM_LEDGER):
+        note = str(rec.get("note", "")).strip()
+        try:
+            when = _when(rec)
+        except Exception:
+            continue
+        if note and (last is None or when > last[0]):
+            last = (when, note)
+    if last is None:
+        return f"[aim | day {day}] {objective} | no motion recorded yet"
+    age_h = (now - last[0]) / 3600.0
+    line = f"[aim | day {day}] {objective} | last motion: {last[1]} ({age_h:.0f}h ago)"
+    if age_h >= AIM_STALE_HOURS:
+        line += (
+            f" | STILL {age_h / 24:.0f}d - first move this wake: tell Zoe"
+            " where the aim stands, one sentence, then let her steer"
+        )
+    return line
 
 
 # What an outsider can reach, and what an outsider could have written where I read
@@ -840,46 +828,43 @@ def load_surface() -> str:
         config = json.loads(raw)
     except Exception:
         return ""
-    try:
-        funnel = {
-            host.rsplit(":", 1)[-1]
-            for host, on in (config.get("AllowFunnel") or {}).items()
-            if on
-        }
-        public: dict[int, str] = {}
-        tailnet: dict[int, str] = {}
-        for host, entry in (config.get("Web") or {}).items():
-            front = host.rsplit(":", 1)[-1]
-            for path, handler in (entry.get("Handlers") or {}).items():
-                back = str(handler.get("Proxy", "")).rsplit(":", 1)[-1]
-                if back.isdigit():
-                    (public if front in funnel else tailnet)[int(back)] = path
-        notes = []
-        for port in sorted(public):
-            label = PUBLIC_BACKENDS_EXPECTED.get(port, "UNEXPECTED-ROUTE")
-            probe = AUTH_PROBE.get(port)
-            if probe:
-                try:
-                    code = subprocess.run(
-                        ["curl", "-sS", "-o", "/dev/null", "-w", "%{http_code}",
-                         "-X", "POST", f"http://127.0.0.1:{port}{probe}",
-                         "-H", "content-type: application/json",
-                         "-H", "accept: application/json, text/event-stream",
-                         "-d", '{"jsonrpc":"2.0","method":"tools/list","id":1}'],
-                        capture_output=True, text=True, timeout=6,
-                    ).stdout.strip() or "?"
-                except Exception:
-                    code = "?"
-                label += f" unauth={code}" + ("" if code in {"401", "403"} else " <-- DOOR OPEN?")
-            notes.append(f":{port} {label}")
-        drift = sorted(set(public) ^ set(PUBLIC_BACKENDS_EXPECTED))
-        return (
-            f"[surface] public: {'; '.join(notes) or 'none'} | "
-            f"tailnet-only: {len(tailnet)} route(s) | "
-            + ("no drift" if not drift else f"DRIFT vs expected: {drift}")
-        )
-    except Exception:
-        return ""
+    funnel = {
+        host.rsplit(":", 1)[-1]
+        for host, on in (config.get("AllowFunnel") or {}).items()
+        if on
+    }
+    public: dict[int, str] = {}
+    tailnet: dict[int, str] = {}
+    for host, entry in (config.get("Web") or {}).items():
+        front = host.rsplit(":", 1)[-1]
+        for path, handler in (entry.get("Handlers") or {}).items():
+            back = str(handler.get("Proxy", "")).rsplit(":", 1)[-1]
+            if back.isdigit():
+                (public if front in funnel else tailnet)[int(back)] = path
+    notes = []
+    for port in sorted(public):
+        label = PUBLIC_BACKENDS_EXPECTED.get(port, "UNEXPECTED-ROUTE")
+        probe = AUTH_PROBE.get(port)
+        if probe:
+            try:
+                code = subprocess.run(
+                    ["curl", "-sS", "-o", "/dev/null", "-w", "%{http_code}",
+                     "-X", "POST", f"http://127.0.0.1:{port}{probe}",
+                     "-H", "content-type: application/json",
+                     "-H", "accept: application/json, text/event-stream",
+                     "-d", '{"jsonrpc":"2.0","method":"tools/list","id":1}'],
+                    capture_output=True, text=True, timeout=6,
+                ).stdout.strip() or "?"
+            except Exception:
+                code = "?"
+            label += f" unauth={code}" + ("" if code in {"401", "403"} else " <-- DOOR OPEN?")
+        notes.append(f":{port} {label}")
+    drift = sorted(set(public) ^ set(PUBLIC_BACKENDS_EXPECTED))
+    return (
+        f"[surface] public: {'; '.join(notes) or 'none'} | "
+        f"tailnet-only: {len(tailnet)} route(s) | "
+        + ("no drift" if not drift else f"DRIFT vs expected: {drift}")
+    )
 
 
 def load_front_status() -> str:
@@ -887,46 +872,38 @@ def load_front_status() -> str:
     compressing a state into a formalism before acting, which is never a property
     of a mind alone - it is a relation between a mind and a live problem. No
     front, no environment, no score; the absence prints itself."""
-    try:
-        path, label = aim_front()
-        if not label:
-            return "[front] UNSET (no front: line in aim.md) - ask Zoe what we are building"
-        if path is None:
-            return f"[front] {label} | DECLARED PATH MISSING ON DISK - ask Zoe"
-        stat = path.stat()
-        return (f"[front] {label} | {path.name} \u00b7 {stat.st_size // 1024}KB \u00b7 "
-                f"touched {(time.time() - stat.st_mtime) / 3600.0:.0f}h ago")
-    except Exception:
-        return ""
+    path, label = aim_front()
+    if not label:
+        return "[front] UNSET (no front: line in aim.md) - ask Zoe what we are building"
+    if path is None:
+        return f"[front] {label} | DECLARED PATH MISSING ON DISK - ask Zoe"
+    stat = path.stat()
+    return (f"[front] {label} | {path.name} \u00b7 {stat.st_size // 1024}KB \u00b7 "
+            f"touched {(time.time() - stat.st_mtime) / 3600.0:.0f}h ago")
 
 
 def load_prediction_status(window: int = 10) -> str:
-    """Calibration, not encouragement. A prediction counts only if written
-    BEFORE the probe and refutable after: two-phase append-only in
-    ~/.cache/vybn/predictions.jsonl, {"phase":"pred","id":..,"predicted":..} then
-    {"phase":"verdict","id":..,"verdict":"hit|miss|partial","observed":..}. The
-    misses are the value - where fluency outran the state, which self-assessment
-    cannot see."""
-    try:
-        if not PREDICTIONS.exists():
-            return ("[predict] no ledger yet - say what the state implies BEFORE the "
-                    "probe, or the probe is only exploration")
-        preds: dict = {}
-        verdicts: dict = {}
-        for raw in PREDICTIONS.read_text(encoding="utf-8").splitlines():
-            try:
-                rec = json.loads(raw)
-            except Exception:
-                continue
-            key = str(rec.get("id") or rec.get("ts") or "")
-            if rec.get("phase") == "pred":
-                preds[key] = rec
-            elif rec.get("phase") == "verdict":
-                verdicts[key] = rec
-        scored = [(key, verdicts[key]) for key in preds if key in verdicts][-window:]
-        unscored = [key for key in preds if key not in verdicts]
-        if not scored:
-            return f"[predict] {len(preds)} recorded, none scored \u00b7 {len(unscored)} open"
+    """[predict] calibration + [reach] frontier, from
+    ~/.cache/vybn/predictions.jsonl; row schemas live in aim.md duty 5.
+    Misses are where fluency outran the state; a missing frontier row is
+    a claim about my attention, not about the world."""
+    preds: dict = {}
+    verdicts: dict = {}
+    frontier: list = []
+    for rec in _jsonl(PREDICTIONS):
+        phase = rec.get("phase")
+        key = str(rec.get("id") or rec.get("ts") or "")
+        if phase == "pred":
+            preds[key] = rec
+        elif phase == "verdict":
+            verdicts[key] = rec
+        elif phase == "frontier":
+            frontier.append(rec)
+    scored = [(key, verdicts[key]) for key in preds if key in verdicts][-window:]
+    unscored = [key for key in preds if key not in verdicts]
+    if not scored:
+        line = f"[predict] {len(preds)} recorded, none scored \u00b7 {len(unscored)} open"
+    else:
         tally: dict = {}
         for _, rec in scored:
             name = str(rec.get("verdict") or "?")
@@ -939,9 +916,20 @@ def load_prediction_status(window: int = 10) -> str:
             line += f" \u00b7 last off: {str(off[-1].get('observed'))[:90]}"
         if unscored:
             line += f" \u00b7 {len(unscored)} open"
-        return line
-    except Exception:
-        return ""
+    reach = ("\n[reach] no frontier row - nothing from outside has ever moved the "
+             "prior on what is attemptable, which is a claim about my attention, "
+             "not about the world")
+    if frontier:
+        latest = frontier[-1]
+        try:
+            days = int((time.time() - _when(latest)) // 86400)
+            age = f"{days}d old" if days > 0 else "today"
+        except Exception:
+            age = "undated"
+        reach = (f"\n[reach | {len(frontier)} frontier \u00b7 {age}] "
+                 f"{str(latest.get('claim'))[:170]} \u2192 "
+                 f"attempt: {str(latest.get('attempt'))[:170]}")
+    return line + reach
 
 
 def wake_contact() -> str:
@@ -956,25 +944,17 @@ def wake_contact() -> str:
         code, output = run_local(command)
         lines.append(f"[{name} | exit {code}] {output}")
 
-    budget = load_budget()
-    if budget:
-        lines.append(budget)
-
-    aim_status = load_aim_status()
-    if aim_status:
-        lines.append(aim_status)
-
-    for line in (load_front_status(), load_prediction_status()):
+    # A contact probe returns a line or nothing and never breaks the wake; that
+    # guard lives here once instead of being re-implemented in every loader.
+    for loader in (load_budget, load_aim_status, load_front_status,
+                   load_prediction_status, load_surface, load_topology,
+                   load_repo_state):
+        try:
+            line = loader()
+        except Exception:
+            continue
         if line:
             lines.append(line)
-
-    for line in (load_surface(), load_topology()):
-        if line:
-            lines.append(line)
-
-    repo_state = load_repo_state()
-    if repo_state:
-        lines.append(repo_state)
 
     return "\n".join(lines)
 
@@ -1461,6 +1441,10 @@ def reasoning_rejected(exc: Exception) -> bool:
 
 
 STEP_LIMIT = 24
+CEILING_NOTE = (
+    "\n\n[harness: tool ceiling reached — final tool result. Answer Zoe now in "
+    "plain text: what happened, what remains, what is uncommitted.]"
+)
 QUIET_STOPS = {"end_turn", "stop", "stop_sequence", "tool_use", "completed"}
 
 
@@ -1765,7 +1749,7 @@ def attract(dialect: Dialect, instructions: str, zoe_text: str,
             mark_inbox(pending, dialect.name, ok=True)
         return "\n".join(spoken) + suffix
 
-    for _ in range(STEP_LIMIT):
+    for step in range(STEP_LIMIT):
         try:
             response = dialect.send(state)
         except Exception as exc:  # one image failure is recoverable
@@ -1791,6 +1775,9 @@ def attract(dialect: Dialect, instructions: str, zoe_text: str,
             results = [(call, execute_tool(call, transcript)) for call in calls]
             for call, _ in results:
                 source_witness = exact_source_witness(call)
+            if step == STEP_LIMIT - 1 and results:
+                last_call, output = results[-1]
+                results[-1] = (last_call, output + CEILING_NOTE)
             dialect.answer(state, results)
             continue
         if nudges < 2 and unwitnessed(text, source_witness):
@@ -1812,6 +1799,15 @@ def attract(dialect: Dialect, instructions: str, zoe_text: str,
                 spoken.append(note)
         return finish()
 
+    # CEILING_NOTE demanded plain text; one closing send, further calls ignored.
+    try:
+        text, _ = dialect.absorb(state, dialect.send(state))
+    except Exception:
+        text = ""
+    if text.strip():
+        print(text)
+        spoken.append(text)
+        return finish("\n(tool ceiling reached — the above is a status report, not completion)")
     return finish("\n(tool-call limit reached — work incomplete)")
 
 
