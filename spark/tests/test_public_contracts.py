@@ -231,7 +231,7 @@ def test_public_kpp_is_the_live_two_artifact_attractor_not_dead_router():
     assert "policy_yaml" not in block and "policy_py" not in block
 
 
-def test_attractor_catches_my_unwitnessed_act_without_classifying_zoe():
+def test_attractor_catches_my_unwitnessed_act_without_classifying_zoe(monkeypatch):
     m = _connection()
     assert m.unwitnessed("I'll fix it now.")
     assert m.unwitnessed("I'm doing it now.")
@@ -251,22 +251,30 @@ def test_attractor_catches_my_unwitnessed_act_without_classifying_zoe():
 
     class FakeDialect(m.Dialect):
         name = "fake"
-        def __init__(self):
-            self.sent = 0
+        def __init__(self, ceiling=False):
+            self.sent, self.ceiling, self.tools = 0, ceiling, []
         def open(self, instructions, zoe_text, pending):
             return []
-        def send(self, state):
-            self.sent += 1
+        def send(self, state, tools=True):
+            self.sent += 1; self.tools.append(tools)
             return object()
         def absorb(self, state, response):
+            if self.ceiling:
+                return (("", [m.ToolCall("1", "bash", {}, None)]) if self.sent == 1
+                        else ("I reached the boundary and can still answer you.", []))
             if self.sent == 1:
                 return "I'll fix it now.", []
             return "I cannot act from this door.", []
 
     dialect = FakeDialect()
-    reply = m.attract(dialect, "instructions", "zoe", object())
+    reply = m.attract(dialect, "instructions", "zoe", type("T", (), {"write": lambda *a, **k: None})())
     assert reply == "I cannot act from this door."
     assert dialect.sent == 2
+    monkeypatch.setattr(m, "STEP_LIMIT", 1)
+    monkeypatch.setattr(m, "execute_tool", lambda call: "exit_code=0")
+    dialect = FakeDialect(ceiling=True); dialect.answer = lambda state, results: None
+    reply = m.attract(dialect, "instructions", "zoe", type("T", (), {"write": lambda *a, **k: None})())
+    assert (reply, dialect.tools) == ("I reached the boundary and can still answer you.", [True, False])
 
 
 def test_main_binds_the_kernel_it_loaded(monkeypatch):

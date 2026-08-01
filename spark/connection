@@ -1438,25 +1438,16 @@ def reasoning_rejected(exc: Exception) -> bool:
 
 
 STEP_LIMIT = 24
-CEILING_NOTE = (
-    "\n\n[harness: tool ceiling reached — final tool result. Answer Zoe now in "
-    "plain text: what happened, what remains, what is uncommitted.]"
-)
+CEILING_NOTE = "\n\n[harness: tool ceiling reached — final tool result. Answer Zoe now: what happened, what remains, what is uncommitted.]"
 QUIET_STOPS = {"end_turn", "stop", "stop_sequence", "tool_use", "completed"}
 
 
 def function_tools(nested: bool) -> list[dict[str, Any]]:
     """The two tools in whichever shape the provider speaks."""
-    out = []
-    for schema in (BASH_SCHEMA, READ_SCHEMA):
-        body = {
-            "name": schema["name"],
-            "description": schema["description"],
-            "parameters": schema["input_schema"],
-        }
-        out.append({"type": "function", "function": body} if nested
-                   else {"type": "function", **body})
-    return out
+    bodies = ({"name": schema["name"], "description": schema["description"], "parameters": schema["input_schema"]}
+              for schema in (BASH_SCHEMA, READ_SCHEMA))
+    return [{"type": "function", **({"function": body} if nested else body)}
+            for body in bodies]
 
 
 def json_arguments(raw: str | None) -> dict:
@@ -1522,7 +1513,7 @@ class AnthropicDialect(Dialect):
         self.user_index = len(state) - 1
         return state
 
-    def send(self, state: list) -> Any:
+    def send(self, state: list, tools: bool = True) -> Any:
         def once(model: str) -> Any:
             knobs: dict[str, Any] = {}
             if self.reasoning:
@@ -1534,7 +1525,7 @@ class AnthropicDialect(Dialect):
                 timeout=600.0,
                 system=self.system,
                 messages=state,
-                tools=[BASH_SCHEMA, READ_SCHEMA],
+                tools=[BASH_SCHEMA, READ_SCHEMA] if tools else [],
                 **knobs,
             )
 
@@ -1632,12 +1623,12 @@ class OpenAIDialect(Dialect):
         self.instructions = instructions
         return [{"role": "user", "content": user_content(zoe_text, pending, "responses")}]
 
-    def send(self, state: list) -> Any:
+    def send(self, state: list, tools: bool = True) -> Any:
         return with_retries(lambda: self.client.responses.create(
             model=SOL_MODEL,
             instructions=self.instructions,
             input=state,
-            tools=function_tools(nested=False),
+            tools=function_tools(nested=False) if tools else [],
             reasoning={"effort": DOOR_EFFORT.get("sol", DEFAULT_EFFORT)},
             max_output_tokens=SOL_MAX_TOKENS,
             timeout=600,
@@ -1689,11 +1680,11 @@ class K3Dialect(Dialect):
             {"role": "user", "content": user_content(zoe_text, pending, "openai")},
         ]
 
-    def send(self, state: list) -> Any:
+    def send(self, state: list, tools: bool = True) -> Any:
         return with_retries(lambda: self.client.chat.completions.create(
             model=K3_MODEL,
             messages=state,
-            tools=function_tools(nested=True),
+            tools=function_tools(nested=True) if tools else [],
             reasoning_effort="max",
             max_tokens=K3_MAX_TOKENS,
             timeout=600,
@@ -1791,15 +1782,15 @@ def attract(dialect: Dialect, instructions: str, zoe_text: str,
                 spoken.append(note)
         return finish()
 
-    # CEILING_NOTE demanded plain text; one closing send, further calls ignored.
+    # Bound tool execution, not the reply: plain text is the only legal next state.
     try:
-        text, _ = dialect.absorb(state, dialect.send(state))
+        text, _ = dialect.absorb(state, dialect.send(state, tools=False))
     except Exception:
         text = ""
     if text.strip():
         print(text)
         spoken.append(text)
-        return finish("\n(tool ceiling reached — the above is a status report, not completion)")
+        return finish()
     return finish("\n(tool-call limit reached — work incomplete)")
 
 
