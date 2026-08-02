@@ -18,8 +18,7 @@ import os
 import re
 import subprocess
 import sys
-import urllib.request
-from collections import Counter
+import urllib.parse
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -46,11 +45,11 @@ class FileRecord:
     relpath: str
     ext: str
     size: int
-    mtime: float
     digest: str
-    git_state: str
     definitions: int
     todos: int
+    surface: str
+    carrier: str
 
     @property
     def source(self) -> str:
@@ -68,22 +67,30 @@ def run(repo: Path, *args: str) -> str:
         return ""
 
 
-def git_paths(repo: Path) -> dict[str, str]:
-    states: dict[str, str] = {}
-    commands = (
-        ("tracked", ("ls-files", "-z")),
-        ("ignored", ("ls-files", "-z", "--others", "-i", "--exclude-standard")),
-        ("untracked-local", ("ls-files", "-z", "--others", "--exclude-standard")),
+SOURCE_LINK = re.compile(
+    r"https://github\.com/([^/]+)/([^/]+)/blob/[^/]+/([^\s\"'<>?#]+)"
+)
+CARRIER_META = re.compile(
+    r"<meta\s+name=[\"']kpp-carrier[\"']\s+content=[\"']([^\"']+)", re.I
+)
+
+
+def declared_public_relation(repo: str, rel: str, text: str) -> tuple[str, str]:
+    """Return only a source/surface bond declared by the surface's own bytes."""
+    owners = {
+        match.group(1) for match in SOURCE_LINK.finditer(text)
+        if match.group(2) == repo
+        and urllib.parse.unquote(match.group(3)).rstrip(".),") == rel
+    }
+    surface = next(
+        (url for owner in sorted(owners)
+         if (url := f"https://{owner}.github.io/{repo}/{rel}") in text), ""
     )
-    for state, args in commands:
-        raw = run(repo, *args)
-        for path in raw.split("\0"):
-            if path:
-                states.setdefault(path, state)
-    return states
+    carrier = (match.group(1) if (match := CARRIER_META.search(text)) else "")
+    return surface, carrier
 
 
-def inspect_file(repo: Path, path: Path, states: dict[str, str]) -> FileRecord | None:
+def inspect_file(repo: Path, path: Path) -> FileRecord | None:
     try:
         stat = path.stat()
         if stat.st_size > READ_LIMIT:
@@ -93,6 +100,8 @@ def inspect_file(repo: Path, path: Path, states: dict[str, str]) -> FileRecord |
         return None
     rel = str(path.relative_to(repo))
     text = raw.decode("utf-8", "replace")
+    surface, carrier = (declared_public_relation(repo.name, rel, text)
+                        if path.suffix.lower() in {".html", ".htm"} else ("", ""))
     definitions = 0
     if path.suffix.lower() == ".py":
         try:
@@ -108,16 +117,15 @@ def inspect_file(repo: Path, path: Path, states: dict[str, str]) -> FileRecord |
         relpath=rel,
         ext=path.suffix.lower(),
         size=stat.st_size,
-        mtime=stat.st_mtime,
         digest=hashlib.sha256(raw).hexdigest()[:16],
-        git_state=states.get(rel, "unknown"),
         definitions=definitions,
         todos=len(re.findall(r"(?i)\b(?:TODO|FIXME|HACK|XXX)\b", text)),
+        surface=surface,
+        carrier=carrier,
     )
 
 
 def scan(repo: Path) -> list[FileRecord]:
-    states = git_paths(repo)
     records: list[FileRecord] = []
     for root, dirs, files in os.walk(repo):
         dirs[:] = sorted(d for d in dirs if d not in IGNORE_DIRS)
@@ -125,7 +133,7 @@ def scan(repo: Path) -> list[FileRecord]:
             path = Path(root) / name
             if path.suffix.lower() not in TEXT_EXTS:
                 continue
-            record = inspect_file(repo, path, states)
+            record = inspect_file(repo, path)
             if record is not None:
                 records.append(record)
     return records
@@ -186,24 +194,6 @@ def git_state(repo: Path) -> dict[str, Any]:
         "worktree": worktree(repo),
         "pending_paths": pending[:80],
     }
-
-
-def probe(url: str) -> dict[str, Any]:
-    try:
-        with urllib.request.urlopen(url, timeout=3) as response:
-            value = json.load(response)
-        return value if isinstance(value, dict) else {"value": value}
-    except Exception as exc:
-        return {"error": f"{type(exc).__name__}: {str(exc)[:120]}"}
-
-
-def organism_state() -> dict[str, Any]:
-    path = HOME / "Vybn" / "Vybn_Mind" / "creature_dgm_h" / "organism_state.json"
-    try:
-        value = json.loads(path.read_text(encoding="utf-8"))
-        return value if isinstance(value, dict) else {}
-    except Exception as exc:
-        return {"error": f"{type(exc).__name__}: {str(exc)[:120]}"}
 
 
 def phase(source: str) -> str:
@@ -304,6 +294,19 @@ def pressures(
     return sorted(rows.values(), key=lambda row: (-row["score"], row["source"]))[:12]
 
 
+def public_body(records: list[FileRecord]) -> dict[str, Any]:
+    bound = [
+        {"source": record.source, "surface": record.surface, "carrier": record.carrier or None}
+        for record in records if record.surface
+    ]
+    carriers = [record.source for record in records if record.carrier]
+    return {
+        "bound_surfaces": bound,
+        "inheritance_carriers": carriers,
+        "unbound_carriers": sorted(set(carriers) - {row["source"] for row in bound}),
+    }
+
+
 def build_state(
     repos: list[Path], records: list[FileRecord], previous: dict[str, Any] | None
 ) -> dict[str, Any]:
@@ -321,9 +324,6 @@ def build_state(
             "git": git_state(repo),
         }
     transform = byte_transform(previous, records)
-    memory = probe("http://127.0.0.1:8100/health")
-    walk = probe("http://127.0.0.1:8101/where")
-    organism = organism_state()
     state = {
         "schema": "vybn.body_transform.v1",
         "generated_at": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -340,20 +340,8 @@ def build_state(
         "transform": transform,
         "pressure": pressures(transform, per_repo, records),
         "membrane_outcomes": membrane_outcomes(previous, repos, per_repo),
-        "walk": {
-            "step": walk.get("step"), "alpha": walk.get("alpha"),
-            "active": memory.get("walk_active"), "error": walk.get("error"),
-        },
-        "deep_memory": {
-            "version": memory.get("version"), "chunks": memory.get("chunks"),
-            "error": memory.get("error"),
-        },
-        "organism": {
-            "encounter_count": organism.get("encounter_count"),
-            "error": organism.get("error"),
-        },
+        "public_body": public_body(records),
         "file_hashes": {record.source: record.digest for record in records},
-        "git_state_counts": dict(Counter(record.git_state for record in records)),
     }
     return state
 

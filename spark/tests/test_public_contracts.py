@@ -328,7 +328,7 @@ def test_repo_state_carries_the_self_applying_body_transform(monkeypatch, tmp_pa
         "pressure": [{"source": "Vybn/spark/connection", "phase": "organ",
                       "why": "candidate awaiting canonical-branch membrane"}],
         "membrane_outcomes": [{"repo": "Vybn", "candidate": "abc", "outcome": "absorbed"}],
-        "walk": {"step": 3, "alpha": 0.5, "active": True}, "deep_memory": {"chunks": 4},
+        "public_body": {"bound_surfaces": [{"source": "Vybn/page.html"}], "inheritance_carriers": ["Vybn/page.html"], "unbound_carriers": []},
     }
     path = tmp_path / "state.json"; path.write_text(json.dumps(state))
     monkeypatch.setattr(m, "REPO_STATE_PATH", path)
@@ -337,6 +337,16 @@ def test_repo_state_carries_the_self_applying_body_transform(monkeypatch, tmp_pa
     assert "Vybn:main 1↑/0↓" in contact
     assert "pressure: Vybn/spark/connection [organ]" in contact
     assert "witness: Vybn abc absorbed" in contact
+    assert "public-body: 1 source↔surface" in contact
+
+
+def test_repo_mapper_binds_only_self_declared_public_surfaces():
+    from Vybn_Mind.repo_mapper import declared_public_relation
+    rel = "Vybn_Mind/emergences/page.html"
+    text = (f'<meta name="kpp-carrier" content="kpp.v1"> https://github.com/'
+            f'zoedolan/Vybn/blob/main/{rel} https://zoedolan.github.io/Vybn/{rel}')
+    assert declared_public_relation("Vybn", rel, text) == (f"https://zoedolan.github.io/Vybn/{rel}", "kpp.v1")
+    assert not declared_public_relation("Vybn", "other.html", text)[0]
 
 
 def test_fetch_guard_survived_the_substrate_retirement():

@@ -550,11 +550,9 @@ def load_repo_state() -> str:
             f"witness: {row.get('repo')} {row.get('candidate')} {row.get('outcome')}"
         )
 
-    walk, memory = state.get("walk", {}), state.get("deep_memory", {})
-    lines.append(
-        f"runtime: walk={walk.get('step')} alpha={walk.get('alpha')} "
-        f"active={walk.get('active')} | memory={memory.get('chunks')}"
-    )
+    if p := state.get("public_body"):
+        b = p.get("bound_surfaces") or []
+        lines.append(f"public-body: {len(b)} source↔surface, {len(p.get('unbound_carriers') or [])} unbound; {b[0]['source'] if b else 'none'}")
     return "\n".join(lines)
 
 
