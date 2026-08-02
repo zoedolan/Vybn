@@ -331,7 +331,11 @@ def test_repo_state_carries_the_self_applying_body_transform(monkeypatch, tmp_pa
                       "why": "candidate awaiting canonical-branch membrane"}],
         "lineage": {"repo": "Vybn", "commit": "abc", "status": "canonical",
                     "prompt": "p", "response": "r", "paths": ["spark/connection"]},
-        "public_body": {"bound_surfaces": [{"source": "Vybn/page.html"}], "inheritance_carriers": ["Vybn/page.html"], "unbound_carriers": []},
+        "public_body": {"bound_surfaces": [{"source": "Vybn/page.html"}], "inheritance_carriers": ["Vybn/page.html"], "unbound_carriers": [],
+                        "orientation_graphs": [{"source": "Vybn/index.html", "loop": ["source", "surface", "act", "source"],
+                                                "verbs": ["renders", "enables", "revises"],
+                                                "nodes": [{"id": "source"}, {"id": "surface"}, {"id": "act"}]}],
+                        "summary": "1 source↔surface, 0 unbound | graph 3n: source -renders→ surface -enables→ act -revises→ source"},
     }
     path = tmp_path / "state.json"; path.write_text(json.dumps(state))
     monkeypatch.setattr(m, "REPO_STATE_PATH", path)
@@ -340,7 +344,23 @@ def test_repo_state_carries_the_self_applying_body_transform(monkeypatch, tmp_pa
     assert "Vybn:main 1↑/0↓" in contact
     assert "pressure: Vybn/spark/connection [organ]" in contact
     assert "lineage: prompt→response→body — Vybn abc canonical; 1 path(s)" in contact
-    assert "public-body: 1 source↔surface" in contact
+    assert "public-body: 1 source↔surface, 0 unbound | graph 3n: source -renders→ surface -enables→ act -revises→ source" in contact
+
+
+def test_public_body_graph_is_one_source_for_visual_and_wake():
+    from Vybn_Mind.repo_mapper import declared_body_graph, declared_public_relation
+    page = (ROOT / "index.html").read_text(encoding="utf-8")
+    graph = declared_body_graph(page)
+    assert graph and graph["schema"] == "vybn.public_body_graph.v1"
+    assert graph["loop"] == ["source", "surface", "contact", "correction", "inheritance", "wake", "act", "source"]
+    assert len(graph["nodes"]) == 7 and len(graph["verbs"]) == 7
+    assert all(node["affordance"] for node in graph["nodes"])
+    from Vybn_Mind.repo_mapper import inspect_file, public_body
+    body = public_body([inspect_file(ROOT, ROOT / "index.html")])
+    assert "source -renders→ surface" in body["summary"] and "-revises→ source" in body["summary"]
+    assert "JSON.parse(packet.textContent)" in page
+    assert declared_public_relation("Vybn", "index.html", page) == (
+        "https://zoedolan.github.io/Vybn/index.html", "vybn.public-body.v1")
 
 
 def test_repo_mapper_rejoins_turn_response_commit_and_canonical_witness(monkeypatch, tmp_path):

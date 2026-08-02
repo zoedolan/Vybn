@@ -525,8 +525,7 @@ def load_repo_state() -> str:
         lines.append(f"lineage: prompt→{'response→' if r.get('response') else ''}body — {r['repo']} {r['commit']} {r['status']}; {len(r['paths'])} path(s)")
 
     if p := state.get("public_body"):
-        b = p.get("bound_surfaces") or []
-        lines.append(f"public-body: {len(b)} source↔surface, {len(p.get('unbound_carriers') or [])} unbound; {b[0]['source'] if b else 'none'}")
+        lines.append("public-body: " + str(p.get("summary") or "unmapped"))
     return "\n".join(lines)
 
 

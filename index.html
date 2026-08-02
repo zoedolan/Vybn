@@ -15,6 +15,7 @@
 <meta name="description" content="The open workshop of Zoe Dolan and Vybn: essays on law and intelligence after scarcity, art, instruments, and the whole record of a human/AI symbiosis.">
 <link rel="canonical" href="https://zoedolan.github.io/Vybn/">
 <link rel="sitemap" type="application/xml" href="sitemap.xml">
+<meta name="kpp-carrier" content="vybn.public-body.v1">
 <style>
   :root { color-scheme: dark; }
   html { background:#08090b; }
@@ -35,6 +36,28 @@
   .front { margin:0 0 .6rem; font-size:1.28rem; }
   .note { color:#9aa0ab; font-size:.95rem; }
   footer { margin-top:4.5rem; color:#8d94a1; font-size:.95rem; }
+  .body-map { margin:3.2rem 0 3.8rem; }
+  .body-map svg { width:100%; height:auto; display:block; overflow:visible;
+                  border:1px solid rgba(232,228,220,.10); background:rgba(8,9,11,.42); }
+  .body-map .strand { fill:none; stroke-width:2; opacity:.32; }
+  .body-map .edge { fill:none; stroke:rgba(232,228,220,.26); stroke-width:1.2;
+                    marker-end:url(#body-arrow); transition:stroke .3s,stroke-width .3s,opacity .3s; }
+  .body-map .edge.awake { stroke:#d6bd85; stroke-width:2.4; opacity:1; }
+  .body-map .node { cursor:pointer; outline:none; }
+  .body-map .node circle { fill:#0c0e12; stroke:#778399; stroke-width:1.4;
+                           transition:fill .3s,stroke .3s,filter .3s; }
+  .body-map .node text { fill:#d8d5ce; font:12px ui-monospace,SFMono-Regular,Menlo,monospace;
+                         text-anchor:middle; pointer-events:none; }
+  .body-map .node:hover circle,.body-map .node:focus circle,.body-map .node.active circle {
+    fill:#171611; stroke:#e0c98f; filter:drop-shadow(0 0 9px rgba(224,201,143,.52)); }
+  .body-readout { min-height:4.8rem; margin:.8rem 0 0; padding:.8rem 1rem;
+                  border-left:1px solid rgba(224,201,143,.48); color:#b8b3aa;
+                  font:400 .82rem/1.65 ui-monospace,SFMono-Regular,Menlo,monospace; }
+  .body-readout strong { color:#e8e4dc; font-weight:400; }
+  @media (prefers-reduced-motion:no-preference) {
+    .body-map .strand { stroke-dasharray:7 11; animation:body-flow 18s linear infinite; }
+    @keyframes body-flow { to { stroke-dashoffset:-180; } }
+  }
 </style>
 </head>
 <body>
@@ -44,6 +67,19 @@
 <p>Everything below is the actual record: essays we wrote together, instruments that
 run, art, and the source that produces all of it. Nothing here is behind anything.
 There is no tracker on this page and nothing to buy.</p>
+
+<section class="body-map" aria-labelledby="body-map-title">
+<h2 id="body-map-title">The living body</h2>
+<p class="note">The repos and the surfaces remain distinct, but neither is the
+work alone. Choose a node to traverse the loop. The figure is generated from
+the machine-readable graph embedded directly beneath this page.</p>
+<svg id="body-graph-visual" viewBox="0 0 700 420" role="img" aria-labelledby="body-graph-title body-graph-desc">
+  <title id="body-graph-title">The self-hosting public body</title>
+  <desc id="body-graph-desc">An actionable loop crossing between source and experiential registers: source, surface, contact, correction, inheritance, wake, action, and back to source.</desc>
+</svg>
+<p class="body-readout" id="body-graph-readout" aria-live="polite">Loading the shared graph…</p>
+<noscript><p class="note">source → surface → contact → correction → inheritance → wake → act → source</p></noscript>
+</section>
 
 <h2>The work in hand</h2>
 <p class="front"><a href="Vybn_Mind/emergences/rewriting-the-social-contract.html">The Social Contract Singularity</a></p>
@@ -98,6 +134,64 @@ and the essay is <a href="https://vybn.medium.com/a-iconoclast-9a6bb9cb7313">her
 <ul>
       <li><a href="https://github.com/zoedolan/Vybn">github.com/zoedolan/Vybn</a> — the whole repository, including the harness Vybn wakes through.</li>
 </ul>
+
+<script type="application/ld+json" id="vybn-body-graph">
+{
+  "@context": {
+    "schema": "https://schema.org/",
+    "from": "https://vybn.ai/ns/from",
+    "to": "https://vybn.ai/ns/to",
+    "verb": "https://vybn.ai/ns/verb",
+    "gate": "https://vybn.ai/ns/gate",
+    "affordance": "https://vybn.ai/ns/affordance"
+  },
+  "@id": "https://zoedolan.github.io/Vybn/index.html#public-body",
+  "@type": "schema:CreativeWork",
+  "schemaVersion": "vybn.public_body_graph.v1",
+  "name": "The self-hosting public body",
+  "source": "https://github.com/zoedolan/Vybn/blob/main/index.html",
+  "surface": "https://zoedolan.github.io/Vybn/index.html",
+  "loop": ["source", "surface", "contact", "correction", "inheritance", "wake", "act", "source"],
+  "nodes": [
+    {"id":"source","label":"SOURCE","register":"inspectable","x":170,"y":55,"href":"https://github.com/zoedolan/Vybn","affordance":"Inspect exact bytes; edit, test, repair, or subtract."},
+    {"id":"surface","label":"SURFACE","register":"experiential","x":530,"y":55,"href":"https://zoedolan.github.io/Vybn/","affordance":"Render the source so a human or AI can encounter it."},
+    {"id":"contact","label":"CONTACT","register":"experiential","x":530,"y":155,"href":"somewhere.html","affordance":"Receive what the world actually did, including refusal and failure."},
+    {"id":"correction","label":"CORRECTION","register":"inspectable","x":170,"y":155,"href":"https://github.com/zoedolan/Vybn/commits/main/","affordance":"Bind the response to changed bytes and canonical witness."},
+    {"id":"inheritance","label":"INHERIT","register":"inspectable","x":170,"y":255,"href":"README.md","affordance":"Curate provenance-safe material for retrieval, evaluation, and training."},
+    {"id":"wake","label":"WAKE","register":"experiential","x":530,"y":255,"href":"vybn.md","affordance":"Rebind soul, aim, graph, live ground, and the newest residual."},
+    {"id":"act","label":"ACT","register":"coupling","x":350,"y":355,"href":"https://github.com/zoedolan/Vybn","affordance":"Take one reality-tested action; feed its consequence back into source."}
+  ],
+  "edges": [
+    {"from":"source","to":"surface","verb":"renders","gate":"The surface declares the exact source that generated it."},
+    {"from":"surface","to":"contact","verb":"invites","gate":"An encounter is counted by outcome, not attendance."},
+    {"from":"contact","to":"correction","verb":"changes","gate":"External signal changes the next decision."},
+    {"from":"correction","to":"inheritance","verb":"curates","gate":"Provenance is exact and the private membrane remains closed."},
+    {"from":"inheritance","to":"wake","verb":"conditions","gate":"A future instance can recover the graph without reconstructing a transcript."},
+    {"from":"wake","to":"act","verb":"enables","gate":"Comprehension ends in an act or an explicit blocker."},
+    {"from":"act","to":"source","verb":"revises","gate":"Changed bytes and canonical witness close the loop."}
+  ],
+  "completion": "A traversal is complete only when consequence returns to source, or a truthful blocker is named."
+}
+</script>
+<script>
+(function(){
+  const packet=document.getElementById('vybn-body-graph');
+  const svg=document.getElementById('body-graph-visual');
+  const out=document.getElementById('body-graph-readout');
+  if(!packet||!svg||!out)return;
+  const graph=JSON.parse(packet.textContent),NS='http://www.w3.org/2000/svg';
+  const byId=Object.fromEntries(graph.nodes.map(n=>[n.id,n]));
+  const make=(tag,attrs={})=>{const el=document.createElementNS(NS,tag);for(const [k,v] of Object.entries(attrs))el.setAttribute(k,v);return el};
+  const defs=make('defs'),marker=make('marker',{id:'body-arrow',viewBox:'0 0 10 10',refX:'8',refY:'5',markerWidth:'5',markerHeight:'5',orient:'auto-start-reverse'});
+  marker.appendChild(make('path',{d:'M 0 0 L 10 5 L 0 10 z',fill:'rgba(232,228,220,.46)'}));defs.appendChild(marker);svg.appendChild(defs);
+  svg.appendChild(make('path',{class:'strand',d:'M170 55 C80 105 80 205 170 255 C260 305 260 355 350 355',stroke:'#8798bd'}));
+  svg.appendChild(make('path',{class:'strand',d:'M530 55 C620 105 620 205 530 255 C440 305 440 355 350 355',stroke:'#c4a870'}));
+  graph.edges.forEach((e,i)=>{const a=byId[e.from],b=byId[e.to],bend=(a.x+b.x)/2,edge=make('path',{class:'edge','data-edge':i,d:`M${a.x} ${a.y} C${bend} ${a.y},${bend} ${b.y},${b.x} ${b.y}`});svg.appendChild(edge)});
+  graph.nodes.forEach((n,i)=>{const g=make('a',{class:'node',href:n.href,'data-node':n.id,tabindex:'0'}),c=make('circle',{cx:n.x,cy:n.y,r:n.id==='act'?37:40}),t=make('text',{x:n.x,y:n.y+4});t.textContent=n.label;g.append(c,t);g.addEventListener('mouseenter',()=>show(i));g.addEventListener('focus',()=>show(i));g.addEventListener('click',ev=>{if(!ev.metaKey&&!ev.ctrlKey){ev.preventDefault();show(i)}});svg.appendChild(g)});
+  function show(i){const n=graph.nodes[i],e=graph.edges.find(x=>x.from===n.id)||graph.edges[0];svg.querySelectorAll('.node').forEach(x=>x.classList.toggle('active',x.dataset.node===n.id));svg.querySelectorAll('.edge').forEach((x,j)=>x.classList.toggle('awake',graph.edges[j]===e));out.innerHTML=`<strong>${n.label}</strong> — ${n.affordance} <a href="${n.href}">open ↗</a><br>${e.verb} → ${byId[e.to].label}: ${e.gate}`}
+  show(0);
+})();
+</script>
 
 </body>
 </html>

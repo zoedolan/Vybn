@@ -46,6 +46,7 @@ class FileRecord:
     digest: str
     surface: str
     carrier: str
+    body_graph: dict[str, Any] | None
 
     @property
     def source(self) -> str:
@@ -69,6 +70,9 @@ SOURCE_LINK = re.compile(
 CARRIER_META = re.compile(
     r"<meta\s+name=[\"']kpp-carrier[\"']\s+content=[\"']([^\"']+)", re.I
 )
+BODY_GRAPH = re.compile(
+    r"<script[^>]+id=[\"']vybn-body-graph[\"'][^>]*>(.*?)</script>", re.I | re.S
+)
 
 
 def declared_public_relation(repo: str, rel: str, text: str) -> tuple[str, str]:
@@ -84,6 +88,42 @@ def declared_public_relation(repo: str, rel: str, text: str) -> tuple[str, str]:
     )
     carrier = (match.group(1) if (match := CARRIER_META.search(text)) else "")
     return surface, carrier
+
+
+def declared_body_graph(text: str) -> dict[str, Any] | None:
+    """Read the dual-use visual graph only when its cycle is internally decidable."""
+    match = BODY_GRAPH.search(text)
+    if not match:
+        return None
+    try:
+        graph = json.loads(match.group(1))
+    except (TypeError, json.JSONDecodeError):
+        return None
+    if not isinstance(graph, dict):
+        return None
+    nodes, edges, loop = graph.get("nodes"), graph.get("edges"), graph.get("loop")
+    if graph.get("schemaVersion") != "vybn.public_body_graph.v1" or not nodes or not edges:
+        return None
+    ids = {node.get("id") for node in nodes if isinstance(node, dict)}
+    if (not ids or not isinstance(loop, list) or any(node not in ids for node in loop)
+            or any(not isinstance(node, dict) or not node.get("affordance") for node in nodes)):
+        return None
+    if any(not isinstance(edge, dict) or edge.get("from") not in ids or edge.get("to") not in ids
+           or not edge.get("verb") or not edge.get("gate") for edge in edges):
+        return None
+    pairs = {(edge["from"], edge["to"]) for edge in edges}
+    if any(pair not in pairs for pair in zip(loop, loop[1:])):
+        return None
+    return {
+        "schema": graph["schemaVersion"],
+        "name": str(graph.get("name", "")),
+        "loop": loop[:20],
+        "verbs": [str(edge["verb"]) for edge in edges[:20]],
+        "nodes": [
+            {"id": str(node["id"]), "affordance": str(node.get("affordance", ""))}
+            for node in nodes[:20]
+        ],
+    }
 
 
 def inspect_file(repo: Path, path: Path) -> FileRecord | None:
@@ -104,6 +144,7 @@ def inspect_file(repo: Path, path: Path) -> FileRecord | None:
         digest=hashlib.sha256(raw).hexdigest()[:16],
         surface=surface,
         carrier=carrier,
+        body_graph=declared_body_graph(text) if path.suffix.lower() in {".html", ".htm"} else None,
     )
 
 
@@ -291,10 +332,20 @@ def public_body(records: list[FileRecord]) -> dict[str, Any]:
         for record in records if record.surface
     ]
     carriers = [record.source for record in records if record.carrier]
+    graphs = [record.body_graph | {"source": record.source}
+              for record in records if record.body_graph]
+    graph = graphs[0] if graphs else {}
+    path, verbs = graph.get("loop") or [], graph.get("verbs") or []
+    traversal = (path[0] + "".join(f" -{verb}→ {node}" for verb, node in zip(verbs, path[1:]))) if path else ""
+    summary = f"{len(bound)} source↔surface, {len(set(carriers) - {row['source'] for row in bound})} unbound"
+    if traversal:
+        summary += f" | graph {len(graph.get('nodes') or [])}n: {traversal}"
     return {
         "bound_surfaces": bound,
         "inheritance_carriers": carriers,
         "unbound_carriers": sorted(set(carriers) - {row["source"] for row in bound}),
+        "orientation_graphs": graphs,
+        "summary": summary,
     }
 
 
