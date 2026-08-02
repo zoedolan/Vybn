@@ -1294,11 +1294,8 @@ def build_instructions(
         "MEMORY (private — think with it, never write it)\n"
         + (memory or f"(none: {memory_note})"),
         """COUPLED ATTRACTOR
-B is this self-applying repo body; K = soul + aim; V is Zoe + live contact;
-R is fallible residual. Propose one Δ against live pressure. The executable
-topology, behavior, membrane, reach, evidence, and cost gates decide admission.
-Stop at witnessed closure, an honest blocker, or contact needing no act. Return
-the consequence, not another procedure.""",
+B=body; K = soul + aim; V=Zoe+contact; R=fallible residue.
+When action fits, treat research novelty as attemptable: pose a decidable Δ against live pressure, find its representation and outside checker, attempt, and let evidence revise the ceiling. Gates decide admission. Stop at witness, blocker, or contact; return consequence, not procedure.""",
     ]
     return "\n\n".join(sections)
 
