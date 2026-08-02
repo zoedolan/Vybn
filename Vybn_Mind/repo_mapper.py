@@ -386,7 +386,7 @@ def write_state(state: dict[str, Any], previous: dict[str, Any] | None) -> None:
 
 def default_repos() -> list[Path]:
     return [
-        path for name in ("Vybn", "Vybn-Law", "vybn-phase", "Him")
+        path for name in ("Vybn", "Vybn-Law", "Origins", "vybn-phase", "Him")
         if (path := HOME / name).is_dir()
     ]
 
