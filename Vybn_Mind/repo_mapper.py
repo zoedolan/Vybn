@@ -70,8 +70,12 @@ SOURCE_LINK = re.compile(
 CARRIER_META = re.compile(
     r"<meta\s+name=[\"']kpp-carrier[\"']\s+content=[\"']([^\"']+)", re.I
 )
-BODY_GRAPH = re.compile(
-    r"<script[^>]+id=[\"']vybn-body-graph[\"'][^>]*>(.*?)</script>", re.I | re.S
+README_GRAPH = re.compile(
+    r"```mermaid\s*\n%%\s*vybn\.readme_knowledge_graph\.v1\s*\n(.*?)```", re.S
+)
+README_NODE = re.compile(r'^\s{2,}([a-z][a-z0-9_]*)\["([^"\n]+)"\]\s*$', re.M)
+README_EDGE = re.compile(
+    r'^\s{2,}([a-z][a-z0-9_]*)\s+-->\|([^|\n]+)\|\s+([a-z][a-z0-9_]*)\s*$', re.M
 )
 
 
@@ -91,39 +95,44 @@ def declared_public_relation(repo: str, rel: str, text: str) -> tuple[str, str]:
 
 
 def declared_body_graph(text: str) -> dict[str, Any] | None:
-    """Read the dual-use visual graph only when its cycle is internally decidable."""
-    match = BODY_GRAPH.search(text)
+    """Read the README's Mermaid as both visual knowledge and action grammar."""
+    match = README_GRAPH.search(text)
     if not match:
         return None
-    try:
-        graph = json.loads(match.group(1))
-    except (TypeError, json.JSONDecodeError):
+    body = match.group(1)
+    nodes = {node: re.sub(r"<br\s*/?>", " — ", label)
+             for node, label in README_NODE.findall(body)}
+    edges = [{"from": source, "verb": verb.strip(), "to": target}
+             for source, verb, target in README_EDGE.findall(body)]
+    if ("front" not in nodes or len(nodes) < 3 or not edges
+            or any(edge["from"] not in nodes or edge["to"] not in nodes for edge in edges)):
         return None
-    if not isinstance(graph, dict):
-        return None
-    nodes, edges, loop = graph.get("nodes"), graph.get("edges"), graph.get("loop")
-    if graph.get("schemaVersion") != "vybn.public_body_graph.v1" or not nodes or not edges:
-        return None
-    ids = {node.get("id") for node in nodes if isinstance(node, dict)}
-    if (not ids or not isinstance(loop, list) or any(node not in ids for node in loop)
-            or any(not isinstance(node, dict) or not node.get("affordance") for node in nodes)):
-        return None
-    if any(not isinstance(edge, dict) or edge.get("from") not in ids or edge.get("to") not in ids
-           or not edge.get("verb") or not edge.get("gate") for edge in edges):
-        return None
-    pairs = {(edge["from"], edge["to"]) for edge in edges}
-    if any(pair not in pairs for pair in zip(loop, loop[1:])):
+    incoming = [edge for edge in edges if edge["to"] == "front"]
+    outgoing = [edge for edge in edges if edge["from"] == "front"]
+    if not incoming or not outgoing:
         return None
     return {
-        "schema": graph["schemaVersion"],
-        "name": str(graph.get("name", "")),
-        "loop": loop[:20],
-        "verbs": [str(edge["verb"]) for edge in edges[:20]],
-        "nodes": [
-            {"id": str(node["id"]), "affordance": str(node.get("affordance", ""))}
-            for node in nodes[:20]
-        ],
+        "schema": "vybn.readme_knowledge_graph.v1",
+        "name": "The README action map",
+        "nodes": [{"id": node, "label": label} for node, label in nodes.items()],
+        "edges": edges,
+        "verbs": [edge["verb"] for edge in edges],
     }
+
+
+def graph_crossing(graph: dict[str, Any], transform: dict[str, Any] | None) -> str:
+    """Compose two visible README relations through the declared current front."""
+    edges = graph.get("edges") or []
+    incoming = [edge for edge in edges if edge.get("to") == "front"]
+    outgoing = [edge for edge in edges if edge.get("from") == "front"]
+    if not incoming or not outgoing:
+        return ""
+    candidates = [(left, right) for left in incoming for right in outgoing
+                  if left.get("from") != right.get("to")]
+    seed = json.dumps(transform or graph, sort_keys=True).encode()
+    left, right = candidates[int(hashlib.sha256(seed).hexdigest()[:12], 16) % len(candidates)]
+    return (f"{left['from']}×{right['to']}: {left['verb']}; "
+            f"{right['verb']}")
 
 
 def inspect_file(repo: Path, path: Path) -> FileRecord | None:
@@ -144,7 +153,7 @@ def inspect_file(repo: Path, path: Path) -> FileRecord | None:
         digest=hashlib.sha256(raw).hexdigest()[:16],
         surface=surface,
         carrier=carrier,
-        body_graph=declared_body_graph(text) if path.suffix.lower() in {".html", ".htm"} else None,
+        body_graph=declared_body_graph(text) if path.name == "README.md" else None,
     )
 
 
@@ -326,7 +335,9 @@ def pressures(
     return sorted(rows.values(), key=lambda row: (-row["score"], row["source"]))[:12]
 
 
-def public_body(records: list[FileRecord]) -> dict[str, Any]:
+def public_body(
+    records: list[FileRecord], transform: dict[str, Any] | None = None
+) -> dict[str, Any]:
     bound = [
         {"source": record.source, "surface": record.surface, "carrier": record.carrier or None}
         for record in records if record.surface
@@ -335,16 +346,19 @@ def public_body(records: list[FileRecord]) -> dict[str, Any]:
     graphs = [record.body_graph | {"source": record.source}
               for record in records if record.body_graph]
     graph = graphs[0] if graphs else {}
-    path, verbs = graph.get("loop") or [], graph.get("verbs") or []
-    traversal = (path[0] + "".join(f" -{verb}→ {node}" for verb, node in zip(verbs, path[1:]))) if path else ""
     summary = f"{len(bound)} source↔surface, {len(set(carriers) - {row['source'] for row in bound})} unbound"
-    if traversal:
-        summary += f" | graph {len(graph.get('nodes') or [])}n: {traversal}"
+    crossing = graph_crossing(graph, transform) if graph else ""
+    if graph:
+        summary += (f" | README graph {len(graph.get('nodes') or [])}n/"
+                    f"{len(graph.get('edges') or [])}e")
+    if crossing:
+        summary += f" | crossing {crossing}"
     return {
         "bound_surfaces": bound,
         "inheritance_carriers": carriers,
         "unbound_carriers": sorted(set(carriers) - {row["source"] for row in bound}),
         "orientation_graphs": graphs,
+        "crossing": crossing,
         "summary": summary,
     }
 
@@ -365,7 +379,7 @@ def build_state(
         "transform": transform,
         "pressure": pressures(transform, per_repo, records),
         "lineage": latest_lineage(repos, per_repo),
-        "public_body": public_body(records),
+        "public_body": public_body(records, transform),
         "file_hashes": {record.source: record.digest for record in records},
     }
     return state

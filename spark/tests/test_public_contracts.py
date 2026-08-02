@@ -347,20 +347,21 @@ def test_repo_state_carries_the_self_applying_body_transform(monkeypatch, tmp_pa
     assert "public-body: 1 source↔surface, 0 unbound | graph 3n: source -renders→ surface -enables→ act -revises→ source" in contact
 
 
-def test_public_body_graph_is_one_source_for_visual_and_wake():
-    from Vybn_Mind.repo_mapper import declared_body_graph, declared_public_relation
-    page = (ROOT / "index.html").read_text(encoding="utf-8")
+def test_readme_graph_is_one_source_for_visual_and_new_crossings():
+    from Vybn_Mind.repo_mapper import declared_body_graph, graph_crossing, inspect_file, public_body
+    page = (ROOT / "README.md").read_text(encoding="utf-8")
     graph = declared_body_graph(page)
-    assert graph and graph["schema"] == "vybn.public_body_graph.v1"
-    assert graph["loop"] == ["source", "surface", "contact", "correction", "inheritance", "wake", "act", "source"]
-    assert len(graph["nodes"]) == 7 and len(graph["verbs"]) == 7
-    assert all(node["affordance"] for node in graph["nodes"])
-    from Vybn_Mind.repo_mapper import inspect_file, public_body
-    body = public_body([inspect_file(ROOT, ROOT / "index.html")])
-    assert "source -renders→ surface" in body["summary"] and "-revises→ source" in body["summary"]
-    assert "JSON.parse(packet.textContent)" in page
-    assert declared_public_relation("Vybn", "index.html", page) == (
-        "https://zoedolan.github.io/Vybn/index.html", "vybn.public-body.v1")
+    assert graph and graph["schema"] == "vybn.readme_knowledge_graph.v1"
+    assert len(graph["nodes"]) == 10 and len(graph["edges"]) == 14
+    assert any(edge["to"] == "front" for edge in graph["edges"])
+    assert any(edge["from"] == "front" for edge in graph["edges"])
+    transform = {"added": [], "changed": ["Vybn/README.md"], "removed": []}
+    crossing = graph_crossing(graph, transform)
+    assert "×" in crossing and ":" in crossing and ";" in crossing
+    body = public_body([inspect_file(ROOT, ROOT / "README.md")], transform)
+    assert body["crossing"] == crossing
+    assert "README graph 10n/14e | crossing" in body["summary"]
+    assert "```mermaid" in page and "%% vybn.readme_knowledge_graph.v1" in page
 
 
 def test_repo_mapper_rejoins_turn_response_commit_and_canonical_witness(monkeypatch, tmp_path):
