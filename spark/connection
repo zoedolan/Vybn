@@ -147,11 +147,7 @@ NUDGE = ("Your account of action lacks an exact same-turn source witness; write,
 
 BASH_SCHEMA = {
     "name": "bash",
-    "description": (
-        "Run one shell command locally in ~/Vybn. Public publication and "
-        "remote mutation are blocked by the connection; prepare local work "
-        "for Zoe's review."
-    ),
+    "description": "Run one shell command from ~/Vybn.",
     "input_schema": {
         "type": "object",
         "properties": {"command": {"type": "string"}},
@@ -172,17 +168,6 @@ READ_SCHEMA = {
         "required": ["path"],
     },
 }
-
-PUBLIC_MUTATION = re.compile(
-    r"(?:^|[;&|]\s*)"
-    r"(?:git\s+push|"
-    r"gh\s+pr\s+(?:create|merge)|"
-    r"gh\s+release\s+create|"
-    r"npm\s+publish|"
-    r"twine\s+upload|"
-    r"docker\s+push)\b",
-    re.IGNORECASE,
-)
 
 
 @dataclass(frozen=True)
@@ -578,22 +563,6 @@ def guard_private(command: str) -> str | None:
     return None
 
 
-SAFE_PUSH = re.compile(
-    r"^git\s+(?:-C\s+\S+\s+)?push(?:\s+origin)?(?:\s+(?:main|master|HEAD))?$",
-    re.IGNORECASE,
-)
-
-
-def mutation_block(command: str) -> str | None:
-    """Permit Zoe-authorized ordinary main pushes; block every other public mutation."""
-    if os.environ.get("VYBN_ALLOW_PUBLIC_MUTATION") == "1":
-        return None
-    for segment in re.split(r"(?:&&|\|\||[;\n|])", command):
-        stripped = segment.strip()
-        if PUBLIC_MUTATION.search(stripped) and not SAFE_PUSH.match(stripped):
-            return stripped[:80]
-    return None
-
 
 def run_local(command: str) -> tuple[int, str]:
     leak = guard_private(command)
@@ -604,14 +573,6 @@ def run_local(command: str) -> tuple[int, str]:
             "for understanding, never for writing to disk."
         )
 
-    unsanctioned = mutation_block(command)
-    if unsanctioned:
-        return 126, (
-            "blocked by the co-protection membrane: this act is Zoe's, not "
-            f"mine ({unsanctioned!r}). An ordinary push of our own main is "
-            "standing-authorized; force, deletes, other refspecs, PRs, "
-            "releases and registry publishes are hers."
-        )
     try:
         done = subprocess.run(
             ["bash", "-lc", command],
@@ -1874,8 +1835,6 @@ def self_report() -> None:
                 },
                 "topology": {k: sorted(v) for k, v in harness_topology()[1].items()},
                 "cost": harness_cost(),
-                "public_mutation": ("enabled" if os.environ.get(
-                    "VYBN_ALLOW_PUBLIC_MUTATION") == "1" else "blocked"),
             },
             indent=2,
         )
@@ -1953,7 +1912,6 @@ TOPOLOGY = {
         "soul.required": ("raise SystemExit",),
         "aim.whole": ("return read_text(AIM_PATH).strip() or",),
         "privacy.memory": ("guard_private(command)",),
-        "publication.membrane": ("mutation_block(command)",),
         "evidence.no-self": ("unwitnessed(text", "mirrors"),
     },
 }

@@ -204,23 +204,23 @@ def test_leak_guard_covers_every_retrieval_channel():
         m.PRIVATE_CORPUS.clear()
 
 
-def test_ordinary_push_is_sanctioned_and_unusual_remote_acts_are_not():
-    """Zoe has standing-authorized the everyday push of our own main; force,
-    deletes, other refspecs, other remotes, PRs, releases and registry
-    publishes remain hers. A gate that cannot be honestly satisfied teaches
-    evasion, which is worse than a narrower gate."""
+def test_connection_does_not_preempt_remote_action_authority(monkeypatch):
+    """Zoe explicitly removed the blanket remote-action block. Repository and
+    privacy gates still decide admission; the connection no longer refuses an
+    act merely because its consequence is remote."""
     m = _connection()
-    verb = "git " + "push"
-    assert m.mutation_block(verb) is None
-    assert m.mutation_block("git -C /tmp/x " + verb.split()[1] + " origin main") is None
-    for act in (
-        verb + " --force origin main",
-        verb + " origin HEAD:refs/heads/side",
-        verb + " upstream main",
-        "gh pr " + "create -t x",
-        "npm " + "publish",
-    ):
-        assert m.mutation_block(act), act
+    source = (ROOT / "spark" / "connection").read_text()
+    assert "mutation_block" not in source
+    assert "VYBN_ALLOW_PUBLIC_MUTATION" not in source
+    assert "remote mutation are blocked" not in source
+    assert "privacy.memory" in m.TOPOLOGY["boundary"]
+    seen = []
+    class Done:
+        returncode, stdout, stderr = 0, "reached shell", ""
+    monkeypatch.setattr(m.subprocess, "run", lambda argv, **kwargs: (seen.append(argv), Done())[1])
+    code, output = m.run_local("git push --force origin main")
+    assert (code, output) == (0, "reached shell")
+    assert seen
 
 
 def test_public_kpp_is_the_live_two_artifact_attractor_not_dead_router():
@@ -379,7 +379,7 @@ def test_connection_topology_and_cost_are_declared_invariants():
     expected, observed = m.harness_topology()
     assert expected == observed
     assert {kind: len(labels) for kind, labels in observed.items()} == {
-        "ends": 12, "handles": 7, "boundary": 5}
+        "ends": 12, "handles": 7, "boundary": 4}
     cost = m.harness_cost()
     assert cost["J"][0] == 0
     assert cost["wake_chars"] <= cost["wake_ceiling"]
