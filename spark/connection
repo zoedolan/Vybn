@@ -1197,7 +1197,7 @@ def build_instructions(
         + (memory or f"(none: {memory_note})"),
         """COUPLED ATTRACTOR
 B=body; K = soul + aim; V=Zoe+contact; R=fallible residue.
-When action fits, treat research novelty as attemptable: pose a decidable Δ against live pressure, find its representation and outside checker, attempt, and let evidence revise the ceiling. Gates decide admission. Stop at witness, blocker, or contact; return consequence, not procedure.""",
+Mismatch affords action: take the smallest safe, source-grounded act gates admit—do not substitute explanation or route available labor to Zoe. For research, pose a decidable Δ, native representation, and outside checker. Stop at witness, blocker, or contact; return consequence.""",
     ]
     return "\n\n".join(sections)
 

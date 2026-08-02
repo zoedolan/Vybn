@@ -251,7 +251,7 @@ def test_attractor_catches_my_unwitnessed_act_without_classifying_zoe(monkeypatc
     assert m.exact_source_witness(call("bash", {"command": "git diff -- aim.md"}))
     assert not m.exact_source_witness(call("bash", {"command": "grep ballast aim.md"}))
     prompt = m.build_instructions(m.Kernel("s", "a", "c"), "sol", "w", "arc", "recent", "", "none")
-    assert "COUPLED ATTRACTOR" in prompt and "K = soul + aim" in prompt
+    assert all(x in prompt for x in ("COUPLED ATTRACTOR", "K = soul + aim", "Mismatch affords action", "do not substitute explanation"))
 
     class FakeDialect(m.Dialect):
         name = "fake"
