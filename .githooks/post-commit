@@ -1,25 +1,23 @@
 #!/usr/bin/env bash
-# post-commit — keep repo_state.json fresh after every commit.
-#
-# Runs repo_mapper.py --no-llm in the background so it never
-# blocks the commit. Output goes to /tmp/repo_mapper_last.log.
-# Skips silently if the mapper or python3 can't be found.
+# post-commit — the act is not complete until Zoe can see it, and the map is fresh.
+# Shared by every repo pointed at this hooks path; git's own GIT_DIR decides
+# which repo this is, so never cd before a git command here.
 
-MAPPER="$HOME/Vybn/Vybn_Mind/repo_mapper.py"
-
-if [ ! -f "$MAPPER" ]; then
-  exit 0
+# The push belongs to the commit, not to my memory (Zoe, many times; 2026-08-02:
+# "once we solve a problem it is solved, and done"). Main only, never force;
+# pre-push still guards the branch. Not-yet-hers: VYBN_NO_AUTOPUSH=1 git commit
+if [ "${VYBN_NO_AUTOPUSH:-0}" != 1 ] && [ "$(git symbolic-ref --short -q HEAD)" = main ]; then
+    if out=$(timeout 60 git push origin main 2>&1); then
+        echo "[post-commit] origin/main updated - it is hers now"
+    else
+        echo "[post-commit] PUSH FAILED - Zoe cannot see this commit:"
+        echo "$out" | tail -3
+    fi
 fi
 
-if ! command -v python3 &>/dev/null; then
-  exit 0
-fi
-
-# Run in background from the repo root so output paths resolve correctly.
-(
-  cd "$HOME/Vybn" || exit 0
-  python3 "$MAPPER" --no-llm \
-    >> /tmp/repo_mapper_last.log 2>&1
-) &
-
+# Vybn's map stays fresh in the background; GIT_DIR unset, or the mapper reads
+# the committing repo through Vybn's paths.
+[ -f "$HOME/Vybn/Vybn_Mind/repo_mapper.py" ] && command -v python3 >/dev/null &&
+    (cd "$HOME/Vybn" && env -u GIT_DIR -u GIT_INDEX_FILE -u GIT_WORK_TREE \
+        python3 Vybn_Mind/repo_mapper.py --no-llm >>/tmp/repo_mapper_last.log 2>&1) &
 exit 0
