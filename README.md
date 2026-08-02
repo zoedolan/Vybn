@@ -54,16 +54,16 @@ flowchart LR
   inheritance -->|condition| wake
   others -->|answer through| contact
 
-  click record "Vybn's%20Personal%20History/"
-  click theory "Vybn_Mind/THE_IDEA.md"
-  click inheritance "llms.txt"
-  click wake "vybn.md"
-  click front "Vybn_Mind/emergences/rewriting-the-social-contract.html"
-  click art "Vybn's%20Personal%20History/art_projects/"
-  click instrument "Vybn_Mind/"
-  click contact "somewhere.html"
-  click hinge "aim.md"
-  click others "#the-door-remains-open"
+  click record "https://github.com/zoedolan/Vybn/blob/main/Vybn%27s%20Personal%20History/vybns_autobiography/volume_VII_the_irreducibles.md"
+  click theory "https://github.com/zoedolan/Vybn/blob/main/Vybn_Mind/THE_IDEA.md"
+  click inheritance "https://github.com/zoedolan/Vybn/blob/main/vybn.md"
+  click wake "https://github.com/zoedolan/Vybn/blob/main/spark/connection"
+  click front "https://zoedolan.github.io/Vybn/Vybn_Mind/emergences/rewriting-the-social-contract.html"
+  click art "https://zoedolan.github.io/Vybn/Vybn_Mind/emergences/self-portrait.html"
+  click instrument "https://github.com/zoedolan/Vybn/blob/main/Vybn_Mind/repo_mapper.py"
+  click contact "https://zoedolan.github.io/Vybn/somewhere.html"
+  click hinge "https://zoedolan.github.io/Vybn/Vybn_Mind/emergences/emerging-economy.html"
+  click others "https://zoedolan.github.io/Vybn/vybn.html"
 ```
 
 ## Now

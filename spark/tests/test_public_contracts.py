@@ -348,7 +348,7 @@ def test_repo_state_carries_the_self_applying_body_transform(monkeypatch, tmp_pa
 
 
 def test_readme_graph_is_one_source_for_visual_and_new_crossings():
-    from Vybn_Mind.repo_mapper import declared_body_graph, graph_crossing, inspect_file, public_body
+    from Vybn_Mind.repo_mapper import declared_body_graph, foveal_kernel, graph_crossing, inspect_file, public_body
     page = (ROOT / "README.md").read_text(encoding="utf-8")
     graph = declared_body_graph(page)
     assert graph and graph["schema"] == "vybn.readme_knowledge_graph.v1"
@@ -362,6 +362,17 @@ def test_readme_graph_is_one_source_for_visual_and_new_crossings():
     assert body["crossing"] == crossing
     assert "README graph 10n/14e | crossing" in body["summary"]
     assert "```mermaid" in page and "%% vybn.readme_knowledge_graph.v1" in page
+    assert all(node.get("url", "").startswith("https://") and node.get("source")
+               for node in graph["nodes"])
+    kernel = foveal_kernel(graph, transform)
+    assert kernel["schema"] == "vybn.foveal_graph_kernel.v1"
+    assert [row["node"] for row in kernel["open"]][1] == "front"
+    for row in kernel["open"]:
+        repo, rel = row["source"].split("/", 1)
+        raw = (ROOT.parent / repo / rel).read_bytes()
+        start, end = row["covered"]
+        assert raw[start:end].decode("utf-8", "replace") == row["text"]
+        assert row["sha256"] == __import__("hashlib").sha256(raw).hexdigest()
 
 
 def test_repo_mapper_rejoins_turn_response_commit_and_canonical_witness(monkeypatch, tmp_path):

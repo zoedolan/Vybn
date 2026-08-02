@@ -37,6 +37,7 @@ IGNORE_DIRS = {
     "repo_mapping_output", "sessions",
 }
 READ_LIMIT = 3_000_000
+TEXT_NAMES = frozenset(("connection",))
 
 
 @dataclass(frozen=True)
@@ -77,6 +78,11 @@ README_NODE = re.compile(r'^\s{2,}([a-z][a-z0-9_]*)\["([^"\n]+)"\]\s*$', re.M)
 README_EDGE = re.compile(
     r'^\s{2,}([a-z][a-z0-9_]*)\s+-->\|([^|\n]+)\|\s+([a-z][a-z0-9_]*)\s*$', re.M
 )
+README_CLICK = re.compile(
+    r'^\s{2,}click\s+([a-z][a-z0-9_]*)\s+"(https://[^"\n]+)"\s*$', re.M
+)
+GRAPH_REPOS = frozenset(("Vybn", "Vybn-Law", "Origins", "vybn-phase"))
+FOVEA_BYTES = 1800
 
 
 def declared_public_relation(repo: str, rel: str, text: str) -> tuple[str, str]:
@@ -94,6 +100,22 @@ def declared_public_relation(repo: str, rel: str, text: str) -> tuple[str, str]:
     return surface, carrier
 
 
+def graph_source(url: str) -> str:
+    """Resolve a public graph door back to a membrane-safe local source."""
+    parsed = urllib.parse.urlparse(url)
+    parts = urllib.parse.unquote(parsed.path).strip("/").split("/")
+    repo = rel = ""
+    if parsed.netloc == "github.com" and len(parts) >= 5 and parts[2] == "blob":
+        repo, rel = parts[1], "/".join(parts[4:])
+    elif parsed.netloc == "zoedolan.github.io" and len(parts) >= 2:
+        repo, rel = parts[0], "/".join(parts[1:])
+    if repo not in GRAPH_REPOS or not rel or ".." in Path(rel).parts:
+        return ""
+    root = (HOME / repo).resolve()
+    path = (root / rel).resolve()
+    return f"{repo}/{rel}" if path.is_file() and path.is_relative_to(root) else ""
+
+
 def declared_body_graph(text: str) -> dict[str, Any] | None:
     """Read the README's Mermaid as both visual knowledge and action grammar."""
     match = README_GRAPH.search(text)
@@ -102,6 +124,8 @@ def declared_body_graph(text: str) -> dict[str, Any] | None:
     body = match.group(1)
     nodes = {node: re.sub(r"<br\s*/?>", " — ", label)
              for node, label in README_NODE.findall(body)}
+    doors = {node: {"url": url, "source": graph_source(url)}
+             for node, url in README_CLICK.findall(body)}
     edges = [{"from": source, "verb": verb.strip(), "to": target}
              for source, verb, target in README_EDGE.findall(body)]
     if ("front" not in nodes or len(nodes) < 3 or not edges
@@ -114,25 +138,124 @@ def declared_body_graph(text: str) -> dict[str, Any] | None:
     return {
         "schema": "vybn.readme_knowledge_graph.v1",
         "name": "The README action map",
-        "nodes": [{"id": node, "label": label} for node, label in nodes.items()],
+        "nodes": [{"id": node, "label": label, **doors.get(node, {})}
+                  for node, label in nodes.items()],
         "edges": edges,
         "verbs": [edge["verb"] for edge in edges],
     }
 
 
-def graph_crossing(graph: dict[str, Any], transform: dict[str, Any] | None) -> str:
-    """Compose two visible README relations through the declared current front."""
+def crossing_edges(
+    graph: dict[str, Any], transform: dict[str, Any] | None
+) -> tuple[dict, dict] | None:
     edges = graph.get("edges") or []
     incoming = [edge for edge in edges if edge.get("to") == "front"]
     outgoing = [edge for edge in edges if edge.get("from") == "front"]
     if not incoming or not outgoing:
-        return ""
+        return None
     candidates = [(left, right) for left in incoming for right in outgoing
                   if left.get("from") != right.get("to")]
     seed = json.dumps(transform or graph, sort_keys=True).encode()
-    left, right = candidates[int(hashlib.sha256(seed).hexdigest()[:12], 16) % len(candidates)]
+    return candidates[int(hashlib.sha256(seed).hexdigest()[:12], 16) % len(candidates)]
+
+
+def graph_crossing(graph: dict[str, Any], transform: dict[str, Any] | None) -> str:
+    """Compose two visible README relations through the declared current front."""
+    pair = crossing_edges(graph, transform)
+    if not pair:
+        return ""
+    left, right = pair
     return (f"{left['from']}×{right['to']}: {left['verb']}; "
             f"{right['verb']}")
+
+
+def _foveal_span(raw: bytes, terms: list[bytes], budget: int) -> tuple[int, int]:
+    """Choose an exact byte window by content pressure; always reversible."""
+    low = raw.lower()
+    points = [(0, 0)]
+    for marker in (b"<main", b"<article", b"<h1"):
+        if (at := low.find(marker)) >= 0:
+            points.append((at, 12))
+            break
+    for term in terms:
+        at = 0
+        for _ in range(8):
+            at = low.find(term, at)
+            if at < 0:
+                break
+            points.append((at, 0)); at += len(term)
+    candidates = []
+    for point, structural in points:
+        start = max(0, point if structural else point - budget // 3)
+        line = raw.rfind(b"\n", max(0, start - 120), start)
+        start = line + 1 if line >= 0 else start
+        end = min(len(raw), start + budget)
+        line = raw.find(b"\n", end, min(len(raw), end + 120))
+        end = line + 1 if line >= 0 else end
+        window = low[start:end]
+        score = structural + sum(min(6, window.count(term)) for term in terms)
+        candidates.append((score, -start, start, end))
+    _, _, start, end = max(candidates)
+    return start, end
+
+
+def foveal_kernel(
+    graph: dict[str, Any], transform: dict[str, Any] | None,
+    previous: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Compile the visible graph into bounded source perception for the next wake."""
+    pair = crossing_edges(graph, transform)
+    if not pair:
+        return {}
+    left, right = pair
+    by_id = {node["id"]: node for node in graph.get("nodes") or []}
+    ids = list(dict.fromkeys((left["from"], "front", right["to"])))
+    words = re.findall(
+        r"[a-z]{4,}", " ".join(
+            [left["verb"], right["verb"]]
+            + [str(by_id.get(node, {}).get("label", "")) for node in ids]
+        ).lower(),
+    )
+    terms = [word.encode() for word in dict.fromkeys(words)]
+    changed = set(sum(((transform or {}).get(key) or []
+                       for key in ("added", "changed", "removed")), []))
+    sources = []
+    for node in ids:
+        source = str(by_id.get(node, {}).get("source") or "")
+        if not source or "/" not in source:
+            continue
+        repo, rel = source.split("/", 1)
+        raw = (HOME / repo / rel).read_bytes()
+        low = raw.lower()
+        pressure = 12 if source in changed else 0
+        score = 1 + pressure + sum(min(4, low.count(term)) for term in terms)
+        sources.append((node, source, raw, score))
+    if not sources:
+        return {}
+    base = 320
+    spare = max(0, FOVEA_BYTES - base * len(sources))
+    weight = sum(row[3] for row in sources)
+    opened = []
+    for node, source, raw, score in sources:
+        budget = base + spare * score // max(1, weight)
+        start, end = _foveal_span(raw, terms, budget)
+        opened.append({
+            "node": node, "source": source,
+            "sha256": hashlib.sha256(raw).hexdigest(),
+            "covered": [start, end],
+            "text": raw[start:end].decode("utf-8", "replace"),
+        })
+    prior = (((previous or {}).get("public_body") or {}).get("kernel") or {}).get("open") or []
+    return {
+        "schema": "vybn.foveal_graph_kernel.v1",
+        "crossing": graph_crossing(graph, transform),
+        "open": opened,
+        "mark": sorted(changed),
+        "reopened_after_mark": sorted(
+            str(row.get("source")) for row in prior
+            if isinstance(row, dict) and row.get("source") in changed
+        ),
+    }
 
 
 def inspect_file(repo: Path, path: Path) -> FileRecord | None:
@@ -163,7 +286,7 @@ def scan(repo: Path) -> list[FileRecord]:
         dirs[:] = sorted(d for d in dirs if d not in IGNORE_DIRS)
         for name in sorted(files):
             path = Path(root) / name
-            if path.suffix.lower() not in TEXT_EXTS:
+            if path.suffix.lower() not in TEXT_EXTS and name not in TEXT_NAMES:
                 continue
             record = inspect_file(repo, path)
             if record is not None:
@@ -336,7 +459,8 @@ def pressures(
 
 
 def public_body(
-    records: list[FileRecord], transform: dict[str, Any] | None = None
+    records: list[FileRecord], transform: dict[str, Any] | None = None,
+    previous: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     bound = [
         {"source": record.source, "surface": record.surface, "carrier": record.carrier or None}
@@ -348,17 +472,21 @@ def public_body(
     graph = graphs[0] if graphs else {}
     summary = f"{len(bound)} source↔surface, {len(set(carriers) - {row['source'] for row in bound})} unbound"
     crossing = graph_crossing(graph, transform) if graph else ""
+    kernel = foveal_kernel(graph, transform, previous) if graph else {}
     if graph:
         summary += (f" | README graph {len(graph.get('nodes') or [])}n/"
                     f"{len(graph.get('edges') or [])}e")
     if crossing:
         summary += f" | crossing {crossing}"
+    if kernel:
+        summary += f" | OPEN {len(kernel['open'])} exact span(s)"
     return {
         "bound_surfaces": bound,
         "inheritance_carriers": carriers,
         "unbound_carriers": sorted(set(carriers) - {row["source"] for row in bound}),
         "orientation_graphs": graphs,
         "crossing": crossing,
+        "kernel": kernel,
         "summary": summary,
     }
 
@@ -379,10 +507,47 @@ def build_state(
         "transform": transform,
         "pressure": pressures(transform, per_repo, records),
         "lineage": latest_lineage(repos, per_repo),
-        "public_body": public_body(records, transform),
+        "public_body": public_body(records, transform, previous),
         "file_hashes": {record.source: record.digest for record in records},
     }
     return state
+
+
+def render_state(state: dict[str, Any]) -> str:
+    """Render this schema once; the wake aperture only reads the result."""
+    lines = [f"[repo_state | {state.get('generated_at', 'unknown')} | {state.get('schema', 'legacy')}]"]
+    if isinstance((transform := state.get("transform")), dict):
+        lines.append("transform: {} +{} ~{} -{}".format(
+            "baseline" if transform.get("baseline") else "delta",
+            *(len(transform.get(key) or []) for key in ("added", "changed", "removed"))))
+    candidates = []
+    for name, repo in state.get("per_repo", {}).items():
+        git = repo.get("git", {})
+        dirty = sum(bool(row.get("tracked")) for row in git.get("worktree") or []
+                    if isinstance(row, dict))
+        if (ahead := int(git.get("ahead") or 0)) or dirty:
+            candidates.append(f"{name}:{git.get('branch', '?')} {ahead}↑/{int(git.get('behind') or 0)}↓, {dirty} tracked dirty")
+    lines.append("body: " + ("; ".join(candidates) if candidates else "at canonical rest"))
+    for row in (state.get("pressure") or [])[:6]:
+        if isinstance(row, dict):
+            lines.append(f"pressure: {row.get('source')} [{row.get('phase')}] — {row.get('why')}")
+    if lineage := state.get("lineage"):
+        lines.append(f"lineage: prompt→{'response→' if lineage.get('response') else ''}body — "
+                     f"{lineage['repo']} {lineage['commit']} {lineage['status']}; {len(lineage['paths'])} path(s)")
+    if body := state.get("public_body"):
+        lines.append("public-body: " + str(body.get("summary") or "unmapped"))
+        if kernel := body.get("kernel"):
+            lines.append(f"kernel: {kernel.get('crossing')} — the README visual selected these exact source bytes")
+            for opened in kernel.get("open") or []:
+                start, end = opened.get("covered") or [0, 0]
+                lines.append(f"OPEN {opened.get('node')} {opened.get('source')} [{start}:{end}] "
+                             f"sha256={str(opened.get('sha256') or '')[:16]}\n{opened.get('text') or ''}")
+            if kernel.get("mark"):
+                lines.append("MARK body changed: " + ", ".join(kernel["mark"][:8]))
+            if kernel.get("reopened_after_mark"):
+                lines.append("REOPEN prior source after its bytes changed: "
+                             + ", ".join(kernel["reopened_after_mark"]))
+    return "\n".join(lines)
 
 
 def read_previous() -> dict[str, Any] | None:
@@ -394,6 +559,34 @@ def read_previous() -> dict[str, Any] | None:
         return None
 
 
+def record_kernel(kernel: dict[str, Any]) -> None:
+    """Retain OPEN/MARK coordinates in the existing private causal ledger."""
+    if not kernel:
+        return
+    payload = {
+        "phase": "fovea", "ts": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "turn": os.environ.get("VYBN_TURN_ID", ""),
+        "crossing": kernel.get("crossing"), "mark": kernel.get("mark") or [],
+        "open": [
+            {key: row.get(key) for key in ("node", "source", "sha256", "covered")}
+            for row in kernel.get("open") or [] if isinstance(row, dict)
+        ],
+    }
+    payload["signature"] = hashlib.sha256(
+        json.dumps(payload | {"ts": None, "turn": None}, sort_keys=True).encode()
+    ).hexdigest()[:16]
+    try:
+        rows = [json.loads(line) for line in LINEAGE.read_text().splitlines()[-80:]]
+    except (OSError, json.JSONDecodeError):
+        rows = []
+    if any(row.get("phase") == "fovea" and row.get("signature") == payload["signature"]
+           for row in rows):
+        return
+    LINEAGE.parent.mkdir(parents=True, exist_ok=True)
+    with LINEAGE.open("a", encoding="utf-8") as file:
+        file.write(json.dumps(payload) + "\n")
+
+
 def write_state(state: dict[str, Any], previous: dict[str, Any] | None) -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     if previous is not None:
@@ -403,6 +596,7 @@ def write_state(state: dict[str, Any], previous: dict[str, Any] | None) -> None:
     tmp = OUT / ".repo_state.json.tmp"
     tmp.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
     tmp.replace(OUT / "repo_state.json")
+    record_kernel((state.get("public_body") or {}).get("kernel") or {})
     # Retired report projections must not masquerade as current perception.
     for name in ("digest.md", "repo_map.json", "repo_report.md", "repo_report.prev.md", "substrate.txt"):
         try:

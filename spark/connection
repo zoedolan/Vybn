@@ -20,7 +20,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
-from Vybn_Mind.repo_mapper import close_lineage
+from Vybn_Mind.repo_mapper import close_lineage, render_state
 
 HOME = Path.home()
 REPO = HOME / "Vybn"
@@ -479,54 +479,10 @@ def aim_keywords(limit: int = 18) -> frozenset[str]:
 
 
 def load_repo_state() -> str:
-    if not REPO_STATE_PATH.exists():
-        return ""
     try:
-        state = json.loads(REPO_STATE_PATH.read_text(encoding="utf-8"))
+        return render_state(json.loads(REPO_STATE_PATH.read_text(encoding="utf-8"))) if REPO_STATE_PATH.exists() else ""
     except (OSError, json.JSONDecodeError):
         return ""
-
-    lines = [f"[repo_state | {state.get('generated_at', 'unknown')} | {state.get('schema', 'legacy')}]"]
-
-    transform = state.get("transform")
-    if isinstance(transform, dict):
-        lines.append(
-            "transform: {} +{} ~{} -{}".format(
-                "baseline" if transform.get("baseline") else "delta",
-                len(transform.get("added") or []),
-                len(transform.get("changed") or []),
-                len(transform.get("removed") or []),
-            )
-        )
-
-    candidates = []
-    for name, repo in state.get("per_repo", {}).items():
-        git = repo.get("git", {})
-        tracked_dirty = sum(
-            bool(row.get("tracked")) for row in (git.get("worktree") or [])
-            if isinstance(row, dict)
-        )
-        ahead = int(git.get("ahead") or 0)
-        behind = int(git.get("behind") or 0)
-        if ahead or tracked_dirty:
-            candidates.append(
-                f"{name}:{git.get('branch', '?')} {ahead}↑/{behind}↓, "
-                f"{tracked_dirty} tracked dirty"
-            )
-    lines.append("body: " + ("; ".join(candidates) if candidates else "at canonical rest"))
-
-    for row in (state.get("pressure") or [])[:6]:
-        if not isinstance(row, dict):
-            continue
-        lines.append(
-            f"pressure: {row.get('source')} [{row.get('phase')}] — {row.get('why')}"
-        )
-    if r := state.get("lineage"):
-        lines.append(f"lineage: prompt→{'response→' if r.get('response') else ''}body — {r['repo']} {r['commit']} {r['status']}; {len(r['paths'])} path(s)")
-
-    if p := state.get("public_body"):
-        lines.append("public-body: " + str(p.get("summary") or "unmapped"))
-    return "\n".join(lines)
 
 
 def private_strings(node: Any) -> list[str]:
