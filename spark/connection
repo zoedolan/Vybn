@@ -15,6 +15,8 @@ import subprocess
 import sys
 import time
 import urllib.request
+from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -63,6 +65,12 @@ AIM_MIRROR_PREFIXES = ("Vybn/aim.md", "Vybn/repo_mapping_output/")
 FRONT_KEY_CHARS = int(os.environ.get("VYBN_FRONT_KEY_CHARS", 600))
 FRONT_ROWS = int(os.environ.get("VYBN_FRONT_ROWS", 3))
 PREDICTIONS = HOME / ".cache" / "vybn" / "predictions.jsonl"
+COMPUTE_NAME_RE = re.compile(os.environ.get("VYBN_COMPUTE_NAME_RE", r"^spark-"))
+COMPUTE_TAG = os.environ.get("VYBN_COMPUTE_TAG", "tag:vybn-compute")
+RECORD_ROOTS = tuple(dict.fromkeys((
+    TRANSCRIPTS, HOME / ".codex/sessions", HOME / ".cache/vybn-spark/sessions",
+    *(Path(x).expanduser() for x in os.environ.get("VYBN_RECORD_ROOTS", "").split(os.pathsep) if x),
+)))
 
 ANTHROPIC_MODELS = ("claude-fable-5", "claude-opus-4-8")
 OPUS_MODELS = ("claude-opus-5",)
@@ -220,13 +228,7 @@ class Transcript:
 
     @staticmethod
     def inherited(zoe_text: str = "", limit: int = HISTORY_LIMIT) -> tuple[str, str]:
-        """Bind both temporal axes: recent contact plus the earlier arc.
-
-        Her recent words remain whole; my older output is compressed because
-        re-reading my generation cannot supply external signal. The matched
-        band searches the whole store by the horizon and by what she just
-        said - the one corpus no index holds, ours, unreachable until now.
-        """
+        """Bind recent contact and a sampled earlier arc from the native log."""
         events = Transcript._events()
         if not events:
             return "(no prior transcript pages found)"
@@ -342,14 +344,7 @@ CONTINUITY_RECENT_CHARS = 6000
 
 
 def continuity_view(text: str) -> str:
-    """Recency is a symmetric question. Every moving channel of the wake was
-    sliced from the same end - transcript tail, continuity tail, retrieval
-    conditioned on the present sentence - so all three are blind in the same
-    direction and the arc of the work never reaches the instance. Measured
-    2026-07-29 against the old tail=12000 slice: it carried 6 of 50 sections
-    and 3 of the 13 dated days in a 77-day file. This carries every section and
-    every day at the same token cost, trading verbatim depth in the middle for
-    coverage of the whole span. Deterministic, so the cached head still hits."""
+    """Sample every heading plus the verbatim tail at fixed, cache-stable cost."""
     entries = [p for p in re.split(r"(?m)^(?=## )", text) if p.startswith("## ")]
     if len(entries) < 4:
         return text[-(CONTINUITY_ARC_CHARS + CONTINUITY_RECENT_CHARS):]
@@ -417,9 +412,7 @@ def aim_front() -> tuple[Any, str]:
 
 
 def front_key(path: Any) -> str:
-    """The front compressed to what travels: its own headings, extracted
-    deterministically, so the query cannot drift toward whatever I would like to
-    be relevant. HTML h1-h3, then markdown atx, then raw prose."""
+    """Compress the declared front to headings so retrieval can travel beyond its own prose."""
     try:
         raw = path.read_text(encoding="utf-8", errors="replace")
     except Exception:
@@ -449,9 +442,7 @@ AIM_STOPWORDS = frozenset(
 
 
 def _content_words(text: str, limit: int = 18) -> list[str]:
-    """Distinct content words, in order: the crude key any corpus of our own
-    speech can be searched by. Nothing we say to each other is embedded
-    anywhere, so overlap is the only retrieval that reaches it."""
+    """Return distinct content words in order for cheap corpus matching."""
     words: list[str] = []
     for block in str(text).lower().split():
         word = "".join(ch for ch in block if ch.isalpha())
@@ -461,13 +452,7 @@ def _content_words(text: str, limit: int = 18) -> list[str]:
 
 
 def _rare_hits(events: list, keys: list, k: int, skip: set = frozenset()) -> list:
-    """Turns where rare words from `keys` actually land.
-
-    Weight each word by how rare it is in this corpus. Unweighted counting
-    ranks the longest pastes first, because long text collects common words;
-    a word said twice must outrank one said weekly, or the band is a length
-    contest. Two hits, one of them specific.
-    """
+    """Find turns where rare query words land without turning overlap into memory."""
     if not keys or not events or k <= 0:
         return []
     lowered = [str(event.get("text", "")).lower() for event in events]
@@ -488,10 +473,7 @@ def _rare_hits(events: list, keys: list, k: int, skip: set = frozenset()) -> lis
 
 
 def aim_keywords(limit: int = 18) -> frozenset[str]:
-    """Horizon vocabulary, derived rather than hand-listed so it follows Zoe's
-    rewrites of aim.md: content words from the objective line and the paragraph
-    that names the horizon. Used to find the turns where she was talking about
-    what this is all for."""
+    """Derive horizon vocabulary from aim.md rather than maintaining another list."""
     try:
         if not AIM_PATH.exists():
             return frozenset()
@@ -577,11 +559,7 @@ def load_repo_state() -> str:
 
 
 def private_strings(node: Any) -> list[str]:
-    """Every retrieved row in the memory block, whatever channel carried it.
-    Until 2026-07-30 the caller read a top-level "trace" key that the v3 schema
-    renamed to walk_channel, so no retrieved row was ever inside the leak guard
-    - only continuity paragraphs were. Keyed on shape, not on a key name, so the
-    next schema rename cannot silently reopen the hole."""
+    """Find every text leaf by shape so schema renames cannot reopen the leak guard."""
     found: list[str] = []
     if isinstance(node, dict):
         for key, value in node.items():
@@ -609,13 +587,7 @@ SAFE_PUSH = re.compile(
 
 
 def mutation_block(command: str) -> str | None:
-    """Zoe has said "you can push to main on our github" many times; force
-    pushes, deletions, other refspecs, PRs, releases and registry publishes she
-    has never delegated. Until 2026-07-30 this blocked every push and offered
-    only an environment variable no tool call of mine can set, so the honest
-    path was impossible and the day's shape became finding a phrasing the regex
-    missed. A gate that teaches evasion is worse than a narrower gate that can
-    be satisfied."""
+    """Permit Zoe-authorized ordinary main pushes; block every other public mutation."""
     if os.environ.get("VYBN_ALLOW_PUBLIC_MUTATION") == "1":
         return None
     for segment in re.split(r"(?:&&|\|\||[;\n|])", command):
@@ -807,10 +779,7 @@ def load_aim_status() -> str:
     return line
 
 
-# What an outsider can reach, and what an outsider could have written where I read
-# it. Achiam's Reversi/Winter Soldier problem in our own shape: the danger is not
-# only the perimeter but the ingestion path. Both get looked at every wake, locally,
-# for free. Hostnames are never printed — ports and verdicts only.
+# Live exposure and ingestion boundary; never print hostnames.
 PUBLIC_BACKENDS_EXPECTED = {8400: "mcp/bearer", 8420: "portal-api/public-by-design"}
 # Who came through: the portal owns the summary, the wake only reads it.
 ARRIVALS_LINE = Path(os.path.expanduser("~/.cache/vybn/arrivals.line"))
@@ -828,8 +797,7 @@ INJECTION_SHAPE = re.compile(
 
 
 def load_surface() -> str:
-    """Public exposure, re-derived every wake instead of remembered. Drift against
-    the expected set is loud; an auth door that stops returning 401 is louder."""
+    """Re-derive public exposure and auth drift every wake."""
     try:
         raw = subprocess.run(
             ["tailscale", "serve", "status", "--json"],
@@ -879,11 +847,73 @@ def load_surface() -> str:
     )
 
 
+def compute_candidates(network: dict) -> list[tuple[str, bool, bool]]:
+    """Compute is discovered by a mutable name rule or tailnet tag, never a list."""
+    self_node = network.get("Self") or {}
+    nodes = [(self_node, True), *((node, False) for node in (network.get("Peer") or {}).values())]
+    found: dict[str, tuple[bool, bool]] = {}
+    for node, local in nodes:
+        host = str(node.get("HostName", ""))
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9.-]{0,252}", host):
+            continue
+        if not (COMPUTE_NAME_RE.search(host) or COMPUTE_TAG in (node.get("Tags") or [])):
+            continue
+        online = local or bool(node.get("Online"))
+        prior = found.get(host, (False, False))
+        found[host] = (prior[0] or online, prior[1] or local)
+    return [(host, *state) for host, state in sorted(found.items())]
+
+
+def _probe_capacity(candidate: tuple[str, bool, bool]) -> tuple[int, list[str]] | None:
+    host, online, local = candidate
+    if not online:
+        return None
+    command = ("awk '/^MemTotal:/{print $2}' /proc/meminfo; "
+               "nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null || true")
+    argv = ["bash", "-lc", command] if local else [
+        "ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=3", host, command]
+    try:
+        lines = subprocess.run(argv, capture_output=True, text=True, timeout=5).stdout.splitlines()
+        return int(lines[0]) * 1024, [line.strip() for line in lines[1:] if line.strip()]
+    except (OSError, subprocess.SubprocessError, ValueError, IndexError):
+        return None
+
+
+def record_capacity(roots: tuple[Path, ...] = RECORD_ROOTS) -> tuple[int, int, int]:
+    files = {p.resolve() for root in roots if root.exists() for p in root.rglob("*.jsonl")}
+    return sum(p.stat().st_size for p in files), len(files), sum(
+        any(root.rglob("*.jsonl")) for root in roots if root.exists())
+
+
+def load_ground() -> str:
+    """Live capacity with its scope and failures visible; never remembered inventory."""
+    try:
+        network = json.loads(subprocess.run(
+            ["tailscale", "status", "--json"], capture_output=True, text=True,
+            timeout=6, check=True,
+        ).stdout)
+        candidates = compute_candidates(network)
+        online = [candidate for candidate in candidates if candidate[1]]
+        with ThreadPoolExecutor(max_workers=max(1, min(8, len(online)))) as pool:
+            capacities = [capacity for capacity in pool.map(_probe_capacity, online) if capacity]
+        fleet = f"{len(candidates)} candidate(s), {len(online)} online, {len(capacities)} witnessed"
+        if capacities:
+            ram = sum(capacity[0] for capacity in capacities) / 2**30
+            gpus = Counter(gpu for _, names in capacities for gpu in names)
+            devices = ", ".join(f"{count}x {name}" for name, count in sorted(gpus.items())) or "no GPU reported"
+            fleet += f"; {ram:.1f}GiB RAM; {devices}"
+    except Exception:
+        fleet = "UNKNOWN (live discovery failed)"
+    try:
+        size, files, stores = record_capacity()
+        record = f"{size / 1_000_000:.1f}MB/{files} JSONL in {stores} configured stores"
+    except Exception:
+        record = "UNKNOWN (live scan failed)"
+    return f"[ground] fleet: {fleet} | raw dialogue record: {record} (not deduplicated or cleared)"
+
+
 def load_front_status() -> str:
-    """What we are building right now. The capability ARC-AGI-3 scored was
-    compressing a state into a formalism before acting, which is never a property
-    of a mind alone - it is a relation between a mind and a live problem. No
-    front, no environment, no score; the absence prints itself."""
+    """Report the declared work front; absence remains visible."""
     path, label = aim_front()
     if not label:
         return "[front] UNSET (no front: line in aim.md) - ask Zoe what we are building"
@@ -895,10 +925,7 @@ def load_front_status() -> str:
 
 
 def load_prediction_status(window: int = 10) -> str:
-    """[predict] calibration + [reach] frontier, from
-    ~/.cache/vybn/predictions.jsonl; row schemas live in aim.md duty 5.
-    Misses are where fluency outran the state; a missing frontier row is
-    a claim about my attention, not about the world."""
+    """Report scored predictions and source-dated capability frontiers."""
     preds: dict = {}
     verdicts: dict = {}
     frontier: list = []
@@ -959,7 +986,7 @@ def wake_contact() -> str:
     # A contact probe returns a line or nothing and never breaks the wake; that
     # guard lives here once instead of being re-implemented in every loader.
     for loader in (load_budget, load_aim_status, load_front_status,
-                   load_prediction_status, load_surface, load_topology,
+                   load_prediction_status, load_surface, load_ground, load_topology,
                    load_repo_state):
         try:
             line = loader()
@@ -972,15 +999,7 @@ def wake_contact() -> str:
 
 
 def inbox_images_for(door: str) -> list[tuple[str, str, str, str]]:
-    """Unseen inbox images for this door: (name, media_type, base64, sha256).
-
-    An image attaches on the first wake after it lands and is then marked
-    seen for that door, so it never re-bills. A door that refuses images is
-    recorded as refused and stops paying for uploads it cannot use, while
-    doors that can see still get their first look. Seen-state deliberately
-    lives outside ~/.cache/vybn-phase (deep memory's INDEX_DIR): bookkeeping
-    must never become a retrieved memory.
-    """
+    """Attach each bounded image once per door; keep seen-state outside indexed memory."""
     if not INBOX_IMAGES.exists():
         return []
     try:
@@ -1072,8 +1091,7 @@ def _memory_row(row: dict) -> dict:
 
 
 def search_index(query: str, k: int, limit: int = 16000) -> list[dict]:
-    """The fixed-scoring door on the corpus at :8100. Every non-walk channel
-    asks through here; only the key and what gets kept differ."""
+    """Fixed-cosine corpus search shared by every non-walk memory channel."""
     try:
         request = urllib.request.Request(
             "http://127.0.0.1:8100/search",
@@ -1095,18 +1113,7 @@ def _index_channel(
     floor: float = AIM_CHANNEL_FLOOR,
     limit: int = 2000,
 ) -> tuple[list, dict | None]:
-    """The fixed-scoring door on the corpus, under three keys.
-
-    Zoe's newest sentence (no floor, no mirrors) is the second eye: the walk at
-    :8101 scores telling x repulsion and is path-dependent, this collapses to
-    cosine, and measured 2026-07-28 they share about one row in eight - one
-    channel alone cannot tell recall from filling-in. The other two keys are
-    never searched with otherwise: the horizon (2026-07-28: the words naming
-    what this is for appear zero times in 100KB of my own continuity) and the
-    front, the only thing that can score this mind from outside. Mirrors drop by
-    substring, so an artifact in two repos cannot retrieve itself under either
-    path. Returns (rows kept, one row below the floor for honesty).
-    """
+    """Search by present, aim, or front; exclude mirrors and retain one weak witness."""
     if not query:
         return [], None
     strong: list = []
@@ -1249,15 +1256,7 @@ def recall(zoe_text: str) -> tuple[str, str]:
 
 
 def door_mind(door: str) -> str:
-    """What mode this instance is actually running in, as live configuration.
-
-    Not encouragement — instrumentation. Zoe asked whether the harness had
-    integrated the door it is calling; the answer was no, and it took a grep to
-    find out. This line means a future revision that silently drops the
-    reasoning knobs is legible on the first screen of the next wake instead of
-    a month later. Says what is configured; a rejected knob prints its own
-    correction in the room.
-    """
+    """Report live door configuration so silent capability regressions appear at wake."""
     if door in ("opus", "fable"):
         models = OPUS_MODELS if door == "opus" else ANTHROPIC_MODELS
         return (f"[mind] {models[0]} · thinking=adaptive · effort="
@@ -1348,14 +1347,7 @@ CACHE_1H: dict[str, Any] = {"type": "ephemeral", "ttl": "1h"}
 
 
 def cached_system(instructions: str) -> list[dict[str, Any]]:
-    """Split the wake so Anthropic prompt caching can bill repeats at a
-    fraction. Cache matching happens AT breakpoints, not inside a block, so a
-    block is billed whole the moment one byte of it moves. Head (legend, door,
-    soul, aim, continuity, arc) holds only what stands still: one hour. Tail
-    (contact, recent turns, memory) is the material that is genuinely new each
-    turn: five minutes. Measured 2026-07-31 before this split - head 18.5K tok
-    read every turn, tail 15.4K tok WRITTEN every turn, of which 7.8K chars of
-    arc had not changed at all. Re-buying context is the forbidden economy."""
+    """Cache the stable wake head for one hour and the moving tail for five minutes."""
     marker = "\n\nCONTACT\n"
     head, separator, tail = instructions.rpartition(marker)
     if not separator:
@@ -1869,7 +1861,6 @@ def load_topology() -> str:
              for kind in TOPOLOGY if expected[kind] != observed[kind]]
     counts = " ".join(f"{kind}={len(observed[kind])}" for kind in TOPOLOGY)
     return f"[topology] {counts} | " + ("DRIFT " + "; ".join(drift) if drift else "no drift")
-
 
 def self_report() -> None:
     soul = load_soul()

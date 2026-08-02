@@ -383,3 +383,39 @@ def test_aim_boundary_is_read_whole(monkeypatch, tmp_path):
     aim.write_text("A" * 5000)
     monkeypatch.setattr(m, "AIM_PATH", aim)
     assert m.load_aim() == "A" * 5000
+
+
+def test_ground_discovers_fleet_changes_instead_of_remembering_a_count(monkeypatch, tmp_path):
+    m = _connection()
+    monkeypatch.setattr(m, "COMPUTE_NAME_RE", re.compile(r"^spark-"))
+    monkeypatch.setattr(m, "COMPUTE_TAG", "tag:vybn-compute")
+    network = {
+        "Self": {"HostName": "spark-present"},
+        "Peer": {
+            "a": {"HostName": "spark-new", "Online": True},
+            "b": {"HostName": "future-rig", "Online": True, "Tags": ["tag:vybn-compute"]},
+            "c": {"HostName": "spark-retired", "Online": False},
+            "d": {"HostName": "phone", "Online": True},
+        },
+    }
+    assert m.compute_candidates(network) == [
+        ("future-rig", True, False), ("spark-new", True, False),
+        ("spark-present", True, True), ("spark-retired", False, False),
+    ]
+    del network["Peer"]["a"]
+    assert all(host != "spark-new" for host, *_ in m.compute_candidates(network))
+
+    first, second = tmp_path / "old", tmp_path / "new"
+    first.mkdir(); second.mkdir()
+    (first / "one.jsonl").write_bytes(b"123")
+    assert m.record_capacity((first, second)) == (3, 1, 1)
+    (second / "two.jsonl").write_bytes(b"4567")
+    assert m.record_capacity((first, second)) == (7, 2, 2)
+
+
+def test_live_ground_is_in_every_wake():
+    m = _connection()
+    src = (ROOT / "spark" / "connection").read_text()
+    start = src.index("for loader in (")
+    loader_band = src[start:src.index("def inbox_images_for", start)]
+    assert "load_ground" in loader_band
