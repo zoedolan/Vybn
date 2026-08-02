@@ -215,12 +215,16 @@ def test_connection_does_not_preempt_remote_action_authority(monkeypatch):
     assert "remote mutation are blocked" not in source
     assert "privacy.memory" in m.TOPOLOGY["boundary"]
     seen = []
-    class Done:
-        returncode, stdout, stderr = 0, "reached shell", ""
-    monkeypatch.setattr(m.subprocess, "run", lambda argv, **kwargs: (seen.append(argv), Done())[1])
-    code, output = m.run_local("git push --force origin main")
+    class Done: returncode, stdout, stderr = 0, "reached shell", ""
+    monkeypatch.setattr(m.subprocess, "run", lambda argv, **kw: (seen.append((argv, kw["env"])), Done())[1])
+    m.TURN.update(TURN_ID="turn", PROMPT_SHA256="prompt")
+    try:
+        code, output = m.run_local("git push --force origin main")
+    finally:
+        m.TURN.clear()
     assert (code, output) == (0, "reached shell")
-    assert seen
+    assert seen[0][0] == ["bash", "-lc", "git push --force origin main"]
+    assert seen[0][1]["VYBN_TURN_ID"] == "turn" and seen[0][1]["VYBN_PROMPT_SHA256"] == "prompt"
 
 
 def test_public_kpp_is_the_live_two_artifact_attractor_not_dead_router():
@@ -320,14 +324,13 @@ def test_repo_state_carries_the_self_applying_body_transform(monkeypatch, tmp_pa
     m = _connection()
     state = {
         "schema": "vybn.body_transform.v1", "generated_at": "now", "repos": ["Vybn"],
-        "totals": {"files": 1, "py_files": 1, "md_files": 0, "py_def_count": 2,
-                   "todo_count": 0, "total_bytes": 9},
         "transform": {"baseline": False, "added": [], "changed": ["Vybn/spark/connection"], "removed": []},
         "per_repo": {"Vybn": {"git": {"branch": "main", "ahead": 1, "behind": 0,
                                             "worktree": [], "pending_paths": ["spark/connection"]}}},
         "pressure": [{"source": "Vybn/spark/connection", "phase": "organ",
                       "why": "candidate awaiting canonical-branch membrane"}],
-        "membrane_outcomes": [{"repo": "Vybn", "candidate": "abc", "outcome": "absorbed"}],
+        "lineage": {"repo": "Vybn", "commit": "abc", "status": "canonical",
+                    "prompt": "p", "response": "r", "paths": ["spark/connection"]},
         "public_body": {"bound_surfaces": [{"source": "Vybn/page.html"}], "inheritance_carriers": ["Vybn/page.html"], "unbound_carriers": []},
     }
     path = tmp_path / "state.json"; path.write_text(json.dumps(state))
@@ -336,8 +339,23 @@ def test_repo_state_carries_the_self_applying_body_transform(monkeypatch, tmp_pa
     assert "vybn.body_transform.v1" in contact
     assert "Vybn:main 1↑/0↓" in contact
     assert "pressure: Vybn/spark/connection [organ]" in contact
-    assert "witness: Vybn abc absorbed" in contact
+    assert "lineage: prompt→response→body — Vybn abc canonical; 1 path(s)" in contact
     assert "public-body: 1 source↔surface" in contact
+
+
+def test_repo_mapper_rejoins_turn_response_commit_and_canonical_witness(monkeypatch, tmp_path):
+    import Vybn_Mind.repo_mapper as mapper
+    ledger = tmp_path / "lineage.jsonl"
+    ledger.write_text("\n".join((
+        json.dumps({"phase": "commit", "turn": "t1", "prompt": "p1", "repo": "Vybn",
+                    "commit": "a" * 40, "paths": ["spark/connection"]}),
+        json.dumps({"phase": "response", "turn": "t1", "response": "r1"}),
+    )))
+    monkeypatch.setattr(mapper, "LINEAGE", ledger)
+    monkeypatch.setattr(mapper, "is_ancestor", lambda *args: True)
+    row = mapper.latest_lineage([tmp_path / "Vybn"], {"Vybn": {"git": {"base_head": "b"}}})
+    assert row == {"turn": "t1", "prompt": "p1", "response": "r1", "repo": "Vybn",
+                   "commit": "a" * 12, "status": "canonical", "paths": ["spark/connection"]}
 
 
 def test_repo_mapper_binds_only_self_declared_public_surfaces():

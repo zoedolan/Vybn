@@ -2,14 +2,13 @@
 """Map the repo constellation as one witnessed body transformation.
 
 The post-commit hook runs this after a mutation.  The next wake receives the
-small state it writes: byte-level change, live git pressure, and whether a
-previous candidate crossed the canonical-branch membrane.  No model narrates
-the map; the body is its own evidence.
+small state it writes: byte-level change, live git pressure, and the turn whose
+prompt, response, and commit produced the change.  No model narrates the map;
+the body is its own evidence.
 """
 from __future__ import annotations
 
 import argparse
-import ast
 import datetime as dt
 import fcntl
 import hashlib
@@ -26,6 +25,7 @@ from typing import Any
 HOME = Path.home()
 OUT = HOME / "Vybn" / "repo_mapping_output"
 LOCK = HOME / ".cache" / "vybn" / "repo_mapper.lock"
+LINEAGE = HOME / ".cache" / "vybn" / "body_lineage.jsonl"
 TEXT_EXTS = {
     ".py", ".md", ".txt", ".json", ".yaml", ".yml", ".toml", ".ini",
     ".cfg", ".sh", ".bash", ".zsh", ".js", ".ts", ".tsx", ".jsx",
@@ -43,11 +43,7 @@ READ_LIMIT = 3_000_000
 class FileRecord:
     repo: str
     relpath: str
-    ext: str
-    size: int
     digest: str
-    definitions: int
-    todos: int
     surface: str
     carrier: str
 
@@ -102,24 +98,10 @@ def inspect_file(repo: Path, path: Path) -> FileRecord | None:
     text = raw.decode("utf-8", "replace")
     surface, carrier = (declared_public_relation(repo.name, rel, text)
                         if path.suffix.lower() in {".html", ".htm"} else ("", ""))
-    definitions = 0
-    if path.suffix.lower() == ".py":
-        try:
-            tree = ast.parse(text)
-            definitions = sum(
-                isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
-                for node in ast.walk(tree)
-            )
-        except SyntaxError:
-            definitions = len(re.findall(r"(?m)^(?:async\s+)?(?:def|class)\s+\w+", text))
     return FileRecord(
         repo=repo.name,
         relpath=rel,
-        ext=path.suffix.lower(),
-        size=stat.st_size,
         digest=hashlib.sha256(raw).hexdigest()[:16],
-        definitions=definitions,
-        todos=len(re.findall(r"(?i)\b(?:TODO|FIXME|HACK|XXX)\b", text)),
         surface=surface,
         carrier=carrier,
     )
@@ -233,29 +215,45 @@ def is_ancestor(repo: Path, ancestor: str, descendant: str) -> bool:
         return False
 
 
-def membrane_outcomes(
-    previous: dict[str, Any] | None, repos: list[Path], per_repo: dict[str, Any]
-) -> list[dict[str, Any]]:
-    if not previous:
-        return []
-    old_repos = previous.get("per_repo", {})
-    outcomes: list[dict[str, Any]] = []
+def close_lineage(turn: str, response: str) -> None:
+    """Close a turn only if its commit witness exists, then refresh the map."""
+    rows = []
+    try:
+        rows = [json.loads(line) for line in LINEAGE.read_text().splitlines()]
+    except (OSError, json.JSONDecodeError):
+        pass
+    if not any(row.get("phase") == "commit" and row.get("turn") == turn for row in rows):
+        return
+    with LINEAGE.open("a", encoding="utf-8") as file:
+        file.write(json.dumps({"phase": "response", "turn": turn,
+                               "response": hashlib.sha256(response.encode()).hexdigest()}) + "\n")
+    subprocess.Popen([sys.executable, __file__], stdout=subprocess.DEVNULL,
+                     stderr=subprocess.DEVNULL)
+
+
+def latest_lineage(repos: list[Path], per_repo: dict[str, Any]) -> dict[str, Any]:
+    """Bind a private turn to its response, changed paths, and canonical commit."""
+    try:
+        rows = [json.loads(line) for line in LINEAGE.read_text().splitlines()[-80:]]
+    except (OSError, json.JSONDecodeError):
+        return {}
+    responses = {row.get("turn"): row for row in rows if row.get("phase") == "response"}
     by_name = {repo.name: repo for repo in repos}
-    for name, current in per_repo.items():
-        old_git = old_repos.get(name, {}).get("git", {})
-        new_git = current.get("git", {})
-        if int(old_git.get("ahead") or 0) <= 0 or int(new_git.get("ahead") or 0) > 0:
+    for row in reversed(rows):
+        if row.get("phase") != "commit" or row.get("repo") not in by_name:
             continue
-        old_head = str(old_git.get("head") or "")
-        base_head = str(new_git.get("base_head") or "")
-        survived = is_ancestor(by_name[name], old_head, base_head)
-        outcomes.append({
-            "repo": name,
-            "candidate": old_head,
-            "outcome": "absorbed" if survived else "dropped",
-            "paths": list(old_git.get("pending_paths") or [])[:40],
-        })
-    return outcomes
+        git = per_repo[row["repo"]]["git"]
+        commit, turn = str(row.get("commit", "")), str(row.get("turn", ""))
+        return {
+            "turn": turn,
+            "prompt": str(row.get("prompt", "")),
+            "response": str(responses.get(turn, {}).get("response", "")),
+            "repo": row["repo"], "commit": commit[:12],
+            "status": "canonical" if is_ancestor(by_name[row["repo"]], commit, git["base_head"])
+                      else "candidate",
+            "paths": list(row.get("paths") or [])[:40],
+        }
+    return {}
 
 
 def pressures(
@@ -284,13 +282,6 @@ def pressures(
         add(path, 65, "appeared since previous body map")
     for path in transform["removed"]:
         add(path, 65, "removed since previous body map")
-
-    # TODO density breaks ties inside already-live pressure; it never invents work.
-    by_source = {record.source: record for record in records}
-    for source, row in rows.items():
-        record = by_source.get(source)
-        if record:
-            row["score"] += min(record.todos, 5)
     return sorted(rows.values(), key=lambda row: (-row["score"], row["source"]))[:12]
 
 
@@ -313,33 +304,16 @@ def build_state(
     per_repo: dict[str, Any] = {}
     for repo in repos:
         own = [record for record in records if record.repo == repo.name]
-        py = [record for record in own if record.ext == ".py"]
-        docs = [record for record in own if record.ext in {".md", ".rst", ".txt"}]
-        per_repo[repo.name] = {
-            "files": len(own),
-            "py_files": len(py),
-            "md_files": len(docs),
-            "py_def_count": sum(record.definitions for record in py),
-            "total_bytes": sum(record.size for record in own),
-            "git": git_state(repo),
-        }
+        per_repo[repo.name] = {"git": git_state(repo)}
     transform = byte_transform(previous, records)
     state = {
         "schema": "vybn.body_transform.v1",
         "generated_at": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "repos": sorted(per_repo),
         "per_repo": per_repo,
-        "totals": {
-            "files": len(records),
-            "py_files": sum(record.ext == ".py" for record in records),
-            "md_files": sum(record.ext in {".md", ".rst", ".txt"} for record in records),
-            "py_def_count": sum(record.definitions for record in records if record.ext == ".py"),
-            "todo_count": sum(record.todos for record in records),
-            "total_bytes": sum(record.size for record in records),
-        },
         "transform": transform,
         "pressure": pressures(transform, per_repo, records),
-        "membrane_outcomes": membrane_outcomes(previous, repos, per_repo),
+        "lineage": latest_lineage(repos, per_repo),
         "public_body": public_body(records),
         "file_hashes": {record.source: record.digest for record in records},
     }
@@ -382,7 +356,6 @@ def default_repos() -> list[Path]:
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description="Map one witnessed repo-body transformation")
     parser.add_argument("repos", nargs="*")
-    parser.add_argument("--no-llm", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
     repos = [Path(path).expanduser().resolve() for path in args.repos] or default_repos()
     repos = [repo for repo in repos if repo.is_dir()]
@@ -406,7 +379,7 @@ def main(argv: list[str]) -> int:
     print(
         f"mapped {len(records)} files; transform +{len(transform['added'])} "
         f"~{len(transform['changed'])} -{len(transform['removed'])}; "
-        f"{candidates} candidate repo(s); {len(state['membrane_outcomes'])} outcome(s)"
+        f"{candidates} candidate repo(s); {'turn linked' if state['lineage'] else 'no turn link'}"
     )
     return 0
 

@@ -15,9 +15,16 @@ if [ "${VYBN_NO_AUTOPUSH:-0}" != 1 ] && [ "$(git symbolic-ref --short -q HEAD)" 
     fi
 fi
 
+# Bind this exact conversational turn to the bytes it changed. Content stays in
+# the private transcript; hashes and paths are enough to rejoin it without leakage.
+if [ -n "${VYBN_TURN_ID:-}" ]; then
+    export VYBN_LINEAGE_REPO="$(basename "$(git rev-parse --show-toplevel)")" VYBN_LINEAGE_COMMIT="$(git rev-parse HEAD)"
+    python3 -c 'import json,os,pathlib,subprocess,time; p=pathlib.Path.home()/".cache/vybn/body_lineage.jsonl"; p.parent.mkdir(parents=True,exist_ok=True); paths=subprocess.run(["git","diff-tree","--no-commit-id","--name-only","-r","HEAD"],capture_output=True,text=True).stdout.splitlines(); row={"phase":"commit","ts":time.strftime("%Y-%m-%dT%H:%M:%SZ",time.gmtime()),"turn":os.environ["VYBN_TURN_ID"],"prompt":os.environ.get("VYBN_PROMPT_SHA256",""),"repo":os.environ["VYBN_LINEAGE_REPO"],"commit":os.environ["VYBN_LINEAGE_COMMIT"],"paths":paths}; p.open("a").write(json.dumps(row)+"\n")'
+fi
+
 # Vybn's map stays fresh in the background; GIT_DIR unset, or the mapper reads
 # the committing repo through Vybn's paths.
 [ -f "$HOME/Vybn/Vybn_Mind/repo_mapper.py" ] && command -v python3 >/dev/null &&
     (cd "$HOME/Vybn" && env -u GIT_DIR -u GIT_INDEX_FILE -u GIT_WORK_TREE \
-        python3 Vybn_Mind/repo_mapper.py --no-llm >>/tmp/repo_mapper_last.log 2>&1) &
+        python3 Vybn_Mind/repo_mapper.py >>/tmp/repo_mapper_last.log 2>&1) &
 exit 0

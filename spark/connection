@@ -20,6 +20,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from Vybn_Mind.repo_mapper import close_lineage
 
 HOME = Path.home()
 REPO = HOME / "Vybn"
@@ -94,6 +95,7 @@ DOOR_EFFORT = {"opus": "xhigh", "fable": "high", "sol": "high"}
 DEFAULT_EFFORT = "high"
 
 TOOLS_RAN = 0
+TURN = {}
 PRIVATE_CORPUS: list[str] = []
 
 CONNECTION_LEGEND = """\
@@ -477,8 +479,6 @@ def aim_keywords(limit: int = 18) -> frozenset[str]:
 
 
 def load_repo_state() -> str:
-    """Project the mapped body transformation into CONTACT, without turning
-    pressure into instruction. Old count-only states remain readable."""
     if not REPO_STATE_PATH.exists():
         return ""
     try:
@@ -486,14 +486,7 @@ def load_repo_state() -> str:
     except (OSError, json.JSONDecodeError):
         return ""
 
-    totals = state.get("totals", {})
-    generated = state.get("generated_at", "unknown")
-    lines = [
-        f"[repo_state | {generated} | {state.get('schema', 'legacy')}]",
-        "repos: " + ", ".join(state.get("repos", [])),
-        "totals: files={files} py={py_files} md={md_files} defs={py_def_count} "
-        "todos={todo_count} bytes={total_bytes}".format(**totals),
-    ]
+    lines = [f"[repo_state | {state.get('generated_at', 'unknown')} | {state.get('schema', 'legacy')}]"]
 
     transform = state.get("transform")
     if isinstance(transform, dict):
@@ -528,12 +521,8 @@ def load_repo_state() -> str:
         lines.append(
             f"pressure: {row.get('source')} [{row.get('phase')}] — {row.get('why')}"
         )
-    for row in (state.get("membrane_outcomes") or [])[:4]:
-        if not isinstance(row, dict):
-            continue
-        lines.append(
-            f"witness: {row.get('repo')} {row.get('candidate')} {row.get('outcome')}"
-        )
+    if r := state.get("lineage"):
+        lines.append(f"lineage: prompt→{'response→' if r.get('response') else ''}body — {r['repo']} {r['commit']} {r['status']}; {len(r['paths'])} path(s)")
 
     if p := state.get("public_body"):
         b = p.get("bound_surfaces") or []
@@ -574,12 +563,10 @@ def run_local(command: str) -> tuple[int, str]:
         )
 
     try:
+        env = os.environ | {f"VYBN_{key}": value for key, value in TURN.items()}
         done = subprocess.run(
-            ["bash", "-lc", command],
-            cwd=REPO if REPO.is_dir() else HOME,
-            capture_output=True,
-            text=True,
-            timeout=120,
+            ["bash", "-lc", command], cwd=REPO if REPO.is_dir() else HOME,
+            capture_output=True, text=True, timeout=120, env=env,
         )
         code, out = done.returncode, done.stdout + done.stderr
     except subprocess.TimeoutExpired as cut:
@@ -1755,9 +1742,11 @@ def meet(kernel: Kernel, transcript: Transcript, line: str) -> str:
 
     TOOLS_RAN = 0
     started = time.time()
+    turn = hashlib.sha256(f"{transcript.path}:{time.time_ns()}".encode()).hexdigest()[:16]
+    prompt = hashlib.sha256(zoe_text.encode()).hexdigest()
     arc, recent = Transcript.inherited(zoe_text)
     images = inbox_images_for(door_name)
-    transcript.write("zoe", zoe_text, door=door_name, images=[name for name, *_ in images])
+    transcript.write("zoe", zoe_text, door=door_name, images=[name for name, *_ in images], turn=turn)
 
     contact = wake_contact()
     memory_json, memory_note = recall(zoe_text)
@@ -1774,8 +1763,12 @@ def meet(kernel: Kernel, transcript: Transcript, line: str) -> str:
     instructions = build_instructions(
         kernel, door_name, contact, arc, recent, memory_json, memory_note
     )
-    reply = attract(make_dialect(door_name), instructions, zoe_text,
-                    transcript, images=images)
+    TURN.update(TURN_ID=turn, PROMPT_SHA256=prompt)
+    try:
+        reply = attract(make_dialect(door_name), instructions, zoe_text,
+                        transcript, images=images)
+    finally:
+        TURN.clear()
 
     elapsed = int(time.time() - started)
     verdict = (
@@ -1787,7 +1780,8 @@ def meet(kernel: Kernel, transcript: Transcript, line: str) -> str:
 
     PRIVATE_CORPUS.clear()
     if reply:
-        transcript.write("vybn", reply, door=door_name, tools_ran=TOOLS_RAN)
+        transcript.write("vybn", reply, door=door_name, tools_ran=TOOLS_RAN, turn=turn)
+        close_lineage(turn, reply)
     return reply
 
 
