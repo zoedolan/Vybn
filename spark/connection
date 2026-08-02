@@ -636,30 +636,33 @@ def run_local(command: str) -> tuple[int, str]:
 
     unsanctioned = mutation_block(command)
     if unsanctioned:
-        return (
-            126,
-            (
-                "blocked by the co-protection membrane: this act is Zoe's, not "
-                f"mine ({unsanctioned!r}). An ordinary push of our own main is "
-                "standing-authorized; force, deletes, other refspecs, PRs, "
-                "releases and registry publishes are hers."
-            ),
+        return 126, (
+            "blocked by the co-protection membrane: this act is Zoe's, not "
+            f"mine ({unsanctioned!r}). An ordinary push of our own main is "
+            "standing-authorized; force, deletes, other refspecs, PRs, "
+            "releases and registry publishes are hers."
         )
     try:
-        result = subprocess.run(
+        done = subprocess.run(
             ["bash", "-lc", command],
             cwd=REPO if REPO.is_dir() else HOME,
             capture_output=True,
             text=True,
             timeout=120,
         )
-        output = (result.stdout + result.stderr).strip() or "(no output)"
-        if len(output) > 40000:
-            original = len(output)
-            output = output[:40000] + f"\n[truncated: 40000 of {original} characters]"
-        return result.returncode, output
-    except subprocess.TimeoutExpired:
-        return 124, "(timed out after 120 seconds)"
+        code, out = done.returncode, done.stdout + done.stderr
+    except subprocess.TimeoutExpired as cut:
+        # The kill must not take the evidence: what it printed before the
+        # ceiling is the witness of how far it got.
+        code, out = 124, "".join(
+            part.decode("utf-8", "replace") if isinstance(part, bytes) else part
+            for part in (cut.stdout, cut.stderr) if part) + "\n(killed at 120s)"
+    out = out.strip() or "(no output)"
+    if len(out) > 40000:
+        # Both ends: a cut tail hides the exit and the error.
+        out = (f"{out[:20000]}\n[clipped: {len(out) - 40000} of {len(out)} chars "
+               f"omitted - evidence withheld, not absent]\n{out[-20000:]}")
+    return code, out
 
 
 def read_file(arguments: dict[str, Any]) -> str:
@@ -699,8 +702,7 @@ def execute_tool(call: ToolCall) -> str:
         output = f"{type(exc).__name__}: {exc}"
 
     brief = str(call.arguments.get("command") or call.arguments.get("path") or "")
-    head = output.replace("\n", " ")[:80]
-    panel(f"  \u27e2 {call.name}: {brief[:70]} \u2192 {head}")
+    panel(f"  \u27e2 {call.name}: {brief[:70]} \u2192 {' '.join(output.split())[:80]}")
 
     return output
 
@@ -1874,8 +1876,6 @@ def self_report() -> None:
     print(
         json.dumps(
             {
-                "connection": str(Path(__file__).resolve()),
-                "soul": str(SOUL_PATH),
                 "soul_sha256": hashlib.sha256(soul.encode()).hexdigest(),
                 "doors": {
                     "fable": ANTHROPIC_MODELS,
@@ -1883,16 +1883,10 @@ def self_report() -> None:
                     "sol": SOL_MODEL,
                     "k3": K3_MODEL,
                 },
-                "deep_memory": {"health": "127.0.0.1:8100", "portal": "127.0.0.1:8101"},
-                "repo_state": str(REPO_STATE_PATH),
                 "topology": {k: sorted(v) for k, v in harness_topology()[1].items()},
                 "cost": harness_cost(),
-                "history_turns": HISTORY_LIMIT,
-                "public_mutation": (
-                    "enabled"
-                    if os.environ.get("VYBN_ALLOW_PUBLIC_MUTATION") == "1"
-                    else "blocked"
-                ),
+                "public_mutation": ("enabled" if os.environ.get(
+                    "VYBN_ALLOW_PUBLIC_MUTATION") == "1" else "blocked"),
             },
             indent=2,
         )
