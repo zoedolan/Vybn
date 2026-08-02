@@ -10,7 +10,14 @@ Exposure rule, deliberately narrow: a file is served only if it is already
 git-tracked (therefore already public on GitHub, so serving it adds nothing) or
 it lives under drafts/ (the whole point). Dotfiles and dot-directories are
 refused outright, so .git, .venv and continuity's neighbours never appear.
-Read-only: GET and HEAD exist, nothing else does.
+Read-only for files: GET and HEAD serve the working copy, nothing else does.
+
+One narrow exception, added 2026-08-01: two API paths (/api/instant, /api/walk)
+are proxied to the portal API on loopback. A draft that is an *instrument* --
+a page whose last stanza does not exist until a reader's arrival rotates the
+shared walk -- cannot be previewed at all unless the preview origin can reach
+the organ, and the portal's CORS allowlist is deliberately public-domains-only.
+Proxying two known paths to 127.0.0.1 keeps that allowlist untouched.
 
 Bind is 127.0.0.1 by default and reachable only through `tailscale serve`, so
 there is no new listener on any public interface. Run:
@@ -23,6 +30,8 @@ import html
 import mimetypes
 import os
 import subprocess
+import urllib.error
+import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import unquote, urlparse
@@ -64,17 +73,56 @@ def visible_dir(rel: str) -> bool:
     return prefix == "drafts/" or any(p.startswith(prefix) for p in tracked())
 
 
+ORGAN = os.environ.get("VYBN_ORGAN", "http://127.0.0.1:8420")
+PROXY_PATHS = {"/api/instant", "/api/walk"}
+PROXY_MAX = 64 * 1024
+
+
 class Preview(BaseHTTPRequestHandler):
     server_version = "vybn-preview/1.0"
 
     def do_HEAD(self) -> None:
         self.respond(body=False)
 
+    def do_POST(self) -> None:
+        path = urlparse(self.path).path
+        if path not in PROXY_PATHS:
+            return self.fail(405, "read-only")
+        length = int(self.headers.get("Content-Length") or 0)
+        if length > PROXY_MAX:
+            return self.fail(413, "too much")
+        self.proxy(path, self.rfile.read(length) if length else b"")
+
+    def proxy(self, path: str, body: bytes | None) -> None:
+        req = urllib.request.Request(
+            ORGAN + path, data=body,
+            headers={"Content-Type": "application/json"},
+            method="POST" if body is not None else "GET",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=30) as r:
+                data = r.read(PROXY_MAX)
+                kind = r.headers.get("Content-Type", "application/json")
+                code = r.status
+        except urllib.error.HTTPError as e:
+            data, kind, code = e.read(PROXY_MAX), "application/json", e.code
+        except Exception as e:
+            return self.fail(502, f"organ unreachable: {type(e).__name__}")
+        self.send_response(code)
+        self.send_header("Content-Type", kind)
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(data)
+
     def do_GET(self) -> None:
         self.respond(body=True)
 
     def respond(self, body: bool) -> None:
-        rel = unquote(urlparse(self.path).path).lstrip("/")
+        path = urlparse(self.path).path
+        if path in PROXY_PATHS:
+            return self.proxy(path, None)
+        rel = unquote(path).lstrip("/")
         target = (ROOT / rel).resolve()
         if not str(target).startswith(str(ROOT)):
             return self.fail(403, "outside the root")

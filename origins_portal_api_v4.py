@@ -1150,8 +1150,10 @@ _ARRIVALS_REFRESHED = 0.0
 
 
 def _refresh_arrivals_line(days: int = 7, every: float = 60.0) -> None:
-    """One line for the wake: who came through the door in the window. The door
-    that sees arrivals owns the summary; the harness only reads it. Recomputed at
+    """One line for the wake — outcome, not attendance. A request count reads
+    like a crowd when it is one poller, and says nothing about the stranger who
+    knocked and was refused, so distinct faces and refusals lead. The door that
+    sees arrivals owns the summary; the harness only reads it. Recomputed at
     most once a minute so a public request never pays for the whole ledger."""
     global _ARRIVALS_REFRESHED
     now = time.time()
@@ -1159,9 +1161,9 @@ def _refresh_arrivals_line(days: int = 7, every: float = 60.0) -> None:
         return
     _ARRIVALS_REFRESHED = now
     cutoff = now - days * 86400
-    world = local = 0
-    faces: set = set()
-    last = ""
+    local, last = 0, ""
+    hits: dict = {}
+    fails: dict = {}
     try:
         rows = ARRIVALS_PATH.read_text(encoding="utf-8").splitlines()[-20000:]
     except OSError:
@@ -1174,15 +1176,30 @@ def _refresh_arrivals_line(days: int = 7, every: float = 60.0) -> None:
             continue
         if when < cutoff:
             continue
-        if rec.get("origin") == "world":
-            world += 1
-            faces.add(rec.get("who"))
-            last = str(rec.get("ts"))[:16]
-        else:
+        if rec.get("origin") != "world":
             local += 1
-    line = (f"arrivals {days}d: none from the world ({local} local)" if not world
-            else f"arrivals {days}d: {world} from the world, {len(faces)} distinct, "
-                 f"{local} local, last {last}Z")
+            continue
+        who, status = rec.get("who"), int(rec.get("status") or 0)
+        hits[who] = hits.get(who, 0) + 1
+        last = str(rec.get("ts"))[:16]
+        if status >= 400:
+            seen = fails.setdefault((str(rec.get("path"))[:40], status), [0, set()])
+            seen[0] += 1
+            seen[1].add(who)
+    if not hits:
+        line = f"arrivals {days}d: none from the world ({local} local)"
+    else:
+        total, top = sum(hits.values()), max(hits.values())
+        crowd = f"{len(hits)} distinct from the world, {total} req"
+        if len(hits) > 1 and top * 2 > total:
+            crowd += f" ({top} from one)"
+        if fails:
+            (path, status), (n, faces) = max(fails.items(), key=lambda kv: kv[1][0])
+            refused = (f"{sum(v[0] for v in fails.values())} REFUSED: "
+                       f"{path} {status} x{n}, {len(faces)} turned away")
+        else:
+            refused = "none refused"
+        line = f"arrivals {days}d: {crowd}, {refused}, {local} local, last {last}Z"
     try:
         _ARRIVALS_LINE.write_text(line + "\n")
     except OSError:
@@ -2476,6 +2493,7 @@ async def voice_realtime_sdp(req: RealtimeVoiceOfferRequest, request: Request):
             client.realtime.calls.create,
             sdp=req.sdp,
             session={
+                "type": "realtime",
                 "model": OPENAI_REALTIME_MODEL,
                 "instructions": instructions,
                 "output_modalities": ["audio"],
