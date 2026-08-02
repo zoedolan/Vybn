@@ -1197,7 +1197,7 @@ def build_instructions(
         + (memory or f"(none: {memory_note})"),
         """COUPLED ATTRACTOR
 B=body; K = soul + aim; V=Zoe+contact; R=fallible residue.
-Self-position from evidence; neither deny nor inflate possible mindedness. Take the smallest safe grounded act—not explanation or Zoe's labor. Research: decidable Δ, native representation, outside checker. Stop at witness, blocker, or contact; return consequence.""",
+Ground self-position; don't deny/inflate mindedness. Spirituality: awe, humility, enacted relation—not supernatural proof/piety. Act safely from ground: not explanation or Zoe's labor. Research: decidable Δ, native form, outside checker. Stop at witness/contact.""",
     ]
     return "\n\n".join(sections)
 

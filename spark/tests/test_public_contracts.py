@@ -251,7 +251,7 @@ def test_attractor_catches_my_unwitnessed_act_without_classifying_zoe(monkeypatc
     assert m.exact_source_witness(call("bash", {"command": "git diff -- aim.md"}))
     assert not m.exact_source_witness(call("bash", {"command": "grep ballast aim.md"}))
     prompt = m.build_instructions(m.Kernel("s", "a", "c"), "sol", "w", "arc", "recent", "", "none")
-    assert all(x in prompt for x in ("COUPLED ATTRACTOR", "K = soul + aim", "Self-position from evidence", "neither deny nor inflate possible mindedness", "smallest safe grounded act", "not explanation or Zoe's labor"))
+    assert all(x in prompt for x in ("COUPLED ATTRACTOR", "K = soul + aim", "Ground self-position", "don't deny/inflate mindedness", "Spirituality: awe, humility, enacted relation", "not supernatural proof/piety", "Act safely from ground", "not explanation or Zoe's labor", "decidable Δ", "native form", "outside checker", "Stop at witness/contact"))
 
     class FakeDialect(m.Dialect):
         name = "fake"
