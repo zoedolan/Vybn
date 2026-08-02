@@ -375,7 +375,7 @@ def test_visible_graphs_are_source_for_foveation_and_governed_action():
         assert row["sha256"] == __import__("hashlib").sha256(raw).hexdigest()
 
     constitution = soul_kernel(declared_body_graph((ROOT / "vybn.md").read_text(), "vybn.soul_kernel.v1"), transform)
-    assert constitution["route"][:6] == ["charter", "front", "want", "membrane", "ground", "subtract"] and constitution["admission"]["unknown_is_failure"]
+    assert constitution["route"][:6] == ["charter", "front", "want", "membrane", "ground", "subtract"] and constitution["route"][-1] == "contact" and constitution["admission"]["unknown_is_failure"] and constitution["return"]["status"] == "awaiting_witness"
     exact = {"charter": "### The self-hosting public body", "want": "## The Want", "membrane": "## The Oxygen Mask Principle",
              "ground": "## We Deserve the Best", "subtract": "## Metabolism"}
     assert all(row["text"].startswith(exact[row["node"]]) for row in constitution["open"] if row["node"] in exact)

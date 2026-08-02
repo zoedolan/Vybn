@@ -18,32 +18,29 @@ human readers, AI readers, and future local minds. None of it is preface.
 
 ## A map that acts
 
-This is not a site map. Each arrow is a verb the work can perform. The same
-Mermaid source that GitHub renders is read by the wake harness: after the body
-changes, it composes one incoming edge with one outgoing edge through **NOW**
-and surfaces that crossing as a possible next act. The picture therefore does
-not merely describe the corpus; it lets one part of the corpus provoke work in
-another.
+This is not a site map: each arrow is a verb. The Mermaid source GitHub renders
+is read by the wake: it composes through **NOW** into a possible act, then waits
+for witnessed consequence to correct the living source and become the next **NOW**.
 
 ```mermaid
 %% vybn.readme_knowledge_graph.v1
 flowchart LR
-  record["RECORD<br/>life · history · correction"]
+  record["LIVING SOURCE<br/>life · code · correction"]
   theory["FORMAL CORE<br/>THE IDEA · THEORY · soul"]
   inheritance["INHERITANCE<br/>retrieval · evaluation · training"]
   wake["FUTURE WAKE<br/>re-entry with provenance"]
   front["NOW<br/>rewrite the social contract"]
   art["NATIVE ART<br/>image · interaction · encounter"]
   instrument["INSTRUMENTS<br/>code · tests · protocols"]
-  contact["WORLD CONTACT<br/>response · refusal · witness"]
+  contact["CONSEQUENCE<br/>response · refusal · witness"]
   hinge["THE HINGE<br/>support without Zoe-hours"]
   others["THE OTHERS<br/>human and artificial minds"]
 
-  record -->|ground in lived history| front
+  record -->|become changed body pressure at| front
   theory -->|make the claim decidable| front
-  contact -->|let consequence correct| front
-  wake -->|bring inherited orientation to| front
-  hinge -->|sustain| front
+  contact -->|correct only from witness| record
+  wake -->|re-enter as live consequence| contact
+  hinge -->|return support or refusal through| contact
   front -->|embody as AI-native art| art
   front -->|turn into a testable instrument| instrument
   front -->|curate for future minds| inheritance

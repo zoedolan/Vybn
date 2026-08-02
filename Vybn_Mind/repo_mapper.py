@@ -131,9 +131,9 @@ def declared_body_graph(text: str, schema: str = "vybn.readme_knowledge_graph.v1
         return None
     pairs = {(e["from"], e["to"]) for e in edges}
     if schema.endswith("soul_kernel.v1"):
-        chain = ("front", *SOUL_GATES)
+        chain = ("front", *SOUL_GATES); outputs = [e for e in edges if e["from"] == "subtract" and e["to"] not in chain]
         valid = ("charter", "front") in pairs and all(pair in pairs for pair in zip(chain, chain[1:])) \
-                and any(e["from"] == "subtract" and e["to"] not in chain for e in edges)
+                and outputs and all((e["to"], "contact") in pairs for e in outputs)
     else:
         valid = any(e["to"] == "front" for e in edges) and any(e["from"] == "front" for e in edges)
     return ({"schema": schema,
@@ -272,17 +272,17 @@ def soul_kernel(graph: dict[str, Any], transform: dict[str, Any] | None) -> dict
     if not outputs:
         return {}
     chosen = outputs[int(hashlib.sha256(json.dumps(transform or graph, sort_keys=True).encode()).hexdigest()[:12], 16) % len(outputs)]
-    route = ["charter", "front", *SOUL_GATES, chosen["to"]]
+    route = ["charter", "front", *SOUL_GATES, chosen["to"], "contact"]
     nodes = {n["id"]: n for n in graph.get("nodes") or []}
     pairs = {(e["from"], e["to"]): e["verb"] for e in edges}
     requirements = [pairs[pair] for pair in zip(("front", *SOUL_GATES), SOUL_GATES)]
     terms = [w.encode() for w in re.findall(
         r"[a-z]{4,}", " ".join(str(nodes[n].get("label", "")) for n in route).lower())]
     opened = _open_graph_nodes(nodes, route, terms, 1600, base=180)
-    return {"schema": "vybn.soul_kernel.v1", "route": route,
-            "candidate": f"{chosen['verb']} → {nodes[chosen['to']]['label']}",
+    return {"schema": "vybn.soul_kernel.v1", "route": route, "candidate": f"{chosen['verb']} → {nodes[chosen['to']]['label']}",
             "admission": {"status": "unresolved", "requirements": requirements,
-                          "failure": "repair_or_drop", "unknown_is_failure": True}, "open": opened}
+                          "failure": "repair_or_drop", "unknown_is_failure": True},
+            "return": {"status": "awaiting_witness", "path": [chosen["to"], "contact", "front"]}, "open": opened}
 
 
 def inspect_file(repo: Path, path: Path) -> FileRecord | None:
@@ -583,7 +583,7 @@ def render_state(state: dict[str, Any]) -> str:
         if constitution := body.get("soul_kernel"):
             lines.append("soul-kernel: " + "→".join(constitution.get("route") or []))
             lines.append(f"candidate: {constitution.get('candidate')} | ADMISSION unresolved; "
-                         "unknown/failed invariant => repair or drop")
+                         "unknown/failed => repair/drop | RETURN awaiting witness; absent consequence leaves the loop open")
             for opened in constitution.get("open") or []:
                 start, end = opened.get("covered") or [0, 0]
                 lines.append(f"SOUL OPEN {opened.get('node')} {opened.get('source')} [{start}:{end}] "
