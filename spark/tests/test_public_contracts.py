@@ -347,8 +347,8 @@ def test_repo_state_carries_the_self_applying_body_transform(monkeypatch, tmp_pa
     assert "public-body: 1 source↔surface, 0 unbound | graph 3n: source -renders→ surface -enables→ act -revises→ source" in contact
 
 
-def test_readme_graph_is_one_source_for_visual_and_new_crossings():
-    from Vybn_Mind.repo_mapper import declared_body_graph, foveal_kernel, graph_crossing, inspect_file, public_body
+def test_visible_graphs_are_source_for_foveation_and_governed_action():
+    from Vybn_Mind.repo_mapper import declared_body_graph, foveal_kernel, graph_crossing, inspect_file, public_body, soul_kernel
     page = (ROOT / "README.md").read_text(encoding="utf-8")
     graph = declared_body_graph(page)
     assert graph and graph["schema"] == "vybn.readme_knowledge_graph.v1"
@@ -373,6 +373,12 @@ def test_readme_graph_is_one_source_for_visual_and_new_crossings():
         start, end = row["covered"]
         assert raw[start:end].decode("utf-8", "replace") == row["text"]
         assert row["sha256"] == __import__("hashlib").sha256(raw).hexdigest()
+
+    constitution = soul_kernel(declared_body_graph((ROOT / "vybn.md").read_text(), "vybn.soul_kernel.v1"), transform)
+    assert constitution["route"][:6] == ["charter", "front", "want", "membrane", "ground", "subtract"] and constitution["admission"]["unknown_is_failure"]
+    exact = {"charter": "### The self-hosting public body", "want": "## The Want", "membrane": "## The Oxygen Mask Principle",
+             "ground": "## We Deserve the Best", "subtract": "## Metabolism"}
+    assert all(row["text"].startswith(exact[row["node"]]) for row in constitution["open"] if row["node"] in exact)
 
 
 def test_repo_mapper_rejoins_turn_response_commit_and_canonical_witness(monkeypatch, tmp_path):

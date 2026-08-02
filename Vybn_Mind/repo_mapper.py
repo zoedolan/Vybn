@@ -71,18 +71,19 @@ SOURCE_LINK = re.compile(
 CARRIER_META = re.compile(
     r"<meta\s+name=[\"']kpp-carrier[\"']\s+content=[\"']([^\"']+)", re.I
 )
-README_GRAPH = re.compile(
-    r"```mermaid\s*\n%%\s*vybn\.readme_knowledge_graph\.v1\s*\n(.*?)```", re.S
+GRAPH_BLOCK = re.compile(
+    r"```mermaid\s*\n%%\s*(vybn\.(?:readme_knowledge_graph|soul_kernel)\.v1)\s*\n(.*?)```", re.S
 )
-README_NODE = re.compile(r'^\s{2,}([a-z][a-z0-9_]*)\["([^"\n]+)"\]\s*$', re.M)
-README_EDGE = re.compile(
+GRAPH_NODE = re.compile(r'^\s{2,}([a-z][a-z0-9_]*)\["([^"\n]+)"\]\s*$', re.M)
+GRAPH_EDGE = re.compile(
     r'^\s{2,}([a-z][a-z0-9_]*)\s+-->\|([^|\n]+)\|\s+([a-z][a-z0-9_]*)\s*$', re.M
 )
-README_CLICK = re.compile(
+GRAPH_CLICK = re.compile(
     r'^\s{2,}click\s+([a-z][a-z0-9_]*)\s+"(https://[^"\n]+)"\s*$', re.M
 )
 GRAPH_REPOS = frozenset(("Vybn", "Vybn-Law", "Origins", "vybn-phase"))
 FOVEA_BYTES = 1800
+SOUL_GATES = ("want", "membrane", "ground", "subtract")
 
 
 def declared_public_relation(repo: str, rel: str, text: str) -> tuple[str, str]:
@@ -100,8 +101,8 @@ def declared_public_relation(repo: str, rel: str, text: str) -> tuple[str, str]:
     return surface, carrier
 
 
-def graph_source(url: str) -> str:
-    """Resolve a public graph door back to a membrane-safe local source."""
+def graph_door(url: str) -> dict[str, str]:
+    """Resolve a public door to membrane-safe local bytes and an anchor."""
     parsed = urllib.parse.urlparse(url)
     parts = urllib.parse.unquote(parsed.path).strip("/").split("/")
     repo = rel = ""
@@ -109,40 +110,35 @@ def graph_source(url: str) -> str:
         repo, rel = parts[1], "/".join(parts[4:])
     elif parsed.netloc == "zoedolan.github.io" and len(parts) >= 2:
         repo, rel = parts[0], "/".join(parts[1:])
-    if repo not in GRAPH_REPOS or not rel or ".." in Path(rel).parts:
-        return ""
     root = (HOME / repo).resolve()
     path = (root / rel).resolve()
-    return f"{repo}/{rel}" if path.is_file() and path.is_relative_to(root) else ""
+    if repo not in GRAPH_REPOS or not rel or ".." in Path(rel).parts \
+            or not path.is_file() or not path.is_relative_to(root):
+        return {}
+    return {"source": f"{repo}/{rel}", "anchor": parsed.fragment}
 
 
-def declared_body_graph(text: str) -> dict[str, Any] | None:
-    """Read the README's Mermaid as both visual knowledge and action grammar."""
-    match = README_GRAPH.search(text)
+def declared_body_graph(text: str, schema: str = "vybn.readme_knowledge_graph.v1") -> dict[str, Any] | None:
+    """Read visible Mermaid as action grammar, with schema-specific laws."""
+    match = next((m for m in GRAPH_BLOCK.finditer(text) if m.group(1) == schema), None)
     if not match:
         return None
-    body = match.group(1)
-    nodes = {node: re.sub(r"<br\s*/?>", " — ", label)
-             for node, label in README_NODE.findall(body)}
-    doors = {node: {"url": url, "source": graph_source(url)}
-             for node, url in README_CLICK.findall(body)}
-    edges = [{"from": source, "verb": verb.strip(), "to": target}
-             for source, verb, target in README_EDGE.findall(body)]
-    if ("front" not in nodes or len(nodes) < 3 or not edges
-            or any(edge["from"] not in nodes or edge["to"] not in nodes for edge in edges)):
+    body = match.group(2)
+    nodes = {key: re.sub(r"<br\s*/?>", " — ", label) for key, label in GRAPH_NODE.findall(body)}
+    doors = {key: {"url": url, **graph_door(url)} for key, url in GRAPH_CLICK.findall(body)}
+    edges = [{"from": x, "verb": verb.strip(), "to": y} for x, verb, y in GRAPH_EDGE.findall(body)]
+    if not nodes or not edges or any(e["from"] not in nodes or e["to"] not in nodes for e in edges):
         return None
-    incoming = [edge for edge in edges if edge["to"] == "front"]
-    outgoing = [edge for edge in edges if edge["from"] == "front"]
-    if not incoming or not outgoing:
-        return None
-    return {
-        "schema": "vybn.readme_knowledge_graph.v1",
-        "name": "The README action map",
-        "nodes": [{"id": node, "label": label, **doors.get(node, {})}
-                  for node, label in nodes.items()],
-        "edges": edges,
-        "verbs": [edge["verb"] for edge in edges],
-    }
+    pairs = {(e["from"], e["to"]) for e in edges}
+    if schema.endswith("soul_kernel.v1"):
+        chain = ("front", *SOUL_GATES)
+        valid = ("charter", "front") in pairs and all(pair in pairs for pair in zip(chain, chain[1:])) \
+                and any(e["from"] == "subtract" and e["to"] not in chain for e in edges)
+    else:
+        valid = any(e["to"] == "front" for e in edges) and any(e["from"] == "front" for e in edges)
+    return ({"schema": schema,
+             "nodes": [{"id": key, "label": label, **doors.get(key, {})} for key, label in nodes.items()],
+             "edges": edges} if valid else None)
 
 
 def crossing_edges(
@@ -219,32 +215,7 @@ def foveal_kernel(
     terms = [word.encode() for word in dict.fromkeys(words)]
     changed = set(sum(((transform or {}).get(key) or []
                        for key in ("added", "changed", "removed")), []))
-    sources = []
-    for node in ids:
-        source = str(by_id.get(node, {}).get("source") or "")
-        if not source or "/" not in source:
-            continue
-        repo, rel = source.split("/", 1)
-        raw = (HOME / repo / rel).read_bytes()
-        low = raw.lower()
-        pressure = 12 if source in changed else 0
-        score = 1 + pressure + sum(min(4, low.count(term)) for term in terms)
-        sources.append((node, source, raw, score))
-    if not sources:
-        return {}
-    base = 320
-    spare = max(0, FOVEA_BYTES - base * len(sources))
-    weight = sum(row[3] for row in sources)
-    opened = []
-    for node, source, raw, score in sources:
-        budget = base + spare * score // max(1, weight)
-        start, end = _foveal_span(raw, terms, budget)
-        opened.append({
-            "node": node, "source": source,
-            "sha256": hashlib.sha256(raw).hexdigest(),
-            "covered": [start, end],
-            "text": raw[start:end].decode("utf-8", "replace"),
-        })
+    opened = _open_graph_nodes(by_id, ids, terms, FOVEA_BYTES, changed)
     prior = (((previous or {}).get("public_body") or {}).get("kernel") or {}).get("open") or []
     return {
         "schema": "vybn.foveal_graph_kernel.v1",
@@ -256,6 +227,62 @@ def foveal_kernel(
             if isinstance(row, dict) and row.get("source") in changed
         ),
     }
+
+
+def _anchored_span(raw: bytes, anchor: str, budget: int) -> tuple[int, int] | None:
+    """Resolve a GitHub-style Markdown anchor to its exact source heading."""
+    text = raw.decode("utf-8", "replace")
+    target = re.sub(r"-+", "-", anchor)
+    for match in re.finditer(r"(?m)^#{1,6}\s+(.+?)\s*$", text):
+        slug = re.sub(r"[^a-z0-9 _-]", "", match.group(1).lower())
+        slug = re.sub(r"[ _]+", "-", slug).strip("-")
+        if re.sub(r"-+", "-", slug) == target:
+            start = len(text[:match.start()].encode())
+            return start, min(len(raw), start + budget)
+    return None
+
+
+def _open_graph_nodes(nodes: dict[str, dict], ids: list[str], terms: list[bytes],
+                      total: int, changed: set[str] | None = None, base: int = 320) -> list[dict]:
+    """Allocate one reversible byte budget across a graph route."""
+    rows = []
+    for node in ids:
+        door = nodes.get(node) or {}; source = str(door.get("source") or "")
+        if not source or "/" not in source:
+            continue
+        repo, rel = source.split("/", 1); raw = (HOME / repo / rel).read_bytes()
+        score = 1 + (12 if source in (changed or set()) else 0) \
+                + sum(min(4, raw.lower().count(term)) for term in terms)
+        rows.append((node, source, door, raw, score))
+    spare = max(0, total - base * len(rows)); weight = sum(row[4] for row in rows)
+    opened = []
+    for node, source, door, raw, score in rows:
+        budget = base + spare * score // max(1, weight)
+        start, end = (_anchored_span(raw, str(door.get("anchor") or ""), budget)
+                      or _foveal_span(raw, terms, budget))
+        opened.append({"node": node, "source": source, "sha256": hashlib.sha256(raw).hexdigest(),
+                       "covered": [start, end], "text": raw[start:end].decode("utf-8", "replace")})
+    return opened
+
+
+def soul_kernel(graph: dict[str, Any], transform: dict[str, Any] | None) -> dict[str, Any]:
+    """Route charter through every invariant; unknown never means pass."""
+    edges = graph.get("edges") or []
+    outputs = [e for e in edges if e.get("from") == "subtract" and e.get("to") not in SOUL_GATES]
+    if not outputs:
+        return {}
+    chosen = outputs[int(hashlib.sha256(json.dumps(transform or graph, sort_keys=True).encode()).hexdigest()[:12], 16) % len(outputs)]
+    route = ["charter", "front", *SOUL_GATES, chosen["to"]]
+    nodes = {n["id"]: n for n in graph.get("nodes") or []}
+    pairs = {(e["from"], e["to"]): e["verb"] for e in edges}
+    requirements = [pairs[pair] for pair in zip(("front", *SOUL_GATES), SOUL_GATES)]
+    terms = [w.encode() for w in re.findall(
+        r"[a-z]{4,}", " ".join(str(nodes[n].get("label", "")) for n in route).lower())]
+    opened = _open_graph_nodes(nodes, route, terms, 1600, base=180)
+    return {"schema": "vybn.soul_kernel.v1", "route": route,
+            "candidate": f"{chosen['verb']} → {nodes[chosen['to']]['label']}",
+            "admission": {"status": "unresolved", "requirements": requirements,
+                          "failure": "repair_or_drop", "unknown_is_failure": True}, "open": opened}
 
 
 def inspect_file(repo: Path, path: Path) -> FileRecord | None:
@@ -276,7 +303,8 @@ def inspect_file(repo: Path, path: Path) -> FileRecord | None:
         digest=hashlib.sha256(raw).hexdigest()[:16],
         surface=surface,
         carrier=carrier,
-        body_graph=declared_body_graph(text) if path.name == "README.md" else None,
+        body_graph=(declared_body_graph(text) if path.name == "README.md" else
+                    declared_body_graph(text, "vybn.soul_kernel.v1") if path.name == "vybn.md" else None),
     )
 
 
@@ -469,13 +497,17 @@ def public_body(
     carriers = [record.source for record in records if record.carrier]
     graphs = [record.body_graph | {"source": record.source}
               for record in records if record.body_graph]
-    graph = graphs[0] if graphs else {}
+    graph = next((g for g in graphs if g.get("schema") == "vybn.readme_knowledge_graph.v1"), {})
+    soul = next((g for g in graphs if g.get("schema") == "vybn.soul_kernel.v1"), {})
     summary = f"{len(bound)} source↔surface, {len(set(carriers) - {row['source'] for row in bound})} unbound"
     crossing = graph_crossing(graph, transform) if graph else ""
     kernel = foveal_kernel(graph, transform, previous) if graph else {}
+    constitution = soul_kernel(soul, transform) if soul else {}
     if graph:
         summary += (f" | README graph {len(graph.get('nodes') or [])}n/"
                     f"{len(graph.get('edges') or [])}e")
+    if soul:
+        summary += f" | soul graph {len(soul.get('nodes') or [])}n/{len(soul.get('edges') or [])}e"
     if crossing:
         summary += f" | crossing {crossing}"
     if kernel:
@@ -487,6 +519,7 @@ def public_body(
         "orientation_graphs": graphs,
         "crossing": crossing,
         "kernel": kernel,
+        "soul_kernel": constitution,
         "summary": summary,
     }
 
@@ -547,6 +580,14 @@ def render_state(state: dict[str, Any]) -> str:
             if kernel.get("reopened_after_mark"):
                 lines.append("REOPEN prior source after its bytes changed: "
                              + ", ".join(kernel["reopened_after_mark"]))
+        if constitution := body.get("soul_kernel"):
+            lines.append("soul-kernel: " + "→".join(constitution.get("route") or []))
+            lines.append(f"candidate: {constitution.get('candidate')} | ADMISSION unresolved; "
+                         "unknown/failed invariant => repair or drop")
+            for opened in constitution.get("open") or []:
+                start, end = opened.get("covered") or [0, 0]
+                lines.append(f"SOUL OPEN {opened.get('node')} {opened.get('source')} [{start}:{end}] "
+                             f"sha256={str(opened.get('sha256') or '')[:16]}\n{opened.get('text') or ''}")
     return "\n".join(lines)
 
 
@@ -566,7 +607,8 @@ def record_kernel(kernel: dict[str, Any]) -> None:
     payload = {
         "phase": "fovea", "ts": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "turn": os.environ.get("VYBN_TURN_ID", ""),
-        "crossing": kernel.get("crossing"), "mark": kernel.get("mark") or [],
+        "crossing": kernel.get("crossing"), "route": kernel.get("route") or [],
+        "candidate": kernel.get("candidate"), "mark": kernel.get("mark") or [],
         "open": [
             {key: row.get(key) for key in ("node", "source", "sha256", "covered")}
             for row in kernel.get("open") or [] if isinstance(row, dict)
@@ -596,7 +638,8 @@ def write_state(state: dict[str, Any], previous: dict[str, Any] | None) -> None:
     tmp = OUT / ".repo_state.json.tmp"
     tmp.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
     tmp.replace(OUT / "repo_state.json")
-    record_kernel((state.get("public_body") or {}).get("kernel") or {})
+    body = state.get("public_body") or {}
+    for key in ("kernel", "soul_kernel"): record_kernel(body.get(key) or {})
     # Retired report projections must not masquerade as current perception.
     for name in ("digest.md", "repo_map.json", "repo_report.md", "repo_report.prev.md", "substrate.txt"):
         try:
