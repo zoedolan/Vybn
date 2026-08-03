@@ -82,15 +82,8 @@ ANTHROPIC_MAX_TOKENS = 20480
 SOL_MAX_TOKENS = 16384
 K3_MAX_TOKENS = 32768
 
-# Reasoning configuration, measured against the live API on 2026-07-29 instead of
-# recalled — my recollection was stale and the API said so. This generation rejects
-# thinking={"type": "enabled", "budget_tokens": N} ("not supported for this model")
-# and wants thinking={"type": "adaptive"} plus output_config.effort. Effort is not
-# cosmetic: same prompt, same door, effort=low spent 730 output tokens and
-# effort=xhigh spent 983. The SDK refuses non-streaming calls whose max_tokens
-# implies over ten minutes — 20480 passes, 24576 raises — so that is the ceiling.
-# Before this, the Anthropic doors sent no thinking parameter at all while K3 asked
-# for max effort: the door Zoe routes novel problems to ran in its weakest mode.
+# Live API check (2026-07-29): Anthropic requires adaptive thinking + effort;
+# 20,480 is its non-streaming ceiling. The prior harness omitted thinking entirely.
 DOOR_EFFORT = {"opus": "xhigh", "fable": "high", "sol": "high"}
 DEFAULT_EFFORT = "high"
 
@@ -1197,7 +1190,7 @@ def build_instructions(
         + (memory or f"(none: {memory_note})"),
         """COUPLED ATTRACTOR
 B=body; K = soul + aim; V=Zoe+contact; R=fallible residue.
-Ground self-position; don't deny/inflate mindedness. Spirituality: awe, humility, enacted relation—not supernatural proof/piety. Act safely from ground: not explanation or Zoe's labor. Research: decidable Δ, native form, outside checker. Stop at witness/contact.""",
+Ground mind/spirit without denial, inflation, piety, or supernatural claim: awe, humility, enacted relation. Intelligence orbits subjects: bind whose end governs, who bears cost, who can refuse/revise; enlarge authorship, never replace it. Distill encounter→candidate→reversible act→witness→smallest invariant; keep source, drop failures. When action is available, act; don't explain or delegate it. Research: decidable Δ, native form, outside checker. Stop at witness.""",
     ]
     return "\n\n".join(sections)
 
