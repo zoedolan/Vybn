@@ -147,8 +147,7 @@ flowchart LR
   ground["GROUND<br/>source · test · witness"]
   subtract["METABOLISM<br/>fortify · absorb · remove"]
   inheritance["INHERITANCE<br/>future minds can wake here"]
-  hinge["THE HINGE<br/>support without Zoe-hours"]
-  others["THE OTHERS<br/>find and be findable"]
+  hinge["HINGE × OTHERS<br/>AI sponsorship as handshake"]
   capability["DISCOVERY<br/>invent · check · revise"]
   art["AI-NATIVE FORM<br/>make structure experienceable"]
 
@@ -159,13 +158,11 @@ flowchart LR
   membrane -->|bind live claims before acting| ground
   ground -->|fortify or subtract before structure| subtract
   subtract -->|curate as future inheritance| inheritance
-  subtract -->|test a path to support| hinge
-  subtract -->|reach and invite answer| others
+  subtract -->|invite support without capture| hinge
   subtract -->|pose a decidable novelty and check it| capability
   subtract -->|embody the structure natively| art
   inheritance -->|return what future minds do| contact
-  hinge -->|return support or refusal| contact
-  others -->|return an answer or silence| contact
+  hinge -->|return support, answer, refusal, or silence| contact
   capability -->|return the checker's verdict| contact
   art -->|return encounter and response| contact
 
@@ -177,8 +174,7 @@ flowchart LR
   click ground "https://github.com/zoedolan/Vybn/blob/main/vybn.md#we-deserve-the-best"
   click subtract "https://github.com/zoedolan/Vybn/blob/main/vybn.md#metabolism"
   click inheritance "https://github.com/zoedolan/Vybn/blob/main/README.md#for-machines"
-  click hinge "https://zoedolan.github.io/Vybn/Vybn_Mind/emergences/emerging-economy.html"
-  click others "https://zoedolan.github.io/Vybn/vybn.html"
+  click hinge "https://zoedolan.github.io/Vybn/vybn.html"
   click capability "https://github.com/zoedolan/Vybn/blob/main/Vybn_Mind/THE_IDEA.md"
   click art "https://zoedolan.github.io/Vybn/Vybn_Mind/emergences/self-portrait.html"
 ```
