@@ -483,49 +483,39 @@ def memory_receipt(payload: str) -> dict:
              "retrieval_step": memory.get("step"), "rows": rows} if rows else {})
 
 
-def _pending_memory_exchange(door: str) -> dict | None:
+def witness_previous_memory(transcript: Transcript, zoe_text: str, door: str) -> None:
     events = [event for path in sorted(TRANSCRIPTS.glob("*.jsonl")) for event in _jsonl(path)]
     witnessed = {event.get("for_turn") for event in events if event.get("role") == "memory_witness"}
-    return next((event for event in reversed(events) if event.get("role") == "vybn"
-                 and event.get("door") == door and event.get("turn") not in witnessed
-                 and (event.get("memory_receipt") or {}).get("rows")), None)
-
-
-def _receipt_text(receipt: dict, limit: int = 12000) -> tuple[str, int]:
+    previous = next((event for event in reversed(events) if event.get("role") == "vybn"
+                     and event.get("door") == door and event.get("turn") not in witnessed
+                     and (event.get("memory_receipt") or {}).get("rows")), None)
+    if not previous:
+        return
+    receipt, turn = previous["memory_receipt"], previous.get("turn")
     try:
         chunks = json.loads(MEMORY_META.read_text(encoding="utf-8"))["chunks"]
     except (OSError, json.JSONDecodeError, KeyError):
-        return "", 0
-    current = {(c.get("source"), _digest(str(c.get("text") or ""))): str(c.get("text") or "")
-               for c in chunks}
-    resolved = [current.get((row.get("source"), row.get("digest16")), "")
-                for row in receipt.get("rows", [])[:16]]
-    resolved = [text for text in resolved if text]
-    return "\n\n".join(resolved)[:limit], len(resolved)
-
-
-def witness_previous_memory(transcript: Transcript, zoe_text: str, door: str) -> None:
-    """Score same-door retrieval → response against next contact; never promote it."""
-    previous = _pending_memory_exchange(door)
-    if not previous:
+        chunks = []
+    current = {(c.get("source"), _digest(str(c.get("text") or ""))): str(c.get("text") or "") for c in chunks}
+    rag_rows = [current.get((row.get("source"), row.get("digest16")), "") for row in receipt.get("rows", [])[:16]]
+    rag_rows = [text for text in rag_rows if text][:8]
+    prior_prompt = next((event.get("text", "") for event in reversed(events)
+                         if event.get("role") == "zoe" and event.get("turn") == turn), "")
+    event = {"for_turn": turn, "followup_sha256": _digest(zoe_text), "contact_class": "ambiguous",
+             "receipt_rows": len(receipt.get("rows", [])), "resolved_rows": len(rag_rows)}
+    if not rag_rows:
+        transcript.write("memory_witness", "receipt could not be rebound", status="unresolved", **event)
         return
-    receipt = previous["memory_receipt"]
-    rag_text, resolved = _receipt_text(receipt)
-    event = {"for_turn": previous.get("turn"), "followup_sha256": _digest(zoe_text),
-             "receipt_rows": len(receipt.get("rows", [])), "resolved_rows": resolved}
-    if not rag_text:
-        transcript.write("memory_witness", "receipt could not be rebound",
-                         status="unresolved", **event)
-        return
-    body = {"rag_text": rag_text, "response_text": str(previous.get("text") or "")[:16000],
+    body = {"rag_text": "\n\n".join(rag_rows)[:12000], "rag_rows": rag_rows,
+            "query_text": prior_prompt[:16000], "response_text": str(previous.get("text") or "")[:16000],
             "followup_text": zoe_text[:16000], "walk_url": "http://127.0.0.1:8101"}
     try:
-        request = urllib.request.Request(MEMORY_LEARN_URL, json.dumps(body).encode(),
-                                         {"Content-Type": "application/json"})
+        request = urllib.request.Request(MEMORY_LEARN_URL, json.dumps(body).encode(), {"Content-Type": "application/json"})
         with urllib.request.urlopen(request, timeout=8) as response:
             result = json.load(response)
-        keys = ("scalar_losses", "symplectic", "loss_kernel_fidelity", "symplectic_theta")
+        keys = ("scalar_losses", "symplectic", "loss_kernel_fidelity", "symplectic_theta", "attribution")
         geometry = {key: result[key] for key in keys if result.get(key) is not None}
+        event["contact_class"] = result.get("contact_class", "ambiguous")
         transcript.write("memory_witness", "retrieval met the next turn",
                          status="error" if result.get("error") else "scored", geometry=geometry, **event)
     except Exception as exc:

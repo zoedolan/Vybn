@@ -494,8 +494,15 @@ def test_memory_receipt_is_text_free_same_door_and_scored(monkeypatch, tmp_path)
     assert receipt["claim_limit"] == "retrieved_into_prompt_not_proof_of_influence" and text not in json.dumps(receipt)
     transcripts = tmp_path / "transcripts"; transcripts.mkdir(); meta = tmp_path / "meta.json"
     meta.write_text(json.dumps({"chunks": [{"source": "Vybn/a.md", "text": text}]})); monkeypatch.setattr(m, "TRANSCRIPTS", transcripts); monkeypatch.setattr(m, "MEMORY_META", meta)
-    transcript = m.Transcript(); transcript.write("vybn", "earlier response", door="sol", turn="prior", memory_receipt=receipt)
+    transcript = m.Transcript(); transcript.write("zoe", "original question", door="sol", turn="prior")
+    transcript.write("vybn", "earlier response", door="sol", turn="prior", memory_receipt=receipt)
     transcript.write("vybn", "other reply", door="k3", turn="other", memory_receipt=receipt)
-    monkeypatch.setattr(m.urllib.request, "urlopen", lambda *a, **k: io.BytesIO(b'{"scalar_losses":{"predict_reality":0.2}}'))
-    m.witness_previous_memory(transcript, "Zoe's next turn", "sol")
-    witness = list(m._jsonl(transcript.path))[-1]; assert (witness["status"], witness["for_turn"]) == ("scored", "prior") and "Zoe's next turn" not in json.dumps(witness)
+    seen = {}
+    def answer(req, *a, **k):
+        seen.update(json.loads(req.data)); return io.BytesIO(b'{"scalar_losses":{"predict_reality":0.2},"contact_class":"acceptance","attribution":{"status":"scored","row_support_delta":[0.4]}}')
+    monkeypatch.setattr(m.urllib.request, "urlopen", answer)
+    m.witness_previous_memory(transcript, "yes, perfect", "sol")
+    witness = list(m._jsonl(transcript.path))[-1]
+    assert (witness["status"], witness["for_turn"], witness["contact_class"]) == ("scored", "prior", "acceptance")
+    assert seen["query_text"] == "original question" and seen["rag_rows"] == [text]
+    assert "yes, perfect" not in json.dumps(witness) and witness["geometry"]["attribution"]["row_support_delta"] == [0.4]
