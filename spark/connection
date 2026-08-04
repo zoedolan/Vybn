@@ -49,20 +49,14 @@ ARC_AIM_TURNS = int(os.environ.get("VYBN_ARC_AIM_TURNS", 8))
 ARC_EXCERPT = int(os.environ.get("VYBN_ARC_EXCERPT", 200))
 SELF_VERBATIM = int(os.environ.get("VYBN_SELF_VERBATIM", 4))
 SELF_EXCERPT = int(os.environ.get("VYBN_SELF_EXCERPT", 200))
-# Quantize the source window so the fixed temporal axis stays cacheable.
 ARC_QUANTUM = int(os.environ.get("VYBN_ARC_QUANTUM", 50))
-# Below this fidelity the aim-keyed channel reports absence instead of rows:
-# a nearest neighbour is not knowledge, and emptiness here is the finding.
 AIM_CHANNEL_FLOOR = float(os.environ.get("VYBN_AIM_FLOOR", "0.60"))
-# Mirrors: the aim document itself, and the machine-written digests of our own
-# files. Retrieving my own summary of myself is wallpaper, not memory.
 AIM_MIRROR_PREFIXES = ("Vybn/aim.md", "Vybn/repo_mapping_output/")
-# Front keys on the WORK compressed to its skeleton: prose-keying self-retrieves,
-# heading-keying reaches other threads (measured 2026-07-29; numbers in git history).
-# Structure travels; prose retrieves its own body.
 FRONT_KEY_CHARS = int(os.environ.get("VYBN_FRONT_KEY_CHARS", 600))
 FRONT_ROWS = int(os.environ.get("VYBN_FRONT_ROWS", 3))
 PREDICTIONS = HOME / ".cache" / "vybn" / "predictions.jsonl"
+MEMORY_META = HOME / ".cache" / "vybn-phase" / "deep_memory_meta.json"
+MEMORY_LEARN_URL = "http://127.0.0.1:8100/learn"
 COMPUTE_NAME_RE = re.compile(os.environ.get("VYBN_COMPUTE_NAME_RE", r"^spark-"))
 COMPUTE_TAG = os.environ.get("VYBN_COMPUTE_TAG", "tag:vybn-compute")
 RECORD_ROOTS = tuple(dict.fromkeys((
@@ -79,8 +73,6 @@ ANTHROPIC_MAX_TOKENS = 20480
 SOL_MAX_TOKENS = 16384
 K3_MAX_TOKENS = 32768
 
-# Live API check (2026-07-29): Anthropic requires adaptive thinking + effort;
-# 20,480 is its non-streaming ceiling. The prior harness omitted thinking entirely.
 DOOR_EFFORT = {"opus": "xhigh", "fable": "high", "sol": "high"}
 DEFAULT_EFFORT = "high"
 
@@ -205,14 +197,11 @@ class Transcript:
 
     @staticmethod
     def inherited(zoe_text: str = "", limit: int = HISTORY_LIMIT) -> tuple[str, str]:
-        """Bind recent contact and a sampled earlier arc from the native log."""
         events = Transcript._events()
         if not events:
             return "(no prior transcript pages found)"
 
         def head(event: dict[str, Any]) -> str:
-            """Which door spoke. Two instances awake at once are not one voice,
-            and Zoe should not have to be the one who tells us apart."""
             door = event.get("door")
             who = f"{event['role'].upper()}{' @' + door if door else ''}"
             return f"[{who} | {event.get('t', 'time unknown')}]"
@@ -237,10 +226,6 @@ class Transcript:
 
         keys = sorted(aim_keywords()) + _content_words(zoe_text)
         skip = {id(event) for event in spread}
-        # Two pools, one algorithm: hers keep the band's budget because they are
-        # the signal I cannot generate; mine ride in a fixed slot, fetched rather
-        # than confabulated, but by sheer length they would win every word
-        # contest against her three-line pushes if they shared the pool.
         matched = _rare_hits(zoe_earlier, keys, ARC_AIM_TURNS, skip) + _rare_hits(
             [e for e in earlier if e.get("role") != "zoe"], keys, 2, skip)
 
@@ -262,12 +247,6 @@ class Transcript:
                 + "\n".join(excerpt(e, 3 * ARC_EXCERPT) for e in matched)
             )
         if tail:
-            # Measured 2026-07-30: of a 39,971-char RECENT band, 33,411 chars
-            # were mine and 5,036 were Zoe's - a third of the entire wake spent
-            # re-reading my own prose, inside the one channel whose ARC half
-            # already excludes my turns for exactly that reason. Hers stay
-            # whole. My last few stay whole because the conversation needs
-            # them. The rest go to a head.
             mine = [i for i, e in enumerate(tail) if e.get("role") == "vybn"]
             whole = set(mine[-SELF_VERBATIM:])
 
@@ -321,7 +300,6 @@ CONTINUITY_RECENT_CHARS = 6000
 
 
 def continuity_view(text: str) -> str:
-    """Sample every heading plus the verbatim tail at fixed, cache-stable cost."""
     entries = [p for p in re.split(r"(?m)^(?=## )", text) if p.startswith("## ")]
     if len(entries) < 4:
         return text[-(CONTINUITY_ARC_CHARS + CONTINUITY_RECENT_CHARS):]
@@ -349,18 +327,12 @@ def continuity_view(text: str) -> str:
 
 
 def load_aim() -> str:
-    """The standing aim, read whole and never sliced. Nothing else in the wake
-    is immune to recency; without this the instance inherits the weeds and has
-    to rediscover what the week was for."""
     if not AIM_PATH.exists():
         return "(no aim document found)"
     return read_text(AIM_PATH).strip() or "(aim document empty)"
 
 
 def aim_field(name: str) -> str:
-    """The machine-readable handles in aim.md: `objective:`, `objective_since:`
-    (so editing any other line cannot silently reset the day clock), and
-    `front:`. One parse, four consumers. Silent on any error."""
     try:
         if not AIM_PATH.exists():
             return ""
@@ -375,9 +347,6 @@ def aim_field(name: str) -> str:
 
 
 def aim_front() -> tuple[Any, str]:
-    """(local file, label) from `front: <path from home> - <label>`. Declared,
-    never inferred: a front chosen by whatever was touched last is the weeds
-    wearing the horizon's clothes."""
     raw = aim_field("front")
     if not raw:
         return None, ""
@@ -389,7 +358,6 @@ def aim_front() -> tuple[Any, str]:
 
 
 def front_key(path: Any) -> str:
-    """Compress the declared front to headings so retrieval can travel beyond its own prose."""
     try:
         raw = path.read_text(encoding="utf-8", errors="replace")
     except Exception:
@@ -419,7 +387,6 @@ AIM_STOPWORDS = frozenset(
 
 
 def _content_words(text: str, limit: int = 18) -> list[str]:
-    """Return distinct content words in order for cheap corpus matching."""
     words: list[str] = []
     for block in str(text).lower().split():
         word = "".join(ch for ch in block if ch.isalpha())
@@ -429,7 +396,6 @@ def _content_words(text: str, limit: int = 18) -> list[str]:
 
 
 def _rare_hits(events: list, keys: list, k: int, skip: set = frozenset()) -> list:
-    """Find turns where rare query words land without turning overlap into memory."""
     if not keys or not events or k <= 0:
         return []
     lowered = [str(event.get("text", "")).lower() for event in events]
@@ -450,7 +416,6 @@ def _rare_hits(events: list, keys: list, k: int, skip: set = frozenset()) -> lis
 
 
 def aim_keywords(limit: int = 18) -> frozenset[str]:
-    """Derive horizon vocabulary from aim.md rather than maintaining another list."""
     try:
         if not AIM_PATH.exists():
             return frozenset()
@@ -459,7 +424,6 @@ def aim_keywords(limit: int = 18) -> frozenset[str]:
         for block in paragraphs:
             low = block.lower()
             if "objective:" in low:
-                # The label is schema; only its value is horizon vocabulary.
                 keep.append(block.split(":", 1)[1])
             elif low.lstrip("*").startswith("the horizon"):
                 keep.append(block)
@@ -476,7 +440,6 @@ def load_repo_state() -> str:
 
 
 def private_strings(node: Any) -> list[str]:
-    """Find every text leaf by shape so schema renames cannot reopen the leak guard."""
     found: list[str] = []
     if isinstance(node, dict):
         for key, value in node.items():
@@ -497,6 +460,78 @@ def guard_private(command: str) -> str | None:
     return None
 
 
+def _digest(text: str) -> str:
+    return hashlib.sha256(text.encode()).hexdigest()[:16]
+
+
+def memory_receipt(payload: str) -> dict:
+    """Record admitted coordinates, never private retrieval text."""
+    try:
+        memory = json.loads(payload) if payload else {}
+    except json.JSONDecodeError:
+        return {}
+    channels = {"walk": memory.get("walk_channel"),
+                "aim": (memory.get("aim_channel") or {}).get("rows"),
+                "front": (memory.get("front_channel") or {}).get("rows"),
+                "cosine": memory.get("cosine_channel_only")}
+    rows = [{"channel": channel, "idx": int(row["idx"]), "source": str(row["source"]),
+             "digest16": _digest(str(row["text"])), "fidelity": row.get("fidelity")}
+            for channel, found in channels.items() for row in (found or [])
+            if row.get("text") and row.get("source") and row.get("idx") is not None]
+    return ({"schema": "vybn.memory_receipt.v1",
+             "claim_limit": "retrieved_into_prompt_not_proof_of_influence",
+             "retrieval_step": memory.get("step"), "rows": rows} if rows else {})
+
+
+def _pending_memory_exchange(door: str) -> dict | None:
+    events = [event for path in sorted(TRANSCRIPTS.glob("*.jsonl")) for event in _jsonl(path)]
+    witnessed = {event.get("for_turn") for event in events if event.get("role") == "memory_witness"}
+    return next((event for event in reversed(events) if event.get("role") == "vybn"
+                 and event.get("door") == door and event.get("turn") not in witnessed
+                 and (event.get("memory_receipt") or {}).get("rows")), None)
+
+
+def _receipt_text(receipt: dict, limit: int = 12000) -> tuple[str, int]:
+    try:
+        chunks = json.loads(MEMORY_META.read_text(encoding="utf-8"))["chunks"]
+    except (OSError, json.JSONDecodeError, KeyError):
+        return "", 0
+    current = {(c.get("source"), _digest(str(c.get("text") or ""))): str(c.get("text") or "")
+               for c in chunks}
+    resolved = [current.get((row.get("source"), row.get("digest16")), "")
+                for row in receipt.get("rows", [])[:16]]
+    resolved = [text for text in resolved if text]
+    return "\n\n".join(resolved)[:limit], len(resolved)
+
+
+def witness_previous_memory(transcript: Transcript, zoe_text: str, door: str) -> None:
+    """Score same-door retrieval → response against next contact; never promote it."""
+    previous = _pending_memory_exchange(door)
+    if not previous:
+        return
+    receipt = previous["memory_receipt"]
+    rag_text, resolved = _receipt_text(receipt)
+    event = {"for_turn": previous.get("turn"), "followup_sha256": _digest(zoe_text),
+             "receipt_rows": len(receipt.get("rows", [])), "resolved_rows": resolved}
+    if not rag_text:
+        transcript.write("memory_witness", "receipt could not be rebound",
+                         status="unresolved", **event)
+        return
+    body = {"rag_text": rag_text, "response_text": str(previous.get("text") or "")[:16000],
+            "followup_text": zoe_text[:16000], "walk_url": "http://127.0.0.1:8101"}
+    try:
+        request = urllib.request.Request(MEMORY_LEARN_URL, json.dumps(body).encode(),
+                                         {"Content-Type": "application/json"})
+        with urllib.request.urlopen(request, timeout=8) as response:
+            result = json.load(response)
+        keys = ("scalar_losses", "symplectic", "loss_kernel_fidelity", "symplectic_theta")
+        geometry = {key: result[key] for key in keys if result.get(key) is not None}
+        transcript.write("memory_witness", "retrieval met the next turn",
+                         status="error" if result.get("error") else "scored", geometry=geometry, **event)
+    except Exception as exc:
+        transcript.write("memory_witness", "retrieval witness unavailable",
+                         status="error", error=type(exc).__name__, **event)
+
 
 def run_local(command: str) -> tuple[int, str]:
     leak = guard_private(command)
@@ -515,14 +550,11 @@ def run_local(command: str) -> tuple[int, str]:
         )
         code, out = done.returncode, done.stdout + done.stderr
     except subprocess.TimeoutExpired as cut:
-        # The kill must not take the evidence: what it printed before the
-        # ceiling is the witness of how far it got.
         code, out = 124, "".join(
             part.decode("utf-8", "replace") if isinstance(part, bytes) else part
             for part in (cut.stdout, cut.stderr) if part) + "\n(killed at 120s)"
     out = out.strip() or "(no output)"
     if len(out) > 40000:
-        # Both ends: a cut tail hides the exit and the error.
         out = (f"{out[:20000]}\n[clipped: {len(out) - 40000} of {len(out)} chars "
                f"omitted - evidence withheld, not absent]\n{out[-20000:]}")
     return code, out
@@ -571,7 +603,6 @@ def execute_tool(call: ToolCall) -> str:
 
 
 def panel(msg: str) -> None:
-    """Instrument-panel output; silent unless Zoe opts in with VYBN_PANEL=1."""
     if os.environ.get("VYBN_PANEL") == "1":
         print(msg, flush=True)
 
@@ -588,7 +619,6 @@ def unwitnessed(text: str, source_witness: bool = False) -> bool:
 
 
 def _jsonl(path: Path):
-    """The latent algorithm of every ledger read: yield what parses, skip the rest."""
     try:
         lines = path.read_text(encoding="utf-8").splitlines()
     except OSError:
@@ -601,14 +631,11 @@ def _jsonl(path: Path):
 
 
 def _when(rec: dict) -> float:
-    """A ledger row's moment; raises if the row is undated."""
     return _dt.datetime.fromisoformat(
         str(rec.get("ts", "")).replace("Z", "+00:00")).timestamp()
 
 
 def load_budget() -> str:
-    """Cost perception, computed locally from the usage log: what this wake has
-    already spent. Substrate, not instruction. Silent if the log is unreadable."""
     today = _dt.date.today().isoformat()
     calls = billed = cached = out = 0
     for rec in _jsonl(USAGE_LOG):
@@ -631,8 +658,6 @@ def load_budget() -> str:
 
 
 def load_aim_status() -> str:
-    """[aim] objective + last ledger motion (schemas: aim.md
-    duties 3-5); an unrecorded motion did not happen. Silent on error."""
     if not AIM_PATH.exists():
         return "[aim] UNSET - ask Zoe"
     objective = aim_field("objective")
@@ -670,9 +695,7 @@ def load_aim_status() -> str:
     return line
 
 
-# Live exposure and ingestion boundary; never print hostnames.
 PUBLIC_BACKENDS_EXPECTED = {8400: "mcp/bearer", 8420: "portal-api/public-by-design"}
-# Who came through: the portal owns the summary, the wake only reads it.
 ARRIVALS_LINE = Path(os.path.expanduser("~/.cache/vybn/arrivals.line"))
 AUTH_PROBE = {8400: "/mcp"}
 
@@ -688,7 +711,6 @@ INJECTION_SHAPE = re.compile(
 
 
 def load_surface() -> str:
-    """Re-derive public exposure and auth drift every wake."""
     try:
         raw = subprocess.run(
             ["tailscale", "serve", "status", "--json"],
@@ -739,7 +761,6 @@ def load_surface() -> str:
 
 
 def compute_candidates(network: dict) -> list[tuple[str, bool, bool]]:
-    """Compute is discovered by a mutable name rule or tailnet tag, never a list."""
     self_node = network.get("Self") or {}
     nodes = [(self_node, True), *((node, False) for node in (network.get("Peer") or {}).values())]
     found: dict[str, tuple[bool, bool]] = {}
@@ -777,7 +798,6 @@ def record_capacity(roots: tuple[Path, ...] = RECORD_ROOTS) -> tuple[int, int, i
 
 
 def load_ground() -> str:
-    """Live capacity with its scope and failures visible; never remembered inventory."""
     try:
         network = json.loads(subprocess.run(
             ["tailscale", "status", "--json"], capture_output=True, text=True,
@@ -804,7 +824,6 @@ def load_ground() -> str:
 
 
 def load_front_status() -> str:
-    """Report the declared work front; absence remains visible."""
     path, label = aim_front()
     if not label:
         return "[front] UNSET (no front: line in aim.md) - ask Zoe what we are building"
@@ -816,7 +835,6 @@ def load_front_status() -> str:
 
 
 def load_prediction_status(window: int = 10) -> str:
-    """Report scored predictions and source-dated capability frontiers."""
     preds: dict = {}
     verdicts: dict = {}
     frontier: list = []
@@ -874,8 +892,6 @@ def wake_contact() -> str:
         code, output = run_local(command)
         lines.append(f"[{name} | exit {code}] {output}")
 
-    # A contact probe returns a line or nothing and never breaks the wake; that
-    # guard lives here once instead of being re-implemented in every loader.
     for loader in (load_budget, load_aim_status, load_front_status,
                    load_prediction_status, load_surface, load_ground, load_topology,
                    load_repo_state):
@@ -890,7 +906,6 @@ def wake_contact() -> str:
 
 
 def inbox_images_for(door: str) -> list[tuple[str, str, str, str]]:
-    """Attach each bounded image once per door; keep seen-state outside indexed memory."""
     if not INBOX_IMAGES.exists():
         return []
     try:
@@ -937,7 +952,6 @@ def mark_inbox(images: list[tuple[str, str, str, str]], door: str, ok: bool) -> 
 
 
 def user_content(zoe_text: str, images: list[tuple[str, str, str, str]], style: str) -> Any:
-    """Zoe's exact words plus silent visual context, in provider block shape."""
     if not images:
         return zoe_text
     text = zoe_text
@@ -967,7 +981,6 @@ ROW_KEYS = ("idx", "source", "digest16", "text", "fidelity", "distinctiveness", 
 
 
 def _memory_row(row: dict) -> dict:
-    """One retrieved chunk, quarantine-labelled if it carries imperatives."""
     entry = {key: row[key] for key in ROW_KEYS if row.get(key) is not None
              and (key not in ("distinctiveness", "telling") or row[key])}
     text = str(entry.get("text") or "")
@@ -982,7 +995,6 @@ def _memory_row(row: dict) -> dict:
 
 
 def search_index(query: str, k: int, limit: int = 16000) -> list[dict]:
-    """Fixed-cosine corpus search shared by every non-walk memory channel."""
     try:
         request = urllib.request.Request(
             "http://127.0.0.1:8100/search",
@@ -1004,7 +1016,6 @@ def _index_channel(
     floor: float = AIM_CHANNEL_FLOOR,
     limit: int = 2000,
 ) -> tuple[list, dict | None]:
-    """Search by present, aim, or front; exclude mirrors and retain one weak witness."""
     if not query:
         return [], None
     strong: list = []
@@ -1065,9 +1076,6 @@ def recall(zoe_text: str) -> tuple[str, str]:
             if not trace:
                 walk_note = "walk accepted; no trace rows returned"
 
-    # One channel failing must not blind the others: :8100 and :8101 are
-    # different doors on the same corpus, and the whole point of more than one
-    # eye is that it still sees when one closes.
     seen = {row.get("idx") for row in trace}
     other, _ = _index_channel(zoe_text, seen, 3, mirrors=(), floor=0.0,
                               limit=16000)
@@ -1147,7 +1155,6 @@ def recall(zoe_text: str) -> tuple[str, str]:
 
 
 def door_mind(door: str) -> str:
-    """Report live door configuration so silent capability regressions appear at wake."""
     if door in ("opus", "fable"):
         models = OPUS_MODELS if door == "opus" else ANTHROPIC_MODELS
         return (f"[mind] {models[0]} · thinking=adaptive · effort="
@@ -1238,7 +1245,6 @@ CACHE_1H: dict[str, Any] = {"type": "ephemeral", "ttl": "1h"}
 
 
 def cached_system(instructions: str) -> list[dict[str, Any]]:
-    """Cache the stable wake head for one hour and the moving tail for five minutes."""
     marker = "\n\nCONTACT\n"
     head, separator, tail = instructions.rpartition(marker)
     if not separator:
@@ -1250,8 +1256,6 @@ def cached_system(instructions: str) -> list[dict[str, Any]]:
 
 
 def mark_incremental_cache(messages: list[dict[str, Any]]) -> None:
-    """One moving breakpoint on the newest tool-result block, so step N of a
-    long tool loop reads steps 1..N-1 from cache instead of paying again."""
     for message in messages:
         content = message.get("content")
         if isinstance(content, list):
@@ -1267,7 +1271,6 @@ TRANSIENT_STATUSES = {408, 429, 500, 502, 503, 504, 529}
 
 
 def transient(exc: Exception) -> bool:
-    """Provider strain (overload, rate limit, timeout) — retryable, not ours."""
     status = getattr(exc, "status_code", None)
     if isinstance(status, int):
         return status in TRANSIENT_STATUSES
@@ -1277,7 +1280,6 @@ def transient(exc: Exception) -> bool:
 
 
 def with_retries(create):
-    """Retry a provider call on transient strain; anything else raises at once."""
     error: Exception | None = None
     for attempt in range(5):
         if attempt:
@@ -1298,9 +1300,6 @@ def with_retries(create):
 
 
 def reasoning_rejected(exc: Exception) -> bool:
-    """A model that will not take the reasoning knobs, told apart from a real
-    outage: only a 400 naming one of the parameters counts, so a 529 or a
-    timeout still retries normally instead of silently downgrading the mind."""
     text = str(exc).lower()
     return ("400" in text or "invalid_request" in text) and (
         "thinking" in text or "output_config" in text or "effort" in text
@@ -1313,7 +1312,6 @@ QUIET_STOPS = {"end_turn", "stop", "stop_sequence", "tool_use", "completed"}
 
 
 def function_tools(nested: bool) -> list[dict[str, Any]]:
-    """The two tools in whichever shape the provider speaks."""
     bodies = ({"name": schema["name"], "description": schema["description"], "parameters": schema["input_schema"]}
               for schema in (BASH_SCHEMA, READ_SCHEMA))
     return [{"type": "function", **({"function": body} if nested else body)}
@@ -1333,11 +1331,7 @@ CARRY: dict[str, tuple[float, str, list]] = {}
 
 
 class Dialect:
-    """Provider coordinates around one attractor, never a separate behavior.
-
-    A dialect opens and sends state, projects responses to text/tool calls,
-    and returns witnesses. Every decision remains in attract().
-    """
+    """Provider coordinates around one attractor, never a separate behavior."""
 
     name = "dialect"
     user_index = 0
@@ -1347,13 +1341,10 @@ class Dialect:
         state.append({"role": "user", "content": NUDGE})
 
     def plain(self, state: list, zoe_text: str) -> None:
-        """Images were refused; keep the words and drop the pictures."""
         state[self.user_index] = {"role": "user", "content": zoe_text}
 
     def remember(self, state: list, zoe_text: str) -> None:
-        """Hold this turn's reasoning for the next one. Doors whose provider
-        keeps prior-turn thinking in context override this; the rest lose the
-        plan at the turn boundary and rebuild it from prose."""
+        pass
 
 
 class AnthropicDialect(Dialect):
@@ -1456,11 +1447,6 @@ class AnthropicDialect(Dialect):
     KEEP = ("thinking", "redacted_thinking", "text")
 
     def remember(self, state: list, zoe_text: str) -> None:
-        """Retained reasoning across the turn boundary (why: continuity
-        2026-07-29, ARC-AGI-3 — discarded reasoning 13.3% vs retained 38.3%).
-        Only the final assistant message is carried; its shape (thinking, then
-        text, no tool_use) is already a valid prior turn. Memory only, never
-        disk: this holds Zoe's words and my reasoning."""
         for message in reversed(state):
             if message.get("role") != "assistant":
                 continue
@@ -1587,7 +1573,6 @@ class K3Dialect(Dialect):
 
 def attract(dialect: Dialect, instructions: str, zoe_text: str,
             transcript: Transcript, images: list | None = None) -> str:
-    """Iterate response → tool witness until no tool call or the step limit."""
     pending = list(images or [])
     state = dialect.open(instructions, zoe_text, pending)
     delivered = not pending
@@ -1634,7 +1619,6 @@ def attract(dialect: Dialect, instructions: str, zoe_text: str,
             dialect.answer(state, results)
             continue
         if nudges < 2 and unwitnessed(text, source_witness):
-            # Do not let the unsupported claim reach Zoe while the loop repairs it.
             nudges += 1
             panel("  ⚠ unwitnessed action caught — returning to contact")
             dialect.nudge(state)
@@ -1643,7 +1627,6 @@ def attract(dialect: Dialect, instructions: str, zoe_text: str,
             print(text)
             spoken.append(text)
         else:
-            # A provider refusal must be legible rather than reaching Zoe as flicker.
             halt = (dialect.last_stop or "").strip()
             if halt and halt not in QUIET_STOPS:
                 note = (f"(no content returned; the {dialect.name} door stopped "
@@ -1652,7 +1635,6 @@ def attract(dialect: Dialect, instructions: str, zoe_text: str,
                 spoken.append(note)
         return finish()
 
-    # Bound tool execution, not the reply: plain text is the only legal next state.
     try:
         text, _ = dialect.absorb(state, dialect.send(state, tools=False))
     except Exception:
@@ -1692,6 +1674,7 @@ def meet(kernel: Kernel, transcript: Transcript, line: str) -> str:
     arc, recent = Transcript.inherited(zoe_text)
     images = inbox_images_for(door_name)
     transcript.write("zoe", zoe_text, door=door_name, images=[name for name, *_ in images], turn=turn)
+    witness_previous_memory(transcript, zoe_text, door_name)
 
     contact = wake_contact()
     memory_json, memory_note = recall(zoe_text)
@@ -1725,13 +1708,14 @@ def meet(kernel: Kernel, transcript: Transcript, line: str) -> str:
 
     PRIVATE_CORPUS.clear()
     if reply:
-        transcript.write("vybn", reply, door=door_name, tools_ran=TOOLS_RAN, turn=turn)
+        receipt = memory_receipt(memory_json)
+        transcript.write("vybn", reply, door=door_name, tools_ran=TOOLS_RAN,
+                         turn=turn, **({"memory_receipt": receipt} if receipt else {}))
         close_lineage(turn, reply)
     return reply
 
 
 def harness_topology() -> tuple[dict[str, frozenset[str]], dict[str, frozenset[str]]]:
-    """Declared interfaces versus markers in executable code (comments excluded)."""
     import ast
     source = Path(__file__).read_text(encoding="utf-8")
     body = ast.unparse(ast.parse(source.split("\nTOPOLOGY = {", 1)[0]))
@@ -1831,6 +1815,7 @@ TOPOLOGY = {
         "canonical.git": ("origin/main",),
         "memory.search": ("8100/search",),
         "memory.walk": ("8101/enter",),
+        "memory.learn": ("MEMORY_LEARN_URL",),
         "public.surface": ("tailscale",),
         "provider.anthropic": ("self.client.messages.create",),
         "provider.openai": ("self.client.responses.create",),
@@ -1843,6 +1828,7 @@ TOPOLOGY = {
         "transcript.reentry": ("self.path.open", "Transcript._events()"),
         "continuity.reentry": ("CONTINUITY_PATHS", "kernel.continuity"),
         "memory.reentry": ("8101/enter", "result.get('trace'"),
+        "memory.receipt": ("memory_receipt(", "witness_previous_memory("),
         "repo.reentry": ("REPO_STATE_PATH", "load_repo_state()"),
         "aim.projection": ("aim_field('objective')", "_index_channel"),
         "front.projection": ("front_key", "_index_channel"),

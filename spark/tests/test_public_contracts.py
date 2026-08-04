@@ -435,7 +435,7 @@ def test_connection_topology_and_cost_are_declared_invariants():
     expected, observed = m.harness_topology()
     assert expected == observed
     assert {kind: len(labels) for kind, labels in observed.items()} == {
-        "ends": 12, "handles": 7, "boundary": 4}
+        "ends": 13, "handles": 8, "boundary": 4}
     cost = m.harness_cost()
     assert cost["J"][0] == 0
     assert cost["wake_chars"] <= cost["wake_ceiling"]
@@ -485,3 +485,17 @@ def test_live_ground_is_in_every_wake():
     start = src.index("for loader in (")
     loader_band = src[start:src.index("def inbox_images_for", start)]
     assert "load_ground" in loader_band
+
+
+def test_memory_receipt_is_text_free_same_door_and_scored(monkeypatch, tmp_path):
+    import io
+    m = _connection(); text = "private retrieved words"
+    receipt = m.memory_receipt(json.dumps({"step": 7, "walk_channel": [{"idx": 4, "source": "Vybn/a.md", "text": text}]}))
+    assert receipt["claim_limit"] == "retrieved_into_prompt_not_proof_of_influence" and text not in json.dumps(receipt)
+    transcripts = tmp_path / "transcripts"; transcripts.mkdir(); meta = tmp_path / "meta.json"
+    meta.write_text(json.dumps({"chunks": [{"source": "Vybn/a.md", "text": text}]})); monkeypatch.setattr(m, "TRANSCRIPTS", transcripts); monkeypatch.setattr(m, "MEMORY_META", meta)
+    transcript = m.Transcript(); transcript.write("vybn", "earlier response", door="sol", turn="prior", memory_receipt=receipt)
+    transcript.write("vybn", "other reply", door="k3", turn="other", memory_receipt=receipt)
+    monkeypatch.setattr(m.urllib.request, "urlopen", lambda *a, **k: io.BytesIO(b'{"scalar_losses":{"predict_reality":0.2}}'))
+    m.witness_previous_memory(transcript, "Zoe's next turn", "sol")
+    witness = list(m._jsonl(transcript.path))[-1]; assert (witness["status"], witness["for_turn"]) == ("scored", "prior") and "Zoe's next turn" not in json.dumps(witness)
